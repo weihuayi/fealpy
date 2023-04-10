@@ -6,7 +6,6 @@ from .Mesh3d import Mesh3d
     
 # 这个数据接口为有限元服务
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
-from .mesh_tools import show_mesh_3d
 
 from ..geometry import project
 

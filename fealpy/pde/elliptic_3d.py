@@ -1,16 +1,7 @@
 import numpy as np
 from ..decorator import cartesian
 
-
-class CosCosCosPDEData:
-    """
-    方程：
-    -\Delta u = 3\pi^2 \cos(\pi x)\cos(\pi y)\cos(\pi z), 
-       u(x,y,0) = u(x,0,z) = u(0,y,z) = 0.
-       u(x,y,1) = u(x,1,z) = u(1,y,z) = 0.
-    真解：
-    u(x) = \cos(\pi x)\cos(\pi y)\cos(\pi z).
-    """
+class SinSinSinPDEData:
     def domain(self):
         """
         @brief 得到 PDE 模型的区域
@@ -22,35 +13,35 @@ class CosCosCosPDEData:
     def solution(self, p):
         """
         @brief 计算 PDE 模型的精确解
-        @param p: 自标量 x,y,z 的数组
+        @param p: 自变量 x, y z 的数组
         @return: PDE 模型在给定点的精确解
         """
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
         pi = np.pi
-        val = np.cos(pi*x)*np.cos(pi*y)*np.cos(pi*z)
+        val = np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*z)
         return val 
     
     @cartesian
     def source(self, p):
         """
         @brief: 计算 PDE 模型的原项 
-        @param p: 自标量 x,y,z 的数组
+        @param p: 自变量 x, y, z 的数组
         @return: PDE 模型在给定点处的源项
         """
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
         pi = np.pi
-        val = 3*pi*pi*np.cos(pi*x)*np.cos(pi*y)*np.cos(pi*z)
+        val = 3 * pi**2 * np.sin(pi*x) * np.sin(pi*y) * np.sin(pi*z)
         return val
     
     @cartesian
     def gradient(self, p):
         """
         @brief: 计算 PDE 模型的真解的梯度
-        @param p: 自标量 x,y,z 的数组
+        @param p: 自变量 x, y, z 的数组
         @return: PDE 模型在给定点处真解的梯度
         """
         x = p[..., 0]
@@ -58,9 +49,9 @@ class CosCosCosPDEData:
         z = p[..., 2]
         pi = np.pi
         val = np.zeros(p.shape, dtype=np.float64)
-        val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)*np.cos(pi*z)
-        val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)*np.cos(pi*z)
-        val[..., 2] = -pi*np.cos(pi*x)*np.cos(pi*y)*np.sin(pi*z)
+        val[..., 0] = pi * np.cos(pi*x) * np.sin(pi*y) * np.sin(pi*z)
+        val[..., 1] = pi * np.sin(pi*x) * np.cos(pi*y) * np.sin(pi*z)
+        val[..., 1] = pi * np.sin(pi*x) * np.sin(pi*y) * np.cos(pi*z)
         return val
         
     @cartesian    

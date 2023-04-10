@@ -36,7 +36,7 @@ class TrussStructureIntegrator:
             assert out.shape == (NC, GD*ldof, GD*ldof)
             K = out
 
-        if space0.doforder == 'nodes':
+        if space0.doforder == 'sdofs':
             for i in range(GD):
                 for j in range(i, GD):
                     if i == j:

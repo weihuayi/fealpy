@@ -18,63 +18,52 @@ class DiffusionIntegrator:
         q = self.q
         mesh = space.mesh
         GD = mesh.geo_dimension()
-        NC = mesh.number_of_cells()
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
+        NC = len(cellmeasure)
+        ldof = space.number_of_local_dofs() 
+        if out is None:
+            D = np.zeros((NC, ldof, ldof), dtype=space.ftype)
+        else:
+            D = out
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        NQ = len(ws)
 
-        if index != np.s_[:]:
-            NC = len(index)
-
-
-        phi0 = space0.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
+
         if coef is None:
-            D = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
+            D += np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
-                    if coef.coordtype == 'barycentric':
-                        coef = coef(bcs, index=index)
-                    elif coef.coordtype == 'cartesian':
+                    if coef.coordtype == 'cartesian':
                         ps = mesh.bc_to_point(bcs, index=index)
                         coef = coef(ps)
+                    elif coef.coordtype == 'barycentric':
+                        coef = coef(bcs, index=index)
                 else:
-                    raise ValueError('''
-                    You should add decorator "cartesian" or "barycentric" on
-                    function `basis0`
-
-                    from fealpy.decorator import cartesian, barycentric
-
-                    @cartesian
-                    def basis0(p):
-                        ...
-
-                    @barycentric
-                    def basis0(p):
-                        ...
-
-                    ''')
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    coef = coef(ps)
             if np.isscalar(coef):
-                D = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
-                D*=coef
+                D += coef*np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ): 
-                    D = np.einsum('q, c, qcim, qcjm, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('q, c, qcim, qcjm, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
                 elif coef.shape == (NQ, NC):
-                    D = np.einsum('q, qc, qcim, qcjm, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('q, qc, qcim, qcjm, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
                 else:
                     n = len(coef.shape)
                     shape = (4-n)*(1, ) + coef.shape
-                    D = np.einsum('q, qcmn, qcin, qcjm, c->cij', ws, coef.reshape(shape), phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('q, qcmn, qcin, qcjm, c->cij', ws, coef.reshape(shape), phi0, phi1, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef不支持该类型")
 
-        return D
+        if out is None:
+            return D
+
 
     def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):
         """

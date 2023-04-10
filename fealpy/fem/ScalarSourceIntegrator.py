@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from typing import TypedDict, Callable, Tuple, Union
 
 
-class SourceIntegrator():
+class ScalarSourceIntegrator():
 
     def __init__(self, 
             f: Union[Callable, int, float, NDArray], 
@@ -22,14 +22,8 @@ class SourceIntegrator():
         """
         @brief 组装单元向量
 
-        @param[in] space 
+        @param[in] space 一个标量的函数空间
 
-        @todo 考虑向量和张量空间的情形
-        
-        @note 该函数有如下的情形需要考虑： 
-            * f 是标量 
-            * f 是标量函数 (NQ, NC)，基是标量函数 (NQ, NC, ldof)
-            * f 是向量函数 (NQ, NC, GD)， 基是向量函数 (NQ, NC, ldof, GD)
         """
         f = self.f
         q = self.q
@@ -42,7 +36,7 @@ class SourceIntegrator():
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 
         if out is None:
-            bb = np.zeros((NC, gdof), dtype=space.ftype)
+            bb = np.zeros((NC, ldof), dtype=space.ftype)
         else:
             bb = out
 
@@ -65,13 +59,11 @@ class SourceIntegrator():
             val = f
 
         if isinstance(val, (int, float)):
-            bb += val*np.einsum('q, qc, qci, c->ci', ws, phi, cellmeasure, optimize=True)
-        elif isinstance(val, np.ndarray): 
+            bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
+        else:
             if val.shape[-1] == 1:
                 val = val[..., 0]
             bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
-        else:
-            raise ValueError("We need to consider more cases!")
 
         if out is None:
             return bb 

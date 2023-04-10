@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse import triu, tril, find, hstack
-from .mesh_tools import unique_row
 
 
 class PolyhedronMesh():
@@ -153,7 +152,11 @@ class PolyhedronMeshDataStructure():
     def construct(self):
 
         totalEdge = self.total_edge()
-        _, i0, j = unique_row(np.sort(totalEdge, axis=1))
+        _, i0, j = np.unique(
+                np.sort(totalEdge, axis=1),
+                return_index=True,
+                return_inverse=True,
+                axis=0)
 
         self.NE = len(i0) 
 

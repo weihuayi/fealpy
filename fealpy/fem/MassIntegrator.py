@@ -10,23 +10,25 @@ class MassIntegrator:
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None):
         """
         @note 没有参考单元的组装方式
         """
         q = self.q
         coef = self.coef
-        mesh = space0.mesh
+        mesh = space.mesh
 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
+
+        NC = len(cellmeasure)
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs, index=index)
 
-        phi0 = space0.basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
         if coef is None:
@@ -39,21 +41,7 @@ class MassIntegrator:
                     elif coef.coordtype == 'cartesian':
                         coef = coef(ps)
                 else:
-                    raise ValueError('''
-                    You should add decorator "cartesian" or "barycentric" on
-                    function `basis0`
-
-                    from fealpy.decorator import cartesian, barycentric
-
-                    @cartesian
-                    def basis0(p):
-                        ...
-
-                    @barycentric
-                    def basis0(p):
-                        ...
-
-                    ''')
+                    coef = coef(ps)
 
             if np.isscalar(coef):
                 M = np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
