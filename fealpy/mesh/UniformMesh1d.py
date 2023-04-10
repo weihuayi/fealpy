@@ -445,7 +445,10 @@ class UniformMesh1d(Mesh1d):
         @param[in] tau float, 当前时间步长
         """
 
+        print("tau:", tau)
+        print("self.h:", self.h)
         r = tau/self.h**2 
+        print("r:", r)
         if r > 0.5:
             raise ValueError(f"The r: {r} should be smaller than 0.5")
 
@@ -453,6 +456,7 @@ class UniformMesh1d(Mesh1d):
         k = np.arange(NN)
 
         A = diags([1 - 2 * r], [0], shape=(NN, NN), format='csr')
+        print("A:", A.toarray())
 
         val = np.broadcast_to(r, (NN-1, ))
         I = k[1:]
