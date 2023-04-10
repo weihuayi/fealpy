@@ -7,20 +7,6 @@ from .Mesh import Mesh
 
 
 class Mesh3d(Mesh):
-    def __init__(self):
-        pass
-
-    def number_of_nodes(self):
-        return self.ds.NN
-
-    def number_of_edges(self):
-        return self.ds.NE
-
-    def number_of_faces(self):
-        return self.ds.NF
-
-    def number_of_cells(self):
-        return self.ds.NC
 
     def number_of_nodes_of_cells(self):
         return self.ds.number_of_nodes_of_cells()
