@@ -10,7 +10,7 @@ pde = SinExpPDEData()
 
 # 空间离散
 domain = pde.domain()
-nx = 40 
+nx = 10 
 hx = (domain[1] - domain[0])/nx
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
 node = mesh.node
@@ -18,11 +18,13 @@ isBdNode = mesh.ds.boundary_node_flag()
 
 # 时间离散
 duration = pde.duration()
-nt = 3200 
+nt = 200 
 tau = (duration[1] - duration[0])/nt 
 
 uh0 = mesh.interpolate(pde.init_solution, intertype='node')
 
+A = mesh.parabolic_operator_forward(tau)
+print("A:", A)
 
 def advance_forward(n):
     """
