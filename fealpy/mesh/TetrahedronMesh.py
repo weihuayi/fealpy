@@ -27,8 +27,8 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     NVF = 3
     NEF = 3
 
-    def __init__(self, N, cell):
-        super().__init__(N, cell)
+    def __init__(self, NN, cell):
+        super().__init__(NN, cell)
 
     def number_of_vertices_of_cells(self):
         return self.NVC
@@ -1032,9 +1032,8 @@ class TetrahedronMesh(Mesh3d):
             newCell[7*NC:, 1] = p[range(NC), T[:, 0]]
             newCell[7*NC:, 2] = p[range(NC), T[:, 4]] 
             newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
-
-            NN = self.number_of_nodes()
-            self.ds.reinit(NN, newCell)
+ 
+            self.ds.reinit(NN+NE, newCell)
 
     def is_valid(self, threshold=1e-15):
         """

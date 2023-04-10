@@ -258,8 +258,7 @@ class TriangleMesh(Mesh2d):
             self.node = np.concatenate((node, newNode), axis=0)
             p = np.r_['-1', cell, edge2newNode[cell2edge]]
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
-            NN = self.node.shape[0]
-            self.ds.reinit(NN, cell)
+            self.ds.reinit(NN+NE, cell)
 
         if returnim:
             return nodeIMatrix, cellIMatrix
