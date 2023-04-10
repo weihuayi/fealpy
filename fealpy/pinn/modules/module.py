@@ -5,7 +5,7 @@ from typing import (
 import numpy as np
 from numpy.typing import NDArray
 import torch
-from torch import Tensor
+from torch import Tensor, device
 from torch.nn import Module
 
 from ..tools import mkfs
@@ -17,12 +17,12 @@ class TensorMapping(Module):
     @brief A function whose input and output are tensors. The `forward` method\
            is not implemented, override it to build a function.
     """
-    def _call_impl(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
-                   **kwargs):
-        p = mkfs(*input, f_shape=f_shape)
+    def mkfs(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
+                   device: device, **kwargs):
+        p = mkfs(*input, f_shape=f_shape, device=device)
         return super()._call_impl(p, **kwargs)
 
-    __call__: Callable[..., Tensor] = _call_impl
+    __call__: Callable[..., Tensor]
 
     def fixed(self, idx: Sequence[int], value: Sequence[float]):
         """
@@ -156,6 +156,9 @@ class TensorMapping(Module):
             return u_plot.reshape(mesh[0].shape), mesh
         else:
             return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf, axis=-1)], mesh
+
+    def add_surface(self, axes):
+        pass
 
 
 class ZeroMapping(Module):
