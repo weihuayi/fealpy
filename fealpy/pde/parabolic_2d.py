@@ -1,10 +1,11 @@
 import numpy as np
 from ..decorator import cartesian
 
-class SinExpPDEData:
+class SinSinExpPDEData:
     def __init__(self, D=[0, 1, 0, 1], T=[0, 1]):
         """
         @brief 模型初始化函数
+        `
         @param[in] D 模型空间定义域
         @param[in] T 模型时间定义域
         """
