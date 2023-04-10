@@ -123,7 +123,7 @@ class HeatConductionPDEData:
 
         @return 真解函数值
         """
-        return np.exp(-self._k * (pi**2) * t / self._L**2) * np.sin(np.pi * p / self._L)
+        return np.exp(-self._k * (np.pi**2) * t / self._L**2) * np.sin(np.pi * p / self._L)
 
     @cartesian
     def init_solution(self, p):

@@ -56,10 +56,11 @@ class LinearForm:
 
         NC = mesh.number_of_cells()
         gdof = space.number_of_global_dofs()
+        ldof = space.number_of_local_dofs()
 
         bb = np.zeros((NC, ldof), dtype=space.ftype)
         for inte in self.dintegrators:
-            inte.assembly_cell_matrix(space, out=bb)
+            inte.assembly_cell_vector(space, out=bb)
 
         cell2dof = space.cell_to_dof()
         self._V = np.zeros((gdof, ), dtype=space.ftype)

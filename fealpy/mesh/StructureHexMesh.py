@@ -272,8 +272,8 @@ class StructureHexMesh(Mesh3d):
     def laplace_operator_coef(self,coef):
         """
         coef is a function, and the input is the coordinate.
-        The output is three coefficients c11, c22 and c33 in matrix \kappa = [[c11, 0, 0], [0, c22, 0], [0, 0, c33]] for equation
-                                  -\nabla \cdot (\kappa \nabla u) = f
+        The output is three coefficients c11, c22 and c33 in matrix \\kappa = [[c11, 0, 0], [0, c22, 0], [0, 0, c33]] for equation
+                                  -\\nabla \\cdot (\\kappa \\nabla u) = f
         The example of coef is: def coef(x,y):
                                     if x > 0 and y > 0:
                                         return 1.0, 1.0, 1.0

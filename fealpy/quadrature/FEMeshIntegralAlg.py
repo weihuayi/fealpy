@@ -70,8 +70,13 @@ class FEMeshIntegralAlg():
                 elif v.coordtype == 'barycentric':
                     v = v(bcs)
 
-        f = np.power(np.abs(u - v), power) 
+        if u.shape[-1] == 1:
+            u = u[..., 0]
 
+        if v.shape[-1] == 1:
+            v = v[..., 0]
+
+        f = np.power(np.abs(u - v), power) 
         if isinstance(f, (int, float)): # f为标量常函数
             e = f*self.cellmeasure
         elif isinstance(f, np.ndarray):

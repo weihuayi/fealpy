@@ -51,8 +51,8 @@ class SourceIntegrator():
 
         phi = space.basis(bcs, index=index) #TODO: 考虑非重心坐标的情形
 
-        if callable(f) and hasattr(f, coordtype):
-            if hasattr(f, coordtype):
+        if callable(f):
+            if hasattr(f, 'coordtype'):
                 if f.coordtype == 'barycentric':
                     val = f(bcs, index=index)
                 elif f.coordtype == 'cartesian':
@@ -67,6 +67,8 @@ class SourceIntegrator():
         if isinstance(val, (int, float)):
             bb += val*np.einsum('q, qc, qci, c->ci', ws, phi, cellmeasure, optimize=True)
         elif isinstance(val, np.ndarray): 
+            if val.shape[-1] == 1:
+                val = val[..., 0]
             bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
         else:
             raise ValueError("We need to consider more cases!")

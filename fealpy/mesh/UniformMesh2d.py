@@ -517,7 +517,7 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
-        @brief: 组装 \Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
+        @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
         """
         if uh is None:
             uh = self.function('node').reshape(-1, )
@@ -536,6 +536,41 @@ class UniformMesh2d(Mesh2d):
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
         return A, f 
+
+    ## @ingroup FDMInterface
+    def parabolic_operator_forward(self, tau):
+        """
+        @brief 生成抛物方程的向前差分迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+
+        r_x = tau/self.h[0]**2
+        r_y = tau/self.h[1]**2
+        print("r_x:", r_x, "r_y:", r_y)
+        if r_x + r_y > 1.5:
+            raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
+
+        NN = self.number_of_nodes()
+
+        A = diags([1 - 2 * r_x - 2 * r_y], [0], shape=(NN, NN), format='csr')
+        print("A:", A.toarray())
+
+        val_x = np.broadcast_to(r_x, (NN - self.nx,))
+        val_y = np.broadcast_to(r_y, (NN - self.ny,))
+
+        I_x = np.arange(self.ny, NN)
+        J_x = np.arange(0, NN - self.ny)
+    
+        I_y = np.delete(np.arange(1, NN), np.arange(self.ny - 1, NN - 1, self.ny))
+        J_y = np.delete(np.arange(0, NN - 1), np.arange(self.ny - 1, NN - 1, self.ny))
+
+        A += csr_matrix((val_x, (I_x, J_x)), shape=(NN, NN))
+        A += csr_matrix((val_x, (J_x, I_x)), shape=(NN, NN))
+
+        A += csr_matrix((val_y, (I_y, J_y)), shape=(NN, NN))
+        A += csr_matrix((val_y, (J_y, I_y)), shape=(NN, NN))
+        return A
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):

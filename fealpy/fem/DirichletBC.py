@@ -15,7 +15,7 @@ class DirichletBC():
         @brief 处理 Dirichlet 边界条件  
 
         @note 
-            * 如果 `uh` 是一个向量场或张量场，则 `F` 必须是一个展平向量，F.shape[0] = A.shape[0] == A.shape[1]
+            * 如果 `uh` 是一个向量场或张量场，则 `f` 必须是一个展平向量，F.shape[0] = A.shape[0] == A.shape[1]
         """
         space = self.space
         gD = self.gD
@@ -23,7 +23,7 @@ class DirichletBC():
         f = f - A@uh.flat # 注意这里不修改外界 f 的值
 
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        bdIdx[isBdNode] = 1
+        bdIdx[isDDof.flat] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1

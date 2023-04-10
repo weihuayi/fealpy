@@ -18,6 +18,8 @@ from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangent
 
 from .LinearForm import LinearForm
 from .SourceIntegrator import SourceIntegrator
+from .ScalarSourceIntegrator import ScalarSourceIntegrator
+from .VectorSourceIntegrator import VectorSourceIntegrator
 
 
 from .DirichletBC import DirichletBC

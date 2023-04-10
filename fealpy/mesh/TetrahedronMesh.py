@@ -2,7 +2,6 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 from scipy.spatial import KDTree
-from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
 from ..decorator import timer
@@ -28,8 +27,8 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     NVF = 3
     NEF = 3
 
-    def __init__(self, N, cell):
-        super().__init__(N, cell)
+    def __init__(self, NN, cell):
+        super().__init__(NN, cell)
 
     def number_of_vertices_of_cells(self):
         return self.NVC
@@ -987,7 +986,7 @@ class TetrahedronMesh(Mesh3d):
             cell2edge = self.ds.cell_to_edge()
 
             edge2newNode = np.arange(NN, NN+NE)
-            newNode = (node[edge[:,0], :]+node[edge[:,1], :])/2.0
+            newNode = (node[edge[:, 0], :]+node[edge[:, 1], :])/2.0
 
             self.node = np.concatenate((node, newNode), axis=0)
 
@@ -1033,9 +1032,8 @@ class TetrahedronMesh(Mesh3d):
             newCell[7*NC:, 1] = p[range(NC), T[:, 0]]
             newCell[7*NC:, 2] = p[range(NC), T[:, 4]] 
             newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
-
-            N = self.number_of_nodes()
-            self.ds.reinit(N, newCell)
+ 
+            self.ds.reinit(NN+NE, newCell)
 
     def is_valid(self, threshold=1e-15):
         """
