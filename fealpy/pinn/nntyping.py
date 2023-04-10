@@ -45,5 +45,5 @@ class MeshLike(Protocol[_GD, _TD]):
     def cell_bc_to_point(self, bc: NDArray) -> NDArray: ...
 
 
-TriangleMesh = MeshLike[Literal[2], Literal[3]]
-TetrahedronMesh = MeshLike[Literal[3], Literal[4]]
+TriangleMesh = MeshLike[Literal[2], Literal[2]]
+TetrahedronMesh = MeshLike[Literal[3], Literal[3]]
