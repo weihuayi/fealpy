@@ -129,6 +129,9 @@ def test_tetrahedron_mesh():
     from fealpy.fem import LinearForm
     from fealpy.fem import DirichletBC
 
+    from fealpy.functionspace import LagrangeFiniteElementSpace as OSpace 
+    from fealpy.boundarycondition import DirichletBC as DBC
+
 
     pde = PDE()
     domain = pde.domain()
@@ -138,7 +141,7 @@ def test_tetrahedron_mesh():
     maxit = 4
     p = 1
 
-    em = np.zeros((2, 4), dtype=np.float64)
+    em =  np.zeros((2, 4), dtype=np.float64)
 
     mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
     mesh.uniform_refine(n=3)
@@ -154,11 +157,26 @@ def test_tetrahedron_mesh():
         lform.add_domain_integrator(ScalarSourceIntegrator(pde.source))
         lform.assembly()
 
+        ipdb.set_trace()
         A = bform.get_matrix()
         f = lform.get_vector() 
 
+        ospace = OSpace(mesh, p=p)
+        obc = DBC(ospace, pde.dirichlet)
+        B = ospace.stiff_matrix()
+        e = ospace.source_vector(pde.source)
+
+        np.testing.assert_array_almost_equal(A.toarray(), B.toarray())
+        np.testing.assert_array_almost_equal(f, e)
+
         uh = space.function()
         A, f = bc.apply(A, f, uh)
+
+        B, e = obc.apply(B, e)
+
+        np.testing.assert_array_almost_equal(f, e)
+        np.testing.assert_array_almost_equal(A.toarray(), B.toarray())
+
         uh[:] = spsolve(A, f)
 
         em[0, i] = mesh.error(pde.solution, uh, q=p+3)
