@@ -1,18 +1,36 @@
 
-from torch import Tensor, dtype
+from typing import Optional
+from torch import Tensor
+import numpy as np
+
+
+# Descriptor for entities
+class Entity():
+    def __init__(self) -> None:
+        self._data = None
+
+    def __get__(self, obj, objtype) -> Tensor:
+        if self._data is not None:
+            return self._data
+        raise ValueError(f"No data for the entity.")
+
+    def __set__(self, val: Tensor, obj, objtype):
+        self._data = val
+
 
 class MeshDataStructure():
     NN: int = -1
     '''Number of nodes'''
-    NE: int = -1
-    '''Number of edges'''
-    NF: int = -1
-    '''Number of faces'''
-    NC: int = -1
-    '''Number of cells'''
-    cell: Tensor
-    edge: Tensor
-    itype: dtype
+    # NE: int = -1
+    # '''Number of edges'''
+    # NF: int = -1
+    # '''Number of faces'''
+    # NC: int = -1
+    # '''Number of cells'''
+    cell = Entity()
+    face = Entity()
+    edge = Entity()
+    edge2cell: Optional[Tensor]
 
     localEdge: Tensor
     localFace: Tensor
@@ -24,10 +42,34 @@ class MeshDataStructure():
     NEC: int
     NFC: int
 
+    def __init__(self, NN: int, cell: Tensor):
+        self.reinit(NN=NN, cell=cell)
+        self.itype = cell.dtype
+        self.device = cell.device
+
+    def reinit(self, NN: int, cell: Tensor):
+        self.NN = NN
+        self.cell = cell
+        self.construct()
+
+    @property
+    def NC(self):
+        return self.cell.shape[0]
+
+    @property
+    def NF(self):
+        return self.face.shape[0]
+
+    @property
+    def NE(self):
+        return self.edge.shape[0]
+
 
 class Mesh():
     ds: MeshDataStructure
     node: Tensor
+
+    ### Defined here ###
 
     def number_of_nodes(self) -> int:
         return self.ds.NN
@@ -41,16 +83,9 @@ class Mesh():
     def number_of_cells(self) -> int:
         return self.ds.NC
 
-    def geo_dimension(self) -> int:
-        raise NotImplementedError
+    ### Defined in Meshxd ###
 
     def top_dimension(self) -> int:
-        raise NotImplementedError
-
-    def uniform_refine(self):
-        raise NotImplementedError
-
-    def integrator(self, k):
         raise NotImplementedError
 
     def number_of_entities(self, etype, index=np.s_[:]):
@@ -63,6 +98,17 @@ class Mesh():
         raise NotImplementedError
 
     def entity_measure(self, etype, index=np.s_[:]):
+        raise NotImplementedError
+
+    ### Defined in final Mesh.
+
+    def geo_dimension(self) -> int:
+        raise NotImplementedError
+
+    def integrator(self, k):
+        raise NotImplementedError
+
+    def uniform_refine(self):
         raise NotImplementedError
 
     def shape_function(self, p):

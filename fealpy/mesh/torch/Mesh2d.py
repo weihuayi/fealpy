@@ -13,7 +13,8 @@ class Mesh2d(Mesh):
 
     def entity(self, etype: Union[int, str]=2):
         """
-        @brief Get entities in mesh."""
+        @brief Get entities in mesh.
+        """
         if etype in {'cell', 2}:
             return self.ds.cell
         elif etype in {'edge', 'face', 1}:
@@ -22,24 +23,39 @@ class Mesh2d(Mesh):
             return self.node
         raise ValueError(f"Invalid etype '{etype}'.")
 
+    def entity_barycenter(self, etype: Union[int, str], index=np.s_[:]):
+        """
+        @brief Get barycenters of entities.
+        """
+        node = self.entity('node')
+        if etype in {'cell', 2}:
+            cell = self.ds.cell
+            return torch.sum(node[cell[index], :], dim=1) / cell.shape[1]
+        elif etype in {'edge', 'face', 1}:
+            edge = self.ds.edge
+            return torch.sum(node[edge[index], :], dim=1) / edge.shape[1]
+        elif etype in {'node', 0}:
+            return node[index]
+        raise ValueError('the entity `{}` is not correct!'.format(etype))
+
+    def entity_measure(self, etype: Union[int, str]=2, index=np.s_[:]):
+        """
+        @brief Get measurements for entities.
+        """
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        raise ValueError(f"Invalid etity type {etype}.")
+
 
 class Mesh2dDataStructure(MeshDataStructure):
     """
     @brief The topology data structure of mesh 2d.\
            This is an abstract class and can not be used directly.
     """
-
-    def __init__(self, NN: int, cell: Tensor):
-        self.reinit(NN=NN, cell=cell)
-        self.itype = cell.dtype
-        self.device = cell.device
-
-    def reinit(self, NN: int, cell: Tensor):
-        self.NN = NN
-        self.NC = cell.shape[0]
-        self.cell = cell
-        self.construct()
-
     def total_edge(self) -> Tensor:
         """
         @brief Return total edges in mesh.
@@ -78,6 +94,10 @@ class Mesh2dDataStructure(MeshDataStructure):
         self.edge2cell[:, 3] = i1%NEC
 
         self.edge = totalEdge[i0, :]
+
+    def clear(self):
+        self.edge = None
+        self.edge2cell = None
 
 
     ### Cell ###
