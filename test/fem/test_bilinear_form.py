@@ -24,9 +24,33 @@ def test_interval_mesh():
     bform.add_domain_integrator(DiffusionIntegrator())
     bform.assembly()
 
-    K = bform.M
+    K = bform.get_matrix()
 
-    bc = DirichletBC(space, disp, threshold=idx)
+def test_triangle_mesh():
+
+    from fealpy.mesh import TriangleMesh 
+    from fealpy.functionspace import LagrangeFESpace as Space
+    from fealpy.functionspace import LagrangeFiniteElementSpace as OldSpace 
+    from fealpy.fem import DiffusionIntegrator
+
+    p=3
+    mesh = TriangleMesh.from_one_triangle()
+    mesh.uniform_refine()
+    space = Space(mesh, p=p)
+
+    bform = BilinearForm(space)
+    bform.add_domain_integrator(DiffusionIntegrator())
+    bform.assembly()
+
+    ospace = OldSpace(mesh, p=p)
+
+    A = bform.get_matrix()
+
+    B = ospace.stiff_matrix()
+
+    np.testing.assert_array_almost_equal(A.toarray(), B.toarray())
+
+
 
 
 def test_truss_structure():
@@ -47,7 +71,7 @@ def test_truss_structure():
     bform.add_domain_integrator(TrussStructureIntegrator(E, A))
     bform.assembly()
 
-    K = bform.M
+    K = bform.get_matrix()
 
     uh = space.function(dim=GD)
     
@@ -61,18 +85,18 @@ def test_truss_structure():
     A, F = bc.apply(K, F.flat, uh)
 
     uh.flat[:] = spsolve(A, F)
-    print('uh:', uh)
     fig = plt.figure()
     axes = fig.add_subplot(1, 1, 1, projection='3d') 
     mesh.add_plot(axes)
 
-    mesh.node += uh
+    mesh.node += 100*uh
     mesh.add_plot(axes, nodecolor='b', cellcolor='m')
     plt.show()
 
 
 if __name__ == '__main__':
-    test_truss_structure()
+    test_triangle_mesh()
+    #test_truss_structure()
 
 
 

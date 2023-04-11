@@ -265,6 +265,7 @@ class Mesh2dDataStructure():
         self.cell = cell
         self.itype = cell.dtype
         self.construct()
+        self.NF = self.NE
 
     def reinit(self, NN, cell):
         self.NN = NN

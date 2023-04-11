@@ -63,6 +63,9 @@ def test_triangle_mesh():
     from fealpy.fem import LinearForm
     from fealpy.fem import DirichletBC
 
+    from fealpy.functionspace import LagrangeFiniteElementSpace as OSpace 
+    from fealpy.boundarycondition import DirichletBC as DBC
+
 
     pde = PDE()
     domain = pde.domain()
@@ -90,8 +93,23 @@ def test_triangle_mesh():
         A = bform.get_matrix()
         f = lform.get_vector() 
 
+        ospace = OSpace(mesh, p=p)
+        obc = DBC(ospace, pde.dirichlet)
+        B = ospace.stiff_matrix()
+        e = ospace.source_vector(pde.source)
+
+        np.testing.assert_array_almost_equal(A.toarray(), B.toarray())
+        np.testing.assert_array_almost_equal(f, e)
+
+        #ipdb.set_trace()
         uh = space.function()
         A, f = bc.apply(A, f, uh)
+
+        B, e = obc.apply(B, e)
+
+        np.testing.assert_array_almost_equal(f, e)
+        np.testing.assert_array_almost_equal(A.toarray(), B.toarray())
+
         uh[:] = spsolve(A, f)
 
         em[0, i] = mesh.error(pde.solution, uh, q=p+3)
@@ -154,5 +172,6 @@ def test_tetrahedron_mesh():
     assert np.abs(ratio[1, -1] - 2**p) < 0.1
 
 if __name__ == "__main__":
+    #test_triangle_mesh()
     test_tetrahedron_mesh()
 
