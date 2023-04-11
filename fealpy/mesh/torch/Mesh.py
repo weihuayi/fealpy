@@ -14,7 +14,7 @@ class Entity():
             return self._data
         raise ValueError(f"No data for the entity.")
 
-    def __set__(self, val: Tensor, obj, objtype):
+    def __set__(self, obj, val: Tensor):
         self._data = val
 
 
@@ -30,7 +30,7 @@ class MeshDataStructure():
     cell = Entity()
     face = Entity()
     edge = Entity()
-    edge2cell: Optional[Tensor]
+    edge2cell = Entity()
 
     localEdge: Tensor
     localFace: Tensor
@@ -54,14 +54,17 @@ class MeshDataStructure():
 
     @property
     def NC(self):
+        """Number of cells"""
         return self.cell.shape[0]
 
     @property
     def NF(self):
+        """Number of faces"""
         return self.face.shape[0]
 
     @property
     def NE(self):
+        """Number of edges"""
         return self.edge.shape[0]
 
 
