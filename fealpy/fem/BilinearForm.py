@@ -69,7 +69,6 @@ class BilinearForm:
 
             mesh = space.mesh
             NC = mesh.number_of_cells()
-
             CM = np.zeros((NC, ldof, ldof), dtype=space.ftype)
             for inte in self.dintegrators:
                 inte.assembly_cell_matrix(space, out=CM)
