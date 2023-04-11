@@ -37,7 +37,7 @@ class SMDof2d():
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        multiIndex = np.zeros((ldof, 2), dtype=np.int)
+        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
         multiIndex[:, 1] = idx - idx0*(idx0 + 1)/2
         multiIndex[:, 0] = idx0 - multiIndex[:, 1]
         return multiIndex
