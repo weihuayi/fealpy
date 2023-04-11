@@ -3,7 +3,6 @@ from scipy.sparse import csr_matrix, coo_matrix
 import multiprocessing as mp
 from multiprocessing.pool import ThreadPool as Pool
 from ..decorator import timer
-import ipdb
 
 
 class FEMeshIntegralAlg():

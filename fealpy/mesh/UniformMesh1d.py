@@ -445,10 +445,7 @@ class UniformMesh1d(Mesh1d):
         @param[in] tau float, 当前时间步长
         """
 
-        print("tau:", tau)
-        print("self.h:", self.h)
         r = tau/self.h**2 
-        print("r:", r)
         if r > 0.5:
             raise ValueError(f"The r: {r} should be smaller than 0.5")
 

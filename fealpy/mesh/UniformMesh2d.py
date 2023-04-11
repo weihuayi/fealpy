@@ -537,7 +537,7 @@ class UniformMesh2d(Mesh2d):
         A = D0@A@D0 + D1
         return A, f 
 
-    ## @ingroup FDMInterface
+    ## @ingroup FDMInterface 
     def parabolic_operator_forward(self, tau):
         """
         @brief 生成抛物方程的向前差分迭代矩阵
@@ -547,30 +547,106 @@ class UniformMesh2d(Mesh2d):
 
         r_x = tau/self.h[0]**2
         r_y = tau/self.h[1]**2
-        print("r_x:", r_x, "r_y:", r_y)
         if r_x + r_y > 1.5:
             raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
+        n0 = self.nx + 1
+        n1 = self.ny + 1
+        k = np.arange(NN).reshape(n0, n1)
 
         A = diags([1 - 2 * r_x - 2 * r_y], [0], shape=(NN, NN), format='csr')
-        print("A:", A.toarray())
 
-        val_x = np.broadcast_to(r_x, (NN - self.nx,))
-        val_y = np.broadcast_to(r_y, (NN - self.ny,))
+        val_x = np.broadcast_to(r_x, (NN - n0,))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        I_x = np.arange(self.ny, NN)
-        J_x = np.arange(0, NN - self.ny)
-    
-        I_y = np.delete(np.arange(1, NN), np.arange(self.ny - 1, NN - 1, self.ny))
-        J_y = np.delete(np.arange(0, NN - 1), np.arange(self.ny - 1, NN - 1, self.ny))
+        val_y = np.broadcast_to(r_y, (NN - n1, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_y, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        A += csr_matrix((val_x, (I_x, J_x)), shape=(NN, NN))
-        A += csr_matrix((val_x, (J_x, I_x)), shape=(NN, NN))
-
-        A += csr_matrix((val_y, (I_y, J_y)), shape=(NN, NN))
-        A += csr_matrix((val_y, (J_y, I_y)), shape=(NN, NN))
         return A
+
+    ## @ingroup FDMInterface 
+    def parabolic_operator_backward(self, tau):
+        """
+        @brief 生成抛物方程的向后差分迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+        r_x = tau/self.h[0]**2
+        r_y = tau/self.h[1]**2
+        if r_x + r_y > 1.5:
+            raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
+
+        NN = self.number_of_nodes()
+        n0 = self.nx + 1
+        n1 = self.ny + 1
+        k = np.arange(NN).reshape(n0, n1)
+
+        A = diags([1 + 2 * r_x + 2 * r_y], [0], shape=(NN, NN), format='csr')
+
+        val_x = np.broadcast_to(-r_x, (NN - n0,))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val_y = np.broadcast_to(-r_y, (NN - n1, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_y, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+    def parabolic_operator_crank_nicholson(self, tau):
+        """
+        @brief 生成抛物方程的 CN 差分格式的迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+        r_x = tau/self.h[0]**2
+        r_y = tau/self.h[1]**2
+        if r_x + r_y > 1.5:
+            raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
+
+        NN = self.number_of_nodes()
+        n0 = self.nx + 1
+        n1 = self.ny + 1
+        k = np.arange(NN).reshape(n0, n1)
+
+        A = diags([1 + r_x + r_y], [0], shape=(NN, NN), format='csr')
+
+        val_x = np.broadcast_to(-r_x/2, (NN-n0, ))
+        I = k[1:].flat
+        J = k[0:-1].flat
+        A += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val_y = np.broadcast_to(-r_y/2, (NN-n1, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_y, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        B = diags([1 - r_x - r_y], [0], shape=(NN, NN), format='csr')
+
+        val_x = np.broadcast_to(r_x/2, (NN-n0, ))
+        I = k[1:].flat
+        J = k[0:-1].flat
+        B += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        B += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val_y = np.broadcast_to(r_y/2, (NN-n1, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        B += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        B += csr_matrix((val_y, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A, B
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):
