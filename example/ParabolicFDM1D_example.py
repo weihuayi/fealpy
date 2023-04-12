@@ -10,7 +10,7 @@ pde = SinExpPDEData()
 
 # 空间离散
 domain = pde.domain()
-nx = 10 
+nx = 40 
 hx = (domain[1] - domain[0])/nx
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
 node = mesh.node
@@ -18,13 +18,11 @@ isBdNode = mesh.ds.boundary_node_flag()
 
 # 时间离散
 duration = pde.duration()
-nt = 200 
+nt = 3200 
 tau = (duration[1] - duration[0])/nt 
 
 uh0 = mesh.interpolate(pde.init_solution, intertype='node')
-
-A = mesh.parabolic_operator_forward(tau)
-print("A:", A)
+print("uh0", uh0.shape)
 
 def advance_forward(n):
     """
@@ -96,8 +94,9 @@ def advance_crank_nicholson(n):
 
         return uh0, t
 
+uh0, t = advance_forward(2)
 
-fig, axes = plt.subplots()
-box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
-mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
-plt.show()
+# fig, axes = plt.subplots()
+# box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
+# mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
+# plt.show()
