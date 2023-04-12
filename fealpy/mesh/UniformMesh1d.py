@@ -156,8 +156,7 @@ class UniformMesh1d(Mesh1d):
             axes.set_title(s)
             return line
 
-        ani = animation.FuncAnimation(fig, func, frames=frames,
-                                      init_func=init_func,
+        ani = animation.FuncAnimation(fig, func, frames=frames, 
                                       interval=interval)
         ani.save(fname)
 
