@@ -543,8 +543,8 @@ class UniformMesh2d(Mesh2d):
         @brief 更新网格函数 uh 的 Dirichlet 边界值
         """
         node = self.node
-        isBdNode = self.ds.boundary_node_flag()
-        uh[isBdNode]  = gD(node[isBdNode])
+        isBdNode = self.ds.boundary_node_flag().reshape(uh.shape)
+        uh[isBdNode]  = gD(node[isBdNode, :])
 
     ## @ingroup FDMInterface 
     def parabolic_operator_forward(self, tau):
@@ -555,7 +555,7 @@ class UniformMesh2d(Mesh2d):
         """
         r_x = tau/self.h[0]**2
         r_y = tau/self.h[1]**2
-        if r_x + r_y > 1.5:
+        if r_x + r_y > 1.5: #TODO: 数学
             raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
 
         NN = self.number_of_nodes()

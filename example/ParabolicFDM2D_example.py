@@ -41,8 +41,7 @@ def advance_forward(n):
         A = mesh.parabolic_operator_forward(tau)
         source = lambda p: pde.source(p, t + tau)
         f = mesh.interpolate(source, intertype='node')
-        uh0.flat[:] = A@uh0.flat[:] + tau*f.flat[:]
-        print("uh0", uh0[:])
+        uh0.flat = A@uh0.flat + tau*f.flat
         gD = lambda p: pde.dirichlet(p, t+tau)
         mesh.update_dirichlet_bc(gD, uh0)
         
