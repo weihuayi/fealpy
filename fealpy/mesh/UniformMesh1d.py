@@ -282,12 +282,12 @@ class UniformMesh1d(Mesh1d):
     ## @ingroup FDMInterface
     def interpolate(self, f, intertype='node'):
         """
-        @brief Interpolate the given function f on the mesh based on the specified interpolation type.
+        @brief                 Interpolate the given function f on the mesh based on the specified interpolation type.
 
-        @param[in] f The function to be interpolated on the mesh.
-        @param[in] intertype The type of interpolation, either 'node' or 'cell' (default: 'node').
+        @param[in] f           The function to be interpolated on the mesh.
+        @param[in] intertype   The type of interpolation, either 'node' or 'cell' (default: 'node').
 
-        @return The interpolated values of the function f on the mesh nodes or cell barycenters.
+        @return                The interpolated values of the function f on the mesh nodes or cell barycenters.
 
         @throws ValueError if the given intertype is invalid.
         """
@@ -444,7 +444,6 @@ class UniformMesh1d(Mesh1d):
 
         @param[in] tau float, 当前时间步长
         """
-
         r = tau/self.h**2 
         if r > 0.5:
             raise ValueError(f"The r: {r} should be smaller than 0.5")
