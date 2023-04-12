@@ -164,7 +164,8 @@ class UniformMesh2d(Mesh2d):
         """
         import matplotlib.animation as animation
         # 显示二维网格数据
-        data = axes.imshow([], cmap='jet', vmin=-0.2, vmax=0.2, extent=box[:4])
+        uh = self.function()
+        data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, extent=box)
 
         def func(n, *fargs):
             uh, t = advance(n)
