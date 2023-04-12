@@ -537,6 +537,15 @@ class UniformMesh2d(Mesh2d):
         A = D0@A@D0 + D1
         return A, f 
 
+    ## @ingroup FDMInterface
+    def update_dirichlet_bc(self, gD, uh):
+        """
+        @brief 更新网格函数 uh 的 Dirichlet 边界值
+        """
+        node = self.node
+        isBdNode = self.ds.boundary_node_flag()
+        uh[isBdNode]  = gD(node[isBdNode])
+
     ## @ingroup FDMInterface 
     def parabolic_operator_forward(self, tau):
         """
@@ -544,7 +553,6 @@ class UniformMesh2d(Mesh2d):
 
         @param[in] tau float, 当前时间步长
         """
-
         r_x = tau/self.h[0]**2
         r_y = tau/self.h[1]**2
         if r_x + r_y > 1.5:
@@ -646,6 +654,7 @@ class UniformMesh2d(Mesh2d):
         J = k[:, 0:-1].flat
         B += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
         B += csr_matrix((val_y, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
         return A, B
 
     ## @ingroup FDMInterface
