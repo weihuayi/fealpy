@@ -447,7 +447,6 @@ class UniformMesh1d(Mesh1d):
         k = np.arange(NN)
 
         A = diags([1 - 2 * r], [0], shape=(NN, NN), format='csr')
-        print("A:", A.toarray())
 
         val = np.broadcast_to(r, (NN-1, ))
         I = k[1:]

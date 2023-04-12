@@ -22,11 +22,9 @@ isBdNode = mesh.ds.boundary_node_flag()
 duration = pde.duration()
 nt = 6400 
 tau = (duration[1] - duration[0])/nt 
-
+print("网比r_x:", tau/(hx**2))
+print("网比r_y:", tau/(hy**2))
 uh0 = mesh.interpolate(pde.init_solution, intertype='node')
-print("uh0", uh0)
-print(uh0.shape)
-
 
 def advance_forward(n):
     """
@@ -39,9 +37,11 @@ def advance_forward(n):
         return uh0, t
     else:
         A = mesh.parabolic_operator_forward(tau)
+        
         source = lambda p: pde.source(p, t + tau)
         f = mesh.interpolate(source, intertype='node')
-        uh0.flat = A@uh0.flat + tau*f.flat
+        
+        uh0[:].flat = A@uh0[:].flat + (tau*f[:]).flat
         gD = lambda p: pde.dirichlet(p, t+tau)
         mesh.update_dirichlet_bc(gD, uh0)
         
@@ -50,4 +50,7 @@ def advance_forward(n):
         print(f"the max error is {e}")
         return uh0, t
 
-uh0, t = advance_forward(2)
+fig, axes = plt.subplots()
+box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
+mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
+plt.show()

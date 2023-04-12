@@ -555,7 +555,7 @@ class UniformMesh2d(Mesh2d):
         """
         r_x = tau/self.h[0]**2
         r_y = tau/self.h[1]**2
-        if r_x + r_y > 1.5: #TODO: 数学
+        if r_x + r_y > 0.5: #TODO: 数学
             raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
