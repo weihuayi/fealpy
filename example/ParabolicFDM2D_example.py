@@ -51,6 +51,6 @@ def advance_forward(n):
         return uh0, t
 
 fig, axes = plt.subplots()
-box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
+box = [0, 1, 0, 1] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
 mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
 plt.show()
