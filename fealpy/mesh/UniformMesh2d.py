@@ -156,18 +156,18 @@ class UniformMesh2d(Mesh2d):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box,
-                       init, forward, fname='test.mp4',
+    def show_animation(self, fig, axes, box, advance, init=None, fname='test.mp4',
                        fargs=None, frames=1000, lw=2, interval=50):
         """
         @brief
         """
         import matplotlib.animation as animation
 
-        data = init(axes)
+        data = axes.imshow([], cmap='jet', vmin=-0.2, vmax=0.2, extent=domain)
+
         def func(n, *fargs):
-            Ez, t = forward(n)
-            data.set_array(Ez)
+            uh, t = forward(n)
+            data.set_array(uh)
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             axes.set_title(s)

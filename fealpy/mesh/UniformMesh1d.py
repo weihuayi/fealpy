@@ -148,11 +148,6 @@ class UniformMesh1d(Mesh1d):
         axes.set_ylim(box[2], box[3])
         x = self.node
 
-        def init_func():
-            if callable(init):
-                init()
-            return line
-
         def func(n, *fargs):
             uh, t = advance(n)
             line.set_data((x, uh))
