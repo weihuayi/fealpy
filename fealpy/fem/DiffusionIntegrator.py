@@ -29,6 +29,7 @@ class DiffusionIntegrator:
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+        NQ = len(ws)
 
         phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
