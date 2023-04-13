@@ -210,7 +210,20 @@ class UniformMesh2d(Mesh2d):
 
 
     def show_animation_vtk(self):
-        import vtk
+        import vtkmodules.vtkInteractionStyle
+        import vtkmodules.vtkRenderingOpenGL2
+        from vtkmodules.vtkCommonColor import vtkNamedColors
+        from vtkmodules.vtkCommonDataModel import vtkImageData
+        from vtkmodules.vtkCommonCore import vtkLookupTable
+        from vtkmodules.vtkFiltersGeometry import vtkImageDataGeometryFilter
+        from vtkmodules.vtkRenderingCore import (
+            vtkActor,
+            vtkDataSetMapper,
+            vtkRenderWindow,
+            vtkRenderWindowInteractor,
+            vtkRenderer
+        )
+        from vtk.util import numpy_support
 
 
     ## @ingroup GeneralInterface
