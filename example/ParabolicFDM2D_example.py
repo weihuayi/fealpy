@@ -22,11 +22,13 @@ isBdNode = mesh.ds.boundary_node_flag()
 duration = pde.duration()
 nt = 6400 
 tau = (duration[1] - duration[0])/nt 
-print("网比r_x:", tau/(hx**2))
-print("网比r_y:", tau/(hy**2))
+print("网比r_x:", tau/(hx**2)) # 0.25
+print("网比r_y:", tau/(hy**2)) # 0.25
+
+# 准备初值
 uh0 = mesh.interpolate(pde.init_solution, intertype='node')
 
-def advance_forward(n):
+def advance_forward(n, *fargs):
     """
     @brief 时间步进格式为向前欧拉方法
 
@@ -51,6 +53,6 @@ def advance_forward(n):
         return uh0, t
 
 fig, axes = plt.subplots()
-box = [0, 1, 0, 1] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
+box = [0, 1, 0, 1] # 图像显示的范围 0 <= x <= 1, 0 <= y <= 1
 mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
 plt.show()
