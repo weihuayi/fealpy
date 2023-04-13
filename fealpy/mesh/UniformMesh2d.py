@@ -156,18 +156,20 @@ class UniformMesh2d(Mesh2d):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box,
-                       init, forward, fname='test.mp4',
-                       fargs=None, frames=1000, lw=2, interval=50):
+    def show_animation(self, fig, axes, box, advance, fname='test.mp4',
+                       init=None, fargs=None, 
+                       frames=1000, lw=2, interval=50):
         """
         @brief
         """
         import matplotlib.animation as animation
+        # 显示二维网格数据
+        uh = self.function()
+        data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, extent=box)
 
-        data = init(axes)
         def func(n, *fargs):
-            Ez, t = forward(n)
-            data.set_array(Ez)
+            uh, t = advance(n)
+            data.set_array(uh)
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             axes.set_title(s)
@@ -555,7 +557,7 @@ class UniformMesh2d(Mesh2d):
         """
         r_x = tau/self.h[0]**2
         r_y = tau/self.h[1]**2
-        if r_x + r_y > 1.5: #TODO: 数学
+        if r_x + r_y > 0.5: #TODO: 数学
             raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
