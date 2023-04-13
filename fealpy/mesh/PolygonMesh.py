@@ -1,7 +1,10 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from ..common import ranges
+
 from ..quadrature import TriangleQuadrature
+from ..quadrature import GaussLegendreQuadrature
+
 from .Mesh2d import Mesh2d
 
 class PolygonMesh(Mesh2d):
@@ -25,8 +28,17 @@ class PolygonMesh(Mesh2d):
         self.itype = cell.dtype
         self.ftype = node.dtype
 
-    def integrator(self, k):
-        return TriangleQuadrature(k)
+    def geo_dimension(self):
+        return self.node.shape[-1]
+
+    def integrator(self, q, etype='cell'):
+        """
+        @brief 获取不同维度网格实体上的积分公式
+        """
+        if etype in {'cell', 2}:
+            return TriangleQuadrature(q)
+        elif etype in {'edge', 'face', 1}:
+            return GaussLegendreQuadrature(q)
 
     def number_of_vertices_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
@@ -107,8 +119,8 @@ class PolygonMesh(Mesh2d):
         cell = self.ds.cell
         cellLocation = self.ds.cellLocation
 
-        idx1 = np.zeros(cell.shape[0], dtype=np.int_)
-        idx2 = np.zeros(cell.shape[0], dtype=np.int_)
+        idx1 = np.zeros(cell.shape[0], dtype=self.itype)
+        idx2 = np.zeros(cell.shape[0], dtype=self.itype)
 
         idx1[0:-1] = cell[1:]
         idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
@@ -125,8 +137,8 @@ class PolygonMesh(Mesh2d):
         node = self.node
         cell, cellLocation = self.entity('cell')
 
-        idx1 = np.zeros(cell.shape[0], dtype=np.int)
-        idx2 = np.zeros(cell.shape[0], dtype=np.int)
+        idx1 = np.zeros(cell.shape[0], dtype=self.itype)
+        idx2 = np.zeros(cell.shape[0], dtype=self.itype)
 
         idx1[0:-1] = cell[1:]
         idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
@@ -144,7 +156,7 @@ class PolygonMesh(Mesh2d):
         edge = self.ds.edge
         edge2cell = self.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        w = np.array([[0, -1], [1, 0]], dtype=self.itype)
         v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
         val = np.sum(v*node[edge[:, 0], :], axis=1)
         a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
@@ -159,7 +171,7 @@ class PolygonMesh(Mesh2d):
         edge = self.ds.edge
         edge2cell = self.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        w = np.array([[0, -1], [1, 0]], dtype=self.itype)
         v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
         val = np.sum(v*node[edge[:, 0], :], axis=1)
         a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
@@ -267,12 +279,15 @@ class PolygonMeshDataStructure():
         self.cell = cell
         self.cellLocation = cellLocation
 
+        self.itype = cell.dtype
+
         if topdata is None:
             self.construct()
         else:
             self.edge = topdata[0]
             self.edge2cell = topdata[1]
             self.NE = len(edge)
+
 
     def reinit(self, NN, cell, cellLocation):
         self.NN = NN
@@ -306,7 +321,7 @@ class PolygonMeshDataStructure():
         NC = self.NC
         NV = self.number_of_nodes_of_cells()
 
-        totalEdge = np.zeros((cell.shape[0], 2), dtype=np.int)
+        totalEdge = np.zeros((cell.shape[0], 2), dtype=self.itype)
         totalEdge[:, 0] = cell
         totalEdge[:-1, 1] = cell[1:]
         totalEdge[cellLocation[1:] - 1, 1] = cell[cellLocation[:-1]]
@@ -326,9 +341,9 @@ class PolygonMeshDataStructure():
                 axis=0)
         NE = i0.shape[0]
         self.NE = NE
-        self.edge2cell = np.zeros((NE, 4), dtype=np.int)
+        self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
-        i1 = np.zeros(NE, dtype=np.int)
+        i1 = np.zeros(NE, dtype=self.itype)
         i1[j] = np.arange(len(cell))
 
         self.edge = totalEdge[i0]
@@ -372,7 +387,7 @@ class PolygonMeshDataStructure():
             cell2edge += coo_matrix((val, (edge2cell[:,1], J)), shape=(NC, NE), dtype=np.bool_)
             return cell2edge.tocsr()
         else:
-            cell2edge = np.zeros(cell.shape[0], dtype=np.int)
+            cell2edge = np.zeros(cell.shape[0], dtype=self.itype)
             cell2edge[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]] = range(NE)
             cell2edge[cellLocation[edge2cell[:, 1]] + edge2cell[:, 3]] = range(NE)
             return cell2edge
@@ -388,7 +403,7 @@ class PolygonMeshDataStructure():
             cell2edgeSign = csr_matrix((val, (edge2cell[:,0], range(NE))), shape=(NC,NE), dtype=np.bool_)
             return cell2edgeSign
         else:
-            cell2edgeSign = np.zeros(cell.shape[0], dtype=np.int)
+            cell2edgeSign = np.zeros(cell.shape[0], dtype=self.itype)
             isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
             cell2edgeSign[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]] = 1
             cell2edgeSign[cellLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]] = -1
