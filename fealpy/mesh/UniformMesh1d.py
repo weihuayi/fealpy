@@ -143,37 +143,42 @@ class UniformMesh1d(Mesh1d):
         """
         # 导入 matplotlib.animation 模块以创建动画
         import matplotlib.animation as animation
-
-        # 创建一条线，并设置线宽
+        
+        # 计算初始解
+        x = self.node
+        # 创建一个空的线对象
         line, = axes.plot([], [], lw=lw)
+
+        # 初始化线对象
+        if init is not None:
+            if fargs is not None:
+                init_data = init(*fargs)
+            else:
+                init_data = init()
+        else:
+            init_data, _ = advance(0)
+        line, = axes.plot(x, init_data, lw=lw)
 
         # 设置 x 轴和 y 轴的显示范围
         axes.set_xlim(box[0], box[1])
         axes.set_ylim(box[2], box[3])
 
-        # 获取网格节点
-        x = self.node
-
         # 定义一个更新动画帧的函数，该函数接收一个参数 n，表示当前帧序号
         def func(n, *fargs):
             # 调用 advance 函数进行时间步进，返回当前时间步的解 uh 和时间 t
-            uh, t = advance(n)
-
+            uh, t = advance(n, *fargs)
             # 设置线的 x 和 y 坐标数据
             line.set_data((x, uh))
-
             # 设置标题，显示当前帧序号和时间
             s = "frame=%05d, time=%0.8f" % (n, t)
             print(s)
             axes.set_title(s)
-
             # 返回线对象，以便在动画中更新
             return line
 
-        # 创建一个 FuncAnimation 对象，它将 fig 作为画布，func 作为更新函数，frames 为帧数
+        # 创建一个 funcanimation 对象，它将 fig 作为画布，func 作为更新函数，frames 为帧数
         # 并设置动画间隔时间
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
-
         # 保存动画为视频文件
         ani.save(fname)
 

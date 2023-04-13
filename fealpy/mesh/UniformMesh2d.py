@@ -158,25 +158,54 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup GeneralInterface
     def show_animation(self, fig, axes, box, advance, fname='test.mp4',
                        init=None, fargs=None, 
-                       frames=1000, lw=2, interval=50):
+                       frames=1000, interval=50):
         """
-        @brief
+        @brief 生成求解过程动画并保存为指定文件名的视频文件
+
+        @param[in] fig         matplotlib 图形对象
+        @param[in] axes        matplotlib 坐标轴对象
+        @param[in] box         四元组，定义图像显示范围
+        @param[in] advance     用于更新求解过程的函数
+        @param[in] fname       输出动画文件的名称，默认为 'test.mp4'
+        @param[in] init        初始化函数（可选）
+        @param[in] fargs       传递给 advance 函数的参数（可选）
+        @param[in] frames      动画的总帧数，默认为 1000
+        @param[in] interval    帧之间的时间间隔，默认为 50 毫秒
         """
+        # 导入 matplotlib.animation 模块以创建动画
         import matplotlib.animation as animation
+
         # 显示二维网格数据
         uh = self.function()
+        # 在坐标轴上绘制二维数组或图像的 Matplotlib 函数，
+        # imshow 函数可以自动处理二维数组数据的显示，因此不需要额外的初始化操作
+        # 将 uh（网格函数计算得到的数值解）以图像的形式显示在坐标轴上，
+        # 使用 'jet' 颜色映射，并限制颜色映射的数据值范围为 -0.2 到 0.2，
+        # 显示范围由 box 参数定义。
         data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, extent=box)
-
+        
+        # 根据当前帧序号计算数值解，更新图像对象的数值数组，
+        # 然后显示当前帧序号和时刻
         def func(n, *fargs):
-            uh, t = advance(n)
+            # 计算当前时刻的数值解并返回，uh 是数值解，t 是当前时刻
+            uh, t = advance(n, *fargs)
+            # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
             data.set_array(uh)
+            # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
+            # 将格式化的字符串设置为坐标轴的标题
             axes.set_title(s)
+            # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
             axes.set_aspect('equal')
             return data
 
-        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
+        # 创建一个 funcanimation 对象，它将 fig 作为画布，func 作为帧更新函数，
+        # init_func 作为初始化函数，用于在动画开始之前设置图像的初始状态，
+        # fargs 作为一个元组，包含要传递给 func 函数的额外参数，frames 为帧数
+        # 并设置动画间隔时间
+        ani = animation.FuncAnimation(fig, func, init_func=init, fargs=fargs, 
+                                      frames=frames, interval=interval)
         ani.save(fname)
 
 
@@ -557,8 +586,8 @@ class UniformMesh2d(Mesh2d):
         """
         r_x = tau/self.h[0]**2
         r_y = tau/self.h[1]**2
-        if r_x + r_y > 0.5: #TODO: 数学
-            raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
+        if r_x + r_y > 0.5:
+            raise ValueError(f"The r_x+r_y: {r_x+r_y} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
