@@ -56,7 +56,7 @@ def p2g(particles):
     global grid_m
     global grid_v
     for p in particles:
-        Xp =  p.x / dx # 求商、求余
+        Xp =  p.x / dx # 变化到网格为1的网格上
         base = (Xp - 0.5).astype(np.int32)
         fx = Xp - base
         w = np.array([0.5 * (1.5 - fx)**2, 0.75 - (fx - 1)**2, 0.5 * (fx - 0.5)**2]) 

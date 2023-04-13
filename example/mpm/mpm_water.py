@@ -1,20 +1,24 @@
 import numpy as np
 
 from fealpy.mesh import UniformMesh2d
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib import animation
 
-def p2m():
+def p2m(particles):
     xp = particles["position"]/hx
-    base  = (xp - 0.5).astype(np.int_) # 四舍五入？
-    w = [0.5 * (1.5 - xp)**2, 0.75 - (xp - 1)**2, 0.5 * (xp - 0.5)**2]
+    base  = (xp - 0.5).astype(np.int_)
+    fx = xp-base
+    w = np.array([0.5 * (1.5 - fx)**2, 0.75 - (fx - 1)**2, 0.5 * (fx - 0.5)**2])
     stress = -dt * 4 * E * particles['vol'] * (particles['J'] - 1)/hx**2
     affine = particles['mass'][..., None, None] * particles['C']
     affine[..., 0, 0] += stress
     affine[..., 1, 1] += stress
-
+    
     for i in range(3):
         for j in range(3):
             offset = np.array([i, j])
-            dp = (offset - xp) * hx
+            dp = (offset - fx) * hx
             weight = w[i][:, 0]*w[j][:, 1]
             idx = base + offset
             val = np.einsum('ijk,ik->ij', affine, dp)
@@ -40,26 +44,27 @@ def set_bound():
     mv11 = mv[:, nx-bound:]
     mv11[mv11[..., 1] > 0, 1] = 0.0
 
-def m2p():
+def m2p(particles):
     xp = particles["position"]/hx
-    base  = (xp - 0.5).astype(np.int_) # 四舍五入？
-    w = [0.5 * (1.5 - xp)**2, 0.75 - (xp - 1)**2, 0.5 * (xp - 0.5)**2]
+    base  = (xp - 0.5).astype(np.int_) 
+    fx = xp-base
+    w = [0.5 * (1.5 - fx)**2, 0.75 - (fx - 1)**2, 0.5 * (fx - 0.5)**2]
     particles['velocity'] = 0.0
     particles['C'] = 0.0
     for i in range(3):
         for j in range(3):
             offset = np.array([i, j])
-            dp = (offset - xp) * hx
+            dp = (offset - fx) * hx
             weight = w[i][:, 0]*w[j][:, 1]
             idx = base + offset
             pv = mv[idx[:, 0], idx[:, 1]]
             particles['velocity'] += weight[:, None] * pv
             particles['C'] += np.einsum('p, pi, pj->pij', weight, pv, dp)
-    particles['C'] *=4/hx**2
+    particles['C'] *= 4/hx**2
     particles['position'] += dt * particles['velocity']
-    particles['J'] *= 1 + dt * particles['C'].trace()
+    particles['J'] *= 1 + dt * particles['C'].trace(axis1=1,axis2=2)
 
-dt = 2e-4 # 时间步长
+dt = 1e-4 # 时间步长
 maxit = 9000  # 模拟步数
 
 # 背景网格
@@ -101,4 +106,34 @@ particles["mass"] = mass
 particles["vol"] = vol
 particles["J"] = 1
 
+xx = []
+yy = []
 
+for i in range(maxit):
+    mm[:] = 0.0
+    mv[:] = 0.0
+    p2m(particles)
+    set_bound()
+    m2p(particles)      
+    xx.append(list(particles['position'][:,0]))
+    yy.append(list(particles['position'][:,1]))
+
+
+print("finish")
+fig, ax = plt.subplots()
+sc = ax.scatter([],[])
+plt.xlim([0, 1])
+plt.ylim([0, 1])
+plt.xlabel('X')
+plt.ylabel('Y')
+
+def update(i):
+    x = xx[i]
+    y = yy[i]
+    sc.set_offsets(np.c_[x, y])  # 更新散点图的位置
+    return sc,
+
+anim = FuncAnimation(fig, update, frames=maxit, interval=1, blit=True)
+#FFwriter = animation.FFMpegWriter(fps=300, extra_args=['-vcodec', 'libx264'])
+#anim.save('basic_animation.mp4',writer=FFwriter)
+plt.show()
