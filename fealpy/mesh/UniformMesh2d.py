@@ -176,7 +176,7 @@ class UniformMesh2d(Mesh2d):
         import matplotlib.animation as animation
 
         # 显示二维网格数据
-        uh = self.function()
+        uh, t = advance(0) 
         # 在坐标轴上绘制二维数组或图像的 Matplotlib 函数，
         # imshow 函数可以自动处理二维数组数据的显示，因此不需要额外的初始化操作
         # 将 uh（网格函数计算得到的数值解）以图像的形式显示在坐标轴上，
