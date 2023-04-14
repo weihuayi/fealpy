@@ -1,13 +1,12 @@
 
 import torch
 from fealpy.pinn.sampler import (
-    JoinedSampler,
-    HybridSampler,
     ISampler,
     BoxBoundarySampler,
     TriangleMeshSampler,
     TetrahedronMeshSampler
 )
+from fealpy.pinn.sampler.sampler import JoinedSampler, HybridSampler
 from fealpy.mesh import MeshFactory as Mf
 
 

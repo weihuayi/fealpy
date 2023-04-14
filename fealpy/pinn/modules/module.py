@@ -18,9 +18,9 @@ class TensorMapping(Module):
            is not implemented, override it to build a function.
     """
     def mkfs(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
-                   device: device, **kwargs):
+                   device: Optional[device]=None, **kwargs) -> Tensor:
         p = mkfs(*input, f_shape=f_shape, device=device)
-        return super()._call_impl(p, **kwargs)
+        return self.__call__(p, **kwargs)
 
     __call__: Callable[..., Tensor]
 
