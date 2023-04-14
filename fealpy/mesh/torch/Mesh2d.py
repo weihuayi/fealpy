@@ -206,7 +206,7 @@ class Mesh2d(Mesh):
         elif etype in {'edge', 'face', 1}:
             return self.ds.edge
         elif etype in {'node', 0}:
-            return self.node
+            return self.node.reshape(-1, self.geo_dimension())
         raise ValueError(f"Invalid etype '{etype}'.")
 
     def entity_barycenter(self, etype: Union[int, str], index=np.s_[:]):
@@ -229,7 +229,7 @@ class Mesh2d(Mesh):
         @brief Get measurements for entities.
         """
         if etype in {'cell', 2}:
-            return self.cell_area()
+            return self.cell_area()[index]
         elif etype in {'edge', 'face', 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
