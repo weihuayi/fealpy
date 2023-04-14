@@ -90,15 +90,17 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
         super().__init__(net)
         self._time_idx = time_idx
 
-    def space(self, time: Tensor=None):
+    def _space_fn(self, p: Tensor):
         if self._time_idx is None:
             return self.__net
         else:
-            return Projected(self.__net, [time, ...]) # TODO: finish this
+            comps: List[Optional[Tensor]] = [None] * p.shape[-1]
+            comps[self._time_idx] = p[..., self._time_idx:self._time_idx+1]
+            return Projected(self.__net, comps=comps)
 
     def forward(self, p: Tensor):
         shape = p.shape[:-1] + (1,)
-        up = self.net
+        up = self.net(p)
         shape_m = (3,)*self.GD + up.shape
 
         if self.GD != p.shape[-1]:
