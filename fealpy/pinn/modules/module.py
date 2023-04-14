@@ -1,5 +1,5 @@
 from typing import (
-    Optional, Tuple, Callable, Sequence
+    Optional, Tuple, Callable, Sequence, Union
 )
 
 import numpy as np
@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, device
 from torch.nn import Module
 
-from ..tools import mkfs
+from ..tools import mkfs, proj
 from ..nntyping import VectorFunction, MeshLike
 
 
@@ -33,7 +33,7 @@ class TensorMapping(Module):
         @param value: Sequence[int]. Values of data in fixed features.
         """
         assert len(idx) == len(value)
-        return _Fixed(self, idx, value)
+        return Fixed(self, idx, value)
 
     def extracted(self, *idx: int):
         """
@@ -42,7 +42,7 @@ class TensorMapping(Module):
 
         @param *idx: int. Indices of features to extract.
         """
-        return _Extracted(self, idx)
+        return Extracted(self, idx)
 
     def from_numpy(self, ps: NDArray) -> Tensor:
         """
@@ -192,7 +192,7 @@ class Solution(TensorMapping):
         return self.__net(p)
 
 
-class _Fixed(Solution):
+class Fixed(Solution):
     def __init__(self, net: Optional[Module],
                  idx: Sequence[int],
                  values: Sequence[float]
@@ -204,9 +204,7 @@ class _Fixed(Solution):
     def forward(self, p: Tensor):
         total_feature = p.shape[-1] + len(self._fixed_idx)
         size = p.shape[:-1] + (total_feature, )
-        fixed_p = torch.zeros(size, dtype=torch.float)
-        if p.is_cuda:
-            fixed_p = fixed_p.cuda()
+        fixed_p = torch.zeros(size, dtype=torch.float, device=p.device)
         fixed_p[..., self._fixed_idx] = self._fixed_value
 
         feature_mask = torch.ones((total_feature, ), dtype=torch.bool)
@@ -216,7 +214,7 @@ class _Fixed(Solution):
         return self.net.forward(fixed_p)
 
 
-class _Extracted(Solution):
+class Extracted(Solution):
     def __init__(self, net: Optional[Module],
                  idx: Sequence[int]
         ) -> None:
@@ -225,3 +223,14 @@ class _Extracted(Solution):
 
     def forward(self, p: Tensor):
         return self.net.forward(p)[..., self._extracted_idx]
+
+
+class Projected(Solution):
+    def __init__(self, net: Optional[Module],
+                 comps: Sequence[Union[None, Tensor, int, float]]) -> None:
+        super().__init__(net)
+        self._comps = comps
+
+    def forward(self, p: Tensor):
+        inputs = proj(p, self._comps)
+        return self.net.forward(inputs)

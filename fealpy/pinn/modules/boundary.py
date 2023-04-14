@@ -3,10 +3,11 @@ from typing import Union, Optional, List
 
 import torch
 from torch import Tensor
+from torch.nn import Module
 
 from ..nntyping import TensorFunction
-from ..modules import Solution, ZeroMapping
 from ..tools import mkfs
+from .module import Solution, ZeroMapping, Projected
 
 
 ### Boundary setting tools
@@ -85,9 +86,19 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
 
     @note !Not Fully Implemented! Now only 1d and 2d are supported.
     """
+    def __init__(self, net: Optional[Module] = None, time_idx: Optional[int]=None) -> None:
+        super().__init__(net)
+        self._time_idx = time_idx
+
+    def space(self, time: Tensor=None):
+        if self._time_idx is None:
+            return self.__net
+        else:
+            return Projected(self.__net, [time, ...]) # TODO: finish this
+
     def forward(self, p: Tensor):
         shape = p.shape[:-1] + (1,)
-        up = self.net(p)
+        up = self.net
         shape_m = (3,)*self.GD + up.shape
 
         if self.GD != p.shape[-1]:
