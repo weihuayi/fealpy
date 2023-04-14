@@ -562,19 +562,26 @@ class UniformMesh2d(Mesh2d):
     def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
         @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
+
+        @param[in] A sparse matrix, (NN, NN)
+        @param[in] f 
+
+        @todo 考虑 uh 是向量函数的情形
         """
         if uh is None:
-            uh = self.function('node').reshape(-1, )
+            uh = self.function('node').reshape(-1)
+        else:
+            uh = uh.reshape(-1) # 展开为一维数组
+
+        f = f.reshape(-1, ) # 展开为一维数组
         
-        GD = self.geo_dimension()
         node = self.entity('node')
         isBdNode = self.ds.boundary_node_flag()
         uh[isBdNode]  = gD(node[isBdNode])
-        f = f.reshape(-1, )
         f -= A@uh
         f[isBdNode] = uh[isBdNode]
 
-        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+        bdIdx = np.zeros(A.shape[0], dtype=self.itype)
         bdIdx[isBdNode] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
