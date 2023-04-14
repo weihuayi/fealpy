@@ -571,9 +571,9 @@ class UniformMesh2d(Mesh2d):
         if uh is None:
             uh = self.function('node').reshape(-1)
         else:
-            uh = uh.reshape(-1) # 展开为一维数组
+            uh = uh.reshape(-1) # 展开为一维数组 TODO:向量型函数
 
-        f = f.reshape(-1, ) # 展开为一维数组
+        f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
         
         node = self.entity('node')
         isBdNode = self.ds.boundary_node_flag()
@@ -592,6 +592,8 @@ class UniformMesh2d(Mesh2d):
     def update_dirichlet_bc(self, gD, uh):
         """
         @brief 更新网格函数 uh 的 Dirichlet 边界值
+
+        @todo 考虑向量型函数
         """
         node = self.node
         isBdNode = self.ds.boundary_node_flag().reshape(uh.shape)
