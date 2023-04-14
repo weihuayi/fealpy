@@ -4,7 +4,7 @@ import torch
 from typing import Union
 from torch import Tensor
 
-from .Mesh import Mesh, MeshDataStructure
+from .Mesh import Mesh, MeshDataStructure, Redirector
 
 
 class Mesh2dDataStructure(MeshDataStructure):
@@ -12,6 +12,9 @@ class Mesh2dDataStructure(MeshDataStructure):
     @brief The topology data structure of mesh 2d.\
            This is an abstract class and can not be used directly.
     """
+    TD = 2
+    face = Redirector('edge')
+
     def total_edge(self) -> Tensor:
         """
         @brief Return total edges in mesh.
@@ -27,7 +30,7 @@ class Mesh2dDataStructure(MeshDataStructure):
         return totalEdge
 
     def construct(self):
-        NC = self.NC
+        NC = self.number_of_cells()
         NEC = self.NEC
 
         totalEdge = self.total_edge()
@@ -35,14 +38,13 @@ class Mesh2dDataStructure(MeshDataStructure):
                 return_index=True,
                 return_inverse=True,
                 axis=0)
-        NE = i0.shape[0]
-        self.NE = NE
 
+        NE = i0.shape[0]
         self.edge2cell = torch.zeros((NE, 4), dtype=self.itype, device=self.device)
 
         i0 = torch.from_numpy(i0)
         i1 = torch.zeros(NE, dtype=self.itype)
-        i1[j] = range(NEC*NC)
+        i1[j] = torch.arange(NEC*NC)
 
         self.edge2cell[:, 0] = i0//NEC
         self.edge2cell[:, 1] = i1//NEC
@@ -74,8 +76,8 @@ class Mesh2dDataStructure(MeshDataStructure):
         @return: A tensor with shape (NC, NEC), containing indexes of edges in\
                  every cells.
         """
-        NC = self.NC
-        NE = self.NE
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
         NEC = self.NEC
         edge2cell = self.edge2cell
 
@@ -88,7 +90,7 @@ class Mesh2dDataStructure(MeshDataStructure):
         """
         @brief
         """
-        NC = self.NC
+        NC = self.number_of_cells()
         NEC = self.NEC
 
         edge2cell = self.edge2cell
@@ -158,7 +160,7 @@ class Mesh2dDataStructure(MeshDataStructure):
         @return: A bool tensor with shape (NN, ) to indicate if a node is\
                  on the boundary or not.
         """
-        NN = self.NN
+        NN = self.number_of_nodes()
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
         isBdNode = torch.zeros((NN,), dtype=torch.bool, device=self.device)
@@ -184,7 +186,7 @@ class Mesh2dDataStructure(MeshDataStructure):
         @return: A bool tensor with shape (NC, ) to indicate if a cell locats\
                  next to the boundary.
         """
-        NC = self.NC
+        NC = self.number_of_cells()
         edge2cell = self.edge2cell
         isBdCell = torch.zeros((NC,), dtype=torch.bool, device=self.device)
         isBdEdge = self.boundary_edge_flag()
@@ -194,9 +196,6 @@ class Mesh2dDataStructure(MeshDataStructure):
 
 class Mesh2d(Mesh):
     ds: Mesh2dDataStructure
-
-    def top_dimension(self):
-        return 2
 
     def entity(self, etype: Union[int, str]=2):
         """
@@ -230,14 +229,14 @@ class Mesh2d(Mesh):
         @brief Get measurements for entities.
         """
         if etype in {'cell', 2}:
-            return self.cell_area(index=index)
+            return self.cell_area()
         elif etype in {'edge', 'face', 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
             return 0
         raise ValueError(f"Invalid etity type {etype}.")
 
-    def cell_area(self):
+    def cell_area(self) -> Tensor:
         """
         @brief
         """
