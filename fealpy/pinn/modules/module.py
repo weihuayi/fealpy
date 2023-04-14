@@ -26,8 +26,8 @@ class TensorMapping(Module):
 
     def fixed(self, idx: Sequence[int], value: Sequence[float]):
         """
-        @brief Return a module wrapped from this. The input of the wrapped module can provide\
-               some features for the input of the original, and the rest features are fixed.
+        @brief Return a module wrapped from this, to make some input features fixed.\
+               See `fealpy.pinn.modules.Fixed`.
 
         @param idx: Sequence[int]. The indices of features to be fixed.
         @param value: Sequence[int]. Values of data in fixed features.
@@ -38,7 +38,7 @@ class TensorMapping(Module):
     def extracted(self, *idx: int):
         """
         @brief Return a module wrapped from this. The output features of the wrapped module are extracted\
-               from the original one.
+               from the original one. See `fealpy.pinn.modules.Extracted`.
 
         @param *idx: int. Indices of features to extract.
         """
@@ -193,10 +193,17 @@ class Solution(TensorMapping):
 
 
 class Fixed(Solution):
-    def __init__(self, net: Optional[Module],
+    def __init__(self, net: Module,
                  idx: Sequence[int],
                  values: Sequence[float]
         ) -> None:
+        """
+        @brief Fix some input features of `net`, as a wrapped module.
+
+        @param net: The original module.
+        @param idx: Indices of features to be fixed.
+        @param values: Values of fixed features.
+        """
         super().__init__(net)
         self._fixed_idx = torch.tensor(idx, dtype=torch.long)
         self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(0)
@@ -215,9 +222,15 @@ class Fixed(Solution):
 
 
 class Extracted(Solution):
-    def __init__(self, net: Optional[Module],
+    def __init__(self, net: Module,
                  idx: Sequence[int]
         ) -> None:
+        """
+        @brief Extract some output features of `net`, as a wrapped module.
+
+        @param net: The original module.
+        @param idx: Indices of output features to extract.
+        """
         super().__init__(net)
         self._extracted_idx = torch.tensor(idx, dtype=torch.long)
 
@@ -226,8 +239,15 @@ class Extracted(Solution):
 
 
 class Projected(Solution):
-    def __init__(self, net: Optional[Module],
-                 comps: Sequence[Union[None, Tensor, int, float]]) -> None:
+    def __init__(self, net: Module,
+                 comps: Sequence[Union[None, Tensor, float]]) -> None:
+        """
+        @brief Project the input features of `net` into a sub space, as a wrapped module.\
+               See `fealpy.pinn.tools.proj`.
+
+        @param net: The original module.
+        @param comps: Components in projected features.
+        """
         super().__init__(net)
         self._comps = comps
 

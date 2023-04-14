@@ -93,7 +93,8 @@ def proj(p: Tensor, comps: Sequence[Union[None, Tensor, float]]) -> Tensor:
     @brief Make a projection of the input tensor.
 
     @param p: The input tensor.
-    @param comps: A sequence specifying components (dim -1) of the output.
+    @param comps: A sequence specifying components (dim -1) of the output. Using `None` to remain original,\
+                  and `Ellipsis`(or `...`) to skip features.
 
     @return: Tensor. `dtype` and `device` of the projected is same to the input's.
 
@@ -115,7 +116,7 @@ def proj(p: Tensor, comps: Sequence[Union[None, Tensor, float]]) -> Tensor:
     ellipsis_used = False
     i = 0
     j = 0
-    while i < len(comps):
+    while j < p.shape[-1]:
         comp = comps[i]
         i += 1
         if comp is None:
