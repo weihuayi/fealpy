@@ -1,9 +1,11 @@
 import numpy as np 
 
 from fealpy.pde.elliptic_1d import SinPDEData
+# from fealpy.pde.elliptic_1d import ExpPDEData
 
 # PDE 模型
 pde = SinPDEData()
+# pde = ExpPDEData()
 domain = pde.domain()
 # test
 print('domain :', domain)
@@ -17,12 +19,6 @@ import matplotlib.pyplot as plt
 hx = 0.1
 nx = int((domain[1] - domain[0])/hx)
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
-print("NN:", mesh.number_of_nodes())
-print("NE:", mesh.number_of_edges())
-print("NF:", mesh.number_of_faces())
-print("NC:", mesh.number_of_cells())
-print("gd:", mesh.geo_dimension())
-print("td:", mesh.top_dimension())
 
 fig = plt.figure(1)
 axes = fig.gca() 
