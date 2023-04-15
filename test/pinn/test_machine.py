@@ -28,7 +28,7 @@ class TestMachine():
         px = torch.empty((100, 1), dtype=torch.float32)
         py = torch.empty((100, 1), dtype=torch.float32)
         s1 = s.fixed([0, 2], [10, 20])
-        assert s1(px, py).shape == (100, 2)
+        assert s1.mkfs(px, py).shape == (100, 2)
 
     def test_extracted(self):
         s = Solution(nn.Linear(2, 3))
@@ -41,5 +41,5 @@ class TestMachine():
         px = torch.empty((100, 3), dtype=torch.float32)
         py = torch.empty((100, 2), dtype=torch.float32)
         pz = torch.empty((100, 2), dtype=torch.float32)
-        ret = s(0, px, py, 1, pz, 0)
+        ret = s.mkfs(0, px, py, 1, pz, 0)
         assert ret.shape == (100, 2)

@@ -1,5 +1,5 @@
 from typing import (
-    Optional, Tuple, Callable, Sequence
+    Optional, Tuple, Callable, Sequence, Union
 )
 
 import numpy as np
@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, device
 from torch.nn import Module
 
-from ..tools import mkfs
+from ..tools import mkfs, proj
 from ..nntyping import VectorFunction, MeshLike
 
 
@@ -18,31 +18,31 @@ class TensorMapping(Module):
            is not implemented, override it to build a function.
     """
     def mkfs(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
-                   device: device, **kwargs):
+                   device: Optional[device]=None, **kwargs) -> Tensor:
         p = mkfs(*input, f_shape=f_shape, device=device)
-        return super()._call_impl(p, **kwargs)
+        return self.__call__(p, **kwargs)
 
     __call__: Callable[..., Tensor]
 
     def fixed(self, idx: Sequence[int], value: Sequence[float]):
         """
-        @brief Return a module wrapped from this. The input of the wrapped module can provide\
-               some features for the input of the original, and the rest features are fixed.
+        @brief Return a module wrapped from this, to make some input features fixed.\
+               See `fealpy.pinn.modules.Fixed`.
 
         @param idx: Sequence[int]. The indices of features to be fixed.
         @param value: Sequence[int]. Values of data in fixed features.
         """
         assert len(idx) == len(value)
-        return _Fixed(self, idx, value)
+        return Fixed(self, idx, value)
 
     def extracted(self, *idx: int):
         """
         @brief Return a module wrapped from this. The output features of the wrapped module are extracted\
-               from the original one.
+               from the original one. See `fealpy.pinn.modules.Extracted`.
 
         @param *idx: int. Indices of features to extract.
         """
-        return _Extracted(self, idx)
+        return Extracted(self, idx)
 
     def from_numpy(self, ps: NDArray) -> Tensor:
         """
@@ -192,11 +192,18 @@ class Solution(TensorMapping):
         return self.__net(p)
 
 
-class _Fixed(Solution):
-    def __init__(self, net: Optional[Module],
+class Fixed(Solution):
+    def __init__(self, net: Module,
                  idx: Sequence[int],
                  values: Sequence[float]
         ) -> None:
+        """
+        @brief Fix some input features of `net`, as a wrapped module.
+
+        @param net: The original module.
+        @param idx: Indices of features to be fixed.
+        @param values: Values of fixed features.
+        """
         super().__init__(net)
         self._fixed_idx = torch.tensor(idx, dtype=torch.long)
         self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(0)
@@ -204,9 +211,7 @@ class _Fixed(Solution):
     def forward(self, p: Tensor):
         total_feature = p.shape[-1] + len(self._fixed_idx)
         size = p.shape[:-1] + (total_feature, )
-        fixed_p = torch.zeros(size, dtype=torch.float)
-        if p.is_cuda:
-            fixed_p = fixed_p.cuda()
+        fixed_p = torch.zeros(size, dtype=torch.float, device=p.device)
         fixed_p[..., self._fixed_idx] = self._fixed_value
 
         feature_mask = torch.ones((total_feature, ), dtype=torch.bool)
@@ -216,12 +221,36 @@ class _Fixed(Solution):
         return self.net.forward(fixed_p)
 
 
-class _Extracted(Solution):
-    def __init__(self, net: Optional[Module],
+class Extracted(Solution):
+    def __init__(self, net: Module,
                  idx: Sequence[int]
         ) -> None:
+        """
+        @brief Extract some output features of `net`, as a wrapped module.
+
+        @param net: The original module.
+        @param idx: Indices of output features to extract.
+        """
         super().__init__(net)
         self._extracted_idx = torch.tensor(idx, dtype=torch.long)
 
     def forward(self, p: Tensor):
         return self.net.forward(p)[..., self._extracted_idx]
+
+
+class Projected(Solution):
+    def __init__(self, net: Module,
+                 comps: Sequence[Union[None, Tensor, float]]) -> None:
+        """
+        @brief Project the input features of `net` into a sub space, as a wrapped module.\
+               See `fealpy.pinn.tools.proj`.
+
+        @param net: The original module.
+        @param comps: Components in projected features.
+        """
+        super().__init__(net)
+        self._comps = comps
+
+    def forward(self, p: Tensor):
+        inputs = proj(p, self._comps)
+        return self.net.forward(inputs)
