@@ -136,7 +136,7 @@ class Mesh2d(Mesh):
         edge = self.entity('edge')
         NE = self.number_of_edges()
         v = node[edge[index, -1],:] - node[edge[index, 0],:]
-        length = np.sqrt(np.sum(v**2, axis=1))
+        length = np.linalg.norm(v, axis=1)
         v /= length.reshape(-1, 1)
         return v
 
