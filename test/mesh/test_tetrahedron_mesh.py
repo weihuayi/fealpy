@@ -1,29 +1,40 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import pytest
 from fealpy.mesh import TetrahedronMesh 
+from fealpy.functionspace import LagrangeFiniteElementSpace
 
-def test_uniform_refine():
+import ipdb
+
+@pytest.mark.parametrize("n", [0, 1, 2, 3, 4])
+def test_uniform_refine(n):
+    mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
+    mesh.uniform_refine(n=n)
+
+    vol = mesh.entity_measure('cell')
+    assert np.all(vol>0)
+
+
+@pytest.mark.parametrize("p", [1, 2, 3, 4])
+def test_interpolate(p):
     mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
 
-    vol = mesh.entity_measure('cell')
+    mesh.uniform_refine(n=3)
 
-    mesh.uniform_refine()
+    ips0 = mesh.interpolation_points(p)
 
-    vol = mesh.entity_measure('cell')
+    space = LagrangeFiniteElementSpace(mesh, p=p)
+    ips1 = space.interpolation_points()
 
-    mesh.uniform_refine()
-
-    vol = mesh.entity_measure('cell')
-
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    print(cell[0, :])
-    print(node[cell[0]])
+    assert np.allclose(ips0, ips1)
 
 
+    c2d0 = mesh.cell_to_ipoint(p)
+    c2d1 = space.cell_to_dof()
 
-    print(vol)
+    assert np.all(c2d0 == c2d1)
+
 
 
 if __name__ == "__main__":
-    test_uniform_refine()
+    test_interpolate(1)
