@@ -101,5 +101,6 @@ def init_callback():
     uh0, _ = advance_forward(0)
     return uh0
 
-mesh.show_animation(fig, axes, box, advance_forward, init=init_callback, frames=nt + 1)
+# mesh.show_animation(fig, axes, box, advance_forward, init=init_callback, frames=nt + 1)
+mesh.show_animation(fig, axes, box, advance_crank_nicholson, init=init_callback, frames=nt + 1)
 plt.show()

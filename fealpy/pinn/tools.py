@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple, Callable
+from typing import Union, Optional, Tuple, Callable, Sequence, Type
 
 import torch
 from torch import Tensor, device
@@ -81,8 +81,55 @@ def use_mkfs(func: Callable[..., Tensor]):
     ```
     and then `f` can be used like `f(x, y)`.
     """
-    def wrapped(*input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
+    def wrapped(*input: Tensor, f_shape: Optional[Tuple[int, ...]]=None,
                 device: Optional[device]=None, requires_grad: bool=False, **kwargs):
         p = mkfs(*input, f_shape=f_shape, device=device, requires_grad=requires_grad)
         return func(p, **kwargs)
     return wrapped
+
+
+def proj(p: Tensor, comps: Sequence[Union[None, Tensor, float]]) -> Tensor:
+    """
+    @brief Make a projection of the input tensor.
+
+    @param p: The input tensor.
+    @param comps: A sequence specifying components (dim -1) of the output. Using `None` to remain original,\
+                  and `Ellipsis`(or `...`) to skip features.
+
+    @return: Tensor. `dtype` and `device` of the projected is same to the input's.
+
+    @example:
+    >>> import torch
+    >>> a = torch.ones((5, 1), dtype=torch.float32)
+    >>> b = 3 * torch.ones((5, 1))
+    >>> proj(a, [None, b, 5.5])
+    tensor([[ 1.0000,  3.0000,  5.5000],
+            [ 1.0000,  3.0000,  5.5000],
+            [ 1.0000,  3.0000,  5.5000],
+            [ 1.0000,  3.0000,  5.5000],
+            [ 1.0000,  3.0000,  5.5000]])
+    """
+    if p.shape[-1] != len(comps) and ... not in comps:
+        raise ValueError("Length of compoents mismatch the shape of input in dim -1.")
+
+    projed = p.clone()
+    ellipsis_used = False
+    i = 0
+    j = 0
+    while j < p.shape[-1]:
+        comp = comps[i]
+        i += 1
+        if comp is None:
+            j += 1
+
+        elif comp is ...:
+            if ellipsis_used:
+                raise ValueError("Can not understand the index if ellipsis is used twice or more.")
+            ellipsis_used = True
+            j = p.shape[-1] - (len(comps) - i)
+
+        else:
+            projed[..., j:j+1] = comp
+            j += 1
+
+    return projed
