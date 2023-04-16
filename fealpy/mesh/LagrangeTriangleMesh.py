@@ -64,6 +64,8 @@ class LagrangeTriangleMesh(Mesh2d):
         self.celldata = {}
         self.meshdata = {}
         self.multi_index_matrix = multi_index_matrix
+    def geo_dimension(self):
+        return self.GD
 
     def reference_cell_measure(self):
         return 0.5

@@ -1,4 +1,56 @@
+from typing import Optional, Generic, TypeVar
+from numpy.typing import NDArray
 import numpy as np
+
+# Descriptor for entities
+_VT = TypeVar('_VT')
+class Redirector(Generic[_VT]):
+    def __init__(self, target: str) -> None:
+        self._target = target
+
+    def __get__(self, obj, objtype) -> _VT:
+        return getattr(obj, self._target)
+
+    def __set__(self, obj, val: _VT):
+        setattr(obj, self._target, val)
+
+class MeshDataStructure():
+    NN: int = -1
+    TD: int
+
+    cell: NDArray 
+    face: Optional[NDArray]
+    edge: Optional[NDArray]
+    edge2cell: Optional[NDArray]
+
+    localEdge: NDArray
+    localFace: NDArray
+    localCell: NDArray
+
+    NVC: int
+    NVE: int
+    NVF: int
+    NEC: int
+    NFC: int
+
+    def construct(self):
+        raise NotImplementedError
+
+    def number_of_cells(self):
+        """Number of cells"""
+        return self.cell.shape[0]
+
+    def number_of_faces(self):
+        """Number of faces"""
+        return self.face.shape[0]
+
+    def number_of_edges(self):
+        """Number of edges"""
+        return self.edge.shape[0]
+
+    def number_of_nodes(self):
+        """Number of nodes"""
+        return self.NN
 
 class Mesh:
 
