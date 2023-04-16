@@ -210,6 +210,7 @@ class Mesh2d(Mesh):
             if self.geo_dimension() == 2:
                 poly = PolyCollection(node[cell[:, self.ds.ccw], :])
             else:
+                import mpl_toolkits.mplot3d as a3
                 poly = a3.art3d.Poly3DCollection(node[cell[:, self.ds.ccw], :])
         else:
             if self.meshtype == 'polygon':
