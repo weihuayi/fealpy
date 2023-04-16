@@ -1178,23 +1178,22 @@ class LagrangeFiniteElementSpace():
                     return 0.0 
                 else:
                     phi = self.basis(bcs)
-                    bb = np.einsum('m, mik, i->ik...', 
-                            ws, phi, self.cellmeasure)
+                    bb = np.einsum('q, qci, c->ci', ws, phi, self.cellmeasure)
                     bb *= fval
             else:
                 phi = self.basis(bcs)
-                bb = np.einsum('m, mi..., mik, i->ik...',
+                bb = np.einsum('q, qc..., qci, c->ci...',
                         ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
 
             shape = gdof if dim is None else (gdof, dim)
             b = np.zeros(shape, dtype=bb.dtype)
-            if dim is None:
+            if len(bb.shape) == 2:
                 np.add.at(b, cell2dof, bb)
-            else:
+            elif len(bb.shape) == 3:
                 np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
-            b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
+            b = np.einsum('i, ic..., c->c...', ws, fval, cellmeasure)
 
         return b
 

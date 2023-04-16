@@ -329,3 +329,8 @@ class IntervalMeshDataStructure():
         isBdCell = self.boundary_cell_flag()
         idx, = np.nonzero(isBdCell)
         return idx 
+
+    boundary_face_index = boundary_node_index
+    boundary_edge_index = boundary_cell_index
+
+
