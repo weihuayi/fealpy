@@ -15,15 +15,16 @@ class SimplexMeshCLFEDof():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_node_index()
+            index = self.mesh.ds.boundary_face_index()
             if callable(threshold):
                 bc = self.mesh.entity_barycenter(TD-1, index=index)
                 flag = threshold(bc)
                 index = index[flag]
 
         gdof = self.number_of_global_dofs()
+        face2dof = self.face_to_dof()
         isBdDof = np.zeros(gdof, dtype=np.bool_)
-        isBdDof[index] = True
+        isBdDof[face2dof[index]] = True
         return isBdDof
 
     def face_to_dof(self, index=np.s_[:]):

@@ -4,10 +4,10 @@ from ..functionspace import ScaledMonomialSpace2d, ScaledMonomialSpace3d
 
 
 class ScaledMonomialSpaceMassIntegrator2d:
+    def __init__(self, q=3):
+        self.q = q
 
     def assembly_cell_matrix(self, space: ScaledMonomialSpace2d):
-        """
-        """
         p = space.p
         mesh = space.mesh
         node = mesh.entity('node')
@@ -18,8 +18,9 @@ class ScaledMonomialSpaceMassIntegrator2d:
 
         NC = mesh.number_of_cells()
 
-        qf = GaussLegendreQuadrature(p + 1)
-        bcs, ws = qf.quadpts, qf.weights
+        qf = mesh.integrator(p+1, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         phi0 = space.basis(ps, index=edge2cell[:, 0], p=p)
         phi1 = space.basis(ps[:, isInEdge, :], index=edge2cell[isInEdge, 1], p=p)
@@ -33,7 +34,7 @@ class ScaledMonomialSpaceMassIntegrator2d:
         H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
         ldof = space.number_of_local_dofs(p=p, doftype='cell')
-        H = np.zeros((NC, ldof, ldof), dtype=np.float)
+        H = np.zeros((NC, ldof, ldof), dtype=space.ftype)
         np.add.at(H, edge2cell[:, 0], H0)
         np.add.at(H, edge2cell[isInEdge, 1], H1)
 
@@ -46,6 +47,9 @@ class ScaledMonomialSpaceMassIntegrator2d:
         pass
 
 class ScaledMonomialSpaceMassIntegrator3d:
+    def __init__(self, q=3):
+        self.q = 3
+
     def assembly_cell_matrix(self, space: ScaledMonomialSpace3d):
         """
         """

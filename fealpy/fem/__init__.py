@@ -12,6 +12,7 @@ from .TrussStructureIntegrator import TrussStructureIntegrator
 from .MassIntegrator import MassIntegrator
 from .DiffusionIntegrator import DiffusionIntegrator
 from .ConvectionIntegrator import ConvectionIntegrator
+from .LinearElasticityOperatorIntegrator import LinearElasticityOperatorIntegrator
 
 from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangentOperatorIntegrator
 
