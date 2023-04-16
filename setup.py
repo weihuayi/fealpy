@@ -36,7 +36,7 @@ setup(
     zip_safe=False,
     extras_require={
         "doc": ["sphinx", "recommonmark", "sphinx-rtd-theme"],
-        "dev": ["pytest>=3.6", "pytest-cov", "codecov", "bump2version"],
+        "dev": ["pytest>=3.6", "pytest-cov", "bump2version"],
     },
     include_package_data=True,
     python_requires=">=3.6",

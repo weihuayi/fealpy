@@ -136,7 +136,7 @@ class Mesh2d(Mesh):
         edge = self.entity('edge')
         NE = self.number_of_edges()
         v = node[edge[index, -1],:] - node[edge[index, 0],:]
-        length = np.sqrt(np.sum(v**2, axis=1))
+        length = np.linalg.norm(v, axis=1)
         v /= length.reshape(-1, 1)
         return v
 
@@ -210,6 +210,7 @@ class Mesh2d(Mesh):
             if self.geo_dimension() == 2:
                 poly = PolyCollection(node[cell[:, self.ds.ccw], :])
             else:
+                import mpl_toolkits.mplot3d as a3
                 poly = a3.art3d.Poly3DCollection(node[cell[:, self.ds.ccw], :])
         else:
             if self.meshtype == 'polygon':
