@@ -31,9 +31,9 @@ class GeneralSampler(Protocol):
 
 _GD = TypeVar('_GD', bound=int, covariant=True)
 _TD = TypeVar('_TD', bound=int, covariant=True)
+_NVC = TypeVar('_NVC', bound=int, covariant=True)
 
-
-class MeshLike(Protocol[_GD, _TD]):
+class MeshLike(Protocol[_GD, _TD, _NVC]):
     def geo_dimension(self) -> _GD: ...
     def top_dimension(self) -> _TD: ...
 
@@ -45,5 +45,7 @@ class MeshLike(Protocol[_GD, _TD]):
     def cell_bc_to_point(self, bc: NDArray) -> NDArray: ...
 
 
-TriangleMesh = MeshLike[Literal[2], Literal[2]]
-TetrahedronMesh = MeshLike[Literal[3], Literal[3]]
+TriangleMesh = MeshLike[int, Literal[2], Literal[3]]
+QuadrangleMesh = MeshLike[int, Literal[2], Literal[4]]
+
+TetrahedronMesh = MeshLike[int, Literal[3], Literal[4]]

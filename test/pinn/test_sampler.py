@@ -4,7 +4,8 @@ from fealpy.pinn.sampler import (
     ISampler,
     BoxBoundarySampler,
     TriangleMeshSampler,
-    TetrahedronMeshSampler
+    TetrahedronMeshSampler,
+    QuadrangleMeshSampler
 )
 from fealpy.pinn.sampler.sampler import JoinedSampler, HybridSampler
 from fealpy.mesh import MeshFactory as Mf
@@ -59,6 +60,18 @@ class TestSimple():
         _valified_range(out[:, 0], 0, 1)
         _valified_range(out[:, 1], 1, 3)
         _valified_range(out[:, 2], 2, 5)
+
+
+    def test_quadsampler(self):
+        mesh = Mf.boxmesh2d([0, 1, 1, 2], nx=10, ny=10, meshtype='quad')
+        s = QuadrangleMeshSampler(10, mesh)
+        assert s.m == 1000
+        assert s.nd == 2
+
+        out = s.run()
+        assert out.shape == (1000, 2)
+        _valified_range(out[:, 0], 0, 1)
+        _valified_range(out[:, 1], 1, 2)
 
 
 class TestCombiation():
