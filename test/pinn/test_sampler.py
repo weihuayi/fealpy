@@ -3,8 +3,8 @@ import torch
 from fealpy.pinn.sampler import (
     ISampler,
     BoxBoundarySampler,
-    TriangleMeshSampler,
-    TetrahedronMeshSampler,
+    get_mesh_sampler,
+    TMeshSampler,
     QuadrangleMeshSampler
 )
 from fealpy.pinn.sampler.sampler import JoinedSampler, HybridSampler
@@ -39,7 +39,8 @@ class TestSimple():
 
     def test_trisampler(self):
         mesh = Mf.boxmesh2d([0, 2, 0, 3], nx=10, ny=10, meshtype='tri')
-        s = TriangleMeshSampler(10, mesh)
+        s = get_mesh_sampler(10, mesh)
+        assert isinstance(s, TMeshSampler)
         assert s.m == 2000
         assert s.nd == 2
 
@@ -51,7 +52,8 @@ class TestSimple():
 
     def test_tetsampler(self):
         mesh = Mf.boxmesh3d([0, 1, 1, 3, 2, 5], nx=5, ny=5, nz=5, meshtype='tet')
-        s = TetrahedronMeshSampler(10, mesh)
+        s = get_mesh_sampler(10, mesh)
+        assert isinstance(s, TMeshSampler)
         assert s.m == 7500
         assert s.nd == 3
 
@@ -64,7 +66,8 @@ class TestSimple():
 
     def test_quadsampler(self):
         mesh = Mf.boxmesh2d([0, 1, 1, 2], nx=10, ny=10, meshtype='quad')
-        s = QuadrangleMeshSampler(10, mesh)
+        s = get_mesh_sampler(10, mesh)
+        assert isinstance(s, QuadrangleMeshSampler)
         assert s.m == 1000
         assert s.nd == 2
 

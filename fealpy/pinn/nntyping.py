@@ -3,8 +3,6 @@ from typing import (
     Optional,
     Union,
     Protocol,
-    TypeVar,
-    Literal
 )
 
 
@@ -14,7 +12,6 @@ from numpy.typing import NDArray
 
 dtype = Optional[bool]
 TensorOrArray = Union[Tensor, NDArray]
-# Mesh = Union[Mesh2d, Mesh3d]
 
 TensorFunction = Callable[[Tensor], Tensor]
 VectorFunction = Callable[[NDArray], NDArray]
@@ -29,13 +26,12 @@ class GeneralSampler(Protocol):
     def nd(self) -> int: ...
     def run(self) -> Tensor: ...
 
-_GD = TypeVar('_GD', bound=int, covariant=True)
-_TD = TypeVar('_TD', bound=int, covariant=True)
-_NVC = TypeVar('_NVC', bound=int, covariant=True)
 
-class MeshLike(Protocol[_GD, _TD, _NVC]):
-    def geo_dimension(self) -> _GD: ...
-    def top_dimension(self) -> _TD: ...
+class MeshLike(Protocol):
+    """A simple protocal for meshes."""
+    def geo_dimension(self) -> int: ...
+    def top_dimension(self) -> int: ...
+    def number_of_nodes_of_cells(self) -> int: ...
 
     def entity(self, etype: Union[str, int]='cell') -> NDArray: ...
     def entity_measure(self, etype: Union[str, int]=3, index=np.s_[:]) -> NDArray: ...
@@ -43,9 +39,3 @@ class MeshLike(Protocol[_GD, _TD, _NVC]):
 
     def integrator(self, q: int, etype: Union[int, str]): ...
     def cell_bc_to_point(self, bc: NDArray) -> NDArray: ...
-
-
-TriangleMesh = MeshLike[int, Literal[2], Literal[3]]
-QuadrangleMesh = MeshLike[int, Literal[2], Literal[4]]
-
-TetrahedronMesh = MeshLike[int, Literal[3], Literal[4]]
