@@ -9,7 +9,7 @@ class NonlinearSolver:
     def newton_raphson(self, u, f, calculate_P, calculate_Kt):
         iter = 0
         c = 0
-        uold = u.copy()
+        uold = u
         P = calculate_P(u)
         R = f - P
         conv = np.sum(R**2)/(1+np.sum(f**2))
@@ -29,7 +29,7 @@ class NonlinearSolver:
             R = f - P
             conv = np.sum(R**2)/(1+np.sum(f**2))
             c = abs(0.9-u[1])/abs(0.9-uold[1])**2 if len(u) > 1 else 0
-            uold = u.copy()
+            uold = u
             iter += 1
 
             if len(u) == 1:
@@ -77,4 +77,80 @@ class NonlinearSolver:
 
         return u
 
+
+    def modified_newton_raphson(self, u, f, calculate_P, calculate_Kt):
+        iter = 0
+        c = 0
+        uold = u
+        P = calculate_P(u)
+        R = f - P
+        conv = np.sum(R**2)/(1+np.sum(f**2))
+
+        if len(u) == 1:
+            print('iter   u1          conv      c')
+            print(f'{iter:3d} {u[0]:7.5f} {conv:12.3e} {c:7.5f}')
+        else:
+            print('iter   u1      u2          conv      c')
+            print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+
+        Kt = calculate_Kt(u)
+        while conv > self.tol and iter < self.max_iter:
+            delu = np.linalg.solve(Kt, R)
+            u = uold + delu
+            P = calculate_P(u)
+            R = f - P
+            conv = np.sum(R**2)/(1+np.sum(f**2))
+            c = abs(0.9-u[1])/abs(0.9-uold[1])**2 if len(u) > 1 else 0
+            uold = u
+            iter += 1
+
+            if len(u) == 1:
+                print(f'{iter:3d} {u[0]:7.5f} {conv:12.3e} {c:7.5f}')
+            else:
+                print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+
+        return u
+
+
+    def incremental_secant(self, u, f, calculate_P, calculate_Kt):
+        iter = 0
+        c = 0
+        uold = u
+        P = calculate_P(u)
+        Pold = P
+        R = f - P
+        if f == 0:
+            conv = np.sum(R**2)
+        else:
+            conv = np.sum(R**2)/(1+np.sum(f**2))
+
+        if len(u) == 1:
+            print('iter   u1          conv      c')
+            print(f'{iter:3d} {u[0]:7.5f} {conv:12.3e} {c:7.5f}')
+        else:
+            print('iter   u1      u2          conv      c')
+            print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+
+        Ks = calculate_Kt(u)
+        while conv > self.tol and iter < self.max_iter:
+            delu = R / Ks # delu 2D-ndarray 
+            u = uold + delu.reshape(-1)
+            P = calculate_P(u)
+            R = f - P
+            if f == 0:
+                conv = np.sum(R**2)
+            else:
+                conv = np.sum(R**2)/(1+np.sum(f**2))
+            c = abs(u[0]) / abs(uold[0])**2 
+            Ks = (P-Pold) / (u-uold) # 割线矩阵 
+            uold = u
+            Pold = P
+            iter += 1
+
+            if len(u) == 1:
+                print(f'{iter:3d} {u[0]:7.5f} {conv:12.3e} {c:7.5f}')
+            else:
+                print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+
+        return u
     # ... 其他方法 ...
