@@ -59,7 +59,7 @@ def test_tetrahedron_mesh():
 
     p=1
     mesh = TetrahedronMesh.from_one_tetrahedron()
-    mesh.uniform_refine()
+    mesh.uniform_refine(n=1)
     space = Space(mesh, p=p)
 
     bform = BilinearForm(space)
@@ -148,8 +148,8 @@ def test_linear_elasticity_model():
 
 
 if __name__ == '__main__':
-    test_linear_elasticity_model()
-    #test_tetrahedron_mesh()
+    #test_linear_elasticity_model()
+    test_tetrahedron_mesh()
     #test_triangle_mesh()
     #test_truss_structure()
 
