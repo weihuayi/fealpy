@@ -1,12 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from typing import Callable 
+
 class NonlinearSolver:
-    def __init__(self, tol, max_iter):
+    def __init__(self, tol: np.float_, max_iter: np.int_):
         self.tol = tol
         self.max_iter = max_iter
 
-    def newton_raphson(self, u, f, calculate_P, calculate_Kt):
+    def newton_raphson(self, u: np.ndarray, f: np.ndarray, 
+                       calculate_P: Callable[[np.ndarray], np.ndarray], 
+                       calculate_Kt: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+        """
+        使用 Newton-Raphson 方法求解非线性方程组
+
+        @param u: 初始向量值
+        @param f: 非线性方程组右侧的常数向量
+        @param calculate_P: 计算非线性方程组的函数
+        @param calculate_Kt: 计算切线刚度矩阵的函数
+        @return: 非线性方程组的解
+        """
         iter = 0
         c = 0
         uold = u
@@ -78,13 +91,27 @@ class NonlinearSolver:
         return u
 
 
-    def modified_newton_raphson(self, u, f, calculate_P, calculate_Kt):
+    def modified_newton_raphson(self, u: np.ndarray, f: np.ndarray, 
+                       calculate_P: Callable[[np.ndarray], np.ndarray], 
+                       calculate_Kt: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+        """
+        使用修正的 Newton-Raphson 方法求解非线性方程组
+
+        @param u: 初始向量值
+        @param f: 非线性方程组右侧的常数向量
+        @param calculate_P: 计算非线性方程组的函数
+        @param calculate_Kt: 计算切线刚度矩阵的函数
+        @return: 非线性方程组的解
+        """
         iter = 0
         c = 0
         uold = u
         P = calculate_P(u)
         R = f - P
-        conv = np.sum(R**2)/(1+np.sum(f**2))
+        if f == 0:
+            conv = np.sum(R**2)
+        else:
+            conv = np.sum(R**2)/(1+np.sum(f**2))
 
         if len(u) == 1:
             print('iter   u1          conv      c')
