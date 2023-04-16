@@ -47,9 +47,7 @@ class LearningMachine():
         param = next(self.solution.parameters())
 
         if param is not None:
-            device = param.device
-            if device[0:4] == "cuda":
-                inputs = inputs.cuda(int(device[5:]))
+            inputs = inputs.to(param.device)
 
         outputs = func(inputs, self.solution.forward)
 
