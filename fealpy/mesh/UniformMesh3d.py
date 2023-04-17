@@ -659,6 +659,16 @@ class UniformMesh3d(Mesh3d):
 
         @throws ValueError if the given etype is invalid.
         """
+        if etype in {'cell', 3}:
+            return self.ds.cell
+        elif etype in {'face', 2}:
+            return self.ds.face
+        elif etype in {'edge', 1}:
+            return self.ds.edge
+        elif etype in {'node', 0}:
+            return self.node.reshape(-1, 3)
+        else:
+            raise ValueError("`etype` is wrong!")
         pass
 
     ## @ingroup FEMInterface

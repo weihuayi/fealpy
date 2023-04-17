@@ -124,54 +124,50 @@ class StructureMesh3dDataStructure():
 
         # x direction
         NF0 = 0
-        NF1 = ny * nz
-        face2cell[NF0:NF1, 0] = idx[0].flatten()
-        face2cell[NF0:NF1, 1] = idx[0].flatten()
-        face2cell[NF0:NF1, 2:4] = 0
+        NF1 = (nx+1) * ny * nz
+        face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
+        face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
+        face2cell[NF0:NF1-ny*nz, 2] = 0
+        face2cell[NF0:NF1-ny*nz, 3] = 1
 
-        NF0 = NF1
-        NF1 += nx * ny * nz
-        face2cell[NF0:NF1, 0] = idx.flatten()
-        face2cell[NF0:NF1, 2] = 1
-        face2cell[NF0:NF1 - ny * nz, 1] = idx[1:].flatten()
-        face2cell[NF0:NF1 - ny * nz, 3] = 0
-        face2cell[NF1 - ny * nz:NF1, 1] = idx[-1].flatten()
-        face2cell[NF1 - ny * nz:NF1, 3] = 1
+        face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
+        face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
+        face2cell[NF1-ny*nz:NF1, 2] = 1
+        face2cell[NF0:NF0+ny*nz, 3] = 0
 
         # y direction
-        c = np.transpose(idx, (1, 0, 2))
+        idy = np.swapaxes(idx, 1, 0)
         NF0 = NF1
-        NF1 += nx * nz
-        face2cell[NF0:NF1, 0] = c[0].flatten()
-        face2cell[NF0:NF1, 1] = c[0].flatten()
-        face2cell[NF0:NF1, 2:4] = 2
+        NF1 += nx * (ny+1) * nz
 
-        NF0 = NF1
-        NF1 += nx * ny * nz
-        face2cell[NF0:NF1, 0] = c.flatten()
-        face2cell[NF0:NF1, 2] = 3
-        face2cell[NF0:NF1 - nx * nz, 1] = c[1:].flatten()
-        face2cell[NF0:NF1 - nx * nz, 3] = 2
-        face2cell[NF1 - nx * nz:NF1, 1] = c[-1].flatten()
-        face2cell[NF1 - nx * nz:NF1, 3] = 3
+        fidy = np.arange(NF0, NF1).reshape(nx, ny+1, nz).swapaxes(0, 1)
+
+        face2cell[fidy[:-1], 0] = idy
+        face2cell[fidy[1:], 1] = idy
+        face2cell[fidy[:-1], 2] = 0
+        face2cell[fidy[1:], 3] = 1
+
+        face2cell[fidy[-1], 0] = idy[-1]
+        face2cell[fidy[0], 1] = idy[0]
+        face2cell[fidy[-1], 2] = 1
+        face2cell[fidy[0], 3] = 0
 
         # z direction
-        c = np.transpose(idx, (2, 0, 1))
+        idz = np.transpose(idx, (2, 0, 1))
         NF0 = NF1
-        NF1 += nx * ny
-        face2cell[NF0:NF1, 0] = c[0].flatten()
-        face2cell[NF0:NF1, 1] = c[0].flatten()
-        face2cell[NF0:NF1, 2:4] = 4
+        NF1 += nx * ny * (nz + 1)
 
-        NF0 = NF1
-        NF1 += nx * ny * nz
-        face2cell[NF0:NF1, 0] = c.flatten()
-        face2cell[NF0:NF1, 2] = 5
-        face2cell[NF0:NF1 - nx * ny, 1] = c[1:].flatten()
-        face2cell[NF0:NF1 - nx * ny, 3] = 4
-        face2cell[NF1 - nx * ny:NF1, 1] = c[-1].flatten()
-        face2cell[NF1 - nx * ny:NF1, 3] = 5
+        fidz = np.arange(NF0, NF1).reshape(nx, ny, nz+1).transpose(2, 0, 1)
 
+        face2cell[fidz[:-1], 0] = idz
+        face2cell[fidz[1:], 1] = idz
+        face2cell[fidz[:-1], 2] = 0
+        face2cell[fidz[1:], 3] = 1
+
+        face2cell[fidz[-1], 0] = idz[-1]
+        face2cell[fidz[0], 1] = idz[0]
+        face2cell[fidz[-1], 2] = 1
+        face2cell[fidz[0], 3] = 0
         return face2cell
 
     @property

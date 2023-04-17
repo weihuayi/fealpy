@@ -54,12 +54,12 @@ class NDof2d:
         isBdDof[edge2dof[idx]] = True
         return isBdDof
 
-    def edge_to_dof(self):
+    def edge_to_dof(self, index=np.s_[:]):
         mesh = self.mesh
         NE = mesh.number_of_edges()
         edof = self.number_of_local_dofs('edge')
         edge2dof = np.arange(NE * edof).reshape(NE, edof)
-        return edge2dof
+        return edge2dof[index]
 
     def cell_to_dof(self):
         """
@@ -142,7 +142,7 @@ class FirstNedelecFiniteElementSpace2d:
         -----
         """
 
-        # 每个单元上的全部自由度个数
+                # 每个单元上的全部自由度个数
         ldof = self.number_of_local_dofs(doftype='all')
         edof = self.number_of_local_dofs(doftype='edge')
 
@@ -359,8 +359,12 @@ class FirstNedelecFiniteElementSpace2d:
             if isinstance(c, (int, float)):
                 M = np.einsum('i, ijkd, ijmd, j->jkm', c * ws, phi, phi,
                               self.cellmeasure, optimize=True)
-            else:
-                M = np.einsum('i, ij, ijkd, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+            elif isinstance(c, np.ndarray):
+                if len(c.shape)==2:
+                    M = np.einsum('i, ij, ijkd, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+                elif len(c.shape)==4:
+                    print("aaa")
+                    M = np.einsum('i, ijdl, ijkd, ijml, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
 
@@ -369,6 +373,46 @@ class FirstNedelecFiniteElementSpace2d:
 
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
+
+    def edge_basis(self, bcs, index=np.s_[:]):
+        """
+        @brief 计算每条边上的 v \cdot t(即 n \times v) 在重心坐标处的值.
+                对于线性元，这个值就是 1/e
+        """
+        em = self.mesh.entity_measure("edge", index=index)
+        shape = bcs.shape[:-1] + (len(em), )
+        val = np.broadcast_to(1/em, shape,) #(NQ, NE)
+        return val
+
+    def edge_mass_matrix(self, c = 1, index=np.s_[:]):
+        """
+        @brief (n \times u, n \times v)_{Gamma_{robin}}
+               注意 : n_i \times \phi_i = 1/e_i
+        @param c 系数, 现在只考虑了 c 是常数的情况
+        """
+        edge2dof = self.dof.edge_to_dof(index=index)
+        em = self.mesh.entity_measure("edge", index=index)
+        gdof = self.dof.number_of_global_dofs()
+
+        EM = c*csr_matrix((em.flat, (edge2dof.flat, edge2dof.flat)), shape=(gdof, gdof))
+        return EM
+
+    def robin_vector(self, f, isRobinEdge):
+        """
+        @brief 计算 (f, n\times v)_{\Gamma_{robin}} 其中 n \times v = 1/e
+        """
+        eint = self.integralalg.edgeintegrator
+        bcs, ws = eint.get_quadrature_points_and_weights()
+        n = self.mesh.edge_unit_normal()[isRobinEdge]
+
+        point = self.mesh.bc_to_point(bcs, index=isRobinEdge)
+        fval = f(point, n)
+
+        e2dof = self.dof.edge_to_dof(index=isRobinEdge)
+        gdof = self.dof.number_of_global_dofs()
+        F = np.zeros(gdof, dtype=np.float_)
+        F[e2dof] = np.einsum("qe, q->e", fval, ws)[:, None] 
+        return F
 
     def curl_matrix(self, c=None, q=None):
         """
@@ -399,6 +443,7 @@ class FirstNedelecFiniteElementSpace2d:
             if isinstance(c, (int, float)):
                 M = np.einsum('i, ijk, ijm, j->jkm', c * ws, phi, phi, cellmeasure, optimize=True)
             else:
+                print("aaa")
                 M = np.einsum('q, qc, qck..., qcm..., c->ckm', ws, c, phi, phi, cellmeasure, optimize=True)
 
         cell2dof = self.cell_to_dof()
@@ -415,6 +460,9 @@ class FirstNedelecFiniteElementSpace2d:
         gdof = self.number_of_global_dofs()
         b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof)
         return b
+
+    def face_mass_matrix(self):
+        pass
 
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """

@@ -196,10 +196,6 @@ class DoubleBandY():
         return self(p)
 
     def gradient(self, p):
-        k = self.k
-        b = self.b
-        l = self.l
-
         val = self(p)
 
         x = p[..., 0] - self.center[0]
