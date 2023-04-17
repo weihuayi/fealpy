@@ -64,7 +64,10 @@ class Mesh1d(Mesh):
 
             return ipoint
 
-    def cell_to_ipoint(self, p):
+    def node_to_ipoint(self, p, index=np.s_[:]):
+        return np.arange(self.number_of_nodes())
+
+    def cell_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取网格边与插值点的对应关系
         """
@@ -76,16 +79,10 @@ class Mesh1d(Mesh):
         cell2ipoints[:, [0, -1]] = cell
         if p > 1:
             cell2ipoints[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
-        return cell2ipoints
-    
-    def edge_to_ipoint(self, p, index=np.s_[:]):
-        return self.cell_to_ipoint()
+        return cell2ipoints[index]
 
-    def face_to_ipoint(self, p, index=np.s_[:]):
-        return self.node_to_ipoint()
-
-    def node_to_ipoint(self, p, index=np.s_[:]):
-        raise NotImplementedError
+    edge_to_ipoint = cell_to_ipoint
+    face_to_ipoint = node_to_ipoint
 
     def multi_index_matrix(self, p, etype=1):
         ldof = p+1

@@ -253,8 +253,8 @@ class TetrahedronMesh(Mesh3d):
         NC = self.number_of_cells()
         GD = self.geo_dimension()
 
-        ldof = self.number_of_local_ipoints()
-        gdof = self.number_of_global_ipoints()
+        ldof = self.number_of_local_ipoints(p)
+        gdof = self.number_of_global_ipoints(p)
         ipoints = np.zeros((gdof, GD), dtype=self.ftype)
         ipoints[:NN, :] = node
 
@@ -267,18 +267,18 @@ class TetrahedronMesh(Mesh3d):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, GD) 
 
         if p > 2:
+            mi = self.multi_index_matrix(p, 'face') 
             NF = self.number_of_faces()
             fidof = (p+1)*(p+2)//2 - 3*p
             face = self.entity('face') 
-            isEdgeIPoints = (self.multi_index_matrix(p, 'face') == 0)
-            isInFaceIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] | isEdgeIPoints[:, 2])
-            w = self.multi_index_matrix(p, 'face')[isInFaceDof, :]/p
-            ipoints[NN+(p-1)*NE:NN+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, node[face,:]).reshape(-1, GD)
+            isInFaceIPoints = np.sum(mi > 0, axis=-1) == 3
+            w = mi[isInFaceIPoints, :]/p
+            ipoints[NN+(p-1)*NE:NN+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, node[face, :]).reshape(-1, GD)
 
         if p > 3:
-            isFaceIPoints = self.multi_index_matrix(p, 'cell')
-            isInCellIPoints = ~(isFaceIPoints[:,0] | isFaceIPoints[:,1] | isFaceIPoints[:,2] | isFaceIPoints[:, 3])
-            w = self.multi_index_matrix(p, 'cell')[isInCellIPoints, :]/p
+            mi = self.multi_index_matrix(p, 'cell') 
+            isInCellIPoints = np.sum(mi > 0, axis=-1) == 4
+            w = mi[isInCellIPoints, :]/p
             ipoints[NN+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell,:]).reshape(-1, GD)
         return ipoints
@@ -372,61 +372,6 @@ class TetrahedronMesh(Mesh3d):
         fdof = (p+1)*(p+2)//2
         ldof = (p+1)*(p+2)*(p+3)//6 
 
-        localFace = self.ds.localFace 
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NF = self.number_of_faces()
-        NC = self.number_of_cells()
-
-        face = self.entity('face')
-        cell = self.entity('cell')
-        cell2face = self.ds.cell_to_face()
-
-        cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
-
-        face2ipoint = self.face_to_ipoint(p)
-        isFaceIPoint = self.multi_index_matrix(p) == 0
-        faceIdx = self.multi_index_matrix(p, 'face').T
-
-        for i in range(4):
-            fi = face[cell2face[:, i]] # 第 i 个全局面 
-            idxi = np.argsort(fi, axis=1) # 第 i 个全局面顶点做一个排序
-
-            fj = cell[:, localFace[i]] # 第 i 个局部面
-            idxj = np.argsort(fj, axis=1) # 第 i 个局部面的顶点编号做一个排序
-            idxjr = np.argsort(idxj, axis=1) # 第 i 个局部面
-
-            idx = idxi[np.arange(NC).reshape(-1, 1), idxjr] # 
-
-            isCase0 = (np.sum(idx == np.array([1, 2, 0]), axis=1) == 3)
-            isCase1 = (np.sum(idx == np.array([2, 0, 1]), axis=1) == 3)
-            idx[isCase0, :] = [2, 0, 1]
-            idx[isCase1, :] = [1, 2, 0]
-            k = faceIdx[idx[:, 1], :] + faceIdx[idx[:, 2], :]
-            a = k*(k+1)//2 + faceIdx[idx[:, 2], :]
-            cell2ipoint[:, isFaceIPoint[:, i]] = face2ipoint[cell2face[:, [i]], a]
-
-        if p > 3:
-            base = NN + (p-1)*NE + (fdof - 3*p)*NF
-            idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
-            isInCellIPoint = ~(isFaceIPoint[:, 0] | isFaceIPoint[:, 1] | isFaceIPoint[:, 2] | isFaceIPoint[:, 3])
-            cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
-
-        return cell2ipoint
-
-    def cell_to_ipoint_1(self, p):
-        """
-        @brief 获取单元与插值点的对应关系
-
-        @param[in] p 正整数
-
-        @return  cell2ipoints 数组， 形状为 (NC, ldof)
-        """
-
-        edof = p+1
-        fdof = (p+1)*(p+2)//2
-        ldof = (p+1)*(p+2)*(p+3)//6 
-
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NF = self.number_of_faces()
@@ -467,6 +412,7 @@ class TetrahedronMesh(Mesh3d):
             cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
 
         return cell2ipoint
+
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 3}:

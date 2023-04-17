@@ -218,14 +218,12 @@ class IntervalMesh(Mesh1d):
             newCell[:NC][isMarkedCell, 1] = range(NN, NN+N)
             newCell[NC:, 0] = range(NN, NN+N)
             newCell[NC:, 1] = cell[isMarkedCell, 1]
-            print(newCell)
-            print(self.node)
 
             self.ds.reinit(NN+N, newCell)
 
     @classmethod
     def from_interval_domain(cls, domain, nx=10):
-        node = np.linspace(domain[0], domain[1], nx+1, dtype=np.float64).reshape(-1, 1)
+        node = np.linspace(domain[0], domain[1], nx+1, dtype=np.float64)
         cell = np.zeros((nx, 2), dtype=np.int_)
         cell[:, 0] = np.arange(0, nx)
         cell[:, 1] = np.arange(1, nx+1)
@@ -329,3 +327,8 @@ class IntervalMeshDataStructure():
         isBdCell = self.boundary_cell_flag()
         idx, = np.nonzero(isBdCell)
         return idx 
+
+    boundary_face_index = boundary_node_index
+    boundary_edge_index = boundary_cell_index
+
+

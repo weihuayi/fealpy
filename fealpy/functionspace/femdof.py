@@ -95,7 +95,7 @@ class CPLFEMDof1d():
             NN = mesh.number_of_nodes()
             NC = mesh.number_of_cells()
             ldof = self.number_of_local_dofs()
-            cell2dof = np.zeros((NC, ldof), dtype=np.int)
+            cell2dof = np.zeros((NC, ldof), dtype=self.mesh.itype)
             cell2dof[:, [0, -1]] = cell
             cell2dof[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
             return cell2dof
