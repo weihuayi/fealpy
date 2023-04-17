@@ -46,7 +46,10 @@ class LinearElasticityOperatorIntegrator:
 
         A = [np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure, optimize=True) for i, j in idx]
 
-        D = mu*np.sum(A)
+        D = 0
+        for i in range(GD):
+            D += mu*A[imap[(i, i)]]
+        
         if space[0].doforder == 'sdofs': # 标量自由度优先排序 
             for i in range(GD):
                 for j in range(i, GD):
