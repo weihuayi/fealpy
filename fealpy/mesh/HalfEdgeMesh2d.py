@@ -465,6 +465,9 @@ class HalfEdgeMesh2d(Mesh2d):
         else:
             raise ValueError("`entitytype` is wrong!")
 
+    def geo_dimension(self):
+        return self.node.shape[1]
+
     def entity_barycenter(self, etype='cell', index=np.s_[:]):
         node = self.entity('node')
         GD = self.geo_dimension()
