@@ -16,22 +16,26 @@ class DiffusionIntegrator:
         """
         coef = self.coef
         q = self.q
-        mesh = space.mesh
+        if not isinstance(space, tuple): 
+            space0 = space
+        else:
+            GD = len(space)
+            space0 = space[0]
+        
+        mesh = space0.mesh
         GD = mesh.geo_dimension()
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
         NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs() 
-        if out is None:
-            D = np.zeros((NC, ldof, ldof), dtype=space.ftype)
-        else:
-            D = out
+        ldof = space0.number_of_local_dofs() 
+
+        D = np.zeros((NC, ldof, ldof), dtype=space0.ftype)
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         NQ = len(ws)
 
-        phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space0.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
 
@@ -62,8 +66,28 @@ class DiffusionIntegrator:
             else:
                 raise ValueError("coef不支持该类型")
 
-        if out is None:
-            return D
+        if not isinstance(space, tuple): 
+            if out is None:
+                return D
+            else:
+                assert out.shape == (NC, ldof, ldof)
+                out += D
+        else:
+            if out is None:
+                VD = n.zeros((NC, GD*ldof, GD*ldof), dtype=space.ftype)
+            else:
+                assert out.shape == (NC, GD*ldof, GD*ldof)
+                VD = out
+            
+            if space0.doforder == 'sdofs':
+                for i in range(GD):
+                    VD[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D
+            elif space0.doforder == 'vdims':
+                for i in range(GD):
+                    VD[:, i::GD, i::GD] += D 
+            
+            if out is None:
+                return VM
 
 
     def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):

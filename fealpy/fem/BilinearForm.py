@@ -110,6 +110,7 @@ class BilinearForm:
                             self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
 
             elif space[0].doforder == 'vdims':
+                print("asda")
                 for i in range(GD):
                     for j in range(i, GD):
                         if i==j:
@@ -125,8 +126,6 @@ class BilinearForm:
 
                             val = CM[:, j::GD, i::GD] 
                             self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
-
-
 
     def fast_assembly(self):
         """
