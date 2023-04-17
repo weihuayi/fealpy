@@ -1,12 +1,12 @@
 import numpy as np
 
 
-class MassIntegrator:
+class ScalarMassIntegrator:
     """
     @note (c u, v)
     """    
 
-    def __init__(self, c=None, q=3):
+    def __init__(self, c=None, q=None):
         self.coef = c
         self.q = q
 
@@ -15,27 +15,27 @@ class MassIntegrator:
         """
         @note 没有参考单元的组装方式
         """
-        q = self.q
-        coef = self.coef
-        mesh = space.mesh
 
+        q = self.q if self.q is not None else space.p+1
+        coef = self.coef
+        
+        mesh = space.mesh
+ 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs() 
-        
+        ldof = space.number_of_local_dofs()  
+
         if out is None:
-            M = np.zeros((NC, ldof, ldof), dtype=space.ftype)
+            M = np.zeros((NC, ldof, ldof), dtype=space0.ftype)
         else:
             M = out
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-
-        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof, ...)
-        phi1 = phi0
+        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof)
 
         if coef is None:
             M += np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
@@ -50,16 +50,20 @@ class MassIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
-
             if np.isscalar(coef):
                 M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
-                M += np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                if coef.shape == (NC, ):
+                    M += np.einsum('q, c, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                else:
+                    M += np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
 
-        return M
-
+        if out is None:
+            returm M
+        
+    
     def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         @brief 基于无数值积分的组装方式
