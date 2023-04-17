@@ -16,6 +16,7 @@ from .ScalarSourceIntegrator import ScalarSourceIntegrator
 
 # Integrator for vector case
 from .VectorSourceIntegrator import VectorSourceIntegrator
+from .VectorDiffusionIntegrator import VectorDiffusionIntegrator
 
 from .TrussStructureIntegrator import TrussStructureIntegrator
 from .DiffusionIntegrator import DiffusionIntegrator
