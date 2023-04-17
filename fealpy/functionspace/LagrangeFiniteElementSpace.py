@@ -1132,7 +1132,7 @@ class LagrangeFiniteElementSpace():
         A = self.integralalg.serial_construct_matrix(b0, b1=b1, c=c, q=q)
         return A 
 
-    def source_vector(self, f, dim=None, q=None):
+    def source_vector(self, f, dim=1, q=None):
         """
         @brief 组装刚度矩阵
         """
@@ -1184,18 +1184,20 @@ class LagrangeFiniteElementSpace():
                 phi = self.basis(bcs)
                 bb = np.einsum('q, qc..., qci, c->ci...',
                         ws, fval, phi, self.cellmeasure)
-            cell2dof = self.cell_to_dof() #(NC, ldof)
 
-            shape = gdof if dim is None else (gdof, dim)
-            b = np.zeros(shape, dtype=bb.dtype)
-            if len(bb.shape) == 2:
-                np.add.at(b, cell2dof, bb)
-            elif len(bb.shape) == 3:
-                np.add.at(b, (cell2dof, np.s_[:]), bb)
+            if len(bb.shape) == 2: 
+                bb = bb[..., None]
+
+            cell2dof = self.cell_to_dof() #(NC, ldof)
+            b = np.zeros((gdof, dim), dtype=bb.dtype)
+            np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
             b = np.einsum('i, ic..., c->c...', ws, fval, cellmeasure)
 
-        return b
+        if dim == 1:
+            return b.reshape(-1)
+        else:
+            return b
 
 
     def grad_component_matrix(self):

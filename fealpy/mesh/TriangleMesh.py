@@ -74,7 +74,6 @@ class TriangleMesh(Mesh2d):
         """
         @brief 把重心坐标积分点变换到实际网格实体上的笛卡尔坐标点
         """
-
         TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
         node = self.node
         entity = self.entity(etype=TD)[index]
