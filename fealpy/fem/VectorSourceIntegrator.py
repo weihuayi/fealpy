@@ -1,14 +1,14 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from typing import TypedDict, Callable, Tuple, Union
+from typing import TypedDict, Callable, Tuple, Union, Optional
 
 
 class VectorSourceIntegrator():
 
     def __init__(self, 
             f: Union[Callable, int, float, NDArray], 
-            q: int=3):
+            q: Optional[int]=None):
         """
         @brief
 
@@ -16,7 +16,6 @@ class VectorSourceIntegrator():
         """
         self.f = f
         self.q = q
-        self.vector = None
 
     def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
@@ -29,31 +28,40 @@ class VectorSourceIntegrator():
             * (NC, GD) 分片常向量情形
             * (NQ, NC, GD) 变向量情形
         """
+        
+
+    def assembly_cell_vector_for_scalar_basis_vspace(self, index=n.s_[:],
+            cellmeasure=None, out=None):
+        """
+        @brief 组装单元向量
+
+        @param[in] space 
+        """
+        assert isinstance(space, tuple) # 假设向量空间是由标量空间组合而成
+
         f = self.f
-        q = self.q
 
-        if isinstance(space, tuple):
-            mesh = space[0].mesh # 向量空间是由标量空间组合而成
-        else:
-            mesh = space.mesh # 向量空间的基函数是向量函数
-
+        p = space[0].p
+        mesh = space[0].mesh # 获取网格对像
         GD = mesh.geo_dimension()
+
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs() 
+        ldof = space[0].number_of_local_dofs() 
         if out is None:
-            bb = np.zeros((NC, gdof), dtype=space.ftype)
+            if space[0].doforder == 'sdofs': # 标量基函数自由度排序优先
+                bb = np.zeros((NC, GD, ldof), dtype=space.ftype)
+            elif space[0].doforder == 'vdims': # 向量分量自由度排序优先
+                bb = np.zeros((NC, ldof, GD), dtype=space.ftype)
         else:
             bb = out
 
+        q = self.q if self.q is not None else p+1 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        if isinstance(space, tuple):
-            phi = space[0].basis(bcs, index=index)
-        else:
-            phi = space.basis(bcs, index=index)
+        phi = space[0].basis(bcs, index=index)
 
         if callable(f):
             if hasattr(f, 'coordtype'):
@@ -68,16 +76,97 @@ class VectorSourceIntegrator():
         else:
             val = f
 
-        if not isinstance(space, tuple):
-            bb += np.einsum('q, qcd, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
-        else:
+        if isinstance(val, (int, float)):
             if space[0].doforder == 'sdofs':
-                bb += np.einsum('q, qcd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                bb += np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)[:, None, :]
             elif space[0].doforder == 'vdims':
-                bb += np.einsum('q, qcd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
-            else:
-                raise ValueError(f"we don't support the space[0].doforder type: {space[0].doforder}")
+                bb += np.einsum('q, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)[:, :, None]
+        elif isinstance(val, np.ndarray):
+            if val.shape == (GD, ): # GD << NC
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, d, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, d, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            elif val.shape == (NC, GD): 
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, cd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, cd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            elif val.shape == (NQ, NC, GD):
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, qcd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, qcd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
 
         if out is None:
             return bb 
-        
+
+    def assembly_cell_vector_for_vector_basis_vspace():
+        """
+        @brief 组装单元向量
+
+        @param[in] space 
+        """
+
+        f = self.f
+
+        p = space[0].p
+        mesh = space[0].mesh # 获取网格对像
+        GD = mesh.geo_dimension()
+
+        if cellmeasure is None:
+            cellmeasure = mesh.entity_measure('cell', index=index)
+
+        NC = len(cellmeasure)
+        ldof = space[0].number_of_local_dofs() 
+        if out is None:
+            if space[0].doforder == 'sdofs': # 标量基函数自由度排序优先
+                bb = np.zeros((NC, GD, ldof), dtype=space.ftype)
+            elif space[0].doforder == 'vdims': # 向量分量自由度排序优先
+                bb = np.zeros((NC, ldof, GD), dtype=space.ftype)
+        else:
+            bb = out
+
+        q = self.q if self.q is not None else p+1 
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = space[0].basis(bcs, index=index)
+
+        if callable(f):
+            if hasattr(f, 'coordtype'):
+                if f.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    val = f(ps)
+                elif f.coordtype == 'barycentric':
+                    val = f(bcs, index=index)
+            else: # 默认是笛卡尔
+                ps = mesh.bc_to_point(bcs, index=index)
+                val = f(ps)
+        else:
+            val = f
+
+        if isinstance(val, (int, float)):
+            if space[0].doforder == 'sdofs':
+                bb += np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)[:, None, :]
+            elif space[0].doforder == 'vdims':
+                bb += np.einsum('q, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)[:, :, None]
+        elif isinstance(val, np.ndarray):
+            if val.shape == (GD, ): # GD << NC
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, d, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, d, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            elif val.shape == (NC, GD): 
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, cd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, cd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            elif val.shape == (NQ, NC, GD):
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, qcd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, qcd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+
+        if out is None:
+            return bb 
+        pass
