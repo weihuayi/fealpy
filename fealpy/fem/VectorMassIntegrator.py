@@ -1,10 +1,10 @@
 import numpy as np
 
-from .ScalarDiffusionIntegrator import ScalarDiffusionIntegrator 
+from .ScalarMassIntegrator import ScalarMassIntegrator 
 
-class VectorDiffusionIntegrator:
+class VectorMassIntegrator:
     """
-    @note (c \\grad u, \\grad v)
+    @note (c u, v)
     """    
     def __init__(self, c=None, q=None):
         self.coef = c
@@ -15,11 +15,11 @@ class VectorDiffusionIntegrator:
         @note 没有参考单元的组装方式
         """
         if isinstance(space, tuple): # 由标量空间组合而成的空间
-            self.assembly_cell_matrix_1(space, index=index, cellmeasure=cellmeasure, out=out)
+            self.assembly_cell_matrix_for_scalar_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
         else: # 空间基函数是向量函数
-            self.assembly_cell_matrix_0(space, index=index, cellmeasure=cellmeasure, out=out)
+            self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
 
-    def assembly_cell_matrix_0(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def assembly_cell_matrix_for_vector_basis_vspace(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 空间基函数是向量型
         """
@@ -44,24 +44,25 @@ class VectorDiffusionIntegrator:
         bcs, ws = qf.get_quadrature_points_and_weights()
         NQ = len(ws)
 
-        gphi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, GD, GD)
+        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof, GD)
 
         if coef is None:
-            D += np.einsum('q, qcimn, qcjmn, c->cij', ws, gphi0, gphi0, cellmeasure, optimize=True)
+            D += np.einsum('q, qcim, qcjm, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
 
         if out is None:
             return D
 
-    def assembly_cell_matrix_1(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def assembly_cell_matrix_for_scalar_basis_vspace(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 标量空间拼成的向量空间 
         """
-
+        
         GD = space[0].geo_dimension()
+        assert len(space) == GD
         ldof = space[0].number_of_local_dofs()
 
-        integrator = ScalarDiffusionIntegrator(self.coef, self.q)
+        integrator = ScalarMassIntegrator(self.coef, self.q)
         # 组装标量的单元扩散矩阵
         # D.shape == (NC, ldof, ldof)
         D = inegrator.assembly_cell_matrix(space, index=index, cellmeasure=cellmeasure)

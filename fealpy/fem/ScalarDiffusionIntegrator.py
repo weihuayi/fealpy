@@ -4,17 +4,16 @@ class ScalarDiffusionIntegrator:
     """
     @note (c \\grad u, \\grad v)
     """    
-    def __init__(self, c=None):
+    def __init__(self, c=None, q=None):
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
-            out=None, q=None):
+    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @note 没有参考单元的组装方式
         """
         p = space.p
-        q = p+3 if q is None else q
+        q = self.q if self.q is not None else p+1 
 
         coef = self.coef
         mesh = space.mesh
