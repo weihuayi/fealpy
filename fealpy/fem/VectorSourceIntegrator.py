@@ -24,12 +24,10 @@ class VectorSourceIntegrator():
 
         @param[in] space 
 
-        @todo 考虑向量和张量空间的情形
-        
-        @note 该函数有如下的情形需要考虑： 
-            * f 是标量 
-            * f 是标量函数 (NQ, NC)，基是标量函数 (NQ, NC, ldof)
-            * f 是向量函数 (NQ, NC, GD)， 基是向量函数 (NQ, NC, ldof, GD)
+        @note f 是一个向量函数，返回形状可以为
+            * (GD, ) 常向量情形
+            * (NC, GD) 分片常向量情形
+            * (NQ, NC, GD) 变向量情形
         """
         f = self.f
         q = self.q

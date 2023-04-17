@@ -1132,7 +1132,7 @@ class LagrangeFiniteElementSpace():
         A = self.integralalg.serial_construct_matrix(b0, b1=b1, c=c, q=q)
         return A 
 
-    def source_vector(self, f, dim=None, q=None):
+    def source_vector(self, f, dim=1, q=None):
         """
         @brief 组装刚度矩阵
         """
@@ -1178,25 +1178,26 @@ class LagrangeFiniteElementSpace():
                     return 0.0 
                 else:
                     phi = self.basis(bcs)
-                    bb = np.einsum('m, mik, i->ik...', 
-                            ws, phi, self.cellmeasure)
+                    bb = np.einsum('q, qci, c->ci', ws, phi, self.cellmeasure)
                     bb *= fval
             else:
                 phi = self.basis(bcs)
-                bb = np.einsum('m, mi..., mik, i->ik...',
+                bb = np.einsum('q, qc..., qci, c->ci...',
                         ws, fval, phi, self.cellmeasure)
+
+            if len(bb.shape) == 2: 
+                bb = bb[..., None]
+
             cell2dof = self.cell_to_dof() #(NC, ldof)
-
-            shape = gdof if dim is None else (gdof, dim)
-            b = np.zeros(shape, dtype=bb.dtype)
-            if dim is None:
-                np.add.at(b, cell2dof, bb)
-            else:
-                np.add.at(b, (cell2dof, np.s_[:]), bb)
+            b = np.zeros((gdof, dim), dtype=bb.dtype)
+            np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
-            b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
+            b = np.einsum('i, ic..., c->c...', ws, fval, cellmeasure)
 
-        return b
+        if dim == 1:
+            return b.reshape(-1)
+        else:
+            return b
 
 
     def grad_component_matrix(self):

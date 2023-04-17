@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class MassIntegrator:
+class ScalarMassIntegrator:
     """
     @note (c u, v)
     """    

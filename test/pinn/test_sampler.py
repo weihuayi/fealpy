@@ -1,13 +1,13 @@
 
 import torch
 from fealpy.pinn.sampler import (
-    JoinedSampler,
-    HybridSampler,
     ISampler,
     BoxBoundarySampler,
-    TriangleMeshSampler,
-    TetrahedronMeshSampler
+    get_mesh_sampler,
+    TMeshSampler,
+    QuadrangleMeshSampler
 )
+from fealpy.pinn.sampler.sampler import JoinedSampler, HybridSampler
 from fealpy.mesh import MeshFactory as Mf
 
 
@@ -39,7 +39,8 @@ class TestSimple():
 
     def test_trisampler(self):
         mesh = Mf.boxmesh2d([0, 2, 0, 3], nx=10, ny=10, meshtype='tri')
-        s = TriangleMeshSampler(10, mesh)
+        s = get_mesh_sampler(10, mesh)
+        assert isinstance(s, TMeshSampler)
         assert s.m == 2000
         assert s.nd == 2
 
@@ -51,7 +52,8 @@ class TestSimple():
 
     def test_tetsampler(self):
         mesh = Mf.boxmesh3d([0, 1, 1, 3, 2, 5], nx=5, ny=5, nz=5, meshtype='tet')
-        s = TetrahedronMeshSampler(10, mesh)
+        s = get_mesh_sampler(10, mesh)
+        assert isinstance(s, TMeshSampler)
         assert s.m == 7500
         assert s.nd == 3
 
@@ -60,6 +62,19 @@ class TestSimple():
         _valified_range(out[:, 0], 0, 1)
         _valified_range(out[:, 1], 1, 3)
         _valified_range(out[:, 2], 2, 5)
+
+
+    def test_quadsampler(self):
+        mesh = Mf.boxmesh2d([0, 1, 1, 2], nx=10, ny=10, meshtype='quad')
+        s = get_mesh_sampler(10, mesh)
+        assert isinstance(s, QuadrangleMeshSampler)
+        assert s.m == 1000
+        assert s.nd == 2
+
+        out = s.run()
+        assert out.shape == (1000, 2)
+        _valified_range(out[:, 0], 0, 1)
+        _valified_range(out[:, 1], 1, 2)
 
 
 class TestCombiation():
