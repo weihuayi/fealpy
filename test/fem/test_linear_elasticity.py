@@ -19,8 +19,11 @@ def test_linear_elasticity_lfem(p, n):
     mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
     space = Space(mesh, p=p)
 
+    ospace = Space(mesh, p=p)
+
     bform = BilinearForm(space)
-    bform.add_domain_integrator(LinearElasticityOperatorIntegrator(pde.lam)
+    bform.add_domain_integrator(LinearElasticityOperatorIntegrator(pde.lam, pde.mu)
     bform.assembly()
+    A = bform
 
 
