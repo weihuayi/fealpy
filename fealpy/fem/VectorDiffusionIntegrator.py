@@ -14,12 +14,14 @@ class VectorDiffusionIntegrator:
         """
         @note 没有参考单元的组装方式
         """
-        if isinstance(space, tuple): # 由标量空间组合而成的空间
-            self.assembly_cell_matrix_1(space, index=index, cellmeasure=cellmeasure, out=out)
+        if isinstance(space, tuple) and not isinstance(space[0], tuple): # 由标量空间组合而成的空间
+            return self.assembly_cell_matrix_for_vspace_with_sacalar_basis(
+                    space, index=index, cellmeasure=cellmeasure, out=out)
         else: # 空间基函数是向量函数
-            self.assembly_cell_matrix_0(space, index=index, cellmeasure=cellmeasure, out=out)
+            return self.assembly_cell_matrix_for_vspace_with_vector_basis(
+                    space, index=index, cellmeasure=cellmeasure, out=out)
 
-    def assembly_cell_matrix_0(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def assembly_cell_matrix_for_vspace_with_vector_basis(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 空间基函数是向量型
         """
@@ -53,7 +55,8 @@ class VectorDiffusionIntegrator:
         if out is None:
             return D
 
-    def assembly_cell_matrix_1(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def assembly_cell_matrix_for_vspace_with_sacalar_basi(
+            self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 标量空间拼成的向量空间 
         """

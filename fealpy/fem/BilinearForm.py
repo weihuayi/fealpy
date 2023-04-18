@@ -2,9 +2,6 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 class BilinearForm:
-    """
-
-    """
     def __init__(self, space, atype=None):
         """
         @brief 
@@ -48,8 +45,9 @@ class BilinearForm:
 
     def update(self):
         """
-        @brief 当空间发生改变时，重新组装矩阵
+        @brief 当空间发生改变时，调用这个函数重新组装矩阵
         """
+        self.assembly()
 
     def assembly(self):
         """
@@ -62,70 +60,85 @@ class BilinearForm:
             * 向量空间（基函数是向量型的）
             * 张量空间（基函数是张量型的
         """
+        if isinstance(self.space, tuple) and not isinstance(space[0], tuple):
+            # 由标量函数空间组成的向量函数空间
+            self.assembly_for_vspace_with_scalar_basis()
+        else:
+            # 标量函数空间或基是向量函数的向量函数空间
+            self.assembly_for_sspace_and_vspace_with_vector_basis()
+
+
+    def assembly_for_sspace_and_vspace_with_vector_basis(self):
+        """
+        @brief 基函数为标量函数的标量空间, 以及基函数为向量函数的函数空间
+        """
         space = self.space
-        if not isinstance(space, tuple): 
-            ldof = space.number_of_local_dofs()
-            gdof = space.number_of_global_dofs()
+        ldof = space.number_of_local_dofs()
+        gdof = space.number_of_global_dofs()
 
-            mesh = space.mesh
-            NC = mesh.number_of_cells()
-            CM = np.zeros((NC, ldof, ldof), dtype=space.ftype)
-            for inte in self.dintegrators:
-                inte.assembly_cell_matrix(space, out=CM)
+        mesh = space.mesh
+        NC = mesh.number_of_cells()
+        CM = np.zeros((NC, ldof, ldof), dtype=space.ftype)
+        for di in self.dintegrators:
+            di.assembly_cell_matrix(space, out=CM)
 
-            cell2dof = space.cell_to_dof()
-            I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
-            J = np.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
+        cell2dof = space.cell_to_dof()
+        I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
+        self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
 
-            self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        else: 
-            mesh = space[0].mesh
-            GD = mesh.geo_dimension()
-            NC = mesh.number_of_cells()
-            ldof = space[0].number_of_local_dofs()
-            gdof = space[0].number_of_global_dofs()
-            cell2dof = space[0].cell_to_dof() # 标量
+    def assembly_for_vspace_with_scalar_basis(self):
+        """
+        @brief 基函数由标量函数组合而成的向量函数空间
+        """
+        space = self.space
+        assert isinstance(space, tuple) and not isinstance(space[0], tuple)
 
-            CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
+        mesh = space[0].mesh
+        GD = space[0].geo_dimension()
+        ldof = space[0].number_of_local_dofs()
+        gdof = space[0].number_of_global_dofs()
+        cell2dof = space[0].cell_to_dof() # 标量空间的自由度矩阵
 
-            for inte in self.dintegrators:
-                inte.assembly_cell_matrix(space, out=CM)
+        cellmeasure = mesh.entity_measure()
+        NC = mesh.number_of_cells()
+        CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
+        for inte in self.dintegrators:
+            inte.assembly_cell_matrix(space, cellmeasure=cellmeasure, out=CM)
 
-            self._M = csr_matrix((GD*gdof, GD*gdof), dtype=space[0].ftype)
-            if space[0].doforder == 'sdofs':
-                for i in range(GD):
-                    for j in range(i, GD):
-                        if i == j:
-                            val = CM[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof]
-                            I = np.broadcast_to(cell2dof[:, :, None]+i*gdof, shape=val.shape)
-                            J = np.broadcast_to(cell2dof[:, None, :]+i*gdof, shape=val.shape)
-                            self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
-                        else:
-                            val = CM[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof]
-                            I = np.broadcast_to(cell2dof[:, :, None]+i*gdof, shape=val.shape)
-                            J = np.broadcast_to(cell2dof[:, None, :]+j*gdof, shape=val.shape)
-                            self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
+        self._M = csr_matrix((GD*gdof, GD*gdof), dtype=space[0].ftype)
+        if space[0].doforder == 'sdofs':
+            for i in range(GD):
+                for j in range(i, GD):
+                    if i == j:
+                        val = CM[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof]
+                        I = np.broadcast_to(cell2dof[:, :, None]+i*gdof, shape=val.shape)
+                        J = np.broadcast_to(cell2dof[:, None, :]+i*gdof, shape=val.shape)
+                        self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
+                    else:
+                        val = CM[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof]
+                        I = np.broadcast_to(cell2dof[:, :, None]+i*gdof, shape=val.shape)
+                        J = np.broadcast_to(cell2dof[:, None, :]+j*gdof, shape=val.shape)
+                        self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
 
-                            val = CM[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof]
-                            self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
+                        val = CM[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof]
+                        self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
+        elif space[0].doforder == 'vdims':
+            for i in range(GD):
+                for j in range(i, GD):
+                    if i==j:
+                        val = CM[:, i::GD, i::GD]
+                        I = np.broadcast_to(GD*cell2dof[:, :, None]+i, shape=val.shape)
+                        J = np.broadcast_to(GD*cell2dof[:, None, :]+i, shape=val.shape)
+                        self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
+                    else:
+                        val = CM[:, i::GD, j::GD] 
+                        I = np.broadcast_to(GD*cell2dof[:, :, None]+i, shape=val.shape)
+                        J = np.broadcast_to(GD*cell2dof[:, None, :]+j, shape=val.shape)
+                        self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
 
-            elif space[0].doforder == 'vdims':
-                print("asda")
-                for i in range(GD):
-                    for j in range(i, GD):
-                        if i==j:
-                            val = CM[:, i::GD, i::GD]
-                            I = np.broadcast_to(GD*cell2dof[:, :, None]+i, shape=val.shape)
-                            J = np.broadcast_to(GD*cell2dof[:, None, :]+i, shape=val.shape)
-                            self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
-                        else:
-                            val = CM[:, i::GD, j::GD] 
-                            I = np.broadcast_to(GD*cell2dof[:, :, None]+i, shape=val.shape)
-                            J = np.broadcast_to(GD*cell2dof[:, None, :]+j, shape=val.shape)
-                            self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
-
-                            val = CM[:, j::GD, i::GD] 
-                            self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
+                        val = CM[:, j::GD, i::GD] 
+                        self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
 
     def fast_assembly(self):
         """
