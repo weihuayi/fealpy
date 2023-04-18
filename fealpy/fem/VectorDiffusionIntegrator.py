@@ -51,6 +51,7 @@ class VectorDiffusionIntegrator:
         if coef is None:
             D += np.einsum('q, qcimn, qcjmn, c->cij', ws, gphi0, gphi0, cellmeasure, optimize=True)
         else:
+            pass #todo
 
         if out is None:
             return D

@@ -61,7 +61,7 @@ class ScalarMassIntegrator:
                 raise ValueError("coef is not correct!")
 
         if out is None:
-            returm M
+            return M
         
     
     def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):

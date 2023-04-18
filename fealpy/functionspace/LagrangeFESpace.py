@@ -372,7 +372,7 @@ class LagrangeFESpace():
             mesh, 
             p: int=1, 
             spacetype: str='C', 
-            doforder: str='vdims'):
+            doforder: str='sdofs'):
         """
         @brief Initialize the Lagrange finite element space.
 
