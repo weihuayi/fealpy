@@ -49,7 +49,7 @@ class VectorMassIntegrator:
         if coef is None:
             D += np.einsum('q, qcim, qcjm, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
-
+            pass
         if out is None:
             return D
 

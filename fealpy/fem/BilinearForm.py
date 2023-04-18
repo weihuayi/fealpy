@@ -60,7 +60,7 @@ class BilinearForm:
             * 向量空间（基函数是向量型的）
             * 张量空间（基函数是张量型的
         """
-        if isinstance(self.space, tuple) and not isinstance(space[0], tuple):
+        if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
             # 由标量函数空间组成的向量函数空间
             self.assembly_for_vspace_with_scalar_basis()
         else:

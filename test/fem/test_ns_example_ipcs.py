@@ -11,7 +11,9 @@ import numpy as np
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.fem import DiffusionIntegrator, MassIntegrator, ConvectionIntegrator
+from fealpy.fem import VectorDiffusionIntegrator, VectorMassIntegrator
+from fealpy.fem import NSIntegrator
+
 from fealpy.fem import LinearElasticityOperatorIntegrator
 from fealpy.decorator import cartesian, barycentric
 from fealpy.fem import LinearForm
@@ -32,12 +34,11 @@ timeline = UniformTimeLine(0,T,nt)
 dt = timeline.dt
 
 bform = BilinearForm(2*(space,))
-#bform.add_domain_integrator(MassIntegrator())
-#bform.add_domain_integrator(DiffusionIntegrator())
-bform.add_domain_integrator(LinearElasticityOperatorIntegrator(lam=0,mu=0.5))
+bform.add_domain_integrator(VectorMassIntegrator())
+#bform.add_domain_integrator(VectorDiffusionIntegrator())
+#bform.add_domain_integrator(LinearElasticityOperatorIntegrator(lam=0,mu=0.5))
 bform.assembly()
 A = bform.get_matrix()
-
 
 qf = mesh.integrator(4,'cell')
 bcs,ws = qf.get_quadrature_points_and_weights()
@@ -57,8 +58,8 @@ E10 = csr_matrix(((1/2*E2).flat,(I.flat,J.flat)),shape=(ugdof,ugdof))
 E01 = csr_matrix(((1/2*E3).flat,(I.flat,J.flat)),shape=(ugdof,ugdof))
 E = bmat([[E00,E01],[E10,E11]])
 
-#AA = oldspace.mass_matrix()
-AA = oldspace.stiff_matrix()
+AA = oldspace.mass_matrix()
+#AA = oldspace.stiff_matrix()
 AA = bmat([[AA,None],[None,AA]])
-print(np.sum(np.abs(E-A)))
+print(np.sum(np.abs(AA-A)))
 

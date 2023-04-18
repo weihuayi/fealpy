@@ -37,7 +37,7 @@ class VectorSourceIntegrator():
                     index=index, cellmeasure=cellmeasure, out=out)
         
 
-    def assembly_cell_vector_for_vspace_with_scalar_basis(self, index=n.s_[:],
+    def assembly_cell_vector_for_vspace_with_scalar_basis(self, index=np.s_[:],
             cellmeasure=None, out=None):
         """
         @brief 由标量空间组合成的向量空间的单元向量组装 
