@@ -3,11 +3,12 @@ from typing import Optional, Union
 import torch
 from torch import Tensor, device
 
+from .Mesh import Redirector
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
-
+    # Only constants can be defined here.
     localEdge = torch.tensor([(1, 2), (2, 0), (0, 1)])
     localFace = torch.tensor([(1, 2), (2, 0), (0, 1)])
     localCell = torch.tensor([
@@ -18,10 +19,10 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
     NVC = 3
     NVE = 2
-    NVF = 2
+    NVF = Redirector('NVE')
 
     NEC = 3
-    NFC = 3
+    NFC = Redirector('NEC')
 
 
 class TriangleMesh(Mesh2d):
@@ -33,9 +34,6 @@ class TriangleMesh(Mesh2d):
         self.ds = TriangleMeshDataStructure(NN=node.shape[0], cell=cell.to(itype))
         self.device = node.device
 
-    def geo_dimension(self) -> int:
-        return self.node.shape[-1]
-
     def uniform_refine(self):
         return super().uniform_refine()
 
@@ -46,13 +44,13 @@ class TriangleMesh(Mesh2d):
         TD = bc.shape[-1] - 1
         multi_idx = self.multi_index_matrix(p=p, device=self.device)
         c = torch.arange(1, p+1, dtype=torch.int, device=self.device)
-        P = 1.0/np.multiply.accumulate(c)
+        P = 1.0/torch.cumprod(c, dim=0)
         t = torch.arange(0, p, dtype=torch.int, device=self.device)
 
         shape = bc.shape[:-1] + (p+1, TD+1)
         A = torch.ones(shape, dtype=self.ftype, device=self.device)
         A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
+        torch.cumprod(A, dim=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
 
         idx = torch.arange(TD+1, device=self.device)
@@ -68,7 +66,7 @@ class TriangleMesh(Mesh2d):
     @staticmethod
     def multi_index_matrix(p: int, etype: Union[int, str]=2, device: Optional[device]=None):
         """
-        @brief Get p-order multi-index matrix in triangle.
+        @brief Get p-order multi-index matrix in a triangle.
 
         @param[in] p: Positive integer.
 
