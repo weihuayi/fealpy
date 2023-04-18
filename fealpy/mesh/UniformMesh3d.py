@@ -1,6 +1,6 @@
 import numpy as np
 import warnings
-from scipy.sparse import csr_matrix, diags
+from scipy.sparse import csr_matrix, diags, spdiags
 from types import ModuleType
 from .Mesh3d import Mesh3d
     
@@ -53,7 +53,7 @@ class UniformMesh3d(Mesh3d):
         self.origin = origin
 
         self.ftype = ftype
-        self.ityep = itype
+        self.itype = itype
  
         # Mesh dimensions
         self.nx = extent[1] - extent[0]
@@ -63,7 +63,7 @@ class UniformMesh3d(Mesh3d):
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
 
         # Data structure for finite element computation
-        self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz)
+        self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype)
 
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
@@ -533,20 +533,42 @@ class UniformMesh3d(Mesh3d):
         pass
 
     ## @ingroup FDMInterface
-    def error(self, h, nx, ny, nz, u, uh):
+    def error(self, u, uh, errortype='all'):
         """
-        @brief 计算真解在网格点处与数值解的误差
-        @param[in] u
-        @param[in] uh
+        @brief       Compute the error between the true solution and the numerical solution.
+
+        @param[in]   u: The true solution as a function.
+        @param[in]   uh: The numerical solution as an 2D array.
+        @param[in]   errortype: The error type, which can be 'all', 'max', 'L2' or 'l2'
         """
-        e = u - uh
 
-        emax = np.max(np.abs(e))
-        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1) and (uh.shape[2] == self.nz+1)
+        hx = self.h[0]
+        hy = self.h[1]
+        hz = self.h[2]
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        node = self.node
+        uI = u(node)
+        e = uI - uh
 
-        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1) * (nz - 1)) * np.sum(e ** 2))
+        if errortype == 'all':
+            emax = np.max(np.abs(e))
+            e0 = np.sqrt(hx * hy * hz * np.sum(e ** 2))
+            el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * np.sum(e ** 2))
 
-        return emax, e0, el2
+            return emax, e0, el2
+        elif errortype == 'max':
+            emax = np.max(np.abs(e))
+            return emax
+        elif errortype == 'L2':
+            e0 = np.sqrt(hx * hy * hz * np.sum(e ** 2))
+            return e0
+        elif errortype == 'l2':
+            el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * np.sum(e ** 2))
+            return el2
+
 
     ## @ingroup FDMInterface
     def elliptic_operator(self, d=3, c=None, r=None):                                                                                                                
@@ -601,11 +623,34 @@ class UniformMesh3d(Mesh3d):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, uh, A, f):
+    def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
-        @brief
+        @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
+
+        @param[in] A sparse matrix, (NN, NN)
+        @param[in] f 
+
+        @todo 考虑 uh 是向量函数的情形
         """
-        pass
+        if uh is None:
+            uh = self.function('node').reshape(-1)
+        else:
+            uh = uh.reshape(-1) # 展开为一维数组 TODO:向量型函数
+
+        f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
+        
+        node = self.entity('node')
+        isBdNode = self.ds.boundary_node_flag()
+        uh[isBdNode]  = gD(node[isBdNode])
+        f -= A@uh
+        f[isBdNode] = uh[isBdNode]
+
+        bdIdx = np.zeros(A.shape[0], dtype=self.itype)
+        bdIdx[isBdNode] = 1
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
+        return A, f 
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):

@@ -14,7 +14,7 @@ domain = pde.domain()
 nx = 10
 ny = 10
 nz = 10
-maxit = 4
+maxit = 2
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
 hz = (domain[5] - domain[4])/nz
@@ -28,7 +28,7 @@ for i in range(maxit):
     A = mesh.laplace_operator()
     f = mesh.interpolate(pde.source)
     A, f = mesh.apply_dirichlet_bc(pde.dirichlet, A, f, uh=uh)
-    uh[:] = spsolve(A, f)
+    uh.flat[:] = spsolve(A, f)
     em[0, i], em[1, i], em[2, i] = mesh.error(pde.solution, uh)
     if i < maxit - 1:
         mesh.uniform_refine()

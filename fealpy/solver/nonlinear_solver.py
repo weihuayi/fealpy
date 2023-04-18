@@ -8,7 +8,6 @@ class NonlinearSolver:
         self.tol = tol
         self.max_iter = max_iter
 
-
     def newton_raphson_bivariate(self, u: np.ndarray, f: np.ndarray, 
                        calculate_P: Callable[[np.ndarray], np.ndarray], 
                        calculate_Kt: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
@@ -63,7 +62,6 @@ class NonlinearSolver:
         iter = 0
         u = u0
         uold = u
-
         P = calculate_P(u)
         R = -P
         conv = R**2
