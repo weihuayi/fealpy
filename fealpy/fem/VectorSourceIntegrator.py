@@ -37,19 +37,18 @@ class VectorSourceIntegrator():
                     index=index, cellmeasure=cellmeasure, out=out)
         
 
-    def assembly_cell_vector_for_vspace_with_scalar_basis(self, index=n.s_[:],
-            cellmeasure=None, out=None):
+    def assembly_cell_vector_for_vspace_with_scalar_basis(
+            self, index=np.s_[:], cellmeasure=None, out=None):
         """
-        @brief 由标量空间组合成的向量空间的单元向量组装 
+        @brief 由标量空间张成的向量空间 
 
         @param[in] space 
         """
         # 假设向量空间是由标量空间组合而成
+        space = self.space
         assert isinstance(space, tuple) and ~isinstance(space[0], tuple) 
-
+        
         f = self.f
-
-        p = space[0].p
         mesh = space[0].mesh # 获取网格对像
         GD = mesh.geo_dimension()
 
@@ -66,9 +65,10 @@ class VectorSourceIntegrator():
         else:
             bb = out
 
-        q = self.q if self.q is not None else p+1 
+        q = self.q if self.q is not None else space[0].p + 1 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
         phi = space[0].basis(bcs, index=index)
 
         if callable(f):
@@ -109,16 +109,17 @@ class VectorSourceIntegrator():
         if out is None:
             return bb 
 
-    def assembly_cell_vector_for_vspace_with_vector_basis():
+    def assembly_cell_vector_for_vspace_with_vector_basis(
+            self, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 组装单元向量
 
         @param[in] space 
         """
 
+        space = self.space
         f = self.f
 
-        p = space.p
         mesh = space.mesh # 获取网格对像
         GD = mesh.geo_dimension()
 
@@ -133,9 +134,10 @@ class VectorSourceIntegrator():
         else:
             bb = out
 
-        q = self.q if self.q is not None else p+3 
+        q = self.q if self.q is not None else space.p + 3 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
         phi = space.basis(bcs, index=index)
 
         if callable(f):

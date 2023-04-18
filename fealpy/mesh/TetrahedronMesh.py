@@ -306,7 +306,7 @@ class TetrahedronMesh(Mesh3d):
         NC = self.number_of_cells()
         return NN + NE*(p-1) + NF*(p-2)*(p-1)//2 + NC*(p-3)*(p-2)*(p-1)//6
     
-    def edge_to_ipoint(self, p):
+    def edge_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取网格中每条边与插值点的对应关系
         """
@@ -321,7 +321,7 @@ class TetrahedronMesh(Mesh3d):
             edge2ipoint[:,1:-1] = base + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2ipoint
 
-    def face_to_ipoint(self, p):
+    def face_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取网格中每个三角形面与插值点的对应关系
         """
@@ -359,7 +359,7 @@ class TetrahedronMesh(Mesh3d):
 
         return face2ipoint
 
-    def cell_to_ipoint(self, p):
+    def cell_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取单元与插值点的对应关系
 

@@ -50,8 +50,8 @@ class LinearForm:
             * 向量空间（基函数是向量型的）
             * 张量空间（基函数是张量型的
         """
-        if isinstance(self.space, tuple) and not isinstance(space[0], tuple):
-            # 由标量函数空间组成的向量函数空间
+        if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
+            # 由标量函数空间张成的向量函数空间
             self.assembly_for_vspace_with_scalar_basis()
         else:
             # 标量函数空间或基是向量函数的向量函数空间
@@ -71,8 +71,8 @@ class LinearForm:
         ldof = space.number_of_local_dofs()
 
         bb = np.zeros((NC, ldof), dtype=space.ftype)
-        for inte in self.dintegrators:
-            inte.assembly_cell_vector(space, cellmeasure=cellmeasure, out=bb)
+        for di in self.dintegrators:
+            di.assembly_cell_vector(space, cellmeasure=cellmeasure, out=bb)
 
         cell2dof = space.cell_to_dof()
         self._V = np.zeros((gdof, ), dtype=space.ftype)
@@ -80,7 +80,7 @@ class LinearForm:
 
     def assembly_for_vspace_with_scalar_basis(self):
         """
-        @brief 基函数由标量函数组合而成的向量函数空间
+        @brief 由标量空间张成的向量函数空间
         """
         space = self.space
         assert isinstance(space, tuple) and not isinstance(space[0], tuple)
@@ -101,7 +101,7 @@ class LinearForm:
         elif space[0].doforder == 'vdims': # 向量分量自由度优先排序
             bb = np.zeros((NC, ldof, GD), dtype=mesh.ftype)
 
-        for di in self.dintegrators():
+        for di in self.dintegrators:
             di.assembly_cell_vector(space, cellmeasure=cellmeasure, out=bb)
 
         self._V = np.zeros((GD*gdof, ), dtype=mesh.ftype)
@@ -110,7 +110,7 @@ class LinearForm:
             for i in range(GD):
                 np.add.at(V[i, :], cell2dof, bb[:, i, :])
         elif space[0].doforder == 'vdims': # 向量分量自由度优先排序
-            V = self._V.reshape(GD, gdof)
+            V = self._V.reshape(gdof, GD) 
             for i in range(GD):
                 np.add.at(V[:, i], cell2dof, bb[:, :, i])
 

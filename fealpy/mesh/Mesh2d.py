@@ -21,15 +21,15 @@ class Mesh2d(Mesh):
     def top_dimension(self):
         return 2
 
-    def entity(self, etype=2):
+    def entity(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
-            return self.ds.cell
+            return self.ds.cell[index]
         elif etype in {'edge', 'face', 1}:
-            return self.ds.edge
+            return self.ds.edge[index]
         elif etype in {'node', 0}:
-            return self.node
+            return self.node[index]
         else:
-            raise ValueError("`etype` is wrong!")
+            raise ValueError(f" entity type {etype}  is wrong!")
 
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
