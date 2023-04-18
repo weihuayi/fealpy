@@ -444,6 +444,13 @@ class LagrangeFESpace():
     @barycentric
     def grad_basis(self, bc, index=np.s_[:]):
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
+    
+    @barycentric
+    def face_basis(self, bc):
+        """
+        @brief 计算 face 上的基函数在给定积分点处的函数值
+        """
+        pass
 
     @barycentric
     def value(self, 
