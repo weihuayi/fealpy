@@ -126,7 +126,7 @@ class Mesh():
     def number_of_entities(self, etype, index=np.s_[:]):
         raise NotImplementedError
 
-    def entity(self, etype, index=np.s_[:]):
+    def entity(self, etype: Union[int, str], index=np.s_[:]):
         raise NotImplementedError
 
     def entity_barycenter(self, etype, index=np.s_[:]):
@@ -198,3 +198,39 @@ class _Count():
 
     def nodes_of_cells(self):
         return self._ds.cell.shape[-1]
+
+
+class _Entity():
+    pass
+
+# Similarly to the example above,
+# Implement `_Measure`, `_Barycenter` class for every types of meshes.
+
+class _Measure():
+    pass
+
+class _Barycenter():
+    pass
+
+# Mesh typs has `measure` and `barycenter` properties (point to the classes' instances above)
+# to specify how to measure entities, and how to calculate the barycenter of entities.
+
+
+class _Boundary():
+    def __init__(self) -> None:
+        pass
+
+    def edge_flag(self):
+        pass
+
+
+class _Plot():
+    pass
+
+
+# Structure:
+# mesh.torch Module
+#  |- Mesh, Mesh1d, Mesh2d, Mesh3d -> mesh.py
+#  |- MeshDataStructure, ... -> mesh_data_structure.py
+#  |- Entity, Measure, Barcenter, ... -> typing.py
+#  |- TriangleMesh, TriangleMeshDataStructure, _Entity, ... -> triangle_mesh.py
