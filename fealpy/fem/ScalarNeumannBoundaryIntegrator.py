@@ -54,8 +54,9 @@ class ScalarNeumannBoundaryIntegrator:
         else:
             assert out.shape == (gdof,)
             F = out
-        
+
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, facemeasure)
+        print(F.shape, bb.shape)
         np.add.at(F, face2dof, bb)
         
         if out is None:

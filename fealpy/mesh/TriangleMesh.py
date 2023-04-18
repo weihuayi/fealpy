@@ -115,12 +115,12 @@ class TriangleMesh(Mesh2d):
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
-    def shape_function(self, bc, p=1):
+    def shape_function(self, bc, p=1, etype='cell'):
         """
         @brief
         """
         TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p)
+        multiIndex = self.multi_index_matrix(p, etype=etype)
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)

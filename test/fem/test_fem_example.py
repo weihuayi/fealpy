@@ -99,7 +99,7 @@ def test_triangle_mesh(p, n, maxit):
         bc1 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
         bc2 = NeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
         uh = space.function()
-        f = bc2.assembly_face_vector(space, out=f)
+        f = bc2.assembly_face_vector(space, out=f, q=p)
         A, f = bc1.apply(A, f, uh)
 
 
