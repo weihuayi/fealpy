@@ -335,39 +335,42 @@ class TriangleMesh(Mesh2d):
                     node[cell, :]).reshape(-1, GD)
         return ipoints
 
-    def face_to_ipoint(self, p):
+
+    def edge_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取网格边与插值点的对应关系
         """
-        NF = self.number_of_faces()
+
+        if index == np.s_[:]:
+            NE = self.number_of_edges()
+            index = np.arange(NE)
+        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        elif isinstance(index, list) and (type(index[0]) is np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        else:
+            NE = len(index)
+
         NN = self.number_of_nodes()
 
-        face = self.entity('face')
-        face2ipoints = np.zeros((NF, p+1), dtype=np.int_)
-        face2ipoints[:, [0, -1]] = face 
-        if p > 1:
-            face2ipoints[:, 1:-1] = NN + np.arange(NF*(p-1)).reshape(NF, p-1)
-        return face2ipoints
-
-    def edge_to_ipoint(self, p):
-        """
-        @brief 获取网格边与插值点的对应关系
-        """
-        NE = self.number_of_edges()
-        NN = self.number_of_nodes()
-
-        edge = self.entity('edge')
-        edge2ipoints = np.zeros((NE, p+1), dtype=np.int_)
+        edge = self.entity('edge', index=index)
+        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
         edge2ipoints[:, [0, -1]] = edge
         if p > 1:
-            edge2ipoints[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+            idx = NN + np.arange(p-1)
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
         return edge2ipoints
 
-    def cell_to_ipoint(self, p):
+    face_to_ipoint = edge_to_ipoint
+
+    def cell_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取网格中的三角形单元与插值点的对应关系
+        @todo 只获取一部分单元的插值点全局编号
         """
-        cell = self.entity('cell')
+        cell = self.entity('cell', index=index)
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()

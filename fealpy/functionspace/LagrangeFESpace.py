@@ -28,16 +28,16 @@ class SimplexMeshCLFEDof():
         return isBdDof
 
     def face_to_dof(self, index=np.s_[:]):
-        return self.mesh.face_to_ipoint(self.p)
+        return self.mesh.face_to_ipoint(self.p, index=index)
 
     def edge_to_dof(self, index=np.s_[:]):
-        return self.mesh.edge_to_ipoint(self.p)
+        return self.mesh.edge_to_ipoint(self.p, index=index)
 
     def cell_to_dof(self, index=np.s_[:]):
-        return self.mesh.cell_to_ipoint(self.p)
+        return self.mesh.cell_to_ipoint(self.p, index=index)
 
     def interpolation_points(self):
-        return self.mesh.interpolation_points(self.p)
+        return self.mesh.interpolation_points(self.p, index=index)
 
     def number_of_global_dofs(self):
         return self.mesh.number_of_global_ipoints(self.p)
@@ -372,7 +372,7 @@ class LagrangeFESpace():
             mesh, 
             p: int=1, 
             spacetype: str='C', 
-            doforder: str='vdims'):
+            doforder: str='sdofs'):
         """
         @brief Initialize the Lagrange finite element space.
 
