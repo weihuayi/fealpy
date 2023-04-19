@@ -30,10 +30,10 @@ class VectorSourceIntegrator():
         """
 
         if isinstance(space, tuple) and ~isinstance(space[0], tuple):
-            return self.assembly_cell_vector_for_vspace_with_scalar_basis(sapce, 
+            return self.assembly_cell_vector_for_vspace_with_scalar_basis(space, 
                     index=index, cellmeasure=cellmeasure, out=out)
         else:
-            return self.assembly_cell_vector_for_vspace_with_vector_basis(sapce, 
+            return self.assembly_cell_vector_for_vspace_with_vector_basis(space, 
                     index=index, cellmeasure=cellmeasure, out=out)
         
 
@@ -110,7 +110,7 @@ class VectorSourceIntegrator():
             return bb 
 
     def assembly_cell_vector_for_vspace_with_vector_basis(
-            self, index=np.s_[:], cellmeasure=None, out=None):
+            self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 组装单元向量
 
@@ -130,7 +130,7 @@ class VectorSourceIntegrator():
         ldof = space.number_of_local_dofs() 
 
         if out is None:
-                bb = np.zeros((NC, ldof), dtype=space.ftype)
+            bb = np.zeros((NC, ldof), dtype=space.ftype)
         else:
             bb = out
 

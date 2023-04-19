@@ -25,6 +25,8 @@ from .LinearElasticityOperatorIntegrator import LinearElasticityOperatorIntegrat
 
 from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangentOperatorIntegrator
 
+from .VectorNeumannBoundaryIntegrator import VectorNeumannBoundaryIntegrator
+from .ScalarNeumannBoundaryIntegrator import ScalarNeumannBoundaryIntegrator
 
 from .DirichletBC import DirichletBC
 
