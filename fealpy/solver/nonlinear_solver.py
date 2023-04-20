@@ -241,16 +241,77 @@ class NonlinearSolver:
 
         return u
 
+    
+    def Incremental_Force(self, u_init: np.ndarray, f: np.ndarray, force_increment: np.int_,
+                        calculate_P: Callable[[np.ndarray], np.ndarray], 
+                        calculate_Kt: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+        """
+        使用增量力法求解非线性方程组
 
-    def displacement_control_procedure(self, u1_init: np.float_, u2_init: np.float_,
+        @param u_init: 初始向量值
+        @param f: 非线性方程组右侧的常数向量
+        @param force_increment: 载荷增量数量
+        @param calculate_P: 计算非线性方程组的函数
+        @param calculate_Kt: 计算切线刚度矩阵的函数
+        @return: 非线性方程组的解
+        """
+        u = u_init
+        uold = u
+        f_increment = f / force_increment
+        print("步骤   u1        u2        F")
+
+        # 存储数据的列表
+        u1_list = []
+        u2_list = []
+        F_list = []
+
+        for i in range(1, force_increment+1):
+            f_current = f_increment * i
+            P = calculate_P(u)
+            R = f_current - P
+            conv = np.sum(R**2) / (1+np.sum(f_current**2))
+            
+            iter = 0
+            while conv > self.tol and iter < self.max_iter:
+                Kt = calculate_Kt(u)
+                delu = np.linalg.solve(Kt, R)
+                u = uold + delu
+                P = calculate_P(u)
+                R = f_current - P
+                conv = np.sum(R**2)/(1+np.sum(f_current**2))
+                uold = u
+                iter += 1
+
+            print("{:3d} {:7.5f} {:7.5f} {:7.3f}".format(i, u[0], u[1], f_current[1]))
+
+            # 将数据添加到列表中
+            u1_list.append(u[0])
+            u2_list.append(u[1])
+            F_list.append(f_current[1])
+
+        # 绘制 u1、u2 与 F 的关系图
+        plt.figure()
+        plt.plot(F_list, u1_list, marker='o', label='u1')
+        plt.plot(F_list, u2_list, marker='s', label='u2')
+        plt.xlabel('Force')
+        plt.ylabel('Displacement')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+        return u
+
+
+    def Incremental_displacement(self, u1_init: np.float_, u2_init: np.float_,
+                    displacement_increment: np.int_,
                     calculate_P: Callable[[np.float_, np.float_], np.float_],
                     calculate_Kt: Callable[[np.float_, np.float_], np.float_],
                     calculate_F: Callable[[np.float_, np.float_], np.float_]) -> Tuple[np.float_, np.float_]:
         """
-        使用位移控制过程求解非线性方程组
+        使用增量位移法求解非线性方程组
 
         @param u1_init: u1 的初始值
         @param u2_init: u2 的初始值
+        @param displacement_increment: 位移增量数量
         @param calculate_P: 计算非线性方程组 P 的函数
         @param calculate_Kt: 计算切线刚度矩阵 Kt 的函数
         @param calculate_F: 计算作用力 F 的函数
@@ -266,7 +327,7 @@ class NonlinearSolver:
         F_list = []
         
         # 位移循环增量
-        for i in range(1, 10):
+        for i in range(1, displacement_increment):
             u2 = u2_init * i
             P = calculate_P(u1, u2)
             R = - P
