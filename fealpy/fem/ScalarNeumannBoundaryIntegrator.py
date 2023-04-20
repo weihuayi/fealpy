@@ -5,7 +5,7 @@ class ScalarNeumannBoundaryIntegrator:
     def __init__(self, space, gN, threshold=None, q=None):
         self.space = space
         self.gN = gN
-        self.q = q
+        self.q = None
         self.threshold = threshold
 
     def assembly_face_vector(self, space, index=np.s_[:], facemeasure=None,
@@ -31,27 +31,34 @@ class ScalarNeumannBoundaryIntegrator:
         if facemeasure is None:
             facemeasure = mesh.entity_measure('face', index=index)
 
-        q = self.q if self.q is not None else space.p + 1
+        q = q if q is not None else space.p + 3 #TODO: 积分精度选择策略
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = self.face_basis(bcs)
-        pp = mesh.bc_to_point(bcs, index=index)
-        val = gN(pp, n) 
-
-        if len(val.shape) == 2:
-            dim = 1
-            if F is None:
-                F = np.zeros((gdof, ), dtype=self.ftype)
+        phi = space.face_basis(bcs)
+        
+        if callable(gN):
+            if hasattr(gN, 'coordtype'):
+                if gN.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    val = gN(ps, n) 
+                elif gN.coordtype == 'barycentric':
+                    val = gN(bcs, n, index=index)
+            else: # 默认是笛卡尔
+                ps = mesh.bc_to_point(bcs, index=index)
+                val = gN(ps, n)
         else:
-            dim = val.shape[-1]
-            if F is None:
-                F = np.zeros((gdof, dim), dtype=self.ftype)
+            val = gN
 
 
-        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
-        if dim == 1:
-            np.add.at(F, face2dof, bb)
+        if out is None:
+            F = np.zeros((gdof, ), dtype=self.ftype)
         else:
-            np.add.at(F, (face2dof, np.s_[:]), bb)
-
-        return F
+            assert out.shape == (gdof,)
+            F = out
+        
+        bb = np.einsum('q, qf, qfi, f->fi', ws, val, phi, facemeasure,
+                optimize=True)
+        np.add.at(F, face2dof, bb)
+        
+        if out is None:
+            return F

@@ -148,8 +148,8 @@ def test_linear_elasticity_model():
 
 
 if __name__ == '__main__':
-    #test_linear_elasticity_model()
-    test_tetrahedron_mesh()
+    test_linear_elasticity_model()
+    #test_tetrahedron_mesh()
     #test_triangle_mesh()
     #test_truss_structure()
 

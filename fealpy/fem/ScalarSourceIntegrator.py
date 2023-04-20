@@ -13,7 +13,6 @@ class ScalarSourceIntegrator():
         @param[in] f 
         """
         self.f = f
-        self.q = q
         self.vector = None
 
     def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None,
