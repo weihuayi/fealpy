@@ -1,8 +1,8 @@
 
 from abc import ABCMeta, abstractmethod
-from typing import Union
+from typing import Union, Optional
 import torch
-from torch import Tensor
+from torch import Tensor, device
 import numpy as np
 
 from .mesh_data_structure import (
@@ -174,11 +174,12 @@ class Mesh(metaclass=ABCMeta):
         """
         pass
 
-    @classmethod
+    @staticmethod
     @abstractmethod
-    def multi_index_matrix(cls, p: int) -> Tensor:
+    def multi_index_matrix(p: int, etype: Union[int, str]='cell',
+                           deivce: Optional[device]=None) -> Tensor:
         """
-        @brief Make the multi-index matrix of mesh.
+        @brief Make the multi-index matrix of a single entity.
         """
         pass
 
@@ -234,24 +235,9 @@ class Mesh(metaclass=ABCMeta):
         pass
 
 
-class _Boundary():
-    def __init__(self) -> None:
-        pass
-
-    def edge_flag(self):
-        pass
-
-
-class _Plot():
-    pass
-
-
-# Structure:
-# mesh.torch Module
-#  |- Mesh, Mesh1d, Mesh2d, Mesh3d -> mesh.py
-#  |- MeshDataStructure, ... -> mesh_data_structure.py
-#  |- Entity, Measure, Barcenter, ... -> typing.py
-#  |- TriangleMesh, TriangleMeshDataStructure, _Entity, ... -> triangle_mesh.py
+##################################################
+### Mesh with Different Topology Dimension
+##################################################
 
 
 class Mesh1d(Mesh):
@@ -274,7 +260,7 @@ class Mesh2d(Mesh):
         elif etype in {'edge', 'face', 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
-            return 0
+            return torch.zeros((1,))
         raise ValueError(f"Invalid etity type {etype}.")
 
     def cell_area(self) -> Tensor:

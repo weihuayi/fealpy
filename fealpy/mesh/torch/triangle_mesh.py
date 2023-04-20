@@ -4,7 +4,7 @@ import torch
 from torch import Tensor, device
 
 from .mesh_data_structure import Mesh2dDataStructure
-from .Mesh import Mesh2d
+from .mesh import Mesh2d
 
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
