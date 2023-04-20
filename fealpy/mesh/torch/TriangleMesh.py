@@ -3,12 +3,11 @@ from typing import Optional, Union
 import torch
 from torch import Tensor, device
 
-from .Mesh import Redirector
-from .Mesh2d import Mesh2d, Mesh2dDataStructure
-
+from .mesh_data_structure import Mesh2dDataStructure, Redirector
+from .Mesh import Mesh2d
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
-    # Only constants can be defined here.
+    # Constants Only
     localEdge = torch.tensor([(1, 2), (2, 0), (0, 1)])
     localFace = torch.tensor([(1, 2), (2, 0), (0, 1)])
     localCell = torch.tensor([
@@ -19,10 +18,8 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
     NVC = 3
     NVE = 2
-    NVF = Redirector('NVE')
 
     NEC = 3
-    NFC = Redirector('NEC')
 
 
 class TriangleMesh(Mesh2d):
@@ -57,7 +54,7 @@ class TriangleMesh(Mesh2d):
         phi = torch.prod(A[..., multi_idx, idx], dim=-1)
         return phi
 
-    def grad_shape_function(self, bc: Tensor, index=...):
+    def grad_shape_function(self, bc: Tensor, p: int, index=...):
         """
         @brief
         """

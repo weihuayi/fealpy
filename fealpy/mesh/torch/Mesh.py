@@ -1,90 +1,18 @@
 
-from typing import Optional, Generic, TypeVar, Union
+from abc import ABCMeta, abstractmethod
+from typing import Union
+import torch
 from torch import Tensor
 import numpy as np
 
-
-_VT = TypeVar('_VT')
-
-class Redirector(Generic[_VT]):
-    def __init__(self, target: str) -> None:
-        self._target = target
-
-    def __get__(self, obj, objtype) -> _VT:
-        return getattr(obj, self._target)
-
-    def __set__(self, obj, val: _VT):
-        setattr(obj, self._target, val)
+from .mesh_data_structure import (
+    MeshDataStructure,
+    Mesh1dDataStructure,
+    Mesh2dDataStructure
+)
 
 
-class MeshDataStructure():
-    # Variables
-    NN: int = -1
-    cell: Tensor
-    face: Optional[Tensor]
-    edge: Optional[Tensor]
-    edge2cell: Optional[Tensor]
-
-    # Constants
-    TD: int
-    localEdge: Tensor
-    localFace: Tensor
-    localCell: Tensor
-    NVC: int
-    NVE: int
-    NVF: int
-    NEC: int
-    NFC: int
-
-    def __init__(self, NN: int, cell: Tensor):
-        self.itype = cell.dtype
-        self.device = cell.device
-        self.reinit(NN=NN, cell=cell)
-
-    def reinit(self, NN: int, cell: Tensor):
-        self.NN = NN
-        self.cell = cell
-        self.construct()
-
-    def construct(self):
-        raise NotImplementedError
-
-    @property
-    def number(self):
-        return _Count(self) # Is this better?
-
-    def number_of_cells(self):
-        """Number of cells"""
-        return self.cell.shape[0]
-
-    def number_of_faces(self):
-        """Number of faces"""
-        return self.face.shape[0]
-
-    def number_of_edges(self):
-        """Number of edges"""
-        return self.edge.shape[0]
-
-    def number_of_nodes(self):
-        """Number of nodes"""
-        return self.NN
-
-    def number_of_nodes_of_cells(self) -> int:
-        """Number of nodes in a cell"""
-        return self.cell.shape[-1]
-
-    def number_of_edges_of_cells(self) -> int:
-        """Number of edges in a cell"""
-        return self.NEC
-
-    def number_of_faces_of_cells(self) -> int:
-        """Number of faces in a cell"""
-        return self.NFC
-
-    number_of_vertices_of_cells = number_of_nodes_of_cells
-
-
-class Mesh():
+class Mesh(metaclass=ABCMeta):
     ds: MeshDataStructure
     node: Tensor
 
@@ -102,11 +30,31 @@ class Mesh():
     def number_of_cells(self) -> int:
         return self.ds.number_of_cells()
 
+    @abstractmethod
     def uniform_refine(self) -> None:
-        raise NotImplementedError
+        """
+        @brief Refine the whole mesh uniformly.
+        """
+        pass
 
+    @abstractmethod
     def cell_location(self):
-        raise NotImplementedError
+        pass
+
+    @abstractmethod
+    def show_function(self):
+        pass
+
+    @abstractmethod
+    def show_animation(self):
+        pass
+
+    @abstractmethod
+    def add_plot(self, axes):
+        """
+        @brief Plot the mesh in an axes.
+        """
+        pass
 
 
     ### FEM Interfaces ###
@@ -123,81 +71,113 @@ class Mesh():
         """
         return self.ds.TD
 
-    def number_of_entities(self, etype, index=np.s_[:]):
-        raise NotImplementedError
+    @abstractmethod
+    def integrator(self, k: int):
+        pass
 
-    def entity(self, etype: Union[int, str], index=np.s_[:]):
-        raise NotImplementedError
+    @abstractmethod
+    def bc_to_point(self, bc: Tensor) -> Tensor:
+        pass
 
-    def entity_barycenter(self, etype, index=np.s_[:]):
-        raise NotImplementedError
-
-    def entity_measure(self, etype, index=np.s_[:]):
-        raise NotImplementedError
-
-    def integrator(self, k):
-        raise NotImplementedError
-
-    def shape_function(self, p):
-        raise NotImplementedError
-
-    def grad_shape_function(self, p, index=np.s_[:]):
-        raise NotImplementedError
-
-    def number_of_local_ipoints(self, p):
-        raise NotImplementedError
-
-    def number_of_global_ipoints(self, p):
-        raise NotImplementedError
-
-    def interpolation_points(self):
-        raise NotImplementedError
-
-    def cell_to_ipoint(self, p, index=np.s_[:]):
-        raise NotImplementedError
-
-    def edge_to_ipoint(self, p, index=np.s_[:]):
-        raise NotImplementedError
-
-    def face_to_ipoint(self, p, index=np.s_[:]):
-        raise NotImplementedError
-
-    def node_to_ipoint(self, p, index=np.s_[:]):
-        raise NotImplementedError
-
-
-# TODO: Is this better?
-
-class _Count():
-    def __init__(self, ds: MeshDataStructure) -> None:
-        self._ds = ds
-
-    def __call__(self, etype: Union[int, str]):
-        TD = self._ds.TD
+    def entity(self, etype: Union[int, str], index=np.s_[:]) -> Tensor:
+        """
+        @brief Get entities.
+        """
+        TD = self.ds.TD
         if etype in {'cell', TD}:
-            return self.nodes()
+            return self.ds.cell[index]
         elif etype in {'face', TD-1}:
-            return self.faces()
+            return self.ds.face[index]
         elif etype in {'edge', 1}:
-            return self.edges()
+            return self.ds.edge[index]
         elif etype in {'node', 0}:
-            return self.nodes()
-        raise ValueError(f"Invalid entity type '{etype}'.")
+            return self.node.reshape(-1, self.geo_dimension())[index]
+        raise ValueError(f"Invalid etype '{etype}'.")
 
-    def nodes(self):
-        return self._ds.NN
+    def entity_barycenter(self, etype: Union[int, str], index=np.s_[:]) -> Tensor:
+        """
+        @brief Calculate barycenters of entities.
+        """
+        node = self.entity('node')
+        TD = self.ds.TD
+        if etype in {'cell', TD}:
+            cell = self.ds.cell
+            return torch.sum(node[cell[index], :], dim=1) / cell.shape[1]
+        elif etype in {'edge', 1}:
+            edge = self.ds.edge
+            return torch.sum(node[edge[index], :], dim=1) / edge.shape[1]
+        elif etype in {'node', 0}:
+            return node[index]
+        elif etype in {'face', TD-1}: # Try 'face' in the last
+            face = self.ds.face
+            return torch.sum(node[face[index], :], dim=1) / face.shape[1]
+        raise ValueError(f"Invalid etype '{etype}'.")
 
-    def edges(self):
-        return self._ds.edge.shape[0]
+    @abstractmethod
+    def entity_measure(self, etype: Union[int, str], index=np.s_[:]) -> Tensor:
+        """
+        @brief Calculate measurements of entities.
+        """
+        pass
 
-    def faces(self):
-        return self._ds.face.shape[0]
+    @classmethod
+    @abstractmethod
+    def multi_index_matrix(cls, p: int) -> Tensor:
+        """
+        @brief Make the multi-index matrix of mesh.
+        """
+        pass
 
-    def cells(self):
-        return self._ds.cell.shape[0]
+    @abstractmethod
+    def shape_function(self, bc: Tensor, p: int) -> Tensor:
+        """
+        @brief
+        """
+        pass
 
-    def nodes_of_cells(self):
-        return self._ds.cell.shape[-1]
+    @abstractmethod
+    def grad_shape_function(self, bc: Tensor, p: int, index=np.s_[:]) -> Tensor:
+        """
+        @brief
+        """
+        pass
+
+    @abstractmethod
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
+        """
+        @brief Return the number of p-order integral points in a single entity.
+        """
+        pass
+
+    @abstractmethod
+    def number_of_global_ipoints(self, p: int):
+        """
+        @brief Return the number of all p-order integral points.
+        """
+        pass
+
+    @abstractmethod
+    def interpolation_points(self, p: int):
+        """
+        @brief Get all the p-order interpolation points in the mesh.
+        """
+        pass
+
+    @abstractmethod
+    def cell_to_ipoint(self, p: int, index=np.s_[:]):
+        pass
+
+    @abstractmethod
+    def edge_to_ipoint(self, p: int, index=np.s_[:]):
+        pass
+
+    @abstractmethod
+    def face_to_ipoint(self, p: int, index=np.s_[:]):
+        pass
+
+    @abstractmethod
+    def node_to_ipoint(self, p: int, index=np.s_[:]):
+        pass
 
 
 class _Entity():
@@ -234,3 +214,50 @@ class _Plot():
 #  |- MeshDataStructure, ... -> mesh_data_structure.py
 #  |- Entity, Measure, Barcenter, ... -> typing.py
 #  |- TriangleMesh, TriangleMeshDataStructure, _Entity, ... -> triangle_mesh.py
+
+
+class Mesh1d(Mesh):
+    ds: Mesh1dDataStructure
+
+
+class Mesh2d(Mesh):
+    ds: Mesh2dDataStructure
+
+    def entity_measure(self, etype: Union[int, str]=2, index=np.s_[:]):
+        """
+        @brief Get measurements for entities.
+        """
+        if etype in {'cell', 2}:
+            return self.cell_area()[index]
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        raise ValueError(f"Invalid etity type {etype}.")
+
+    def cell_area(self) -> Tensor:
+        """
+        @brief Area of cells in a 2-d mesh.
+        """
+        NC = self.number_of_cells()
+        node = self.node
+        edge = self.ds.edge
+        edge2cell = self.ds.edge2cell
+        is_inner_edge = ~self.ds.boundary_edge_flag()
+
+        v = (node[edge[:, 1], :] - node[edge[:, 0], :])
+        val = torch.sum(v*node[edge[:, 0], :], dim=1)
+        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
+        a /= 2
+        return a
+
+    def edge_length(self, index=np.s_[:]) -> Tensor:
+        """
+        @brief Length of edges in a 2-d mesh.
+        """
+        node = self.entity('node')
+        edge = self.entity('edge')
+        v = node[edge[index, 1], :] - node[edge[index, 0], :]
+        length = torch.sqrt(torch.sum(v**2, dim=1))
+        return length
