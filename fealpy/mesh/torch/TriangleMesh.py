@@ -3,8 +3,9 @@ from typing import Optional, Union
 import torch
 from torch import Tensor, device
 
-from .mesh_data_structure import Mesh2dDataStructure, Redirector
+from .mesh_data_structure import Mesh2dDataStructure
 from .Mesh import Mesh2d
+
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
     # Constants Only
@@ -23,16 +24,17 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
 
 class TriangleMesh(Mesh2d):
-    def __init__(self, node: Tensor, cell: Tensor, itype=torch.uint8, ftype=torch.float64):
+    def __init__(self, node: Tensor, cell: Tensor):
         assert cell.shape[-1] == 3
-        self.itype = itype
-        self.ftype = ftype
-        self.node = node.to(ftype)
-        self.ds = TriangleMeshDataStructure(NN=node.shape[0], cell=cell.to(itype))
+
+        self.itype = cell.dtype
+        self.ftype = node.dtype
+        self.node = node
+        self.ds = TriangleMeshDataStructure(NN=node.shape[0], cell=cell)
         self.device = node.device
 
-    def uniform_refine(self):
-        return super().uniform_refine()
+    def uniform_refine(self, n: int=1):
+        pass
 
     def shape_function(self, bc: Tensor, p: int=1) -> Tensor:
         """
@@ -46,7 +48,7 @@ class TriangleMesh(Mesh2d):
 
         shape = bc.shape[:-1] + (p+1, TD+1)
         A = torch.ones(shape, dtype=self.ftype, device=self.device)
-        A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
+        A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1) # TODO: Make the graph linked here!!!
         torch.cumprod(A, dim=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
 
@@ -58,7 +60,7 @@ class TriangleMesh(Mesh2d):
         """
         @brief
         """
-        ...
+        pass
 
     @staticmethod
     def multi_index_matrix(p: int, etype: Union[int, str]=2, device: Optional[device]=None):
@@ -88,5 +90,11 @@ class TriangleMesh(Mesh2d):
 
         raise ValueError(f"Invalid entity type '{etype}'.")
 
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str] = 'cell') -> int:
+        pass
+
+    def number_of_global_ipoints(self, p: int):
+        pass
+
     def interpolation_points(self):
-        return super().interpolation_points()
+        pass

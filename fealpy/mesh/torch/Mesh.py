@@ -13,6 +13,24 @@ from .mesh_data_structure import (
 
 
 class Mesh(metaclass=ABCMeta):
+    """
+    @brief The abstract base class for all meshes in fealpy. This can not be\
+           instantiated before all abstract methods are overriden.
+
+    @note: Abstract methods list:
+    ```
+    def uniform_refine(self) -> None: ...
+    def add_plot(self, axes) -> None: ...
+
+    def integrator(self, k: int, etype: Union[int, str]): ...
+    def entity_measure(self, etype: Union[int, str], index=np.s_[:]) -> Tensor: ...
+    @classmethod
+    def multi_index_matrix(cls, p: int) -> Tensor: ...
+    def shape_function(self, bc: Tensor, p: int) -> Tensor: ...
+    def grad_shape_function(self, bc: Tensor, p: int, index=np.s_[:]) -> Tensor: ...
+    ...
+    ```
+    """
     ds: MeshDataStructure
     node: Tensor
 
@@ -30,27 +48,35 @@ class Mesh(metaclass=ABCMeta):
     def number_of_cells(self) -> int:
         return self.ds.number_of_cells()
 
+    def number_of_nodes_of_cells(self) -> int:
+        """Number of nodes in a cell"""
+        return self.ds.cell.shape[-1]
+
+    def number_of_edges_of_cells(self) -> int:
+        """Number of edges in a cell"""
+        return self.ds.NEC
+
+    def number_of_faces_of_cells(self) -> int:
+        """Number of faces in a cell"""
+        return self.ds.NFC
+
     @abstractmethod
-    def uniform_refine(self) -> None:
+    def uniform_refine(self, n: int=1) -> None:
         """
-        @brief Refine the whole mesh uniformly.
+        @brief Refine the whole mesh uniformly for `n` times.
         """
         pass
 
-    @abstractmethod
-    def cell_location(self):
-        pass
+    # @abstractmethod
+    # def show_function(self):
+    #     pass
+
+    # @abstractmethod
+    # def show_animation(self):
+    #     pass
 
     @abstractmethod
-    def show_function(self):
-        pass
-
-    @abstractmethod
-    def show_animation(self):
-        pass
-
-    @abstractmethod
-    def add_plot(self, axes):
+    def add_plot(self, *args, **kwargs):
         """
         @brief Plot the mesh in an axes.
         """
@@ -72,26 +98,54 @@ class Mesh(metaclass=ABCMeta):
         return self.ds.TD
 
     @abstractmethod
-    def integrator(self, k: int):
+    def integrator(self, k: int, etype: Union[int, str]):
+        """
+        @brief Get the integration formula on a mesh entity of different dimensions.
+        """
         pass
 
-    @abstractmethod
-    def bc_to_point(self, bc: Tensor) -> Tensor:
-        pass
+    def bc_to_point(self, bc: Tensor, etype: Union[int, str]='cell',
+                    index=np.s_[:]) -> Tensor:
+        """
+        @brief Convert barycenter coordinate points to cartesian coordinate points\
+               on mesh entities.
+
+        @param bc: Barycenter coordinate points tensor, with shape (NQ, NVC), where\
+                   NVC is the number of nodes in each entity.
+        @param etype: Specify the type of entities on which the coordinates be converted.
+        @param index: Index to slice entities.
+
+        @note: To get the correct result, the order of bc must match the order of nodes\
+               in the entity.
+
+        @return: Cartesian coordinate points tensor, with shape (NQ, GD).
+        """
+        if etype in {'node', 0}:
+            raise ValueError(f"Can not convert the coordinates on nodes, please\
+                             use type of entities of higher dimension.")
+        node = self.node
+        entity = self.entity(etype=etype, index=index)
+        p = torch.einsum('...j, ijk -> ...ik', bc, node[entity])
+        return p
 
     def entity(self, etype: Union[int, str], index=np.s_[:]) -> Tensor:
         """
         @brief Get entities.
+
+        @param etype: Type of entities. Accept dimension or name.
+        @param index: Index for entities.
+
+        @return: A tensor representing the entities in this mesh.
         """
         TD = self.ds.TD
         if etype in {'cell', TD}:
             return self.ds.cell[index]
-        elif etype in {'face', TD-1}:
-            return self.ds.face[index]
         elif etype in {'edge', 1}:
             return self.ds.edge[index]
         elif etype in {'node', 0}:
             return self.node.reshape(-1, self.geo_dimension())[index]
+        elif etype in {'face', TD-1}: # Try 'face' in the last
+            return self.ds.face[index]
         raise ValueError(f"Invalid etype '{etype}'.")
 
     def entity_barycenter(self, etype: Union[int, str], index=np.s_[:]) -> Tensor:
@@ -180,22 +234,6 @@ class Mesh(metaclass=ABCMeta):
         pass
 
 
-class _Entity():
-    pass
-
-# Similarly to the example above,
-# Implement `_Measure`, `_Barycenter` class for every types of meshes.
-
-class _Measure():
-    pass
-
-class _Barycenter():
-    pass
-
-# Mesh typs has `measure` and `barycenter` properties (point to the classes' instances above)
-# to specify how to measure entities, and how to calculate the barycenter of entities.
-
-
 class _Boundary():
     def __init__(self) -> None:
         pass
@@ -221,6 +259,10 @@ class Mesh1d(Mesh):
 
 
 class Mesh2d(Mesh):
+    """
+    @brief The abstract class for all meshes with topology dimension 2.\
+           This is still abstract, and some methods need to be overiden.
+    """
     ds: Mesh2dDataStructure
 
     def entity_measure(self, etype: Union[int, str]=2, index=np.s_[:]):
@@ -261,3 +303,14 @@ class Mesh2d(Mesh):
         v = node[edge[index, 1], :] - node[edge[index, 0], :]
         length = torch.sqrt(torch.sum(v**2, dim=1))
         return length
+
+    def add_plot(
+            self, plot_or_axes,
+            nodecolor='w', edgecolor='k',
+            cellcolor=[0.5, 0.9, 0.45], aspect=None,
+            linewidths=1, markersize=50,
+            showaxis=False, showcolorbar=False,
+            cmax=None, cmin=None,
+            colorbarshrink=1, cmap='jet', box=None
+        ):
+        pass
