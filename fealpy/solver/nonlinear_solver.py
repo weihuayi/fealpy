@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from typing import Callable 
+from typing import Callable, Tuple 
 
 class NonlinearSolver:
     def __init__(self, tol: np.float_, max_iter: np.int_):
@@ -241,4 +241,66 @@ class NonlinearSolver:
 
         return u
 
+
+    def displacement_control_procedure(self, u1_init: np.float_, u2_init: np.float_,
+                    calculate_P: Callable[[np.float_, np.float_], np.float_],
+                    calculate_Kt: Callable[[np.float_, np.float_], np.float_],
+                    calculate_F: Callable[[np.float_, np.float_], np.float_]) -> Tuple[np.float_, np.float_]:
+        """
+        使用位移控制过程求解非线性方程组
+
+        @param u1_init: u1 的初始值
+        @param u2_init: u2 的初始值
+        @param calculate_P: 计算非线性方程组 P 的函数
+        @param calculate_Kt: 计算切线刚度矩阵 Kt 的函数
+        @param calculate_F: 计算作用力 F 的函数
+        @return: 非线性方程组的解 (u1, u2)
+        """
+        u1 = u1_init
+        u1old = u1
+        print("步骤   u1        u2        F")
+
+        # 存储数据的列表
+        u1_list = []
+        u2_list = []
+        F_list = []
+        
+        # 位移循环增量
+        for i in range(1, 10):
+            u2 = u2_init * i
+            P = calculate_P(u1, u2)
+            R = - P
+            conv = R ** 2
+            
+            # 收敛循环
+            iter = 0
+            while conv > self.tol and iter < self.max_iter:
+                Kt = calculate_Kt(u1, u2)
+                delu1 = R / Kt
+                u1 = u1old + delu1
+                P = calculate_P(u1, u2)
+                R = -P
+                conv = R**2
+                u1old = u1
+                iter += 1
+
+            F = calculate_F(u1, u2)
+            print("{:3d} {:7.5f} {:7.5f} {:7.3f}".format(i, u1, u2, F))
+
+            # 将数据添加到列表中
+            u1_list.append(u1)
+            u2_list.append(u2)
+            F_list.append(F)
+
+        # 绘制 u1、u2 与 F 的关系图
+        plt.figure()
+        plt.plot(F_list, u1_list, marker='o', label='u1')
+        plt.plot(F_list, u2_list, marker='s', label='u2')
+        plt.xlabel('Force')
+        plt.ylabel('Displacement')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+        return u1, u2
     # ... 其他方法 ...
