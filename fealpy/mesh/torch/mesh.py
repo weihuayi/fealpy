@@ -75,12 +75,13 @@ class Mesh(metaclass=ABCMeta):
     # def show_animation(self):
     #     pass
 
-    @abstractmethod
-    def add_plot(self, *args, **kwargs):
+    @property
+    def add_plot(self):
         """
-        @brief Plot the mesh in an axes.
+        @brief Plot machine for this mesh.
         """
-        pass
+        from .plot import MeshPlot
+        return MeshPlot(self)
 
 
     ### FEM Interfaces ###
@@ -200,19 +201,19 @@ class Mesh(metaclass=ABCMeta):
     @abstractmethod
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         """
-        @brief Return the number of p-order integral points in a single entity.
+        @brief Return the number of p-order interpolation points in a single entity.
         """
         pass
 
     @abstractmethod
-    def number_of_global_ipoints(self, p: int):
+    def number_of_global_ipoints(self, p: int) -> int:
         """
-        @brief Return the number of all p-order integral points.
+        @brief Return the number of all p-order interpolation points.
         """
         pass
 
     @abstractmethod
-    def interpolation_points(self, p: int):
+    def interpolation_points(self, p: int) -> Tensor:
         """
         @brief Get all the p-order interpolation points in the mesh.
         """
@@ -241,6 +242,10 @@ class Mesh(metaclass=ABCMeta):
 
 
 class Mesh1d(Mesh):
+    """
+    @brief The abstract class for all meshes with topology dimension 1.\
+           This is still abstract, and some methods need to be overiden.
+    """
     ds: Mesh1dDataStructure
 
 
@@ -289,14 +294,3 @@ class Mesh2d(Mesh):
         v = node[edge[index, 1], :] - node[edge[index, 0], :]
         length = torch.sqrt(torch.sum(v**2, dim=1))
         return length
-
-    def add_plot(
-            self, plot_or_axes,
-            nodecolor='w', edgecolor='k',
-            cellcolor=[0.5, 0.9, 0.45], aspect=None,
-            linewidths=1, markersize=50,
-            showaxis=False, showcolorbar=False,
-            cmax=None, cmin=None,
-            colorbarshrink=1, cmap='jet', box=None
-        ):
-        pass

@@ -45,7 +45,7 @@ class Mesh2dDataStructure(MeshDataStructure):
 
         i0 = torch.from_numpy(i0)
         i1 = torch.zeros(NE, dtype=self.itype)
-        i1[j] = torch.arange(NEC*NC)
+        i1[j] = torch.arange(NEC*NC, dtype=self.itype)
 
         self.edge2cell[:, 0] = i0//NEC
         self.edge2cell[:, 1] = i1//NEC
