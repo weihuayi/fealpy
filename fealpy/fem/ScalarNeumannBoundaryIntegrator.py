@@ -39,7 +39,7 @@ class ScalarNeumannBoundaryIntegrator:
             if hasattr(gN, 'coordtype'):
                 if gN.coordtype == 'cartesian':
                     pp = mesh.bc_to_point(bcs, index=index)
-                    val = gN(pp, n) 
+                    val = gN(pp, n)
                 elif gN.coordtype == 'barycentric':
                     val = gN(bcs, n, index=index)
             else: # 默认是笛卡尔
@@ -56,7 +56,6 @@ class ScalarNeumannBoundaryIntegrator:
             F = out
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, facemeasure)
-        print(F.shape, bb.shape)
         np.add.at(F, face2dof, bb)
         
         if out is None:
