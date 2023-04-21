@@ -500,7 +500,7 @@ class UniformMesh2d(Mesh2d):
 
         if errortype == 'all':
             emax = np.max(np.abs(e))
-            e0 = np.sqrt(hx * hy * 2 * np.sum(e ** 2))
+            e0 = np.sqrt(hx * hy * np.sum(e ** 2))
             el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
 
             return emax, e0, el2
@@ -508,7 +508,7 @@ class UniformMesh2d(Mesh2d):
             emax = np.max(np.abs(e))
             return emax
         elif errortype == 'L2':
-            e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+            e0 = np.sqrt(hx * hy * np.sum(e ** 2))
             return e0
         elif errortype == 'l2':
             el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))

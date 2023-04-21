@@ -1043,12 +1043,12 @@ class TetrahedronMesh(Mesh3d):
         node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
         
         #节点的编号映射 
-        nodetags_map = dict({j:i for i,j in enumerate(ntags)})
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
 
         # 获取四面体单元信息
         tetrahedron_type = 4  # 四面体单元的类型编号为 4
         tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
-        evid = np.array([node_tags[j] for j in tetrahedron_connectivity])
+        evid = np.array([nodetags_map[j] for j in tetrahedron_connectivity])
         cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
 
         # 输出节点和单元数量
