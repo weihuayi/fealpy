@@ -174,7 +174,9 @@ class Mesh1d(Mesh):
             node = np.r_['1', node, np.zeros_like(node)]
 
         GD = self.geo_dimension()
-        if GD == 2:
+        if GD == 1:
+            axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
+        elif GD == 2:
             axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
         elif GD == 3:
             axes.scatter(node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
