@@ -31,7 +31,7 @@ class ScalarNeumannBoundaryIntegrator:
         if facemeasure is None:
             facemeasure = mesh.entity_measure('face', index=index)
 
-        q = q if q is not None else space.p + 3 #TODO: 积分精度选择策略
+        q = self.q if self.q is not None else space.p + 3 #TODO: 积分精度选择策略
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.face_basis(bcs)
@@ -60,5 +60,4 @@ class ScalarNeumannBoundaryIntegrator:
                 optimize=True)
         np.add.at(F, face2dof, bb)
         
-        if out is None:
-            return F
+        return F

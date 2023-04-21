@@ -70,6 +70,8 @@ def test_interval_mesh(p, n, maxit):
 def test_triangle_mesh(p, n, maxit):
     from fealpy.pde.poisson_2d import CosCosData as PDE
     from fealpy.mesh import TriangleMesh 
+    from fealpy.boundarycondition import NeumannBC as OldNeumannBC
+    from fealpy.boundarycondition import DirichletBC as OldDirichletBC
 
     pde = PDE()
     domain = pde.domain()
@@ -77,7 +79,7 @@ def test_triangle_mesh(p, n, maxit):
 
     for i in range(maxit):
         mesh = TriangleMesh.from_unit_square(nx=n*2**i, ny=n*2**i)
-        space = Space(mesh, p=p)
+        space = Space(mesh, p=p, doforder='vdims')
 
         
         bform = BilinearForm(space)
@@ -96,11 +98,21 @@ def test_triangle_mesh(p, n, maxit):
         np.testing.assert_allclose(A.toarray(), OA.toarray())
         np.testing.assert_allclose(f, Of)
 
-        bc1 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        obc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
+        Of = obc.apply(Of)
+
         bc2 = NeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
+        f = bc2.assembly_face_vector(space, out=f)
+        np.testing.assert_allclose(f, Of)
+        
         uh = space.function()
-        f = bc2.assembly_face_vector(space, out=f, q=p)
+        Obc1 = OldDirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        OA, Of = Obc1.apply(OA, Of, uh)
+        bc1 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
         A, f = bc1.apply(A, f, uh)
+
+        np.testing.assert_allclose(A.toarray(), OA.toarray())
+        np.testing.assert_allclose(f, Of)
 
 
         uh[:] = spsolve(A, f)
