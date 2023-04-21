@@ -1,19 +1,20 @@
 
 import numpy as np
 import torch
-from typing import Union
 from torch import Tensor
 
-from .Mesh import Mesh, MeshDataStructure, Redirector
+from .mesh_ds import MeshDataStructure, Redirector
 
 
 class Mesh2dDataStructure(MeshDataStructure):
     """
-    @brief The topology data structure of mesh 2d.\
+    @brief The topology data structure of 2-d mesh.\
            This is an abstract class and can not be used directly.
     """
     TD = 2
-    face = Redirector('edge')
+    face: Redirector[Tensor] = Redirector('edge')
+    NVF: Redirector[int] = Redirector('NVE')
+    NFC: Redirector[int] = Redirector('NEC')
 
     def total_edge(self) -> Tensor:
         """
@@ -44,7 +45,7 @@ class Mesh2dDataStructure(MeshDataStructure):
 
         i0 = torch.from_numpy(i0)
         i1 = torch.zeros(NE, dtype=self.itype)
-        i1[j] = torch.arange(NEC*NC)
+        i1[j] = torch.arange(NEC*NC, dtype=self.itype)
 
         self.edge2cell[:, 0] = i0//NEC
         self.edge2cell[:, 1] = i1//NEC
@@ -192,63 +193,3 @@ class Mesh2dDataStructure(MeshDataStructure):
         isBdEdge = self.boundary_edge_flag()
         isBdCell[edge2cell[isBdEdge, 0]] = True
         return isBdCell
-
-
-class Mesh2d(Mesh):
-    ds: Mesh2dDataStructure
-
-    def entity(self, etype: Union[int, str]=2):
-        """
-        @brief Get entities in mesh.
-        """
-        if etype in {'cell', 2}:
-            return self.ds.cell
-        elif etype in {'edge', 'face', 1}:
-            return self.ds.edge
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, self.geo_dimension())
-        raise ValueError(f"Invalid etype '{etype}'.")
-
-    def entity_barycenter(self, etype: Union[int, str], index=np.s_[:]):
-        """
-        @brief Get barycenters of entities.
-        """
-        node = self.entity('node')
-        if etype in {'cell', 2}:
-            cell = self.ds.cell
-            return torch.sum(node[cell[index], :], dim=1) / cell.shape[1]
-        elif etype in {'edge', 'face', 1}:
-            edge = self.ds.edge
-            return torch.sum(node[edge[index], :], dim=1) / edge.shape[1]
-        elif etype in {'node', 0}:
-            return node[index]
-        raise ValueError('the entity `{}` is not correct!'.format(etype))
-
-    def entity_measure(self, etype: Union[int, str]=2, index=np.s_[:]):
-        """
-        @brief Get measurements for entities.
-        """
-        if etype in {'cell', 2}:
-            return self.cell_area()[index]
-        elif etype in {'edge', 'face', 1}:
-            return self.edge_length(index=index)
-        elif etype in {'node', 0}:
-            return 0
-        raise ValueError(f"Invalid etity type {etype}.")
-
-    def cell_area(self) -> Tensor:
-        """
-        @brief
-        """
-        NC = self.number_of_cells()
-        node = self.node
-        edge = self.ds.edge
-        edge2cell = self.ds.edge2cell
-        is_inner_edge = ~self.ds.boundary_edge_flag()
-
-        v = (node[edge[:, 1], :] - node[edge[:, 0], :])
-        val = torch.sum(v*node[edge[:, 0], :], dim=1)
-        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
-        a /= 2
-        return a
