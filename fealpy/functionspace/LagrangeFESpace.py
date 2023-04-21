@@ -36,7 +36,7 @@ class SimplexMeshCLFEDof():
     def cell_to_dof(self, index=np.s_[:]):
         return self.mesh.cell_to_ipoint(self.p, index=index)
 
-    def interpolation_points(self):
+    def interpolation_points(self, index=np.s_[:]):
         return self.mesh.interpolation_points(self.p, index=index)
 
     def number_of_global_dofs(self):
@@ -418,7 +418,7 @@ class LagrangeFESpace():
         return self.dof.cell_to_dof()[index]
 
     def face_to_dof(self, index=np.s_[:]):
-        return self.dof.face_to_dof() #TODO: index
+        return self.dof.face_to_dof()[index] #TODO: index
 
     def edge_to_dof(self, index=np.s_[:]):
         return self.dof.edge_to_dof() #TODO：index
@@ -450,7 +450,9 @@ class LagrangeFESpace():
         """
         @brief 计算 face 上的基函数在给定积分点处的函数值
         """
-        pass
+        p = self.p
+        phi = self.mesh.shape_function(bc, p=p,etype='face')
+        return phi[..., None, :]
 
     @barycentric
     def value(self, 
