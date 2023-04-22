@@ -103,7 +103,7 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         v = node[edge[index,1],:] - node[edge[index,0],:]
-        length = np.linalg.norm(v, axis=1))
+        length = np.linalg.norm(v, axis=1)
         return length
 
     def cell_area(self, index=np.s_[:]):
