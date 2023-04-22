@@ -14,6 +14,7 @@ def test_linear_elasticity_lfem(p, n):
     from fealpy.fem import BilinearForm
     from fealpy.fem import LinearForm
     from fealpy.fem import DirichletBC
+    from fealpy.fem import VectorNeumannBCIntegrator
 
     from fealpy.functionspace import LagrangeFiniteElementSpace as OldSpace
     from fealpy.boundarycondition import NeumannBC as OldNeumannBC

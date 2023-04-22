@@ -6,27 +6,27 @@ This module provide many fem model
 
 '''
 
-from .BilinearForm import BilinearForm
-from .LinearForm import LinearForm
+from .bilinear_form import BilinearForm
+from .linear_form import LinearForm
 
 # Integrator for scalar case
-from .ScalarMassIntegrator import ScalarMassIntegrator
-from .ScalarDiffusionIntegrator import ScalarDiffusionIntegrator
-from .ScalarSourceIntegrator import ScalarSourceIntegrator
+from .scalar_mass_integrator import ScalarMassIntegrator
+from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
+from .scalar_source_integrator import ScalarSourceIntegrator
 
 # Integrator for vector case
-from .VectorSourceIntegrator import VectorSourceIntegrator
-from .VectorDiffusionIntegrator import VectorDiffusionIntegrator
+from .vector_source_integrator import VectorSourceIntegrator
+from .vector_diffusion_integrator import VectorDiffusionIntegrator
 
-from .TrussStructureIntegrator import TrussStructureIntegrator
-from .DiffusionIntegrator import DiffusionIntegrator
-from .ConvectionIntegrator import ConvectionIntegrator
-from .LinearElasticityOperatorIntegrator import LinearElasticityOperatorIntegrator
+from .truss_structure_integrator import TrussStructureIntegrator
+from .diffusion_integrator import DiffusionIntegrator
+from .convection_integrator import ConvectionIntegrator
+from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
-from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangentOperatorIntegrator
+from .provides_symmetric_tangent_operator_Integrator import ProvidesSymmetricTangentOperatorIntegrator
 
-from .VectorNeumannBoundaryIntegrator import VectorNeumannBoundaryIntegrator
-from .ScalarNeumannBoundaryIntegrator import ScalarNeumannBoundaryIntegrator
+from .vector_neumann_bc_integrator import VectorNeumannBCIntegrator
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
-from .DirichletBC import DirichletBC
+from .dirichlet_bc import DirichletBC
 
