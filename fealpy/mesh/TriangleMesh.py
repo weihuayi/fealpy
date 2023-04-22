@@ -115,12 +115,12 @@ class TriangleMesh(Mesh2d):
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
-    def shape_function(self, bc, p=1):
+    def shape_function(self, bc, p=1, etype='cell'):
         """
         @brief
         """
         TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p)
+        multiIndex = self.multi_index_matrix(p, etype=etype)
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
@@ -300,9 +300,10 @@ class TriangleMesh(Mesh2d):
         NC = self.number_of_cells()
         return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
         """
         @brief 获取三角形网格上所有 p 次插值点
+        TODO index
         """
         cell = self.entity('cell')
         node = self.entity('node')
@@ -340,8 +341,7 @@ class TriangleMesh(Mesh2d):
         """
         @brief 获取网格边与插值点的对应关系
         """
-
-        if index == np.s_[:]:
+        if isinstance(index, slice) and index == slice(None):
             NE = self.number_of_edges()
             index = np.arange(NE)
         elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
