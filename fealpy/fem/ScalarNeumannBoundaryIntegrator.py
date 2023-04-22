@@ -8,8 +8,7 @@ class ScalarNeumannBoundaryIntegrator:
         self.q = None
         self.threshold = threshold
 
-    def assembly_face_vector(self, space, index=np.s_[:], facemeasure=None,
-            out=None):
+    def assembly_face_vector(self, space, out=None):
         """
         """
         gN = self.gN
@@ -21,15 +20,13 @@ class ScalarNeumannBoundaryIntegrator:
             index = threshold
         else:
             index = mesh.ds.boundary_face_index()
-            if threshold is not None:
-                bc = mesh.entity_barycenter('face', index=index)
-                flag = threshold(bc)
-                index = index[flag]
+            if callable(threshold):
+                bc = mesh.entity_barycenter('face')
+                index = index[threshold(bc)]
 
         face2dof = space.face_to_dof(index=index)
         n = mesh.face_unit_normal(index=index)
-        if facemeasure is None:
-            facemeasure = mesh.entity_measure('face', index=index)
+        facemeasure = mesh.entity_measure('face', index=index)
 
         q = self.q if self.q is not None else space.p + 3 #TODO: 积分精度选择策略
         qf = mesh.integrator(q, 'face')
