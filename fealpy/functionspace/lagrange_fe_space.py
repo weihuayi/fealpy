@@ -443,6 +443,10 @@ class LagrangeFESpace():
 
     @barycentric
     def grad_basis(self, bc, index=np.s_[:]):
+        """
+        @brief 
+        @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
+        """
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
     
     @barycentric
@@ -507,11 +511,17 @@ class LagrangeFESpace():
         """
         """
         gdof = self.number_of_global_dofs()
-        gphi = self.grad_basis(bc, index=index) # (NQ, NC, ldof, GD)
+        gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
-        if self.doforder == 'sdofs':
+
+        if dim == 0:
+            # gphi.shape == (NQ, NC, ldof, GD)
+            # uh.shape == (gdof, )
+            # uh[..., cell2dof].shape == (..., NC, ldof)
+            # val.shape == (NQ, ..., GD, NC)
+        elif self.doforder == 'sdofs':
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (..., gdof)
             # uh[..., cell2dof].shape == (..., NC, ldof)

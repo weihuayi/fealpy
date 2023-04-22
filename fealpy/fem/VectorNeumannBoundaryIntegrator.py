@@ -1,3 +1,5 @@
+
+from typing import Optional, Union, Callable
 import numpy as np
 
 class VectorNeumannBoundaryIntegrator:
@@ -7,21 +9,21 @@ class VectorNeumannBoundaryIntegrator:
         self.q = q
         self.threshold = threshold
 
-    def assembly_face_vector(self, space, index=np.s_[:], facemeasure=None, out=None):
+    def assembly_face_vector(self, space, out=None):
         """
         @brief 组装单元向量
         """
 
         if isinstance(space, tuple) and ~isinstance(space[0], tuple):
-            return self.assembly_face_vector_for_vspace_with_scalar_basis(space, 
-                    index=index, facemeasure=facemeasure, out=out)
+            return self.assembly_face_vector_for_vspace_with_scalar_basis(
+                    space, out=out)
         else:
-            return self.assembly_face_vector_for_vspace_with_vector_basis(space, 
-                    index=index, facemeasure=facemeasure, out=out)
+            return self.assembly_face_vector_for_vspace_with_vector_basis(
+                    space, out=out)
         
 
     def assembly_face_vector_for_vspace_with_scalar_basis(
-            self, space, index=np.s_[:], facemeasure=None, out=None):
+            self, space, out=None):
         """
         @brief 由标量空间张成的向量空间 
 
@@ -35,9 +37,16 @@ class VectorNeumannBoundaryIntegrator:
         mesh = space[0].mesh # 获取网格对像
         GD = mesh.geo_dimension()
 
-        if facemeasure is None:
-            facemeasure = mesh.entity_measure('face', index=index)
+  
+        if isinstance(self.threshold, np.ndarray):
+            index = self.threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+            if callable(self.threshold):
+                bc = self.mesh.entity_barycenter('face')
+                index = index[self.threshold(bc)]
 
+        facemeasure = mesh.entity_measure('face', index=index)
         NF = len(facemeasure)
         ldof = space[0].number_of_face_dofs() 
         if out is None:
