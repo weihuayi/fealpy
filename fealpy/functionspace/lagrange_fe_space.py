@@ -509,6 +509,7 @@ class LagrangeFESpace():
             index: Union[np.ndarray, slice]=np.s_[:]
             ) -> np.ndarray:
         """
+        @note
         """
         gdof = self.number_of_global_dofs()
         gphi = self.grad_basis(bc, index=index)
@@ -516,11 +517,12 @@ class LagrangeFESpace():
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
 
-        if dim == 0:
+        if dim == 0: # 如果
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (gdof, )
-            # uh[..., cell2dof].shape == (..., NC, ldof)
-            # val.shape == (NQ, ..., GD, NC)
+            # uh[cell2dof].shape == (NC, ldof)
+            # val.shape == (NQ, NC, GD)
+            val = np.einsum('...cim, ci->...cm', gphi, uh[cell2dof[index]])
         elif self.doforder == 'sdofs':
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (..., gdof)
