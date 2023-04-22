@@ -261,7 +261,7 @@ class Mesh2d(Mesh):
         @brief Get measurements for entities.
         """
         if etype in {'cell', 2}:
-            return self.cell_area()[index]
+            return self.cell_area()[index] #TODO: self.cell_area(index=index)
         elif etype in {'edge', 'face', 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
@@ -279,8 +279,9 @@ class Mesh2d(Mesh):
         is_inner_edge = ~self.ds.boundary_edge_flag()
 
         v = (node[edge[:, 1], :] - node[edge[:, 0], :])
-        val = torch.sum(v*node[edge[:, 0], :], dim=1)
-        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        val = torch.sum(v*node[edge[:, 0], :], dim=1) # TODO: torch.dot?
+        # TODO: torch.add.at?
+        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC) 
         a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
         a /= 2
         return a
@@ -292,5 +293,5 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         v = node[edge[index, 1], :] - node[edge[index, 0], :]
-        length = torch.sqrt(torch.sum(v**2, dim=1))
+        length = torch.sqrt(torch.sum(v**2, dim=1)) # TODO: torch.norm?
         return length
