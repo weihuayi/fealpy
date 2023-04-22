@@ -12,6 +12,10 @@ from .mesh_data_structure import (
 )
 
 
+class DimensionError(Exception):
+    pass
+
+
 class Mesh(metaclass=ABCMeta):
     """
     @brief The abstract base class for all meshes in fealpy. This can not be\
@@ -268,7 +272,7 @@ class Mesh2d(Mesh):
             return torch.zeros((1,))
         raise ValueError(f"Invalid etity type {etype}.")
 
-    def cell_area(self) -> Tensor:
+    def _cell_area(self, index=np.s_[:]) -> Tensor:
         """
         @brief Area of cells in a 2-d mesh.
         """
@@ -279,12 +283,32 @@ class Mesh2d(Mesh):
         is_inner_edge = ~self.ds.boundary_edge_flag()
 
         v = (node[edge[:, 1], :] - node[edge[:, 0], :])
-        val = torch.sum(v*node[edge[:, 0], :], dim=1) # TODO: torch.dot?
+        val = torch.linalg.vecdot(v, node[edge[:, 0], :], dim=-1)
         # TODO: torch.add.at?
-        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC) 
+        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
         a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
         a /= 2
         return a
+
+    def cell_area(self, index=np.s_[:]) -> Tensor:
+        """
+        @brief Area of cells in a 2-d mesh.
+        """
+        GD = self.geo_dimension()
+        NVC = self.number_of_nodes_of_cells()
+        node = self.entity('node')
+        cell = self.entity('cell')
+        v1 = node[cell[index, 1:NVC-1], :] - node[cell[index, 0:1], :]
+        v2 = node[cell[index, 2:NVC], :] - node[cell[index, 1:NVC-1], :]
+
+        if GD == 2:
+            sub_area = (v1[..., 0]*v2[..., 1] - v2[..., 0]*v1[..., 1]) * 0.5
+            return torch.sum(sub_area, dim=-1)
+        elif GD == 3:
+            sub_area = torch.linalg.cross(v1, v2, dim=-1)
+            return torch.norm(torch.sum(sub_area, dim=-2), dim=-1)
+        else:
+            raise DimensionError(f"Unexcepted geometry dimension '{GD}' occured.")
 
     def edge_length(self, index=np.s_[:]) -> Tensor:
         """
@@ -293,5 +317,4 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         v = node[edge[index, 1], :] - node[edge[index, 0], :]
-        length = torch.sqrt(torch.sum(v**2, dim=1)) # TODO: torch.norm?
-        return length
+        return torch.norm(v, dim=-1)

@@ -1,8 +1,9 @@
-import numpy as np
-
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from ..common import ranges
 from types import ModuleType
+
+import numpy as np
+from scipy.sparse import coo_matrix, csr_matrix
+
+from ..common import ranges
 from .Mesh import Mesh
 
 class Mesh2d(Mesh):
@@ -52,7 +53,7 @@ class Mesh2d(Mesh):
         elif etype in {'node', 0}:
             bc = node[index]
         else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity))
+            raise ValueError('the entity `{}` is not correct!'.format(etype))
         return bc
 
     def node_size(self):
@@ -103,7 +104,7 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         v = node[edge[index,1],:] - node[edge[index,0],:]
-        length = np.linalg.norm(v, axis=1))
+        length = np.linalg.norm(v, axis=1)
         return length
 
     def cell_area(self, index=np.s_[:]):
