@@ -49,7 +49,6 @@ class ScalarNeumannBCIntegrator:
         else:
             assert out.shape == (gdof,)
             F = out
-        
         bb = np.einsum('q, qf, qfi, f->fi', ws, val, phi, facemeasure, optimize=True)
         np.add.at(F, face2dof, bb)
 

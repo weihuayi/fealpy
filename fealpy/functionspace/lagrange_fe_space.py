@@ -455,7 +455,7 @@ class LagrangeFESpace():
         @brief 计算 face 上的基函数在给定积分点处的函数值
         """
         p = self.p
-        phi = self.mesh.shape_function(bc, p=p,etype='face')
+        phi = self.mesh.shape_function(bc, p=p, etype='face')
         return phi[..., None, :]
 
     @barycentric
