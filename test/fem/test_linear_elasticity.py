@@ -21,6 +21,8 @@ def test_linear_elasticity_lfem(p, n):
     from fealpy.boundarycondition import NeumannBC as OldNeumannBC
     from fealpy.boundarycondition import DirichletBC as OldDirichletBC
 
+    ipdb.set_trace()
+
     pde = BoxDomainData2d()
     domain = pde.domain()
     mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)

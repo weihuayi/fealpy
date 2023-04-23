@@ -29,7 +29,7 @@ class VectorSourceIntegrator():
             * (NQ, NC, GD) 变向量情形
         """
 
-        if isinstance(space, tuple) and ~isinstance(space[0], tuple):
+        if isinstance(space, tuple) and not isinstance(space[0], tuple):
             return self.assembly_cell_vector_for_vspace_with_scalar_basis(space, 
                     index=index, cellmeasure=cellmeasure, out=out)
         else:
@@ -46,7 +46,7 @@ class VectorSourceIntegrator():
         """
         # 假设向量空间是由标量空间组合而成
         space = self.space
-        assert isinstance(space, tuple) and ~isinstance(space[0], tuple) 
+        assert isinstance(space, tuple) and not isinstance(space[0], tuple) 
         
         f = self.f
         mesh = space[0].mesh # 获取网格对像
