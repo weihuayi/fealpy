@@ -1,6 +1,6 @@
 import numpy as np
 
-from .ScalarDiffusionIntegrator import ScalarDiffusionIntegrator 
+from .scalar_diffusion_integrator import ScalarDiffusionIntegrator 
 
 class VectorDiffusionIntegrator:
     """

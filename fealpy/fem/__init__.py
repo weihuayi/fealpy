@@ -23,7 +23,7 @@ from .diffusion_integrator import DiffusionIntegrator
 from .convection_integrator import ConvectionIntegrator
 from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
-from .provides_symmetric_tangent_operator_Integrator import ProvidesSymmetricTangentOperatorIntegrator
+from .provides_symmetric_tangent_operator_integrator import ProvidesSymmetricTangentOperatorIntegrator
 
 from .vector_neumann_bc_integrator import VectorNeumannBCIntegrator
 from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
