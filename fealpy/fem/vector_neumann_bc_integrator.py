@@ -37,9 +37,9 @@ class VectorNeumannBCIntegrator:
         if isinstance(self.threshold, np.ndarray):
             index = self.threshold
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = mesh.ds.boundary_face_index()
             if callable(self.threshold):
-                bc = self.mesh.entity_barycenter('face')
+                bc = mesh.entity_barycenter('face')
                 index = index[self.threshold(bc)]
 
         facemeasure = mesh.entity_measure('face', index=index)
@@ -103,9 +103,9 @@ class VectorNeumannBCIntegrator:
         if isinstance(self.threshold, np.ndarray):
             index = self.threshold
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = mesh.ds.boundary_face_index()
             if callable(self.threshold):
-                bc = self.mesh.entity_barycenter('face')
+                bc = mesh.entity_barycenter('face')
                 index = index[self.threshold(bc)]
 
         facemeasure = mesh.entity_measure('face', index=index)
