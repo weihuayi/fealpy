@@ -53,6 +53,33 @@ class SinPDEData:
         """
         return self.solution(p)
 
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        x = p[..., 0]
+        return x == 0.0
+
+    @cartesian
+    def neumann(self, p, n):
+        """ 
+        Neuman  boundary condition
+
+        Parameters
+        ----------
+
+        p: (NQ, NE)
+        n: (NE)
+
+        grad*n : (NQ, NE)
+        """
+        grad = self.gradient(p)
+        val = np.sum(grad*n, axis=-1)
+        return val
+
+    @cartesian
+    def is_neumann_boundary(self, p):
+        x = p[..., 0]
+        return x == 1.0
+
 
 class ExpPDEData:
     def domain(self):
