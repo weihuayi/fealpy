@@ -42,7 +42,7 @@ class Mesh1d(Mesh):
         NC = self.number_of_cells()
         return NN + (p-1)*NC
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
         GD = self.geo_dimension()
         node = self.entity('node') 
 

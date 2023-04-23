@@ -102,7 +102,7 @@ class Mesh:
     def number_of_global_ipoints(self, p):
         raise NotImplementedError
 
-    def interpolation_points(self):
+    def interpolation_points(self, p, index=np.s_[:]):
         raise NotImplementedError
 
     def cell_to_ipoint(self, p, index=np.s_[:]):

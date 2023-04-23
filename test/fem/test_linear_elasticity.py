@@ -36,7 +36,7 @@ def test_linear_elasticity_lfem(p, n):
     bform.assembly()
 
     lform = LinearForm(vspace)
-    lform.add_domain_integrator(VectorSourceIntegrator(pde.source, q=1)
+    lform.add_domain_integrator(VectorSourceIntegrator(pde.source, q=1))
     lform.add_boundary_integrator(VectorNeumannBCIntegrator(pde.neumann, threshold=pde.is_neumann_boundary, q=1))
     lform.assembly()
 
