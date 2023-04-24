@@ -11,9 +11,14 @@ class Mesh3dDataStructure(MeshDataStructure):
     @brief The topology data structure of 3-d mesh.\
            This is an abstract class and can not be used directly.
     """
-    TD = 3
+    # Variables
     face2cell: Tensor
     cell2edge: Tensor
+
+    # Constants
+    TD = 3
+    localFace2edge: Tensor
+    localEdge2face: Tensor
 
     def total_edge(self):
         cell = self.cell
@@ -71,28 +76,23 @@ class Mesh3dDataStructure(MeshDataStructure):
     ### Cell ###
 
     def cell_to_node(self):
-        """
-        @brief Neighber info from cell to node.
-
-        @return: A tensor with shape (NC, NVC), containing indexes of nodes in\
-                 every cells.
-        """
         return self.cell
 
     def cell_to_edge(self):
-        """
-        @brief Neighber info from cell to edge.
-
-        @return: A tensor with shape (NC, NEC), containing indexes of edges in\
-                 every cells.
-        """
         return self.cell2edge
 
     def cell_to_edge_sign(self):
         pass
 
     def cell_to_face(self):
-        pass
+        NC = self.number_of_cells()
+        NF = self.number_of_faces()
+        face2cell = self.face2cell
+        NFC = self.number_of_faces_of_cells()
+        cell2face = torch.zeros((NC, NFC), dtype=self.itype)
+        cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
+        cell2face[face2cell[:, 1], face2cell[:, 3]] = range(NF)
+        return cell2face
 
     def cell_to_face_sign(self):
         pass
@@ -104,22 +104,29 @@ class Mesh3dDataStructure(MeshDataStructure):
     ### Face ###
 
     def face_to_node(self):
-        pass
+        return self.face
 
     def face_to_edge(self):
-        pass
+        cell2edge = self.cell2edge
+        face2cell = self.face2cell
+        localFace2edge = self.localFace2edge
+        face2edge = cell2edge[
+                face2cell[:, [0]],
+                localFace2edge[face2cell[:, 2]]
+                ]
+        return face2edge
 
     def face_to_face(self):
         pass
 
     def face_to_cell(self):
-        pass
+        return self.face2cell
 
 
     ### Edge ###
 
     def edge_to_node(self):
-        pass
+        return self.edge
 
     def edge_to_edge(self):
         pass
@@ -149,13 +156,29 @@ class Mesh3dDataStructure(MeshDataStructure):
     ### Boundary ###
 
     def boundary_node_flag(self):
-        pass
+        NN = self.number_of_nodes()
+        face = self.face
+        isBdFace = self.boundary_face_flag()
+        isBdPoint = torch.zeros((NN,), dtype=torch.bool)
+        isBdPoint[face[isBdFace, :]] = True
+        return isBdPoint
 
     def boundary_edge_flag(self):
-        pass
+        NE = self.number_of_edges()
+        face2edge = self.face_to_edge()
+        isBdFace = self.boundary_face_flag()
+        isBdEdge = torch.zeros((NE,), dtype=torch.bool)
+        isBdEdge[face2edge[isBdFace, :]] = True
+        return isBdEdge
 
     def boundary_face_flag(self):
-        pass
+        face2cell = self.face_to_cell()
+        return face2cell[:, 0] == face2cell[:, 1]
 
     def boundary_cell_flag(self):
-        pass
+        NC = self.number_of_cells()
+        face2cell = self.face_to_cell()
+        isBdFace = self.boundary_face_flag()
+        isBdCell = torch.zeros((NC,), dtype=torch.bool)
+        isBdCell[face2cell[isBdFace, 0]] = True
+        return isBdCell

@@ -11,9 +11,12 @@ class Mesh2dDataStructure(MeshDataStructure):
     @brief The topology data structure of 2-d mesh.\
            This is an abstract class and can not be used directly.
     """
-    TD = 2
+    #Variables
     face: Redirector[Tensor] = Redirector('edge')
     edge2cell: Tensor
+
+    # Constants
+    TD = 2
     NVF: Redirector[int] = Redirector('NVE')
     NFC: Redirector[int] = Redirector('NEC')
 
@@ -91,9 +94,6 @@ class Mesh2dDataStructure(MeshDataStructure):
         return cell2edge
 
     def cell_to_edge_sign(self):
-        """
-        @brief
-        """
         NC = self.number_of_cells()
         NEC = self.NEC
 

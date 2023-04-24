@@ -77,7 +77,7 @@ class MeshDataStructure(metaclass=ABCMeta):
         """Number of nodes"""
         return self.NN
 
-    def number_of_nodes_of_cells(self) -> int:
+    def number_of_vertices_of_cells(self) -> int:
         """Number of nodes in a cell"""
         return self.cell.shape[-1]
 
@@ -89,4 +89,4 @@ class MeshDataStructure(metaclass=ABCMeta):
         """Number of faces in a cell"""
         return self.NFC
 
-    number_of_vertices_of_cells = number_of_nodes_of_cells
+    number_of_nodes_of_cells = number_of_vertices_of_cells
