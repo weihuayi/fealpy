@@ -2,7 +2,6 @@ import numpy as np
 from .TriangleMesh import TriangleMesh
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
-from ..common import hash2map
 
 
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
@@ -17,11 +16,6 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     NEC = 4
     NFC = 4
 
-    localCell = np.array([
-        (0, 1, 2, 3),
-        (1, 2, 3, 0),
-        (2, 3, 0, 1),
-        (3, 0, 1, 2)])
 
     def __init__(self, NN, cell):
         super().__init__(NN, cell)
@@ -165,7 +159,7 @@ class QuadrangleMesh(Mesh2d):
             NP += (p-1)*(p-1)*NC
         return NP
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
         """
         @brief 获取四边形网格上所有 p 次插值点
         """
@@ -197,6 +191,76 @@ class QuadrangleMesh(Mesh2d):
             ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell[0, 3, 1, 2]]).reshape(-1, GD)
         return ipoints
+
+    def cell_to_ipoint(self, p, index=np.s_[:]):
+        """
+        @brief 获取单元上的双 p 次插值点
+        """
+
+        cell = self.entity('cell')
+
+        if p==1:
+            return cell[index, [0, 3, 1, 2]] # 先排 y 方向，再排 x 方向 
+
+        edge2cell = self.ds.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells() 
+
+        cell2ipoint = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
+        c2p= cell2dof.reshape((NC, p+1, p+1))
+
+        e2p = self.edge_to_ipoint()
+        flag = edge2cell[:, 2] == 0
+        c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+        flag = edge2cell[:, 2] == 1
+        c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+        flag = edge2cell[:, 2] == 2
+        c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+        flag = edge2cell[:, 2] == 3
+        c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        flag = iflag & (edge2cell[:, 3] == 0) 
+        c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+        flag = iflag & (edge2cell[:, 3] == 3)
+        c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+        c2p[:, 1:-1, 1:-1] = NN + NE*(p-1) + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
+
+        return cell2ipoint[index]
+
+    
+    def edge_to_ipoint(self, p, index=np.s_[:]):
+        """
+        @brief 获取边上的插值点对应关系
+        """
+        edge = self.entity('edge')
+
+        if p == 1:
+            return edge
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        edge2ipoint = np.zeros((NE, p+1), dtype=np.int)
+        edge2ipoint[:, [0, -1]] = edge
+
+        edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+        return edge2dof
+
+    face_to_ipoint = edge_to_ipoint
+
+    def node_to_ipoint(self, p, index=np.s_[:]):
+        NN = self.number_of_nodes()
+        return np.arange(NN)[index]
+
+    def cell_to_ipoint(self, p):
+        pass
 
     def number_of_corner_nodes(self):
         return self.ds.NN

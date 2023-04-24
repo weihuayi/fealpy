@@ -1191,6 +1191,10 @@ class LagrangeFiniteElementSpace():
                     bb = np.einsum('q, cd, qci, c->cid', ws, fval, phi, self.cellmeasure)
                 elif fval.shape == (NQ, NC, GD):
                     bb = np.einsum('q, qcd, qci, c->cid', ws, fval, phi, self.cellmeasure)
+                elif fval.shape == (NC, ):
+                    bb = np.einsum('q, c, qci, c->ci', ws, fval, phi, self.cellmeasure)
+                elif fval.shape == (NQ, NC):
+                    bb = np.einsum('q, qc, qci, c->ci', ws, fval, phi, self.cellmeasure)
 
             if len(bb.shape) == 2: 
                 bb = bb[..., None]
