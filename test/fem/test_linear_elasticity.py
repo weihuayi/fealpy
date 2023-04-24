@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import ipdb
 import pytest
 
@@ -24,7 +25,7 @@ def test_linear_elasticity_lfem(p, n):
     pde = BoxDomainData2d()
     domain = pde.domain()
     mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
-    mesh = TriangleMesh.from_one_triangle()
+    #mesh = TriangleMesh.from_one_triangle()
     GD = mesh.geo_dimension()
     
     # 新接口程序
@@ -44,28 +45,37 @@ def test_linear_elasticity_lfem(p, n):
     A = bform.get_matrix()
     F = lform.get_vector()
 
-    bc = DirichletBC(vspace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
-    A, F = bc.apply(A, F, uh)
 
     # 老接口程序 
     ospace = OldSpace(mesh, p=p)
     ouh = ospace.function(dim=GD) # (NDof, GD)
     oA = ospace.linear_elasticity_matrix(pde.lam, pde.mu, q=p+2)
-    oF = ospace.source_vector(pde.source, dim=GD).T.flat
+    oF = ospace.source_vector(pde.source, dim=GD)
 
+    bc = DirichletBC(vspace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+    A, F = bc.apply(A, F, uh)
 
     if hasattr(pde, 'neumann'):
         print('neumann')
-        bc = OldNeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
-        OF = bc.apply(OF)
+        bc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
+        OF = bc.apply(oF)
 
     if hasattr(pde, 'dirichlet'):
         print('dirichlet')
-        bc = OldDirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        bc = OldDirichletBC(ospace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
         oA, oF = bc.apply(oA, oF, ouh)
 
+    index, = np.nonzero(np.abs(F - oF))
+    fig, axes = plt.subplots()
+    mesh.add_plot(axes)
+    mesh.find_node(axes, index=index)
+    plt.show()
+
+    ipdb.set_trace()
     np.testing.assert_array_almost_equal(A.toarray(), oA.toarray())
     np.testing.assert_array_almost_equal(F, oF)
+
+
 
 
 if __name__ == "__main__":

@@ -450,7 +450,7 @@ class LagrangeFESpace():
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
     
     @barycentric
-    def face_basis(self, bc):
+    def face_basis(self, bc, index=np.s_[:]):
         """
         @brief 计算 face 上的基函数在给定积分点处的函数值
         """
@@ -546,7 +546,7 @@ class LagrangeFESpace():
         pass
 
 
-    def boundary_intepolate(self, 
+    def boundary_interpolate(self, 
             gD: Union[Callable, int, float, np.ndarray], 
             uh: np.ndarray, 
             threshold: Union[Callable, np.ndarray, None]=None) -> np.ndarray:

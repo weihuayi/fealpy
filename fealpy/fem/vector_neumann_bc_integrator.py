@@ -39,18 +39,19 @@ class VectorNeumannBCIntegrator:
         else:
             index = mesh.ds.boundary_face_index()
             if callable(self.threshold):
-                bc = mesh.entity_barycenter('face')
+                bc = mesh.entity_barycenter('face', index=index)
                 index = index[self.threshold(bc)]
 
         facemeasure = mesh.entity_measure('face', index=index)
         NF = len(facemeasure)
-        ldof = space[0].number_of_face_dofs() 
+        ldof = space[0].number_of_local_dofs(doftype='face')
 
-        bb = np.zeros((NF, ldof, GD), dtype=space.ftype)
+        bb = np.zeros((NF, ldof, GD), dtype=space[0].ftype)
 
         q = self.q if self.q is not None else space[0].p + 1 
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
+        NQ = len(ws)
 
         phi = space[0].face_basis(bcs, index=index) # (NQ, NF, ldof)
         n = mesh.face_unit_normal(index=index)
@@ -81,11 +82,15 @@ class VectorNeumannBCIntegrator:
         else:
             assert out.shape == (GD*gdof,)
             F = out
-        
-        if space[0].doforder == 'vdims':
-            np.add.at(F.reshape(gdof, GD), (face2dof, np.s_[:]), bb)
-        elif space[0].doforder == 'sdofs':
-            np.add.at(F.reshape(GD, gdof).T, (face2dof, np.s_[:]), bb)
+
+        if space[0].doforder == 'sdofs': # 标量空间自由度优先排序
+            V = F.reshape(GD, gdof)
+            for i in range(GD):
+                np.add.at(V[i, :], face2dof, bb[:, :, i])
+        elif space[0].doforder == 'vdims': # 向量分量自由度优先排序
+            V = F.reshape(gdof, GD) 
+            for i in range(GD):
+                np.add.at(V[:, i], face2dof, bb[:, :, i])
 
         if out is None:
             return F
@@ -105,7 +110,7 @@ class VectorNeumannBCIntegrator:
         else:
             index = mesh.ds.boundary_face_index()
             if callable(self.threshold):
-                bc = mesh.entity_barycenter('face')
+                bc = mesh.entity_barycenter('face', index=index)
                 index = index[self.threshold(bc)]
 
         facemeasure = mesh.entity_measure('face', index=index)
