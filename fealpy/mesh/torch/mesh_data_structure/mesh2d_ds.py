@@ -13,6 +13,7 @@ class Mesh2dDataStructure(MeshDataStructure):
     """
     TD = 2
     face: Redirector[Tensor] = Redirector('edge')
+    edge2cell: Tensor
     NVF: Redirector[int] = Redirector('NVE')
     NFC: Redirector[int] = Redirector('NEC')
 
@@ -30,15 +31,19 @@ class Mesh2dDataStructure(MeshDataStructure):
         totalEdge = cell[:, localEdge].reshape(-1, 2)
         return totalEdge
 
+    total_face = total_edge
+
     def construct(self):
         NC = self.number_of_cells()
-        NEC = self.NEC
+        NEC = self.number_of_edges_of_cells()
 
         totalEdge = self.total_edge()
         _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
                 return_index=True,
                 return_inverse=True,
                 axis=0)
+
+        self.edge = totalEdge[i0, :]
 
         NE = i0.shape[0]
         self.edge2cell = torch.zeros((NE, 4), dtype=self.itype, device=self.device)
@@ -47,12 +52,10 @@ class Mesh2dDataStructure(MeshDataStructure):
         i1 = torch.zeros(NE, dtype=self.itype)
         i1[j] = torch.arange(NEC*NC, dtype=self.itype)
 
-        self.edge2cell[:, 0] = i0//NEC
-        self.edge2cell[:, 1] = i1//NEC
-        self.edge2cell[:, 2] = i0%NEC
-        self.edge2cell[:, 3] = i1%NEC
-
-        self.edge = totalEdge[i0, :]
+        self.edge2cell[:, 0] = i0 // NEC
+        self.edge2cell[:, 1] = i1 // NEC
+        self.edge2cell[:, 2] = i0 % NEC
+        self.edge2cell[:, 3] = i1 % NEC
 
     def clear(self):
         self.edge = None
@@ -79,7 +82,7 @@ class Mesh2dDataStructure(MeshDataStructure):
         """
         NC = self.number_of_cells()
         NE = self.number_of_edges()
-        NEC = self.NEC
+        NEC = self.number_of_edges_of_cells()
         edge2cell = self.edge2cell
 
         cell2edge = torch.zeros((NC, NEC), dtype=self.itype, device=self.device)
@@ -122,6 +125,8 @@ class Mesh2dDataStructure(MeshDataStructure):
     def edge_to_edge(self):
         pass
 
+    edge_to_face = edge_to_edge
+
     def edge_to_cell(self):
         """
         @brief Neighber info from edge to cell.
@@ -138,6 +143,9 @@ class Mesh2dDataStructure(MeshDataStructure):
     ### Face ###
 
     face_to_cell = edge_to_cell
+    face_to_face = edge_to_edge
+    face_to_edge = edge_to_edge
+    face_to_node = edge_to_node
 
 
     ### Node ###
@@ -147,6 +155,8 @@ class Mesh2dDataStructure(MeshDataStructure):
 
     def node_to_edge(self):
         pass
+
+    node_to_face = node_to_edge
 
     def node_to_cell(self):
         pass

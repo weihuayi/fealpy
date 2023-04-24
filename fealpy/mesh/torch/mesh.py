@@ -8,7 +8,8 @@ import numpy as np
 from .mesh_data_structure import (
     MeshDataStructure,
     Mesh1dDataStructure,
-    Mesh2dDataStructure
+    Mesh2dDataStructure,
+    Mesh3dDataStructure
 )
 
 
@@ -78,14 +79,6 @@ class Mesh(metaclass=ABCMeta):
     # @abstractmethod
     # def show_animation(self):
     #     pass
-
-    @property
-    def add_plot(self):
-        """
-        @brief Plot machine for this mesh.
-        """
-        from .plot import MeshPlot
-        return MeshPlot(self)
 
 
     ### FEM Interfaces ###
@@ -318,3 +311,11 @@ class Mesh2d(Mesh):
         edge = self.entity('edge')
         v = node[edge[index, 1], :] - node[edge[index, 0], :]
         return torch.norm(v, dim=-1)
+
+
+class Mesh3d(Mesh):
+    """
+    @brief The abstract class for all meshes with topology dimension 3.\
+           This is still abstract, and some methods need to be overiden.
+    """
+    ds: Mesh3dDataStructure
