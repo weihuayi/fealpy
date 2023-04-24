@@ -34,10 +34,14 @@ class IntervalMesh(Mesh1d):
         -----
             把重心坐标转换为实际空间坐标
         """
+        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
         node = self.node if node is None else node
-        cell = self.entity('cell')
-        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
-        return p
+        entity = self.entity(etype=TD)[index]
+        if TD == 0:
+            return(entity[None, :])
+        else: 
+            p = np.einsum('...j, ijk->...ik', bc, node[entity])
+            return p
 
     def entity(self, etype=1):
         if etype in {'cell', 'edge', 1}:
@@ -53,7 +57,7 @@ class IntervalMesh(Mesh1d):
         if etype in {1, 'cell', 'edge'}:
             return self.cell_length(index=index, node=None)
         elif etype in {0, 'face', 'node'}:
-            return 0
+            return np.array([0], dtype=self.ftype)
         else:
             raise ValueError("`etype` is wrong!")
 
@@ -145,6 +149,20 @@ class IntervalMesh(Mesh1d):
         return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2,
                         axis=-1))
 
+
+    def face_unit_normal(self, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            返回点的法线向量
+        """
+        NN = self.number_of_nodes()
+        n = np.ones(NN, dtype=self.ftype)
+        n2c = self.ds.node_to_cell()
+        flat = (n2c[:, 0] == n2c[:, 1]) & (n2c[:, 3] == 0)
+        n[flat]= -1
+        return n[index]
 
     def cell_normal(self, index=np.s_[:], node=None):
         """

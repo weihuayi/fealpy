@@ -3,6 +3,7 @@ import numpy as np
 from types import ModuleType
 from .Mesh import Mesh
 from ..quadrature import GaussLegendreQuadrature
+from ..quadrature import ZeroDimensionQuadrature
 
 ## @defgroup GeneralInterface
 class Mesh1d(Mesh):
@@ -32,7 +33,10 @@ class Mesh1d(Mesh):
         -----
             返回第 k 个高斯积分公式。
         """
-        return GaussLegendreQuadrature(k)
+        if etype in {'cell', 'edge', 1}:
+            return GaussLegendreQuadrature(k)
+        elif etype in {'node', 'face', 0}:
+            return ZeroDimensionQuadrature(k) 
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         return p+1
@@ -42,7 +46,7 @@ class Mesh1d(Mesh):
         NC = self.number_of_cells()
         return NN + (p-1)*NC
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
         GD = self.geo_dimension()
         node = self.entity('node') 
 
@@ -65,7 +69,7 @@ class Mesh1d(Mesh):
             return ipoint
 
     def node_to_ipoint(self, p, index=np.s_[:]):
-        return np.arange(self.number_of_nodes())
+        return np.arange(self.number_of_nodes())[:, None]
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
@@ -91,22 +95,26 @@ class Mesh1d(Mesh):
         multiIndex[:, 1] = p - multiIndex[:, 0]
         return multiIndex
 
-    def shape_function(self, bc, p=1):
+    def shape_function(self, bc, p=1, etype='cell'):
         """
         @brief 
         """
-        TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix(p)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        if etype in {'cell', 'edge', 1}:
+
+            TD = bc.shape[-1] - 1 
+            multiIndex = self.multi_index_matrix(p)
+            c = np.arange(1, p+1, dtype=np.int_)
+            P = 1.0/np.multiply.accumulate(c)
+            t = np.arange(0, p)
+            shape = bc.shape[:-1]+(p+1, TD+1)
+            A = np.ones(shape, dtype=self.ftype)
+            A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+            np.cumprod(A, axis=-2, out=A)
+            A[..., 1:, :] *= P.reshape(-1, 1)
+            idx = np.arange(TD+1)
+            phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        elif etype in {'face', 'node', 0}:
+            phi = np.array([[1]], dtype=self.ftype)
         return phi
 
 

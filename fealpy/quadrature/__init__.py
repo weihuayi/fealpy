@@ -12,3 +12,4 @@ from .PolyhedronMeshIntegralAlg import PolyhedronMeshIntegralAlg
 
 from .TensorProductQuadrature import TensorProductQuadrature
 
+from .ZeroDimensionQuadrature import ZeroDimensionQuadrature

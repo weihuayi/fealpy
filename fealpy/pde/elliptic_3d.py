@@ -51,7 +51,24 @@ class SinSinSinPDEData:
         val = np.zeros(p.shape, dtype=np.float64)
         val[..., 0] = pi * np.cos(pi*x) * np.sin(pi*y) * np.sin(pi*z)
         val[..., 1] = pi * np.sin(pi*x) * np.cos(pi*y) * np.sin(pi*z)
-        val[..., 1] = pi * np.sin(pi*x) * np.sin(pi*y) * np.cos(pi*z)
+        val[..., 2] = pi * np.sin(pi*x) * np.sin(pi*y) * np.cos(pi*z)
+        return val
+
+    @cartesian
+    def neumann(self, p, n):
+        """ 
+        Neuman  boundary condition
+
+        Parameters
+        ----------
+
+        p: (NQ, NE, 3)
+        n: (NE, 3)
+
+        grad*n : (NQ, NE, 3)
+        """
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1) # (NQ, NE)
         return val
         
     @cartesian    

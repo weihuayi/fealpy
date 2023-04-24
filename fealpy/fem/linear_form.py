@@ -78,6 +78,9 @@ class LinearForm:
         self._V = np.zeros((gdof, ), dtype=space.ftype)
         np.add.at(self._V, cell2dof, bb)
 
+        for bi in self.bintegrators:
+            bi.assembly_face_vector(space, out=self._V)
+
     def assembly_for_vspace_with_scalar_basis(self):
         """
         @brief 由标量空间张成的向量函数空间
@@ -113,6 +116,9 @@ class LinearForm:
             V = self._V.reshape(gdof, GD) 
             for i in range(GD):
                 np.add.at(V[:, i], cell2dof, bb[:, :, i])
+
+        for bi in self.bintegrators:
+            bi.assembly_face_vector(space, out=self._V)
 
     def update(self):
         """

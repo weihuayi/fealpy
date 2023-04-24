@@ -134,7 +134,9 @@ class TriangleMesh(Mesh2d):
         return phi
 
     def grad_shape_function(self, bc, p=1, index=np.s_[:]):
-
+        """
+        @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
+        """
         TD = self.top_dimension()
         multiIndex = self.multi_index_matrix(p)
 
@@ -187,8 +189,8 @@ class TriangleMesh(Mesh2d):
             Dlambda[:, 1] = v1@W/length[:, None]
             Dlambda[:, 2] = v2@W/length[:, None]
         elif GD == 3:
-            length = np.sqrt(np.square(nv).sum(axis=1))
-            n = nv/length.reshape((-1, 1))
+            length = np.linalg.norm(nv, axis=-1, keepdims=True)
+            n = nv/length
             Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
             Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
             Dlambda[:, 2] = np.cross(n, v2)/length[:, None]

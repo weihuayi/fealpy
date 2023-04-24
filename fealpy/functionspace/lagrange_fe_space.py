@@ -443,15 +443,19 @@ class LagrangeFESpace():
 
     @barycentric
     def grad_basis(self, bc, index=np.s_[:]):
+        """
+        @brief 
+        @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
+        """
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
     
     @barycentric
-    def face_basis(self, bc):
+    def face_basis(self, bc, index=np.s_[:]):
         """
         @brief 计算 face 上的基函数在给定积分点处的函数值
         """
         p = self.p
-        phi = self.mesh.shape_function(bc, p=p,etype='face')
+        phi = self.mesh.shape_function(bc, p=p, etype='face')
         return phi[..., None, :]
 
     @barycentric
@@ -505,13 +509,21 @@ class LagrangeFESpace():
             index: Union[np.ndarray, slice]=np.s_[:]
             ) -> np.ndarray:
         """
+        @note
         """
         gdof = self.number_of_global_dofs()
-        gphi = self.grad_basis(bc, index=index) # (NQ, NC, ldof, GD)
+        gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
-        if self.doforder == 'sdofs':
+
+        if dim == 0: # 如果
+            # gphi.shape == (NQ, NC, ldof, GD)
+            # uh.shape == (gdof, )
+            # uh[cell2dof].shape == (NC, ldof)
+            # val.shape == (NQ, NC, GD)
+            val = np.einsum('...cim, ci->...cm', gphi, uh[cell2dof[index]])
+        elif self.doforder == 'sdofs':
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (..., gdof)
             # uh[..., cell2dof].shape == (..., NC, ldof)
@@ -530,7 +542,11 @@ class LagrangeFESpace():
 
         return val
 
-    def set_dirichlet_bc(self, 
+    def interpolate(self):
+        pass
+
+
+    def boundary_interpolate(self, 
             gD: Union[Callable, int, float, np.ndarray], 
             uh: np.ndarray, 
             threshold: Union[Callable, np.ndarray, None]=None) -> np.ndarray:
@@ -548,6 +564,7 @@ class LagrangeFESpace():
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
         isDDof = self.is_boundary_dof(threshold=threshold)
+        GD = self.geo_dimension()
 
         if callable(gD): 
             gD = gD(ipoints[isDDof])
@@ -561,7 +578,10 @@ class LagrangeFESpace():
             if isinstance(gD, (int, float)):
                 uh[..., isDDof] = gD 
             elif isinstance(gD, np.ndarray):
-                uh[..., isDDof] = gD.T
+                if gD.shape == (GD, ):
+                    uh[..., isDDof] = gD[:, None]
+                else:
+                    uh[..., isDDof] = gD.T
             else:
                 raise ValueError("Unsupported type for gD. Must be a callable, int, float, or numpy.ndarray.")
 
@@ -572,6 +592,8 @@ class LagrangeFESpace():
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
             isDDof = np.broadcast_to(isDDof.reshape(shape), shape=uh.shape) 
         return isDDof
+
+    set_dirichlet_bc = boundary_interpolate 
 
 
     def function(self, dim=None, array=None, dtype=np.float64):

@@ -95,20 +95,17 @@ class BoxDomainData2d():
     @cartesian
     def source(self, p):
         val = np.array([0.0, 0.0], dtype=np.float64)
-        shape = len(p.shape[:-1])*(1, ) + (2, )
-        return val.reshape(shape)
+        return val
 
     @cartesian
     def dirichlet(self, p):
         val = np.array([0.0, 0.0], dtype=np.float64)
-        shape = len(p.shape[:-1])*(1, ) + (2, )
-        return val.reshape(shape)
+        return val
 
     @cartesian
     def neumann(self, p, n):
         val = np.array([-500, 0.0], dtype=np.float64)
-        shape = len(p.shape[:-1])*(1, ) + (2, )
-        return val.reshape(shape)
+        return val
 
     @cartesian
     def is_dirichlet_boundary(self, p):
@@ -177,9 +174,8 @@ class BoxDomainData3d():
         return val.reshape(shape) 
     @cartesian
     def dirichlet(self, p):
-        shape = len(p.shape)*(1, )
-        val = np.array([0.0])
-        return val.reshape(shape)
+        val = np.array([0.0, 0.0, 0.0])
+        return val
 
     @cartesian
     def is_dirichlet_boundary(self, p):

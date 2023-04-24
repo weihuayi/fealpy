@@ -16,7 +16,7 @@ from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
-from fealpy.fem import ScalarNeumannBoundaryIntegrator as NeumannBC
+from fealpy.fem import ScalarNeumannBCIntegrator as NeumannBC
 
 @pytest.mark.parametrize("p, n, maxit", 
         [(1, 10, 4), (2, 8, 4), (3, 6, 4), (4, 4, 4)])

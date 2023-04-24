@@ -1,8 +1,9 @@
-import numpy as np
-
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from ..common import ranges
 from types import ModuleType
+
+import numpy as np
+from scipy.sparse import coo_matrix, csr_matrix
+
+from ..common import ranges
 from .Mesh import Mesh
 
 class Mesh2d(Mesh):
@@ -52,7 +53,7 @@ class Mesh2d(Mesh):
         elif etype in {'node', 0}:
             bc = node[index]
         else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity))
+            raise ValueError('the entity `{}` is not correct!'.format(etype))
         return bc
 
     def node_size(self):
@@ -103,22 +104,25 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         v = node[edge[index,1],:] - node[edge[index,0],:]
-        length = np.sqrt(np.sum(v**2,axis=1))
+        length = np.linalg.norm(v, axis=1)
         return length
 
-    def cell_area(self, index=None):
+    def cell_area(self, index=np.s_[:]):
+        """
+        @brief 根据散度定理计算多边形的面积
+        @note 请注意下面的计算方式不方便实现部分单元面积的计算
+        """
         NC = self.number_of_cells()
         node = self.entity('node')
         edge = self.entity('edge')
         edge2cell = self.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        w = np.array([[0, -1], [1, 0]])
-        v =  (node[edge[:, 1], :] - node[edge[:, 0], :])
-        val = np.sum(v*node[edge[:, 0], :], axis=1)
+        v =  node[edge[:, 1], :] - node[edge[:, 0], :]
+        val = np.einsum('ij, ij->i', v, node[edge[:, 0], :], optimize=True)
         a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
         a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
         a /=2
-        return a
+        return a[index]
 
     def edge_frame(self, index=np.s_[:]):
         t = self.edge_unit_tangent(index=index)
