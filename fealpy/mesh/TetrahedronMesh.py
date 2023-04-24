@@ -182,12 +182,12 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:, i, :] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
 
-    def shape_function(self, bc, p=1):
+    def shape_function(self, bc, p=1, etype='cell'):
         """
-        @brief 
+        @brief 四面体单元上的形函数 
         """
         TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix(p)
+        multiIndex = self.multi_index_matrix(p, etype=etype)
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
@@ -238,7 +238,7 @@ class TetrahedronMesh(Mesh3d):
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
         """
         @brief 获取整个四面体网格上的全部插值点
         """
@@ -281,7 +281,7 @@ class TetrahedronMesh(Mesh3d):
             w = mi[isInCellIPoints, :]/p
             ipoints[NN+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell,:]).reshape(-1, GD)
-        return ipoints
+        return ipoints[index]
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
@@ -1130,8 +1130,23 @@ class TetrahedronMesh(Mesh3d):
             idxMap = np.zeros(NN, dtype=cell.dtype)
             idxMap[isValidNode] = range(isValidNode.sum())
             cell = idxMap[cell]
+        mesh = TetrahedronMesh(node, cell)
 
-        return TetrahedronMesh(node, cell)
+        bdface = mesh.ds.boundary_face_index()
+        f2n = mesh.face_unit_normal()[bdface]
+        isLeftBd   = np.abs(f2n[:, 0]+1)<1e-14
+        isRightBd  = np.abs(f2n[:, 0]-1)<1e-14
+        isFrontBd  = np.abs(f2n[:, 1]+1)<1e-14
+        isBackBd   = np.abs(f2n[:, 1]-1)<1e-14
+        isBottomBd = np.abs(f2n[:, 2]+1)<1e-14
+        isUpBd     = np.abs(f2n[:, 2]-1)<1e-14
+        mesh.meshdata["leftface"]   = bdface[isLeftBd]
+        mesh.meshdata["rightface"]  = bdface[isRightBd]
+        mesh.meshdata["frontface"]  = bdface[isFrontBd]
+        mesh.meshdata["backface"]   = bdface[isBackBd]
+        mesh.meshdata["upface"]     = bdface[isUpBd]
+        mesh.meshdata["bottomface"] = bdface[isBottomBd]
+        return mesh 
 
     def print_cformat(self):
         def print_cpp_array(arr):
