@@ -185,11 +185,11 @@ class QuadrangleMesh(Mesh2d):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
                     node[edge,:]).reshape(-1, GD)
         if p > 2:
-            mutiIndex = self.multi_index_matrix(p, 'edge')
+            multiIndex = self.multi_index_matrix(p, 'edge')
             bc = multiIndex[1:-1, :]/p
             w = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
             ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    node[cell[0, 3, 1, 2]]).reshape(-1, GD)
+                    node[cell[:, [0, 3, 1, 2]]]).reshape(-1, GD)
         return ipoints
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
@@ -208,9 +208,9 @@ class QuadrangleMesh(Mesh2d):
         NC = self.number_of_cells() 
 
         cell2ipoint = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
-        c2p= cell2dof.reshape((NC, p+1, p+1))
+        c2p= cell2ipoint.reshape((NC, p+1, p+1))
 
-        e2p = self.edge_to_ipoint()
+        e2p = self.edge_to_ipoint(p)
         flag = edge2cell[:, 2] == 0
         c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
         flag = edge2cell[:, 2] == 1
@@ -235,32 +235,37 @@ class QuadrangleMesh(Mesh2d):
 
         return cell2ipoint[index]
 
-    
     def edge_to_ipoint(self, p, index=np.s_[:]):
         """
-        @brief 获取边上的插值点对应关系
+        @brief 获取网格边与插值点的对应关系
         """
-        edge = self.entity('edge')
-
-        if p == 1:
-            return edge
+        if isinstance(index, slice) and index == slice(None):
+            NE = self.number_of_edges()
+            index = np.arange(NE)
+        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        elif isinstance(index, list) and (type(index[0]) is np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        else:
+            NE = len(index)
 
         NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        edge2ipoint = np.zeros((NE, p+1), dtype=np.int)
-        edge2ipoint[:, [0, -1]] = edge
 
-        edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
-        return edge2dof
+        edge = self.entity('edge', index=index)
+        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
+        edge2ipoints[:, [0, -1]] = edge
+        if p > 1:
+            idx = NN + np.arange(p-1)
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
+        return edge2ipoints
 
     face_to_ipoint = edge_to_ipoint
 
     def node_to_ipoint(self, p, index=np.s_[:]):
         NN = self.number_of_nodes()
         return np.arange(NN)[index]
-
-    def cell_to_ipoint(self, p):
-        pass
 
     def number_of_corner_nodes(self):
         return self.ds.NN
