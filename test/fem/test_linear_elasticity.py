@@ -65,13 +65,12 @@ def test_linear_elasticity_lfem(p, n):
         bc = OldDirichletBC(ospace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
         oA, oF = bc.apply(oA, oF, ouh)
 
-    index, = np.nonzero(np.abs(F - oF))
-    fig, axes = plt.subplots()
-    mesh.add_plot(axes)
-    mesh.find_node(axes, index=index)
-    plt.show()
+    #index, = np.nonzero(np.abs(F - oF))
+    #fig, axes = plt.subplots()
+    #mesh.add_plot(axes)
+    #mesh.find_node(axes, index=index)
+    #plt.show()
 
-    ipdb.set_trace()
     np.testing.assert_array_almost_equal(A.toarray(), oA.toarray())
     np.testing.assert_array_almost_equal(F, oF)
 

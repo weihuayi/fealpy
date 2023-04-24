@@ -50,7 +50,7 @@ class DirichletBC():
         assert isinstance(space, tuple) and not isinstance(space[0], tuple)
 
         gD = self.gD
-        isDDof = space[0].set_dirichlet_bc(gD, uh, threshold=self.threshold) # isDDof.shape == uh.shape
+        isDDof = space[0].boundary_interpolate(gD, uh, threshold=self.threshold) # isDDof.shape == uh.shape
         f = f - A@uh.flat # 注意这里不修改外界 f 的值
 
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)

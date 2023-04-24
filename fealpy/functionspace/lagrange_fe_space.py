@@ -564,6 +564,7 @@ class LagrangeFESpace():
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
         isDDof = self.is_boundary_dof(threshold=threshold)
+        GD = self.geo_dimension()
 
         if callable(gD): 
             gD = gD(ipoints[isDDof])
@@ -577,7 +578,10 @@ class LagrangeFESpace():
             if isinstance(gD, (int, float)):
                 uh[..., isDDof] = gD 
             elif isinstance(gD, np.ndarray):
-                uh[..., isDDof] = gD.T
+                if gD.shape == (GD, ):
+                    uh[..., isDDof] = gD[:, None]
+                else:
+                    uh[..., isDDof] = gD.T
             else:
                 raise ValueError("Unsupported type for gD. Must be a callable, int, float, or numpy.ndarray.")
 

@@ -191,7 +191,7 @@ class Mesh:
             node = np.r_['1', node, np.zeros_like(node)]
             GD = 2
 
-        if index == np.s_[:]:
+        if isinstance(index, slice) and  index == np.s_[:]:
             index = range(node.shape[0])
         elif (type(index) is np.int_):
             index = np.array([index], dtype=np.int_)
@@ -199,8 +199,6 @@ class Mesh:
             index, = np.nonzero(index)
         elif (type(index) is list) and (type(index[0]) is np.bool_):
             index, = np.nonzero(index)
-        else:
-            raise ValueError("the type of index is not correct!")
 
         if (type(color) is np.ndarray) and (np.isreal(color[0])):
             umax = color.max()
@@ -308,7 +306,7 @@ class Mesh:
         if GD == 1:
             bc = np.r_['1', bc, np.zeros_like(bc)]
             GD = 2
-        if index == np.s_[:]:
+        if isinstance(index, slice) and index == np.s_[:]:
             index = range(bc.shape[0])
         elif (type(index) is np.int_):
             index = np.array([index], dtype=np.int_)
@@ -316,8 +314,7 @@ class Mesh:
             index, = np.nonzero(index)
         elif (type(index) is list) and (type(index[0]) is np.bool_):
             index, = np.nonzero(index)
-        else:
-            raise ValueError("the type of index is not correct!")
+
         if (type(color) is np.ndarray) & (np.isreal(color[0])):
             umax = color.max()
             umin = color.min()
