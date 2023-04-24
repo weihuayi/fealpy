@@ -542,7 +542,11 @@ class LagrangeFESpace():
 
         return val
 
-    def set_dirichlet_bc(self, 
+    def interpolate(self):
+        pass
+
+
+    def boundary_intepolate(self, 
             gD: Union[Callable, int, float, np.ndarray], 
             uh: np.ndarray, 
             threshold: Union[Callable, np.ndarray, None]=None) -> np.ndarray:
@@ -584,6 +588,8 @@ class LagrangeFESpace():
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
             isDDof = np.broadcast_to(isDDof.reshape(shape), shape=uh.shape) 
         return isDDof
+
+    set_dirichlet_bc = boundary_interpolate 
 
 
     def function(self, dim=None, array=None, dtype=np.float64):
