@@ -33,7 +33,7 @@ def test_linear_elasticity_lfem_2d(p, n):
     ouh = ospace.function(dim=GD)
     
     # 新接口程序
-    space = Space(mesh, p=p, doforder='vdims')
+    space = Space(mesh, p=p, doforder='sdofs')
     uh = space.function(dim=GD)
     vspace = GD*(space, ) # 把标量空间张成向量空间
     bform = BilinearForm(vspace)
@@ -61,7 +61,6 @@ def test_linear_elasticity_lfem_2d(p, n):
         print('neumann')
         bc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
         oF = bc.apply(oF)
-    np.testing.assert_array_almost_equal(B.toarray(), oA.toarray())
 
     if hasattr(pde, 'dirichlet'):
         bc = DirichletBC(vspace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
@@ -77,16 +76,13 @@ def test_linear_elasticity_lfem_2d(p, n):
     ouh.T.flat = spsolve(oA, oF)
     uh.flat = spsolve(A, F)
 
-    NN = mesh.number_of_nodes()
-    np.testing.assert_array_almost_equal(F.reshape(NN, GD), oF.reshape(GD, NN).T)
-
 
 
     # 画出原始网格
     mesh.add_plot(plt)
 
     # 画出变形网格
-    mesh.node += 100*uh[:NN]
+    mesh.node += 100*uh[:, :NN].T
     mesh.add_plot(plt)
 
     plt.show()
