@@ -26,15 +26,15 @@ class Mesh3d(Mesh):
         """
         return 3
 
-    def entity(self, etype='cell'):
+    def entity(self, etype='cell', index=np.s_[:]):
         if etype in {'cell', 3}:
-            return self.ds.cell
+            return self.ds.cell[index]
         elif etype in {'face', 2}:
-            return self.ds.face
+            return self.ds.face[index]
         elif etype in {'edge', 1}:
-            return self.ds.edge
+            return self.ds.edge[index]
         elif etype in {'node', 0}:
-            return self.node
+            return self.node[index]
         else:
             raise ValueError("`etype` is wrong!")
 

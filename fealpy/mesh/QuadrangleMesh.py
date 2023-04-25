@@ -55,10 +55,30 @@ class QuadrangleMesh(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return qf 
 
+    def multi_index_matrix(self, p, etype='edge'):
+        """
+        @brief 获取网格边上的 p 次的多重指标矩阵
+
+        @param[in] p 正整数 
+
+        @return multiIndex  ndarray with shape (ldof, 2)
+        """
+        if etype in {'edge', 'face', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
+        else:
+            raise ValueError(f"etype is {etype}! For QuadrangleMesh, we just support etype with value `edge`, `face` or `1`")
+
     def edge_shape_function(self, bc, p=1):
         """
         @brief the shape function on edge  
         """
+        if p == 1:
+            return bc
+
         TD = bc.shape[-1] - 1
         multiIndex = self.multi_index_matrix(p, etype=etype)
         c = np.arange(1, p+1, dtype=np.int_)
@@ -72,7 +92,6 @@ class QuadrangleMesh(Mesh2d):
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
-
 
     def grad_edge_shape_function(self, bc, p=1):
         """
@@ -128,7 +147,7 @@ class QuadrangleMesh(Mesh2d):
         phi = phi.reshape(shape) # 展平积分点
         return phi
 
-    def grad_shape_function(self, bc, p=1, variables='u'):
+    def grad_shape_function(self, bc, p=1, variables='x'):
         """
         @brief  四边形单元形函数的导数
 
@@ -142,22 +161,22 @@ class QuadrangleMesh(Mesh2d):
         """
         assert isinstance(bc, tuple) and len(bc) == 2
 
-        Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+        Dlambda = np.array([-1, 1], dtype=self.ftype)
         # 一维基函数值
         # (NQ, p+1)
         phi = self.edge_shape_function(bc[0], p=p)  
 
         # 关于**一维变量重心坐标**的导数
-        # lambda_0 = 1 - xi
-        # lambda_1 = xi
+        # lambda_0 = 1 - u 
+        # lambda_1 = v 
         # (NQ, ldof, 2) 
         R = self.grad_edge_shape_function(bc[0], p=p)  
 
-        # 关于**一维变量**的导数
-        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, 1)
+        # 关于一维变量的导数
+        gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
 
-        gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
-        gphi1 = np.einsum('kn, imt->kinm', phi, gphi)
+        gphi0 = np.einsum('im, kn->ikmn', gphi, phi)
+        gphi1 = np.einsum('kn, im->kinm', phi, gphi)
         n = gphi0.shape[0]*gphi0.shape[1]
         shape = (n, (p+1)*(p+1), 2)
         gphi = np.zeros(shape, dtype=self.ftype)
@@ -165,14 +184,48 @@ class QuadrangleMesh(Mesh2d):
         gphi[..., 1].flat = gphi1.flat
 
         if variables == 'u':
-            return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
+            return gphi
         elif variables == 'x':
-            J = np.einsum( 'ijn, ...ijk->...ink', self.node[entity], gphi)
-            G, J = self.first_fundamental_form(bc, index=index,
-                    return_jacobi=True)
+            J = self.jacobi_matrix(bc)
+            G = self.first_fundamental_form(J)
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
+
+    def jacobi_matrix(self, bc, index=np.s_[:]):
+        """
+        @brief 
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+        NQ = len(bc[0])
+        gphi = np.ones((NQ, 2), dtype=self.ftype)
+        gphi[:, 0] = -1
+
+        gphi0 = np.einsum('im, kn->ikmn', gphi, phi)
+        gphi1 = np.einsum('kn, im->kinm', phi, gphi)
+        ldof = gphi0.shape[0]*gphi0.shape[1]
+        shape = (ldof, 4, 2)
+        gphi = np.zeros(shape, dtype=self.ftype)
+        gphi[..., 0].flat = gphi0.flat
+        gphi[..., 1].flat = gphi1.flat
+
+        cell = self.entity('cell')
+        node = self.entity('node')
+        J = np.einsum( 'ijn, ...ijk->...ink', node[cell[index, [0, 3, 1, 2]]], gphi)
+        return J
+
+    def first_fundamental_form(self, J):
+        """
+        @brief 由 Jacobi 矩阵计算第一基本形式。
+        """
+        shape = J.shape[0:-2] + (2, 2)
+        G = np.zeros(shape, dtype=self.ftype)
+        for i in range(2):
+            G[..., i, i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
+            for j in range(i+1, 2):
+                G[..., i, j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
+                G[..., j, i] = G[..., i, j]
+        return G
 
 
     def bc_to_point(self, bc, index=np.s_[:]):
@@ -251,22 +304,6 @@ class QuadrangleMesh(Mesh2d):
             self.node = np.r_['0', self.node, edgeCenter, cellCenter]
             self.ds.reinit(N + NE + NC, cell)
 
-    def multi_index_matrix(self, p, etype='edge'):
-        """
-        @brief 获取网格边上的 p 次的多重指标矩阵
-
-        @param[in] p 正整数 
-
-        @return multiIndex  ndarray with shape (ldof, 2)
-        """
-        if etype in {'edge', 'face', 1}:
-            ldof = p+1
-            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-            multiIndex[:, 0] = np.arange(p, -1, -1)
-            multiIndex[:, 1] = p - multiIndex[:, 0]
-            return multiIndex
-        else:
-            raise ValueError(f"etype is {etype}! For QuadrangleMesh, we just support etype with value `edge`, `face` or `1`")
 
     def number_of_local_ipoints(self, p):
         return (p+1)*(p+1)

@@ -61,6 +61,18 @@ def test_quadrangle_mesh_interpolate():
     #mesh.find_node(axes, node=ips, showindex=True)
     #plt.show()
 
+def test_quadrangle_mesh_shape_function():
+    ipdb.set_trace()
+    mesh = QuadrangleMesh.from_one_quadrangle()
+    bcs, ws = mesh.integrator(3).get_quadrature_points_and_weights()
+    phi = mesh.shape_function(bcs, p=1)
+    gphi = mesh.grad_shape_function(bcs, p=1)
+
+    phi = mesh.shape_function(bcs, p=2)
+    gphi = mesh.grad_shape_function(bcs, p=2)
+
+
+
 if __name__ == "__main__":
-    test_quadrangle_mesh_interpolate()
+    test_quadrangle_mesh_shape_function()
 
