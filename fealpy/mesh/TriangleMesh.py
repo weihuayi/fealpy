@@ -119,6 +119,9 @@ class TriangleMesh(Mesh2d):
         """
         @brief
         """
+        if p==1:
+            return bc
+
         TD = bc.shape[-1] - 1
         multiIndex = self.multi_index_matrix(p, etype=etype)
         c = np.arange(1, p+1, dtype=np.int_)
@@ -369,6 +372,53 @@ class TriangleMesh(Mesh2d):
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
+        """
+        cell = self.entity('cell')
+        if p==1:
+            return cell[index] 
+
+        mi = self.multi_index_matrix(p)
+        idx0, = np.nonzero(mi[:, 0] == 0)
+        idx1, = np.nonzero(mi[:, 1] == 0)
+        idx2, = np.nonzero(mi[:, 2] == 0)
+
+        edge2cell = self.ds.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells() 
+
+        e2p = self.edge_to_ipoint(p)
+        ldof = self.number_of_local_ipoints(p)
+        c2p = np.zeros((NC, ldof), dtype=self.itype)
+
+        flag = edge2cell[:, 2] == 0
+        c2p[edge2cell[flag, 0][:, None], idx0] = e2p[flag]
+
+        flag = edge2cell[:, 2] == 1
+        c2p[edge2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+
+        flag = edge2cell[:, 2] == 2
+        c2p[edge2cell[flag, 0][:, None], idx2] = e2p[flag]
+
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+
+        flag = iflag & (edge2cell[:, 3] == 0)
+        c2p[edge2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p[edge2cell[flag, 1][:, None], idx1] = e2p[flag]
+
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p[edge2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+
+        cdof = (p-1)*(p-2)//2
+        flag = np.sum(mi > 0, axis=1) == 3
+        c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
+        return c2p[index]
+
+    def _cell_to_ipoint(self, p, index=np.s_[:]):
+        """
         @brief 获取网格中的三角形单元与插值点的对应关系
         @todo 只获取一部分单元的插值点全局编号
         """
@@ -412,22 +462,6 @@ class TriangleMesh(Mesh2d):
             idof = ldof - 3*p
             cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
 
-        return cell2ipoint
-
-    def cell_to_ipoint_1(self, p, index=np.s_[:]):
-        """
-        """
-        cell = self.entity('cell')
-        if p==1:
-            return cell[index] 
-
-        edge2cell = self.ds.edge_to_cell()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells() 
-
-        nip = self.number_of_local_ipoints()
-        cell2ipoint = np.zeros((NC, nip), dtype=self.itype)
         return cell2ipoint
 
 

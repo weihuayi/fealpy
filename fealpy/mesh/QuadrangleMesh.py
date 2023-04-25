@@ -55,6 +55,41 @@ class QuadrangleMesh(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return qf 
 
+    def edge_shape_function(self, bc, p=1):
+        """
+        @brief 
+        """
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=etype)
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi
+
+    face_shape_function = edge_shape_function
+
+    def shape_function(self, bc, p=1):
+        """
+        @brief
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+        phi0 = self.face_shape_function(bc[0], p=p) # x direction
+        phi1 = self.face_shape_function(bc[1], p=p) # y direction
+        phi = np.einsum('im, kn->ikmn', phi0, phi1)
+        shape = phi.shape[:-2] + (-1, )
+        phi = phi.reshape(shape) # 展平自由度
+        shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
+        phi = phi.reshape(shape) # 展平积分点
+
+
+
     def bc_to_point(self, bc, index=np.s_[:]):
         """
         @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
@@ -139,12 +174,14 @@ class QuadrangleMesh(Mesh2d):
 
         @return multiIndex  ndarray with shape (ldof, 2)
         """
-        if etype in {'edge', 1}:
+        if etype in {'edge', 'face', 1}:
             ldof = p+1
             multiIndex = np.zeros((ldof, 2), dtype=np.int_)
             multiIndex[:, 0] = np.arange(p, -1, -1)
             multiIndex[:, 1] = p - multiIndex[:, 0]
             return multiIndex
+        else:
+            raise ValueError(f"etype is {etype}! For QuadrangleMesh, we just support etype with value `edge`, `face` or `1`")
 
     def number_of_local_ipoints(self, p):
         return (p+1)*(p+1)
