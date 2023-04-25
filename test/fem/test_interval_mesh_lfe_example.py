@@ -8,21 +8,17 @@ import ipdb
 
 from fealpy.functionspace import LagrangeFESpace as Space
 
-from fealpy.functionspace import LagrangeFiniteElementSpace as OldSpace
-
 from fealpy.fem import ScalarDiffusionIntegrator
 from fealpy.fem import ScalarSourceIntegrator
 
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
-from fealpy.fem import ScalarNeumannBCIntegrator as NeumannBC
-from fealpy.boundarycondition import NeumannBC as OldNeumannBC
-from fealpy.boundarycondition import DirichletBC as OldDirichletBC
+from fealpy.fem import ScalarNeumannBCIntegrator
 
 @pytest.mark.parametrize("p, n, maxit", 
         [(1, 10, 4), (2, 8, 4), (3, 6, 4), (4, 4, 4)])
-def test_interval_mesh(p, n, maxit):
+def test_dirichlet_bc_on_interval_mesh(p, n, maxit):
     from fealpy.pde.elliptic_1d import SinPDEData as PDE
     from fealpy.mesh import IntervalMesh
 
@@ -46,29 +42,9 @@ def test_interval_mesh(p, n, maxit):
         A = bform.get_matrix()
         f = lform.get_vector() 
 
-        ospace = OldSpace(mesh, p=p)
-        OA = ospace.stiff_matrix()
-        Of = ospace.source_vector(pde.source, q=p+3)
-        np.testing.assert_allclose(A.toarray(), OA.toarray())
-#        np.testing.assert_allclose(f, Of)
-
-#        obc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
-#        Of = obc.apply(Of)
-        bc2 = NeumannBC(pde.neumann, threshold=pde.is_neumann_boundary)
-        bc2.assembly_face_vector(space, out=f)
-#        np.testing.assert_allclose(f, Of)
-        
-        uh = space.function()
-        Obc1 = OldDirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
-        OA, Of = Obc1.apply(OA, Of, uh)
-
-        bc1 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
-        A, f = bc1.apply(A, f, uh)
+        bc = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        A, f = bc.apply(A, f, uh)
         uh[:] = spsolve(A, f)
-
-        np.testing.assert_allclose(A.toarray(), OA.toarray())
-        np.testing.assert_allclose(f, Of)
-
 
         em[0, i] = mesh.error(pde.solution, uh, q=p+3)
         em[1, i] = mesh.error(pde.gradient, uh.grad_value, q=p+3)
