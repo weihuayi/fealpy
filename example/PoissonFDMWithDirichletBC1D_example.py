@@ -7,7 +7,7 @@ from fealpy.pde.elliptic_1d import SinPDEData
 pde = SinPDEData()
 # pde = ExpPDEData()
 domain = pde.domain()
-# test
+# 检查定义的 pde 模型是否正确
 print('domain :', domain)
 print(np.abs(pde.solution(0)) < 1e-12)
 print(np.abs(pde.solution(1)) < 1e-12)
@@ -20,6 +20,7 @@ hx = 0.1
 nx = int((domain[1] - domain[0])/hx)
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
 
+# 画出网格图像
 fig = plt.figure(1)
 axes = fig.gca() 
 mesh.add_plot(axes) 
@@ -30,6 +31,7 @@ plt.show()
 
 uI = mesh.interpolate(pde.solution, 'node') # 返回右端项在网格节点处的函数值
 
+# 插值函数的图像
 fig = plt.figure(2)
 axes = fig.gca()
 mesh.show_function(axes, uI)
@@ -74,10 +76,9 @@ print(np.vstack((et, eu)))
 print("----------------------------------------------------------------------")
 
 grad_uh = mesh.gradient(f=uh[:], order=1)
-print("grad_uh:\n", grad_uh)
-print("----------------------------------------------------------------------")
 
-egradt = ['$|| \nabla u - \nabla u_h||_{\infty}$', '$|| \nabla u - \nabla u_h||_{0}$', '$|| \nabla u - \nabla u_h ||_{1}$'] 
+egradt = ['$|| \nabla u - \nabla u_h||_{\infty}$', '$|| \nabla u - \nabla u_h||_{0}$',
+          '$|| \nabla u - \nabla u_h ||_{1}$'] 
 egradu = np.zeros(len(et), dtype=np.float64) 
 egradu[0], egradu[1], egradu[2] = mesh.error(pde.gradient, grad_uh)
 egradt = np.array(egradt)
@@ -109,4 +110,21 @@ print("em:\n", em)
 print("em_ratio:", em[:, 0:-1]/em[:, 1:])
 print("egradm:\n", egradm)
 print("egradm_ratio:", egradm[:, 0:-1]/egradm[:, 1:])
+
+
+linetype = ['r-*', 'g-o']
+
+fig = plt.figure(5)
+plt.xlabel('h')
+plt.ylabel('error')
+axes = fig.gca()
+
+c = np.polyfit(np.log(hx), np.log(em[0]), 1)
+axes.loglog(hx, em[0], linetype[0], label='$||u-u_h||_{L^2} = O(h^{%0.4f})$'%(c[0]))
+
+c = np.polyfit(np.log(hx), np.log(em[1]), 1)
+axes.loglog(hx, em[1], linetype[1], label='$||\\nabla u-\\nabla u_h||_{L^2} = O(h^{%0.4f})$'%(c[0]))
+
+axes.legend()
+plt.show()
 

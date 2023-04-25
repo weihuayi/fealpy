@@ -55,7 +55,7 @@ class SinSinPDEData:
     def dirichlet(self, p):
         return self.solution(p)
 
-    @cartesion
+    @cartesian
     def is_dirichlet_boundary(self, p):
         x = p[..., 0]
         y = p[..., 1]
