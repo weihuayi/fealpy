@@ -449,6 +449,7 @@ class UniformMesh1d(Mesh1d):
     def update_dirichlet_bc(self, gD, uh):
         """
         @brief 更新网格函数 uh 的 Dirichlet 边界值
+        @todo 
         """
         node = self.node
         isBdNode = self.ds.boundary_node_flag()
@@ -526,21 +527,13 @@ class UniformMesh1d(Mesh1d):
         """
         @brief 生成波动方程的离散矩阵
         """
-        r = tau/self.h**2 
+        r = tau**2/self.h**2 
 
         NN = self.number_of_nodes()
 
         A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
         A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
         A2 = diags([- 1 - 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
-
-
-        A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
-                [0, 1, -1], shape=(n0, n0), format='csr')
-        A1 = diags([2 - 2*r**2*(1-2*theta), r**2*(1-2*theta), r**2*(1-2*theta)], 
-                [0, 1, -1], shape=(n0, n0), format='csr')
-        A2 = diags([-1 - 2*r**2*theta, r**2*theta, r**2*theta], 
-                [0, 1, -1], shape=(n0, n0), format='csr')
 
         I = k[1:]
         J = k[0:-1]
