@@ -265,23 +265,23 @@ class Mesh2d(Mesh):
             return torch.zeros((1,))
         raise ValueError(f"Invalid etity type {etype}.")
 
-    def _cell_area(self, index=np.s_[:]) -> Tensor:
-        """
-        @brief Area of cells in a 2-d mesh.
-        """
-        NC = self.number_of_cells()
-        node = self.node
-        edge = self.ds.edge
-        edge2cell = self.ds.edge2cell
-        is_inner_edge = ~self.ds.boundary_edge_flag()
+    # def _cell_area(self, index=np.s_[:]) -> Tensor:
+    #     """
+    #     @brief Area of cells in a 2-d mesh.
+    #     """
+    #     NC = self.number_of_cells()
+    #     node = self.node
+    #     edge = self.ds.edge
+    #     edge2cell = self.ds.edge2cell
+    #     is_inner_edge = ~self.ds.boundary_edge_flag()
 
-        v = (node[edge[:, 1], :] - node[edge[:, 0], :])
-        val = torch.linalg.vecdot(v, node[edge[:, 0], :], dim=-1)
-        # TODO: torch.add.at?
-        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
-        a /= 2
-        return a
+    #     v = (node[edge[:, 1], :] - node[edge[:, 0], :])
+    #     val = torch.linalg.vecdot(v, node[edge[:, 0], :], dim=-1)
+    #     # TODO: torch.add.at?
+    #     a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+    #     a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
+    #     a /= 2
+    #     return a
 
     def cell_area(self, index=np.s_[:]) -> Tensor:
         """

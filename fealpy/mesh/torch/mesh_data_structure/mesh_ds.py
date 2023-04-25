@@ -26,6 +26,7 @@ class MeshDataStructure(metaclass=ABCMeta):
     cell: Tensor
     face: _tensor_redirectable
     edge: _tensor_redirectable
+    ccw: Tensor
 
     # Constants
     TD: int
@@ -39,13 +40,13 @@ class MeshDataStructure(metaclass=ABCMeta):
     NFC: _int_redirectable
 
     def __init__(self, NN: int, cell: Tensor):
-        self.itype = cell.dtype
-        self.device = cell.device
         self.reinit(NN=NN, cell=cell)
 
     def reinit(self, NN: int, cell: Tensor):
         self.NN = NN
         self.cell = cell
+        self.itype = cell.dtype
+        self.device = cell.device
         self.construct()
 
     @abstractmethod
