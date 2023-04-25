@@ -26,7 +26,7 @@ class MeshDataStructure(metaclass=ABCMeta):
     cell: Tensor
     face: _tensor_redirectable
     edge: _tensor_redirectable
-    edge2cell: Tensor
+    ccw: Tensor
 
     # Constants
     TD: int
@@ -40,40 +40,45 @@ class MeshDataStructure(metaclass=ABCMeta):
     NFC: _int_redirectable
 
     def __init__(self, NN: int, cell: Tensor):
-        self.itype = cell.dtype
-        self.device = cell.device
         self.reinit(NN=NN, cell=cell)
 
     def reinit(self, NN: int, cell: Tensor):
         self.NN = NN
         self.cell = cell
+        self.itype = cell.dtype
+        self.device = cell.device
         self.construct()
 
     @abstractmethod
     def construct(self) -> None:
+        """
+        @brief Construct the topology data structure.
+
+        This is called automatically in initialization, and there are no need\
+        for users to call this.
+        """
         pass
 
-    @property
-    def number(self):
-        return _Count(self) # Is this better?
+    def clear(self) -> None:
+        raise NotImplementedError
 
-    def number_of_cells(self):
+    def number_of_cells(self) -> int:
         """Number of cells"""
         return self.cell.shape[0]
 
-    def number_of_faces(self):
+    def number_of_faces(self) -> int:
         """Number of faces"""
         return self.face.shape[0]
 
-    def number_of_edges(self):
+    def number_of_edges(self) -> int:
         """Number of edges"""
         return self.edge.shape[0]
 
-    def number_of_nodes(self):
+    def number_of_nodes(self) -> int:
         """Number of nodes"""
         return self.NN
 
-    def number_of_nodes_of_cells(self) -> int:
+    def number_of_vertices_of_cells(self) -> int:
         """Number of nodes in a cell"""
         return self.cell.shape[-1]
 
@@ -85,36 +90,4 @@ class MeshDataStructure(metaclass=ABCMeta):
         """Number of faces in a cell"""
         return self.NFC
 
-    number_of_vertices_of_cells = number_of_nodes_of_cells
-
-
-class _Count():
-    def __init__(self, ds: MeshDataStructure) -> None:
-        self._ds = ds
-
-    def __call__(self, etype: Union[int, str]):
-        TD = self._ds.TD
-        if etype in {'cell', TD}:
-            return self.nodes()
-        elif etype in {'face', TD-1}:
-            return self.faces()
-        elif etype in {'edge', 1}:
-            return self.edges()
-        elif etype in {'node', 0}:
-            return self.nodes()
-        raise ValueError(f"Invalid entity type '{etype}'.")
-
-    def nodes(self):
-        return self._ds.NN
-
-    def edges(self):
-        return self._ds.edge.shape[0]
-
-    def faces(self):
-        return self._ds.face.shape[0]
-
-    def cells(self):
-        return self._ds.cell.shape[0]
-
-    def nodes_of_cells(self):
-        return self._ds.cell.shape[-1]
+    number_of_nodes_of_cells = number_of_vertices_of_cells

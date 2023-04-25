@@ -6,6 +6,7 @@ from torch import Tensor, device
 
 from .mesh_data_structure import Mesh2dDataStructure
 from .mesh import Mesh2d
+from .plot import Plotable
 
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
@@ -23,7 +24,7 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     NEC = 3
 
 
-class TriangleMesh(Mesh2d):
+class TriangleMesh(Mesh2d, Plotable):
     def __init__(self, node: Tensor, cell: Tensor):
         assert cell.shape[-1] == 3
 
