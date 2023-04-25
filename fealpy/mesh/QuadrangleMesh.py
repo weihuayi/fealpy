@@ -57,7 +57,7 @@ class QuadrangleMesh(Mesh2d):
 
     def edge_shape_function(self, bc, p=1):
         """
-        @brief 
+        @brief the shape function on edge  
         """
         TD = bc.shape[-1] - 1
         multiIndex = self.multi_index_matrix(p, etype=etype)
@@ -73,21 +73,106 @@ class QuadrangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
+
+    def grad_edge_shape_function(self, bc, p=1):
+        """
+        @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
+        """
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
+
+        c = np.arange(1, p+1)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=bc.dtype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+        return R # (..., ldof, TD+1)
+
     face_shape_function = edge_shape_function
+    grad_face_shape_function = grad_edge_shape_function
 
     def shape_function(self, bc, p=1):
         """
-        @brief
+        @brief 四边形单元上的形函数
         """
         assert isinstance(bc, tuple) and len(bc) == 2
-        phi0 = self.face_shape_function(bc[0], p=p) # x direction
-        phi1 = self.face_shape_function(bc[1], p=p) # y direction
+        phi0 = self.edge_shape_function(bc[0], p=p) # x direction
+        phi1 = self.edge_shape_function(bc[1], p=p) # y direction
         phi = np.einsum('im, kn->ikmn', phi0, phi1)
         shape = phi.shape[:-2] + (-1, )
         phi = phi.reshape(shape) # 展平自由度
         shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
         phi = phi.reshape(shape) # 展平积分点
+        return phi
 
+    def grad_shape_function(self, bc, p=1, variables='u'):
+        """
+        @brief  四边形单元形函数的导数
+
+        @note 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+
+        bc 是一个长度为 2 的 tuple
+
+        bc[i] 是一个一维积分公式的重心坐标数组
+
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+
+        Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+        # 一维基函数值
+        # (NQ, p+1)
+        phi = self.edge_shape_function(bc[0], p=p)  
+
+        # 关于**一维变量重心坐标**的导数
+        # lambda_0 = 1 - xi
+        # lambda_1 = xi
+        # (NQ, ldof, 2) 
+        R = self.grad_edge_shape_function(bc[0], p=p)  
+
+        # 关于**一维变量**的导数
+        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, 1)
+
+        gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
+        gphi1 = np.einsum('kn, imt->kinm', phi, gphi)
+        n = gphi0.shape[0]*gphi0.shape[1]
+        shape = (n, (p+1)*(p+1), 2)
+        gphi = np.zeros(shape, dtype=self.ftype)
+        gphi[..., 0].flat = gphi0.flat
+        gphi[..., 1].flat = gphi1.flat
+
+        if variables == 'u':
+            return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
+        elif variables == 'x':
+            J = np.einsum( 'ijn, ...ijk->...ink', self.node[entity], gphi)
+            G, J = self.first_fundamental_form(bc, index=index,
+                    return_jacobi=True)
+            G = np.linalg.inv(G)
+            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
+            return gphi
 
 
     def bc_to_point(self, bc, index=np.s_[:]):
