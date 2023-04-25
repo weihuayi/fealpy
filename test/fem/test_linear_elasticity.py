@@ -61,7 +61,6 @@ def test_linear_elasticity_lfem_2d(p, n):
         print('neumann')
         bc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
         oF = bc.apply(oF)
-
     np.testing.assert_array_almost_equal(B.toarray(), oA.toarray())
 
     if hasattr(pde, 'dirichlet'):

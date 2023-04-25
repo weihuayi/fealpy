@@ -139,10 +139,7 @@ class BilinearForm:
                         J = np.broadcast_to(GD*cell2dof[:, None, :] + j, shape=val.shape)
                         self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
 
-                        val = CM[:, j::GD, i::GD] 
-                        I = np.broadcast_to(cell2dof[:, :, None]+j*gdof, shape=val.shape)
-                        J = np.broadcast_to(cell2dof[:, None, :]+i*gdof, shape=val.shape)
-                        self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
+                        self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
 
     def fast_assembly(self):
         """
