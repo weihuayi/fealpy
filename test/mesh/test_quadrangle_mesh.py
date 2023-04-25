@@ -56,7 +56,6 @@ def test_quadrangle_mesh_interpolate():
     mesh.uniform_refine(1)
     ips = mesh.interpolation_points(3)
     c2p = mesh.cell_to_ipoint(3)
-    print(c2p)
     fig, axes = plt.subplots()
     mesh.add_plot(axes)
     mesh.find_node(axes, node=ips, showindex=True)

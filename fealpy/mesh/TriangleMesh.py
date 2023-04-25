@@ -414,6 +414,23 @@ class TriangleMesh(Mesh2d):
 
         return cell2ipoint
 
+    def cell_to_ipoint_1(self, p, index=np.s_[:]):
+        """
+        """
+        cell = self.entity('cell')
+        if p==1:
+            return cell[index] 
+
+        edge2cell = self.ds.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells() 
+
+        nip = self.number_of_local_ipoints()
+        cell2ipoint = np.zeros((NC, nip), dtype=self.itype)
+        return cell2ipoint
+
+
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
             VTK_TRIANGLE = 5
