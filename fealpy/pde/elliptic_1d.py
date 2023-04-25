@@ -1,13 +1,15 @@
 import numpy as np
 from ..decorator import cartesian
+from typing import List 
 
 class SinPDEData:
     """
-    -u''(x) = 16\pi^2\sin(4\pi x), 
-       u(0) = 0,\quad u(1) = 0.
-    真解：u(x) = \sin(4\pi x).
+    -u''(x) = 16 pi^2 sin(4 pi x), 
+       u(0) = 0, u(1) = 0.
+    exact solution：
+       u(x) = sin(4 pi x).
     """
-    def domain(self):
+    def domain(self) -> List[int]:
         """
         @brief:    Get the domain of the PDE model
 
@@ -16,40 +18,40 @@ class SinPDEData:
         return [0, 1]
 
     @cartesian    
-    def solution(self, p):
+    def solution(self, p: np.ndarray) -> np.ndarray:
         """
-        @brief: Calculate the exact solution of the PDE model
+        @brief:    Calculate the exact solution of the PDE model
 
-        @param p: An array of the independent variable x
-        @return: The exact solution of the PDE model at the given points
+        @param p:  An array of the independent variable x
+        @return:   The exact solution of the PDE model at the given points
         """
         return np.sin(4*np.pi*p)
     
     @cartesian    
-    def source(self, p):
+    def source(self, p: np.ndarray) -> np.ndarray:
         """
-        @brief: Calculate the source term of the PDE model
+        @brief:    Calculate the source term of the PDE model
 
-        @param p: An array of the independent variable x
-        @return: The source term of the PDE model at the given points
+        @param p:  An array of the independent variable x
+        @return:   The source term of the PDE model at the given points
         """
         return 16*np.pi**2*np.sin(4*np.pi*p)
     
     @cartesian    
-    def gradient(self, p):
+    def gradient(self, p: np.ndarray) -> np.ndarray:
         """
-        @brief: Calculate the gradient of the exact solution of the PDE model
+        @brief:    Calculate the gradient of the exact solution of the PDE model
 
-        @param p: An array of the independent variable x
+        @param p:  An array of the independent variable x
 
-        @return: The gradient of the exact solution of the PDE model at the given points
+        @return:   The gradient of the exact solution of the PDE model at the given points
         """
         return 4*np.pi*np.cos(4*np.pi*p)
 
     @cartesian    
-    def dirichlet(self, p):
+    def dirichlet(self, p: np.ndarray) -> np.ndarray:
         """
-        @brief: 模型的 Dirichlet 边界条件
+        @brief:    Dirichlet BC
         """
         return self.solution(p)
 

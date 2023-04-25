@@ -8,7 +8,8 @@ import numpy as np
 from .mesh_data_structure import (
     MeshDataStructure,
     Mesh1dDataStructure,
-    Mesh2dDataStructure
+    Mesh2dDataStructure,
+    Mesh3dDataStructure
 )
 
 
@@ -78,14 +79,6 @@ class Mesh(metaclass=ABCMeta):
     # @abstractmethod
     # def show_animation(self):
     #     pass
-
-    @property
-    def add_plot(self):
-        """
-        @brief Plot machine for this mesh.
-        """
-        from .plot import MeshPlot
-        return MeshPlot(self)
 
 
     ### FEM Interfaces ###
@@ -272,23 +265,23 @@ class Mesh2d(Mesh):
             return torch.zeros((1,))
         raise ValueError(f"Invalid etity type {etype}.")
 
-    def _cell_area(self, index=np.s_[:]) -> Tensor:
-        """
-        @brief Area of cells in a 2-d mesh.
-        """
-        NC = self.number_of_cells()
-        node = self.node
-        edge = self.ds.edge
-        edge2cell = self.ds.edge2cell
-        is_inner_edge = ~self.ds.boundary_edge_flag()
+    # def _cell_area(self, index=np.s_[:]) -> Tensor:
+    #     """
+    #     @brief Area of cells in a 2-d mesh.
+    #     """
+    #     NC = self.number_of_cells()
+    #     node = self.node
+    #     edge = self.ds.edge
+    #     edge2cell = self.ds.edge2cell
+    #     is_inner_edge = ~self.ds.boundary_edge_flag()
 
-        v = (node[edge[:, 1], :] - node[edge[:, 0], :])
-        val = torch.linalg.vecdot(v, node[edge[:, 0], :], dim=-1)
-        # TODO: torch.add.at?
-        a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
-        a /= 2
-        return a
+    #     v = (node[edge[:, 1], :] - node[edge[:, 0], :])
+    #     val = torch.linalg.vecdot(v, node[edge[:, 0], :], dim=-1)
+    #     # TODO: torch.add.at?
+    #     a = torch.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+    #     a += torch.bincount(edge2cell[is_inner_edge, 1], weights=-val[is_inner_edge], minlength=NC)
+    #     a /= 2
+    #     return a
 
     def cell_area(self, index=np.s_[:]) -> Tensor:
         """
@@ -318,3 +311,11 @@ class Mesh2d(Mesh):
         edge = self.entity('edge')
         v = node[edge[index, 1], :] - node[edge[index, 0], :]
         return torch.norm(v, dim=-1)
+
+
+class Mesh3d(Mesh):
+    """
+    @brief The abstract class for all meshes with topology dimension 3.\
+           This is still abstract, and some methods need to be overiden.
+    """
+    ds: Mesh3dDataStructure
