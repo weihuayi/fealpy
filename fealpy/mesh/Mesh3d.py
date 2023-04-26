@@ -135,7 +135,8 @@ class Mesh3d(Mesh):
             isInterfaceFace = np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 1
             isBdFace = (np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 2) & isBdFace
             face = face[isBdFace | isInterfaceFace][:, self.ds.ccw]
-
+        
+        import mpl_toolkits.mplot3d as a3
         faces = a3.art3d.Poly3DCollection(
                 node[face],
                 facecolor=facecolor,
