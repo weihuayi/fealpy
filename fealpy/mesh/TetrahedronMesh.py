@@ -1023,6 +1023,64 @@ class TetrahedronMesh(Mesh3d):
 
     ## @ingroup MeshGenerators
     @classmethod
+    def from_cylinder_gmsh(cls, radius, height, lc):
+        """
+        @brief Generate a tetrahedral mesh for a cylinder domain
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("Cylinder")
+
+        # 几何定义
+        bot_center = gmsh.model.geo.addPoint(0, 0, 0, lc)
+        top_center = gmsh.model.geo.addPoint(0, 0, height, lc)
+
+        bot_circle = gmsh.model.geo.addCircleArc(
+            gmsh.model.geo.addPoint(radius, 0, 0, lc), bot_center, gmsh.model.geo.addPoint(0, radius, 0, lc)
+        )
+        top_circle = gmsh.model.geo.addCircleArc(
+            gmsh.model.geo.addPoint(radius, 0, height, lc), top_center, gmsh.model.geo.addPoint(0, radius, height, lc)
+        )
+
+        gmsh.model.geo.addCurveLoop([bot_circle], tag=1)
+        gmsh.model.geo.addCurveLoop([top_circle], tag=2)
+
+        bot_surface = gmsh.model.geo.addPlaneSurface([1])
+        top_surface = gmsh.model.geo.addPlaneSurface([2])
+
+        gmsh.model.geo.addLine(bot_center, top_center, tag=3)
+
+        side_surface = gmsh.model.geo.addSurfaceFilling([bot_circle, top_circle, 3])
+
+        gmsh.model.geo.addPhysicalSurface([bot_surface, top_surface, side_surface], tag=1)
+        gmsh.model.geo.synchronize()
+
+        # 网格生成
+        gmsh.model.mesh.generate(3)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
+        
+        #节点的编号映射 
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+
+        # 获取四面体单元信息
+        tetrahedron_type = 4  # 四面体单元的类型编号为 4
+        tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
+        evid = np.array([nodetags_map[j] for j in tetrahedron_connectivity])
+        cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of tetrahedra: {cell.shape[0]}")
+
+        gmsh.finalize()
+        return cls(node, cell)
+
+
+    ## @ingroup MeshGenerators
+    @classmethod
     def from_unit_sphere_gmsh(cls, h): 
         """
         Generate a tetrahedral mesh for a unit sphere by gmsh.

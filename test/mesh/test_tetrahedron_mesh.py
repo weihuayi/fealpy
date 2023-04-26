@@ -28,13 +28,16 @@ def test_interpolate(p):
 
     assert np.allclose(ips0, ips1)
 
-
     c2d0 = mesh.cell_to_ipoint(p)
     c2d1 = space.cell_to_dof()
 
     assert np.all(c2d0 == c2d1)
 
+def test_tetrhedron_mesh_generation_on_cylinder():
+    mesh = TetrahedronMesh.from_cylinder_gmsh(1, 5, 0.1)
+    mesh.add_plot(plt)
+    plt.show()
 
 
 if __name__ == "__main__":
-    test_interpolate(1)
+    test_tetrhedron_mesh_generation_on_cylinder()

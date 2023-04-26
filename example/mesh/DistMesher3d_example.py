@@ -24,8 +24,9 @@ parser.add_argument('--domain',
         help=
         """
         指定要运行的例子\n
-        0 : 单位球体 \n
-        1 : 圆柱体\n
+        0 : 立方体 \n
+        1 : 单位球体\n
+        2 ：圆柱体
         """)
 
 parser.add_argument('--hmin', 
@@ -37,8 +38,8 @@ parser.add_argument('--hmax',
         help="最大网格尺寸值，默认与最小网格尺寸相同")
 
 parser.add_argument('--maxit', 
-        default=500, type=int, 
-        help="最大迭代次数，默认 500 次")
+        default=1000, type=int, 
+        help="最大迭代次数，默认 1000 次")
 
 args = parser.parse_args()
 domain = args.domain
