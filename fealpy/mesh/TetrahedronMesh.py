@@ -1032,32 +1032,15 @@ class TetrahedronMesh(Mesh3d):
         gmsh.model.add("Cylinder")
 
         # 几何定义
-        bot_center = gmsh.model.geo.addPoint(0, 0, 0, lc)
-        top_center = gmsh.model.geo.addPoint(0, 0, height, lc)
-
-        bot_circle = gmsh.model.geo.addCircleArc(
-            gmsh.model.geo.addPoint(radius, 0, 0, lc), bot_center, gmsh.model.geo.addPoint(0, radius, 0, lc)
-        )
-        top_circle = gmsh.model.geo.addCircleArc(
-            gmsh.model.geo.addPoint(radius, 0, height, lc), top_center, gmsh.model.geo.addPoint(0, radius, height, lc)
-        )
-
-        gmsh.model.geo.addCurveLoop([bot_circle], tag=1)
-        gmsh.model.geo.addCurveLoop([top_circle], tag=2)
-
-        bot_surface = gmsh.model.geo.addPlaneSurface([1])
-        top_surface = gmsh.model.geo.addPlaneSurface([2])
-
-        gmsh.model.geo.addLine(bot_center, top_center, tag=3)
-
-        side_surface = gmsh.model.geo.addSurfaceFilling([bot_circle, top_circle, 3])
-
-        gmsh.model.geo.addPhysicalSurface([bot_surface, top_surface, side_surface], tag=1)
-        gmsh.model.geo.synchronize()
-
+        gmsh.model.occ.addCylinder(0.0,0.0,0.0,0,0,height,radius)
+        gmsh.model.occ.synchronize()
+        
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),lc)
+        
         # 网格生成
         gmsh.model.mesh.generate(3)
-
+        gmsh.fltk.run()
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
