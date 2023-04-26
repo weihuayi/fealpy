@@ -11,8 +11,7 @@ from fealpy.geometry import CylinderDomain
 
 from fealpy.geometry import dunion
 from fealpy.geometry import huniform
-from fealpy.mesh import DistMesher3d 
-from fealpy.mesh import MeshFactory as MF
+from fealpy.mesh import TetrahedronMesh
 
 
 parser = argparse.ArgumentParser(description=
@@ -139,6 +138,6 @@ elif domain == 4: # 偶极子天线模型
 elif domain == 5:
     domain = TorusDomain()
     
-mesher = DistMesher3d(domain, hmin, output=True)
-mesh = mesher.meshing(maxit)
+
+mesh = TetrahedronMesh.from_domain_distmesh(domain, hmin, maxit=maxit)
 mesh.to_vtk(fname='test.vtu')

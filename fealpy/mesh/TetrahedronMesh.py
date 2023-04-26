@@ -992,6 +992,14 @@ class TetrahedronMesh(Mesh3d):
         vol = self.cell_volume()
         return np.all(vol > threshold)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_domain_distmesh(cls, domain, hmin, maxit=100, output=False):
+        from .DistMesher3d import DistMesher3d
+        mesher = DistMesher3d(domain, hmin, output=output)
+        mesh = mesher.meshing(maxit)
+        return mesh
+
 
     ## @ingroup MeshGenerators
     @classmethod
