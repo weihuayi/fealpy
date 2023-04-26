@@ -62,7 +62,6 @@ def test_quadrangle_mesh_interpolate():
     #plt.show()
 
 def test_quadrangle_mesh_shape_function():
-    ipdb.set_trace()
     mesh = QuadrangleMesh.from_one_quadrangle()
     bcs, ws = mesh.integrator(3).get_quadrature_points_and_weights()
     phi = mesh.shape_function(bcs, p=1)
@@ -70,6 +69,9 @@ def test_quadrangle_mesh_shape_function():
 
     phi = mesh.shape_function(bcs, p=2)
     gphi = mesh.grad_shape_function(bcs, p=2)
+
+    J = mesh.jacobi_matrix(bcs)
+    print(np.linalg.det(J))
 
 
 

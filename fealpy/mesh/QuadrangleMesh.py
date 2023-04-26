@@ -198,6 +198,8 @@ class QuadrangleMesh(Mesh2d):
         """
         assert isinstance(bc, tuple) and len(bc) == 2
         NQ = len(bc[0])
+
+        phi = bc[0]
         gphi = np.ones((NQ, 2), dtype=self.ftype)
         gphi[:, 0] = -1
 

@@ -994,6 +994,25 @@ class TetrahedronMesh(Mesh3d):
 
     ## @ingroup MeshGenerators
     @classmethod
+    def from_meshpy(cls, points, facets, h, 
+        hole_points=None, 
+        facet_markers=None, 
+        point_markers=None):
+
+        from meshpy.tet import MeshInfo, build
+
+        mesh_info = MeshInfo()
+        mesh_info.set_points(points)
+        mesh_info.set_facets(facets)
+        mesh = build(mesh_info, max_volume=h**3/6.0)
+
+        node = np.array(mesh.points, dtype=np.float64)
+        cell = np.array(mesh.elements, dtype=np.int_)
+
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
     def from_domain_distmesh(cls, domain, hmin, maxit=100, output=False):
         from .DistMesher3d import DistMesher3d
         mesher = DistMesher3d(domain, hmin, output=output)

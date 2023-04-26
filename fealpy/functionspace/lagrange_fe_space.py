@@ -4,7 +4,6 @@ from .Function import Function
 from ..decorator import barycentric
 from .fem_dofs import *
 
-
 class LagrangeFESpace():
     DOF = { 'C': {
                 "IntervalMesh": IntervalMeshCFEDof,
