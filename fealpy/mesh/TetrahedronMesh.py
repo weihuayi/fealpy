@@ -357,7 +357,7 @@ class TetrahedronMesh(Mesh3d):
             fidof = fdof - 3*p
             face2ipoint[:, isInFaceIPoint] = base + np.arange(NF*fidof).reshape(NF, fidof)
 
-        return face2ipoint
+        return face2ipoint[index]
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """

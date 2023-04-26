@@ -33,7 +33,7 @@ def test_linear_elasticity_lfem_2d(p, n):
     ouh = ospace.function(dim=GD)
     
     # 新接口程序
-    space = Space(mesh, p=p, doforder='sdofs')
+    space = Space(mesh, p=p, doforder='vidms')
     uh = space.function(dim=GD)
     vspace = GD*(space, ) # 把标量空间张成向量空间
     bform = BilinearForm(vspace)
@@ -82,6 +82,74 @@ def test_linear_elasticity_lfem_2d(p, n):
     mesh.add_plot(plt)
 
     # 画出变形网格
+    mesh.node += 100*uh[:NN]
+    mesh.add_plot(plt)
+
+    plt.show()
+
+
+def test_linear_elasticity_lfem_3d(p, n):
+    """
+    @brief Lagrange 元求解线弹性问题
+    """
+    from fealpy.pde.linear_elasticity_model import BoxDomainData3d
+
+    pde = BoxDomainData3d()
+    domain = pde.domain()
+    mesh = pde.init_mesh(n=n)
+    GD = mesh.geo_dimension()
+    NN = mesh.number_of_nodes()
+
+    ospace = OldSpace(mesh, p=p)
+    ouh = ospace.function(dim=GD)
+    
+    # 新接口程序
+    space = Space(mesh, p=p, doforder='sdofs')
+    uh = space.function(dim=GD)
+    vspace = GD*(space, ) # 把标量空间张成向量空间
+    bform = BilinearForm(vspace)
+    bform.add_domain_integrator(LinearElasticityOperatorIntegrator(pde.lam, pde.mu))
+    bform.assembly()
+
+    lform = LinearForm(vspace)
+    lform.add_domain_integrator(VectorSourceIntegrator(pde.source, q=1))
+    if hasattr(pde, 'neumann'):
+        bi = VectorNeumannBCIntegrator(pde.neumann, threshold=pde.is_neumann_boundary, q=1)
+        lform.add_boundary_integrator(bi)
+    lform.assembly()
+
+    A = bform.get_matrix()
+    F = lform.get_vector()
+    oA = ospace.linear_elasticity_matrix(pde.lam, pde.mu, q=p+2)
+    oF = ospace.source_vector(pde.source, dim=GD)
+
+    if hasattr(pde, 'neumann'):
+        print('neumann')
+        bc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
+        oF = bc.apply(oF)
+    
+    np.testing.assert_array_almost_equal(A.toarray(), oA.toarray())
+    np.testing.assert_array_almost_equal(F, oF.T.flat)
+
+
+    if hasattr(pde, 'dirichlet'):
+        bc = DirichletBC(vspace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        A, F = bc.apply(A, F, uh)
+
+    if hasattr(pde, 'dirichlet'):
+        print('dirichlet')
+        bc = OldDirichletBC(ospace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        oA, oF = bc.apply(oA, oF, ouh)
+    np.testing.assert_array_almost_equal(A.toarray(), oA.toarray())
+    np.testing.assert_array_almost_equal(F, oF)
+
+    ouh.T.flat = spsolve(oA, oF)
+    uh.flat = spsolve(A, F)
+
+    # 画出原始网格
+    mesh.add_plot(plt)
+
+    # 画出变形网格
     mesh.node += 100*uh[:, :NN].T
     mesh.add_plot(plt)
 
@@ -89,4 +157,5 @@ def test_linear_elasticity_lfem_2d(p, n):
 
 
 if __name__ == "__main__":
-    test_linear_elasticity_lfem_2d(1, 10)
+    #test_linear_elasticity_lfem_2d(1, 10)
+    test_linear_elasticity_lfem_3d(1, 1)

@@ -54,7 +54,7 @@ elif GD == 3:
 
 pde = PDE()
 domain = pde.domain()
-mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
+mesh = pde.init_mesh(n=n)
 NN = mesh.number_of_nodes()
 
 space = LagrangeFiniteElementSpace(mesh, p=p)

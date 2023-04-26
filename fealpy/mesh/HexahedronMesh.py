@@ -233,7 +233,6 @@ class HexahedronMesh(Mesh3d):
 
         cell = self.entity('cell')
         node = self.entity('node')
-        J = 
         J = np.einsum( 'ijn, ...ijk->...ink', node[cell[index, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
         return J
 
