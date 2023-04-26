@@ -1040,7 +1040,7 @@ class TetrahedronMesh(Mesh3d):
         
         # 网格生成
         gmsh.model.mesh.generate(3)
-        gmsh.fltk.run()
+
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
