@@ -36,8 +36,8 @@ def advance(n, *frags):
     if n == 0:
         return uh0, t
     elif n == 1:
-        r = tau/hx 
-        uh1[1:-1] = r**2*(uh0[0:-2] + uh0[2:])/2.0 + r**2*uh0[1:-1] + tau*vh0[1:-1]
+        rx = tau/hx 
+        uh1[1:-1] = rx**2*(uh0[0:-2] + uh0[2:])/2.0 + (1-rx**2)*uh0[1:-1] + tau*vh0[1:-1]
         gD = lambda p: pde.dirichlet(p, t)
         mesh.update_dirichlet_bc(gD, uh1)
         return uh1, t
@@ -59,7 +59,7 @@ def advance(n, *frags):
             
         return uh1, t
 
-box = [0, 1, -4, 4]
+box = [0, 1, -0.1, 0.1]
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, advance, frames=nt+1)
 plt.show()

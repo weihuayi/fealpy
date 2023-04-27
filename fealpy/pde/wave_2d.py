@@ -1,7 +1,7 @@
 import numpy as np
 from fealpy.decorator import cartesian
 
-class StringOscillationPDEData: #可以点击这里查看 FEALPy 仓库中的代码。
+class MembraneOscillationPDEData:
     
     def __init__(self, D=[0, 1, 0, 1], T=[0, 4]):
         

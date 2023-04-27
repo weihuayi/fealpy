@@ -769,11 +769,7 @@ class UniformMesh2d(Mesh2d):
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        return A0, A1, A2(self, r, theta=0.5):
-        """
-        @brief
-        """
-        pass
+        return A0, A1, A2
 
     ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
