@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import List, Tuple
+from typing import Tuple
 from ..decorator import cartesian
 
 class StringOscillationPDEData:
@@ -82,7 +82,7 @@ class StringOscillationPDEData:
 
          @param[in] t float, 时间点 
         """
-        return 0.0
+        return np.zeros_like(p) 
         
     @cartesian
     def source(self, p: np.ndarray, t: np.float64) -> np.float64:

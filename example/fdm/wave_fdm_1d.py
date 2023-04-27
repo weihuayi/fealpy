@@ -1,28 +1,29 @@
 import numpy 
 import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.wave_1d import StringOscillationPDEData
 
 from fealpy.mesh import UniformMesh1d
 
+import ipdb
+
+theta = 0.5
 
 pde = StringOscillationPDEData()
 domain = pde.domain()
 duration = pde.duration()
 
-nx = 10
+nx = 100
 hx = (domain[1] - domain[0])/nx
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
 
-nt = 100
+nt = 1000
 tau = (duration[1] - duration[0])/nt
 
 uh0 = mesh.interpolate(pde.init_solution, 'node')
 vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
 uh1 = mesh.function('node')
-
-
-A, B, C = mesh.wave_operator(tau, theta=0.5)
 
 
 def advance(n, *frags):
@@ -35,18 +36,30 @@ def advance(n, *frags):
     if n == 0:
         return uh0, t
     elif n == 1:
-        r = tau/hx**2 
+        r = tau/hx 
         uh1[1:-1] = r**2*(uh0[0:-2] + uh0[2:])/2.0 + r**2*uh0[1:-1] + tau*vh0[1:-1]
-        mesh.update_dirichlet_bc(pde.dirichlet, uh1)
+        gD = lambda p: pde.dirichlet(p, t)
+        mesh.update_dirichlet_bc(gD, uh1)
         return uh1, t
     else:
+        A, B, C = mesh.wave_operator(tau, theta=theta)
         source = lambda p: pde.source(p, t + tau)
         f = mesh.interpolate(source, intertype='node')
-        uh0[:] = A@uh0 + tau*f
-        gD = lambda p: pde.dirichlet(p, t+tau)
-        mesh.update_dirichlet_bc(gD, uh0)
-        
-        solution = lambda p: pde.solution(p, t + tau)
-        e = mesh.error(solution, uh0, errortype='max')
-        print(f"the max error is {e}")
-        return uh0, t
+        f *= tau**2
+        f += B@uh1 + C@uh0
+
+        uh0[:] = uh1[:]
+        if theta == 0.0:
+            uh1[:] = f
+            mesh.update_dirichlet_bc(gD, uh1)
+        else:
+            gD = lambda p: pde.dirichlet(p, t+tau)
+            A, f = mesh.apply_dirichlet_bc(gD, A, f)
+            uh1[:] = spsolve(A, f)
+            
+        return uh1, t
+
+box = [0, 1, -4, 4]
+fig, axes = plt.subplots()
+mesh.show_animation(fig, axes, box, advance, frames=nt+1)
+plt.show()
