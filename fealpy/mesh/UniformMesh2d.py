@@ -1,10 +1,12 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import warnings
 
 from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags
 from types import ModuleType
-from typing import Tuple
+from typing import Any, Callable, Tuple
 from .Mesh2d import Mesh2d
+from typing import Optional, Tuple, Callable, Any, Union
 
 # 这个数据接口为有限元服务
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
@@ -156,21 +158,24 @@ class UniformMesh2d(Mesh2d):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box, advance, fname='test.mp4',
-                       init=None, fargs=None, 
-                       frames=1000, interval=50):
+    def show_animation(self, fig: plt.figure, axes: plt.axes, 
+                       box :Tuple[np.float64, np.float64, np.float64, np.float64], 
+                       advance: Callable[[np.int_, Any], Tuple[np.ndarray, np.float64]], 
+                       fname :str = 'test.mp4',
+                       init: Optional[Callable] = None, fargs: Optional[Callable] = None, 
+                       frames: np.int_ = 1000, interval: np.int_ = 50) -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
-        @param[in] fig         matplotlib 图形对象
-        @param[in] axes        matplotlib 坐标轴对象
-        @param[in] box         四元组，定义图像显示范围
-        @param[in] advance     用于更新求解过程的函数
-        @param[in] fname       输出动画文件的名称，默认为 'test.mp4'
-        @param[in] init        初始化函数（可选）
-        @param[in] fargs       传递给 advance 函数的参数（可选）
-        @param[in] frames      动画的总帧数，默认为 1000
-        @param[in] interval    帧之间的时间间隔，默认为 50 毫秒
+        @param fig         : plt.Figure | matplotlib 图形对象
+        @param axes        : plt.Axes   | matplotlib 坐标轴对象
+        @param box         : tuple      | 四元组，定义图像显示范围
+        @param advance     : Callable   | 用于更新求解过程的函数
+        @param fname       : str        | 输出动画文件的名称，默认为 'test.mp4'
+        @param init        : Optional[Callable] | 初始化函数（可选）
+        @param fargs       : Optional[Tuple]    | 传递给 advance 函数的参数（可选）
+        @param frames      : int        | 动画的总帧数，默认为 1000
+        @param interval    : int        | 帧之间的时间间隔，默认为 50 毫秒
         """
         # 导入 matplotlib.animation 模块以创建动画
         import matplotlib.animation as animation
@@ -181,8 +186,9 @@ class UniformMesh2d(Mesh2d):
         # imshow 函数可以自动处理二维数组数据的显示，因此不需要额外的初始化操作
         # 将 uh（网格函数计算得到的数值解）以图像的形式显示在坐标轴上，
         # 使用 'jet' 颜色映射，并限制颜色映射的数据值范围为 -0.2 到 0.2，
-        # 显示范围由 box 参数定义。
-        data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, extent=box)
+        # 显示范围由 box 参数定义, 'bicubic' 使用三次样条插值方法。
+        data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, 
+                           extent=box, interpolation='bicubic')
         
         # 根据当前帧序号计算数值解，更新图像对象的数值数组，
         # 然后显示当前帧序号和时刻
