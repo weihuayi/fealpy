@@ -265,6 +265,7 @@ class Mesh2dDataStructure():
     """
 
     def __init__(self, NN, cell):
+        self.TD = 2
         self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell

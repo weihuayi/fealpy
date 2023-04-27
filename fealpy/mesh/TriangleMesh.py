@@ -115,6 +115,8 @@ class TriangleMesh(Mesh2d):
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
+
+
     def shape_function(self, bc, p=1, etype='cell'):
         """
         @brief
@@ -136,7 +138,7 @@ class TriangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
+    def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
@@ -171,9 +173,41 @@ class TriangleMesh(Mesh2d):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        Dlambda = self.grad_lambda(index=index)
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        return gphi #(..., NC, ldof, GD)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
+            return gphi #(..., NC, ldof, GD)
+        elif variables == 'u':
+            return R
+
+    def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
+        """
+        @brief 计算单元上所有形函数在边上的积分点处的导函数值
+
+        @brief bc 边上的一组积分点
+        @brief cindex 边所在的单元编号
+        @brief lidx 边在该单元的局部编号
+        @brief direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+        """
+
+        NC = len(cindex)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NC, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NC)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
+
+        return gphi 
+
+    grad_shape_function_on_face = grad_shape_function_on_edge
 
     def grad_lambda(self, index=np.s_[:]):
         node = self.node
