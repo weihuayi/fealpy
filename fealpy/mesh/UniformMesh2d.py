@@ -624,13 +624,13 @@ class UniformMesh2d(Mesh2d):
 
         A = diags([1 - 2 * r_x - 2 * r_y], [0], shape=(NN, NN), format='csr')
 
-        val_x = np.broadcast_to(r_x, (NN - n0,))
+        val_x = np.broadcast_to(r_x, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(r_y, (NN - n1, ))
+        val_y = np.broadcast_to(r_y, (NN - n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -657,13 +657,13 @@ class UniformMesh2d(Mesh2d):
 
         A = diags([1 + 2 * r_x + 2 * r_y], [0], shape=(NN, NN), format='csr')
 
-        val_x = np.broadcast_to(-r_x, (NN - n0,))
+        val_x = np.broadcast_to(-r_x, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(-r_y, (NN - n1, ))
+        val_y = np.broadcast_to(-r_y, (NN - n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -688,13 +688,13 @@ class UniformMesh2d(Mesh2d):
 
         A = diags([1 + r_x + r_y], [0], shape=(NN, NN), format='csr')
 
-        val_x = np.broadcast_to(-r_x/2, (NN-n0, ))
+        val_x = np.broadcast_to(-r_x/2, (NN-n1, ))
         I = k[1:].flat
         J = k[0:-1].flat
         A += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(-r_y/2, (NN-n1, ))
+        val_y = np.broadcast_to(-r_y/2, (NN-n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -702,13 +702,13 @@ class UniformMesh2d(Mesh2d):
 
         B = diags([1 - r_x - r_y], [0], shape=(NN, NN), format='csr')
 
-        val_x = np.broadcast_to(r_x/2, (NN-n0, ))
+        val_x = np.broadcast_to(r_x/2, (NN-n1, ))
         I = k[1:].flat
         J = k[0:-1].flat
         B += csr_matrix((val_x, (I, J)), shape=(NN, NN), dtype=self.ftype)
         B += csr_matrix((val_x, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(r_y/2, (NN-n1, ))
+        val_y = np.broadcast_to(r_y/2, (NN-n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         B += csr_matrix((val_y, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -721,49 +721,49 @@ class UniformMesh2d(Mesh2d):
         """
         @brief 生成波动方程的离散矩阵
         """
-        r_x = a*tau/self.h[0]
-        r_y = a*tau/self.h[1]
+        rx = a*tau/self.h[0]
+        ry = a*tau/self.h[1]
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
         n1 = self.ny + 1
         k = np.arange(NN).reshape(n0, n1)
 
-        A0 = diags([1 + 2*r_x**2*theta + 2*r_y**2*theta], [0], shape=(NN, NN), format='csr')
-        A1 = diags([2*(1 - (r_x**2 + r_y**2)*(1 - 2*theta))], [0], shape=(NN, NN), format='csr')
-        A2 = diags([-(1 + 2*r_x**2*theta + 2*r_y**2*theta)], [0], shape=(NN, NN), format='csr')
+        A0 = diags([1 + 2*rx**2*theta + 2*ry**2*theta], [0], shape=(NN, NN), format='csr')
+        A1 = diags([2*(1 - (rx**2 + ry**2)*(1 - 2*theta))], [0], shape=(NN, NN), format='csr')
+        A2 = diags([-(1 + 2*rx**2*theta + 2*ry**2*theta)], [0], shape=(NN, NN), format='csr')
 
-        val_x = np.broadcast_to(-r_x**2, (NN-1, ))
+        val = np.broadcast_to(-rx**2, (NN-n1, ))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(-r_y**2, (NN-1, ))
+        val = np.broadcast_to(-ry**2, (NN-n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_x = np.broadcast_to(r_x**2*(1 - 2*theta), (NN-1, ))
+        val = np.broadcast_to(rx**2*(1 - 2*theta), (NN-n1, ))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(r_y**2*(1 - 2*theta), (NN-1, ))
+        val = np.broadcast_to(ry**2*(1 - 2*theta), (NN-n1, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         
-        val_x = np.broadcast_to(r_x**2*theta, (NN-1, ))
+        val = np.broadcast_to(rx**2*theta, (NN-n1, ))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val_y = np.broadcast_to(r_y**2*theta, (NN-1, ))
+        val = np.broadcast_to(ry**2*theta, (NN-n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)

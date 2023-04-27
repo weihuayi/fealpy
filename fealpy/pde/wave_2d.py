@@ -76,5 +76,18 @@ class MembraneOscillationPDEData:
          @brief 初值条件的导数
          @param[in] p numpy.ndarray, 空间点
         """
-        return np.zeros_like(p)
+        x = p[..., 0]
+        return np.zeros_like(x)
+
+    @cartesian    
+    def dirichlet(self, p: np.ndarray, t: np.float64) -> np.float64:
+        """
+        @brief Dirichlet 边界条件
+
+        @param[in] p numpy.ndarray, 空间点
+        @param[in] t float, 时间点 
+
+        @return 边界条件函数值
+        """
+        return 0.0 
        
