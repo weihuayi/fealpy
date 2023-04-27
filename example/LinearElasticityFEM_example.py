@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.linear_elasticity_model import  BoxDomainData3d 
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 from fealpy.boundarycondition import NeumannBC
@@ -52,12 +53,11 @@ elif GD == 3:
     from fealpy.pde.linear_elasticity_model import BoxDomainData3d as PDE
 
 pde = PDE()
+domain = pde.domain()
 mesh = pde.init_mesh(n=n)
 NN = mesh.number_of_nodes()
 
 space = LagrangeFiniteElementSpace(mesh, p=p)
-
-
 
 uh = space.function(dim=GD) # (NDof, GD)
 A = space.linear_elasticity_matrix(pde.lam, pde.mu, q=p+2)

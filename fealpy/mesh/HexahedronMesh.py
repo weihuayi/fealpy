@@ -73,6 +73,182 @@ class HexahedronMesh(Mesh3d):
         elif etype in {'edge', 1}:
             return qf 
 
+    def multi_index_matrix(self, p, etype='edge'):
+        """
+        @brief 获取网格边上的 p 次的多重指标矩阵
+
+        @param[in] p 正整数 
+
+        @return multiIndex  ndarray with shape (ldof, 2)
+        """
+        if etype in {'edge', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
+        else:
+            raise ValueError(f"etype is {etype}! For QuadrangleMesh, we just support etype with value `edge`, `1`")
+
+    def edge_shape_function(self, bc, p=1):
+        """
+        @brief the shape function on edge  
+        """
+        assert bc.shape[-1] == 2
+
+        if p == 1:
+            return bc
+        TD = 1 # toplogy dimension
+        multiIndex = self.multi_index_matrix(p, etype=etype)
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi
+
+    def grad_edge_shape_function(self, bc, p=1):
+        """
+        @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
+        """
+        assert bc.shape[-1] == 2
+        TD = 1 # toplogy dimension
+        multiIndex = self.multi_index_matrix(p) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
+
+        c = np.arange(1, p+1)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=bc.dtype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+        return R # (..., ldof, TD+1)
+
+    face_shape_function = edge_shape_function
+    grad_face_shape_function = grad_edge_shape_function
+
+    def shape_function(self, bc, p=1):
+        """
+        @brief 六面体单元上的形函数
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+        phi = self.edge_shape_function(bc[0], p=p) 
+        phi = np.einsum('il, jm, kn->ijklmn', phi, phi, phi)
+        shape = phi.shape[:-3] + (-1, )
+        phi = phi.reshape(shape) # 展平自由度
+        shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
+        phi = phi.reshape(shape) # 展平积分点
+        return phi
+
+    def grad_shape_function(self, bc, p=1, variables='x'):
+        """
+        @brief  六面体单元形函数的导数
+
+        @note 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+
+        bc 是一个长度为 2 的 tuple
+
+        bc[i] 是一个一维积分公式的重心坐标数组
+
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+
+        Dlambda = np.array([-1, 1], dtype=self.ftype)
+        phi = self.edge_shape_function(bc[0], p=p)  
+
+        # 关于**一维变量重心坐标**的导数
+        # lambda_0 = 1 - u 
+        # lambda_1 = v 
+        # (NQ, ldof, 2) 
+        R = self.grad_edge_shape_function(bc[0], p=p)  
+
+        # 关于一维变量的导数
+        gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
+
+        gphi0 = np.einsum('il, jm, kn->ijklmn', gphi, phi, phi)
+        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, gphi, phi)
+        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, phi, gphi)
+        n = gphi0.shape[0]*gphi0.shape[1]*gphi0.shape[2]
+        shape = (n, (p+1)*(p+1)*(p+1), 3)
+        gphi = np.zeros(shape, dtype=self.ftype)
+        gphi[..., 0].flat = gphi0.flat
+        gphi[..., 1].flat = gphi1.flat
+        gphi[..., 2].flat = gphi2.flat
+
+        if variables == 'u':
+            return gphi
+        elif variables == 'x':
+            J = self.jacobi_matrix(bc)
+            G = self.first_fundamental_form(J)
+            G = np.linalg.inv(G)
+            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
+            return gphi
+
+    def jacobi_matrix(self, bc, index=np.s_[:]):
+        """
+        @brief 
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+        NQ = len(bc[0])
+        gphi = np.ones((NQ, 2), dtype=self.ftype)
+        gphi[:, 0] = -1
+
+        gphi0 = np.einsum('il, jm, kn->ijklmn', gphi, phi, phi)
+        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, gphi, phi)
+        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, phi, gphi)
+        n = gphi0.shape[0]*gphi0.shape[1]*gphi0.shape[2]
+        shape = (n, (p+1)*(p+1)*(p+1), 3)
+        gphi = np.zeros(shape, dtype=self.ftype)
+        gphi[..., 0].flat = gphi0.flat
+        gphi[..., 1].flat = gphi1.flat
+        gphi[..., 2].flat = gphi2.flat
+
+        cell = self.entity('cell')
+        node = self.entity('node')
+        J = np.einsum( 'ijn, ...ijk->...ink', node[cell[index, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
+        return J
+
+    def first_fundamental_form(self, J):
+        """
+        @brief 由 Jacobi 矩阵计算第一基本形式。
+        """
+        shape = J.shape[0:-2] + (2, 2)
+        G = np.zeros(shape, dtype=self.ftype)
+        for i in range(2):
+            G[..., i, i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
+            for j in range(i+1, 2):
+                G[..., i, j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
+                G[..., j, i] = G[..., i, j]
+        return G
+
     def bc_to_point(self, bc, index=np.s_[:]):
         """
         @brief 把重心坐标积分点变换为网格实体上的笛卡尔坐标点

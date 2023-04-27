@@ -50,7 +50,36 @@ class SinSinPDEData:
         val[..., 0] = pi*np.cos(pi*x)*np.sin(pi*y)
         val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y)
         return val
-        
+
     @cartesian    
     def dirichlet(self, p):
         return self.solution(p)
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.abs(x) < 1e-12 | np.abs(y) < 1e-12
+
+    @cartesian
+    def neumann(self, p, n):
+        """ 
+        Neuman  boundary condition
+
+        Parameters
+        ----------
+
+        p: (NQ, NE, 2)
+        n: (NE, 2)
+
+        grad*n : (NQ, NE, 2)
+        """
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1) # (NQ, NE)
+        return val
+
+    @cartesian
+    def is_neumann_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.abs(x-1.0) < 1e-12 | np.abs(y-1.0) < 1e-12

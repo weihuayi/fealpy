@@ -102,7 +102,7 @@ class Mesh:
     def number_of_global_ipoints(self, p):
         raise NotImplementedError
 
-    def interpolation_points(self):
+    def interpolation_points(self, p, index=np.s_[:]):
         raise NotImplementedError
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
@@ -116,6 +116,54 @@ class Mesh:
 
     def node_to_ipoint(self, p, index=np.s_[:]):
         raise NotImplementedError
+
+    def show_angle(self, axes, angle=None):
+        """
+        @brief 显示网格角度的分布直方图
+        """
+        if angle is None:
+            angle = self.angle() 
+        hist, bins = np.histogram(angle.flatten('F')*180/np.pi, bins=50, range=(0, 180))
+        center = (bins[:-1] + bins[1:])/2
+        axes.bar(center, hist, align='center', width=180/50.0)
+        axes.set_xlim(0, 180)
+        mina = np.min(angle.flatten('F')*180/np.pi)
+        maxa = np.max(angle.flatten('F')*180/np.pi)
+        meana = np.mean(angle.flatten('F')*180/np.pi)
+        axes.annotate('Min angle: {:.4}'.format(mina), xy=(0.41, 0.5),
+                textcoords='axes fraction',
+                horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Max angle: {:.4}'.format(maxa), xy=(0.41, 0.45),
+                textcoords='axes fraction',
+                horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Average angle: {:.4}'.format(meana), xy=(0.41, 0.40),
+                textcoords='axes fraction',
+                horizontalalignment='left', verticalalignment='top')
+        return mina, maxa, meana
+
+    def show_quality(self, axes, qtype=None, quality=None):
+        """
+        @brief 显示网格质量分布的分布直方图
+        """
+        if quality is None:
+            quality = self.cell_quality() 
+        minq = np.min(quality)
+        maxq = np.max(quality)
+        meanq = np.mean(quality)
+        hist, bins = np.histogram(quality, bins=50, range=(0, 1))
+        center = (bins[:-1] + bins[1:]) / 2
+        axes.bar(center, hist, align='center', width=0.02)
+        axes.set_xlim(0, 1)
+        axes.annotate('Min quality: {:.6}'.format(minq), xy=(0.1, 0.5),
+                textcoords='axes fraction',
+                horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Max quality: {:.6}'.format(maxq), xy=(0.1, 0.45),
+                textcoords='axes fraction',
+                horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Average quality: {:.6}'.format(meanq), xy=(0.1, 0.40),
+                textcoords='axes fraction',
+                horizontalalignment='left', verticalalignment='top')
+        return minq, maxq, meanq
 
     def add_plot(self):
         raise NotImplementedError
@@ -191,7 +239,7 @@ class Mesh:
             node = np.r_['1', node, np.zeros_like(node)]
             GD = 2
 
-        if index == np.s_[:]:
+        if isinstance(index, slice) and  index == np.s_[:]:
             index = range(node.shape[0])
         elif (type(index) is np.int_):
             index = np.array([index], dtype=np.int_)
@@ -199,8 +247,6 @@ class Mesh:
             index, = np.nonzero(index)
         elif (type(index) is list) and (type(index[0]) is np.bool_):
             index, = np.nonzero(index)
-        else:
-            raise ValueError("the type of index is not correct!")
 
         if (type(color) is np.ndarray) and (np.isreal(color[0])):
             umax = color.max()
@@ -308,7 +354,7 @@ class Mesh:
         if GD == 1:
             bc = np.r_['1', bc, np.zeros_like(bc)]
             GD = 2
-        if index == np.s_[:]:
+        if isinstance(index, slice) and index == np.s_[:]:
             index = range(bc.shape[0])
         elif (type(index) is np.int_):
             index = np.array([index], dtype=np.int_)
@@ -316,8 +362,7 @@ class Mesh:
             index, = np.nonzero(index)
         elif (type(index) is list) and (type(index[0]) is np.bool_):
             index, = np.nonzero(index)
-        else:
-            raise ValueError("the type of index is not correct!")
+
         if (type(color) is np.ndarray) & (np.isreal(color[0])):
             umax = color.max()
             umin = color.min()

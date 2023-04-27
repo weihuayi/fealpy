@@ -1,11 +1,12 @@
 import numpy as np
+import ipdb
 import pytest
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import QuadrangleMesh
 from fealpy.quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 
-def test_QuadrangleMesh_constructor():
+def test_quadrangle_mesh_constructor():
     node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
     cell = np.array([[0, 1, 2, 3]], dtype=np.uint64)
     quad_mesh = QuadrangleMesh(node, cell)
@@ -21,7 +22,7 @@ def test_QuadrangleMesh_constructor():
     assert isinstance(quad_mesh.edgedata, dict)
     assert isinstance(quad_mesh.meshdata, dict)
 
-def test_QuadrangleMesh_integrator():
+def test_quadrangle_mesh_integrator():
     node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
     cell = np.array([[0, 1, 2, 3]], dtype=np.uint64)
     quad_mesh = QuadrangleMesh(node, cell)
@@ -36,14 +37,8 @@ def test_QuadrangleMesh_integrator():
     ([(0, 0), (1, 0), (1, 1), (0, 1)], 0.5),
     ([(0, 0), (1, 0), (0.5, 1)], 0.1),
 ])
-def test_QuadrangleMesh_from_polygon_gmsh(vertices, h):
+def test_quadrangle_mesh_from_polygon_gmsh(vertices, h):
     quad_mesh = QuadrangleMesh.from_polygon_gmsh(vertices, h)
-
-    #fig = plt.figure()
-    #axes = fig.add_subplot(111)
-    #quad_mesh.add_plot(axes)
-    #plt.show()
-
 
     assert isinstance(quad_mesh, QuadrangleMesh)
     assert quad_mesh.node.shape[1] == 2
@@ -52,4 +47,34 @@ def test_QuadrangleMesh_from_polygon_gmsh(vertices, h):
     assert quad_mesh.p == 1
     assert quad_mesh.itype == np.uint64
     assert quad_mesh.ftype == np.float64
+
+
+def test_quadrangle_mesh_interpolate():
+    node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
+    cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+    mesh = QuadrangleMesh(node, cell)
+    mesh.uniform_refine(1)
+    ips = mesh.interpolation_points(4)
+    c2p = mesh.cell_to_ipoint(4)
+    #fig, axes = plt.subplots()
+    #mesh.add_plot(axes)
+    #mesh.find_node(axes, node=ips, showindex=True)
+    #plt.show()
+
+def test_quadrangle_mesh_shape_function():
+    mesh = QuadrangleMesh.from_one_quadrangle()
+    bcs, ws = mesh.integrator(3).get_quadrature_points_and_weights()
+    phi = mesh.shape_function(bcs, p=1)
+    gphi = mesh.grad_shape_function(bcs, p=1)
+
+    phi = mesh.shape_function(bcs, p=2)
+    gphi = mesh.grad_shape_function(bcs, p=2)
+
+    J = mesh.jacobi_matrix(bcs)
+    print(np.linalg.det(J))
+
+
+
+if __name__ == "__main__":
+    test_quadrangle_mesh_shape_function()
 

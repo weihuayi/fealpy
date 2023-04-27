@@ -26,15 +26,15 @@ class Mesh3d(Mesh):
         """
         return 3
 
-    def entity(self, etype='cell'):
+    def entity(self, etype='cell', index=np.s_[:]):
         if etype in {'cell', 3}:
-            return self.ds.cell
+            return self.ds.cell[index]
         elif etype in {'face', 2}:
-            return self.ds.face
+            return self.ds.face[index]
         elif etype in {'edge', 1}:
-            return self.ds.edge
+            return self.ds.edge[index]
         elif etype in {'node', 0}:
-            return self.node
+            return self.node[index]
         else:
             raise ValueError("`etype` is wrong!")
 
@@ -135,7 +135,8 @@ class Mesh3d(Mesh):
             isInterfaceFace = np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 1
             isBdFace = (np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 2) & isBdFace
             face = face[isBdFace | isInterfaceFace][:, self.ds.ccw]
-
+        
+        import mpl_toolkits.mplot3d as a3
         faces = a3.art3d.Poly3DCollection(
                 node[face],
                 facecolor=facecolor,

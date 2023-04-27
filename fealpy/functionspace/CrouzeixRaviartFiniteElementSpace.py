@@ -6,6 +6,7 @@ from ..quadrature import FEMeshIntegralAlg
 
 from .Function import Function
 
+
 class CRDof():
     def __init__(self, mesh):
         self.mesh = mesh
@@ -71,7 +72,6 @@ class CRDof():
             return 1
         elif doftype in {'node'}:
             return 0
-
 class CrouzeixRaviartFiniteElementSpace():
     def __init__(self, mesh, q=None):
         self.mesh = mesh

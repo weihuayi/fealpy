@@ -182,12 +182,12 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:, i, :] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
 
-    def shape_function(self, bc, p=1):
+    def shape_function(self, bc, p=1, etype='cell'):
         """
-        @brief 
+        @brief 四面体单元上的形函数 
         """
         TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix(p)
+        multiIndex = self.multi_index_matrix(p, etype=etype)
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
@@ -238,7 +238,7 @@ class TetrahedronMesh(Mesh3d):
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
         """
         @brief 获取整个四面体网格上的全部插值点
         """
@@ -281,7 +281,7 @@ class TetrahedronMesh(Mesh3d):
             w = mi[isInCellIPoints, :]/p
             ipoints[NN+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell,:]).reshape(-1, GD)
-        return ipoints
+        return ipoints[index]
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
@@ -357,7 +357,7 @@ class TetrahedronMesh(Mesh3d):
             fidof = fdof - 3*p
             face2ipoint[:, isInFaceIPoint] = base + np.arange(NF*fidof).reshape(NF, fidof)
 
-        return face2ipoint
+        return face2ipoint[index]
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
@@ -992,6 +992,33 @@ class TetrahedronMesh(Mesh3d):
         vol = self.cell_volume()
         return np.all(vol > threshold)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_meshpy(cls, points, facets, h, 
+        hole_points=None, 
+        facet_markers=None, 
+        point_markers=None):
+
+        from meshpy.tet import MeshInfo, build
+
+        mesh_info = MeshInfo()
+        mesh_info.set_points(points)
+        mesh_info.set_facets(facets)
+        mesh = build(mesh_info, max_volume=h**3/6.0)
+
+        node = np.array(mesh.points, dtype=np.float64)
+        cell = np.array(mesh.elements, dtype=np.int_)
+
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_domain_distmesh(cls, domain, hmin, maxit=100, output=False):
+        from .DistMesher3d import DistMesher3d
+        mesher = DistMesher3d(domain, hmin, output=output)
+        mesh = mesher.meshing(maxit)
+        return mesh
+
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -1012,6 +1039,47 @@ class TetrahedronMesh(Mesh3d):
                 [0.0, 0.0, 1.0]], dtype=np.float64)
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_cylinder_gmsh(cls, radius, height, lc):
+        """
+        @brief Generate a tetrahedral mesh for a cylinder domain
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("Cylinder")
+
+        # 几何定义
+        gmsh.model.occ.addCylinder(0.0,0.0,0.0,0,0,height,radius)
+        gmsh.model.occ.synchronize()
+        
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),lc)
+        
+        # 网格生成
+        gmsh.model.mesh.generate(3)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
+        
+        #节点的编号映射 
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+
+        # 获取四面体单元信息
+        tetrahedron_type = 4  # 四面体单元的类型编号为 4
+        tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
+        evid = np.array([nodetags_map[j] for j in tetrahedron_connectivity])
+        cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of tetrahedra: {cell.shape[0]}")
+
+        gmsh.finalize()
+        return cls(node, cell)
+
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -1043,12 +1111,12 @@ class TetrahedronMesh(Mesh3d):
         node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
         
         #节点的编号映射 
-        nodetags_map = dict({j:i for i,j in enumerate(ntags)})
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
 
         # 获取四面体单元信息
         tetrahedron_type = 4  # 四面体单元的类型编号为 4
         tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
-        evid = np.array([node_tags[j] for j in tetrahedron_connectivity])
+        evid = np.array([nodetags_map[j] for j in tetrahedron_connectivity])
         cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
 
         # 输出节点和单元数量
@@ -1130,8 +1198,23 @@ class TetrahedronMesh(Mesh3d):
             idxMap = np.zeros(NN, dtype=cell.dtype)
             idxMap[isValidNode] = range(isValidNode.sum())
             cell = idxMap[cell]
+        mesh = TetrahedronMesh(node, cell)
 
-        return TetrahedronMesh(node, cell)
+        bdface = mesh.ds.boundary_face_index()
+        f2n = mesh.face_unit_normal()[bdface]
+        isLeftBd   = np.abs(f2n[:, 0]+1)<1e-14
+        isRightBd  = np.abs(f2n[:, 0]-1)<1e-14
+        isFrontBd  = np.abs(f2n[:, 1]+1)<1e-14
+        isBackBd   = np.abs(f2n[:, 1]-1)<1e-14
+        isBottomBd = np.abs(f2n[:, 2]+1)<1e-14
+        isUpBd     = np.abs(f2n[:, 2]-1)<1e-14
+        mesh.meshdata["leftface"]   = bdface[isLeftBd]
+        mesh.meshdata["rightface"]  = bdface[isRightBd]
+        mesh.meshdata["frontface"]  = bdface[isFrontBd]
+        mesh.meshdata["backface"]   = bdface[isBackBd]
+        mesh.meshdata["upface"]     = bdface[isUpBd]
+        mesh.meshdata["bottomface"] = bdface[isBottomBd]
+        return mesh 
 
     def print_cformat(self):
         def print_cpp_array(arr):

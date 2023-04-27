@@ -711,7 +711,7 @@ class UniformMesh2d(Mesh2d):
         return A, B
 
     ## @ingroup FDMInterface
-    def wave_equation(self, r, theta):
+    def wave_equation(self, r, theta=0.5):
         """
         @brief
         """

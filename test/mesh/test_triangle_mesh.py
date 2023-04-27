@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import ipdb
 import pytest
 from fealpy.mesh import TriangleMesh  # 请替换为实际模块名
 
@@ -18,6 +20,18 @@ def test_triangle_mesh_init():
 
     assert mesh.ds.NN == 3
     assert mesh.ds.NC == 1
+
+def test_triangle_mesh_interpolate():
+    mesh = TriangleMesh.from_one_triangle()
+    mesh.uniform_refine()
+    ips = mesh.interpolation_points(4)
+    c2p = mesh.cell_to_ipoint(4)
+
+    fig, axes = plt.subplots()
+    mesh.add_plot(axes)
+    mesh.find_node(axes, node=ips, showindex=True)
+    plt.show()
+
 
 @pytest.mark.parametrize("vertices, h", [
     ([(0, 0), (1, 0), (1, 1), (0, 1)], 0.1),
@@ -70,5 +84,5 @@ def test_from_torus_surface(R, r, Nu, Nv):
     plt.show()
 
 if __name__ == "__main__":
-
-    test_from_torus_surface(3, 1, 20, 20)
+    test_triangle_mesh_interpolate()
+    #test_from_torus_surface(3, 1, 20, 20)

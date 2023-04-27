@@ -4,9 +4,8 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-
 from fealpy.geometry import RectangleDomain, CircleDomain
-from fealpy.mesh.DistMesher2d import DistMesher2d 
+from fealpy.mesh import TriangleMesh
 
 
 parser = argparse.ArgumentParser(description=
@@ -49,7 +48,6 @@ if domain == 0:
     box = [0, 1, 0, 1]
     domain = RectangleDomain(box)
 elif domain == 1:
-
     def sizing_function(p, *args):
         fd = args[0]
         x = p[:, 0]
@@ -59,12 +57,11 @@ elif domain == 1:
         return h
     domain = CircleDomain(fh=sizing_function)
 
-mesher = DistMesher2d(domain, hmin)
-mesh = mesher.meshing(maxit=maxit)
+mesh = TriangleMesh.from_domain_distmesh(domain, hmin, maxit=maxit)
 
 c = mesh.circumcenter()
 fig, axes = plt.subplots()
 mesh.add_plot(axes)
-#mesh.find_node(axes, node=c)
+mesh.find_node(axes, node=c)
 plt.show()
 
