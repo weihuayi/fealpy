@@ -61,7 +61,7 @@ class StringOscillationPDEData:
 
         @return 真解函数值
         """
-        return 0.0
+        return np.zeros_like(p) 
         
     @cartesian
     def source(self, p, t):

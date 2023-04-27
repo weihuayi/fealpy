@@ -523,13 +523,14 @@ class UniformMesh1d(Mesh1d):
 
 
     ## @ingroup FDMInterface
-    def wave_operator(self, tau, theta=0.5):
+    def wave_operator(self, tau, a=1, theta=0.5):
         """
         @brief 生成波动方程的离散矩阵
         """
-        r = tau**2/self.h**2 
+        r = a*tau/self.h 
 
         NN = self.number_of_nodes()
+        k = np.arange(NN)
 
         A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
         A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
