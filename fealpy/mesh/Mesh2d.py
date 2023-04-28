@@ -129,6 +129,7 @@ class Mesh2d(Mesh):
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
+
     def edge_unit_normal(self, index=np.s_[:]):
         #TODO: 3D Case
         v = self.edge_unit_tangent(index=index)
@@ -218,10 +219,9 @@ class Mesh2d(Mesh):
                 poly = a3.art3d.Poly3DCollection(node[cell[:, self.ds.ccw], :])
         else:
             if self.meshtype == 'polygon':
-                cell, cellLocation = cell
                 NC = self.number_of_cells()
                 patches = [
-                        Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                        Polygon(node[cell[i], :], True)
                         for i in range(NC)]
             elif self.ds.NV in {3, 4}:
                 NC = self.number_of_cells()
