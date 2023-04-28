@@ -615,7 +615,7 @@ class UniformMesh2d(Mesh2d):
         rx = tau/self.h[0]**2
         ry = tau/self.h[1]**2
         if rx + ry > 0.5:
-            raise ValueError(f"The r_x+r_y: {r_x+r_y} should be smaller than 0.5")
+            raise ValueError(f"The rx+ry: {rx+ry} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
@@ -624,7 +624,7 @@ class UniformMesh2d(Mesh2d):
 
         A = diags([1 - 2 * rx - 2 * ry], [0], shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(r_x, (NN - n1,))
+        val = np.broadcast_to(rx, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -648,7 +648,7 @@ class UniformMesh2d(Mesh2d):
         rx = tau/self.h[0]**2
         ry = tau/self.h[1]**2
         if rx + ry > 1.5:
-            raise ValueError(f"The sum r_x + r_y: {r_x + r_y} should be smaller than 0.5")
+            raise ValueError(f"The sum rx + ry: {rx + ry} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
