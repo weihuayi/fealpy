@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 
-from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags
+from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags, spmatrix
 from types import ModuleType
 from typing import Any, Callable, Tuple
 from .Mesh2d import Mesh2d
@@ -565,15 +565,18 @@ class UniformMesh2d(Mesh2d):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD, A, f, uh=None):
+    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray], np.ndarray], A: spmatrix, 
+                           f: np.ndarray, uh: Optional[np.ndarray] = None) -> Tuple[spmatrix, np.ndarray]:
         """
-        @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
+        @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界和向量型函数
+        
+        @param[in] gD  表示 Dirichlet 边界值函数
+        @param[in] A  (NN, NN), 稀疏矩阵
+        @param[in] f  可能是一维数组（标量型右端项）或二维数组（向量型右端项）
+        @param[in, optional] uh  默认为 None，表示网格函数，如果为 None 则创建一个新的网格函数
 
-        @param[in] A sparse matrix, (NN, NN)
-        @param[in] f 
-
-        @todo 考虑 uh 是向量函数的情形
-        """
+        @return Tuple[spmatrix, np.ndarray], 返回处理后的稀疏矩阵 A 和数组 f
+        """        
         if uh is None:
             uh = self.function('node').reshape(-1)
         else:
@@ -595,15 +598,16 @@ class UniformMesh2d(Mesh2d):
         return A, f 
 
     ## @ingroup FDMInterface
-    def update_dirichlet_bc(self, gD, uh):
+    def update_dirichlet_bc(self, gD: Callable[[np.ndarray], Any], uh: np.ndarray) -> None:
         """
         @brief 更新网格函数 uh 的 Dirichlet 边界值
-
         @todo 考虑向量型函数
+        @param[in] gD Callable[[np.ndarray], Any], 表示 Dirichlet 边界值函数
+        @param[in, out] uh np.ndarray, 表示网格函数，将被更新为具有正确的 Dirichlet 边界值
         """
         node = self.node
         isBdNode = self.ds.boundary_node_flag().reshape(uh.shape)
-        uh[isBdNode]  = gD(node[isBdNode, :])
+        uh[isBdNode] = gD(node[isBdNode, :])
 
     ## @ingroup FDMInterface 
     def parabolic_operator_forward(self, tau):
