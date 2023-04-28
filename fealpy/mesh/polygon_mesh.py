@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Union
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix
 
 from ..common import ranges
 from ..quadrature import TriangleQuadrature
@@ -11,7 +11,7 @@ from .mesh_base import Mesh2d
 from .mesh_data_structure import Mesh2dDataStructure
 
 class PolygonMesh(Mesh2d):
-    def __init__(self, node, cell, cellLocation=None, topdata=None):
+    def __init__(self, node: NDArray, cell: NDArray, cellLocation=None, topdata=None):
         self.node = node
         if cellLocation is None:
             if len(cell.shape)  == 2:
@@ -34,9 +34,6 @@ class PolygonMesh(Mesh2d):
         self.face_data = self.edge_data
         self.mesh_data = {}
 
-    def geo_dimension(self):
-        return self.node.shape[-1]
-
     def integrator(self, q, etype='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式
@@ -46,7 +43,7 @@ class PolygonMesh(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return GaussLegendreQuadrature(q)
 
-    def entity_barycenter(self, etype='cell', index=np.s_[:]):
+    def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:]):
 
         node = self.entity('node')
         GD = self.geo_dimension()
@@ -62,9 +59,9 @@ class PolygonMesh(Mesh2d):
             bc = node
         return bc
 
-    def edge_bc_to_point(self, bcs, index=np.s_[:]):
+    def edge_bc_to_point(self, bcs: NDArray, index=np.s_[:]):
         """
-        @brief 给出边上的重心坐标，返回其对应的插值点 
+        @brief 给出边上的重心坐标，返回其对应的插值点
         """
         node = self.entity('node')
         edge = self.entity('edge')
@@ -84,22 +81,22 @@ class PolygonMesh(Mesh2d):
 
     def shape_function(self, bc: NDArray, p: int) -> NDArray:
         raise NotImplementedError
-        
+
     def grad_shape_function(self, bc: NDArray, p: int, index=np.s_[:]) -> NDArray:
         raise NotImplementedError
 
     def interpolation_points(self):
         raise NotImplementedError
-    
+
     def multi_index_matrix(self):
-        raise NotImplementedError 
+        raise NotImplementedError
 
     def node_to_ipoint(self):
         raise NotImplementedError
 
     def number_of_global_ipoints(self, p: int) -> int:
         raise NotImplementedError
-       
+
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         raise NotImplementedError
 
@@ -107,7 +104,7 @@ class PolygonMesh(Mesh2d):
         raise NotImplementedError
 
     @classmethod
-    def from_mesh(cls, mesh):
+    def from_mesh(cls, mesh: Mesh2d):
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         NC = mesh.number_of_cells()
@@ -121,9 +118,8 @@ class PolygonMesh(Mesh2d):
         return cls(node, cell, cellLocation)
 
 
-
 class PolygonMeshDataStructure(Mesh2dDataStructure):
-    def __init__(self, NN, cell, cellLocation, topdata=None):
+    def __init__(self, NN: int, cell: NDArray, cellLocation: NDArray, topdata=None):
         self.TD = 2
         self.NN = NN
         self.NC = cellLocation.shape[0] - 1
@@ -138,21 +134,18 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
         else:
             self.edge = topdata[0]
             self.edge2cell = topdata[1]
-            self.NE = len(edge)
+            self.NE = len(self.edge)
             self.NF = self.NE
 
 
-    def reinit(self, NN, cell, cellLocation):
+    def reinit(self, NN: int, cell: NDArray, cellLocation: NDArray):
         self.NN = NN
         self.NC = cellLocation.shape[0] - 1
 
         self._cell = cell
+        self.itype = cell.dtype
         self.cellLocation = cellLocation
         self.construct()
-
-    def clear(self):
-        self.edge = None
-        self.edge2cell = None
 
     def number_of_vertices_of_cells(self):
         return self.cellLocation[1:] - self.cellLocation[0:-1]
@@ -187,7 +180,7 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
 
         NV = self.number_of_vertices_of_cells()
         cellIdx = np.repeat(range(self.NC), NV)
- 
+
         localIdx = ranges(NV)
 
         self.edge2cell[:, 0] = cellIdx[i0]
@@ -198,7 +191,7 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
     @property
     def cell(self):
         return np.hsplit(self._cell, self.cellLocation[1:-1])
-    
+
     def cell_to_node(self):
         NN = self.NN
         NC = self.NC
@@ -226,42 +219,11 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
 
     face_to_cell = edge_to_cell
 
-    def boundary_node_flag(self):
-        NN = self.NN
-        edge = self.edge
-        isBdEdge = self.boundary_edge_flag()
-        isBdNode = np.zeros(NN, dtype=np.bool_)
-        isBdNode[edge[isBdEdge,:]] = True
-        return isBdNode
+    ### boundary ###
 
     def boundary_edge_flag(self):
-        edge2cell = self.edge2cell
-        return edge2cell[:,0] == edge2cell[:,1]
+        return self.boundary_face_flag()
 
     def boundary_edge(self):
         edge = self.edge
         return edge[self.boundary_edge_index()]
-
-    def boundary_cell_flag(self):
-        NC = self.NC
-        edge2cell = self.edge2cell
-        isBdEdge = self.boundary_edge_flag()
-
-        isBdCell = np.zeros(NC, dtype=np.bool_)
-        isBdCell[edge2cell[isBdEdge,0]] = True
-        return isBdCell
-
-    def boundary_node_index(self):
-        isBdNode = self.boundary_node_flag()
-        idx, = np.nonzero(isBdNode)
-        return idx
-
-    def boundary_edge_index(self):
-        isBdEdge = self.boundary_edge_flag()
-        idx, = np.nonzero(isBdEdge)
-        return idx
-
-    def boundary_cell_index(self):
-        isBdCell = self.boundary_cell_flag()
-        idx, = np.nonzero(isBdCell)
-        return idx
