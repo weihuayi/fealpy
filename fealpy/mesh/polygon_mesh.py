@@ -1,11 +1,14 @@
 import numpy as np
+from typing import Union
+from numpy.typing import NDArray
 from scipy.sparse import csr_matrix
 
 from ..common import ranges
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
 
-from .Mesh2d import Mesh2d
+from .mesh_base import Mesh2d
+from .mesh_data_structure import Mesh2dDataStructure
 
 class PolygonMesh(Mesh2d):
     def __init__(self, node, cell, cellLocation=None, topdata=None):
@@ -71,6 +74,38 @@ class PolygonMesh(Mesh2d):
     bc_to_point = edge_bc_to_point
     face_bc_to_point = edge_bc_to_point
 
+    def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
+        raise NotImplementedError
+
+    def edge_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
+        raise NotImplementedError
+
+    face_to_ipoint = edge_to_ipoint
+
+    def shape_function(self, bc: NDArray, p: int) -> NDArray:
+        raise NotImplementedError
+        
+    def grad_shape_function(self, bc: NDArray, p: int, index=np.s_[:]) -> NDArray:
+        raise NotImplementedError
+
+    def interpolation_points(self):
+        raise NotImplementedError
+    
+    def multi_index_matrix(self):
+        raise NotImplementedError 
+
+    def node_to_ipoint(self):
+        raise NotImplementedError
+
+    def number_of_global_ipoints(self, p: int) -> int:
+        raise NotImplementedError
+       
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
+        raise NotImplementedError
+
+    def uniform_refine(self, n: int=1) -> None:
+        raise NotImplementedError
+
     @classmethod
     def from_mesh(cls, mesh):
         node = mesh.entity('node')
@@ -87,7 +122,7 @@ class PolygonMesh(Mesh2d):
 
 
 
-class PolygonMeshDataStructure():
+class PolygonMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, NN, cell, cellLocation, topdata=None):
         self.TD = 2
         self.NN = NN
@@ -125,12 +160,14 @@ class PolygonMeshDataStructure():
     number_of_edges_of_cells = number_of_vertices_of_cells
     number_of_faces_of_cells = number_of_vertices_of_cells
 
-    def total_edge(self):
+    def total_edge(self) -> NDArray:
         totalEdge = np.zeros((self._cell.shape[0], 2), dtype=self.itype)
         totalEdge[:, 0] = self._cell
         totalEdge[:-1, 1] = self._cell[1:]
         totalEdge[self.cellLocation[1:] - 1, 1] = self._cell[self.cellLocation[:-1]]
         return totalEdge
+
+    total_face = total_edge
 
     def construct(self):
         totalEdge = self.total_edge()

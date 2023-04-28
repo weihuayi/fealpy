@@ -107,15 +107,15 @@ class MeshDataStructure(metaclass=ABCMeta):
 
     def number_of_cells(self):
         """Number of cells"""
-        return self.cell.shape[0]
+        return len(self.cell)
 
     def number_of_faces(self):
         """Number of faces"""
-        return self.face.shape[0]
+        return len(self.face)
 
     def number_of_edges(self):
         """Number of edges"""
-        return self.edge.shape[0]
+        return len(self.edge)
 
     def number_of_nodes(self):
         """Number of nodes"""
