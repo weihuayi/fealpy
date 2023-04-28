@@ -4,7 +4,7 @@ import warnings
 
 from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags, spmatrix
 from types import ModuleType
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Union
 from .Mesh2d import Mesh2d
 from typing import Optional, Tuple, Callable, Any, Union
 
@@ -158,52 +158,83 @@ class UniformMesh2d(Mesh2d):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig: plt.figure, axes: plt.axes, 
-                       box :Tuple[np.float64, np.float64, np.float64, np.float64], 
+    from mpl_toolkits.mplot3d import Axes3D
+    def show_animation(self, fig: plt.figure, axes: Union[plt.Axes, Axes3D],
+                       box: Tuple[np.float64, np.float64, np.float64, np.float64], 
                        advance: Callable[[np.int_, Any], Tuple[np.ndarray, np.float64]], 
-                       fname :str = 'test.mp4',
+                       plot_type :str = 'imshow', fname :str = 'test.mp4',
                        init: Optional[Callable] = None, fargs: Optional[Callable] = None, 
                        frames: np.int_ = 1000, interval: np.int_ = 50) -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
         @param fig         : plt.Figure | matplotlib 图形对象
-        @param axes        : plt.Axes   | matplotlib 坐标轴对象
+        @param axes        : Union[plt.Axes, Axes3D] | matplotlib 坐标轴对象
         @param box         : tuple      | 四元组，定义图像显示范围
         @param advance     : Callable   | 用于更新求解过程的函数
-        @param fname       : str        | 输出动画文件的名称，默认为 'test.mp4'
+        @param plot_type   : str, 可选  | 默认值为 'imshow',要显示的绘图类型('imshow', 'plot_surface', 'contourf')
+        @param fname       : str, 可选  | 输出动画文件的名称，默认值为 'test.mp4'
         @param init        : Optional[Callable] | 初始化函数（可选）
         @param fargs       : Optional[Tuple]    | 传递给 advance 函数的参数（可选）
         @param frames      : int        | 动画的总帧数，默认为 1000
         @param interval    : int        | 帧之间的时间间隔，默认为 50 毫秒
         """
-        # 导入 matplotlib.animation 模块以创建动画
+        # 创建动画所需的类和函数
         import matplotlib.animation as animation
+        # 绘制颜色条的类
+        import matplotlib.colorbar as colorbar
 
-        # 显示二维网格数据
+        # 初始化二维网格数据
         uh, t = advance(0) 
-        # 在坐标轴上绘制二维数组或图像的 Matplotlib 函数，
-        # imshow 函数可以自动处理二维数组数据的显示，因此不需要额外的初始化操作
-        # 将 uh（网格函数计算得到的数值解）以图像的形式显示在坐标轴上，
-        # 使用 'jet' 颜色映射，并限制颜色映射的数据值范围为 -0.2 到 0.2，
-        # 显示范围由 box 参数定义, 'bicubic' 使用三次样条插值方法。
-        data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, 
-                           extent=box, interpolation='bicubic')
         
-        # 根据当前帧序号计算数值解，更新图像对象的数值数组，
-        # 然后显示当前帧序号和时刻
+        if plot_type == 'imshow':
+            data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, 
+                            extent=box, interpolation='bicubic')
+        elif plot_type == 'plot_surface':
+            x = np.linspace(box[0], box[1], self.node.shape[0])
+            y = np.linspace(box[2], box[3], self.node.shape[1])
+            X, Y = np.meshgrid(x, y)
+            data = axes.plot_surface(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2, rstride=1, cstride=1)
+        elif plot_type == 'contourf':
+            x = np.linspace(box[0], box[1], self.node.shape[0])
+            y = np.linspace(box[2], box[3], self.node.shape[1])
+            X, Y = np.meshgrid(x, y)
+            data = axes.contourf(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
+            # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
+            # 后续的代码中无需对颜色条进行额外的更新操作
+            cbar = fig.colorbar(data, ax=axes)
+        
+        # 根据当前帧序号计算数值解，更新图像对象的数值数组，显示当前帧序号和时刻
         def func(n, *fargs):
+            # 声明 data 为非局部变量 这样在 func 函数内部对 data 进行的修改会影响到外部的 data 变量
+            nonlocal data
             # 计算当前时刻的数值解并返回，uh 是数值解，t 是当前时刻
             uh, t = advance(n, *fargs)
-            # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
-            data.set_array(uh)
+            if plot_type == 'imshow':
+                # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
+                data.set_array(uh)
+                # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
+                axes.set_aspect('equal')
+            elif plot_type == 'plot_surface':
+                axes.clear()  # 清除当前帧的图像
+                data = axes.plot_surface(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
+                z_min = np.min(uh)
+                z_max = np.max(uh)
+                axes.set_zlim(z_min, z_max)
+            elif plot_type == 'contourf':
+                # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
+                # data.collections 保存了所有已经生成的等高线填充层 
+                # 更新图像时 需要将旧的等高线填充层从图形中移除 以免遮挡住新的等高线填充层
+                for coll in data.collections:
+                    axes.collections.remove(coll)
+                data = axes.contourf(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
+                axes.set_aspect('equal')
+
             # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             # 将格式化的字符串设置为坐标轴的标题
             axes.set_title(s)
-            # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
-            axes.set_aspect('equal')
             return data
 
         # 创建一个 funcanimation 对象，它将 fig 作为画布，func 作为帧更新函数，
@@ -212,7 +243,7 @@ class UniformMesh2d(Mesh2d):
         # 并设置动画间隔时间
         ani = animation.FuncAnimation(fig, func, init_func=init, fargs=fargs, 
                                       frames=frames, interval=interval)
-        ani.save(fname)
+        ani.save('{}_{}'.format(plot_type, fname))
 
 
     def show_animation_vtk(self):
