@@ -219,9 +219,10 @@ class Mesh2d(Mesh):
                 poly = a3.art3d.Poly3DCollection(node[cell[:, self.ds.ccw], :])
         else:
             if self.meshtype == 'polygon':
+                cell, cellLocation = cell
                 NC = self.number_of_cells()
                 patches = [
-                        Polygon(node[cell[i], :], True)
+                        Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
                         for i in range(NC)]
             elif self.ds.NV in {3, 4}:
                 NC = self.number_of_cells()
