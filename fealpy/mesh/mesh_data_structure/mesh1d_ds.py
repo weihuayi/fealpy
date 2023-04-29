@@ -30,12 +30,16 @@ class Mesh1dDataStructure(RegularCellMeshDS):
     def construct(self) -> None:
         pass
 
+    ### cell ###
+
     def cell_to_edge(self) -> NDArray:
         NC = self.number_of_cells()
         return np.arange(NC, dtype=self.itype).reshape(NC, 1)
 
     def cell_to_face(self) -> NDArray:
         return self.cell
+
+    ### face ###
 
     def face_to_cell(self) -> NDArray:
         NN = self.number_of_nodes()
@@ -50,6 +54,18 @@ class Mesh1dDataStructure(RegularCellMeshDS):
         node2cell[-1, 1] = NC - 1
         node2cell[-1, 3] = 1
         return node2cell
+
+    face_to_edge = face_to_cell
+
+    ### edge ###
+
+    edge_to_face = cell_to_face
+    edge_to_cell = cell_to_edge
+
+    ### node ###
+
+    node_to_edge = face_to_cell
+    node_to_cell = face_to_cell
 
 
 class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):

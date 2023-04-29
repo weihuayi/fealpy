@@ -4,10 +4,10 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, RegularCellMeshDS, StructureMeshDS
+from .mesh_ds import Redirector, MeshDataStructure, RegularCellMeshDS, Structured
 
 
-class Mesh2dDataStructure(RegularCellMeshDS):
+class Mesh2dDataStructure(MeshDataStructure):
     """
     @brief The topology data structure of 2-d mesh.\
            This is an abstract class and can not be used directly.
@@ -18,7 +18,6 @@ class Mesh2dDataStructure(RegularCellMeshDS):
 
     # Constants
     TD: int = 2
-    localFace: Redirector[NDArray] = Redirector('localEdge')
 
     def construct(self):
         """
@@ -232,5 +231,5 @@ class Mesh2dDataStructure(RegularCellMeshDS):
         return self.boundary_face_flag()
 
 
-class StructureMesh2dDataStructure(StructureMeshDS, Mesh2dDataStructure):
+class StructureMesh2dDataStructure(Structured, Mesh2dDataStructure, RegularCellMeshDS):
     pass

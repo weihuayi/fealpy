@@ -50,7 +50,7 @@ class PolygonMesh(Mesh2d):
 
         if etype in {'cell', 2}:
             cell2node = self.ds.cell_to_node()
-            NV = self.number_of_vertices_of_cells().reshape(-1,1)
+            NV = self.ds.number_of_vertices_of_cells().reshape(-1,1)
             bc = cell2node*node/NV
         elif etype in {'edge', 1}:
             edge = self.ds.edge
@@ -119,14 +119,11 @@ class PolygonMesh(Mesh2d):
 
 
 class PolygonMeshDataStructure(Mesh2dDataStructure):
+    TD: int = 2
     def __init__(self, NN: int, cell: NDArray, cellLocation: NDArray, topdata=None):
-        self.TD = 2
         self.NN = NN
-        self.NC = cellLocation.shape[0] - 1
-
         self._cell = cell
         self.cellLocation = cellLocation
-
         self.itype = cell.dtype
 
         if topdata is None:
@@ -134,18 +131,16 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
         else:
             self.edge = topdata[0]
             self.edge2cell = topdata[1]
-            self.NE = len(self.edge)
-            self.NF = self.NE
-
 
     def reinit(self, NN: int, cell: NDArray, cellLocation: NDArray):
         self.NN = NN
-        self.NC = cellLocation.shape[0] - 1
-
         self._cell = cell
         self.itype = cell.dtype
         self.cellLocation = cellLocation
         self.construct()
+
+    def number_of_cells(self) -> int:
+        return self.cellLocation.shape[0] - 1
 
     def number_of_vertices_of_cells(self):
         return self.cellLocation[1:] - self.cellLocation[0:-1]
@@ -169,8 +164,6 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
                 return_inverse=True,
                 axis=0)
         NE = i0.shape[0]
-        self.NE = NE
-        self.NF = NE
         self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
         i1 = np.zeros(NE, dtype=self.itype)
@@ -192,22 +185,28 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
     def cell(self):
         return np.hsplit(self._cell, self.cellLocation[1:-1])
 
+    ### cell ###
+
     def cell_to_node(self):
-        NN = self.NN
-        NC = self.NC
-        NE = self.NE
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
 
         NV = self.number_of_vertices_of_cells()
         I = np.repeat(range(NC), NV)
-        J = cell
+        J = self.cell
 
         val = np.ones(len(self._cell), dtype=np.bool_)
         cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool_)
         return cell2node
 
+    def cell_to_edge(self) -> NDArray:
+        raise NotImplementedError
+
+    cell_to_face = cell_to_edge
+
     def edge_to_cell(self, return_sparse=False):
-        NE = self.NE
-        NC = self.NC
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
         edge2cell = self.edge2cell
         if return_sparse:
             val = np.ones(NE, dtype=np.bool_)
@@ -223,7 +222,3 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
 
     def boundary_edge_flag(self):
         return self.boundary_face_flag()
-
-    def boundary_edge(self):
-        edge = self.edge
-        return edge[self.boundary_edge_index()]

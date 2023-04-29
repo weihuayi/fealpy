@@ -51,7 +51,7 @@ class MeshDataStructure(metaclass=ABCMeta):
     # Variables
     itype: np.dtype
     NN: int = -1
-    cell: NDArray
+    cell: _array_redirectable
     face: _array_redirectable
     edge: _array_redirectable
 
@@ -214,8 +214,8 @@ class RegularCellMeshDS(MeshDataStructure):
     NFC: _int_redirectable
     NEF: int
     ccw: NDArray
-    localEdge: _array_redirectable
-    localFace: _array_redirectable
+    localEdge: NDArray
+    localFace: NDArray
     localFace2edge: NDArray
     localEdge2face: NDArray
 
@@ -280,12 +280,18 @@ class RegularCellMeshDS(MeshDataStructure):
         return total_edge
 
 
-class StructureMeshDS(RegularCellMeshDS):
+class Structured():
     """
     @brief Base class of data structure for structure meshes.
 
     Subclass to change nonstructure mesh type to structure mesh type.
     """
+    # Variables
+    cell: _array_redirectable = Redirector('cell_')
+
+    # Constants
+    TD: int
+
     def __init__(self, *nx: int, itype: dtype) -> None:
         if len(nx) != self.TD:
             raise ValueError(f"Number of `nx` must match the top dimension.")
@@ -305,7 +311,7 @@ class StructureMeshDS(RegularCellMeshDS):
         return self.nx_[2]
 
     @property
-    def cell(self):
+    def cell_(self):
         TD = self.TD
         NN = self.NN
         NC = np.prod(self.nx_)
@@ -339,8 +345,8 @@ class StructureMeshDS(RegularCellMeshDS):
         @brief Warning: `construct` method is not available any more in structure\
                meshes. This raises NotImplementedError when called.
         """
-        raise NotImplementedError(f"'construct' method is unnecessary for\
-                                  structure meshes.")
+        raise NotImplementedError("'construct' method is unnecessary for"
+                                  "structure meshes.")
 
     @final
     def clear(self) -> None:
