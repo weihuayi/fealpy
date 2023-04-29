@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import MeshDataStructure, RegularCellMeshDS, Structured
+from .mesh_ds import MeshDataStructure, StructureMeshDS
 
 
 class Mesh3dDataStructure(MeshDataStructure):
@@ -17,7 +17,7 @@ class Mesh3dDataStructure(MeshDataStructure):
     cell2edge: NDArray
 
     # Constants
-    TD = 3
+    TD: int = 3
 
     def construct(self):
         NC = self.number_of_cells()
@@ -340,5 +340,5 @@ class Mesh3dDataStructure(MeshDataStructure):
         return node2cell
 
 
-class StructureMesh3dDataStructure(Structured, Mesh3dDataStructure, RegularCellMeshDS):
+class StructureMesh3dDataStructure(StructureMeshDS, Mesh3dDataStructure):
     pass

@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, MeshDataStructure, RegularCellMeshDS, Structured
+from .mesh_ds import Redirector, MeshDataStructure, StructureMeshDS
 
 
 class Mesh2dDataStructure(MeshDataStructure):
@@ -231,5 +231,5 @@ class Mesh2dDataStructure(MeshDataStructure):
         return self.boundary_face_flag()
 
 
-class StructureMesh2dDataStructure(Structured, Mesh2dDataStructure, RegularCellMeshDS):
+class StructureMesh2dDataStructure(StructureMeshDS, Mesh2dDataStructure):
     pass

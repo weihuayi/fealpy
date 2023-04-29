@@ -4,10 +4,10 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, RegularCellMeshDS, StructureMeshDS
+from .mesh_ds import Redirector, HomogeneousMeshDS, Structured
 
 
-class Mesh1dDataStructure(RegularCellMeshDS):
+class Mesh1dDataStructure(HomogeneousMeshDS):
     """
     @brief The topology data structure of 1-d mesh.\
            This is an abstract class and can not be used directly.
@@ -68,5 +68,5 @@ class Mesh1dDataStructure(RegularCellMeshDS):
     node_to_cell = face_to_cell
 
 
-class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
+class StructureMesh1dDataStructure(Structured, Mesh1dDataStructure):
     pass

@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import TypeVar, Generic, Union, final
+from typing import TypeVar, Generic, Union, Callable
 
 import numpy as np
 from numpy import dtype
@@ -203,7 +203,7 @@ class MeshDataStructure(metaclass=ABCMeta):
         return self.cell[self.boundary_cell_flag()]
 
 
-class RegularCellMeshDS(MeshDataStructure):
+class HomogeneousMeshDS(MeshDataStructure):
     """
     @brief Data structure for meshes having uniform shape of cells.
 
@@ -219,21 +219,16 @@ class RegularCellMeshDS(MeshDataStructure):
     localFace2edge: NDArray
     localEdge2face: NDArray
 
-    def __init__(self, NN: int, cell: NDArray, *args, **kwargs) -> None:
+    def __init__(self, NN: int, cell: NDArray) -> None:
         self.reinit(NN=NN, cell=cell)
 
-    def reinit(self, NN: int, cell: NDArray, *args, **kwargs):
+    def reinit(self, NN: int, cell: NDArray):
         self.NN = NN
         self.cell = cell
         self.itype = cell.dtype
         self.construct()
 
-    @abstractmethod
-    def construct(self) -> None:
-        pass
-
-    def clear(self) -> None:
-        raise NotImplementedError
+    construct: Callable[[], None]
 
     def number_of_vertices_of_cells(self) -> int:
         """Number of vertices in a cell"""
@@ -280,7 +275,7 @@ class RegularCellMeshDS(MeshDataStructure):
         return total_edge
 
 
-class Structured():
+class StructureMeshDS(HomogeneousMeshDS):
     """
     @brief Base class of data structure for structure meshes.
 
@@ -339,7 +334,6 @@ class Structured():
 
         return cell
 
-    @final
     def construct(self) -> None:
         """
         @brief Warning: `construct` method is not available any more in structure\
@@ -347,7 +341,3 @@ class Structured():
         """
         raise NotImplementedError("'construct' method is unnecessary for"
                                   "structure meshes.")
-
-    @final
-    def clear(self) -> None:
-        pass
