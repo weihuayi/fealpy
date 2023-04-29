@@ -11,6 +11,11 @@ from .mesh_base import Mesh2d
 from .mesh_data_structure import Mesh2dDataStructure
 
 class PolygonMesh(Mesh2d):
+    """
+    @brief Polygon mesh type.
+    """
+    ds: "PolygonMeshDataStructure"
+
     def __init__(self, node: NDArray, cell: NDArray, cellLocation=None, topdata=None):
         self.node = node
         if cellLocation is None:
@@ -50,14 +55,22 @@ class PolygonMesh(Mesh2d):
 
         if etype in {'cell', 2}:
             cell2node = self.ds.cell_to_node()
-            NV = self.ds.number_of_vertices_of_cells().reshape(-1,1)
+            NV = self.ds.number_of_vertices_of_cells().reshape(-1, 1)
             bc = cell2node*node/NV
         elif etype in {'edge', 1}:
             edge = self.ds.edge
-            bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
+            bc = np.mean(node[edge, :], axis=1).reshape(-1, GD)
         elif etype in {'node', 0}:
             bc = node
         return bc
+
+    def bc_to_point(self, bc: NDArray, etype: Union[int, str]='cell',
+                    index=np.s_[:]) -> NDArray:
+        if etype in {'cell', 2}:
+            raise NotImplementedError("cell_bc_to_point has not been implemented"
+                                      "for polygon mesh.")
+        else:
+            return self.edge_bc_to_point(bcs=bc, index=index)
 
     def edge_bc_to_point(self, bcs: NDArray, index=np.s_[:]):
         """
@@ -68,7 +81,6 @@ class PolygonMesh(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
-    bc_to_point = edge_bc_to_point
     face_bc_to_point = edge_bc_to_point
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
@@ -217,8 +229,3 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
             return edge2cell
 
     face_to_cell = edge_to_cell
-
-    ### boundary ###
-
-    def boundary_edge_flag(self):
-        return self.boundary_face_flag()

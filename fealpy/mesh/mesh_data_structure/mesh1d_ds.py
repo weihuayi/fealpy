@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, HomogeneousMeshDS, Structured
+from .mesh_ds import Redirector, HomogeneousMeshDS, StructureMeshDS
 
 
 class Mesh1dDataStructure(HomogeneousMeshDS):
@@ -68,5 +68,5 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     node_to_cell = face_to_cell
 
 
-class StructureMesh1dDataStructure(Structured, Mesh1dDataStructure):
+class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
     pass

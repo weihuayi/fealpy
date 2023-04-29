@@ -205,9 +205,7 @@ class MeshDataStructure(metaclass=ABCMeta):
 
 class HomogeneousMeshDS(MeshDataStructure):
     """
-    @brief Data structure for meshes having uniform shape of cells.
-
-    @seealso: PolygonMeshDS.
+    @brief Data structure for meshes with homogeneous shape of cells.
     """
     # Constants
     NEC: _int_redirectable
