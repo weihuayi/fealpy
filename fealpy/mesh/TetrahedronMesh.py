@@ -200,7 +200,7 @@ class TetrahedronMesh(Mesh3d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
+    def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
 
         TD = self.top_dimension()
 
@@ -234,9 +234,15 @@ class TetrahedronMesh(Mesh3d):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        Dlambda = self.grad_lambda(index=index)
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        return gphi #(..., NC, ldof, GD)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
+            return gphi #(..., NC, ldof, GD)
+        elif variables == 'u':
+            return R
+
+    def grad_shape_function_on_face(self, bc, cindex, lidx, p=1, direction=True):
+        pass
 
     def interpolation_points(self, p, index=np.s_[:]):
         """

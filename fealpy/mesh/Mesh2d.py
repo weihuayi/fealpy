@@ -129,6 +129,7 @@ class Mesh2d(Mesh):
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
+
     def edge_unit_normal(self, index=np.s_[:]):
         #TODO: 3D Case
         v = self.edge_unit_tangent(index=index)
@@ -265,6 +266,7 @@ class Mesh2dDataStructure():
     """
 
     def __init__(self, NN, cell):
+        self.TD = 2
         self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell

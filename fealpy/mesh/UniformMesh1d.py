@@ -523,13 +523,21 @@ class UniformMesh1d(Mesh1d):
 
 
     ## @ingroup FDMInterface
-    def wave_operator(self, tau, theta=0.5):
+    def wave_operator(self, tau: np.float64, a: np.float64 = 1.0,
+                    theta: np.float64 = 0.5):
         """
         @brief 生成波动方程的离散矩阵
+
+        @param[in] tau float, 时间步长
+        @param[in] a float, 波速，默认值为 1
+        @param[in] theta float, 时间离散格式参数，默认值为 0.5
+
+        @return 三个离散矩阵 A0, A1, A2，分别对应于不同的时间步
         """
-        r = tau**2/self.h**2 
+        r = a * tau / self.h 
 
         NN = self.number_of_nodes()
+        k = np.arange(NN)
 
         A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
         A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
