@@ -2,6 +2,7 @@
 Provide plotting tools for given points with structure.
 """
 
+from typing import Sequence
 from numpy.typing import NDArray
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d import Axes3D
@@ -112,9 +113,9 @@ def line(axes: Axes, points: NDArray, struct: NDArray, color, linewidths):
 
 
 def poly(axes: Axes, points: NDArray, struct: NDArray, edgecolor,
-         cellcolor, linewidths, alpha):
+         cellcolor, linewidths=0.1, alpha=1.0):
     """
-    @brief Show polygons in the axes.
+    @brief Show homogeneous polygons in the axes.
 
     @param points: An NDArray[float] containing positions of the vertices.
     @param struct: An NDArray[int] of indices of nodes in every polygons.\
@@ -133,6 +134,35 @@ def poly(axes: Axes, points: NDArray, struct: NDArray, edgecolor,
     else:
         from matplotlib.collections import PolyCollection
         poly = PolyCollection(vts)
+
+    poly.set_edgecolor(edgecolor)
+    poly.set_linewidth(linewidths)
+    poly.set_facecolor(cellcolor)
+    poly.set_alpha(alpha)
+
+    return axes.add_collection(collection=poly)
+
+
+def poly_(axes: Axes, points: NDArray, struct_seq: Sequence[NDArray],
+          edgecolor, cellcolor, linewidths=0.1, alpha=1.0):
+    """
+    @brief Show polygons (may have different shape of cells) in the axes.
+    """
+    GD = points.shape[-1]
+    if GD != 2:
+        raise NotImplementedError('Polygons with points with geometry dimension'
+                                  f'{GD} has not been implemented.')
+    if not isinstance(axes, Axes):
+        raise TypeError(f"Require 2d Axes object but got {axes.__class__.__name__}.")
+
+    from matplotlib.patches import Polygon
+    from matplotlib.collections import PatchCollection
+    NC = len(struct_seq)
+    patches = [
+        Polygon(points[struct_seq[i], :], closed=True)
+        for i in range(NC)
+    ]
+    poly = PatchCollection(patches=patches)
 
     poly.set_edgecolor(edgecolor)
     poly.set_linewidth(linewidths)
