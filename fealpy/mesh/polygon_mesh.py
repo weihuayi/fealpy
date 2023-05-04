@@ -7,9 +7,8 @@ from ..common import ranges
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
 
-from .mesh_base import Mesh2d
+from .mesh_base import Mesh2d, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
-from .plotting import Plotable, AddPlot2dPoly
 
 
 class PolygonMesh(Mesh2d, Plotable):
@@ -132,7 +131,7 @@ class PolygonMesh(Mesh2d, Plotable):
         return cls(node, cell, cellLocation)
 
 
-PolygonMesh.set_ploter(AddPlot2dPoly)
+PolygonMesh.set_ploter('polygon2d')
 
 
 class PolygonMeshDataStructure(Mesh2dDataStructure):

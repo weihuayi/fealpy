@@ -1,7 +1,7 @@
 
 from typing import (
     Callable, Optional, TypeVar, Any, Union, Sequence, Generic,
-    Type
+    Dict, Type
 )
 import numpy as np
 from numpy.typing import NDArray
@@ -20,6 +20,17 @@ def array_color_map(arr: NDArray, cmap,
     cmin = cmin or arr.min()
     norm = colors.Normalize(vmin=cmin, vmax=cmax)
     return cm.ScalarMappable(norm=norm, cmap=cmap)
+
+_ploter_map_: Dict[str, Type] = {}
+
+def get_ploter(key: str) -> Type['MeshPloter']:
+    if key in _ploter_map_:
+        return _ploter_map_[key]
+    else:
+        raise KeyError(f"Can not find a ploter class that key '{key}' mapping to."
+                       "To use Plotable, register the target ploter first and then"
+                       "specify the ploter for mesh by setting a same key."
+                       "See MeshPloter.register() and Plotable.set_ploter().")
 
 
 class MeshPloter(Generic[_MT]):
@@ -53,6 +64,18 @@ class MeshPloter(Generic[_MT]):
     __call__ = _call_impl
 
     draw: Callable[..., Any]
+
+    @classmethod
+    def register(cls, key: str):
+        """
+        @brief Register this ploter with a unique string key.
+        """
+        if key in _ploter_map_:
+            ploter = _ploter_map_[key]
+            raise KeyError(f"Key '{key}' has been used by ploter {ploter.__name__}.")
+        elif not issubclass(cls, MeshPloter):
+            raise TypeError(f"Expect subclass of MeshPloter but got itself.")
+        _ploter_map_[key] = cls
 
     def set_show_axis(self, switch: bool=True):
         if switch:
@@ -90,125 +113,6 @@ class MeshPloter(Generic[_MT]):
             self._axes.set_zlim(box[4:6])
 
 
-class Plotable():
-    """
-    @brief Base class for plotable meshes. Inherit this class to obtain several\
-           plotting methods.
-
-    Before using these plotting methods, call the class method
-    `MeshClass.set_ploter()` to chose a proper ploter for the mesh type.
-    For example, specity a plotter for a mesh type named 'TriangleMesh':
-    ```
-        class TriangleMesh(Mesh2d, Plotable):
-            # codes for mesh ...
-            ...
-
-        TriangleMesh.set_ploter(MyPloter)
-    ```
-    Here `MyPloter` is a subclass of `MeshPloter`. Then, instances of `TriangleMesh`
-    may call methods such as `add_plot()` to draw the mesh.
-
-    @seealso: MeshPloter.
-    """
-    _ploter_class: Optional[Type[MeshPloter]] = None
-
-    @property
-    def add_plot(self):
-        if self._ploter_class is not None:
-            return self._ploter_class(self)
-        else:
-            raise Exception('MeshPloter of the type of mesh should be specified'
-                            'before drawing. If a mesh is inherited from Plotable,'
-                            'use MeshClass.set_ploter(MeshPloterClass) to specify.')
-
-    @classmethod
-    def set_ploter(cls, ploter: Type[MeshPloter]):
-        cls._ploter_class = ploter
-
-    def find_entity(self, axes: Axes, etype: Union[int, str], index=np.s_[:],
-                    showindex: bool=False, color='r', markersize=20,
-                    fontcolor='k', fontsize=24):
-        """
-        @brief Show barycenters of the entity.
-        """
-        if not isinstance(self, Mesh):
-            raise TypeError("Plotable only works for mesh type,"
-                            f"but got {self.__class__.__name__}.")
-
-        bc = self.entity_barycenter(etype=etype, index=index)
-        if bc.ndim == 1:
-            bc = bc[:, None]
-
-        if isinstance(color, np.ndarray) and np.isreal(color[0]):
-            mapper = array_color_map(color, 'rainbow')
-            color = mapper.to_rgba(color)
-
-        A.scatter(axes=axes, points=bc, color=color, markersize=markersize)
-        if showindex:
-            if index == np.s_[:]:
-                index = np.arange(bc.shape[0])
-            elif isinstance(index, np.ndarray):
-                if (index.dtype is np.bool_):
-                    index, = np.nonzero(index)
-            else:
-                raise TypeError("Unknown index format.")
-            A.show_index(axes=axes, location=bc, number=index,
-                         fontcolor=fontcolor, fontsize=fontsize)
-
-    def find_node(self, axes,
-            index=np.s_[:],
-            showindex=False,
-            color='r', markersize=20,
-            fontsize=16, fontcolor='r',
-            multi_index=None):
-        return self.find_entity(
-                axes, 'node', index=index,
-                showindex=showindex,
-                color=color,
-                markersize=markersize,
-                fontsize=fontsize,
-                fontcolor=fontcolor)
-
-    def find_edge(self, axes,
-            index=np.s_[:],
-            showindex=False,
-            color='g', markersize=22,
-            fontsize=18, fontcolor='g'):
-        return self.find_entity(
-                axes, 'edge', index=index,
-                showindex=showindex,
-                color=color,
-                markersize=markersize,
-                fontsize=fontsize,
-                fontcolor=fontcolor)
-
-    def find_face(self, axes,
-            index=np.s_[:],
-            showindex=False,
-            color='b', markersize=24,
-            fontsize=20, fontcolor='b'):
-        return self.find_entity(
-                axes, 'face', index=index,
-                showindex=showindex,
-                color=color,
-                markersize=markersize,
-                fontsize=fontsize,
-                fontcolor=fontcolor)
-
-    def find_cell(self, axes,
-            index=np.s_[:],
-            showindex=False,
-            color='y', markersize=26,
-            fontsize=22, fontcolor='y'):
-        return self.find_entity(
-                axes, 'cell', index=index,
-                showindex=showindex,
-                color=color,
-                markersize=markersize,
-                fontsize=fontsize,
-                fontcolor=fontcolor)
-
-
 ##################################################
 ### MeshPloter subclasses
 ##################################################
@@ -240,6 +144,8 @@ class AddPlot1d(MeshPloter[Mesh1d]):
 
         return A.line(axes=axes, points=node, struct=cell, color=cellcolor,
                       linewidths=linewidths)
+
+AddPlot1d.register('1d')
 
 
 class AddPlot2dHomo(MeshPloter[Mesh2d]):
@@ -276,6 +182,8 @@ class AddPlot2dHomo(MeshPloter[Mesh2d]):
                       edgecolor=edgecolor, cellcolor=cellcolor,
                       linewidths=linewidths, alpha=alpha)
 
+AddPlot2dHomo.register('2d')
+
 
 class AddPlot2dPoly(MeshPloter[Mesh2d]):
     def draw(
@@ -308,8 +216,10 @@ class AddPlot2dPoly(MeshPloter[Mesh2d]):
                        edgecolor=edgecolor, cellcolor=cellcolor,
                       linewidths=linewidths, alpha=alpha)
 
+AddPlot2dPoly.register('polygon2d')
 
-class AddPlot3d(MeshPloter[Mesh3d]):
+
+class AddPlot3dHomo(MeshPloter[Mesh3d]):
     def draw(
             self, nodecolor='k', edgecolor='k', cellcolor='w',
             markersize=20, linewidths=0.5, alpha=0.8,
@@ -354,35 +264,4 @@ class AddPlot3d(MeshPloter[Mesh3d]):
         return A.poly(axes=axes, points=node, struct=face, edgecolor=edgecolor,
                       cellcolor=cellcolor, linewidths=linewidths, alpha=alpha)
 
-
-# _DEFAULTS = {
-#     'nodecolor': 'r',
-#     'edgecolor': 'k',
-#     'facecolor': 'cy',
-#     'cellcolor': [0.2, 0.6, 1.0],
-
-#     'markersize': 10.0,
-#     'linewidths': 0.1,
-#     'alpha': 1.0,
-# }
-
-
-# class PlotModule():
-#     def __init__(self, **kwargs) -> None:
-#         self._options = kwargs
-
-#     def _get_options(self, key: str):
-#         if key in self._options:
-#             return self._options[key]
-#         elif key in _DEFAULTS:
-#             return _DEFAULTS[key]
-#         else:
-#             raise KeyError(f"Failed to load default value of {key}.")
-
-#     def _call_impl(self, axes: Axes, mesh: Mesh):
-#         return self.draw(axes=axes, mesh=mesh)
-
-#     __call__ = _call_impl
-
-#     def draw(self, axes: Axes, mesh: Mesh):
-#         raise NotImplementedError
+AddPlot3dHomo.register('3d')
