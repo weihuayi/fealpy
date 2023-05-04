@@ -7,10 +7,11 @@ from ..common import ranges
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
 
-from .mesh_base import Mesh2d
+from .mesh_base import Mesh2d, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
 
-class PolygonMesh(Mesh2d):
+
+class PolygonMesh(Mesh2d, Plotable):
     """
     @brief Polygon mesh type.
     """
@@ -19,7 +20,7 @@ class PolygonMesh(Mesh2d):
     def __init__(self, node: NDArray, cell: NDArray, cellLocation=None, topdata=None):
         self.node = node
         if cellLocation is None:
-            if len(cell.shape)  == 2:
+            if len(cell.shape) == 2:
                 NC = cell.shape[0]
                 NV = cell.shape[1]
                 cell = cell.reshape(-1)
@@ -57,7 +58,7 @@ class PolygonMesh(Mesh2d):
             cell2node = self.ds.cell_to_node()
             NV = self.ds.number_of_vertices_of_cells().reshape(-1, 1)
             bc = cell2node*node/NV
-        elif etype in {'edge', 1}:
+        elif etype in {'edge', 'face', 1}:
             edge = self.ds.edge
             bc = np.mean(node[edge, :], axis=1).reshape(-1, GD)
         elif etype in {'node', 0}:
@@ -130,6 +131,9 @@ class PolygonMesh(Mesh2d):
         return cls(node, cell, cellLocation)
 
 
+PolygonMesh.set_ploter('polygon2d')
+
+
 class PolygonMeshDataStructure(Mesh2dDataStructure):
     TD: int = 2
     def __init__(self, NN: int, cell: NDArray, cellLocation: NDArray, topdata=None):
@@ -184,7 +188,8 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
         self.edge = totalEdge[i0]
 
         NV = self.number_of_vertices_of_cells()
-        cellIdx = np.repeat(range(self.NC), NV)
+        NC = self.number_of_cells()
+        cellIdx = np.repeat(range(NC), NV)
 
         localIdx = ranges(NV)
 
@@ -205,7 +210,7 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
 
         NV = self.number_of_vertices_of_cells()
         I = np.repeat(range(NC), NV)
-        J = self.cell
+        J = self._cell
 
         val = np.ones(len(self._cell), dtype=np.bool_)
         cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool_)
