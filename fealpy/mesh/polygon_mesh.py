@@ -34,11 +34,11 @@ class PolygonMesh(Mesh2d, Plotable):
         self.itype = cell.dtype
         self.ftype = node.dtype
 
-        self.cell_data = {}
-        self.node_data = {}
-        self.edge_data = {}
-        self.face_data = self.edge_data
-        self.mesh_data = {}
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = self.edgedata
+        self.meshdata = {}
 
     def integrator(self, q, etype='cell'):
         """
@@ -88,7 +88,30 @@ class PolygonMesh(Mesh2d, Plotable):
         raise NotImplementedError
 
     def edge_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
-        raise NotImplementedError
+        """
+        @brief 获取网格边与插值点的对应关系
+        """
+        if isinstance(index, slice) and index == slice(None):
+            NE = self.number_of_edges()
+            index = np.arange(NE)
+        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        elif isinstance(index, list) and (type(index[0]) is np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        else:
+            NE = len(index)
+
+        NN = self.number_of_nodes()
+
+        edge = self.entity('edge', index=index)
+        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
+        edge2ipoints[:, [0, -1]] = edge
+        if p > 1:
+            idx = NN + np.arange(p-1)
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
+        return edge2ipoints
 
     face_to_ipoint = edge_to_ipoint
 
@@ -205,6 +228,10 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
     ### cell ###
 
     def cell_to_node(self):
+        """
+        @brief 单元到节点的拓扑关系，默认返回稀疏矩阵
+        @note 当获取单元实体时，请使用 `mesh.entity('cell')` 接口
+        """
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
 
@@ -227,8 +254,8 @@ class PolygonMeshDataStructure(Mesh2dDataStructure):
         edge2cell = self.edge2cell
         if return_sparse:
             val = np.ones(NE, dtype=np.bool_)
-            edge2cell = coo_matrix((val, (range(NE), edge2cell[:,0])), shape=(NE, NC), dtype=np.bool_)
-            edge2cell+= coo_matrix((val, (range(NE), edge2cell[:,1])), shape=(NE, NC), dtype=np.bool_)
+            edge2cell = coo_matrix((val, (range(NE), edge2cell[:, 0])), shape=(NE, NC), dtype=np.bool_)
+            edge2cell+= coo_matrix((val, (range(NE), edge2cell[:, 1])), shape=(NE, NC), dtype=np.bool_)
             return edge2cell.tocsr()
         else:
             return edge2cell
