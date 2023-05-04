@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse.linalg import spsolve
-import ipdb
+# import ipdb
 import matplotlib.pyplot as plt
 from fealpy.pde.elliptic_1d import SinPDEData
 from fealpy.mesh import UniformMesh1d

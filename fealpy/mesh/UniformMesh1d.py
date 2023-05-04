@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 
+from typing import Callable, Union, Tuple, List
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from types import ModuleType
 from typing import Tuple 
@@ -18,7 +19,7 @@ class UniformMesh1d(Mesh1d):
     @brief    A class for representing a uniformly partitioned one-dimensional mesh.
     """
     def __init__(self, 
-            extent: Tuple[int, int],
+            extent: List[np.int_],
             h: float = 1.0,
             origin: float = 0.0,
             itype: type = np.int_,
@@ -317,15 +318,18 @@ class UniformMesh1d(Mesh1d):
         return F
 
     ## @ingroup FDMInterface
-    def error(self, u, uh, errortype='all'):
+    def error(self, u: Callable, uh: np.ndarray, errortype: str = 'all') -> Union[np.float64, Tuple[np.float64, np.float64, np.float64]]:
         """
-        @brief        Compute the error between the true solution and the numerical solution.
- 
-        @param[in]    u: The true solution as a function.
-        @param[in]    uh: The numerical solution as an array.
-        @param[in]    errortype: The error type, which can be 'all', 'max', 'L2' or 'H1'
-        """
+        计算真实解和数值解之间的误差
 
+        @param[in] u: 真实解的函数
+        @param[in] uh: 数值解的数组
+        @param[in] errortype: 误差类型，可以是'all'、'max'、'L2' 或 'H1'
+        @return 如果errortype为'all'，则返回一个包含最大误差、L2误差和H1误差的元组；
+                如果errortype为'max'，则返回最大误差；
+                如果errortype为'L2'，则返回L2误差；
+                如果errortype为'H1'，则返回H1误差
+        """
         h = self.h
         node = self.node
         uI = u(node)

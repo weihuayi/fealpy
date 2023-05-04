@@ -517,15 +517,18 @@ class UniformMesh2d(Mesh2d):
         return F
 
     ## @ingroup FDMInterface
-    def error(self, u, uh, errortype='all'):
+    def error(self, u: Callable, uh: np.ndarray, errortype: str = 'all') -> Union[float, Tuple[np.float64, np.float64, np.float64]]:
         """
-        @brief       Compute the error between the true solution and the numerical solution.
+        计算真实解和数值解之间的误差。
 
-        @param[in]   u: The true solution as a function.
-        @param[in]   uh: The numerical solution as an 2D array.
-        @param[in]   errortype: The error type, which can be 'all', 'max', 'L2' or 'l2'
+        @param[in] u: 真实解的函数。
+        @param[in] uh: 数值解的二维数组。
+        @param[in] errortype: 误差类型，可以是'all'、'max'、'L2' 或 'l2'。
+        @return 如果errortype为'all'，则返回一个包含最大误差、L2误差和l2误差的元组；
+                如果errortype为'max'，则返回最大误差；
+                如果errortype为'L2'，则返回L2误差；
+                如果errortype为'l2'，则返回l2误差。
         """
-
         assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
         hx = self.h[0]
         hy = self.h[1]
