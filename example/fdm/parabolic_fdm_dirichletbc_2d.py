@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -5,13 +6,53 @@ from scipy.sparse.linalg import spsolve
 from fealpy.pde.parabolic_2d import SinSinExpPDEData
 from fealpy.mesh import UniformMesh2d
 
+
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        二维均匀网格（区间）上抛物型方程的有限差分方法，
+        边界条件为的带纯 Dirichlet 型，
+        有三种离散格式供选择：1、向前欧拉；2、向后欧拉；3、crank_nicholson。
+        """)
+
+parser.add_argument('--nx',
+        default=40, type=int,
+        help="x 方向上的剖分段数，默认为 40 段.")
+
+parser.add_argument('--ny',
+        default=40, type=int,
+        help="y 方向上的剖分段数，默认为 40 段.")
+
+parser.add_argument('--nt',
+        default=6400, type=int,
+        help='时间剖分段数，默认为 6400 段.')
+
+parser.add_argument('--discrete_format',
+        default=1, type=int,
+        help=
+        """
+        离散格式选择：1、向前欧拉；2、向后欧拉；3、crank_nicholson，
+        使用相应的数字编号选择离散格式，默认为 1、向前欧拉格式。
+        """)
+
+parser.add_argument('--box',
+        default=[0, 1, 0, 1], type=list,
+        help="图像显示的范围，默认为： 0 <= x <= 1, 0 <= y <= 1")
+
+args = parser.parse_args()
+
+nx = args.nx
+ny = args.ny
+nt = args.nt
+discrete_format = args.discrete_format
+
+
+
 # PDE 模型
 pde = SinSinExpPDEData()
 
 # 空间离散
 domain = pde.domain()
-nx = 40
-ny = 40
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
 mesh = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(domain[0], domain[2]))
@@ -20,7 +61,6 @@ isBdNode = mesh.ds.boundary_node_flag()
 
 # 时间离散
 duration = pde.duration()
-nt = 6400 
 tau = (duration[1] - duration[0])/nt 
 
 # 准备初值
@@ -106,9 +146,18 @@ def advance_crank_nicholson(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.flo
 
         return uh0, t
 
+if discrete_format == 1:
+    dis_format = advance_forward
+elif discrete_format == 2:
+    dis_format = advance_backward
+elif discrete_format == 3:
+    dis_format = advance_crank_nicholson
+else:
+    raise ValueError("请选择正确的离散格式.")
+
 fig, axes = plt.subplots()
-box = [0, 1, 0, 1] # 图像显示的范围 0 <= x <= 1, 0 <= y <= 1
+box = args.box
 # mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
-mesh.show_animation(fig, axes, box, advance_backward, frames=nt + 1)
+mesh.show_animation(fig, axes, box, dis_format, frames=nt + 1)
 # mesh.show_animation(fig, axes, box, advance_crank_nicholson, frames=nt + 1)
 plt.show()

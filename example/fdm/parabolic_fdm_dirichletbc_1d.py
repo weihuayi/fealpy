@@ -31,6 +31,10 @@ parser.add_argument('--discrete_format',
         使用相应的数字编号选择离散格式，默认为 1、向前欧拉格式。
         """)
 
+parser.add_argument('--box',
+        default=[0, 1, -1.5, 1.5], type=list,
+        help="图像显示的范围，默认为： 0 <= x <= 1, -1.5 <= y <= 1.5")
+
 args = parser.parse_args()
 
 nx = args.nx
@@ -135,7 +139,7 @@ else:
     raise ValueError("请选择正确的离散格式.")
 
 fig, axes = plt.subplots()
-box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
+box = args.box
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, dis_format, frames=nt + 1)
 # mesh.show_animation(fig, axes, box, advance_backward, frames=nt + 1)
