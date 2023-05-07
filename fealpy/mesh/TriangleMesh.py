@@ -5,7 +5,7 @@ from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
-
+from .triangle_quality import *
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 
@@ -819,6 +819,10 @@ class TriangleMesh(Mesh2d):
                 textcoords='axes fraction',
                 horizontalalignment='left', verticalalignment='top')
         return mina, maxa, meana
+    
+    def cell_quality(self,measure='radius_ratio'):
+        if measure=='radius_ratio':
+            return radius_ratio(self) 
 
     def show_quality(self, axes, qtype=None, quality=None):
         """
@@ -855,8 +859,6 @@ class TriangleMesh(Mesh2d):
             angle = self.angle()
             asum = np.sum(angle[edge2cell[:, 0:2], edge2cell[:, 2:4]], axis=1)
             isNonDelaunayEdge = (asum > np.pi) & (edge2cell[:,0] != edge2cell[:,1])
-
-            return isNonDelaunayEdge
 
             if np.sum(isNonDelaunayEdge) == 0:
                 break
