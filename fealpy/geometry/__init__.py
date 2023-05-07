@@ -44,6 +44,7 @@ from .explicit_curve import (
     BSplineCurve,
     CRSplineCurve,
     BezierCurve,
+    CHSplineCurve,
     )
 
 # 2d Domain
