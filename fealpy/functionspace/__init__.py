@@ -28,7 +28,7 @@ from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElement
 from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtualElementSpace2d
 from .DivFreeNonConformingVirtualElementSpace2d import DivFreeNonConformingVirtualElementSpace2d
 from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
-
+from .conforming_navier_stokes_vem_space_2d import ConformingNavierStokesVEMSpace2d
 # WG
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
 

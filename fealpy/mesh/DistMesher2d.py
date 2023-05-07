@@ -101,7 +101,7 @@ class DistMesher2d():
 
         return edge
 
-    def projection(self, node, d):
+    def project(self, node, d):
         """
         @brief 把移动到区域外面的点投影到边界上
 
@@ -112,8 +112,8 @@ class DistMesher2d():
         domain = self.domain
         fd = domain.signed_dist_function
 
-        if hasattr(domain, 'projection'):
-            node = domain.projection(node)
+        if hasattr(domain, 'project'):
+            node = domain.project(node)
         else:
             depsx = np.array([self.deps, 0])
             depsy = np.array([0, self.deps])
@@ -184,7 +184,7 @@ class DistMesher2d():
             d = fd(node)
             isOut = d > 0
             if np.any(isOut):
-                node[isOut] = self.projection(node[isOut], d[isOut])
+                node[isOut] = self.project(node[isOut], d[isOut])
              
             if self.dt*np.max(md[~isOut]) < self.ptol*self.hmin:
                 break

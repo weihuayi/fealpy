@@ -129,6 +129,7 @@ class Mesh2d(Mesh):
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
+
     def edge_unit_normal(self, index=np.s_[:]):
         #TODO: 3D Case
         v = self.edge_unit_tangent(index=index)

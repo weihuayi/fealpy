@@ -53,7 +53,7 @@ class Mesh(metaclass=ABCMeta):
 
     def number_of_nodes_of_cells(self) -> int:
         """Number of nodes in a cell"""
-        return self.ds.cell.shape[-1]
+        return self.ds.NVC
 
     def number_of_edges_of_cells(self) -> int:
         """Number of edges in a cell"""
@@ -66,7 +66,7 @@ class Mesh(metaclass=ABCMeta):
     number_of_vertices_of_cells = number_of_nodes_of_cells
 
     @abstractmethod
-    def uniform_refine(self, n: int=1) -> int:
+    def uniform_refine(self, n: int=1) -> None:
         """
         @brief Refine the whole mesh uniformly for `n` times.
         """
