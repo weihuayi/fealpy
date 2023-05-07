@@ -3,53 +3,12 @@ import matplotlib.pyplot as plt
 
 
 from fealpy.mesh import TriangleMesh 
-from fealpy.geometry import dcircle, drectangle
-from fealpy.geometry import ddiff, huniform
-from fealpy.mesh.DistMesher2d import DistMesher2d 
 
+from fealpy.geometry import SquareWithCircleHoleDomain
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm
 from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
 
-class SquareWithCircleHoleDomain:
-    def __init__(self, fh=huniform):
-        """
-        """
-        self.fh = fh
-        self.box = [0, 1, 0, 1]
-        vertices = np.array([
-            (0.0, 0.0), 
-            (1.0, 0.0), 
-            (1.0, 1.0),
-            (0.0, 1.0)],dtype=np.float64)
-
-        fd1 = lambda p: dcircle(p, [0.5, 0.5], 0.2)
-        fd2 = lambda p: drectangle(p, [0.0, 1, 0.0, 1])
-        fd = lambda p: ddiff(fd2(p), fd1(p))
-
-        self.facets = {0:vertices, 1:fd}
-
-
-    def __call__(self, p):
-        """
-        @brief 符号距离函数
-        """
-        return self.facets[1](p) 
-
-    def signed_dist_function(self, p):
-        return self(p)
-
-    def sizing_function(self, p):
-        return self.fh(p)
-
-    def facet(self, dim):
-        return self.facets[dim]
-
-    def meshing_facet_0d(self):
-        return self.facets[0]
-
-    def meshing_facet_1d(self, hmin, fh=None):
-        pass
 
 class Brittle_Facture_model():
     def __init__(self):
@@ -115,7 +74,7 @@ bform = BilinearForm(GD*(space, ))
 integrator = ProvidesSymmetricTangentOperatorIntegrator(model.lam, model.mu, u, d, H)
 
 bform.add_domain_integrator(integrator)
-bform.assembly()
+#bform.assembly()
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
