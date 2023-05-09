@@ -2,7 +2,7 @@ import numpy as np
 from mgis import behaviour as mg
 import ipdb
 
-ipdb.set_trace()
+#ipdb.set_trace()
 
 
 # 加载共享库
@@ -15,14 +15,28 @@ options.stress_measure = mg.FiniteStrainBehaviourOptionsStressMeasure.CAUCHY
 options.tangent_operator = mg.FiniteStrainBehaviourOptionsTangentOperator.DS_DEGL
 
 # 加载行为
-behaviour = mg.load(options, behaviour_library, behaviour_name, mg.Hypothesis.Tridimensional)
+h = mg.Hypothesis.Tridimensional
+b = mg.load(options, behaviour_library, behaviour_name, h)
+
+print(b.source)
+print(b.behaviour)
+print(b.hypothesis)
+print(b.tfel_version)
+print(b.esvs)
+print(mg.getArraySize(b.esvs, b.hypothesis))
+print(b.esvs[0].name)
+print(b.esvs[0].type)
+
+d = mg.BehaviourData(b)
+print(d.s0.external_state_variables)
+print(d.s1)
 
 # 设置材料属性
 young = 200000.0
 nu = 0.3
 
 n = 1
-mstate = mg.MaterialDataManager(behaviour, n)
+mstate = mg.MaterialDataManager(b, n)
 
 # 为行为设置 Young's modulus 和 Poisson's ratio
 mstate.s0.setMaterialProperty('YoungModulus', young)
