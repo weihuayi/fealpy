@@ -19,4 +19,4 @@ def radius_ratio(mesh):
     q = l.prod(axis=1)
     area = np.cross(v[1], v[2])/2
     quality = (p*q)/(16*area**2)
-    return quality
+    return 1/quality
