@@ -74,7 +74,7 @@ bform = BilinearForm(GD*(space, ))
 integrator = ProvidesSymmetricTangentOperatorIntegrator(model.lam, model.mu, u, d, H)
 
 bform.add_domain_integrator(integrator)
-#bform.assembly()
+bform.assembly()
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
