@@ -1,0 +1,18 @@
+@DSL DefaultDSL;
+@Behaviour OrthotropicElasticity;
+@Author    Helfer Thomas;
+@Date      10/03/11;
+
+@ModellingHypotheses {".+"};
+
+@OrthotropicBehaviour;
+@RequireStiffnessTensor<Altered>;
+@ProvidesSymmetricTangentOperator;
+
+@Integrator{
+  static_cast<void>(smt);
+  sig = D*(eto+deto);
+  if(computeTangentOperator_){
+    Dt = D;
+  }
+}

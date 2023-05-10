@@ -9,7 +9,6 @@ from scipy.sparse import spdiags
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import MeshFactory
 from fealpy.pde.timeharmonic_2d import CosSinData, LShapeRSinData, InHomogeneousData
 from fealpy.functionspace import FirstKindNedelecFiniteElementSpace2d 
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -251,7 +250,8 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
              '$|| u - R_h[u_h]||_{\Omega,0}$',
              '$||\\nabla\\times u - R_h[\\nabla\\times u_h]||_{\Omega, 0}$',
-             'eta'
+             'eta0',
+             'eta1'
              ]
 errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float64)
 NDof = np.zeros(args.maxit, dtype=np.float64)
@@ -294,7 +294,8 @@ for i in range(args.maxit):
     eta1 = space.integralalg.error(uh.value,  
             ruh, power=2, celltype=True) # xi_K
     eta = np.sqrt(eta0**2 + eta1**2) # S_K
-    errorMatrix[4, i] = np.sqrt(np.sum(eta**2)) # S_h
+    errorMatrix[4, i] = np.sqrt(np.sum(eta0**2)) # S_h
+    errorMatrix[5, i] = np.sqrt(np.sum(eta1**2)) # S_h
     if i < args.maxit - 1:
         isMarkedCell = mark(eta, theta=args.theta)
         mesh.bisect(isMarkedCell)

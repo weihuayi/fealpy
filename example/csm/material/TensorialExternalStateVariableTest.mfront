@@ -1,0 +1,59 @@
+@Behaviour TensorialExternalStateVariableTest;
+@Author Helfer Thomas;
+@Date 23 / 11 / 06;
+@Description {
+  A very first test(the most simple one in fact).
+}
+
+@UseQt true;
+@AbaqusFiniteStrainStrategy[abaqusexplicit] MieheApelLambrechtLogarithmicStrain;
+@EuroplexusFiniteStrainStrategy[epx] MieheApelLambrechtLogarithmicStrain;
+
+// Material properties
+@MaterialProperty stress young;
+young.setGlossaryName("YoungModulus");
+@MaterialProperty real nu;
+nu.setGlossaryName("PoissonRatio");
+
+@StateVariable tvector<N, stress> v_isv;
+@StateVariable tvector<N, frequency> v2_isv[2];
+@StateVariable StressStensor s_isv;
+@StateVariable Stensor s2_isv[2];
+@StateVariable StressTensor t_isv;
+@StateVariable Tensor t2_isv[2];
+
+@ExternalStateVariable tvector<N, stress> v_esv;
+@ExternalStateVariable tvector<N, frequency> v2_esv[2];
+@ExternalStateVariable StressStensor s_esv;
+@ExternalStateVariable Stensor s2_esv[2];
+@ExternalStateVariable StressTensor t_esv;
+@ExternalStateVariable Tensor t2_esv[2];
+
+// Lame Coefficients
+@LocalVariable stress lambda, mu;
+
+@InitLocalVariables {
+  lambda = computeLambda(young, nu);
+  mu = computeMu(young, nu);
+}
+
+@PredictionOperator {
+  static_cast<void>(smt);  // remove unused variable warning
+  computeAlteredElasticStiffness<hypothesis, real>::exe(Dt, lambda, mu);
+}
+
+@Integrator {
+  const auto e = eto + deto;
+  sig = lambda * trace(e) * StrainStensor::Id() + 2 * mu * (e);
+  v_isv = v_esv + dv_esv;
+  v2_isv = v2_esv + dv2_esv;
+  s_isv = s_esv + ds_esv;
+  s2_isv = s2_esv + ds2_esv;
+  t_isv = t_esv + dt_esv;
+  t2_isv = t2_esv + dt2_esv;
+}
+
+@TangentOperator {
+  static_cast<void>(smt);  // remove unused variable warning
+  Dt = lambda * Stensor4::IxI() + 2 * mu * Stensor4::Id();
+}

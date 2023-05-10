@@ -1,0 +1,41 @@
+@Behaviour BoundsCheckTest;
+@Author Helfer Thomas;
+@Date 13/11/2018;
+@Description{
+ "Test of:"
+ "- the bounds on material properties."
+ "- the bounds on internal state variables."
+ "- the bounds on external state variables."
+}
+
+@MaterialProperty stress young;
+young.setGlossaryName("YoungModulus");
+@MaterialProperty real   nu;
+nu.setGlossaryName("PoissonRatio");
+
+@StateVariable real iv;
+iv.setEntryName("StateVariable");
+
+@ExternalStateVariable real ev;
+ev.setEntryName("ExternalStateVariable");
+
+@PhysicalBounds young in [0:*[;
+@Bounds         young in [100e9:200e9];
+@PhysicalBounds nu in [-1:0.5];
+
+@PhysicalBounds iv in [0:0.8];
+@Bounds iv in [0.2:0.5];
+
+@PhysicalBounds ev in [0:500];
+@Bounds ev in [200:400];
+			      
+@ProvidesSymmetricTangentOperator;
+@Integrator{
+  static_cast<void>(smt); // remove compiler warning
+  const stress lambda = computeLambda(young,nu);
+  const stress mu     = computeMu(young,nu);
+  sig = lambda*trace(eto+deto)*StrainStensor::Id()+2*mu*(eto+deto);
+  if(computeTangentOperator_){
+    Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
+  }
+}

@@ -1,0 +1,20 @@
+@DSL MaterialLaw;
+@Law MaterialPropertyErrnoCheck;
+
+@Includes{
+#include "TFEL/Math/General/IEEE754.hxx"
+}
+
+@Output E;
+E.setGlossaryName("YoungModulus");
+
+@Input T;
+T.setGlossaryName("Temperature");
+
+@Function
+{
+  E = acos(T);
+  if (tfel::math::ieee754::isnan(E)) {
+    E = 0;
+  }
+}

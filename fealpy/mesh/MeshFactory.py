@@ -11,7 +11,6 @@ from .StructureQuadMesh import StructureQuadMesh
 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
-from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
 from ..geometry import huniform

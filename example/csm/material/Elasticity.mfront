@@ -1,0 +1,54 @@
+@Behaviour Elasticity;
+@Author Helfer Thomas;
+@Date 23/11/06;
+@Description{
+ A very first test 
+ (the most simple one in fact).
+}
+
+@ModellingHypotheses {".+"};
+@ProvidesSymmetricTangentOperator;
+
+// Material properties
+@MaterialProperty stress young;
+young.setGlossaryName("YoungModulus");
+@MaterialProperty real   nu;
+nu.setGlossaryName("PoissonRatio");
+
+@ExternalStateVariable<AxisymmetricalGeneralisedPlaneStress> stress sigzz;
+AxisymmetricalGeneralisedPlaneStress::sigzz.setGlossaryName("AxialStress");
+
+// Lame Coefficients
+@LocalVariable stress lambda,mu;
+
+@InitLocalVariables{
+  lambda = computeLambda(young,nu);
+  mu = computeMu(young,nu);
+}
+
+@PredictionOperator{
+  static_cast<void>(smt); // remove unused variable warning
+  computeAlteredElasticStiffness<hypothesis,real>::exe(Dt,lambda,mu);
+}
+
+@Integrator{
+  sig = lambda*trace(eto+deto)*StrainStensor::Id()+2*mu*(eto+deto);
+  if(computeTangentOperator_){
+    Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
+  }
+}
+
+@Integrator<PlaneStress,Replace>{
+  // here we compute the tangent operator even if we don't need too
+  static_cast<void>(computeTangentOperator_);
+  computeAlteredElasticStiffness<hypothesis,real>::exe(Dt,lambda,mu);
+  sig = Dt*(eto+deto);
+}
+
+@Integrator<AxisymmetricalGeneralisedPlaneStress,Replace>{
+  // here we compute the tangent operator even if we don't need too
+  static_cast<void>(computeTangentOperator_);
+  computeAlteredElasticStiffness<hypothesis,real>::exe(Dt,lambda,mu);
+  sig = Dt*(eto+deto);
+  sig(2)=this->sigzz+this->dsigzz;
+}
