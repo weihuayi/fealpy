@@ -1,0 +1,15 @@
+@DSL MaterialLaw;
+@Law MaterialPropertyBoundCheck3;
+
+@Output E;
+E.setGlossaryName("YoungModulus");
+
+@Input T;
+T.setGlossaryName("Temperature");
+
+@Bounds T in ]*:300];
+
+@Function
+{
+  E = T;
+}

@@ -1,0 +1,13 @@
+@DSL MaterialLaw;
+@Law MaterialPropertyErrnoCheck2;
+
+@Output E;
+E.setGlossaryName("YoungModulus");
+
+@Input T;
+T.setGlossaryName("Temperature");
+
+@Function
+{
+  E = acos(T);
+}
