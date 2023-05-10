@@ -43,9 +43,14 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         """
         @brief 计算偏差
         """
+        '''
         diff = val - np.mean(val, axis=(1, 2))
         abs_val = np.abs(diff[:, ...])
         dev = np.mean(abs_val)
+        '''
+        I = np.eye(2)
+        tr = np.trace(val)
+        dev = val - (1/3) * tr * I
         return dev
 
     def disp_tangent_operator(self):
@@ -61,11 +66,21 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         tn = trs - tp # 负应变的迹
         trp, trn = self.macaulay_operation(trs) # 迹的麦考利运算
         dev = self.deviator(s) # 应变的偏差
-        tsp = kappa*trp**2/2.0 + mu *np.inner(dev, dev) # 正能量密度(用来更新历史函数)
-        print(trp.shape)
-        H = max(tsp, H) # 更新历史函数
-        g_d = (1-d)**2 + 1e-10
-        return tsp
+        val = np.einsum('ijk, ijk -> i', dev, dev)
+        tsp = kappa * trp**2/2.0 + mu * val 
+#        H = max(tsp, H) # 更新历史函数
+       
+        # 计算应力
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        g_d = (1-d(bc))**2 + 1e-10
+        sigma = np.einsum('i, ijk -> ijk', 2*mu*g_d, dev)
+        val = g_d * trp + trn
+        sigma[:, 0, 0] += val * kappa
+        sigma[:, 1, 1] += val * kappa
+
+        # 计算应力关于应变的偏导
+
+        return sigma
 
 
 
