@@ -1,0 +1,42 @@
+@DSL DefaultFiniteStrainDSL;
+@Behaviour SaintVenantKirchhoffElasticity;
+@Author Thomas Helfer;
+@Date 19/10/2013;
+@Description{
+  "The Saint Venant - Kirchhoff hyper elastic behaviour"
+}
+
+@MaterialProperty stress young;
+young.setGlossaryName("YoungModulus");
+@MaterialProperty real nu;
+nu.setGlossaryName("PoissonRatio");
+
+@LocalVariable stress lambda;   //<! First  LamÃ© coefficient
+@LocalVariable stress mu;       //<! Second LamÃ© coefficient
+@LocalVariable StrainStensor e; //<! Green-Lagrange strain
+
+@InitLocalVariables{
+  lambda = computeLambda(young,nu);
+  mu     = computeMu(young,nu);
+}
+
+@PredictionOperator<DS_DEGL>{
+  static_cast<void>(smt);
+  Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
+}
+
+@Integrator{
+  e = computeGreenLagrangeTensor(F1);
+  const auto s = lambda*trace(e)*StrainStensor::Id()+2*mu*e;
+  sig = convertSecondPiolaKirchhoffStressToCauchyStress(s,F1);
+}
+
+@TangentOperator<DS_DEGL>{
+  static_cast<void>(smt);
+  Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
+}
+
+@InternalEnergy{
+  const auto tr = trace(e);
+  Psi_s = lambda*tr*tr/2+mu*(e|e);
+}

@@ -1,0 +1,16 @@
+@DSL Implicit;
+@Author Thomas Helfer;
+@Date 3 / 08 / 2018;
+@Behaviour Norton;
+@Description {
+  "This file implements the Norton law "
+  "using the StandardElastoViscoplasticity brick"
+}
+
+@ModellingHypotheses{".+"};
+@Epsilon 1.e-16;
+
+@Brick StandardElastoViscoPlasticity{
+  stress_potential : "Hooke" {young_modulus : 150e9, poisson_ratio : 0.3},
+  inelastic_flow : "Norton" {criterion : "Mises", A : 8.e-67, n : 8.2, K : 1}
+};

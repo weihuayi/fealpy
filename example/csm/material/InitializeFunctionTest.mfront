@@ -1,0 +1,29 @@
+@DSL Implicit;
+@Behaviour InitializeFunctionTest;
+@Author Thomas Helfer;
+@Date 03 / 02 / 2022;
+
+@Algorithm NewtonRaphson;
+@Epsilon 1.e-14;
+@Theta 1;
+
+@Brick StandardElastoViscoPlasticity{
+  stress_potential : "Hooke" {young_modulus : 200e9, poisson_ratio : 0.3},
+  inelastic_flow : "Plastic" {
+    criterion : "Mises",
+    isotropic_hardening : "Linear" {R0 : 150e6},
+    kinematic_hardening : "Armstrong-Frederick" {C : 40e6, D : 0.3}
+  }
+};
+
+@InitializeFunction ElasticStrainFromInitialStress {
+  const auto K = young / (3 * (1 - 2 * nu));
+  const auto pr = trace(sig) / 3;
+  const auto s = deviator(sig);
+  eel = eval((pr / (3 * K)) * Stensor::Id() + s / (2 * mu));
+}
+
+@InitializeFunctionVariable stress pr;
+@InitializeFunction StressFromInitialPressure {
+  sig = pr * Stensor::Id();
+}

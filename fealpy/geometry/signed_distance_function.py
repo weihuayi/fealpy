@@ -1,30 +1,27 @@
 import numpy as np
 from .geoalg import project
 
-class DistDomain2d():
-    def __init__(self, fd, fh, bbox, pfix=None, *args):
-        self.params = fd, fh, bbox, pfix, args
-
-class DistDomain3d():
-    def __init__(self, fd, fh, bbox, pfix=None, *args):
-        self.params = fd, fh, bbox, pfix, args
-
 def dcircle(p, cxy=[0, 0], r=1):
     x = p[..., 0]
     y = p[..., 1]
     return np.sqrt((x - cxy[0])**2 + (y - cxy[1])**2) - r
 
 def drectangle(p, box):
-    return -dmin(dmin(dmin(p[:, 1] - box[2], box[3]-p[:,1]), p[:,0] - box[0]), box[1] - p[:,0])
+    x = p[..., 0]
+    y = p[..., 1]
+    d = dmin(y - box[2], box[3] - y)
+    d = dmin(d, x - box[0])
+    d = dmin(d, box[1] - x)
+    return -d
 
 def dsine(p, cxy, r):
-    x = p[:,0]
-    y = p[:,1]
+    x = p[..., 0]
+    y = p[..., 1]
     return (y - cxy[1]) - r*np.sin(x-cxy[0])
 
 def dparabolic(p, cxy, r):
-    x = p[:,0]
-    y = p[:,1]
+    x = p[..., 0]
+    y = p[..., 1]
     return (y - cxy[1])**2 - 2*r*x
 
 def dcurve(p, curve, maxit=200, tol=1e-12):

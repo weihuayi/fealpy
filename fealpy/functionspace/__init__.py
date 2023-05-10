@@ -18,6 +18,8 @@ from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d
 from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementSpace2d
 from .FirstNedelecFiniteElementSpace2d import FirstNedelecFiniteElementSpace2d
 from .FirstNedelecFiniteElementSpace3d import FirstNedelecFiniteElementSpace3d
+from .first_nedelec_fe_on_triangle_mesh import FirstNedelecFEOnTriangleMesh
+
 
 # PFEM
 from .ParametricLagrangeFiniteElementSpace import ParametricLagrangeFiniteElementSpace

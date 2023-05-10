@@ -1,4 +1,3 @@
-
 import numpy as np
 
 class GBezierSurface:
@@ -10,4 +9,3 @@ class GBezierSurface:
         """
         self.vert = vert
         self.node = node
-

@@ -1,0 +1,26 @@
+@Behaviour ParameterTest;
+@Author Helfer Thomas;
+@Date 13/11/2018;
+@Description{
+ "Test of how parameters are handled."
+}
+
+// Material properties
+@Parameter stress young = 150e9;
+@Parameter real nu    = 0.3;
+young.setGlossaryName("YoungModulus");
+nu.setGlossaryName("PoissonRatio");
+
+@Parameter real A[2] = {7, 2};
+A.setEntryName("ParametersArray");
+
+@ProvidesSymmetricTangentOperator;
+@Integrator{
+  static_cast<void>(smt); // remove compiler warning
+  const stress lambda = computeLambda(young,nu);
+  const stress mu     = computeMu(young,nu);
+  sig = lambda*trace(eto+deto)*StrainStensor::Id()+2*mu*(eto+deto);
+  if(computeTangentOperator_){
+    Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
+  }
+}
