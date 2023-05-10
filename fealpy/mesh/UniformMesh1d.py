@@ -564,6 +564,33 @@ class UniformMesh1d(Mesh1d):
 
         return A0, A1, A2
 
+def ExcitationTube_operator_windward(self, a, tau):
+    r = a*tau/self.h
+
+    NN = self.number_of_nodes()
+    k = np.arange(NN)
+
+    if a > 0:
+        A = diags([1 - r], [0], shape=(NN, NN), format='csr')
+
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(r, (NN-1, ))
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+
+        return A
+    else:
+        B = diags([1 + r], [0], shape=(NN, NN), format='csr')
+
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(-r, (NN-1, ))
+        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return B
+
     ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
         """
