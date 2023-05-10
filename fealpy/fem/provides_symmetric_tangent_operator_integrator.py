@@ -69,9 +69,17 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         val = np.einsum('ijk, ijk -> i', dev, dev)
         tsp = kappa * trp**2/2.0 + mu * val 
 #        H = max(tsp, H) # 更新历史函数
-        g_d = (1-d)**2 + 1e-10
-        sigma = (g_d * trp + trn) * kappa * np.eyes(2) + 2 * mu * g_d * dev
-        print(sigma.shape)
+       
+        # 计算应力
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        g_d = (1-d(bc))**2 + 1e-10
+        sigma = np.einsum('i, ijk -> ijk', 2*mu*g_d, dev)
+        val = g_d * trp + trn
+        sigma[:, 0, 0] += val * kappa
+        sigma[:, 1, 1] += val * kappa
+
+        # 计算应力关于应变的偏导
+
         return sigma
 
 
