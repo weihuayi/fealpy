@@ -28,7 +28,7 @@ class ScalarMassIntegrator:
         ldof = space.number_of_local_dofs()  
 
         if out is None:
-            M = np.zeros((NC, ldof, ldof), dtype=space0.ftype)
+            M = np.zeros((NC, ldof, ldof), dtype=space.ftype)
         else:
             M = out
 
@@ -36,7 +36,6 @@ class ScalarMassIntegrator:
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof)
-
         if coef is None:
             M += np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:

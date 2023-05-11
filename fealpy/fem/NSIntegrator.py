@@ -1,18 +1,15 @@
 import numpy as np
 
 class NSOperatorIntegrator:
-    def __init__(self, lam, mu, q=None):
-        self.lam = lam
+    def __init__(self, mu=None, q=None):
         self.mu = mu
         self.q = q 
 
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
-        construct the linear elasticity fem matrix
+        construct the mu * (epslion(u), epslion(v)) fem matrix
         """
 
-        lam = self.lam
-        mu = self.mu
         mesh = space[0].mesh
         ldof = space[0].number_of_local_dofs()
         p = space[0].p
@@ -48,30 +45,26 @@ class NSOperatorIntegrator:
 
         D = 0
         for i in range(GD):
-            D += mu*A[imap[(i, i)]]
+            D += 1/2*A[imap[(i, i)]]
         
         if space[0].doforder == 'sdofs': # 标量自由度优先排序 
             for i in range(GD):
                 for j in range(i, GD):
                     if i == j:
-                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D 
-                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += (mu + lam)*A[imap[(i, i)]]
+                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D  
+                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += 1/2*A[imap[(i, i)]]
                     else:
-                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += lam*A[imap[(i, j)]] 
-                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += mu*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += lam*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += mu*A[imap[(i, j)]]
+                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += 1/2*A[imap[(i, j)]].transpose(0, 2, 1)
+                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += 1/2*A[imap[(i, j)]]
         elif space[0].doforder == 'vdims':
             for i in range(GD):
                 for j in range(i, GD):
                     if i == j:
                         K[:, i::GD, i::GD] += D 
-                        K[:, i::GD, i::GD] += (mu + lam)*A[imap[(i, i)]]
+                        K[:, i::GD, i::GD] += 1/2*A[imap[(i, i)]]
                     else:
-                        K[:, i::GD, j::GD] += lam*A[imap[(i, j)]] 
-                        K[:, i::GD, j::GD] += mu*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j::GD, i::GD] += lam*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j::GD, i::GD] += mu*A[imap[(i, j)]]
+                        K[:, i::GD, j::GD] += 1/2*A[imap[(i, j)]].transpose(0, 2, 1)
+                        K[:, j::GD, i::GD] += 1/2*A[imap[(i, j)]]
         if out is None:
             return K
 
