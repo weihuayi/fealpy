@@ -564,32 +564,87 @@ class UniformMesh1d(Mesh1d):
 
         return A0, A1, A2
 
-def ExcitationTube_operator_windward(self, a, tau):
-    r = a*tau/self.h
+    def hyperbolic_operator_explicity_upwind(self, a, tau):
+        """
+        @brief 双曲方程的显式迎风格式
+        """
+        r = a*tau/self.h
 
-    NN = self.number_of_nodes()
-    k = np.arange(NN)
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 1.0")
 
-    if a > 0:
-        A = diags([1 - r], [0], shape=(NN, NN), format='csr')
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
 
+        if a > 0:
+            A = diags([1 - r], [0], shape=(NN, NN), format='csr')
+
+            I = k[1:]
+            J = k[0:-1]
+
+            val = np.broadcast_to(r, (NN-1, ))
+            A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+
+            return A
+        else:
+            B = diags([1 + r], [0], shape=(NN, NN), format='csr')
+
+            I = k[1:]
+            J = k[0:-1]
+
+            val = np.broadcast_to(-r, (NN-1, ))
+            B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+            return B
+
+
+    def hyperbolic_operator_explicity_upwind_with_viscous(self, a, tau):
+        """
+        @brief 带粘性项的显式迎风格式 
+        """
+        r = a*tau/self.h
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1-np.abs(r)], [0], shape=(NN, NN), format='csr')
+        val0 = np.broadcast_to(1/2*np.abs(r)-1/2*r, (NN-1, ))
+        val1 = np.broadcast_to(1/2*r+1/2*np.abs(r), (NN-1, ))
         I = k[1:]
         J = k[0:-1]
-
-        val = np.broadcast_to(r, (NN-1, ))
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-
+        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A
-    else:
-        B = diags([1 + r], [0], shape=(NN, NN), format='csr')
 
-        I = k[1:]
-        J = k[0:-1]
+    def hyperbolic_operator_explicity_lax_friedrichs(self, a, tau):
+        """
+        @brief lax_friedrichs 格式
+        """
+        pass
 
-        val = np.broadcast_to(-r, (NN-1, ))
-        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+    def hyperbolic_operator_implicity_upwind(self, a, tau):
+        """
+        @brief 隐式迎风格式
+        """
+        pass
 
-        return B
+    def hyperbolic_operator_implicity_center(self, a, tau):
+        """
+        @brief 隐式中心格式
+        """
+
+    def hyperbolic_operator_leap_frog(self, a, tau):
+        """
+        @brief 蛙跳格式
+        """
+        pass
+
+    def hyperbolic_operator_lax_wendroff(self, a, tau):
+        """
+        @brief Lax-Wendroff 格式
+        """
+        pass
+
 
     ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
