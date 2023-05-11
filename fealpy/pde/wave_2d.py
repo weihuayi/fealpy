@@ -53,22 +53,11 @@ class MembraneOscillationPDEData:
         @param[in] t float, 时间点 
         @return 返回 val
         """
+
         x, y = p[..., 0], p[..., 1]
-        val = np.zeros_like(x)
-        
-        flag1 = (x < 0.5) & (y < 0.5)
-        val[flag1] = (1 / 6) * x[flag1] * y[flag1]
-        
-        flag2 = (x >= 0.5) & (y < 0.5)
-        val[flag2] = (1 / 3) * (1 - x[flag2]) * y[flag2]
-        
-        flag3 = (x >= 0.5) & (y >= 0.5)
-        val[flag3] = (1 / 2) * (1 - x[flag3]) * (1 - y[flag3])
-        
-        flag4 = (x < 0.5) & (y >= 0.5)
-        val[flag4] = (1 / 2) * x[flag4] * (1 - y[flag4])
-        
-        return val
+        eps = 0.01
+        pi = np.pi
+        return eps*np.sin(pi*x)*np.sin(pi*y)
     
     @cartesian
     def init_solution_diff_t(self, p):
