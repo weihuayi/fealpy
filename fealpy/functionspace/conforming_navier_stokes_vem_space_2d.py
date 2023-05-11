@@ -6,7 +6,6 @@ from numpy.linalg import inv
 
 
 class ConformingNavierStokesVEMSpace2d:
-
     def __init__(self, mesh, p=1):
         self.mesh = mesh
         self.p = p
@@ -95,6 +94,9 @@ class CNSVEMDof2d:
         return cell2dof, cell2dofLocation
 
     def number_of_global_dofs(self):
+        """
+        @brief 返回全局自由度的个数
+        """
         mesh = self.mesh
         p = self.p
         
@@ -103,18 +105,26 @@ class CNSVEMDof2d:
         NC = mesh.number_of_cells()
         gdof = 2*NN
         gdof += 2*NE*(p-1)
-        gdof += NC*((p-1)*p)
-        
+        gdof += NC*(p-1)*p
         return gdof
     
-    def number_of_local_dofs(self):
+    def number_of_local_dofs(self, doftype='all'):
+        """
+        @brief  返回每个单元自由度的个数
+        """
         mesh = self.mesh
         p = self.p
-        
-        NV = mesh.number_of_vertices_of_cells()
-        ldof = 2*p*NV+(p-1)*p
-        
-        return ldof
+
+        if doftype in {'all'}:
+            NV = mesh.number_of_vertices_of_cells()
+            ldof = 2*p*NV+(p-1)*p
+            return ldof
+        elif doftype in {'cell', 2}:
+            return (p-1)*p
+        elif doftype in {'edge', 'face', 1}:
+            return 2*(p+1) 
+        elif doftype in {'node', 0}:
+            return 2
         
 
 

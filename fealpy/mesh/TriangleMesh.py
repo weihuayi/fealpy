@@ -339,7 +339,7 @@ class TriangleMesh(Mesh2d):
         NC = self.number_of_cells()
         return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
 
-    def interpolation_points(self, p, index=np.s_[:]):
+    def interpolation_points(self, p: int, index=np.s_[:]):
         """
         @brief 获取三角形网格上所有 p 次插值点
         TODO index
