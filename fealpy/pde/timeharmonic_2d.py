@@ -19,7 +19,7 @@ class InHomogeneousData:
             (1, 1),
             (-1, 1)], dtype=np.float64)
 
-        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
         mesh = TriangleMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
@@ -139,10 +139,10 @@ class CosSinData:
             (0, 0),
             (1, 0),
             (1, 1),
-            (0, 1)], dtype=np.float)
+            (0, 1)], dtype=np.float64)
 
         if meshtype == 'quadtree':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
@@ -156,15 +156,15 @@ class CosSinData:
                 (1, 0.4),
                 (0.3, 1),
                 (0, 0.6),
-                (0.5, 0.45)], dtype=np.float)
+                (0.5, 0.45)], dtype=np.float64)
             cell = np.array([
                 (0, 4, 8, 7), (4, 1, 5, 8),
-                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int)
+                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int_)
             mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype == 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
