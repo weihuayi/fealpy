@@ -96,7 +96,7 @@ dtype = [("position", "float64", (2, )),
          ("C", "float64", (2, 2)),
          ("J", "float64")]
 particles = np.zeros(num_particles, dtype=dtype)
-
+print(particles[0]["position"])
 # 初始化
 particles["position"] = 0.4*np.random.rand(num_particles, 2) + 0.2
 particles["velocity"] = np.array([0, -1])
