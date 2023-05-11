@@ -142,6 +142,4 @@ fig, axes = plt.subplots()
 box = args.box
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, dis_format, frames=nt + 1)
-# mesh.show_animation(fig, axes, box, advance_backward, frames=nt + 1)
-# mesh.show_animation(fig, axes, box, advance_crank_nicholson, frames=nt + 1)
 plt.show()
