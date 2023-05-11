@@ -17,11 +17,13 @@ from .scalar_source_integrator import ScalarSourceIntegrator
 # Integrator for vector case
 from .vector_source_integrator import VectorSourceIntegrator
 from .vector_diffusion_integrator import VectorDiffusionIntegrator
+from .vector_mass_integrator import VectorMassIntegrator
 
 from .truss_structure_integrator import TrussStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
 from .convection_integrator import ConvectionIntegrator
 from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
+from .NSIntegrator import NSOperatorIntegrator
 
 from .provides_symmetric_tangent_operator_integrator import ProvidesSymmetricTangentOperatorIntegrator
 

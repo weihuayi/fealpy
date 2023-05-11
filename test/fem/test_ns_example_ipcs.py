@@ -8,57 +8,47 @@
 	@ref 
 '''  
 import numpy as np
+from scipy.sparse import bmat,csr_matrix,hstack,vstack,spdiags
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.fem import DiffusionIntegrator, MassIntegrator, ConvectionIntegrator
-from fealpy.fem import LinearElasticityOperatorIntegrator
-from fealpy.decorator import cartesian, barycentric
-from fealpy.fem import LinearForm
-from fealpy.fem import BilinearForm
-from fealpy.fem import DirichletBC
-from fealpy.fem import SourceIntegrator
 from fealpy.timeintegratoralg import UniformTimeLine
-from scipy.sparse import csr_matrix,bmat
 
-T=2
-nt=100
-ns = 20
-p = 2
+from scipy.sparse import csr_matrix,hstack,vstack,spdiags
+from fealpy.fem import ScalarDiffusionIntegrator, VectorMassIntegrator
+from fealpy.fem import NSOperatorIntegrator
+from fealpy.fem import BilinearForm
+T=10
+nt=50
+ns = 16
+rho = 1
+mu = 1
+
 mesh = TriangleMesh.from_unit_square(nx=ns, ny=ns)
-space = LagrangeFESpace(mesh,p=p,doforder='sdofs')
-oldspace = LagrangeFiniteElementSpace(mesh,p=p)
 timeline = UniformTimeLine(0,T,nt)
+uspace = LagrangeFESpace(mesh,p=2,doforder='sdofs')
+pspace = LagrangeFESpace(mesh,p=1,doforder='sdofs')
 dt = timeline.dt
 
-bform = BilinearForm(2*(space,))
-#bform.add_domain_integrator(MassIntegrator())
-#bform.add_domain_integrator(DiffusionIntegrator())
-bform.add_domain_integrator(LinearElasticityOperatorIntegrator(lam=0,mu=0.5))
-bform.assembly()
-A = bform.get_matrix()
+# 第一个
+Vbform = BilinearForm(2*(uspace,))
+Vbform.add_domain_integrator(VectorMassIntegrator(rho/dt))
+Vbform.add_domain_integrator(NSOperatorIntegrator(mu))
+#Vbform.add_domain_integrator(NSOperatorIntegrator(1,3))
+Vbform.assembly()
+A = Vbform.get_matrix()
+print(np.sum(np.abs(A.toarray())))
 
+#第二个
+Sbform = BilinearForm(pspace)
+Sbform.add_domain_integrator(ScalarDiffusionIntegrator(c=1))
+Sbform.assembly()
+B = Sbform.get_matrix()
+print(np.sum(np.abs(B.toarray())))
 
-qf = mesh.integrator(4,'cell')
-bcs,ws = qf.get_quadrature_points_and_weights()
-cellmeasure = mesh.entity_measure('cell')
-ugphi = oldspace.grad_basis(bcs)
-ugdof = oldspace.number_of_global_dofs()
-ucell2dof = oldspace.cell_to_dof()
-E0 = np.einsum('i,ijk,ijm,j -> jkm',ws,ugphi[...,0],ugphi[...,0],cellmeasure)
-E1 = np.einsum('i,ijk,ijm,j -> jkm',ws,ugphi[...,1],ugphi[...,1],cellmeasure)
-E2 = np.einsum('i,ijk,ijm,j -> jkm',ws,ugphi[...,0],ugphi[...,1],cellmeasure)
-E3 = np.einsum('i,ijk,ijm,j -> jkm',ws,ugphi[...,1],ugphi[...,0],cellmeasure)
-I = np.broadcast_to(ucell2dof[:,:,None],shape = E0.shape)
-J = np.broadcast_to(ucell2dof[:,None,:],shape = E0.shape)
-E00 = csr_matrix(((E0+1/2*E1).flat,(I.flat,J.flat)),shape=(ugdof,ugdof))
-E11 = csr_matrix(((E1+1/2*E0).flat,(I.flat,J.flat)),shape=(ugdof,ugdof))
-E10 = csr_matrix(((1/2*E2).flat,(I.flat,J.flat)),shape=(ugdof,ugdof))
-E01 = csr_matrix(((1/2*E3).flat,(I.flat,J.flat)),shape=(ugdof,ugdof))
-E = bmat([[E00,E01],[E10,E11]])
-
-#AA = oldspace.mass_matrix()
-AA = oldspace.stiff_matrix()
-AA = bmat([[AA,None],[None,AA]])
-print(np.sum(np.abs(E-A)))
-
+#第三个
+Vbform1 = BilinearForm(2*(uspace,))
+Vbform1.add_domain_integrator(VectorMassIntegrator(c=1))
+Vbform1.assembly()
+C = Vbform1.get_matrix()
+print(np.sum(np.abs(C.toarray())))
