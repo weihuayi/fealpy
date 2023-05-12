@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+# 
+
+from typing import Callable, Tuple, Any
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-
 from scipy.sparse.linalg import spsolve
 from fealpy.pde.parabolic_2d import SinSinExpPDEData
 from fealpy.mesh import UniformMesh2d
@@ -67,9 +70,9 @@ tau = (duration[1] - duration[0])/nt
 uh0 = mesh.interpolate(pde.init_solution, intertype='node') # uh0.shape = (nx+1, ny+1)
 
 # 三种时间步进格式
-from typing import Callable, Tuple, Any
 
-def advance_forward(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.float64]:
+def advance_forward(
+        n: int, *frags: Any) -> Tuple[np.ndarray, float]:
     """
     @brief 时间步进格式为向前欧拉方法
     
@@ -84,7 +87,7 @@ def advance_forward(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.float64]:
         source = lambda p: pde.source(p, t + tau)
         f = mesh.interpolate(source, intertype='node')
         
-        uh0[:].flat = A@uh0[:].flat + (tau*f[:]).flat
+        uh0.flat = A@uh0.flat + (tau*f).flat
         gD = lambda p: pde.dirichlet(p, t+tau)
         mesh.update_dirichlet_bc(gD, uh0)
         
@@ -94,7 +97,8 @@ def advance_forward(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.float64]:
         return uh0, t
 
 
-def advance_backward(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.float64]:
+def advance_backward(
+        n: int, *frags: Any) -> Tuple[np.ndarray, float]:
     """
     @brief 时间步进格式为向后欧拉方法
     
@@ -120,7 +124,8 @@ def advance_backward(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.float64]:
         print(f"the max error is {e}")
         return uh0, t
 
-def advance_crank_nicholson(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.float64]:
+def advance_crank_nicholson(
+        n: int, *frags: Any) -> Tuple[np.ndarray, float]:
     """
     @brief 时间步进格式为 CN 方法
     
@@ -132,9 +137,10 @@ def advance_crank_nicholson(n: np.int_, *frags: Any) -> Tuple[np.ndarray, np.flo
     else:
         A, B = mesh.parabolic_operator_crank_nicholson(tau)
         source = lambda p: pde.source(p, t + tau)
-        f = mesh.interpolate(source, intertype='node') # f.shape = (nx+1,ny+1)
+        # f.shape = (nx+1,ny+1)
+        f = mesh.interpolate(source, intertype='node') 
         f *= tau
-        f.flat[:] += B@uh0.flat[:]
+        f.flat += B@uh0.flat
          
         gD = lambda p: pde.dirichlet(p, t+tau)
         A, f = mesh.apply_dirichlet_bc(gD, A, f)
@@ -157,7 +163,5 @@ else:
 
 fig, axes = plt.subplots()
 box = args.box
-# mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
 mesh.show_animation(fig, axes, box, dis_format, frames=nt + 1)
-# mesh.show_animation(fig, axes, box, advance_crank_nicholson, frames=nt + 1)
 plt.show()

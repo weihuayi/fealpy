@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# 
+
 import argparse
 
 import numpy as np
@@ -49,7 +52,6 @@ domain = pde.domain()
 hx = (domain[1] - domain[0])/nx
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
 node = mesh.node
-isBdNode = mesh.ds.boundary_node_flag()
 
 # 时间离散
 duration = pde.duration()
