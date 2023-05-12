@@ -28,23 +28,22 @@ _array_redirectable = Union[NDArray, Redirector[NDArray]]
 
 class MeshDataStructure(metaclass=ABCMeta):
     """
-    @brief The abstract base class for all mesh types in FEALPy.
+    @brief The abstract base class for all mesh data structure types in FEALPy.
 
     This can not be instantialized before all abstract methods being implemented.
 
     Besides, this class attribute need to define:
     - `TD`: int, the topology dimension of mesh.
 
-    This base class have already provide some frequently-used methods:
+    This base class have already provide some methods:
     - Number of entities:
     such as `number_of_cells()`, `number_of_nodes_of_cells()` and other similar
     number-counting methods.
     - Neighbor info from other to node:
     they are `cell_to_node`, `face_to_node`, `edge_to_node`.
 
-    A final mesh data structure class is supposed able to calculate any neighber
-    relationship between mesh entities. These methods may be named like
-    `cell_to_edge()`, `face_to_node()`, ...
+    A final mesh data structure class is supposed able to calculate critical
+    relationship between mesh entities. They are abstracts listed below.
 
     Abstract methods list:
     - `cell_to_edge`
@@ -64,19 +63,35 @@ class MeshDataStructure(metaclass=ABCMeta):
     # counters
 
     def number_of_cells(self):
-        """Number of cells"""
+        """
+        @brief Return the number of cells in the mesh.
+
+        This is done by getting the length of `cell` array.
+        """
         return len(self.cell)
 
     def number_of_faces(self):
-        """Number of faces"""
+        """
+        @brief Return the number of faces in the mesh.
+
+        This is done by getting the length of `face` array. Make sure the `face`
+        array is calculated when calling this method.
+        """
         return len(self.face)
 
     def number_of_edges(self):
-        """Number of edges"""
+        """
+        @brief Return the number of edges in the mesh.
+
+        This is done by getting the length of `edge` array. Make sure the `edge`
+        array is calculated when calling this method.
+        """
         return len(self.edge)
 
     def number_of_nodes(self):
-        """Number of nodes"""
+        """
+        @brief Return the number of nodes in the mesh.
+        """
         return self.NN
 
     # cell
@@ -210,7 +225,8 @@ class HomogeneousMeshDS(MeshDataStructure):
     """
     @brief Data structure for meshes with homogeneous shape of cells.
 
-    In this subclass, `localFace` and `localEdge` are intruduced.
+    In this subclass, `localFace` and `localEdge` are intruduced, and the `construct()`
+    method are used.
     """
     # Constants
     ccw: NDArray
@@ -276,23 +292,45 @@ class HomogeneousMeshDS(MeshDataStructure):
             del self.edge2cell
 
     def number_of_vertices_of_cells(self) -> int:
-        """Number of vertices in a cell"""
+        """
+        @brief Return the number of vertices in a cell.
+        """
         return self.cell.shape[-1]
 
     def number_of_edges_of_cells(self) -> int:
-        """Number of edges in a cell"""
+        """
+        @brief Return the number of edges in a cell.
+
+        This is equal to the length of `localEdge` in axis-0, usually be marked
+        as NEC.
+        """
         return self.localEdge.shape[0]
 
     def number_of_faces_of_cells(self) -> int:
-        """Number of faces in a cell"""
+        """
+        @brief Return the number of faces in a cell.
+
+        This is equal to the length of `localFace` in axis-0, usually be marked
+        as NFC.
+        """
         return self.localFace.shape[0]
 
     def number_of_vertices_of_faces(self) -> int:
-        """Number of vertices in a face"""
+        """
+        @brief Return the number of vertices in a face.
+
+        This is equal to the length of `localFace` in axis-1, usually be marked
+        as NVF.
+        """
         return self.localFace.shape[-1]
 
     def number_of_vertices_of_edges(self) -> int:
-        """Number of vertices in an edge"""
+        """
+        @brief Return the number of vertices in an edge.
+
+        This is equal to the length of `localEdge` in axis-1, usually be marked
+        as NVE.
+        """
         return self.localEdge.shape[-1]
 
     number_of_nodes_of_cells = number_of_vertices_of_cells
