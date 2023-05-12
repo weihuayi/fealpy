@@ -19,5 +19,5 @@
 | 刘志   | 1985547582@qq.com           | july-liuzhi   |
 | 黄春蕾 |                             |               |
 | 刘洋   | 89122231@qq.com             | liuyang778    |
-| 丁人杰 |
+| 丁人杰 | 18379451180@163.com         | Dingrenjiemath|
 | 陈潮林 |
