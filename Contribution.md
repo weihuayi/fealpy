@@ -13,7 +13,7 @@
 | 彭淼颖 | 530334303@qq.com            |               |
 | 刘琴   | 2655493031@qq.com           | BellaLq       |
 | 何亮   | 894758682@qq.com            | brighthe      |
-| 刘嘉旺 |                             |               |
+| 刘嘉旺 | 15674760037@163.com         | Liujiawangmath|
 | 汪文彬 | 1243702877@qq.com           | Wangwenbinmath|
 | 张靖红 |                             |               |
 | 刘志   | 1985547582@qq.com           | july-liuzhi   |
