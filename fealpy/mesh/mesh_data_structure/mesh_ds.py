@@ -18,6 +18,9 @@ class Redirector(Generic[_VT]):
     def __set__(self, obj, val: _VT) -> None:
         setattr(obj, self._target, val)
 
+    def __delete__(self, obj) -> None:
+        delattr(obj, self._target)
+
 
 _int_redirectable = Union[int, Redirector[int]]
 _array_redirectable = Union[NDArray, Redirector[NDArray]]
@@ -206,16 +209,13 @@ class MeshDataStructure(metaclass=ABCMeta):
 class HomogeneousMeshDS(MeshDataStructure):
     """
     @brief Data structure for meshes with homogeneous shape of cells.
+
+    In this subclass, `localFace` and `localEdge` are intruduced.
     """
     # Constants
-    NEC: _int_redirectable
-    NFC: _int_redirectable
-    NEF: int
     ccw: NDArray
     localEdge: NDArray
     localFace: NDArray
-    localFace2edge: NDArray
-    localEdge2face: NDArray
 
     def __init__(self, NN: int, cell: NDArray) -> None:
         self.reinit(NN=NN, cell=cell)
@@ -226,7 +226,54 @@ class HomogeneousMeshDS(MeshDataStructure):
         self.itype = cell.dtype
         self.construct()
 
-    construct: Callable[[], None]
+    def construct(self) -> None:
+        NC = self.number_of_cells()
+
+        total_face = self.total_face()
+        _, i0, j = np.unique(
+            np.sort(total_face, axis=1),
+            return_index=True,
+            return_inverse=True,
+            axis=0
+        )
+        self.face = total_face[i0, :]
+        NFC = self.number_of_faces_of_cells()
+        NF = i0.shape[0]
+
+        self.face2cell = np.zeros((NF, 4), dtype=self.itype)
+
+        i1 = np.zeros(NF, dtype=self.itype)
+        i1[j] = np.arange(NF, dtype=self.itype)
+
+        self.face2cell[:, 0] = i0 // NFC
+        self.face2cell[:, 1] = i1 // NFC
+        self.face2cell[:, 2] = i0 % NFC
+        self.face2cell[:, 3] = i1 % NFC
+
+        if self.TD == 3:
+            total_edge = self.total_edge()
+
+            _, i2, j = np.unique(
+                np.sort(total_edge, axis=1),
+                return_index=True,
+                return_inverse=True,
+                axis=0
+            )
+            self.edge = total_edge[i2, :]
+            self.cell2edge = np.reshape(j, (NC, NFC))
+
+        elif self.TD == 2:
+            self.edge2cell = self.face2cell
+
+    def clean(self) -> None:
+        del self.face # this also deletes edge in 2-d mesh.
+        del self.face2cell
+
+        if self.TD == 3:
+            del self.edge
+            del self.cell2edge
+        elif self.TD == 2:
+            del self.edge2cell
 
     def number_of_vertices_of_cells(self) -> int:
         """Number of vertices in a cell"""
@@ -234,11 +281,11 @@ class HomogeneousMeshDS(MeshDataStructure):
 
     def number_of_edges_of_cells(self) -> int:
         """Number of edges in a cell"""
-        return self.NEC
+        return self.localEdge.shape[0]
 
     def number_of_faces_of_cells(self) -> int:
         """Number of faces in a cell"""
-        return self.NFC
+        return self.localFace.shape[0]
 
     def number_of_vertices_of_faces(self) -> int:
         """Number of vertices in a face"""
