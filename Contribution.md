@@ -16,7 +16,7 @@
 | 刘嘉旺 |                             |               |
 | 汪文彬 | 1243702877@qq.com           | Wangwenbinmath|
 | 张靖红 |                             |               |
-| 刘志   |                             |               |
+| 刘志   | 1985547582@qq.com           | july-liuzhi   |
 | 黄春蕾 |                             |               |
 | 刘洋   | 89122231@qq.com             | liuyang778    |
 | 丁人杰 |
