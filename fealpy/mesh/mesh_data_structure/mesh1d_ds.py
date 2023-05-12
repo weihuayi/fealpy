@@ -17,8 +17,6 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
 
     # Constants
     TD = 1
-    NEC = 1
-    NFC = 2
     localEdge = np.array([(0, 1)], dtype=np.int_)
     localFace = np.array([(0, ), (1, )], dtype=np.int_)
 
@@ -26,9 +24,6 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     def face(self):
         NN = self.number_of_nodes()
         return np.arange(NN, dtype=self.itype).reshape(NN, 1)
-
-    def construct(self) -> None:
-        pass
 
     ### cell ###
 

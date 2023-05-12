@@ -19,50 +19,6 @@ class Mesh3dDataStructure(MeshDataStructure):
     # Constants
     TD: int = 3
 
-    def construct(self):
-        NC = self.number_of_cells()
-
-        totalFace = self.total_face()
-
-        _, i0, j = np.unique(
-                np.sort(totalFace, axis=1),
-                return_index=True,
-                return_inverse=True,
-                axis=0)
-
-        self.face = totalFace[i0]
-
-        NF = i0.shape[0]
-        self.NF = NF
-
-        self.face2cell = np.zeros((NF, 4), dtype=self.itype)
-
-        i1 = np.zeros(NF, dtype=self.itype)
-        NFC = self.number_of_faces_of_cells()
-        i1[j] = np.arange(NFC*NC)
-
-        self.face2cell[:, 0] = i0 // NFC
-        self.face2cell[:, 1] = i1 // NFC
-        self.face2cell[:, 2] = i0 % NFC
-        self.face2cell[:, 3] = i1 % NFC
-
-        totalEdge = self.total_edge()
-        self.edge, i2, j = np.unique(
-                np.sort(totalEdge, axis=1),
-                return_index=True,
-                return_inverse=True,
-                axis=0)
-        NEC = self.number_of_edges_of_cells()
-        self.cell2edge = np.reshape(j, (NC, NEC))
-        self.NE = self.edge.shape[0]
-
-    def clear(self):
-        self.face = None
-        self.edge = None
-        self.face2cell = None
-        self.cell2edge = None
-
-
     ### Cell ###
 
     def cell_to_edge(self, return_sparse=False):
