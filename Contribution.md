@@ -1,5 +1,3 @@
-
-
 # 贡献者
 
 | 姓名   | 邮箱                        | github账号    |
@@ -15,9 +13,11 @@
 | 彭淼颖 | 530334303@qq.com            |               |
 | 刘琴   | 2655493031@qq.com           | BellaLq       |
 | 何亮   | 894758682@qq.com            | brighthe      |
-| 刘嘉旺 |                             |               |
-| 汪文斌 |                             |               |
+| 刘嘉旺 | 15674760037@163.com         | Liujiawangmath|
+| 汪文彬 | 1243702877@qq.com           | Wangwenbinmath|
 | 张靖红 |                             |               |
-| 刘志   |                             |               |
+| 刘志   | 1985547582@qq.com           | july-liuzhi   |
 | 黄春蕾 |                             |               |
-| 刘洋   |                             |               |
+| 刘洋   | 89122231@qq.com             | liuyang778    |
+| 丁人杰 | 18379451180@163.com         | Dingrenjiemath|
+| 陈潮林 |
