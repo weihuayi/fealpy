@@ -4,6 +4,7 @@ Provide the `add_plot` API in Plotable.
 
 from typing import Optional, Union
 import numpy as np
+from numpy.typing import NDArray
 from .mesh import Mesh
 
 
@@ -71,29 +72,57 @@ class Plotable():
 
         A.scatter(axes=axes, points=bc, color=color, markersize=markersize)
         if showindex:
-            if index == np.s_[:]:
-                index = np.arange(bc.shape[0])
-            elif isinstance(index, np.ndarray):
-                if (index.dtype is np.bool_):
-                    index, = np.nonzero(index)
-            else:
-                raise TypeError("Unknown index format.")
             A.show_index(axes=axes, location=bc, number=index,
                          fontcolor=fontcolor, fontsize=fontsize)
 
-    def find_node(self, axes,
+    def find_node(self, axes, *,
+            node: Optional[NDArray]=None,
             index=np.s_[:],
             showindex=False,
             color='r', markersize=20,
             fontsize=16, fontcolor='r',
-            multi_index=None):
-        return self.find_entity(
-                axes, 'node', index=index,
-                showindex=showindex,
-                color=color,
-                markersize=markersize,
-                fontsize=fontsize,
-                fontcolor=fontcolor)
+            multi_index=None) -> None:
+        """
+        @brief Show nodes in the axes.
+
+        @param axes: The axes to draw points.
+        @param node: an array containing node to draw, optional. If not provided,\
+        use the nodes in the mesh.
+        @param index: an array or slice controlling the ID of nodes and providing\
+        index to be printed when `showindex == True`.
+        @param showindex: bool. Print indices of entities if `True`.
+        @param color: str | NDArray. Color of node points scattered, defualts to `'r'`.\
+        A string such as `'r'`, `'b'` or a float sequence containing RGB information,
+        like `[0.2, 0.4, 0.6]` are acceptable.
+        @param markersize: float. The size of node points scattered, defualts to 20.0.
+        @param fontsize: int. The size of indices printed, defaults to 16.
+        @param fontcolor: str | Sequence[float]. Color of indices font.
+        """
+        if node is None:
+            return self.find_entity(
+                    axes, 'node', index=index,
+                    showindex=showindex,
+                    color=color,
+                    markersize=markersize,
+                    fontsize=fontsize,
+                    fontcolor=fontcolor)
+        else:
+            from ..plotting import artist as A
+            from ..plotting.classic import array_color_map
+
+            if node.ndim == 1:
+                node_ = node[:, None]
+            else:
+                node_ = node
+
+            if isinstance(color, np.ndarray) and np.isreal(color[0]):
+                mapper = array_color_map(color, 'rainbow')
+                color = mapper.to_rgba(color)
+
+        A.scatter(axes=axes, points=node_, color=color, markersize=markersize)
+        if showindex:
+            A.show_index(axes=axes, location=node_, number=index,
+                            fontcolor=fontcolor, fontsize=fontsize)
 
     def find_edge(self, axes,
             index=np.s_[:],
