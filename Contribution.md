@@ -7,7 +7,7 @@
 | 王栋   |                             | wangdong19    |
 | 王鹏祥 | 2016750202@smail.xtu.edu.cn | WPengXiang    |
 | 高婷艺 |                             | gaotingyi     |
-| 田昊伦 | 2250213115@qq.com           |               |
+| 田昊伦 | 2250213115@qq.com           |  ChaosTHL     |
 | 陈康   | ck1193838646@163.com        | concha-k-chen |
 | 郑仰阳 |                             |               |
 | 彭淼颖 | 530334303@qq.com            |               |
