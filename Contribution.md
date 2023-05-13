@@ -20,4 +20,4 @@
 | 黄春蕾 |                             |               |
 | 刘洋   | 89122231@qq.com             | liuyang778    |
 | 丁人杰 | 18379451180@163.com         | Dingrenjiemath|
-| 陈潮林 |
+| 陈潮林 | 2767709137@qq.com           | Chaolinmath   |
