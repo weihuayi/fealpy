@@ -196,17 +196,19 @@ class PolygonMesh(Mesh2d, Plotable):
             return node
 
         gdof = self.number_of_global_ipoints(p)
-        ipoint = np.zeros((gdof, GD), dtype=self.ftype)
+        
 
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
+        NC = self.number_of_cells()
         start = 0
+        ipoint = np.zeros((gdof, GD), dtype=self.ftype)
         ipoint[start:NN, :] = node
 
         start += NN
 
-        edge = mesh.entity('edge')
+        edge = self.entity('edge')
         qf = self.integrator(p+1, etype='edge', qtype='lobatto')
         bcs = qf.quadpts[1:-1, :]
         ipoint[start:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs, node[edge, :]).reshape(-1, GD)
@@ -216,7 +218,7 @@ class PolygonMesh(Mesh2d, Plotable):
             ipoint[start:] = self.entity_barycenter('cell')
             return ipoint
 
-        h = np.sqrt(self.entity_measure('cell'))[:, None]*scale
+        h = np.sqrt(self.cell_area())[:, None]*scale
         bc = self.entity_barycenter('cell')
         t = np.array([
             [0.0, 0.0],
@@ -268,20 +270,56 @@ class PolygonMesh(Mesh2d, Plotable):
         raise NotImplementedError
 
     @classmethod
-    def from_one_triangle(cls):
-        pass
+    def from_one_triangle(cls, meshtype='iso'):
+        if meshtype == 'equ':
+            node = np.array([
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.5, np.sqrt(3)/2]], dtype=np.float_)
+        elif meshtype =='iso':
+            node = np.array([
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0]], dtype=np.float_)
+        cell = np.array([[0, 1, 2]],dtype=np.int_)
+        return cls(node, cell)
 
     @classmethod
     def from_one_square(cls):
-        pass
+        node = np.array([
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 1.0]],dtype=np.float_)
+        cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+        return cls(node, cell)
+
 
     @classmethod
-    def from_one_5(cls):
-        pass
+    def from_one_pentagon(cls):
+        pi = np.pi
+        node = np.array([
+            (0.0, 0.0),
+            (np.cos(2/5*pi), -np.sin(2/5*pi)),
+            (np.cos(2/5*pi)+1, -np.sin(2/5*pi)),
+            ( 2*np.cos(1/5*pi), 0.0),
+            (np.cos(1/5*pi), np.sin(1/5*pi))],dtype=np.float_) 
+        cell = np.array([0, 1, 2, 3, 4], dtype=np.int_)
+        cellLocation = np.array([0, 5], dtype=np.int_)
+        return cls(node, cell, cellLocation)
 
     @classmethod
-    def from_one_6(cls):
-        pass
+    def from_one_hexagon(cls):
+        node = np.array([
+            [0.0, 0.0],
+            [1/2, -np.sqrt(3)/2],
+            [3/2, -np.sqrt(3)/2],
+            [2.0, 0.0],
+            [3/2, np.sqrt(3)/2],
+            [1/2, np.sqrt(3)/2]], dtype=np.float_)
+        cell = np.array([0, 1, 2, 3, 4, 5], dtype=np.int_)
+        cellLocation = np.array([0, 6], dtype=np.int_)
+        return cls(node, cell ,cellLocation)
 
     @classmethod
     def from_mesh(cls, mesh: Mesh2d):
@@ -296,6 +334,25 @@ class PolygonMesh(Mesh2d, Plotable):
     def from_quadtree(cls, quadtree):
         node, cell, cellLocation = quadtree.to_pmesh()
         return cls(node, cell, cellLocation)
+    
+    
+    
+    def cell_area(self, index=None):
+        #TODO: 3D Case
+        NC = self.number_of_cells()
+        node = self.node
+        edge = self.ds.edge
+        edge2cell = self.ds.edge2cell
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        w = np.array([[0, -1], [1, 0]], dtype=self.itype)
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
+        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
+        a /=2
+        return a
+        
+    
 
 
 PolygonMesh.set_ploter('polygon2d')
