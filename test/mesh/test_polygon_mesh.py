@@ -36,8 +36,30 @@ def test_polygon_mesh_interpolation_points(p):
     mesh.find_node(axes, node=ips, showindex=True)
     plt.show()
 
+@pytest.mark.parametrize('meshtype', ['equ', 'iso'])
+def test_from_one_triangle(meshtype): 
+    mesh = PolygonMesh.from_one_triangle(meshtype=meshtype)
+    fig, axes = plt.subplots()
+    mesh.add_plot(axes)
+    mesh.find_node(axes, showindex=True)
+    mesh.find_cell(axes, showindex=True)
+    mesh.find_edge(axes, showindex=True)
+    plt.show()
+def test_from_one():
+    #mesh = PolygonMesh.from_one_square()
+    #mesh = PolygonMesh.from_one_pentagon() 
+    #mesh = PolygonMesh.from_one_hexagon()
+    fig, axes = plt.subplots()
+    mesh.add_plot(axes)
+    mesh.find_node(axes, showindex=True)
+    mesh.find_cell(axes, showindex=True)
+    mesh.find_edge(axes, showindex=True)
+    plt.show()
+
 
 if __name__ == "__main__":
     #test_polygon_mesh_constructor()
-    test_polygon_mesh_interpolation_points(1)
+    test_polygon_mesh_interpolation_points(4)
+    #test_from_one_triangle('iso')
+    #test_from_one()
 
