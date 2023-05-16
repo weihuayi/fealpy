@@ -1,12 +1,15 @@
 import numpy as np
 from mgis import behaviour as mg
 import ipdb
+from mfront_duild import mfront_build
 
 #ipdb.set_trace()
 
+# 调用编译函数并传入.mfront文件名
+so_fname = mfront_build.compile_mfront_file("material/saint_venant_kirchhoff.mfront")
 
 # 加载共享库
-behaviour_library = './libBehaviour.so'  # 或者是你的库文件的实际路径
+behaviour_library = 'so_fname'  # 或者是你的库文件的实际路径
 behaviour_name = 'SaintVenantKirchhoffElasticity'
 
 # 创建有限应变行为选项
