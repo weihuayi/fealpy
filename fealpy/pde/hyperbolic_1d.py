@@ -39,18 +39,17 @@ class ExcitationTubePDEData:
         flag3 = ~flag1 & ~flag2
         
         val[flag1] = 1
-        val[flag3] = 1 - p[flag3] + t[flag3]
-        val[flag2] = p[flag2] - t[flag2] - 1
+        val[flag3] = 1 - p[flag3] + t
+        val[flag2] = p[flag2] - t - 1
         
         return val
 
     @cartesian
-    def init_solution(self, p, t):
+    def init_solution(self, p):
         """
         @brief 真解函数
 
         @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
 
         @return 真解函数值
         """
@@ -79,7 +78,7 @@ class ExcitationTubePDEData:
         @param[in] p numpy.ndarray, 空间点
         @param[in] t float, 时间点 
         """
-        return np.ones(t.shape)
+        return np.ones(p.shape)
         
     def a(self):
         return 1
