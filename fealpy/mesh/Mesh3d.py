@@ -144,7 +144,7 @@ class Mesh3d(Mesh):
                 edgecolor=edgecolor,
                 alpha=alpha)
         h = axes.add_collection3d(faces)
-        box = np.zeros((2, 3), dtype=np.float)
+        box = np.zeros((2, 3), dtype=np.float64)
         box[0, :] = np.min(node, axis=0)
         box[1, :] = np.max(node, axis=0)
         axes.scatter(box[:, 0], box[:, 1], box[:, 2], s=0)

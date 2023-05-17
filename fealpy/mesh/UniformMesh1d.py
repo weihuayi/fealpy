@@ -618,9 +618,27 @@ class UniformMesh1d(Mesh1d):
 
     def hyperbolic_operator_explicity_lax_friedrichs(self, a, tau):
         """
-        @brief lax_friedrichs 格式
+        @brief 积分守恒型 lax_friedrichs 格式
         """
-        pass
+        r = tau/self.h
+    
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([0], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(1/2, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        
+        B = diags([0], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(r/2, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A, B
 
     def hyperbolic_operator_implicity_upwind(self, a, tau):
         """

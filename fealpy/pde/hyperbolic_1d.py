@@ -1,8 +1,10 @@
 import numpy as np
-from fealpy.decorator import cartesian
 
-class ExcitationTubePDEData:
-    def __init__(self, D=(0, 2), T=(0, 4)):
+from fealpy.decorator import cartesian
+from typing import Tuple
+
+class Hyperbolic1dPDEData:
+    def __init__(self, D: Tuple[int, int]=(0, 2), T: Tuple[int, int]=(0, 4)):
         """
         @brief 模型初始化函数
         @param[in] D 模型空间定义域
@@ -11,20 +13,20 @@ class ExcitationTubePDEData:
         self._domain = D 
         self._duration = T 
 
-    def domain(self):
+    def domain(self) -> Tuple[int, int]:
         """
         @brief 空间区间
         """
         return self._domain
 
-    def duration(self):
+    def duration(self)-> Tuple[int, int]:
         """
         @brief 时间区间
         """
         return self._duration 
         
     @cartesian
-    def solution(self, p, t):
+    def solution(self, p: np.ndarray, t: np.float64) -> np.ndarray:
         """
         @brief 真解函数
 
@@ -45,7 +47,7 @@ class ExcitationTubePDEData:
         return val
 
     @cartesian
-    def init_solution(self, p):
+    def init_solution(self, p: np.ndarray) -> np.ndarray:
         """
         @brief 真解函数
 
@@ -59,7 +61,7 @@ class ExcitationTubePDEData:
         return val
         
     @cartesian
-    def source(self, p, t):
+    def source(self, p: np.ndarray, t: np.float64) -> np.float64:
         """
         @brief 方程右端项 
 
@@ -71,7 +73,7 @@ class ExcitationTubePDEData:
         return 0.0
 
     @cartesian    
-    def dirichlet(self, p, t):
+    def dirichlet(self, p: np.ndarray, t: np.float64) -> np.ndarray:
         """
         @brief Dirichlet 边界条件
 
@@ -80,5 +82,5 @@ class ExcitationTubePDEData:
         """
         return np.ones(p.shape)
         
-    def a(self):
+    def a(self) -> np.int_:
         return 1
