@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from fealpy.pde.hyperbolic_1d import Hyperbolic1dPDEData
 from fealpy.mesh import UniformMesh1d
 
-a = 1
 pde = Hyperbolic1dPDEData()
+a = 1
 
 domain = pde.domain()
 nx = 40
