@@ -243,7 +243,7 @@ elif args.pde == 'CS':
 mesh = pde.init_mesh(n=args.nrefine)
 
 mesh.add_plot(plt)
-plt.savefig('./test-' + str(0) + '.eps')
+plt.savefig('./test-' + str(0) + '.png')
 plt.close()
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
@@ -289,10 +289,10 @@ for i in range(args.maxit):
     errorMatrix[3, i] = space.integralalg.L2_error(pde.curl, rcuh)
 
     # 计算单元上的恢复型误差
-    eta0 = space.integralalg.error(uh.curl_value, 
-            rcuh, power=2, celltype=True) # eta_K
-    eta1 = space.integralalg.error(uh.value,  
+    eta0 = space.integralalg.error(uh.value,  
             ruh, power=2, celltype=True) # xi_K
+    eta1 = space.integralalg.error(uh.curl_value, 
+            rcuh, power=2, celltype=True) # eta_K
     eta = np.sqrt(eta0**2 + eta1**2) # S_K
     errorMatrix[4, i] = np.sqrt(np.sum(eta0**2)) # S_h
     errorMatrix[5, i] = np.sqrt(np.sum(eta1**2)) # S_h
@@ -300,9 +300,9 @@ for i in range(args.maxit):
         isMarkedCell = mark(eta, theta=args.theta)
         mesh.bisect(isMarkedCell)
         mesh.add_plot(plt)
-        plt.savefig('./test-' + str(i+1) + '.eps')
+        plt.savefig('./test-' + str(i+1) + '.png')
         plt.close()
 
 showmultirate(plt, args.maxit-10, NDof, errorMatrix,  errorType, propsize=6)
-plt.savefig('./error.eps')
+plt.savefig('./error.png')
 plt.show()

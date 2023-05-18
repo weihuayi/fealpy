@@ -1,4 +1,9 @@
-import numpy 
+#!/usr/bin/env python3
+# 
+import argparse
+from typing import Callable, Tuple, Any
+
+import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
@@ -8,27 +13,54 @@ from fealpy.mesh import UniformMesh1d
 
 import ipdb
 
-theta = 0.5
+ipdb.set_trace()
+
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        一维均匀网格上用有限差分方法求解波动方程，其中
+        边界条件为的纯 Dirichlet 边界条件
+        """)
+
+parser.add_argument('--nx',
+        default=100, type=int,
+        help='空间剖分段数，默认为 100 段.')
+
+parser.add_argument('--nt',
+        default=1000, type=int,
+        help='时间剖分段数，默认为 1000 段.')
+
+parser.add_argument('--theta',
+        default=0.5, type=float,
+        help='离散格式参数，默认 0.5.')
+
+args = parser.parse_args()
+
+theta = args.theta 
+nx = args.nx
+nt = args.nt
 
 pde = StringOscillationPDEData()
-domain = pde.domain()
-duration = pde.duration()
 
-nx = 100
+# 空间离散
+domain = pde.domain()
 hx = (domain[1] - domain[0])/nx
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
 
-nt = 1000
+# 时间离散
+duration = pde.duration()
 tau = (duration[1] - duration[0])/nt
 
+# 初值
 uh0 = mesh.interpolate(pde.init_solution, 'node')
 vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
 uh1 = mesh.function('node')
 
-
-def advance(n, *frags):
+# 定义时间步进函数
+def advance(
+        n: int, *frags: Any) -> Tuple[np.float64, float]:
     """
-    @brief 时间步进格式为向前欧拉方法
+    @brief 波动方程的时间步进程序 
 
     @param[in] n int, 表示第 `n` 个时间步（当前时间步） 
     """
@@ -48,14 +80,14 @@ def advance(n, *frags):
         f *= tau**2
         f += B@uh1 + C@uh0
 
-        uh0[:] = uh1[:]
+        uh0[:] = uh1
+        gD = lambda p: pde.dirichlet(p, t+tau)
         if theta == 0.0:
             uh1[:] = f
             mesh.update_dirichlet_bc(gD, uh1)
         else:
-            gD = lambda p: pde.dirichlet(p, t+tau)
             A, f = mesh.apply_dirichlet_bc(gD, A, f)
-            uh1[:] = spsolve(A, f)
+            uh1.flat = spsolve(A, f)
             
         return uh1, t
 

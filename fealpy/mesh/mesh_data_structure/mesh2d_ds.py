@@ -19,38 +19,6 @@ class Mesh2dDataStructure(MeshDataStructure):
     # Constants
     TD: int = 2
 
-    def construct(self):
-        """
-        @brief Construct edge and edge2cell from cell
-        """
-        NC = self.number_of_cells()
-        NEC = self.number_of_edges_of_cells()
-
-        totalEdge = self.total_edge()
-        _, i0, j = np.unique(
-            np.sort(totalEdge, axis=-1),
-            return_index=True,
-            return_inverse=True,
-            axis=0
-        )
-
-        self.edge = totalEdge[i0, :]
-
-        NE = i0.shape[0]
-        self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
-
-        i1 = np.zeros(NE, dtype=self.itype)
-        i1[j] = np.arange(NEC*NC, dtype=self.itype)
-
-        self.edge2cell[:, 0] = i0//NEC
-        self.edge2cell[:, 1] = i1//NEC
-        self.edge2cell[:, 2] = i0%NEC
-        self.edge2cell[:, 3] = i1%NEC
-
-    def clear(self):
-        self.edge = None
-        self.edge2cell = None
-
     ### cell ###
 
     def cell_to_edge(self):

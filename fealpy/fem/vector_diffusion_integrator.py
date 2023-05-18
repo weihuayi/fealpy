@@ -52,11 +52,10 @@ class VectorDiffusionIntegrator:
             D += np.einsum('q, qcimn, qcjmn, c->cij', ws, gphi0, gphi0, cellmeasure, optimize=True)
         else:
             pass #todo
-
         if out is None:
             return D
 
-    def assembly_cell_matrix_for_vspace_with_sacalar_basi(
+    def assembly_cell_matrix_for_vspace_with_sacalar_basis(
             self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 标量空间拼成的向量空间 

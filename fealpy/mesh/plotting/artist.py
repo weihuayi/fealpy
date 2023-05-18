@@ -2,7 +2,7 @@
 Provide plotting tools for given points with structure.
 """
 
-from typing import Sequence
+from typing import Sequence, Union
 from numpy.typing import NDArray
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d import Axes3D
@@ -34,11 +34,21 @@ def _validate_geo_dim(axes: Axes, points: NDArray):
     raise ValueError(f"Plotting for {GD}-d points has not been implemented.")
 
 
-def show_index(axes: Axes, location: NDArray, number: NDArray, fontcolor='k',
-               fontsize=24):
+def show_index(axes: Axes, location: NDArray, number: Union[NDArray, slice],
+               fontcolor='k', fontsize=24):
     """
     @brief Show index numbers in the given locations in 2d or 3d.
     """
+    if number == np.s_[:]:
+        number = np.arange(location.shape[0])
+    elif isinstance(number, np.ndarray):
+        if (number.dtype is np.bool_):
+            number, = np.nonzero(number)
+    elif isinstance(number, slice):
+        number = np.arange(number.start, number.stop, number.step)
+    else:
+        raise TypeError("Unknown index number format.")
+
     GD = location.shape[-1]
     loc = _validate_geo_dim(axes, location)
     if GD == 3:

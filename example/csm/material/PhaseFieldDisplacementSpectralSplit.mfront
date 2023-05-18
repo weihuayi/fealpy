@@ -1,0 +1,72 @@
+@DSL DefaultDSL;
+@Author Tran Thang Dang/Jérémy Bleyer/Thomas Helfer;
+@Date 05/02/2016;
+@Behaviour PhaseFieldDisplacementSpectralSplit;
+
+@MaterialProperty stress Yg;
+Yg.setGlossaryName("YoungModulus") ;
+@MaterialProperty real nu ;
+nu.setGlossaryName("PoissonRatio") ;
+@Parameter real kres = 1e-6 ; // residual stiffness
+
+@StateVariable real H;
+H.setEntryName("HistoryFunction");
+
+@StateVariable real psi_p;
+psi_p.setEntryName("PositiveEnergyDensity");
+
+@ExternalStateVariable real d;
+d.setGlossaryName("Damage");
+
+@ProvidesSymmetricTangentOperator ;
+@Integrator{
+  constexpr const strain emin = 1.e-12;
+  // positive part
+  const auto f  = [](const real x){return x>0 ? x : 0;};
+  // derivative of the positive part
+  const auto df = [&emin](const real x)
+    {return std::abs(x)<emin ? 0.5 : ((x<0) ? 0 : 1);};
+  // update the damage
+  const auto d_ = d + dd;
+  // lame coefficients
+  const auto lambda = computeLambda(Yg, nu);
+  const auto mu     = computeMu(Yg, nu);
+  // computation of the stress, positive energy density and consistent
+  // tangent operator
+  const StrainStensor e_ = eto + deto;
+  const auto fdf     = e_.computeIsotropicFunctionAndDerivative(f,df,emin*0.1);
+  const auto& ep     = fdf.first;  // positive part of e_
+  const auto& dep_de = fdf.second; // derivative of the positive part of e_
+  const StrainStensor en = e_-ep;  // negative part of e_
+  // energy density
+  const strain tr  = trace(e_);
+  const strain tr_p = max(tr,real(0));
+  const strain tr_n = min(tr,real(0));
+  psi_p = ((lambda/2)*(tr_p)*(tr_p))+(mu*(ep|ep));
+  H = max(H, psi_p);
+  // stress
+  const auto degrad = ((1-d_)*(1-d_))+kres; // degradation function
+  sig = 2*mu*(degrad*ep+en)+lambda*(degrad*tr_p+tr_n)*StrainStensor::Id();
+  // consistent tangent operator (secant one here)
+  if(computeTangentOperator_){
+    if(tr>=0){
+      Dt=degrad*(lambda*Stensor4::IxI()+2*mu*dep_de)+(2*mu*(Stensor4::Id()-dep_de));
+    } else {
+      Dt=degrad*2*mu*dep_de+(lambda*Stensor4::IxI()+2*mu*(Stensor4::Id()-dep_de));
+    }
+  }
+  static_cast<void>(smt);
+} // end of @Integrator
+
+@APosterioriTimeStepScalingFactor {
+  // pas d'acroissement de l'endommagement sur le pas de temps
+  if (dd<1.e-4){
+    return {true,1.e-2/(max(dd,1e-4))};
+  }
+  return {true,1};
+}
+
+@InternalEnergy{
+  const auto degrad = ((1-d)*(1-d))+kres;
+ Psi_s = degrad*psi_p;
+}

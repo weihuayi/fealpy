@@ -1,0 +1,39 @@
+@DSL DefaultGenericBehaviour;
+@Behaviour PhaseFieldDamage;
+@Author Jérémy Bleyer;
+@Date 07 / 04 / 2020;
+
+@Gradient real d;
+d.setGlossaryName("Damage");
+@Flux real Y;
+Y.setEntryName("EnergyRelease");
+
+@Gradient TVector g;
+g.setEntryName("DamageGradient");
+@Flux TVector q;
+q.setEntryName("DualDamageGradient");
+
+@TangentOperatorBlock ∂q∕∂Δg;
+@AdditionalTangentOperatorBlock ∂Y∕∂Δd;
+
+@MaterialProperty real l₀;
+l₀.setEntryName("RegularizationLength");
+@MaterialProperty real Gc;
+Gc.setEntryName("FractureEnergy");
+
+@ExternalStateVariable real H;
+H.setEntryName("HistoryFunction");
+
+@ProvidesTangentOperator;
+@Integrator {
+  // remove useless warnings, as we always compute the tangent operator
+  static_cast<void>(computeTangentOperator_);
+  ∂q∕∂Δg = Gc*l₀* tmatrix<N, N, real>::Id();
+  ∂Y∕∂Δd = Gc/l₀+2*H;
+  q = Gc*l₀*(g+Δg);
+  Y = ∂Y∕∂Δd ⋅ (d+Δd)-2*H;
+}
+
+@DissipatedEnergy{
+Psi_d = Gc/2/l₀*(d*d + l₀*l₀*(g|g));
+}
