@@ -1,15 +1,12 @@
 import numpy as np
 from mgis import behaviour as mg
 import ipdb
-from mfront_duild import mfront_build
 
 #ipdb.set_trace()
 
-# 调用编译函数并传入.mfront文件名
-so_fname = mfront_build.compile_mfront_file("material/saint_venant_kirchhoff.mfront")
 
 # 加载共享库
-behaviour_library = 'so_fname'  # 或者是你的库文件的实际路径
+behaviour_library = "./libsaint_venant_kirchhoff.so"  # 用实际路径替换
 behaviour_name = 'SaintVenantKirchhoffElasticity'
 
 # 创建有限应变行为选项
@@ -21,9 +18,9 @@ options.tangent_operator = mg.FiniteStrainBehaviourOptionsTangentOperator.DS_DEG
 h = mg.Hypothesis.Tridimensional
 b = mg.load(options, behaviour_library, behaviour_name, h)
 
-print(b.source)
-print(b.behaviour)
-print(b.hypothesis)
+print('source:', b.source)
+print('behaviour:', b.behaviour)
+print('hypothesis:', b.hypothesis)
 print(b.tfel_version)
 print(b.esvs)
 print(mg.getArraySize(b.esvs, b.hypothesis))
@@ -31,8 +28,8 @@ print(b.esvs[0].name)
 print(b.esvs[0].type)
 
 d = mg.BehaviourData(b)
-print(d.s0.external_state_variables)
-print(d.s1)
+print('s0:', d.s0.external_state_variables)
+print('s1:', d.s1)
 
 # 设置材料属性
 young = 200000.0
