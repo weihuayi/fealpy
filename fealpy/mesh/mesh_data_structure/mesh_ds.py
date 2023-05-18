@@ -406,6 +406,30 @@ class StructureMeshDS(HomogeneousMeshDS):
     def nz(self):
         return self.nx_[2]
 
+    def number_of_cells(self) -> int:
+        """
+        @brief Return the number of cells in the struct mesh.
+
+        This is equal to nx*ny*nz*...
+        """
+        return np.prod(self.nx_, axis=0)
+
+    def number_of_faces(self):
+        """
+        @brief Return the number of faces in the struct mesh.
+        """
+        full = np.prod(self.nx_, axis=0)
+        adds = full / self.nx_
+        return full + np.sum(adds, axis=0)
+
+    def number_of_edges(self):
+        """
+        @brief Return the number of edges in the struct mesh.
+        """
+        full = np.prod(self.nx_ + 1, axis=0)
+        subs = full / (self.nx_ + 1)
+        return full - np.sum(subs, axis=0)
+
     @property
     def cell_(self):
         TD = self.TD
