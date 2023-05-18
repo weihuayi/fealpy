@@ -45,6 +45,7 @@ def test_from_one_triangle(meshtype):
     mesh.find_cell(axes, showindex=True)
     mesh.find_edge(axes, showindex=True)
     plt.show()
+
 def test_from_one():
     #mesh = PolygonMesh.from_one_square()
     #mesh = PolygonMesh.from_one_pentagon() 

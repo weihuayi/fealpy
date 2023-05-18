@@ -104,15 +104,15 @@ class PolygonMesh(Mesh2d, Plotable):
         """
         @brief 获取局部插值点的个数
         """
-        if doftype in {'all'}:
-            NV = self.number_of_vertices_of_cells()
+        if iptype in {'all'}:
+            NV = self.ds.number_of_vertices_of_cells()
             ldof = NV + (p-1)*NV + (p-1)*p//2
             return ldof
-        elif doftype in {'cell', 2}:
+        elif iptype in {'cell', 2}:
             return (p-1)*p//2
-        elif doftype in {'edge', 'face', 1}:
+        elif iptype in {'edge', 'face', 1}:
             return (p+1) 
-        elif doftype in {'node', 0}:
+        elif iptype in {'node', 0}:
             return 1 
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
@@ -124,28 +124,28 @@ class PolygonMesh(Mesh2d, Plotable):
             return cell[index]
         else:
             NC = self.number_of_cells()
-            ldof = self.number_of_local_ipoints(iptype='all')
+            ldof = self.number_of_local_ipoints(p, iptype='all')
 
             location = np.zeros(NC+1, dtype=self.itype)
             location[1:] = np.add.accumulate(ldof)
 
             cell2ipoint = np.zeros(location[-1], dtype=self.itype)
 
-            edge2ipoint = self.edge_to_ipoint()
+            edge2ipoint = self.edge_to_ipoint(p)
             edge2cell = self.ds.edge_to_cell()
 
             idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-            cell2dof[idx] = edge2ipoint[:, 0:p]
+            cell2ipoint[idx] = edge2ipoint[:, 0:p]
  
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
             idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
 
             NN = self.number_of_nodes()
-            NV = self.number_of_vertices_of_cells()
+            NV = self.ds.number_of_vertices_of_cells()
             NE = self.number_of_edges()
-            cdof = self.number_of_local_ipoints(iptype='cell') 
-            idx = (location[:-1] + NV*p).reshape(-1, 1) + np.arange(idof)
+            cdof = self.number_of_local_ipoints(p, iptype='cell') 
+            idx = (location[:-1] + NV*p).reshape(-1, 1) + np.arange(cdof)
             cell2ipoint[idx] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
             return np.hsplit(cell2ipoint, location[1:-1])[index]
 
