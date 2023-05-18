@@ -237,7 +237,20 @@ class HomogeneousMeshDS(MeshDataStructure):
         self.reinit(NN=NN, cell=cell)
 
     def reinit(self, NN: int, cell: NDArray):
+        if not isinstance(NN, int):
+            raise TypeError("Expect int for number of nodes, "
+                            f"but got {NN.__class__.__name__}.")
+        if NN <= 0:
+            raise ValueError("The number of nodes must be positive, "
+                             f"but got {NN}.")
         self.NN = NN
+
+        if not isinstance(cell, np.ndarray):
+            raise TypeError("Expect numpy array for cell entity, "
+                            f"but got {cell.__class__.__name__}.")
+        if cell.ndim != 2:
+            raise ValueError("Cell array should be 2-dimensional, "
+                             f"but got array with shape {cell.shape}.")
         self.cell = cell
         self.itype = cell.dtype
         self.construct()
@@ -373,6 +386,11 @@ class StructureMeshDS(HomogeneousMeshDS):
     def __init__(self, *nx: int, itype: dtype) -> None:
         if len(nx) != self.TD:
             raise ValueError(f"Number of `nx` must match the top dimension.")
+        for nx_item in nx:
+            if not isinstance(nx_item, int):
+                raise TypeError(f"Expect int for nx, but got {nx_item}.")
+        if not isinstance(itype, np.dtype):
+            raise TypeError(f"{itype} is not a valid numpy data type.")
 
         self.nx_ = np.array(nx, dtype=itype)
         self.NN = np.prod(self.nx_ + 1)
