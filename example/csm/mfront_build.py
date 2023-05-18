@@ -31,6 +31,6 @@ def compile_mfront_file(file_path):
     shutil.rmtree("include")
     shutil.rmtree("src")
 
-# 调用编译函数并传入.mfront文件名
-compile_mfront_file("material/saint_venant_kirchhoff.mfront")
+    return so_file
 
+file = compile_mfront_file('material/saint_venant_kirchhoff.mfront')

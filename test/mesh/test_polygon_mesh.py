@@ -18,7 +18,7 @@ def test_polygon_mesh_constructor():
     mesh.add_plot(axes)
     plt.show()
 
-def test_polygon_mesh_interpolation_points(p):
+def test_polygon_mesh_interpolation_points_4():
     node = np.array([
         (0.0, 0.0), (0.0, 1.0), (0.0, 2.0), (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
         (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float64)
@@ -28,8 +28,18 @@ def test_polygon_mesh_interpolation_points(p):
     mesh = PolygonMesh(node, cell, cellLocation)
 
     gdof = mesh.number_of_global_ipoints(p)
-
     ips = mesh.interpolation_points(p)
+
+    c2p = mesh.cell_to_ipoint(p)
+    result = [
+            np.array([ 0, 12, 13, 14,  3, 27, 28, 29,  4, 15, 16, 17, 48, 49, 50, 51, 52, 53]), 
+            np.array([ 4, 21, 22, 23,  1,  9, 10, 11,  0, 17, 16, 15, 54, 55, 56, 57, 58, 59]), 
+            np.array([ 1, 23, 22, 21,  4, 33, 34, 35,  5, 24, 25, 26,  2, 18, 19, 20, 60, 61, 62, 63, 64, 65]), 
+            array([ 3, 30, 31, 32,  6, 42, 43, 44,  7, 36, 37, 38,  4, 29, 28, 27, 66, 67, 68, 69, 70, 71]), 
+            array([ 4, 38, 37, 36,  7, 45, 46, 47,  8, 39, 40, 41,  5, 35, 34, 33, 72, 73, 74, 75, 76, 77])
+            ]
+    for a0, a1 in zip(c2p, result):
+        np.testing.assert_equal(a0, a1) 
 
     fig, axes = plt.subplots()
     mesh.add_plot(axes)

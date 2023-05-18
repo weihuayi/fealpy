@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import TriangleMesh
 from fealpy.mesh.polygon_mesh import PolygonMesh
 from fealpy.mesh import PolygonMesh as PolygonMesh_old
-from fealpy.functionspace.conforming_scalar_virtual_element_space_2d import CVEMDof2d
+from fealpy.functionspace.conforming_scalar_ve_space_2d import CVEMDof2d
 from fealpy.functionspace.ConformingVirtualElementSpace2d import CVEMDof2d as CVEMDof2d_old
 
 
