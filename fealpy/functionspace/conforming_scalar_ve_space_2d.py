@@ -32,11 +32,11 @@ class CVEMDof2d():
     def cell_to_dof(self, index=np.s_[:]):
         return self.mesh.cell_to_ipoint(self.p, index=index)
 
-    def number_of_global_dofs(self, index=np.s_[:]):
+    def number_of_global_dofs(self):
         return self.mesh.number_of_global_ipoints(self.p)
 
-    def number_of_local_dofs(self, index=np.s_[:]):
-        return self.mesh.number_of_local_ipoints(self.p)
+    def number_of_local_dofs(self, doftype='all'):
+        return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)
 
     def interpolation_points(self, index=np.s_[:]):
         return self.mesh.interpolation_points(self.p,scale=0.3)
