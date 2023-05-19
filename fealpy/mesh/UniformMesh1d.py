@@ -121,7 +121,7 @@ class UniformMesh1d(Mesh1d):
         return n0.astype('int64')
 
     ## @ingroup GeneralInterface
-    def show_function(self, plot, uh):
+    def show_function(self, plot, uh, box=None):
         """
         @brief 画出定义在网格上的离散函数
         """
@@ -131,6 +131,12 @@ class UniformMesh1d(Mesh1d):
             axes = fig.gca()
         else:
             axes = plot
+
+        # 设置 x 轴和 y 轴的显示范围
+        if box is not None:
+            axes.set_xlim(box[0], box[1])
+            axes.set_ylim(box[2], box[3])
+
         node = self.node
         line = axes.plot(node, uh)
         return line

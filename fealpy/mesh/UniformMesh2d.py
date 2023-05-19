@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import warnings
 
 from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags, spmatrix
@@ -160,9 +158,7 @@ class UniformMesh2d(Mesh2d):
 
     ## @ingroup GeneralInterface
     def show_animation(self, 
-            fig: plt.figure, 
-            axes: Union[plt.Axes, Axes3D],
-            box, 
+            fig, axes, box, 
             advance: Callable[[np.int_, Any], Tuple[np.ndarray, np.float64]], 
             fname :str = 'test.mp4',
             init: Optional[Callable] = None, 
