@@ -31,7 +31,7 @@ def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
     else:
         A = mesh.hyperbolic_operator_explicity_upwind(tau)
         source = lambda p: pde.source(p, t + tau)
-        uh0[:] = A@uh0
+        uh0[:] = A@uh0 + source
 
         gD = lambda p: pde.dirichlet(p, t+tau)
         mesh.update_dirichlet_bc(gD, uh0, threshold=0)
