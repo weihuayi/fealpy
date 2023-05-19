@@ -218,8 +218,8 @@ class UniformMesh2d(Mesh2d):
             elif plot_type == 'plot_surface':
                 axes.clear()  # 清除当前帧的图像
                 data = axes.plot_surface(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
-                z_min = np.min(uh)
-                z_max = np.max(uh)
+                z_min = -5
+                z_max = 5
                 axes.set_zlim(z_min, z_max)
             elif plot_type == 'contourf':
                 # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
@@ -753,6 +753,9 @@ class UniformMesh2d(Mesh2d):
         B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A, B
+
+        A1 += csr_matrix((val, (J.flat, I.flat)), shape=(NN, NN), dtype=self.ftype)
+
 
     ## @ingroup FDMInterface
     def wave_operator(self, tau, a=1, theta=0.5):
