@@ -13,8 +13,8 @@ from fealpy.mesh import UniformMesh2d
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        二维均匀网格（区间）上抛物型方程的有限差分方法，
-        边界条件为的带纯 Dirichlet 型，
+        二维均匀网格上抛物型方程的有限差分方法，
+        边界条件为纯 Dirichlet 型，
         有三种离散格式供选择：1、向前欧拉；2、向后欧拉；3、crank_nicholson。
         """)
 
@@ -84,14 +84,14 @@ def advance_forward(
     else:
         A = mesh.parabolic_operator_forward(tau)
         
-        source = lambda p: pde.source(p, t + tau)
+        source = lambda p: pde.source(p, t)
         f = mesh.interpolate(source, intertype='node')
         
         uh0.flat = A@uh0.flat + (tau*f).flat
-        gD = lambda p: pde.dirichlet(p, t+tau)
+        gD = lambda p: pde.dirichlet(p, t)
         mesh.update_dirichlet_bc(gD, uh0)
         
-        solution = lambda p: pde.solution(p, t + tau)
+        solution = lambda p: pde.solution(p, t)
         e = mesh.error(solution, uh0, errortype='max')
         print(f"the max error is {e}")
         return uh0, t
@@ -110,16 +110,16 @@ def advance_backward(
     else:
         A = mesh.parabolic_operator_backward(tau)
         
-        source = lambda p: pde.source(p, t + tau)
+        source = lambda p: pde.source(p, t)
         f = mesh.interpolate(source, intertype='node')
         f *= tau
         f += uh0
 
-        gD = lambda p: pde.dirichlet(p, t+tau)
+        gD = lambda p: pde.dirichlet(p, t)
         A, f = mesh.apply_dirichlet_bc(gD, A, f)
         uh0.flat = spsolve(A, f)
         
-        solution = lambda p: pde.solution(p, t + tau)
+        solution = lambda p: pde.solution(p, t)
         e = mesh.error(solution, uh0, errortype='max')
         print(f"the max error is {e}")
         return uh0, t
@@ -136,17 +136,17 @@ def advance_crank_nicholson(
         return uh0, t
     else:
         A, B = mesh.parabolic_operator_crank_nicholson(tau)
-        source = lambda p: pde.source(p, t + tau)
+        source = lambda p: pde.source(p, t)
         # f.shape = (nx+1,ny+1)
         f = mesh.interpolate(source, intertype='node') 
         f *= tau
         f.flat += B@uh0.flat
          
-        gD = lambda p: pde.dirichlet(p, t+tau)
+        gD = lambda p: pde.dirichlet(p, t)
         A, f = mesh.apply_dirichlet_bc(gD, A, f)
         uh0.flat = spsolve(A, f)
 
-        solution = lambda p: pde.solution(p, t + tau)
+        solution = lambda p: pde.solution(p, t)
         e = mesh.error(solution, uh0, errortype='max')
         print(f"the max error is {e}")
 
