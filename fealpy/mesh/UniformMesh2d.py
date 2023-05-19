@@ -138,7 +138,7 @@ class UniformMesh2d(Mesh2d):
         return n0.astype('int64'), n1.astype('int64')
 
     ## @ingroup GeneralInterface
-    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='jet'):
+    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
             
         """
         @brief    显示一个定义在网格节点上的函数
@@ -166,9 +166,7 @@ class UniformMesh2d(Mesh2d):
             frames: np.int_ = 1000, 
             interval: np.int_ = 50, 
             plot_type :str = 'imshow',
-            cmap='rainbow',
-            vmin=-1, 
-            vmax=1) -> None:
+            cmap='rainbow') -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
@@ -195,10 +193,9 @@ class UniformMesh2d(Mesh2d):
             data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5], 
                     extent=box[0:4], interpolation='bicubic')
         elif plot_type == 'surface':
-            x = np.linspace(box[0], box[1], self.node.shape[0])
-            y = np.linspace(box[2], box[3], self.node.shape[1])
-            X, Y = np.meshgrid(x, y)
-            data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4],
+            X = self.node[..., 0]
+            Y = self.node[..., 1]
+            data = axes.plot_surface(X, Y, uh, linewidth=0, cmap=cmap, vmin=box[4],
                     vmax=box[5], rstride=1, cstride=1)
             axes.set_xlim(box[0], box[1])
             axes.set_ylim(box[2], box[3])
@@ -206,7 +203,8 @@ class UniformMesh2d(Mesh2d):
         elif plot_type == 'contourf':
             X = self.node[..., 0]
             Y = self.node[..., 1]
-            data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
+            data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5], 
+                    interpolation='bicubic')
             # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
             # 后续的代码中无需对颜色条进行额外的更新操作
             cbar = fig.colorbar(data, ax=axes)
@@ -224,15 +222,19 @@ class UniformMesh2d(Mesh2d):
                 axes.set_aspect('equal')
             elif plot_type == 'surface':
                 axes.clear()  # 清除当前帧的图像
-                data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=vmin,
-                        vmax=vmax)
+                data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4],
+                        vmax=box[5])
+                axes.set_xlim(box[0], box[1])
+                axes.set_ylim(box[2], box[3])
+                axes.set_zlim(box[4], box[5])
             elif plot_type == 'contourf':
                 # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
                 # data.collections 保存了所有已经生成的等高线填充层 
                 # 更新图像时 需要将旧的等高线填充层从图形中移除 以免遮挡住新的等高线填充层
                 for coll in data.collections:
                     axes.collections.remove(coll)
-                data = axes.contourf(X, Y, uh, cmap=cmap, vmin=vmin, vmax=vmax)
+                data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4],
+                        vmax=box[5])
                 axes.set_aspect('equal')
 
             # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
