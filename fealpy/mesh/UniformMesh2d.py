@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import warnings
 
 from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags, spmatrix
@@ -139,7 +138,7 @@ class UniformMesh2d(Mesh2d):
         return n0.astype('int64'), n1.astype('int64')
 
     ## @ingroup GeneralInterface
-    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='jet'):
+    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
             
         """
         @brief    显示一个定义在网格节点上的函数
@@ -158,21 +157,24 @@ class UniformMesh2d(Mesh2d):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    from mpl_toolkits.mplot3d import Axes3D
-    def show_animation(self, fig: plt.figure, axes: Union[plt.Axes, Axes3D],
-                       box: Tuple[np.float64, np.float64, np.float64, np.float64], 
-                       advance: Callable[[np.int_, Any], Tuple[np.ndarray, np.float64]], 
-                       plot_type :str = 'imshow', fname :str = 'test.mp4',
-                       init: Optional[Callable] = None, fargs: Optional[Callable] = None, 
-                       frames: np.int_ = 1000, interval: np.int_ = 50) -> None:
+    def show_animation(self, 
+            fig, axes, box, 
+            advance: Callable[[np.int_, Any], Tuple[np.ndarray, np.float64]], 
+            fname :str = 'test.mp4',
+            init: Optional[Callable] = None, 
+            fargs: Optional[Callable] = None, 
+            frames: np.int_ = 1000, 
+            interval: np.int_ = 50, 
+            plot_type :str = 'imshow',
+            cmap='rainbow') -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
         @param fig         : plt.Figure | matplotlib 图形对象
         @param axes        : Union[plt.Axes, Axes3D] | matplotlib 坐标轴对象
-        @param box         : tuple      | 四元组，定义图像显示范围
+        @param box         : list      | 定义图像显示范围
         @param advance     : Callable   | 用于更新求解过程的函数
-        @param plot_type   : str, 可选  | 默认值为 'imshow',要显示的绘图类型('imshow', 'plot_surface', 'contourf')
+        @param plot_type   : str, 可选  | 默认值为 'imshow',要显示的绘图类型('imshow', 'surface', 'contourf')
         @param fname       : str, 可选  | 输出动画文件的名称，默认值为 'test.mp4'
         @param init        : Optional[Callable] | 初始化函数（可选）
         @param fargs       : Optional[Tuple]    | 传递给 advance 函数的参数（可选）
@@ -188,18 +190,21 @@ class UniformMesh2d(Mesh2d):
         uh, t = advance(0) 
         
         if plot_type == 'imshow':
-            data = axes.imshow(uh, cmap='jet', vmin=-0.2, vmax=0.2, 
-                            extent=box, interpolation='bicubic')
-        elif plot_type == 'plot_surface':
-            x = np.linspace(box[0], box[1], self.node.shape[0])
-            y = np.linspace(box[2], box[3], self.node.shape[1])
-            X, Y = np.meshgrid(x, y)
-            data = axes.plot_surface(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2, rstride=1, cstride=1)
+            data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5], 
+                    extent=box[0:4], interpolation='bicubic')
+        elif plot_type == 'surface':
+            X = self.node[..., 0]
+            Y = self.node[..., 1]
+            data = axes.plot_surface(X, Y, uh, linewidth=0, cmap=cmap, vmin=box[4],
+                    vmax=box[5], rstride=1, cstride=1)
+            axes.set_xlim(box[0], box[1])
+            axes.set_ylim(box[2], box[3])
+            axes.set_zlim(box[4], box[5])
         elif plot_type == 'contourf':
-            x = np.linspace(box[0], box[1], self.node.shape[0])
-            y = np.linspace(box[2], box[3], self.node.shape[1])
-            X, Y = np.meshgrid(x, y)
-            data = axes.contourf(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
+            X = self.node[..., 0]
+            Y = self.node[..., 1]
+            data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5], 
+                    interpolation='bicubic')
             # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
             # 后续的代码中无需对颜色条进行额外的更新操作
             cbar = fig.colorbar(data, ax=axes)
@@ -215,19 +220,21 @@ class UniformMesh2d(Mesh2d):
                 data.set_array(uh)
                 # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
                 axes.set_aspect('equal')
-            elif plot_type == 'plot_surface':
+            elif plot_type == 'surface':
                 axes.clear()  # 清除当前帧的图像
-                data = axes.plot_surface(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
-                z_min = -5
-                z_max = 5
-                axes.set_zlim(z_min, z_max)
+                data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4],
+                        vmax=box[5])
+                axes.set_xlim(box[0], box[1])
+                axes.set_ylim(box[2], box[3])
+                axes.set_zlim(box[4], box[5])
             elif plot_type == 'contourf':
                 # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
                 # data.collections 保存了所有已经生成的等高线填充层 
                 # 更新图像时 需要将旧的等高线填充层从图形中移除 以免遮挡住新的等高线填充层
                 for coll in data.collections:
                     axes.collections.remove(coll)
-                data = axes.contourf(X, Y, uh, cmap='jet', vmin=-0.2, vmax=0.2)
+                data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4],
+                        vmax=box[5])
                 axes.set_aspect('equal')
 
             # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
@@ -758,7 +765,37 @@ class UniformMesh2d(Mesh2d):
 
 
     ## @ingroup FDMInterface
-    def wave_operator(self, tau, a=1, theta=0.5):
+    def wave_operator_explicity(self, tau, a=1): 
+        """
+        @brief 用显格式求解波动方程
+        """
+        rx = a*tau/self.h[0]
+        ry = a*tau/self.h[1]
+
+        NN = self.number_of_nodes()
+        n0 = self.nx + 1
+        n1 = self.ny + 1
+        k = np.arange(NN).reshape(n0, n1)
+
+        A = diags([2*(1 -  rx**2 - ry**2)], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(rx**2, (NN - n1,))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(ry**2, (NN - n0, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A
+
+
+    ## @ingroup FDMInterface
+    def wave_operator_theta(self, tau, a=1, theta=0.5):
         """
         @brief 生成波动方程的离散矩阵
         """

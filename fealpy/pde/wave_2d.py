@@ -57,8 +57,8 @@ class MembraneOscillationPDEData:
         x, y = p[..., 0], p[..., 1]
         eps = 0.00001
         pi = np.pi
-        # return eps*np.sin(pi*x)*np.sin(pi*y)
-        return eps*(np.sin(4*pi*x)+np.cos(4*pi*y))
+        val = np.sin(4*pi*x) + np.cos(4*pi*y)
+        return eps*val
     
     @cartesian
     def init_solution_diff_t(self, p):
