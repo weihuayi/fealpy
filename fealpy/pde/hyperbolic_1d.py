@@ -60,10 +60,14 @@ class Hyperbolic1dPDEData:
 
         @return 真解函数值
         """
+<<<<<<< HEAD
         val = np.zeros_like(p)
         val = np.abs(p-1)
         
         return val
+=======
+        return np.abs(p-1)
+>>>>>>> upstream/master
         
     @cartesian
     def source(self, p: np.ndarray , t: np.float64 ) -> np.float64:

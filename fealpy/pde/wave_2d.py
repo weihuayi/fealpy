@@ -3,7 +3,7 @@ from fealpy.decorator import cartesian
 
 class MembraneOscillationPDEData:
     
-    def __init__(self, D=[0, 1, 0, 1], T=[0, 4]):
+    def __init__(self, D=[0, 1, 0, 1], T=[0, 2]):
         
         """
         @brief 模型初始化函数
@@ -57,7 +57,8 @@ class MembraneOscillationPDEData:
         x, y = p[..., 0], p[..., 1]
         eps = 0.01
         pi = np.pi
-        return eps*np.sin(pi*x)*np.sin(pi*y)
+        val = np.sin(4*pi*x) + np.cos(4*pi*y)
+        return eps*val
     
     @cartesian
     def init_solution_diff_t(self, p):

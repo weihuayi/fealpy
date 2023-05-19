@@ -6,7 +6,6 @@ from fealpy.pde.hyperbolic_1d import Hyperbolic1dPDEData
 from fealpy.mesh import UniformMesh1d
 
 pde = Hyperbolic1dPDEData()
-a = 1
 
 domain = pde.domain()
 nx = 40
@@ -19,9 +18,9 @@ tau = (duration[1] - duration[0])/nt
 
 uh0 = mesh.interpolate(pde.init_solution, intertype='node')
 
-def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
+def hyperbolic_explicity_windward(n, *fargs):
     """
-    @brief 时间步进格式为迎风格式
+    @brief 时间步进格式为迎风格式 
 
     @param[in] n int, 表示第 `n` 个时间步（当前时间步）
     """
@@ -29,7 +28,11 @@ def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
     if n == 0:
         return uh0, t
     else:
+<<<<<<< HEAD
         A = mesh.hyperbolic_operator_explicity_upwind(pde.a(), tau)
+=======
+        A = mesh.hyperbolic_operator_explicity_upwind(tau)
+>>>>>>> upstream/master
         uh0[:] = A@uh0
 
         gD = lambda p: pde.dirichlet(p, t)
@@ -61,7 +64,7 @@ def hyperbolic_lax(n, *fargs):
         print(f"the max error is {e}")
         return uh0, t
 
-def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
+def hyperbolic_windward_(n, *fargs): # 点击这里查看 FEALPy 中的代码
     """
     @brief 时间步进格式为中心差分格式
 
@@ -105,5 +108,9 @@ def hyperbolic_windward_with_vicious(n, *fargs):
 
 box = [0, 2, 0, 2]
 fig, axes = plt.subplots()
+<<<<<<< HEAD
 mesh.show_animation(fig, axes, box,hyperbolic_windward , frames=nt+1)
+=======
+mesh.show_animation(fig, axes, box, hyperbolic_explicity_windward, frames=nt+1)
+>>>>>>> upstream/master
 plt.show()

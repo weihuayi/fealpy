@@ -121,7 +121,7 @@ class UniformMesh1d(Mesh1d):
         return n0.astype('int64')
 
     ## @ingroup GeneralInterface
-    def show_function(self, plot, uh):
+    def show_function(self, plot, uh, box=None):
         """
         @brief 画出定义在网格上的离散函数
         """
@@ -131,6 +131,12 @@ class UniformMesh1d(Mesh1d):
             axes = fig.gca()
         else:
             axes = plot
+
+        # 设置 x 轴和 y 轴的显示范围
+        if box is not None:
+            axes.set_xlim(box[0], box[1])
+            axes.set_ylim(box[2], box[3])
+
         node = self.node
         line = axes.plot(node, uh)
         return line
@@ -459,8 +465,17 @@ class UniformMesh1d(Mesh1d):
         if threshold is None:
             isBdNode = self.ds.boundary_node_flag()
             uh[isBdNode]  = gD(node[isBdNode])
+<<<<<<< HEAD
         else:
             uh[threshold] = gD(node[threshold])
+=======
+        elif isinstance(threshold, int):
+            uh[threshold] = gD(node[threshold])
+        elif callable(threshold):
+            isBdNode = threshold(node)
+            uh[isBdNode]  = gD(node[isBdNode])
+
+>>>>>>> upstream/master
     def parabolic_operator_forward(self, tau):
         """
         @brief 生成抛物方程的向前差分迭代矩阵
@@ -566,7 +581,7 @@ class UniformMesh1d(Mesh1d):
 
         return A0, A1, A2
 
-    def hyperbolic_operator_explicity_upwind(self, a, tau):
+    def hyperbolic_operator_explicity_upwind(self, tau, a=1):
         """
         @brief 双曲方程的显式迎风格式
         """
