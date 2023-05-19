@@ -60,7 +60,8 @@ def test_interpolation_points_4(p):
 
     dof = CVVEDof2d(pmesh, p)
     ips = dof.interpolation_points(scale=0.3)
-    print(ips)
+    np.testing.assert_allclose(ips[-1], np.array([0.31565566, 0.30271471]),
+            atol=1e-6)
 
     fig, axes = plt.subplots()
     pmesh.add_plot(axes)
