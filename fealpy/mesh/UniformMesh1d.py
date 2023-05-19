@@ -465,8 +465,11 @@ class UniformMesh1d(Mesh1d):
         if threshold is None:
             isBdNode = self.ds.boundary_node_flag()
             uh[isBdNode]  = gD(node[isBdNode])
-        else:
+        elif isinstance(threshold, int):
             uh[threshold] = gD(node[threshold])
+        elif callable(threshold):
+            isBdNode = threshold(node)
+            uh[isBdNode]  = gD(node[isBdNode])
 
     def parabolic_operator_forward(self, tau):
         """
