@@ -761,6 +761,9 @@ class UniformMesh2d(Mesh2d):
 
         return A, B
 
+        A1 += csr_matrix((val, (J.flat, I.flat)), shape=(NN, NN), dtype=self.ftype)
+
+
     ## @ingroup FDMInterface
     def wave_operator_explicity(self, tau, a=1): 
         """

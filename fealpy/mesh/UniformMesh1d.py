@@ -615,7 +615,9 @@ class UniformMesh1d(Mesh1d):
         @param[in] tau float, 当前时间步长
         """
         r = a*tau/self.h
-
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+        
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
@@ -642,11 +644,12 @@ class UniformMesh1d(Mesh1d):
         A = diags([1-r], [0], shape=(NN, NN), format='csr')
         val0 = np.broadcast_to(0, (NN-1, ))
         val1 = np.broadcast_to(r, (NN-1, ))
+
         I = k[1:]
         J = k[0:-1]
         A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
-    
+
         return A
 
     def hyperbolic_operator_explicity_lax_friedrichs(self, a, tau):
@@ -669,7 +672,7 @@ class UniformMesh1d(Mesh1d):
         A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
     
-        return A 
+        return A
 
     def hyperbolic_operator_implicity_upwind(self, a, tau):
         """
