@@ -142,21 +142,48 @@ class UniformMesh1d(Mesh1d):
         return line
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box, advance, fname='test.mp4',
-                   init=None, fargs=None,
-                   frames=1000, lw=2, interval=50):
+    from matplotlib.figure import Figure
+    from matplotlib.axes import Axes
+    from typing import Optional, Callable, Any, Tuple
+
+    def show_animation(self, 
+                    fig: Figure, 
+                    axes: Axes, 
+                    box: Tuple[float, float, float, float], 
+                    advance: Callable[[int, Any], Tuple[Any, float]], 
+                    fname: str = 'test.mp4',
+                    init: Optional[Callable[..., Any]] = None, 
+                    fargs: Optional[Tuple] = None,
+                    frames: int = 1000, 
+                    lw: int = 2, 
+                    interval: int = 50, 
+                    line_style: str = '-', 
+                    marker: Optional[str] = None, 
+                    color: str = 'blue') -> None:
         """
-        @brief:    在一维一致网格中生成一个动画
+        在一维一致网格中生成一个动画
+
+        @param fig: matplotlib的Figure对象，用于绘制动画。
+        @param axes: matplotlib的Axes对象，用于设置坐标轴和画图。
+        @param box: 一个四元组，分别表示x轴的最小值、最大值和y轴的最小值、最大值。
+        @param advance: 一个函数，接受当前帧序号（和可选的其他参数），返回当前时间步的解和时间。
+        @param fname: 字符串，保存的视频文件的名称，默认为'test.mp4'。
+        @param init: 一个可选的函数，用于初始化线的数据，返回初始化的数据，默认为None。
+        @param fargs: 一个可选的元组，包含传递给init和advance函数的额外参数，默认为None。
+        @param frames: 整数，动画的帧数，默认为1000。
+        @param lw: 整数，线的宽度，默认为2。
+        @param interval: 整数，动画中每帧之间的间隔（以毫秒为单位），默认为50。
+        @param line_style: 字符串，线的样式，默认为'-'，表示实线。
+        @param marker: 字符串，线条上标记点的样式，默认为None，表示没有标记点。
+        @param color: 字符串，线的颜色，默认为'blue'。
+
+        @return: None
         """
-        # 导入 matplotlib.animation 模块以创建动画
         import matplotlib.animation as animation
         
-        # 计算初始解
         x = self.node
-        # 创建一个空的线对象
-        line, = axes.plot([], [], lw=lw)
+        line, = axes.plot([], [], lw=lw, linestyle=line_style, marker=marker, color=color)
 
-        # 初始化线对象
         if init is not None:
             if fargs is not None:
                 init_data = init(*fargs)
@@ -164,29 +191,20 @@ class UniformMesh1d(Mesh1d):
                 init_data = init()
         else:
             init_data, _ = advance(0)
-        line, = axes.plot(x, init_data, lw=lw)
+        line.set_data(x, init_data)  
 
-        # 设置 x 轴和 y 轴的显示范围
         axes.set_xlim(box[0], box[1])
         axes.set_ylim(box[2], box[3])
 
-        # 定义一个更新动画帧的函数，该函数接收一个参数 n，表示当前帧序号
         def func(n, *fargs):
-            # 调用 advance 函数进行时间步进，返回当前时间步的解 uh 和时间 t
             uh, t = advance(n, *fargs)
-            # 设置线的 x 和 y 坐标数据
-            line.set_data((x, uh))
-            # 设置标题，显示当前帧序号和时间
+            line.set_data(x, uh) 
             s = "frame=%05d, time=%0.8f" % (n, t)
             print(s)
             axes.set_title(s)
-            # 返回线对象，以便在动画中更新
             return line
 
-        # 创建一个 funcanimation 对象，它将 fig 作为画布，func 作为更新函数，frames 为帧数
-        # 并设置动画间隔时间
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
-        # 保存动画为视频文件
         ani.save(fname)
 
 
