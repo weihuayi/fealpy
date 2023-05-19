@@ -52,9 +52,10 @@ def hyperbolic_lax(n, *fargs):
         A = mesh.hyperbolic_operator_explicity_lax_friedrichs(pde.a(), tau)
         uh0[:] = A@uh0
         
-        gD = lambda p: pde.dirichlet(p, t+tau)
-        mesh.update_dirichlet_bc(gD, uh0)
-        solution = lambda p: pde.solution(p, t + tau)
+        gD = lambda p: pde.dirichlet(p, t)
+        mesh.update_dirichlet_bc(gD, uh0, threshold=0)
+
+        solution = lambda p: pde.solution(p, t)
         e = mesh.error(solution, uh0, errortype='max')
         print(f"the max error is {e}")
         return uh0, t
@@ -69,14 +70,13 @@ def hyperbolic_windward_(n, *fargs): # 点击这里查看 FEALPy 中的代码
     if n == 0:
         return uh0, t
     else:
-        A = mesh.hyperbolic_operator_central(tau)
-        source = lambda p: pde.source(p, t + tau)
+        A = mesh.hyperbolic_operator_central(pde.a(), tau)
         uh0[:] = A@uh0
         
-        gD = lambda p: pde.dirichlet(p, t+tau)
-        mesh.update_dirichlet_bc(gD, uh0)
+        gD = lambda p: pde.dirichlet(p, t)
+        mesh.update_dirichlet_bc(gD, uh0, threshold=0)
         
-        solution = lambda p: pde.solution(p, t + tau)
+        solution = lambda p: pde.solution(p, t)
         e = mesh.error(solution, uh0, errortype='max')
         print(f"the max error is {e}")
         return uh0, t
@@ -94,15 +94,15 @@ def hyperbolic_windward_with_vicious(n, *fargs):
         A = mesh.hyperbolic_operator_explicity_upwind_viscous(pde.a(), tau)
         uh0[:] = A@uh0
         
-        gD = lambda p: pde.dirichlet(p, t+tau)
-        mesh.update_dirichlet_bc(gD, uh0)
+        gD = lambda p: pde.dirichlet(p, t)
+        mesh.update_dirichlet_bc(gD, uh0, threshold=0)
         
-        solution = lambda p: pde.solution(p, t + tau)
+        solution = lambda p: pde.solution(p, t)
         e = mesh.error(solution, uh0, errortype='max')
         print(f"the max error is {e}")
         return uh0, t
 
 box = [0, 2, 0, 2]
 fig, axes = plt.subplots()
-mesh.show_animation(fig, axes, box, hyperbolic_explicity_windward, frames=nt+1)
+mesh.show_animation(fig, axes, box,hyperbolic_windward , frames=nt+1)
 plt.show()
