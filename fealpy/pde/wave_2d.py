@@ -55,7 +55,7 @@ class MembraneOscillationPDEData:
         """
 
         x, y = p[..., 0], p[..., 1]
-        eps = 0.01
+        eps = 0.00001
         pi = np.pi
         val = np.sin(4*pi*x) + np.cos(4*pi*y)
         return eps*val

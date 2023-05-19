@@ -615,17 +615,20 @@ class UniformMesh1d(Mesh1d):
         @brief 带粘性项的显式迎风格式 
         """
         r = a*tau/self.h
-
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+        
         NN = self.number_of_nodes()
         k = np.arange(NN)
-
-        A = diags([1-np.abs(r)], [0], shape=(NN, NN), format='csr')
-        val0 = np.broadcast_to(1/2*np.abs(r)-1/2*r, (NN-1, ))
-        val1 = np.broadcast_to(1/2*r+1/2*np.abs(r), (NN-1, ))
+        
+        A = diags([1-r], [0], shape=(NN, NN), format='csr')
+        val0 = np.broadcast_to(r, (NN-1, ))
+        val1 = np.broadcast_to(0, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
         A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        
         return A
 
     def hyperbolic_operator_explicity_lax_friedrichs(self, a, tau):
@@ -633,24 +636,19 @@ class UniformMesh1d(Mesh1d):
         @brief 积分守恒型 lax_friedrichs 格式
         """
         r = tau/self.h
-    
+
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
         A = diags([0], [0], shape=(NN, NN), format='csr')
-        val = np.broadcast_to(1/2, (NN-1, ))
+        val0 = np.broadcast_to(1/2 + r, (NN-1, ))
+        val1 = np.broadcast_to(1/2 - r, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
         
-        B = diags([0], [0], shape=(NN, NN), format='csr')
-        val = np.broadcast_to(r/2, (NN-1, ))
-        I = k[1:]
-        J = k[0:-1]
-        B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        return A, B
+        return A
 
     def hyperbolic_operator_implicity_upwind(self, a, tau):
         """

@@ -35,4 +35,3 @@ mg.integrate(behaviour, state_variables, material_properties, deformation_gradie
 stress = state_variables.s1.gradients["Stress"]
 
 print("Stress tensor: ", stress)
-
