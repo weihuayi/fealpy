@@ -140,7 +140,7 @@ class UniformMesh2d(Mesh2d):
         return n0.astype('int64'), n1.astype('int64')
 
     ## @ingroup GeneralInterface
-    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='jet'):
+    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
             
         """
         @brief    显示一个定义在网格节点上的函数
@@ -170,9 +170,7 @@ class UniformMesh2d(Mesh2d):
             frames: np.int_ = 1000, 
             interval: np.int_ = 50, 
             plot_type :str = 'imshow',
-            cmap='rainbow',
-            vmin=-1, 
-            vmax=1) -> None:
+            cmap='rainbow') -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
@@ -199,9 +197,8 @@ class UniformMesh2d(Mesh2d):
             data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5], 
                     extent=box[0:4], interpolation='bicubic')
         elif plot_type == 'surface':
-            x = np.linspace(box[0], box[1], self.node.shape[0])
-            y = np.linspace(box[2], box[3], self.node.shape[1])
-            X, Y = np.meshgrid(x, y)
+            X = self.node[..., 0]
+            Y = self.node[..., 1]
             data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4],
                     vmax=box[5], rstride=1, cstride=1)
             axes.set_xlim(box[0], box[1])
