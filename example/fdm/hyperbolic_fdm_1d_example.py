@@ -28,11 +28,7 @@ def hyperbolic_explicity_windward(n, *fargs):
     if n == 0:
         return uh0, t
     else:
-<<<<<<< HEAD
-        A = mesh.hyperbolic_operator_explicity_upwind(pde.a(), tau)
-=======
         A = mesh.hyperbolic_operator_explicity_upwind(tau)
->>>>>>> upstream/master
         uh0[:] = A@uh0
 
         gD = lambda p: pde.dirichlet(p, t)
@@ -108,9 +104,5 @@ def hyperbolic_windward_with_vicious(n, *fargs):
 
 box = [0, 2, 0, 2]
 fig, axes = plt.subplots()
-<<<<<<< HEAD
 mesh.show_animation(fig, axes, box,hyperbolic_windward , frames=nt+1)
-=======
-mesh.show_animation(fig, axes, box, hyperbolic_explicity_windward, frames=nt+1)
->>>>>>> upstream/master
 plt.show()
