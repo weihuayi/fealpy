@@ -55,10 +55,7 @@ class Hyperbolic1dPDEData:
 
         @return 真解函数值
         """
-        val = np.zeros_like(p)
-        val = abs(p-1)
-        
-        return val
+        return np.abs(p-1)
         
     @cartesian
     def source(self, p: np.ndarray, t: np.float64) -> np.float64:
@@ -81,6 +78,6 @@ class Hyperbolic1dPDEData:
         @param[in] t float, 时间点 
         """
         return np.ones(p.shape)
-        
-    def a(self) -> np.int_:
-        return 1
+
+    def is_dirichlet_boundary(self, p):
+        return np.abs(p - self._domain[0]) < 1e-12
