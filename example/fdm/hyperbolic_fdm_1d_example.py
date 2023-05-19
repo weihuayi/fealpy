@@ -29,12 +29,12 @@ def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
     if n == 0:
         return uh0, t
     else:
-        A = mesh.hyperbolic_operator_explicity_upwind(pde.a(), tau)
+        A = mesh.hyperbolic_operator_explicity_upwind(tau)
         source = lambda p: pde.source(p, t + tau)
         uh0[:] = A@uh0
 
         gD = lambda p: pde.dirichlet(p, t+tau)
-        mesh.update_dirichlet_bc(gD, uh0)
+        mesh.update_dirichlet_bc(gD, uh0, threshold=0)
 
         solution = lambda p: pde.solution(p, t + tau)
         e = mesh.error(solution, uh0, errortype='max')
@@ -61,7 +61,7 @@ def hyperbolic_lax(n, *fargs):
         print(f"the max error is {e}")
         return uh0, t
 
-def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
+def hyperbolic_windward_(n, *fargs): # 点击这里查看 FEALPy 中的代码
     """
     @brief 时间步进格式为中心差分格式
 
@@ -106,5 +106,5 @@ def hyperbolic_windward_with_vicious(n, *fargs):
 
 box = [0, 2, 0, 2]
 fig, axes = plt.subplots()
-mesh.show_animation(fig, axes, box, hyperbolic_windward_with_vicious, frames=nt+1)
+mesh.show_animation(fig, axes, box, hyperbolic_windward, frames=nt+1)
 plt.show()
