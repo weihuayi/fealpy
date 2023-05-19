@@ -450,15 +450,17 @@ class UniformMesh1d(Mesh1d):
         return A, f 
 
     ## @ingroup FDMInterface
-    def update_dirichlet_bc(self, gD, uh):
+    def update_dirichlet_bc(self, gD, uh, threshold=None):
         """
         @brief 更新网格函数 uh 的 Dirichlet 边界值
         @todo 
         """
         node = self.node
-        isBdNode = self.ds.boundary_node_flag()
-        uh[isBdNode]  = gD(node[isBdNode])
-
+        if threshold is None:
+            isBdNode = self.ds.boundary_node_flag()
+            uh[isBdNode]  = gD(node[isBdNode])
+        else:
+            uh[threshold] = gD(node[threshold])
     def parabolic_operator_forward(self, tau):
         """
         @brief 生成抛物方程的向前差分迭代矩阵
@@ -597,71 +599,157 @@ class UniformMesh1d(Mesh1d):
 
             return B
 
-
-    def hyperbolic_operator_explicity_upwind_with_viscous(self, a, tau):
+    def hyperbolic_operator_central(self, tau, a):
         """
-        @brief 带粘性项的显式迎风格式 
+        @brief 双曲方程的中心差分迭代矩阵
+        @param[in] tau float, 当前时间步长
         """
         r = a*tau/self.h
 
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([1-np.abs(r)], [0], shape=(NN, NN), format='csr')
-        val0 = np.broadcast_to(1/2*np.abs(r)-1/2*r, (NN-1, ))
-        val1 = np.broadcast_to(1/2*r+1/2*np.abs(r), (NN-1, ))
+        A = diags([1], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(-r/2, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+    def hyperbolic_operator_explicity_upwind_with_viscous(self, a, tau):
+        """
+        @brief 带粘性项的显式迎风格式 
+        """
+        r = a*tau/self.h
+    
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+    
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+    
+        A = diags([1-r], [0], shape=(NN, NN), format='csr')
+        val0 = np.broadcast_to(0, (NN-1, ))
+        val1 = np.broadcast_to(r, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
         A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+    
         return A
 
     def hyperbolic_operator_explicity_lax_friedrichs(self, a, tau):
         """
         @brief 积分守恒型 lax_friedrichs 格式
         """
-        r = tau/self.h
+        r = a*tau/self.h
     
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
         A = diags([0], [0], shape=(NN, NN), format='csr')
-        val = np.broadcast_to(1/2, (NN-1, ))
+        val0 = np.broadcast_to(1/2 - r, (NN-1, ))
+        val1 = np.broadcast_to(1/2 + r, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        
-        B = diags([0], [0], shape=(NN, NN), format='csr')
-        val = np.broadcast_to(r/2, (NN-1, ))
-        I = k[1:]
-        J = k[0:-1]
-        B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        return A, B
+        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+    
+        return A 
 
     def hyperbolic_operator_implicity_upwind(self, a, tau):
         """
         @brief 隐式迎风格式
         """
-        pass
+        r = a*tau/self.h
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        if a > 0:
+            A = diags([1 + r], [0], shape=(NN, NN), format='csr')
+            val0 = np.broadcast_to(0, (NN-1, ))
+            val1 = np.broadcast_to(-r, (NN-1, ))
+            I = k[1:]
+            J = k[0:-1]
+            A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
+            A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+            return A
+        else:
+            B = diags([1 - r], [0], shape=(NN, NN), format='csr')
+            val0 = np.broadcast_to(r, (NN-1, ))
+            val1 = np.broadcast_to(0, (NN-1, ))
+            I = k[1:]
+            J = k[0:-1]
+            B += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
+            B += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+            return B
 
     def hyperbolic_operator_implicity_center(self, a, tau):
         """
         @brief 隐式中心格式
         """
-
+        r = a*tau/self.h
+    
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+    
+        A = diags([1], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(r/2, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
+    
+        return A
     def hyperbolic_operator_leap_frog(self, a, tau):
         """
         @brief 蛙跳格式
         """
-        pass
+        r = a*tau/self.h
+    
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+    
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+    
+        A = diags([0], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(-r, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
+       
+       return A
 
     def hyperbolic_operator_lax_wendroff(self, a, tau):
         """
         @brief Lax-Wendroff 格式
         """
-        pass
+        r = a*tau/self.h
+    
+        if r > 1.0:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1 - r**2], [0], shape=(NN, NN), format='csr')
+        val0 = np.broadcast_to(-r/2 + r**2/2, (NN-1, ))
+        val1 = np.broadcast_to(r/2 + r**2/2 + r, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+    
+        return A
 
 
     ## @ingroup FDMInterface

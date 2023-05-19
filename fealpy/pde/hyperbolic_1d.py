@@ -3,8 +3,13 @@ import numpy as np
 from fealpy.decorator import cartesian
 from typing import Tuple
 
+import numpy as np # 具体代码可参考 FEALPy 仓库
+
+from fealpy.decorator import cartesian
+from typing import Union, Tuple, List 
+
 class Hyperbolic1dPDEData:
-    def __init__(self, D: Tuple[int, int]=(0, 2), T: Tuple[int, int]=(0, 4)):
+    def __init__(self, D: Union[Tuple[int, int], List[int]] = (0, 2), T: Union[Tuple[int, int], List[int]] = (0, 4)):
         """
         @brief 模型初始化函数
         @param[in] D 模型空间定义域
@@ -13,13 +18,13 @@ class Hyperbolic1dPDEData:
         self._domain = D 
         self._duration = T 
 
-    def domain(self) -> Tuple[int, int]:
+    def domain(self) -> Union[Tuple[float, float], List[float]]:
         """
         @brief 空间区间
         """
         return self._domain
 
-    def duration(self)-> Tuple[int, int]:
+    def duration(self)-> Union[Tuple[float, float], List[float]]:
         """
         @brief 时间区间
         """
@@ -56,12 +61,12 @@ class Hyperbolic1dPDEData:
         @return 真解函数值
         """
         val = np.zeros_like(p)
-        val = abs(p-1)
+        val = np.abs(p-1)
         
         return val
         
     @cartesian
-    def source(self, p: np.ndarray, t: np.float64) -> np.float64:
+    def source(self, p: np.ndarray , t: np.float64 ) -> np.float64:
         """
         @brief 方程右端项 
 
@@ -81,6 +86,6 @@ class Hyperbolic1dPDEData:
         @param[in] t float, 时间点 
         """
         return np.ones(p.shape)
-        
-    def a(self) -> np.int_:
-        return 1
+
+    def is_dirichlet_boundary(self, p):
+        return np.abs(p - self._domain[0]) < 1e-12
