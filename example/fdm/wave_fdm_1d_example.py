@@ -13,13 +13,14 @@ from fealpy.mesh import UniformMesh1d
 
 import ipdb
 
-ipdb.set_trace()
+# ipdb.set_trace()
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
         一维均匀网格上用有限差分方法求解波动方程，其中
-        边界条件为的纯 Dirichlet 边界条件
+        边界条件为纯 Dirichlet 边界条件
+        已知初始时刻解函数及其关于时间的偏导函数的表达式
         """)
 
 parser.add_argument('--nx',
@@ -75,13 +76,13 @@ def advance(
         return uh1, t
     else:
         A, B, C = mesh.wave_operator(tau, theta=theta)
-        source = lambda p: pde.source(p, t + tau)
+        source = lambda p: pde.source(p, t)
         f = mesh.interpolate(source, intertype='node')
         f *= tau**2
         f += B@uh1 + C@uh0
 
         uh0[:] = uh1
-        gD = lambda p: pde.dirichlet(p, t+tau)
+        gD = lambda p: pde.dirichlet(p, t)
         if theta == 0.0:
             uh1[:] = f
             mesh.update_dirichlet_bc(gD, uh1)
