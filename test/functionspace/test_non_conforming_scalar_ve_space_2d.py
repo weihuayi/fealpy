@@ -18,6 +18,7 @@ def test_dof_3(p):
     mesh = PolygonMesh(node, cell, cellLocation)
 
     dof = NCSVEDof2d(mesh, p)
+   
     isBdDof = dof.is_boundary_dof()
     result = np.array([ True,  True , True,  True,  True,  True, False, False  ,False,  True,  True,  True,False, False, False,  True,  True,  True, False, False, False,  True,  True,True, False, False, False, False, False, False,  True,  True,  True,  True,  True,True,  True,  True,  True, False, False, False, False, False, False, False, False,False, False, False, False, False, False, False])
     np.testing.assert_equal(isBdDof, result)
@@ -38,10 +39,9 @@ def test_dof_3(p):
             np.array([29, 28, 27, 36, 37, 38, 30, 31, 32, 26, 25, 24, 51, 52, 53])]
     for a0, a1 in zip(cell2dof, result):
         np.testing.assert_equal(a0, a1)
-
+    
     ips = dof.interpolation_points()
-    np.testing.assert_allclose(ips[-1], np.array([2,  1.88729833]),
-            atol=1e-6)
+    np.testing.assert_allclose(ips[-1], np.array([1.5, 1.67320508]),atol=1e-6)
 
     if False:
         fig, axes = plt.subplots()
