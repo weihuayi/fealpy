@@ -90,7 +90,7 @@ class NCSVEDof2d():
         ldofs = NCE*p + (p-1)*p//2
         return ldofs
 
-    def interpolation_points(self):
+    def interpolation_points(self, scale:float=0.3):
         """
         Get the node-value-type interpolation points.
 
@@ -98,17 +98,49 @@ class NCSVEDof2d():
         """
         p = self.p
         mesh = self.mesh
+        gdof = self.number_of_global_dofs()
         node = mesh.entity('node')
         edge = mesh.entity('edge')
 
         GD = mesh.geo_dimension()
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
 
         qf = GaussLegendreQuadrature(p)
         bcs, ws = qf.get_quadrature_points_and_weights()
+        ipoint = np.zeros((gdof, GD),dtype=np.float_)
+        if p==1:
+            ipoint = np.einsum(
+                    'ij, ...jm->...im',
+                    bcs, node[edge, :]).reshape(-1, GD)
+            return ipoint
 
-        ipoint = np.einsum(
-                'ij, ...jm->...im',
-                bcs, node[edge, :]).reshape(-1, GD)
+        ipoint[:NE*p, :] =  np.einsum(
+                    'ij, ...jm->...im',
+                    bcs, node[edge, :]).reshape(-1, GD)
+        if p == 2:
+            ipoint[NE*p:, :] = mesh.entity_barycenter('cell')
+            return ipoint
+
+        h = np.sqrt(mesh.cell_area())[:, None]*scale
+        bc = mesh.entity_barycenter('cell')
+        t = np.array([
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.5, np.sqrt(3)/2]], dtype=np.float_)
+        t -= np.array([0.5, np.sqrt(3)/6.0], dtype=np.float_)
+
+        tri = np.zeros((NC, 3, GD), dtype=np.float_)
+        tri[:, 0, :] = bc + t[0]*h
+        tri[:, 1, :] = bc + t[1]*h
+        tri[:, 2, :] = bc + t[2]*h
+
+        bcs = mesh.multi_index_matrix(p-2)/(p-2)
+        ipoint[NE*p:, :] = np.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
         return ipoint
+
+
+
+
 
 
