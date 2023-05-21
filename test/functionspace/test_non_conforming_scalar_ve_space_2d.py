@@ -8,7 +8,7 @@ from fealpy.functionspace.non_conforming_scalar_ve_space_2d import NCSVEDof2d
 
 
 
-def test_dof_3(p):
+def test_dof_3(p, plot=False):
     node = np.array([
         (0.0, 0.0), (0.0, 1.0), (0.0, 2.0), (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
         (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float64)
@@ -43,12 +43,13 @@ def test_dof_3(p):
     ips = dof.interpolation_points()
     np.testing.assert_allclose(ips[-1], np.array([1.5, 1.67320508]),atol=1e-6)
 
-    if False:
+    if plot:
         fig, axes = plt.subplots()
         mesh.add_plot(axes)
         mesh.find_node(axes, node=ips, showindex=True)
         mesh.find_cell(axes, showindex=True)
         mesh.find_edge(axes, showindex=True)
         plt.show()
+
 if __name__ == "__main__":
-    test_dof_3(3)
+    test_dof_3(3, True)

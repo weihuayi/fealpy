@@ -54,9 +54,9 @@ class NCSVEDof2d():
             NC = mesh.number_of_cells()
 
             ldof = self.number_of_local_dofs()
-            cell2dofLocation = np.zeros(NC+1, dtype=np.int)
+            cell2dofLocation = np.zeros(NC+1, dtype=np.int_)
             cell2dofLocation[1:] = np.add.accumulate(ldof)
-            cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
+            cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int_)
 
             edge2dof = self.edge_to_dof()
             edge2cell = mesh.ds.edge_to_cell()
