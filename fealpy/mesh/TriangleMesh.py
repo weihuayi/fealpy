@@ -2138,7 +2138,7 @@ class TriangleMesh(Mesh2d):
 
 
 class TriangleMeshWithInfinityNode:
-    def __init__(self, mesh):
+    def __init__(self, mesh, bc=True):
         edge = mesh.ds.edge
         bdEdgeIdx = mesh.ds.boundary_edge_index()
         NBE = len(bdEdgeIdx)
@@ -2156,8 +2156,14 @@ class TriangleMeshWithInfinityNode:
         node = mesh.node
         self.node = np.append(node, [[np.nan, np.nan]], axis=0)
         self.ds = TriangleMeshDataStructure(NN+1, newCell)
-        self.center = np.append(mesh.entity_barycenter(),
-                0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+
+        if bc:
+            self.center = np.append(mesh.entity_barycenter(),
+                    0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+        else:
+            self.center = np.append(mesh.circumcenter(),
+                    0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+
         self.meshtype = 'tri'
 
     def number_of_nodes(self):

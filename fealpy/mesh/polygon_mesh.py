@@ -296,11 +296,14 @@ class PolygonMesh(Mesh2d, Plotable):
         return cls(node, cell)
     
     @classmethod
-    def from_triangle_mesh_by_dual(cls, mesh):
+    def from_triangle_mesh_by_dual(cls, mesh, bc=True):
         """
         @brief 生成三角形网格的对偶网格，目前默认用三角形的重心做为对偶网格的顶点
+
+        @param mesh 
+        @param bc bool 如果为真，则对偶网格点为三角形单元重心; 否则为三角形单元外心
         """
-        mesh = TriangleMeshWithInfinityNode(mesh)
+        mesh = TriangleMeshWithInfinityNode(mesh, bc=bc)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return cls(pnode, pcell, pcellLocation)
 
