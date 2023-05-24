@@ -21,6 +21,7 @@ from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
 from .HexahedronMesh import HexahedronMesh
+from .polygon_mesh import PolygonMesh
 
 #from .SurfaceTriangleMesh import SurfaceTriangleMesh
 #from .PrismMesh import PrismMesh
