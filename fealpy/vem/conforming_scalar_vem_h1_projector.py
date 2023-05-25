@@ -1,10 +1,13 @@
 import numpy as np
+from fealpy.mesh.polygon_mesh import PolygonMesh
 
-from ..functionspace import ConformingScalarVESpace2d
-from ..functionspace import ConformingVectorVESpace2d
-
-
-class ConformingScalarVEMH1Projector2d:
+from fealpy.functionspace import ConformingScalarVESpace2d
+from fealpy.functionspace import ConformingVectorVESpace2d
+import ipdb
+from fealpy.mesh import MeshFactory as MF
+class ConformingScalarVEMH1Projector2d():
+    def __init__(self):
+        pass
 
     def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M, D):
         pass
@@ -17,10 +20,36 @@ class ConformingScalarVEMH1Projector2d:
         """
         p = space.p
         mesh = space.mesh
+        NC = mesh.number_of_cells()
+        NV = mesh.ds.number_of_vertices_of_cells()
+        h = space.smspace.cellsize
+        for i in range(NC):
+            smldof = space.smspace.number_of_local_dofs()
+            ldof = space.number_of_local_dofs()
+            B = np.zeros((smldof, ldof[i]),dtype=np.float_)
+            if p==1:
+                B[0, :] = 1/NV[i]
+                B[1:, :] = mesh.node_normal()[i:i+NV,:].T/h[i]
+                return B
+            else:
+                B[0,NV[i]*p] = 1 
+                data = space.smspace.diff_index_2()
+                xx = data['xx']
+                yy = data['yy']
+                print(xx)
+                print(xx[0].shape)
+                print(xx[0].shape[0])
+                B[xx[0],NV[i]*p+np.arange(xx[0].shape[0])] -= xx[1]
+                B[yy[0],NV[i]*p+np.arange(yy[0].shape[0])] -= yy[1]
+            return B
 
-        smldof = space.smspace.number_of_local_dofs()
 
-        NV = mesh.number_of_vertices_of_cells()
+
+
+
+
+"""
+        NV = mesh.ds.number_of_vertices_of_cells()
         h = self.smspace.cellsize
         cell2dof = space.cell_to_dof() # 是一个自由度管理的列表
         B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float)
@@ -74,3 +103,4 @@ class ConformingScalarVEMH1Projector2d:
                         %(NV[edge2cell[isInEdge, 1]].reshape(-1, 1)*p)
                 np.add.at(B, (np.s_[:], idx), val)
             return B
+            """
