@@ -33,7 +33,7 @@ def test_linear_elasticity_lfem_2d(p, n):
     ouh = ospace.function(dim=GD)
     
     # 新接口程序
-    space = Space(mesh, p=p, doforder='vidms')
+    space = Space(mesh, p=p, doforder='vdims')
     uh = space.function(dim=GD)
     vspace = GD*(space, ) # 把标量空间张成向量空间
     bform = BilinearForm(vspace)
@@ -157,5 +157,5 @@ def test_linear_elasticity_lfem_3d(p, n):
 
 
 if __name__ == "__main__":
-    #test_linear_elasticity_lfem_2d(1, 10)
-    test_linear_elasticity_lfem_3d(1, 1)
+    test_linear_elasticity_lfem_2d(1, 10)
+    #test_linear_elasticity_lfem_3d(1, 1)

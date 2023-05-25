@@ -2044,7 +2044,7 @@ class TriangleMesh(Mesh2d):
         # 获取三角形单元信息
         cell_type = 2  # 三角形单元的类型编号为 2
         cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
-        cell = np.array(cell_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
+        cell = np.array(cell_connectivity, dtype=np.int_).reshape(-1, 3) - 1
 
         # 输出节点和单元数量
         print(f"Number of nodes: {node.shape[0]}")
@@ -2094,11 +2094,11 @@ class TriangleMesh(Mesh2d):
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
 
-        idx = np.zeros((nu+1, nv+1), np.uint32)
+        idx = np.zeros((nu+1, nv+1), np.int_)
         idx[0:-1, 0:-1] = np.arange(NN).reshape(nu, nv)
         idx[-1, :] = idx[0, :]
         idx[:, -1] = idx[:, 0]
-        cell = np.zeros((2*NC, 3), dtype=np.uint32)
+        cell = np.zeros((2*NC, 3), dtype=np.int_)
         cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
         cell[:NC, 1] = idx[1:,1:].flatten(order='F')
         cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
@@ -2138,7 +2138,7 @@ class TriangleMesh(Mesh2d):
 
 
 class TriangleMeshWithInfinityNode:
-    def __init__(self, mesh):
+    def __init__(self, mesh, bc=True):
         edge = mesh.ds.edge
         bdEdgeIdx = mesh.ds.boundary_edge_index()
         NBE = len(bdEdgeIdx)
@@ -2156,8 +2156,14 @@ class TriangleMeshWithInfinityNode:
         node = mesh.node
         self.node = np.append(node, [[np.nan, np.nan]], axis=0)
         self.ds = TriangleMeshDataStructure(NN+1, newCell)
-        self.center = np.append(mesh.entity_barycenter(),
-                0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+
+        if bc:
+            self.center = np.append(mesh.entity_barycenter(),
+                    0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+        else:
+            self.center = np.append(mesh.circumcenter(),
+                    0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+
         self.meshtype = 'tri'
 
     def number_of_nodes(self):

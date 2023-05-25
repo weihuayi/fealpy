@@ -239,6 +239,31 @@ class IntervalMesh(Mesh1d):
 
             self.ds.reinit(NN+N, newCell)
 
+    ## @ingroup GeneralInterface
+    def show_function(self, plot, uh, box=None):
+        """
+        @brief 画出定义在网格上线性有限元函数
+        """
+        assert self.geo_dimension() == 1
+        assert self.number_of_nodes() == len(uh)
+
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+
+        # 设置 x 轴和 y 轴的显示范围
+        if box is not None:
+            axes.set_xlim(box[0], box[1])
+            axes.set_ylim(box[2], box[3])
+
+        node = self.entity('node').reshape(-1)
+        idx, = np.argsort(node)
+        line = axes.plot(node[idx], uh[idx])
+        return line
+
     @classmethod
     def from_interval_domain(cls, domain, nx=10):
         node = np.linspace(domain[0], domain[1], nx+1, dtype=np.float64)

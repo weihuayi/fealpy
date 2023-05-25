@@ -7,6 +7,7 @@ from ..common import ranges
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import GaussLobattoQuadrature
+from .TriangleMesh import TriangleMeshWithInfinityNode
 
 from .mesh_base import Mesh2d, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
@@ -293,7 +294,18 @@ class PolygonMesh(Mesh2d, Plotable):
             [0.0, 1.0]],dtype=np.float_)
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         return cls(node, cell)
+    
+    @classmethod
+    def from_triangle_mesh_by_dual(cls, mesh, bc=True):
+        """
+        @brief 生成三角形网格的对偶网格，目前默认用三角形的重心做为对偶网格的顶点
 
+        @param mesh 
+        @param bc bool 如果为真，则对偶网格点为三角形单元重心; 否则为三角形单元外心
+        """
+        mesh = TriangleMeshWithInfinityNode(mesh, bc=bc)
+        pnode, pcell, pcellLocation = mesh.to_polygonmesh()
+        return cls(pnode, pcell, pcellLocation)
 
     @classmethod
     def from_one_pentagon(cls):
@@ -320,6 +332,13 @@ class PolygonMesh(Mesh2d, Plotable):
         cell = np.array([0, 1, 2, 3, 4, 5], dtype=np.int_)
         cellLocation = np.array([0, 6], dtype=np.int_)
         return cls(node, cell ,cellLocation)
+
+    @classmethod
+    def from_mixed_polygon(cls):
+        """
+        @brief 生成一个包含多种类型多边形的网格，方便测试相关的程序
+        """
+        pass
 
     @classmethod
     def from_mesh(cls, mesh: Mesh2d):

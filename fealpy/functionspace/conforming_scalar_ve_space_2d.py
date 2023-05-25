@@ -12,7 +12,7 @@ class CSVEDof2d():
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
-        self.cell2dof = self.cell_to_dof()
+        self.cell2dof = self.cell_to_dof() # 初始化的时候就构建出 cell2dof 数组
 
     def is_boundary_dof(self, threshold=None):
         idx = self.mesh.ds.boundary_edge_index()
@@ -29,8 +29,10 @@ class CSVEDof2d():
     def edge_to_dof(self, index=np.s_[:]):
         return self.mesh.edge_to_ipoint(self.p, index=index)
 
-    def cell_to_dof(self, index=np.s_[:]):
-        return self.mesh.cell_to_ipoint(self.p, index=index)
+    face_to_dof = edge_to_dof
+
+    def cell_to_dof(self):
+        return self.mesh.cell_to_ipoint(self.p)
 
     def number_of_global_dofs(self):
         return self.mesh.number_of_global_ipoints(self.p)
@@ -64,6 +66,9 @@ class ConformingScalarVESpace2d():
 
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype=doftype)
+
+    def cell_to_dof(self, index=np.s_[:]):
+        return self.dof.cell2dof[index]
 
     def interpolation_points(self, index=np.s_[:]):
         return self.dof.interpolation_points()

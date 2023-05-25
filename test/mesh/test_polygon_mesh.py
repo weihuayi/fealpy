@@ -4,6 +4,7 @@ import pytest
 import matplotlib.pyplot as plt
 
 from fealpy.mesh.polygon_mesh import PolygonMesh 
+from fealpy.mesh import TriangleMesh
 
 def test_polygon_mesh_constructor():
     node = np.array([
@@ -66,11 +67,21 @@ def test_from_one():
     mesh.find_cell(axes, showindex=True)
     mesh.find_edge(axes, showindex=True)
     plt.show()
-
+def test_from_triangle_mesh_by_dual():
+    mesh = TriangleMesh.from_one_triangle()
+    mesh.uniform_refine()
+    mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
+ 
+    fig, axes = plt.subplots()
+    mesh.add_plot(axes)
+    mesh.find_node(axes, showindex=True)
+    mesh.find_cell(axes, showindex=True)
+    mesh.find_edge(axes, showindex=True)
+    plt.show()
 
 if __name__ == "__main__":
     #test_polygon_mesh_constructor()
-    test_polygon_mesh_interpolation_points(4)
+    #test_polygon_mesh_interpolation_points(4)
     #test_from_one_triangle('iso')
     #test_from_one()
-
+    test_from_triangle_mesh_by_dual()
