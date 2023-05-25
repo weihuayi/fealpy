@@ -135,5 +135,5 @@ def update(i):
 
 anim = FuncAnimation(fig, update, frames=maxit, interval=1, blit=True)
 #FFwriter = animation.FFMpegWriter(fps=300, extra_args=['-vcodec', 'libx264'])
-#anim.save('basic_animation.mp4',writer=FFwriter)
+anim.save('basic_animation.mp4',writer="ffmpeg")
 plt.show()
