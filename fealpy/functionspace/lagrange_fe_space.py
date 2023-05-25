@@ -193,9 +193,6 @@ class LagrangeFESpace():
 
         return val
 
-    def interpolate(self):
-        pass
-
 
     def boundary_interpolate(self, 
             gD: Union[Callable, int, float, np.ndarray], 
@@ -267,3 +264,30 @@ class LagrangeFESpace():
     def show_function(self, axes):
         pass
 
+    
+    def interpolate(self, u, dim=None, dtype=None):
+        """
+        @brief 
+        """
+        assert callable(u)
+
+        if not hasattr(u, 'coordtype'): 
+            ips = self.interpolation_points()
+            uI = u(ips)
+        else:
+            if u.coordtype == 'cartesian':
+                ips = self.interpolation_points()
+                uI = u(ips)
+            elif u.coordtype == 'barycentric':
+                TD = self.TD
+                p = self.p
+                bcs = multi_index_matrix[TD](p)/p
+                uI = u(bcs)
+        
+        if self.doforder == 'sdofs':
+            uI = uI.transpose(1,0)
+
+        if dtype is None:
+            return self.function(dim=dim, array=uI, dtype=uI.dtype)
+        else:
+            return self.function(dim=dim, array=uI, dtype=dtype)

@@ -758,7 +758,7 @@ class UniformMesh1d(Mesh1d):
         A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
        
-       return A
+        return A
 
     def hyperbolic_operator_lax_wendroff(self, a, tau):
         """
