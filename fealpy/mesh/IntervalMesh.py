@@ -260,8 +260,14 @@ class IntervalMesh(Mesh1d):
             axes.set_ylim(box[2], box[3])
 
         node = self.entity('node').reshape(-1)
-        idx, = np.argsort(node)
+        idx = np.argsort(node)
         line = axes.plot(node[idx], uh[idx])
+
+         # 添加注释
+        nonzero_indices = np.nonzero(uh)[0]
+        for i in nonzero_indices:
+            axes.text(node[i], uh[i], f'$\phi_{i}$', fontsize=12, color='b', ha='center', va='bottom')
+
         return line
 
     @classmethod
