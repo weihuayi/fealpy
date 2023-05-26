@@ -33,8 +33,6 @@ class ConformingScalarVEMH1Projector2d():
             B = np.zeros((smldof, ldof[i]),dtype=np.float_)
             if p==1:
                 B[0, :] = 1/NV[i]
-                B[1:, :] = mesh.node_normal()[i:i+NV,:].T/h[i]
-                return B
             else:
                 B[0,NV[i]*p] = 1 
                 data = space.smspace.diff_index_2()
