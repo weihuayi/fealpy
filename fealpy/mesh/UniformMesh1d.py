@@ -141,25 +141,22 @@ class UniformMesh1d(Mesh1d):
         line = axes.plot(node, uh)
         return line
 
+
     ## @ingroup GeneralInterface
     from matplotlib.figure import Figure
     from matplotlib.axes import Axes
     from typing import Optional, Callable, Any, Tuple
-
     def show_animation(self, 
-                    fig: Figure, 
-                    axes: Axes, 
-                    box: Tuple[float, float, float, float], 
-                    advance: Callable[[int, Any], Tuple[Any, float]], 
-                    fname: str = 'test.mp4',
-                    init: Optional[Callable[..., Any]] = None, 
-                    fargs: Optional[Tuple] = None,
-                    frames: int = 1000, 
-                    lw: int = 2, 
-                    interval: int = 50, 
-                    line_style: str = '-', 
-                    marker: Optional[str] = None, 
-                    color: str = 'blue') -> None:
+                fig: Figure, 
+                axes: Axes, 
+                box: Tuple[float, float, float, float], 
+                advance: Callable[[int, Any], Tuple[Any, float]], 
+                fname: str = 'test.mp4',
+                init: Optional[Callable[..., Any]] = None, 
+                fargs: Optional[Tuple] = None,
+                frames: int = 1000, 
+                interval: int = 50,
+                **kwargs) -> None:
         """
         在一维一致网格中生成一个动画
 
@@ -171,18 +168,15 @@ class UniformMesh1d(Mesh1d):
         @param init: 一个可选的函数，用于初始化线的数据，返回初始化的数据，默认为None。
         @param fargs: 一个可选的元组，包含传递给init和advance函数的额外参数，默认为None。
         @param frames: 整数，动画的帧数，默认为1000。
-        @param lw: 整数，线的宽度，默认为2。
         @param interval: 整数，动画中每帧之间的间隔（以毫秒为单位），默认为50。
-        @param line_style: 字符串，线的样式，默认为'-'，表示实线。
-        @param marker: 字符串，线条上标记点的样式，默认为None，表示没有标记点。
-        @param color: 字符串，线的颜色，默认为'blue'。
+        @param kwargs: 其他的可选关键字参数，例如线的宽度（lw）、线的样式（linestyle）、线条上标记点的样式（marker）、线的颜色（color）等。
 
         @return: None
         """
         import matplotlib.animation as animation
         
         x = self.node
-        line, = axes.plot([], [], lw=lw, linestyle=line_style, marker=marker, color=color)
+        line, = axes.plot([], [], **kwargs)
 
         if init is not None:
             if fargs is not None:
@@ -206,6 +200,7 @@ class UniformMesh1d(Mesh1d):
 
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
         ani.save(fname)
+
 
 
     ## @ingroup GeneralInterface
