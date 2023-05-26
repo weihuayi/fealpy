@@ -616,7 +616,7 @@ class UniformMesh1d(Mesh1d):
         """
         r = a*tau/self.h
         if r > 1.0:
-            raise ValueError(f"The r: {r} should be smaller than 0.5")
+            raise ValueError(f"The r: {r} should be smaller than 1.0")
         
         NN = self.number_of_nodes()
         k = np.arange(NN)
@@ -636,7 +636,7 @@ class UniformMesh1d(Mesh1d):
         r = a*tau/self.h
     
         if r > 1.0:
-            raise ValueError(f"The r: {r} should be smaller than 0.5")
+            raise ValueError(f"The r: {r} should be smaller than 1.0")
     
         NN = self.number_of_nodes()
         k = np.arange(NN)
@@ -659,7 +659,7 @@ class UniformMesh1d(Mesh1d):
         r = a*tau/self.h
     
         if r > 1.0:
-            raise ValueError(f"The r: {r} should be smaller than 0.5")
+            raise ValueError(f"The r: {r} should be smaller than 1.0")
 
         NN = self.number_of_nodes()
         k = np.arange(NN)
@@ -728,7 +728,7 @@ class UniformMesh1d(Mesh1d):
         r = a*tau/self.h
     
         if r > 1.0:
-            raise ValueError(f"The r: {r} should be smaller than 0.5")
+            raise ValueError(f"The r: {r} should be smaller than 1.0")
     
         NN = self.number_of_nodes()
         k = np.arange(NN)
@@ -740,7 +740,7 @@ class UniformMesh1d(Mesh1d):
         A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
        
-       return A
+        return A
 
     def hyperbolic_operator_lax_wendroff(self, a, tau):
         """
@@ -749,14 +749,14 @@ class UniformMesh1d(Mesh1d):
         r = a*tau/self.h
     
         if r > 1.0:
-            raise ValueError(f"The r: {r} should be smaller than 0.5")
+            raise ValueError(f"The r: {r} should be smaller than 1.0")
 
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
         A = diags([1 - r**2], [0], shape=(NN, NN), format='csr')
         val0 = np.broadcast_to(-r/2 + r**2/2, (NN-1, ))
-        val1 = np.broadcast_to(r/2 + r**2/2 + r, (NN-1, ))
+        val1 = np.broadcast_to(r/2 + r**2/2 , (NN-1, ))
         I = k[1:]
         J = k[0:-1]
         A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
