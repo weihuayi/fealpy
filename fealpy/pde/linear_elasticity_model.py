@@ -56,16 +56,33 @@ class LinearElasticityTempalte():
 
 
 class BoxDomainData2d():
-    def __init__(self, E=1e+5, nu=0.2):
+    """
+    @brief 混合边界条件的线弹性问题模型
+    @note 本模型假设在二维方形区域 [0,1] x [0,1] 内的线性弹性问题
+    """
+    def __init__(self, E:float=1e+5, nu:float=0.2):
+        """
+        @brief 构造函数
+        @param[in] E 弹性模量，默认值为 1e+5
+        @param[in] nu 泊松比，默认值为 0.2
+        """
         self.E = E 
         self.nu = nu
+        # 拉梅常数
         self.lam = self.nu*self.E/((1+self.nu)*(1-2*self.nu))
+        # 剪切模量
         self.mu = self.E/(2*(1+self.nu))
 
     def domain(self):
         return [0, 1, 0, 1]
 
-    def init_mesh(self, n=1, meshtype='tri'):
+    def init_mesh(self, n:int=1, meshtype:str='tri'):
+        """
+        @brief 初始化网格
+        @param[in] n 网格加密的次数，默认值为 1
+        @param[in] meshtype 网格类型，默认为 'tri'
+        @return 返回一个初始化后的网格对象
+        """
         node = np.array([
             (0, 0),
             (1, 0),
@@ -86,29 +103,60 @@ class BoxDomainData2d():
 
     @cartesian
     def strain(self, p):
+        """
+        @brief 返回给定点的应变
+        @param[in] p 一个表示空间点坐标的数组
+        @return 返回应变，这里返回 0.0
+        """
         return 0.0
 
     @cartesian
     def stress(self, p):
+        """
+        @brief 返回给定点的应力
+        @param[in] p 一个表示空间点坐标的数组
+        @return 返回应力，这里返回 0.0
+        """
         return 0.0
 
     @cartesian
     def source(self, p):
+        """
+        @brief 返回给定点的源项值 f
+        @param[in] p 一个表示空间点坐标的数组
+        @return 返回源项值，这里返回常数向量 [0.0, 0.0]
+        """
         val = np.array([0.0, 0.0], dtype=np.float64)
         return val
 
     @cartesian
     def dirichlet(self, p):
+        """
+        @brief 返回 Dirichlet 边界上的给定点的位移
+        @param[in] p 一个表示空间点坐标的数组
+        @return 返回位移值，这里返回常数向量 [0.0, 0.0]
+        """
         val = np.array([0.0, 0.0], dtype=np.float64)
         return val
 
     @cartesian
     def neumann(self, p, n):
+        """
+        @brief 返回 Neumann 边界上的给定点的应力
+        @param[in] p 一个表示空间点坐标的数组
+        @param[in] n 一个表示该点处的单位外法向的数组
+        @return 返回应力值，这里返回常数向量 [-500, 0.0]
+        """
         val = np.array([-500, 0.0], dtype=np.float64)
         return val
 
     @cartesian
     def is_dirichlet_boundary(self, p):
+        """
+        @brief 判断给定点是否在 Dirichlet 边界上
+        @param[in] p 一个表示空间点坐标的数组
+        @return 如果在 Dirichlet 边界上，返回 True，否则返回 False
+        """
         x = p[..., 0]
         y = p[..., 1]
         flag = np.abs(x) < 1e-13
@@ -116,6 +164,11 @@ class BoxDomainData2d():
 
     @cartesian
     def is_neumann_boundary(self, p):
+        """
+        @brief 判断给定点是否在 Neumann 边界上
+        @param[in] p 一个表示空间点坐标的数组
+        @return 如果在 Neumann 边界上，返回 True，否则返回 False
+        """
         x = p[..., 0]
         y = p[..., 1]
         flag = np.abs(x - 1) < 1e-13

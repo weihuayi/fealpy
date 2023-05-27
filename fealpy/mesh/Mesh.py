@@ -228,15 +228,20 @@ class Mesh:
             showindex=False, 
             color='r', markersize=20, 
             fontsize=16, fontcolor='r', 
-            multiindex=None):
+            multiindex=None,  add_y_axis=False):
 
         if node is None:
             node = self.entity('node')
 
         GD = self.geo_dimension()
 
+        # 将一维节点映射到二维平面上
         if GD == 1:
-            node = np.r_['1', node, np.zeros_like(node)]
+            # node = np.r_['1', node, np.zeros_like(node)]
+            if add_y_axis:
+                node = np.r_['1', node, np.full_like(node, 0.5)]
+            else:
+                node = np.r_['1', node, np.zeros_like(node)]
             GD = 2
 
         if isinstance(index, slice) and  index == np.s_[:]:

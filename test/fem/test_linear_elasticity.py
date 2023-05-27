@@ -27,12 +27,15 @@ def test_linear_elasticity_lfem_2d(p, n):
     domain = pde.domain()
     mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
     GD = mesh.geo_dimension()
+    print("GD:", GD)
     NN = mesh.number_of_nodes()
+    print("NN:", NN)
 
     ospace = OldSpace(mesh, p=p)
     ouh = ospace.function(dim=GD)
     
     # 新接口程序
+    # 构建双线性型，表示问题的微分形式
     space = Space(mesh, p=p, doforder='vdims')
     uh = space.function(dim=GD)
     vspace = GD*(space, ) # 把标量空间张成向量空间
@@ -40,6 +43,7 @@ def test_linear_elasticity_lfem_2d(p, n):
     bform.add_domain_integrator(LinearElasticityOperatorIntegrator(pde.lam, pde.mu))
     bform.assembly()
 
+    # 构建单线性型，表示问题的源项
     lform = LinearForm(vspace)
     lform.add_domain_integrator(VectorSourceIntegrator(pde.source, q=1))
     if hasattr(pde, 'neumann'):
@@ -64,6 +68,10 @@ def test_linear_elasticity_lfem_2d(p, n):
 
     if hasattr(pde, 'dirichlet'):
         bc = DirichletBC(vspace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        print("bc:", bc)
+        print("A:", A.shape)
+        print("F:", F.shape)
+        print("uh:", uh.shape)
         A, F = bc.apply(A, F, uh)
 
     if hasattr(pde, 'dirichlet'):
@@ -75,8 +83,6 @@ def test_linear_elasticity_lfem_2d(p, n):
 
     ouh.T.flat = spsolve(oA, oF)
     uh.flat = spsolve(A, F)
-
-
 
     # 画出原始网格
     mesh.add_plot(plt)
@@ -99,6 +105,7 @@ def test_linear_elasticity_lfem_3d(p, n):
     mesh = pde.init_mesh(n=n)
     GD = mesh.geo_dimension()
     NN = mesh.number_of_nodes()
+    print("NN:", NN)
 
     ospace = OldSpace(mesh, p=p)
     ouh = ospace.function(dim=GD)
@@ -157,5 +164,5 @@ def test_linear_elasticity_lfem_3d(p, n):
 
 
 if __name__ == "__main__":
-    test_linear_elasticity_lfem_2d(1, 10)
-    #test_linear_elasticity_lfem_3d(1, 1)
+    # test_linear_elasticity_lfem_2d(1, 10)
+    test_linear_elasticity_lfem_3d(1, 1)

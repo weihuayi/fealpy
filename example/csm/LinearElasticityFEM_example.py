@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# 
 
 import argparse
 import numpy as np
@@ -74,7 +73,7 @@ if hasattr(pde, 'dirichlet'):
     A, F = bc.apply(A, F, uh)
 
 uh.T.flat[:] = spsolve(A, F)
-
+print("uh:", uh)
 # 画出原始网格
 mesh.add_plot(plt)
 
