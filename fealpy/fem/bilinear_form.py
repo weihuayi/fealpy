@@ -99,7 +99,7 @@ class BilinearForm:
         ldof = space[0].number_of_local_dofs()
         gdof = space[0].number_of_global_dofs()
         cell2dof = space[0].cell_to_dof() # 标量空间的自由度矩阵
-
+        
         cellmeasure = mesh.entity_measure()
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)

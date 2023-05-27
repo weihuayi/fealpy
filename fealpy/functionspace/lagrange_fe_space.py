@@ -285,7 +285,7 @@ class LagrangeFESpace():
                 uI = u(bcs)
         
         if self.doforder == 'sdofs':
-            uI = uI.transpose(1,0)
+            uI = uI.swapaxes(uI.ndim-1,uI.ndim-2)
 
         if dtype is None:
             return self.function(dim=dim, array=uI, dtype=uI.dtype)

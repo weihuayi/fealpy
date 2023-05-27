@@ -23,7 +23,7 @@ from fealpy.fem import VectorSourceIntegrator
 
 from fealpy.decorator import cartesian, barycentric
 T=10
-nt=5
+nt=50
 ns = 16
 rho = 1
 mu = 1
@@ -36,27 +36,31 @@ pspace = LagrangeFESpace(mesh,p=1,doforder=doforder)
 dt = timeline.dt
 
 # 第一个
-Vbform = BilinearForm(2*(uspace,))
-Vbform.add_domain_integrator(VectorMassIntegrator(rho/dt))
-Vbform.add_domain_integrator(NSOperatorIntegrator(mu))
-#Vbform.add_domain_integrator(NSOperatorIntegrator(1,3))
-Vbform.assembly()
-A = Vbform.get_matrix()
-print(np.sum(np.abs(A.toarray())))
+Vbform0 = BilinearForm(2*(uspace,))
+Vbform0.add_domain_integrator(VectorMassIntegrator(rho/dt))
+Vbform0.assembly()
+A1 = Vbform0.get_matrix()
+
+Vbform1 = BilinearForm(2*(uspace,))
+Vbform1.add_domain_integrator(NSOperatorIntegrator(mu))
+Vbform1.assembly()
+A2 = Vbform1.get_matrix()
+A = A1+A2
+print("第一个方程左端：",np.sum(np.abs(A.toarray())))
 
 #第二个
 Sbform = BilinearForm(pspace)
 Sbform.add_domain_integrator(ScalarDiffusionIntegrator(c=1))
 Sbform.assembly()
 B = Sbform.get_matrix()
-print(np.sum(np.abs(B.toarray())))
+print("第二个方程的左端：",np.sum(np.abs(B.toarray())))
 
 #第三个
-Vbform1 = BilinearForm(2*(uspace,))
-Vbform1.add_domain_integrator(VectorMassIntegrator(c=1))
-Vbform1.assembly()
-C = Vbform1.get_matrix()
-print(np.sum(np.abs(C.toarray())))
+Vbform2 = BilinearForm(2*(uspace,))
+Vbform2.add_domain_integrator(VectorMassIntegrator(c=1))
+Vbform2.assembly()
+C = Vbform2.get_matrix()
+print("第三个方程的左端:",np.sum(np.abs(C.toarray())))
 
 u0 = uspace.function(dim=2)
 us = uspace.function(dim=2)
@@ -74,46 +78,72 @@ def velocity_field(p):
     u[..., 1] = 0
     return u
 
+
 u0 = uspace.interpolate(velocity_field, dim=2)
-'''
+
 @barycentric
 def f(bcs,index):
     b1 = u0(bcs,index)
-    b2 = np.einsum('imk,ijmk->ijk',u0(bcs,index),u0.grad_value(bcs,index))
-    return b1+b2 
-'''
+    b2 = np.einsum('idc,idjc->ijc',u0(bcs,index),u0.grad_value(bcs,index))
+    return rho/dt*b1+b2
 
 qf = mesh.integrator(4)
 bcs,ws = qf.get_quadrature_points_and_weights()
-print(u0(bcs).shape)
-print(u0.grad_value(bcs).shape)
-#b2 = np.einsum('imk,ijmk->ijk',u0(bcs),u0.grad_value(bcs))
-
-#lform = LinearForm(2*(uspace,))
-#lform.add_domain_integrator(VectorSourceIntegrator(f))
-#lform.assembly()
-#b1 = lform.get_vector()
-'''
-fuu = u0(bcs)
-fbb1 = np.einsum('i,ijk,ijm,j -> jkm',ws,uphi,fuu,cellmeasure)
+cellmeasure = uspace.cellmeasure
+uphi = uspace.basis(bcs)
+#fbb1 = np.einsum('i,ijk,imj,j -> jkm',ws,uphi,u0(bcs),cellmeasure)
+fbb1 = np.einsum('i,ijk,imj,j -> jkm',ws,uphi,f(bcs,np.s_[:]),cellmeasure)
+ugdof = uspace.number_of_global_dofs()
+ucell2dof = uspace.cell_to_dof()
 fb1 = np.zeros((ugdof,2))
 np.add.at(fb1,(ucell2dof,np.s_[:]),fbb1)
-print(fb1.shape)
 print(np.sum(np.abs(fb1)))
-fb1 = (rho/dt)*fb1
 
-fgu = u0.grad_value(bcs)
-fbb2 = np.einsum('i,ijn,ijk,ijmk,j -> jnm',ws,uphi,fuu,fgu,cellmeasure)
-fb2 = np.zeros((ugdof,2))
-np.add.at(fb2,(ucell2dof,np.s_[:]),fbb2)
-'''
 
+lform = LinearForm(2*(uspace,))
+lform.add_domain_integrator(VectorSourceIntegrator(f))
+lform.assembly()
+b1 = lform.get_vector()
+print(np.sum(np.abs(b1)))
 
 '''
 for i in range(nt):
     t1 = timeline.next_time_level()
     print("t=", t1)
     
+    b10 = A@u0
+    
+    @barycentric
+    def f1(bcs,index):
+        b2 = np.einsum('idc,idjc->ijc',u0(bcs,index),u0.grad_value(bcs,index))
+        return rho*b2
+
+    lform = LinearForm(2*(uspace,))
+    lform.add_domain_integrator(VectorSourceIntegrator(f2))
+    lform.assembly()
+    b12 = lform.get_vector()
+
+    b11 = A1@u0 
+    b13 = A2@u0
+    b1 =  b11-b12-b13+
+
+    
+    b21 = B@p0
+    b22 = 
+
+    
+    @barycentric
+    def f1(bcs,index):
+        c1 = us(bcs,index)
+        c2 = np.einsum('idc,idjc->ijc',p0.grad_value(bcs,index),p1.grad_value(bcs,index))
+        c3 = np.einsum('idc,idjc->ijc',p0.grad_value(bcs,index),p1.grad_value(bcs,index))
+        return rho*b2
+
+    lform = LinearForm(2*(uspace,))
+    lform.add_domain_integrator(VectorSourceIntegrator(f2))
+    lform.assembly()
+        c2 = 
+        return rho*b2
 
 
     timeline.advance() 
