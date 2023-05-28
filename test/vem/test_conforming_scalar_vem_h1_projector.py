@@ -8,7 +8,7 @@ import ipdb
 from fealpy.vem.conforming_scalar_vem_h1_projector import ConformingScalarVEMH1Projector2d
 from fealpy.mesh import MeshFactory as MF
 from fealpy.mesh.polygon_mesh import PolygonMesh
-def test_assembly_cell_righthand_side(p,plot=False):
+def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
     nx = 2
     ny = 2
     dim = 2
@@ -16,6 +16,9 @@ def test_assembly_cell_righthand_side(p,plot=False):
     mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='poly')
     space = ConformingVirtualElementSpace2d(mesh, p=p)
     realB = space.matrix_B()
+    H = space.H
+    realD = space.matrix_D(H)
+
     if plot:
         fig ,axes = plt.subplots()
         mesh.add_plot(axes)
@@ -30,6 +33,7 @@ def test_assembly_cell_righthand_side(p,plot=False):
     space =  ConformingScalarVESpace2d(mesh, p=p)
     b = ConformingScalarVEMH1Projector2d()
     B = b.assembly_cell_righthand_side(space)
+    D = b.assembly_cell_dof_matrix(space,H)
 
     ldof = mesh.number_of_local_ipoints(p)
     a = np.add.accumulate(ldof)
@@ -37,7 +41,11 @@ def test_assembly_cell_righthand_side(p,plot=False):
     location = np.zeros(NC+1, dtype=np.int_)
     location[1:] = a
     for i in range(NC):
-        np.testing.assert_equal(realB[:,location[i]:location[i+1]], B[i])
+        np.testing.assert_allclose(realB[:,location[i]:location[i+1]],
+                B[i],atol=1e-14)
+        np.testing.assert_allclose(realD[location[i]:location[i+1],:], D[i], atol=1e-14)
+        #np.testing.assert_equal(realB[:,location[i]:location[i+1]], B[i])
+        #np.testing.assert_equal(realD[location[i]:location[i+1],:], D[i])
         i = i+1
 
     if plot:
@@ -48,5 +56,5 @@ def test_assembly_cell_righthand_side(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_righthand_side(3)
+    test_assembly_cell_righthand_side_and_dof_matrix(4)
 
