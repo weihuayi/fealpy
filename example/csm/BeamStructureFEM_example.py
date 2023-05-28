@@ -15,8 +15,8 @@ parser.add_argument('--modulus',
         help='梁单元的杨氏模量, 默认为 2000 ton/mm^2.')
 
 parser.add_argument('--inertia',
-        default=118.6*10**(-6), type=float,
-        help='杆单元的杨氏模量, 默认为 118.6*10**(-6) ton/mm^2.')
+        default=118.6e-6, type=float,
+        help='梁单元的惯性矩, 默认为 118.6e-6 ton/mm^2.')
 
 args = parser.parse_args()
 

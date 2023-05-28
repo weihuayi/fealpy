@@ -58,7 +58,6 @@ elif GD == 3:
 domain = pde.domain()
 mesh = pde.init_mesh(n=n)
 NN = mesh.number_of_nodes()
-print("NN:", NN)
 
 # 新接口程序
 # 构建双线性型，表示问题的微分形式
@@ -79,15 +78,9 @@ lform.assembly()
 
 A = bform.get_matrix()
 F = lform.get_vector()
-idx = np.r_['0', np.arange(0, NN*2, 2), np.arange(1, NN*2, 2)]
-B = A[idx, :][:, idx]
 
 if hasattr(pde, 'dirichlet'):
     bc = DirichletBC(vspace, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
-    print("bc:", bc)
-    print("A:", A.shape)
-    print("F:", F.shape)
-    print("uh:", uh.shape)
     A, F = bc.apply(A, F, uh)
 
 uh.flat[:] = spsolve(A, F)
