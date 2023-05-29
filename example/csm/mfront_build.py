@@ -33,4 +33,5 @@ def compile_mfront_file(file_path):
 
     return so_file
 
-file = compile_mfront_file('material/saint_venant_kirchhoff.mfront')
+#file = compile_mfront_file('material/saint_venant_kirchhoff.mfront')
+file = compile_mfront_file('material/PhaseFieldDisplacementSpectralSplit.mfront')
