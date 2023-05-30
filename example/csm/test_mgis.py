@@ -1,9 +1,11 @@
 import numpy as np
 from mgis import behaviour as mg
+from fealpy.csm.mfront import compile_mfront_file
+
 import ipdb
 
-#ipdb.set_trace()
 
+#file = compile_mfront_file('material/saint_venant_kirchhoff.mfront')
 
 # 加载共享库
 behaviour_library = "./libsaint_venant_kirchhoff.so"  # 用实际路径替换
@@ -18,6 +20,7 @@ options.tangent_operator = mg.FiniteStrainBehaviourOptionsTangentOperator.DS_DEG
 h = mg.Hypothesis.Tridimensional
 b = mg.load(options, behaviour_library, behaviour_name, h)
 
+ipdb.set_trace()
 print('source:', b.source)
 print('behaviour:', b.behaviour)
 print('hypothesis:', b.hypothesis)
