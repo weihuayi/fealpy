@@ -1,4 +1,6 @@
 import numpy as np
+from numpy.linalg import inv
+
 from fealpy.mesh.polygon_mesh import PolygonMesh
 from fealpy.quadrature import GaussLobattoQuadrature
 
@@ -60,7 +62,7 @@ class ConformingScalarVEMH1Projector2d():
             BB.append(B)
         return BB
     
-    def assembly_cell_dof_matrix(self, space: ConformingScalarVESpace2d, H):
+    def assembly_cell_dof_matrix(self, space: ConformingScalarVESpace2d):
         """
         @brief 组装自由度矩阵 D
 
@@ -73,6 +75,7 @@ class ConformingScalarVEMH1Projector2d():
         cell = mesh.entity('cell')
         node = mesh.entity('node')
         h = space.smspace.cellsize
+        H = space.smspace.matrix_H()
         DD = []
         for i in range(NC):
             ldof = space.number_of_local_dofs()
@@ -102,6 +105,41 @@ class ConformingScalarVEMH1Projector2d():
                 DD.append(D)
         return DD
  
+    def assembly_cell_lefthand_side(self, space: ConformingScalarVESpace2d):
+        """
+        @brief 组装 H1 投影算子的左端矩阵
+
+        @return 列表 G[i] 代表第 i 个单元上 H1
+        投影左端矩阵,数组大小为(smldof,smldof)
+        """
+        p = space.p
+        mesh = space.mesh
+        NC = mesh.number_of_cells()
+        if p == 1:
+            G = [np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])]
+            G = G*NC
+        else:
+            B = self.assembly_cell_righthand_side(space)
+            D = self.assembly_cell_dof_matrix(space)
+            g = lambda x: x[0]@x[1]
+            G = list(map(g, zip(B, D)))
+        return G
+ 
+    def assembly_cell_H1_matrix(self, space: ConformingScalarVESpace2d):
+        """
+        @bfief 组装 H1 投影矩阵
+
+        @return 返回为列表，列表中数组大小为(smldof,ldof)
+        """
+        p = space.p
+        B = self.assembly_cell_righthand_side(space)
+        G = self.assembly_cell_lefthand_side(space)
+        if p == 1:
+            return B
+        else:
+            g = lambda x: inv(x[0])@x[1]
+            return list(map(g, zip(G, B)))
+
 
 
 
