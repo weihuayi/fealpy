@@ -24,6 +24,8 @@ from fealpy.fem import NSOperatorIntegrator,PressIntegrator
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import VectorSourceIntegrator, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+
 ## 参数解析
 degree =2 
 dim = 2
@@ -77,6 +79,8 @@ domain = [0, 1, 0, 1]
 mesh = TriangleMesh.from_unit_square(nx=ns, ny=ns)
 nuspace = LagrangeFESpace(mesh,p=2,doforder=doforder)
 npspace = LagrangeFESpace(mesh,p=1,doforder=doforder)
+ubc = DirichletBC(nuspace, usolution)
+pbc = DirichletBC(npspace, psolution)
 
 smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
 tmesh = UniformTimeLine(0, T, nt) # 均匀时间剖分
@@ -84,13 +88,13 @@ tmesh = UniformTimeLine(0, T, nt) # 均匀时间剖分
 uspace = LagrangeFiniteElementSpace(smesh, p=degree)
 pspace = LagrangeFiniteElementSpace(smesh, p=degree-1)
 
-u0 = uspace.function(dim=2)
-us = uspace.function(dim=2)
-u1 = uspace.function(dim=2)
+u0 = nuspace.function(dim=2)
+us = nuspace.function(dim=2)
+u1 = nuspace.function(dim=2)
 
 
-p0 = pspace.function()
-p1 = pspace.function()
+p0 = npspace.function()
+p1 = npspace.function()
 
 #组装矩阵准备工作
 dt = tmesh.dt
@@ -99,12 +103,12 @@ bcs,ws = qf.get_quadrature_points_and_weights()
 cellmeasure = smesh.entity_measure('cell')
 
 ## 速度空间
-ugphi = uspace.grad_basis(bcs)
-ugdof = uspace.number_of_global_dofs()
-ucell2dof = uspace.cell_to_dof()
+ugphi = nuspace.grad_basis(bcs)
+ugdof = nuspace.number_of_global_dofs()
+ucell2dof = nuspace.cell_to_dof()
 ## 压力空间
-pgdof = pspace.number_of_global_dofs()
-pcell2dof = pspace.cell_to_dof()
+pgdof = npspace.number_of_global_dofs()
+pcell2dof = npspace.cell_to_dof()
 
 # 第一个
 Vbform0 = BilinearForm(2*(nuspace,))
@@ -118,10 +122,10 @@ Vbform1.assembly()
 A2 = Vbform1.get_matrix()
 A = A1+A2
 
-Vbform3 = BilinearForm((pspace,nuspace))
-Vbform3.add_domain_integrator(PressIntegrator())
-Vbform3.assembly()
-D = Vbform3.get_matrix()
+#Vbform3 = BilinearForm((npspace,nuspace))
+#Vbform3.add_domain_integrator(PressIntegrator())
+#Vbform3.assembly()
+#D = Vbform3.get_matrix()
 
 ##边界处理
 isBDof = uspace.boundary_dof()
@@ -130,7 +134,7 @@ bdIdx = np.zeros((A.shape[0],),np.int32)
 bdIdx[isBDof] = 1
 Tbd = spdiags(bdIdx,0,A.shape[0],A.shape[0])
 T = spdiags(1-bdIdx,0,A.shape[0],A.shape[0])
-A = T@A + Tbd
+AA = T@A@T + Tbd
 
 
 #组装第二个方程的左端矩阵
@@ -156,11 +160,11 @@ for i in range(2):
     print("t1=", t1)
 
     #组装第一个方程的右端向量
-    fb1 = A1@u0.flatten(order='F')
+    fb1 = A1@u0.flatten(order='C')
 
     @barycentric
     def f1(bcs,index):
-        b2 = np.einsum('ijk,ijmk->ijm',u0(bcs,index),u0.grad_value(bcs,index))
+        b2 = np.einsum('imj,ikmj->ijk',u0(bcs,index),u0.grad_value(bcs,index))
         return rho*b2
 
     lform = LinearForm(2*(nuspace,))
@@ -168,7 +172,7 @@ for i in range(2):
     lform.assembly()
     fb2 = lform.get_vector()  
     
-    fb3 = A2@u0.flatten(order='F')
+    fb3 = A2@u0.flatten(order='C')
     
     fp = p0(bcs)
     fbb4 = np.einsum('i,ij,ijk,j->jk',ws,fp,ugphi[...,0],cellmeasure) 
@@ -181,24 +185,28 @@ for i in range(2):
 
     b1 = fb1-fb2+fb4-mu*fb3
     
-    fisbdf = uspace.boundary_dof()
     ipoint = uspace.interpolation_points()
     ue2 = usolution(ipoint)
-    b1[0:len(fisbdf)][fisbdf] = ue2[fisbdf][:,0]
-    b1[len(fisbdf):][fisbdf] = ue2[fisbdf][:,1]
+    bt = np.zeros(shape=b1.shape)
+    bt[isBDof] = ue2.flatten(order='F')[isBDof]
+    bb1 = b1 - A@bt
+    print("asd",np.sum(np.abs(bt)))
+    bb1[isBDof] = ue2.flatten(order='F')[isBDof]
+    
+    uuu = nuspace.function(dim=2)
+    AAA,bbb = ubc.apply(A,b1,uuu)
 
-    ctx.set_centralized_sparse(A)
-    x = b1.copy()
+    ctx.set_centralized_sparse(AAA)
+    x = bb1.copy()
     ctx.set_rhs(x)
     ctx.run(job=6)
-    us[:,0] = x[0:ugdof]
-    us[:,1] = x[ugdof:]
+    us.flat[:] = x
 
     #组装第二个方程的右端向量
      
     @barycentric
     def f2(bcs,index):
-        b2 = us.grad_value(bcs,index)[...,0,0]+us.grad_value(bcs,index)[...,1,1]
+        b2 = us.grad_value(bcs,index)[...,0,0,:]+us.grad_value(bcs,index)[...,1,1,:]
         return -1/dt*b2
 
     lform = LinearForm(pspace)
@@ -225,25 +233,24 @@ for i in range(2):
     lform.assembly()
     tb2 = lform.get_vector()   
     
-    tb1 = C@us.flatten(order='F')
+    tb1 = C@us.flatten(order='C')
     b3 = tb1 - tb2
     
     ctx.set_centralized_sparse(C)
     x = b3.copy()
     ctx.set_rhs(x)
     ctx.run(job=6)
-    u1[:,0] = x[0:ugdof]
-    u1[:,1] = x[ugdof:]
     
+    u1.flat[:] = x[:]
 
     co1 = usolution(smesh.node)
     NN = smesh.number_of_nodes()
-    co2 = u1[:NN]
+    co2 = u1[:,:NN].transpose(1,0)
     errorMatrix[0,i] = np.abs(co1-co2).max()
-    errorMatrix[0,i] = uspace.integralalg.error(usolution,u1)
+    #errorMatrix[0,i] = uspace.integralalg.error(usolution,u1)
     #errorMatrix[1,i] = pspace.integralalg.error(psolution,p1)
     print("结果",np.sum(np.abs(u1))) 
-    u0[:] = u1 
+    u0[:] = u1
     p0[:] = p1
 
     # 时间步进一层 
@@ -258,7 +265,7 @@ node = smesh.node
 x = tuple(node[:,0])
 y = tuple(node[:,1])
 NN = smesh.number_of_nodes()
-u = u1[:NN]
+u = u1.transpose()[:NN]
 ux = tuple(u[:,0])
 uy = tuple(u[:,1])
 
