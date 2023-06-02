@@ -772,8 +772,8 @@ class UniformMesh1d(Mesh1d):
         val1 = np.broadcast_to(r/2 + r**2/2 , (NN-1, ))
         I = k[1:]
         J = k[0:-1]
-        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
     
         return A
 
