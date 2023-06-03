@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import pyamg
 from fealpy.mesh import EdgeMesh 
 from scipy.sparse import csr_matrix, spdiags
 from scipy.sparse.linalg import spsolve
@@ -63,6 +64,8 @@ F = np.einsum('ijk -> ik', F)
 
 # 求解
 uh = np.zeros((NN, GD+1), dtype=np.float64)
-uh.T.flat = spsolve(K, F)
+ml = pyamg.ruge_stuben_solver(K)
+uh.T.flat = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
+#uh.T.flat = spsolve(K, F)
 
 print(uh)
