@@ -22,23 +22,23 @@ class DirichletBC():
             return self.apply_for_vspace_with_scalar_basis(A, f, uh)
         else:
             # 标量函数空间或基是向量函数的向量函数空间
-            return self.apply_for_sspace_and_vspace_with_vector_basis(A, f, uh)
+            return self.apply_for_space_and_vspace_with_vector_basis(A, f, uh)
 
-    def apply_for_sspace_and_vspace_with_vector_basis(self, A, f, uh):
+    def apply_for_space_and_vspace_with_vector_basis(self, A, f, uh):
         """
         """
         space = self.space
         gD = self.gD
         isDDof = space.boundary_interpolate(gD, uh, threshold=self.threshold) # isDDof.shape == uh.shape
-        f = f - A@uh # 注意这里不修改外界 f 的值
+        f = f.reshape(-1) - A@uh.reshape(-1) # 注意这里不修改外界 f 的值
 
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        bdIdx[isDDof] = 1
+        bdIdx[isDDof.reshape(-1)] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
 
-        f[isDDof] = uh[isDDof]
+        f[isDDof.reshape(-1)] = uh[isDDof].reshape(-1)
 
         return A, f 
 
