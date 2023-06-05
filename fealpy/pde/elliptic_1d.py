@@ -51,36 +51,9 @@ class SinPDEData:
     @cartesian    
     def dirichlet(self, p: np.ndarray) -> np.ndarray:
         """
-        @brief:    Dirichlet BC
+        @brief: Dirichlet BC
         """
         return self.solution(p)
-
-    @cartesian
-    def is_dirichlet_boundary(self, p):
-        x = p[..., 0]
-        return x == 0.0
-
-    @cartesian
-    def neumann(self, p, n):
-        """ 
-        Neuman  boundary condition
-
-        Parameters
-        ----------
-
-        p: (NQ, NE)
-        n: (NE)
-
-        grad*n : (NQ, NE)
-        """
-        grad = self.gradient(p)
-        val = np.sum(grad*n, axis=-1)
-        return val
-
-    @cartesian
-    def is_neumann_boundary(self, p):
-        x = p[..., 0]
-        return x == 1.0
 
 
 class ExpPDEData:
@@ -131,3 +104,56 @@ class ExpPDEData:
         @brief: 模型的 Dirichlet 边界条件
         """
         return self.solution(p)
+
+class CDRPDEData:
+    """
+    5u''(x) + u'(x) + 0.001u(x) = q(x)
+    BC: u(0) = 100, u'(-1) = 0
+    源项 q(x) = 10, x = 0,
+              = o, x \neq 0
+    """
+    def __init__(self):
+        self.L = 1000 # 河流的长度
+        self.Q0 = 10 # 污染物产生速度
+        self.A = 1 # 河流横截面积
+        self.C0 = 100 # 河流起点污染物浓度
+
+    def domain(self) -> List[int]:
+        return [0, self.L]
+
+    @cartesian
+    def source(self, p: np.ndarray) -> np.ndarray:
+        Q = np.zeros_like(p)
+        Q[0] = self.Q0/self.A
+        return Q
+
+    @cartesian    
+    def dirichlet(self, p: np.ndarray) -> np.ndarray:
+        """
+        Dirichlet bc
+        """
+        x = p[..., 0]
+        return np.where(x==0, self.C0, 0)
+
+    @cartesian
+    def is_dirichlet_boundary(self, p: np.ndarray) -> np.ndarray:
+        """
+        判断给定点是否在 Dirichlet 边界上
+        """
+        x = p[..., 0]
+        return x == 0.0
+
+    @cartesian
+    def neumann(self, p: np.ndarray) -> np.ndarray:
+        """ 
+        Neumann bc
+        """
+        return np.zeros_like(p)
+
+    @cartesian
+    def is_neumann_boundary(self, p: np.ndarray) -> np.ndarray:
+        """
+        判断给定点是否在 Neumann 边界上
+        """
+        x = p[..., 0]
+        return x == self.L
