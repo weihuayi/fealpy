@@ -1,7 +1,7 @@
 """
 Provide abstract class for mesh with different topology dimension.
 """
-from typing import Union, Option
+from typing import Union, Optional
 import numpy as np
 from numpy.typing import NDArray
 
@@ -71,13 +71,13 @@ class Mesh1d(Mesh):
         return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2, axis=-1))
 
     def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:], 
-            node: Option[NDArray]=None):
+            node: Optional[NDArray]=None):
         """
         @brief 
         """
         node = self.entity('node') if node is None else node
         if etype in {1, 'cell',  'edge'}:
-            cell = self.entity(etype=etype, index)
+            cell = self.entity(etype, index=index)
             bc = np.sum(node[cell], axis=1)/cell.shape[-1]
         elif etype in {'node', 'face', 0}:
             bc = self.entity(etype, index=index)

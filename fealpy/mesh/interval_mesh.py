@@ -40,7 +40,6 @@ class IntervalMesh(Mesh1d, Plotable):
         self.ftype = node.dtype
 
 
-
     def vtk_cell_type(self):
         VTK_LINE = 3
         return VTK_LINE
@@ -78,9 +77,6 @@ class IntervalMesh(Mesh1d, Plotable):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
-
-
-
 
 
     def face_unit_normal(self, index=np.s_[:], node=None):

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 
-from fealpy.mesh import IntervalMesh
+from fealpy.mesh.interval_mesh import IntervalMesh
 
 def test_interval_domain():
     mesh = IntervalMesh.from_interval_domain([0, 1], nx=10)

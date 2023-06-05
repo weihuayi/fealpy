@@ -40,10 +40,11 @@ D = DInv.inv()
 D = D.subs({vp[0] : E[1]*v[0]/E[0], vp[2] : E[2]*v[2]/E[0], vp[1] :
     E[2]*v[1]/E[1]})
 
-D = D.subs({ -1 + E[2]*v[1]**2/E[1] + E[1]*v[0]**2/E[0] + E[2]*v[2]**2/E[0] +
-    2*E[2]*v[0]*v[1]*v[2]/E[0] : -h})
+c = -(-1 + E[2]*v[1]**2/E[1] + E[1]*v[0]**2/E[0] + E[2]*v[2]**2/E[0] + 2*E[2]*v[0]*v[1]*v[2]/E[0])
+
+D = D.subs({ c : h})
 
 
-
+print(latex(c))
 print(latex(DInv))
 print(latex(D))
