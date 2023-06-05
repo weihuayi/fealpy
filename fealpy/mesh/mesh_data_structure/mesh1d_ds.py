@@ -37,6 +37,9 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     ### face ###
 
     def face_to_cell(self) -> NDArray:
+        """
+        @TODO
+        """
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         assert NC + 1 == NN
