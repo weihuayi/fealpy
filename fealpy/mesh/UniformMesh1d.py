@@ -552,8 +552,7 @@ class UniformMesh1d(Mesh1d):
 
 
     ## @ingroup FDMInterface
-    def wave_operator(self, tau: np.float64, a: np.float64 = 1.0,
-                    theta: np.float64 = 0.5):
+    def wave_operator(self, tau: float, a: float = 1.0, theta: float = 0.5):
         """
         @brief 生成波动方程的离散矩阵
 

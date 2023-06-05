@@ -72,8 +72,8 @@ idx, f = mesh.meshdata['force_bc'] # idx.shape = (2, ), f.shape = (3, )
 F[idx] = f # (10, 3)
 
 idx, disp = mesh.meshdata['disp_bc']
-bc = DirichletBC(space, disp, threshold=idx)
-A, F = bc.apply(K, F, uh)
+bc = DirichletBC(vspace, disp, threshold=idx)
+A, F = bc.apply(K, F.flat, uh)
 
 uh.flat[:] = spsolve(A, F)
 
