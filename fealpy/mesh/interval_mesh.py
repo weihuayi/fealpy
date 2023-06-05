@@ -101,27 +101,16 @@ class IntervalMesh(Mesh1d, Plotable):
 
     def cell_tangent(self, index=np.s_[:], node=None):
         """
-
-        Notes
-        -----
-            返回单元的切向向量
+        @brief 单元的切向量 
         """
         node = self.node if node is None else node
         cell = self.entity('cell')
         v = node[cell[index, 1]] - node[cell[index, 0]]
         return v
 
-    def uniform_refine(self, n=1, inplace=True):
+    def uniform_refine(self, n=1, options={}):
         """
-
-        Notes
-        -----
-            对网格进行一致加密，
-
-            inplace 默认为 True， 意思是直接在单元内部修改
-
-        TODO:
-            1. 实现 inplace 为 False 的情形
+        @brief 一致加密网格 
         """
         for i in range(n):
             NN = self.number_of_nodes()
@@ -140,7 +129,10 @@ class IntervalMesh(Mesh1d, Plotable):
             NN = self.node.shape[0]
             self.ds.reinit(NN, ncell)
 
-    def refine(self, isMarkedCell, inplace=True):
+    def refine(self, isMarkedCell, options={}):
+        """
+        @brief 自适应加密网格
+        """
 
         node = self.entity('node')
         cell = self.entity('cell')
