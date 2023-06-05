@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 from scipy.sparse import csr_matrix
 from types import ModuleType
 
@@ -7,25 +8,13 @@ from .mesh_base import Mesh1d, Plotable
 from .mesh_data_structure import Mesh1dDataStructure
 
 class IntervalMeshDataStructure(Mesh1dDataStructure):
-    def __init__(self, NN, cell):
-        self.NN = NN
-        self.NC = len(cell)
-        self.cell = cell
-        self.itype = cell.dtype
-        self.construct()
-
-    def reinit(self, NN, cell):
-        self.NN = NN
-        self.NC = cell.shape[0]
-        self.cell = cell
-        self.construct()
 
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
 
 class IntervalMesh(Mesh1d, Plotable):
-    def __init__(self, node, cell):
+    def __init__(self, node: NDArray, cell: NDArray):
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
         else:
@@ -37,7 +26,7 @@ class IntervalMesh(Mesh1d, Plotable):
         self.nodedata = {}
         self.celldata = {}
         self.edgedata = self.celldata # celldata and edgedata are the same thing
-        self.facedata = self.nodedata # facedata and nodedata are the same thing 
+        self.facedata = self.nodedata # facedata and nodedata are the same thing
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -71,10 +60,10 @@ class IntervalMesh(Mesh1d, Plotable):
         cell = np.c_[np.zeros((NC, 1), dtype=cell.dtype), cell]
         cell[:, 0] = NV
 
-        cellType = self.vtk_cell_type()  # segment 
+        cellType = self.vtk_cell_type()  # segment
 
         if fname is None:
-            return node, cell.flatten(), cellType, NC 
+            return node, cell.flatten(), cellType, NC
         else:
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
@@ -132,7 +121,7 @@ class IntervalMesh(Mesh1d, Plotable):
             inplace 默认为 True， 意思是直接在单元内部修改
 
         TODO:
-            1. 实现 inplace 为 False 的情形 
+            1. 实现 inplace 为 False 的情形
         """
         for i in range(n):
             NN = self.number_of_nodes()
@@ -215,12 +204,12 @@ class IntervalMesh(Mesh1d, Plotable):
         dt = 2*np.pi/n
         theta  = np.arange(0, 2*np.pi, dt)
 
-        node = np.zeros((n, 2),dtype = np.float64)
-        cell = np.zeros((n, 2),dtype = np.int_)
+        node = np.zeros((n, 2), dtype=np.float64)
+        cell = np.zeros((n, 2), dtype=np.int_)
 
 
-        node[:, 0] = r*np.cos(theta)
-        node[:, 1] = r*np.sin(theta)
+        node[:, 0] = radius*np.cos(theta)
+        node[:, 1] = radius*np.sin(theta)
 
         node[:, 0] = node[:,0] + center[0]
         node[:, 1] = node[:,1] + center[1]
@@ -230,6 +219,4 @@ class IntervalMesh(Mesh1d, Plotable):
 
         return cls(node, cell)
 
-IntervalMesh.set_ploter('intervalmesh')
-
-
+IntervalMesh.set_ploter('1d')
