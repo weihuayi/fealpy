@@ -7,7 +7,6 @@ from .mesh_base import Mesh1d, Plotable
 from .mesh_data_structure import Mesh1dDataStructure
 
 class IntervalMeshDataStructure(Mesh1dDataStructure):
-    TD: int = 1
     def __init__(self, NN, cell):
         self.NN = NN
         self.NC = len(cell)
@@ -20,6 +19,10 @@ class IntervalMeshDataStructure(Mesh1dDataStructure):
         self.NC = cell.shape[0]
         self.cell = cell
         self.construct()
+
+    def total_face(self):
+        return self.cell.reshape(-1, 1)
+
 
 class IntervalMesh(Mesh1d, Plotable):
     def __init__(self, node, cell):
