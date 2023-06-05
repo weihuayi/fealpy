@@ -272,7 +272,7 @@ class HomogeneousMeshDS(MeshDataStructure):
         self.face2cell = np.zeros((NF, 4), dtype=self.itype)
 
         i1 = np.zeros(NF, dtype=self.itype)
-        i1[j] = np.arange(NF, dtype=self.itype)
+        i1[j] = np.arange(NFC*NC, dtype=self.itype)
 
         self.face2cell[:, 0] = i0 // NFC
         self.face2cell[:, 1] = i1 // NFC

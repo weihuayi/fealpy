@@ -94,17 +94,19 @@ class MeshPloter(Generic[_MT]):
         else:
             self._axes.set_box_aspect(aspect=aspect)
 
-    def set_lim(self, box: Optional[NDArray]=None):
+    def set_lim(self, box: Optional[NDArray]=None, tol=0.1):
         from mpl_toolkits.mplot3d import Axes3D
 
         GD = self._mesh.geo_dimension()
+
         if box is None:
             node: NDArray = self._mesh.entity('node')
-            em: NDArray = self._mesh.entity_measure('edge')
-            tol = np.max(em)/100
-            box = np.zeros(2*GD, dtype=np.float64)
-            box[0::2] = np.min(node, axis=0) - tol
-            box[1::2] = np.max(node, axis=0) + tol
+            if node.ndim == 1:
+                node = node.reshape(-1, 1)
+
+            box = np.array([-0.5, 0.5]*3, dtype=np.float64)
+            box[0:2*GD:2] = np.min(node, axis=0) - tol
+            box[1:1+2*GD:2] = np.max(node, axis=0) + tol
 
         self._axes.set_xlim(box[0:2])
         self._axes.set_ylim(box[2:4])
@@ -122,7 +124,7 @@ class AddPlot1d(MeshPloter[Mesh1d]):
     def draw(
             self, nodecolor='k', cellcolor='k',
             markersize=20, linewidths=1,
-            aspect='equal',
+            aspect=None,
             shownode=True, showaxis=False,
             box=None, **kwargs
         ):
