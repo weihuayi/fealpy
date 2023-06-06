@@ -20,7 +20,7 @@ options.tangent_operator = mg.FiniteStrainBehaviourOptionsTangentOperator.DS_DEG
 h = mg.Hypothesis.Tridimensional
 b = mg.load(options, behaviour_library, behaviour_name, h)
 
-ipdb.set_trace()
+#ipdb.set_trace()
 print('source:', b.source)
 print('behaviour:', b.behaviour)
 print('hypothesis:', b.hypothesis)
@@ -47,13 +47,14 @@ mstate.s0.setMaterialProperty('PoissonRatio', nu)
 
 # 执行计算
 strain = np.zeros((6,), dtype=np.float64) # 设置应变张量（此处示例使用零张量）
-mstate.s1.e0 = strain #设置应变
+mstate.s0.e0 = strain #设置应变
 
 # 计算切线算子
 #tangent_operator = mg.Tensor()  # 创建一个Tensor对象以存储切线算子
 #mstate.s1.k = tangent_operator  # 设置切线算子
 
 # 执行计算
+kk = mstate.K
 mg.compute_tangent_operator(mstate)
 
 # 获取切线算子信息
