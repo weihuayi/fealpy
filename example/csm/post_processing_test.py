@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import mgis.behaviour as mgis_bv
 from fealpy.csm.mfront import compile_mfront_file
 
@@ -7,10 +7,8 @@ file = compile_mfront_file('material/PostProcessingTest.mfront')
 lib = "./libPostProcessingTest.so"  # 用实际路径替换
 
 eps = 1.e-14
-e = numpy.asarray([1.3e-2, 1.2e-2, 1.4e-2, 0., 0., 0.],
-                  dtype=numpy.float64) # 输入 应变
-e2 = numpy.asarray([1.2e-2, 1.3e-2, 1.4e-2, 0., 0., 0.],
-                   dtype=numpy.float64) # 预期输出
+e = np.asarray([1.5e-2, 1.2e-2, 1.4e-2, 0., 0., 0.], dtype=np.float64) # 输入 应变
+e2 = np.asarray([1.2e-2, 1.4e-2, 1.5e-2, 0., 0., 0.], dtype=np.float64) # 预期输出
 
 h = mgis_bv.Hypothesis.Tridimensional # 表示是三维
 b = mgis_bv.load(lib, 'PostProcessingTest', h) # 加载行为
@@ -30,10 +28,11 @@ mgis_bv.update(m) # 更新材料数据
 print('m:', m.s1)
 m.s1.gradients[0:] = e # 材料数据的梯度
 m.s1.gradients[1:] = e
-print('m:', m.s1.gradients)
-outputs = numpy.empty(shape=(2, 3), dtype=numpy.float64)
+print('m.s1.gradinets:', m.s1.gradients)
+outputs = np.empty(shape=(2, 3), dtype=np.float64)
 mgis_bv.executePostProcessing(outputs.reshape(6), m, "PrincipalStrain") # 后处理，获得主应变的值
-print(outputs, e2)
+print('principal strain:', outputs)
+print('e2:', e2)
 for i in range(0, 3):
     assert abs(outputs[0, i] - e2[i]) < eps, "invalid output value"
     assert abs(outputs[1, i] - e2[i]) < eps, "invalid output value"
