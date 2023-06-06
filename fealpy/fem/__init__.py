@@ -7,6 +7,7 @@ This module provide many fem model
 '''
 
 from .bilinear_form import BilinearForm
+from .mixed_bilinear_form import MixedBilinearForm
 from .linear_form import LinearForm
 
 # Integrator for scalar case
