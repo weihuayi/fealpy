@@ -11,8 +11,21 @@ class ConformingScalarVEMH1Projector2d():
     def __init__(self):
         pass
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M, D):
-        pass
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
+        """
+        @bfief 组装 H1 投影矩阵
+
+        @return 返回为列表，列表中数组大小为(smldof,ldof)
+        """
+        p = space.p
+        B = self.assembly_cell_righthand_side(space)
+        G = self.assembly_cell_lefthand_side(space)
+        if p == 1:
+            return B
+        else:
+            g = lambda x: inv(x[0])@x[1]
+            return list(map(g, zip(G, B)))
+
 
     def assembly_cell_righthand_side(self, space: ConformingScalarVESpace2d):
         """
