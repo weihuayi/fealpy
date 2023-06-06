@@ -1,11 +1,12 @@
 import numpy as np
 import warnings
 
+from matplotlib.pyplot import Figure
+from matplotlib.axes import Axes
 from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags, spmatrix
 from types import ModuleType
-from typing import Any, Callable, Tuple, Union
+from typing import Optional, Tuple, Callable, Any, Union, List
 from .Mesh2d import Mesh2d
-from typing import Optional, Tuple, Callable, Any, Union
 
 # 这个数据接口为有限元服务
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
@@ -157,16 +158,15 @@ class UniformMesh2d(Mesh2d):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, 
-            fig, axes, box, 
-            advance: Callable[[np.int_, Any], Tuple[np.ndarray, np.float64]], 
-            fname :str = 'test.mp4',
-            init: Optional[Callable] = None, 
-            fargs: Optional[Callable] = None, 
-            frames: np.int_ = 1000, 
-            interval: np.int_ = 50, 
-            plot_type :str = 'imshow',
-            cmap='rainbow') -> None:
+    def show_animation(self, fig: Figure, axes: Axes, box: List[float], 
+                    advance: Callable[[int, Any], Tuple[np.ndarray, float]], 
+                    fname: str = 'test.mp4',
+                    init: Optional[Callable] = None, 
+                    fargs: Optional[Callable] = None, 
+                    frames: np.int_ = 1000, 
+                    interval: np.int_ = 50, 
+                    plot_type: str = 'imshow',
+                    cmap='rainbow') -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
@@ -188,7 +188,6 @@ class UniformMesh2d(Mesh2d):
 
         # 初始化二维网格数据
         uh, t = advance(0) 
-        
         if plot_type == 'imshow':
             data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5], 
                     extent=box[0:4], interpolation='bicubic')

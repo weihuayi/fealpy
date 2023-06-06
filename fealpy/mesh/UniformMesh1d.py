@@ -425,12 +425,11 @@ class UniformMesh1d(Mesh1d):
         return A
 
     ## @ingroup FDMInterface
-    def laplace_operator(self):
+    def laplace_operator(self) -> csr_matrix:
         """
-        @brief Assemble the finite difference matrix for the Laplace operator u''.
+        @brief 组装 Laplace 算子 ∆u 对应的有限差分离散矩阵
 
-        @note Note that boundary conditions are not handled in this function.
-
+        @note 并未处理边界条件
         """
         h = self.h
         cx = 1/(h**2)
@@ -446,10 +445,40 @@ class UniformMesh1d(Mesh1d):
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A
 
+
+    ## @ingroup FDMInterface
+    def cdr_operator(self) -> csr_matrix: 
+        """
+        @brief： 组装 C D R 算子对应的有限差分离散矩阵
+
+        @note 并未处理边界条件
+        """
+        h = self.h
+        cx = 5 / (self.h ** 2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([-2 * cx], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(cx, (NN-1,))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        cy = 1 / (2 * h)
+        val2 = np.broadcast_to(cy, (NN-1,))
+        A += csr_matrix((-val2, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val2, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        A += diags([0.001], [0], shape=(NN, NN), format='csr')
+
+        return A
+
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
-        @brief 组装 u_xx 对应的有限差分矩阵，考虑了 Dirichlet 边界
+        @brief 考虑纯 Dirichlet 边界
         """
         if uh is None:
             uh = self.function('node')
@@ -552,8 +581,7 @@ class UniformMesh1d(Mesh1d):
 
 
     ## @ingroup FDMInterface
-    def wave_operator(self, tau: np.float64, a: np.float64 = 1.0,
-                    theta: np.float64 = 0.5):
+    def wave_operator(self, tau: float, a: float = 1.0, theta: float = 0.5):
         """
         @brief 生成波动方程的离散矩阵
 

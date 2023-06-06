@@ -1,19 +1,11 @@
-#!/usr/bin/env python3
-# 
 import argparse
-from typing import Callable, Tuple, Any
-
 import numpy as np
 import matplotlib.pyplot as plt
+
 from scipy.sparse.linalg import spsolve
-
+from typing import Callable, Tuple, Any
 from fealpy.pde.wave_1d import StringOscillationPDEData
-
 from fealpy.mesh import UniformMesh1d
-
-import ipdb
-
-# ipdb.set_trace()
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -58,8 +50,7 @@ vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
 uh1 = mesh.function('node')
 
 # 定义时间步进函数
-def advance(
-        n: int, *frags: Any) -> Tuple[np.float64, float]:
+def advance(n: int, *frags: Any) -> Tuple[np.float64, float]:
     """
     @brief 波动方程的时间步进程序 
 

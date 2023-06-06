@@ -20,11 +20,6 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     localEdge = np.array([(0, 1)], dtype=np.int_)
     localFace = np.array([(0, ), (1, )], dtype=np.int_)
 
-    @property
-    def face(self):
-        NN = self.number_of_nodes()
-        return np.arange(NN, dtype=self.itype).reshape(NN, 1)
-
     ### cell ###
 
     def cell_to_edge(self) -> NDArray:
@@ -37,18 +32,7 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     ### face ###
 
     def face_to_cell(self) -> NDArray:
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        assert NC + 1 == NN
-        I = np.arange(NC)
-        node2cell = np.zeros((NN, 4), dtype=self.itype)
-        node2cell[1:, 0] = I
-        node2cell[:-1, 1] = I
-        node2cell[1:, 2] = 1
-        node2cell[:-1, 3] = 0
-        node2cell[-1, 1] = NC - 1
-        node2cell[-1, 3] = 1
-        return node2cell
+        return self.face2cell
 
     face_to_edge = face_to_cell
 
@@ -64,4 +48,20 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
 
 
 class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
-    pass
+
+    def face_to_cell(self) -> NDArray:
+        """
+        @TODO
+        """
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        assert NC + 1 == NN
+        I = np.arange(NC)
+        node2cell = np.zeros((NN, 4), dtype=self.itype)
+        node2cell[1:, 0] = I
+        node2cell[:-1, 1] = I
+        node2cell[1:, 2] = 1
+        node2cell[:-1, 3] = 0
+        node2cell[-1, 1] = NC - 1
+        node2cell[-1, 3] = 1
+        return node2cell
