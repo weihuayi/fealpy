@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
-# 
-
-from typing import Callable, Tuple, Any
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+
+from typing import Callable, Tuple, Any
 from scipy.sparse.linalg import spsolve
 from fealpy.pde.parabolic_2d import SinSinExpPDEData
 from fealpy.mesh import UniformMesh2d
@@ -39,8 +37,8 @@ parser.add_argument('--discrete_format',
         """)
 
 parser.add_argument('--box',
-        default=[0, 1, 0, 1], type=list,
-        help="图像显示的范围，默认为： 0 <= x <= 1, 0 <= y <= 1")
+        default=[0, 1, 0, 1, -1, 1], type=list,
+        help="图像显示的范围，默认为： 0 <= x <= 1, 0 <= y <= 1, 0 <= uh <= 1")
 
 args = parser.parse_args()
 

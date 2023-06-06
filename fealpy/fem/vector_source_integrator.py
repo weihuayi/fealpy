@@ -57,9 +57,9 @@ class VectorSourceIntegrator():
         ldof = space[0].number_of_local_dofs() 
         if out is None:
             if space[0].doforder == 'sdofs': # 标量基函数自由度排序优先
-                bb = np.zeros((NC, GD, ldof), dtype=space.ftype)
+                bb = np.zeros((NC, GD, ldof), dtype=space[0].ftype)
             elif space[0].doforder == 'vdims': # 向量分量自由度排序优先
-                bb = np.zeros((NC, ldof, GD), dtype=space.ftype)
+                bb = np.zeros((NC, ldof, GD), dtype=space[0].ftype)
         else:
             bb = out
 

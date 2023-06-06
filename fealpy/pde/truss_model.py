@@ -1,31 +1,29 @@
-#!/usr/bin/env python3
-# 
 import numpy as np
-
-from fealpy.decorator  import cartesian 
-from TrussMesh import TrussMesh
+from ..decorator import cartesian 
+from ..mesh import EdgeMesh
+# from TrussMesh import TrussMesh
 
 class Truss_3d():
     def __init__(self):
-        self.A = 2000 # 横截面积 mm^2
-        self.E = 1500 # 弹性模量 ton/mm^2
+        """
+        初始化函数
 
-    def init_mesh(self, n=1):
-        d1 = 952.5 # 单位 mm
-        d2 = 2540
-        h1 = 5080
-        h2 = 2540
-        node = np.array([
-            [-d1, 0, h1], [d1, 0, h1], [-d1, d1, h2], [d1, d1, h2],
-            [d1, -d1, h2], [-d1, -d1, h2], [-d2, d2, 0], [d2, d2, 0],
-            [d2, -d2, 0], [-d2, -d2, 0]], dtype=np.float64)
-        edge = np.array([
-            [0, 1], [3, 0], [1, 2], [1, 5], [0, 4], 
-            [1, 3], [1, 4], [0, 2], [0, 5], [2, 5],
-            [4, 3], [2, 3], [4, 5], [2, 9], [6, 5], 
-            [8, 3], [7, 4], [6, 3], [2, 7], [9, 4],
-            [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=np.int_)
-        mesh = TrussMesh(node, edge)
+        在此函数中设置桁架模型的基本参数
+        """
+        self.A0: float = 2000 # 横截面积 mm^2
+        self.E: float = 1500 # 弹性模量 ton/mm^2
+
+    def init_mesh(self):
+        """
+        初始化网格结构
+
+        此函数用于初始化桁架的网格结构
+
+        返回:
+        mesh: EdgeMesh, 初始化的网格对象
+        """
+        mesh = EdgeMesh.from_tower()
+
         return mesh
 
     @cartesian

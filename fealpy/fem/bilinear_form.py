@@ -13,7 +13,7 @@ class BilinearForm:
 
         self._M = None # 需要组装的矩阵 
 
-    def add_domain_integrator(self, I):
+    def add_domain_integrator(self, I) -> None:
         """
         @brief 增加一个区域积分对象
         """
@@ -68,9 +68,20 @@ class BilinearForm:
             return self.assembly_for_sspace_and_vspace_with_vector_basis()
 
 
-    def assembly_for_sspace_and_vspace_with_vector_basis(self):
+    def assembly_for_sspace_and_vspace_with_vector_basis(self) -> None:
         """
-        @brief 基函数为标量函数的标量空间, 以及基函数为向量函数的函数空间
+        组装标量空间（其基函数为标量函数）和向量空间（其基函数为向量函数）的矩阵的方法
+
+        方法:
+        1. 定义空间和获取局部和全局自由度数
+        2. 获取网格和单元数量
+        3. 初始化单元格矩阵 CM
+        4. 对于每个区域积分器，组装单元矩阵
+        5. 获取单元到自由度的映射
+        6. 生成 I 和 J 的矩阵来构建稀疏矩阵
+        7. 使用 CM、I 和 J 生成稀疏矩阵并保存到 _M 属性中
+
+        注意：这个函数不返回任何值，结果保存在 _M 属性中
         """
         space = self.space
         ldof = space.number_of_local_dofs()
@@ -87,9 +98,21 @@ class BilinearForm:
         J = np.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
         self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
 
-    def assembly_for_vspace_with_scalar_basis(self):
+    def assembly_for_vspace_with_scalar_basis(self) -> None:
         """
-        @brief 基函数由标量函数组合而成的向量函数空间
+        组装基函数由标量函数组合而成的向量函数空间的矩阵
+
+        方法：
+        1. 获取空间，确保其为元组类型，且其元素不为元组
+        2. 获取网格、空间维度、局部和全局自由度数
+        3. 从空间中获取单元到自由度的映射
+        4. 获取网格的度量和单元数量
+        5. 初始化单元矩阵 CM
+        6. 对于每个区域积分器，组装单元矩阵
+        7. 初始化稀疏矩阵 _M
+        8. 根据空间的自由度排序优先级，进行对应的操作来更新 _M
+
+        注意：这个函数不返回任何值，结果保存在 _M 属性中
         """
         space = self.space
         assert isinstance(space, tuple) and not isinstance(space[0], tuple)

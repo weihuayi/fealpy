@@ -1,7 +1,7 @@
 """
 Provide abstract class for mesh with different topology dimension.
 """
-from typing import Union
+from typing import Union, Optional
 import numpy as np
 from numpy.typing import NDArray
 
@@ -30,25 +30,95 @@ class Mesh1d(Mesh):
     """
     ds: Mesh1dDataStructure
 
-    def integrator(self, k, etype='cell'):
+    def integrator(self, k):
         """
         @brief 返回第 k 个高斯积分公式。
         """
         from ...quadrature import GaussLegendreQuadrature
         return GaussLegendreQuadrature(k)
 
-    def entity_measure(self, etype: Union[int, str]='cell', index=np.s_[:]) -> NDArray:
-        # TODO: finish this
-        pass
+    def entity(self, etype: Union[int, str]='cell', index=np.s_[:]):
+        if etype in {'cell', 'edge', 1}:
+            return self.ds.cell[index]
+        elif etype in {'node', 'face', 0}:
+            return self.node[index]
+        else:
+            raise ValueError(f" The entity type {etype} is wrong!")
 
-    def cell_length(self, index=np.s_[:]):
+    def entity_measure(self, etype: Union[int, str]='cell', index=np.s_[:], node=None):
         """
-        @brief
         """
-        pass
+        if etype in {1, 'cell', 'edge'}:
+            return self.cell_length(index=index, node=None)
+        elif etype in {0, 'face', 'node'}:
+            return np.array([0], dtype=self.ftype)
+        else:
+            raise ValueError("`etype` is wrong!")
+        
+    def cell_length(self, index=np.s_[:], node=None):
+        """
+        @brief 计算单元的长度
+        @param[in] etype
+        @param[in] index
+        @param[in] node 用户提供的网格节点坐标
+
+        @note 如果是一维结构网格可以重新实现这个计算函数
+        """
+        node = self.node if node is None else node
+        cell = self.ds.cell
+        GD = self.geo_dimension()
+        # 这里要求 node 必须是 (NN, GD) 维的
+        return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2, axis=-1))
+
+    def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:], 
+            node: Optional[NDArray]=None):
+        """
+        @brief 
+        """
+        node = self.entity('node') if node is None else node
+        if etype in {1, 'cell',  'edge'}:
+            cell = self.entity(etype, index=index)
+            bc = np.sum(node[cell], axis=1)/cell.shape[-1]
+        elif etype in {'node', 'face', 0}:
+            bc = self.entity(etype, index=index)
+        else:
+            raise ValueError(f'the entity type: `{etype}` is not correct!') 
+        return bc
+
+    def bc_to_point(self, bc: NDArray, index=np.s_[:], node=None):
+        """
+        @brief 把重心坐标转换为实际坐标
+        """
+        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
+        node = self.node if node is None else node
+        entity = self.entity(etype=TD)[index]
+        if TD == 0:
+            return(entity[None, :])
+        else: 
+            p = np.einsum('...j, ijk->...ik', bc, node[entity])
+            return p
+
+    def grad_lambda(self, index=np.s_[:]):
+        """
+        @brief 计算所有单元上重心坐标函数的导数
+        """
+        node = self.entity('node')
+        cell = self.entity('cell', index=index)
+        v = node[cell[:, 1]] - node[cell[:, 0]]
+        NC = len(cell) 
+        GD = self.geo_dimension()
+        Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
+        h2 = np.sum(v**2, axis=-1)
+        v /=h2.reshape(-1, 1)
+        Dlambda[:, 0, :] = -v
+        Dlambda[:, 1, :] = v
+        return Dlambda
 
     @staticmethod
     def multi_index_matrix(p: int, etype: Union[int, str]=1) -> NDArray:
+        """
+        @brief 计算二维的 p 次多重指标矩阵
+        """
         ldof = p+1
         multiIndex = np.zeros((ldof, 2), dtype=np.int_)
         multiIndex[:, 0] = np.arange(p, -1, -1)
@@ -56,6 +126,9 @@ class Mesh1d(Mesh):
         return multiIndex
 
     def shape_function(self, bc, p=1) -> NDArray:
+        """
+        @brief 计算一维单元上的形函数
+        """
         TD = bc.shape[-1] - 1
         multiIndex = self.multi_index_matrix(p)
         c = np.arange(1, p+1, dtype=np.int_)
@@ -71,8 +144,12 @@ class Mesh1d(Mesh):
         return phi
 
     def grad_shape_function(self, bc: NDArray, p=1, index=np.s_[:]) -> NDArray:
-        TD = self.top_dimension()
+        """
+        @brief 计算一维单元上的形函数的梯度
+        @note 注意，这里是关于物理空间变量的梯度！
+        """
 
+        TD = self.top_dimension()
         multiIndex = self.multi_index_matrix(p)
 
         c = np.arange(1, p+1, dtype=self.itype)
@@ -106,9 +183,6 @@ class Mesh1d(Mesh):
         Dlambda = self.grad_lambda(index=index)
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi
-
-    def grad_lambda(self, index=np.s_[:]) -> NDArray:
-        pass
 
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         return p + 1
