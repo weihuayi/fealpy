@@ -21,7 +21,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import ScalarDiffusionIntegrator, VectorMassIntegrator
 from fealpy.fem import NSOperatorIntegrator,PressIntegrator
-from fealpy.fem import BilinearForm
+from fealpy.fem import BilinearForm,MixedBilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import VectorSourceIntegrator, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
@@ -92,23 +92,10 @@ u0 = nuspace.function(dim=2)
 us = nuspace.function(dim=2)
 u1 = nuspace.function(dim=2)
 
-
 p0 = npspace.function()
 p1 = npspace.function()
 
-#组装矩阵准备工作
 dt = tmesh.dt
-qf = smesh.integrator(8,'cell')
-bcs,ws = qf.get_quadrature_points_and_weights()
-cellmeasure = smesh.entity_measure('cell')
-
-## 速度空间
-ugphi = nuspace.grad_basis(bcs)
-ugdof = nuspace.number_of_global_dofs()
-ucell2dof = nuspace.cell_to_dof()
-## 压力空间
-pgdof = npspace.number_of_global_dofs()
-pcell2dof = npspace.cell_to_dof()
 
 # 第一个
 Vbform0 = BilinearForm(2*(nuspace,))
@@ -122,20 +109,10 @@ Vbform1.assembly()
 A2 = Vbform1.get_matrix()
 A = A1+A2
 
-#Vbform3 = BilinearForm((npspace,nuspace))
-#Vbform3.add_domain_integrator(PressIntegrator())
-#Vbform3.assembly()
-#D = Vbform3.get_matrix()
-
-##边界处理
-isBDof = uspace.boundary_dof()
-isBDof = np.hstack((isBDof,isBDof))
-bdIdx = np.zeros((A.shape[0],),np.int32)
-bdIdx[isBDof] = 1
-Tbd = spdiags(bdIdx,0,A.shape[0],A.shape[0])
-T = spdiags(1-bdIdx,0,A.shape[0],A.shape[0])
-AA = T@A@T + Tbd
-
+Vbform3 = MixedBilinearForm((npspace,),(nuspace,nuspace))
+Vbform3.add_domain_integrator(PressIntegrator())
+Vbform3.assembly()
+D = Vbform3.get_matrix()
 
 #组装第二个方程的左端矩阵
 Sbform = BilinearForm(npspace)
@@ -148,7 +125,6 @@ Vbform2 = BilinearForm(2*(nuspace,))
 Vbform2.add_domain_integrator(VectorMassIntegrator(c=1))
 Vbform2.assembly()
 C = Vbform2.get_matrix()
-print("第三个方程的左端：",np.sum(np.abs(C.toarray())))
 
 ctx = DMumpsContext()
 ctx.set_silent()
@@ -173,31 +149,13 @@ for i in range(2):
     fb2 = lform.get_vector()  
     
     fb3 = A2@u0.flatten(order='C')
-    
-    fp = p0(bcs)
-    fbb4 = np.einsum('i,ij,ijk,j->jk',ws,fp,ugphi[...,0],cellmeasure) 
-    fbb5 = np.einsum('i,ij,ijk,j->jk',ws,fp,ugphi[...,1],cellmeasure) 
-    fb4 = np.zeros((ugdof))
-    fb5 = np.zeros((ugdof))
-    np.add.at(fb4,ucell2dof,fbb4)
-    np.add.at(fb5,ucell2dof,fbb5)
-    fb4 = np.hstack((fb4,fb5))
+    fb4 = D@p0.flatten(order='C')
 
     b1 = fb1-fb2+fb4-mu*fb3
-    
-    ipoint = uspace.interpolation_points()
-    ue2 = usolution(ipoint)
-    bt = np.zeros(shape=b1.shape)
-    bt[isBDof] = ue2.flatten(order='F')[isBDof]
-    bb1 = b1 - A@bt
-    print("asd",np.sum(np.abs(bt)))
-    bb1[isBDof] = ue2.flatten(order='F')[isBDof]
-    
-    uuu = nuspace.function(dim=2)
-    AAA,bbb = ubc.apply(A,b1,uuu)
+    AA,b1 = ubc.apply(A,b1)
 
-    ctx.set_centralized_sparse(AAA)
-    x = bb1.copy()
+    ctx.set_centralized_sparse(AA)
+    x = b1.copy()
     ctx.set_rhs(x)
     ctx.run(job=6)
     us.flat[:] = x
