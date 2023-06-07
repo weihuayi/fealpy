@@ -5,23 +5,15 @@ import scipy
 import matplotlib.pyplot as plt
 import matplotlib
 
-from  fealpy.timeintegratoralg import UniformTimeLine
-from fealpy.mesh import MeshFactory as MF
-from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.decorator import cartesian,barycentric
-from fealpy.boundarycondition import DirichletBC
-from fealpy.quadrature import GaussLegendreQuadrature
-from scipy.sparse.linalg import spsolve
-from scipy.sparse import csr_matrix,hstack,vstack,spdiags
-
-from scipy.linalg import solve
-from fealpy.tools.show import showmultirate
 
 from fealpy.mesh import TriangleMesh
+from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.functionspace import LagrangeFESpace
+
 from fealpy.fem import ScalarDiffusionIntegrator, VectorMassIntegrator
-from fealpy.fem import NSOperatorIntegrator,PressIntegrator
-from fealpy.fem import BilinearForm,MixedBilinearForm
+from fealpy.fem import NSOperatorIntegrator, PressIntegrator
+from fealpy.fem import BilinearForm, MixedBilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import VectorSourceIntegrator, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
@@ -85,9 +77,6 @@ pbc = DirichletBC(npspace, psolution)
 smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
 tmesh = UniformTimeLine(0, T, nt) # 均匀时间剖分
 
-uspace = LagrangeFiniteElementSpace(smesh, p=degree)
-pspace = LagrangeFiniteElementSpace(smesh, p=degree-1)
-
 u0 = nuspace.function(dim=2)
 us = nuspace.function(dim=2)
 u1 = nuspace.function(dim=2)
@@ -104,13 +93,13 @@ Vbform0.assembly()
 A1 = Vbform0.get_matrix()
 
 Vbform1 = BilinearForm(2*(nuspace,))
-Vbform1.add_domain_integrator(NSOperatorIntegrator(mu))
+Vbform1.add_domain_integrator(NSOperatorIntegrator(mu)) #TODO：命名
 Vbform1.assembly()
 A2 = Vbform1.get_matrix()
 A = A1+A2
 
-Vbform3 = MixedBilinearForm((npspace,),(nuspace,nuspace))
-Vbform3.add_domain_integrator(PressIntegrator())
+Vbform3 = MixedBilinearForm((npspace,), 2*(nuspace, ))
+Vbform3.add_domain_integrator(PressIntegrator()) #TODO: 命名
 Vbform3.assembly()
 D = Vbform3.get_matrix()
 
@@ -130,29 +119,30 @@ ctx = DMumpsContext()
 ctx.set_silent()
 errorMatrix = np.zeros((2,nt),dtype=np.float64)
 
+@barycentric
+def f1(bcs,index):
+    b2 = np.einsum('imj, ikmj->ijk', u0(bcs, index),u0.grad_value(bcs,index))
+    return rho*b2
+
+lform = LinearForm(2*(nuspace,))
+lform.add_domain_integrator(VectorSourceIntegrator(f1))
+
 for i in range(2): 
     # 下一个的时间层 t1
     t1 = tmesh.next_time_level()
     print("t1=", t1)
 
     #组装第一个方程的右端向量
-    fb1 = A1@u0.flatten(order='C')
+    fb1 = A1@u0.flat
 
-    @barycentric
-    def f1(bcs,index):
-        b2 = np.einsum('imj,ikmj->ijk',u0(bcs,index),u0.grad_value(bcs,index))
-        return rho*b2
-
-    lform = LinearForm(2*(nuspace,))
-    lform.add_domain_integrator(VectorSourceIntegrator(f1))
     lform.assembly()
     fb2 = lform.get_vector()  
     
-    fb3 = A2@u0.flatten(order='C')
-    fb4 = D@p0.flatten(order='C')
+    fb3 = A2@u0.flat
+    fb4 = D@p0.flat
 
-    b1 = fb1-fb2+fb4-mu*fb3
-    AA,b1 = ubc.apply(A,b1)
+    b1 = fb1 - fb2 + fb4 - mu*fb3
+    AA, b1 = ubc.apply(A, b1)
 
     ctx.set_centralized_sparse(AA)
     x = b1.copy()
