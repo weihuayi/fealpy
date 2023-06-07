@@ -116,7 +116,7 @@ class LinearForm:
             V = self._V.reshape(gdof, GD) 
             for i in range(GD):
                 np.add.at(V[:, i], cell2dof, bb[:, :, i])
-
+        
         for bi in self.bintegrators:
             bi.assembly_face_vector(space, out=self._V)
 
