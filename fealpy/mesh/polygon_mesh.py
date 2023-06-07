@@ -359,7 +359,7 @@ class PolygonMesh(Mesh2d, Plotable):
 
 
     @classmethod
-    def from_vem_example1(cls, box=[0, 1, 0, 1], nx=10, ny=10, ratio=0.618):
+    def distorted_concave_rhombic_quadrilaterals_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, ratio=0.618):
         """
         @brief 虚单元网格，矩形内部包含一个菱形，两者共用左下和右上的节点
 
@@ -395,7 +395,7 @@ class PolygonMesh(Mesh2d, Plotable):
 
 
     @classmethod
-    def from_vem_example2(cls, box=[0, 1, 0, 1], nx=10, ny=10):
+    def nonconvex_octagonal_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10):
         """
         @brief 虚单元网格，矩形网格的每条内部边上加一个点后形成的八边形网格
 
