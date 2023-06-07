@@ -476,26 +476,73 @@ class UniformMesh1d(Mesh1d):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD, A, f, uh=None):
+    def apply_dirichlet_bc(self, gD, A, f, uh=None, threshold=None):
         """
-        @brief 考虑纯 Dirichlet 边界
+        @brief 考虑 Dirichlet 边界
         """
         if uh is None:
             uh = self.function('node')
 
         node = self.node
-        isBdNode = self.ds.boundary_node_flag()
-        uh[isBdNode]  = gD(node[isBdNode])
+        if threshold is None:
+            isBdNode = self.ds.boundary_node_flag()
+            index = isBdNode
+        elif isinstance(threshold, int):
+            index = threshold
+        elif callable(threshold):
+            index = threshold(node)
+        else:
+            index = self.ds.boundary_node_flag()
+
+        uh[index]  = gD(node[index])
 
         f -= A@uh
-        f[isBdNode] = uh[isBdNode]
+        f[index] = uh[index]
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        bdIdx[isBdNode] = 1
+        bdIdx[index] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
         return A, f 
+
+
+    ## @ingroup FDMInterface
+    def apply_neumann_bc(self, gN, A, f, uh=None, threshold=None):
+        """
+        @brief 考虑 Neumann 边界
+        """
+        if uh is None:
+            uh = self.function('node')
+
+        node = self.node
+        if threshold is None:
+            isBdNode = self.ds.boundary_node_flag()
+            index = isBdNode
+        elif isinstance(threshold, int):
+            index = threshold
+        elif callable(threshold):
+            index = threshold(node)
+        else:
+            index = self.ds.boundary_node_flag()
+
+        uh[index]  = gN(node[index])
+
+        f -= A@uh
+        f[index] = uh[index]
+    
+        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+        bdIdx[index] = 1
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        bdIdx1 = np.zeros(A.shape[0], dtype=np.float64)
+        bdIdx1[index] = 1 / self.h
+        bdIdx2 = np.zeros(A.shape[0]-1, dtype=float)
+        bdIdx2[-1] = -1 / self.h
+        D1 = spdiags(bdIdx1, 0, A.shape[0], A.shape[0])
+        D1 += spdiags(bdIdx2, -1, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
+        return A, f
+
 
     ## @ingroup FDMInterface
     def update_dirichlet_bc(self, gD, uh, threshold=None):
