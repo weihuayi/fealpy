@@ -22,6 +22,7 @@ from fealpy.fem import LinearForm
 from fealpy.fem import VectorSourceIntegrator
 
 from fealpy.decorator import cartesian, barycentric
+
 T=10
 nt=50
 ns = 16
@@ -31,8 +32,8 @@ doforder = 'sdofs'
 
 mesh = TriangleMesh.from_unit_square(nx=ns, ny=ns)
 timeline = UniformTimeLine(0,T,nt)
-uspace = LagrangeFESpace(mesh,p=2,doforder=doforder)
-pspace = LagrangeFESpace(mesh,p=1,doforder=doforder)
+uspace = LagrangeFESpace(mesh, p=2, doforder=doforder)
+pspace = LagrangeFESpace(mesh, p=1, doforder=doforder)
 dt = timeline.dt
 
 # 第一个
@@ -42,11 +43,10 @@ Vbform0.assembly()
 A1 = Vbform0.get_matrix()
 
 Vbform1 = BilinearForm(2*(uspace,))
-Vbform1.add_domain_integrator(NSOperatorIntegrator(mu))
+Vbform1.add_domain_integrator(NSOperatorIntegrator(mu)) #TODO: 重新命名积分子
 Vbform1.assembly()
 A2 = Vbform1.get_matrix()
 A = A1+A2
-print("第一个方程左端：",np.sum(np.abs(A.toarray())))
 
 #第二个
 Sbform = BilinearForm(pspace)
@@ -57,7 +57,7 @@ print("第二个方程的左端：",np.sum(np.abs(B.toarray())))
 
 #第三个
 Vbform2 = BilinearForm(2*(uspace,))
-Vbform2.add_domain_integrator(VectorMassIntegrator(c=1))
+Vbform2.add_domain_integrator(VectorMassIntegrator(c=1)) #TODO: 考虑与第一个共用一个双线性型
 Vbform2.assembly()
 C = Vbform2.get_matrix()
 print("第三个方程的左端:",np.sum(np.abs(C.toarray())))
