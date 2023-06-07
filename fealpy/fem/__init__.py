@@ -7,6 +7,7 @@ This module provide many fem model
 '''
 
 from .bilinear_form import BilinearForm
+from .mixed_bilinear_form import MixedBilinearForm
 from .linear_form import LinearForm
 
 # Integrator for scalar case
@@ -23,7 +24,8 @@ from .truss_structure_integrator import TrussStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
 from .convection_integrator import ConvectionIntegrator
 from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
-from .NSIntegrator import NSOperatorIntegrator
+from .ns_integrator import NSOperatorIntegrator
+from .press_integrator import PressIntegrator
 
 from .provides_symmetric_tangent_operator_integrator import ProvidesSymmetricTangentOperatorIntegrator
 
