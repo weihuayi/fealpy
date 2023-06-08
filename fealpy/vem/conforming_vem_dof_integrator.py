@@ -21,8 +21,8 @@ class ConformingVEMDoFIntegrator2d:
         cell, cellLocation = mesh.entity('cell')
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        cell2dof, cell2dofLocation = space.cell_to_dof()
-        D = np.ones((len(cell2dof), smldof), dtype=np.float)
+        cell2dofLocation = space.dof.cell2dofLocation
+        D = np.ones((cell2dofLocation[-1], smldof), dtype=np.float64)
 
         if p == 1:
             bc = np.repeat(space.smspace.cellbarycenter, NV, axis=0)
@@ -43,4 +43,5 @@ class ConformingVEMDoFIntegrator2d:
             idof = (p-1)*p//2 # the number of dofs of scale polynomial space with degree p-2
             idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
             D[idx, :] = M[:, :idof, :]/area.reshape(-1, 1, 1)
-        return D
+
+        return np.hsplit(D, cell2dofLocation[1:-1])
