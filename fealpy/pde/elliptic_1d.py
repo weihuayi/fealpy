@@ -124,7 +124,7 @@ class CDRPDEData:
     @cartesian
     def source(self, p: np.ndarray) -> np.ndarray:
         Q = np.zeros_like(p)
-        Q[0] = self.Q0/self.A
+        Q[1] = self.Q0/self.A
         return Q
 
     @cartesian    

@@ -495,7 +495,6 @@ class UniformMesh1d(Mesh1d):
             index = self.ds.boundary_node_flag()
 
         uh[index]  = gD(node[index])
-
         f -= A@uh
         f[index] = uh[index]
     
@@ -510,7 +509,9 @@ class UniformMesh1d(Mesh1d):
     ## @ingroup FDMInterface
     def apply_neumann_bc(self, gN, A, f, uh=None, threshold=None):
         """
-        @brief 考虑 Neumann 边界
+        @brief 考虑 Neumann 边界，只有右边界点为 Neumann 边界条件
+
+        TODO:错误！
         """
         if uh is None:
             uh = self.function('node')
@@ -526,10 +527,11 @@ class UniformMesh1d(Mesh1d):
         else:
             index = self.ds.boundary_node_flag()
 
-        uh[index]  = gN(node[index])
+        # uh[index]  = gN(node[index])
 
-        f -= A@uh
-        f[index] = uh[index]
+        # f -= A@uh
+        # f[index] = uh[index]
+        f[index] = gN(node[index])
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[index] = 1
