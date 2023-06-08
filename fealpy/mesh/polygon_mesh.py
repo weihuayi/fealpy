@@ -420,12 +420,6 @@ class PolygonMesh(Mesh2d, Plotable):
         a /=2
         return a
     """
-    def edge_normal(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index, 1],:] - node[edge[index, 0],:]
-        w = np.array([(0,-1),(1,0)])
-        return v@w 
     def node_normal(self):
         node = self.node
         cell, cellLocation = self.entity('cell')
@@ -441,7 +435,6 @@ class PolygonMesh(Mesh2d, Plotable):
         w = np.array([(0,-1),(1,0)])
         d = node[idx1] - node[idx2]
         return 0.5*d@w
-
     """
    
 
