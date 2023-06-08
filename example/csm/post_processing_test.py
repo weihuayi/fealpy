@@ -12,23 +12,15 @@ e2 = np.asarray([1.2e-2, 1.4e-2, 1.5e-2, 0., 0., 0.], dtype=np.float64) # 预期
 
 h = mgis_bv.Hypothesis.Tridimensional # 表示是三维
 b = mgis_bv.load(lib, 'PostProcessingTest', h) # 加载行为
-# path to the test library
-print('Behaviour:', b.behaviour)
-print('Hypothesis:', h)
-print('Source:', b.source)
 postprocessings = b.getPostProcessingsNames()
-print('Post-processings:', postprocessings)
 
 m = mgis_bv.MaterialDataManager(b, 2) # 2 表示要处理的材料数量
 mgis_bv.setMaterialProperty(m.s1, "YoungModulus", 150e9) # 设置材料属性
 mgis_bv.setMaterialProperty(m.s1, "PoissonRatio", 0.3)
 mgis_bv.setExternalStateVariable(m.s1, "Temperature", 293.15) # 设置外部状态变量
-print('m:', m.s1)
 mgis_bv.update(m) # 更新材料数据
-print('m:', m.s1)
 m.s1.gradients[0:] = e # 材料数据的梯度
 m.s1.gradients[1:] = e
-print('m.s1.gradinets:', m.s1.gradients)
 outputs = np.empty(shape=(2, 3), dtype=np.float64)
 mgis_bv.executePostProcessing(outputs.reshape(6), m, "PrincipalStrain") # 后处理，获得主应变的值
 print('principal strain:', outputs)
@@ -36,4 +28,6 @@ print('e2:', e2)
 for i in range(0, 3):
     assert abs(outputs[0, i] - e2[i]) < eps, "invalid output value"
     assert abs(outputs[1, i] - e2[i]) < eps, "invalid output value"
+
+K = mgis_bv.IntegrationType.IntegrationWithTangentOperator
 
