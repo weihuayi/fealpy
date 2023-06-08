@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 class MixedBilinearForm:
-    def __init__(self, trialspace:tuple ,testspace:tuple, atype=None):
+    def __init__(self, trialspace:tuple, testspace:tuple, atype=None):
         """
         @brief 
         """
