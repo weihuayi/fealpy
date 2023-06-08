@@ -9,7 +9,7 @@ from fealpy.vem.conforming_scalar_vem_h1_projector import ConformingScalarVEMH1P
 from fealpy.vem.laplace_Integrator import ConformingScalarVEMLaplaceIntegrator
 from fealpy.mesh import MeshFactory as MF
 from fealpy.mesh.polygon_mesh import PolygonMesh
-def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
+def test_assembly_cell_matrix(p,plot=False):
     nx = 2
     ny = 2
     dim = 2
@@ -43,5 +43,5 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_righthand_side_and_dof_matrix(1)
+    test_assembly_cell_matrix(1)
 

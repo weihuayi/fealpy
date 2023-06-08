@@ -54,6 +54,7 @@ class ConformingScalarVESpace2d():
         self.mesh = mesh
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q, bc=bc)
+        self.integralalg = self.smspace.integralalg
         self.cellmeasure = self.smspace.cellmeasure
         self.dof = CSVEDof2d(mesh, p)
 
@@ -82,3 +83,9 @@ class ConformingScalarVESpace2d():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=dtype)
+
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
+        return f
+
+

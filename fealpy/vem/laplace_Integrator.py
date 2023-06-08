@@ -48,6 +48,21 @@ class ConformingScalarVEMLaplaceIntegrator():
         gdof = space.number_of_global_dofs()
         A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
         return A
+    
+    def source_vector(self, f):
+        space = self.space
+        L2project = ConformingScalarVEML2Projector2d()
+        PI0 = L2project.assembly_cell_matrix(space)
+        phi = space.smspace.basis
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
+        bb = space.integralalg.integral(u, celltype=True)
+        g = lambda x: x[0].T@x[1]
+        bb = np.concatenate(list(map(g, zip(PI0, bb))))
+        gdof = space.number_of_global_dofs()
+        b = np.bincount(np.concatenate(space.dof.cell2dof), weights=bb, minlength=gdof)
+        return b
+
 
 
 
