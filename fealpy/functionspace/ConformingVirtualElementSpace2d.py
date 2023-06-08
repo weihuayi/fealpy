@@ -390,7 +390,7 @@ class ConformingVirtualElementSpace2d():
                     A[0, -1] = -1
                     A[-1, 0] = -1
                     return x[1].T@tG@x[1] + M.T@A@M
-                #f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+                f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
                 K = list(map(f1, zip(DD, PI1)))
             else:
                 cellbarycenter = self.smspace.cellbarycenter

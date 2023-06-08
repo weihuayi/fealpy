@@ -128,32 +128,29 @@ class CDRPDEData:
         return Q
 
     @cartesian    
-    def dirichlet(self, p: np.ndarray) -> np.ndarray:
+    def dirichlet(self, x: np.ndarray) -> np.ndarray:
         """
         Dirichlet bc
         """
-        x = p[..., 0]
         return np.where(x==0, self.C0, 0)
 
     @cartesian
-    def is_dirichlet_boundary(self, p: np.ndarray) -> np.ndarray:
+    def is_dirichlet_boundary(self, x: np.ndarray) -> np.ndarray:
         """
         判断给定点是否在 Dirichlet 边界上
         """
-        x = p[..., 0]
-        return x == 0.0
+        return x == 0
 
     @cartesian
-    def neumann(self, p: np.ndarray) -> np.ndarray:
+    def neumann(self, x: np.ndarray) -> np.ndarray:
         """ 
         Neumann bc
         """
-        return np.zeros_like(p)
+        return np.zeros_like(x)
 
     @cartesian
-    def is_neumann_boundary(self, p: np.ndarray) -> np.ndarray:
+    def is_neumann_boundary(self, x: np.ndarray) -> np.ndarray:
         """
         判断给定点是否在 Neumann 边界上
         """
-        x = p[..., 0]
         return x == self.L

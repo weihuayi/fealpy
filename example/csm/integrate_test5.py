@@ -4,6 +4,10 @@ import mgis.behaviour as mgis_bv
 import mgis.model
 from fealpy.csm.mfront import compile_mfront_file
 
+import ipdb
+
+ipdb.set_trace()
+
 file = compile_mfront_file('material/ode_rk54.mfront')
 
 # 测试库的路径

@@ -16,7 +16,9 @@ class DirichletBC():
         self.threshold = threshold
         self.bctype = 'Dirichlet'
 
-    def apply(self, A: csr_matrix, f: np.ndarray, uh: np.ndarray) -> Tuple[csr_matrix, np.ndarray]:
+    def apply(self, A, f, uh=None):
+    def apply(self, A, f, uh):
+    def apply(self, A: csr_matrix, f: np.ndarray, uh: np.ndarray=None) -> Tuple[csr_matrix, np.ndarray]:
         """
         @brief 处理 Dirichlet 边界条件  
 
@@ -28,6 +30,10 @@ class DirichletBC():
         @note 
             * 如果 `uh` 是一个向量场或张量场，则 `f` 必须是一个展平向量，F.shape[0] = A.shape[0] == A.shape[1]
         """
+        gdof = self.space.number_of_global_dofs()
+        GD = A.shape[0]//gdof
+        if uh is None:
+            uh = self.space.function(dim=GD)  
         if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
             # 由标量函数空间组成的向量函数空间
             return self.apply_for_vspace_with_scalar_basis(A, f, uh)

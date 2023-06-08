@@ -12,6 +12,9 @@ from .TriangleMesh import TriangleMeshWithInfinityNode
 from .mesh_base import Mesh2d, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
 
+from . import StructureQuadMesh, QuadrangleMesh
+from .MeshFactory import boxmesh2d
+
 
 class PolygonMesh(Mesh2d, Plotable):
     """
@@ -353,8 +356,54 @@ class PolygonMesh(Mesh2d, Plotable):
     def from_quadtree(cls, quadtree):
         node, cell, cellLocation = quadtree.to_pmesh()
         return cls(node, cell, cellLocation)
-    
-    
+
+
+    @classmethod
+    def distorted_concave_rhombic_quadrilaterals_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, ratio=0.618):
+        """
+        @brief 虚单元网格，矩形内部包含一个菱形，两者共用左下和右上的节点
+
+        @param box 网格所占区域
+        @param nx 沿 x 轴方向剖分段数
+        @param ny 沿 y 轴方向剖分段数
+        @param ratio 矩形内部菱形的大小比例
+        """
+        mesh0 = StructureQuadMesh(box, nx, ny)
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+
+        node_append1 = node[cell[:, 3]] * (1-ratio) + node[cell[:, 1]] * ratio
+        node_append2 = node[cell[:, 3]] * ratio + node[cell[:, 1]] * (1-ratio)
+        new_node = np.vstack((node, node_append1, node_append2))
+
+        cell = np.tile(cell, (3, 1))
+        idx1 = np.arange(NN, NN + NC)
+        idx2 = np.arange(NN + NC, NN + 2 * NC)
+        cell[0:NC, 3] = idx1
+        cell[NC:2 * NC, 1] = idx1
+        cell[NC:2 * NC, 3] = idx2
+        cell[2 * NC:3 * NC, 1] = idx2
+
+        return QuadrangleMesh(new_node, cell)
+
+
+    @classmethod
+    def nonconvex_octagonal_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10):
+        """
+        @brief 虚单元网格，矩形网格的每条内部边上加一个点后形成的八边形网格
+
+        @param box 网格所占区域
+        @param nx 沿 x 轴方向剖分段数
+        @param ny 沿 y 轴方向剖分段数
+        """
+        return boxmesh2d(box, nx, ny, meshtype='noconvex')
     
     def cell_area(self, index=None):
         #TODO: 3D Case

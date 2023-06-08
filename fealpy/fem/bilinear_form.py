@@ -118,11 +118,11 @@ class BilinearForm:
         assert isinstance(space, tuple) and not isinstance(space[0], tuple)
 
         mesh = space[0].mesh
-        GD = space[0].geo_dimension()
+        GD = space[0].geo_dimension() # 如果是对称张量
         ldof = space[0].number_of_local_dofs()
         gdof = space[0].number_of_global_dofs()
         cell2dof = space[0].cell_to_dof() # 标量空间的自由度矩阵
-
+        
         cellmeasure = mesh.entity_measure()
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
