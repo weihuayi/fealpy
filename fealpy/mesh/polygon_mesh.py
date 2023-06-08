@@ -121,7 +121,7 @@ class PolygonMesh(Mesh2d, Plotable):
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
-        @brief 
+        @brief  
         """
         cell = self.entity('cell')
         if p == 1:

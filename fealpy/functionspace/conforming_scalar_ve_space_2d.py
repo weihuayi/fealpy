@@ -13,6 +13,11 @@ class CSVEDof2d():
         self.p = p
         self.mesh = mesh
         self.cell2dof = self.cell_to_dof() # 初始化的时候就构建出 cell2dof 数组
+        
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='all')
+        self.cell2dofLocation = np.zeros(NC+1, dtype=mesh.itype)
+        self.cell2dofLocation[1:] = np.add.accumulate(ldof)
 
     def is_boundary_dof(self, threshold=None):
         idx = self.mesh.ds.boundary_edge_index()
