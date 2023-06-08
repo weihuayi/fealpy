@@ -5,9 +5,7 @@ from fealpy.functionspace import ConformingScalarVESpace2d
 
 class ConformingScalarVEML2Projector2d():
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M, PI1):
-
-        C = self.assembly_cell_right_hand_side(space, M, PI1) 
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M, C):
         pi0 = lambda x: inv(x[0])@x[1]
         return list(map(pi0, zip(M, C))) # TODO：并行加速
 
