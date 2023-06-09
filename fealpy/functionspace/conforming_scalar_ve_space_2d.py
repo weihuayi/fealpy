@@ -3,9 +3,6 @@ from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from .Function import Function
-from ..quadrature import GaussLobattoQuadrature
-from ..quadrature import GaussLegendreQuadrature
-from ..quadrature import PolygonMeshIntegralAlg
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 class CSVEDof2d():
@@ -59,13 +56,12 @@ class ConformingScalarVESpace2d():
         self.mesh = mesh
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q, bc=bc)
-        self.integralalg = self.smspace.integralalg
         self.cellmeasure = self.smspace.cellmeasure
         self.dof = CSVEDof2d(mesh, p)
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
-        self.stype = 'cvem' # 空间类型
+        self.stype = 'csvem' # 空间类型
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -89,8 +85,7 @@ class ConformingScalarVESpace2d():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=dtype)
 
-    def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
-        return f
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, coordtype='cartesian', dtype=dtype)
 
 

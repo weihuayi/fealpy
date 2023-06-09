@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from typing import TypedDict, Callable, Tuple, Union
 
 
-class ScalarSourceIntegrator():
+class ConformingVEMScalarSourceIntegrator2d():
 
     def __init__(self, f: Union[Callable, int, float, NDArray]):
         """

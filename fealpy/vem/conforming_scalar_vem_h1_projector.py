@@ -7,19 +7,23 @@ from fealpy.quadrature import GaussLobattoQuadrature
 from fealpy.functionspace import ConformingScalarVESpace2d
 
 class ConformingScalarVEMH1Projector2d():
+    def __init__(self, D):
+        self.D = D
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, G, B):
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
         """
         @bfief 组装 H1 投影矩阵
 
         @return 返回为列表，列表中数组大小为(smldof,ldof)
         """
         p = space.p
+        self.B = self.assembly_cell_right_hand_side(sapce) 
         if p == 1:
-            return B
+            return self.B
         else:
+            self.G = self.assembly_cell_left_hand_side(space) 
             g = lambda x: inv(x[0])@x[1]
-            return list(map(g, zip(G, B)))
+            return list(map(g, zip(self.G, self.B)))
 
 
     def assembly_cell_right_hand_side(self, space: ConformingScalarVESpace2d):
@@ -74,7 +78,7 @@ class ConformingScalarVEMH1Projector2d():
 
         return B 
     
-    def assembly_cell_left_hand_side(self, space: ConformingScalarVESpace2d, B, D):
+    def assembly_cell_left_hand_side(self, space: ConformingScalarVESpace2d):
         """
         @brief 组装 H1 投影算子的左端矩阵
 
@@ -88,5 +92,5 @@ class ConformingScalarVEMH1Projector2d():
             G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
         else:
             g = lambda x: x[0]@x[1]
-            G = list(map(g, zip(B, D))) #TODO： 并行加速
+            G = list(map(g, zip(self.B, self.D))) #TODO： 并行加速
         return G

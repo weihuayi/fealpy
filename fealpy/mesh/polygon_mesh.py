@@ -2,6 +2,7 @@ import numpy as np
 from typing import Union
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, coo_matrix
+import inspect
 
 from ..common import ranges
 from ..quadrature import TriangleQuadrature
@@ -273,11 +274,11 @@ class PolygonMesh(Mesh2d, Plotable):
     def uniform_refine(self, n: int=1) -> None:
         raise NotImplementedError
 
-    def integral(self, u, q, celltype=False):
+    def integral(self, u, q=3, celltype=False):
         """
         @brief 多边形网格上的数值积分
 
-        @param[in] u 被积函数
+        @param[in] u 被积函数, 需要两个参数 (x, index)
         @param[in] q 积分公式编号
         """
         node = self.entity('node')
@@ -324,20 +325,40 @@ class PolygonMesh(Mesh2d, Plotable):
         else:
             return e.sum(axis=0)
 
-    def error(self, u, v, celltype=False, power=2, q=None):
+    def error(self, u, v, q=3, celltype=False, power=2):
         """
-        @brief 
-        """
-        def efun(x, index):
-            return np.abs(u(x, index) - v(x, index))**power
+        @brief 在当前多边形网格上计算误差 \int |u - v|^power dx 
 
-        e = self.integral(efun, celltype=celltype, q=q)
+        @param[in] u 函数
+        @param[in] v 函数
+        @param[in] q 积分公式编号
+        """
+
+        nu = len(inspect.signature(u).parameters)
+        nv = len(inspect.signature(v).parameters)
+
+        assert 1 <= nu <= 2
+        assert 1 <= nv <= 2
+
+        if (nu == 1) and (nv == 2):
+            def efun(x, index):
+                return np.abs(u(x) - v(x, index))**power
+        elif (nu == 2) and (nv == 2):
+            def efun(x, index):
+                return np.abs(u(x, index) - v(x, index))**power
+        elif (nu == 1) and (nv == 1):
+            def efun(x, index):
+                return np.abs(u(x) - v(x))**power
+        else:
+            def efun(x, index):
+                return np.abs(u(x, index) - v(x))**power
+
+        e = self.integral(efun, q, celltype=celltype)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1
             if n > 0:
                 for i in range(n):
                     e = e.sum(axis=-1)
-
         if celltype == False:
             e = np.power(np.sum(e), 1/power)
         else:
