@@ -64,8 +64,29 @@ F = np.einsum('ijk -> ik', F)
 
 # 求解
 uh = np.zeros((NN, GD+1), dtype=np.float64)
-ml = pyamg.ruge_stuben_solver(K)
-uh.T.flat = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
+# ml = pyamg.ruge_stuben_solver(K)
+# uh.T.flat = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
 #uh.T.flat = spsolve(K, F)
+# print(uh)
 
+from scipy.sparse.linalg import LinearOperator, cg
+
+# 求解
+uh = np.zeros((NN, GD+1), dtype=np.float64)
+
+# 定义边界条件
+bc = np.array([0, NN-1])  # 梁的两端
+K[bc, :] = 0
+K[:, bc] = 0
+K[bc, bc] = 1
+
+# 定义 LinearOperator，方便进行共轭梯度求解
+linear_operator = LinearOperator((NN*(GD+1), NN*(GD+1)), matvec=lambda x: K.dot(x))
+
+# 使用共轭梯度法求解
+uh.T.flat, info = cg(linear_operator, F, tol=1e-10)
+
+# 如果求解成功，info应为0，否则打印错误信息
+if info != 0:
+    print(f"Conjugate gradient method did not converge with error {info}")
 print(uh)
