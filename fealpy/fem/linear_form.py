@@ -52,10 +52,10 @@ class LinearForm:
         """
         if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
             # 由标量函数空间张成的向量函数空间
-            self.assembly_for_vspace_with_scalar_basis()
+            return self.assembly_for_vspace_with_scalar_basis()
         else:
             # 标量函数空间或基是向量函数的向量函数空间
-            self.assembly_for_sspace_and_vspace_with_vector_basis()
+            return self.assembly_for_sspace_and_vspace_with_vector_basis()
 
     def assembly_for_sspace_and_vspace_with_vector_basis(self):
         """
@@ -80,6 +80,8 @@ class LinearForm:
 
         for bi in self.bintegrators:
             bi.assembly_face_vector(space, out=self._V)
+
+        return self._V
 
     def assembly_for_vspace_with_scalar_basis(self):
         """
@@ -120,9 +122,11 @@ class LinearForm:
         for bi in self.bintegrators:
             bi.assembly_face_vector(space, out=self._V)
 
+        return self._V
+
     def update(self):
         """
         @brief 当空间改变时，重新组装向量
         """
-        self.assembly()
+        return self.assembly()
 
