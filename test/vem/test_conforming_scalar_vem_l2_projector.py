@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.functionspace import ConformingScalarVESpace2d 
 from fealpy.functionspace import ConformingVirtualElementSpace2d
+from fealpy.vem.conforming_vem_dof_integrator import ConformingVEMDoFIntegrator2d
 from fealpy.vem.conforming_scalar_vem_h1_projector import ConformingScalarVEMH1Projector2d
 from fealpy.vem.conforming_scalar_vem_l2_projector import ConformingScalarVEML2Projector2d
 from fealpy.mesh import MeshFactory as MF
@@ -34,19 +35,28 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
     mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='tri')
     mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
     space =  ConformingScalarVESpace2d(mesh, p=p)
-    b = ConformingScalarVEML2Projector2d()
-    C = b.assembly_cell_righthand_side(space)
-    PI0 = b.assembly_cell_matrix(space)
 
+    b = ConformingScalarVEMH1Projector2d()
+    B = b.assembly_cell_right_hand_side(space)
+    dofmatrix = ConformingVEMDoFIntegrator2d()
+    D = dofmatrix.assembly_cell_matrix(space, H)
+    G = b.assembly_cell_left_hand_side(space, B, D)
+    PI1 = b.assembly_cell_matrix(space, G, B)
+
+    a = ConformingScalarVEML2Projector2d()
+    C = a.assembly_cell_right_hand_side(space, H, PI1)
+    PI0 = a.assembly_cell_matrix(space, H, C)
 
     NC = mesh.number_of_cells()
     for i in range(NC):
         np.testing.assert_allclose(realC[i], C[i] ,atol=1e-10)
         np.testing.assert_allclose(realPI0[i], PI0[i], atol=1e-10)
-
-        #np.testing.assert_equal(realC[i], C[i])
-        #np.testing.assert_equal(realPI0[i], PI0[i])
-
+        if p==2 or p ==3:
+            np.testing.assert_equal(realC[i], C[i])
+            np.testing.assert_equal(realPI0[i], PI0[i])
+        else:
+            np.testing.assert_allclose(realC[i], C[i] ,atol=1e-10)
+            np.testing.assert_allclose(realPI0[i], PI0[i], atol=1e-10)
         i = i+1
 
     if plot:

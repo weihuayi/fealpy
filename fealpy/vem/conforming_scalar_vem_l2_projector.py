@@ -2,19 +2,14 @@ import numpy as np
 from numpy.linalg import inv
 
 from fealpy.functionspace import ConformingScalarVESpace2d
-from fealpy.vem.conforming_scalar_vem_h1_projector import ConformingScalarVEMH1Projector2d
+
 class ConformingScalarVEML2Projector2d():
-    def __init__(self):
-        pass
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
-        H = space.smspace.matrix_H()
-        C = self.assembly_cell_righthand_side(space) 
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M, C):
         pi0 = lambda x: inv(x[0])@x[1]
-        return list(map(pi0, zip(H, C)))
+        return list(map(pi0, zip(M, C))) # TODO：并行加速
 
-
-    def assembly_cell_righthand_side(self, space: ConformingScalarVESpace2d):
+    def assembly_cell_right_hand_side(self, space: ConformingScalarVESpace2d, M, PI1):
         """
         @brief 组装 L2 投影算子的右端矩阵
 
@@ -26,12 +21,9 @@ class ConformingScalarVEML2Projector2d():
 
         idof = (p-1)*p//2
         smldof = space.smspace.number_of_local_dofs()
-        H = space.smspace.matrix_H()
-        H1Projector = ConformingScalarVEMH1Projector2d()
-        PI1 = H1Projector.assembly_cell_H1_matrix(space)
 
         d = lambda x: x[0]@x[1]
-        C = list(map(d, zip(H, PI1)))
+        C = list(map(d, zip(M, PI1))) #TODO: 并行加速
         if p == 1:
             return C
         else:
@@ -39,6 +31,6 @@ class ConformingScalarVEML2Projector2d():
                     '0',
                     np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],
                     x[2][idof:, :]]
-            return list(map(l, zip(NV, space.smspace.cellmeasure, C)))
+            return list(map(l, zip(NV, space.smspace.cellmeasure, C))) #TODO：并行加速
 
 
