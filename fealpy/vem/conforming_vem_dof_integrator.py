@@ -1,5 +1,6 @@
 import numpy as np
 from ..functionspace import ConformingVirtualElementSpace2d
+from fealpy.quadrature import GaussLobattoQuadrature
 
 
 class ConformingVEMDoFIntegrator2d:
@@ -13,12 +14,12 @@ class ConformingVEMDoFIntegrator2d:
         p = space.p
         smldof = space.smspace.number_of_local_dofs()
         mesh = space.mesh
-        NV = mesh.number_of_vertices_of_cells()
+        NV = mesh.ds.number_of_vertices_of_cells()
         h = space.smspace.cellsize
         node = mesh.entity('node')
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
-        cell, cellLocation = mesh.entity('cell')
+        cell = np.concatenate(mesh.entity('cell'))
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         cell2dofLocation = space.dof.cell2dofLocation
@@ -27,7 +28,7 @@ class ConformingVEMDoFIntegrator2d:
         if p == 1:
             bc = np.repeat(space.smspace.cellbarycenter, NV, axis=0)
             D[:, 1:] = (node[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
-            return D
+            return np.vsplit(D, cell2dofLocation[1:-1])
 
         qf = GaussLobattoQuadrature(p+1)
         bcs, ws = qf.quadpts, qf.weights
@@ -44,4 +45,4 @@ class ConformingVEMDoFIntegrator2d:
             idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
             D[idx, :] = M[:, :idof, :]/area.reshape(-1, 1, 1)
 
-        return np.hsplit(D, cell2dofLocation[1:-1])
+        return np.vsplit(D, cell2dofLocation[1:-1])

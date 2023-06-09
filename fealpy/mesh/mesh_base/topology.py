@@ -64,11 +64,11 @@ class Mesh1d(Mesh):
 
         @note 如果是一维结构网格可以重新实现这个计算函数
         """
-        node = self.node if node is None else node
-        cell = self.ds.cell
+        node = self.entity('node') if node is None else node
+        cell = self.entity('cell', index=index)
         GD = self.geo_dimension()
         # 这里要求 node 必须是 (NN, GD) 维的
-        return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2, axis=-1))
+        return np.sqrt(np.sum((node[cell[:, 1]] - node[cell[:, 0]])**2, axis=-1))
 
     def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:], 
             node: Optional[NDArray]=None):

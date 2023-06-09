@@ -8,17 +8,16 @@ from fealpy.functionspace import ConformingScalarVESpace2d
 
 class ConformingScalarVEMH1Projector2d():
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, D):
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, G, B):
         """
         @bfief 组装 H1 投影矩阵
 
         @return 返回为列表，列表中数组大小为(smldof,ldof)
         """
-        B = self.assembly_cell_right_hand_side(space)
+        p = space.p
         if p == 1:
             return B
         else:
-            G = self.assembly_cell_left_hand_side(space, B, D)
             g = lambda x: inv(x[0])@x[1]
             return list(map(g, zip(G, B)))
 
@@ -42,7 +41,7 @@ class ConformingScalarVEMH1Projector2d():
 
         cell2dofLocation = space.dof.cell2dofLocation
         BB = np.zeros((smldof, cell2dofLocation[-1]), dtype=np.float64)
-        B = np.hsplit(BB, self.cell2dofLocation[1:-1]) 
+        B = np.hsplit(BB, cell2dofLocation[1:-1]) 
 
         for i in range(NC): #TODO：并行加加速
             if p==1:

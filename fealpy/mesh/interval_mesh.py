@@ -8,7 +8,6 @@ from .mesh_base import Mesh1d, Plotable
 from .mesh_data_structure import Mesh1dDataStructure
 
 class IntervalMeshDataStructure(Mesh1dDataStructure):
-
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
