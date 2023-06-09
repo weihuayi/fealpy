@@ -17,7 +17,7 @@ class ConformingScalarVEMH1Projector2d():
         @return 返回为列表，列表中数组大小为(smldof,ldof)
         """
         p = space.p
-        self.B = self.assembly_cell_right_hand_side(sapce) 
+        self.B = self.assembly_cell_right_hand_side(space) 
         if p == 1:
             return self.B
         else:
