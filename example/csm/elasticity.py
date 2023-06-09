@@ -25,7 +25,8 @@ mgis_bv.setExternalStateVariable(m.s1, "Temperature", 293.15) # 设置外部状�
 mgis_bv.update(m) # 更新材料数据
 #b.gradients[0] = eto
 m.s1.gradients[0:] = eto
-it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
+#it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
+it = mgis_bv.IntegrationType.IntegrationWithConsistentTangentOperator
 dt = 0
 mgis_bv.integrate(m, it, dt, 0, m.n)
 
