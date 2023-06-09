@@ -2,6 +2,7 @@ import numpy as np
 from typing import Union
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, coo_matrix
+import inspect
 
 from ..common import ranges
 from ..quadrature import TriangleQuadrature
@@ -121,7 +122,7 @@ class PolygonMesh(Mesh2d, Plotable):
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
-        @brief 
+        @brief  
         """
         cell = self.entity('cell')
         if p == 1:
@@ -273,6 +274,97 @@ class PolygonMesh(Mesh2d, Plotable):
     def uniform_refine(self, n: int=1) -> None:
         raise NotImplementedError
 
+    def integral(self, u, q=3, celltype=False):
+        """
+        @brief 多边形网格上的数值积分
+
+        @param[in] u 被积函数, 需要两个参数 (x, index)
+        @param[in] q 积分公式编号
+        """
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+        NC = self.number_of_cells()
+
+        bcs, ws = self.integrator(q).get_quadrature_points_and_weights()
+
+        bc = self.entity_barycenter('cell')
+        tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
+
+        v1 = node[edge[:, 0]] - bc[edge2cell[:, 0]] 
+        v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]] 
+        a = np.cross(v1, v2)/2.0
+
+        pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
+        val = u(pp, edge2cell[:, 0])
+
+        shape = (NC, ) + val.shape[2:]
+        e = np.zeros(shape, dtype=np.float64)
+
+        ee = np.einsum('i, ij..., j->j...', ws, val, a, optimize=True)
+        np.add.at(e, edge2cell[:, 0], ee)
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        if np.sum(isInEdge) > 0:
+            tri = [
+                    bc[edge2cell[isInEdge, 1]],
+                    node[edge[isInEdge, 1]],
+                    node[edge[isInEdge, 0]]
+                    ]
+            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 0]] 
+            v2 = node[edge[isInEgge, 0]] - bc[edge2cell[isInEdge, 0]] 
+            a = np.cross(v1, v2)/2.0
+
+            pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
+            val = u(pp, edge2cell[isInEdge, 1])
+            ee = np.einsum('i, ij..., j->j...', ws, val, a, optimize=True)
+            np.add.at(e, edge2cell[isInEdge, 1], ee)
+
+        if celltype is True:
+            return e
+        else:
+            return e.sum(axis=0)
+
+    def error(self, u, v, q=3, celltype=False, power=2):
+        """
+        @brief 在当前多边形网格上计算误差 \int |u - v|^power dx 
+
+        @param[in] u 函数
+        @param[in] v 函数
+        @param[in] q 积分公式编号
+        """
+
+        nu = len(inspect.signature(u).parameters)
+        nv = len(inspect.signature(v).parameters)
+
+        assert 1 <= nu <= 2
+        assert 1 <= nv <= 2
+
+        if (nu == 1) and (nv == 2):
+            def efun(x, index):
+                return np.abs(u(x) - v(x, index))**power
+        elif (nu == 2) and (nv == 2):
+            def efun(x, index):
+                return np.abs(u(x, index) - v(x, index))**power
+        elif (nu == 1) and (nv == 1):
+            def efun(x, index):
+                return np.abs(u(x) - v(x))**power
+        else:
+            def efun(x, index):
+                return np.abs(u(x, index) - v(x))**power
+
+        e = self.integral(efun, q, celltype=celltype)
+        if isinstance(e, np.ndarray):
+            n = len(e.shape) - 1
+            if n > 0:
+                for i in range(n):
+                    e = e.sum(axis=-1)
+        if celltype == False:
+            e = np.power(np.sum(e), 1/power)
+        else:
+            e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e
+
     @classmethod
     def from_one_triangle(cls, meshtype='iso'):
         if meshtype == 'equ':
@@ -420,12 +512,6 @@ class PolygonMesh(Mesh2d, Plotable):
         a /=2
         return a
     """
-    def edge_normal(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index, 1],:] - node[edge[index, 0],:]
-        w = np.array([(0,-1),(1,0)])
-        return v@w 
     def node_normal(self):
         node = self.node
         cell, cellLocation = self.entity('cell')
@@ -441,7 +527,6 @@ class PolygonMesh(Mesh2d, Plotable):
         w = np.array([(0,-1),(1,0)])
         d = node[idx1] - node[idx2]
         return 0.5*d@w
-
     """
    
 

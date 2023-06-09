@@ -5,16 +5,27 @@ from fealpy.functionspace import ConformingScalarVESpace2d
 from fealpy.functionspace import ConformingVirtualElementSpace2d
 import ipdb
 
-from fealpy.vem.conforming_scalar_vem_h1_projector import ConformingScalarVEMH1Projector2d
-from fealpy.vem.laplace_Integrator import ConformingScalarVEMLaplaceIntegrator
-from fealpy.mesh import MeshFactory as MF
-from fealpy.mesh.polygon_mesh import PolygonMesh
-def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
+from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
+from fealpy.vem import ConformingVEMDoFIntegrator2d
+from fealpy.vem import ConformingScalarVEMH1Projector2d
+from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
+from fealpy.vem import BilinearForm
+
+from fealpy.mesh import MeshFactory as MF # 老的网格生成接口，将来会去掉！
+
+from fealpy.mesh import TriangleMesh
+from fealpy.mesh import PolygonMesh
+
+def test_assembly_cell_matrix(p,plot=False):
     nx = 2
     ny = 2
     dim = 2
     domain = np.array([0, 1, 0, 1])
-    mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='poly')
+
+
+    # 老的网格接口
+    mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='tri')
+    mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
     space = ConformingVirtualElementSpace2d(mesh, p=p)
     realstiff = space.stiff_matrix()
 
@@ -27,13 +38,28 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
         plt.show()
 
 
-    mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='tri')
-    mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
+    # 新的网格接口
+    tmesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
+    mesh = PolygonMesh.from_triangle_mesh_by_dual(tmesh)
     space =  ConformingScalarVESpace2d(mesh, p=p)
-    c = ConformingScalarVEMLaplaceIntegrator(space)
-    stiff = c.assembly_cell_matrix()
-    np.testing.assert_equal(realstiff.toarray(), stiff.toarray())
 
+    m = ScaledMonomialSpaceMassIntegrator2d()
+    M = m.assembly_cell_matrix(space)
+
+    d = ConformingVEMDoFIntegrator2d()
+    D = d.assembly_cell_matrix(space, M)
+
+    projector = ConformingScalarVEMH1Projector2d(D)
+    PI1 = b.assembly_cell_matrix(space)
+
+
+    a = BilinearForm(space)
+
+    I = ConformingScalarVEMLaplaceIntegrator(projector)
+    a.add_domain_integrator(I)
+    a.assembly()
+    stiff = a.get_matrix()
+    np.testing.assert_equal(realstiff.toarray(), stiff.toarray())
 
     if plot:
         fig ,axes = plt.subplots()
@@ -43,5 +69,5 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_righthand_side_and_dof_matrix(1)
+    test_assembly_cell_matrix(5)
 
