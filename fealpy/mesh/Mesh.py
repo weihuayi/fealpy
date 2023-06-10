@@ -1,6 +1,8 @@
 from typing import Optional, Generic, TypeVar
 from numpy.typing import NDArray
 import numpy as np
+from matplotlib import colors
+from matplotlib import cm
 
 # Descriptor for entities
 _VT = TypeVar('_VT')
