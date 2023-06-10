@@ -228,7 +228,7 @@ class Mesh(metaclass=ABCMeta):
 
     ### Other Interfaces ###
 
-    def error(self, u, v, q=None, power=2, celltype=False):
+    def error(self, u, v, q=3, power=2, celltype=False):
         """
         @brief Calculate the error between two functions.
         """
