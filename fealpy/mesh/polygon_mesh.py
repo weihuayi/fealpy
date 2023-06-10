@@ -459,10 +459,13 @@ class PolygonMesh(Mesh2d, Plotable):
         @param ny 沿 y 轴方向剖分段数
         @param ratio 矩形内部菱形的大小比例
         """
-        from .StructureQuadMesh import StructureQuadMesh
         from .QuadrangleMesh import QuadrangleMesh
+        from .UniformMesh2d import UniformMesh2d
 
-        mesh0 = StructureQuadMesh(box, nx, ny)
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
         node0 = mesh0.entity("node")
         cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
         mesh = QuadrangleMesh(node0, cell0)
@@ -485,7 +488,7 @@ class PolygonMesh(Mesh2d, Plotable):
         cell[NC:2 * NC, 3] = idx2
         cell[2 * NC:3 * NC, 1] = idx2
 
-        return QuadrangleMesh(new_node, cell)
+        return PolygonMesh(new_node, cell)
 
 
     @classmethod
@@ -497,8 +500,51 @@ class PolygonMesh(Mesh2d, Plotable):
         @param nx 沿 x 轴方向剖分段数
         @param ny 沿 y 轴方向剖分段数
         """
-        raise NotImplementedError
-        return boxmesh2d(box, nx, ny, meshtype='noconvex')
+        from .QuadrangleMesh import QuadrangleMesh
+        from .UniformMesh2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+        NN = (nx + 1) * (ny + 1)
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        cell2edge = mesh.ds.cell_to_edge()
+        isbdedge = mesh.ds.boundary_edge_flag()
+        isbdcell = mesh.ds.boundary_cell_flag()
+
+        nie = np.sum(~isbdedge)
+        hx = 1 / nx
+        hy = 1 / ny
+        newnode = np.zeros((NN + nie, 2), dtype=np.float_)
+        newnode[:NN] = node
+        newnode[NN:] = 0.5 * node[edge[~isbdedge, 0]] + 0.5 * node[edge[~isbdedge, 1]]
+        newnode[NN: NN + (nx - 1) * ny] = newnode[NN: NN + (nx - 1) * ny] + np.array([[0.2 * hx, 0.1 * hy]])
+        newnode[NN + (nx - 1) * ny:] = newnode[NN + (nx - 1) * ny:] + np.array([[0.1 * hx, 0.2 * hy]])
+
+        edge2newnode = -np.ones(NE, dtype=np.int_)
+        edge2newnode[~isbdedge] = np.arange(NN, newnode.shape[0])
+        newcell = np.zeros((NC, 8), dtype=np.int_)
+        newcell[:, ::2] = cell
+        newcell[:, 1::2] = edge2newnode[cell2edge]
+
+        flag = newcell > -1
+        num = np.zeros(NC + 1, dtype=np.int_)
+        num[1:] = np.sum(flag, axis=-1)
+        newcell = newcell[flag]
+        cellLocation = np.cumsum(num)
+
+        return PolygonMesh(newnode, newcell, cellLocation)
+
 
 
     def cell_area(self, index=None):
