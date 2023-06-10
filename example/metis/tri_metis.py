@@ -32,15 +32,9 @@ mesh = TriangleMesh.from_polygon_gmsh(vertices, h)
 # Partition the mesh cells into n parts 
 edgecuts, parts = metis.part_mesh(mesh, nparts=n, entity='node')
 
-node = mesh.node
-edge = mesh.ds.edge
-cell = mesh.ds.cell
-cell2edge = mesh.ds.cell_to_edge()
-edge2cell = mesh.ds.edge_to_cell()
-isBdNode = mesh.ds.boundary_node_flag()
-
-data = {'Point':node, 'Face':edge+1, 'Elem':cell+1,
-        'Edge2Elem':edge2cell+1, 'isBdPoint':isBdNode, 'Partitions':parts+1}
+node = mesh.entity('node')
+edge = mesh.entity('edge')
+cell = mesh.entity('cell')
 
 fig = plt.figure()
 axes = fig.gca()
