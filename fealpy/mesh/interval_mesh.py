@@ -185,6 +185,8 @@ class IntervalMesh(Mesh1d, Plotable):
         cell[:, 1] = np.arange(1, nx+1)
         return cls(node, cell)
 
+    from_interval = from_interval_domain
+
     @classmethod
     def from_circle_boundary(cls, center=(0, 0), radius=1.0, n=10):
         dt = 2*np.pi/n

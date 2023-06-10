@@ -170,7 +170,7 @@ class Mesh:
     def add_plot(self):
         raise NotImplementedError
 
-    def error(self, u, v, q=None, power=2, celltype=False):
+    def error(self, u, v, q=3, power=2, celltype=False):
         """
         @brief 给定两个函数，计算两个函数的之间的差，默认计算 L2 差（power=2) 
 
