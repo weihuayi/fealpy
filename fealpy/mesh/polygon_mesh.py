@@ -515,24 +515,6 @@ class PolygonMesh(Mesh2d, Plotable):
         a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
         a /=2
         return a
-    """
-    def node_normal(self):
-        node = self.node
-        cell, cellLocation = self.entity('cell')
-
-        idx1 = np.zeros(cell.shape[0], dtype=self.itype)
-        idx2 = np.zeros(cell.shape[0], dtype=self.itype)
-
-        idx1[0:-1] = cell[1:]
-        idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
-        idx2[1:] = cell[0:-1]
-        idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
-
-        w = np.array([(0,-1),(1,0)])
-        d = node[idx1] - node[idx2]
-        return 0.5*d@w
-    """
-
 
 PolygonMesh.set_ploter('polygon2d')
 
