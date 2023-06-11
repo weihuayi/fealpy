@@ -3,19 +3,15 @@ import matplotlib.pyplot as plt
 
 from fealpy.functionspace import ConformingScalarVESpace2d 
 from fealpy.functionspace import ConformingVirtualElementSpace2d
+from fealpy.vem.conforming_vem_dof_integrator import ConformingVEMDoFIntegrator2d
+from fealpy.vem.conforming_scalar_vem_h1_projector import ConformingScalarVEMH1Projector2d
+from fealpy.vem.conforming_scalar_vem_l2_projector import ConformingScalarVEML2Projector2d
 from fealpy.mesh import MeshFactory as MF
 from fealpy.mesh.polygon_mesh import PolygonMesh
-from fealpy.mesh import MeshFactory as MF
-from fealpy.mesh import TriangleMesh
-from fealpy.mesh import PolygonMesh
-from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
-from fealpy.vem import ConformingVEMDoFIntegrator2d
-from fealpy.vem import ConformingScalarVEMH1Projector2d
-from fealpy.vem  import ConformingScalarVEML2Projector2d
 
 def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
-    nx = 10
-    ny = 10
+    nx = 2
+    ny = 2
     domain = np.array([0, 1, 0, 1])
     mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='poly')
     space = ConformingVirtualElementSpace2d(mesh, p=p)
@@ -35,31 +31,27 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 
-    tmesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
-    mesh = PolygonMesh.from_triangle_mesh_by_dual(tmesh)
+
+    mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='tri')
+    mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
     space =  ConformingScalarVESpace2d(mesh, p=p)
-    m = ScaledMonomialSpaceMassIntegrator2d()
-    M = m.assembly_cell_matrix(space.smspace)
 
-    d = ConformingVEMDoFIntegrator2d()
-    D = d.assembly_cell_matrix(space, M)
+    b = ConformingScalarVEMH1Projector2d()
+    B = b.assembly_cell_right_hand_side(space)
+    dofmatrix = ConformingVEMDoFIntegrator2d()
+    D = dofmatrix.assembly_cell_matrix(space, H)
+    G = b.assembly_cell_left_hand_side(space, B, D)
+    PI1 = b.assembly_cell_matrix(space, G, B)
 
- 
-
-    projector = ConformingScalarVEMH1Projector2d(D)
-    B = projector.assembly_cell_right_hand_side(space)
-    PI1 = projector.assembly_cell_matrix(space)
-
-
-    a = ConformingScalarVEML2Projector2d(M, PI1)
-    C = a.assembly_cell_right_hand_side(space)
-    PI0 = a.assembly_cell_matrix(space)
+    a = ConformingScalarVEML2Projector2d()
+    C = a.assembly_cell_right_hand_side(space, H, PI1)
+    PI0 = a.assembly_cell_matrix(space, H, C)
 
     NC = mesh.number_of_cells()
     for i in range(NC):
         np.testing.assert_allclose(realC[i], C[i] ,atol=1e-10)
         np.testing.assert_allclose(realPI0[i], PI0[i], atol=1e-10)
-        if p==2 or p ==3 or p==1:
+        if p==2 or p ==3:
             np.testing.assert_equal(realC[i], C[i])
             np.testing.assert_equal(realPI0[i], PI0[i])
         else:

@@ -311,8 +311,8 @@ class PolygonMesh(Mesh2d, Plotable):
                     node[edge[isInEdge, 1]],
                     node[edge[isInEdge, 0]]
                     ]
-            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 0]] 
-            v2 = node[edge[isInEgge, 0]] - bc[edge2cell[isInEdge, 0]] 
+            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 1]] 
+            v2 = node[edge[isInEdge, 0]] - bc[edge2cell[isInEdge, 1]] 
             a = np.cross(v1, v2)/2.0
 
             pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
