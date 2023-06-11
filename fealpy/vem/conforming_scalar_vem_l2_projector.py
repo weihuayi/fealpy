@@ -4,12 +4,17 @@ from numpy.linalg import inv
 from fealpy.functionspace import ConformingScalarVESpace2d
 
 class ConformingScalarVEML2Projector2d():
+    def __init__(self, M, PI1):
+        self.M = M
+        self.PI1 = PI1
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M, C):
+
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
+        self.C = self.assembly_cell_right_hand_side(space)
         pi0 = lambda x: inv(x[0])@x[1]
-        return list(map(pi0, zip(M, C))) # TODO：并行加速
+        return list(map(pi0, zip(self.M, self.C))) # TODO：并行加速
 
-    def assembly_cell_right_hand_side(self, space: ConformingScalarVESpace2d, M, PI1):
+    def assembly_cell_right_hand_side(self, space: ConformingScalarVESpace2d):
         """
         @brief 组装 L2 投影算子的右端矩阵
 
@@ -23,7 +28,7 @@ class ConformingScalarVEML2Projector2d():
         smldof = space.smspace.number_of_local_dofs()
 
         d = lambda x: x[0]@x[1]
-        C = list(map(d, zip(M, PI1))) #TODO: 并行加速
+        C = list(map(d, zip(self.M, self.PI1))) #TODO: 并行加速
         if p == 1:
             return C
         else:

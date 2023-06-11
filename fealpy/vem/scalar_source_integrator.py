@@ -22,4 +22,15 @@ class ConformingVEMScalarSourceIntegrator2d():
         @param[in] space 一个标量的函数空间
 
         """
-        pass
+     def source_vector(self, f):
+        PI0 = self.PI0
+        phi = self.smspace.basis
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
+        bb = self.integralalg.integral(u, celltype=True)
+        g = lambda x: x[0].T@x[1]
+        bb = np.concatenate(list(map(g, zip(PI0, bb))))
+        gdof = self.number_of_global_dofs()
+        b = np.bincount(self.dof.cell2dof, weights=bb, minlength=gdof)
+        return b
+
