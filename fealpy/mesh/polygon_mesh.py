@@ -5,16 +5,9 @@ from scipy.sparse import csr_matrix, coo_matrix
 import inspect
 
 from ..common import ranges
-from ..quadrature import TriangleQuadrature
-from ..quadrature import GaussLegendreQuadrature
-from ..quadrature import GaussLobattoQuadrature
-from .TriangleMesh import TriangleMeshWithInfinityNode
 
 from .mesh_base import Mesh2d, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
-
-from . import StructureQuadMesh, QuadrangleMesh
-from .MeshFactory import boxmesh2d
 
 
 class PolygonMesh(Mesh2d, Plotable):
@@ -46,16 +39,20 @@ class PolygonMesh(Mesh2d, Plotable):
         self.facedata = self.edgedata
         self.meshdata = {}
 
+
     def integrator(self, q, etype='cell', qtype='legendre'):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
         if etype in {'cell', 2}:
+            from ..quadrature import TriangleQuadrature
             return TriangleQuadrature(q)
         elif etype in {'edge', 'face', 1}:
             if qtype in {'legendre'}:
+                from ..quadrature import GaussLegendreQuadrature
                 return GaussLegendreQuadrature(q)
             elif qtype in {'lobatto'}:
+                from ..quadrature import GaussLobattoQuadrature
                 return GaussLobattoQuadrature(q)
 
     def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:]):
@@ -104,7 +101,7 @@ class PolygonMesh(Mesh2d, Plotable):
             gdof += NE*(p-1) + NC*(p-1)*p//2
         return gdof
 
-    def number_of_local_ipoints(self, 
+    def number_of_local_ipoints(self,
             p: int, iptype: Union[int, str]='all') -> Union[NDArray, int]:
         """
         @brief 获取局部插值点的个数
@@ -116,13 +113,13 @@ class PolygonMesh(Mesh2d, Plotable):
         elif iptype in {'cell', 2}:
             return (p-1)*p//2
         elif iptype in {'edge', 'face', 1}:
-            return (p+1) 
+            return (p+1)
         elif iptype in {'node', 0}:
-            return 1 
+            return 1
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
-        @brief  
+        @brief
         """
         cell = self.entity('cell')
         if p == 1:
@@ -141,7 +138,7 @@ class PolygonMesh(Mesh2d, Plotable):
 
             idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
             cell2ipoint[idx] = edge2ipoint[:, 0:p]
- 
+
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
             idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
@@ -149,7 +146,7 @@ class PolygonMesh(Mesh2d, Plotable):
             NN = self.number_of_nodes()
             NV = self.ds.number_of_vertices_of_cells()
             NE = self.number_of_edges()
-            cdof = self.number_of_local_ipoints(p, iptype='cell') 
+            cdof = self.number_of_local_ipoints(p, iptype='cell')
             idx = (location[:-1] + NV*p).reshape(-1, 1) + np.arange(cdof)
             cell2ipoint[idx] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
             return np.hsplit(cell2ipoint, location[1:-1])[index]
@@ -177,7 +174,7 @@ class PolygonMesh(Mesh2d, Plotable):
         edge2ipoints[:, [0, -1]] = edge
         if p > 1:
             idx = NN + np.arange(p-1)
-            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx
         return edge2ipoints
 
     face_to_ipoint = edge_to_ipoint
@@ -190,7 +187,7 @@ class PolygonMesh(Mesh2d, Plotable):
         NN = self.number_of_nodes()
         return np.arange(NN)
 
-    def interpolation_points(self, p: int, 
+    def interpolation_points(self, p: int,
             index=np.s_[:], scale: float=0.3):
         """
         @brief 获取多边形网格上的插值点
@@ -201,7 +198,6 @@ class PolygonMesh(Mesh2d, Plotable):
             return node
 
         gdof = self.number_of_global_ipoints(p)
-        
 
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
@@ -241,7 +237,8 @@ class PolygonMesh(Mesh2d, Plotable):
         return ipoint
 
 
-    def multi_index_matrix(self, p: int, etype=2):
+    @staticmethod
+    def multi_index_matrix(p: int, etype=2):
         """
         @brief 获取三角形上的 p 次的多重指标矩阵
 
@@ -291,8 +288,8 @@ class PolygonMesh(Mesh2d, Plotable):
         bc = self.entity_barycenter('cell')
         tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
 
-        v1 = node[edge[:, 0]] - bc[edge2cell[:, 0]] 
-        v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]] 
+        v1 = node[edge[:, 0]] - bc[edge2cell[:, 0]]
+        v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
         a = np.cross(v1, v2)/2.0
 
         pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
@@ -311,8 +308,8 @@ class PolygonMesh(Mesh2d, Plotable):
                     node[edge[isInEdge, 1]],
                     node[edge[isInEdge, 0]]
                     ]
-            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 0]] 
-            v2 = node[edge[isInEgge, 0]] - bc[edge2cell[isInEdge, 0]] 
+            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 0]]
+            v2 = node[edge[isInEdge, 0]] - bc[edge2cell[isInEdge, 0]]
             a = np.cross(v1, v2)/2.0
 
             pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
@@ -327,7 +324,7 @@ class PolygonMesh(Mesh2d, Plotable):
 
     def error(self, u, v, q=3, celltype=False, power=2):
         """
-        @brief 在当前多边形网格上计算误差 \int |u - v|^power dx 
+        @brief 在当前多边形网格上计算误差 \int |u - v|^power dx
 
         @param[in] u 函数
         @param[in] v 函数
@@ -389,15 +386,17 @@ class PolygonMesh(Mesh2d, Plotable):
             [0.0, 1.0]],dtype=np.float_)
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         return cls(node, cell)
-    
+
     @classmethod
     def from_triangle_mesh_by_dual(cls, mesh, bc=True):
         """
         @brief 生成三角形网格的对偶网格，目前默认用三角形的重心做为对偶网格的顶点
 
-        @param mesh 
+        @param mesh
         @param bc bool 如果为真，则对偶网格点为三角形单元重心; 否则为三角形单元外心
         """
+        from .TriangleMesh import TriangleMeshWithInfinityNode
+
         mesh = TriangleMeshWithInfinityNode(mesh, bc=bc)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return cls(pnode, pcell, pcellLocation)
@@ -410,7 +409,7 @@ class PolygonMesh(Mesh2d, Plotable):
             (np.cos(2/5*pi), -np.sin(2/5*pi)),
             (np.cos(2/5*pi)+1, -np.sin(2/5*pi)),
             ( 2*np.cos(1/5*pi), 0.0),
-            (np.cos(1/5*pi), np.sin(1/5*pi))],dtype=np.float_) 
+            (np.cos(1/5*pi), np.sin(1/5*pi))],dtype=np.float_)
         cell = np.array([0, 1, 2, 3, 4], dtype=np.int_)
         cellLocation = np.array([0, 5], dtype=np.int_)
         return cls(node, cell, cellLocation)
@@ -460,7 +459,13 @@ class PolygonMesh(Mesh2d, Plotable):
         @param ny 沿 y 轴方向剖分段数
         @param ratio 矩形内部菱形的大小比例
         """
-        mesh0 = StructureQuadMesh(box, nx, ny)
+        from .QuadrangleMesh import QuadrangleMesh
+        from .UniformMesh2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
         node0 = mesh0.entity("node")
         cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
         mesh = QuadrangleMesh(node0, cell0)
@@ -483,7 +488,7 @@ class PolygonMesh(Mesh2d, Plotable):
         cell[NC:2 * NC, 3] = idx2
         cell[2 * NC:3 * NC, 1] = idx2
 
-        return QuadrangleMesh(new_node, cell)
+        return PolygonMesh(new_node, cell)
 
 
     @classmethod
@@ -495,8 +500,53 @@ class PolygonMesh(Mesh2d, Plotable):
         @param nx 沿 x 轴方向剖分段数
         @param ny 沿 y 轴方向剖分段数
         """
-        return boxmesh2d(box, nx, ny, meshtype='noconvex')
-    
+        from .QuadrangleMesh import QuadrangleMesh
+        from .UniformMesh2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+        NN = (nx + 1) * (ny + 1)
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        cell2edge = mesh.ds.cell_to_edge()
+        isbdedge = mesh.ds.boundary_edge_flag()
+        isbdcell = mesh.ds.boundary_cell_flag()
+
+        nie = np.sum(~isbdedge)
+        hx = 1 / nx
+        hy = 1 / ny
+        newnode = np.zeros((NN + nie, 2), dtype=np.float_)
+        newnode[:NN] = node
+        newnode[NN:] = 0.5 * node[edge[~isbdedge, 0]] + 0.5 * node[edge[~isbdedge, 1]]
+        newnode[NN: NN + (nx - 1) * ny] = newnode[NN: NN + (nx - 1) * ny] + np.array([[0.2 * hx, 0.1 * hy]])
+        newnode[NN + (nx - 1) * ny:] = newnode[NN + (nx - 1) * ny:] + np.array([[0.1 * hx, 0.2 * hy]])
+
+        edge2newnode = -np.ones(NE, dtype=np.int_)
+        edge2newnode[~isbdedge] = np.arange(NN, newnode.shape[0])
+        newcell = np.zeros((NC, 8), dtype=np.int_)
+        newcell[:, ::2] = cell
+        newcell[:, 1::2] = edge2newnode[cell2edge]
+
+        flag = newcell > -1
+        num = np.zeros(NC + 1, dtype=np.int_)
+        num[1:] = np.sum(flag, axis=-1)
+        newcell = newcell[flag]
+        cellLocation = np.cumsum(num)
+
+        return PolygonMesh(newnode, newcell, cellLocation)
+
+
+
     def cell_area(self, index=None):
         #TODO: 3D Case
         NC = self.number_of_cells()
@@ -511,25 +561,6 @@ class PolygonMesh(Mesh2d, Plotable):
         a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
         a /=2
         return a
-    """
-    def node_normal(self):
-        node = self.node
-        cell, cellLocation = self.entity('cell')
-
-        idx1 = np.zeros(cell.shape[0], dtype=self.itype)
-        idx2 = np.zeros(cell.shape[0], dtype=self.itype)
-
-        idx1[0:-1] = cell[1:]
-        idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
-        idx2[1:] = cell[0:-1]
-        idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
-
-        w = np.array([(0,-1),(1,0)])
-        d = node[idx1] - node[idx2]
-        return 0.5*d@w
-    """
-   
-
 
 PolygonMesh.set_ploter('polygon2d')
 

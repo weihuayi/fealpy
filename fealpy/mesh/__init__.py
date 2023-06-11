@@ -16,15 +16,12 @@ from .StructureHexMesh import StructureHexMesh
 
 from .EdgeMesh import EdgeMesh
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
-from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
-from .IntervalMesh import IntervalMesh
 from .HexahedronMesh import HexahedronMesh
-from .polygon_mesh import PolygonMesh
 
-#from .SurfaceTriangleMesh import SurfaceTriangleMesh
-#from .PrismMesh import PrismMesh
+from .interval_mesh import IntervalMesh
+from .polygon_mesh import PolygonMesh
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
