@@ -6,17 +6,21 @@ from typing import TypedDict, Callable, Tuple, Union
 
 class ScalarSourceIntegrator():
 
-    def __init__(self, f: Union[Callable, int, float, NDArray]):
+    def __init__(self, f: Union[Callable, int, float, NDArray], q=None):
         """
         @brief
 
         @param[in] f 
         """
         self.f = f
+        self.q = q
         self.vector = None
 
-    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None,
-            out=None, q=None):
+    def assembly_cell_vector(self, 
+            space, 
+            index=np.s_[:], 
+            cellmeasure=None,
+            out=None):
         """
         @brief 组装单元向量
 
@@ -25,6 +29,7 @@ class ScalarSourceIntegrator():
         """
         f = self.f
         p = space.p
+        q = self.q
 
         q = p+3 if q is None else q
 

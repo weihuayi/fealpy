@@ -47,7 +47,7 @@ class BilinearForm:
         """
         @brief 当空间发生改变时，调用这个函数重新组装矩阵
         """
-        self.assembly()
+        return self.assembly()
 
     def assembly(self):
         """
@@ -81,7 +81,6 @@ class BilinearForm:
         6. 生成 I 和 J 的矩阵来构建稀疏矩阵
         7. 使用 CM、I 和 J 生成稀疏矩阵并保存到 _M 属性中
 
-        注意：这个函数不返回任何值，结果保存在 _M 属性中
         """
         space = self.space
         ldof = space.number_of_local_dofs()
@@ -97,6 +96,7 @@ class BilinearForm:
         I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
         J = np.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
         self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return self._M
 
     def assembly_for_vspace_with_scalar_basis(self) -> None:
         """
@@ -163,6 +163,8 @@ class BilinearForm:
                         self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
 
                         self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
+
+        return self._M
 
     def fast_assembly(self):
         """

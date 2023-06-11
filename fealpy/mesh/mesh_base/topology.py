@@ -30,7 +30,7 @@ class Mesh1d(Mesh):
     """
     ds: Mesh1dDataStructure
 
-    def integrator(self, k):
+    def integrator(self, k, etype='cell'):
         """
         @brief 返回第 k 个高斯积分公式。
         """
@@ -192,7 +192,7 @@ class Mesh1d(Mesh):
         NC = self.number_of_cells()
         return NN + (p-1)*NC
 
-    def interpolation_points(self, p: int) -> NDArray:
+    def interpolation_points(self, p: int, index=np.s_[:]) -> NDArray:
         GD = self.geo_dimension()
         node = self.entity('node')
 
