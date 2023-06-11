@@ -3,7 +3,7 @@ import ipdb
 import pytest
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import PolygonMesh 
+from fealpy.mesh.polygon_mesh import PolygonMesh 
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import ConformingScalarVESpace2d 
 
@@ -88,15 +88,13 @@ def test_integral():
     p = 2
     space =  ConformingScalarVESpace2d(mesh, p=p)
     phi = space.smspace.basis
-    def f(p):
+    def f(p, index):
         x = p[...,0]
         y = p[...,1]
         val = x**2+y**2
         return val
-    def u(x, index):
-        return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
-    a = mesh.integral(u, q=5, celltype=False)
-    np.testing.assert_allclose(a[0],2/3,atol=1e-16)
+    a = mesh.integral(f, q=5, celltype=False)
+    np.testing.assert_allclose(a,2/3,atol=1e-16)
     return a 
 
 if __name__ == "__main__":
