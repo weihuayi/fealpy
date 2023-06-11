@@ -35,8 +35,5 @@ sig = m.s1.thermodynamic_forces
 
 Dt = m.K
 # 输出结果
-print("Predicted Stress:")
-print(sig)
-print("Tangent Stiffness:")
-print(Dt)
-
+print("Predicted Stress:", sig)
+print("Tangent Stiffness:", Dt)
