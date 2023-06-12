@@ -17,9 +17,8 @@ from fealpy.mesh import TriangleMesh
 from fealpy.mesh.polygon_mesh  import PolygonMesh
 
 def test_assembly_cell_matrix(p, plot=False):
-    nx = 2
-    ny = 2
-    dim = 2
+    nx = 4
+    ny = 4
     domain = np.array([0, 1, 0, 1])
 
 
@@ -67,5 +66,5 @@ def test_assembly_cell_matrix(p, plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_matrix(3)
+    test_assembly_cell_matrix(2)
 

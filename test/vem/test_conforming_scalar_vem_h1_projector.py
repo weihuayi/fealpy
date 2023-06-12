@@ -6,15 +6,14 @@ from fealpy.functionspace import ConformingVirtualElementSpace2d
 import ipdb
 from fealpy.mesh import MeshFactory as MF
 from fealpy.mesh import TriangleMesh
-from fealpy.mesh import PolygonMesh
+from fealpy.mesh.polygon_mesh import PolygonMesh
 from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
 from fealpy.vem import ConformingVEMDoFIntegrator2d
 from fealpy.vem import ConformingScalarVEMH1Projector2d
 from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
 def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
-    nx = 2
-    ny = 2
-    dim = 2
+    nx = 1
+    ny = 1
     domain = np.array([0, 1, 0, 1])
     mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='poly')
     space = ConformingVirtualElementSpace2d(mesh, p=p)
@@ -44,6 +43,7 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
  
 
     projector = ConformingScalarVEMH1Projector2d(D)
+    #ipdb.set_trace()
     B = projector.assembly_cell_right_hand_side(space)
     PI1 = projector.assembly_cell_matrix(space)
 
@@ -54,7 +54,7 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
     location = np.zeros(NC+1, dtype=np.int_)
     location[1:] = a
     for i in range(NC):
-        if p==2 or p==3:
+        if p==2 or p==3 or p==4 or p==5 or p==1:
             np.testing.assert_equal(realB[:,location[i]:location[i+1]], B[i])
             np.testing.assert_equal(realD[location[i]:location[i+1],:], D[i])
             #np.testing.assert_equal(realG[i], G[i]) 
@@ -77,5 +77,5 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_righthand_side_and_dof_matrix(3)
+    test_assembly_cell_righthand_side_and_dof_matrix(2)
 

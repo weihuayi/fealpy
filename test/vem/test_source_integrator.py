@@ -58,4 +58,4 @@ def test_integral(p):
     F = a.get_vector()
     np.testing.assert_equal(realF, F)
 if __name__ == "__main__":
-    test_integral(3)
+    test_integral(2)
