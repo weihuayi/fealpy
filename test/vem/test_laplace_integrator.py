@@ -14,7 +14,7 @@ from fealpy.vem import BilinearForm
 from fealpy.mesh import MeshFactory as MF # 老的网格生成接口，将来会去掉！
 
 from fealpy.mesh import TriangleMesh
-from fealpy.mesh import PolygonMesh
+from fealpy.mesh.polygon_mesh  import PolygonMesh
 
 def test_assembly_cell_matrix(p, plot=False):
     nx = 2

@@ -88,4 +88,28 @@ class ConformingScalarVESpace2d():
     def function(self, dim=None, array=None, dtype=np.float64):
         return Function(self, dim=dim, array=array, coordtype='cartesian', dtype=dtype)
 
+    def set_dirichlet_bc(self, gD, uh, threshold=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        p = self.p
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        end = NN + (p - 1)*NE
+        ipoints = self.interpolation_points()
+        isDDof = self.dof.is_boundary_dof(threshold=threshold)
+        uh[isDDof] = gD(ipoints[:end][isDDof[:end]])
+        return isDDof
+    def project_to_smspace(self, uh, PI1):
+        """
+        Project a conforming vem function uh into polynomial space.
+        """
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape)
+        p = self.p
+        g = lambda x: x[0]@uh[x[1]]
+        S = self.smspace.function(dim=dim)
+        S[:] = np.concatenate(list(map(g, zip(PI1, cell2dof))))
+        return S
+
 
