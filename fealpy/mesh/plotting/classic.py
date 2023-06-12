@@ -28,9 +28,9 @@ def get_ploter(key: str) -> Type['MeshPloter']:
     if key in _ploter_map_:
         return _ploter_map_[key]
     else:
-        raise KeyError(f"Can not find a ploter class that key '{key}' mapping to."
-                       "To use Plotable, register the target ploter first and then"
-                       "specify the ploter for mesh by setting a same key."
+        raise KeyError(f"Can not find a ploter class that key '{key}' mapping to. "
+                       "To use Plotable, register the target ploter first and then "
+                       "specify the ploter for mesh by setting a same key. "
                        "See MeshPloter.register() and Plotable.set_ploter().")
 
 
@@ -40,7 +40,7 @@ class MeshPloter(Generic[_MT]):
 
     def __init__(self, mesh: _MT) -> None:
         if not isinstance(mesh, Mesh):
-            raise TypeError("MeshPloter only works for mesh type,"
+            raise TypeError("MeshPloter only works for mesh type, "
                             f"but got {self.__class__.__name__}.")
         self._mesh = mesh
 
