@@ -13,8 +13,8 @@ from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
 from fealpy.vem import ConformingScalarVEML2Projector2d 
 
 def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
-    nx = 2
-    ny = 2
+    nx = 4
+    ny = 4
     domain = np.array([0, 1, 0, 1])
     mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='poly')
     space = ConformingVirtualElementSpace2d(mesh, p=p)
@@ -74,5 +74,5 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_righthand_side_and_dof_matrix(1)
+    test_assembly_cell_righthand_side_and_dof_matrix(2)
 

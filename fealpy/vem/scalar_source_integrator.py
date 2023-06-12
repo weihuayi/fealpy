@@ -26,9 +26,10 @@ class ConformingVEMScalarSourceIntegrator2d():
         """
         f = self.f
         phi = space.smspace.basis
+        p = space.p
         def u(x, index):
             return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
-        bb = space.mesh.integral(u, celltype=True)
+        bb = space.mesh.integral(u, q=p+3, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
         return bb
