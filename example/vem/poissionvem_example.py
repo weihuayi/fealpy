@@ -88,7 +88,6 @@ for i in range(maxit):
 
     #组装右端 F
     a = ConformingScalarVEML2Projector2d(M, PI1)
-    C = a.assembly_cell_right_hand_side(space)
     PI0 = a.assembly_cell_matrix(space)
 
 
