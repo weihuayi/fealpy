@@ -264,6 +264,30 @@ class Mesh2d(Mesh):
     """
     ds: Mesh2dDataStructure
 
+    def multi_index_matrix(self, p, etype=2):
+        """
+        @brief 获取的 p 次的多重指标矩阵
+
+        @param[in] p positive integer
+
+        @return multiIndex  ndarray with shape (ldof, 3)
+        """
+        if etype in {'cell', 2}:
+            ldof = (p+1)*(p+2)//2
+            idx = np.arange(0, ldof)
+            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+            multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+            multiIndex[:,1] = idx0 - multiIndex[:,2]
+            multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+            return multiIndex
+        elif etype in {'face', 'edge', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
+
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
             return self.cell_area(index=index)
@@ -390,6 +414,43 @@ class Mesh3d(Mesh):
     ```
     """
     ds: Mesh3dDataStructure
+
+    def multi_index_matrix(self, p, etype='cell'):
+        """
+        @brief 获取 p 次的多重指标矩阵
+
+        @param[in] p 正整数 
+
+        @return multiIndex  ndarray with shape (ldof, 4)
+        """
+        if etype in {'cell', 3}:
+            ldof = (p+1)*(p+2)*(p+3)//6
+            idx = np.arange(1, ldof)
+            idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
+            idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
+            idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
+            idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
+            multiIndex = np.zeros((ldof, 4), dtype=np.int_)
+            multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+            multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+            multiIndex[1:, 1] = idx0 - idx2
+            multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
+            return multiIndex
+        elif etype in {'face', 2}:
+            ldof = (p+1)*(p+2)//2
+            idx = np.arange(0, ldof)
+            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+            multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+            multiIndex[:,1] = idx0 - multiIndex[:,2]
+            multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+            return multiIndex
+        elif etype in {'edge', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
 
     def entity_measure(self, etype=3, index=np.s_[:]):
         if etype in {'cell', 3}:
