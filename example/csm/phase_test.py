@@ -23,7 +23,7 @@ mgis_bv.setExternalStateVariable(m.s1, "Temperature", 293.15) #设置外部状�
 mgis_bv.setExternalStateVariable(m.s1, "Damage", 0.1) #设置外部状态变量
 # 初始化局部变量
 mgis_bv.update(m) # 更新材料数据
-m.s1.internal_state_variables[0] = 1e15
+m.s0.internal_state_variables[0] = 1e15
 m.s1.gradients[0:] = eto
 #it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
 it = mgis_bv.IntegrationType.IntegrationWithConsistentTangentOperator
