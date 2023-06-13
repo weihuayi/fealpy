@@ -2,6 +2,8 @@ from .scaled_monomial_space_mass_integrator import ScaledMonomialSpaceMassIntegr
 from .scaled_monomial_space_mass_integrator import ScaledMonomialSpaceMassIntegrator3d
 from .conforming_vem_dof_integrator import ConformingVEMDoFIntegrator2d
 from .conforming_scalar_vem_h1_projector import ConformingScalarVEMH1Projector2d
+from .conforming_scalar_vem_l2_projector import ConformingScalarVEML2Projector2d
 from .laplace_integrator import ConformingScalarVEMLaplaceIntegrator2d
+from .scalar_source_integrator import ConformingVEMScalarSourceIntegrator2d 
 from .bilinear_form import BilinearForm
-#from .linear_form import LinearForm
+from .linear_form import LinearForm

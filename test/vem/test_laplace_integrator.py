@@ -14,18 +14,16 @@ from fealpy.vem import BilinearForm
 from fealpy.mesh import MeshFactory as MF # 老的网格生成接口，将来会去掉！
 
 from fealpy.mesh import TriangleMesh
-from fealpy.mesh import PolygonMesh
+from fealpy.mesh.polygon_mesh  import PolygonMesh
 
-def test_assembly_cell_matrix(p,plot=False):
-    nx = 2
-    ny = 2
-    dim = 2
+def test_assembly_cell_matrix(p, plot=False):
+    nx = 4
+    ny = 4
     domain = np.array([0, 1, 0, 1])
 
 
     # 老的网格接口
-    mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='tri')
-    mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
+    mesh = MF.boxmesh2d(domain, nx, ny, meshtype ='poly')
     space = ConformingVirtualElementSpace2d(mesh, p=p)
     realstiff = space.stiff_matrix()
 
@@ -42,20 +40,19 @@ def test_assembly_cell_matrix(p,plot=False):
     tmesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
     mesh = PolygonMesh.from_triangle_mesh_by_dual(tmesh)
     space =  ConformingScalarVESpace2d(mesh, p=p)
-
     m = ScaledMonomialSpaceMassIntegrator2d()
-    M = m.assembly_cell_matrix(space)
+    M = m.assembly_cell_matrix(space.smspace)
 
     d = ConformingVEMDoFIntegrator2d()
     D = d.assembly_cell_matrix(space, M)
 
     projector = ConformingScalarVEMH1Projector2d(D)
-    PI1 = b.assembly_cell_matrix(space)
+    PI1 = projector.assembly_cell_matrix(space)
 
 
     a = BilinearForm(space)
 
-    I = ConformingScalarVEMLaplaceIntegrator(projector)
+    I = ConformingScalarVEMLaplaceIntegrator2d(projector)
     a.add_domain_integrator(I)
     a.assembly()
     stiff = a.get_matrix()
@@ -69,5 +66,5 @@ def test_assembly_cell_matrix(p,plot=False):
         mesh.find_edge(axes, showindex=True)
         plt.show()
 if __name__ == "__main__":
-    test_assembly_cell_matrix(5)
+    test_assembly_cell_matrix(2)
 
