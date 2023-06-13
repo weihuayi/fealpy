@@ -16,8 +16,6 @@ class DirichletBC():
         self.threshold = threshold
         self.bctype = 'Dirichlet'
 
-    def apply(self, A, f, uh=None):
-    def apply(self, A, f, uh):
     def apply(self, A: csr_matrix, f: np.ndarray, uh: np.ndarray=None) -> Tuple[csr_matrix, np.ndarray]:
         """
         @brief 处理 Dirichlet 边界条件  
