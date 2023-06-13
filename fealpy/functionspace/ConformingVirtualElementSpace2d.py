@@ -35,7 +35,7 @@ class CVEMDof2d():
         NE = mesh.number_of_edges()
 
         edge = mesh.entity('edge')
-        edge2dof = np.zeros((NE, p+1), dtype=np.int)
+        edge2dof = np.zeros((NE, p+1), dtype=np.int_)
         edge2dof[:, [0, p]] = edge
         if p > 1:
             edge2dof[:, 1:-1] = np.arange(NN, NN + NE*(p-1)).reshape(NE, p-1)
@@ -52,9 +52,9 @@ class CVEMDof2d():
             NC = mesh.number_of_cells()
 
             ldof = self.number_of_local_dofs()
-            cell2dofLocation = np.zeros(NC+1, dtype=np.int)
+            cell2dofLocation = np.zeros(NC+1, dtype=np.int_)
             cell2dofLocation[1:] = np.add.accumulate(ldof)
-            cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
+            cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int_)
 
             edge2dof = self.edge_to_dof()
             edge2cell = mesh.ds.edge_to_cell()
@@ -106,7 +106,7 @@ class CVEMDof2d():
             GD = mesh.geo_dimension()
             NE = mesh.number_of_edges()
 
-            ipoint = np.zeros((NN+(p-1)*NE, GD), dtype=np.float)
+            ipoint = np.zeros((NN+(p-1)*NE, GD), dtype=np.float64)
             ipoint[:NN, :] = node
             edge = mesh.entity('edge')
 
@@ -304,7 +304,7 @@ class ConformingVirtualElementSpace2d():
         NN = mesh.number_of_nodes()
         NV = mesh.number_of_vertices_of_cells()
 
-        nodeEta = np.zeros(NN, dtype=np.float_)
+        nodeEta = np.zeros(NN, dtype=np.float64)
 
         cell, cellLocation = mesh.entity('cell')
         NNC = cellLocation[1:] - cellLocation[:-1] #number_of_node_per_cell
@@ -416,7 +416,7 @@ class ConformingVirtualElementSpace2d():
         J = np.concatenate(list(map(f3, cd)))
         val = np.concatenate(list(map(f4, K)))
         gdof = self.number_of_global_dofs()
-        A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float64)
         return A
 
     def mass_matrix(self, cfun=None):
@@ -447,7 +447,7 @@ class ConformingVirtualElementSpace2d():
         J = np.concatenate(list(map(f3, cd)))
         val = np.concatenate(list(map(f4, K)))
         gdof = self.number_of_global_dofs()
-        M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float64)
         return M
 
     def cross_mass_matrix(self, wh):
@@ -479,7 +479,7 @@ class ConformingVirtualElementSpace2d():
         J = np.concatenate(list(map(f3, cd)))
         val = np.concatenate(list(map(f4, K)))
         gdof = self.number_of_global_dofs()
-        M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float64)
         return M
 
     def source_vector(self, f):
@@ -531,8 +531,8 @@ class ConformingVirtualElementSpace2d():
         val0 = np.concatenate(list(map(f4, K)))
         val1 = np.concatenate(list(map(f5, K)))
         gdof = self.number_of_global_dofs()
-        A = csr_matrix((val0, (I, J)), shape=(gdof, gdof), dtype=np.float)
-        S = csr_matrix((val1, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        A = csr_matrix((val0, (I, J)), shape=(gdof, gdof), dtype=np.float64)
+        S = csr_matrix((val1, (I, J)), shape=(gdof, gdof), dtype=np.float64)
         return A, S
 
     def cell_to_dof(self):
@@ -642,7 +642,7 @@ class ConformingVirtualElementSpace2d():
     def projection(self, u, up):
         pass
 
-    def array(self, dim=None, dtype=np.float_):
+    def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof
@@ -650,7 +650,7 @@ class ConformingVirtualElementSpace2d():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=dtype)
 
     def matrix_D(self, H):
         p = self.p
@@ -665,7 +665,7 @@ class ConformingVirtualElementSpace2d():
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         cell2dof, cell2dofLocation = self.cell_to_dof()
-        D = np.ones((len(cell2dof), smldof), dtype=np.float)
+        D = np.ones((len(cell2dof), smldof), dtype=np.float64)
 
         if p == 1:
             bc = np.repeat(self.smspace.cellbarycenter, NV, axis=0)
@@ -695,7 +695,7 @@ class ConformingVirtualElementSpace2d():
         NV = mesh.number_of_vertices_of_cells()
         h = self.smspace.cellsize
         cell2dof, cell2dofLocation = self.cell_to_dof()
-        B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float)
+        B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float64)
         if p == 1:
             B[0, :] = 1/np.repeat(NV, NV)
             B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1, -1)

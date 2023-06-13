@@ -6,11 +6,12 @@ from fealpy.functionspace import ConformingVirtualElementSpace2d
 import ipdb
 from fealpy.mesh import MeshFactory as MF
 from fealpy.mesh import TriangleMesh
-from fealpy.mesh.polygon_mesh import PolygonMesh
+from fealpy.mesh import PolygonMesh
 from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
 from fealpy.vem import ConformingVEMDoFIntegrator2d
 from fealpy.vem import ConformingScalarVEMH1Projector2d
 from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
+
 def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
     nx = 1
     ny = 1
