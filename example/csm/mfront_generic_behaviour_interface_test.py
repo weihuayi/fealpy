@@ -14,7 +14,3 @@ e2 = np.asarray([1.2e-2, 1.3e-2, 1.4e-2, 0., 0., 0.],
 
 h = mgis_bv.Hypothesis.Tridimensional # 表示是三维
 b = mgis_bv.load(lib, 'PostProcessingTest', h) # 加载行为
-# path to the test library
-print('Behaviour:', b.behaviour)
-print('Hypothesis:', h)
-print('Source:', b.source)

@@ -1,16 +1,10 @@
 import numpy as np
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix
 from types import ModuleType
 
-from ..quadrature import GaussLegendreQuadrature
 from .mesh_base import Mesh1d, Plotable
 from .mesh_data_structure import Mesh1dDataStructure
 
-class IntervalMeshDataStructure(Mesh1dDataStructure):
-
-    def total_face(self):
-        return self.cell.reshape(-1, 1)
 
 
 class IntervalMesh(Mesh1d, Plotable):
@@ -191,6 +185,8 @@ class IntervalMesh(Mesh1d, Plotable):
         cell[:, 1] = np.arange(1, nx+1)
         return cls(node, cell)
 
+    from_interval = from_interval_domain
+
     @classmethod
     def from_circle_boundary(cls, center=(0, 0), radius=1.0, n=10):
         dt = 2*np.pi/n
@@ -212,3 +208,7 @@ class IntervalMesh(Mesh1d, Plotable):
         return cls(node, cell)
 
 IntervalMesh.set_ploter('1d')
+
+class IntervalMeshDataStructure(Mesh1dDataStructure):
+    def total_face(self):
+        return self.cell.reshape(-1, 1)

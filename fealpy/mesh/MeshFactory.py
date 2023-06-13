@@ -5,7 +5,6 @@ from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .HexahedronMesh import HexahedronMesh
-from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
 from .StructureQuadMesh import StructureQuadMesh
 
@@ -94,6 +93,7 @@ def meshpy2d(points, facets, h, hole_points=None, facet_markers=None, point_mark
     if meshtype in {'t', 'tri', 'triangle'}:
         return TriangleMesh(node, cell)
     elif meshtype in {'p', 'polygon', 'poly'}:
+        from .PolygonMesh import PolygonMesh
         mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
@@ -236,6 +236,7 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         else:
             return LagrangeQuadrangleMesh(node, cell[:, [0, 3, 1, 2]], p=p)
     elif meshtype in {'polygon', 'poly'}:
+        from .PolygonMesh import PolygonMesh
         cell = np.zeros((2*NC, 3), dtype=np.int_)
         cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
         cell[:NC, 1] = idx[1:,1:].flatten(order='F')
@@ -251,6 +252,7 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
     elif meshtype == 'noconvex':
+        from .PolygonMesh import PolygonMesh
         mesh0 = StructureQuadMesh(box, nx, ny)
         node0 = mesh0.entity("node")
         cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
@@ -360,6 +362,7 @@ def triangle(box, h, meshtype='tri'):
     if meshtype in {'tri', 'triangle'}:
         return TriangleMesh(node, cell)
     elif meshtype in {'polygon', 'poly'}:
+        from .PolygonMesh import PolygonMesh
         mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
@@ -499,6 +502,7 @@ def unitcirclemesh(h=0.1, meshtype='tri', p=None):
             mesh = LagrangeTriangleMesh(node, cell, p=p)
             return mesh
     elif meshtype in {'polygon', 'poly'}:
+        from .PolygonMesh import PolygonMesh
         mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
@@ -511,6 +515,7 @@ def distmesh2d(fd, fh, h0, bbox, pfix):
 
 def polygon_mesh(meshtype='triquad'):
     if meshtype in {'triquad'}:
+        from .PolygonMesh import PolygonMesh
         node = np.array([
             (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
             (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
@@ -523,6 +528,7 @@ def polygon_mesh(meshtype='triquad'):
         return mesh
 
 def interfacemesh2d(interface, n=20):
+    from .PolygonMesh import PolygonMesh
     alg = InterfaceMesh2d(interface, interface.box, n)
     ppoint, pcell, pcellLocation = alg.run()
     pmesh = PolygonMesh(ppoint, pcell, pcellLocation)

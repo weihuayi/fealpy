@@ -116,7 +116,7 @@ class CDRPDEData:
         self.L = 1000 # 河流的长度
         self.Q0 = 10 # 污染物产生速度
         self.A = 1 # 河流横截面积
-        self.C0 = 100 # 河流起点污染物浓度
+        self.C0 = 0 # 河流起点污染物浓度
 
     def domain(self) -> List[int]:
         return [0, self.L]
@@ -124,7 +124,7 @@ class CDRPDEData:
     @cartesian
     def source(self, p: np.ndarray) -> np.ndarray:
         Q = np.zeros_like(p)
-        Q[0] = self.Q0/self.A
+        Q[1] = self.Q0/self.A
         return Q
 
     @cartesian    

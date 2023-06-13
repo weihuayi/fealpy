@@ -3,9 +3,6 @@ from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from .Function import Function
-from ..quadrature import GaussLobattoQuadrature
-from ..quadrature import GaussLegendreQuadrature
-from ..quadrature import PolygonMeshIntegralAlg
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 class CSVEDof2d():
@@ -13,6 +10,11 @@ class CSVEDof2d():
         self.p = p
         self.mesh = mesh
         self.cell2dof = self.cell_to_dof() # 初始化的时候就构建出 cell2dof 数组
+        
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='all')
+        self.cell2dofLocation = np.zeros(NC+1, dtype=mesh.itype)
+        self.cell2dofLocation[1:] = np.add.accumulate(ldof)
 
     def is_boundary_dof(self, threshold=None):
         idx = self.mesh.ds.boundary_edge_index()
@@ -59,7 +61,7 @@ class ConformingScalarVESpace2d():
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
-        self.stype = 'cvem' # 空间类型
+        self.stype = 'csvem' # 空间类型
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -82,3 +84,32 @@ class ConformingScalarVESpace2d():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=dtype)
+
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, coordtype='cartesian', dtype=dtype)
+
+    def set_dirichlet_bc(self, gD, uh, threshold=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        p = self.p
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        end = NN + (p - 1)*NE
+        ipoints = self.interpolation_points()
+        isDDof = self.dof.is_boundary_dof(threshold=threshold)
+        uh[isDDof] = gD(ipoints[:end][isDDof[:end]])
+        return isDDof
+    def project_to_smspace(self, uh, PI1):
+        """
+        Project a conforming vem function uh into polynomial space.
+        """
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape)
+        p = self.p
+        g = lambda x: x[0]@uh[x[1]]
+        S = self.smspace.function(dim=dim)
+        S[:] = np.concatenate(list(map(g, zip(PI1, cell2dof))))
+        return S
+
+

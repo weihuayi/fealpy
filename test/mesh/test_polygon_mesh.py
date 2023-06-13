@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.mesh.polygon_mesh import PolygonMesh 
 from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import ConformingScalarVESpace2d 
 
 def test_polygon_mesh_constructor():
     node = np.array([
@@ -78,10 +79,28 @@ def test_from_triangle_mesh_by_dual():
     mesh.find_cell(axes, showindex=True)
     mesh.find_edge(axes, showindex=True)
     plt.show()
+def test_integral():
+    nx = 20
+    ny = 20
+    domain = [0, 1, 0, 1]
+    tmesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
+    mesh = PolygonMesh.from_triangle_mesh_by_dual(tmesh)
+    p = 2
+    space =  ConformingScalarVESpace2d(mesh, p=p)
+    phi = space.smspace.basis
+    def f(p, index):
+        x = p[...,0]
+        y = p[...,1]
+        val = x**2+y**2
+        return val
+    a = mesh.integral(f, q=5, celltype=False)
+    np.testing.assert_allclose(a,2/3,atol=1e-16)
+    return a 
 
 if __name__ == "__main__":
     #test_polygon_mesh_constructor()
     #test_polygon_mesh_interpolation_points(4)
     #test_from_one_triangle('iso')
     #test_from_one()
-    test_from_triangle_mesh_by_dual()
+    #test_from_triangle_mesh_by_dual()
+    test_integral()

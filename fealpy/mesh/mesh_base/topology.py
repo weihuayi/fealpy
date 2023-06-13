@@ -30,7 +30,7 @@ class Mesh1d(Mesh):
     """
     ds: Mesh1dDataStructure
 
-    def integrator(self, k):
+    def integrator(self, k, etype='cell'):
         """
         @brief 返回第 k 个高斯积分公式。
         """
@@ -64,11 +64,11 @@ class Mesh1d(Mesh):
 
         @note 如果是一维结构网格可以重新实现这个计算函数
         """
-        node = self.node if node is None else node
-        cell = self.ds.cell
+        node = self.entity('node') if node is None else node
+        cell = self.entity('cell', index=index)
         GD = self.geo_dimension()
         # 这里要求 node 必须是 (NN, GD) 维的
-        return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2, axis=-1))
+        return np.sqrt(np.sum((node[cell[:, 1]] - node[cell[:, 0]])**2, axis=-1))
 
     def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:], 
             node: Optional[NDArray]=None):
@@ -192,7 +192,7 @@ class Mesh1d(Mesh):
         NC = self.number_of_cells()
         return NN + (p-1)*NC
 
-    def interpolation_points(self, p: int) -> NDArray:
+    def interpolation_points(self, p: int, index=np.s_[:]) -> NDArray:
         GD = self.geo_dimension()
         node = self.entity('node')
 
