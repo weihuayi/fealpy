@@ -43,8 +43,6 @@ class QuadrangleMesh(Mesh2d, Plotable):
         self.face_tangent = self.edge_tangent
         self.face_unit_tangent = self.edge_unit_tangent
 
-        self.edge_bc_to_point = self.bc_to_point
-        self.cell_bc_to_point = self.bc_to_point
 
         self.face_shape_function = self._shape_function
         self.grad_face_shape_function = self._grad_shape_function
@@ -87,6 +85,8 @@ class QuadrangleMesh(Mesh2d, Plotable):
             p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
         return p 
 
+    edge_bc_to_point = bc_to_point
+    cell_bc_to_point = bc_to_point
 
     def shape_function(self, bc, p=1):
         """
@@ -95,11 +95,8 @@ class QuadrangleMesh(Mesh2d, Plotable):
         assert isinstance(bc, tuple) and len(bc) == 2
         phi0 = self._shape_function(bc[0], p=p) # x direction
         phi1 = self._shape_function(bc[1], p=p) # y direction
-        phi = np.einsum('im, kn->ikmn', phi0, phi1)
-        shape = phi.shape[:-2] + (-1, )
-        phi = phi.reshape(shape) # 展平自由度
-        shape = (-1, ) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
-        phi = phi.reshape(shape) # 展平积分点
+        ldof = phi0.shape[-1]*phi1.shape[-1]
+        phi = np.einsum('im, kn->ikmn', phi0, phi1).reshape(-1, ldof)
         return phi
 
     def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
@@ -127,13 +124,12 @@ class QuadrangleMesh(Mesh2d, Plotable):
         gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
 
         n = phi0.shape[0]*phi1.shape[0] # 张量积分点的个数
-        shape = (n, (p+1)*(p+1), 2)
+        ldof = phi0.shape[-1]*phi1.shape[-1]
+        shape = (n, ldof, 2)
         gphi = np.zeros(shape, dtype=self.ftype)
 
-        val = np.einsum('im, kn->ikmn', gphi0, phi1)
-        gphi[..., 0].flat = val.flat
-        val = np.einsum('im, kn->ikmn', phi0, gphi1)
-        gphi[..., 1].flat = val.flat
+        gphi[..., 0] = np.einsum('im, kn->ikmn', gphi0, phi1).reshape(-1, ldof)
+        gphi[..., 1] = np.einsum('im, kn->ikmn', phi0, gphi1).reshape(-1, ldof)
 
         if variables == 'u':
             return gphi
@@ -227,29 +223,27 @@ class QuadrangleMesh(Mesh2d, Plotable):
         node = self.entity('node')
         if p == 1:
             return node
-        if p > 1:
-            NN = self.number_of_nodes() 
-            GD = self.geo_dimension()
 
-            gdof = self.number_of_global_ipoints(p)
-            ipoints = np.zeros((gdof, GD), dtype=self.ftype)
-            ipoints[:NN, :] = node
+        NN = self.number_of_nodes() 
+        GD = self.geo_dimension()
 
-            NE = self.number_of_edges()
+        gdof = self.number_of_global_ipoints(p)
+        ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+        ipoints[:NN, :] = node
 
-            edge = self.entity('edge')
+        NE = self.number_of_edges()
 
-            w = np.zeros((p-1, 2), dtype=np.float64)
-            w[:, 0] = np.arange(p-1, 0, -1)/p
-            w[:, 1] = w[-1::-1, 0]
-            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
-                    node[edge,:]).reshape(-1, GD)
-        if p > 2:
-            multiIndex = self.multi_index_matrix(p, 'edge')
-            bc = multiIndex[1:-1, :]/p
-            w = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
-            ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    node[cell[:, [0, 3, 1, 2]]]).reshape(-1, GD)
+        edge = self.entity('edge')
+
+        multiIndex = self.multi_index_matrix(p, 1)
+        w = multiIndex[1:-1, :]/p
+        ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                node[edge,:]).reshape(-1, GD)
+
+        w = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
+        ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                node[cell[:, [0, 3, 1, 2]]]).reshape(-1, GD)
+
         return ipoints
 
     def cell_to_ipoint(self, p, index=np.s_[:]):

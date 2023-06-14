@@ -367,11 +367,11 @@ class Mesh(metaclass=ABCMeta):
                 elif v.coordtype == 'barycentric':
                     v = v(bcs)
 
-        if u.shape[-1] == 1:
-            u = u[..., 0]
+        #if u.shape[-1] == 1:
+        #    u = u[..., 0]
 
-        if v.shape[-1] == 1:
-            v = v[..., 0]
+        #if v.shape[-1] == 1:
+        #    v = v[..., 0]
 
         cm = self.entity_measure('cell')
 
