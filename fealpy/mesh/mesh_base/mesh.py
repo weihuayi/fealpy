@@ -121,7 +121,6 @@ class Mesh(metaclass=ABCMeta):
         """
         if p == 1:
             return bc
-
         TD = bc.shape[-1] - 1
         multiIndex = self.multi_index_matrix(p, etype=TD)
         c = np.arange(1, p+1, dtype=np.int_)

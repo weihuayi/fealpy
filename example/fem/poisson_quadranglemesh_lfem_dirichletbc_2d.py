@@ -15,6 +15,8 @@ from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
 
+import ipdb
+
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -26,11 +28,11 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--nx',
-        default=4, type=int,
+        default=8, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--ny',
-        default=4, type=int,
+        default=8, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
@@ -44,7 +46,7 @@ nx = args.nx
 ny = args.ny
 maxit = args.maxit
 
-
+#ipdb.set_trace()
 pde = CosCosData()
 domain = pde.domain()
 
@@ -80,4 +82,4 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print(errorMatrix)
-print(errroMatrix[:, 0:-1]/errorMatrix[:, 1:])
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])

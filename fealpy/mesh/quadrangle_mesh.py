@@ -98,7 +98,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
         phi = np.einsum('im, kn->ikmn', phi0, phi1)
         shape = phi.shape[:-2] + (-1, )
         phi = phi.reshape(shape) # 展平自由度
-        shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
+        shape = (-1, ) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
         phi = phi.reshape(shape) # 展平积分点
         return phi
 
@@ -117,26 +117,23 @@ class QuadrangleMesh(Mesh2d, Plotable):
         assert isinstance(bc, tuple) and len(bc) == 2
 
         Dlambda = np.array([-1, 1], dtype=self.ftype)
-        # 一维基函数值
-        # (NQ, p+1)
-        phi = self._shape_function(bc[0], p=p)  
 
-        # 关于**一维变量重心坐标**的导数
-        # lambda_0 = 1 - u 
-        # lambda_1 = v 
-        # (NQ, ldof, 2) 
-        R = self._grad_shape_function(bc[0], p=p)  
+        phi0 = self._shape_function(bc[0], p=p)  
+        R0 = self._grad_shape_function(bc[0], p=p)  
+        gphi0 = np.einsum('...ij, j->...i', R0, Dlambda) # (..., ldof)
 
-        # 关于一维变量的导数
-        gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
+        phi1 = self._shape_function(bc[1], p=p)  
+        R1 = self._grad_shape_function(bc[1], p=p)  
+        gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
 
-        gphi0 = np.einsum('im, kn->ikmn', gphi, phi)
-        gphi1 = np.einsum('kn, im->kinm', phi, gphi)
-        n = gphi0.shape[0]*gphi0.shape[1]
+        n = phi0.shape[0]*phi1.shape[0] # 张量积分点的个数
         shape = (n, (p+1)*(p+1), 2)
         gphi = np.zeros(shape, dtype=self.ftype)
-        gphi[..., 0].flat = gphi0.flat
-        gphi[..., 1].flat = gphi1.flat
+
+        val = np.einsum('im, kn->ikmn', gphi0, phi1)
+        gphi[..., 0].flat = val.flat
+        val = np.einsum('im, kn->ikmn', phi0, gphi1)
+        gphi[..., 1].flat = val.flat
 
         if variables == 'u':
             return gphi
@@ -149,26 +146,14 @@ class QuadrangleMesh(Mesh2d, Plotable):
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """
-        @brief 计算积分点处的 Jacobi 矩阵
+        @brief 计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
+
+        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
-        assert isinstance(bc, tuple) and len(bc) == 2
-        NQ = len(bc[0])
-
-        phi = bc[0]
-        gphi = np.ones((NQ, 2), dtype=self.ftype)
-        gphi[:, 0] = -1
-
-        gphi0 = np.einsum('im, kn->ikmn', gphi, phi)
-        gphi1 = np.einsum('kn, im->kinm', phi, gphi)
-        ldof = gphi0.shape[0]*gphi0.shape[1]
-        shape = (ldof, 4, 2)
-        gphi = np.zeros(shape, dtype=self.ftype)
-        gphi[..., 0].flat = gphi0.flat
-        gphi[..., 1].flat = gphi1.flat
-
-        cell = self.entity('cell', index=index)
         node = self.entity('node')
-        J = np.einsum( 'ijn, ...ijk->...ink', node[cell[:, [0, 3, 1, 2]]], gphi)
+        cell = self.entity('cell', index=index)
+        gphi = self.grad_shape_function(bc, p=1, variables='u', index=index) 
+        J = np.einsum( 'cim, ...in->...cmn', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 
     def first_fundamental_form(self, J):
@@ -190,7 +175,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
         @brief 一致加密四边形网格
         """
         for i in range(n):
-            N = self.number_of_nodes()
+            NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
 
@@ -199,12 +184,12 @@ class QuadrangleMesh(Mesh2d, Plotable):
             edgeCenter = self.entity_barycenter('edge')
             cellCenter = self.entity_barycenter('cell')
 
-            edge2center = np.arange(N, N+NE)
+            edge2center = np.arange(NN, NN + NE)
 
             cell = self.ds.cell
             cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
             ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
-            cc = np.arange(N + NE, N + NE + NC).reshape(-1, 1)
+            cc = np.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
  
             cell = np.zeros((4*NC, 4), dtype=np.int_)
             cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
@@ -213,12 +198,12 @@ class QuadrangleMesh(Mesh2d, Plotable):
             cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
 
             self.node = np.r_['0', self.node, edgeCenter, cellCenter]
-            self.ds.reinit(N + NE + NC, cell)
+            self.ds.reinit(NN + NE + NC, cell)
 
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         if iptype in {'cell', 2}:
-            return (p+1)*(p+2)
+            return (p+1)*(p+1)
         elif iptype in {'face', 'edge',  1}:
             return self.p + 1
         elif iptype in {'node', 0}:
