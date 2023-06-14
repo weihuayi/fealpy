@@ -1,9 +1,9 @@
 import numpy as np
 from .mesh_base import Mesh2d, Plotable
-from .mesh_data_structure import Mesh2dDataStructure
+from .mesh_data_structure import Mesh2dDataStructure, HomogeneousMeshDS
 
 
-class QuadrangleMeshDataStructure(Mesh2dDataStructure):
+class QuadrangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
     localEdge = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
     localFace = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
     ccw = np.array([0, 1, 2, 3])
@@ -14,9 +14,6 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
 
     NEC = 4
     NFC = 4
-
-    def __init__(self, NN, cell):
-        super().__init__(NN, cell)
 
 
 ## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
@@ -79,63 +76,6 @@ class QuadrangleMesh(Mesh2d, Plotable):
     edge_bc_to_point = bc_to_point
     cell_bc_to_point = bc_to_point
 
-    def edge_shape_function(self, bc, p=1):
-        """
-        @brief the shape function on edge  
-        """
-        if p == 1:
-            return bc
-
-        TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=etype)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
-
-    def grad_edge_shape_function(self, bc, p=1):
-        """
-        @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
-        """
-        TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p) 
-        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
-
-        c = np.arange(1, p+1)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=bc.dtype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=bc.dtype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=bc.dtype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return R # (..., ldof, TD+1)
 
     face_shape_function = edge_shape_function
     grad_face_shape_function = grad_edge_shape_function
@@ -145,8 +85,8 @@ class QuadrangleMesh(Mesh2d, Plotable):
         @brief 四边形单元上的形函数
         """
         assert isinstance(bc, tuple) and len(bc) == 2
-        phi0 = self.edge_shape_function(bc[0], p=p) # x direction
-        phi1 = self.edge_shape_function(bc[1], p=p) # y direction
+        phi0 = self._shape_function(bc[0], p=p) # x direction
+        phi1 = self._shape_function(bc[1], p=p) # y direction
         phi = np.einsum('im, kn->ikmn', phi0, phi1)
         shape = phi.shape[:-2] + (-1, )
         phi = phi.reshape(shape) # 展平自由度
@@ -154,7 +94,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
         phi = phi.reshape(shape) # 展平积分点
         return phi
 
-    def grad_shape_function(self, bc, p=1, variables='x'):
+    def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """
         @brief  四边形单元形函数的导数
 
@@ -171,13 +111,13 @@ class QuadrangleMesh(Mesh2d, Plotable):
         Dlambda = np.array([-1, 1], dtype=self.ftype)
         # 一维基函数值
         # (NQ, p+1)
-        phi = self.edge_shape_function(bc[0], p=p)  
+        phi = self._shape_function(bc[0], p=p)  
 
         # 关于**一维变量重心坐标**的导数
         # lambda_0 = 1 - u 
         # lambda_1 = v 
         # (NQ, ldof, 2) 
-        R = self.grad_edge_shape_function(bc[0], p=p)  
+        R = self._grad_shape_function(bc[0], p=p)  
 
         # 关于一维变量的导数
         gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
@@ -193,7 +133,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
         if variables == 'u':
             return gphi
         elif variables == 'x':
-            J = self.jacobi_matrix(bc)
+            J = self.jacobi_matrix(bc, index=index)
             G = self.first_fundamental_form(J)
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
@@ -218,9 +158,9 @@ class QuadrangleMesh(Mesh2d, Plotable):
         gphi[..., 0].flat = gphi0.flat
         gphi[..., 1].flat = gphi1.flat
 
-        cell = self.entity('cell')
+        cell = self.entity('cell', index=index)
         node = self.entity('node')
-        J = np.einsum( 'ijn, ...ijk->...ink', node[cell[index, [0, 3, 1, 2]]], gphi)
+        J = np.einsum( 'ijn, ...ijk->...ink', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 
     def first_fundamental_form(self, J):
@@ -269,8 +209,13 @@ class QuadrangleMesh(Mesh2d, Plotable):
             self.ds.reinit(N + NE + NC, cell)
 
 
-    def number_of_local_ipoints(self, p):
-        return (p+1)*(p+1)
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        if iptype in {'cell', 2}:
+            return (p+1)*(p+2)
+        elif iptype in {'face', 'edge',  1}:
+            return self.p + 1
+        elif iptype in {'node', 0}:
+            return 1
     
     def number_of_global_ipoints(self, p):
         NP = self.number_of_nodes()

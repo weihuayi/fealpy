@@ -93,7 +93,7 @@ class MeshDataStructure(metaclass=ABCMeta):
         @brief Return the number of nodes in the mesh.
         """
         return self.NN
-
+    
     # cell
 
     def cell_to_node(self, *args, **kwargs) -> NDArray:
@@ -280,6 +280,7 @@ class HomogeneousMeshDS(MeshDataStructure):
         self.face2cell[:, 3] = i1 % NFC
 
         if self.TD == 3:
+            NEC = self.number_of_edges_of_cells()
             total_edge = self.total_edge()
 
             _, i2, j = np.unique(
@@ -289,7 +290,7 @@ class HomogeneousMeshDS(MeshDataStructure):
                 axis=0
             )
             self.edge = total_edge[i2, :]
-            self.cell2edge = np.reshape(j, (NC, NFC))
+            self.cell2edge = np.reshape(j, (NC, NEC)) # 原来是 NFC, 应为 NEC
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell

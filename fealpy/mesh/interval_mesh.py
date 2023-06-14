@@ -3,9 +3,12 @@ from numpy.typing import NDArray
 from types import ModuleType
 
 from .mesh_base import Mesh1d, Plotable
-from .mesh_data_structure import Mesh1dDataStructure
+from .mesh_data_structure import Mesh1dDataStructure, HomogeneousMeshDS
 
 
+class IntervalMeshDataStructure(Mesh1dDataStructure, HomogeneousMeshDS):
+    def total_face(self):
+        return self.cell.reshape(-1, 1)
 
 class IntervalMesh(Mesh1d, Plotable):
     def __init__(self, node: NDArray, cell: NDArray):
@@ -209,6 +212,3 @@ class IntervalMesh(Mesh1d, Plotable):
 
 IntervalMesh.set_ploter('1d')
 
-class IntervalMeshDataStructure(Mesh1dDataStructure):
-    def total_face(self):
-        return self.cell.reshape(-1, 1)

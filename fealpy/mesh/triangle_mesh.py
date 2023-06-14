@@ -6,9 +6,9 @@ from scipy.spatial import KDTree
 from .triangle_quality import *
 
 from .mesh_base import Mesh2d, Plotable
-from .mesh_data_structure import Mesh2dDataStructure
+from .mesh_data_structure import Mesh2dDataStructure, HomogeneousMeshDS
 
-class TriangleMeshDataStructure(Mesh2dDataStructure):
+class TriangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
@@ -19,15 +19,12 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
     NEC: int = 3
     NFC: int = 3
-    TD: int = 2
 
     localCell = np.array([
         (0, 1, 2),
         (1, 2, 0),
         (2, 0, 1)])
 
-    def __init__(self, NN, cell):
-        super().__init__(NN,cell)
 
 ## @defgroup MeshGenerators TriangleMesh Common Region Mesh Generators
 ## @defgroup MeshQuality
@@ -67,16 +64,6 @@ class TriangleMesh(Mesh2d, Plotable):
             from ..quadrature import GaussLegendreQuadrature
             return GaussLegendreQuadrature(q)
 
-    def bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换到实际网格实体上的笛卡尔坐标点
-        """
-        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
-        node = self.node
-        entity = self.entity(etype=TD)[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
-
     edge_bc_to_point = bc_to_point
     cell_bc_to_point = bc_to_point
 
@@ -98,62 +85,13 @@ class TriangleMesh(Mesh2d, Plotable):
         return result
 
 
-    def shape_function(self, bc, p=1, etype='cell'):
-        """
-        @brief
-        """
-        if p==1:
-            return bc
-
-        TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=etype)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
+    shape_function = _shape_function
 
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
-        TD = self.top_dimension()
-        multiIndex = self.multi_index_matrix(p)
-
-        c = np.arange(1, p+1, dtype=self.itype)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_ipoints(p)
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=self.ftype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-
+        R = self._grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
@@ -332,33 +270,6 @@ class TriangleMesh(Mesh2d, Plotable):
         return ipoints
 
 
-    def edge_to_ipoint(self, p, index=np.s_[:]):
-        """
-        @brief 获取网格边与插值点的对应关系
-        """
-        if isinstance(index, slice) and index == slice(None):
-            NE = self.number_of_edges()
-            index = np.arange(NE)
-        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
-            index, = np.nonzero(index)
-            NE = len(index)
-        elif isinstance(index, list) and (type(index[0]) is np.bool_):
-            index, = np.nonzero(index)
-            NE = len(index)
-        else:
-            NE = len(index)
-
-        NN = self.number_of_nodes()
-
-        edge = self.entity('edge', index=index)
-        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
-        edge2ipoints[:, [0, -1]] = edge
-        if p > 1:
-            idx = NN + np.arange(p-1)
-            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
-        return edge2ipoints
-
-    face_to_ipoint = edge_to_ipoint
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """

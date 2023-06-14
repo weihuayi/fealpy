@@ -9,12 +9,14 @@ class LagrangeFESpace():
                 "IntervalMesh": IntervalMeshCFEDof,
                 "TriangleMesh": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
+                "QuadrangleMesh" : QuadrangleMeshCFEDof,
                 "EdgeMesh": EdgeMeshCFEDof,
                 }, 
             'D':{
                 "IntervalMesh": IntervalMeshDFEDof,
                 "TriangleMesh": TriangleMeshDFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
+                "QuadrangleMesh" : QuadrangleMeshDFEDof,
                 "EdgeMesh": EdgeMeshDFEDof, 
                 }
         } 

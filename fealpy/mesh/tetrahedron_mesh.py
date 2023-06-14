@@ -3,10 +3,10 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 from scipy.spatial import KDTree
 from .mesh_base import Mesh3d, Plotable
-from .mesh_data_structure import Mesh3dDataStructure
+from .mesh_data_structure import Mesh3dDataStructure, HomogeneousMeshDS
 
 
-class TetrahedronMeshDataStructure(Mesh3dDataStructure):
+class TetrahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
     OFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     SFace = np.array([(1, 2, 3),  (0, 2, 3), (0, 1, 3), (0, 1, 2)])  
     ccw = np.array([0, 1, 2])
@@ -25,13 +25,7 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     NFC = 4
     NVF = 3
     NEF = 3
-    TD = 3
 
-    def __init__(self, NN, cell):
-        super().__init__(NN, cell)
-
-    def number_of_vertices_of_cells(self):
-        return self.NVC
 
     def face_to_edge_sign(self):
         face2edge = self.face_to_edge()
@@ -872,7 +866,6 @@ class TetrahedronMesh(Mesh3d, Plotable):
         if returnim is True:
             return IM
 
-    @timer
     def uniform_refine(self, n=1):
         """
         Perform uniform refinement on the tetrahedral mesh.

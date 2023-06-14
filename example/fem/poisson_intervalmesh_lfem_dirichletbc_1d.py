@@ -6,8 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
-from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh import TriangleMesh 
+from fealpy.pde.poisson_1d import CosData
+from fealpy.mesh.interval_mesh import IntervalMesh 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import DiffusionIntegrator 
 from fealpy.fem import ScalarSourceIntegrator
@@ -18,7 +18,7 @@ from fealpy.fem import DirichletBC
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        TriangleMesh 上任意次有限元方法
+        IntervalMesh 上任意次有限元方法
         """)
 
 parser.add_argument('--degree',
@@ -29,10 +29,6 @@ parser.add_argument('--nx',
         default=4, type=int,
         help='初始网格剖分段数.')
 
-parser.add_argument('--ny',
-        default=4, type=int,
-        help='初始网格剖分段数.')
-
 parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
@@ -40,15 +36,14 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 
 p = args.degree
-nx = args.nx
-ny = args.ny
+nx =  args.nx
 maxit = args.maxit
 
 
-pde = CosCosData()
+pde = CosData()
 domain = pde.domain()
 
-mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
+mesh = IntervalMesh.from_interval(domain, nx=nx)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$', 
         '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']

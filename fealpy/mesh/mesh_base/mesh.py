@@ -65,6 +65,108 @@ class Mesh(metaclass=ABCMeta):
 
     number_of_vertices_of_cells = number_of_nodes_of_cells
 
+    @staticmethod
+    def multi_index_matrix(self, p: int, etype: int):
+        """
+        @brief 获取 p 次的多重指标矩阵
+
+        @param[in] p 正整数 
+
+        @return multiIndex  ndarray with shape (ldof, 4)
+        """
+        if etype == 3:
+            ldof = (p+1)*(p+2)*(p+3)//6
+            idx = np.arange(1, ldof)
+            idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
+            idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
+            idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
+            idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
+            multiIndex = np.zeros((ldof, 4), dtype=np.int_)
+            multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+            multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+            multiIndex[1:, 1] = idx0 - idx2
+            multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
+            return multiIndex
+        elif etype == 2:
+            ldof = (p+1)*(p+2)//2
+            idx = np.arange(0, ldof)
+            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+            multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+            multiIndex[:,1] = idx0 - multiIndex[:,2]
+            multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+            return multiIndex
+        elif etype == 1:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
+
+    @staticmethod
+    def _shape_function(self, bc, p=1):
+        """
+        @brief    
+        """
+        if p == 1:
+            return bc
+
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=1)
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi
+
+    @staticmethod
+    def _grad_shape_function(self, bc: NDArray, p: int =1) -> NDArray:
+        """
+        @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
+        """
+        if p == 1:
+            return bc
+
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=1) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
+
+        c = np.arange(1, p+1)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=bc.dtype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+        return R # (..., ldof, TD+1)
+
+
     @abstractmethod
     def uniform_refine(self, n: int=1) -> None:
         """
@@ -74,7 +176,6 @@ class Mesh(metaclass=ABCMeta):
 
 
     ### FEM Interfaces ###
-
     def geo_dimension(self) -> int:
         """
         @brief Get geometry dimension of the mesh.
@@ -130,7 +231,8 @@ class Mesh(metaclass=ABCMeta):
 
         @return: A tensor representing the entities in this mesh.
         """
-        TD = self.ds.TD
+        TD = self.top_dimension()
+        GD = self.geo_dimension()
         if etype in {'cell', TD}:
             return self.ds.cell[index]
         elif etype in {'edge', 1}:
@@ -167,13 +269,6 @@ class Mesh(metaclass=ABCMeta):
         """
         pass
 
-    @staticmethod
-    @abstractmethod
-    def multi_index_matrix(p: int, etype: Union[int, str]='cell') -> NDArray:
-        """
-        @brief Make the multi-index matrix of a single entity.
-        """
-        pass
 
     @abstractmethod
     def shape_function(self, bc: NDArray, p: int) -> NDArray:
@@ -210,21 +305,64 @@ class Mesh(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
-    def cell_to_ipoint(self, p: int, index=np.s_[:]):
-        pass
+    def node_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
+        return np.arange(self.number_of_nodes())[index]
+
+    def edge_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
+        """
+        @brief 获取网格边与插值点的对应关系
+        """
+        if isinstance(index, slice) and index == slice(None):
+            NE = self.number_of_edges()
+            index = np.arange(NE)
+        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        elif isinstance(index, list) and (type(index[0]) is np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        else:
+            NE = len(index)
+
+        NN = self.number_of_nodes()
+
+        edge = self.entity('edge', index=index)
+        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
+        edge2ipoints[:, [0, -1]] = edge
+        if p > 1:
+            idx = NN + np.arange(p-1)
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
+        return edge2ipoints
 
     @abstractmethod
     def face_to_ipoint(self, p: int, index=np.s_[:]):
         pass
 
     @abstractmethod
-    def edge_to_ipoint(self, p: int, index=np.s_[:]):
+    def cell_to_ipoint(self, p: int, index=np.s_[:]):
         pass
 
-    @abstractmethod
-    def node_to_ipoint(self, p: int, index=np.s_[:]):
-        pass
+    def edge_length(self, index=np.s_[:]):
+        """
+        @brief
+        """
+        node = self.entity('node')
+        edge = self.entity('edge')
+        v = node[edge[index,1]] - node[edge[index,0]]
+        return np.linalg.norm(v, axis=1)
+
+    def edge_tangent(self):
+        edge = self.ds.edge
+        node = self.node
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        return v
+
+    def edge_unit_tangent(self):
+        edge = self.ds.edge
+        node = self.node
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        length = np.sqrt(np.square(v).sum(axis=1))
+        return v/length.reshape(-1, 1)
 
     ### Other Interfaces ###
 

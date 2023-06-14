@@ -545,8 +545,6 @@ class PolygonMesh(Mesh2d, Plotable):
 
         return PolygonMesh(newnode, newcell, cellLocation)
 
-
-
     def cell_area(self, index=None):
         #TODO: 3D Case
         NC = self.number_of_cells()
