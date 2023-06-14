@@ -52,6 +52,11 @@ class TriangleMesh(Mesh2d, Plotable):
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
+        
+        self.edge_bc_to_point = self.bc_to_point
+        self.cell_bc_to_point = self.bc_to_point
+        self.shape_function = self._shape_function
+        self.face_to_ipoint = self.edge_to_ipoint
 
     def integrator(self, q, etype='cell'):
         """
@@ -64,8 +69,6 @@ class TriangleMesh(Mesh2d, Plotable):
             from ..quadrature import GaussLegendreQuadrature
             return GaussLegendreQuadrature(q)
 
-    edge_bc_to_point = bc_to_point
-    cell_bc_to_point = bc_to_point
 
     def point_to_bc(self, point):
         i_cell = self.location(point)
@@ -85,7 +88,6 @@ class TriangleMesh(Mesh2d, Plotable):
         return result
 
 
-    shape_function = _shape_function
 
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
         """
@@ -127,6 +129,7 @@ class TriangleMesh(Mesh2d, Plotable):
         return gphi 
 
     grad_shape_function_on_face = grad_shape_function_on_edge
+
 
     def grad_lambda(self, index=np.s_[:]):
         node = self.node
@@ -242,6 +245,7 @@ class TriangleMesh(Mesh2d, Plotable):
         node = self.entity('node')
         if p == 1:
             return node
+
         if p > 1:
             NN = self.number_of_nodes()
             GD = self.geo_dimension()
@@ -260,7 +264,8 @@ class TriangleMesh(Mesh2d, Plotable):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
                     node[edge,:]).reshape(-1, GD)
         if p > 2:
-            multiIndex = self.multi_index_matrix(p, 'cell')
+            TD = self.top_dimension()
+            multiIndex = self.multi_index_matrix(p, TD)
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
                     isEdgeIPoints[:,2])
@@ -269,8 +274,6 @@ class TriangleMesh(Mesh2d, Plotable):
                     node[cell, :]).reshape(-1, GD)
         return ipoints
 
-
-
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
         """
@@ -278,7 +281,7 @@ class TriangleMesh(Mesh2d, Plotable):
         if p==1:
             return cell[index] 
 
-        mi = self.multi_index_matrix(p)
+        mi = self.multi_index_matrix(p, 2)
         idx0, = np.nonzero(mi[:, 0] == 0)
         idx1, = np.nonzero(mi[:, 1] == 0)
         idx2, = np.nonzero(mi[:, 2] == 0)

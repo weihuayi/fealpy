@@ -40,6 +40,20 @@ class QuadrangleMesh(Mesh2d, Plotable):
         self.facedata = self.edgedata
         self.meshdata = {}
 
+        self.face_tangent = self.edge_tangent
+        self.face_unit_tangent = self.edge_unit_tangent
+
+        self.edge_bc_to_point = self.bc_to_point
+        self.cell_bc_to_point = self.bc_to_point
+
+        self.face_shape_function = self._shape_function
+        self.grad_face_shape_function = self._grad_shape_function
+
+        self.edge_shape_function = self._shape_function
+        self.grad_edge_shape_function = self._grad_shape_function
+
+        self.face_to_ipoint = self.edge_to_ipoint
+
     def integrator(self, q, etype='cell'):
         from ..quadrature import GaussLegendreQuadrature
         qf = GaussLegendreQuadrature(q)
@@ -73,12 +87,6 @@ class QuadrangleMesh(Mesh2d, Plotable):
             p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
         return p 
 
-    edge_bc_to_point = bc_to_point
-    cell_bc_to_point = bc_to_point
-
-
-    face_shape_function = edge_shape_function
-    grad_face_shape_function = grad_edge_shape_function
 
     def shape_function(self, bc, p=1):
         """
@@ -141,7 +149,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """
-        @brief 
+        @brief 计算积分点处的 Jacobi 矩阵
         """
         assert isinstance(bc, tuple) and len(bc) == 2
         NQ = len(bc[0])
@@ -175,7 +183,6 @@ class QuadrangleMesh(Mesh2d, Plotable):
                 G[..., i, j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
                 G[..., j, i] = G[..., i, j]
         return G
-
 
 
     def uniform_refine(self, n=1):
@@ -303,37 +310,6 @@ class QuadrangleMesh(Mesh2d, Plotable):
 
         return cell2ipoint[index]
 
-    def edge_to_ipoint(self, p, index=np.s_[:]):
-        """
-        @brief 获取网格边与插值点的对应关系
-        """
-        if isinstance(index, slice) and index == slice(None):
-            NE = self.number_of_edges()
-            index = np.arange(NE)
-        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
-            index, = np.nonzero(index)
-            NE = len(index)
-        elif isinstance(index, list) and (type(index[0]) is np.bool_):
-            index, = np.nonzero(index)
-            NE = len(index)
-        else:
-            NE = len(index)
-
-        NN = self.number_of_nodes()
-
-        edge = self.entity('edge', index=index)
-        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
-        edge2ipoints[:, [0, -1]] = edge
-        if p > 1:
-            idx = NN + np.arange(p-1)
-            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
-        return edge2ipoints
-
-    face_to_ipoint = edge_to_ipoint
-
-    def node_to_ipoint(self, p, index=np.s_[:]):
-        NN = self.number_of_nodes()
-        return np.arange(NN)[index]
 
     def number_of_corner_nodes(self):
         return self.ds.NN
@@ -344,7 +320,6 @@ class QuadrangleMesh(Mesh2d, Plotable):
         cell = self.entity('cell')
         cell = cell[np.arange(NC).reshape(-1, 1), self.ds.localCell[idx]]
         self.ds.reinit(NN, cell)
-
 
     def angle(self):
         NC = self.number_of_cells()
@@ -582,7 +557,33 @@ class QuadrangleMesh(Mesh2d, Plotable):
         """
         @brief 把每个三角形分成三个四边形 
         """
-        pass
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        node0 = mesh.entity('node')
+        cell0 = mesh.entity('cell')
+        ec = mesh.entity_barycenter('edge')
+        cc = mesh.entity_barycenter('cell')
+        cell2edge = mesh.ds.cell_to_edge()
+
+        node = np.r_['0', node0, ec, cc]
+        cell = np.zeros((3*NC, 4), dtype=self.itype)
+        idx = np.arange(NC)
+        cell[:NC, 0] = NN + NE + idx
+        cell[:NC, 1] = cell2edge[:, 0] + NN
+        cell[:NC, 2] = cell0[:, 2]
+        cell[:NC, 3] = cell2edge[:, 1] + NN
+
+        cell[NC:2*NC, 0] = cell[:NC, 0]
+        cell[NC:2*NC, 1] = cell2edge[:, 1] + NN
+        cell[NC:2*NC, 2] = cell0[:, 0]
+        cell[NC:2*NC, 3] = cell2edge[:, 2] + NN
+
+        cell[2*NC:3*NC, 0] = cell[:NC, 0]
+        cell[2*NC:3*NC, 1] = cell2edge[:, 2] + NN
+        cell[2*NC:3*NC, 2] = cell0[:, 1]
+        cell[2*NC:3*NC, 3] = cell2edge[:, 0] + NN
+        return cls(node, cell)
 
 
 QuadrangleMesh.set_ploter('2d')

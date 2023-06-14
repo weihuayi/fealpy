@@ -65,14 +65,26 @@ class Mesh(metaclass=ABCMeta):
 
     number_of_vertices_of_cells = number_of_nodes_of_cells
 
+    def geo_dimension(self) -> int:
+        """
+        @brief Get geometry dimension of the mesh.
+        """
+        return self.node.shape[-1]
+
+    def top_dimension(self) -> int:
+        """
+        @brief Get topology dimension of the mesh.
+        """
+        return self.ds.TD
+
     @staticmethod
-    def multi_index_matrix(self, p: int, etype: int):
+    def multi_index_matrix(p: int, etype: int) -> NDArray:
         """
         @brief 获取 p 次的多重指标矩阵
 
         @param[in] p 正整数 
 
-        @return multiIndex  ndarray with shape (ldof, 4)
+        @return multiIndex  ndarray with shape (ldof, TD+1)
         """
         if etype == 3:
             ldof = (p+1)*(p+2)*(p+3)//6
@@ -103,7 +115,6 @@ class Mesh(metaclass=ABCMeta):
             multiIndex[:, 1] = p - multiIndex[:, 0]
             return multiIndex
 
-    @staticmethod
     def _shape_function(self, bc, p=1):
         """
         @brief    
@@ -112,7 +123,7 @@ class Mesh(metaclass=ABCMeta):
             return bc
 
         TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=1)
+        multiIndex = self.multi_index_matrix(p, etype=TD)
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
@@ -125,16 +136,12 @@ class Mesh(metaclass=ABCMeta):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    @staticmethod
     def _grad_shape_function(self, bc: NDArray, p: int =1) -> NDArray:
         """
         @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
         """
-        if p == 1:
-            return bc
-
         TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=1) 
+        multiIndex = self.multi_index_matrix(p, etype=TD) 
         ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
 
         c = np.arange(1, p+1)
@@ -176,17 +183,6 @@ class Mesh(metaclass=ABCMeta):
 
 
     ### FEM Interfaces ###
-    def geo_dimension(self) -> int:
-        """
-        @brief Get geometry dimension of the mesh.
-        """
-        return self.node.shape[-1]
-
-    def top_dimension(self) -> int:
-        """
-        @brief Get topology dimension of the mesh.
-        """
-        return self.ds.TD
 
     @abstractmethod
     def integrator(self, k: int, etype: Union[int, str]):
@@ -271,20 +267,6 @@ class Mesh(metaclass=ABCMeta):
 
 
     @abstractmethod
-    def shape_function(self, bc: NDArray, p: int) -> NDArray:
-        """
-        @brief
-        """
-        pass
-
-    @abstractmethod
-    def grad_shape_function(self, bc: NDArray, p: int, index=np.s_[:]) -> NDArray:
-        """
-        @brief
-        """
-        pass
-
-    @abstractmethod
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         """
         @brief Return the number of p-order interpolation points in a single entity.
@@ -334,32 +316,24 @@ class Mesh(metaclass=ABCMeta):
             edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
         return edge2ipoints
 
-    @abstractmethod
-    def face_to_ipoint(self, p: int, index=np.s_[:]):
-        pass
-
-    @abstractmethod
-    def cell_to_ipoint(self, p: int, index=np.s_[:]):
-        pass
-
-    def edge_length(self, index=np.s_[:]):
+    def edge_length(self, index=np.s_[:], node=None):
         """
         @brief
         """
-        node = self.entity('node')
+        node = self.entity('node') if node is None else node
         edge = self.entity('edge')
         v = node[edge[index,1]] - node[edge[index,0]]
         return np.linalg.norm(v, axis=1)
 
-    def edge_tangent(self):
-        edge = self.ds.edge
-        node = self.node
-        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+    def edge_tangent(self, index=np.s_[:], node=None):
+        node = self.entity('node') if node is None else node
+        edge = self.entity('edge')
+        v = node[edge[index, 1], :] - node[edge[index, 0], :]
         return v
 
-    def edge_unit_tangent(self):
-        edge = self.ds.edge
-        node = self.node
+    def edge_unit_tangent(self, index=np.s_[:], node=None):
+        node = self.entity('node') if node is None else node
+        edge = self.entity('edge')
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)

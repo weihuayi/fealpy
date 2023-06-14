@@ -37,8 +37,6 @@ class Mesh1d(Mesh):
         from ...quadrature import GaussLegendreQuadrature
         return GaussLegendreQuadrature(k)
 
-    cell_length = edge_length
-
     def entity_measure(self, etype: Union[int, str]='cell', index=np.s_[:], node=None):
         """
         """
@@ -95,8 +93,6 @@ class Mesh1d(Mesh):
 
             return ipoint
 
-    cell_to_ipoint = edge_to_ipoint
-    face_to_ipoint = node_to_ipoint
 
 
 
@@ -159,8 +155,7 @@ class Mesh2d(Mesh):
     ## Special Methods in 2D
     def node_size(self):
         """
-        @brief
-        计算每个网格节点邻接边的长度平均值, 做为节点处的网格尺寸值
+        @brief 计算每个网格节点邻接边的长度平均值, 做为节点处的网格尺寸值
         """
         NN = self.number_of_nodes()
         edge = self.entity('edge')
@@ -174,55 +169,36 @@ class Mesh2d(Mesh):
 
         return h/deg
 
-    def face_normal(self, index=np.s_[:]):
-        v = self.face_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-    def face_unit_normal(self, index=np.s_[:]):
-        v = self.face_unit_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-    def face_tangent(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index,1],:] - node[edge[index,0],:]
-        return v
-
-    def face_unit_tangent(self, index=np.s_[:]):
-        edge = self.entity('edge')
-        node = self.entity('node')
-        v = node[edge[index,1],:] - node[edge[index,0],:]
-        length = np.linalg.norm(v, ord=2, axis=1)
-        v /= length.reshape(-1, 1)
-        return v
 
     def edge_frame(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上的局部标架 
+        """
+        assert self.geo_dimension() == 2
         t = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
 
-    def edge_unit_normal(self, index=np.s_[:]):
-        #TODO: 3D Case
-        v = self.edge_unit_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-
     def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
         v = self.edge_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_tangent(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index, 1],:] - node[edge[index, 0],:]
-        return v
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
-
+    face_normal = edge_normal
+    face_unit_normal = edge_unit_normal
 
 ##################################################
 ### Topology dimension 3 Mesh
@@ -240,7 +216,6 @@ class Mesh3d(Mesh):
     ```
     """
     ds: Mesh3dDataStructure
-
 
     def entity_measure(self, etype=3, index=np.s_[:]):
         if etype in {'cell', 3}:

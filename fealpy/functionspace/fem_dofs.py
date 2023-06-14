@@ -3,9 +3,10 @@ from typing import Optional, Union, Callable
 
 class LinearMeshCFEDof():
     def __init__(self, mesh, p):
+        TD = mesh.top_dimension()
         self.mesh = mesh
         self.p = p
-        self.multiIndex = mesh.multi_index_matrix(p) 
+        self.multiIndex = mesh.multi_index_matrix(p, TD) 
         self.cell2dof = self.cell_to_dof()
 
     def is_boundary_dof(self, threshold=None):

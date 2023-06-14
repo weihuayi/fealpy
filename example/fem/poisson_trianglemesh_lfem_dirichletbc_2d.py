@@ -15,6 +15,8 @@ from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
 
+import ipdb
+
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -80,4 +82,4 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print(errorMatrix)
-print(errroMatrix[:, 0:-1]/errorMatrix[:, 1:])
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])

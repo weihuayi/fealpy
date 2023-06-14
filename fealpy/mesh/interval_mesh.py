@@ -29,6 +29,22 @@ class IntervalMesh(Mesh1d, Plotable):
         self.ftype = node.dtype
 
 
+        
+        self.cell_length = self.edge_length
+        self.cell_to_ipoint = self.edge_to_ipoint
+        self.face_to_ipoint = self.node_to_ipoint
+        self.shape_function = self._shape_function
+
+    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
+        """
+        @brief 
+        """
+        R = self._grad_shape_function(bc, p=p)
+        Dlambda = self.grad_lambda(index=index)
+        gphi = np.einsum('...ij, cjm->...cim', R, Dlambda)
+        return gphi 
+
+
     def vtk_cell_type(self):
         VTK_LINE = 3
         return VTK_LINE

@@ -70,6 +70,11 @@ class TetrahedronMesh(Mesh3d, Plotable):
         self.nodedata = {}
         self.meshdata = {}
 
+        self.edge_bc_to_point = self.bc_to_point
+        self.face_bc_to_point = self.bc_to_point
+        self.cell_bc_to_point = self.bc_to_point
+        self.shape_function = self._shape_function
+
         if showmemory:
             nsize = self.node.size*self.node.itemsize/2**30
             csize = self.ds.cell.size*self.ds.cell.itemsize/2**30
@@ -100,20 +105,6 @@ class TetrahedronMesh(Mesh3d, Plotable):
             from ..quadrature import GaussLegendreQuadrature
             return GaussLegendreQuadrature(q)
 
-    def bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换到实际网格实体上的笛卡尔坐标点
-        """
-        TD = bc.shape[-1] - 1 #
-        node = self.node
-        entity = self.entity(etype=TD)[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
-
-    edge_bc_to_point = bc_to_point
-    face_bc_to_point = bc_to_point
-    cell_bc_to_point = bc_to_point
-
     def grad_lambda(self, index=np.s_[:]):
         localFace = self.ds.localFace
         node = self.node
@@ -128,58 +119,8 @@ class TetrahedronMesh(Mesh3d, Plotable):
             Dlambda[:, i, :] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
 
-    def shape_function(self, bc, p=1, etype='cell'):
-        """
-        @brief 四面体单元上的形函数 
-        """
-        TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix(p, etype=etype)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
-
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
-
-        TD = self.top_dimension()
-
-        multiIndex = self.multi_index_matrix(p)
-
-        c = np.arange(1, p+1, dtype=self.itype)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_ipoints(p)
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=self.ftype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-
+        R = self._grad_shape_function(bc, p=p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
@@ -204,6 +145,7 @@ class TetrahedronMesh(Mesh3d, Plotable):
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         GD = self.geo_dimension()
+        TD = self.top_dimension()
 
         ldof = self.number_of_local_ipoints(p)
         gdof = self.number_of_global_ipoints(p)
@@ -219,7 +161,7 @@ class TetrahedronMesh(Mesh3d, Plotable):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, GD) 
 
         if p > 2:
-            mi = self.multi_index_matrix(p, 'face') 
+            mi = self.multi_index_matrix(p, TD-1) 
             NF = self.number_of_faces()
             fidof = (p+1)*(p+2)//2 - 3*p
             face = self.entity('face') 
@@ -228,7 +170,7 @@ class TetrahedronMesh(Mesh3d, Plotable):
             ipoints[NN+(p-1)*NE:NN+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, node[face, :]).reshape(-1, GD)
 
         if p > 3:
-            mi = self.multi_index_matrix(p, 'cell') 
+            mi = self.multi_index_matrix(p, TD) 
             isInCellIPoints = np.sum(mi > 0, axis=-1) == 4
             w = mi[isInCellIPoints, :]/p
             ipoints[NN+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
@@ -258,25 +200,11 @@ class TetrahedronMesh(Mesh3d, Plotable):
         NC = self.number_of_cells()
         return NN + NE*(p-1) + NF*(p-2)*(p-1)//2 + NC*(p-3)*(p-2)*(p-1)//6
     
-    def edge_to_ipoint(self, p, index=np.s_[:]):
-        """
-        @brief 获取网格中每条边与插值点的对应关系
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-
-        base = NN
-        edge = self.entity('edge')
-        edge2ipoint = np.zeros((NE, p+1), dtype=np.int_)
-        edge2ipoint[:, [0, -1]] = edge
-        if p > 1:
-            edge2ipoint[:,1:-1] = base + np.arange(NE*(p-1)).reshape(NE, p-1)
-        return edge2ipoint
-
     def face_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 获取网格中每个三角形面与插值点的对应关系
         """
+        TD = self.top_dimension()
         fdof = (p+1)*(p+2)//2
 
         edgeIdx = np.zeros((2, p+1), dtype=np.int_)
@@ -293,7 +221,7 @@ class TetrahedronMesh(Mesh3d, Plotable):
         edge2ipoint = self.edge_to_ipoint(p)
         face2ipoint = np.zeros((NF, fdof), dtype=np.int_)
 
-        faceIdx = self.multi_index_matrix(p, etype='face') 
+        faceIdx = self.multi_index_matrix(p, TD-1) 
         isEdgeIPoint = (faceIdx == 0)
 
         fe = np.array([1, 0, 0])
@@ -320,6 +248,7 @@ class TetrahedronMesh(Mesh3d, Plotable):
         @return  cell2ipoints 数组， 形状为 (NC, ldof)
         """
 
+        TD = self.top_dimension()
         edof = p+1
         fdof = (p+1)*(p+2)//2
         ldof = (p+1)*(p+2)*(p+3)//6 
@@ -336,8 +265,8 @@ class TetrahedronMesh(Mesh3d, Plotable):
         cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
 
         face2ipoint = self.face_to_ipoint(p)
-        m2 = self.multi_index_matrix(p, 'face').T
-        m3 = self.multi_index_matrix(p, 'cell').T
+        m2 = self.multi_index_matrix(p, TD-1).T
+        m3 = self.multi_index_matrix(p, TD).T
         isFaceIPoint = (m3 == 0)
         
         fidx = np.argsort(face, axis=1) # 第 i 个全局面顶点做一个排序
@@ -524,17 +453,6 @@ class TetrahedronMesh(Mesh3d, Plotable):
         nv = np.cross(v01, v02)
         area = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return area
-
-    def edge_length(self, index=np.s_[:]):
-        """
-        @brief 计算网格边的长度
-        """
-        edge = self.entity('edge')
-        node = self.entity('node')
-        v = node[edge[index, 1]] - node[edge[index, 0]]
-        length = np.sqrt(np.sum(v**2, axis=-1))
-        return length
-
 
     def dihedral_angle(self):
         """

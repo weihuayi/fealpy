@@ -15,6 +15,8 @@ from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
 
+import ipdb
+
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -55,6 +57,7 @@ for i in range(maxit):
     space = LagrangeFESpace(mesh, p=p)
     NDof[i] = space.number_of_global_dofs()
 
+    #ipdb.set_trace()
     bform = BilinearForm(space)
     bform.add_domain_integrator(DiffusionIntegrator(q=3))
     A = bform.assembly()
