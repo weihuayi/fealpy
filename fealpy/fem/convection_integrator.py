@@ -11,13 +11,14 @@ class ConvectionIntegrator:
         self.a = a
         self.q = q
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
+    def assembly_cell_matrix(self, vspace, index=np.s_[:], cellmeasure=None,
             out=None):
         """
         @note 没有参考单元的组装方式
         """
         q = self.q
         coef = self.coef
+        space = vspace
         mesh = space.mesh
         
         GD = mesh.geo_dimension()
@@ -50,8 +51,7 @@ class ConvectionIntegrator:
                 ps = mesh.bc_to_point(bcs, index=index)
                 coef = coef(ps)
             
-            if coef.shape == (NQ, NC, GD):  
-                #print(np.sum(np.abs(coef)))
+            if coef.shape == (NQ, NC, GD): 
                 C += self.a*np.einsum('q, qcn, qck, qcmn, c->ckm',ws, coef, phi, gphi, cellmeasure) 
             elif coef.shape == (NC, GD):
                 C += self.a*np.einsum('q, cn, qck, qcmn, c->ckm',ws, coef, phi, gphi, cellmeasure) 

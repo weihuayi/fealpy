@@ -216,6 +216,8 @@ class Mesh:
             elif f.shape == (GD, GD):
                 e = cm[:, None, None]*f
             else:
+                if f.shape[1] != len(cm):
+                    f = f.transpose(0,2,1)
                 e = np.einsum('q, qc..., c->c...', ws, f, cm)
 
         if celltype is False:
