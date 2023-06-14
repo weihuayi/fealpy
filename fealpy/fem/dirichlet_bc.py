@@ -46,7 +46,7 @@ class DirichletBC():
         space = self.space
         gD = self.gD
         isDDof = space.boundary_interpolate(gD, uh, threshold=self.threshold) # isDDof.shape == uh.shape
-        f = f - A@uh # 注意这里不修改外界 f 的值
+        f = f - A@uh.reshape(-1) # 注意这里不修改外界 f 的值
 
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isDDof.reshape(-1)] = 1

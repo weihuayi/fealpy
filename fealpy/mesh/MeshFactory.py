@@ -200,7 +200,6 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
     node[:, 0] = X.flatten()
     node[:, 1] = Y.flatten()
     NN = len(node)
-    print(N)
 
     idx = np.arange(N).reshape(nx+1, ny+1)
     if meshtype in {'tri', 'triangle'}:

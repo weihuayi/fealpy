@@ -69,48 +69,50 @@ def psolution(p):
 domain = [0, 1, 0, 1]
 
 mesh = TriangleMesh.from_unit_square(nx=ns, ny=ns)
-nuspace = LagrangeFESpace(mesh,p=2,doforder=doforder)
-npspace = LagrangeFESpace(mesh,p=1,doforder=doforder)
-ubc = DirichletBC(nuspace, usolution)
-pbc = DirichletBC(npspace, psolution)
+uspace = LagrangeFESpace(mesh,p=2,doforder=doforder)
+pspace = LagrangeFESpace(mesh,p=1,doforder=doforder)
+ubc = DirichletBC(uspace, usolution)
+pbc = DirichletBC(pspace, psolution)
 
-smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
 tmesh = UniformTimeLine(0, T, nt) # 均匀时间剖分
 
-u0 = nuspace.function(dim=2)
-us = nuspace.function(dim=2)
-u1 = nuspace.function(dim=2)
+u0 = uspace.function(dim=2)
+us = uspace.function(dim=2)
+u1 = uspace.function(dim=2)
 
-p0 = npspace.function()
-p1 = npspace.function()
+uso = uspace.interpolate(usolution, 2)
+pso = pspace.interpolate(psolution)
+
+p0 = pspace.function()
+p1 = pspace.function()
 
 dt = tmesh.dt
 
 # 第一个
-Vbform0 = BilinearForm(2*(nuspace,))
+Vbform0 = BilinearForm(2*(uspace,))
 Vbform0.add_domain_integrator(VectorMassIntegrator(rho/dt))
 Vbform0.assembly()
 A1 = Vbform0.get_matrix()
 
-Vbform1 = BilinearForm(2*(nuspace,))
+Vbform1 = BilinearForm(2*(uspace,))
 Vbform1.add_domain_integrator(NSOperatorIntegrator(mu)) #TODO：命名
 Vbform1.assembly()
 A2 = Vbform1.get_matrix()
 A = A1+A2
 
-Vbform3 = MixedBilinearForm((npspace,), 2*(nuspace, ))
+Vbform3 = MixedBilinearForm((pspace,), 2*(uspace, ))
 Vbform3.add_domain_integrator(PressIntegrator()) #TODO: 命名
 Vbform3.assembly()
 D = Vbform3.get_matrix()
 
 #组装第二个方程的左端矩阵
-Sbform = BilinearForm(npspace)
+Sbform = BilinearForm(pspace)
 Sbform.add_domain_integrator(ScalarDiffusionIntegrator(c=1))
 Sbform.assembly()
 B = Sbform.get_matrix()
 
 #组装第三个方程的左端矩阵
-Vbform2 = BilinearForm(2*(nuspace,))
+Vbform2 = BilinearForm(2*(uspace,))
 Vbform2.add_domain_integrator(VectorMassIntegrator(c=1))
 Vbform2.assembly()
 C = Vbform2.get_matrix()
@@ -119,13 +121,7 @@ ctx = DMumpsContext()
 ctx.set_silent()
 errorMatrix = np.zeros((2,nt),dtype=np.float64)
 
-@barycentric
-def f1(bcs,index):
-    b2 = np.einsum('imj, ikmj->ijk', u0(bcs, index),u0.grad_value(bcs,index))
-    return rho*b2
 
-lform = LinearForm(2*(nuspace,))
-lform.add_domain_integrator(VectorSourceIntegrator(f1))
 
 for i in range(2): 
     # 下一个的时间层 t1
@@ -134,12 +130,18 @@ for i in range(2):
 
     #组装第一个方程的右端向量
     fb1 = A1@u0.flat
+    
+    @barycentric
+    def f1(bcs,index):
+        b2 = np.einsum('imj, ikmj->ijk', u0(bcs, index),u0.grad_value(bcs,index))
+        return rho*b2
+    lform = LinearForm(2*(uspace,))
+    lform.add_domain_integrator(VectorSourceIntegrator(f1))
 
     lform.assembly()
     fb2 = lform.get_vector()  
-    
-    fb3 = A2@u0.flat
-    fb4 = D@p0.flat
+    fb3 = A2@u0.flatten(order='C')
+    fb4 = D@p0.flatten(order='C')
 
     b1 = fb1 - fb2 + fb4 - mu*fb3
     AA, b1 = ubc.apply(A, b1)
@@ -156,7 +158,7 @@ for i in range(2):
     def f2(bcs,index):
         b2 = us.grad_value(bcs,index)[...,0,0,:]+us.grad_value(bcs,index)[...,1,1,:]
         return -1/dt*b2
-
+    
     lform = LinearForm(pspace)
     lform.add_domain_integrator(ScalarSourceIntegrator(f2))
     lform.assembly()
@@ -176,7 +178,7 @@ for i in range(2):
         b3 = p1.grad_value(bcs,index)-p0.grad_value(bcs,index)
         return dt*b3
 
-    lform = LinearForm((nuspace,)*2)
+    lform = LinearForm((uspace,)*2)
     lform.add_domain_integrator(VectorSourceIntegrator(f3))
     lform.assembly()
     tb2 = lform.get_vector()   
@@ -191,28 +193,27 @@ for i in range(2):
     
     u1.flat[:] = x[:]
 
-    co1 = usolution(smesh.node)
-    NN = smesh.number_of_nodes()
+    co1 = usolution(mesh.node)
+    NN = mesh.number_of_nodes()
     co2 = u1[:,:NN].transpose(1,0)
     errorMatrix[0,i] = np.abs(co1-co2).max()
-    #errorMatrix[0,i] = uspace.integralalg.error(usolution,u1)
-    #errorMatrix[1,i] = pspace.integralalg.error(psolution,p1)
+    errorMatrix[0,i] = mesh.error(uso, u1)
+    errorMatrix[1,i] = mesh.error(pso, p1)
     print("结果",np.sum(np.abs(u1))) 
     u0[:] = u1
     p0[:] = p1
 
     # 时间步进一层 
     tmesh.advance()
-
 # 画图
 '''
 print(errorMatrix[0,:])
 ctx.destroy()
 fig1 = plt.figure()
-node = smesh.node
+node = mesh.node
 x = tuple(node[:,0])
 y = tuple(node[:,1])
-NN = smesh.number_of_nodes()
+NN = mesh.number_of_nodes()
 u = u1.transpose()[:NN]
 ux = tuple(u[:,0])
 uy = tuple(u[:,1])
