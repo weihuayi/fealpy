@@ -68,7 +68,7 @@ def test_quadrangle_mesh_shape_function(p, plot=False):
     def u(p):
         x = p[..., 0]
         y = p[..., 1]
-        return x*y
+        return x**2*y**2
 
     ipdb.set_trace()
     mesh = QuadrangleMesh.from_one_quadrangle()
@@ -84,8 +84,8 @@ def test_quadrangle_mesh_shape_function(p, plot=False):
         val = np.einsum('qi, ci->qc', phi, uI[cell2dof])
         return val
 
-    #e = mesh.error(u, uh)
-    #print(e)
+    e = mesh.error(u, uh)
+    print(e)
 
     if plot:
         fig, axes = plt.subplots()
@@ -95,5 +95,5 @@ def test_quadrangle_mesh_shape_function(p, plot=False):
 
 
 if __name__ == "__main__":
-    test_quadrangle_mesh_shape_function(2, True)
+    test_quadrangle_mesh_shape_function(1, True)
 

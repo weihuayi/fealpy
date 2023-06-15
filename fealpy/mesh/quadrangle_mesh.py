@@ -206,14 +206,10 @@ class QuadrangleMesh(Mesh2d, Plotable):
             return 1
     
     def number_of_global_ipoints(self, p):
-        NP = self.number_of_nodes()
-        if p > 1:
-            NE = self.number_of_edges()
-            NP += (p-1)*NE
-        if p > 2:
-            NC = self.number_of_cells()
-            NP += (p-1)*(p-1)*NC
-        return NP
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-1)*(p-1)*NC
 
     def interpolation_points(self, p, index=np.s_[:]):
         """
@@ -240,7 +236,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
         ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
                 node[edge,:]).reshape(-1, GD)
 
-        w = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
+        w = np.einsum('im, jn->ijmn', w, w).reshape(-1, 4)
         ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
                 node[cell[:, [0, 3, 1, 2]]]).reshape(-1, GD)
 
