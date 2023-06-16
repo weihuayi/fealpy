@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from matplotlib.axes import Axes
 
-from ..mesh_base import Mesh, Mesh1d, Mesh2d, Mesh3d
+from ..mesh_base import Mesh
 from . import artist as A
 
 _MT = TypeVar('_MT', bound=Mesh)
@@ -164,7 +164,7 @@ EntityFinder.register('finder')
 ##################################################
 
 
-class AddPlot1d(MeshPloter[Mesh1d]):
+class AddPlot1d(MeshPloter):
     def draw(
             self, nodecolor='k', cellcolor='k',
             markersize=20, linewidths=1,
@@ -194,7 +194,7 @@ class AddPlot1d(MeshPloter[Mesh1d]):
 AddPlot1d.register('1d')
 
 
-class AddPlot2dHomo(MeshPloter[Mesh2d]):
+class AddPlot2dHomo(MeshPloter):
     def draw(
             self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
             linewidths: float=1.0, alpha: float=1.0,
@@ -231,7 +231,7 @@ class AddPlot2dHomo(MeshPloter[Mesh2d]):
 AddPlot2dHomo.register('2d')
 
 
-class AddPlot2dPoly(MeshPloter[Mesh2d]):
+class AddPlot2dPoly(MeshPloter):
     def draw(
             self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
             linewidths: float=1.0, alpha: float=1.0,
@@ -265,7 +265,7 @@ class AddPlot2dPoly(MeshPloter[Mesh2d]):
 AddPlot2dPoly.register('polygon2d')
 
 
-class AddPlot3dHomo(MeshPloter[Mesh3d]):
+class AddPlot3dHomo(MeshPloter):
     def draw(
             self, nodecolor='k', edgecolor='k', cellcolor='w',
             markersize=20, linewidths=0.5, alpha=0.8,

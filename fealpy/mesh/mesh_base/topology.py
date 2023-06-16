@@ -190,6 +190,7 @@ class Mesh2d(Mesh):
         """
         @brief 计算二维网格中每条边上单位法线
         """
+        assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
@@ -234,12 +235,6 @@ class Mesh3d(Mesh):
             return np.zeros(1, dtype=self.ftype)
         else:
             raise ValueError("`entitytype` is wrong!")
-
-    def cell_volume(self, index=np.s_[:]):
-        pass
-
-    def face_area(self, index=np.s_[:]):
-        pass
 
 
 

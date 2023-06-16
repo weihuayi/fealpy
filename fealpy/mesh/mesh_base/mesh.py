@@ -1,8 +1,3 @@
-"""
-Provide the abstract base class for mesh.
-"""
-
-from abc import ABCMeta, abstractmethod
 from typing import Union
 from numpy.typing import NDArray
 import numpy as np
@@ -10,27 +5,10 @@ import numpy as np
 from ..mesh_data_structure import MeshDataStructure
 
 
-class Mesh(metaclass=ABCMeta):
+class Mesh():
     """
-    @brief The abstract base class for mesh. This can not be instantiated before\
-           all abstract methods being overriden.
+    @brief The base class for mesh. 
 
-    @note: Abstract methods list:
-    ```
-    def uniform_refine(self, n: int=1) -> int: ...
-    def integrator(self, k: int, etype: Union[int, str]): ...
-    def entity_measure(self, etype: Union[int, str], index=np.s_[:]) -> NDArray: ...
-    @staticmethod
-    def multi_index_matrix(p: int, etype: Union[int, str]='cell') -> NDArray: ...
-    def shape_function(self, bc: NDArray, p: int) -> NDArray: ...
-    def grad_shape_function(self, bc: NDArray, p: int, index=np.s_[:]) -> NDArray: ...
-    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int: ...
-    def number_of_global_ipoints(self, p: int) -> int: ...
-    def interpolation_points(self, p: int) -> NDArray: ...
-    def cell_to_ipoint(self, p: int, index=np.s_[:]): ...
-    def face_to_ipoint(self, p: int, index=np.s_[:]): ...
-    def edge_to_ipoint(self, p: int, index=np.s_[:]): ...
-    def node_to_ipoint(self, p: int, index=np.s_[:]): ...
     """
     ds: MeshDataStructure
     node: NDArray
@@ -172,23 +150,30 @@ class Mesh(metaclass=ABCMeta):
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return R # (..., ldof, TD+1)
 
+    def shape_function(self, bc, p=1) -> NDArray:
+        """
+        @brief The cell shape function. 
+        """
+        raise NotImplementedError
 
-    @abstractmethod
+    def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
+        """
+        @brief The gradient of the cell shape function. 
+        """
+        raise NotImplementedError
+
     def uniform_refine(self, n: int=1) -> None:
         """
         @brief Refine the whole mesh uniformly for `n` times.
         """
-        pass
+        raise NotImplementedError
 
 
-    ### FEM Interfaces ###
-
-    @abstractmethod
     def integrator(self, k: int, etype: Union[int, str]):
         """
         @brief Get the integration formula on a mesh entity of different dimensions.
         """
-        pass
+        raise NotImplementedError
 
     def bc_to_point(self, bc: NDArray, etype: Union[int, str]='cell',
                     index=np.s_[:]) -> NDArray:
@@ -255,36 +240,32 @@ class Mesh(metaclass=ABCMeta):
         elif etype in {'face', TD-1}: # Try 'face' in the last
             face = self.ds.face
             return np.sum(node[face[index], :], axis=1) / face.shape[1]
-        raise ValueError(f"Invalid etype '{etype}'.")
+        raise ValueError(f"Invalid entity type '{etype}'.")
 
-    @abstractmethod
     def entity_measure(self, etype: Union[int, str], index=np.s_[:]) -> NDArray:
         """
         @brief Calculate measurements of entities.
         """
-        pass
+        raise NotImplementedError
 
 
-    @abstractmethod
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         """
         @brief Return the number of p-order interpolation points in a single entity.
         """
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def number_of_global_ipoints(self, p: int) -> int:
         """
         @brief Return the number of all p-order interpolation points.
         """
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def interpolation_points(self, p: int) -> NDArray:
         """
         @brief Get all the p-order interpolation points in the mesh.
         """
-        pass
+        raise NotImplementedError
 
     def node_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         return np.arange(self.number_of_nodes())[index]
@@ -336,8 +317,6 @@ class Mesh(metaclass=ABCMeta):
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
-
-    ### Other Interfaces ###
 
     def error(self, u, v, q=3, power=2, celltype=False):
         """

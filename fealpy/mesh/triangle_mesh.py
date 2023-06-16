@@ -5,7 +5,7 @@ from scipy.spatial import KDTree
 
 from .triangle_quality import *
 
-from .mesh_base import Mesh2d, Plotable
+from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh2dDataStructure, HomogeneousMeshDS
 
 class TriangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
@@ -28,7 +28,7 @@ class TriangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
 
 ## @defgroup MeshGenerators TriangleMesh Common Region Mesh Generators
 ## @defgroup MeshQuality
-class TriangleMesh(Mesh2d, Plotable):
+class TriangleMesh(Mesh, Plotable):
     def __init__(self, node, cell):
         """
         @brief TriangleMesh 对象的初始化函数
@@ -55,8 +55,9 @@ class TriangleMesh(Mesh2d, Plotable):
         
         self.edge_bc_to_point = self.bc_to_point
         self.cell_bc_to_point = self.bc_to_point
-        self.shape_function = self._shape_function
         self.face_to_ipoint = self.edge_to_ipoint
+
+        self.shape_function = self._shape_function
 
     def ref_cell_measure(self):
         return 0.5
@@ -75,24 +76,15 @@ class TriangleMesh(Mesh2d, Plotable):
             from ..quadrature import GaussLegendreQuadrature
             return GaussLegendreQuadrature(q)
 
-
-    def point_to_bc(self, point):
-        i_cell = self.location(point)
-        node = self.node
-        cell = self.entity('cell')
-        i_cellmeasure = self.cell_area()[i_cell]
-        i_cell = node[cell[i_cell]]
-        point = point[:,np.newaxis, :]
-        v = i_cell - point
-        area0 = 0.5* np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
-        area1 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
-        area2 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
-        result = np.zeros((i_cell.shape[0], 3))
-        result[:, 0] = area0/i_cellmeasure
-        result[:, 1] = area1/i_cellmeasure
-        result[:, 2] = area2/i_cellmeasure
-        return result
-
+    def entity_measure(self, etype=2, index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        else:
+            raise ValueError(f"Invalid entity type '{etype}'.")
 
 
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
@@ -135,99 +127,6 @@ class TriangleMesh(Mesh2d, Plotable):
         return gphi 
 
     grad_shape_function_on_face = grad_shape_function_on_edge
-
-
-    def grad_lambda(self, index=np.s_[:]):
-        node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
-        v0 = node[cell[index, 2]] - node[cell[index, 1]]
-        v1 = node[cell[index, 0]] - node[cell[index, 2]]
-        v2 = node[cell[index, 1]] - node[cell[index, 0]]
-        GD = self.geo_dimension()
-        nv = np.cross(v1, v2)
-        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
-        if GD == 2:
-            length = nv
-            W = np.array([[0, 1], [-1, 0]])
-            Dlambda[:, 0] = v0@W/length[:, None]
-            Dlambda[:, 1] = v1@W/length[:, None]
-            Dlambda[:, 2] = v2@W/length[:, None]
-        elif GD == 3:
-            length = np.linalg.norm(nv, axis=-1, keepdims=True)
-            n = nv/length
-            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
-            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
-            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
-        return Dlambda
-
-    def rot_lambda(self, index=np.s_[:]):
-        node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
-        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
-        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
-        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
-        GD = self.geo_dimension()
-        nv = np.cross(v2, -v1)
-        Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
-        if GD == 2:
-            length = nv
-        elif GD == 3:
-            length = np.sqrt(np.sum(nv**2, axis=-1))
-
-        Rlambda[:,0,:] = v0/length.reshape((-1, 1))
-        Rlambda[:,1,:] = v1/length.reshape((-1, 1))
-        Rlambda[:,2,:] = v2/length.reshape((-1, 1))
-
-        return Rlambda
-
-    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
-        """
-        @brief 一致加密三角形网格
-        """
-
-        if returnim:
-            nodeIMatrix = []
-            cellIMatrix = []
-        for i in range(n):
-            NN = self.number_of_nodes()
-            NC = self.number_of_cells()
-            NE = self.number_of_edges()
-            node = self.entity('node')
-            edge = self.entity('edge')
-            cell = self.entity('cell')
-            cell2edge = self.ds.cell_to_edge()
-            edge2newNode = np.arange(NN, NN+NE)
-            newNode = (node[edge[:,0],:] + node[edge[:,1],:])/2.0
-
-            if returnim:
-                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
-                nodeIMatrix.append(A.tocsr())
-                B = eye(NC, dtype=self.ftype)
-                B = bmat([[B], [B], [B], [B]])
-                cellIMatrix.append(B.tocsr())
-
-            if surface is not None:
-                newNode, _ = surface.project(newNode)
-
-            if interface is not None:
-                for key, levelset in interface:
-                    isInterfaceEdge = self.edgedata[key]
-                    p = newNode[isInterfaceEdge]
-                    levelset.project(p)
-                    newNode[isInterfaceEdge] = p
-
-
-            self.node = np.concatenate((node, newNode), axis=0)
-            p = np.r_['-1', cell, edge2newNode[cell2edge]]
-            cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
-            self.ds.reinit(NN+NE, cell)
-
-        if returnim:
-            return nodeIMatrix, cellIMatrix
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         if iptype in {'cell', 2}:
@@ -326,6 +225,130 @@ class TriangleMesh(Mesh2d, Plotable):
         flag = np.sum(mi > 0, axis=1) == 3
         c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
         return c2p[index]
+
+
+    def edge_frame(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上的局部标架 
+        """
+        assert self.geo_dimension() == 2
+        t = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        n = t@w
+        return n, t
+
+    def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    face_normal = edge_normal
+    face_unit_normal = edge_unit_normal
+    def grad_lambda(self, index=np.s_[:]):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+        GD = self.geo_dimension()
+        nv = np.cross(v1, v2)
+        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+            W = np.array([[0, 1], [-1, 0]])
+            Dlambda[:, 0] = v0@W/length[:, None]
+            Dlambda[:, 1] = v1@W/length[:, None]
+            Dlambda[:, 2] = v2@W/length[:, None]
+        elif GD == 3:
+            length = np.linalg.norm(nv, axis=-1, keepdims=True)
+            n = nv/length
+            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
+            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
+            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
+        return Dlambda
+
+    def rot_lambda(self, index=np.s_[:]):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
+        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
+        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
+        GD = self.geo_dimension()
+        nv = np.cross(v2, -v1)
+        Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+        elif GD == 3:
+            length = np.sqrt(np.sum(nv**2, axis=-1))
+
+        Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+        Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+        Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+
+        return Rlambda
+
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+        """
+        @brief 一致加密三角形网格
+        """
+
+        if returnim:
+            nodeIMatrix = []
+            cellIMatrix = []
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            NE = self.number_of_edges()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+            cell2edge = self.ds.cell_to_edge()
+            edge2newNode = np.arange(NN, NN+NE)
+            newNode = (node[edge[:,0],:] + node[edge[:,1],:])/2.0
+
+            if returnim:
+                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                nodeIMatrix.append(A.tocsr())
+                B = eye(NC, dtype=self.ftype)
+                B = bmat([[B], [B], [B], [B]])
+                cellIMatrix.append(B.tocsr())
+
+            if surface is not None:
+                newNode, _ = surface.project(newNode)
+
+            if interface is not None:
+                for key, levelset in interface:
+                    isInterfaceEdge = self.edgedata[key]
+                    p = newNode[isInterfaceEdge]
+                    levelset.project(p)
+                    newNode[isInterfaceEdge] = p
+
+
+            self.node = np.concatenate((node, newNode), axis=0)
+            p = np.r_['-1', cell, edge2newNode[cell2edge]]
+            cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
+            self.ds.reinit(NN+NE, cell)
+
+        if returnim:
+            return nodeIMatrix, cellIMatrix
+
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
@@ -1304,7 +1327,6 @@ class TriangleMesh(Mesh2d, Plotable):
         self.ds.reinit(NN, cell)
 
 
-
     def jacobian_matrix(self, index=np.s_[:]):
         """
         @brief 获得三角形单元对应的 Jacobian 矩阵
@@ -1336,6 +1358,22 @@ class TriangleMesh(Mesh2d, Plotable):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
+    def point_to_bc(self, point):
+        i_cell = self.location(point)
+        node = self.node
+        cell = self.entity('cell')
+        i_cellmeasure = self.cell_area()[i_cell]
+        i_cell = node[cell[i_cell]]
+        point = point[:,np.newaxis, :]
+        v = i_cell - point
+        area0 = 0.5* np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
+        area1 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
+        area2 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
+        result = np.zeros((i_cell.shape[0], 3))
+        result[:, 0] = area0/i_cellmeasure
+        result[:, 1] = area1/i_cellmeasure
+        result[:, 2] = area2/i_cellmeasure
+        return result
 
     def mark_interface_cell(self, phi):
         """

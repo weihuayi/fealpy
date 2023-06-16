@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 from scipy.spatial import KDTree
-from .mesh_base import Mesh3d, Plotable
+from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh3dDataStructure, HomogeneousMeshDS
 
 
@@ -42,7 +42,7 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
 
 ## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
 ## @defgroup MeshQuality
-class TetrahedronMesh(Mesh3d, Plotable):
+class TetrahedronMesh(Mesh, Plotable):
     def __init__(self, node, cell, showmemory=False):
         """
         @brief Initializes a TetrahedronMesh object.
@@ -110,6 +110,42 @@ class TetrahedronMesh(Mesh3d, Plotable):
         elif etype in {'edge', 1}:
             from ..quadrature import GaussLegendreQuadrature
             return GaussLegendreQuadrature(q)
+
+    def entity_measure(self, etype=3, index=np.s_[:]):
+        if etype in {'cell', 3}:
+            return self.cell_volume(index=index)
+        elif etype in {'face', 2}:
+            return self.face_area(index=index)
+        elif etype in {'edge', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return np.zeros(1, dtype=self.ftype)
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
+
+    def cell_volume(self, index=np.s_[:]):
+        """
+        @brief 计算网格单元的体积
+        """
+        cell = self.ds.cell
+        node = self.node
+        v01 = node[cell[index, 1]] - node[cell[index, 0]]
+        v02 = node[cell[index, 2]] - node[cell[index, 0]]
+        v03 = node[cell[index, 3]] - node[cell[index, 0]]
+        volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
+        return volume
+
+    def face_area(self, index=np.s_[:]):
+        """
+        @brief 计算所有网格面的面积
+        """
+        face = self.ds.face
+        node = self.node
+        v01 = node[face[index, 1], :] - node[face[index, 0], :]
+        v02 = node[face[index, 2], :] - node[face[index, 0], :]
+        nv = np.cross(v01, v02)
+        area = np.sqrt(np.square(nv).sum(axis=1))/2.0
+        return area
 
     def grad_lambda(self, index=np.s_[:]):
         localFace = self.ds.localFace
@@ -436,29 +472,6 @@ class TetrahedronMesh(Mesh3d, Plotable):
         length = np.sqrt(np.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def cell_volume(self, index=np.s_[:]):
-        """
-        @brief 计算网格单元的体积
-        """
-        cell = self.ds.cell
-        node = self.node
-        v01 = node[cell[index, 1]] - node[cell[index, 0]]
-        v02 = node[cell[index, 2]] - node[cell[index, 0]]
-        v03 = node[cell[index, 3]] - node[cell[index, 0]]
-        volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
-        return volume
-
-    def face_area(self, index=np.s_[:]):
-        """
-        @brief 计算所有网格面的面积
-        """
-        face = self.ds.face
-        node = self.node
-        v01 = node[face[index, 1], :] - node[face[index, 0], :]
-        v02 = node[face[index, 2], :] - node[face[index, 0], :]
-        nv = np.cross(v01, v02)
-        area = np.sqrt(np.square(nv).sum(axis=1))/2.0
-        return area
 
     def dihedral_angle(self):
         """

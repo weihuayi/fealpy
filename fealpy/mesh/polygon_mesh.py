@@ -6,11 +6,11 @@ import inspect
 
 from ..common import ranges
 
-from .mesh_base import Mesh2d, Plotable
+from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
 
 
-class PolygonMesh(Mesh2d, Plotable):
+class PolygonMesh(Mesh, Plotable):
     """
     @brief Polygon mesh type.
     """
@@ -402,7 +402,7 @@ class PolygonMesh(Mesh2d, Plotable):
         pass
 
     @classmethod
-    def from_mesh(cls, mesh: Mesh2d):
+    def from_mesh(cls, mesh: Mesh):
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         NC = mesh.number_of_cells()

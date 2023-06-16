@@ -1,8 +1,10 @@
 import numpy as np
+
 from numpy.typing import NDArray
+from typing import Union
 from types import ModuleType
 
-from .mesh_base import Mesh1d, Plotable
+from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh1dDataStructure, HomogeneousMeshDS
 
 
@@ -10,7 +12,7 @@ class IntervalMeshDataStructure(Mesh1dDataStructure, HomogeneousMeshDS):
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
-class IntervalMesh(Mesh1d, Plotable):
+class IntervalMesh(Mesh, Plotable):
     def __init__(self, node: NDArray, cell: NDArray):
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
@@ -33,6 +35,7 @@ class IntervalMesh(Mesh1d, Plotable):
         self.cell_length = self.edge_length
         self.cell_tangent = self.edge_tangent
         self.cell_unit_tangent = self.edge_unit_tangent
+
         self.cell_to_ipoint = self.edge_to_ipoint
         self.face_to_ipoint = self.node_to_ipoint
         self.shape_function = self._shape_function
@@ -43,82 +46,95 @@ class IntervalMesh(Mesh1d, Plotable):
     def ref_face_measure(self):
         return 0.0
 
-    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
+    def integrator(self, q: int, etype: Union[str, int]='cell'):
+        """
+        @brief 返回第 k 个高斯积分公式。
+        """
+        from ..quadrature import GaussLegendreQuadrature
+        return GaussLegendreQuadrature(q)
+
+    def grad_shape_function(self, bc: NDArray, p: int=1, variables: str='x', index=np.s_[:]):
         """
         @brief 
         """
         R = self._grad_shape_function(bc, p=p)
-        Dlambda = self.grad_lambda(index=index)
-        gphi = np.einsum('...ij, cjm->...cim', R, Dlambda)
-        return gphi 
-
-    def vtk_cell_type(self):
-        VTK_LINE = 3
-        return VTK_LINE
-
-    def to_vtk(self, etype='edge', index=np.s_[:], fname=None):
-        """
-
-        Parameters
-        ----------
-
-        Notes
-        -----
-        把网格转化为 VTK 的格式
-        """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
-
-        node = self.entity('node')
-        GD = self.geo_dimension()
-        if GD < 3:
-            node = np.c_[node, np.zeros((node.shape[0], 3-GD))]
-
-        cell = self.entity(etype)[index]
-        NV = cell.shape[-1]
-        NC = len(cell)
-
-        cell = np.c_[np.zeros((NC, 1), dtype=cell.dtype), cell]
-        cell[:, 0] = NV
-
-        cellType = self.vtk_cell_type()  # segment
-
-        if fname is None:
-            return node, cell.flatten(), cellType, NC
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = np.einsum('...ij, cjm->...cim', R, Dlambda)
+            return gphi 
         else:
-            print("Writting to vtk...")
-            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
+            return R
 
+    def entity_measure(self, etype: Union[int, str]='cell', index=np.s_[:], node=None):
+        """
+        """
+        if etype in {1, 'cell', 'edge'}:
+            return self.cell_length(index=index, node=None)
+        elif etype in {0, 'face', 'node'}:
+            return np.array([0.0], dtype=self.ftype)
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
+
+    def grad_lambda(self, index=np.s_[:]):
+        """
+        @brief 计算所有单元上重心坐标函数的导数
+        """
+        node = self.entity('node')
+        cell = self.entity('cell', index=index)
+        v = node[cell[:, 1]] - node[cell[:, 0]]
+        NC = len(cell) 
+        GD = self.geo_dimension()
+        Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
+        h2 = np.sum(v**2, axis=-1)
+        v /=h2.reshape(-1, 1)
+        Dlambda[:, 0, :] = -v
+        Dlambda[:, 1, :] = v
+        return Dlambda
+
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
+        return p + 1
+
+    def number_of_global_ipoints(self, p: int) -> int:
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NC
+
+    def interpolation_points(self, p: int, index=np.s_[:]) -> NDArray:
+        GD = self.geo_dimension()
+        node = self.entity('node')
+
+        if p == 1:
+            return node
+        else:
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            gdof = NN + NC*(p-1)
+            ipoint = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoint[:NN] = node
+            cell = self.entity('cell')
+            w = np.zeros((p-1,2), dtype=np.float64)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            GD = self.geo_dimension()
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                    node[cell]).reshape(-1, GD)
+
+            return ipoint
 
     def face_unit_normal(self, index=np.s_[:], node=None):
         """
-
-        Notes
-        -----
-            返回点的法线向量
+        @brief
         """
-        NN = self.number_of_nodes()
-        n = np.ones(NN, dtype=self.ftype)
-        n2c = self.ds.node_to_cell()
-        flat = (n2c[:, 0] == n2c[:, 1]) & (n2c[:, 3] == 0)
-        n[flat]= -1
-        return n[index]
+        raise NotImplementedError
 
     def cell_normal(self, index=np.s_[:], node=None):
         """
-
-        Notes
-        -----
-            返回二维空间中单元的法线向量
+        @brief 单元的法线方向
         """
-        GD = self.geo_dimension()
-        if GD != 2:
-            raise ValueError('cell_normal just work for 2D Case')
+        assert self.geo_dimension() == 2
         v = self.cell_tangent(index=index, node=node)
         w = np.array([(0, -1),(1, 0)])
         return v@w
-
 
     def uniform_refine(self, n=1, options={}):
         """
@@ -224,6 +240,45 @@ class IntervalMesh(Mesh1d, Plotable):
         cell[:, 1][:-1] = np.arange(1,n)
 
         return cls(node, cell)
+
+    def vtk_cell_type(self):
+        VTK_LINE = 3
+        return VTK_LINE
+
+    def to_vtk(self, etype='edge', index=np.s_[:], fname=None):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = np.c_[node, np.zeros((node.shape[0], 3-GD))]
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = np.c_[np.zeros((NC, 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment
+
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+
 
 IntervalMesh.set_ploter('1d')
 

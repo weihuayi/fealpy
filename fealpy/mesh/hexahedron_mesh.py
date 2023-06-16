@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse import triu, tril, find, hstack
 
-from .mesh_base import Mesh3d, Plotable
+from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh3dDataStructure, HomogeneousMeshDS
 
 class HexahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
@@ -25,14 +25,14 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
         [1, 4], [1, 3], [1, 5], [2, 1]])
     ccw = np.array([0, 1, 2, 3])
 
-    NVC = 8
-    NEC = 12
-    NFC = 6
-    NVF = 4
-    NEF = 4
+    NVC: int = 8
+    NEC: int = 12
+    NFC: int = 6
+    NVF: int = 4
+    NEF: int = 4
 
 
-class HexahedronMesh(Mesh3d, Plotable):
+class HexahedronMesh(Mesh, Plotable):
     """
     @brief 非结构六面体网格数据结构对象
     """
@@ -65,6 +65,7 @@ class HexahedronMesh(Mesh3d, Plotable):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 3}:
             return TensorProductQuadrature((qf, qf, qf)) 
@@ -72,6 +73,41 @@ class HexahedronMesh(Mesh3d, Plotable):
             return TensorProductQuadrature((qf, qf)) 
         elif etype in {'edge', 1}:
             return qf 
+
+    def entity_measure(self, etype=3, index=np.s_[:]):
+        if etype in {'cell', 3}:
+            return self.cell_volume(index=index)
+        elif etype in {'face', 2}:
+            return self.face_area(index=index)
+        elif etype in {'edge', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return np.zeros(1, dtype=self.ftype)
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
+
+    def cell_volume(self, index=np.s_[:]):
+        """
+        @brief 计算单元体积
+        """
+        qf = self.integrator(2, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        detJ = np.linalg.det(J)
+        val = np.einsum('..., ...c->c', ws, detJ)
+        return val
+
+    def face_area(self, index=np.s_[:]):
+        """
+        @brief 
+        """
+        qf = self.integrator(2, etype='face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        n = np.sqrt(np.sum(n**2, axis=-1))
+        val = np.einsum('q, qi->i', ws, n)
+        return val 
 
     def bc_to_point(self, bc, index=np.s_[:]):
         """
@@ -175,31 +211,9 @@ class HexahedronMesh(Mesh3d, Plotable):
         node = self.entity('node')
         entity = self.entity(TD, index=index)
         gphi = self.grad_shape_function(bc, p=1, variables='u') 
-        J = np.einsum( 'cim, ...in->...cmn', node[entity[:, [0, 4, 5, 7, 1, 5, 2, 6]]], gphi)
+        J = np.einsum( 'cim, in->cmn', node[entity[:, [0, 4, 5, 7, 1, 5, 2, 6]]], gphi)
         return J
 
-    def cell_volume(self, index=np.s_[:]):
-        """
-        @brief 计算单元体积
-        """
-        qf = self.integrator(2, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        J = self.jacobi_matrix(bcs, index=index)
-        detJ = np.linalg.det(J)
-        val = np.einsum('..., ...c->c', ws, detJ)
-        return val
-
-    def face_area(self, index=np.s_[:]):
-        """
-        @brief 
-        """
-        qf = self.integrator(2, etype='face')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        J = self.jacobi_matrix(bcs, index=index)
-        n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        n = np.sqrt(np.sum(n**2, axis=-1))
-        val = np.einsum('q, qi->i', ws, n)
-        return val 
 
     def first_fundamental_form(self, J):
         """
@@ -259,7 +273,7 @@ class HexahedronMesh(Mesh3d, Plotable):
         return ipoint
 
     def face_to_ipoint(self, p):
-        """!
+        """
         @brief 生成每个面上的插值点全局编号
         """
         NN = self.number_of_nodes()
@@ -416,18 +430,6 @@ class HexahedronMesh(Mesh3d, Plotable):
         cell2ipoint[:, indof] = np.arange(NN+NE*(p-1)+NF*(p-1)**2, 
                 NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
         return cell2ipoint
-
-    def cell_volume(self):
-        pass
-
-    def face_area(self):
-        pass
-
-    def jacobi_at_corner(self):
-        pass
-
-    def cell_quality(self):
-        pass
 
     @classmethod
     def from_one_hexahedron(cls):

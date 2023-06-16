@@ -1,5 +1,5 @@
 import numpy as np
-from .mesh_base import Mesh2d, Plotable
+from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh2dDataStructure, HomogeneousMeshDS
 
 
@@ -66,6 +66,39 @@ class QuadrangleMesh(Mesh2d, Plotable):
             return TensorProductQuadrature((qf, qf)) 
         elif etype in {'edge', 'face', 1}:
             return qf 
+
+    def entity_measure(self, etype=2, index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        else:
+            raise ValueError(f"Invalid entity type '{etype}'.")
+
+    def cell_area(self, index=np.s_[:]):
+        """
+        @brief 根据散度定理计算多边形的面积
+        @note 请注意下面的计算方式不方便实现部分单元面积的计算
+        """
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+
+        t = self.edge_tangent()
+        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1] 
+
+        a = np.zeros(NC, dtype=self.ftype)
+        np.add.at(a, edge2cell[:, 0], val)
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+
+        a /= 2.0
+
+        return a[index]
 
     def bc_to_point(self, bc, index=np.s_[:]):
         """
@@ -174,36 +207,37 @@ class QuadrangleMesh(Mesh2d, Plotable):
                 G[..., j, i] = G[..., i, j]
         return G
 
-
-    def uniform_refine(self, n=1):
+    def edge_frame(self, index=np.s_[:]):
         """
-        @brief 一致加密四边形网格
+        @brief 计算二维网格中每条边上的局部标架 
         """
-        for i in range(n):
-            NN = self.number_of_nodes()
-            NE = self.number_of_edges()
-            NC = self.number_of_cells()
+        assert self.geo_dimension() == 2
+        t = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        n = t@w
+        return n, t
 
-            # Find the cutted edge  
-            cell2edge = self.ds.cell_to_edge()
-            edgeCenter = self.entity_barycenter('edge')
-            cellCenter = self.entity_barycenter('cell')
+    def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
-            edge2center = np.arange(NN, NN + NE)
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
-            cell = self.ds.cell
-            cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
-            ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
-            cc = np.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
- 
-            cell = np.zeros((4*NC, 4), dtype=np.int_)
-            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
-            cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
-            cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
-            cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
+    face_normal = edge_normal
+    face_unit_normal = edge_unit_normal
 
-            self.node = np.r_['0', self.node, edgeCenter, cellCenter]
-            self.ds.reinit(NN + NE + NC, cell)
 
 
     def number_of_local_ipoints(self, p, iptype='cell'):
@@ -294,6 +328,35 @@ class QuadrangleMesh(Mesh2d, Plotable):
 
         return cell2ipoint[index]
 
+    def uniform_refine(self, n=1):
+        """
+        @brief 一致加密四边形网格
+        """
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+
+            # Find the cutted edge  
+            cell2edge = self.ds.cell_to_edge()
+            edgeCenter = self.entity_barycenter('edge')
+            cellCenter = self.entity_barycenter('cell')
+
+            edge2center = np.arange(NN, NN + NE)
+
+            cell = self.ds.cell
+            cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
+            ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
+            cc = np.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
+ 
+            cell = np.zeros((4*NC, 4), dtype=np.int_)
+            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
+            cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
+            cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
+            cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
+
+            self.node = np.r_['0', self.node, edgeCenter, cellCenter]
+            self.ds.reinit(NN + NE + NC, cell)
 
     def number_of_corner_nodes(self):
         return self.ds.NN

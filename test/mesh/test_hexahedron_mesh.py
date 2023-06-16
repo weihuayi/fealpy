@@ -10,6 +10,7 @@ from fealpy.mesh.hexahedron_mesh import HexahedronMesh
 def test_hexahedrom_mesh_measure():
     mesh = HexahedronMesh.from_one_hexahedron()
 
+    ipdb.set_trace()
     vol = mesh.entity_measure('cell')
     print(vol)
 

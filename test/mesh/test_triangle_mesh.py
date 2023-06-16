@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipdb
 import pytest
-from fealpy.mesh import TriangleMesh  # 请替换为实际模块名
+from fealpy.mesh.triangle_mesh import TriangleMesh  # 请替换为实际模块名
 
 
 def test_triangle_mesh_init():
