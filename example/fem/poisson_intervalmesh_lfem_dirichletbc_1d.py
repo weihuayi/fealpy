@@ -9,11 +9,11 @@ from scipy.sparse.linalg import spsolve
 from fealpy.pde.poisson_1d import CosData
 from fealpy.mesh.interval_mesh import IntervalMesh 
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import DiffusionIntegrator 
-from fealpy.fem import ScalarSourceIntegrator
-from fealpy.fem import BilinearForm
-from fealpy.fem import LinearForm
-from fealpy.fem import DirichletBC
+from fealpy.fem import DiffusionIntegrator # 计算单元矩阵 
+from fealpy.fem import ScalarSourceIntegrator # 计算单元向量
+from fealpy.fem import BilinearForm # 组装总矩阵
+from fealpy.fem import LinearForm # 组装总向量
+from fealpy.fem import DirichletBC # 处理边界条件
 
 import ipdb
 

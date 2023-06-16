@@ -66,11 +66,11 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
     bform = BilinearForm(space)
-    bform.add_domain_integrator(DiffusionIntegrator(q=3))
+    bform.add_domain_integrator(DiffusionIntegrator(q=p+2))
     A = bform.assembly()
 
     lform = LinearForm(space)
-    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=3))
+    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
     F = lform.assembly()
 
     bc = DirichletBC(space, pde.dirichlet) 
@@ -85,3 +85,4 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print(errorMatrix)
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])

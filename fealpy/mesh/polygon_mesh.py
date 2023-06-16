@@ -180,13 +180,6 @@ class PolygonMesh(Mesh2d, Plotable):
     face_to_ipoint = edge_to_ipoint
 
 
-    def node_to_ipoint(self):
-        """
-        @brief 网格节点到插值点的映射关系
-        """
-        NN = self.number_of_nodes()
-        return np.arange(NN)
-
     def interpolation_points(self, p: int,
             index=np.s_[:], scale: float=0.3):
         """
@@ -235,32 +228,6 @@ class PolygonMesh(Mesh2d, Plotable):
         bcs = self.multi_index_matrix(p-2)/(p-2)
         ipoint[start:] = np.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
         return ipoint
-
-
-    @staticmethod
-    def multi_index_matrix(p: int, etype=2):
-        """
-        @brief 获取三角形上的 p 次的多重指标矩阵
-
-        @param[in] p positive integer
-
-        @return multiIndex  ndarray with shape (ldof, 3)
-        """
-        if etype in {'cell', 2}:
-            ldof = (p+1)*(p+2)//2
-            idx = np.arange(0, ldof)
-            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
-            multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
-            multiIndex[:,1] = idx0 - multiIndex[:,2]
-            multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
-            return multiIndex
-        elif etype in {'face', 'edge', 1}:
-            ldof = p+1
-            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-            multiIndex[:, 0] = np.arange(p, -1, -1)
-            multiIndex[:, 1] = p - multiIndex[:, 0]
-            return multiIndex
 
     def shape_function(self, bc: NDArray, p: int) -> NDArray:
         raise NotImplementedError

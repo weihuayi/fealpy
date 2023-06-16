@@ -20,11 +20,11 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
        (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
        (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
        (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)]);
-    NVC = 4
-    NEC = 6
-    NFC = 4
-    NVF = 3
-    NEF = 3
+    NVC: int = 4
+    NEC: int = 6
+    NFC: int = 4
+    NVF: int = 3
+    NEF: int = 3
 
 
     def face_to_edge_sign(self):
@@ -161,7 +161,7 @@ class TetrahedronMesh(Mesh3d, Plotable):
         if p > 1:
             NE = self.number_of_edges()
             edge = self.entity('edge') 
-            w = np.zeros((p-1,2), dtype=self.ftype)
+            w = np.zeros((p-1,2), dtype=self.ftype) #TODO: fix it
             w[:, 0] = np.arange(p-1, 0, -1)/p
             w[:, 1] = w[-1::-1, 0]
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, GD) 

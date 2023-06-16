@@ -103,9 +103,9 @@ class TriangleMesh(Mesh2d, Plotable):
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-            return gphi #(..., NC, ldof, GD)
+            return gphi #(NQ, NC, ldof, GD)
         elif variables == 'u':
-            return R
+            return R #(NQ, ldof, TD+1)
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
         """
@@ -138,8 +138,8 @@ class TriangleMesh(Mesh2d, Plotable):
 
 
     def grad_lambda(self, index=np.s_[:]):
-        node = self.node
-        cell = self.ds.cell
+        node = self.entity('node')
+        cell = self.entity('cell')
         NC = self.number_of_cells() if index == np.s_[:] else len(index)
         v0 = node[cell[index, 2]] - node[cell[index, 1]]
         v1 = node[cell[index, 0]] - node[cell[index, 2]]
@@ -162,8 +162,8 @@ class TriangleMesh(Mesh2d, Plotable):
         return Dlambda
 
     def rot_lambda(self, index=np.s_[:]):
-        node = self.node
-        cell = self.ds.cell
+        node = self.entity('node')
+        cell = self.entity('cell')
         NC = self.number_of_cells() if index == np.s_[:] else len(index)
         v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
         v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
@@ -278,7 +278,7 @@ class TriangleMesh(Mesh2d, Plotable):
             w = multiIndex[isInCellIPoints, :]/p
             ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell, :]).reshape(-1, GD)
-        return ipoints
+        return ipoints # (gdof, GD)
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
@@ -1303,40 +1303,6 @@ class TriangleMesh(Mesh2d, Plotable):
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
 
-
-    def linear_stiff_matrix(self, c=None):
-        """
-        Notes
-        -----
-        线性元的刚度矩阵
-        """
-        warnings.warn("The linear_stiff_matrix() is deprecated and will be removed in a future version. "
-                      "Please use the interpolate() instead.", DeprecationWarning)
-
-        NN = self.number_of_nodes()
-
-        area = self.cell_area()
-        gphi = self.grad_lambda()
-
-        if callable(c):
-            bc = np.array([1/3, 1/3, 1/3], dtype=self.ftype)
-            if c.coordtype == 'cartesian':
-                ps = self.bc_to_point(bc)
-                c = c(ps)
-            elif c.coordtype == 'barycentric':
-                c = c(bc)
-
-        if c is not None:
-            area *= c
-
-        A = gphi@gphi.swapaxes(-1, -2)
-        A *= area[:, None, None]
-
-        cell = self.entity('cell')
-        I = np.broadcast_to(cell[:, :, None], shape=A.shape)
-        J = np.broadcast_to(cell[:, None, :], shape=A.shape)
-        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return A
 
 
     def jacobian_matrix(self, index=np.s_[:]):

@@ -31,6 +31,8 @@ class IntervalMesh(Mesh1d, Plotable):
 
         
         self.cell_length = self.edge_length
+        self.cell_tangent = self.edge_tangent
+        self.cell_unit_tangent = self.edge_unit_tangent
         self.cell_to_ipoint = self.edge_to_ipoint
         self.face_to_ipoint = self.node_to_ipoint
         self.shape_function = self._shape_function
@@ -117,14 +119,6 @@ class IntervalMesh(Mesh1d, Plotable):
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
-    def cell_tangent(self, index=np.s_[:], node=None):
-        """
-        @brief 单元的切向量 
-        """
-        node = self.node if node is None else node
-        cell = self.entity('cell')
-        v = node[cell[index, 1]] - node[cell[index, 0]]
-        return v
 
     def uniform_refine(self, n=1, options={}):
         """
