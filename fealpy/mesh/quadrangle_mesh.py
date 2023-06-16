@@ -52,6 +52,12 @@ class QuadrangleMesh(Mesh2d, Plotable):
 
         self.face_to_ipoint = self.edge_to_ipoint
 
+    def ref_cell_measure(self):
+        return 1.0
+
+    def ref_face_measure(self):
+        return 1.0
+
     def integrator(self, q, etype='cell'):
         from ..quadrature import GaussLegendreQuadrature
         qf = GaussLegendreQuadrature(q)
@@ -158,11 +164,12 @@ class QuadrangleMesh(Mesh2d, Plotable):
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。
         """
-        shape = J.shape[0:-2] + (2, 2)
+        TD = J.shape[-1]
+        shape = J.shape[0:-2] + (TD, TD)
         G = np.zeros(shape, dtype=self.ftype)
-        for i in range(2):
+        for i in range(TD):
             G[..., i, i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
-            for j in range(i+1, 2):
+            for j in range(i+1, TD):
                 G[..., i, j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
                 G[..., j, i] = G[..., i, j]
         return G

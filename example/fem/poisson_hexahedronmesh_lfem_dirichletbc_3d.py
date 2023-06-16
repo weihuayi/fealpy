@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh.quadrangle_mesh import QuadrangleMesh 
+from fealpy.mesh.hexahedron_mesh import HexahedronMesh 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import DiffusionIntegrator 
 from fealpy.fem import ScalarSourceIntegrator
@@ -20,7 +20,7 @@ import ipdb
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        QuadrangleMesh 上任意次有限元方法
+        HexahedronMesh 上任意次有限元方法
         """)
 
 parser.add_argument('--degree',
@@ -28,11 +28,15 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--nx',
-        default=8, type=int,
+        default=4, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--ny',
-        default=8, type=int,
+        default=4, type=int,
+        help='初始网格剖分段数.')
+
+parser.add_argument('--nz',
+        default=4, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
@@ -44,13 +48,14 @@ args = parser.parse_args()
 p = args.degree
 nx = args.nx
 ny = args.ny
+nz = args.nz
 maxit = args.maxit
 
 #ipdb.set_trace()
-pde = CosCosData()
+pde = CosCosCosData()
 domain = pde.domain()
 
-mesh = QuadrangleMesh.from_box(domain, nx=nx, ny=ny)
+mesh = HexahedronMesh.from_box(domain, nx=nx, ny=ny, nz=nz)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$', 
         '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']
@@ -63,11 +68,11 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
     bform = BilinearForm(space)
-    bform.add_domain_integrator(DiffusionIntegrator(q=p+2))
+    bform.add_domain_integrator(DiffusionIntegrator(q=3))
     A = bform.assembly()
 
     lform = LinearForm(space)
-    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
+    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=3))
     F = lform.assembly()
 
     bc = DirichletBC(space, pde.dirichlet) 

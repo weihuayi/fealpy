@@ -58,6 +58,12 @@ class TriangleMesh(Mesh2d, Plotable):
         self.shape_function = self._shape_function
         self.face_to_ipoint = self.edge_to_ipoint
 
+    def ref_cell_measure(self):
+        return 0.5
+
+    def ref_face_measure(self):
+        return 1.0
+
     def integrator(self, q, etype='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式

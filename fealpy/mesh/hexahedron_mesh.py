@@ -1,11 +1,11 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse import triu, tril, find, hstack
+
 from .mesh_base import Mesh3d, Plotable
-from .mesh_data_structure import Mesh3dDataStructure
+from .mesh_data_structure import Mesh3dDataStructure, HomogeneousMeshDS
 
-class HexahedronMeshDataStructure(Mesh3dDataStructure):
-
+class HexahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
     # The following local data structure should be class properties
     localEdge = np.array([
         (0, 1), (1, 2), (2, 3), (0, 3),
@@ -55,6 +55,12 @@ class HexahedronMesh(Mesh3d, Plotable):
         self.edge_shape_function = self._shape_function
         self.grad_edge_shape_function = self._grad_shape_function
 
+    def ref_cell_measure(self):
+        return 1.0
+
+    def ref_face_meausre(self):
+        return 1.0
+
     def integrator(self, q, etype='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式
@@ -80,9 +86,9 @@ class HexahedronMesh(Mesh3d, Plotable):
             bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
             bc = np.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
 
-            # node[cell].shape == (NC, 8, 2)
+            # node[cell].shape == (NC, 8, 3)
             # bc.shape == (NQ, 8)
-            p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 5, 7, 1, 5, 2, 6]]]) # (NQ, NC, 2)
+            p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 5, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
 
         if isinstance(bc, tuple) and len(bc) == 2:
             face = self.entity('face', index=index)
@@ -108,10 +114,10 @@ class HexahedronMesh(Mesh3d, Plotable):
         @brief 六面体单元上的形函数
         """
         if isinstance(bc, tuple):
-            GD = len(bc)
+            TD = len(bc)
             phi = [self._shape_function(val, p=p) for val in bc]
-            ldof = (p+1)**GD 
-            if GD == 3:
+            ldof = (p+1)**TD
+            if TD == 3:
                 return np.einsum('im, jn, ko->ijkmno', phi[0], phi[1], phi[2]).reshape(-1, ldof)
             else: 
                 return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
@@ -123,73 +129,88 @@ class HexahedronMesh(Mesh3d, Plotable):
         """
         @brief  六面体单元形函数的导数
         """
-        assert isinstance(bc, tuple) and len(bc) == 2
+        assert isinstance(bc, tuple)
+
+        TD = len(bc)
 
         Dlambda = np.array([-1, 1], dtype=self.ftype)
+        phi = self._shape_function(bc[0], p=p)  
+        R = self._grad_shape_function(bc[0], p=p)  
+        gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
 
-        phi0 = self._shape_function(bc[0], p=p)  
-        R0 = self._grad_shape_function(bc[0], p=p)  
-        gphi0 = np.einsum('...ij, j->...i', R0, Dlambda) # (..., ldof)
-
-        phi1 = self._shape_function(bc[1], p=p)  
-        R1 = self._grad_shape_function(bc[1], p=p)  
-        gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
-
-        phi2 = self._shape_function(bc[2], p=p)  
-        R2 = self._grad_shape_function(bc[2], p=p)  
-        gphi2 = np.einsum('...ij, j->...i', R2, Dlambda) # (..., ldof)
-
-        n = phi0.shape[0]*phi1.shape[0]*phi2.shape[0] # 张量积分点的个数
-        ldof = phi0.shape[-1]*phi1.shape[-1]*phi2.shape[-1]
-        shape = (n, ldof, 3)
+        n = phi.shape[0]**TD
+        ldof = phi.shape[-1]**TD
+        shape = (n, ldof, TD)
         gphi = np.zeros(shape, dtype=self.ftype)
 
-        gphi[..., 0] = np.einsum('im, jn, ko->ijkmno', gphi0, phi1, phi2).reshape(-1, ldof)
-        gphi[..., 1] = np.einsum('im, jn, ko->ijkmno', phi0, gphi1, phi2).reshape(-1, ldof)
-        gphi[..., 2] = np.einsum('im, jn, ko->ijkmno', phi0, phi1, gphi2).reshape(-1, ldof)
-
-        if variables == 'u':
-            return gphi
-        elif variables == 'x':
-            J = self.jacobi_matrix(bc, index=index)
-            G = self.first_fundamental_form(J)
-            G = np.linalg.inv(G)
-            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
-            return gphi
+        if TD == 3:
+            gphi[..., 0] = np.einsum('im, jn, ko->ijkmno', gphi, phi, phi).reshape(-1, ldof)
+            gphi[..., 1] = np.einsum('im, jn, ko->ijkmno', phi, gphi, phi).reshape(-1, ldof)
+            gphi[..., 2] = np.einsum('im, jn, ko->ijkmno', phi, phi, gphi).reshape(-1, ldof)
+            if variables == 'x':
+                J = self.jacobi_matrix(bc, index=index)
+                J = np.linalg.inv(J)
+                # J^{-T}\nabla_u phi
+                gphi = np.einsum('...cmn, ...lm->...cln', J, gphi) 
+                return gphi
+        elif TD == 2:
+            gphi[..., 0] = np.einsum('im, jn->ijmn', gphi, phi).reshape(-1, ldof)
+            gphi[..., 1] = np.einsum('im, jn->ijmn', phi, gphi).reshape(-1, ldof)
+            if variables == 'x':
+                J = self.jacobi_matrix(bc, index=index)
+                G = self.first_fundamental_form(J)
+                G = np.linalg.inv(G)
+                gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
+                return gphi
+        return gphi
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """
+        @brief 计算参考单元 （u, v, w) 到实际六面体单元间映射的 Jacobi 矩阵。
+
+            x(u, v, w) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """
+        assert isinstance(bc, tuple)
+        TD = len(bc)
+        node = self.entity('node')
+        entity = self.entity(TD, index=index)
+        gphi = self.grad_shape_function(bc, p=1, variables='u') 
+        J = np.einsum( 'cim, ...in->...cmn', node[entity[:, [0, 4, 5, 7, 1, 5, 2, 6]]], gphi)
+        return J
+
+    def cell_volume(self, index=np.s_[:]):
+        """
+        @brief 计算单元体积
+        """
+        qf = self.integrator(2, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        detJ = np.linalg.det(J)
+        val = np.einsum('..., ...c->c', ws, detJ)
+        return val
+
+    def face_area(self, index=np.s_[:]):
+        """
         @brief 
         """
-        assert isinstance(bc, tuple) and len(bc) == 2
-        NQ = len(bc[0])
-        gphi = np.ones((NQ, 2), dtype=self.ftype)
-        gphi[:, 0] = -1
-
-        gphi0 = np.einsum('il, jm, kn->ijklmn', gphi, phi, phi)
-        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, gphi, phi)
-        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, phi, gphi)
-        n = gphi0.shape[0]*gphi0.shape[1]*gphi0.shape[2]
-        shape = (n, (p+1)**3, 3)
-        gphi = np.zeros(shape, dtype=self.ftype)
-        gphi[..., 0].flat = gphi0.flat
-        gphi[..., 1].flat = gphi1.flat
-        gphi[..., 2].flat = gphi2.flat
-
-        cell = self.entity('cell')
-        node = self.entity('node')
-        J = np.einsum( 'ijn, ...ijk->...ink', node[cell[index, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
-        return J
+        qf = self.integrator(2, etype='face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        n = np.sqrt(np.sum(n**2, axis=-1))
+        val = np.einsum('q, qi->i', ws, n)
+        return val 
 
     def first_fundamental_form(self, J):
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。
         """
-        shape = J.shape[0:-2] + (2, 2)
+        TD = J.shape[-1]
+        shape = J.shape[0:-2] + (TD, TD)
         G = np.zeros(shape, dtype=self.ftype)
-        for i in range(2):
+        for i in range(TD):
             G[..., i, i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
-            for j in range(i+1, 2):
+            for j in range(i+1, TD):
                 G[..., i, j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
                 G[..., j, i] = G[..., i, j]
         return G
@@ -408,14 +429,24 @@ class HexahedronMesh(Mesh3d, Plotable):
     def cell_quality(self):
         pass
 
-    def print(self):
-        print("Point:\n", self.node)
-        print("Cell:\n", self.ds.cell)
-        print("Edge:\n", self.ds.edge)
-        print("Face:\n", self.ds.face)
-        print("Face2cell:\n", self.ds.face2cell)
+    @classmethod
+    def from_one_hexahedron(cls):
+        """
+        @brief 构造一个只有一个六面体的网格
+        """
+        node = np.array([
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [0.0, 0.0, 1.0],
+            ], dtype=np.float64)
 
-
+        cell = np.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=np.int_)
+        return cls(node, cell)
 
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):

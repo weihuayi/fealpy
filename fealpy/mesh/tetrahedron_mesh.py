@@ -91,6 +91,12 @@ class TetrahedronMesh(Mesh3d, Plotable):
             print("memory size of cell2edge array (GB): ", c2esize)
             print("Total memory size (GB): ",  total)
 
+    def ref_cell_measure(self):
+        return 1.0/6.0
+
+    def ref_face_measure(self):
+        return 1.0/2.0
+
     def integrator(self, q, etype=3):
         """
         @brief 获取不同维度网格实体上的积分公式 

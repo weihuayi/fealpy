@@ -59,11 +59,11 @@ for i in range(maxit):
 
     #ipdb.set_trace()
     bform = BilinearForm(space)
-    bform.add_domain_integrator(DiffusionIntegrator(q=3))
+    bform.add_domain_integrator(DiffusionIntegrator(q=p+3))
     A = bform.assembly()
 
     lform = LinearForm(space)
-    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=3))
+    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=p+3))
     F = lform.assembly()
 
     bc = DirichletBC(space, pde.dirichlet) 
@@ -71,10 +71,11 @@ for i in range(maxit):
     A, F = bc.apply(A, F, uh)
     uh[:] = spsolve(A, F)
 
-    errorMatrix[0, i] = mesh.error(pde.solution, uh)
-    errorMatrix[1, i] = mesh.error(pde.gradient, uh.grad_value)
+    errorMatrix[0, i] = mesh.error(pde.solution, uh, q=p+3)
+    errorMatrix[1, i] = mesh.error(pde.gradient, uh.grad_value, q=p+3)
 
     if i < maxit-1:
         mesh.uniform_refine()
 
 print(errorMatrix)
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])

@@ -22,9 +22,8 @@ class CosData:
         @brief 方程真解的的导数
 
         """
-        x = p[..., 0]
         pi = np.pi
-        val = -pi*np.sin(pi*x)
+        val = -pi*np.sin(pi*p)
         return val
 
     @cartesian
