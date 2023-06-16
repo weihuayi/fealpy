@@ -70,10 +70,13 @@ def test_quadrangle_mesh_shape_function(p, plot=False):
         y = p[..., 1]
         return x**2*y**2
 
-    ipdb.set_trace()
     mesh = QuadrangleMesh.from_one_quadrangle()
+    mesh.uniform_refine()
+    cm = mesh.entity_measure('cell')
+    print('cm:', cm)
     ips = mesh.interpolation_points(p)
     cell2dof = mesh.cell_to_ipoint(p)
+    print(cm)
     print(cell2dof)
     print(ips)
     uI = u(ips)
@@ -95,5 +98,5 @@ def test_quadrangle_mesh_shape_function(p, plot=False):
 
 
 if __name__ == "__main__":
-    test_quadrangle_mesh_shape_function(1, True)
+    test_quadrangle_mesh_shape_function(2, True)
 

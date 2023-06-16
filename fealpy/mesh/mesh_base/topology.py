@@ -144,12 +144,18 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         edge2cell = self.ds.edge_to_cell()
+
+        t = self.edge_tangent()
+        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1] 
+
+        a = np.zeros(NC, dtype=self.ftype)
+        np.add.at(a, edge2cell[:, 0], val)
+
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        v =  node[edge[:, 1], :] - node[edge[:, 0], :]
-        val = np.einsum('ij, ij->i', v, node[edge[:, 0], :], optimize=True)
-        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
-        a /=2
+        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+
+        a /= 2.0
+
         return a[index]
 
     ## Special Methods in 2D

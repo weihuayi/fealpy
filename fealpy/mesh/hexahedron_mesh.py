@@ -24,24 +24,13 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
         [2, 4], [4, 3], [3, 5], [5, 2], 
         [1, 4], [1, 3], [1, 5], [2, 1]])
     ccw = np.array([0, 1, 2, 3])
+
     NVC = 8
     NEC = 12
     NFC = 6
     NVF = 4
     NEF = 4
-    TD = 3
 
-    def __init__(self, NN, cell):
-        super().__init__(NN, cell)
-
-        
-    def face_to_edge_sign(self):
-        face2edge = self.face_to_edge()
-        edge = self.edge
-        face2edgeSign = np.zeros((NF, 4), dtype=np.bool_)
-        for i in range(4):
-            face2edgeSign[:, i] = (face[:, i] == edge[face2edge[:, i], 0])
-        return face2edgeSign
 
 class HexahedronMesh(Mesh3d, Plotable):
     """
@@ -63,9 +52,12 @@ class HexahedronMesh(Mesh3d, Plotable):
         self.facedata = {} 
         self.meshdata = {}
 
+        self.edge_shape_function = self._shape_function
+        self.grad_edge_shape_function = self._grad_shape_function
+
     def integrator(self, q, etype='cell'):
         """
-        @brief 获取不同维度网格实体上的积分公式 
+        @brief 获取不同维度网格实体上的积分公式
         """
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 3}:
@@ -75,140 +67,91 @@ class HexahedronMesh(Mesh3d, Plotable):
         elif etype in {'edge', 1}:
             return qf 
 
-    def multi_index_matrix(self, p, etype='edge'):
+    def bc_to_point(self, bc, index=np.s_[:]):
         """
-        @brief 获取网格边上的 p 次的多重指标矩阵
-
-        @param[in] p 正整数 
-
-        @return multiIndex  ndarray with shape (ldof, 2)
+        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
         """
-        if etype in {'edge', 1}:
-            ldof = p+1
-            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-            multiIndex[:, 0] = np.arange(p, -1, -1)
-            multiIndex[:, 1] = p - multiIndex[:, 0]
-            return multiIndex
+        node = self.entity('node')
+        if isinstance(bc, tuple) and len(bc) == 3:
+            cell = self.entity('cell')[index]
+
+            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
+            bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
+            bc = np.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
+
+            # node[cell].shape == (NC, 8, 2)
+            # bc.shape == (NQ, 8)
+            p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 5, 7, 1, 5, 2, 6]]]) # (NQ, NC, 2)
+
+        if isinstance(bc, tuple) and len(bc) == 2:
+            face = self.entity('face', index=index)
+
+            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
+            bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+
+            # node[cell].shape == (NC, 4, 2)
+            # bc.shape == (NQ, 4)
+            p = np.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
         else:
-            raise ValueError(f"etype is {etype}! For QuadrangleMesh, we just support etype with value `edge`, `1`")
+            edge = self.entity('edge', index=index)[index]
+            p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        return p 
 
-    def edge_shape_function(self, bc, p=1):
-        """
-        @brief the shape function on edge  
-        """
-        assert bc.shape[-1] == 2
-
-        if p == 1:
-            return bc
-        TD = 1 # toplogy dimension
-        multiIndex = self.multi_index_matrix(p, etype=etype)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
-
-    def grad_edge_shape_function(self, bc, p=1):
-        """
-        @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
-        """
-        assert bc.shape[-1] == 2
-        TD = 1 # toplogy dimension
-        multiIndex = self.multi_index_matrix(p) 
-        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
-
-        c = np.arange(1, p+1)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=bc.dtype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=bc.dtype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=bc.dtype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return R # (..., ldof, TD+1)
-
-    face_shape_function = edge_shape_function
-    grad_face_shape_function = grad_edge_shape_function
+    edge_bc_to_point = bc_to_point
+    face_bc_to_point = bc_to_point
+    cell_bc_to_point = bc_to_point
 
     def shape_function(self, bc, p=1):
         """
         @brief 六面体单元上的形函数
-        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
         """
-        assert isinstance(bc, tuple) and len(bc) == 2
-        phi = self.edge_shape_function(bc[0], p=p) 
-        phi = np.einsum('il, jm, kn->ijklmn', phi, phi, phi)
-        shape = phi.shape[:-3] + (-1, )
-        phi = phi.reshape(shape) # 展平自由度
-        shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
-        phi = phi.reshape(shape) # 展平积分点
+        if isinstance(bc, tuple):
+            GD = len(bc)
+            phi = [self._shape_function(val, p=p) for val in bc]
+            ldof = (p+1)**GD 
+            if GD == 3:
+                return np.einsum('im, jn, ko->ijkmno', phi[0], phi[1], phi[2]).reshape(-1, ldof)
+            else: 
+                return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
+        else:
+            return self._shape_function(bc, p=p)
         return phi
 
     def grad_shape_function(self, bc, p=1, variables='x'):
         """
         @brief  六面体单元形函数的导数
-
-        @note 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
-
-        bc 是一个长度为 2 的 tuple
-
-        bc[i] 是一个一维积分公式的重心坐标数组
-
-        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
         """
         assert isinstance(bc, tuple) and len(bc) == 2
 
         Dlambda = np.array([-1, 1], dtype=self.ftype)
-        phi = self.edge_shape_function(bc[0], p=p)  
 
-        # 关于**一维变量重心坐标**的导数
-        # lambda_0 = 1 - u 
-        # lambda_1 = v 
-        # (NQ, ldof, 2) 
-        R = self.grad_edge_shape_function(bc[0], p=p)  
+        phi0 = self._shape_function(bc[0], p=p)  
+        R0 = self._grad_shape_function(bc[0], p=p)  
+        gphi0 = np.einsum('...ij, j->...i', R0, Dlambda) # (..., ldof)
 
-        # 关于一维变量的导数
-        gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
+        phi1 = self._shape_function(bc[1], p=p)  
+        R1 = self._grad_shape_function(bc[1], p=p)  
+        gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
 
-        gphi0 = np.einsum('il, jm, kn->ijklmn', gphi, phi, phi)
-        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, gphi, phi)
-        gphi1 = np.einsum('il, jm, kn->ijklmn', phi, phi, gphi)
-        n = gphi0.shape[0]*gphi0.shape[1]*gphi0.shape[2]
-        shape = (n, (p+1)*(p+1)*(p+1), 3)
+        phi2 = self._shape_function(bc[2], p=p)  
+        R2 = self._grad_shape_function(bc[2], p=p)  
+        gphi2 = np.einsum('...ij, j->...i', R2, Dlambda) # (..., ldof)
+
+        n = phi0.shape[0]*phi1.shape[0]*phi2.shape[0] # 张量积分点的个数
+        ldof = phi0.shape[-1]*phi1.shape[-1]*phi2.shape[-1]
+        shape = (n, ldof, 3)
         gphi = np.zeros(shape, dtype=self.ftype)
-        gphi[..., 0].flat = gphi0.flat
-        gphi[..., 1].flat = gphi1.flat
-        gphi[..., 2].flat = gphi2.flat
+
+        gphi[..., 0] = np.einsum('im, jn, ko->ijkmno', gphi0, phi1, phi2).reshape(-1, ldof)
+        gphi[..., 1] = np.einsum('im, jn, ko->ijkmno', phi0, gphi1, phi2).reshape(-1, ldof)
+        gphi[..., 2] = np.einsum('im, jn, ko->ijkmno', phi0, phi1, gphi2).reshape(-1, ldof)
 
         if variables == 'u':
             return gphi
         elif variables == 'x':
-            J = self.jacobi_matrix(bc)
+            J = self.jacobi_matrix(bc, index=index)
             G = self.first_fundamental_form(J)
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
@@ -227,7 +170,7 @@ class HexahedronMesh(Mesh3d, Plotable):
         gphi1 = np.einsum('il, jm, kn->ijklmn', phi, gphi, phi)
         gphi1 = np.einsum('il, jm, kn->ijklmn', phi, phi, gphi)
         n = gphi0.shape[0]*gphi0.shape[1]*gphi0.shape[2]
-        shape = (n, (p+1)*(p+1)*(p+1), 3)
+        shape = (n, (p+1)**3, 3)
         gphi = np.zeros(shape, dtype=self.ftype)
         gphi[..., 0].flat = gphi0.flat
         gphi[..., 1].flat = gphi1.flat
@@ -251,66 +194,6 @@ class HexahedronMesh(Mesh3d, Plotable):
                 G[..., j, i] = G[..., i, j]
         return G
 
-    def bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换为网格实体上的笛卡尔坐标点
-        """
-        node = self.entity('node')
-        if isinstance(bc, tuple):
-            if len(bc) == 2:
-                face = self.entity('face')[index]
-                bc0 = bc[0] # (NQ0, 2)
-                bc1 = bc[1] # (NQ1, 2)
-                bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
-                p = np.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
-            elif len(bc) == 3:
-                cell = self.entity('cell')[index]
-                bc0 = bc[0] # (NQ0, 2)
-                bc1 = bc[1] # (NQ1, 2)
-                bc2 = bc[2] # (NQ1, 2)
-                bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, NQ2, 2, 2, 2)
-                p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
-        else:
-            edge = self.entity('edge')[index]
-            p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 3)
-        return p 
-
-    def edge_bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换为网格边上的笛卡尔坐标点
-        """
-        node = self.node
-        entity = self.entity('edge')[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
-
-    def face_bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换为网格面上的笛卡尔坐标点
-        """
-        assert len(bc) == 2
-        node = self.entity('node')
-        face = self.entity('face')[index]
-        bc0 = bc[0] # (NQ0, 2)
-        bc1 = bc[1] # (NQ1, 2)
-        bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
-        p = np.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
-        return p
-
-    def cell_bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换为网格单元上的笛卡尔坐标点
-        """
-        assert len(bc) == 3
-        node = self.entity('node')
-        cell = self.entity('cell')[index]
-        bc0 = bc[0] # (NQ0, 2)
-        bc1 = bc[1] # (NQ1, 2)
-        bc2 = bc[2] # (NQ2, 2)
-        bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, NQ2, 2, 2, 2)
-        p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
-        return p
-
     def uniform_refine(self, n=1):
         """
         @brief 一致加密六面体网格 
@@ -318,20 +201,22 @@ class HexahedronMesh(Mesh3d, Plotable):
         for i in range(n):
             pass
 
-    def number_of_local_ipoints(p, celltype):
-        if celltype=='edge':
-            return p+1
-        elif celltype=='face':
-            return (p+1)**2
-        elif celltype=='cell':
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        if iptype in {'cell', 3}:
             return (p+1)**3
+        elif iptype in {'face', 2}:
+            return (p + 1)**2
+        elif iptype in {'edge', 1}:
+            return p + 1
+        elif iptype in {'node', 0}:
+            return 1
 
     def number_of_global_ipoints(self, p):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NF = self.number_of_faces()
         NC = self.number_of_cells()
-        return NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3
+        return NN + NE * (p-1) + NF * (p-1)**2 + NC * (p-1)**3
 
     def interpolation_points(self, p):
         node = self.entity('node')
@@ -340,7 +225,7 @@ class HexahedronMesh(Mesh3d, Plotable):
 
         c2ip = self.cell_to_ipoint(p)
         gp = self.number_of_global_ipoints(p)
-        ipoint = np.zeros([gp, 3], dtype=np.float_)
+        ipoint = np.zeros([gp, 3], dtype=np.float64)
 
         p04 = np.linspace(node[cell[:, 0]], node[cell[:, 4]], p+1, endpoint=True).swapaxes(0, 1)
         p37 = np.linspace(node[cell[:, 3]], node[cell[:, 7]], p+1, endpoint=True).swapaxes(0, 1)
@@ -351,19 +236,6 @@ class HexahedronMesh(Mesh3d, Plotable):
         p1 = np.linspace(p15, p26, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
         ipoint[c2ip] = np.linspace(p0, p1, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
         return ipoint
-
-    def edge_to_ipoint(self, p):
-        """!
-        @brief 生成每条边上的插值点全局编号
-        """
-        edge = self.entity('edge')
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        e2ip = np.zeros([NE, p+1], dtype=np.int_)
-        e2ip[:, 0] = edge[:, 0]
-        e2ip[:, -1] = edge[:, -1]
-        e2ip[:, 1:-1] = np.arange(NN, NN+NE*(p-1)).reshape(-1, p-1)
-        return e2ip
 
     def face_to_ipoint(self, p):
         """!

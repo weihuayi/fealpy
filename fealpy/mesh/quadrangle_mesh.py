@@ -86,18 +86,20 @@ class QuadrangleMesh(Mesh2d, Plotable):
         return p 
 
     edge_bc_to_point = bc_to_point
+    face_bc_to_point = bc_to_point
     cell_bc_to_point = bc_to_point
 
     def shape_function(self, bc, p=1):
         """
         @brief 四边形单元上的形函数
         """
-        assert isinstance(bc, tuple) and len(bc) == 2
-        phi0 = self._shape_function(bc[0], p=p) # x direction
-        phi1 = self._shape_function(bc[1], p=p) # y direction
-        ldof = phi0.shape[-1]*phi1.shape[-1]
-        phi = np.einsum('im, kn->ikmn', phi0, phi1).reshape(-1, ldof)
-        return phi
+        if isinstance(bc, tuple):
+            GD = len(bc)
+            phi = [self._shape_function(val, p=p) for val in bc]
+            ldof = (p+1)**GD 
+            return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
+        else:
+            return self._shape_function(bc, p=p)
 
     def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """
@@ -201,7 +203,7 @@ class QuadrangleMesh(Mesh2d, Plotable):
         if iptype in {'cell', 2}:
             return (p+1)*(p+1)
         elif iptype in {'face', 'edge',  1}:
-            return self.p + 1
+            return p + 1
         elif iptype in {'node', 0}:
             return 1
     
