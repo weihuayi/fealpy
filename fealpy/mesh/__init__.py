@@ -9,6 +9,10 @@ This module provide mesh
 # 结构化网格
 from .interval_mesh import IntervalMesh
 from .polygon_mesh import PolygonMesh
+from .triangle_mesh import TriangleMesh, TriangleMeshWithInfinityNode
+from .quadrangle_mesh import QuadrangleMesh
+from .tetrahedron_mesh import TetrahedronMesh
+from .hexahedron_mesh import HexahedronMesh
 
 from .UniformMesh1d import UniformMesh1d
 from .UniformMesh2d import UniformMesh2d
@@ -18,10 +22,6 @@ from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
 
 from .EdgeMesh import EdgeMesh
-from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
-from .QuadrangleMesh import QuadrangleMesh
-from .TetrahedronMesh import TetrahedronMesh
-from .HexahedronMesh import HexahedronMesh
 
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh

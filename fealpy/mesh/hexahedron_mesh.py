@@ -413,8 +413,9 @@ class HexahedronMesh(Mesh, Plotable):
         @brief 生成每个单元上的插值点全局编号
         """
 
+        cell = self.entity('cell', index=index)
         if p == 1:
-            return self.entity('cell', index=index)
+            return cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]
 
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -423,7 +424,6 @@ class HexahedronMesh(Mesh, Plotable):
 
         edge = self.entity('edge')
         face = self.entity('face')
-        cell = self.entity('cell')
 
         cell2face = self.ds.cell_to_face()
         face2edge = self.ds.face_to_edge()

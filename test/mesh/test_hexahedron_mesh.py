@@ -24,6 +24,7 @@ def test_hexahedrom_mesh_interpolation(p):
     from fealpy.decorator import cartesian, barycentric
     mesh = HexahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=2, ny=2, nz=2)
     cell = mesh.entity('cell')
+    node = mesh.entity('node')
 
     @cartesian
     def u(ps):
@@ -33,6 +34,7 @@ def test_hexahedrom_mesh_interpolation(p):
         return x*y*z
 
     ips = mesh.interpolation_points(p)
+    cell2dof = mesh.cell_to_ipoint(p)
     uI = u(ips)
 
     @barycentric
@@ -40,8 +42,10 @@ def test_hexahedrom_mesh_interpolation(p):
         phi = mesh.shape_function(bcs, p=p)
         val = np.einsum('qi, ci->qc', phi, uI[cell2dof])
         return val
-        
+
+    e = mesh.error(u, uh, q=3)
+    print(e)
 
 
 if __name__ == "__main__":
-    test_hexahedrom_mesh_measure()
+    test_hexahedrom_mesh_interpolation(1)

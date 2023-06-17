@@ -30,8 +30,6 @@ class IntervalMesh(Mesh, Plotable):
         self.itype = cell.dtype
         self.ftype = node.dtype
 
-
-        
         self.cell_length = self.edge_length
         self.cell_tangent = self.edge_tangent
         self.cell_unit_tangent = self.edge_unit_tangent
