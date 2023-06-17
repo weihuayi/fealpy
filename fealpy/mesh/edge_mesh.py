@@ -33,7 +33,7 @@ class EdgeMeshDataStructure(Mesh1dDataStructure, HomogeneousMeshDS):
 
 ## @defgroup MeshGenerators Meshgeneration algorithms on commonly used domain 
 ## @defgroup MeshQuality
-class EdgeMesh(Mesh):
+class EdgeMesh(Mesh, Plotable):
     def __init__(self, node, cell):
         self.node = node
         self.itype = cell.dtype
