@@ -94,7 +94,7 @@ class HexahedronMesh(Mesh, Plotable):
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs, index=index)
         detJ = np.linalg.det(J)
-        val = np.einsum('..., ...c->c', ws, detJ)
+        val = np.einsum('q, qc->c', ws, detJ)
         return val
 
     def face_area(self, index=np.s_[:]):
@@ -124,9 +124,9 @@ class HexahedronMesh(Mesh, Plotable):
 
             # node[cell].shape == (NC, 8, 3)
             # bc.shape == (NQ, 8)
-            p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 5, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
+            p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
 
-        if isinstance(bc, tuple) and len(bc) == 2:
+        elif isinstance(bc, tuple) and len(bc) == 2:
             face = self.entity('face', index=index)
 
             bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
@@ -161,18 +161,16 @@ class HexahedronMesh(Mesh, Plotable):
             return self._shape_function(bc, p=p)
         return phi
 
-    def grad_shape_function(self, bc, p=1, variables='x'):
+    def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """
         @brief  六面体单元形函数的导数
         """
         assert isinstance(bc, tuple)
-
         TD = len(bc)
-
         Dlambda = np.array([-1, 1], dtype=self.ftype)
         phi = self._shape_function(bc[0], p=p)  
         R = self._grad_shape_function(bc[0], p=p)  
-        gphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
+        dphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
 
         n = phi.shape[0]**TD
         ldof = phi.shape[-1]**TD
@@ -180,30 +178,29 @@ class HexahedronMesh(Mesh, Plotable):
         gphi = np.zeros(shape, dtype=self.ftype)
 
         if TD == 3:
-            gphi[..., 0] = np.einsum('im, jn, ko->ijkmno', gphi, phi, phi).reshape(-1, ldof)
-            gphi[..., 1] = np.einsum('im, jn, ko->ijkmno', phi, gphi, phi).reshape(-1, ldof)
-            gphi[..., 2] = np.einsum('im, jn, ko->ijkmno', phi, phi, gphi).reshape(-1, ldof)
+            gphi[..., 0] = np.einsum('im, jn, ko->ijkmno', dphi, phi, phi).reshape(-1, ldof)
+            gphi[..., 1] = np.einsum('im, jn, ko->ijkmno', phi, dphi, phi).reshape(-1, ldof)
+            gphi[..., 2] = np.einsum('im, jn, ko->ijkmno', phi, phi, dphi).reshape(-1, ldof)
             if variables == 'x':
                 J = self.jacobi_matrix(bc, index=index)
                 J = np.linalg.inv(J)
                 # J^{-T}\nabla_u phi
-                gphi = np.einsum('...cmn, ...lm->...cln', J, gphi) 
+                gphi = np.einsum('qcmn, qlm->qcln', J, gphi) 
                 return gphi
         elif TD == 2:
-            gphi[..., 0] = np.einsum('im, jn->ijmn', gphi, phi).reshape(-1, ldof)
-            gphi[..., 1] = np.einsum('im, jn->ijmn', phi, gphi).reshape(-1, ldof)
+            gphi[..., 0] = np.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof)
+            gphi[..., 1] = np.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof)
             if variables == 'x':
                 J = self.jacobi_matrix(bc, index=index)
                 G = self.first_fundamental_form(J)
                 G = np.linalg.inv(G)
-                gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
+                gphi = np.einsum('qikm, qimn, qln->qilk', J, G, gphi) 
                 return gphi
         return gphi
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """
-        @brief 计算参考单元 （u, v, w) 到实际六面体单元间映射的 Jacobi 矩阵。
-
+        @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵。
             x(u, v, w) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         assert isinstance(bc, tuple)
@@ -211,9 +208,11 @@ class HexahedronMesh(Mesh, Plotable):
         node = self.entity('node')
         entity = self.entity(TD, index=index)
         gphi = self.grad_shape_function(bc, p=1, variables='u') 
-        J = np.einsum( 'cim, in->cmn', node[entity[:, [0, 4, 5, 7, 1, 5, 2, 6]]], gphi)
+        if TD == 3:
+            J = np.einsum( 'cim, qin->qcmn', node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
+        elif TD == 2:
+            J = np.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
-
 
     def first_fundamental_form(self, J):
         """
@@ -231,10 +230,108 @@ class HexahedronMesh(Mesh, Plotable):
 
     def uniform_refine(self, n=1):
         """
-        @brief 一致加密六面体网格 
+        @brief 一致加密六面体网格 n 次
         """
         for i in range(n):
-            pass
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NF = self.number_of_faces()
+            NC = self.number_of_cells()
+            node = np.zeros((NN + NE + NF + NC, 3), dtype=self.ftype)
+            start = 0
+            end = NN
+            node[start:end] = self.entity('node')
+            start = end
+            end = start + NE
+            node[start:end] = self.entity_barycenter('edge')
+            start = end
+            end = start + NF 
+            node[start:end] = self.entity_barycenter('face')
+            start = end
+            end = start + NF 
+            node[start:end] = self.entity_barycenter('cell')
+
+            cell = np.zeros((8*NC, 8), dtype=self.itype)
+            c2n = self.entity('cell')
+            c2e = self.ds.cell_to_edge() + NN
+            c2f = self.ds.cell_to_face() + (NN + NE)
+            c2c = np.arange(NC) + (NN + NE + NF)
+
+            cell[0::8, 0] = c2n[:, 0]
+            cell[0::8, 1] = c2e[:, 0]
+            cell[0::8, 2] = c2f[:, 0]
+            cell[0::8, 3] = c2e[:, 3]  
+            cell[0::8, 4] = c2e[:, 4]  
+            cell[0::8, 5] = c2f[:, 4]  
+            cell[0::8, 6] = c2c  
+            cell[0::8, 7] = c2f[:, 2] 
+
+            cell[1::8, 0] = c2n[:, 1]
+            cell[1::8, 1] = c2e[:, 1]
+            cell[1::8, 2] = c2f[:, 0]
+            cell[1::8, 3] = c2e[:, 0]  
+            cell[1::8, 4] = c2e[:, 5]  
+            cell[1::8, 5] = c2f[:, 3]  
+            cell[1::8, 6] = c2c  
+            cell[1::8, 7] = c2f[:, 4] 
+
+            cell[2::8, 0] = c2n[:, 2]
+            cell[2::8, 1] = c2e[:, 2]
+            cell[2::8, 2] = c2f[:, 0]
+            cell[2::8, 3] = c2e[:, 1]  
+            cell[2::8, 4] = c2e[:, 6]  
+            cell[2::8, 5] = c2f[:, 5]  
+            cell[2::8, 6] = c2c  
+            cell[2::8, 7] = c2f[:, 3] 
+
+            cell[3::8, 0] = c2n[:, 3]
+            cell[3::8, 1] = c2e[:, 3]
+            cell[3::8, 2] = c2f[:, 0]
+            cell[3::8, 3] = c2e[:, 2]  
+            cell[3::8, 4] = c2e[:, 7]  
+            cell[3::8, 5] = c2f[:, 2]  
+            cell[3::8, 6] = c2c  
+            cell[3::8, 7] = c2f[:, 5] 
+
+            cell[4::8, 0] = c2n[:, 4]
+            cell[4::8, 1] = c2e[:,11]
+            cell[4::8, 2] = c2f[:, 1]
+            cell[4::8, 3] = c2e[:, 8]  
+            cell[4::8, 4] = c2e[:, 4]  
+            cell[4::8, 5] = c2f[:, 2]  
+            cell[4::8, 6] = c2c  
+            cell[4::8, 7] = c2f[:, 4] 
+
+            cell[5::8, 0] = c2n[:, 5]
+            cell[5::8, 1] = c2e[:, 8]
+            cell[5::8, 2] = c2f[:, 1]
+            cell[5::8, 3] = c2e[:, 9]  
+            cell[5::8, 4] = c2e[:, 5]  
+            cell[5::8, 5] = c2f[:, 4]  
+            cell[5::8, 6] = c2c  
+            cell[5::8, 7] = c2f[:, 3] 
+
+            cell[6::8, 0] = c2n[:, 6]
+            cell[6::8, 1] = c2e[:, 9]
+            cell[6::8, 2] = c2f[:, 1]
+            cell[6::8, 3] = c2e[:,10]  
+            cell[6::8, 4] = c2e[:, 6]  
+            cell[6::8, 5] = c2f[:, 3]  
+            cell[6::8, 6] = c2c  
+            cell[6::8, 7] = c2f[:, 5] 
+
+            cell[7::8, 0] = c2n[:, 7]
+            cell[7::8, 1] = c2e[:,10]
+            cell[7::8, 2] = c2f[:, 1]
+            cell[7::8, 3] = c2e[:,11]  
+            cell[7::8, 4] = c2e[:, 7]  
+            cell[7::8, 5] = c2f[:, 5]  
+            cell[7::8, 6] = c2c  
+            cell[7::8, 7] = c2f[:, 2] 
+
+            self.node = node
+            self.ds.reinit(NN+NE+NF+NC, cell)
+
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         if iptype in {'cell', 3}:
@@ -253,7 +350,10 @@ class HexahedronMesh(Mesh, Plotable):
         NC = self.number_of_cells()
         return NN + NE * (p-1) + NF * (p-1)**2 + NC * (p-1)**3
 
-    def interpolation_points(self, p):
+    def interpolation_points(self, p, index=np.s_[:]):
+        """
+        @brief 生成整个网格上的插值点
+        """
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells()
@@ -272,7 +372,7 @@ class HexahedronMesh(Mesh, Plotable):
         ipoint[c2ip] = np.linspace(p0, p1, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
         return ipoint
 
-    def face_to_ipoint(self, p):
+    def face_to_ipoint(self, p, index=np.s_[:]):
         """
         @brief 生成每个面上的插值点全局编号
         """
@@ -308,10 +408,15 @@ class HexahedronMesh(Mesh, Plotable):
                 NN+NE*(p-1)+NF*(p-1)**2).reshape(NF, -1)
         return face2ipoint
 
-    def cell_to_ipoint(self, p):
+    def cell_to_ipoint(self, p, index=np.s_[:]):
         """!
         @brief 生成每个单元上的插值点全局编号
         """
+
+        cell = self.entity('cell', index=index)
+        if p == 1:
+            return cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]
+
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NF = self.number_of_faces()
@@ -319,7 +424,6 @@ class HexahedronMesh(Mesh, Plotable):
 
         edge = self.entity('edge')
         face = self.entity('face')
-        cell = self.entity('cell')
 
         cell2face = self.ds.cell_to_face()
         face2edge = self.ds.face_to_edge()
@@ -365,71 +469,7 @@ class HexahedronMesh(Mesh, Plotable):
         indof = np.all(multiIndex>0, axis=-1)&np.all(multiIndex<p, axis=-1)
         cell2ipoint[:, indof] = np.arange(NN+NE*(p-1)+NF*(p-1)**2, 
                 NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
-        return cell2ipoint
-
-    def cell_to_ipoint0(self, p):
-        """!
-        @brief 生成每个单元上的插值点全局编号
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NF = self.number_of_faces()
-        NC = self.number_of_cells()
-        edge = self.entity('edge')
-        face = self.entity('face')
-        cell = self.entity('cell')
-        cell2face = self.ds.cell_to_face()
-        face2ipoint = self.face_to_ipoint(p)
-
-        multiIndex = np.zeros([(p+1)**3, 3], dtype=np.int_)
-        multiIndex[:, 0] = np.repeat(np.arange(p+1), (p+1)**2)
-        multiIndex[:, 1] = np.tile(np.repeat(np.arange(p+1), p+1), (p+1))
-        multiIndex[:, 2] = np.tile(np.arange(p+1), (p+1)**2)
-
-        dofidx = np.zeros((6, (p+1)**2), dtype=np.int_) #四条边上自由度的局部编号
-        dofidx[0], = np.where(multiIndex[:, 2]==0)
-        dofidx[1], = np.where(multiIndex[:, 2]==p)
-        dofidx[2], = np.where(multiIndex[:, 1]==0)
-        dofidx[3], = np.where(multiIndex[:, 1]==p)
-        dofidx[4], = np.where(multiIndex[:, 0]==0)
-        dofidx[5], = np.where(multiIndex[:, 0]==p)
-
-        cell2ipoint = np.zeros([NC, (p+1)**3], dtype=np.int_)
-        localFace = np.array([[0, 1, 2, 3], [4, 5, 6, 7], 
-                              [0, 3, 7, 4], [1, 2, 6, 5], 
-                              [0, 1, 5, 4], [3, 2, 6, 7]],dtype=np.int_) 
-
-        multiIndex0 = np.zeros(((p+1)**2, 4, 2), dtype=np.int_)
-        multiIndex0[:, 2, 0] = np.repeat(np.arange(p+1), p+1)
-        multiIndex0[:, 2, 1] = np.tile(np.arange(p+1), p+1)
-        multiIndex0[:, 0] = p - multiIndex0[:, 2]
-        multiIndex0[:, 1, 0] = multiIndex0[:, 2, 0]
-        multiIndex0[:, 1, 1] = p - multiIndex0[:, 2, 1]
-        multiIndex0[:, 3, 0] = p - multiIndex0[:, 2, 0]
-        multiIndex0[:, 3, 1] =  multiIndex0[:, 2, 1]
-
-        for i in range(6): #面上的自由度
-            gf = face[cell2face[:, i]]
-            lf = cell[:, localFace[i]]
-            idx0 = np.argsort(gf, axis=-1)
-            idx1 = np.argsort(lf, axis=-1)
-            idx1 = np.argsort(idx1, axis=-1)
-            idx0 = idx0[np.arange(NC)[:, None], idx1] #(NC, 4)
-            idx = multiIndex0[:, idx0].swapaxes(0, 1) #(NC, NQ, 4, 2)
-            #print('idx', idx)
-
-            idx = idx[..., 2, 0]*(p+1)+idx[..., 2, 1]
-            #print('idx0', idx0)
-            #print("gf = ", gf)
-            #print('lf = ', lf)
-            #print('i = ', i)
-
-            cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
-
-        indof = np.all(multiIndex>0, axis=-1)&np.all(multiIndex<p, axis=-1)
-        cell2ipoint[:, indof] = np.arange(NN+NE*(p-1)+NF*(p-1)**2, 
-                NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
-        return cell2ipoint
+        return cell2ipoint[index]
 
     @classmethod
     def from_one_hexahedron(cls):
@@ -440,15 +480,95 @@ class HexahedronMesh(Mesh, Plotable):
             [0.0, 0.0, 0.0],
             [1.0, 0.0, 0.0],
             [1.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
             [0.0, 0.0, 1.0],
             [1.0, 0.0, 1.0],
             [1.0, 1.0, 1.0],
-            [0.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0],
             ], dtype=np.float64)
 
         cell = np.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=np.int_)
         return cls(node, cell)
+
+    @classmethod
+    def from_one_tetrahedron(cls):
+        """
+        @brief 把一个四面体区域分解为四个六面体单元 
+        """
+        from .tetrahedron_mesh import TetrahedronMesh
+
+        mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
+        return cls.from_tetrahedron_mesh(mesh)
+        
+
+    @classmethod
+    def from_tetrahedron_mesh(cls, mesh):
+        """
+        @brief 给定一个四面体网格，把每个四面体网格分成四个六面体
+        """
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        NF = mesh.number_of_faces()
+        NC = mesh.number_of_cells()
+        node = np.zeros((NN + NE + NF + NC, 3), dtype=mesh.ftype)
+        start = 0
+        end = NN
+        node[start:end] = mesh.entity('node')
+        start = end
+        end = start + NE
+        node[start:end] = mesh.entity_barycenter('edge')
+        start = end
+        end = start + NF 
+        node[start:end] = mesh.entity_barycenter('face')
+        start = end
+        end = start + NF 
+        node[start:end] = mesh.entity_barycenter('cell')
+
+        cell = np.zeros((4*NC, 8), dtype=mesh.itype)
+        c2n = mesh.entity('cell')
+        c2e = mesh.ds.cell_to_edge() + NN
+        c2f = mesh.ds.cell_to_face() + (NN + NE)
+        c2c = np.arange(NC) + (NN + NE + NF)
+
+        cell[0::4, 0] = c2n[:, 0]
+        cell[0::4, 1] = c2e[:, 0]
+        cell[0::4, 2] = c2f[:, 3]
+        cell[0::4, 3] = c2e[:, 1]  
+        cell[0::4, 4] = c2e[:, 2]  
+        cell[0::4, 5] = c2f[:, 2]  
+        cell[0::4, 6] = c2c  
+        cell[0::4, 7] = c2f[:, 1] 
+
+        cell[1::4, 0] = c2n[:, 1]
+        cell[1::4, 1] = c2e[:, 3]
+        cell[1::4, 2] = c2f[:, 3]
+        cell[1::4, 3] = c2e[:, 0]  
+        cell[1::4, 4] = c2e[:, 4]  
+        cell[1::4, 5] = c2f[:, 0]  
+        cell[1::4, 6] = c2c  
+        cell[1::4, 7] = c2f[:, 2] 
+
+        cell[2::4, 0] = c2n[:, 2]
+        cell[2::4, 1] = c2e[:, 1]
+        cell[2::4, 2] = c2f[:, 3]
+        cell[2::4, 3] = c2e[:, 3]  
+        cell[2::4, 4] = c2e[:, 5]  
+        cell[2::4, 5] = c2f[:, 1]  
+        cell[2::4, 6] = c2c  
+        cell[2::4, 7] = c2f[:, 0] 
+
+        cell[3::4, 0] = c2n[:, 3]
+        cell[3::4, 1] = c2e[:, 5]
+        cell[3::4, 2] = c2f[:, 0]
+        cell[3::4, 3] = c2e[:, 4]  
+        cell[3::4, 4] = c2e[:, 2]  
+        cell[3::4, 5] = c2f[:, 1]  
+        cell[3::4, 6] = c2c  
+        cell[3::4, 7] = c2f[:, 2] 
+
+        return cls(node, cell)
+        
+
 
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):

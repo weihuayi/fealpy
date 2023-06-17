@@ -3,7 +3,7 @@ import numpy as np
 import scipy.io as sio
 import re
 
-from .TriangleMesh import TriangleMesh
+from .triangle_mesh import TriangleMesh
 
 class CCGMeshReader:
     def __init__(self, fname):

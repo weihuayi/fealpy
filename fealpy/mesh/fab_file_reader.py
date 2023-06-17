@@ -5,7 +5,7 @@ import scipy.io as sio
 
 import matplotlib.pyplot as plt
 
-from .TriangleMesh import TriangleMesh
+from .triangle_mesh import TriangleMesh
 
 class FABFileReader:
     def __init__(self, fname):

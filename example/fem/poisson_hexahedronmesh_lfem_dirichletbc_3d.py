@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
-from fealpy.pde.poisson_2d import CosCosData
+from fealpy.pde.poisson_3d import CosCosCosData
 from fealpy.mesh.hexahedron_mesh import HexahedronMesh 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import DiffusionIntegrator 

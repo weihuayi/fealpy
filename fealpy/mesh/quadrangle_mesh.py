@@ -17,7 +17,7 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
 
 
 ## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
-class QuadrangleMesh(Mesh2d, Plotable):
+class QuadrangleMesh(Mesh, Plotable):
     """
     @brief 非结构四边形网格数据结构对象
     """

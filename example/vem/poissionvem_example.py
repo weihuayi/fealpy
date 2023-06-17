@@ -90,7 +90,6 @@ for i in range(maxit):
     a = ConformingScalarVEML2Projector2d(M, PI1)
     PI0 = a.assembly_cell_matrix(space)
 
-
     b = ConformingVEMScalarSourceIntegrator2d(pde.source, PI0)
     a = LinearForm(space)
     a.add_domain_integrator(b)
