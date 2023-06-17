@@ -56,7 +56,6 @@ class PolygonMesh(Mesh, Plotable):
                 return GaussLobattoQuadrature(q)
 
     def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:]):
-
         node = self.entity('node')
         GD = self.geo_dimension()
 
@@ -70,6 +69,39 @@ class PolygonMesh(Mesh, Plotable):
         elif etype in {'node', 0}:
             bc = node
         return bc
+
+    def entity_measure(self, etype=2, index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        else:
+            raise ValueError(f"Invalid entity type '{etype}'.")
+
+    def cell_area(self, index=np.s_[:]):
+        """
+        @brief 根据散度定理计算多边形的面积
+        @note 请注意下面的计算方式不方便实现部分单元面积的计算
+        """
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+
+        t = self.edge_tangent()
+        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1] 
+
+        a = np.zeros(NC, dtype=self.ftype)
+        np.add.at(a, edge2cell[:, 0], val)
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+
+        a /= 2.0
+
+        return a[index]
 
     def bc_to_point(self, bc: NDArray, etype: Union[int, str]='cell',
                     index=np.s_[:]) -> NDArray:
@@ -328,6 +360,129 @@ class PolygonMesh(Mesh, Plotable):
         else:
             e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e
+
+    @classmethod
+    def from_quadtree(cls, qtree):
+        """
+        @brief 从四叉树生成多边形网格 
+        """
+        isRootCell = qtree.is_root_cell()
+
+        if np.all(isRootCell):
+            NC = qtree.number_of_cells()
+
+            node = qtree.entity('node') 
+            cell = qtree.entity('cell') 
+
+            pcell = cell.reshape(-1) 
+            pcellLocation = np.arange(0, 4*(NC+1), 4)
+
+            return cls(node, pcell, pcellLocation) 
+        else:
+            NN = qtree.number_of_nodes()
+            NE = qtree.number_of_edges()
+            NC = qtree.number_of_cells()
+
+            cell = self.entity('cell')
+            edge = self.entity('edge')
+            edge2cell = self.ds.edge_to_cell()
+            cell2cell = self.ds.cell_to_cell()
+            cell2edge = self.ds.cell_to_edge()
+
+            parent = qtree.parent
+            child = qtree.child
+
+            isLeafCell = qtree.is_leaf_cell()
+            isLeafEdge = isLeafCell[edge2cell[:, 0]] & isLeafCell[edge2cell[:, 1]]
+
+            pedge2cell = edge2cell[isLeafEdge, :]
+            pedge = edge[isLeafEdge, :]
+
+            isRootCell = qtree.is_root_cell()
+            isLevelBdEdge =  (pedge2cell[:, 0] == pedge2cell[:, 1]) 
+
+            # Find the index of all boundary edges on each tree level
+            pedgeIdx, = np.nonzero(isLevelBdEdge)
+            while len(pedgeIdx) > 0:
+                cellIdx = pedge2cell[pedgeIdx, 1] 
+                localIdx = pedge2cell[pedgeIdx, 3]
+
+                parentCellIdx = parent[cellIdx, 0] 
+                
+                neighborCellIdx = cell2cell[parentCellIdx, localIdx]
+                
+                isFound = isLeafCell[neighborCellIdx] | isRootCell[neighborCellIdx]
+                pedge2cell[pedgeIdx[isFound], 1] = neighborCellIdx[isFound]
+
+                edgeIdx = cell2edge[parentCellIdx, localIdx]
+
+                isCase = (edge2cell[edgeIdx, 0] != parentCellIdx) & isFound
+                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 2] 
+
+                isCase = (edge2cell[edgeIdx, 0] == parentCellIdx) & isFound
+                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 3] 
+
+                isSpecial = isFound & (parentCellIdx == neighborCellIdx) 
+                pedge2cell[pedgeIdx[isSpecial], 1] =  pedge2cell[pedgeIdx[isSpecial], 0]
+                pedge2cell[pedgeIdx[isSpecial], 3] =  pedge2cell[pedgeIdx[isSpecial], 2]
+
+                pedgeIdx = pedgeIdx[~isFound]
+                pedge2cell[pedgeIdx, 1] = parentCellIdx[~isFound]
+
+
+            PNC = isLeafCell.sum()
+            cellIdxMap = np.zeros(NC, dtype=qtree.itype)
+            cellIdxMap[isLeafCell] = np.arange(PNC)
+            cellIdxInvMap, = np.nonzero(isLeafCell)
+
+            pedge2cell[:, 0:2] = cellIdxMap[pedge2cell[:, 0:2]]
+
+            # 计算每个叶子四边形单元的每条边上有几条叶子边
+            # 因为叶子单元的边不一定是叶子边
+            isInPEdge = (pedge2cell[:, 0] != pedge2cell[:, 1])
+            cornerLocation = np.zeros((PNC, 5), dtype=qtree.itype)
+            np.add.at(cornerLocation.ravel(), 5*pedge2cell[:, 0] + pedge2cell[:, 2] + 1, 1)
+            np.add.at(cornerLocation.ravel(), 5*pedge2cell[isInPEdge, 1] + pedge2cell[isInPEdge, 3] + 1, 1)
+            cornerLocation = cornerLocation.cumsum(axis=1)
+
+
+            pcellLocation = np.zeros(PNC+1, dtype=qtree.itype)
+            pcellLocation[1:] = cornerLocation[:, 4].cumsum()
+            pcell = np.zeros(pcellLocation[-1], dtype=qtree.itype)
+            cornerLocation += pcellLocation[:-1].reshape(-1, 1) 
+            pcell[cornerLocation[:, 0:-1]] = cell[isLeafCell, :]
+
+            PNE = pedge.shape[0]
+            val = np.ones(PNE, dtype=np.bool_)
+            p2pe = coo_matrix(
+                    (val, (pedge[:,0], range(PNE))),
+                    shape=(NN, PNE), dtype=np.bool_)
+            p2pe += coo_matrix(
+                    (val, (pedge[:,1], range(PNE))),
+                    shape=(NN, PNE), dtype=np.bool_)
+            p2pe = p2pe.tocsr()
+            NES = np.asarray(p2pe.sum(axis=1)).reshape(-1) 
+            isPast = np.zeros(PNE, dtype=np.bool_)
+            for i in range(4):
+                currentIdx = cornerLocation[:, i]
+                endIdx = cornerLocation[:, i+1]
+                cellIdx = np.arange(PNC)
+                while True:
+                    isNotOK = ((currentIdx + 1) < endIdx)
+                    currentIdx = currentIdx[isNotOK]
+                    endIdx = endIdx[isNotOK]
+                    cellIdx = cellIdx[isNotOK]
+                    if len(currentIdx) == 0:
+                        break
+                    nodeIdx = pcell[currentIdx] 
+                    _, J = p2pe[nodeIdx].nonzero()
+                    isEdge = (pedge2cell[J, 1] == np.repeat(cellIdx, NES[nodeIdx])) \
+                            & (pedge2cell[J, 3] == i) & (~isPast[J])
+                    isPast[J[isEdge]] = True
+                    pcell[currentIdx + 1] = pedge[J[isEdge], 0]
+                    currentIdx += 1
+
+            return cls(node,  pcell, pcellLocation)
 
     @classmethod
     def from_one_triangle(cls, meshtype='iso'):
