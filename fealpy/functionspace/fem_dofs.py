@@ -130,6 +130,10 @@ class QuadrangleMeshCFEDof(LinearMeshCFEDof):
     def __init__(self, mesh, p):
         super(QuadrangleMeshCFEDof, self).__init__(mesh, p)
 
+class HexahedronMeshCFEDof(LinearMeshCFEDof):
+    def __init__(self, mesh, p):
+        super(HexahedronMeshCFEDof, self).__init__(mesh, p)
+
 class LinearMeshDFEDof():
     """
     间断单元自由度管理基类.
@@ -232,9 +236,14 @@ class TetrahedronMeshDFEDof(LinearMeshDFEDof):
         else:
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell' and 3.")
 
+
 class QuadrangleMeshDFEDof(LinearMeshDFEDof):
     def __init__(self, mesh, p):
         super(QuadrangleMeshDFEDof, self).__init__(mesh, p)
+
+class HexahedronMeshDFEDof(LinearMeshCFEDof):
+    def __init__(self, mesh, p):
+        super(HexahedronMeshDFEDof, self).__init__(mesh, p)
 
 class EdgeMeshCFEDof():
     """

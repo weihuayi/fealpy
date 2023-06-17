@@ -10,6 +10,7 @@ class LagrangeFESpace():
                 "TriangleMesh": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
                 "QuadrangleMesh" : QuadrangleMeshCFEDof,
+                "HexahedronMesh" : HexahedronMeshCFEDof,
                 "EdgeMesh": EdgeMeshCFEDof,
                 }, 
             'D':{
@@ -17,6 +18,7 @@ class LagrangeFESpace():
                 "TriangleMesh": TriangleMeshDFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
                 "QuadrangleMesh" : QuadrangleMeshDFEDof,
+                "HexahedronMesh" : HexahedronMeshDFEDof,
                 "EdgeMesh": EdgeMeshDFEDof, 
                 }
         } 
