@@ -13,15 +13,14 @@ from .triangle_mesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .quadrangle_mesh import QuadrangleMesh
 from .tetrahedron_mesh import TetrahedronMesh
 from .hexahedron_mesh import HexahedronMesh
+from .edge_mesh import EdgeMesh
 
 from .UniformMesh1d import UniformMesh1d
 from .UniformMesh2d import UniformMesh2d
 from .UniformMesh3d import UniformMesh3d
-
 from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
 
-from .EdgeMesh import EdgeMesh
 
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
