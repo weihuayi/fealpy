@@ -2,7 +2,6 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from .hexahedron_mesh import HexahedronMesh 
-from .polyhedron_mesh import PolyhedronMesh 
 from ..common import ranges
 
 class Octree(HexahedronMesh):
