@@ -185,29 +185,13 @@ class StringOscillationSinCosPDEData:
         """
         return np.cos(np.pi * x)
 
-    def dirichlet(self, x, t: np.float64) -> np.float64:
+    def dirichlet(self, x: np.ndarray, t: np.float64) -> np.ndarray:
+        """
+        @brief Dirichlet
+        """
         val = np.zeros_like(x)
         val[0] = np.sin(np.pi * t) / np.pi
         val[-1] = -np.sin(np.pi * t) / np.pi
         return val
  
 
-    def dirichlet_boundary_condition_left(self, t: np.float64) -> np.float64:
-        """
-        @brief 左边界条件函数
-
-        @param[in] t float, 时间点 
-
-        @return 左边界条件函数值
-        """
-        return np.sin(np.pi * t) / np.pi
-    
-    def dirichlet_boundary_condition_right(self, t: np.float64) -> np.float64:
-        """
-        @brief 右边界条件函数
-
-        @param[in] t float, 时间点 
-
-        @return 右边界条件函数值
-        """
-        return -np.sin(np.pi * t) / np.pi
