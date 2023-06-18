@@ -478,7 +478,7 @@ class UniformMesh1d(Mesh1d):
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, gD, A, f, uh=None, threshold=None):
         """
-        @brief 考虑 Dirichlet 边界
+        @brief 考虑纯 Dirichlet 边界
         """
         if uh is None:
             uh = self.function('node')
@@ -547,7 +547,7 @@ class UniformMesh1d(Mesh1d):
 
 
     ## @ingroup FDMInterface
-    def update_dirichlet_bc(self, gD, uh, threshold=None):
+    def update_dirichlet_bc(self, gD, uh, t, threshold=None):
         """
         @brief 更新网格函数 uh 的 Dirichlet 边界值
         @todo 
@@ -555,12 +555,12 @@ class UniformMesh1d(Mesh1d):
         node = self.node
         if threshold is None:
             isBdNode = self.ds.boundary_node_flag()
-            uh[isBdNode]  = gD(node[isBdNode])
+            uh[isBdNode]  = gD(node[isBdNode], t)
         elif isinstance(threshold, int):
-            uh[threshold] = gD(node[threshold])
+            uh[threshold] = gD(node[threshold], t)
         elif callable(threshold):
             isBdNode = threshold(node)
-            uh[isBdNode]  = gD(node[isBdNode])
+            uh[isBdNode]  = gD(node[isBdNode], t)
 
     def parabolic_operator_forward(self, tau):
         """
@@ -645,9 +645,9 @@ class UniformMesh1d(Mesh1d):
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
-        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
-        A2 = diags([- 1 - 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
+        A0 = diags([1 + 2 * r**2 * theta], 0, shape=(NN, NN), format='csr')
+        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], 0, shape=(NN, NN), format='csr')
+        A2 = diags([- 1 - 2 * r**2 * theta], 0, shape=(NN, NN), format='csr')
 
         I = k[1:]
         J = k[0:-1]
