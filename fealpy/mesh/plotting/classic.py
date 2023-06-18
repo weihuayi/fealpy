@@ -127,6 +127,17 @@ class MeshPloter(Generic[_MT]):
 
 
 class EntityFinder(MeshPloter):
+    def get_boundary_flag(self, etype: Union[int, str]):
+        if etype in {'cell', self.mesh.ds.TD}:
+            return self.mesh.ds.boundary_cell_flag()
+        elif etype in {'face', self.mesh.ds.TD-1}:
+            return self.mesh.ds.boundary_face_flag()
+        elif etype in {'edge', 1}:
+            return self.mesh.ds.boundary_edge_flag()
+        elif etype in {'node', 0}:
+            return self.mesh.ds.boundary_node_flag()
+        raise ValueError(f"Invalid entity type '{etype}'.")
+
     def draw(self, etype_or_node: Union[int, str, NDArray], index=np.s_[:],
                 showindex: bool=False, color='r', markersize=20,
                 fontcolor='k', fontsize=24):
@@ -140,6 +151,7 @@ class EntityFinder(MeshPloter):
 
         if isinstance(etype_or_node, (int, str)):
             bc = self.mesh.entity_barycenter(etype=etype_or_node, index=index)
+            bdr_flag = self.get_boundary_flag(etype=etype_or_node)
         elif isinstance(etype_or_node, np.ndarray):
             bc = etype_or_node
         else:
@@ -151,7 +163,9 @@ class EntityFinder(MeshPloter):
             mapper = array_color_map(color, 'rainbow')
             color = mapper.to_rgba(color)
 
-        A.scatter(axes=axes, points=bc, color=color, markersize=markersize)
+        A.scatter(axes=axes, points=bc[~bdr_flag], color=color, markersize=markersize)
+        A.scatter(axes=axes, points=bc[bdr_flag], color=color,
+                  marker='^', markersize=markersize)
         if showindex:
             A.show_index(axes=axes, location=bc, number=index,
                          fontcolor=fontcolor, fontsize=fontsize)
