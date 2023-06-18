@@ -196,7 +196,7 @@ AddPlot1d.register('1d')
 
 class AddPlot2dHomo(MeshPloter):
     def draw(
-            self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
+            self, edgecolor='k', cellcolor=[0.2, 0.6, 1.0],
             linewidths: float=1.0, alpha: float=1.0,
             aspect=None,
             showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
@@ -233,7 +233,7 @@ AddPlot2dHomo.register('2d')
 
 class AddPlot2dPoly(MeshPloter):
     def draw(
-            self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
+            self, edgecolor='k', cellcolor=[0.2, 0.6, 1.0],
             linewidths: float=1.0, alpha: float=1.0,
             aspect=None,
             showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
