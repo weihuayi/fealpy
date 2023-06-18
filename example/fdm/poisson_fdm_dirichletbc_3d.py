@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
-
 import numpy as np
 import matplotlib.pyplot as plt
+
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import diags
-
 from fealpy.pde.elliptic_3d import SinSinSinPDEData 
 from fealpy.mesh import UniformMesh3d
 

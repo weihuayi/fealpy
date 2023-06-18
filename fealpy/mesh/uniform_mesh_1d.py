@@ -478,8 +478,8 @@ class UniformMesh1d(Mesh):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray, np.float64], np.ndarray], 
-                           A: np.ndarray, f: np.ndarray, t: np.float64, 
+    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray, Optional[float]], np.ndarray], 
+                           A: np.ndarray, f: np.ndarray, t: Optional[float] = None, 
                            uh: Union[np.ndarray, np.flatiter, None] = None, 
                            threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -496,7 +496,7 @@ class UniformMesh1d(Mesh):
         f : np.ndarray
             需要更新的向量。此函数将直接修改这个向量来应用 Dirichlet 边界条件。
 
-        t : np.float64
+        t : Optional[np.float64] = None
             当前的时间。这个值将被传递给 gD 函数，以便根据当前时间计算 Dirichlet 边界条件的值。
 
         uh : Union[np.ndarray, np.flatiter, None] = None
@@ -529,7 +529,10 @@ class UniformMesh1d(Mesh):
         else:
             index = self.ds.boundary_node_flag()
 
-        uh[index]  = gD(node[index], t)
+        # uh[index]  = gD(node[index], t)
+        args = (node[index],) if t is None else (node[index], t)
+        uh[index]  = gD(*args)
+
         f -= A@uh
         f[index] = uh[index]
     
@@ -583,7 +586,7 @@ class UniformMesh1d(Mesh):
 
     ## @ingroup FDMInterface
     def update_dirichlet_bc(self, gD: Callable[[np.ndarray, np.float64], np.ndarray], 
-                                  uh: np.ndarray, t: np.float64, 
+                                  uh: np.ndarray, t: Optional[float] = None, 
                                   threshold: Optional[Union[int, Callable[[np.ndarray], np.float64]]] = None) -> None:
         """
         更新网格函数 uh 的 Dirichlet 边界值
@@ -609,14 +612,15 @@ class UniformMesh1d(Mesh):
 
         """
         node = self.node
+        isBdNode = self.ds.boundary_node_flag()
+        args = (node[isBdNode],) if t is None else (node[isBdNode], t)
         if threshold is None:
-            isBdNode = self.ds.boundary_node_flag()
-            uh[isBdNode]  = gD(node[isBdNode], t)
+            uh[isBdNode]  = gD(*args)
         elif isinstance(threshold, int):
-            uh[threshold] = gD(node[threshold], t)
+            uh[threshold] = gD(*args)
         elif callable(threshold):
             isBdNode = threshold(node)
-            uh[isBdNode]  = gD(node[isBdNode], t)
+            uh[isBdNode]  = gD(*args)
 
     def parabolic_operator_forward(self, tau):
         """
