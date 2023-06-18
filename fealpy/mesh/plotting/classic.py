@@ -128,7 +128,7 @@ class MeshPloter(Generic[_MT]):
 
 class EntityFinder(MeshPloter):
     def draw(self, etype_or_node: Union[int, str, NDArray], index=np.s_[:],
-                showindex: bool=False, color='r', markersize=20,
+                showindex: bool=False, color='r', marker='o', markersize=20,
                 fontcolor='k', fontsize=24):
         """
         @brief Show the barycenter of each entity.
@@ -151,7 +151,8 @@ class EntityFinder(MeshPloter):
             mapper = array_color_map(color, 'rainbow')
             color = mapper.to_rgba(color)
 
-        A.scatter(axes=axes, points=bc, color=color, markersize=markersize)
+        A.scatter(axes=axes, points=bc, color=color,
+                  marker=marker, markersize=markersize)
         if showindex:
             A.show_index(axes=axes, location=bc, number=index,
                          fontcolor=fontcolor, fontsize=fontsize)
@@ -196,7 +197,7 @@ AddPlot1d.register('1d')
 
 class AddPlot2dHomo(MeshPloter):
     def draw(
-            self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
+            self, edgecolor='k', cellcolor='#99BBF6',
             linewidths: float=1.0, alpha: float=1.0,
             aspect=None,
             showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
@@ -233,7 +234,7 @@ AddPlot2dHomo.register('2d')
 
 class AddPlot2dPoly(MeshPloter):
     def draw(
-            self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
+            self, edgecolor='k', cellcolor='#99BBF6',
             linewidths: float=1.0, alpha: float=1.0,
             aspect=None,
             showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
