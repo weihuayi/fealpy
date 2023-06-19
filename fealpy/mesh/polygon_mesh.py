@@ -581,8 +581,8 @@ class PolygonMesh(Mesh, Plotable):
         @param ny 沿 y 轴方向剖分段数
         @param ratio 矩形内部菱形的大小比例
         """
-        from .QuadrangleMesh import QuadrangleMesh
-        from .UniformMesh2d import UniformMesh2d
+        from .quadrangle_mesh import QuadrangleMesh
+        from .uniform_mesh_2d import UniformMesh2d
 
         hx = (box[1] - box[0]) / nx
         hy = (box[3] - box[2]) / ny
@@ -610,7 +610,7 @@ class PolygonMesh(Mesh, Plotable):
         cell[NC:2 * NC, 3] = idx2
         cell[2 * NC:3 * NC, 1] = idx2
 
-        return PolygonMesh(new_node, cell)
+        return cls(new_node, cell)
 
 
     @classmethod
@@ -622,8 +622,8 @@ class PolygonMesh(Mesh, Plotable):
         @param nx 沿 x 轴方向剖分段数
         @param ny 沿 y 轴方向剖分段数
         """
-        from .QuadrangleMesh import QuadrangleMesh
-        from .UniformMesh2d import UniformMesh2d
+        from .quadrangle_mesh import QuadrangleMesh
+        from .uniform_mesh_2d import UniformMesh2d
 
         hx = (box[1] - box[0]) / nx
         hy = (box[3] - box[2]) / ny
@@ -665,7 +665,91 @@ class PolygonMesh(Mesh, Plotable):
         newcell = newcell[flag]
         cellLocation = np.cumsum(num)
 
-        return PolygonMesh(newnode, newcell, cellLocation)
+        return cls(newnode, newcell, cellLocation)
+
+    @classmethod
+    def hybrid_polygon_mesh(cls, box=[0, 1, 0, 1], nx=4, ny=4, ratio=0.9):
+        """
+        @brief  虚单元网格，混合多边形
+
+        @param box 网格所占区域
+        @param nx 沿 x 轴方向剖分段数
+        @param ny 沿 y 轴方向剖分段数
+        """
+        from fealpy.mesh.quadrangle_mesh import QuadrangleMesh
+        from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+        NN = (nx + 1) * (ny + 1)
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        cell2edge = mesh.ds.cell_to_edge()
+        isbdedge = mesh.ds.boundary_edge_flag()
+        isbdcell = mesh.ds.boundary_cell_flag()
+
+        new_num_edge = NE + 8 * NC
+        hx = 1 / nx
+        hy = 1 / ny
+        newnode = np.zeros((NN + new_num_edge, 2), dtype=np.float_)
+        newnode[:NN] = node
+        newnode[NN:NN + NE] = 0.5 * node[edge[:, 0]] + 0.5 * node[edge[:, 1]]
+
+        newnode[NN + NE:NN + NE + NC] = 0.75 * node[cell[:, 0]] + 0.25 * node[cell[:, 2]]
+        newnode[NN + NE + NC:NN + NE + 2 * NC] = 0.25 * node[cell[:, 0]] + 0.75 * node[cell[:, 2]]
+        newnode[NN + NE + 2 * NC:NN + NE + 3 * NC] = 0.75 * node[cell[:, 1]] + 0.25 * node[cell[:, 3]]
+        newnode[NN + NE + 3 * NC:NN + NE + 4 * NC] = 0.25 * node[cell[:, 1]] + 0.75 * node[cell[:, 3]]
+
+        newnode[NN + NE + 4 * NC:NN + NE + 5 * NC] = 0.5 * node[cell[:, 0]] + 0.5 * newnode[NN + NE:NN + NE + NC]
+        newnode[NN + NE + 5 * NC:NN + NE + 6 * NC] = 0.5 * node[cell[:, 1]] + 0.5 * newnode[
+                                                                                    NN + NE + 2 * NC:NN + NE + 3 * NC]
+        newnode[NN + NE + 6 * NC:NN + NE + 7 * NC] = (1 - ratio) * (
+                    0.5 * node[cell[:, 0]] + 0.5 * node[cell[:, 3]]) + ratio * newnode[
+                                                                               NN + NE + 3 * NC:NN + NE + 4 * NC]
+        newnode[NN + NE + 7 * NC:NN + NE + 8 * NC] = (1 - ratio) * (
+                    0.5 * node[cell[:, 1]] + 0.5 * node[cell[:, 2]]) + ratio * newnode[NN + NE + NC:NN + NE + 2 * NC]
+
+        edge2newnode = np.arange(NN, NN + NE)
+        newcell = np.zeros((NC, 42), dtype=np.int_)
+        # newcell[:, ::2] = cell
+        # newcell[:, 1::2] = edge2newnode[cell2edge]
+        newcell[:, [0, 24]] = cell[:, 0][:, np.newaxis]
+        newcell[:, [4, 6]] = cell[:, 1][:, np.newaxis]
+        newcell[:, [11, 13]] = cell[:, 2][:, np.newaxis]
+        newcell[:, [15, 20]] = cell[:, 3][:, np.newaxis]
+
+        newcell[:, [1, 3, 29]] = edge2newnode[cell2edge[:, 0]][:, np.newaxis]
+        newcell[:, [7, 10, 33]] = edge2newnode[cell2edge[:, 1]][:, np.newaxis]
+        newcell[:, [14]] = edge2newnode[cell2edge[:, 2]][:, np.newaxis]
+        newcell[:, [21, 23, 36]] = edge2newnode[cell2edge[:, 3]][:, np.newaxis]
+
+        newcell[:, [26, 27, 37]] = np.arange(NN + NE, NN + NE + NC)[:, np.newaxis]
+        newcell[:, [18, 40]] = np.arange(NN + NE + NC, NN + NE + 2 * NC)[:, np.newaxis]
+        newcell[:, [8, 31, 32]] = np.arange(NN + NE + 2 * NC, NN + NE + 3 * NC)[:, np.newaxis]
+        newcell[:, [17, 41]] = np.arange(NN + NE + 3 * NC, NN + NE + 4 * NC)[:, np.newaxis]
+        newcell[:, [2, 25, 28]] = np.arange(NN + NE + 4 * NC, NN + NE + 5 * NC)[:, np.newaxis]
+        newcell[:, [5, 9, 30]] = np.arange(NN + NE + 5 * NC, NN + NE + 6 * NC)[:, np.newaxis]
+        newcell[:, [16, 22, 35, 38]] = np.arange(NN + NE + 6 * NC, NN + NE + 7 * NC)[:, np.newaxis]
+        newcell[:, [12, 19, 34, 39]] = np.arange(NN + NE + 7 * NC, NN + NE + 8 * NC)[:, np.newaxis]
+
+        # local_location = np.array([3, 6, 10, 13, 20, 23, 27, 32, 38, 42])
+        local_location = np.array([3, 3, 4, 3, 7, 3, 4, 5, 6, 4])
+        temp_location = np.tile(local_location, NC)
+        num = np.zeros(temp_location.shape[0] + 1, dtype=np.int_)
+        num[1:] = temp_location
+        cellLocation = np.cumsum(num)
+
+        return cls(newnode, newcell.reshape(-1), cellLocation)
 
     def cell_area(self, index=None):
         #TODO: 3D Case

@@ -53,8 +53,8 @@ class Plotable():
             node: Optional[NDArray]=None,
             index=np.s_[:],
             showindex=False,
-            color='r', markersize=20,
-            fontsize=16, fontcolor='r',
+            color='r', marker='o', markersize=12,
+            fontsize=12, fontcolor='r',
             multi_index=None) -> None:
         """
         @brief Show nodes in the axes.
@@ -77,6 +77,7 @@ class Plotable():
                     axes, etype_or_node='node', index=index,
                     showindex=showindex,
                     color=color,
+                    marker=marker,
                     markersize=markersize,
                     fontsize=fontsize,
                     fontcolor=fontcolor)
@@ -85,6 +86,7 @@ class Plotable():
                     axes, etype_or_node=node, index=index,
                     showindex=showindex,
                     color=color,
+                    marker=marker,
                     markersize=markersize,
                     fontsize=fontsize,
                     fontcolor=fontcolor)
@@ -92,12 +94,13 @@ class Plotable():
     def find_edge(self, axes,
             index=np.s_[:],
             showindex=False,
-            color='g', markersize=22,
-            fontsize=18, fontcolor='g'):
+            color='g', marker='^', markersize=15,
+            fontsize=15, fontcolor='g'):
         return self.find_entity(
                 axes, 'edge', index=index,
                 showindex=showindex,
                 color=color,
+                marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
@@ -105,12 +108,13 @@ class Plotable():
     def find_face(self, axes,
             index=np.s_[:],
             showindex=False,
-            color='b', markersize=24,
-            fontsize=20, fontcolor='b'):
+            color='#673AB7', marker='d', markersize=18,
+            fontsize=18, fontcolor='#673AB7'):
         return self.find_entity(
                 axes, 'face', index=index,
                 showindex=showindex,
                 color=color,
+                marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
@@ -118,12 +122,13 @@ class Plotable():
     def find_cell(self, axes,
             index=np.s_[:],
             showindex=False,
-            color='y', markersize=26,
-            fontsize=22, fontcolor='y'):
+            color='b', marker='s', markersize=21,
+            fontsize=21, fontcolor='b'):
         return self.find_entity(
                 axes, 'cell', index=index,
                 showindex=showindex,
                 color=color,
+                marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)

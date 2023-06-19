@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh.triangle_mesh import TriangleMesh 
+from fealpy.mesh import TriangleMesh 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import DiffusionIntegrator 
 from fealpy.fem import ScalarSourceIntegrator
