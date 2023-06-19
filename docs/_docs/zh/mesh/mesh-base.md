@@ -62,7 +62,7 @@ plt.show()
 
 网格图像为
 
-<img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
+<img src="../../../assets/images/mesh/tri-mesh/triangle_1.png" alt="Triangle" style="zoom:50%;" />
 
 $\quad$在上述算例中，`cell` 包含的两个单元为 `[1,2,0]` 与 `[3,0,2]`，
 它存储的是构成网格单元的节点的编号，
