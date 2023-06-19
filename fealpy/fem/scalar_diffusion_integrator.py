@@ -50,6 +50,7 @@ class ScalarDiffusionIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
+
             if np.isscalar(coef):
                 D += coef*np.einsum('q, qcid, qcjd, c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
@@ -72,14 +73,14 @@ class ScalarDiffusionIntegrator:
             return D
 
 
-    def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix_fast(self, space, index=np.s_[:], cellmeasure=None):
         """
         """
         mesh = space0.mesh 
         assert mesh.meshtype in ['tri', 'tet']
 
 
-    def assembly_cell_matrix_ref(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix_ref(self, space, index=np.s_[:], cellmeasure=None):
         """
         @note 基于参考单元矩阵组装方式
         """
