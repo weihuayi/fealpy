@@ -1,16 +1,16 @@
 import numpy as np
 
-
-class ScalarNeumannBCIntegrator:
-    def __init__(self, gN, threshold=None, q=3):
-        self.gN = gN
+class ScalarBoundarySourceIntegrator:
+    def __init__(self, source, q=3, threshold=None):
+        self.source = source 
         self.q = q 
         self.threshold = threshold
 
     def assembly_face_vector(self, space, out=None):
         """
         """
-        gN = self.gN
+        q = self.q
+        source = self.source
         threshold = self.threshold
         mesh = space.mesh
         gdof = space.number_of_global_dofs()
@@ -27,21 +27,21 @@ class ScalarNeumannBCIntegrator:
         n = mesh.face_unit_normal(index=index)
         facemeasure = mesh.entity_measure('face', index=index)
 
-        qf = mesh.integrator(self.q, 'face')
+        qf = mesh.integrator(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.face_basis(bcs)
         
-        if callable(gN):
-            if ~hasattr(gN, 'coordtype') or gN.coordtype == 'cartesian':
+        if callable(source):
+            if ~hasattr(source, 'coordtype') or source.coordtype == 'cartesian':
                 ps = mesh.bc_to_point(bcs, index=index)
                 # 在实际问题当中，法向 n  这个参数一般不需要
                 # 传入 n， 用户可根据需要来计算 Neumann 边界的法向梯度
-                val = gN(ps, n) 
-            elif gN.coordtype == 'barycentric':
+                val = source(ps, n) 
+            elif source.coordtype == 'barycentric':
                 # 这个时候 gN 是一个有限元函数，一定不需要算面法向
-                val = gN(bcs, index=index)
+                val = source(bcs, index=index)
         else:
-            val = gN
+            val = source 
 
         if out is None:
             F = np.zeros((gdof, ), dtype=self.ftype)

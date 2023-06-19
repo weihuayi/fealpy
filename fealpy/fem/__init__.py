@@ -12,13 +12,16 @@ from .linear_form import LinearForm
 
 # Integrator for scalar case
 from .scalar_mass_integrator import ScalarMassIntegrator
+from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
+from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator as ScalarNeumannSourceIntegrator
+from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator as ScalarRobinSourceIntegrator
 
 # Integrator for vector case
-from .vector_source_integrator import VectorSourceIntegrator
 from .vector_diffusion_integrator import VectorDiffusionIntegrator
 from .vector_mass_integrator import VectorMassIntegrator
+from .vector_source_integrator import VectorSourceIntegrator
 
 from .truss_structure_integrator import TrussStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
