@@ -17,7 +17,7 @@ from ..geometry import project
 ## @defgroup FEMInterface
 ## @defgroup FDMInterface
 ## @defgroup GeneralInterface
-class UniformMesh2d(Mesh):
+class UniformMesh2d(Mesh, Plotable):
     """
     @brief A class for representing a two-dimensional structured mesh with uniform discretization in both x and y directions.
     """
@@ -1114,6 +1114,7 @@ class UniformMesh2d(Mesh):
 
         return idxMap
 
+UniformMesh2d.set_ploter('2d')
 
 class UniformMesh2dFunction():
     def __init__(self, mesh, f):

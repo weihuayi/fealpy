@@ -10,7 +10,7 @@ from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
 from ..geometry import project
 
-class UniformMesh3d(Mesh):
+class UniformMesh3d(Mesh, Plotable):
     """
     @brief A class for representing a three-dimensional structured mesh with uniform discretization in x, y, and z directions.
     """
@@ -754,10 +754,6 @@ class UniformMesh3d(Mesh):
         pass
 
     ## @ingroup FEMInterface
-    def multi_index_matrix(self, p, etype=1):
-        pass
-
-    ## @ingroup FEMInterface
     def shape_function(self, bc, p=1):
         pass
 
@@ -777,13 +773,6 @@ class UniformMesh3d(Mesh):
     def interpolation_points(self, p):
         pass
 
-    ## @ingroup FEMInterface
-    def node_to_ipoint(self, p):
-        pass
-
-    ## @ingroup FEMInterface
-    def edge_to_ipoint(self, p):
-        pass
 
     ## @ingroup FEMInterface
     def face_to_ipoint(self, p):
@@ -792,3 +781,5 @@ class UniformMesh3d(Mesh):
     ## @ingroup FEMInterface
     def cell_to_ipoint(self, p):
         pass
+
+UniformMesh3d.set_ploter('3d')

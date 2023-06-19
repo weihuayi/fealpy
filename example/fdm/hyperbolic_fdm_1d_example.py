@@ -1,7 +1,7 @@
 import numpy as np
-from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
+from scipy.sparse.linalg import spsolve
 from fealpy.pde.hyperbolic_1d import Hyperbolic1dPDEData
 from fealpy.mesh import UniformMesh1d
 
@@ -60,7 +60,7 @@ def hyperbolic_lax(n, *fargs):
         print(f"the max error is {e}")
         return uh0, t
 
-def hyperbolic_windward_(n, *fargs): # 点击这里查看 FEALPy 中的代码
+def hyperbolic_windward(n, *fargs): # 点击这里查看 FEALPy 中的代码
     """
     @brief 时间步进格式为中心差分格式
 
@@ -70,7 +70,7 @@ def hyperbolic_windward_(n, *fargs): # 点击这里查看 FEALPy 中的代码
     if n == 0:
         return uh0, t
     else:
-        A = mesh.hyperbolic_operator_central(pde.a(), tau)
+        A = mesh.hyperbolic_operator_central(1, tau)
         uh0[:] = A@uh0
         
         gD = lambda p: pde.dirichlet(p, t)
@@ -104,5 +104,5 @@ def hyperbolic_windward_with_vicious(n, *fargs):
 
 box = [0, 2, 0, 2]
 fig, axes = plt.subplots()
-mesh.show_animation(fig, axes, box,hyperbolic_windward , frames=nt+1)
+mesh.show_animation(fig, axes, box, hyperbolic_windward, frames=nt+1)
 plt.show()

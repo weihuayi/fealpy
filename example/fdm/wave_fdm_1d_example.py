@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 from typing import Callable, Tuple, Any
 from fealpy.pde.wave_1d import StringOscillationPDEData
-from fealpy.mesh import UniformMesh1d
+from fealpy.mesh.uniform_mesh_1d import UniformMesh1d
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=

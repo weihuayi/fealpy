@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from ..decorator import cartesian
 
 class StringOscillationPDEData:
@@ -185,13 +185,23 @@ class StringOscillationSinCosPDEData:
         """
         return np.cos(np.pi * x)
 
-    def dirichlet(self, x: np.ndarray, t: np.float64) -> np.ndarray:
+    #def dirichlet(self, x: np.ndarray, t: np.float64) -> np.ndarray:
+    #    """
+    #    @brief Dirichlet
+    #    """
+     #   val = np.zeros_like(x)
+      #  val[0] = np.sin(np.pi * t) / np.pi
+       # val[-1] = -np.sin(np.pi * t) / np.pi
+        #return val
+ 
+
+    def dirichlet(self, x: np.ndarray, t: Optional[float] = None) -> np.ndarray:
         """
         @brief Dirichlet
         """
+        if t is None:
+            t = 1.0  # 或者其他适当的默认值
         val = np.zeros_like(x)
         val[0] = np.sin(np.pi * t) / np.pi
         val[-1] = -np.sin(np.pi * t) / np.pi
         return val
- 
-
