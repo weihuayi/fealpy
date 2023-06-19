@@ -1,6 +1,3 @@
-"""
-多变量 N-R 方法主程序（收敛例子）
-"""
 import numpy as np
 
 from fealpy.opt import Problem

@@ -1,4 +1,5 @@
 import numpy as np
+
 from ..decorator import cartesian
 from typing import List 
 

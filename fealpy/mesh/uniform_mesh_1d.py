@@ -4,7 +4,6 @@ import warnings
 from typing import Callable, Union, Tuple, List
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from types import ModuleType
-from typing import Tuple 
 
 from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh1dDataStructure, HomogeneousMeshDS
@@ -478,10 +477,9 @@ class UniformMesh1d(Mesh, Plotable):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray, np.float64], np.ndarray], 
-                           A: np.ndarray, f: np.ndarray, t: np.float64, 
-                           uh: Union[np.ndarray, np.flatiter, None] = None, 
-                           threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[np.ndarray, np.ndarray]:
+    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray, Optional[float]], np.ndarray], 
+                        A: np.ndarray, f: np.ndarray, uh: Union[np.ndarray, np.flatiter, None] = None, 
+                        threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
         应用 Dirichlet 边界条件，并更新给定的矩阵 A 和向量 f。
 
@@ -495,9 +493,6 @@ class UniformMesh1d(Mesh, Plotable):
 
         f : np.ndarray
             需要更新的向量。此函数将直接修改这个向量来应用 Dirichlet 边界条件。
-
-        t : np.float64
-            当前的时间。这个值将被传递给 gD 函数，以便根据当前时间计算 Dirichlet 边界条件的值。
 
         uh : Union[np.ndarray, np.flatiter, None] = None
             表示网格上的函数值的 numpy 数组。如果提供了此参数，则此函数将直接修改这个数组以应用 Dirichlet 边界条件。如果此参数为 None（默认），
@@ -529,7 +524,8 @@ class UniformMesh1d(Mesh, Plotable):
         else:
             index = self.ds.boundary_node_flag()
 
-        uh[index]  = gD(node[index], t)
+        uh[index]  = gD(node[index])
+
         f -= A@uh
         f[index] = uh[index]
     
@@ -582,22 +578,18 @@ class UniformMesh1d(Mesh, Plotable):
 
 
     ## @ingroup FDMInterface
-    def update_dirichlet_bc(self, gD: Callable[[np.ndarray, np.float64], np.ndarray], 
-                                  uh: np.ndarray, t: np.float64, 
-                                  threshold: Optional[Union[int, Callable[[np.ndarray], np.float64]]] = None) -> None:
+    def update_dirichlet_bc(self, gD: Callable[[np.ndarray], np.ndarray], uh: np.ndarray, 
+                            threshold: Optional[Union[int, Callable[[np.ndarray], np.float64]]] = None) -> None:
         """
         更新网格函数 uh 的 Dirichlet 边界值
 
         参数：
-        gD : Callable[[np.ndarray, np.float64], np.ndarray]
+        gD : Callable[[np.ndarray], np.ndarray]
             描述 Dirichlet 边界条件的函数。这个函数接收两个参数，一个是网格节点的坐标（numpy 数组），另一个是时间 t（浮点数），并返回一个 numpy 数组，
             数组中的值是在给定的网格节点和时间 t 上的 Dirichlet 边界条件的值
 
         uh : np.ndarray
             表示网格上的函数值的 numpy 数组。此函数将更新这个数组的部分元素，以应用 Dirichlet 边界条件
-
-        t : np.float64
-            当前的时间。这个值将被传递给 gD 函数，以便根据当前时间计算 Dirichlet 边界条件的值
 
         threshold : Optional[Union[int, Callable[[np.ndarray], np.ndarray]]]
             用于确定哪些网格节点应用 Dirichlet 边界条件。如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上。
@@ -606,17 +598,18 @@ class UniformMesh1d(Mesh, Plotable):
 
         返回：
         None。这个函数直接修改传入的 uh 数组，而不返回任何值
-
         """
         node = self.node
+        # isBdNode = self.ds.boundary_node_flag()
+        # args = (node[isBdNode],) if t is None else (node[isBdNode], t)
         if threshold is None:
             isBdNode = self.ds.boundary_node_flag()
-            uh[isBdNode]  = gD(node[isBdNode], t)
+            uh[isBdNode]  = gD(node[isBdNode])
         elif isinstance(threshold, int):
-            uh[threshold] = gD(node[threshold], t)
+            uh[threshold] = gD(node[isBdNode])
         elif callable(threshold):
             isBdNode = threshold(node)
-            uh[isBdNode]  = gD(node[isBdNode], t)
+            uh[isBdNode]  = gD(node[isBdNode])
 
     def parabolic_operator_forward(self, tau):
         """

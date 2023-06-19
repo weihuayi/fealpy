@@ -1,10 +1,7 @@
 import numpy as np
-
-from fealpy.decorator import cartesian
-from typing import Tuple
-
 import numpy as np # 具体代码可参考 FEALPy 仓库
 
+from fealpy.decorator import cartesian
 from fealpy.decorator import cartesian
 from typing import Union, Tuple, List 
 
@@ -60,26 +57,10 @@ class Hyperbolic1dPDEData:
 
         @return 真解函数值
         """
-<<<<<<< HEAD
         val = np.zeros_like(p)
         val = np.abs(p-1)
         
         return val
-=======
-        return np.abs(p-1)
->>>>>>> upstream/master
-        
-    @cartesian
-    def source(self, p: np.ndarray , t: np.float64 ) -> np.float64:
-        """
-        @brief 方程右端项 
-
-        @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
-
-        @return 方程右端函数值
-        """
-        return 0.0
 
     @cartesian    
     def dirichlet(self, p: np.ndarray, t: np.float64) -> np.ndarray:
@@ -91,5 +72,5 @@ class Hyperbolic1dPDEData:
         """
         return np.ones(p.shape)
 
-    def is_dirichlet_boundary(self, p):
-        return np.abs(p - self._domain[0]) < 1e-12
+    def a(self) -> np.float64:
+        return 1
