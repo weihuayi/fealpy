@@ -16,7 +16,7 @@ from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
 ## @defgroup FEMInterface 
 ## @defgroup FDMInterface
 ## @defgroup GeneralInterface
-class UniformMesh1d(Mesh):
+class UniformMesh1d(Mesh, Plotable):
     """
     @brief    A class for representing a uniformly partitioned one-dimensional mesh.
     """
@@ -1121,3 +1121,5 @@ class UniformMesh1d(Mesh):
             cell2ipoints[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
         return cell2ipoints
 
+
+UniformMesh1d.set_ploter('1d')
