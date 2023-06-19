@@ -1615,7 +1615,8 @@ class TriangleMesh(Mesh, Plotable):
 
 
     ## @ingroup MeshGenerators
-    def from_quadrange_mesh(cls, mesh):
+    @classmethod
+    def from_quadrangle_mesh(cls, mesh):
         """
         @brief 把一个四边形网格中每个单元分成两个三角形
         """
