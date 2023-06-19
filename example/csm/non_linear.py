@@ -1,44 +1,55 @@
 import numpy as np
 
 from fealpy.opt import Problem
+from scipy.sparse.linalg import LinearOperator
+
+from fealpy.opt.MatrixVectorProductGradientOptimizer import MatrixVectorProductGradientOptimizer
 
 class TwoNonlinearSpingsProblem(Problem):
     def __init__(self):
         x0 = np.zeros(2, dtype=np.float64)
         super().__init__(x0, self.energy)
 
-    def enery(self, x):
-        k0, k1 = self.springs_stiffness(x)
+    def energy(self, x):
+        f = np.array([0, 100])
+        U = np.array([25*x[0]**2 + 500/3*x[0]**3 + 50*(x[1]-x[0])**2 + 200/3*(x[1]-x[0])**3 - f[1]*x[1]])
+        P = np.array([300*x[0]**2+400*x[0]*x[1]-200*x[1]**2+150*x[0]-100*x[1],
+                     200*x[0]**2-400*x[0]*x[1]+200*x[1]**2-100*x[0]+100*x[1]])
+        return U, P
 
-    def springs_stiffness(self, x):
-        return 50 + 500*x[0], 100 + 200*x[1]
+#    def springs_stiffness_matrix(self, x):
+ #       P = np.array([300*x[0]**2+400*x[0]*x[1]-200*x[1]**2+150*x[0]-100*x[1],
+  #                   200*x[0]**2-400*x[0]*x[1]+200*x[1]**2-100*x[0]+100*x[1]])
+   #     return P
 
-    def stiffness_matrix(self, x):
-        return 
+    def tagnent_stiffness_matrix(self, x):
+        Kt = np.array([[600*x[0]+400*x[1]+150, 400*(x[0]-x[1])-100],
+                       [400*(x[0]-x[1])-100, 400*x[1]-400*x[0]+100]])
+        return Kt
+
+    def newton_raphson_preconditioner(self, x):
+        f = np.array([0, 100])
+        P = self.energy(x)[1]
+        R = f - P
+        Kt = self.tagnent_stiffness_matrix(x)
+        delx = np.linalg.solve(Kt, R)
+        x_next = x + delx
+        return x_next
+
+def two_nonlinear_springs_opt():
+    problem = TwoNonlinearSpingsProblem()
+    NDof = len(problem.x0)
+    problem.Preconditioner = LinearOperator((NDof, NDof), problem.newton_raphson_preconditioner)
+    problem.StepLength = 1.0
+    opt = MatrixVectorProductGradientOptimizer(problem)
+    x, _, _ = opt.run()
+    print("x:", x)
+
+if __name__ == "__main__":
+    two_nonlinear_springs_opt()
 
 
 
 
 
-from fealpy.solver.nonlinear_solver import NonlinearSolver
 
-
-# 非线性弹簧刚度矩阵
-def my_calculate_P(u):
-    return np.array([300*u[0]**2+400*u[0]*u[1]-200*u[1]**2+150*u[0]-100*u[1],
-                     200*u[0]**2-400*u[0]*u[1]+200*u[1]**2-100*u[0]+100*u[1]])
-
-# jacobian 矩阵（切线刚度矩阵）
-def my_calculate_Kt(u):
-    return np.array([[600*u[0]+400*u[1]+150, 400*(u[0]-u[1])-100],
-                     [400*(u[0]-u[1])-100, 400*u[1]-400*u[0]+100]])
-
-
-tol = 1.0e-5 # 容差
-max_iter = 20 # 最大迭代次数
-u = np.array([0, 0]) # 初始解
-f = np.array([0, 100]) # 外力
-
-solver = NonlinearSolver(tol, max_iter)
-result = solver.newton_raphson_bivariate(u, f, my_calculate_P, my_calculate_Kt)
-print("最终结果：", result)
