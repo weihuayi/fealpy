@@ -156,10 +156,8 @@ class Mesh1d(Mesh):
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi 
 
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,
-            showaxis=False):
+    def add_plot(self, plot, nodecolor='k', cellcolor='k', aspect='equal', 
+                linewidths=1, markersize=20, showaxis=False):
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
