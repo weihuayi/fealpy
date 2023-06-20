@@ -43,8 +43,8 @@ VectorRobinSourceIntegrator = VectorBoundarySourceIntegrator
 from .truss_structure_integrator import TrussStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
 from .convection_integrator import ConvectionIntegrator
-from .ns_integrator import NSOperatorIntegrator
-from .press_integrator import PressIntegrator
+from .vector_viscous_work_integrator import VectorViscousWorkIntegrator
+from .press_work_integrator import PressWorkIntegrator
 
 from .provides_symmetric_tangent_operator_integrator import ProvidesSymmetricTangentOperatorIntegrator
 

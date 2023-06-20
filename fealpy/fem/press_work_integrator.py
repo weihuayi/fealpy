@@ -1,6 +1,6 @@
 import numpy as np
 
-class PressIntegrator:
+class PressWorkIntegrator:
     def __init__(self, q=None):
         self.q = q 
 

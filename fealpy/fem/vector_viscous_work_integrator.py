@@ -1,6 +1,6 @@
 import numpy as np
 
-class NSOperatorIntegrator:
+class VectorViscousWorkIntegrator:
     def __init__(self, mu=None, q=None):
         self.mu = mu
         self.q = q 
