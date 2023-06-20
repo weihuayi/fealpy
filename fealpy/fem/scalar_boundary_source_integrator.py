@@ -26,9 +26,9 @@ class ScalarBoundarySourceIntegrator:
             # 3. 逻辑数组
             index = threshold 
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = mesh.ds.boundary_face_index()
             if callable(threshold): 
-                bc = self.mesh.entity_barycenter('face', index=index)
+                bc = mesh.entity_barycenter('face', index=index)
                 index = index[threshold(bc)] # 通过边界的重心来判断
 
         face2dof = space.face_to_dof(index=index)
@@ -39,7 +39,7 @@ class ScalarBoundarySourceIntegrator:
         phi = space.face_basis(bcs)
         
         if out is None:
-            F = np.zeros((gdof, ), dtype=self.ftype)
+            F = np.zeros((gdof, ), dtype=mesh.ftype)
         else:
             assert out.shape == (gdof,)
             F = out

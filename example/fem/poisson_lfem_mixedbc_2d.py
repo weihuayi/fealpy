@@ -8,7 +8,7 @@ from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import ScalarDiffusionIntegrator      # (A\nabla u, \nabla v) 
+from fealpy.fem import ScalarLaplaceIntegrator      # (\nabla u, \nabla v) 
 from fealpy.fem import ScalarSourceIntegrator         # (f, v)
 from fealpy.fem import ScalarNeumannSourceIntegrator  # <g_D, v>
 from fealpy.fem import ScalarRobinSourceIntegrator    # <g_R, v>
@@ -17,6 +17,8 @@ from fealpy.fem import ScalarRobinBoundaryIntegrator  # <kappa*u, v>
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
+
+import ipdb
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -52,8 +54,7 @@ nx = args.nx
 ny = args.ny
 maxit = args.maxit
 
-#ipdb.set_trace()
-pde = CosCosData()
+pde = CosCosData(kappa=1.0)
 domain = pde.domain()
 
 if mtype == 'tri':
@@ -76,9 +77,11 @@ for i in range(maxit):
 
     bform = BilinearForm(space)
     # (\nabla u, \nabla v)
-    bform.add_domain_integrator(ScalarDiffusionIntegrator(q=p+2)) 
+    bform.add_domain_integrator(ScalarLaplaceIntegrator(q=p+2)) 
     # <kappa u, v>
-    bform.add_boundary_integrator(ScalarRobinBoundaryIntegrator(pde.kappa, q=p+2)) 
+    rbi = ScalarRobinBoundaryIntegrator(pde.kappa,
+            threshold=pde.is_robin_boundary, q=p+2)
+    bform.add_boundary_integrator(rbi) 
     A = bform.assembly()
 
     lform = LinearForm(space)
@@ -86,13 +89,13 @@ for i in range(maxit):
     si = ScalarSourceIntegrator(pde.source, q=p+2)
     lform.add_domain_integrator(si)
     # <g_R, v> 
-    rsi = ScalarRobinSourceIntegrator(pde.robin, 
-            threshold=pde.is_robin_boundary, q=p+2)
+    rsi = ScalarRobinSourceIntegrator(pde.robin, threshold=pde.is_robin_boundary, q=p+2)
     lform.add_boundary_integrator(rsi)
     # <g_N, v>
     nsi = ScalarNeumannSourceIntegrator(pde.neumann, 
             threshold=pde.is_neumann_boundary, q=p+2)
     lform.add_boundary_integrator(nsi)
+    #ipdb.set_trace()
     F = lform.assembly()
 
     # Dirichlet 边界条件

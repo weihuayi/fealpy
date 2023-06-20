@@ -262,6 +262,7 @@ class TriangleMesh(Mesh, Plotable):
 
     face_normal = edge_normal
     face_unit_normal = edge_unit_normal
+
     def grad_lambda(self, index=np.s_[:]):
         node = self.entity('node')
         cell = self.entity('cell')

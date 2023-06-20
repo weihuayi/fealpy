@@ -44,9 +44,9 @@ class VectorBoundarySourceIntegrator:
             # 3. 逻辑数组
             index = threshold 
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = mesh.ds.boundary_face_index()
             if callable(threshold): 
-                bc = self.mesh.entity_barycenter('face', index=index)
+                bc = mesh.entity_barycenter('face', index=index)
                 index = index[threshold(bc)] # 通过边界的重心来判断
   
         facemeasure = mesh.entity_measure('face', index=index)
@@ -88,7 +88,7 @@ class VectorBoundarySourceIntegrator:
         gdof = space[0].number_of_global_dofs()
         face2dof = space[0].face_to_dof(index=index) # 标量的面元自由度数组
         if out is None:
-            F = np.zeros((GD*gdof, ), dtype=self.ftype)
+            F = np.zeros((GD*gdof, ), dtype=mesh.ftype)
         else:
             assert out.shape == (GD*gdof,)
             F = out
@@ -123,9 +123,9 @@ class VectorBoundarySourceIntegrator:
             # 3. 逻辑数组
             index = threshold 
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = mesh.ds.boundary_face_index()
             if callable(threshold): 
-                bc = self.mesh.entity_barycenter('face', index=index)
+                bc = mesh.entity_barycenter('face', index=index)
                 index = index[threshold(bc)] # 通过边界的重心来判断
 
         facemeasure = mesh.entity_measure('face', index=index)
