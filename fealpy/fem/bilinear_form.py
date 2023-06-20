@@ -96,6 +96,10 @@ class BilinearForm:
         I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
         J = np.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
         self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+        for bi in self.bintegrators:
+            bi.assembly_face_matrix(space, out=self._M)
+
         return self._M
 
     def assembly_for_vspace_with_scalar_basis(self) -> None:
@@ -164,6 +168,8 @@ class BilinearForm:
 
                         self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
 
+        for bi in self.bintegrators:
+            di.assembly_face_matrix(space, out=self._M)
         return self._M
 
     def fast_assembly(self):

@@ -7,16 +7,16 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh import QuadrangleMesh 
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import ScalarDiffusionIntegrator 
-from fealpy.fem import ScalarSourceIntegrator
-from fealpy.fem import ScalarNeumannBCIntegrator
+from fealpy.fem import ScalarDiffusionIntegrator      # (A\nabla u, \nabla v) 
+from fealpy.fem import ScalarSourceIntegrator         # (f, v)
+from fealpy.fem import ScalarNeumannSourceIntegrator  # <g_D, v>
+from fealpy.fem import ScalarRobinSourceIntegrator    # <g_R, v>
+from fealpy.fem import ScalarRobinBoundaryIntegrator  # <kappa*u, v>
+
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
-
-import ipdb
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -73,14 +73,29 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
     bform = BilinearForm(space)
-    bform.add_domain_integrator(DiffusionIntegrator(q=p+2))
+    # (\nabla u, \nabla v)
+    bform.add_domain_integrator(ScalarDiffusionIntegrator(q=p+2)) 
+    # <kappa u, v>
+    bform.add_boundary_integrator(ScalarRobinBoundaryIntegrator(pde.kappa, q=p+2)) 
     A = bform.assembly()
 
     lform = LinearForm(space)
-    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
+    # (f, v)
+    si = ScalarSourceIntegrator(pde.source, q=p+2)
+    lform.add_domain_integrator(si)
+    # <g_R, v> 
+    rsi = ScalarRobinSourceIntegrator(pde.robin, 
+            threshold=pde.is_robin_boundary, q=p+2)
+    lform.add_boundary_integrator(rsi)
+    # <g_N, v>
+    nsi = ScalarNeumannSourceIntegrator(pde.neumann, 
+            threshold=pde.is_neumann_boundary, q=p+2)
+    lform.add_boundary_integrator(nsi)
     F = lform.assembly()
 
-    bc = DirichletBC(space, pde.dirichlet) 
+    # Dirichlet 边界条件
+    bc = DirichletBC(space, 
+            pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
     uh[:] = spsolve(A, F)

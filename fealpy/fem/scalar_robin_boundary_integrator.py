@@ -7,7 +7,7 @@ class ScalarRobinBoundaryIntegrator:
     <\\kappa u, v> 
     """
 
-    def __init__(self, kappa, q=3, threshold=None):
+    def __init__(self, kappa, threshold=None, q=3):
         """
         @param[in] kappa 一个标量值
 

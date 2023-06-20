@@ -10,23 +10,39 @@ from .bilinear_form import BilinearForm
 from .mixed_bilinear_form import MixedBilinearForm
 from .linear_form import LinearForm
 
-# Integrator for scalar case
-from .scalar_mass_integrator import ScalarMassIntegrator
-from .scalar_convection_integrator import ScalarConvectionIntegrator
+# Domain integrator for scalar case
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
+ScalarLaplaceIntegrator = ScalarDiffusionIntegrator 
+from .scalar_convection_integrator import ScalarConvectionIntegrator
+from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
-from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator as ScalarNeumannSourceIntegrator
-from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator as ScalarRobinSourceIntegrator
 
-# Integrator for vector case
+# Boundary integrator for scalar case
+# <kappa u, v>
+from .scalar_robin_boundary_integrator import ScalarRobinBoundaryIntegrator
+# <g, v>
+from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator
+# <g_N, v>
+ScalarNeumannSourceIntegrator = ScalarBoundarySourceIntegrator
+# <g_R, v>
+ScalarRobinSourceIntegrator = ScalarBoundarySourceIntegrator
+
+# Domain integrator for vector case
 from .vector_diffusion_integrator import VectorDiffusionIntegrator
 from .vector_mass_integrator import VectorMassIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
+from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
+# Boundary integrator for vector case
+from .vector_boundary_source_integrator import VectorBoundarySourceIntegrator
+VectorNeumannSourceIntegrator = VectorBoundarySourceIntegrator
+VectorRobinSourceIntegrator = VectorBoundarySourceIntegrator
+
+
+# others
 from .truss_structure_integrator import TrussStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
 from .convection_integrator import ConvectionIntegrator
-from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 from .ns_integrator import NSOperatorIntegrator
 from .press_integrator import PressIntegrator
 

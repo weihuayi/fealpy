@@ -62,9 +62,7 @@ bform = BilinearForm(vspace)
 E = pde.E # 杨氏模量
 A0 = pde.A0 # 横截面积
 bform.add_domain_integrator(TrussStructureIntegrator(E, A0))
-bform.assembly()
-
-K = bform.get_matrix() # (30, 30)
+K = bform.assembly()
 
  # 加载力的条件 
 F = np.zeros((uh.shape[0], GD), dtype=np.float64)

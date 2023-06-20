@@ -4,7 +4,7 @@ class ScalarBoundarySourceIntegrator:
     """
     @brief 组装边界源项向量，主要用于 Neuann 和 Robin 边界函数的积分
     """
-    def __init__(self, source, q=3, threshold=None):
+    def __init__(self, source, threshold=None, q=3):
         self.source = source 
         self.q = q 
         self.threshold = threshold

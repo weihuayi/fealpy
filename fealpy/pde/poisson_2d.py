@@ -8,23 +8,18 @@ class CosCosData:
         u = cos(pi*x)*cos(pi*y)
     """
     def __init__(self):
-        pass
+        self.kappa = 1.0 # Robin 条件中的系数
 
     def domain(self):
+        """
+        @brief 模型定义域
+        """
         return np.array([0, 1, 0, 1])
 
     @cartesian
     def solution(self, p):
-        """ The exact solution 
-        Parameters
-        ---------
-        p : 
-
-
-        Examples
-        -------
-        p = np.array([0, 1], dtype=np.float64)
-        p = np.array([[0, 1], [0.5, 0.5]], dtype=np.float64)
+        """  
+        @brief 模型真解
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -35,9 +30,8 @@ class CosCosData:
 
     @cartesian
     def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
+        """ 
+        @brief 源项
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -47,7 +41,8 @@ class CosCosData:
 
     @cartesian
     def gradient(self, p):
-        """ The gradient of the exact solution 
+        """  
+        @brief 真解梯度
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -59,29 +54,30 @@ class CosCosData:
 
     @cartesian
     def flux(self, p):
+        """
+        @brief 真解通量
+        """
         return -self.gradient(p)
 
     @cartesian
     def dirichlet(self, p):
+        """
+        @brief Dirichlet 边界条件 
+        """
         return self.solution(p)
 
     @cartesian
     def is_dirichlet_boundary(self, p):
+        """
+        @brief Dirichlet 边界的判断函数
+        """
         y = p[..., 1]
-        return ( y == 1.0) | ( y == 0.0)
+        return (np.abs(y - 1.0) < 1e-12) | (np.abs( y -  0.0) < 1e-12)
 
     @cartesian
     def neumann(self, p, n):
         """ 
-        Neuman  boundary condition
-
-        Parameters
-        ----------
-
-        p: (NQ, NE, 2)
-        n: (NE, 2)
-
-        grad*n : (NQ, NE, 2)
+        @brief Neumann 边界条件
         """
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1) # (NQ, NE)
@@ -89,22 +85,30 @@ class CosCosData:
 
     @cartesian
     def is_neumann_boundary(self, p):
+        """
+        @brief Neumann 边界的判断函数
+        """
         x = p[..., 0]
-        return x == 1.0
+        return np.abs(x - 1.0) < 1e-12
 
     @cartesian
     def robin(self, p, n):
+        """
+        @brief Robin 边界条件
+        """
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
         shape = len(val.shape)*(1, )
-        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
         val += self.solution(p) 
-        return val, kappa
+        return val
 
     @cartesian
     def is_robin_boundary(self, p):
+        """
+        @brief Robin 边界条件判断函数
+        """
         x = p[..., 0]
-        return x == 0.0
+        return np.abs(x - 0.0) < 1e-12
         
 
 class SinSinData:
