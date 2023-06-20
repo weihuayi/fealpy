@@ -132,14 +132,13 @@ class QuadrangleMesh(Mesh, Plotable):
         """
         @brief 四边形单元上的形函数
         """
-        assert isinstance(bc, tuple):
+        assert isinstance(bc, tuple)
         GD = len(bc)
         phi = [self._shape_function(val, p=p) for val in bc]
         ldof = (p+1)**GD 
         return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
 
-    def face_shape_function(self, bc, p=1):
-        return self._shape_function(bc, p=p)
+    cell_shape_function = shape_function
 
     def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """
@@ -181,6 +180,8 @@ class QuadrangleMesh(Mesh, Plotable):
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
+
+    cell_grad_shape_function = grad_shape_function
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """

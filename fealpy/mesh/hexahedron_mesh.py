@@ -149,17 +149,22 @@ class HexahedronMesh(Mesh, Plotable):
         """
         @brief 六面体单元上的形函数
         """
-        if isinstance(bc, tuple):
-            TD = len(bc)
-            phi = [self._shape_function(val, p=p) for val in bc]
-            ldof = (p+1)**TD
-            if TD == 3:
-                return np.einsum('im, jn, ko->ijkmno', phi[0], phi[1], phi[2]).reshape(-1, ldof)
-            else: 
-                return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
-        else:
-            return self._shape_function(bc, p=p)
-        return phi
+        assert isinstance(bc, tuple)
+        TD = len(bc)
+        phi = [self._shape_function(val, p=p) for val in bc]
+        ldof = (p+1)**TD
+        return np.einsum('im, jn, ko->ijkmno', phi[0], phi[1], phi[2]).reshape(-1, ldof)
+
+    cell_shape_function = shape_function
+
+    def face_shape_function(self, bc, p=1):
+        """
+        @brief 四边形面上的形函数
+        """
+        TD = len(bc)
+        phi = [self._shape_function(val, p=p) for val in bc]
+        ldof = (p+1)**TD
+        return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
 
     def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """
@@ -197,6 +202,8 @@ class HexahedronMesh(Mesh, Plotable):
                 gphi = np.einsum('qikm, qimn, qln->qilk', J, G, gphi) 
                 return gphi
         return gphi
+
+    cell_grad_shape_function = grad_shape_function
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """

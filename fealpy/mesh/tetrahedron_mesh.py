@@ -74,6 +74,9 @@ class TetrahedronMesh(Mesh, Plotable):
         self.face_bc_to_point = self.bc_to_point
         self.cell_bc_to_point = self.bc_to_point
         self.shape_function = self._shape_function
+        self.cell_shape_function = self._shape_function
+        self.face_shape_function = self._shape_function
+        self.edge_shape_function = self._shape_function
 
         if showmemory:
             nsize = self.node.size*self.node.itemsize/2**30
@@ -170,7 +173,12 @@ class TetrahedronMesh(Mesh, Plotable):
         elif variables == 'u':
             return R
 
+    cell_grad_shape_function = grad_shape_function
+
     def grad_shape_function_on_face(self, bc, cindex, lidx, p=1, direction=True):
+        pass
+
+    def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
         pass
 
     def interpolation_points(self, p, index=np.s_[:]):
