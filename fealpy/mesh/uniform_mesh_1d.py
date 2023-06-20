@@ -1114,5 +1114,5 @@ class UniformMesh1d(Mesh, Plotable):
             cell2ipoints[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
         return cell2ipoints
 
-
+# 调用画图接口
 UniformMesh1d.set_ploter('1d')

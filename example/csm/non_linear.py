@@ -17,11 +17,6 @@ class TwoNonlinearSpingsProblem(Problem):
                      200*x[0]**2-400*x[0]*x[1]+200*x[1]**2-100*x[0]+100*x[1]])
         return U, P
 
-#    def springs_stiffness_matrix(self, x):
- #       P = np.array([300*x[0]**2+400*x[0]*x[1]-200*x[1]**2+150*x[0]-100*x[1],
-  #                   200*x[0]**2-400*x[0]*x[1]+200*x[1]**2-100*x[0]+100*x[1]])
-   #     return P
-
     def tagnent_stiffness_matrix(self, x):
         Kt = np.array([[600*x[0]+400*x[1]+150, 400*(x[0]-x[1])-100],
                        [400*(x[0]-x[1])-100, 400*x[1]-400*x[0]+100]])
