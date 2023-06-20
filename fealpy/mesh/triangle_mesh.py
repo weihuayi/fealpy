@@ -58,6 +58,7 @@ class TriangleMesh(Mesh, Plotable):
         self.face_to_ipoint = self.edge_to_ipoint
 
         self.shape_function = self._shape_function
+        self.face_shape_function = self._shape_function
 
     def ref_cell_measure(self):
         return 0.5

@@ -132,13 +132,14 @@ class QuadrangleMesh(Mesh, Plotable):
         """
         @brief 四边形单元上的形函数
         """
-        if isinstance(bc, tuple):
-            GD = len(bc)
-            phi = [self._shape_function(val, p=p) for val in bc]
-            ldof = (p+1)**GD 
-            return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
-        else:
-            return self._shape_function(bc, p=p)
+        assert isinstance(bc, tuple):
+        GD = len(bc)
+        phi = [self._shape_function(val, p=p) for val in bc]
+        ldof = (p+1)**GD 
+        return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
+
+    def face_shape_function(self, bc, p=1):
+        return self._shape_function(bc, p=p)
 
     def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """

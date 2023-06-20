@@ -35,20 +35,20 @@ class ScalarRobinBoundaryIntegrator:
             # TODO: 更新其它地方的 threshold
             index = threshold 
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = mesh.ds.boundary_face_index()
             if callable(threshold): 
-                bc = self.mesh.entity_barycenter('face', index=index)
+                bc = mesh.entity_barycenter('face', index=index)
                 flag = threshold(bc) # 通过边界的重心来判断
                 index = index[flag]
 
-        face2dof = self.face_to_dof(index)
+        face2dof = space.face_to_dof(index)
 
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         measure = mesh.entity_measure('face', index=index)
 
-        phi = self.face_basis(bcs)
+        phi = space.face_basis(bcs)
         pp = mesh.bc_to_point(bcs, index=index)
         #TODO: 可能需要加入一个备用参数 bcs 
         # 如果 face 是曲，应该是每个积分点处有一个法向

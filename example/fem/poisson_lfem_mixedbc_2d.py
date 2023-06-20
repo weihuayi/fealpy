@@ -57,8 +57,10 @@ pde = CosCosData()
 domain = pde.domain()
 
 if mtype == 'tri':
+    from fealpy.mesh import TriangleMesh
     mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
 elif mtype == 'quad':
+    from fealpy.mesh import QuadrangleMesh
     mesh = QuadrangleMesh.from_box(domain, nx=nx, ny=ny)
 
 
