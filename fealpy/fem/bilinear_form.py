@@ -98,7 +98,7 @@ class BilinearForm:
         self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
 
         for bi in self.bintegrators:
-            bi.assembly_face_matrix(space, out=self._M)
+            self._M += bi.assembly_face_matrix(space)
 
         return self._M
 
@@ -169,7 +169,7 @@ class BilinearForm:
                         self._M += csr_matrix((val.flat, (J.flat, I.flat)), shape=(GD*gdof, GD*gdof))
 
         for bi in self.bintegrators:
-            di.assembly_face_matrix(space, out=self._M)
+            self._M += bi.assembly_face_matrix(space)
         return self._M
 
     def fast_assembly(self):

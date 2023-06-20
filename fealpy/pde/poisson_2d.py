@@ -7,8 +7,8 @@ class CosCosData:
         -\\Delta u = f
         u = cos(pi*x)*cos(pi*y)
     """
-    def __init__(self):
-        self.kappa = 1.0 # Robin 条件中的系数
+    def __init__(self, kappa=1.0):
+        self.kappa = kappa # Robin 条件中的系数
 
     def domain(self):
         """
@@ -98,8 +98,7 @@ class CosCosData:
         """
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
-        shape = len(val.shape)*(1, )
-        val += self.solution(p) 
+        val += self.kappa*self.solution(p) 
         return val
 
     @cartesian

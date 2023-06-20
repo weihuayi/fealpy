@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 
 class ScalarRobinBoundaryIntegrator:
@@ -54,7 +55,7 @@ class ScalarRobinBoundaryIntegrator:
         # 如果 face 是曲，应该是每个积分点处有一个法向
         n = mesh.face_unit_normal(index=index) 
 
-        FM = kappa*np.einsum('q, qci, qcj, c->cij', ws, phi, phi, measure, optimize=true)
+        FM = kappa*np.einsum('q, qci, qcj, c->cij', ws, phi, phi, measure, optimize=True)
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=(gdof, gdof))

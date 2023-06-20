@@ -175,8 +175,7 @@ class Mesh():
         """
         raise NotImplementedError
 
-    def bc_to_point(self, bc: NDArray, etype: Union[int, str]='cell',
-                    index=np.s_[:]) -> NDArray:
+    def bc_to_point(self, bc: NDArray, index=np.s_[:]) -> NDArray:
         """
         @brief Convert barycenter coordinate points to cartesian coordinate points\
                on mesh entities.
@@ -191,11 +190,9 @@ class Mesh():
 
         @return: Cartesian coordinate points array, with shape (NQ, GD).
         """
-        if etype in {'node', 0}:
-            raise ValueError(f"Can not convert the coordinates on nodes, please\
-                             use type of entities of higher dimension.")
-        node = self.node
-        entity = self.entity(etype=etype, index=index)
+        node = self.entity('node')
+        TD = bc.shape[-1] - 1
+        entity = self.entity(TD, index=index)
         p = np.einsum('...j, ijk -> ...ik', bc, node[entity])
         return p
 
@@ -301,19 +298,19 @@ class Mesh():
         @brief
         """
         node = self.entity('node') if node is None else node
-        edge = self.entity('edge')
-        v = node[edge[index,1]] - node[edge[index,0]]
+        edge = self.entity('edge', index=index)
+        v = node[edge[:, 1]] - node[edge[:,0]]
         return np.linalg.norm(v, axis=1)
 
     def edge_tangent(self, index=np.s_[:], node=None):
         node = self.entity('node') if node is None else node
-        edge = self.entity('edge')
-        v = node[edge[index, 1], :] - node[edge[index, 0], :]
+        edge = self.entity('edge', index)
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
         return v
 
     def edge_unit_tangent(self, index=np.s_[:], node=None):
         node = self.entity('node') if node is None else node
-        edge = self.entity('edge')
+        edge = self.entity('edge', index=index)
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)

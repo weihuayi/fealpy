@@ -58,7 +58,9 @@ class TriangleMesh(Mesh, Plotable):
         self.face_to_ipoint = self.edge_to_ipoint
 
         self.shape_function = self._shape_function
+        self.cell_shape_function = self._shape_function
         self.face_shape_function = self._shape_function
+        self.edge_shape_function = self._shape_function
 
     def ref_cell_measure(self):
         return 0.5
@@ -100,14 +102,16 @@ class TriangleMesh(Mesh, Plotable):
         elif variables == 'u':
             return R #(NQ, ldof, TD+1)
 
+    cell_grad_shape_function = grad_shape_function
+
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
         """
         @brief 计算单元上所有形函数在边上的积分点处的导函数值
 
-        @brief bc 边上的一组积分点
-        @brief cindex 边所在的单元编号
-        @brief lidx 边在该单元的局部编号
-        @brief direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+        @param bc 边上的一组积分点
+        @param cindex 边所在的单元编号
+        @param lidx 边在该单元的局部编号
+        @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
         """
 
         NC = len(cindex)
@@ -258,6 +262,7 @@ class TriangleMesh(Mesh, Plotable):
 
     face_normal = edge_normal
     face_unit_normal = edge_unit_normal
+
     def grad_lambda(self, index=np.s_[:]):
         node = self.entity('node')
         cell = self.entity('cell')
