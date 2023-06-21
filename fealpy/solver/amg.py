@@ -43,55 +43,71 @@ class AMGSolver():
     def coarsen_chen(self, A, theta=0.025):
         """
         @brief 
+
+        @param[in] A 对称正定矩阵
+        @param[in] theta 粗化阈值
         """
+
+        # 1. 初始化参数
         N = A.shape[0]
-        isC = np.zeros(N, dtype=bool)
+        isC = np.zeros(N, dtype=np.bool_)
         N0 = min(int(np.floor(np.sqrt(N))), 25)
 
-        # Generate strong connectness matrix
+        # 2. 生成强连通矩阵 
+        # 然后函数计算出归一化的矩阵Am（矩阵A的对角线被归一化），
+        # 并找出强连接的节点，也就是那些Am的元素值小于阈值theta的节点。
+        # 得到的结果保存在矩阵G中。
         Dinv = sp.diags(1./np.sqrt(A.diagonal()))
-        Am = Dinv @ A @ Dinv
+        Am = Dinv @ A @ Dinv # 对角线归一化矩阵
         im, jm, sm = sp.find(Am)
-        idx = (-sm > theta)
-        G = sp.csr_matrix((sm[idx], (im[idx], jm[idx])), shape=(N, N))
+        flag = (-sm > theta) 
+        # 删除对角、非对角弱联接项，注意对角线元素为1，也会被过滤掉
+        G = sp.csr_matrix((sm[flag], (im[flag], jm[flag])), shape=(N, N))
 
-        # Compute degree of vertex
-        deg = np.sum(sp.csr_matrix(G, dtype=np.bool_), axis=1)
-        deg = np.squeeze(np.asarray(deg))
-        if np.sum(deg>0) < 0.25*np.sqrt(N):
+        # 3. 计算顶点的度 
+        # 函数计算出每个节点的度，也就是与每个节点强连接的节点数量。
+        # 如果有太多的节点没有连接，函数会随机选择N0个节点作为粗糙节点并返回。
+        deg = np.array(np.sum(sp.csr_matrix(G, dtype=np.bool_), axis=1).flat,
+                dtype=np.float64)
+        if np.sum(deg > 0) < 0.25*np.sqrt(N):
             isC[np.random.choice(range(N), N0)] = True
             return isC, G
 
-        idx = (deg>0)
-        deg[idx] += 0.1 * np.random.rand(np.sum(idx))
+        flag = (deg > 0)
+        deg[flag] += 0.1 * np.random.rand(np.sum(flag))
 
-        # Find an approximated maximal independent set and put to C set
-        isF = np.zeros(N, dtype=bool)
-        isF[deg == 0] = True
-        isU = np.ones(N, dtype=bool)
+        # 4. 寻找最大独立集 
+        # 函数尝试找出一个近似的最大独立集并将其节点添加到粗糙节点集合中。
+        # 如果某节点被标记为粗糙节点，则其相邻的节点会被标记为细节点。
+        isF = np.zeros(N, dtype=np.bool_)
+        isF[deg == 0] = True # 孤立点为细节点 
+        isU = np.ones(N, dtype=np.bool_) # 未决定的集合
 
         while np.sum(isC) < N/2 and np.sum(isU) > N0:
-            isS = np.zeros(N, dtype=bool)
-            isS[deg>0] = True
-            S = np.where(isS)[0]
-            S_G = G[S,:][:,S]
-            i,j = sp.triu(S_G,1).nonzero()
-            idx = deg[S[i]] >= deg[S[j]]
-            isS[S[j[idx]]] = False
-            isS[S[i[~idx]]] = False
-            isC[isS] = True
+            # 如果粗节点的个数少于总节点个数的一半，并且未决定的点集大于 N0
+            isS = np.zeros(N, dtype=np.bool_) # 选择集
+            isS[deg>0] = True # 从非孤立点选择
+            S = np.nonzero(isS)[0]
+            # 非孤立点集的连接关系
+            i, j = sp.triu(G[S, :][:, S], 1).nonzero()
+
+            # 第 i 个非孤立点的度大于等于第 j 个非孤立点的度
+            flag = deg[S[i]] >= deg[S[j]]
+            isS[S[j[flag]] = False # 把度小的节点从选择集移除
+            isS[S[i[~flag]]] = False # 把度小的节点从选择集移除
+            isC[isS] = True # 剩下的点就是粗点
 
             # Remove coarse nodes and neighboring nodes from undecided set
-            i, _, _ = sp.find(G[:,isC])
-            isF[i] = True
-            isU = ~(isF | isC)
-            deg[~isU] = 0
+            i, _, _ = sp.find(G[:, isC])
+            isF[i] = True # 粗点的相邻点是细点
+            isU = ~(isF | isC) # 不是细点也不是粗点，就是未决定点
+            deg[~isU] = 0 # 粗点或细节的度设置为 0
 
             if np.sum(isU) <= N0:
+                # 如果未决定点的数量小于等于 N0，把未决定点设为粗点
                 isC[isU] = True
                 isU = []
 
-        # print('Number of Coarse Nodes:', np.sum(isC))
         return isC, G
 
     def coarsen_rs(self, A, theta=0.025):
@@ -259,24 +275,32 @@ class AMGSolver():
 
     def interpolation_standard(self, A, isC):
         """
-        @brief 
+        @brief 生成延长和限止矩阵 
+
+        @param[in] A 一个对称正定矩阵
+        @param[in] isC 标记粗点的逻辑数组
+
+        @note Prolongation 矩阵将粗网格上的解插值到四网格上; Restriction  矩阵将
+        细网格上的残差限制到粗网格上。
         """
+
         N = A.shape[0]
 
-        # Index map between coarse grid and fine grid
+        # 1. 索引映射：函数首先创建了一个从粗网格到细网格的索引映射。它找出了所
+        #    有的粗节点和细节点，并存储了他们的索引。
         allNode = np.arange(N)
         fineNode = allNode[~isC]
         Nc = N - len(fineNode)
         coarseNode = np.arange(Nc)
-        coarseNodeFineIdx = np.where(isC)[0]
+        coarseNodeFineIdx = np.nonzero(isC)[0]
 
-        # Construct prolongation and restriction operator
-        Acf = A[coarseNodeFineIdx,:][:,fineNode]
-        Dsum = np.sum(Acf, axis=0)
-        idx = (Dsum != 0)
-        Nf = np.sum(idx)
-        Dsum = sp.diags(1./Dsum[idx], 0)
-        ti, tj, tw = sp.find(Acf[:,idx] @ Dsum)
+        # 2. 构造延长和限止算子
+        Acf = A[coarseNodeFineIdx, :][:, fineNode] # 把粗-->细块拿出来
+        Dsum = np.sum(Acf, axis=0) # 每个细点对应粗点值的和
+        flag = (Dsum != 0) # 各非零的
+        Nf = np.sum(flag)
+        Dsum = sp.diags(1./Dsum[flag], 0)
+        ti, tj, tw = sp.find(Acf[:, flag] @ Dsum)
         ip = np.concatenate((coarseNodeFineIdx, fineNode[ti]))
         jp = np.concatenate((coarseNode, tj))
         sp_vals = np.concatenate((np.ones(Nc), tw))
