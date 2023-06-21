@@ -6,19 +6,12 @@ from scipy.spatial import KDTree
 from .triangle_quality import *
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import Mesh2dDataStructure, HomogeneousMeshDS
+from .mesh_data_structure import Mesh2dDataStructure
 
-class TriangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
+class TriangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
-
-    NVC: int = 3
-    NVE: int = 2
-    NVF: int = 2
-
-    NEC: int = 3
-    NFC: int = 3
 
     localCell = np.array([
         (0, 1, 2),
@@ -52,7 +45,7 @@ class TriangleMesh(Mesh, Plotable):
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
-        
+
         self.edge_bc_to_point = self.bc_to_point
         self.cell_bc_to_point = self.bc_to_point
         self.face_to_ipoint = self.edge_to_ipoint
@@ -111,7 +104,7 @@ class TriangleMesh(Mesh, Plotable):
         @param bc 边上的一组积分点
         @param cindex 边所在的单元编号
         @param lidx 边在该单元的局部编号
-        @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+        @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致
         """
 
         NC = len(cindex)
@@ -129,7 +122,7 @@ class TriangleMesh(Mesh, Plotable):
 
         gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
 
-        return gphi 
+        return gphi
 
     grad_shape_function_on_face = grad_shape_function_on_edge
 
@@ -189,7 +182,7 @@ class TriangleMesh(Mesh, Plotable):
         """
         cell = self.entity('cell')
         if p==1:
-            return cell[index] 
+            return cell[index]
 
         mi = self.multi_index_matrix(p, 2)
         idx0, = np.nonzero(mi[:, 0] == 0)
@@ -199,7 +192,7 @@ class TriangleMesh(Mesh, Plotable):
         edge2cell = self.ds.edge_to_cell()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
-        NC = self.number_of_cells() 
+        NC = self.number_of_cells()
 
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoints(p)
@@ -234,7 +227,7 @@ class TriangleMesh(Mesh, Plotable):
 
     def edge_frame(self, index=np.s_[:]):
         """
-        @brief 计算二维网格中每条边上的局部标架 
+        @brief 计算二维网格中每条边上的局部标架
         """
         assert self.geo_dimension() == 2
         t = self.edge_unit_tangent(index=index)
@@ -599,7 +592,7 @@ class TriangleMesh(Mesh, Plotable):
         @brief 显示网格角度的分布直方图
         """
         if angle is None:
-            angle = self.angle() 
+            angle = self.angle()
         hist, bins = np.histogram(angle.flatten('F')*180/np.pi, bins=50, range=(0, 180))
         center = (bins[:-1] + bins[1:])/2
         axes.bar(center, hist, align='center', width=180/50.0)
@@ -617,17 +610,17 @@ class TriangleMesh(Mesh, Plotable):
                 textcoords='axes fraction',
                 horizontalalignment='left', verticalalignment='top')
         return mina, maxa, meana
-    
+
     def cell_quality(self,measure='radius_ratio'):
         if measure=='radius_ratio':
-            return radius_ratio(self) 
+            return radius_ratio(self)
 
     def show_quality(self, axes, qtype=None, quality=None):
         """
         @brief 显示网格质量分布的分布直方图
         """
         if quality is None:
-            quality = self.cell_quality() 
+            quality = self.cell_quality()
         minq = np.min(quality)
         maxq = np.max(quality)
         meanq = np.mean(quality)
@@ -695,7 +688,7 @@ class TriangleMesh(Mesh, Plotable):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
-        
+
         isBdNode = self.ds.boundary_node_flag()
         isBdCell = self.ds.boundary_cell_flag()
         isFreeNode = ~isBdNode
@@ -708,10 +701,10 @@ class TriangleMesh(Mesh, Plotable):
 
         newNode = np.zeros((NN,2),dtype=np.float64)
         patch_area = np.zeros(NN,dtype=np.float64)
-        
+
         np.add.at(newNode,cell,np.broadcast_to(cc[:,None],(NC,3,2)))
-        np.add.at(patch_area,cell,np.broadcast_to(cm[:,None],(NC,3))) 
-        
+        np.add.at(patch_area,cell,np.broadcast_to(cm[:,None],(NC,3)))
+
         newNode[isBdNode] = node[isBdNode]
         newNode[isFreeNode] = newNode[isFreeNode]/patch_area[...,None][isFreeNode]
         self.node = newNode
@@ -726,7 +719,7 @@ class TriangleMesh(Mesh, Plotable):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
-        
+
         isBdNode = self.ds.boundary_node_flag()
         isBdCell = self.ds.boundary_cell_flag()
         isFreeNode = ~isBdNode
@@ -737,10 +730,10 @@ class TriangleMesh(Mesh, Plotable):
 
         newNode = np.zeros((NN,2),dtype=np.float64)
         patch_area = np.zeros(NN,dtype=np.float64)
-        
+
         np.add.at(newNode,cell,np.broadcast_to(cb[:,None],(NC,3,2)))
-        np.add.at(patch_area,cell,np.broadcast_to(cm[:,None],(NC,3))) 
-        
+        np.add.at(patch_area,cell,np.broadcast_to(cm[:,None],(NC,3)))
+
         newNode[isBdNode] = node[isBdNode]
         newNode[isFreeNode] = newNode[isFreeNode]/patch_area[...,None][isFreeNode]
         self.node = newNode
@@ -1065,8 +1058,8 @@ class TriangleMesh(Mesh, Plotable):
         if rflag == True:
             self.ds.construct()
 
+    @staticmethod
     def adaptive_options(
-            self,
             method='mean',
             maxrefine=5,
             maxcoarsen=0,
@@ -1475,9 +1468,7 @@ class TriangleMesh(Mesh, Plotable):
         else:
             isBigSizeCell = (l > hmax) & isInterfaceCell
 
-
         return isBigCurveCell | isBigSizeCell
-
 
 
     def mark_interface_cell_with_type(self, phi, interface):
@@ -1730,7 +1721,7 @@ class TriangleMesh(Mesh, Plotable):
     ## @ingroup MeshGenerators
     @classmethod
     def from_domain_distmesh(cls, domain, hmin, maxit=100):
-        from .DistMesher2d import DistMesher2d 
+        from .DistMesher2d import DistMesher2d
         mesher = DistMesher2d(domain, hmin)
         mesh = mesher.meshing(maxit=maxit)
         return mesh
@@ -1763,7 +1754,7 @@ class TriangleMesh(Mesh, Plotable):
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         node = node_coords.reshape((-1,3))[:,:2]
-        
+
         # 节点编号映射
         nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
 

@@ -4,22 +4,25 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, MeshDataStructure, StructureMeshDS
+from .mesh_ds import ArrRedirector, HomogeneousMeshDS, StructureMeshDS
 
 
-class Mesh2dDataStructure(MeshDataStructure):
+class Mesh2dDataStructure(HomogeneousMeshDS):
     """
-    @brief The topology data structure of 2-d mesh.\
+    @brief The topology data structure of 2-d homogeneous mesh.\
            This is an abstract class and can not be used directly.
     """
     # Variables
-    face: Redirector[NDArray] = Redirector('edge')
+    face = ArrRedirector('edge')
     edge2cell: NDArray
 
     # Constants
     TD: int = 2
 
     ### cell ###
+
+    def cell_to_node(self) -> NDArray:
+        return self.cell
 
     def cell_to_edge(self):
         """
@@ -61,8 +64,8 @@ class Mesh2dDataStructure(MeshDataStructure):
         NE = self.number_of_edges()
 
         edge2cell = self.edge2cell
-        if (return_sparse == False) & (return_array == False):
-            NEC = self.NEC
+        if (return_sparse == False) and (return_array == False):
+            NEC = self.number_of_edges_of_cells()
             cell2cell = np.zeros((NC, NEC), dtype=self.itype)
             cell2cell[edge2cell[:, 0], edge2cell[:, 2]] = edge2cell[:, 1]
             cell2cell[edge2cell[:, 1], edge2cell[:, 3]] = edge2cell[:, 0]

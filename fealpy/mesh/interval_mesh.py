@@ -5,12 +5,13 @@ from typing import Union
 from types import ModuleType
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import Mesh1dDataStructure, HomogeneousMeshDS
+from .mesh_data_structure import Mesh1dDataStructure
 
 
-class IntervalMeshDataStructure(Mesh1dDataStructure, HomogeneousMeshDS):
+class IntervalMeshDataStructure(Mesh1dDataStructure):
     def total_face(self):
         return self.cell.reshape(-1, 1)
+
 
 class IntervalMesh(Mesh, Plotable):
     def __init__(self, node: NDArray, cell: NDArray):
@@ -53,13 +54,13 @@ class IntervalMesh(Mesh, Plotable):
 
     def grad_shape_function(self, bc: NDArray, p: int=1, variables: str='x', index=np.s_[:]):
         """
-        @brief 
+        @brief
         """
         R = self._grad_shape_function(bc, p=p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = np.einsum('...ij, cjm->...cim', R, Dlambda)
-            return gphi 
+            return gphi
         else:
             return R
 
@@ -80,7 +81,7 @@ class IntervalMesh(Mesh, Plotable):
         node = self.entity('node')
         cell = self.entity('cell', index=index)
         v = node[cell[:, 1]] - node[cell[:, 0]]
-        NC = len(cell) 
+        NC = len(cell)
         GD = self.geo_dimension()
         Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
         h2 = np.sum(v**2, axis=-1)
@@ -136,7 +137,7 @@ class IntervalMesh(Mesh, Plotable):
 
     def uniform_refine(self, n=1, options={}):
         """
-        @brief 一致加密网格 
+        @brief 一致加密网格
         """
         for i in range(n):
             NN = self.number_of_nodes()

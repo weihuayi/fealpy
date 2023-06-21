@@ -1,19 +1,12 @@
 import numpy as np
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import Mesh2dDataStructure, HomogeneousMeshDS
+from .mesh_data_structure import Mesh2dDataStructure
 
 
-class QuadrangleMeshDataStructure(Mesh2dDataStructure, HomogeneousMeshDS):
+class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
     localFace = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
     ccw = np.array([0, 1, 2, 3])
-
-    NVE = 2
-    NVF = 2
-    NVC = 4
-
-    NEC = 4
-    NFC = 4
 
 
 ## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
@@ -29,7 +22,7 @@ class QuadrangleMesh(Mesh, Plotable):
         self.ds = QuadrangleMeshDataStructure(NN, cell)
 
         self.meshtype = 'quad'
-        self.p = 1 # 最低次的四边形 
+        self.p = 1 # 最低次的四边形
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -62,10 +55,10 @@ class QuadrangleMesh(Mesh, Plotable):
         from ..quadrature import GaussLegendreQuadrature
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 2}:
-            from ..quadrature import TensorProductQuadrature 
-            return TensorProductQuadrature((qf, qf)) 
+            from ..quadrature import TensorProductQuadrature
+            return TensorProductQuadrature((qf, qf))
         elif etype in {'edge', 'face', 1}:
-            return qf 
+            return qf
 
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
@@ -88,7 +81,7 @@ class QuadrangleMesh(Mesh, Plotable):
         edge2cell = self.ds.edge_to_cell()
 
         t = self.edge_tangent()
-        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1] 
+        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1]
 
         a = np.zeros(NC, dtype=self.ftype)
         np.add.at(a, edge2cell[:, 0], val)
@@ -122,7 +115,7 @@ class QuadrangleMesh(Mesh, Plotable):
         else:
             edge = self.entity('edge')[index]
             p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
-        return p 
+        return p
 
     edge_bc_to_point = bc_to_point
     face_bc_to_point = bc_to_point
@@ -135,7 +128,7 @@ class QuadrangleMesh(Mesh, Plotable):
         assert isinstance(bc, tuple)
         GD = len(bc)
         phi = [self._shape_function(val, p=p) for val in bc]
-        ldof = (p+1)**GD 
+        ldof = (p+1)**GD
         return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
 
     cell_shape_function = shape_function
@@ -156,12 +149,12 @@ class QuadrangleMesh(Mesh, Plotable):
 
         Dlambda = np.array([-1, 1], dtype=self.ftype)
 
-        phi0 = self._shape_function(bc[0], p=p)  
-        R0 = self._grad_shape_function(bc[0], p=p)  
+        phi0 = self._shape_function(bc[0], p=p)
+        R0 = self._grad_shape_function(bc[0], p=p)
         gphi0 = np.einsum('...ij, j->...i', R0, Dlambda) # (..., ldof)
 
-        phi1 = self._shape_function(bc[1], p=p)  
-        R1 = self._grad_shape_function(bc[1], p=p)  
+        phi1 = self._shape_function(bc[1], p=p)
+        R1 = self._grad_shape_function(bc[1], p=p)
         gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
 
         n = phi0.shape[0]*phi1.shape[0] # 张量积分点的个数
@@ -191,7 +184,7 @@ class QuadrangleMesh(Mesh, Plotable):
         """
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        gphi = self.grad_shape_function(bc, p=1, variables='u', index=index) 
+        gphi = self.grad_shape_function(bc, p=1, variables='u', index=index)
         J = np.einsum( 'cim, ...in->...cmn', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 
@@ -211,7 +204,7 @@ class QuadrangleMesh(Mesh, Plotable):
 
     def edge_frame(self, index=np.s_[:]):
         """
-        @brief 计算二维网格中每条边上的局部标架 
+        @brief 计算二维网格中每条边上的局部标架
         """
         assert self.geo_dimension() == 2
         t = self.edge_unit_tangent(index=index)
@@ -249,7 +242,7 @@ class QuadrangleMesh(Mesh, Plotable):
             return p + 1
         elif iptype in {'node', 0}:
             return 1
-    
+
     def number_of_global_ipoints(self, p):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -265,7 +258,7 @@ class QuadrangleMesh(Mesh, Plotable):
         if p == 1:
             return node
 
-        NN = self.number_of_nodes() 
+        NN = self.number_of_nodes()
         GD = self.geo_dimension()
 
         gdof = self.number_of_global_ipoints(p)
@@ -295,12 +288,12 @@ class QuadrangleMesh(Mesh, Plotable):
         cell = self.entity('cell')
 
         if p==1:
-            return cell[index, [0, 3, 1, 2]] # 先排 y 方向，再排 x 方向 
+            return cell[index, [0, 3, 1, 2]] # 先排 y 方向，再排 x 方向
 
         edge2cell = self.ds.edge_to_cell()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
-        NC = self.number_of_cells() 
+        NC = self.number_of_cells()
 
         cell2ipoint = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
         c2p= cell2ipoint.reshape((NC, p+1, p+1))
@@ -317,7 +310,7 @@ class QuadrangleMesh(Mesh, Plotable):
 
 
         iflag = edge2cell[:, 0] != edge2cell[:, 1]
-        flag = iflag & (edge2cell[:, 3] == 0) 
+        flag = iflag & (edge2cell[:, 3] == 0)
         c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
         flag = iflag & (edge2cell[:, 3] == 1)
         c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
@@ -339,7 +332,7 @@ class QuadrangleMesh(Mesh, Plotable):
             NE = self.number_of_edges()
             NC = self.number_of_cells()
 
-            # Find the cutted edge  
+            # Find the cutted edge
             cell2edge = self.ds.cell_to_edge()
             edgeCenter = self.entity_barycenter('edge')
             cellCenter = self.entity_barycenter('cell')
@@ -350,9 +343,9 @@ class QuadrangleMesh(Mesh, Plotable):
             cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
             ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
             cc = np.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
- 
+
             cell = np.zeros((4*NC, 4), dtype=np.int_)
-            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
+            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]]
             cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
             cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
             cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
@@ -440,7 +433,7 @@ class QuadrangleMesh(Mesh, Plotable):
 
         NC = len(cell)
         if fname is None:
-            return node, cell.flatten(), cellType, NC 
+            return node, cell.flatten(), cellType, NC
         else:
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
@@ -514,7 +507,7 @@ class QuadrangleMesh(Mesh, Plotable):
         idxMap = np.zeros(NN, dtype=cell.dtype)
         idxMap[isValidNode] = range(isValidNode.sum())
         cell = idxMap[cell]
-    
+
         return cls(node, cell)
 
 
@@ -604,7 +597,7 @@ class QuadrangleMesh(Mesh, Plotable):
     @classmethod
     def from_triangle_mesh(cls, mesh):
         """
-        @brief 把每个三角形分成三个四边形 
+        @brief 把每个三角形分成三个四边形
         """
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
