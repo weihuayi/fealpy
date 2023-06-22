@@ -35,8 +35,9 @@ def test_amg():
     A, F = bc.apply(A, F, uh)
 
     solver = AMGSolver()
-    ipdb.set_trace()
+    #ipdb.set_trace()
     solver.setup(A)
+    solver.print()
 
 
 
