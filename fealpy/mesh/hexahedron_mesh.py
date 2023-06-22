@@ -3,9 +3,9 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril,
 from scipy.sparse import triu, tril, find, hstack
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import Mesh3dDataStructure, HomogeneousMeshDS
+from .mesh_data_structure import Mesh3dDataStructure
 
-class HexahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
+class HexahedronMeshDataStructure(Mesh3dDataStructure):
     # The following local data structure should be class properties
     localEdge = np.array([
         (0, 1), (1, 2), (2, 3), (0, 3),
@@ -13,23 +13,17 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure, HomogeneousMeshDS):
         (4, 5), (5, 6), (6, 7), (4, 7)])
     localFace = np.array([
         (0, 3, 2, 1), (4, 5, 6, 7), # bottom and top faces
-        (0, 4, 7, 3), (1, 2, 6, 5), # left and right faces  
+        (0, 4, 7, 3), (1, 2, 6, 5), # left and right faces
         (0, 1, 5, 4), (2, 3, 7, 6)])# front and back faces
     localFace2edge = np.array([
         (3,  2, 1, 0), (8, 9, 10, 11),
         (4, 11, 7, 3), (1, 6,  9,  5),
         (0,  5, 8, 4), (2, 7, 10,  6)])
     localEdge2face = np.array([
-        [4, 0], [3, 0], [5, 0], [0, 2], 
-        [2, 4], [4, 3], [3, 5], [5, 2], 
+        [4, 0], [3, 0], [5, 0], [0, 2],
+        [2, 4], [4, 3], [3, 5], [5, 2],
         [1, 4], [1, 3], [1, 5], [2, 1]])
     ccw = np.array([0, 1, 2, 3])
-
-    NVC: int = 8
-    NEC: int = 12
-    NFC: int = 6
-    NVF: int = 4
-    NEF: int = 4
 
 
 class HexahedronMesh(Mesh, Plotable):
@@ -49,7 +43,7 @@ class HexahedronMesh(Mesh, Plotable):
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
-        self.facedata = {} 
+        self.facedata = {}
         self.meshdata = {}
 
         self.edge_shape_function = self._shape_function
@@ -68,11 +62,11 @@ class HexahedronMesh(Mesh, Plotable):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 3}:
-            return TensorProductQuadrature((qf, qf, qf)) 
+            return TensorProductQuadrature((qf, qf, qf))
         elif etype in {'face', 2}:
-            return TensorProductQuadrature((qf, qf)) 
+            return TensorProductQuadrature((qf, qf))
         elif etype in {'edge', 1}:
-            return qf 
+            return qf
 
     def entity_measure(self, etype=3, index=np.s_[:]):
         if etype in {'cell', 3}:
@@ -99,7 +93,7 @@ class HexahedronMesh(Mesh, Plotable):
 
     def face_area(self, index=np.s_[:]):
         """
-        @brief 
+        @brief
         """
         qf = self.integrator(2, etype='face')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -107,7 +101,7 @@ class HexahedronMesh(Mesh, Plotable):
         n = np.cross(J[..., 0], J[..., 1], axis=-1)
         n = np.sqrt(np.sum(n**2, axis=-1))
         val = np.einsum('q, qi->i', ws, n)
-        return val 
+        return val
 
     def bc_to_point(self, bc, index=np.s_[:]):
         """
@@ -139,7 +133,7 @@ class HexahedronMesh(Mesh, Plotable):
         else:
             edge = self.entity('edge', index=index)[index]
             p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
-        return p 
+        return p
 
     edge_bc_to_point = bc_to_point
     face_bc_to_point = bc_to_point
@@ -173,8 +167,8 @@ class HexahedronMesh(Mesh, Plotable):
         assert isinstance(bc, tuple)
         TD = len(bc)
         Dlambda = np.array([-1, 1], dtype=self.ftype)
-        phi = self._shape_function(bc[0], p=p)  
-        R = self._grad_shape_function(bc[0], p=p)  
+        phi = self._shape_function(bc[0], p=p)
+        R = self._grad_shape_function(bc[0], p=p)
         dphi = np.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
 
         n = phi.shape[0]**TD
@@ -190,7 +184,7 @@ class HexahedronMesh(Mesh, Plotable):
                 J = self.jacobi_matrix(bc, index=index)
                 J = np.linalg.inv(J)
                 # J^{-T}\nabla_u phi
-                gphi = np.einsum('qcmn, qlm->qcln', J, gphi) 
+                gphi = np.einsum('qcmn, qlm->qcln', J, gphi)
                 return gphi
         elif TD == 2:
             gphi[..., 0] = np.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof)
@@ -199,7 +193,7 @@ class HexahedronMesh(Mesh, Plotable):
                 J = self.jacobi_matrix(bc, index=index)
                 G = self.first_fundamental_form(J)
                 G = np.linalg.inv(G)
-                gphi = np.einsum('qikm, qimn, qln->qilk', J, G, gphi) 
+                gphi = np.einsum('qikm, qimn, qln->qilk', J, G, gphi)
                 return gphi
         return gphi
 
@@ -214,7 +208,7 @@ class HexahedronMesh(Mesh, Plotable):
         TD = len(bc)
         node = self.entity('node')
         entity = self.entity(TD, index=index)
-        gphi = self.grad_shape_function(bc, p=1, variables='u') 
+        gphi = self.grad_shape_function(bc, p=1, variables='u')
         if TD == 3:
             J = np.einsum( 'cim, qin->qcmn', node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
         elif TD == 2:
@@ -252,10 +246,10 @@ class HexahedronMesh(Mesh, Plotable):
             end = start + NE
             node[start:end] = self.entity_barycenter('edge')
             start = end
-            end = start + NF 
+            end = start + NF
             node[start:end] = self.entity_barycenter('face')
             start = end
-            end = start + NF 
+            end = start + NF
             node[start:end] = self.entity_barycenter('cell')
 
             cell = np.zeros((8*NC, 8), dtype=self.itype)
@@ -267,74 +261,74 @@ class HexahedronMesh(Mesh, Plotable):
             cell[0::8, 0] = c2n[:, 0]
             cell[0::8, 1] = c2e[:, 0]
             cell[0::8, 2] = c2f[:, 0]
-            cell[0::8, 3] = c2e[:, 3]  
-            cell[0::8, 4] = c2e[:, 4]  
-            cell[0::8, 5] = c2f[:, 4]  
-            cell[0::8, 6] = c2c  
-            cell[0::8, 7] = c2f[:, 2] 
+            cell[0::8, 3] = c2e[:, 3]
+            cell[0::8, 4] = c2e[:, 4]
+            cell[0::8, 5] = c2f[:, 4]
+            cell[0::8, 6] = c2c
+            cell[0::8, 7] = c2f[:, 2]
 
             cell[1::8, 0] = c2n[:, 1]
             cell[1::8, 1] = c2e[:, 1]
             cell[1::8, 2] = c2f[:, 0]
-            cell[1::8, 3] = c2e[:, 0]  
-            cell[1::8, 4] = c2e[:, 5]  
-            cell[1::8, 5] = c2f[:, 3]  
-            cell[1::8, 6] = c2c  
-            cell[1::8, 7] = c2f[:, 4] 
+            cell[1::8, 3] = c2e[:, 0]
+            cell[1::8, 4] = c2e[:, 5]
+            cell[1::8, 5] = c2f[:, 3]
+            cell[1::8, 6] = c2c
+            cell[1::8, 7] = c2f[:, 4]
 
             cell[2::8, 0] = c2n[:, 2]
             cell[2::8, 1] = c2e[:, 2]
             cell[2::8, 2] = c2f[:, 0]
-            cell[2::8, 3] = c2e[:, 1]  
-            cell[2::8, 4] = c2e[:, 6]  
-            cell[2::8, 5] = c2f[:, 5]  
-            cell[2::8, 6] = c2c  
-            cell[2::8, 7] = c2f[:, 3] 
+            cell[2::8, 3] = c2e[:, 1]
+            cell[2::8, 4] = c2e[:, 6]
+            cell[2::8, 5] = c2f[:, 5]
+            cell[2::8, 6] = c2c
+            cell[2::8, 7] = c2f[:, 3]
 
             cell[3::8, 0] = c2n[:, 3]
             cell[3::8, 1] = c2e[:, 3]
             cell[3::8, 2] = c2f[:, 0]
-            cell[3::8, 3] = c2e[:, 2]  
-            cell[3::8, 4] = c2e[:, 7]  
-            cell[3::8, 5] = c2f[:, 2]  
-            cell[3::8, 6] = c2c  
-            cell[3::8, 7] = c2f[:, 5] 
+            cell[3::8, 3] = c2e[:, 2]
+            cell[3::8, 4] = c2e[:, 7]
+            cell[3::8, 5] = c2f[:, 2]
+            cell[3::8, 6] = c2c
+            cell[3::8, 7] = c2f[:, 5]
 
             cell[4::8, 0] = c2n[:, 4]
             cell[4::8, 1] = c2e[:,11]
             cell[4::8, 2] = c2f[:, 1]
-            cell[4::8, 3] = c2e[:, 8]  
-            cell[4::8, 4] = c2e[:, 4]  
-            cell[4::8, 5] = c2f[:, 2]  
-            cell[4::8, 6] = c2c  
-            cell[4::8, 7] = c2f[:, 4] 
+            cell[4::8, 3] = c2e[:, 8]
+            cell[4::8, 4] = c2e[:, 4]
+            cell[4::8, 5] = c2f[:, 2]
+            cell[4::8, 6] = c2c
+            cell[4::8, 7] = c2f[:, 4]
 
             cell[5::8, 0] = c2n[:, 5]
             cell[5::8, 1] = c2e[:, 8]
             cell[5::8, 2] = c2f[:, 1]
-            cell[5::8, 3] = c2e[:, 9]  
-            cell[5::8, 4] = c2e[:, 5]  
-            cell[5::8, 5] = c2f[:, 4]  
-            cell[5::8, 6] = c2c  
-            cell[5::8, 7] = c2f[:, 3] 
+            cell[5::8, 3] = c2e[:, 9]
+            cell[5::8, 4] = c2e[:, 5]
+            cell[5::8, 5] = c2f[:, 4]
+            cell[5::8, 6] = c2c
+            cell[5::8, 7] = c2f[:, 3]
 
             cell[6::8, 0] = c2n[:, 6]
             cell[6::8, 1] = c2e[:, 9]
             cell[6::8, 2] = c2f[:, 1]
-            cell[6::8, 3] = c2e[:,10]  
-            cell[6::8, 4] = c2e[:, 6]  
-            cell[6::8, 5] = c2f[:, 3]  
-            cell[6::8, 6] = c2c  
-            cell[6::8, 7] = c2f[:, 5] 
+            cell[6::8, 3] = c2e[:,10]
+            cell[6::8, 4] = c2e[:, 6]
+            cell[6::8, 5] = c2f[:, 3]
+            cell[6::8, 6] = c2c
+            cell[6::8, 7] = c2f[:, 5]
 
             cell[7::8, 0] = c2n[:, 7]
             cell[7::8, 1] = c2e[:,10]
             cell[7::8, 2] = c2f[:, 1]
-            cell[7::8, 3] = c2e[:,11]  
-            cell[7::8, 4] = c2e[:, 7]  
-            cell[7::8, 5] = c2f[:, 5]  
-            cell[7::8, 6] = c2c  
-            cell[7::8, 7] = c2f[:, 2] 
+            cell[7::8, 3] = c2e[:,11]
+            cell[7::8, 4] = c2e[:, 7]
+            cell[7::8, 5] = c2f[:, 5]
+            cell[7::8, 6] = c2c
+            cell[7::8, 7] = c2f[:, 2]
 
             self.node = node
             self.ds.reinit(NN+NE+NF+NC, cell)
@@ -452,7 +446,7 @@ class HexahedronMesh(Mesh, Plotable):
         dofidx[5], = np.where(multiIndex[:, 1]==p)
 
         cell2ipoint = np.zeros([NC, (p+1)**3], dtype=np.int_)
-        lf2e = np.array([[0, 1, 2, 3], [8, 9, 10, 11], 
+        lf2e = np.array([[0, 1, 2, 3], [8, 9, 10, 11],
                          [3, 7, 11, 4], [1, 6, 9, 5],
                          [0, 5, 8, 4], [2, 6, 10, 7]], dtype=np.int_)
 
@@ -474,7 +468,7 @@ class HexahedronMesh(Mesh, Plotable):
             cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
 
         indof = np.all(multiIndex>0, axis=-1)&np.all(multiIndex<p, axis=-1)
-        cell2ipoint[:, indof] = np.arange(NN+NE*(p-1)+NF*(p-1)**2, 
+        cell2ipoint[:, indof] = np.arange(NN+NE*(p-1)+NF*(p-1)**2,
                 NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
         return cell2ipoint[index]
 
@@ -500,13 +494,13 @@ class HexahedronMesh(Mesh, Plotable):
     @classmethod
     def from_one_tetrahedron(cls):
         """
-        @brief 把一个四面体区域分解为四个六面体单元 
+        @brief 把一个四面体区域分解为四个六面体单元
         """
         from .tetrahedron_mesh import TetrahedronMesh
 
         mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
         return cls.from_tetrahedron_mesh(mesh)
-        
+
 
     @classmethod
     def from_tetrahedron_mesh(cls, mesh):
@@ -525,10 +519,10 @@ class HexahedronMesh(Mesh, Plotable):
         end = start + NE
         node[start:end] = mesh.entity_barycenter('edge')
         start = end
-        end = start + NF 
+        end = start + NF
         node[start:end] = mesh.entity_barycenter('face')
         start = end
-        end = start + NF 
+        end = start + NF
         node[start:end] = mesh.entity_barycenter('cell')
 
         cell = np.zeros((4*NC, 8), dtype=mesh.itype)
@@ -540,41 +534,41 @@ class HexahedronMesh(Mesh, Plotable):
         cell[0::4, 0] = c2n[:, 0]
         cell[0::4, 1] = c2e[:, 0]
         cell[0::4, 2] = c2f[:, 3]
-        cell[0::4, 3] = c2e[:, 1]  
-        cell[0::4, 4] = c2e[:, 2]  
-        cell[0::4, 5] = c2f[:, 2]  
-        cell[0::4, 6] = c2c  
-        cell[0::4, 7] = c2f[:, 1] 
+        cell[0::4, 3] = c2e[:, 1]
+        cell[0::4, 4] = c2e[:, 2]
+        cell[0::4, 5] = c2f[:, 2]
+        cell[0::4, 6] = c2c
+        cell[0::4, 7] = c2f[:, 1]
 
         cell[1::4, 0] = c2n[:, 1]
         cell[1::4, 1] = c2e[:, 3]
         cell[1::4, 2] = c2f[:, 3]
-        cell[1::4, 3] = c2e[:, 0]  
-        cell[1::4, 4] = c2e[:, 4]  
-        cell[1::4, 5] = c2f[:, 0]  
-        cell[1::4, 6] = c2c  
-        cell[1::4, 7] = c2f[:, 2] 
+        cell[1::4, 3] = c2e[:, 0]
+        cell[1::4, 4] = c2e[:, 4]
+        cell[1::4, 5] = c2f[:, 0]
+        cell[1::4, 6] = c2c
+        cell[1::4, 7] = c2f[:, 2]
 
         cell[2::4, 0] = c2n[:, 2]
         cell[2::4, 1] = c2e[:, 1]
         cell[2::4, 2] = c2f[:, 3]
-        cell[2::4, 3] = c2e[:, 3]  
-        cell[2::4, 4] = c2e[:, 5]  
-        cell[2::4, 5] = c2f[:, 1]  
-        cell[2::4, 6] = c2c  
-        cell[2::4, 7] = c2f[:, 0] 
+        cell[2::4, 3] = c2e[:, 3]
+        cell[2::4, 4] = c2e[:, 5]
+        cell[2::4, 5] = c2f[:, 1]
+        cell[2::4, 6] = c2c
+        cell[2::4, 7] = c2f[:, 0]
 
         cell[3::4, 0] = c2n[:, 3]
         cell[3::4, 1] = c2e[:, 5]
         cell[3::4, 2] = c2f[:, 0]
-        cell[3::4, 3] = c2e[:, 4]  
-        cell[3::4, 4] = c2e[:, 2]  
-        cell[3::4, 5] = c2f[:, 1]  
-        cell[3::4, 6] = c2c  
-        cell[3::4, 7] = c2f[:, 2] 
+        cell[3::4, 3] = c2e[:, 4]
+        cell[3::4, 4] = c2e[:, 2]
+        cell[3::4, 5] = c2f[:, 1]
+        cell[3::4, 6] = c2c
+        cell[3::4, 7] = c2f[:, 2]
 
         return cls(node, cell)
-        
+
 
 
     @classmethod

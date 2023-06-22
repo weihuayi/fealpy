@@ -7,7 +7,7 @@ import inspect
 from ..common import ranges
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import Mesh2dDataStructure
+from .mesh_data_structure import MeshDataStructure, ArrRedirector
 
 
 class PolygonMesh(Mesh, Plotable):
@@ -91,7 +91,7 @@ class PolygonMesh(Mesh, Plotable):
         edge2cell = self.ds.edge_to_cell()
 
         t = self.edge_tangent()
-        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1] 
+        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1]
 
         a = np.zeros(NC, dtype=self.ftype)
         np.add.at(a, edge2cell[:, 0], val)
@@ -307,8 +307,8 @@ class PolygonMesh(Mesh, Plotable):
                     node[edge[isInEdge, 1]],
                     node[edge[isInEdge, 0]]
                     ]
-            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 1]] 
-            v2 = node[edge[isInEdge, 0]] - bc[edge2cell[isInEdge, 1]] 
+            v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 1]]
+            v2 = node[edge[isInEdge, 0]] - bc[edge2cell[isInEdge, 1]]
             a = np.cross(v1, v2)/2.0
 
             pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
@@ -364,20 +364,20 @@ class PolygonMesh(Mesh, Plotable):
     @classmethod
     def from_quadtree(cls, qtree):
         """
-        @brief 从四叉树生成多边形网格 
+        @brief 从四叉树生成多边形网格
         """
         isRootCell = qtree.is_root_cell()
 
         if np.all(isRootCell):
             NC = qtree.number_of_cells()
 
-            node = qtree.entity('node') 
-            cell = qtree.entity('cell') 
+            node = qtree.entity('node')
+            cell = qtree.entity('cell')
 
-            pcell = cell.reshape(-1) 
+            pcell = cell.reshape(-1)
             pcellLocation = np.arange(0, 4*(NC+1), 4)
 
-            return cls(node, pcell, pcellLocation) 
+            return cls(node, pcell, pcellLocation)
         else:
             NN = qtree.number_of_nodes()
             NE = qtree.number_of_edges()
@@ -399,30 +399,30 @@ class PolygonMesh(Mesh, Plotable):
             pedge = edge[isLeafEdge, :]
 
             isRootCell = qtree.is_root_cell()
-            isLevelBdEdge =  (pedge2cell[:, 0] == pedge2cell[:, 1]) 
+            isLevelBdEdge =  (pedge2cell[:, 0] == pedge2cell[:, 1])
 
             # Find the index of all boundary edges on each tree level
             pedgeIdx, = np.nonzero(isLevelBdEdge)
             while len(pedgeIdx) > 0:
-                cellIdx = pedge2cell[pedgeIdx, 1] 
+                cellIdx = pedge2cell[pedgeIdx, 1]
                 localIdx = pedge2cell[pedgeIdx, 3]
 
-                parentCellIdx = parent[cellIdx, 0] 
-                
+                parentCellIdx = parent[cellIdx, 0]
+
                 neighborCellIdx = cell2cell[parentCellIdx, localIdx]
-                
+
                 isFound = isLeafCell[neighborCellIdx] | isRootCell[neighborCellIdx]
                 pedge2cell[pedgeIdx[isFound], 1] = neighborCellIdx[isFound]
 
                 edgeIdx = cell2edge[parentCellIdx, localIdx]
 
                 isCase = (edge2cell[edgeIdx, 0] != parentCellIdx) & isFound
-                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 2] 
+                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 2]
 
                 isCase = (edge2cell[edgeIdx, 0] == parentCellIdx) & isFound
-                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 3] 
+                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 3]
 
-                isSpecial = isFound & (parentCellIdx == neighborCellIdx) 
+                isSpecial = isFound & (parentCellIdx == neighborCellIdx)
                 pedge2cell[pedgeIdx[isSpecial], 1] =  pedge2cell[pedgeIdx[isSpecial], 0]
                 pedge2cell[pedgeIdx[isSpecial], 3] =  pedge2cell[pedgeIdx[isSpecial], 2]
 
@@ -449,7 +449,7 @@ class PolygonMesh(Mesh, Plotable):
             pcellLocation = np.zeros(PNC+1, dtype=qtree.itype)
             pcellLocation[1:] = cornerLocation[:, 4].cumsum()
             pcell = np.zeros(pcellLocation[-1], dtype=qtree.itype)
-            cornerLocation += pcellLocation[:-1].reshape(-1, 1) 
+            cornerLocation += pcellLocation[:-1].reshape(-1, 1)
             pcell[cornerLocation[:, 0:-1]] = cell[isLeafCell, :]
 
             PNE = pedge.shape[0]
@@ -461,7 +461,7 @@ class PolygonMesh(Mesh, Plotable):
                     (val, (pedge[:,1], range(PNE))),
                     shape=(NN, PNE), dtype=np.bool_)
             p2pe = p2pe.tocsr()
-            NES = np.asarray(p2pe.sum(axis=1)).reshape(-1) 
+            NES = np.asarray(p2pe.sum(axis=1)).reshape(-1)
             isPast = np.zeros(PNE, dtype=np.bool_)
             for i in range(4):
                 currentIdx = cornerLocation[:, i]
@@ -474,7 +474,7 @@ class PolygonMesh(Mesh, Plotable):
                     cellIdx = cellIdx[isNotOK]
                     if len(currentIdx) == 0:
                         break
-                    nodeIdx = pcell[currentIdx] 
+                    nodeIdx = pcell[currentIdx]
                     _, J = p2pe[nodeIdx].nonzero()
                     isEdge = (pedge2cell[J, 1] == np.repeat(cellIdx, NES[nodeIdx])) \
                             & (pedge2cell[J, 3] == i) & (~isPast[J])
@@ -769,8 +769,14 @@ class PolygonMesh(Mesh, Plotable):
 PolygonMesh.set_ploter('polygon2d')
 
 
-class PolygonMeshDataStructure(Mesh2dDataStructure):
+class PolygonMeshDataStructure(MeshDataStructure):
+    # Variables
+    face = ArrRedirector('edge')
+    edge2cell: NDArray
+
+    # Constants
     TD: int = 2
+
     def __init__(self, NN: int, cell: NDArray, cellLocation: NDArray, topdata=None):
         self.NN = NN
         self._cell = cell

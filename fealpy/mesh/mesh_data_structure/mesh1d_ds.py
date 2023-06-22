@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, HomogeneousMeshDS, StructureMeshDS
+from .mesh_ds import ArrRedirector, HomogeneousMeshDS, StructureMeshDS
 
 
 class Mesh1dDataStructure(HomogeneousMeshDS):
@@ -13,7 +13,7 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
            This is an abstract class and can not be used directly.
     """
     # Variables
-    edge: Redirector[NDArray] = Redirector('cell')
+    edge = ArrRedirector('cell')
 
     # Constants
     TD = 1
@@ -21,6 +21,9 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     localFace = np.array([(0, ), (1, )], dtype=np.int_)
 
     ### cell ###
+
+    def cell_to_node(self) -> NDArray:
+        return self.cell
 
     def cell_to_edge(self) -> NDArray:
         NC = self.number_of_cells()

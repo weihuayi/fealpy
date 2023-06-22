@@ -7,7 +7,7 @@ from ..mesh_data_structure import MeshDataStructure
 
 class Mesh():
     """
-    @brief The base class for mesh. 
+    @brief The base class for mesh.
 
     """
     ds: MeshDataStructure
@@ -31,15 +31,15 @@ class Mesh():
 
     def number_of_nodes_of_cells(self) -> int:
         """Number of nodes in a cell"""
-        return self.ds.NVC
+        return self.ds.number_of_vertices_of_cells()
 
     def number_of_edges_of_cells(self) -> int:
         """Number of edges in a cell"""
-        return self.ds.NEC
+        return self.ds.number_of_edges_of_cells()
 
     def number_of_faces_of_cells(self) -> int:
         """Number of faces in a cell"""
-        return self.ds.NFC
+        return self.ds.number_of_faces_of_cells()
 
     number_of_vertices_of_cells = number_of_nodes_of_cells
 
@@ -60,7 +60,7 @@ class Mesh():
         """
         @brief 获取 p 次的多重指标矩阵
 
-        @param[in] p 正整数 
+        @param[in] p 正整数
 
         @return multiIndex  ndarray with shape (ldof, TD+1)
         """
@@ -95,7 +95,7 @@ class Mesh():
 
     def _shape_function(self, bc, p=1):
         """
-        @brief    
+        @brief
         """
         if p == 1:
             return bc
@@ -118,7 +118,7 @@ class Mesh():
         @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
         """
         TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=TD) 
+        multiIndex = self.multi_index_matrix(p, etype=TD)
         ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
 
         c = np.arange(1, p+1)
@@ -152,13 +152,13 @@ class Mesh():
 
     def shape_function(self, bc, p=1) -> NDArray:
         """
-        @brief The cell shape function. 
+        @brief The cell shape function.
         """
         raise NotImplementedError
 
     def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
         """
-        @brief The gradient of the cell shape function. 
+        @brief The gradient of the cell shape function.
         """
         raise NotImplementedError
 
@@ -290,7 +290,7 @@ class Mesh():
         edge2ipoints[:, [0, -1]] = edge
         if p > 1:
             idx = NN + np.arange(p-1)
-            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx 
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx
         return edge2ipoints
 
     def edge_length(self, index=np.s_[:], node=None):

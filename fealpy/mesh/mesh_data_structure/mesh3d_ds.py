@@ -4,12 +4,12 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import MeshDataStructure, StructureMeshDS
+from .mesh_ds import HomogeneousMeshDS, StructureMeshDS
 
 
-class Mesh3dDataStructure(MeshDataStructure):
+class Mesh3dDataStructure(HomogeneousMeshDS):
     """
-    @brief The topology data structure of 3-d mesh.\
+    @brief The topology data structure of 3-d homogeneous mesh.\
            This is an abstract class and can not be used directly.
     """
     # Variables
@@ -18,6 +18,16 @@ class Mesh3dDataStructure(MeshDataStructure):
 
     # Constants
     TD: int = 3
+    localFace2edge: NDArray
+    localEdge2face: NDArray
+
+    def number_of_edges_of_faces(self):
+        """
+        @brief Return the number of edges in a face, and is only available in 3d mesh.
+
+        This is equal to the length of `localFace2edge` in axis-1.
+        """
+        return self.localFace2edge.shape[1]
 
     ### Cell ###
 
