@@ -14,6 +14,7 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     """
     # Variables
     edge = ArrRedirector('cell')
+    face = ArrRedirector('face_')
 
     # Constants
     TD = 1
@@ -22,8 +23,8 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
 
     ### Special Topology APIs for Non-structures ###
 
-    def cell_to_face(self) -> NDArray: # simplified for 1d case
-        return self.cell
+    def cell_to_face(self, return_sparse=False, return_local=False) -> NDArray: # simplified for 1d case
+        return self.cell_to_node(return_sparse=return_sparse, return_local=return_local)
 
     def cell_to_edge(self) -> NDArray:
         NC = self.number_of_cells()
@@ -32,17 +33,12 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
 
     ### General Topology APIs ###
 
-    def face_to_node(self):
+    @property
+    def face_(self):
         NN = self.NN
         return np.arange(NN, dtype=self.itype).reshape(NN, 1)
 
     def face_to_edge(self, return_sparse=False):
-        return self.face_to_cell(return_sparse=return_sparse)
-
-    def node_to_edge(self, return_sparse=False):
-        return self.face_to_cell(return_sparse=return_sparse)
-
-    def node_to_cell(self, return_sparse=False):
         return self.face_to_cell(return_sparse=return_sparse)
 
     def edge_to_face(self, return_sparse=False):
