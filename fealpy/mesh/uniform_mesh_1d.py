@@ -6,11 +6,10 @@ from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from types import ModuleType
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import Mesh1dDataStructure, HomogeneousMeshDS
+from .mesh_data_structure import StructureMesh1dDataStructure, HomogeneousMeshDS
 
 # 这个数据结构为有限元接口服务
 from ..quadrature import GaussLegendreQuadrature
-from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
 
 ## @defgroup FEMInterface 
 ## @defgroup FDMInterface
