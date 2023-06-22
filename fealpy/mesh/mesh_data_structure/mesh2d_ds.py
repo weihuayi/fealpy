@@ -19,10 +19,8 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
     # Constants
     TD: int = 2
 
-    ### cell ###
 
-    def cell_to_node(self) -> NDArray:
-        return self.cell
+    ### Special Topology APIs for Non-structures ###
 
     def cell_to_edge(self):
         """
@@ -39,19 +37,7 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
         cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
         return cell2edge
 
-    def cell_to_edge_sign(self):
-        NC = self.number_of_cells()
-        NEC = self.number_of_edges_of_cells()
-
-        edge2cell = self.edge2cell
-
-        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
-        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
-
-        return cell2edgeSign
-
     cell_to_face = cell_to_edge
-    cell_to_face_sign = cell_to_edge_sign
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """ Consctruct the neighbor information of cells
@@ -98,16 +84,26 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    ### face ###
-
     def face_to_cell(self):
         return self.edge2cell
 
-    ### edge ###
+
+    ### General Topology APIs ###
+
+    def cell_to_edge_sign(self):
+        NC = self.number_of_cells()
+        NEC = self.number_of_edges_of_cells()
+
+        edge2cell = self.edge2cell
+
+        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+
+        return cell2edgeSign
+
+    cell_to_face_sign = cell_to_edge_sign
 
     edge_to_cell = face_to_cell
-
-    ### node ###
 
     def node_to_node(self, return_array=False):
 

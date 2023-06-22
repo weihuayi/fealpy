@@ -99,7 +99,7 @@ class MeshDataStructure():
         """
         @brief Return neighbor information from cell to node.
         """
-        raise NotImplementedError
+        return self.cell
 
     def cell_to_edge(self, *args, **kwargs) -> NDArray:
         raise NotImplementedError
@@ -109,6 +109,12 @@ class MeshDataStructure():
 
     def face_to_cell(self, *args, **kwargs) -> NDArray:
         raise NotImplementedError
+
+    def face_to_node(self, return_sparse: bool=False):
+        return self.face
+
+    def edge_to_node(self, return_sparse: bool=False):
+        return self.edge
 
 
     # boundary flag

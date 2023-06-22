@@ -20,10 +20,8 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     localEdge = np.array([(0, 1)], dtype=np.int_)
     localFace = np.array([(0, ), (1, )], dtype=np.int_)
 
-    ### cell ###
 
-    def cell_to_node(self) -> NDArray:
-        return self.cell
+    ### Special Topology APIs for Non-structures ###
 
     def cell_to_edge(self) -> NDArray:
         NC = self.number_of_cells()
@@ -32,20 +30,15 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     def cell_to_face(self) -> NDArray:
         return self.cell
 
-    ### face ###
-
     def face_to_cell(self) -> NDArray:
         return self.face2cell
 
+
+    ### General Topology APIs ###
+
     face_to_edge = face_to_cell
-
-    ### edge ###
-
     edge_to_face = cell_to_face
     edge_to_cell = cell_to_edge
-
-    ### node ###
-
     node_to_edge = face_to_cell
     node_to_cell = face_to_cell
 
