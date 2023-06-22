@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, overload, Literal
 from scipy.sparse import csr_matrix
 from numpy.typing import NDArray
 import numpy as np
@@ -9,7 +9,11 @@ def enable_csr(fn: Callable[..., NDArray]):
     @brief Make a function generating neighborhood infomation matrix\
            supporting csr matrix output.
     """
-    def wrapped(self, *args, return_sparse: bool=False, **kwargs):
+    @overload
+    def wrapped(self, *args, return_sparse: Literal[False], **kwargs) -> NDArray: ...
+    @overload
+    def wrapped(self, *args, return_sparse: Literal[True], **kwargs) -> csr_matrix: ...
+    def wrapped(self, *args, return_sparse=False, **kwargs):
         ret = fn(self, *args, **kwargs)
         if return_sparse:
             if ret.ndim != 2:

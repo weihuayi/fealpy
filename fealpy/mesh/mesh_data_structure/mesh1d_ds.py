@@ -23,24 +23,17 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
 
     ### Special Topology APIs for Non-structures ###
 
-    def cell_to_edge(self) -> NDArray:
-        NC = self.number_of_cells()
-        return np.arange(NC, dtype=self.itype).reshape(NC, 1)
-
-    def cell_to_face(self) -> NDArray:
+    def cell_to_face(self) -> NDArray: # simplified for 1d case
         return self.cell
-
-    def face_to_cell(self) -> NDArray:
-        return self.face2cell
 
 
     ### General Topology APIs ###
 
-    face_to_edge = face_to_cell
+    face_to_edge = HomogeneousMeshDS.face_to_cell
     edge_to_face = cell_to_face
-    edge_to_cell = cell_to_edge
-    node_to_edge = face_to_cell
-    node_to_cell = face_to_cell
+    edge_to_cell = HomogeneousMeshDS.cell_to_edge
+    node_to_edge = HomogeneousMeshDS.face_to_cell
+    node_to_cell = HomogeneousMeshDS.face_to_cell
 
 
 class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):

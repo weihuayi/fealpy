@@ -32,36 +32,6 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
 
     ### Special Topology APIs for Non-structures ###
 
-    def cell_to_edge(self, return_sparse=False):
-        """ The neighbor information of cell to edge
-        """
-        if return_sparse is False:
-            return self.cell2edge
-        else:
-            NC = self.number_of_cells()
-            NE = self.number_of_edges()
-            cell2edge = coo_matrix((NC, NE), dtype=np.bool_)
-            NEC = self.number_of_edges_of_cells()
-            cell2edge = csr_matrix(
-                    (
-                        np.ones(NEC*NC, dtype=np.bool_),
-                        (
-                            np.repeat(range(NC), NEC),
-                            self.cell2edge.flat
-                        )
-                    ), shape=(NC, NE))
-            return cell2edge
-
-    def cell_to_face(self):
-        NC = self.number_of_cells()
-        NF = self.number_of_faces()
-        face2cell = self.face2cell
-        NFC = self.number_of_faces_of_cells()
-        cell2face = np.zeros((NC, NFC), dtype=self.itype)
-        cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
-        cell2face[face2cell[:, 1], face2cell[:, 3]] = range(NF)
-        return cell2face
-
     def cell_to_cell(
             self, return_sparse=False,
             return_boundary=True, return_array=False):
@@ -114,22 +84,6 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    def face_to_cell(self, return_sparse=False):
-        if return_sparse is False:
-            return self.face2cell
-        else:
-            NC = self.number_of_cells()
-            NF = self.number_of_faces()
-            face2cell = csr_matrix(
-                    (
-                        np.ones(2*NF, dtype=np.bool_),
-                        (
-                            np.repeat(range(NF), 2),
-                            self.face2cell[:, [0, 1]].flat
-                        )
-                    ), shape=(NF, NC), dtype=np.bool_)
-            return face2cell
-
 
     ### General Topology APIs ###
 
@@ -171,7 +125,7 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
         else:
             NF = self.number_of_faces()
             NE = self.number_of_edges()
-            NEF = self.NEF
+            NEF = self.number_of_edges_of_faces()
             f2e = csr_matrix(
                     (
                         np.ones(NEF*NF, dtype=np.bool_),

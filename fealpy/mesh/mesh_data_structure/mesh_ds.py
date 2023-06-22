@@ -1,8 +1,11 @@
-from typing import TypeVar, Generic, Union, Callable
+from typing import TypeVar, Generic, Union, overload
 
 import numpy as np
 from numpy import dtype
 from numpy.typing import NDArray
+from scipy.sparse import coo_matrix, csr_matrix
+
+from .sparse_tool import enable_csr
 
 _VT = TypeVar('_VT')
 
@@ -99,7 +102,7 @@ class MeshDataStructure():
         """
         @brief Return neighbor information from cell to node.
         """
-        return self.cell
+        raise NotImplementedError
 
     def cell_to_edge(self, *args, **kwargs) -> NDArray:
         raise NotImplementedError
@@ -221,6 +224,7 @@ class HomogeneousMeshDS(MeshDataStructure):
     - Special counting methods, calculating NVC, NEC, NFC, NVF, and NVE;
     - Homogeneous local entities, like `local_edge` and `local_face`;
     - Generate total entities: `total_edge` and `total_face`.
+    - Critical topology relationship methods: `cell_to_<entity>` and `face_to_cell`.
 
     Class variables:
     ccw: NDArray, optional. The indices of nodes sorted counter-clock-wise in\
@@ -371,6 +375,55 @@ class HomogeneousMeshDS(MeshDataStructure):
         local_edge = self.localEdge
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
+
+    # critical topology methods
+
+    def cell_to_node(self) -> NDArray:
+        return self.cell
+
+    @enable_csr
+    def cell_to_edge(self) -> NDArray:
+        """
+        @brief The neighbor information of cell to edge.
+        """
+        if self.TD == 1:
+            NC = self.number_of_cells()
+            return np.arange(NC, dtype=self.itype).reshape(NC, 1)
+        elif self.TD == 2:
+            return self.cell_to_face(return_sparse=False)
+        else:
+            return self.cell2edge
+
+    @enable_csr
+    def cell_to_face(self) -> NDArray:
+        """
+        @brief Neighbor information of cell to face.
+        """
+        NC = self.number_of_cells()
+        NF = self.number_of_faces()
+        NFC = self.number_of_faces_of_cells()
+
+        face2cell = self.face2cell
+        cell2face = np.zeros((NC, NFC), dtype=self.itype)
+        cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
+        cell2face[face2cell[:, 1], face2cell[:, 3]] = range(NF)
+        return cell2face
+
+    def face_to_cell(self, return_sparse=False):
+        if return_sparse is False:
+            return self.face2cell
+        else:
+            NC = self.number_of_cells()
+            NF = self.number_of_faces()
+            face2cell = csr_matrix(
+                    (
+                        np.ones(2*NF, dtype=np.bool_),
+                        (
+                            np.repeat(range(NF), 2),
+                            self.face2cell[:, [0, 1]].flat
+                        )
+                    ), shape=(NF, NC), dtype=np.bool_)
+            return face2cell
 
 
 class StructureMeshDS(HomogeneousMeshDS):
