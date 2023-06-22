@@ -93,7 +93,7 @@ class AMGSolver():
 
             # 第 i 个非孤立点的度大于等于第 j 个非孤立点的度
             flag = deg[S[i]] >= deg[S[j]]
-            isS[S[j[flag]] = False # 把度小的节点从选择集移除
+            isS[S[j[flag]]] = False # 把度小的节点从选择集移除
             isS[S[i[~flag]]] = False # 把度小的节点从选择集移除
             isC[isS] = True # 剩下的点就是粗点
 

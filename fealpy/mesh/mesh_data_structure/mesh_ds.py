@@ -1,4 +1,3 @@
-from abc import ABCMeta, abstractmethod
 from typing import TypeVar, Generic, Union, Callable
 
 import numpy as np
@@ -22,11 +21,11 @@ class Redirector(Generic[_VT]):
         delattr(obj, self._target)
 
 
-_int_redirectable = Union[int, Redirector[int]]
+ArrRedirector = Redirector[NDArray]
 _array_redirectable = Union[NDArray, Redirector[NDArray]]
 
 
-class MeshDataStructure(metaclass=ABCMeta):
+class MeshDataStructure():
     """
     @brief The abstract base class for all mesh data structure types in FEALPy.
 
@@ -93,38 +92,24 @@ class MeshDataStructure(metaclass=ABCMeta):
         @brief Return the number of nodes in the mesh.
         """
         return self.NN
-    
-    # cell
+
+    # topology
 
     def cell_to_node(self, *args, **kwargs) -> NDArray:
         """
         @brief Return neighbor information from cell to node.
         """
-        return self.cell
+        raise NotImplementedError
 
-    @abstractmethod
     def cell_to_edge(self, *args, **kwargs) -> NDArray:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def cell_to_face(self, *args, **kwargs) -> NDArray:
-        pass
+        raise NotImplementedError
 
-    # face
-
-    def face_to_node(self, *args, **kwargs) -> NDArray:
-        return self.face
-
-    @abstractmethod
     def face_to_cell(self, *args, **kwargs) -> NDArray:
-        pass
+        raise NotImplementedError
 
-    # edge
-
-    def edge_to_node(self, *args, **kwargs) -> NDArray:
-        return self.edge
-
-    # node
 
     # boundary flag
 
@@ -225,8 +210,18 @@ class HomogeneousMeshDS(MeshDataStructure):
     """
     @brief Data structure for meshes with homogeneous shape of cells.
 
-    In this subclass, `localFace` and `localEdge` are intruduced, and the `construct()`
-    method are used.
+    This subclass is to implement:
+    - Basic topology relationship: `face2cell` and `cell2edge`(in 3d case);
+    - Special counting methods, calculating NVC, NEC, NFC, NVF, and NVE;
+    - Homogeneous local entities, like `local_edge` and `local_face`;
+    - Generate total entities: `total_edge` and `total_face`.
+
+    Class variables:
+    ccw: NDArray, optional. The indices of nodes sorted counter-clock-wise in\
+         a face(3d case) or a cell(2d case). This will be checked when plotting\
+         the mesh. If not provided, the original order of nodes will be used.
+    localEdge: NDArray with shape (NEC, NVE).
+    localFace: NDArray with shape (NFC, NVF).
     """
     # Constants
     ccw: NDArray
@@ -379,7 +374,7 @@ class StructureMeshDS(HomogeneousMeshDS):
     Subclass to change nonstructure mesh type to structure mesh type.
     """
     # Variables
-    cell: _array_redirectable = Redirector('cell_')
+    cell = ArrRedirector('cell_')
 
     # Constants
     TD: int
@@ -390,8 +385,6 @@ class StructureMeshDS(HomogeneousMeshDS):
         for nx_item in nx:
             if not isinstance(nx_item, int):
                 raise TypeError(f"Expect int for nx, but got {nx_item}.")
-        if not isinstance(itype, np.dtype):
-            raise TypeError(f"{itype} is not a valid numpy data type.")
 
         self.nx_ = np.array(nx, dtype=itype)
         self.NN = np.prod(self.nx_ + 1)
