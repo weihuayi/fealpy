@@ -22,6 +22,9 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
 
     ### Special Topology APIs for Non-structures ###
 
+    def cell_to_edge(self, return_sparse=False):
+        return self.cell_to_face(return_sparse=return_sparse)
+
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """ Consctruct the neighbor information of cells
         """
@@ -81,9 +84,11 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
 
         return cell2edgeSign
 
-    cell_to_face_sign = cell_to_edge_sign
+    def cell_to_face_sign(self):
+        return self.cell_to_edge_sign()
 
-    edge_to_cell = HomogeneousMeshDS.face_to_cell
+    def edge_to_cell(self):
+        return self.face_to_cell()
 
     def node_to_node(self, return_array=False):
 

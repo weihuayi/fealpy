@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
 from .mesh_ds import HomogeneousMeshDS, StructureMeshDS
+from .sparse_tool import enable_csr
 
 
 class Mesh3dDataStructure(HomogeneousMeshDS):
@@ -31,6 +32,10 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
 
 
     ### Special Topology APIs for Non-structures ###
+
+    @enable_csr
+    def cell_to_edge(self):
+        return self.cell2edge
 
     def cell_to_cell(
             self, return_sparse=False,

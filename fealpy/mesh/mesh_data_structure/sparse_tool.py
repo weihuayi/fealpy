@@ -18,7 +18,8 @@ def enable_csr(fn: Callable[..., NDArray]):
         if return_sparse:
             if ret.ndim != 2:
                 raise ValueError("Can only tackle tensors with 2 dimension.")
-            nr, nc = ret.shape
+            nr, _ = ret.shape
+            nc = np.max(ret) + 1
             sp = csr_matrix(
                 (
                     np.ones(nr*nc, dtype=np.bool_),

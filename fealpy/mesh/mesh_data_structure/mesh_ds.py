@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Union, overload
+from typing import TypeVar, Generic, Union, Callable, overload
 
 import numpy as np
 from numpy import dtype
@@ -113,12 +113,11 @@ class MeshDataStructure():
     def face_to_cell(self, *args, **kwargs) -> NDArray:
         raise NotImplementedError
 
-    def face_to_node(self, return_sparse: bool=False):
-        return self.face
+    def face_to_node(self) -> NDArray:
+        raise NotImplementedError
 
-    def edge_to_node(self, return_sparse: bool=False):
+    def edge_to_node(self) -> NDArray:
         return self.edge
-
 
     # boundary flag
 
@@ -127,7 +126,7 @@ class MeshDataStructure():
         @brief Return a bool array to show whether nodes are on the boundary.
         """
         NN = self.number_of_nodes()
-        face2node = self.face
+        face2node = self.face_to_node()
         is_bd_face = self.boundary_face_flag()
         is_bd_node = np.zeros((NN, ), dtype=np.bool_)
         is_bd_node[face2node[is_bd_face, :]] = True
@@ -376,23 +375,12 @@ class HomogeneousMeshDS(MeshDataStructure):
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
-    # critical topology methods
+    # to node
 
     def cell_to_node(self) -> NDArray:
         return self.cell
 
-    @enable_csr
-    def cell_to_edge(self) -> NDArray:
-        """
-        @brief The neighbor information of cell to edge.
-        """
-        if self.TD == 1:
-            NC = self.number_of_cells()
-            return np.arange(NC, dtype=self.itype).reshape(NC, 1)
-        elif self.TD == 2:
-            return self.cell_to_face(return_sparse=False)
-        else:
-            return self.cell2edge
+    # between cell and face
 
     @enable_csr
     def cell_to_face(self) -> NDArray:
@@ -424,6 +412,10 @@ class HomogeneousMeshDS(MeshDataStructure):
                         )
                     ), shape=(NF, NC), dtype=np.bool_)
             return face2cell
+
+    def cell_to_cell(self, return_sparse=False,
+                     return_boundary=True, return_array=False):
+        pass
 
 
 class StructureMeshDS(HomogeneousMeshDS):
