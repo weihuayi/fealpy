@@ -295,16 +295,16 @@ class AMGSolver():
         coarseNodeFineIdx = np.nonzero(isC)[0]
 
         # 2. 构造延长和限止算子
-        Acf = A[coarseNodeFineIdx, :][:, fineNode] # 把粗-->细块拿出来
+        Acf = A[coarseNodeFineIdx, :][:, fineNode] # 获取粗-->细矩阵块拿出来
         Dsum = np.sum(Acf, axis=0) # 每个细点对应粗点值的和
-        flag = (Dsum != 0) # 各非零的
-        Nf = np.sum(flag)
-        Dsum = sp.diags(1./Dsum[flag], 0)
-        ti, tj, tw = sp.find(Acf[:, flag] @ Dsum)
-        ip = np.concatenate((coarseNodeFineIdx, fineNode[ti]))
-        jp = np.concatenate((coarseNode, tj))
-        sp_vals = np.concatenate((np.ones(Nc), tw))
-        Pro = sp.csr_matrix((sp_vals, (ip, jp)), shape=(N, Nc))
+        flag = (Dsum != 0) # 和非零的细节点标记数组
+        Nf = np.sum(flag) # 细节点的个数
+        Dsum = sp.diags(1./Dsum[flag], 0) # 形成一个对角矩阵
+        ti, tj, tw = sp.find(Acf[:, flag] @ Dsum) # 每一列都除以这一列的和
+        I = np.concatenate((coarseNodeFineIdx, fineNode[ti]))
+        J = np.concatenate((coarseNode, tj))
+        val = np.concatenate((np.ones(Nc), tw))
+        Pro = sp.csr_matrix((val, (I, J)), shape=(N, Nc))
         Res = Pro.transpose()
 
         return Pro, Res
