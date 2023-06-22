@@ -5,7 +5,7 @@ from numpy import dtype
 from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
-from .sparse_tool import enable_csr
+from .sparse_tool import enable_csr, arr_to_csr
 
 _VT = TypeVar('_VT')
 
@@ -116,8 +116,11 @@ class MeshDataStructure():
     def face_to_node(self) -> NDArray:
         raise NotImplementedError
 
-    def edge_to_node(self) -> NDArray:
-        return self.edge
+    def edge_to_node(self, return_sparse=False) -> NDArray:
+        if not return_sparse:
+            return self.edge
+        else:
+            return arr_to_csr(self.edge, self.number_of_nodes())
 
     # boundary flag
 
@@ -380,10 +383,12 @@ class HomogeneousMeshDS(MeshDataStructure):
     def cell_to_node(self) -> NDArray:
         return self.cell
 
+    def face_to_node(self) -> NDArray:
+        return self.face
+
     # between cell and face
 
-    @enable_csr
-    def cell_to_face(self) -> NDArray:
+    def cell_to_face(self, return_sparse=False) -> NDArray:
         """
         @brief Neighbor information of cell to face.
         """
@@ -395,23 +400,19 @@ class HomogeneousMeshDS(MeshDataStructure):
         cell2face = np.zeros((NC, NFC), dtype=self.itype)
         cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
         cell2face[face2cell[:, 1], face2cell[:, 3]] = range(NF)
-        return cell2face
+        if not return_sparse:
+            return cell2face
+        else:
+            return arr_to_csr(cell2face, self.number_of_faces())
 
     def face_to_cell(self, return_sparse=False):
         if return_sparse is False:
             return self.face2cell
         else:
-            NC = self.number_of_cells()
-            NF = self.number_of_faces()
-            face2cell = csr_matrix(
-                    (
-                        np.ones(2*NF, dtype=np.bool_),
-                        (
-                            np.repeat(range(NF), 2),
-                            self.face2cell[:, [0, 1]].flat
-                        )
-                    ), shape=(NF, NC), dtype=np.bool_)
-            return face2cell
+            return arr_to_csr(
+                self.face2cell[:, [0, 1]],
+                self.number_of_cells()
+            )
 
     def cell_to_cell(self, return_sparse=False,
                      return_boundary=True, return_array=False):

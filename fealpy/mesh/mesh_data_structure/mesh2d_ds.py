@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
 from .mesh_ds import ArrRedirector, HomogeneousMeshDS, StructureMeshDS
-
+from .sparse_tool import arr_to_csr
 
 class Mesh2dDataStructure(HomogeneousMeshDS):
     """
@@ -131,36 +131,16 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
         return node2node
 
     def node_to_edge(self):
-        """
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NVE = self.NVE
-        I = self.edge.flat
-        J = np.repeat(range(NE), NVE)
-        val = np.ones(NVE*NE, dtype=np.bool_)
-        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE))
-        return node2edge
+        return arr_to_csr(self.edge, self.number_of_nodes(), reversed=True)
 
-    node_to_face = node_to_edge
+    def node_to_face(self):
+        return self.node_to_edge()
 
     def node_to_cell(self, return_localidx=False):
-        """
-        """
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NVC = self.number_of_vertices_of_cells()
+        return arr_to_csr(self.cell, self.number_of_nodes(),
+                          reversed=True, return_local=return_localidx,
+                          dtype=self.itype)
 
-        I = self.cell.flat
-        J = np.repeat(range(NC), NVC)
-
-        if return_localidx == False:
-            val = np.ones(NVC*NC, dtype=np.bool_)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC))
-        else:
-            val = ranges(NVC*np.ones(NC, dtype=self.itype), start=1)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
-        return node2cell
 
     ### boundary ###
 
