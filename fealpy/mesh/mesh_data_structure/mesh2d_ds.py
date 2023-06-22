@@ -22,8 +22,8 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
 
     ### Special Topology APIs for Non-structures ###
 
-    def cell_to_edge(self, return_sparse=False):
-        return self.cell_to_face(return_sparse=return_sparse)
+    def cell_to_edge(self, return_sparse=False, return_local=False):
+        return self.cell_to_face(return_sparse=return_sparse, return_local=return_local)
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """ Consctruct the neighbor information of cells
@@ -87,8 +87,8 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
     def cell_to_face_sign(self):
         return self.cell_to_edge_sign()
 
-    def edge_to_cell(self):
-        return self.face_to_cell()
+    def edge_to_cell(self, return_sparse=False):
+        return self.face_to_cell(return_sparse=return_sparse)
 
     def node_to_node(self, return_array=False):
 
@@ -129,17 +129,6 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
         val = np.ones(2*edge.shape[0], dtype=np.bool_)
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
-
-    def node_to_edge(self):
-        return arr_to_csr(self.edge, self.number_of_nodes(), reversed=True)
-
-    def node_to_face(self):
-        return self.node_to_edge()
-
-    def node_to_cell(self, return_localidx=False):
-        return arr_to_csr(self.cell, self.number_of_nodes(),
-                          reversed=True, return_local=return_localidx,
-                          dtype=self.itype)
 
 
     ### boundary ###

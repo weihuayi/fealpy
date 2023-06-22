@@ -116,11 +116,17 @@ class MeshDataStructure():
     def face_to_node(self) -> NDArray:
         raise NotImplementedError
 
-    def edge_to_node(self, return_sparse=False) -> NDArray:
+    def edge_to_node(self, return_sparse=False, return_local=False):
         if not return_sparse:
             return self.edge
         else:
-            return arr_to_csr(self.edge, self.number_of_nodes())
+            return arr_to_csr(self.edge, self.number_of_nodes(),
+                              return_local=return_local, dtype=self.itype)
+
+    def node_to_edge(self, return_local=False):
+        return arr_to_csr(self.edge, self.number_of_nodes(),
+                          reversed=True, return_local=return_local, dtype=self.itype)
+
 
     # boundary flag
 
@@ -378,17 +384,33 @@ class HomogeneousMeshDS(MeshDataStructure):
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
-    # to node
+    # between (cell, face) and node
 
-    def cell_to_node(self) -> NDArray:
-        return self.cell
+    def cell_to_node(self, return_sparse=False, return_local=False):
+        if not return_sparse:
+            return self.cell
+        else:
+            return arr_to_csr(self.cell, self.NN,
+                              return_local=return_local, dtype=self.itype)
 
-    def face_to_node(self) -> NDArray:
-        return self.face
+    def node_to_cell(self, return_local=False):
+        return arr_to_csr(self.cell, self.NN, reversed=True,
+                          return_local=return_local, dtype=self.itype)
+
+    def face_to_node(self, return_sparse=False, return_local=False):
+        if not return_sparse:
+            return self.face
+        else:
+            return arr_to_csr(self.face, self.NN,
+                              return_local=return_local, dtype=self.itype)
+
+    def node_to_face(self, return_local=False):
+        return arr_to_csr(self.face, self.NN, reversed=True,
+                          return_local=return_local, dtype=self.itype)
 
     # between cell and face
 
-    def cell_to_face(self, return_sparse=False) -> NDArray:
+    def cell_to_face(self, return_sparse=False, return_local=False) -> NDArray:
         """
         @brief Neighbor information of cell to face.
         """
@@ -403,16 +425,15 @@ class HomogeneousMeshDS(MeshDataStructure):
         if not return_sparse:
             return cell2face
         else:
-            return arr_to_csr(cell2face, self.number_of_faces())
+            return arr_to_csr(cell2face, self.number_of_faces(),
+                              return_local=return_local, dtype=self.itype)
 
-    def face_to_cell(self, return_sparse=False):
+    def face_to_cell(self, return_sparse=False): # TODO: return local in sparse
         if return_sparse is False:
             return self.face2cell
         else:
             return arr_to_csr(
-                self.face2cell[:, [0, 1]],
-                self.number_of_cells()
-            )
+                self.face2cell[:, [0, 1]], self.number_of_cells())
 
     def cell_to_cell(self, return_sparse=False,
                      return_boundary=True, return_array=False):
