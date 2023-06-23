@@ -14,45 +14,92 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
     """
     # Variables
     edge = ArrRedirector('cell')
+    face = ArrRedirector('face_')
 
     # Constants
     TD = 1
     localEdge = np.array([(0, 1)], dtype=np.int_)
     localFace = np.array([(0, ), (1, )], dtype=np.int_)
 
-    ### cell ###
+    ### Special Topology APIs for Non-structures ###
 
-    def cell_to_node(self) -> NDArray:
-        return self.cell
+    def cell_to_face(self, return_sparse=False, return_local=False) -> NDArray: # simplified for 1d case
+        return self.cell_to_node(return_sparse=return_sparse, return_local=return_local)
 
     def cell_to_edge(self) -> NDArray:
         NC = self.number_of_cells()
         return np.arange(NC, dtype=self.itype).reshape(NC, 1)
 
-    def cell_to_face(self) -> NDArray:
-        return self.cell
 
-    ### face ###
+    ### General Topology APIs ###
 
-    def face_to_cell(self) -> NDArray:
-        return self.face2cell
+    @property
+    def face_(self):
+        NN = self.NN
+        return np.arange(NN, dtype=self.itype).reshape(NN, 1)
 
-    face_to_edge = face_to_cell
+    def face_to_edge(self, return_sparse=False):
+        return self.face_to_cell(return_sparse=return_sparse)
 
-    ### edge ###
+    def edge_to_face(self, return_sparse=False):
+        return self.cell_to_face(return_sparse=return_sparse)
 
-    edge_to_face = cell_to_face
-    edge_to_cell = cell_to_edge
+    def edge_to_cell(self, return_sparse=False):
+        return self.cell_to_edge(return_sparse=return_sparse)
 
-    ### node ###
 
-    node_to_edge = face_to_cell
-    node_to_cell = face_to_cell
+    # boundary, simplified for 1d
+
+    def boundary_node_flag(self):
+        """
+        @brief Determine boundary nodes in the 1D structure mesh.
+
+        @return isBdNode : np.array, dtype=np.bool_
+            An array of booleans where True indicates a boundary node.
+        """
+        isBdNode = np.zeros(self.NN, dtype=np.bool_)
+        isBdNode[0] = True
+        isBdNode[-1] = True
+        return isBdNode
+
+    def boundary_cell_flag(self):
+        """
+        @brief Determine boundary cells in the 1D structure mesh.
+
+        @return isBdCell : np.array, dtype=np.bool_
+            An array of booleans where True indicates a boundary cell.
+        """
+        NC = self.number_of_cells()
+        isBdCell = np.zeros((NC,), dtype=np.bool_)
+        isBdCell[0] = True
+        isBdCell[-1] = True
+        return isBdCell
+
+    def boundary_node_index(self):
+        """
+        @brief Get the indices of boundary nodes in the 1D structure mesh.
+
+        @return boundary_node_indices : np.array, dtype=self.itype
+            An array containing the indices of the boundary nodes.
+        """
+        return np.array([0, self.NN-1], dtype=self.itype)
+
+    def boundary_cell_index(self):
+        """
+        @brief Get the indices of boundary cells in the 1D structure mesh.
+
+        This function returns an array containing the indices of the
+        boundary cells in the mesh.
+
+        @return boundary_cell_indices : np.array, dtype=self.itype
+            An array containing the indices of the boundary cells.
+        """
+        return np.array([0, self.NC-1], dtype=self.itype)
 
 
 class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
 
-    def face_to_cell(self) -> NDArray:
+    def face_to_cell(self, return_sparse=False) -> NDArray:
         """
         @TODO
         """
