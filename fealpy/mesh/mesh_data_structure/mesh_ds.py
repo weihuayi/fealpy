@@ -127,6 +127,9 @@ class MeshDataStructure():
         return arr_to_csr(self.edge, self.number_of_nodes(),
                           reversed=True, return_local=return_local, dtype=self.itype)
 
+    def node_to_node(self):
+        pass
+
 
     # boundary flag
 
@@ -228,11 +231,15 @@ class HomogeneousMeshDS(MeshDataStructure):
     @brief Data structure for meshes with homogeneous shape of cells.
 
     This subclass is to implement:
+    - Construction of `face2cell` and `face`, basically;
     - Basic topology relationship: `face2cell` and `cell2edge`(in 3d case);
     - Special counting methods, calculating NVC, NEC, NFC, NVF, and NVE;
     - Homogeneous local entities, like `local_edge` and `local_face`;
-    - Generate total entities: `total_edge` and `total_face`.
-    - Critical topology relationship methods: `cell_to_<entity>` and `face_to_cell`.
+    - Generate total entities: `total_edge` and `total_face`;
+    - Topology relationship between cell, face and node; the methods are for all\
+    dimensions, but may have simpler algorithms in low dimension, which can be\
+    implemented overridingly. Note: Relations between `edge` and entities with\
+    dimension higher than it (face and cell) are different in 1d, 2d and 3d.
 
     Class variables:
     ccw: NDArray, optional. The indices of nodes sorted counter-clock-wise in\
@@ -240,6 +247,12 @@ class HomogeneousMeshDS(MeshDataStructure):
          the mesh. If not provided, the original order of nodes will be used.
     localEdge: NDArray with shape (NEC, NVE).
     localFace: NDArray with shape (NFC, NVF).
+
+    @note `face2cell` and `face` will be construct for all homogeneous meshes, but
+    there are some differences in 1d, 2d and 3d case.
+    - 1d: Redirect `edge` to `cell`, and the `face` is like [[0], [1], [2], ..., [NN-1]];
+    - 2d: Redirect `edge` to `face`;
+    - 3d: Also construct `cell2edge` and `edge`.
     """
     # Constants
     ccw: NDArray
