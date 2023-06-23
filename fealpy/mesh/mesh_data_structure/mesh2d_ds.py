@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
 from .mesh_ds import ArrRedirector, HomogeneousMeshDS, StructureMeshDS
-
+from .sparse_tool import arr_to_csr
 
 class Mesh2dDataStructure(HomogeneousMeshDS):
     """
@@ -19,39 +19,11 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
     # Constants
     TD: int = 2
 
-    ### cell ###
 
-    def cell_to_node(self) -> NDArray:
-        return self.cell
+    ### Special Topology APIs for Non-structures ###
 
-    def cell_to_edge(self):
-        """
-        @brief The neighbor information of cell to edge
-        """
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        NEC = self.number_of_edges_of_cells()
-
-        edge2cell = self.edge2cell
-
-        cell2edge = np.zeros((NC, NEC), dtype=self.itype)
-        cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
-        cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
-        return cell2edge
-
-    def cell_to_edge_sign(self):
-        NC = self.number_of_cells()
-        NEC = self.number_of_edges_of_cells()
-
-        edge2cell = self.edge2cell
-
-        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
-        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
-
-        return cell2edgeSign
-
-    cell_to_face = cell_to_edge
-    cell_to_face_sign = cell_to_edge_sign
+    def cell_to_edge(self, return_sparse=False, return_local=False):
+        return self.cell_to_face(return_sparse=return_sparse, return_local=return_local)
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """ Consctruct the neighbor information of cells
@@ -98,16 +70,25 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    ### face ###
 
-    def face_to_cell(self):
-        return self.edge2cell
+    ### General Topology APIs ###
 
-    ### edge ###
+    def cell_to_edge_sign(self):
+        NC = self.number_of_cells()
+        NEC = self.number_of_edges_of_cells()
 
-    edge_to_cell = face_to_cell
+        edge2cell = self.edge2cell
 
-    ### node ###
+        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+
+        return cell2edgeSign
+
+    def cell_to_face_sign(self):
+        return self.cell_to_edge_sign()
+
+    def edge_to_cell(self, return_sparse=False):
+        return self.face_to_cell(return_sparse=return_sparse)
 
     def node_to_node(self, return_array=False):
 
@@ -149,37 +130,6 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
-    def node_to_edge(self):
-        """
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NVE = self.NVE
-        I = self.edge.flat
-        J = np.repeat(range(NE), NVE)
-        val = np.ones(NVE*NE, dtype=np.bool_)
-        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE))
-        return node2edge
-
-    node_to_face = node_to_edge
-
-    def node_to_cell(self, return_localidx=False):
-        """
-        """
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NVC = self.number_of_vertices_of_cells()
-
-        I = self.cell.flat
-        J = np.repeat(range(NC), NVC)
-
-        if return_localidx == False:
-            val = np.ones(NVC*NC, dtype=np.bool_)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC))
-        else:
-            val = ranges(NVC*np.ones(NC, dtype=self.itype), start=1)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
-        return node2cell
 
     ### boundary ###
 
