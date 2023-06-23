@@ -34,10 +34,11 @@ def test_amg():
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
 
-    solver = AMGSolver()
+    solver = AMGSolver(ptype='V', sstep=3)
     #ipdb.set_trace()
     solver.setup(A)
     solver.print()
+    uh[:] = solver.solve(F)
 
 
 

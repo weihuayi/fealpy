@@ -1,23 +1,57 @@
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import eigs, spsolve_triangular
+from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres, 
+        LinearOperator, spsolve_triangular)
+from pypardiso import spsolve
 from timeit import default_timer as timer
 
 from .coarsen import ruge_stuben_chen_coarsen 
 from .interpolation import standard_interpolation 
+from .interpolation import two_points_interpolation
 
+class IterationCounter(object):
+    def __init__(self, disp=True):
+        self._disp = disp
+        self.niter = 0
+    def __call__(self, rk=None):
+        self.niter += 1
+        if self._disp:
+            print('iter %3i' % (self.niter))
 
 class AMGSolver():
     """
     @brief 代数多重网格解法器类。用代数多重网格方法求解
     @note 该求解器完全移植 iFEM
     """
-    def __init__(self):
-        pass
+    def __init__(self,
+            theta: float = 0.025, # 粗化系数
+            csize: int = 50, # 最粗问题规模
+            ctype: str = 'C', # 粗化方法
+            itype: str = 'T', # 插值方法
+            ptype: str = 'W', # 预条件类型
+            sstep: int = 2, # 默认光滑步数
+            isolver: str = 'CG', # 默认迭代解法器
+            maxit: int = 200,   # 默认迭代最大次数
+            csolver: str = 'direct', # 默认粗网格解法器
+            rtol: float = 1e-8,      # 相对误差收敛阈值
+            atol: float = 1e-8,      # 绝对误差收敛阈值
+            ):
+        self.csize = csize 
+        self.theta = theta
+        self.ctype = ctype
+        self.itype = itype
+        self.ptype = ptype
+        self.sstep = sstep
+        self.isolver = isolver
+        self.maxit = maxit
+        self.csolver = csolver
+        self.rtol = rtol
+        self.atol = atol
 
     def setup(self, A):
-        theta = 0.025
-        N0 = 50
+        """
+        @brief 
+        """
         NN = np.ceil(np.log2(A.shape[0])/2-4)
         NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
         self.A = [A]
@@ -27,17 +61,21 @@ class AMGSolver():
         self.P = [ ] # 延长矩阵
         self.R = [ ] # 限止矩阵
         for l in range(NL):
-            self.L.append(sp.tril(self.A[l])) # 前磨光的光滑子
-            self.U.append(sp.triu(self.A[l])) # 后磨光的光滑子
+            self.L.append(sp.tril(self.A[l]).tocsr()) # 前磨光的光滑子
+            self.U.append(sp.triu(self.A[l]).tocsr()) # 后磨光的光滑子
             self.D.append(self.A[l].diagonal())
 
-            isC, G = ruge_stuben_chen_coarsen(self.A[l], theta)
+            isC, G = ruge_stuben_chen_coarsen(self.A[l], self.theta)
             P, R = standard_interpolation(G, isC)
 
-            self.A.append(R@self.A[l]@P)
+            print(type(P))
+            print(type(R))
+            #P, R = two_points_interpolation(G, isC)
+
+            self.A.append((R@self.A[l]@P).tocsr())
             self.P.append(P)
             self.R.append(R)
-            if self.A[-1].shape[0] < N0:
+            if self.A[-1].shape[0] < self.csize:
                 break
 
         # 计算最大和最小特征值
@@ -67,7 +105,20 @@ class AMGSolver():
                 print("R.shape = ", self.R[l].shape) 
 
     def solve(self, b):
-        pass
+        """
+        @brief
+        """
+        N = self.A[0].shape[0]
+        if self.ptype == 'V':
+            P = LinearOperator((N, N), matvec=self.vcycle, dtype=self.A[0].dtype)
+        elif self.ptype == 'W':
+            P = LinearOperator((N, N), matvec=self.wcycle, dtype=self.A[0].dtype)
+        if self.isolver == 'CG':
+            counter = IterationCounter()
+            x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
+            #x, info = cg(self.A[0], b, tol=self.rtol, atol=self.atol, callback=counter)
+            print(info)
+
 
     def vcycle(self, r, level=0):
         """
@@ -80,10 +131,11 @@ class AMGSolver():
         e = [ ] # 误差列表 
 
         for l in range(level, NL - 1, 1):
-            el = spsolve_triangular(self.L[l], r[l], lower=True)
-            for i in range(3):
-                el += spsolve_triangular(self.L[l], r[l] - self.A[l] @ el,
-                        lower=True)
+            #el = spsolve_triangular(self.L[l], r[l], lower=True)
+            el = spsolve(self.L[l], r[l])
+            for i in range(self.sstep):
+                #el += spsolve_triangular(self.L[l], r[l] - self.A[l] @ el, lower=True)
+                el += spsolve(self.L[l], r[l] - self.A[l] @ el)
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
@@ -91,11 +143,12 @@ class AMGSolver():
         e.append(el)
 
         for l in range(NL - 2, level - 1, -1):
-            e[l] += self.P[l] @ e[l - 1]
-            e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l],
-                    lower=False)
-            for i in range(3): # 后磨光
-                e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l], lower=False)
+            e[l] += self.P[l] @ e[l + 1]
+            #e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l], lower=False)
+            e[l] = spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+            for i in range(self.sstep): # 后磨光
+                #e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l], lower=False)
+                e[l] = spsolve(self.U[l], r[l] - self.A[l] @ e[l])
         return e[0]
 
     def wcycle(self, r, level=0):
