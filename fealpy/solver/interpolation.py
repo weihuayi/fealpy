@@ -59,7 +59,7 @@ def two_points_interpolation(A, isC):
     i, j, s = sp.find(Afc)
     HB[i[::-1], 2] = j[::-1]
     HB[i, 1] = j
-    w = np.zeros((len(i), 2))
+    w = np.zeros((len(fineNode), 2))
     w[i[::-1], 1] = s[::-1]
     w[i, 0] = s
     Dsum = np.sum(w, axis=1)
@@ -70,7 +70,7 @@ def two_points_interpolation(A, isC):
     J = np.concatenate((coarseNode, HB[:, 1], HB[:, 2]))
     val = np.concatenate((np.ones(NC), w[:, 0], w[:, 1]))
     P = sp.csr_matrix((val, (I, J)), shape=(N, NC))
-    R = P.transpose()
+    R = P.transpose().tocsr()
 
     return P, R
 

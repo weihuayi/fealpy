@@ -3,11 +3,11 @@ import scipy.sparse as sp
 from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres, 
         LinearOperator, spsolve_triangular)
 from pypardiso import spsolve
-from timeit import default_timer as timer
 
 from .coarsen import ruge_stuben_chen_coarsen 
 from .interpolation import standard_interpolation 
 from .interpolation import two_points_interpolation
+from ..decorator import timer
 
 class IterationCounter(object):
     def __init__(self, disp=True):
@@ -48,6 +48,7 @@ class AMGSolver():
         self.rtol = rtol
         self.atol = atol
 
+    @timer
     def setup(self, A):
         """
         @brief 
@@ -66,11 +67,8 @@ class AMGSolver():
             self.D.append(self.A[l].diagonal())
 
             isC, G = ruge_stuben_chen_coarsen(self.A[l], self.theta)
-            P, R = standard_interpolation(G, isC)
-
-            print(type(P))
-            print(type(R))
-            #P, R = two_points_interpolation(G, isC)
+            #P, R = standard_interpolation(G, isC)
+            P, R = two_points_interpolation(G, isC)
 
             self.A.append((R@self.A[l]@P).tocsr())
             self.P.append(P)
@@ -104,6 +102,7 @@ class AMGSolver():
                 print("P.shape = ", self.P[l].shape) 
                 print("R.shape = ", self.R[l].shape) 
 
+    @timer
     def solve(self, b):
         """
         @brief
@@ -131,11 +130,10 @@ class AMGSolver():
         e = [ ] # 误差列表 
 
         for l in range(level, NL - 1, 1):
-            #el = spsolve_triangular(self.L[l], r[l], lower=True)
             el = spsolve(self.L[l], r[l])
             for i in range(self.sstep):
-                #el += spsolve_triangular(self.L[l], r[l] - self.A[l] @ el, lower=True)
                 el += spsolve(self.L[l], r[l] - self.A[l] @ el)
+            print("level = ", l, np.linalg.norm(el))
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
@@ -144,11 +142,10 @@ class AMGSolver():
 
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
-            #e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l], lower=False)
-            e[l] = spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+            e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
             for i in range(self.sstep): # 后磨光
-                #e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l], lower=False)
-                e[l] = spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+                e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+            print("level = ", l, np.linalg.norm(e[l]))
         return e[0]
 
     def wcycle(self, r, level=0):
@@ -167,7 +164,7 @@ class AMGSolver():
 
         e = spsolve_triangular(self.L[level], r, lower=True)
         for s in range(3):
-            e += spsolve_triangular(self.L[level], r - self.A[level] @ e, lower=True) 
+            e += spsolve(self.L[level], r - self.A[level] @ e) 
 
         rc = self.R[level] @ ( r - self.A[level] @ e) 
 
@@ -175,9 +172,9 @@ class AMGSolver():
         ec += self.wcycle( rc - self.A[level+1] @ ec, level=level+1)
         
         e += self.P[level] @ ec
-        e += spsolve_triangular(self.U[level], r - self.A[level] @ e, lower=False)
+        e += spsolve(self.U[level], r - self.A[level] @ e)
         for s in range(3):
-            e += spsolve_triangular(self.U[level], r - self.A[level] @ e, lower=False)
+            e += spsolve(self.U[level], r - self.A[level] @ e)
 
         return e
 

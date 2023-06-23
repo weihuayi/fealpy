@@ -18,7 +18,7 @@ def test_amg():
     pde = CosCosData()
     domain = pde.domain()
 
-    mesh = TriangleMesh.from_box(domain, nx=100, ny=100)
+    mesh = TriangleMesh.from_box(domain, nx=800, ny=800)
 
     space = LagrangeFESpace(mesh, p=1)
 
@@ -34,10 +34,10 @@ def test_amg():
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
 
-    solver = AMGSolver(ptype='V', sstep=3)
-    #ipdb.set_trace()
+    solver = AMGSolver(ptype='W', sstep=2)
     solver.setup(A)
     solver.print()
+    #ipdb.set_trace()
     uh[:] = solver.solve(F)
 
 
