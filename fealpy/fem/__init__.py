@@ -42,7 +42,7 @@ VectorRobinSourceIntegrator = VectorBoundarySourceIntegrator
 # others
 from .truss_structure_integrator import TrussStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
-from .convection_integrator import ConvectionIntegrator
+from .vector_convection_integrator import VectorConvectionIntegrator
 from .vector_viscous_work_integrator import VectorViscousWorkIntegrator
 from .press_work_integrator import PressWorkIntegrator
 
