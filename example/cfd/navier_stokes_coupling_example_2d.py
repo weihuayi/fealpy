@@ -9,7 +9,6 @@ from scipy.sparse import csr_matrix,hstack,vstack,spdiags,bmat
 from mumps import DMumpsContext
 
 import matplotlib.pyplot as plt
-from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
 from fealpy.timeintegratoralg import UniformTimeLine
@@ -21,27 +20,65 @@ from fealpy.functionspace import LagrangeFESpace
 
 from fealpy.fem import ScalarDiffusionIntegrator, VectorMassIntegrator
 from fealpy.fem import VectorDiffusionIntegrator
-from fealpy.fem import NSOperatorIntegrator, PressIntegrator
-from fealpy.fem import ConvectionIntegrator
+from fealpy.fem import VectorViscousWorkIntegrator, PressWorkIntegrator
+from fealpy.fem import ScalarConvectionIntegrator
 from fealpy.fem import BilinearForm, MixedBilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import VectorSourceIntegrator, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 
 # 参数设置
-udegree = 2
-pdegree = 1
+parser = argparse.ArgumentParser(description=
+        """
+        有限元方法求解NS方程
+        """)
+
+parser.add_argument('--udegree',
+        default=2, type=int,
+        help='运动有限元空间的次数, 默认为 2 次.')
+
+parser.add_argument('--pdegree',
+        default=1, type=int,
+        help='压力有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--nt',
+        default=100, type=int,
+        help='时间剖分段数，默认剖分 5000 段.')
+
+parser.add_argument('--T',
+        default=10, type=float,
+        help='演化终止时间, 默认为 5')
+
+parser.add_argument('--output',
+        default='./', type=str,
+        help='结果输出目录, 默认为 ./')
+
+parser.add_argument('--step',
+        default=10, type=int,
+        help='隔多少步输出一次')
+
+parser.add_argument('--method',
+        default='Netwon', type=str,
+        help='非线性化方法')
+
+args = parser.parse_args()
+udegree = args.udegree
+pdegree = args.pdegree
+nt = args.nt
+T = args.T
+output = args.output
+step = args.step
+method = args.method
 ns = 8
-nt = 100
-T = 10
-rho = 1
+
 mu= 1
+rho = 1
 udim = 2
 doforder = 'sdofs'
 
 pde = PDE()
 mesh = TriangleMesh.from_unit_square(nx=ns, ny=ns)
-smesh = MF.boxmesh2d(pde.domain(), nx=ns, ny=ns, meshtype='tri')
+smesh = TriangleMesh.from_unit_square(nx=ns, ny=ns)
 tmesh = UniformTimeLine(0,T,nt)
 dt = tmesh.dt
 uspace = LagrangeFiniteElementSpace(smesh,p=udegree)
@@ -68,7 +105,7 @@ Vbform0.assembly()
 A = Vbform0.get_matrix()
 
 Vbform1 = MixedBilinearForm((npspace,), 2*(nuspace, ))
-Vbform1.add_domain_integrator(PressIntegrator()) #TODO: 命名
+Vbform1.add_domain_integrator(PressWorkIntegrator()) #TODO: 命名
 Vbform1.assembly()
 B = Vbform1.get_matrix()
 B1 = B[:B.shape[0]//2,:]
@@ -85,7 +122,7 @@ for i in range(0,3):
     print("t1=",t1)
 
     Vbform2 = BilinearForm(nuspace)
-    Vbform2.add_domain_integrator(ConvectionIntegrator(c=u0)) 
+    Vbform2.add_domain_integrator(ScalarConvectionIntegrator(c=u0)) 
     Vbform2.assembly()
     DD = Vbform2.get_matrix()
     
@@ -93,12 +130,37 @@ for i in range(0,3):
     D = D1 * np.broadcast_to(u0[...,0],D1.shape)+\
         D2 * np.broadcast_to(u0[...,1],D1.shape) 
     
+    print("asd",np.abs(DD).sum())
+    print("asd",np.abs(D).sum())
     print(np.sum(np.abs(D-DD))) 
     M = bmat([[E+A+D,None,-B1],[None,E+A+D,-B2],[-B1.T,-B2.T,None]],format='csr')
+     
+    if method == 'Netwon' :
+        A = bmat([[1/dt*M + mu*S+D1+D2+E1, E2, -C1],\
+                [E3, 1/dt*M + mu*S +D1+D2+E4, -C2],\
+                [C1.T, C2.T, None]], format='csr')
+    elif method == 'Ossen':
+        A = bmat([[1/dt*M + mu*S+D1+D2, None, -C1],\
+                [None, 1/dt*M + mu*S +D1+D2, -C2],\
+                [C1.T, C2.T, None]], format='csr')
+    elif method == 'Eular':
+        A = bmat([[1/dt*M + mu*S, None, -C1],\
+                [None, 1/dt*M + mu*S, -C2],\
+                [C1.T, C2.T, None]], format='csr')
     
     #右端项
     F = uspace.source_vector(pde.source,dim=udim) + E@u0
     FF = np.r_['0', F.T.flat, np.zeros(pgdof)]
+    
+    if method == 'Netwon' :
+        b = 1/dt*fb1 + fb2
+        b = np.hstack((b,[0]*pgdof))
+    elif method == 'Ossen':
+        b = 1/dt*fb1
+        b = np.hstack((b,[0]*pgdof))
+    elif method == 'Eular':
+        b =  1/dt*fb1 - fb2
+        b = np.hstack((b,[0]*pgdof))
 
     u_isBdDof = uspace.is_boundary_dof()
     #p_isBdDof = np.zeros(pgdof,dtype=np.bool)
