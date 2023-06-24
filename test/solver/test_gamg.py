@@ -1,11 +1,11 @@
 import numpy as np
 
-from fealpy.solver import AMGSolver
+from fealpy.solver import GAMGSolver
 
 import ipdb
 
 
-def test_amg():
+def test_gamg():
     from fealpy.pde.poisson_2d import CosCosData
     from fealpy.mesh import TriangleMesh 
     from fealpy.functionspace import LagrangeFESpace
@@ -18,7 +18,7 @@ def test_amg():
     pde = CosCosData()
     domain = pde.domain()
 
-    mesh = TriangleMesh.from_box(domain, nx=800, ny=800)
+    mesh = TriangleMesh.from_box(domain, nx=400, ny=400)
 
     space = LagrangeFESpace(mesh, p=1)
 
@@ -34,8 +34,8 @@ def test_amg():
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
 
-    solver = AMGSolver(ptype='W', sstep=2)
-    solver.setup(A)
+    solver = GAMGSolver(ptype='W', sstep=3)
+    solver.amg_setup(A)
     solver.print()
     #ipdb.set_trace()
     uh[:] = solver.solve(F)
@@ -43,4 +43,4 @@ def test_amg():
 
 
 if __name__ == "__main__":
-    test_amg()
+    test_gamg()

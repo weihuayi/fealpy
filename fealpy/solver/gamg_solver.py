@@ -4,9 +4,9 @@ from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres,
         LinearOperator, spsolve_triangular)
 from pypardiso import spsolve
 
-from .coarsen import ruge_stuben_chen_coarsen 
-from .interpolation import standard_interpolation 
-from .interpolation import two_points_interpolation
+from .amg_coarsen import ruge_stuben_chen_coarsen 
+from .amg_interpolation import standard_interpolation 
+from .amg_interpolation import two_points_interpolation
 from ..decorator import timer
 
 class IterationCounter(object):
@@ -18,10 +18,17 @@ class IterationCounter(object):
         if self._disp:
             print('iter %3i' % (self.niter))
 
-class AMGSolver():
+class GAMGSolver():
     """
-    @brief 代数多重网格解法器类。用代数多重网格方法求解
-    @note 该求解器完全移植 iFEM
+    @brief 同时支持几何与代数多重网格的快速解法器
+
+    @note 
+    1. 多重网格方法通常分为几何和代数两种类型 
+    2. 多重网格方法用到两种插值算子：延拓（Prolongation）和 限制（Restriction）算子
+    3. 延拓是指把粗空间上的解插值到细空间中
+    4. 限制是指把细空间上的解插值到粗空间中
+    5. 几何多重网格利用网格的几何结构来构造延拓和限制算子
+    6. 代数多重网格得用离散矩阵的结构来构造延拓和限制算子
     """
     def __init__(self,
             theta: float = 0.025, # 粗化系数
@@ -49,9 +56,11 @@ class AMGSolver():
         self.atol = atol
 
     @timer
-    def setup(self, A):
+    def amg_setup(self, A):
         """
-        @brief 
+        @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
+
+        @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
         """
         NN = np.ceil(np.log2(A.shape[0])/2-4)
         NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
@@ -59,8 +68,8 @@ class AMGSolver():
         self.L = [ ] # 下三角 
         self.U = [ ] # 上三角
         self.D = [ ] # 对角线
-        self.P = [ ] # 延长矩阵
-        self.R = [ ] # 限止矩阵
+        self.P = [ ] # 延拓算子
+        self.R = [ ] # 限制矩阵
         for l in range(NL):
             self.L.append(sp.tril(self.A[l]).tocsr()) # 前磨光的光滑子
             self.U.append(sp.triu(self.A[l]).tocsr()) # 后磨光的光滑子
@@ -76,7 +85,7 @@ class AMGSolver():
             if self.A[-1].shape[0] < self.csize:
                 break
 
-        # 计算最大和最小特征值
+        # 计算最粗矩阵最大和最小特征值
         emax, _ = eigs(self.A[-1], 1, which='LM')
         emin, _ = eigs(self.A[-1], 1, which='SM')
 
@@ -105,56 +114,67 @@ class AMGSolver():
     @timer
     def solve(self, b):
         """
-        @brief
+        @brief 用多重网格方法求解 Ax = b
         """
         N = self.A[0].shape[0]
+
         if self.ptype == 'V':
             P = LinearOperator((N, N), matvec=self.vcycle, dtype=self.A[0].dtype)
         elif self.ptype == 'W':
             P = LinearOperator((N, N), matvec=self.wcycle, dtype=self.A[0].dtype)
+        elif self.ptype == 'F':
+            P = LinearOperator((N, N), matvec=self.fcycle, dtype=self.A[0].dtype)
+
         if self.isolver == 'CG':
             counter = IterationCounter()
             x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
-            #x, info = cg(self.A[0], b, tol=self.rtol, atol=self.atol, callback=counter)
             print(info)
 
 
     def vcycle(self, r, level=0):
         """
-        @brief 
+        @brief V-Cycle 方法求解 Ae=r  
 
-        @note 在每一层求解 Ae = r
+        @note
+        1. 先在最细空间上进行几次（通常为1到2次）光滑（即迭代求解）操作，这个步骤称为前磨光, 它可以消除高频误差。
+        2. 计算残差并将其限制到下一更粗的空间中
+        3. 在更粗的空间上，对该残差方程进行几次（通常为1到2次）迭代求解。
+        4. 重复步骤2和3，直到达到最粗的空间，在最粗网格上通常用直接法直接求解。
+        5. 进行延拓操作，将粗空间误差延拓到相邻细空间上，将此解作为相邻细空间问题的初始猜测。
+        6. 在每个更细的空间中，先进行后磨光（即再次迭代求解），然后再将解延拓到下一个更细的空间中
+        7. 重复步骤6，直到达到最细的网格。
         """
-        NL = len(self.A)
-        r = [r] # 残量列表
-        e = [ ] # 误差列表 
 
+        NL = len(self.A)
+        r = [None]*level + [r] # 残量列表
+        e = [None]*level       # 误差列表 
+
+        # 前磨光
         for l in range(level, NL - 1, 1):
             el = spsolve(self.L[l], r[l])
             for i in range(self.sstep):
                 el += spsolve(self.L[l], r[l] - self.A[l] @ el)
-            print("level = ", l, np.linalg.norm(el))
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
         el = spsolve(self.A[-1], r[-1])
         e.append(el)
 
+        # 后磨光
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
             e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
             for i in range(self.sstep): # 后磨光
                 e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
-            print("level = ", l, np.linalg.norm(e[l]))
-        return e[0]
+
+        return e[level]
 
     def wcycle(self, r, level=0):
         """
+        @brief W-Cycle 方法求解 Ae=r
 
-        @param r 第 level 层的残量
-        @param level 层编号
-
-        @note 在每一层求解 Ae=r, 其中第 0 层是最细层
+        @param r 第 level 空间层的残量
+        @param level 空间层编号
         """
 
         NL = len(self.A)
@@ -162,8 +182,8 @@ class AMGSolver():
             e = spsolve(self.A[-1], r)
             return e
 
-        e = spsolve_triangular(self.L[level], r, lower=True)
-        for s in range(3):
+        e = spsolve(self.L[level], r)
+        for s in range(self.sstep):
             e += spsolve(self.L[level], r - self.A[level] @ e) 
 
         rc = self.R[level] @ ( r - self.A[level] @ e) 
@@ -173,14 +193,14 @@ class AMGSolver():
         
         e += self.P[level] @ ec
         e += spsolve(self.U[level], r - self.A[level] @ e)
-        for s in range(3):
+        for s in range(self.sstep):
             e += spsolve(self.U[level], r - self.A[level] @ e)
-
         return e
 
 
     def fcycle(self, r):
         """
+        @brief F-Cycle 方法求解 Ae=r
         """
         NL = len(self.A)
         r = [r] 
@@ -189,8 +209,8 @@ class AMGSolver():
         # 从最细层到次最粗层
         for l in range(0, NL - 1, 1):
             el = self.vcycle(r[l], level=l)
-            for s in range(3):
-                el += self.vcycle(r[l] - slef.A[l] @ el, level=l)
+            for s in range(self.sstep):
+                el += self.vcycle(r[l] - self.A[l] @ el, level=l)
 
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ e[l]))
@@ -203,7 +223,7 @@ class AMGSolver():
         for l in range(NL - 2, -1, -1):
             e[l] += self.P[l] @ e[l+1]
             e[l] += self.vcycle(r[l] - self.A[l] @ e[l], level=l)
-            for s in range(3):
+            for s in range(self.sstep):
                 e[l] += self.vcycle(r[l] - self.A[l] @ e[l], level=l)
 
         return e[0]
