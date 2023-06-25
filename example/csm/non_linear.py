@@ -1,5 +1,4 @@
 import numpy as np
-from sympy import Max
 
 from fealpy.opt import Problem
 from fealpy.opt.newton_raphson_optimizer import NewtonRaphsonOptimizer
@@ -27,6 +26,7 @@ def two_nonlinear_springs_opt():
     opt = NewtonRaphsonOptimizer(problem)
     x = opt.run()
     print("x:", x)
+    print("energy:", problem.energy)
 
 
 
