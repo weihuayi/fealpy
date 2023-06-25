@@ -10,24 +10,19 @@ class NewtonRaphsonOptimizer(Optimizer):
     def run(self):
         problem = self.problem
         x = problem.x0
-        f, grad = problem.objective(x)
+        f, gradf = problem.objective(x)
         print("f:", f)
-        print("grad:", grad)
-        # 外力 [0, 100] 如何手动输入？
-        R = np.array([0, 100]) - grad
-        print("R:", R)
+        print("gradf:", gradf)
         print("----------------------------")
         for i in range(problem.MaxIters):
             print("Kt^-1:\n", self.P(x))
-            du = self.P(x) @ R
+            du = -self.P(x) @ gradf
             print("du:", du)
             x += du
             print("x:", x)
-            _, grad = problem.objective(x)
-            R = np.array([0, 100]) - grad
-            print("R:", R)
-#            print("x:", x)
-            f_new, grad_new = problem.objective(x)
+            _, gradf = problem.objective(x)
+            print("gradf:", gradf)
+            f_new, grad_f_new = problem.objective(x)
             print("f:", f_new)
             print("-------------------------------")
 
@@ -35,10 +30,10 @@ class NewtonRaphsonOptimizer(Optimizer):
                 print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
                 break
 
-            if np.linalg.norm(grad_new) < problem.NormGradTol:
+            if np.linalg.norm(grad_f_new) < problem.NormGradTol:
                 print(f"Convergence achieved after {i} iterations, the norm of gradient is less than NormGradTol")
                 break
 
-        f, grad = f_new, grad_new
+        f, gradf = f_new, grad_f_new
 
-        return x, f, grad 
+        return x, f, gradf 
