@@ -5,7 +5,6 @@ from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres,
 from pypardiso import spsolve
 
 from .amg_coarsen import ruge_stuben_chen_coarsen 
-from .amg_interpolation import standard_interpolation 
 from .amg_interpolation import two_points_interpolation
 from ..decorator import timer
 
@@ -20,7 +19,7 @@ class IterationCounter(object):
 
 class GAMGSolver():
     """
-    @brief 同时支持几何与代数多重网格的快速解法器
+    @brief 几何与代数多重网格的快速解法器
 
     @note 
     1. 多重网格方法通常分为几何和代数两种类型 
