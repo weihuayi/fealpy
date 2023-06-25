@@ -12,7 +12,7 @@ from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.functionspace import LagrangeFESpace
 
 from fealpy.fem import ScalarDiffusionIntegrator, VectorMassIntegrator
-from fealpy.fem import NSOperatorIntegrator, PressIntegrator
+from fealpy.fem import VectorViscousWorkIntegrator, PressWorkIntegrator
 from fealpy.fem import BilinearForm, MixedBilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import VectorSourceIntegrator, ScalarSourceIntegrator
@@ -95,13 +95,13 @@ Vbform0.assembly()
 A1 = Vbform0.get_matrix()
 
 Vbform1 = BilinearForm(2*(uspace,))
-Vbform1.add_domain_integrator(NSOperatorIntegrator(mu)) #TODO：命名
+Vbform1.add_domain_integrator(VectorViscousWorkIntegrator(mu)) #TODO：命名
 Vbform1.assembly()
 A2 = Vbform1.get_matrix()
 A = A1+A2
 
 Vbform3 = MixedBilinearForm((pspace,), 2*(uspace, ))
-Vbform3.add_domain_integrator(PressIntegrator()) #TODO: 命名
+Vbform3.add_domain_integrator(PressWorkIntegrator()) #TODO: 命名
 Vbform3.assembly()
 D = Vbform3.get_matrix()
 
@@ -197,8 +197,8 @@ for i in range(2):
     NN = mesh.number_of_nodes()
     co2 = u1[:,:NN].transpose(1,0)
     errorMatrix[0,i] = np.abs(co1-co2).max()
-    errorMatrix[0,i] = mesh.error(uso, u1)
-    errorMatrix[1,i] = mesh.error(pso, p1)
+    #errorMatrix[1,i] = mesh.error(uso, u1)
+    #errorMatrix[2,i] = mesh.error(pso, p1)
     print("结果",np.sum(np.abs(u1))) 
     u0[:] = u1
     p0[:] = p1
