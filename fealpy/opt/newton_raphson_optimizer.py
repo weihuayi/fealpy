@@ -10,30 +10,30 @@ class NewtonRaphsonOptimizer(Optimizer):
     def run(self):
         problem = self.problem
         x = problem.x0
-        f, grad = problem.objective(x)
-        R = grad-np.array([0, 100])
+        f, gradf = problem.objective(x)
         print("f:", f)
-        print("grad:", grad)
-        print("R:", R)
+        print("gradf:", gradf)
+        print("----------------------------")
         for i in range(problem.MaxIters):
-            print("x:", x)
-            print("P:", self.P(x))
-            du = -self.P(x) @ R
+            print("Kt^-1:\n", self.P(x))
+            du = -self.P(x) @ gradf
             print("du:", du)
             x += du
-            _, grad = problem.objective(x)
-            R = grad-np.array([0, 100])
             print("x:", x)
-            f_new, grad_new = problem.objective(x)
+            _, gradf = problem.objective(x)
+            print("gradf:", gradf)
+            f_new, grad_f_new = problem.objective(x)
+            print("f:", f_new)
+            print("-------------------------------")
 
             if np.abs(f_new - f) < problem.FunValDiff:
                 print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
                 break
 
-            if np.linalg.norm(grad_new) < problem.NormGradTol:
+            if np.linalg.norm(grad_f_new) < problem.NormGradTol:
                 print(f"Convergence achieved after {i} iterations, the norm of gradient is less than NormGradTol")
                 break
 
-        f, grad = f_new, grad_new
+        f, gradf = f_new, grad_f_new
 
-        return x, f, grad 
+        return x, f, gradf 
