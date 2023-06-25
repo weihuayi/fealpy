@@ -140,6 +140,63 @@ class TriangleMesh(Mesh, Plotable):
         NC = self.number_of_cells()
         return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
 
+    def prolongation_matrix(self, p0:int, p1:int):
+        """
+        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
+        """
+
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()
+        gdof0 = self.number_of_global_ipoints(p0)
+        gdof1 = self.number_of_global_ipoints(p1)
+
+        # 1. 网格节点上的插值点 
+        NN = self.number_of_nodes()
+        I = range(NN)
+        J = range(NN)
+        V = np.ones(NN, dtype=self.ftype)
+        P = coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
+
+        # 2. 网格边内部的插值点 
+        NE = self.number_of_edges()
+        # p1 元在边上插值点对应的重心坐标
+        bcs = self.multi_index_matrix(p1, TD-1)/p1 
+        # p0 元基函数在 p1 元对应的边内部插值点处的函数值
+        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)  
+       
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE, ) + phi.shape
+
+        I = np.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J = np.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V = np.broadcast_to( phi[None, :, :], shape=shape).flat
+
+        P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
+
+        # 3. 单元内部的插值点
+        if p1 > 2:
+            NC = self.number_of_cells()
+            # p1 元在单元上对应插值点的重心坐标
+            bcs = self.multi_index_matrix(p1, TD)/p1
+            flag = np.sum(bcs>0, axis=1) == 3
+            # p0 元基函数在 p1 元对应的单元内部插值点处的函数值
+            phi = self.shape_function(bcs[flag, :], p=p0)
+            c2p1 = self.cell_to_ipoint(p1)[:, flag]
+            c2p0 = self.cell_to_ipoint(p0)
+
+            shape = (NC, ) + phi.shape
+
+            I = np.broadcast_to(c2p1[:, :, None], shape=shape).flat
+            J = np.broadcast_to(c2p0[:, None, :], shape=shape).flat
+            V = np.broadcast_to( phi[None, :, :], shape=shape).flat
+
+            P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
+
+        return P.tocsr()
+
+
     def interpolation_points(self, p: int, index=np.s_[:]):
         """
         @brief 获取三角形网格上所有 p 次插值点
