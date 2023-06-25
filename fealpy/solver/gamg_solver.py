@@ -55,32 +55,52 @@ class GAMGSolver():
         self.atol = atol
 
     @timer
-    def amg_setup(self, A):
+    def setup(self, A, space=None, cdegree=[1]):
         """
         @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
 
+        @param[in] A 矩阵
+        @param[in] space 离散空间
+        @param[in] cdegree 粗空间的次数
+
         @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
         """
-        NN = np.ceil(np.log2(A.shape[0])/2-4)
-        NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
+
+        # 1. 建立初步的算子存储结构
         self.A = [A]
         self.L = [ ] # 下三角 
         self.U = [ ] # 上三角
         self.D = [ ] # 对角线
         self.P = [ ] # 延拓算子
         self.R = [ ] # 限制矩阵
+
+        # 2. 高次元空间到低次元空间的粗化
+        if space is not None:
+            Ps = space.prolongation_matrix(cdegree=cdegree)
+            for P in Ps:
+                self.L.append(sp.tril(self.A[-1], format='csr'))
+                self.U.append(sp.triu(self.A[-1], format='csr'))
+                self.D.append(self.A[-1].diagonal())
+                self.P.append(P)
+                R = P.T.tocsr()
+                self.R.append(R)
+                self.A.append(R @ self.A[-1] @ P)
+
+        # 3. 基于矩阵或几何信息的粗化, 目前只有代数的粗化
+        # TODO：增加几何粗化处理 
+        NN = np.ceil(np.log2(self.A[-1].shape[0])/2-4)
+        NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
         for l in range(NL):
-            self.L.append(sp.tril(self.A[l]).tocsr()) # 前磨光的光滑子
-            self.U.append(sp.triu(self.A[l]).tocsr()) # 后磨光的光滑子
-            self.D.append(self.A[l].diagonal())
+            self.L.append(sp.tril(self.A[-1]).tocsr()) # 前磨光的光滑子
+            self.U.append(sp.triu(self.A[-1]).tocsr()) # 后磨光的光滑子
+            self.D.append(self.A[-1].diagonal())
 
-            isC, G = ruge_stuben_chen_coarsen(self.A[l], self.theta)
-            #P, R = standard_interpolation(G, isC)
+            isC, G = ruge_stuben_chen_coarsen(self.A[-1], self.theta)
             P, R = two_points_interpolation(G, isC)
-
-            self.A.append((R@self.A[l]@P).tocsr())
             self.P.append(P)
             self.R.append(R)
+
+            self.A.append((R@self.A[-1]@P).tocsr())
             if self.A[-1].shape[0] < self.csize:
                 break
 

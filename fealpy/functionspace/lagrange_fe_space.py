@@ -90,6 +90,20 @@ class LagrangeFESpace():
     def top_dimension(self):
         return self.TD
 
+    def prolongation_matrix(self, cdegree=[1]):
+        """
+        @brief 生成当前空间
+
+        @param[in] 粗空间次数列表
+        """
+        assert self.spacetype == 'C' 
+        p = self.p
+        Ps = []
+        for c in cdegree[-1::-1]:
+            Ps.append(self.mesh.prolongation_matrix(c, p))
+            p = c 
+        return Ps
+
     @barycentric
     def basis(self, bc, index=np.s_[:]):
         p = self.p
