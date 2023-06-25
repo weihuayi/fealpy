@@ -73,6 +73,7 @@ for i in range(maxit):
     bc = DirichletBC(space, pde.dirichlet) 
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
+
     uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
