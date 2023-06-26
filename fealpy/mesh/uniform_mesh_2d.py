@@ -10,7 +10,7 @@ from typing import Optional, Tuple, Callable, Any, Union, List
 from .mesh_base import Mesh, Plotable
 
 # 这个数据接口为有限元服务
-from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
+from .mesh_data_structure import StructureMesh2dDataStructure, HomogeneousMeshDS
 from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 from ..geometry import project
 
@@ -74,7 +74,7 @@ class UniformMesh2d(Mesh, Plotable):
         self.meshtype = 'UniformMesh2d'
 
         # Data structure for finite element computation
-        self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
+        self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
     def geo_dimension(self):
         """

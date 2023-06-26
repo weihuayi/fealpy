@@ -186,6 +186,7 @@ class PolygonMesh(Mesh, Plotable):
     def edge_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
         @brief 获取网格边与插值点的对应关系
+
         """
         if isinstance(index, slice) and index == slice(None):
             NE = self.number_of_edges()
@@ -225,6 +226,8 @@ class PolygonMesh(Mesh, Plotable):
             index=np.s_[:], scale: float=0.3):
         """
         @brief 获取多边形网格上的插值点
+        
+        @TODO: 边上可以取不同的插值点，lagrange, lobatto, legendre
         """
         node = self.entity('node')
 
