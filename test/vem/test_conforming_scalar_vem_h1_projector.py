@@ -26,6 +26,7 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p,plot=False):
  
 
     projector = ConformingScalarVEMH1Projector2d(D)
+    ipdb.set_trace()
     B = projector.assembly_cell_right_hand_side(space)
     PI1 = projector.assembly_cell_matrix(space)
 
