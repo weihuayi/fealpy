@@ -83,6 +83,8 @@ def test_from_torus_surface(R, r, Nu, Nv):
     mesh.add_plot(axes)
     plt.show()
 
+
 if __name__ == "__main__":
-    test_triangle_mesh_interpolate()
-    #test_from_torus_surface(3, 1, 20, 20)
+    #TriangleMesh.show_shape_function(p=p)
+    TriangleMesh.show_grad_shape_function(4)
+    #TriangleMesh.show_lattice(5)
