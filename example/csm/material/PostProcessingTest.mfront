@@ -1,0 +1,35 @@
+@Behaviour PostProcessingTest;
+@Author Helfer Thomas;
+@Date 23 / 11 / 06;
+@UseQt true;
+
+// Material properties
+@MaterialProperty stress young;
+young.setGlossaryName("YoungModulus");
+@MaterialProperty real nu;
+nu.setGlossaryName("PoissonRatio");
+
+// Lame Coefficients
+@LocalVariable stress lambda, mu;
+
+@InitLocalVariables {
+  lambda = computeLambda(young, nu);
+  mu = computeMu(young, nu);
+}
+
+@Integrator {
+  const auto e = eto + deto;
+  sig = lambda * trace(e) * StrainStensor::Id() + 2 * mu * (e);
+}
+
+@TangentOperator{
+  static_cast<void>(smt);
+  Dt = lambda * Stensor4::IxI() + 2 * mu * Stensor4::Id();
+}
+
+@PostProcessingVariable tvector<3u,strain> εᵖ;
+εᵖ.setEntryName("PrincipalStrain");
+//! compute the principal strain
+@PostProcessing PrincipalStrain {
+  εᵖ = eto.computeEigenValues(Stensor::ASCENDING);
+}

@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv
 
 from .Function import Function
-from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
+from .scaled_monomial_space_3d import ScaledMonomialSpace3d
 
 from ..decorator import barycentric # 导入默认的坐标类型, 这个空间是重心坐标
 

@@ -1,0 +1,467 @@
+/*!
+ * \file   FiniteSingleCrystal.mfront
+ * \brief  
+ * \author Jean-Michel Proix - Helfer Thomas
+ * \date   20 mars 2014
+ */
+
+@DSL    ImplicitFiniteStrain;
+@Behaviour FiniteStrainSingleCrystal;
+@Author JMP;
+@Description{
+  "Test d'implantation d'une loi "
+  "singlecrystalline en grandes déformations"
+}
+
+@ModellingHypothesis Tridimensional;
+@OrthotropicBehaviour;
+@RequireStiffnessTensor;
+
+@AbaqusOrthotropyManagementPolicy[abaqus] MFront;
+
+@Algorithm NewtonRaphson;
+@Theta 1.;
+@Epsilon 1.e-11;
+
+/*!
+ * La déformation élastique est définie comme une variable
+ * d'intégration
+ */
+@IntegrationVariable StrainStensor eel;
+@StateVariable strain g[12];
+
+@AuxiliaryStateVariable Tensor Fe;
+@AuxiliaryStateVariable real p[12];
+@AuxiliaryStateVariable real a[12];
+
+/*!
+ * Estimation élastique de la partie élastique du gradient de la
+ * transformation
+ */
+@LocalVariable Tensor Fe_tr;
+/*!
+ * Partie élastique du gradient de la
+ * transformation en début de pas
+ */
+@LocalVariable Tensor Fe0;
+/*!
+ * Second tenseur de Piola-Kirchhoff calculé dans la configuration
+ * intermédaire.
+ */
+@LocalVariable StressStensor S;
+/*!
+ * inverse de l'incrément de gradient de transformation plastique
+ */
+@LocalVariable DeformationGradientTensor inv_dFp;
+
+@Includes{
+#include"TFEL/Math/t2tot2.hxx"
+#include"TFEL/Math/General/CubicRoots.hxx"
+#include"TFEL/Material/MetallicCFCSlidingSystems.hxx"
+#include"TFEL/Material/MetallicCFCGenericSlidingSystemsInteractionMatrix.hxx"
+}
+
+@Members{
+  // Mono crystal gliding system
+  typedef MetallicCFCSlidingSystems<real> SlidingSystems;
+  // Interaction matrix
+  typedef MetallicCFCGenericSlidingSystemsInteractionMatrix<real> InteractionMatrix;
+  // number of sliding systems
+  static const unsigned short Nss = SlidingSystems::Nss;
+}
+
+//! interaction matrix
+@LocalVariable tfel::math::tmatrix<12,12,real> mh;
+
+@Parameter h1 = 1.  ;
+@Parameter h2 = 1.  ;
+@Parameter h3 = 0.6 ;
+@Parameter h4 = 12.3;
+@Parameter h5 = 1.6 ;
+@Parameter h6 = 1.8 ;
+
+@MaterialProperty real m;
+@MaterialProperty real K;
+@MaterialProperty real C;
+@MaterialProperty real R0;
+@MaterialProperty real Q;
+@MaterialProperty real b;
+@MaterialProperty real d1;
+
+@InitLocalVariables{
+  // increment du gradient de la transformation
+  const Tensor dF = F1*invert(F0);
+  // sauvegarde de la partie élastique du gradient de la
+  // transformation en début de pas pour le calcul de l'opérateur
+  // tangent
+  Fe0 = Fe;
+  // estimation élastique du tenseur d'élasticité en fin de pas
+  Fe_tr = dF*Fe0;
+  // déformation élastique en début de pas
+  eel = computeGreenLagrangeTensor(Fe);
+  // la matrice d'interaction construite une fois pour toute
+  mh = InteractionMatrix::getInteractionMatrix(h1,h2,h3,
+					       h4,h5,h6);
+} // end of @InitLocalVars
+
+
+@Integrator{
+  /*!
+   * Le second tenseur de Piola-Kirchhoff est défini par la loi
+   * élastique de Saint-Venant Kirchhoff~:
+   * \[
+   * \tenseur{S}=\tenseurq{D}\,.\,\paren{\bts{\tepsilonel}+\Delta\,\tepsilonel}
+   * \]
+   */
+  S = D*(eel+deel);
+  /*!
+   * Le tenseur de Mandel \(\tenseur{M}\) est défini par:
+   * \[
+   * \tenseur{M}=
+   * \paren{\tenseur{I}+2\,\paren{\bts{\tepsilonel}+\Delta\,\tepsilonel}}\,\star\,
+   * \tenseur{S}
+   * \]
+   * où \(\star\) désigne le produit des représentations
+   * matricielles de deux tenseurs symétriques.
+   *
+   * Dans la suite, nous aurons besoin de la dérivée de
+   * \(\tenseur{M}\) par rapport à \(\Delta\,\tepsilonel\). Cette
+   * dérivée est hardue à calculer du fait de la présence d'une
+   * produit matricielle.
+   *
+   * La dérivation d'un produit de matrice est une opération en effet
+   * singulièrement complexe, auquel nous avons essayé apporte une
+   * solution que l'on espère efficace et élégante. Pour la présenter,
+   * considérons deux tenseurs \(\tenseur{A}\) et \(\tenseur{B}\). Nous
+   * proposon propose d'écrire la dérivée du produit
+   * \(\tenseur{A}\,\star\,\tenseur{B}\) ainsi~:
+   * \[
+   * \dtot\paren{\tenseur{A}\,\star\,\tenseur{B}}=
+   * \partial^{l}_{\star}\paren{\tenseur{B}}\,.\,\dtot\,\tenseur{A}+
+   * \partial^{r}_{\star}\paren{\tenseur{A}}\,.\,\dtot\,\tenseur{B}
+   * \]
+   * où \(\partial^{l}_{\star}\paren{\tenseur{B}}\) et
+   * \(\partial^{r}_{\star}\paren{\tenseur{A}}\) désignent deux opérateurs
+   * spéciaux transformant un tenseur non symétrique et un tenseur non
+   * symétrique. Ces opérateurs sont calculés respectivement par les
+   * méthodes statiques tpld (tensor product left derivative) et tprd
+   * (tensor product right derivative) de la classe st2tost2.
+   * 
+   * Nous pouvons alors écrire que~:
+   * \[
+   * \deriv{\tenseur{M}}{\Delta\,\tepsilonel}=
+   * 2\,\partial^{l}_{\star}\paren{\tenseur{S}}+
+   * \partial^{r}_{\star}\paren{\tenseur{I}+2\,\paren{\bts{\tepsilonel}+\Delta\,\tepsilonel}}\,.\,\tenseurq{D}
+   * \]
+   */
+  // Mandel stress tensor
+  const StrainStensor tmp(StrainStensor::Id() + 2*(eel+deel));
+  const StressTensor M = tmp*S;
+  // Mandel stress tensor derivative
+  const st2tot2<N,real> dM_ddeel(2*st2tot2<N,real>::tpld(S)+
+				   st2tot2<N,real>::tprd(tmp,D));
+  /*!
+   * Nous calculons (une approximation) de l'inverse de l'incrément de
+   * la partie plastique du gradient de la transformation~:
+   * \[
+   * \paren{\Delta\,\tns{F}_{p}}^{-1} = \tns{I}-\sum_{i=1}^{12}\Delta\,g_{i}\,\tns{\mu}_{i}
+   * \]
+   */
+  const SlidingSystems& ss = SlidingSystems::getSlidingSystems();
+  inv_dFp = Tensor::Id();
+  for(unsigned short i=0;i!=12;++i){
+    inv_dFp -= dg[i]*ss.mu[i];
+  }
+  real J_inv_dFp = det(inv_dFp);
+  inv_dFp /= CubicRoots::cbrt(J_inv_dFp);
+  /*!
+   * Nous calculons la partie élastique de gradient de la
+   * transformation \(\tns{F}_{e}\) en fin de pas de temps en fin de
+   * pas de temps~:
+   * \[
+   * \tns{F}_{e}=\tns{F}_{e}^{\mathrm{tr}}\,\star\,\paren{\Delta\,\tns{F}_{p}}^{-1}
+   * \]
+   * où \(\star\) représente le produit des représentations
+   * matricielles de \(\tns{F}_{e}^{\mathrm{tr}}\) et
+   * \(\paren{\Delta\,\tns{F}_{p}}^{-1}\).
+   */
+  Fe  = Fe_tr*inv_dFp;
+  /*!
+   * L'équation associée à l'incrément de déformation élastique
+   * impose qu'elle soit égale au tenseur de Green-Lagrange
+   * \(\tenseur{\varepsilon}_{GL}^{\mathrm{el}}\) associé à la partie
+   * élastique \(\tns{F}_{e}\) du gradient de la transformation~:
+   * \[
+   * \bts{\tepsilonel}+\Delta\,\bts{\tepsilonel}-
+   * \tenseur{\varepsilon}_{GL}^{\mathrm{el}}\paren{\tns{F}_{e}}=0
+   * \]
+   */
+  feel = eel+deel-computeGreenLagrangeTensor(Fe);
+  /*!
+   * Le calcul des termes \(\deriv{f_{\tepsilonel}}{\Delta\,g_{i}}\) est assez
+   * technique et devra se faire en plusieurs étapes~:
+   * \[
+   * \deriv{\tenseur{\varepsilon_{GL}}}{\Delta\,g_{i}}=
+   * \Frac{1}{2}\,\deriv{\tenseur{C}_{e}}{\Delta\,g_{i}}=
+   * \Frac{1}{2}\,\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}\,.\,
+   * \deriv{\tns{F}_{e}}{\Delta\,g_{i}}
+   * \]
+   *
+   * La classe t2tost2<N,real> fournit une méthode statique permettant
+   * de calculer la dérivée du tenseur de Cauchy élastique
+   * \(\tenseur{C}_{e}\) par rapport au gradient de la transformation
+   * élastique \(F_{e}\).
+   *
+   * Il faut alors calculer le terme
+   * \(\deriv{\tns{F}_{e}}{\Delta\,g_{i}}\). Le tenseur \(\tns{F}_{e}\)
+   * est le produit \(\star\) des représentation matricielle de deux
+   * tenseurs~: \(\tns{F}_{e}^{\mathrm{tr}}\) et le tenseur
+   * \(\paren{\Delta\,\tns{F}_{p}}^{-1}\).
+   *
+   * Cette démarche est maintenant appliquée au calcul de la dérivée du
+   * tenseur \(\tns{F}_{e}\)~:
+   * \[
+   *  \deriv{\tns{F}_{e}}{\paren{\Delta\,\tns{F}_{p}}^{-1}} =
+   *  \partial^{r}_{\star}\paren{\tns{F}_{e}^{\mathrm{tr}}}
+   * \]
+   *
+   * En négligeant la correction plastique, la dérivée
+   * \(\deriv{\paren{\Delta\,\tns{F}_{p}}^{-1}}{\Delta\,g_{i}}\)
+   * s'écrit simplement~:
+   * \[
+   * \deriv{\paren{\Delta\,\tns{F}_{p}}^{-1}}{\Delta\,g_{i}} = -\tns{\mu}_{i}
+   * \]
+   *
+   * Nous obtenons finalement l'expression la dérivée
+   * \(\deriv{f}{\Delta\,g_{i}}\)~:
+   * \[
+   * \deriv{f_{\tepsilonel}}{\Delta\,g_{i}}=
+   * -\Frac{1}{2}\,\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}\,.\,
+   * \partial^{r}_{\star}\paren{\tns{F}_{e}^{\mathrm{tr}}}\,.\,
+   * \tns{\mu}_{i}
+   * \]
+   */
+  t2tot2<N,real>  tprd = t2tot2<N,real>::tprd(Fe_tr);
+  t2tost2<N,real> dfeel_dinv_dFp = t2tost2<N,real>::dCdF(Fe)*tprd;
+  for(unsigned short i=0;i!=12;++i){
+    // ok, je suis une fainéasse, j'oublie la correction due au déterminant:
+    // 1) il y a de fortes chances pour que ça ne serve à rien
+    // 2) il faut bien laisser du boulot au thésard
+    dfeel_ddg(i) = 0.5*dfeel_dinv_dFp*ss.mu[i];
+  }
+  // increment de déformation plastique
+  real agi[Nss];
+  real pei[Nss];
+  real hsi[Nss] ;
+  real expi[Nss] ;
+  real sgn[Nss] ;
+  // boucle pour calculer une seule fois l'exponentielle
+  for(unsigned short i=0;i!=Nss;++i){
+    agi[i] = abs(dg[i]);
+    expi[i]=exp(-b*(p[i]+agi[i]));
+    pei[i] = Q*(1.-expi[i]) ;
+  }
+  for(unsigned short i=0;i!=Nss;++i){
+    real Rp = R0;
+    for(unsigned short j=0;j!=Nss;++j){
+      Rp += mh(i,j)*pei[j] ;
+    }
+    const real tau = ss.mu[i] | M ;
+    const real va  = (dg[i]-d1*a[i]*agi[i])/(1.+d1*agi[i]);
+    const real tma = tau-C*(a[i]+va) ;
+    const real tmR = abs(tma)-Rp;
+    if (tmR>0.){
+      sgn[i] =tma/abs(tma);
+      hsi[i] = dt*pow(tmR/K,m-1)/K;
+      // équation implicite
+      fg[i] -= hsi[i]*tmR*sgn[i];
+    } else {
+      sgn[i] = 1.;
+      hsi[i] = 0.;
+    }
+  }
+  for(unsigned short i=0;i!=Nss;++i){
+    if(hsi[i]>0){
+      const real Hsi= hsi[i]*m;
+      const real dgsdalfai = -C*Hsi ;
+      const real dalfaidgi = (1-d1*a[i]*sgn[i])/(1+d1*agi[i])/(1+d1*agi[i]) ;
+      const real dgsdRi    = -Hsi*sgn[i];
+      // terme du jacobien
+      dfg_ddeel(i)  = -Hsi*(ss.mu[i]|dM_ddeel);
+      dfg_ddg(i,i) -= dgsdalfai*dalfaidgi ;
+      for(unsigned short j=0;j!=Nss;++j){
+	const real dRsdpj = b*Q*mh(i,j)*expi[j] ;    
+	const real dgsdgj = dgsdRi*dRsdpj*sgn[j];
+	dfg_ddg(i,j) -=  dgsdgj ;
+      }
+    }
+  }
+} // end of @Integrator
+
+@ComputeFinalStress{
+  const SlidingSystems& ss = SlidingSystems::getSlidingSystems();
+  // approximation de l'inverse de \(\Delta\,F_p\)
+  inv_dFp = Tensor::Id();
+  for(unsigned short i=0;i!=12;++i){
+    inv_dFp -= dg[i]*ss.mu[i];
+  }
+  real J_inv_dFp = det(inv_dFp);
+  inv_dFp /= CubicRoots::cbrt(J_inv_dFp);
+  // Fe en fin de pas de temps
+  Fe  = Fe_tr*inv_dFp;
+  // Piola-Kirchhoff II
+  S = D*eel;
+  // Cauchy
+  sig = convertSecondPiolaKirchhoffStressToCauchyStress(S,Fe);
+}
+
+@UpdateAuxiliaryStateVars{
+  for(unsigned short i=0;i!=Nss;++i){
+    p[i]+=abs(dg[i]);
+    a[i]+=(dg[i]-d1*a[i]*abs(dg[i]))/(1.+d1*abs(dg[i]));
+  }
+}
+
+@TangentOperator<DTAU_DDF>{
+  static_cast<void>(smt); // on supprime un warning, on ne traite que
+			  // la tangente cohérente
+  const SlidingSystems& ss = SlidingSystems::getSlidingSystems();
+  /*!
+   * Nous utilisons ici un opérateur naturel pour le code aux éléments
+   * finis Code-Aster~: on laissera MFront généré les autres
+   * opérateurs.
+   *
+   * Le point de départ du calcul est la relation~:
+   * \[
+   * \deriv{\tenseur{\tau}}{\Delta\,\tns{F}}=\deriv{\tenseur{\tau}}{\tns{F}_{e}}\deriv{\tns{F}_{e}}{\Delta\,\tns{F}}
+   * \]
+   * 
+   * Nous calculons maintenant chacun des termes du produit.
+   */
+
+  /*!
+   * La contrainte de Kirchhoff \(\tenseur{\tau}\) se calcule par le
+   * transport dans la configuration finale du second tenseur de
+   * Piola-Kirchhoff calculé dans la configuration intermédiaire.
+   *\[
+   * \tenseur{\tau} = \tns{F}_{e}\,\star\,\tenseur{S}\,\star\,\transpose{\tns{F}_{e}}
+   *\]
+   *où \(\star\) représente le produit matriciel.
+   *
+   * TFEL propose la méthode computePushForwardDerivative permettant
+   * de relier la dérivée \(\deriv{\tenseur{\tau}}{\tns{F}_{e}}\) à la
+   * dérivée du second tenseur de Piola-Kirchhoff
+   * \(\deriv{\tenseur{S}}{\tns{F}_{e}}\). Cette dérivée se calcule
+   * par dérivation en chaînes~:
+   * \[
+   * \deriv{\tenseur{S}}{\tns{F}_{e}}=\deriv{\tenseur{S}}{\tepsilonel_{GL}}\deriv{\tepsilonel_{GL}}{\tenseur{C}_{e}}\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}
+   * \]
+   * soit:
+   * \[
+   * \deriv{\tenseur{S}}{\tns{F}_{e}}=0.5\,D\,\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}
+   * \]
+   *
+   * La dérivée \(\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}\) se calcule
+   * par la méthode statique dCdF de la classe t2tost2.
+   */
+  const t2tost2<N,stress> dC_dFe = t2tost2<N,real>::dCdF(Fe);
+  const t2tost2<N,stress> dS_dFe = 0.5*D*dC_dFe;
+  t2tost2<N,stress> dtau_dFe;
+  computePushForwardDerivative(dtau_dFe,dS_dFe,S,Fe); 
+  /*!
+   * Il nous fait maintenant calculer le terme \(\deriv{\tns{F}_{e}}{\Delta\,\tns{F}}\).
+   *
+   * Nous savons que~:
+   * \[
+   * \tns{F}_{e}=\tns{F}_{e}^{\mathrm{tr}}\,\star\,\paren{\Delta\,\tns{F}_{p}}^{-1}
+   * \]
+   * Par dérivation, nous obtenons~:
+   * \[
+   * \deriv{\tns{F}_{e}}{\Delta\,\tns{F}}=
+   * \partial^{l}_{\star}\paren{\paren{\Delta\,\tns{F}_{p}}^{-1}}\,\deriv{\tns{F}_{e}^{\mathrm{tr}}}{\Delta\,\tns{F}}+
+   * \partial^{r}_{\star}\paren{\tns{F}_{e}^{\mathrm{tr}}}\,\deriv{\paren{\Delta\,\tns{F}_{p}}^{-1}}{\Delta\,\tns{F}}
+   * \]
+   *
+   * Le calcul du terme
+   * \(\deriv{\tns{F}_{e}^{\mathrm{tr}}}{\Delta\,\tns{F}}\) est
+   * aisé~:
+   * \[
+   * \deriv{\tns{F}_{e}^{\mathrm{tr}}}{\Delta\,\tns{F}}=
+   * \partial^{l}_{\star}\paren{\bts{\tns{F}_e}}
+   * \]
+   *
+   * Pour le calcul de la dérivée
+   * \(\deriv{\paren{\Delta\,\tns{F}_{p}}^{-1}}{\Delta\,\tns{F}}\),
+   * nous pouvons nous baser sur l'approximation faite lors de
+   * l'intégration. Nous avons alors directement~:
+   * \[
+   * \deriv{\paren{\Delta\,\tns{F}_{p}}^{-1}}{\Delta\,\tns{F}}=
+   * -\sum_{i=1}^{12}\tns{\mu}_{i}\,\otimes\,\deriv{\Delta\,g_{i}}{\Delta\,\tns{F}}
+   * \]
+   *
+   * Le calcul de \(\deriv{\Delta\,g_{i}}{\Delta\,\tns{F}}\)
+   * représente la seule vraie difficulté. Son calcul peut se faire en
+   * généralisant les techniques utilisées en petites déformations.
+   *
+   * Pour toute variation de \(\delta\,\Delta\,\tns{F}\) de
+   * \(\Delta\,\tns{F}\), la variation du système implicite
+   * \(\delta\,F\) est nulle~: \[
+   * \delta\,F\paren{\Delta\,Y\paren{\delta\,\Delta\,\tns{F}},\delta\,\Delta\,\tns{F}}
+   * =J\,\delta\,\Delta\,Y+
+   * \left.\deriv{F}{\Delta\,\tns{F}}\right|_{\paren{\Delta\,\tepsilonel,\Delta\,g_{i}}}\,\delta\,\Delta\,\tns{F}=0
+   * \]
+   *
+   * Nous avons explicitement spécifié, en utilisant la notation
+   * classique de la thermodynamique, que le calcul du terme
+   * \(\left.\deriv{F}{\Delta\,\tns{F}}\right|_{\paren{\Delta\,\tepsilonel,\Delta\,g_{i}}}\)
+   * se faisait en supposant que \(\Delta\,\tepsilonel\) et
+   * \(\Delta\,g_{i}\) étaient des variables indépendantes.
+   *
+   * Il est donc nécessaire de calculer la dérivée
+   * \(\left.\deriv{F}{\Delta\,\tns{F}}\right|_{\paren{\Delta\,\tepsilonel,\Delta\,g_{i}}}\) dont la seule composante non nulle
+   * est \(\left.\deriv{f_{\tepsilonel}}{\Delta\,\tns{F}}\right|_{\paren{\Delta\,\tepsilonel,\Delta\,g_{i}}}\)~:
+   * \[
+   * \left.\deriv{f_{\tepsilonel}}{\Delta\,\tns{F}}\right|_{\paren{\Delta\,\tepsilonel,\Delta\,g_{i}}}=
+   * -\Frac{1}{2}\,\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}\,.\,
+   * \deriv{\tns{F}_{e}}{\Delta\,\tns{F}}=
+   * -\Frac{1}{2}\,\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}\,.\,
+   * \deriv{}{\Delta\,\tns{F}}\paren{\tns{F}_{e}^{\mathrm{tr}}\,\star\,\paren{\Delta\,\tns{F}_{p}}^{-1}}
+   * \]
+   *
+   * \[
+   * \deriv{}{\Delta\,\tns{F}}\paren{\tns{F}_{e}^{\mathrm{tr}}\,\star\,\paren{\Delta\,\tns{F}_{p}}^{-1}}=
+   * \partial^{l}_{\star}\paren{\paren{\Delta\,\tns{F}_{p}}^{-1}}\,.\,
+   * \deriv{\tns{F}_{e}^{\mathrm{tr}}}{\Delta\,\tns{F}}=
+   * \partial^{l}_{\star}\paren{\paren{\Delta\,\tns{F}_{p}}^{-1}}\,.\,
+   * \partial^{l}_{\star}\paren{\bts{\tns{F}_{e}}}
+   * \]
+   *
+   * Finalement, \(\deriv{f_{\tepsilonel}}{\Delta\,\tns{F}}\) s'écrit~:
+   * \[
+   * \deriv{f_{\tepsilonel}}{\Delta\,\tns{F}}=-\Frac{1}{2}\,\deriv{\tenseur{C}_{e}}{\tns{F}_{e}}\,.\,
+   * \partial^{l}_{\star}\paren{\paren{\Delta\,\tns{F}_{p}}^{-1}}\,.\,
+   * \partial^{l}_{\star}\paren{\bts{\tns{F}_{e}}}
+   * \]
+   */
+  const t2tot2<N,real>  dFe_dDF_tot = t2tot2<N,real>::tpld(inv_dFp,t2tot2<N,real>::tpld(Fe0));
+  const t2tost2<N,real> dfeel_dDF  = -0.5*dC_dFe*dFe_dDF_tot;
+  /*!
+   * La dérivée \(\deriv{\Delta\,g_{i}}{\Delta\,\tns{F}}\) est alors~:
+   * \[
+   * \deriv{\Delta\,g_{i}}{\Delta\,\tns{F}}=-J^{-1}_{\Delta\,g_{i}}|\deriv{f_{\tepsilonel}}{\Delta\,\tns{F}}
+   * \]
+   */
+  st2tost2<N,real> Je;
+  tvector<12u,Stensor> Jg;
+  getPartialJacobianInvert(Je,Jg);
+  // calcul de dinv_Fp_dDF  
+  t2tot2<N,real> dinv_Fp_dDF((ss.mu[0])^(Jg[0]|dfeel_dDF));
+  for(unsigned short i=1;i!=12;++i){
+    dinv_Fp_dDF += (ss.mu[i])^(Jg[i]|dfeel_dDF);
+  }
+  // On peut maintenant calculer dFe_dDF
+  const t2tot2<N,real> dFe_dDF=
+    dFe_dDF_tot+t2tot2<N,real>::tprd(Fe_tr,dinv_Fp_dDF);
+  // et enfin, l'opérateur tangent
+  Dt = dtau_dFe*dFe_dDF;
+}

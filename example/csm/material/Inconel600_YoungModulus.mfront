@@ -1,0 +1,24 @@
+@DSL   MaterialLaw;
+@Material Inconel600;
+@Law      YoungModulus ;
+@Author   S. BEJAOUI;
+@Date     2010-07-23;
+
+@Description
+{
+CEA/DEN/CAD/DEC/SESC/LC2I DO 84 17/03/04
+}
+
+@Output E;
+E.setGlossaryName("YoungModulus");
+
+@Input TK;
+TK.setGlossaryName("Temperature");
+
+@PhysicalBounds TK in [0:*[;
+
+@Function
+{
+  const real TC = TK-273.15;
+  E=(-3.1636e-3*TC*TC-3.8654*TC+2.1421e+4)*1e7;
+}

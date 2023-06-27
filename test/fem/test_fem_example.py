@@ -16,6 +16,7 @@ from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
+from fealpy.fem import ScalarNeumannBCIntegrator as NeumannBC
 
 @pytest.mark.parametrize("p, n, maxit", 
         [(1, 10, 4), (2, 8, 4), (3, 6, 4), (4, 4, 4)])
@@ -67,8 +68,10 @@ def test_interval_mesh(p, n, maxit):
 @pytest.mark.parametrize("p, n, maxit", 
         [(1, 8, 4), (2, 6, 4), (3, 4, 4), (4, 2, 4)])
 def test_triangle_mesh(p, n, maxit):
-    from fealpy.pde.elliptic_2d import SinSinPDEData as PDE
+    from fealpy.pde.poisson_2d import CosCosData as PDE
     from fealpy.mesh import TriangleMesh 
+    from fealpy.boundarycondition import NeumannBC as OldNeumannBC
+    from fealpy.boundarycondition import DirichletBC as OldDirichletBC
 
     pde = PDE()
     domain = pde.domain()
@@ -76,7 +79,7 @@ def test_triangle_mesh(p, n, maxit):
 
     for i in range(maxit):
         mesh = TriangleMesh.from_unit_square(nx=n*2**i, ny=n*2**i)
-        space = Space(mesh, p=p)
+        space = Space(mesh, p=p, doforder='vdims')
 
         
         bform = BilinearForm(space)
@@ -95,9 +98,22 @@ def test_triangle_mesh(p, n, maxit):
         np.testing.assert_allclose(A.toarray(), OA.toarray())
         np.testing.assert_allclose(f, Of)
 
-        bc = DirichletBC(space, pde.dirichlet)
+        obc = OldNeumannBC(ospace, pde.neumann, threshold=pde.is_neumann_boundary)
+        Of = obc.apply(Of)
+
+        bc2 = NeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
+        f = bc2.assembly_face_vector(space, out=f)
+        np.testing.assert_allclose(f, Of)
+        
         uh = space.function()
-        A, f = bc.apply(A, f, uh)
+        Obc1 = OldDirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        OA, Of = Obc1.apply(OA, Of, uh)
+        bc1 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary)
+        A, f = bc1.apply(A, f, uh)
+
+        np.testing.assert_allclose(A.toarray(), OA.toarray())
+        np.testing.assert_allclose(f, Of)
+
 
         uh[:] = spsolve(A, f)
 
@@ -159,7 +175,7 @@ if __name__ == "__main__":
     #test_interval_mesh(1, 10, 4)
     #test_interval_mesh(2, 8, 4)
     #test_interval_mesh(3, 6, 4)
-    test_interval_mesh(4, 4, 4)
-    #test_triangle_mesh()
+    #test_interval_mesh(4, 4, 4)
+    test_triangle_mesh(p=1, n=2, maxit=4)
     #test_tetrahedron_mesh()
 

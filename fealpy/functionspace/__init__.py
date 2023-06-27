@@ -1,14 +1,16 @@
+# 新文件命名规则的空间类
+from .lagrange_fe_space import LagrangeFESpace
+from .bernstein_fe_space import BernsteinFESpace
+from .conforming_vector_ve_space_2d import ConformingVectorVESpace2d
+from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
 
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
-from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_3d import ScaledMonomialSpace3d
 
+from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
+
+# Old class and interface
 from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
-from .BernsteinFiniteElementSpace import BernsteinFiniteElementSpace
-
-from .LagrangeFiniteElementSpaceOnEdgeMesh import LagrangeFiniteElementSpaceOnEdgeMesh
-from .CrouzeixRaviartFiniteElementSpace import CrouzeixRaviartFiniteElementSpace
-
-from .LagrangeFESpace import LagrangeFESpace
 
 # H(div)
 from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
@@ -19,21 +21,5 @@ from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementS
 from .FirstNedelecFiniteElementSpace2d import FirstNedelecFiniteElementSpace2d
 from .FirstNedelecFiniteElementSpace3d import FirstNedelecFiniteElementSpace3d
 
-# PFEM
-from .ParametricLagrangeFiniteElementSpace import ParametricLagrangeFiniteElementSpace
-from .ParametricLagrangeFiniteElementSpaceOnWedgeMesh import ParametricLagrangeFiniteElementSpaceOnWedgeMesh
-
 # VEM
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
-from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtualElementSpace2d
-from .DivFreeNonConformingVirtualElementSpace2d import DivFreeNonConformingVirtualElementSpace2d
-from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
-
-# WG
-from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
-
-from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
-
-#from .FourierSpace import FourierSpace
-#from .SurfaceLagrangeFiniteElementSpace import SurfaceLagrangeFiniteElementSpace
-#from .SimplexSetSpace import SimplexSetSpace

@@ -6,24 +6,50 @@ This module provide many fem model
 
 '''
 
-from .BilinearForm import BilinearForm
-from .LinearForm import LinearForm
+from .bilinear_form import BilinearForm
+from .mixed_bilinear_form import MixedBilinearForm
+from .linear_form import LinearForm
 
-# Integrator for scalar case
-from .ScalarMassIntegrator import ScalarMassIntegrator
-from .ScalarDiffusionIntegrator import ScalarDiffusionIntegrator
-from .ScalarSourceIntegrator import ScalarSourceIntegrator
+# Domain integrator for scalar case
+from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
+ScalarLaplaceIntegrator = ScalarDiffusionIntegrator 
+from .scalar_convection_integrator import ScalarConvectionIntegrator
+from .scalar_mass_integrator import ScalarMassIntegrator
+from .scalar_source_integrator import ScalarSourceIntegrator
 
-# Integrator for vector case
-from .VectorSourceIntegrator import VectorSourceIntegrator
+# Boundary integrator for scalar case
+# <kappa u, v>
+from .scalar_robin_boundary_integrator import ScalarRobinBoundaryIntegrator
+# <g, v>
+from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator
+# <g_N, v>
+ScalarNeumannSourceIntegrator = ScalarBoundarySourceIntegrator
+# <g_R, v>
+ScalarRobinSourceIntegrator = ScalarBoundarySourceIntegrator
 
-from .TrussStructureIntegrator import TrussStructureIntegrator
-from .DiffusionIntegrator import DiffusionIntegrator
-from .ConvectionIntegrator import ConvectionIntegrator
-from .LinearElasticityOperatorIntegrator import LinearElasticityOperatorIntegrator
+# Domain integrator for vector case
+from .vector_diffusion_integrator import VectorDiffusionIntegrator
+from .vector_mass_integrator import VectorMassIntegrator
+from .vector_source_integrator import VectorSourceIntegrator
+from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
-from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangentOperatorIntegrator
+# Boundary integrator for vector case
+from .vector_boundary_source_integrator import VectorBoundarySourceIntegrator
+VectorNeumannSourceIntegrator = VectorBoundarySourceIntegrator
+VectorRobinSourceIntegrator = VectorBoundarySourceIntegrator
 
 
-from .DirichletBC import DirichletBC
+# others
+from .truss_structure_integrator import TrussStructureIntegrator
+from .diffusion_integrator import DiffusionIntegrator
+from .vector_convection_integrator import VectorConvectionIntegrator
+from .vector_viscous_work_integrator import VectorViscousWorkIntegrator
+from .press_work_integrator import PressWorkIntegrator
+
+from .provides_symmetric_tangent_operator_integrator import ProvidesSymmetricTangentOperatorIntegrator
+
+from .vector_neumann_bc_integrator import VectorNeumannBCIntegrator
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+
+from .dirichlet_bc import DirichletBC
 

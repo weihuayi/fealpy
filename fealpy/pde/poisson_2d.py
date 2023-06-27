@@ -1,89 +1,25 @@
 import numpy as np
 
 from ..decorator import cartesian, barycentric
-from ..mesh import TriangleMesh
-from ..mesh import Quadtree
-from ..mesh import QuadrangleMesh
-from ..mesh import Tritree
-from ..mesh import StructureQuadMesh
-from ..mesh import TriangleMeshWithInfinityNode
-from ..mesh import PolygonMesh
-from ..mesh import HalfEdgeMesh2d
-
-from ..mesh import LagrangeTriangleMesh
 
 class CosCosData:
     """
         -\\Delta u = f
         u = cos(pi*x)*cos(pi*y)
     """
-    def __init__(self):
-        pass
+    def __init__(self, kappa=1.0):
+        self.kappa = kappa # Robin 条件中的系数
 
     def domain(self):
-        return np.array([0, 1, 0, 1])
-
-    def init_mesh(self, n=4, meshtype='tri', h=0.1):
-        """ generate the initial mesh
         """
-        node = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float64)
-
-        if meshtype == 'quadtree':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        if meshtype == 'quad':
-            node = np.array([
-                (0, 0),
-                (1, 0),
-                (1, 1),
-                (0, 1),
-                (0.5, 0),
-                (1, 0.4),
-                (0.3, 1),
-                (0, 0.6),
-                (0.5, 0.45)], dtype=np.float64)
-            cell = np.array([
-                (0, 4, 8, 7), (4, 1, 5, 8),
-                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int_)
-            mesh = QuadrangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'halfedge':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
-            mesh = TriangleMesh(node, cell)
-            mesh = HalfEdgeMesh2d.from_mesh(mesh)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'squad':
-            mesh = StructureQuadMesh([0, 1, 0, 1], int(1/h), int(1/h))
-            return mesh
-        else:
-            raise ValueError("".format)
-
+        @brief 模型定义域
+        """
+        return np.array([0, 1, 0, 1])
 
     @cartesian
     def solution(self, p):
-        """ The exact solution 
-        Parameters
-        ---------
-        p : 
-
-
-        Examples
-        -------
-        p = np.array([0, 1], dtype=np.float64)
-        p = np.array([[0, 1], [0.5, 0.5]], dtype=np.float64)
+        """  
+        @brief 模型真解
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -94,9 +30,8 @@ class CosCosData:
 
     @cartesian
     def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
+        """ 
+        @brief 源项
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -106,7 +41,8 @@ class CosCosData:
 
     @cartesian
     def gradient(self, p):
-        """ The gradient of the exact solution 
+        """  
+        @brief 真解梯度
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -118,29 +54,30 @@ class CosCosData:
 
     @cartesian
     def flux(self, p):
+        """
+        @brief 真解通量
+        """
         return -self.gradient(p)
 
     @cartesian
     def dirichlet(self, p):
+        """
+        @brief Dirichlet 边界条件 
+        """
         return self.solution(p)
 
     @cartesian
     def is_dirichlet_boundary(self, p):
+        """
+        @brief Dirichlet 边界的判断函数
+        """
         y = p[..., 1]
-        return ( y == 1.0) | ( y == 0.0)
+        return (np.abs(y - 1.0) < 1e-12) | (np.abs( y -  0.0) < 1e-12)
 
     @cartesian
     def neumann(self, p, n):
         """ 
-        Neuman  boundary condition
-
-        Parameters
-        ----------
-
-        p: (NQ, NE, 2)
-        n: (NE, 2)
-
-        grad*n : (NQ, NE, 2)
+        @brief Neumann 边界条件
         """
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1) # (NQ, NE)
@@ -148,22 +85,29 @@ class CosCosData:
 
     @cartesian
     def is_neumann_boundary(self, p):
+        """
+        @brief Neumann 边界的判断函数
+        """
         x = p[..., 0]
-        return x == 1.0
+        return np.abs(x - 1.0) < 1e-12
 
     @cartesian
     def robin(self, p, n):
+        """
+        @brief Robin 边界条件
+        """
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
-        shape = len(val.shape)*(1, )
-        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
-        val += self.solution(p) 
-        return val, kappa
+        val += self.kappa*self.solution(p) 
+        return val
 
     @cartesian
     def is_robin_boundary(self, p):
+        """
+        @brief Robin 边界条件判断函数
+        """
         x = p[..., 0]
-        return x == 0.0
+        return np.abs(x - 0.0) < 1e-12
         
 
 class SinSinData:
@@ -176,55 +120,6 @@ class SinSinData:
 
     def domain(self):
         return np.array([0, 1, 0, 1])
-
-    def init_mesh(self, n=4, meshtype='tri', h=0.1):
-        """ generate the initial mesh
-        """
-        node = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float64)
-
-        if meshtype == 'quadtree':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        if meshtype == 'quad':
-            node = np.array([
-                (0, 0),
-                (1, 0),
-                (1, 1),
-                (0, 1),
-                (0.5, 0),
-                (1, 0.4),
-                (0.3, 1),
-                (0, 0.6),
-                (0.5, 0.45)], dtype=np.float64)
-            cell = np.array([
-                (0, 4, 8, 7), (4, 1, 5, 8),
-                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int_)
-            mesh = QuadrangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'halfedge':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
-            mesh = TriangleMesh(node, cell)
-            mesh = HalfEdgeMesh2d.from_mesh(mesh)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'squad':
-            mesh = StructureQuadMesh([0, 1, 0, 1], int(1/h), int(1/h))
-            return mesh
-        else:
-            raise ValueError("".format)
-
 
     @cartesian
     def solution(self, p):
@@ -330,49 +225,6 @@ class X2Y2Data:
 
     def domain(self):
         return np.array([0, 1, 0, 1])
-
-    def init_mesh(self, n=4, meshtype='tri', h=0.1):
-        """ generate the initial mesh
-        """
-        node = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float64)
-
-        if meshtype == 'quadtree':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        if meshtype == 'quad':
-            node = np.array([
-                (0, 0),
-                (1, 0),
-                (1, 1),
-                (0, 1),
-                (0.5, 0),
-                (1, 0.4),
-                (0.3, 1),
-                (0, 0.6),
-                (0.5, 0.45)], dtype=np.float64)
-            cell = np.array([
-                (0, 4, 8, 7), (4, 1, 5, 8),
-                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int_)
-            mesh = QuadrangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'squad':
-            mesh = StructureQuadMesh([0, 1, 0, 1], h)
-            return mesh
-        else:
-            raise ValueError("".format)
-
 
     @cartesian
     def solution(self, p):
@@ -483,21 +335,6 @@ class TwoHolesData:
             domain.set_facets(facets)
             domain.set_holes([(0.25, 0.75), (0.6, 0.4)])
         return domain
-
-    def init_mesh(self, n=4, meshtype='tri', h=0.1):
-        """ generate the initial mesh
-        """
-        from meshpy.triangle import build
-        domain = self.domain(domaintype='meshpy')
-        mesh = build(domain, max_volume=h**2)
-        node = np.array(mesh.points, dtype=np.float64)
-        cell = np.array(mesh.elements, dtype=np.int_)
-        if meshtype == 'tri':
-            return TriangleMesh(node, cell)
-        elif meshtype == 'polygon':
-            mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
-            pnode, pcell, pcellLocation = mesh.to_polygonmesh()
-            return PolygonMesh(pnode, pcell, pcellLocation)
 
     @cartesian
     def diffusion_coefficient(self, p):

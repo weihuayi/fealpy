@@ -75,7 +75,7 @@ We thank Dr. Long Chen for the guidance and compiling a systematic documentation
 
 Please cite `fealpy` if you use it in your paper
 
-H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, *Xiangtan University*, 2017-2021.
+H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, *Xiangtan University*, 2017-2023.
 
 ```bibtex
 @misc{fealpy,
@@ -84,7 +84,7 @@ H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://
 	url = {https://github.com/weihuayi/fealpy},
 	author = {Wei, Huayi and Huang, Yunqing},
     institution = {Xiangtan University},
-	year = {Xiangtan University, 2017-2022},
+	year = {Xiangtan University, 2017-2023},
 }
 ```
 

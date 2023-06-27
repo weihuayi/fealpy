@@ -3,7 +3,7 @@ from numpy.linalg import inv
 from scipy.sparse import csr_matrix
 
 from .Function import Function
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
 
 # 导入默认的坐标类型, 这个空间基函数的相关计算，输入参数是重心坐标 
 from ..decorator import barycentric 

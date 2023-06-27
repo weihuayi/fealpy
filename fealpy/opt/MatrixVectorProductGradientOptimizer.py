@@ -26,6 +26,13 @@ class MatrixVectorProductGradientOptimizer(Optimizer):
             gtd = np.dot(g, d)
             alpha, xalpha, falpha, galpha = wolfe_line_search(x, f, gtd, d, self.fun, alpha)
 
+            if abs(f-falpha)<problem.FunValDiff:
+            	x = xalpha
+            	f = falpha
+            	g = galpha
+            	gnorm = norm(g)
+            	break
+            	
             x = xalpha
             f = falpha
             g = galpha

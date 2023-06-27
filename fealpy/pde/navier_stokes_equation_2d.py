@@ -4,8 +4,8 @@ import meshio
 from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory as MF
-from fealpy.geometry import DistDomain2d
-from fealpy.mesh import DistMesh2d
+#from fealpy.geometry import DistDomain2d
+#from fealpy.mesh import DistMesh2d
 from fealpy.geometry import dcircle,drectangle,ddiff,dmin
 from fealpy.geometry import huniform
 class SinCosData:

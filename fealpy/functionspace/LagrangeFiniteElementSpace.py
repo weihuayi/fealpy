@@ -1138,7 +1138,9 @@ class LagrangeFiniteElementSpace():
         """
         p = self.p
         cellmeasure = self.cellmeasure
+        NC = len(cellmeasure)
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        NQ = len(ws)
 
         if hasattr(f, 'coordtype'):
             if f.coordtype == 'cartesian':
@@ -1171,6 +1173,7 @@ class LagrangeFiniteElementSpace():
             ''')
 
         gdof = self.number_of_global_dofs()
+        GD = self.geo_dimension()
 
         if p > 0:
             if type(fval) in {float, int}:
@@ -1180,10 +1183,18 @@ class LagrangeFiniteElementSpace():
                     phi = self.basis(bcs)
                     bb = np.einsum('q, qci, c->ci', ws, phi, self.cellmeasure)
                     bb *= fval
-            else:
+            elif isinstance(fval, np.ndarray): 
                 phi = self.basis(bcs)
-                bb = np.einsum('q, qc..., qci, c->ci...',
-                        ws, fval, phi, self.cellmeasure)
+                if fval.shape == (GD, ):
+                    bb = np.einsum('q, d, qci, c->cid', ws, fval, phi, self.cellmeasure)
+                elif fval.shape == (NC, GD):
+                    bb = np.einsum('q, cd, qci, c->cid', ws, fval, phi, self.cellmeasure)
+                elif fval.shape == (NQ, NC, GD):
+                    bb = np.einsum('q, qcd, qci, c->cid', ws, fval, phi, self.cellmeasure)
+                elif fval.shape == (NC, ):
+                    bb = np.einsum('q, c, qci, c->ci', ws, fval, phi, self.cellmeasure)
+                elif fval.shape == (NQ, NC):
+                    bb = np.einsum('q, qc, qci, c->ci', ws, fval, phi, self.cellmeasure)
 
             if len(bb.shape) == 2: 
                 bb = bb[..., None]
@@ -1284,6 +1295,9 @@ class LagrangeFiniteElementSpace():
                 F = np.zeros((gdof, dim), dtype=self.ftype)
 
 
+        GD = self.geo_dimension()
+        if val.shape == (GD, ):
+            val = val.reshape(1, 1, GD)
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
         if dim == 1:
             np.add.at(F, face2dof, bb)

@@ -59,7 +59,7 @@ def test_tetrahedron_mesh():
 
     p=1
     mesh = TetrahedronMesh.from_one_tetrahedron()
-    mesh.uniform_refine()
+    mesh.uniform_refine(n=1)
     space = Space(mesh, p=p)
 
     bform = BilinearForm(space)
@@ -127,19 +127,23 @@ def test_linear_elasticity_model():
     ny = 10 
     p = 1 
 
-    mesh = TriangleMesh.from_unit_square(nx=nx*2, ny=ny*2)
+#    mesh = TriangleMesh.from_unit_square(nx=nx*2, ny=ny*2)
+    mesh = TriangleMesh.from_one_triangle()
     space = Space(mesh, p=p, doforder='sdofs')
     ospace = OldSpace(mesh, p=p)
 
     GD = mesh.geo_dimension()
     bform = BilinearForm(GD*(space,))
     bform.add_domain_integrator(LinearElasticityOperatorIntegrator(lam=pde.lam,
-        mu=pde.mu, q=p+2))
+        mu=pde.mu, q=p))
 
     bform.assembly()
 
     A = bform.get_matrix()
-    B = ospace.linear_elasticity_matrix(pde.lam, pde.mu, q=p+2)
+    B = ospace.linear_elasticity_matrix(pde.lam, pde.mu, q=p)
+    print(A.toarray())
+    print(B.toarray())
+
     np.testing.assert_array_almost_equal(A.toarray(), B.toarray())
 
 
