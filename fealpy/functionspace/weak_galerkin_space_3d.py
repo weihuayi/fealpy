@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from .Function import Function
 from ..decorator import cartesian
-from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
+from .scaled_monomial_space_3d import ScaledMonomialSpace3d
 
 class WGDof3d:
     """

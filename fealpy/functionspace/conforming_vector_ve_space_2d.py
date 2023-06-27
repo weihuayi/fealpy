@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv
 
 from .Function import Function
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
 
 class CVVEDof2d:
     def __init__(self, mesh, p):

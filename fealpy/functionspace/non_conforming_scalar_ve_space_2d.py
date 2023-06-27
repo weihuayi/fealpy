@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .Function import Function
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
 
 class NCSVEDof2d():
     """

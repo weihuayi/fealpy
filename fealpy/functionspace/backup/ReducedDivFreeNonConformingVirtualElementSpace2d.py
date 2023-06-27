@@ -4,7 +4,7 @@ from scipy.sparse import bmat, coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 import scipy.io as sio
 
 from .Function import Function
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 from ..common import ranges
