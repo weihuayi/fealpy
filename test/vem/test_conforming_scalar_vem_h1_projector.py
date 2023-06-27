@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
 from fealpy.functionspace import ConformingScalarVESpace2d 
 import ipdb
 from fealpy.mesh import TriangleMesh
