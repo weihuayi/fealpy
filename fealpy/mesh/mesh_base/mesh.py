@@ -127,7 +127,7 @@ class Mesh():
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
         A = np.ones(shape, dtype=bc.dtype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
 
         FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
         FF[..., range(p), range(p)] = p
@@ -149,6 +149,63 @@ class Mesh():
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return R # (..., ldof, TD+1)
+
+    def _bernstein_shape_function(self, bc, p=1):
+        """
+        @brief 
+        """
+        TD = bc.shape[1]-1
+        multiIndex = self.multi_index_matrix(p, TD)
+        ldof = multiIndex.shape[0]
+
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        B = np.ones(shape, dtype=bc.dtype)
+        B[..., 1:, :] = bc[..., None, :]
+        B = np.cumprod(B, axis=1)
+
+        P = np.arange(p+1)
+        P[0] = 1
+        P = np.cumprod(P)
+        B /= P[:, None]
+
+        # B : (NQ, p+1, TD+1) 
+        # B[:, multiIndex, np.arange(TD+1).reshape(1, -1)]: (NQ, ldof, TD+1)
+        phi = P[-1]*np.prod(B[:, multiIndex, np.arange(TD+1).reshape(1, -1)], axis=-1)
+
+        return phi
+
+    def _grad_bernstein_shape_function(self, bc, p=1):
+        """
+        @brief 
+        """
+
+        TD = bc.shape[1]-1
+        multiIndex = self.multi_index_matrix(p, TD)
+        ldof = multiIndex.shape[0]
+
+        shape = bc.shape[:-1] + (p+1, TD+1)
+        B = np.ones(shape, dtype=bc.dtype)
+        B[..., 1:, :] = bc[..., None, :]
+        B = np.cumprod(B, axis=1)
+
+        P = np.arange(p+1)
+        P[0] = 1
+        P = np.cumprod(P)
+        B /= P[:, None]
+
+        F = np.zeros(B.shape, dtype=bc.dtype)
+        F[:, 1:] = B[:, :-1]
+
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            idx = np.array(idx, dtype=np.int_)
+            R[..., i] = np.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],
+                    axis=-1)*F[..., multiIndex[:, i], [i]]
+
+        return P[-1]*R
 
     def shape_function(self, bc, p=1) -> NDArray:
         """

@@ -1,44 +1,13 @@
 import numpy as np
 
 from fealpy.decorator import cartesian, barycentric
-from fealpy.mesh import TriangleMesh, LagrangeTriangleMesh, LagrangeWedgeMesh, MeshFactory
 from fealpy.geometry.implicit_surface import SphereSurface
-
-from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
-
 
 class CosCosCosData:
     def __init__(self):
         pass
     def domain(self):#我加的
         return np.array([0, 1, 0, 1, 0, 1])
-
-    def init_mesh(self, n=1, meshtype='tet'):
-        """!
-        @brief 初始网格
-        """
-        node = np.array([
-            [-1, -1, -1],
-            [1, -1, -1],
-            [1, 1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [1, -1, 1],
-            [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float64)
-
-        cell = np.array([
-            [0, 1, 2, 6],
-            [0, 5, 1, 6],
-            [0, 4, 5, 6],
-            [0, 7, 4, 6],
-            [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int_)
-        mesh = TetrahedronMesh(node, cell)
-        #mesh.uniform_refine(n)
-        mesh = MeshFactory.boxmesh3d([0, 1, 0, 1, 0, 1], nx=n, ny=n, nz=n, meshtype="tet")
-        #mesh.label() # 标记最长边
-        return mesh
 
     @cartesian
     def solution(self, p):
@@ -115,28 +84,9 @@ class X2Y2Z2Data:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=1, meshtype='tet'):
-        node = np.array([
-            [-1, -1, -1],
-            [1, -1, -1],
-            [1, 1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [1, -1, 1],
-            [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float64)
 
-        cell = np.array([
-            [0, 1, 2, 6],
-            [0, 5, 1, 6],
-            [0, 4, 5, 6],
-            [0, 7, 4, 6],
-            [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int_)
-        mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
-        mesh.label()
-        return mesh
+    def domain(self):
+        return [-1, 1, -1, 1, -1, 1]
 
     @cartesian
     def solution(self, p):

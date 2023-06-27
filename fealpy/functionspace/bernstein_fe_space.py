@@ -74,7 +74,7 @@ class BernsteinFESpace:
 
         NQ = bc.shape[0]
         TD = bc.shape[1]-1
-        multiIndex = mesh.multi_index_matrix(p)
+        multiIndex = self.mesh.multi_index_matrix(p, etype=TD)
         ldof = multiIndex.shape[0]
 
         B = bc

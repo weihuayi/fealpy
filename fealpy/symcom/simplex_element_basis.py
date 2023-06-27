@@ -2,13 +2,18 @@
 import numpy as np
 import sympy as sp
 
-class LagrangeFEMSpace:
-    def __init__(self, GD):
+class SimplexElementBasis:
+    def __init__(self, GD, btype='lagrange'):
         self.GD = int(GD)
         t = 'l0'
         for i in range(1, GD+1):
             t = t+', l%d'%(i)   
         self.l = sp.symbols(t, real=True)
+
+        if btype in ['lagrange', 'l']:
+            self.basis = self.lagrange_basis
+        elif btype in ['bernstein', 'b']:
+            self.basis = self.bernstein_basis
     
     def number_of_dofs(self, p): 
         GD = self.GD
@@ -45,7 +50,7 @@ class LagrangeFEMSpace:
         return multiIndex
 
 
-    def basis(self, p):
+    def lagrange_basis(self,p):
         l = self.l
         GD = self.GD
         ldof = self.number_of_dofs(p)
@@ -61,6 +66,32 @@ class LagrangeFEMSpace:
             for j in range(GD+1):
                 phi[i] *= A[mi[i, j], j]
         return phi
+
+    def bernstein_basis(self,p):
+        l = self.l
+        GD = self.GD
+        ldof = self.number_of_dofs(p)
+        A = sp.ones(p+1, GD+1)
+        for i in range(1, p+1):
+            for j in range(GD+1):
+                A[i, j] = l[j]*A[i-1, j]
+
+        P = [i for i in range(p+1)]
+        P[0] = 1
+        for i in range(p):
+            P[i+1] *= P[i]
+            for j in range(GD+1):
+                A[i+1, j] /= P[i+1]
+
+        mi = self.multi_index_matrix(p)
+        phi = sp.ones(1, ldof)
+        for i in range(ldof):
+            for j in range(GD+1):
+                phi[i] *= A[mi[i, j], j]
+        for i in range(ldof):
+            phi[i] *= P[p]
+        return phi
+    
     
     def multi_index(self, monoial):
         """
@@ -194,8 +225,14 @@ class LagrangeFEMSpace:
                             temp = sp.diff(phi1[i],l[m])*sp.diff(phi2[j],l[n])*phi3[k]
                             S[i,j,k,m,n] = self.integrate(temp) 
         return S
+
+    def sp_to_np_function(self, f_sp):
+        GD = self.GD
+        l = ['l'+str(i) for i in range(GD+1)]
+        return sp.lambdify(l, f_sp, "numpy")
+
 if __name__ == "__main__":
     from sympy import *
-    space = LagrangeFEMSpace(2)
+    space = SimplexElementBasis(2)
     M = space.gphi_gphi_phi_matrix(2, 2, 2)
     print(M)
