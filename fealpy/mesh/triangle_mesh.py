@@ -1697,7 +1697,7 @@ class TriangleMesh(Mesh, Plotable):
 
 
     @classmethod
-    def show_shape_function(cls, p=1):
+    def show_shape_function(cls, p=1, funtype='L'):
         """
         @brief 可视化展示三角形单元上的 p 次基函数
         """
@@ -1721,7 +1721,10 @@ class TriangleMesh(Mesh, Plotable):
         ips = ips[c2p].reshape(-1, 2)
         bcs = mesh.multi_index_matrix(10*p, TD)/10/p
         ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
-        phi = mesh.shape_function(bcs, p)
+        if funtype == 'L':
+            phi = mesh.shape_function(bcs, p)
+        elif funtype == 'B':
+            phi = mesh._bernstein_shape_function(bcs, p)
         fig = plt.figure()
         for i in range(ldof):
             axes = fig.add_subplot(m, n, i+1, projection='3d')
@@ -1747,7 +1750,7 @@ class TriangleMesh(Mesh, Plotable):
         plt.show()
 
     @classmethod
-    def show_grad_shape_function(cls, p):
+    def show_grad_shape_function(cls, p, funtype='L'):
         """
         """
         import matplotlib.pyplot as plt
@@ -1769,9 +1772,14 @@ class TriangleMesh(Mesh, Plotable):
         ips = ips[c2p].reshape(-1, 2)
         bcs = mesh.multi_index_matrix(p, TD)/p
         ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
-        gphi = mesh.grad_shape_function(bcs, p) #(NQ, NC, ldof, GD)
-        fig = plt.figure()
+        if funtype == 'L':
+            gphi = mesh.grad_shape_function(bcs, p) #(NQ, NC, ldof, GD)
+        elif funtype == 'B':
+            R = mesh._grad_bernstein_shape_function(bcs, p)
+            Dlambda = mesh.grad_lambda()
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
 
+        fig = plt.figure()
         for i in range(ldof):
             axes = fig.add_subplot(m, n, i+1)
             mesh.add_plot(axes)
