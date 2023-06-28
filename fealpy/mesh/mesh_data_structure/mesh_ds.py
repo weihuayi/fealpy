@@ -509,16 +509,16 @@ class StructureMeshDS(HomogeneousMeshDS):
         @brief Return the number of faces in the struct mesh.
         """
         full = np.prod(self.nx_, axis=0)
-        adds = full / self.nx_
-        return full + np.sum(adds, axis=0)
+        adds = full // self.nx_
+        return full*self.TD + np.sum(adds, axis=0)
 
     def number_of_edges(self):
         """
         @brief Return the number of edges in the struct mesh.
         """
         full = np.prod(self.nx_ + 1, axis=0)
-        subs = full / (self.nx_ + 1)
-        return full - np.sum(subs, axis=0)
+        subs = full // (self.nx_ + 1)
+        return full*self.TD - np.sum(subs, axis=0)
 
     @property
     def cell_(self):
