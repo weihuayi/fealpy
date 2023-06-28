@@ -91,6 +91,14 @@ class SimplexElementBasis:
         for i in range(ldof):
             phi[i] *= P[p]
         return phi
+
+    def hermite_basis(self):
+        """
+        @brief 基于 4 次 Bernstein 基来实现顶点 C_1 连续的 Hermite 元 
+        """
+        p = 4
+
+
     
     
     def multi_index(self, monoial):

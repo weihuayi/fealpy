@@ -127,10 +127,13 @@ class TriangleMesh(Mesh, Plotable):
     grad_shape_function_on_face = grad_shape_function_on_edge
 
     def number_of_local_ipoints(self, p, iptype='cell'):
+        """
+        @brief 
+        """
         if iptype in {'cell', 2}:
             return (p+1)*(p+2)//2
-        elif iptype in {'face', 'edge',  1}:
-            return self.p + 1
+        elif iptype in {'face', 'edge',  1}: # 包括两个顶点
+            return p + 1
         elif iptype in {'node', 0}:
             return 1
 
@@ -1682,16 +1685,28 @@ class TriangleMesh(Mesh, Plotable):
         ips = ips[c2p].reshape(-1, 2)
 
         fig = plt.figure()
-        axes = fig.add_subplot(1, 2, 1)
+        axes = fig.add_subplot(1, 3, 1)
         mesh.add_plot(axes)
         mesh.find_node(axes, showindex=True, fontcolor='k')
 
-        axes = fig.add_subplot(1, 2, 2)
+        axes = fig.add_subplot(1, 3, 2)
         mesh.add_plot(axes)
         mesh.find_node(axes, node=ips, showindex=True)
-
         triangulation = mtri.Triangulation(ips[:, 0], ips[:, 1])
         axes.triplot(triangulation, color='black', linestyle='dashed')
+
+        axes = fig.add_subplot(1, 3, 3)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, node=ips)
+        mi = mesh.multi_index_matrix(p, 2)
+        for i, idx in enumerate(mi):
+            s = str(idx).replace('[', '(')
+            s = s.replace(']', ')')
+            s = s.replace(' ', ',')
+            axes.text(ips[i, 0], ips[i, 1], s,
+                    multialignment='center',
+                    fontsize=12, 
+                    color='r')
         plt.show()
 
 

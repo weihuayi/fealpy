@@ -1,6 +1,6 @@
 from sympy import *
 
-from fealpy.symcom import LagrangeFEMSpace
+from fealpy.symcom import SimplexElementBasis 
 
 h = Rational(1, 2)
 
@@ -10,11 +10,11 @@ x0, x1, x2 = symbols('x0, x1, x2')
 y0, y1, y2 = symbols('y0, y1, y2')
 p = 4
 GD = 2
-space = LagrangeFEMSpace(GD)
+space = SimplexElementBasis(GD)
 
 l = space.l
 print(l)
-phi = space.basis(p)
+phi = space.bernstein_basis(p)
 
 f = a*phi[1] + b * phi[3] + c * phi[6]
 
