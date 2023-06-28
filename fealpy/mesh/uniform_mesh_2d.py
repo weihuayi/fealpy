@@ -10,7 +10,7 @@ from typing import Optional, Tuple, Callable, Any, Union, List
 from .mesh_base import Mesh, Plotable
 
 # 这个数据接口为有限元服务
-from .mesh_data_structure import StructureMesh2dDataStructure, HomogeneousMeshDS
+from .mesh_data_structure import StructureMesh2dDataStructure
 from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 from ..geometry import project
 
@@ -141,7 +141,7 @@ class UniformMesh2d(Mesh, Plotable):
 
     ## @ingroup GeneralInterface
     def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
-            
+
         """
         @brief    显示一个定义在网格节点上的函数
         @param    uh 网格节点上的函数值(二维数组)
@@ -159,13 +159,13 @@ class UniformMesh2d(Mesh, Plotable):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig: Figure, axes: Axes, box: List[float], 
-                    advance: Callable[[int, Any], Tuple[np.ndarray, float]], 
+    def show_animation(self, fig: Figure, axes: Axes, box: List[float],
+                    advance: Callable[[int, Any], Tuple[np.ndarray, float]],
                     fname: str = 'test.mp4',
-                    init: Optional[Callable] = None, 
-                    fargs: Optional[Callable] = None, 
-                    frames: np.int_ = 1000, 
-                    interval: np.int_ = 50, 
+                    init: Optional[Callable] = None,
+                    fargs: Optional[Callable] = None,
+                    frames: np.int_ = 1000,
+                    interval: np.int_ = 50,
                     plot_type: str = 'imshow',
                     cmap='rainbow') -> None:
         """
@@ -188,9 +188,9 @@ class UniformMesh2d(Mesh, Plotable):
         import matplotlib.colorbar as colorbar
 
         # 初始化二维网格数据
-        uh, t = advance(0) 
+        uh, t = advance(0)
         if plot_type == 'imshow':
-            data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5], 
+            data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5],
                     extent=box[0:4], interpolation='bicubic')
         elif plot_type == 'surface':
             X = self.node[..., 0]
@@ -203,12 +203,12 @@ class UniformMesh2d(Mesh, Plotable):
         elif plot_type == 'contourf':
             X = self.node[..., 0]
             Y = self.node[..., 1]
-            data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5], 
+            data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5],
                     interpolation='bicubic')
             # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
             # 后续的代码中无需对颜色条进行额外的更新操作
             cbar = fig.colorbar(data, ax=axes)
-        
+
         # 根据当前帧序号计算数值解，更新图像对象的数值数组，显示当前帧序号和时刻
         def func(n, *fargs):
             # 声明 data 为非局部变量 这样在 func 函数内部对 data 进行的修改会影响到外部的 data 变量
@@ -229,7 +229,7 @@ class UniformMesh2d(Mesh, Plotable):
                 axes.set_zlim(box[4], box[5])
             elif plot_type == 'contourf':
                 # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
-                # data.collections 保存了所有已经生成的等高线填充层 
+                # data.collections 保存了所有已经生成的等高线填充层
                 # 更新图像时 需要将旧的等高线填充层从图形中移除 以免遮挡住新的等高线填充层
                 for coll in data.collections:
                     axes.collections.remove(coll)
@@ -248,7 +248,7 @@ class UniformMesh2d(Mesh, Plotable):
         # init_func 作为初始化函数，用于在动画开始之前设置图像的初始状态，
         # fargs 作为一个元组，包含要传递给 func 函数的额外参数，frames 为帧数
         # 并设置动画间隔时间
-        ani = animation.FuncAnimation(fig, func, init_func=init, fargs=fargs, 
+        ani = animation.FuncAnimation(fig, func, init_func=init, fargs=fargs,
                                       frames=frames, interval=interval)
         ani.save('{}_{}'.format(plot_type, fname))
 
@@ -606,25 +606,25 @@ class UniformMesh2d(Mesh, Plotable):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray], np.ndarray], A: spmatrix, 
+    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray], np.ndarray], A: spmatrix,
                            f: np.ndarray, uh: Optional[np.ndarray] = None) -> Tuple[spmatrix, np.ndarray]:
         """
         @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界和向量型函数
-        
+
         @param[in] gD  表示 Dirichlet 边界值函数
         @param[in] A  (NN, NN), 稀疏矩阵
         @param[in] f  可能是一维数组（标量型右端项）或二维数组（向量型右端项）
         @param[in, optional] uh  默认为 None，表示网格函数，如果为 None 则创建一个新的网格函数
 
         @return Tuple[spmatrix, np.ndarray], 返回处理后的稀疏矩阵 A 和数组 f
-        """        
+        """
         if uh is None:
             uh = self.function('node').reshape(-1)
         else:
             uh = uh.reshape(-1) # 展开为一维数组 TODO:向量型函数
 
         f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
-        
+
         node = self.entity('node')
         isBdNode = self.ds.boundary_node_flag()
         uh[isBdNode]  = gD(node[isBdNode])
@@ -636,7 +636,7 @@ class UniformMesh2d(Mesh, Plotable):
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A, f 
+        return A, f
 
     ## @ingroup FDMInterface
     def update_dirichlet_bc(self, gD: Callable[[np.ndarray], Any], uh: np.ndarray) -> None:
@@ -650,7 +650,7 @@ class UniformMesh2d(Mesh, Plotable):
         isBdNode = self.ds.boundary_node_flag().reshape(uh.shape)
         uh[isBdNode] = gD(node[isBdNode, :])
 
-    ## @ingroup FDMInterface 
+    ## @ingroup FDMInterface
     def parabolic_operator_forward(self, tau):
         """
         @brief 生成抛物方程的向前差分迭代矩阵
@@ -683,7 +683,7 @@ class UniformMesh2d(Mesh, Plotable):
 
         return A
 
-    ## @ingroup FDMInterface 
+    ## @ingroup FDMInterface
     def parabolic_operator_backward(self, tau):
         """
         @brief 生成抛物方程的向后差分迭代矩阵
@@ -765,7 +765,7 @@ class UniformMesh2d(Mesh, Plotable):
 
 
     ## @ingroup FDMInterface
-    def wave_operator_explicity(self, tau, a=1): 
+    def wave_operator_explicity(self, tau, a=1):
         """
         @brief 用显格式求解波动方程
         """
@@ -834,7 +834,7 @@ class UniformMesh2d(Mesh, Plotable):
         J = k[:, 0:-1].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        
+
         val = np.broadcast_to(rx**2*theta, (NN-n1, ))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
@@ -947,9 +947,9 @@ class UniformMesh2d(Mesh, Plotable):
     def integrator(self, q, etype='cell'):
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 2}:
-            return TensorProductQuadrature((qf, qf)) 
+            return TensorProductQuadrature((qf, qf))
         elif etype in {'edge', 'face', 1}:
-            return qf 
+            return qf
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):

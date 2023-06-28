@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix, diags, spdiags
 from types import ModuleType
 
 from .mesh_base import Mesh, Plotable
-    
+
 # 这个数据接口为有限元服务
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
@@ -14,7 +14,7 @@ class UniformMesh3d(Mesh, Plotable):
     """
     @brief A class for representing a three-dimensional structured mesh with uniform discretization in x, y, and z directions.
     """
-    def __init__(self, extent, 
+    def __init__(self, extent,
             h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
             ftype=np.float64, itype=np.int_
             ):
@@ -37,7 +37,7 @@ class UniformMesh3d(Mesh, Plotable):
               - Data cropping
               - Handling irregular data
 
-        @example 
+        @example
         from fealpy.mesh import UniformMesh3d
 
         I = [0, 1, 0, 1, 0, 1]
@@ -55,7 +55,7 @@ class UniformMesh3d(Mesh, Plotable):
 
         self.ftype = ftype
         self.itype = itype
- 
+
         # Mesh dimensions
         self.nx = extent[1] - extent[0]
         self.ny = extent[3] - extent[2]
@@ -129,7 +129,7 @@ class UniformMesh3d(Mesh, Plotable):
         pass
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box, 
+    def show_animation(self, fig, axes, box,
                        init, forward, fname='test.mp4',
                        fargs=None, frames=1000, lw=2, interval=50):
         """
@@ -148,7 +148,7 @@ class UniformMesh3d(Mesh, Plotable):
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
                self.origin[1], self.origin[1] + ny*self.h[1],
                self.origin[2], self.origin[2] + ny*self.h[2],
                ]
@@ -178,7 +178,7 @@ class UniformMesh3d(Mesh, Plotable):
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
                self.origin[1], self.origin[1] + ny*self.h[1],
                self.origin[2], self.origin[2] + nz*self.h[2]]
         node = np.zeros((nx+1, ny+1, nz+1, GD), dtype=self.ftype)
@@ -197,8 +197,8 @@ class UniformMesh3d(Mesh, Plotable):
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1], 
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1],
                self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz-1)*self.h[2]]
         bc = np.zeros((nx, ny, nz, GD), dtype=self.ftype)
         bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
@@ -253,7 +253,7 @@ class UniformMesh3d(Mesh, Plotable):
                                              box[0]:box[1]:complex(0, nx + 1),
                                              box[2]:box[3]:complex(0, ny),
                                              box[4]:box[5]:complex(0, nz + 1)]
-        return bc 
+        return bc
 
     ## @ingroup FDMInterface
     def edgez_barycenter(self):
@@ -273,12 +273,12 @@ class UniformMesh3d(Mesh, Plotable):
                                              box[2]:box[3]:complex(0, ny + 1),
                                              box[4]:box[5]:complex(0, nz)]
         return bc
-    
+
     ## @ingroup FDMInterface
     def face_barycenter(self):
         """
         @brief
-        """ 
+        """
         xbc = self.facex_barycenter()
         ybc = self.facey_barycenter()
         zbc = self.facez_barycenter()
@@ -321,7 +321,7 @@ class UniformMesh3d(Mesh, Plotable):
                                              box[2]:box[3]:complex(0, ny + 1),
                                              box[4]:box[5]:complex(0, nz)]
         return bc
-    
+
     ## @ingroup FDMInterface
     def facez_barycenter(self):
         """
@@ -339,14 +339,14 @@ class UniformMesh3d(Mesh, Plotable):
                                              box[0]:box[1]:complex(0, nx),
                                              box[2]:box[3]:complex(0, ny),
                                              box[4]:box[5]:complex(0, nz + 1)]
-        return bc 
+        return bc
 
     ## @ingroup FDMInterface
     def function(self, etype='node', dtype=None, ex=0):
         """
         @brief 返回定义在节点、网格边、或者网格单元上离散函数（数组），元素取值为0
 
-        @param[in] ex 非负整数，把离散函数向外扩展一定宽度  
+        @param[in] ex 非负整数，把离散函数向外扩展一定宽度
         """
         nx = self.ds.nx
         ny = self.ds.ny
@@ -371,7 +371,7 @@ class UniformMesh3d(Mesh, Plotable):
             uh = np.zeros((nx+1, ny, nz+1), dtype=dtype)
         elif etype in {'edgez'}: # 切向与 z 轴平行的边
             uh = np.zeros((nx+1, ny+1, nz), dtype=dtype)
-        elif etype in {'edge', 1}: # 所有的边 
+        elif etype in {'edge', 1}: # 所有的边
             ex = np.zeros((nx, ny+1, nz+1), dtype=dtype)
             ey = np.zeros((nx+1, ny, nz+1), dtype=dtype)
             ez = np.zeros((nx+1, ny+1, nz), dtype=dtype)
@@ -379,7 +379,7 @@ class UniformMesh3d(Mesh, Plotable):
         elif etype in {'cell', 3}:
             uh = np.zeros((nx+2*ex, ny+2*ex, nz+2*ex), dtype=dtype)
         else:
-            raise ValueError(f'the entity `{entity}` is not correct!') 
+            raise ValueError(f'the entity `{entity}` is not correct!')
 
         return uh
 
@@ -393,7 +393,7 @@ class UniformMesh3d(Mesh, Plotable):
         hz = self.h[2]
         fx, fy, fz= np.gradient(f, hx, hy, hz, edge_order=order)
         return fx, fy, fz
-        
+
     ## @ingroup FDMInterface
     def divergence(self, f_x, f_y, f_z, order=1):
         """
@@ -428,14 +428,14 @@ class UniformMesh3d(Mesh, Plotable):
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
                self.origin[1], self.origin[1] + ny*self.h[1],
                self.origin[2], self.origin[2] + nz*self.h[2]]
 
         hx = self.h[0]
-        hy = self.h[1]     
-        hz = self.h[2]  
-        
+        hy = self.h[1]
+        hz = self.h[2]
+
         i, j, k = self.cell_location(p)
         i[i==nx] = i[i==nx]-1
         j[j==ny] = j[j==ny]-1
@@ -458,7 +458,7 @@ class UniformMesh3d(Mesh, Plotable):
 	  + f[i, j+1, k+1]*(1-a)*(1-e)*(1-f)\
 	  + f[i+1, j+1, k+1]*(1-d)*(1-e)*(1-f)
         return F
-   
+
     ## @ingroup FDMInterface
     def interpolation(self, f, intertype='node'):
         """
@@ -572,7 +572,7 @@ class UniformMesh3d(Mesh, Plotable):
 
 
     ## @ingroup FDMInterface
-    def elliptic_operator(self, d=3, c=None, r=None):                                                                                                                
+    def elliptic_operator(self, d=3, c=None, r=None):
         """
         @brief Assemble the finite difference matrix for a general elliptic operator.
         """
@@ -629,7 +629,7 @@ class UniformMesh3d(Mesh, Plotable):
         @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
 
         @param[in] A sparse matrix, (NN, NN)
-        @param[in] f 
+        @param[in] f
 
         @todo 考虑 uh 是向量函数的情形
         """
@@ -639,7 +639,7 @@ class UniformMesh3d(Mesh, Plotable):
             uh = uh.reshape(-1) # 展开为一维数组 TODO:向量型函数
 
         f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
-        
+
         node = self.entity('node')
         isBdNode = self.ds.boundary_node_flag()
         uh[isBdNode]  = gD(node[isBdNode])
@@ -651,7 +651,7 @@ class UniformMesh3d(Mesh, Plotable):
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A, f 
+        return A, f
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):
@@ -660,7 +660,7 @@ class UniformMesh3d(Mesh, Plotable):
         """
         pass
 
-    ## @ingroup FDMInterface                                                                                                                                         
+    ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
         """
         @brief 均匀网格上的 fast sweeping method
@@ -672,7 +672,7 @@ class UniformMesh3d(Mesh, Plotable):
     def geo_dimension(self):
         """
         @brief:    Get the geometry dimension of the mesh.
-         
+
         @return:   The geometry dimension (3 for 3D mesh).
         """
         return 3
@@ -681,7 +681,7 @@ class UniformMesh3d(Mesh, Plotable):
     def top_dimension(self):
         """
         @brief Get the topological dimension of the mesh.
-         
+
         @return The topological dimension (3 for 3D mesh).
         """
         return 3
@@ -718,7 +718,7 @@ class UniformMesh3d(Mesh, Plotable):
         pass
 
     ## @ingroup FEMInterface
-    def entity_barycenter(self, etype='cell'):
+    def entity_barycenter(self, etype='cell', index=np.s_[:]):
         """
         @brief Get the entity (cell, face, edge, or  node) based on the given entity type.
 
@@ -736,7 +736,7 @@ class UniformMesh3d(Mesh, Plotable):
         ny = self.ds.ny
         nz = self.ds.nz
         if etype in {'cell', 3}: # 所有单元
-            return self.cell_barycenter().reshape(-1, 3) 
+            return self.cell_barycenter().reshape(-1, 3)
         elif etype in {'face', 2}: # 所有的面
             pass
         elif etype in {'edge', 1}: # 所有的边
@@ -744,7 +744,7 @@ class UniformMesh3d(Mesh, Plotable):
         elif etype in {'node', 0}:
             return self.node.reshape(-1, 3)
         else:
-            raise ValueError(f'the entity type `{etype}` is not correct!') 
+            raise ValueError(f'the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
     def entity_measure(self, etype):
@@ -764,7 +764,7 @@ class UniformMesh3d(Mesh, Plotable):
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
         pass
-    
+
     ## @ingroup FEMInterface
     def number_of_global_ipoints(self, p):
         pass
