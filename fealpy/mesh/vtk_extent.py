@@ -15,7 +15,7 @@ import vtk.util.numpy_support as vnp
 
 from .vtkCellTypes import *
 
-from .core import multi_index_matrix2d
+from .backup.core import multi_index_matrix2d
 
 def vtk_cell_index(p, celltype):
     """

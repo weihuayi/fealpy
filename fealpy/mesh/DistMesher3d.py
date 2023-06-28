@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 import matplotlib.pyplot as plt
 
-from .TetrahedronMesh import TetrahedronMesh 
+from .tetrahedron_mesh import TetrahedronMesh 
 
 class DistMesher3d():
 

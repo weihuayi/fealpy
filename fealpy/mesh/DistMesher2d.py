@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 import matplotlib.pyplot as plt
 
-from .TriangleMesh import TriangleMesh 
+from .triangle_mesh import TriangleMesh 
 
 class DistMesher2d():
 
