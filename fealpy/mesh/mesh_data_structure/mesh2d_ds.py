@@ -196,8 +196,8 @@ class StructureMesh2dDataStructure(StructureMeshDS, Mesh2dDataStructure):
         nx = self.nx
         ny = self.ny
 
-        NC = self.NC
-        NE = self.NE
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
 
         edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
