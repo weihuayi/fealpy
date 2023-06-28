@@ -264,4 +264,203 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
 
 
 class StructureMesh3dDataStructure(StructureMeshDS, Mesh3dDataStructure):
-    pass
+    cw = np.array([0, 1, 3, 2])
+    ccw = np.array([0, 2, 3, 1])
+    localEdge = np.array([
+        (0, 4), (1, 5), (2, 6), (3, 7),
+        (0, 2), (1, 3), (4, 6), (5, 7),
+        (0, 1), (2, 3), (4, 5), (6, 7)])
+    localFace = np.array([
+        (0, 1, 2, 3), (4, 5, 6, 7),  # left and right faces
+        (0, 1, 4, 5), (2, 3, 6, 7),  # front and back faces
+        (0, 2, 4, 6), (1, 3, 5, 7)])  # bottom and top faces
+    localFace2edge = np.array([
+        (4, 5, 8, 9), (6, 7, 10, 11),
+        (0, 1, 8, 10), (2, 3, 9, 11),
+        (0, 2, 4, 6), (1, 3, 5, 7)])
+
+
+    @property
+    def face(self):
+        """
+        @brief 生成网格中所有的面
+        """
+        NN = self.NN
+        NF = self.number_of_faces()
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
+        face = np.zeros((NF, 4), dtype=np.int_)
+
+        NF0 = 0
+        NF1 = (nx + 1) * ny * nz
+        c = idx[:, :-1, :-1]
+        face[NF0:NF1, 0] = c.flatten()
+        face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
+        face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
+        face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
+        face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
+
+        NF0 = NF1
+        NF1 += nx * (ny + 1) * nz
+        c = np.transpose(idx, (0, 1, 2))[:-1, :, :-1]
+        face[NF0:NF1, 0] = c.flatten()
+        face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
+        face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
+        face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
+        NF2 = NF0 + ny * nz
+        N = nz * (ny + 1)
+        idx1 = np.zeros((nx, nz), dtype=np.int_)
+        idx1 = np.arange(NF2, NF2 + nz)
+        idx1 = idx1 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+        face[idx1] = face[idx1][:, [1, 0, 3, 2]]
+
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        c = np.transpose(idx, (0, 1, 2))[:-1, :-1, :]
+        face[NF0:NF1, 0] = c.flatten()
+        face[NF0:NF1, 1] = face[NF0:NF1, 0] + nz + 1
+        face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
+        face[NF0:NF1, 3] = face[NF0:NF1, 2] + nz + 1
+        N = ny * (nz + 1)
+        idx2 = np.zeros((nx, ny), dtype=np.int_)
+        idx2 = np.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
+        idx2 = idx2 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+        face[idx2] = face[idx2][:, [1, 0, 3, 2]]
+
+        return face
+
+
+    @property
+    def edge(self):
+        """
+        @brief 生成网格中所有的边
+        """
+        NN = self.NN
+        NE = self.number_of_edges()
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
+        edge = np.zeros((NE, 2), dtype=np.int_)
+
+        NE0 = 0
+        NE1 = nx * (ny + 1) * (nz + 1)
+        c = np.transpose(idx, (0, 1, 2))[:-1, :, :]
+        edge[NE0:NE1, 0] = c.flatten()
+        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + (ny + 1) * (nz + 1)
+
+        NE0 = NE1
+        NE1 += (nx + 1) * ny * (nz + 1)
+        c = np.transpose(idx, (0, 1, 2))[:, :-1, :]
+        edge[NE0:NE1, 0] = c.flatten()
+        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + nz + 1
+
+        NE0 = NE1
+        NE1 += (nx + 1) * (ny + 1) * nz
+        c = np.transpose(idx, (0, 1, 2))[:, :, :-1]
+        edge[NE0:NE1, 0] = c.flatten()
+        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + 1
+
+        return edge
+
+
+    @property
+    def face2cell(self):
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        idx = np.arange(NC).reshape(nx, ny, nz)
+        face2cell = np.zeros((NF, 4), dtype=np.int_)
+
+        # x direction
+        NF0 = 0
+        NF1 = (nx+1) * ny * nz
+        face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
+        face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
+        face2cell[NF0:NF1-ny*nz, 2] = 0
+        face2cell[NF0:NF1-ny*nz, 3] = 1
+
+        face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
+        face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
+        face2cell[NF1-ny*nz:NF1, 2] = 1
+        face2cell[NF0:NF0+ny*nz, 3] = 0
+
+        # y direction
+        idy = np.swapaxes(idx, 1, 0)
+        NF0 = NF1
+        NF1 += nx * (ny+1) * nz
+
+        fidy = np.arange(NF0, NF1).reshape(nx, ny+1, nz).swapaxes(0, 1)
+
+        face2cell[fidy[:-1], 0] = idy
+        face2cell[fidy[1:], 1] = idy
+        face2cell[fidy[:-1], 2] = 0
+        face2cell[fidy[1:], 3] = 1
+
+        face2cell[fidy[-1], 0] = idy[-1]
+        face2cell[fidy[0], 1] = idy[0]
+        face2cell[fidy[-1], 2] = 1
+        face2cell[fidy[0], 3] = 0
+
+        # z direction
+        idz = np.transpose(idx, (2, 0, 1))
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+
+        fidz = np.arange(NF0, NF1).reshape(nx, ny, nz+1).transpose(2, 0, 1)
+
+        face2cell[fidz[:-1], 0] = idz
+        face2cell[fidz[1:], 1] = idz
+        face2cell[fidz[:-1], 2] = 0
+        face2cell[fidz[1:], 3] = 1
+
+        face2cell[fidz[-1], 0] = idz[-1]
+        face2cell[fidz[0], 1] = idz[0]
+        face2cell[fidz[-1], 2] = 1
+        face2cell[fidz[0], 3] = 0
+        return face2cell
+
+    @property
+    def cell2edge(self):
+        """
+        The neighbor information of cell to edge
+        @brief 单元和边的邻接关系, 储存每个单元相邻的边的编号
+        """
+        NC = self.number_of_cells()
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+
+        cell2edge = np.zeros((NC, 12), dtype=np.int_)
+
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        cell2edge[:, 0] = idx0[:, :-1, :-1].flatten()
+        cell2edge[:, 1] = idx0[:, :-1, 1:].flatten()
+        cell2edge[:, 2] = idx0[:, 1:, :-1].flatten()
+        cell2edge[:, 3] = idx0[:, 1:, 1:].flatten()
+
+        NE0 = nx * (ny + 1) * (nz + 1)
+        idx1 = np.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)
+        cell2edge[:, 4] = (NE0 + idx1[:-1, :, :-1]).flatten()
+        cell2edge[:, 5] = (NE0 + idx1[:-1, :, 1:]).flatten()
+        cell2edge[:, 6] = (NE0 + idx1[1:, :, :-1]).flatten()
+        cell2edge[:, 7] = (NE0 + idx1[1:, :, 1:]).flatten()
+
+        NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+        idx2 = np.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
+        cell2edge[:, 8] = (NE1 + idx2[:-1, :-1, :]).flatten()
+        cell2edge[:, 9] = (NE1 + idx2[:-1, 1:, :]).flatten()
+        cell2edge[:, 10] = (NE1 + idx2[1:, :-1, :]).flatten()
+        cell2edge[:, 11] = (NE1 + idx2[1:, 1:, :]).flatten()
+
+        return cell2edge

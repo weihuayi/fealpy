@@ -335,6 +335,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         """
         @brief Return the number of vertices in a cell.
         """
+        if hasattr(self, 'NVC'):
+            return getattr(self, 'NVC')
         return self.cell.shape[-1]
 
     def number_of_edges_of_cells(self) -> int:
@@ -344,6 +346,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localEdge` in axis-0, usually be marked
         as NEC.
         """
+        if hasattr(self, 'NEC'):
+            return getattr(self, 'NEC')
         return self.localEdge.shape[0]
 
     def number_of_faces_of_cells(self) -> int:
@@ -353,6 +357,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localFace` in axis-0, usually be marked
         as NFC.
         """
+        if hasattr(self, 'NFC'):
+            return getattr(self, 'NFC')
         return self.localFace.shape[0]
 
     def number_of_vertices_of_faces(self) -> int:
@@ -362,6 +368,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localFace` in axis-1, usually be marked
         as NVF.
         """
+        if hasattr(self, 'NVF'):
+            return getattr(self, 'NVF')
         return self.localFace.shape[-1]
 
     def number_of_vertices_of_edges(self) -> int:
@@ -371,6 +379,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localEdge` in axis-1, usually be marked
         as NVE.
         """
+        if hasattr(self, 'NVE'):
+            return getattr(self, 'NVE')
         return self.localEdge.shape[-1]
 
     number_of_nodes_of_cells = number_of_vertices_of_cells
@@ -499,23 +509,23 @@ class StructureMeshDS(HomogeneousMeshDS):
         @brief Return the number of faces in the struct mesh.
         """
         full = np.prod(self.nx_, axis=0)
-        adds = full / self.nx_
-        return full + np.sum(adds, axis=0)
+        adds = full // self.nx_
+        return full*self.TD + np.sum(adds, axis=0)
 
     def number_of_edges(self):
         """
         @brief Return the number of edges in the struct mesh.
         """
         full = np.prod(self.nx_ + 1, axis=0)
-        subs = full / (self.nx_ + 1)
-        return full - np.sum(subs, axis=0)
+        subs = full // (self.nx_ + 1)
+        return full*self.TD - np.sum(subs, axis=0)
 
     @property
     def cell_(self):
         TD = self.TD
         NN = self.NN
         NC = np.prod(self.nx_)
-        cell = np.zeros((NC, 2*NC), dtype=self.itype)
+        cell = np.zeros((NC, 2**TD), dtype=self.itype)
         idx = np.arange(NN).reshape(self.nx_+1)
         c = idx[(slice(-1), )*TD]
         cell[:, 0] = c.flat
