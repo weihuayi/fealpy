@@ -127,14 +127,27 @@ class CVVEDof2d:
         
 
 class ConformingVectorVESpace2d:
-    def __init__(self, mesh, p=1):
+    def __init__(self, mesh, p=1, q=None, bc=None):
         self.mesh = mesh
         self.p = p
+        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q, bc=bc)
+
         self.itype = mesh.itype
         self.ftype = mesh.ftype
         self.dof = CVVEDof2d(mesh, p)
 
 
+    def number_of_global_dofs(self):
+        return self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self, doftype='all'):
+        return self.dof.number_of_local_dofs(doftype=doftype)
+
+    def cell_to_dof(self, index=np.s_[:]):
+        return self.dof.cell2dof[index]
+
+    def interpolation_points(self, index=np.s_[:]):
+        return self.dof.interpolation_points()
 
 
 

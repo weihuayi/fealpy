@@ -21,7 +21,7 @@ def test_polygon_mesh(p):
    H = mint.assembly_cell_matrix(space)
 
    dint = ScaledMonomialSpaceDiffusionIntegrator2d()
-   ipdb.set_trace()
+   #ipdb.set_trace()
    G = dint.assembly_cell_matrix(space, H) 
 
    @cartesian
