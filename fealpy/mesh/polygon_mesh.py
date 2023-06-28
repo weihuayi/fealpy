@@ -211,6 +211,15 @@ class PolygonMesh(Mesh, Plotable):
         return edge2ipoints
 
     face_to_ipoint = edge_to_ipoint
+    
+    def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
 
     def interpolation_points(self, p: int,
@@ -520,7 +529,7 @@ class PolygonMesh(Mesh, Plotable):
         @param mesh
         @param bc bool 如果为真，则对偶网格点为三角形单元重心; 否则为三角形单元外心
         """
-        from .TriangleMesh import TriangleMeshWithInfinityNode
+        from .triangle_mesh import TriangleMeshWithInfinityNode
 
         mesh = TriangleMeshWithInfinityNode(mesh, bc=bc)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
