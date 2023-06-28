@@ -54,7 +54,7 @@ def test_vector_decomposition(refine=False):
         phi2 = space.smspace.basis(ipoint, p=degree-1)[i, :]
         x = np.array([phi[i][2], -phi[i][1]])
         B = np.einsum('i,j->ij', phi2, x)
-        a, b = vector_decomposition(space)
+        a, b = vector_decomposition(space,p=degree)
 
         C = np.einsum('ij, jm -> im', a[i], gphi)
         B = np.einsum('ij, jk ->ik', b, B)
