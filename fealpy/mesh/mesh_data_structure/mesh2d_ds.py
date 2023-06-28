@@ -153,4 +153,85 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
 
 
 class StructureMesh2dDataStructure(StructureMeshDS, Mesh2dDataStructure):
-    pass
+    cw = np.array([0, 1, 3, 2])
+    ccw = np.array([0, 2, 3, 1])
+    localEdge = np.array([(0, 2), (1, 3), (0, 1), (2, 3)])
+    localFace = localEdge
+
+    @property
+    def edge(self):
+        """
+        @brief 生成网格中所有的边
+        """
+
+        nx = self.nx
+        ny = self.ny
+
+        NN = self.NN
+        NE = self.NE
+
+        idx = np.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
+        edge = np.zeros((NE, 2), dtype=self.itype)
+
+        NE0 = 0
+        NE1 = nx * (ny + 1)
+        edge[NE0:NE1, 0] = idx[:-1, :].flat
+        edge[NE0:NE1, 1] = idx[1:, :].flat
+        edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
+
+        NE0 = NE1
+        NE1 += ny * (nx + 1)
+        edge[NE0:NE1, 0] = idx[:, :-1].flat
+        edge[NE0:NE1, 1] = idx[:, 1:].flat
+        edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
+        return edge
+
+
+    @property
+    def face2cell(self):
+        """
+        @brief 边与单元的邻接关系，储存与每条边相邻的两个单元的信息
+        """
+
+        nx = self.nx
+        ny = self.ny
+
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
+
+        edge2cell = np.zeros((NE, 4), dtype=self.itype)
+
+        idx = np.arange(NC).reshape(nx, ny).T
+
+        # x direction
+        idx0 = np.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
+        # left element
+        edge2cell[idx0[:-1], 0] = idx
+        edge2cell[idx0[:-1], 2] = 0
+        edge2cell[idx0[-1], 0] = idx[-1]
+        edge2cell[idx0[-1], 2] = 1
+
+        # right element
+        edge2cell[idx0[1:], 1] = idx
+        edge2cell[idx0[1:], 3] = 1
+        edge2cell[idx0[0], 1] = idx[0]
+        edge2cell[idx0[0], 3] = 0
+
+        # y direction
+        idx1 = np.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
+        NE0 = nx * (ny + 1)
+        # left element
+        edge2cell[NE0 + idx1[:, 1:], 0] = idx
+        edge2cell[NE0 + idx1[:, 1:], 2] = 3
+        edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+        edge2cell[NE0 + idx1[:, 0], 2] = 2
+
+        # right element
+        edge2cell[NE0 + idx1[:, :-1], 1] = idx
+        edge2cell[NE0 + idx1[:, :-1], 3] = 2
+        edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+        edge2cell[NE0 + idx1[:, -1], 3] = 3
+
+        return edge2cell
+
+    edge2cell = face2cell

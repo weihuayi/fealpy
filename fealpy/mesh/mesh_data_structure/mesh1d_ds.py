@@ -92,8 +92,17 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
 
 
 class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
+    localEdge = np.array([(0, 1)])
+    localFace = np.array([(0,), (1,)])
+    face = ArrRedirector('_face')
 
-    def face_to_cell(self, return_sparse=False) -> NDArray:
+    @property
+    def _face(self):
+        NN = self.number_of_nodes()
+        return np.arange(NN).reshape(NN, 1)
+
+    @property
+    def face2cell(self) -> NDArray:
         """
         @TODO
         """
