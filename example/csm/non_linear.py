@@ -1,12 +1,11 @@
 import numpy as np
 
 from fealpy.opt import Problem
-from fealpy.opt.newton_raphson_optimizer import NewtonRaphsonOptimizer, ModifiedNewtonRaphsonOptimizer
+from fealpy.opt.newton_raphson_optimizer import NewtonRaphsonOptimizer
 
 class TwoNonlinearSpingsProblem(Problem):
     def __init__(self):
-        #x0 = np.zeros(2, dtype=np.float64)
-        x0 = np.array([0.3, 0.6], dtype=np.float64)
+        x0 = np.zeros(2, dtype=np.float64)
         MaxIters = 20
         super().__init__(x0, self.energy, Preconditioner=self.tagnent_stiffness_matrix, MaxIters=MaxIters, )
 
@@ -25,7 +24,6 @@ class TwoNonlinearSpingsProblem(Problem):
 def two_nonlinear_springs_opt():
     problem = TwoNonlinearSpingsProblem()
     opt = NewtonRaphsonOptimizer(problem)
-    # opt = ModifiedNewtonRaphsonOptimizer(problem)
     x = opt.run()
     print("x:", x)
 

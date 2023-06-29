@@ -1,9 +1,5 @@
-import numpy as np
 
-from .optimizer_base import Optimizer, Problem
-
-
-class ModifiedNewtonRaphsonOptimizer(Optimizer):
+class Broyden(Optimizer):
     def __init__(self, problem: Problem) -> None:
         super().__init__(problem)
         self.P = problem.Preconditioner
@@ -30,5 +26,3 @@ class ModifiedNewtonRaphsonOptimizer(Optimizer):
         f, gradf = f_new, grad_f_new
 
         return x, f, gradf 
-
-
