@@ -11,20 +11,11 @@ class NewtonRaphsonOptimizer(Optimizer):
         problem = self.problem
         x = problem.x0
         f, gradf = problem.objective(x)
-        print("f:", f)
-        print("gradf:", gradf)
-        print("----------------------------")
         for i in range(problem.MaxIters):
-            print("Kt^-1:\n", self.P(x))
             du = -self.P(x) @ gradf
-            print("du:", du)
             x += du
-            print("x:", x)
             _, gradf = problem.objective(x)
-            print("gradf:", gradf)
             f_new, grad_f_new = problem.objective(x)
-            print("f:", f_new)
-            print("-------------------------------")
 
             if np.abs(f_new - f) < problem.FunValDiff:
                 print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
@@ -37,3 +28,5 @@ class NewtonRaphsonOptimizer(Optimizer):
         f, gradf = f_new, grad_f_new
 
         return x, f, gradf 
+
+

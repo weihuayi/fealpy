@@ -64,8 +64,6 @@ class NonlinearSolver:
         uold = u
         P = calculate_P(u)
         R = f - P
-        print("R:", R)
-        print("-----------------------------")
         conv = np.sum(R**2)/(1+np.sum(f**2))
         c = 0
 
@@ -83,16 +81,10 @@ class NonlinearSolver:
 
         while conv > self.tol and iter < self.max_iter:
             Kt = calculate_Kt(u)
-            print("Kt:\n", Kt)
-            print("Kt^-1:\n", np.linalg.inv(Kt))
             delu = np.linalg.solve(Kt, R)
-            print("delu:", delu)
             u = uold + delu
-            print("u:", u)
             P = calculate_P(u)
             R = f - P
-            print("R:", R)
-            print("---------------------------------")
             conv = np.sum(R**2)/(1+np.sum(f**2))
             c = np.abs(u_exact[1] - u[1])/np.abs(u_exact[1] - uold[1])**2 if iter > 0 else 0
             uold = u
@@ -181,6 +173,7 @@ class NonlinearSolver:
             print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
 
         Kt = calculate_Kt(u)
+        print("Kt:", Kt)
         while conv > self.tol and iter < self.max_iter:
             delu = np.linalg.solve(Kt, R)
             u = uold + delu
