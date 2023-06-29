@@ -15,6 +15,8 @@ from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
 
+from fealpy.solver import GAMGSolver
+
 import ipdb
 
 ## 参数解析
@@ -74,7 +76,9 @@ for i in range(maxit):
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
 
-    uh[:] = spsolve(A, F)
+    solver = GAMGSolver(ptype='W', sstep=3)
+    solver.setup(A)
+    uh[:] = solver.solve(F)
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
     errorMatrix[1, i] = mesh.error(pde.gradient, uh.grad_value)
