@@ -137,6 +137,17 @@ class VectorMonomialSpace2d():
         gphi[..., -ldof//2:, : , 1] = smgphi
         return gphi
 
+    @cartesian
+    def laplace_basis(self, point, index=np.s_[:], p=None, scaled=True):
+        smlphi = self.smspace.laplace_basis(point, index=index, p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
+        shape = point.shape[:-1] + (ldof, 2)
+        lphi = np.zeros(shape, dtype=self.ftype)
+        lphi[..., :ldof//2, 0] = smlphi
+        lphi[..., -ldof//2:, 1] = smlphi
+        return lphi
+
+
     def number_of_local_dofs(self, p=None, doftype='cell'):
         return self.dof.number_of_local_dofs(p=p, doftype=doftype)
 
