@@ -149,6 +149,8 @@ class GAMGSolver():
             x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
             print(info)
 
+        return x
+
 
     def vcycle(self, r, level=0):
         """
