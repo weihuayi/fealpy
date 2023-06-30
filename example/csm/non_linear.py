@@ -26,8 +26,6 @@ def two_nonlinear_springs_opt():
     opt = NewtonRaphsonOptimizer(problem)
     x = opt.run()
     print("x:", x)
-    print("energy:", problem.energy)
-
 
 
 if __name__ == "__main__":
