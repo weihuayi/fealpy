@@ -16,7 +16,7 @@ h = mgis_bv.Hypothesis.Tridimensional # 表示是三维
 b = mgis_bv.load(lib, "PhaseFieldDisplacementSpectralSplit", h)
 
 # 设置材料属性
-m = mgis_bv.MaterialDataManager(b, 2) # 2 表示要处理的材料数量
+m = mgis_bv.MaterialDataManager(b, 1) # 2 表示积分点的个数
 mgis_bv.setMaterialProperty(m.s1, "YoungModulus", 150e9) # 设置材料属性
 mgis_bv.setMaterialProperty(m.s1, "PoissonRatio", 0.3)
 mgis_bv.setExternalStateVariable(m.s1, "Temperature", 293.15) #设置外部状态变量
@@ -30,7 +30,7 @@ it = mgis_bv.IntegrationType.IntegrationWithConsistentTangentOperator
 dt = 0
 mgis_bv.integrate(m, it, dt, 0, m.n)
 
-idx = mgis_bv.getVariableSize(b.thermodynamic_forces[0], h)
+#idx = mgis_bv.getVariableSize(b.thermodynamic_forces[0], h)
 sig = m.s1.thermodynamic_forces
 
 H = m.s1.internal_state_variables[0]
