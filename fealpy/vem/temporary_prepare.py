@@ -85,3 +85,17 @@ def vector_decomposition(space, p):
     B = np.zeros((ldof, ldof2)) # (2n_k,n_{k-1})
     B[row, cols] = value
     return A, B 
+def laplace_coefficient(space, p):
+    mesh = space.mesh
+    data = space.vmspace.diff_index_2() 
+    cellarea = mesh.cell_area()
+    smldof = space.vmspace.number_of_local_dofs()
+    xx = data['xx']
+    yy = data['yy']
+    E = np.zeros(((p+1)*(p+2),p*(p-1)), dtype=np.float64)
+    E[xx[0], np.arange(p*(p-1)//2)] = xx[1]#/cellarea
+    E[xx[0]+(p+1)*(p+2)//2, p*(p-1)//2+np.arange(p*(p-1)//2)] += xx[1]
+    E[yy[0], np.arange(p*(p-1)//2)] += yy[1]#/cellarea
+    E[yy[0]+(p+1)*(p+2)//2, p*(p-1)//2+np.arange(p*(p-1)//2)] += yy[1]
+    E = E[None, :, :]/cellarea[:, None, None]
+    return E
