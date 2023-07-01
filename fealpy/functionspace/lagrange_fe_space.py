@@ -9,12 +9,16 @@ class LagrangeFESpace():
                 "IntervalMesh": IntervalMeshCFEDof,
                 "TriangleMesh": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
+                "QuadrangleMesh" : QuadrangleMeshCFEDof,
+                "HexahedronMesh" : HexahedronMeshCFEDof,
                 "EdgeMesh": EdgeMeshCFEDof,
                 }, 
             'D':{
                 "IntervalMesh": IntervalMeshDFEDof,
                 "TriangleMesh": TriangleMeshDFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
+                "QuadrangleMesh" : QuadrangleMeshDFEDof,
+                "HexahedronMesh" : HexahedronMeshDFEDof,
                 "EdgeMesh": EdgeMeshDFEDof, 
                 }
         } 
@@ -86,6 +90,20 @@ class LagrangeFESpace():
     def top_dimension(self):
         return self.TD
 
+    def prolongation_matrix(self, cdegree=[1]):
+        """
+        @brief 生成当前空间
+
+        @param[in] 粗空间次数列表
+        """
+        assert self.spacetype == 'C' 
+        p = self.p
+        Ps = []
+        for c in cdegree[-1::-1]:
+            Ps.append(self.mesh.prolongation_matrix(c, p))
+            p = c 
+        return Ps
+
     @barycentric
     def basis(self, bc, index=np.s_[:]):
         p = self.p
@@ -106,7 +124,7 @@ class LagrangeFESpace():
         @brief 计算 face 上的基函数在给定积分点处的函数值
         """
         p = self.p
-        phi = self.mesh.shape_function(bc, p=p, etype='face')
+        phi = self.mesh.face_shape_function(bc, p=p)
         return phi[..., None, :]
 
     @barycentric

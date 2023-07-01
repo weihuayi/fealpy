@@ -82,7 +82,6 @@ class VectorSourceIntegrator():
                 val = f(ps)
         else:
             val = f
-        print(val.shape)
         if isinstance(val, (int, float)):
             if space[0].doforder == 'sdofs':
                 bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)[:, None, :]

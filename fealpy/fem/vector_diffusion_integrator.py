@@ -67,7 +67,8 @@ class VectorDiffusionIntegrator:
         integrator = ScalarDiffusionIntegrator(self.coef, self.q)
         # 组装标量的单元扩散矩阵
         # D.shape == (NC, ldof, ldof)
-        D = inegrator.assembly_cell_matrix(space, index=index, cellmeasure=cellmeasure)
+        D = integrator.assembly_cell_matrix(space[0], index=index, cellmeasure=cellmeasure)
+        NC = len(cellmeasure)
 
         if out is None:
             VD = n.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)

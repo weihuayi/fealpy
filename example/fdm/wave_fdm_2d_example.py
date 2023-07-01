@@ -7,8 +7,6 @@ from fealpy.mesh import UniformMesh2d
 from scipy.sparse.linalg import spsolve
 from fealpy.pde.wave_2d import MembraneOscillationPDEData
 
-import ipdb
-
 
 # 参数解析
 parser = argparse.ArgumentParser(description=

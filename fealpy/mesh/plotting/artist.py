@@ -69,7 +69,8 @@ def show_multi_index():
     pass
 
 
-def scatter(axes: Axes, points: NDArray, color, markersize):
+def scatter(axes: Axes, points: NDArray, color,
+            marker: str='o', markersize: float=12):
     """
     @brief Show points in the axes.
 
@@ -86,12 +87,12 @@ def scatter(axes: Axes, points: NDArray, color, markersize):
     if GD == 3:
         return axes.scatter(
             loc[:, 0], loc[:, 1], loc[:, 2],
-            color=color, s=markersize
+            color=color, s=markersize, marker=marker
         ),
     else:
         return axes.scatter(
             loc[:, 0], loc[:, 1],
-            color=color, s=markersize
+            color=color, s=markersize, marker=marker
         )
 
 

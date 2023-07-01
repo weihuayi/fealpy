@@ -3,11 +3,12 @@ from typing import (
     Callable, Optional, TypeVar, Any, Union, Sequence, Generic,
     Dict, Type
 )
+from types import ModuleType
 import numpy as np
 from numpy.typing import NDArray
 from matplotlib.axes import Axes
 
-from ..mesh_base import Mesh, Mesh1d, Mesh2d, Mesh3d
+from ..mesh_base import Mesh
 from . import artist as A
 
 _MT = TypeVar('_MT', bound=Mesh)
@@ -27,9 +28,9 @@ def get_ploter(key: str) -> Type['MeshPloter']:
     if key in _ploter_map_:
         return _ploter_map_[key]
     else:
-        raise KeyError(f"Can not find a ploter class that key '{key}' mapping to."
-                       "To use Plotable, register the target ploter first and then"
-                       "specify the ploter for mesh by setting a same key."
+        raise KeyError(f"Can not find a ploter class that key '{key}' mapping to. "
+                       "To use Plotable, register the target ploter first and then "
+                       "specify the ploter for mesh by setting a same key. "
                        "See MeshPloter.register() and Plotable.set_ploter().")
 
 
@@ -38,6 +39,9 @@ class MeshPloter(Generic[_MT]):
     _mesh: _MT
 
     def __init__(self, mesh: _MT) -> None:
+        if not isinstance(mesh, Mesh):
+            raise TypeError("MeshPloter only works for mesh type, "
+                            f"but got {self.__class__.__name__}.")
         self._mesh = mesh
 
     @property
@@ -49,14 +53,18 @@ class MeshPloter(Generic[_MT]):
         if isinstance(axes, Axes):
             self._axes = axes
         else:
-            raise TypeError("Param 'axes' should be Axes type"
+            raise TypeError("Param 'axes' should be Axes type, "
                             f"but got {axes.__class__.__name__}.")
 
     @property
     def mesh(self):
         return self._mesh
 
-    def _call_impl(self, axes: Axes, *args, **kwargs):
+    def _call_impl(self, axes: Union[Axes, ModuleType], *args, **kwargs):
+        if isinstance(axes, ModuleType):
+            fig = axes.figure()
+            axes = fig.add_subplot(1, 1, 1)
+
         self.current_axes = axes
 
         return self.draw(*args, **kwargs)
@@ -75,6 +83,9 @@ class MeshPloter(Generic[_MT]):
             raise KeyError(f"Key '{key}' has been used by ploter {ploter.__name__}.")
         elif not issubclass(cls, MeshPloter):
             raise TypeError(f"Expect subclass of MeshPloter but got itself.")
+        elif not isinstance(key, str):
+            raise TypeError("Only accepts a single string as the key, "
+                            f"but got {key.__class__.__name__}.")
         _ploter_map_[key] = cls
 
     def set_show_axis(self, switch: bool=True):
@@ -115,12 +126,46 @@ class MeshPloter(Generic[_MT]):
             self._axes.set_zlim(box[4:6])
 
 
+class EntityFinder(MeshPloter):
+    def draw(self, etype_or_node: Union[int, str, NDArray], index=np.s_[:],
+                showindex: bool=False, color='r', marker='o', markersize=20,
+                fontcolor='k', fontsize=24):
+        """
+        @brief Show the barycenter of each entity.
+        """
+        from ..plotting import artist as A
+        from ..plotting.classic import array_color_map
+
+        axes = self.current_axes
+
+        if isinstance(etype_or_node, (int, str)):
+            bc = self.mesh.entity_barycenter(etype=etype_or_node, index=index)
+        elif isinstance(etype_or_node, np.ndarray):
+            bc = etype_or_node
+        else:
+            raise TypeError(f"Invalid entity type or node info.")
+        if bc.ndim == 1:
+            bc = bc[:, None]
+
+        if isinstance(color, np.ndarray) and np.isreal(color[0]):
+            mapper = array_color_map(color, 'rainbow')
+            color = mapper.to_rgba(color)
+
+        A.scatter(axes=axes, points=bc, color=color,
+                  marker=marker, markersize=markersize)
+        if showindex:
+            A.show_index(axes=axes, location=bc, number=index,
+                         fontcolor=fontcolor, fontsize=fontsize)
+
+EntityFinder.register('finder')
+
+
 ##################################################
 ### MeshPloter subclasses
 ##################################################
 
 
-class AddPlot1d(MeshPloter[Mesh1d]):
+class AddPlot1d(MeshPloter):
     def draw(
             self, nodecolor='k', cellcolor='k',
             markersize=20, linewidths=1,
@@ -150,9 +195,9 @@ class AddPlot1d(MeshPloter[Mesh1d]):
 AddPlot1d.register('1d')
 
 
-class AddPlot2dHomo(MeshPloter[Mesh2d]):
+class AddPlot2dHomo(MeshPloter):
     def draw(
-            self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
+            self, edgecolor='k', cellcolor='#99BBF6',
             linewidths: float=1.0, alpha: float=1.0,
             aspect=None,
             showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
@@ -187,9 +232,9 @@ class AddPlot2dHomo(MeshPloter[Mesh2d]):
 AddPlot2dHomo.register('2d')
 
 
-class AddPlot2dPoly(MeshPloter[Mesh2d]):
+class AddPlot2dPoly(MeshPloter):
     def draw(
-            self, edgecolor='k', cellcolor=[0.5, 0.9, 0.45],
+            self, edgecolor='k', cellcolor='#99BBF6',
             linewidths: float=1.0, alpha: float=1.0,
             aspect=None,
             showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
@@ -221,7 +266,7 @@ class AddPlot2dPoly(MeshPloter[Mesh2d]):
 AddPlot2dPoly.register('polygon2d')
 
 
-class AddPlot3dHomo(MeshPloter[Mesh3d]):
+class AddPlot3dHomo(MeshPloter):
     def draw(
             self, nodecolor='k', edgecolor='k', cellcolor='w',
             markersize=20, linewidths=0.5, alpha=0.8,

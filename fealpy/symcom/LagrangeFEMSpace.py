@@ -45,7 +45,7 @@ class LagrangeFEMSpace:
         return multiIndex
 
 
-    def basis(self,p):
+    def basis(self, p):
         l = self.l
         GD = self.GD
         ldof = self.number_of_dofs(p)

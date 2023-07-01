@@ -2,9 +2,9 @@ import numpy as np
 
 
 class ScalarNeumannBCIntegrator:
-    def __init__(self, gN, threshold=None, q=None):
+    def __init__(self, gN, threshold=None, q=3):
         self.gN = gN
-        self.q = None
+        self.q = q 
         self.threshold = threshold
 
     def assembly_face_vector(self, space, out=None):
@@ -27,8 +27,7 @@ class ScalarNeumannBCIntegrator:
         n = mesh.face_unit_normal(index=index)
         facemeasure = mesh.entity_measure('face', index=index)
 
-        q = self.q if self.q is not None else space.p + 3 #TODO: 积分精度选择策略
-        qf = mesh.integrator(q, 'face')
+        qf = mesh.integrator(self.q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.face_basis(bcs)
         

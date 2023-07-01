@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipdb
 import pytest
-from fealpy.mesh import TriangleMesh  # 请替换为实际模块名
+from fealpy.mesh.triangle_mesh import TriangleMesh  # 请替换为实际模块名
 
 
 def test_triangle_mesh_init():
@@ -83,6 +83,8 @@ def test_from_torus_surface(R, r, Nu, Nv):
     mesh.add_plot(axes)
     plt.show()
 
+
 if __name__ == "__main__":
-    test_triangle_mesh_interpolate()
-    #test_from_torus_surface(3, 1, 20, 20)
+    TriangleMesh.show_shape_function(4, funtype='B')
+    TriangleMesh.show_grad_shape_function(4, funtype='B')
+    #TriangleMesh.show_lattice(5)

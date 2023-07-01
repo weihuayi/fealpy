@@ -8,6 +8,7 @@ class ScaledMonomialSpaceDiffusionIntegrator2d:
 
     def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, M):
         p = space.p
+        mesh = space.mesh
         NC = mesh.number_of_cells()
         ldof0 = space.number_of_local_dofs(p=p-1)
 

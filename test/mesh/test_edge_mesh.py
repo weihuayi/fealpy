@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.mesh import EdgeMesh
+from fealpy.mesh.edge_mesh import EdgeMesh
 from fealpy.quadrature import GaussLegendreQuadrature
 import pytest
 
@@ -33,7 +33,6 @@ def test_add_plot():
 
     mesh = EdgeMesh.from_tower()
     mesh.add_plot(plt)
-    #plt.show()
 
 
 if __name__ == "__main__":

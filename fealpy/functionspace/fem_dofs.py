@@ -1,11 +1,12 @@
 import numpy as np
 from typing import Optional, Union, Callable
 
-class SimplexMeshCFEDof():
+class LinearMeshCFEDof():
     def __init__(self, mesh, p):
+        TD = mesh.top_dimension()
         self.mesh = mesh
         self.p = p
-        self.multiIndex = mesh.multi_index_matrix(p) 
+        self.multiIndex = mesh.multi_index_matrix(p, TD) 
         self.cell2dof = self.cell_to_dof()
 
     def is_boundary_dof(self, threshold=None):
@@ -43,7 +44,7 @@ class SimplexMeshCFEDof():
     def number_of_local_dofs(self, doftype='cell'):
         return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)
 
-class IntervalMeshCFEDof(SimplexMeshCFEDof):
+class IntervalMeshCFEDof(LinearMeshCFEDof):
     def __init__(self, mesh, p: int):
         super(IntervalMeshCFEDof, self).__init__(mesh, p)
 
@@ -59,7 +60,7 @@ class IntervalMeshCFEDof(SimplexMeshCFEDof):
         else:
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell', 'edge', 1, 'node', 'face', and 0.")
 
-class TriangleMeshCFEDof(SimplexMeshCFEDof):
+class TriangleMeshCFEDof(LinearMeshCFEDof):
     def __init__(self, mesh, p):
         super(TriangleMeshCFEDof, self).__init__(mesh, p)
 
@@ -85,7 +86,7 @@ class TriangleMeshCFEDof(SimplexMeshCFEDof):
     def is_on_edge_local_dof(self):
         return self.multiIndex == 0
 
-class TetrahedronMeshCFEDof(SimplexMeshCFEDof):
+class TetrahedronMeshCFEDof(LinearMeshCFEDof):
     def __init__(self, mesh, p):
         super(TetrahedronMeshCFEDof, self).__init__(mesh, p)
 
@@ -125,7 +126,15 @@ class TetrahedronMeshCFEDof(SimplexMeshCFEDof):
         isFaceDof = (self.multiIndex == 0)
         return isFaceDof
 
-class SimplexMeshDFEDof():
+class QuadrangleMeshCFEDof(LinearMeshCFEDof):
+    def __init__(self, mesh, p):
+        super(QuadrangleMeshCFEDof, self).__init__(mesh, p)
+
+class HexahedronMeshCFEDof(LinearMeshCFEDof):
+    def __init__(self, mesh, p):
+        super(HexahedronMeshCFEDof, self).__init__(mesh, p)
+
+class LinearMeshDFEDof():
     """
     间断单元自由度管理基类.
     """
@@ -178,7 +187,7 @@ class SimplexMeshDFEDof():
         return ipoint
 
 
-class IntervalMeshDFEDof(SimplexMeshDFEDof):
+class IntervalMeshDFEDof(LinearMeshDFEDof):
     """
     区间间断单元自由度管理类.
     """
@@ -194,7 +203,7 @@ class IntervalMeshDFEDof(SimplexMeshDFEDof):
         else:
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell', 'edge', and 1.")
 
-class TriangleMeshDFEDof(SimplexMeshDFEDof):
+class TriangleMeshDFEDof(LinearMeshDFEDof):
     """
     三角形间断单元自由度管理类.
     """
@@ -211,7 +220,7 @@ class TriangleMeshDFEDof(SimplexMeshDFEDof):
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell' and 2.")
 
 
-class TetrahedronMeshDFEDof(SimplexMeshDFEDof):
+class TetrahedronMeshDFEDof(LinearMeshDFEDof):
     """
     四面体间断单元自由度管理类.
     """
@@ -227,6 +236,14 @@ class TetrahedronMeshDFEDof(SimplexMeshDFEDof):
         else:
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell' and 3.")
 
+
+class QuadrangleMeshDFEDof(LinearMeshDFEDof):
+    def __init__(self, mesh, p):
+        super(QuadrangleMeshDFEDof, self).__init__(mesh, p)
+
+class HexahedronMeshDFEDof(LinearMeshCFEDof):
+    def __init__(self, mesh, p):
+        super(HexahedronMeshDFEDof, self).__init__(mesh, p)
 
 class EdgeMeshCFEDof():
     """
@@ -266,13 +283,6 @@ class EdgeMeshCFEDof():
 
     def cell_to_dof(self, index=np.s_[:]):
         return self.mesh.cell_to_ipoint(self.p)[index]
-#        cell = self.mesh.entity('cell')
-#        GD = self.mesh.geo_dimension()
-#        NN = self.mesh.number_of_nodes()
-#        cell2dof = np.zeros((cell.shape[0], 2*GD), dtype=np.int_)
-#        for i in range(GD):
-#            cell2dof[:, i::GD] = cell + NN*i 
-#        return cell2dof
 
     def number_of_local_dofs(self, doftype='cell'):
         return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)

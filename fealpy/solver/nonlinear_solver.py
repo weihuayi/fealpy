@@ -45,6 +45,56 @@ class NonlinearSolver:
 
         return u
 
+
+    def newton_raphson(self, u: np.ndarray, f: np.ndarray, 
+                   calculate_P: Callable[[np.ndarray], np.ndarray], 
+                   calculate_Kt: Callable[[np.ndarray], np.ndarray], 
+                   u_exact: np.ndarray) -> np.ndarray:
+        """
+        使用 Newton-Raphson 方法求解非线性方程组
+
+        @param u: 初始向量值
+        @param f: 非线性方程组右侧的常数向量
+        @param calculate_P: 计算非线性方程组的函数
+        @param calculate_Kt: 计算切线刚度矩阵的函数
+        @param u_exact: 准确的解向量
+        @return: 非线性方程组的解
+        """
+        iter = 0
+        uold = u
+        P = calculate_P(u)
+        R = f - P
+        conv = np.sum(R**2)/(1+np.sum(f**2))
+        c = 0
+
+        def print_info():
+            print(f'{iter:3d}', end='')
+            for ui in u:
+                print(f' {ui:7.5f}', end='')
+            print(f' {conv:12.3e} {c:7.5f}')
+
+        print('iter', end='')
+        for i in range(len(u)):
+            print(f'   u{i+1}   ', end='')
+        print('      conv      c')
+        print_info()
+
+        while conv > self.tol and iter < self.max_iter:
+            Kt = calculate_Kt(u)
+            delu = np.linalg.solve(Kt, R)
+            u = uold + delu
+            P = calculate_P(u)
+            R = f - P
+            conv = np.sum(R**2)/(1+np.sum(f**2))
+            c = np.abs(u_exact[1] - u[1])/np.abs(u_exact[1] - uold[1])**2 if iter > 0 else 0
+            uold = u
+            iter += 1
+
+            print_info()
+
+        return u
+
+
     def newton_raphson_unvariate(self, u0: float, calculate_P: Callable[[float], float], 
                                     calculate_Kt: Callable[[float], float]) -> float:
         """
@@ -123,6 +173,7 @@ class NonlinearSolver:
             print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
 
         Kt = calculate_Kt(u)
+        print("Kt:", Kt)
         while conv > self.tol and iter < self.max_iter:
             delu = np.linalg.solve(Kt, R)
             u = uold + delu

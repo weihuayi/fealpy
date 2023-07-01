@@ -37,14 +37,6 @@ class Mesh1d(Mesh):
         from ...quadrature import GaussLegendreQuadrature
         return GaussLegendreQuadrature(k)
 
-    def entity(self, etype: Union[int, str]='cell', index=np.s_[:]):
-        if etype in {'cell', 'edge', 1}:
-            return self.ds.cell[index]
-        elif etype in {'node', 'face', 0}:
-            return self.node[index]
-        else:
-            raise ValueError(f" The entity type {etype} is wrong!")
-
     def entity_measure(self, etype: Union[int, str]='cell', index=np.s_[:], node=None):
         """
         """
@@ -53,50 +45,7 @@ class Mesh1d(Mesh):
         elif etype in {0, 'face', 'node'}:
             return np.array([0], dtype=self.ftype)
         else:
-            raise ValueError("`etype` is wrong!")
-        
-    def cell_length(self, index=np.s_[:], node=None):
-        """
-        @brief 计算单元的长度
-        @param[in] etype
-        @param[in] index
-        @param[in] node 用户提供的网格节点坐标
-
-        @note 如果是一维结构网格可以重新实现这个计算函数
-        """
-        node = self.entity('node') if node is None else node
-        cell = self.entity('cell', index=index)
-        GD = self.geo_dimension()
-        # 这里要求 node 必须是 (NN, GD) 维的
-        return np.sqrt(np.sum((node[cell[:, 1]] - node[cell[:, 0]])**2, axis=-1))
-
-    def entity_barycenter(self, etype: Union[int, str]='cell', index=np.s_[:], 
-            node: Optional[NDArray]=None):
-        """
-        @brief 
-        """
-        node = self.entity('node') if node is None else node
-        if etype in {1, 'cell',  'edge'}:
-            cell = self.entity(etype, index=index)
-            bc = np.sum(node[cell], axis=1)/cell.shape[-1]
-        elif etype in {'node', 'face', 0}:
-            bc = self.entity(etype, index=index)
-        else:
-            raise ValueError(f'the entity type: `{etype}` is not correct!') 
-        return bc
-
-    def bc_to_point(self, bc: NDArray, index=np.s_[:], node=None):
-        """
-        @brief 把重心坐标转换为实际坐标
-        """
-        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
-        node = self.node if node is None else node
-        entity = self.entity(etype=TD)[index]
-        if TD == 0:
-            return(entity[None, :])
-        else: 
-            p = np.einsum('...j, ijk->...ik', bc, node[entity])
-            return p
+            raise ValueError(f"entity type: {etype} is wrong!")
 
     def grad_lambda(self, index=np.s_[:]):
         """
@@ -113,76 +62,6 @@ class Mesh1d(Mesh):
         Dlambda[:, 0, :] = -v
         Dlambda[:, 1, :] = v
         return Dlambda
-
-    @staticmethod
-    def multi_index_matrix(p: int, etype: Union[int, str]=1) -> NDArray:
-        """
-        @brief 计算二维的 p 次多重指标矩阵
-        """
-        ldof = p+1
-        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-        multiIndex[:, 0] = np.arange(p, -1, -1)
-        multiIndex[:, 1] = p - multiIndex[:, 0]
-        return multiIndex
-
-    def shape_function(self, bc, p=1) -> NDArray:
-        """
-        @brief 计算一维单元上的形函数
-        """
-        TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
-
-    def grad_shape_function(self, bc: NDArray, p=1, index=np.s_[:]) -> NDArray:
-        """
-        @brief 计算一维单元上的形函数的梯度
-        @note 注意，这里是关于物理空间变量的梯度！
-        """
-
-        TD = self.top_dimension()
-        multiIndex = self.multi_index_matrix(p)
-
-        c = np.arange(1, p+1, dtype=self.itype)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_ipoints(p)
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=self.ftype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-
-        Dlambda = self.grad_lambda(index=index)
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        return gphi
 
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         return p + 1
@@ -214,26 +93,7 @@ class Mesh1d(Mesh):
 
             return ipoint
 
-    def cell_to_ipoint(self, p, index=np.s_[:]):
-        """
-        @brief 获取网格边与插值点的对应关系
-        """
-        NC = self.number_of_cells()
-        NN = self.number_of_nodes()
 
-        cell = self.entity('cell')
-        cell2ipoints = np.zeros((NC, p+1), dtype=np.int_)
-        cell2ipoints[:, [0, -1]] = cell
-        if p > 1:
-            cell2ipoints[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
-        return cell2ipoints[index]
-
-    edge_to_ipoint = cell_to_ipoint
-
-    def node_to_ipoint(self, p, index=np.s_[:]):
-        return np.arange(self.number_of_nodes())
-
-    face_to_ipoint = node_to_ipoint
 
 
 ##################################################
@@ -274,14 +134,6 @@ class Mesh2d(Mesh):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
 
-    def edge_length(self, index=np.s_[:]):
-        """
-        @brief
-        """
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index,1],:] - node[edge[index,0],:]
-        return np.linalg.norm(v, axis=1)
 
     def cell_area(self, index=np.s_[:]):
         """
@@ -292,19 +144,24 @@ class Mesh2d(Mesh):
         node = self.entity('node')
         edge = self.entity('edge')
         edge2cell = self.ds.edge_to_cell()
+
+        t = self.edge_tangent()
+        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1] 
+
+        a = np.zeros(NC, dtype=self.ftype)
+        np.add.at(a, edge2cell[:, 0], val)
+
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        v =  node[edge[:, 1], :] - node[edge[:, 0], :]
-        val = np.einsum('ij, ij->i', v, node[edge[:, 0], :], optimize=True)
-        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
-        a /=2
+        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+
+        a /= 2.0
+
         return a[index]
 
     ## Special Methods in 2D
     def node_size(self):
         """
-        @brief
-        计算每个网格节点邻接边的长度平均值, 做为节点处的网格尺寸值
+        @brief 计算每个网格节点邻接边的长度平均值, 做为节点处的网格尺寸值
         """
         NN = self.number_of_nodes()
         edge = self.entity('edge')
@@ -318,61 +175,37 @@ class Mesh2d(Mesh):
 
         return h/deg
 
-    def face_normal(self, index=np.s_[:]):
-        v = self.face_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-    def face_unit_normal(self, index=np.s_[:]):
-        v = self.face_unit_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-    def face_tangent(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index,1],:] - node[edge[index,0],:]
-        return v
-
-    def face_unit_tangent(self, index=np.s_[:]):
-        edge = self.entity('edge')
-        node = self.entity('node')
-        v = node[edge[index,1],:] - node[edge[index,0],:]
-        length = np.linalg.norm(v, ord=2, axis=1)
-        v /= length.reshape(-1, 1)
-        return v
 
     def edge_frame(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上的局部标架 
+        """
+        assert self.geo_dimension() == 2
         t = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
 
-    def edge_unit_normal(self, index=np.s_[:]):
-        #TODO: 3D Case
-        v = self.edge_unit_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-    def edge_unit_tangent(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index, -1],:] - node[edge[index, 0],:]
-        length = np.linalg.norm(v, axis=1)
-        v /= length.reshape(-1, 1)
-        return v
-
     def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_tangent(self, index=np.s_[:]):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        v = node[edge[index, 1],:] - node[edge[index, 0],:]
-        return v
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
+    face_normal = edge_normal
+    face_unit_normal = edge_unit_normal
 
 ##################################################
 ### Topology dimension 3 Mesh
@@ -403,24 +236,6 @@ class Mesh3d(Mesh):
         else:
             raise ValueError("`entitytype` is wrong!")
 
-    def cell_volume(self, index=np.s_[:]):
-        pass
 
-    def face_area(self, index=np.s_[:]):
-        pass
 
-    def edge_length(self, index=np.s_[:]):
-        pass
 
-    def edge_tangent(self):
-        edge = self.ds.edge
-        node = self.node
-        v = node[edge[:, 1], :] - node[edge[:, 0], :]
-        return v
-
-    def edge_unit_tangent(self):
-        edge = self.ds.edge
-        node = self.node
-        v = node[edge[:, 1], :] - node[edge[:, 0], :]
-        length = np.sqrt(np.square(v).sum(axis=1))
-        return v/length.reshape(-1, 1)

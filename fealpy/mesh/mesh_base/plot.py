@@ -2,10 +2,9 @@
 Provide the `add_plot` API in Plotable.
 """
 
-from typing import Optional, Union
+from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
-from .mesh import Mesh
 
 
 class Plotable():
@@ -30,57 +29,32 @@ class Plotable():
     """
     _ploter_class: Optional[str] = None
 
-    @property
-    def add_plot(self):
-        if not isinstance(self, Mesh):
-            raise TypeError("Plotable only works for mesh type,"
-                            f"but got {self.__class__.__name__}.")
-
-        from ..plotting.classic import get_ploter
-
-        if self._ploter_class is not None:
-            return get_ploter(self._ploter_class)(self)
-        else:
-            raise Exception('MeshPloter of the type of mesh should be specified'
-                            'before drawing. If a mesh is inherited from Plotable,'
-                            'use MeshClass.set_ploter(MeshPloterClass) to specify.')
-
     @classmethod
     def set_ploter(cls, ploter: str):
         cls._ploter_class = ploter
 
-    def find_entity(self, axes, etype: Union[int, str], index=np.s_[:],
-                    showindex: bool=False, color='r', markersize=20,
-                    fontcolor='k', fontsize=24):
+    @property
+    def add_plot(self):
+        """
+        @brief Show the mesh.
+        """
+        from ..plotting.classic import get_ploter
+        return get_ploter(self._ploter_class)(self)
+
+    @property
+    def find_entity(self):
         """
         @brief Show the barycenter of each entity.
         """
-        from ..plotting import artist as A
-        from ..plotting.classic import array_color_map
-
-        if not isinstance(self, Mesh):
-            raise TypeError("Plotable only works for mesh type,"
-                            f"but got {self.__class__.__name__}.")
-
-        bc = self.entity_barycenter(etype=etype, index=index)
-        if bc.ndim == 1:
-            bc = bc[:, None]
-
-        if isinstance(color, np.ndarray) and np.isreal(color[0]):
-            mapper = array_color_map(color, 'rainbow')
-            color = mapper.to_rgba(color)
-
-        A.scatter(axes=axes, points=bc, color=color, markersize=markersize)
-        if showindex:
-            A.show_index(axes=axes, location=bc, number=index,
-                         fontcolor=fontcolor, fontsize=fontsize)
+        from ..plotting.classic import get_ploter
+        return get_ploter('finder')(self)
 
     def find_node(self, axes, *,
             node: Optional[NDArray]=None,
             index=np.s_[:],
             showindex=False,
-            color='r', markersize=20,
-            fontsize=16, fontcolor='r',
+            color='r', marker='o', markersize=12,
+            fontsize=12, fontcolor='r',
             multi_index=None) -> None:
         """
         @brief Show nodes in the axes.
@@ -100,39 +74,33 @@ class Plotable():
         """
         if node is None:
             return self.find_entity(
-                    axes, 'node', index=index,
+                    axes, etype_or_node='node', index=index,
                     showindex=showindex,
                     color=color,
+                    marker=marker,
                     markersize=markersize,
                     fontsize=fontsize,
                     fontcolor=fontcolor)
         else:
-            from ..plotting import artist as A
-            from ..plotting.classic import array_color_map
-
-            if node.ndim == 1:
-                node_ = node[:, None]
-            else:
-                node_ = node
-
-            if isinstance(color, np.ndarray) and np.isreal(color[0]):
-                mapper = array_color_map(color, 'rainbow')
-                color = mapper.to_rgba(color)
-
-        A.scatter(axes=axes, points=node_, color=color, markersize=markersize)
-        if showindex:
-            A.show_index(axes=axes, location=node_, number=index,
-                            fontcolor=fontcolor, fontsize=fontsize)
+            return self.find_entity(
+                    axes, etype_or_node=node, index=index,
+                    showindex=showindex,
+                    color=color,
+                    marker=marker,
+                    markersize=markersize,
+                    fontsize=fontsize,
+                    fontcolor=fontcolor)
 
     def find_edge(self, axes,
             index=np.s_[:],
             showindex=False,
-            color='g', markersize=22,
-            fontsize=18, fontcolor='g'):
+            color='g', marker='^', markersize=15,
+            fontsize=15, fontcolor='g'):
         return self.find_entity(
                 axes, 'edge', index=index,
                 showindex=showindex,
                 color=color,
+                marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
@@ -140,12 +108,13 @@ class Plotable():
     def find_face(self, axes,
             index=np.s_[:],
             showindex=False,
-            color='b', markersize=24,
-            fontsize=20, fontcolor='b'):
+            color='#673AB7', marker='d', markersize=18,
+            fontsize=18, fontcolor='#673AB7'):
         return self.find_entity(
                 axes, 'face', index=index,
                 showindex=showindex,
                 color=color,
+                marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
@@ -153,12 +122,13 @@ class Plotable():
     def find_cell(self, axes,
             index=np.s_[:],
             showindex=False,
-            color='y', markersize=26,
-            fontsize=22, fontcolor='y'):
+            color='b', marker='s', markersize=21,
+            fontsize=21, fontcolor='b'):
         return self.find_entity(
                 axes, 'cell', index=index,
                 showindex=showindex,
                 color=color,
+                marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)

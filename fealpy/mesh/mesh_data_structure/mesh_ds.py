@@ -1,9 +1,11 @@
-from abc import ABCMeta, abstractmethod
-from typing import TypeVar, Generic, Union, Callable
+from typing import TypeVar, Generic, Union, Callable, overload
 
 import numpy as np
 from numpy import dtype
 from numpy.typing import NDArray
+from scipy.sparse import coo_matrix, csr_matrix
+
+from .sparse_tool import enable_csr, arr_to_csr
 
 _VT = TypeVar('_VT')
 
@@ -22,11 +24,11 @@ class Redirector(Generic[_VT]):
         delattr(obj, self._target)
 
 
-_int_redirectable = Union[int, Redirector[int]]
+ArrRedirector = Redirector[NDArray]
 _array_redirectable = Union[NDArray, Redirector[NDArray]]
 
 
-class MeshDataStructure(metaclass=ABCMeta):
+class MeshDataStructure():
     """
     @brief The abstract base class for all mesh data structure types in FEALPy.
 
@@ -94,37 +96,40 @@ class MeshDataStructure(metaclass=ABCMeta):
         """
         return self.NN
 
-    # cell
+    # topology
 
     def cell_to_node(self, *args, **kwargs) -> NDArray:
         """
         @brief Return neighbor information from cell to node.
         """
-        return self.cell
+        raise NotImplementedError
 
-    @abstractmethod
     def cell_to_edge(self, *args, **kwargs) -> NDArray:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def cell_to_face(self, *args, **kwargs) -> NDArray:
-        pass
+        raise NotImplementedError
 
-    # face
-
-    def face_to_node(self, *args, **kwargs) -> NDArray:
-        return self.face
-
-    @abstractmethod
     def face_to_cell(self, *args, **kwargs) -> NDArray:
+        raise NotImplementedError
+
+    def face_to_node(self) -> NDArray:
+        raise NotImplementedError
+
+    def edge_to_node(self, return_sparse=False, return_local=False):
+        if not return_sparse:
+            return self.edge
+        else:
+            return arr_to_csr(self.edge, self.number_of_nodes(),
+                              return_local=return_local, dtype=self.itype)
+
+    def node_to_edge(self, return_local=False):
+        return arr_to_csr(self.edge, self.number_of_nodes(),
+                          reversed=True, return_local=return_local, dtype=self.itype)
+
+    def node_to_node(self):
         pass
 
-    # edge
-
-    def edge_to_node(self, *args, **kwargs) -> NDArray:
-        return self.edge
-
-    # node
 
     # boundary flag
 
@@ -133,7 +138,7 @@ class MeshDataStructure(metaclass=ABCMeta):
         @brief Return a bool array to show whether nodes are on the boundary.
         """
         NN = self.number_of_nodes()
-        face2node = self.face
+        face2node = self.face_to_node()
         is_bd_face = self.boundary_face_flag()
         is_bd_node = np.zeros((NN, ), dtype=np.bool_)
         is_bd_node[face2node[is_bd_face, :]] = True
@@ -225,8 +230,29 @@ class HomogeneousMeshDS(MeshDataStructure):
     """
     @brief Data structure for meshes with homogeneous shape of cells.
 
-    In this subclass, `localFace` and `localEdge` are intruduced, and the `construct()`
-    method are used.
+    This subclass is to implement:
+    - Construction of `face2cell` and `face`, basically;
+    - Basic topology relationship: `face2cell` and `cell2edge`(in 3d case);
+    - Special counting methods, calculating NVC, NEC, NFC, NVF, and NVE;
+    - Homogeneous local entities, like `local_edge` and `local_face`;
+    - Generate total entities: `total_edge` and `total_face`;
+    - Topology relationship between cell, face and node; the methods are for all\
+    dimensions, but may have simpler algorithms in low dimension, which can be\
+    implemented overridingly. Note: Relations between `edge` and entities with\
+    dimension higher than it (face and cell) are different in 1d, 2d and 3d.
+
+    Class variables:
+    ccw: NDArray, optional. The indices of nodes sorted counter-clock-wise in\
+         a face(3d case) or a cell(2d case). This will be checked when plotting\
+         the mesh. If not provided, the original order of nodes will be used.
+    localEdge: NDArray with shape (NEC, NVE).
+    localFace: NDArray with shape (NFC, NVF).
+
+    @note `face2cell` and `face` will be construct for all homogeneous meshes, but
+    there are some differences in 1d, 2d and 3d case.
+    - 1d: Redirect `edge` to `cell`, and the `face` is like [[0], [1], [2], ..., [NN-1]];
+    - 2d: Redirect `edge` to `face`;
+    - 3d: Also construct `cell2edge` and `edge`.
     """
     # Constants
     ccw: NDArray
@@ -280,6 +306,7 @@ class HomogeneousMeshDS(MeshDataStructure):
         self.face2cell[:, 3] = i1 % NFC
 
         if self.TD == 3:
+            NEC = self.number_of_edges_of_cells()
             total_edge = self.total_edge()
 
             _, i2, j = np.unique(
@@ -289,7 +316,7 @@ class HomogeneousMeshDS(MeshDataStructure):
                 axis=0
             )
             self.edge = total_edge[i2, :]
-            self.cell2edge = np.reshape(j, (NC, NFC))
+            self.cell2edge = np.reshape(j, (NC, NEC)) # 原来是 NFC, 应为 NEC
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell
@@ -308,6 +335,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         """
         @brief Return the number of vertices in a cell.
         """
+        if hasattr(self, 'NVC'):
+            return getattr(self, 'NVC')
         return self.cell.shape[-1]
 
     def number_of_edges_of_cells(self) -> int:
@@ -317,6 +346,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localEdge` in axis-0, usually be marked
         as NEC.
         """
+        if hasattr(self, 'NEC'):
+            return getattr(self, 'NEC')
         return self.localEdge.shape[0]
 
     def number_of_faces_of_cells(self) -> int:
@@ -326,6 +357,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localFace` in axis-0, usually be marked
         as NFC.
         """
+        if hasattr(self, 'NFC'):
+            return getattr(self, 'NFC')
         return self.localFace.shape[0]
 
     def number_of_vertices_of_faces(self) -> int:
@@ -335,6 +368,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localFace` in axis-1, usually be marked
         as NVF.
         """
+        if hasattr(self, 'NVF'):
+            return getattr(self, 'NVF')
         return self.localFace.shape[-1]
 
     def number_of_vertices_of_edges(self) -> int:
@@ -344,6 +379,8 @@ class HomogeneousMeshDS(MeshDataStructure):
         This is equal to the length of `localEdge` in axis-1, usually be marked
         as NVE.
         """
+        if hasattr(self, 'NVE'):
+            return getattr(self, 'NVE')
         return self.localEdge.shape[-1]
 
     number_of_nodes_of_cells = number_of_vertices_of_cells
@@ -370,6 +407,61 @@ class HomogeneousMeshDS(MeshDataStructure):
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
+    # between (cell, face) and node
+
+    def cell_to_node(self, return_sparse=False, return_local=False):
+        if not return_sparse:
+            return self.cell
+        else:
+            return arr_to_csr(self.cell, self.NN,
+                              return_local=return_local, dtype=self.itype)
+
+    def node_to_cell(self, return_local=False):
+        return arr_to_csr(self.cell, self.NN, reversed=True,
+                          return_local=return_local, dtype=self.itype)
+
+    def face_to_node(self, return_sparse=False, return_local=False):
+        if not return_sparse:
+            return self.face
+        else:
+            return arr_to_csr(self.face, self.NN,
+                              return_local=return_local, dtype=self.itype)
+
+    def node_to_face(self, return_local=False):
+        return arr_to_csr(self.face, self.NN, reversed=True,
+                          return_local=return_local, dtype=self.itype)
+
+    # between cell and face
+
+    def cell_to_face(self, return_sparse=False, return_local=False) -> NDArray:
+        """
+        @brief Neighbor information of cell to face.
+        """
+        NC = self.number_of_cells()
+        NF = self.number_of_faces()
+        NFC = self.number_of_faces_of_cells()
+
+        face2cell = self.face2cell
+        cell2face = np.zeros((NC, NFC), dtype=self.itype)
+        cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
+        cell2face[face2cell[:, 1], face2cell[:, 3]] = range(NF)
+        if not return_sparse:
+            return cell2face
+        else:
+            return arr_to_csr(cell2face, self.number_of_faces(),
+                              return_local=return_local, dtype=self.itype)
+
+    def face_to_cell(self, return_sparse=False): # TODO: return local in sparse
+        if return_sparse is False:
+            return self.face2cell
+        else:
+            return arr_to_csr(
+                self.face2cell[:, [0, 1]], self.number_of_cells())
+
+    def cell_to_cell(self, return_sparse=False,
+                     return_boundary=True, return_array=False):
+        pass
+
 
 class StructureMeshDS(HomogeneousMeshDS):
     """
@@ -378,7 +470,7 @@ class StructureMeshDS(HomogeneousMeshDS):
     Subclass to change nonstructure mesh type to structure mesh type.
     """
     # Variables
-    cell: _array_redirectable = Redirector('cell_')
+    cell = ArrRedirector('cell_')
 
     # Constants
     TD: int
@@ -389,8 +481,6 @@ class StructureMeshDS(HomogeneousMeshDS):
         for nx_item in nx:
             if not isinstance(nx_item, int):
                 raise TypeError(f"Expect int for nx, but got {nx_item}.")
-        if not isinstance(itype, np.dtype):
-            raise TypeError(f"{itype} is not a valid numpy data type.")
 
         self.nx_ = np.array(nx, dtype=itype)
         self.NN = np.prod(self.nx_ + 1)
@@ -419,23 +509,23 @@ class StructureMeshDS(HomogeneousMeshDS):
         @brief Return the number of faces in the struct mesh.
         """
         full = np.prod(self.nx_, axis=0)
-        adds = full / self.nx_
-        return full + np.sum(adds, axis=0)
+        adds = full // self.nx_
+        return full*self.TD + np.sum(adds, axis=0)
 
     def number_of_edges(self):
         """
         @brief Return the number of edges in the struct mesh.
         """
         full = np.prod(self.nx_ + 1, axis=0)
-        subs = full / (self.nx_ + 1)
-        return full - np.sum(subs, axis=0)
+        subs = full // (self.nx_ + 1)
+        return full*self.TD - np.sum(subs, axis=0)
 
     @property
     def cell_(self):
         TD = self.TD
         NN = self.NN
         NC = np.prod(self.nx_)
-        cell = np.zeros((NC, 2*NC), dtype=self.itype)
+        cell = np.zeros((NC, 2**TD), dtype=self.itype)
         idx = np.arange(NN).reshape(self.nx_+1)
         c = idx[(slice(-1), )*TD]
         cell[:, 0] = c.flat

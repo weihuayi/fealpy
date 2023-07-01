@@ -3,7 +3,7 @@ import ipdb
 import pytest
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import QuadrangleMesh
+from fealpy.mesh.quadrangle_mesh import QuadrangleMesh
 from fealpy.quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 
 def test_quadrangle_mesh_constructor():
@@ -61,20 +61,42 @@ def test_quadrangle_mesh_interpolate():
     #mesh.find_node(axes, node=ips, showindex=True)
     #plt.show()
 
-def test_quadrangle_mesh_shape_function():
+def test_quadrangle_mesh_shape_function(p, plot=False):
+    from fealpy.decorator import cartesian, barycentric
+
+    @cartesian
+    def u(p):
+        x = p[..., 0]
+        y = p[..., 1]
+        return x**2*y**2
+
     mesh = QuadrangleMesh.from_one_quadrangle()
-    bcs, ws = mesh.integrator(3).get_quadrature_points_and_weights()
-    phi = mesh.shape_function(bcs, p=1)
-    gphi = mesh.grad_shape_function(bcs, p=1)
+    mesh.uniform_refine()
+    cm = mesh.entity_measure('cell')
+    print('cm:', cm)
+    ips = mesh.interpolation_points(p)
+    cell2dof = mesh.cell_to_ipoint(p)
+    print(cm)
+    print(cell2dof)
+    print(ips)
+    uI = u(ips)
 
-    phi = mesh.shape_function(bcs, p=2)
-    gphi = mesh.grad_shape_function(bcs, p=2)
+    @barycentric
+    def uh(bcs):
+        phi = mesh.shape_function(bcs, p=p)
+        val = np.einsum('qi, ci->qc', phi, uI[cell2dof])
+        return val
 
-    J = mesh.jacobi_matrix(bcs)
-    print(np.linalg.det(J))
+    e = mesh.error(u, uh)
+    print(e)
 
+    if plot:
+        fig, axes = plt.subplots()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, node=ips, showindex=True)
+        plt.show()
 
 
 if __name__ == "__main__":
-    test_quadrangle_mesh_shape_function()
+    test_quadrangle_mesh_shape_function(2, True)
 

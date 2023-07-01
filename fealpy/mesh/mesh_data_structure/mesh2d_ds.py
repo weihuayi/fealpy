@@ -4,51 +4,26 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common import ranges
-from .mesh_ds import Redirector, MeshDataStructure, StructureMeshDS
+from .mesh_ds import ArrRedirector, HomogeneousMeshDS, StructureMeshDS
+from .sparse_tool import arr_to_csr
 
-
-class Mesh2dDataStructure(MeshDataStructure):
+class Mesh2dDataStructure(HomogeneousMeshDS):
     """
-    @brief The topology data structure of 2-d mesh.\
+    @brief The topology data structure of 2-d homogeneous mesh.\
            This is an abstract class and can not be used directly.
     """
     # Variables
-    face: Redirector[NDArray] = Redirector('edge')
+    face = ArrRedirector('edge')
     edge2cell: NDArray
 
     # Constants
     TD: int = 2
 
-    ### cell ###
 
-    def cell_to_edge(self):
-        """
-        @brief The neighbor information of cell to edge
-        """
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        NEC = self.number_of_edges_of_cells()
+    ### Special Topology APIs for Non-structures ###
 
-        edge2cell = self.edge2cell
-
-        cell2edge = np.zeros((NC, NEC), dtype=self.itype)
-        cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
-        cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
-        return cell2edge
-
-    def cell_to_edge_sign(self):
-        NC = self.number_of_cells()
-        NEC = self.number_of_edges_of_cells()
-
-        edge2cell = self.edge2cell
-
-        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
-        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
-
-        return cell2edgeSign
-
-    cell_to_face = cell_to_edge
-    cell_to_face_sign = cell_to_edge_sign
+    def cell_to_edge(self, return_sparse=False, return_local=False):
+        return self.cell_to_face(return_sparse=return_sparse, return_local=return_local)
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """ Consctruct the neighbor information of cells
@@ -61,8 +36,8 @@ class Mesh2dDataStructure(MeshDataStructure):
         NE = self.number_of_edges()
 
         edge2cell = self.edge2cell
-        if (return_sparse == False) & (return_array == False):
-            NEC = self.NEC
+        if (return_sparse == False) and (return_array == False):
+            NEC = self.number_of_edges_of_cells()
             cell2cell = np.zeros((NC, NEC), dtype=self.itype)
             cell2cell[edge2cell[:, 0], edge2cell[:, 2]] = edge2cell[:, 1]
             cell2cell[edge2cell[:, 1], edge2cell[:, 3]] = edge2cell[:, 0]
@@ -95,16 +70,25 @@ class Mesh2dDataStructure(MeshDataStructure):
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    ### face ###
 
-    def face_to_cell(self):
-        return self.edge2cell
+    ### General Topology APIs ###
 
-    ### edge ###
+    def cell_to_edge_sign(self):
+        NC = self.number_of_cells()
+        NEC = self.number_of_edges_of_cells()
 
-    edge_to_cell = face_to_cell
+        edge2cell = self.edge2cell
 
-    ### node ###
+        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+
+        return cell2edgeSign
+
+    def cell_to_face_sign(self):
+        return self.cell_to_edge_sign()
+
+    def edge_to_cell(self, return_sparse=False):
+        return self.face_to_cell(return_sparse=return_sparse)
 
     def node_to_node(self, return_array=False):
 
@@ -146,37 +130,6 @@ class Mesh2dDataStructure(MeshDataStructure):
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
-    def node_to_edge(self):
-        """
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NVE = self.NVE
-        I = self.edge.flat
-        J = np.repeat(range(NE), NVE)
-        val = np.ones(NVE*NE, dtype=np.bool_)
-        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE))
-        return node2edge
-
-    node_to_face = node_to_edge
-
-    def node_to_cell(self, return_localidx=False):
-        """
-        """
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NVC = self.number_of_vertices_of_cells()
-
-        I = self.cell.flat
-        J = np.repeat(range(NC), NVC)
-
-        if return_localidx == False:
-            val = np.ones(NVC*NC, dtype=np.bool_)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC))
-        else:
-            val = ranges(NVC*np.ones(NC, dtype=self.itype), start=1)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
-        return node2cell
 
     ### boundary ###
 
@@ -200,4 +153,85 @@ class Mesh2dDataStructure(MeshDataStructure):
 
 
 class StructureMesh2dDataStructure(StructureMeshDS, Mesh2dDataStructure):
-    pass
+    cw = np.array([0, 1, 3, 2])
+    ccw = np.array([0, 2, 3, 1])
+    localEdge = np.array([(0, 2), (1, 3), (0, 1), (2, 3)])
+    localFace = localEdge
+
+    @property
+    def edge(self):
+        """
+        @brief 生成网格中所有的边
+        """
+
+        nx = self.nx
+        ny = self.ny
+
+        NN = self.NN
+        NE = self.NE
+
+        idx = np.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
+        edge = np.zeros((NE, 2), dtype=self.itype)
+
+        NE0 = 0
+        NE1 = nx * (ny + 1)
+        edge[NE0:NE1, 0] = idx[:-1, :].flat
+        edge[NE0:NE1, 1] = idx[1:, :].flat
+        edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
+
+        NE0 = NE1
+        NE1 += ny * (nx + 1)
+        edge[NE0:NE1, 0] = idx[:, :-1].flat
+        edge[NE0:NE1, 1] = idx[:, 1:].flat
+        edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
+        return edge
+
+
+    @property
+    def face2cell(self):
+        """
+        @brief 边与单元的邻接关系，储存与每条边相邻的两个单元的信息
+        """
+
+        nx = self.nx
+        ny = self.ny
+
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
+
+        edge2cell = np.zeros((NE, 4), dtype=self.itype)
+
+        idx = np.arange(NC).reshape(nx, ny).T
+
+        # x direction
+        idx0 = np.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
+        # left element
+        edge2cell[idx0[:-1], 0] = idx
+        edge2cell[idx0[:-1], 2] = 0
+        edge2cell[idx0[-1], 0] = idx[-1]
+        edge2cell[idx0[-1], 2] = 1
+
+        # right element
+        edge2cell[idx0[1:], 1] = idx
+        edge2cell[idx0[1:], 3] = 1
+        edge2cell[idx0[0], 1] = idx[0]
+        edge2cell[idx0[0], 3] = 0
+
+        # y direction
+        idx1 = np.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
+        NE0 = nx * (ny + 1)
+        # left element
+        edge2cell[NE0 + idx1[:, 1:], 0] = idx
+        edge2cell[NE0 + idx1[:, 1:], 2] = 3
+        edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+        edge2cell[NE0 + idx1[:, 0], 2] = 2
+
+        # right element
+        edge2cell[NE0 + idx1[:, :-1], 1] = idx
+        edge2cell[NE0 + idx1[:, :-1], 3] = 2
+        edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+        edge2cell[NE0 + idx1[:, -1], 3] = 3
+
+        return edge2cell
+
+    edge2cell = face2cell

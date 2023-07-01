@@ -4,7 +4,7 @@ from numpy.linalg import inv
 from scipy.sparse import csr_matrix, coo_matrix
 from ..decorator import barycentric
 from .Function import Function
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
 
 class FKNDof2d:
     def __init__(self, mesh, p):

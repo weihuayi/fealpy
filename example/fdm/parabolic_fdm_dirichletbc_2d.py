@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from typing import Callable, Tuple, Any
 from scipy.sparse.linalg import spsolve
 from fealpy.pde.parabolic_2d import SinSinExpPDEData
-from fealpy.mesh import UniformMesh2d
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 
 
 ## 参数解析
