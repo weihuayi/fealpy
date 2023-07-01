@@ -28,7 +28,7 @@ AxisymmetricalGeneralisedPlaneStress::sigzz.setGlossaryName("AxialStress");
 
 @PredictionOperator{
   static_cast<void>(smt); // remove unused variable warning
-  computeAlteredElasticStiffness<hypothesis,real>::exe(Dt,lambda,mu);
+  computeAlteredElasticStiffnessd<hypothesis,real>::exe(Dt,lambda,mu);
 }
 
 @Integrator{
