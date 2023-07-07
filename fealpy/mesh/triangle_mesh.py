@@ -2132,7 +2132,7 @@ class TriangleMeshWithInfinityNode:
         self.ds = TriangleMeshDataStructure(NN+1, newCell)
 
         if bc:
-            self.center = np.append(mesh.entity_barycenter(),
+            self.center = np.append(mesh.entity_barycenter('cell'),
                     0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
         else:
             self.center = np.append(mesh.circumcenter(),
@@ -2140,25 +2140,14 @@ class TriangleMeshWithInfinityNode:
 
         self.meshtype = 'tri'
 
-    def number_of_nodes(self):
-        return self.node.shape[0]
-
-    def number_of_edges(self):
-        return self.ds.NE
-
-    def number_of_faces(self):
-        return self.ds.NE
-
-    def number_of_cells(self):
-        return self.ds.NC
 
     def is_infinity_cell(self):
-        N = self.number_of_nodes()
+        N = self.ds.number_of_nodes()
         cell = self.ds.cell
         return cell[:, 0] == N-1
 
     def is_boundary_edge(self):
-        NE = self.number_of_edges()
+        NE = self.ds.number_of_edges()
         cell2edge = self.ds.cell_to_edge()
         isInfCell = self.is_infinity_cell()
         isBdEdge = np.zeros(NE, dtype=np.bool_)
@@ -2166,7 +2155,7 @@ class TriangleMeshWithInfinityNode:
         return isBdEdge
 
     def is_boundary_node(self):
-        N = self.number_of_nodes()
+        N = self.ds.number_of_nodes()
         edge = self.ds.edge
         isBdEdge = self.is_boundary_edge()
         isBdNode = np.zeros(N, dtype=np.bool_)
@@ -2189,7 +2178,7 @@ class TriangleMeshWithInfinityNode:
         pnode = np.concatenate((self.center, self.node[isBdNode]), axis=0)
         PN = pnode.shape[0]
 
-        node2cell = self.ds.node_to_cell(return_localidx=True)
+        node2cell = self.ds.node_to_cell(return_local=True)
         NV = np.asarray((node2cell > 0).sum(axis=1)).reshape(-1)
         NV[isBdNode] += 1
         NV = NV[:-1]
@@ -2201,7 +2190,7 @@ class TriangleMeshWithInfinityNode:
 
 
         isBdEdge = self.is_boundary_edge()
-        NC = self.number_of_cells() - isBdEdge.sum()
+        NC = self.ds.number_of_cells() - isBdEdge.sum()
         cell = self.ds.cell
         currentCellIdx = np.zeros(PNC, dtype=self.itype)
         currentCellIdx[cell[:NC, 0]] = range(NC)
@@ -2210,7 +2199,7 @@ class TriangleMeshWithInfinityNode:
         pcell[pcellLocation[:-1]] = currentCellIdx
 
         currentIdx = pcellLocation[:-1]
-        N = self.number_of_nodes() - 1
+        N = self.ds.number_of_nodes() - 1
         currentNodeIdx = np.arange(N, dtype=self.itype)
         endIdx = pcellLocation[1:]
         cell2cell = self.ds.cell_to_cell()
