@@ -85,6 +85,6 @@ def test_from_torus_surface(R, r, Nu, Nv):
 
 
 if __name__ == "__main__":
-    TriangleMesh.show_shape_function(4, funtype='B')
-    TriangleMesh.show_grad_shape_function(4, funtype='B')
-    #TriangleMesh.show_lattice(5)
+    TriangleMesh.show_shape_function(3, funtype='L')
+    TriangleMesh.show_grad_shape_function(3, funtype='L')
+    TriangleMesh.show_lattice(3)
