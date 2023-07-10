@@ -892,6 +892,10 @@ class PolygonMeshDataStructure(MeshDataStructure):
         cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool_)
         return cell2node
 
+    def face_to_edge(self) -> NDArray:
+        NE = self.number_of_edges()
+        return np.arange(NE).reshape(-1, 1)
+
     def cell_to_edge(self) -> NDArray:
         raise NotImplementedError
 
