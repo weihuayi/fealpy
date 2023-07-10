@@ -1671,12 +1671,17 @@ class TriangleMesh(Mesh, Plotable):
             isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
     @classmethod
-    def show_lattice(cls, p=1):
+    def show_lattice(cls, p=1, showmultiindex=False):
         """
         @brief 展示三角形上的单纯形格点
         """
         import matplotlib.pyplot as plt
         import matplotlib.tri as mtri
+
+        if showmultiindex:
+            n = 3
+        else:
+            n = 2
         
         mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
         node = mesh.entity('node')
@@ -1685,28 +1690,29 @@ class TriangleMesh(Mesh, Plotable):
         ips = ips[c2p].reshape(-1, 2)
 
         fig = plt.figure()
-        axes = fig.add_subplot(1, 3, 1)
+        axes = fig.add_subplot(1, n, 1)
         mesh.add_plot(axes)
         mesh.find_node(axes, showindex=True, fontcolor='k')
 
-        axes = fig.add_subplot(1, 3, 2)
+        axes = fig.add_subplot(1, n, 2)
         mesh.add_plot(axes)
         mesh.find_node(axes, node=ips, showindex=True)
         triangulation = mtri.Triangulation(ips[:, 0], ips[:, 1])
         axes.triplot(triangulation, color='black', linestyle='dashed')
 
-        axes = fig.add_subplot(1, 3, 3)
-        mesh.add_plot(axes)
-        mesh.find_node(axes, node=ips)
-        mi = mesh.multi_index_matrix(p, 2)
-        for i, idx in enumerate(mi):
-            s = str(idx).replace('[', '(')
-            s = s.replace(']', ')')
-            s = s.replace(' ', ',')
-            axes.text(ips[i, 0], ips[i, 1], s,
-                    multialignment='center',
-                    fontsize=12, 
-                    color='r')
+        if showmultiindex:
+            axes = fig.add_subplot(1, n, 3)
+            mesh.add_plot(axes)
+            mesh.find_node(axes, node=ips)
+            mi = mesh.multi_index_matrix(p, 2)
+            for i, idx in enumerate(mi):
+                s = str(idx).replace('[', '(')
+                s = s.replace(']', ')')
+                s = s.replace(' ', ',')
+                axes.text(ips[i, 0], ips[i, 1], s,
+                        multialignment='center',
+                        fontsize=12, 
+                        color='r')
         plt.show()
 
 
@@ -1763,6 +1769,17 @@ class TriangleMesh(Mesh, Plotable):
             axes.set_ylabel('Y')
             axes.set_zlabel('Z')
         plt.show()
+
+    @classmethod
+    def show_global_basis_function(cls, p=3):
+        """
+        @brief 展示通过单元基函数的拼接+零扩展的方法获取整体基函数的过程
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        mesh = cls.from_unit_sq(nx=3, ny=3)
+        node = mesh.entity('node')
 
     @classmethod
     def show_grad_shape_function(cls, p, funtype='L'):
