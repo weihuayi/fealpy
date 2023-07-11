@@ -124,7 +124,7 @@ axes.legend()
 """
 mesh.add_plot(plt)
 uh.add_plot(plt, cmap='rainbow')
-showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
 """
+showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
 
 plt.show()
