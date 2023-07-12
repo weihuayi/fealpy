@@ -17,6 +17,7 @@ E.setGlossaryName("YoungModulus");
 ν.setGlossaryName("PoissonRatio");
 
 @MaterialProperty real n;
+n.setEntryName("n");
 @MaterialProperty real α;
 α.setEntryName("alpha");
 @MaterialProperty stress σ₀;
