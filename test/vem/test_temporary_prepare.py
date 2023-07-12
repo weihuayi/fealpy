@@ -33,7 +33,7 @@ def test_vector_decomposition(refine=False):
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         mesh = PolygonMesh(node, cell)
 
-    degree = 2
+    degree = 3
     dim = 2
     space =  ConformingScalarVESpace2d(mesh, p=degree)
     m = ScaledMonomialSpaceMassIntegrator2d()
@@ -88,5 +88,5 @@ def test_laplace_coefficient(p):
 
 
 if __name__ == "__main__":
-    #test_vector_decomposition(refine=True)
+    test_vector_decomposition(refine=True)
     test_laplace_coefficient(3)
