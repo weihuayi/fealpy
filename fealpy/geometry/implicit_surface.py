@@ -344,10 +344,14 @@ class EllipsoidSurface:
         return x**2/a**2 + y**2/b**2 + z**2/c**2 - 1 
  
     def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
     def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
@@ -359,6 +363,8 @@ class EllipsoidSurface:
         return grad
 
     def hessian(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         a, b, c = self.c
         x = p[..., 0]
         y = p[..., 1]
@@ -380,6 +386,8 @@ class EllipsoidSurface:
         return H
 
     def jacobi_matrix(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
@@ -389,6 +397,8 @@ class EllipsoidSurface:
         return J
 
     def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
         n = grad/l
