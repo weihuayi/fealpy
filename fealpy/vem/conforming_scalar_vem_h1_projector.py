@@ -1,10 +1,11 @@
 import numpy as np
 from numpy.linalg import inv
 
-from fealpy.mesh.polygon_mesh import PolygonMesh
-from fealpy.quadrature import GaussLobattoQuadrature
+from ..quadrature import GaussLobattoQuadrature
+from ..quadrature import GaussLegendreQuadrature
 
-from fealpy.functionspace import ConformingScalarVESpace2d
+from ..functionspace import ConformingScalarVESpace2d
+from ..functionspace import NonConformingScalarVESpace2d
 
 class ConformingScalarVEMH1Projector2d():
     def __init__(self, D):
