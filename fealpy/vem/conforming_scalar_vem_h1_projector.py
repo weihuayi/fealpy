@@ -20,6 +20,7 @@ class ConformingScalarVEMH1Projector2d():
         p = space.p
         self.B = self.assembly_cell_right_hand_side(space) 
         if p == 1:
+            self.G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
             return self.B
         else:
             self.G = self.assembly_cell_left_hand_side(space) 

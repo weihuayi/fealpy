@@ -112,10 +112,7 @@ for i in range(maxit):
     nx *= 2
     ny *= 2
 
-print(errorMatrix)
-
-fig, axes = plt.subplots()
-mesh.add_plot(axes)
+showmultirate(plt, maxit-2, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
 plt.show()
 
 

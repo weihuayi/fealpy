@@ -2,23 +2,31 @@ import argparse
 import numpy as np
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
-import ipdb
 
+# 模型数据
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh import TriangleMesh 
+
+# 网格
 from fealpy.mesh import PolygonMesh
 
+# 协调有限元空间
 from fealpy.functionspace import ConformingScalarVESpace2d
 
+# 积分子
 from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
 from fealpy.vem import ConformingVEMDoFIntegrator2d
 from fealpy.vem import ConformingScalarVEMH1Projector2d
 from fealpy.vem import ConformingScalarVEML2Projector2d 
 from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
 from fealpy.vem import ConformingVEMScalarSourceIntegrator2d
+
+# 双线性型
 from fealpy.vem import BilinearForm
+
+# 线性型
 from fealpy.vem import LinearForm
 
+# 边界条件
 from fealpy.boundarycondition import DirichletBC 
 from fealpy.tools.show import showmultirate
 
@@ -63,8 +71,7 @@ errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.float64)
 
 for i in range(maxit):
-    tmesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
-    mesh = PolygonMesh.from_triangle_mesh_by_dual(tmesh)
+    mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
 
     space = ConformingScalarVESpace2d(mesh, p=degree)
     uh = space.function()
@@ -78,53 +85,36 @@ for i in range(maxit):
     d = ConformingVEMDoFIntegrator2d()
     D = d.assembly_cell_matrix(space, M)
 
-    projector = ConformingScalarVEMH1Projector2d(D)
-    PI1 = projector.assembly_cell_matrix(space)
+    h1 = ConformingScalarVEMH1Projector2d(D)
+    PI1 = h1.assembly_cell_matrix(space)
+    G = h1.G
 
-    a = BilinearForm(space)
-    I = ConformingScalarVEMLaplaceIntegrator2d(projector)
-    a.add_domain_integrator(I)
-    A = a.assembly()
+    li = ConformingScalarVEMLaplaceIntegrator2d(PI1, G, D)
+    bform = BilinearForm(space)
+    bform.add_domain_integrator(li)
+    A = bform.assembly()
 
     #组装右端 F
-    a = ConformingScalarVEML2Projector2d(M, PI1)
-    PI0 = a.assembly_cell_matrix(space)
+    l2 = ConformingScalarVEML2Projector2d(M, PI1)
+    PI0 = l2.assembly_cell_matrix(space)
 
-    b = ConformingVEMScalarSourceIntegrator2d(pde.source, PI0)
-    a = LinearForm(space)
-    a.add_domain_integrator(b)
-    F = a.assembly()
+    si = ConformingVEMScalarSourceIntegrator2d(pde.source, PI0)
+    lform = LinearForm(space)
+    lform.add_domain_integrator(si)
+    F = lform.assembly()
 
     #处理边界 
     bc = DirichletBC(space, pde.dirichlet)
     A, F = bc.apply(A, F, uh)
 
-    uh[:] = spsolve(A, F).reshape(-1)
+    uh[:] = spsolve(A, F)
     sh = space.project_to_smspace(uh, PI1)
 
     errorMatrix[0, i] = mesh.error(pde.solution, sh.value)
     errorMatrix[1, i] = mesh.error(pde.gradient, sh.grad_value)
 
-    #uI = space.interpolation(pde.solution)
     nx *= 2
     ny *= 2
     
-fig = plt.figure()
-axes = fig.gca()
-linetype = ['k-*', 'r-o', 'b-D', 'g-->', 'k--8', 'm--x','r-.x']
-c = np.polyfit(np.log(NDof), np.log(errorMatrix[0]), 1)
-axes.loglog(NDof, errorMatrix[0], linetype[0], label='$||u-\Pi u_h||_\\infty = O(h^{%0.4f})$'%(c[0]))
-
-c = np.polyfit(np.log(NDof), np.log(errorMatrix[1]), 1)
-axes.loglog(NDof, errorMatrix[1], linetype[1], label='$|| \\nabla u - \Pi \\nabla u_h||_0 = O(h^{%0.4f})$'%(c[0]))
-
-
-
-axes.legend()
-"""
-mesh.add_plot(plt)
-uh.add_plot(plt, cmap='rainbow')
-"""
-showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
-
+showmultirate(plt, maxit-2, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
 plt.show()
