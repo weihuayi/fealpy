@@ -7,7 +7,7 @@ from .linear import MultiLinear, StackStd
 from .module import TensorMapping
 
 class PoU(Module):
-    def forward(self, x: Tensor):
+    def forward(self, x: Tensor): # (N, Mp, d)
         N = x.shape[:-1]
         flag = (-1 < x) * (x < 1)
         flag = torch.cumprod(flag, dim=-1)
@@ -16,25 +16,67 @@ class PoU(Module):
         return ret
 
 
+class PoUSin(Module):
+    def forward(self, x: Tensor): # (N, Mp, d)
+        f1 = (-1.25 <= x) * (x < -0.75)
+        f2 = (-0.75 <= x) * (x < 0.75)
+        f3 = (0.75 <= x) * (x < 1.25)
+        l1 = 0.5 * (1 + 2*torch.sin(2*torch.pi*x)) * f1
+        l2 = f2
+        l3 = 0.5 * (1 - 2*torch.sin(2*torch.pi*x)) * f3
+        ret = l1 + l2 + l3
+        return torch.cumprod(ret, dim=-1)[..., 0]
+
+
+class GlobalRandomFeature(TensorMapping):
+    def __init__(self, features: int, ni: int, no: int,
+                 device=None, dtype=torch.float64) -> None:
+        super().__init__()
+        self.features = features
+        self.l1 = MultiLinear(ni, no, (features, ),
+                              device=device, dtype=dtype, requires_grad=False)
+        self.um = Parameter(torch.empty(features, device=device, dtype=dtype))
+        init.normal_(self.um, 0.0, 0.01)
+
+    def forward(self, p: Tensor):
+        ret = torch.cos(self.l1(p))
+        return torch.einsum('nbo, b -> no', ret, self.um)
+
+
 class RandomFeature(TensorMapping):
-    def __init__(self, Jn: int, centers: Tensor, radius: float):
+    def __init__(self, Jn: int, centers: Tensor, radius: float,
+                 in_dim: int, out_dim: int=1):
         """
         @param Jn: int. Number of basis functions at a single center.
         """
         super().__init__()
         Mp, _ = centers.shape
-        self.std = StackStd(centers, radius)
-        self.linear = MultiLinear(2, 1, (Mp, Jn), dtype=centers.dtype)
-        self.pou = PoU()
-        self.um = Parameter(torch.empty((Mp, Jn), dtype=centers.dtype))
-        init.normal_(self.um, 0.0, 0.1)
+        self.in_dim = in_dim
+        self.out_dim = out_dim
         self.Jn = Jn
+
+        self.std = StackStd(centers, radius)
+        self.linear = MultiLinear(in_dim, out_dim, (Mp, Jn),
+                                  dtype=centers.dtype, requires_grad=False)
+        self.pou = PoUSin()
+        self.um = Parameter(torch.empty((Mp, Jn), dtype=centers.dtype))
+        init.normal_(self.um, 0.0, 0.01)
+
+
+    def number_of_centers(self):
+        return self.std.centers.shape[0]
+
+    def number_of_basis(self):
+        return self.Jn * self.number_of_centers()
+
+    def number_of_local_basis(self):
+        return self.Jn
 
 
     def forward(self, p): # (N, 2)
         ret_std: Tensor = self.std(p) # (N, Mp, 2)
         ret = ret_std.unsqueeze(-2) # (N, Mp, 1, 2)
-        ret = torch.tanh(self.linear(ret)) # (N, Mp, Jn, 1)
+        ret = torch.cos(self.linear(ret)) # (N, Mp, Jn, 1)
         ret = torch.einsum('nm, mj, nmjd -> nd', self.pou(ret_std), self.um, ret) # (N, 1)
         return ret
 
