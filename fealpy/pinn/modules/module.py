@@ -147,7 +147,7 @@ class TensorMapping(Module):
         """
         mesh = np.meshgrid(*xi)
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
-        mesh_pt = [torch.from_numpy(x).float() for x in flat_mesh]
+        mesh_pt = [torch.from_numpy(x) for x in flat_mesh]
         pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
         u_plot: NDArray = pt_u.cpu().detach().numpy()
         assert u_plot.ndim == 2
