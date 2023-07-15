@@ -159,7 +159,7 @@ class ISampler(Sampler):
         @param m: The number of samples to generate.
         @param ranges: An object that can be converted to a `numpy.ndarray`,\
                        representing the ranges in each sampling axis.
-        @param dtype: Data type of samples. Defaults to `torch.float32`.
+        @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param requires_grad: A boolean indicating whether the samples should\
                               require gradient computation. Defaults to `False`.\
                               See `torch.autograd.grad`

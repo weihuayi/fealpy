@@ -1,3 +1,7 @@
+"""
+Solve the poisson 2d problem using global random feature functions.
+"""
+
 
 import numpy as np
 import torch
@@ -6,7 +10,7 @@ from torch.optim import Adam
 
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.pinn.modules import RandomFeature
-from fealpy.pinn.sampler import get_mesh_sampler, BoxBoundarySampler
+from fealpy.pinn.sampler import ISampler, BoxBoundarySampler
 from fealpy.pinn.grad import gradient
 from fealpy.mesh import UniformMesh2d
 
@@ -32,18 +36,18 @@ def pde_part(p: torch.Tensor, u):
 def bc(x: torch.Tensor, u):
     return u - pde.dirichlet(x).unsqueeze(-1)
 
-H = 0.2
-mesh = UniformMesh2d((0, 5, 0, 5), h=(H, H), origin=(0, 0))
-nodes = torch.from_numpy(mesh.node).reshape(-1, 2)
 
-model = RandomFeature(16, nodes, H)
-sampler = get_mesh_sampler(100, mesh, requires_grad=True)
+mesh = UniformMesh2d((0, 10, 0, 10), h=(0.1, 0.1), origin=(0.0, 0.0))
+node = torch.from_numpy(mesh.entity('node'))
+
+model = RandomFeature(32, centers=node, radius=0.05, in_dim=2)
+sampler = ISampler(1000, [[0, 1], [0, 1]], requires_grad=True)
 sampler_bc = BoxBoundarySampler(100, [0.0, 0.0], [1.0, 1.0], requires_grad=True)
-optim = Adam(model.parameters(), 0.001)
+optim = Adam((model.um, ), 0.001)
 loss_fn = MSELoss(reduction='mean')
 
 
-MAX_ITER = 1000
+MAX_ITER = 200
 
 for epoch in range(MAX_ITER):
     optim.zero_grad()
@@ -63,16 +67,16 @@ for epoch in range(MAX_ITER):
     loss.backward()
     optim.step()
 
-    if epoch % 100 == 0:
+    if epoch % 100 == 99:
         with torch.no_grad():
-            print(f"Epoch: {epoch}| Loss: {loss.data}")
+            print(f"Epoch: {epoch+1}| Loss: {loss.data}")
 
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
 
-x = np.linspace(0, 1, 100)
-y = np.linspace(0, 1, 100)
+x = np.linspace(0, 1, 100, dtype=np.float64)
+y = np.linspace(0, 1, 100, dtype=np.float64)
 
 data, (mx, my) = model.meshgrid_mapping(x, y)
 

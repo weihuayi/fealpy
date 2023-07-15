@@ -6,26 +6,37 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
-from fealpy.pde.poisson_2d import CosCosData
+# 模型数据
+from fealpy.pde.diffusion_convection_reaction_2d import PDEData_1 as PDE
+
+# 拉格朗日有限元空间
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import ScalarLaplaceIntegrator      # (\nabla u, \nabla v) 
+
+# 区域积分子
+from fealpy.fem import ScalarDiffusionIntegrator      # (A\nabla u, \nabla v) 
+from fealpy.fem import ScalarConvectionIntegrator     # (b\cdot \nabla u, v) 
+from fealpy.fem import ScalarMassIntegrator           # (r*u, v)
 from fealpy.fem import ScalarSourceIntegrator         # (f, v)
-from fealpy.fem import ScalarNeumannSourceIntegrator  # <g_D, v>
+
+# 边界积分子
+from fealpy.fem import ScalarNeumannSourceIntegrator  # <g_N, v>
 from fealpy.fem import ScalarRobinSourceIntegrator    # <g_R, v>
 from fealpy.fem import ScalarRobinBoundaryIntegrator  # <kappa*u, v>
 
+# 双线性型
 from fealpy.fem import BilinearForm
+
+# 线性型
 from fealpy.fem import LinearForm
+
+# 第一类边界条件
 from fealpy.fem import DirichletBC
 
-from fealpy.solver import GAMGSolver
-
-import ipdb
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        TriangleMesh\QuadrangleMesh 上任意次有限元方法
+        TriangleMesh \ QuadrangleMesh 上任意次有限元方法
         """)
 
 parser.add_argument('--degree',
@@ -56,7 +67,7 @@ nx = args.nx
 ny = args.ny
 maxit = args.maxit
 
-pde = CosCosData(kappa=1.0)
+pde = PDE(kappa=1.0)
 domain = pde.domain()
 
 if mtype == 'tri':
@@ -78,37 +89,36 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
     bform = BilinearForm(space)
-    # (\nabla u, \nabla v)
-    bform.add_domain_integrator(ScalarLaplaceIntegrator(q=p+2)) 
-    # <kappa u, v>
-    rbi = ScalarRobinBoundaryIntegrator(pde.kappa,
+    # (A(x)\nabla u, \nabla v)
+    D = ScalarDiffusionIntegrator(c=pde.diffusion_coefficient, q=p+3)
+    # (b\cdot \nabla u, v)
+    C = ScalarConvectionIntegrator(c=pde.convection_coefficient, q=p+3)
+    # (r*u, v)
+    M = ScalarMassIntegrator(c=pde.reaction_coefficient, q=p+3)
+    # <kappa*u, v>
+    R = ScalarRobinBoundaryIntegrator(pde.kappa,
             threshold=pde.is_robin_boundary, q=p+2)
-    bform.add_boundary_integrator(rbi) 
+    bform.add_domain_integrator([D, C, M]) 
+    bform.add_boundary_integrator(R) 
     A = bform.assembly()
 
     lform = LinearForm(space)
     # (f, v)
-    si = ScalarSourceIntegrator(pde.source, q=p+2)
-    lform.add_domain_integrator(si)
-    # <g_R, v> 
-    rsi = ScalarRobinSourceIntegrator(pde.robin, threshold=pde.is_robin_boundary, q=p+2)
-    lform.add_boundary_integrator(rsi)
+    Vs = ScalarSourceIntegrator(pde.source, q=p+2)
     # <g_N, v>
-    nsi = ScalarNeumannSourceIntegrator(pde.neumann, 
-            threshold=pde.is_neumann_boundary, q=p+2)
-    lform.add_boundary_integrator(nsi)
-    #ipdb.set_trace()
+    Vn = ScalarNeumannSourceIntegrator(pde.neumann, threshold=pde.is_neumann_boundary, q=p+2)
+    # <g_R, v>
+    Vr = ScalarRobinSourceIntegrator(pde.robin, threshold=pde.is_robin_boundary, q=p+2)
+    lform.add_domain_integrator(Vs)
+    lform.add_boundary_integrator([Vr, Vn])
     F = lform.assembly()
 
     # Dirichlet 边界条件
-    bc = DirichletBC(space, 
-            pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
+    bc = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
 
-    solver = GAMGSolver(ptype='W', sstep=2)
-    solver.setup(A)
-    uh[:] = solver.solve(F)
+    uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh, q=p+2)
     errorMatrix[1, i] = mesh.error(pde.gradient, uh.grad_value, q=p+2)
