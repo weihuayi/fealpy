@@ -168,7 +168,7 @@ class StructureMesh2dDataStructure(StructureMeshDS, Mesh2dDataStructure):
         ny = self.ny
 
         NN = self.NN
-        NE = self.NE
+        NE = self.number_of_edges()
 
         idx = np.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
         edge = np.zeros((NE, 2), dtype=self.itype)
