@@ -2,7 +2,7 @@ import numpy as np
 import warnings
 
 from typing import Callable, Union, Tuple, List
-from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
+from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags, spmatrix
 from types import ModuleType
 
 from .mesh_base import Mesh, Plotable
@@ -476,30 +476,39 @@ class UniformMesh1d(Mesh, Plotable):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray, Optional[float]], np.ndarray], 
-                        A: np.ndarray, f: np.ndarray, uh: Union[np.ndarray, np.flatiter, None] = None, 
-                        threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[np.ndarray, np.ndarray]:
+    def apply_dirichlet_bc(self, 
+        gD: Callable[[np.ndarray, Optional[float]], np.ndarray], 
+        A: spmatrix, 
+        f: np.ndarray, 
+        uh: Union[np.ndarray, np.flatiter, None] = None, 
+        threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[np.ndarray, np.ndarray]:
+
         """
-        应用 Dirichlet 边界条件，并更新给定的矩阵 A 和向量 f。
+        应用 Dirichlet 边界条件，并更新给定的矩阵 A 和向量 f
 
         参数：
         gD : Callable[[np.ndarray, np.float64], np.ndarray]
-            描述 Dirichlet 边界条件的函数。这个函数接收两个参数，一个是网格节点的坐标（numpy 数组），另一个是时间 t（浮点数），并返回一个 numpy 数组，
+            描述 Dirichlet 边界条件的函数。
+            这个函数接收两个参数，一个是网格节点的坐标（numpy 数组），
+            另一个是时间 t（浮点数），并返回一个 numpy 数组，
             数组中的值是在给定的网格节点和时间 t 上的 Dirichlet 边界条件的值。
 
-        A : np.ndarray
+        A : spmatrix
             需要更新的矩阵。此函数将直接修改这个矩阵来应用 Dirichlet 边界条件。
 
         f : np.ndarray
             需要更新的向量。此函数将直接修改这个向量来应用 Dirichlet 边界条件。
 
         uh : Union[np.ndarray, np.flatiter, None] = None
-            表示网格上的函数值的 numpy 数组。如果提供了此参数，则此函数将直接修改这个数组以应用 Dirichlet 边界条件。如果此参数为 None（默认），
-            则此函数将创建一个新的网格函数数组。
+            表示网格上的函数值的 numpy 数组。
+            如果提供了此参数，则此函数将直接修改这个数组以应用 Dirichlet 边界条件。
+            如果此参数为 None（默认），则此函数将创建一个新的网格函数数组。
 
         threshold : Optional[Union[int, Callable[[np.ndarray], np.ndarray]]]
-            用于确定哪些网格节点应用 Dirichlet 边界条件。如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上。
-            如果 threshold 是一个整数，则只将 Dirichlet 边界条件应用于具有该索引的节点上。如果 threshold 是一个函数，则将该函数应用于网格节点的坐标，
+            用于确定哪些网格节点应用 Dirichlet 边界条件。
+            如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上。
+            如果 threshold 是一个整数，则只将 Dirichlet 边界条件应用于具有该索引的节点上。
+            如果 threshold 是一个函数，则将该函数应用于网格节点的坐标，
             并将 Dirichlet 边界条件应用于该函数返回 True 的所有节点上。
 
         返回：
@@ -521,7 +530,7 @@ class UniformMesh1d(Mesh, Plotable):
         elif callable(threshold):
             index = threshold(node)
         else:
-            index = self.ds.boundary_node_flag()
+            raise ValueError(f"Invalid threshold: {threshold}")
 
         uh[index]  = gD(node[index])
 
