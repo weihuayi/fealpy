@@ -6,14 +6,12 @@ from torch.nn import Module, Parameter, init
 from .linear import MultiLinear, StackStd
 from .module import TensorMapping
 
+
 class PoU(Module):
     def forward(self, x: Tensor): # (N, Mp, d)
-        N = x.shape[:-1]
-        flag = (-1 < x) * (x < 1)
-        flag = torch.cumprod(flag, dim=-1)
-        ret = torch.zeros(N, dtype=torch.float64)
-        ret[flag] = 1.0
-        return ret
+        flag = (-1 <= x) * (x < 1)
+        flag = torch.prod(flag, dim=-1)
+        return flag.double()
 
 
 class PoUSin(Module):
@@ -21,11 +19,12 @@ class PoUSin(Module):
         f1 = (-1.25 <= x) * (x < -0.75)
         f2 = (-0.75 <= x) * (x < 0.75)
         f3 = (0.75 <= x) * (x < 1.25)
-        l1 = 0.5 * (1 + 2*torch.sin(2*torch.pi*x)) * f1
-        l2 = f2
-        l3 = 0.5 * (1 - 2*torch.sin(2*torch.pi*x)) * f3
+        l1 = 0.5 * (1 + torch.sin(2*torch.pi*x)) * f1
+        l2 = f2.double()
+        l3 = 0.5 * (1 - torch.sin(2*torch.pi*x)) * f3
         ret = l1 + l2 + l3
-        return torch.cumprod(ret, dim=-1)[..., 0]
+        ret = torch.prod(ret, dim=-1)
+        return ret
 
 
 class GlobalRandomFeature(TensorMapping):
@@ -62,7 +61,6 @@ class RandomFeature(TensorMapping):
         self.um = Parameter(torch.empty((Mp, Jn), dtype=centers.dtype))
         init.normal_(self.um, 0.0, 0.01)
 
-
     def number_of_centers(self):
         return self.std.centers.shape[0]
 
@@ -71,7 +69,6 @@ class RandomFeature(TensorMapping):
 
     def number_of_local_basis(self):
         return self.Jn
-
 
     def forward(self, p): # (N, 2)
         ret_std: Tensor = self.std(p) # (N, Mp, 2)
