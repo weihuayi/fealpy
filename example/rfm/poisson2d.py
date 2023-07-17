@@ -34,42 +34,42 @@ def pde_part(p: torch.Tensor, u):
     return u_xx + u_yy + np.pi**2 * u
 
 def bc(x: torch.Tensor, u):
-    return u - pde.dirichlet(x).unsqueeze(-1)
+    return u - pde.dirichlet(x)
 
 
 mesh = UniformMesh2d((0, 2, 0, 2), h=(0.5, 0.5), origin=(0.0, 0.0))
 node = torch.from_numpy(mesh.entity('node'))
 
-model = RandomFeatureFlat(50, 4, centers=node, radius=0.25, in_dim=2,
+model = RandomFeatureFlat(50, 4, centers=node, radius=0.25, in_dim=2, bound=2,
                           activate=torch.cos, print_status=True)
 sampler = get_mesh_sampler(40, mesh, requires_grad=True)
 # sampler = ISampler(1000, [[0, 1], [0, 1]], requires_grad=True)
 sampler_bc = BoxBoundarySampler(1000, [0.0, 0.0], [1.0, 1.0], requires_grad=True)
-optim = Adam(model.um, 1e-3)
+optim = Adam(model.ums, lr=1e-3)
 loss_fn = MSELoss(reduction='mean')
 
 
-MAX_ITER = 100
+MAX_ITER = 500
 
 for epoch in range(MAX_ITER):
     optim.zero_grad()
 
-    # s = sampler.run()
-    # out = model(s)
-    # pde_out = pde_part(s, out)
-    # loss_pde = loss_fn(pde_out, torch.zeros_like(pde_out))
+    s = sampler.run()
+    out = model(s)
+    pde_out = pde_part(s, out)
+    loss_pde = loss_fn(pde_out, torch.zeros_like(pde_out))
 
     s = sampler_bc.run()
     out = model(s)
     bc_out = bc(s, out)
     loss_bc = loss_fn(bc_out, torch.zeros_like(bc_out))
 
-    loss = 0.95*loss_bc
+    loss = 0.95*loss_bc + 0.05*loss_pde
 
     loss.backward()
     optim.step()
 
-    if epoch % 20 == 19:
+    if epoch % 50 == 49:
         with torch.no_grad():
             print(f"Epoch: {epoch+1}| Loss: {loss.data}")
 

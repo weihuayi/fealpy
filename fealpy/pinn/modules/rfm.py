@@ -185,8 +185,8 @@ class RandomFeatureFlat(TensorMapping):
         return self.std.centers.dtype
 
     @property
-    def um(self):
-        return [x.um for x in self.partions] + [self.global_.um, ]
+    def ums(self):
+        return [x.um for x in self.partions]# + [self.global_.um, ]
 
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
