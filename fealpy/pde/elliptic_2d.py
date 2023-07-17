@@ -1,6 +1,6 @@
 import numpy as np
-from ..decorator import cartesian
 
+from ..decorator import cartesian
 
 class SinSinPDEData:
     def domain(self):
@@ -55,3 +55,36 @@ class SinSinPDEData:
     def dirichlet(self, p):
         return self.solution(p)
 
+class CosCosPDEData:
+    def domain(self):
+        return np.array([0, 1, 0, 1])
+    
+    @cartesian
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.sin(pi*x)*np.sin(pi*y)-np.cos(pi*x)*np.cos(pi*y)+1
+        return val
+
+    @cartesian
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = 2*pi**2*(np.sin(pi*x)*np.sin(pi*y)-np.cos(pi*x)*np.cos(pi*y))
+        return val
+
+    @cartesian
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float64)
+        val[..., 0] = pi*np.cos(pi*x)*np.sin(pi*y)+pi*np.sin(pi*x)*np.cos(pi*y)
+        val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y)+pi*np.cos(pi*x)*np.sin(pi*y)
+        return val
+
+    @cartesian
+    def dirichlet(self, p):
+        return self.solution(p)
