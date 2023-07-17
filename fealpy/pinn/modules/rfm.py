@@ -186,12 +186,12 @@ class RandomFeatureFlat(TensorMapping):
 
     @property
     def ums(self):
-        return [x.um for x in self.partions]# + [self.global_.um, ]
+        return [x.um for x in self.partions] + [self.global_.um, ]
 
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
-        # ret = self.global_(p)
-        ret = torch.zeros((p.shape[0], 1), dtype=self.dtype)
+        ret = self.global_(p)
+        # ret = torch.zeros((p.shape[0], 1), dtype=self.dtype)
         for i in range(self.number_of_partitions()):
             x = std[:, i, :] # (N, d)
             ret += self.partions[i](x) * self.pou(x) # (N, 1)

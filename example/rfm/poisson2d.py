@@ -40,7 +40,7 @@ def bc(x: torch.Tensor, u):
 mesh = UniformMesh2d((0, 2, 0, 2), h=(0.5, 0.5), origin=(0.0, 0.0))
 node = torch.from_numpy(mesh.entity('node'))
 
-model = RandomFeatureFlat(50, 4, centers=node, radius=0.25, in_dim=2, bound=2,
+model = RandomFeatureFlat(50, 4, centers=node, radius=0.25, in_dim=2, bound=1,
                           activate=torch.cos, print_status=True)
 sampler = get_mesh_sampler(40, mesh, requires_grad=True)
 # sampler = ISampler(1000, [[0, 1], [0, 1]], requires_grad=True)
@@ -64,7 +64,7 @@ for epoch in range(MAX_ITER):
     bc_out = bc(s, out)
     loss_bc = loss_fn(bc_out, torch.zeros_like(bc_out))
 
-    loss = 0.95*loss_bc + 0.05*loss_pde
+    loss = 0.995*loss_bc + 0.005*loss_pde
 
     loss.backward()
     optim.step()
@@ -75,7 +75,6 @@ for epoch in range(MAX_ITER):
 
 
 from matplotlib import pyplot as plt
-from matplotlib import cm
 
 x = np.linspace(0, 1, 90, dtype=np.float64)
 y = np.linspace(0, 1, 90, dtype=np.float64)
