@@ -6,7 +6,7 @@ from types import ModuleType
 from .mesh_base import Mesh, Plotable
 
 # 这个数据接口为有限元服务
-from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
+from .mesh_data_structure import StructureMesh3dDataStructure
 
 from ..geometry import project
 
@@ -64,7 +64,8 @@ class UniformMesh3d(Mesh, Plotable):
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
 
         # Data structure for finite element computation
-        self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype)
+        self.ds: StructureMesh2dDataStructure = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype=itype)
+
 
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
@@ -738,9 +739,11 @@ class UniformMesh3d(Mesh, Plotable):
         if etype in {'cell', 3}: # 所有单元
             return self.cell_barycenter().reshape(-1, 3)
         elif etype in {'face', 2}: # 所有的面
-            pass
+            bcx, bcy, bcz = self.face_barycenter()
+            return np.concatenate((bcx.reshape(-1, 3), bcy.reshape(-1, 3), bcz.reshape(-1, 3)), axis=0)
         elif etype in {'edge', 1}: # 所有的边
-            pass
+            bcx, bcy, bcz = self.edge_barycenter()
+            return np.concatenate((bcx.reshape(-1, 3), bcy.reshape(-1, 3), bcz.reshape(-1, 3)), axis=0)
         elif etype in {'node', 0}:
             return self.node.reshape(-1, 3)
         else:

@@ -524,7 +524,11 @@ class UniformMesh2d(Mesh, Plotable):
         return F
 
     ## @ingroup FDMInterface
-    def error(self, u: Callable, uh: np.ndarray, errortype: str = 'all') -> Union[float, Tuple[np.float64, np.float64, np.float64]]:
+    def error(self, 
+        u: Callable, 
+        uh: np.ndarray, 
+        errortype: str = 'all') -> Union[float, Tuple[np.float64, np.float64, np.float64]]:
+
         """
         计算真实解和数值解之间的误差。
 
@@ -606,8 +610,13 @@ class UniformMesh2d(Mesh, Plotable):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD: Callable[[np.ndarray], np.ndarray], A: spmatrix,
-                           f: np.ndarray, uh: Optional[np.ndarray] = None) -> Tuple[spmatrix, np.ndarray]:
+    def apply_dirichlet_bc(self, 
+        gD: Callable[[np.ndarray], np.ndarray], 
+        A: spmatrix,
+        f: np.ndarray, 
+        uh: Optional[np.ndarray] = None,
+        threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[spmatrix, np.ndarray]:
+        
         """
         @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界和向量型函数
 
@@ -615,6 +624,7 @@ class UniformMesh2d(Mesh, Plotable):
         @param[in] A  (NN, NN), 稀疏矩阵
         @param[in] f  可能是一维数组（标量型右端项）或二维数组（向量型右端项）
         @param[in, optional] uh  默认为 None，表示网格函数，如果为 None 则创建一个新的网格函数
+        @param[in, optional] threshold 用于确定哪些网格节点应用 Dirichlet 边界条件
 
         @return Tuple[spmatrix, np.ndarray], 返回处理后的稀疏矩阵 A 和数组 f
         """
@@ -626,7 +636,16 @@ class UniformMesh2d(Mesh, Plotable):
         f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
 
         node = self.entity('node')
-        isBdNode = self.ds.boundary_node_flag()
+        # isBdNode = self.ds.boundary_node_flag()
+        if threshold is None:
+            isBdNode = self.ds.boundary_node_flag()
+        elif isinstance(threshold, int):
+            isBdNode = (np.arange(node.shape[0]) == threshold)
+        elif callable(threshold):
+            isBdNode = threshold(node)
+        else:
+            raise ValueError(f"Invalid threshold: {threshold}")
+        
         uh[isBdNode]  = gD(node[isBdNode])
         f -= A@uh
         f[isBdNode] = uh[isBdNode]
