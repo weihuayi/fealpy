@@ -3,4 +3,4 @@ from .module import TensorMapping, Solution, ZeroMapping, Fixed, Extracted, Proj
 from .linear import StackStd, MultiLinear
 from .boundary import LevelSetDBCSolution, BoxDBCSolution
 from .attention import GradAttention
-from .rfm import RandomFeature, GlobalRandomFeature
+from .rfm import RandomFeature, RandomFeatureFlat, PoU, PoUSin

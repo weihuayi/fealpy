@@ -1821,6 +1821,25 @@ class TriangleMesh(Mesh, Plotable):
             axes.set_title(f'$\\nabla\\phi_{{{i}}}$')
         plt.show()
 
+
+    @classmethod
+    def from_obj_file(cls, fname):
+        """
+        @brief 从一个 obj 文件中读取一个三角形网格面
+        """
+        nodes = []
+        cells = []
+        with open(fname, 'r') as file:
+            for line in file:
+                components = line.strip(' \n').split(' ')
+                if components[0] == 'v':
+                    nodes.append([float(components[1]), float(components[2]), float(components[3])])
+                elif components[0] == 'f':
+                    # Subtract 1 from each index to account for 1-based indexing in OBJ files
+                    cells.append([int(i) - 1 for i in components[1:]])
+
+        return cls(np.array(nodes), np.array(cells))
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_quadrangle_mesh(cls, mesh):
