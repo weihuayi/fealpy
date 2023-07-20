@@ -6,13 +6,28 @@ import matplotlib.pyplot as plt
 from fealpy.functionspace import ConformingScalarVESpace2d 
 from fealpy.functionspace.conforming_vector_ve_space_2d import ConformingVectorVESpace2d
 from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d 
-from fealpy.vem.temporary_prepare import vector_decomposition, laplace_coefficient
+from fealpy.vem.temporary_prepare import vector_decomposition, laplace_coefficient, coefficient_of_div_VESpace_represented_by_SMSpace
 from fealpy.mesh import TriangleMesh
 from fealpy.mesh import PolygonMesh
 import ipdb
 from fealpy.mesh import UniformMesh2d
 
-
+def test_coefficient_of_div_VESpace_represented_by_SMSpace(p):
+    node = np.array([
+    (0.0, 0.0), (0.0, 1.0), (0.0, 2.0), (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+    (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float64)
+    cell = np.array([0, 3, 4, 4, 1, 0, 1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5],
+        dtype=np.int_)
+    cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int_)
+    mesh = PolygonMesh(node, cell, cellLocation)
+    
+    space =  ConformingVectorVESpace2d(mesh, p=p)
+    m = ScaledMonomialSpaceMassIntegrator2d()
+    M = m.assembly_cell_matrix(space.smspace)
+    M = M[:, :p*(p+1)//2, :p*(p+1)//2]
+ 
+    K = coefficient_of_div_VESpace_represented_by_SMSpace(space, M)
+    return
 
 
 def test_vector_decomposition(refine=False):
@@ -35,7 +50,7 @@ def test_vector_decomposition(refine=False):
 
     degree = 3
     dim = 2
-    space =  ConformingScalarVESpace2d(mesh, p=degree)
+    space = ConformingVectorVESpace2d(mesh, p=degree)
     m = ScaledMonomialSpaceMassIntegrator2d()
     M = m.assembly_cell_matrix(space.smspace)
     NC = mesh.number_of_cells()
@@ -88,5 +103,6 @@ def test_laplace_coefficient(p):
 
 
 if __name__ == "__main__":
+    test_coefficient_of_div_VESpace_represented_by_SMSpace(1)
     test_vector_decomposition(refine=True)
     test_laplace_coefficient(3)

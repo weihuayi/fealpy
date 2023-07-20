@@ -27,6 +27,7 @@ def test_assembly_cell_righthand_side_and_dof_matrix(p):
     M = m.assembly_cell_matrix(sspace.smspace) #(n_{k-1}, n_{k-1})
     projector = ConformingVectorVEMH1Projector2d(M)
     B = projector.assembly_cell_right_hand_side(space) 
+    print(B)
 
 
 
