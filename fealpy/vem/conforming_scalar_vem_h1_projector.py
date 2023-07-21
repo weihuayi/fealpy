@@ -1,10 +1,11 @@
 import numpy as np
 from numpy.linalg import inv
 
-from fealpy.mesh.polygon_mesh import PolygonMesh
-from fealpy.quadrature import GaussLobattoQuadrature
+from ..quadrature import GaussLobattoQuadrature
+from ..quadrature import GaussLegendreQuadrature
 
-from fealpy.functionspace import ConformingScalarVESpace2d
+from ..functionspace import ConformingScalarVESpace2d
+from ..functionspace import NonConformingScalarVESpace2d
 
 class ConformingScalarVEMH1Projector2d():
     def __init__(self, D):
@@ -19,6 +20,7 @@ class ConformingScalarVEMH1Projector2d():
         p = space.p
         self.B = self.assembly_cell_right_hand_side(space) 
         if p == 1:
+            self.G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
             return self.B
         else:
             self.G = self.assembly_cell_left_hand_side(space) 
@@ -88,6 +90,8 @@ class ConformingScalarVEMH1Projector2d():
         p = space.p
         mesh = space.mesh
         NC = mesh.number_of_cells()
+        self.B = self.assembly_cell_right_hand_side(space) 
+
         if p == 1:
             G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
         else:

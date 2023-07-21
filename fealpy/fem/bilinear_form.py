@@ -15,16 +15,22 @@ class BilinearForm:
 
     def add_domain_integrator(self, I) -> None:
         """
-        @brief 增加一个区域积分对象
+        @brief 增加一个或多个区域积分对象
         """
-        self.dintegrators.append(I)
+        if isinstance(I, list):
+            self.dintegrators.extend(I)
+        else:
+            self.dintegrators.append(I)
 
 
     def add_boundary_integrator(self, I):
         """
-        @brief 增加一个边界积分对象
+        @brief 增加一个或多个边界积分对象
         """
-        self.bintegrators.append(I)
+        if isinstance(I, list):
+            self.bintegrators.extend(I)
+        else:
+            self.bintegrators.append(I)
 
     def mult(self, x, out=None):
         """

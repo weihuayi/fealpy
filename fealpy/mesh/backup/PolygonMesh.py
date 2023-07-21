@@ -356,6 +356,7 @@ class PolygonMeshDataStructure():
         self.edge2cell[:, 1] = cellIdx[i1]
         self.edge2cell[:, 2] = localIdx[i0]
         self.edge2cell[:, 3] = localIdx[i1]
+        self.cell2edge = j
 
     def cell_to_node(self):
         NN = self.NN

@@ -1,3 +1,7 @@
+"""
+Solve the poisson 2d problem using global random feature functions.
+"""
+
 
 import numpy as np
 import torch
@@ -5,8 +9,8 @@ from torch.nn import MSELoss
 from torch.optim import Adam
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.pinn.modules import RandomFeature
-from fealpy.pinn.sampler import get_mesh_sampler, BoxBoundarySampler
+from fealpy.pinn.modules import RandomFeatureFlat, RandomFeature
+from fealpy.pinn.sampler import ISampler, BoxBoundarySampler, get_mesh_sampler
 from fealpy.pinn.grad import gradient
 from fealpy.mesh import UniformMesh2d
 
@@ -30,20 +34,22 @@ def pde_part(p: torch.Tensor, u):
     return u_xx + u_yy + np.pi**2 * u
 
 def bc(x: torch.Tensor, u):
-    return u - pde.dirichlet(x).unsqueeze(-1)
+    return u - pde.dirichlet(x)
 
-H = 0.2
-mesh = UniformMesh2d((0, 5, 0, 5), h=(H, H), origin=(0, 0))
-nodes = torch.from_numpy(mesh.node).reshape(-1, 2)
 
-model = RandomFeature(16, nodes, H)
-sampler = get_mesh_sampler(100, mesh, requires_grad=True)
-sampler_bc = BoxBoundarySampler(100, [0.0, 0.0], [1.0, 1.0], requires_grad=True)
-optim = Adam(model.parameters(), 0.001)
+mesh = UniformMesh2d((0, 2, 0, 2), h=(0.5, 0.5), origin=(0.0, 0.0))
+node = torch.from_numpy(mesh.entity('node'))
+
+model = RandomFeatureFlat(50, 4, centers=node, radius=0.25, in_dim=2, bound=1,
+                          activate=torch.cos, print_status=True)
+sampler = get_mesh_sampler(40, mesh, requires_grad=True)
+# sampler = ISampler(1000, [[0, 1], [0, 1]], requires_grad=True)
+sampler_bc = BoxBoundarySampler(1000, [0.0, 0.0], [1.0, 1.0], requires_grad=True)
+optim = Adam(model.ums, lr=1e-3)
 loss_fn = MSELoss(reduction='mean')
 
 
-MAX_ITER = 1000
+MAX_ITER = 500
 
 for epoch in range(MAX_ITER):
     optim.zero_grad()
@@ -58,27 +64,26 @@ for epoch in range(MAX_ITER):
     bc_out = bc(s, out)
     loss_bc = loss_fn(bc_out, torch.zeros_like(bc_out))
 
-    loss = 0.95*loss_bc + 0.05*loss_pde
+    loss = 0.995*loss_bc + 0.005*loss_pde
 
     loss.backward()
     optim.step()
 
-    if epoch % 100 == 0:
+    if epoch % 50 == 49:
         with torch.no_grad():
-            print(f"Epoch: {epoch}| Loss: {loss.data}")
+            print(f"Epoch: {epoch+1}| Loss: {loss.data}")
 
 
 from matplotlib import pyplot as plt
-from matplotlib import cm
 
-x = np.linspace(0, 1, 100)
-y = np.linspace(0, 1, 100)
+x = np.linspace(0, 1, 90, dtype=np.float64)
+y = np.linspace(0, 1, 90, dtype=np.float64)
 
 data, (mx, my) = model.meshgrid_mapping(x, y)
 
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
-ax.plot_surface(mx, my, data, cmap=cm.RdYlBu_r, edgecolor='blue', linewidth=0.0003, antialiased=True)
+ax.plot_surface(mx, my, data)
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('u')

@@ -19,6 +19,7 @@ class NonlinearSolver:
         @param calculate_P: 计算非线性方程组的函数
         @param calculate_Kt: 计算切线刚度矩阵的函数
         @return: 非线性方程组的解
+        @TODO Delete
         """
         iter = 0
         c = 0
@@ -106,6 +107,7 @@ class NonlinearSolver:
         @param calculate_P: 计算非线性方程的函数
         @param calculate_Kt: 计算切线斜率的函数
         @return: 非线性方程的解
+        @TODO: Delete
         """        
         xdata = [0] * 40 # 初始化一个长度为 40 的列表，用于存储 x 坐标值。
         ydata = [0] * 40 # 初始化一个长度为 40 的列表，用于存储 y 坐标值。
@@ -148,7 +150,8 @@ class NonlinearSolver:
 
     def modified_newton_raphson(self, u: np.ndarray, f: np.ndarray, 
                        calculate_P: Callable[[np.ndarray], np.ndarray], 
-                       calculate_Kt: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+                       calculate_Kt: Callable[[np.ndarray], np.ndarray],
+                       u_exact: np.ndarray) -> np.ndarray:
         """
         使用修正的 Newton-Raphson 方法求解非线性方程组
 
@@ -156,6 +159,7 @@ class NonlinearSolver:
         @param f: 非线性方程组右侧的常数向量
         @param calculate_P: 计算非线性方程组的函数
         @param calculate_Kt: 计算切线刚度矩阵的函数
+        @param u_exact: 准确的解向量
         @return: 非线性方程组的解
         """
         iter = 0
@@ -165,29 +169,30 @@ class NonlinearSolver:
         R = f - P
         conv = np.sum(R**2)/(1+np.sum(f**2))
 
-        if len(u) == 1:
-            print('iter   u1          conv      c')
-            print(f'{iter:3d} {u[0]:7.5f} {conv:12.3e} {c:7.5f}')
-        else:
-            print('iter   u1      u2          conv      c')
-            print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+        def print_info():
+            print(f'{iter:3d}', end='')
+            for ui in u:
+                print(f' {ui:7.5f}', end='')
+            print(f' {conv:12.3e} {c:7.5f}')
+
+        print('iter', end='')
+        for i in range(len(u)):
+            print(f'   u{i+1}   ', end='')
+        print('      conv      c')
+        print_info()
 
         Kt = calculate_Kt(u)
-        print("Kt:", Kt)
         while conv > self.tol and iter < self.max_iter:
             delu = np.linalg.solve(Kt, R)
             u = uold + delu
             P = calculate_P(u)
             R = f - P
             conv = np.sum(R**2)/(1+np.sum(f**2))
-            c = abs(0.9-u[1])/abs(0.9-uold[1])**2 if len(u) > 1 else 0
+            c = abs(u_exact[1]-u[1]) / abs(u_exact[1]-uold[1])**2 if len(u) > 1 else 0
             uold = u
             iter += 1
 
-            if len(u) == 1:
-                print(f'{iter:3d} {u[0]:7.5f} {conv:12.3e} {c:7.5f}')
-            else:
-                print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+            print_info()
 
         return u
 
@@ -253,7 +258,8 @@ class NonlinearSolver:
 
     def Broyden(self, u: np.ndarray, f: np.ndarray, 
                        calculate_P: Callable[[np.ndarray], np.ndarray], 
-                       calculate_Kt: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+                       calculate_Kt: Callable[[np.ndarray], np.ndarray],
+                       u_exact: np.ndarray) -> np.ndarray:
         """
         使用 Broyden 方法求解非线性方程组
 
@@ -261,6 +267,7 @@ class NonlinearSolver:
         @param f: 非线性方程组右侧的常数向量
         @param calculate_P: 计算非线性方程组的函数
         @param calculate_Kt: 计算切线刚度矩阵的函数
+        @param u_exact: 准确的解向量
         @return: 非线性方程组的解
         """
         iter = 0
@@ -271,8 +278,17 @@ class NonlinearSolver:
         Rold = R
         conv = np.sum(R ** 2) / (1 + np.sum(f**2))
 
-        print('iter   u1      u2          conv      c')
-        print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+        def print_info():
+            print(f'{iter:3d}', end='')
+            for ui in u:
+                print(f' {ui:7.5f}', end='')
+            print(f' {conv:12.3e} {c:7.5f}')
+
+        print('iter', end='')
+        for i in range(len(u)):
+            print(f'   u{i+1}   ', end='')
+        print('      conv      c')
+        print_info()
 
         Ks = calculate_Kt(u)
         while conv > self.tol and iter < self.max_iter:
@@ -281,14 +297,14 @@ class NonlinearSolver:
             P = calculate_P(u)
             R = P - f
             conv = np.sum(R ** 2) / (1 + np.sum(f ** 2))
-            c = abs(0.9-u[1])/abs(0.9-uold[1])**2
+            c = abs(u_exact[1]-u[1]) / abs(u_exact[1]-uold[1])**2 if len(u) > 1 else 0
             delR = R - Rold
             Ks = Ks + (delR - Ks @ delu)[:, None] * delu[None, :] / np.linalg.norm(delu) ** 2
             uold = u
             Rold = R
             iter += 1
 
-            print(f'{iter:3d} {u[0]:7.5f} {u[1]:7.5f} {conv:12.3e} {c:7.5f}')
+            print_info()
 
         return u
 
