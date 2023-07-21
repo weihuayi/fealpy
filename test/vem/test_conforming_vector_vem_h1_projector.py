@@ -66,6 +66,6 @@ def test_assembly_cell_matrix(p):
     PI1 = projector.assembly_cell_matrix(space)    
 
 if __name__ == "__main__":
-    test_assembly_cell_righthand_side(2)
-    test_assembly_cell_left_hand_side(2)
-    test_assembly_cell_matrix(2)
+    test_assembly_cell_righthand_side(3)
+    test_assembly_cell_left_hand_side(3)
+    test_assembly_cell_matrix(3)

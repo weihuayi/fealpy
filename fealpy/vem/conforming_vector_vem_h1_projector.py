@@ -66,6 +66,8 @@ class ConformingVectorVEMH1Projector2d():
             v = node[cedge[:, 1]] - node[cedge[:, 0]]
             w = np.array([(0, -1), (1, 0)])
             nm = v@w 
+            sl = np.sqrt(v[:, 0]**2+v[:, 1]**2) # 边长(NE,)
+
             B11 = np.einsum('ijkmn,jm,i->kjin',vmgphi, nm, ws)#(2*ldof,NV[I],NQ,2)
             idx = np.zeros((B11.shape[1:]), dtype=np.int_)
             idx1 = np.arange(0, NV[i]*2*p, 2*p).reshape(-1, 1) + np.arange(0, 2*p+1, 2)
@@ -77,7 +79,7 @@ class ConformingVectorVEMH1Projector2d():
             BB11 = np.zeros((vmldof, ldof[i]), dtype=np.float64)
             np.add.at(BB11, (np.s_[:], idx), B11)
             if p==1:
-                w = np.tile(ws, NV[i])
+                w = np.tile(ws, NV[i]) * np.repeat(sl, ws.shape[0])
                 np.add.at(BB11[0], idx[:, :, 0].flatten(), w)
                 np.add.at(BB11[vmldof//2], idx[:, :, 1].flatten(), w)
 
@@ -96,7 +98,7 @@ class ConformingVectorVEMH1Projector2d():
                 B3 = E[i,...]@-(C@B3)
                 
                 BB = B1 + B2 + B3
-                w = np.tile(ws, NV[i])
+                w = np.tile(ws, NV[i]) * np.repeat(sl, ws.shape[0])
                 np.add.at(BB[0], idx[:, :, 0].flatten(), w)
                 np.add.at(BB[vmldof//2], idx[:, :, 1].flatten(), w)
 
