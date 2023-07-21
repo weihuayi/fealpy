@@ -44,7 +44,7 @@ def coefficient_of_div_VESpace_represented_by_SMSpace(space, M):
             k = np.zeros((smldof, ldof[i]))
             np.add.at(k, (0, idx), val)
         else:
-            k = np.zeros((smldof, ldof[i]))
+            b = np.zeros((smldof, ldof[i]))
             b[1:, -(p*(p+1)//2-1):] = hk[i] * np.eye(p*(p+1)//2-1)
             np.add.at(b, (0, idx), val)
             k = inv(M[i])@b

@@ -7,11 +7,11 @@ class ScaledMonomialSpaceMassIntegrator2d:
     def __init__(self, q=3):
         self.q = q
 
-    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, index=np.s_[:]):
+    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, p=None, index=np.s_[:]):
         """
         @brief 组装缩放单项式空间每个单元上的质量矩阵
         """
-        p = space.p
+        p = space.p if p is None else p
         mesh = space.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
