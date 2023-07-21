@@ -1,12 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
 
 from fealpy.mesh import TriangleMesh 
 
 from fealpy.geometry import SquareWithCircleHoleDomain
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm
-from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
+#from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
+from fealpy.fem import VectorSourceIntegrator
+from fealpy.fem import LinearForm
+from fealpy.fem import DirichletBC
+from fealpy.fem import VectorNeumannBCIntegrator
 
 import mgis.behaviour as mgis_bv
 from fealpy.csm.mfront import compile_mfront_file
@@ -41,29 +46,20 @@ class ramberg_osgood_model():
         """
         return np.array([1, 0], np.float_)
 
-    def is_top_boundary(self, p):
+    def is_right_boundary(self, p):
         """
-        @brief 标记上边界, y = 1 时的边界点
+        @brief 标记右边界, x = 1 时的边界点
         """
-        return np.abs(p[..., 1] - 1) < 1e-12 
+        return np.abs(p[..., 0] - 1) < 1e-12 
 
-    def is_low_boundary(self, p):
+    def is_dirichlet_boundary(self, p):
         """
-        @brief 标记下边界
+        @brief 标记 dirchlet 边界
         Notes
         -----
         DirichletBC，位移为 0
         """
-        return np.abs(p[..., 0]) < 1e-12 
-
-    def is_left_boundary(self, p):
-        """
-        @brief 标记左边界
-        Notes
-        -----
-        DirichletBC，位移为 0
-        """
-        return np.abs(p[..., 1]) < 1e-12 
+        return (np.abs(p[..., 0]) < 1e-12) | (np.abs(p[..., 1]) < 1e-12)
 
 class ramberg_osgood_integrator():
     def __init__(self, mesh, model):
@@ -116,14 +112,16 @@ class ramberg_osgood_integrator():
         M[:, :, [1, 2]] = M[:, :, [2, 1]]
         return M
 
-    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):    
-        m = self.m
+#    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def source(self):
+        m = self._m
         sigma = m.s1.thermodynamic_forces
+        n = sigma.shape[0]
         
-        #将应力转化为felapy中默认的储存顺序, 即二维情况盈利默认储存为 NC*3 的向量
-        sigma = np.delete(sigma, 1, axis=1)
-        sigma[:, [1, 2]] = sigma[:, [2, 1]]
-        return sigma
+        #将应力转化为felapy中默认的储存顺序, 即二维情况盈利默认储存为 NC*2*2 的矩阵
+#        sigma = np.delete(sigma, 1, axis=1)
+#        sigma[:, [1, 2]] = sigma[:, [2, 1]]
+        return sigma.reshape(n, 2, 2)
 
     def strain(self, uh):
         """
@@ -156,17 +154,39 @@ mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
 
 GD = mesh.geo_dimension()
 space = LagrangeFESpace(mesh, p=1, doforder='vdims')
+vspace  = GD*(space, )
 
-u = space.function(dim=GD)
+uh = space.function(dim=GD)
 
 integrator = ramberg_osgood_integrator(mesh, model)
 integrator.build_mfront()
+bform = BilinearForm(vspace)
 
-bform = BilinearForm(GD*(space, ))
-
-integrator.update_mfront(u)
+integrator.update_mfront(uh)
 bform.add_domain_integrator(integrator)
 bform.assembly()
+A = bform.get_matrix()
+
+val = np.array([0.0, 0.0], dtype=np.float64)
+
+# 构建单线性型，表示问题的源项
+lform = LinearForm(vspace)
+print(-integrator.source())
+lform.add_domain_integrator(VectorSourceIntegrator(-integrator.source(), q=1))
+
+neumann = model.right_force_direction()[0]*model.right_force_direction()
+bi = VectorNeumannBCIntegrator(neumann, threshold=model.is_right_boundary, q=1)
+lform.add_boundary_integrator(bi)
+lform.assembly()
+
+A = bform.get_matrix()
+F = lform.get_vector()
+
+bc = DirichletBC(vspace, val, threshold=model.is_dirichlet_boundary)
+A, F = bc.apply(A, F, uh)
+print('A:', A)
+print('F:', F)
+uh.flat[:] = spsolve(A, F)
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
