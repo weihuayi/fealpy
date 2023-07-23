@@ -247,24 +247,29 @@ class NonConformingScalarVESpace2d():
         uh[isDDof] = gD(ipoints[isDDof])
         return isDDof
 
-    def interpolation(self, u):
+    def interpolation(self, u, iptype=True):
         """
-        @brief 
+        @brief 把函数 u 插值到非协调空间当中
         """
         p = self.p
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        ipoint = self.dof.interpolation_points()
-        uI = self.function()
-        uI[:NE*p] = u(ipoint)
+        if iptype is True:
+            ipoint = self.dof.interpolation_points()
+            uI = self.function()
+            uI[:NE*p] = u(ipoint)
+        else:
+            phi = self.smspace.edge_basis
+            def f(x, index):
+                return np.einsum('ij, ij...->ij...', u(x), phi(x, index=index, p=p-1))
         if p > 1:
             phi = self.smspace.basis
 
             def f(x, index):
                 return np.einsum('ij, ij...->ij...', u(x), phi(x, index=index, p=p-2))
 
-            bb = self.integralalg.integral(f,
+            bb = self.mesh.integral(f,
                     celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
             uI[p*NE:] = bb.reshape(-1)
         return uI
