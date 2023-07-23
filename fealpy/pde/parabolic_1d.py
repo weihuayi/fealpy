@@ -39,12 +39,12 @@ class SinExpPDEData:
     @cartesian
     def init_solution(self, p):
         """
-        @brief 真解函数
+        @brief 初始解
 
         @param[in] p numpy.ndarray, 空间点
         @param[in] t float, 时间点 
 
-        @return 真解函数值
+        @return 初始解函数值
         """
         pi = np.pi
         return np.sin(4*pi*p) 
