@@ -1,8 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
-
 from fealpy.quadrature import GaussLobattoQuadrature
-
 
 
 
@@ -24,9 +22,6 @@ def coefficient_of_div_VESpace_represented_by_SMSpace(space, M):
     hk = mesh.entity_measure()
     K = []
     for i in range(NC):
-        b = np.zeros((smldof, ldof[i]))
-        b[1:, -(p*(p+1)//2-1):] = hk[i] * np.eye(p*(p+1)//2-1)
-
         cedge = np.zeros((NV[i], 2), dtype=np.int_)
         cedge[:, 0] = cell[i]
         cedge[:-1, 1] = cell[i][1:]
@@ -45,11 +40,17 @@ def coefficient_of_div_VESpace_represented_by_SMSpace(space, M):
         idx1[-1, -1] = 0
         idx[:, :, 0] = idx1
         idx[:, :, 1] = idx1+1
-        np.add.at(b, (0, idx), val)
-
-        k = inv(M[i])@b
+        if p==1:
+            k = np.zeros((smldof, ldof[i]))
+            np.add.at(k, (0, idx), val)
+        else:
+            b = np.zeros((smldof, ldof[i]))
+            b[1:, -(p*(p+1)//2-1):] = hk[i] * np.eye(p*(p+1)//2-1)
+            np.add.at(b, (0, idx), val)
+            k = inv(M[i])@b
         K.append(k)
     return K
+
 
 def vector_decomposition(space, p):
     """
