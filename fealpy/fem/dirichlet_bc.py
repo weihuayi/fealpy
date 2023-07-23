@@ -27,16 +27,21 @@ class DirichletBC():
         @param[in] f: 右端向量
         @param[in] uh: 解向量
         """
-        gdof = self.space.number_of_global_dofs()
-        GD = A.shape[0]//gdof
-        if uh is None:
-            uh = self.space.function(dim=GD)  
-
         if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
             # 由标量函数空间组成的向量函数空间
+            gdof = self.space[0].number_of_global_dofs()
+            GD = A.shape[0]//gdof
+            if uh is None:
+                uh = self.space[0].function(dim=GD)  
+
             return self.apply_for_vspace_with_scalar_basis(A, f, uh)
         else:
             # 标量函数空间或基是向量函数的向量函数空间
+            gdof = self.space.number_of_global_dofs()
+            GD = A.shape[0]//gdof
+            if uh is None:
+                uh = self.space.function(dim=GD)  
+
             return self.apply_for_other_space(A, f, uh)
 
     def apply_for_other_space(self, A, f, uh) -> Tuple[csr_matrix, np.ndarray]:
