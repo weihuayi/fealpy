@@ -1,4 +1,5 @@
 import numpy as np
+import pyamg
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
@@ -84,7 +85,6 @@ class ramberg_osgood_integrator():
         NC = self.mesh.number_of_cells()
         m = mgis_bv.MaterialDataManager(b, NC)
         self._m = m
-        print(b.mps)
 
         mgis_bv.setMaterialProperty(m.s1, "YoungModulus", self.E) # 设置材料属性
         mgis_bv.setMaterialProperty(m.s1, "PoissonRatio", self.nu)
@@ -104,13 +104,17 @@ class ramberg_osgood_integrator():
         mgis_bv.integrate(m, it, dt, 0, m.n)
         sigma = m.s1.thermodynamic_forces
         M = m.K
+        print(M.shape)
 
         #将切算子矩阵转化为felapy中默认的储存顺序
         M = np.delete(M, 1, axis=1)
         M = np.delete(M, 1, axis=2)
         M[:, [1, 2], :] = M[:, [2, 1], :]
         M[:, :, [1, 2]] = M[:, :, [2, 1]]
-        return M
+        # TODO 计算基函数梯度
+
+        out +=M
+        return out
 
 #    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
     def source(self):
@@ -157,6 +161,9 @@ space = LagrangeFESpace(mesh, p=1, doforder='vdims')
 vspace  = GD*(space, )
 
 uh = space.function(dim=GD)
+node = mesh.entity('node')
+isRNode = model.is_right_boundary(node)
+uh[isRNode, 1] = 1e-5
 
 integrator = ramberg_osgood_integrator(mesh, model)
 integrator.build_mfront()
@@ -187,6 +194,8 @@ A, F = bc.apply(A, F, uh)
 print('A:', A)
 print('F:', F)
 uh.flat[:] = spsolve(A, F)
+#ml = pyamg.ruge_stuben_solver(A)
+#uh.T.flat[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
