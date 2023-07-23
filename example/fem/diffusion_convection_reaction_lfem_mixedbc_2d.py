@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
 # 模型数据
-from fealpy.pde.diffusion_convection_reaction_2d import PDEData_1 as PDE
+from fealpy.pde.diffusion_convection_reaction_2d import PDEData_0 as PDE
 
 # 拉格朗日有限元空间
 from fealpy.functionspace import LagrangeFESpace
@@ -90,11 +90,11 @@ for i in range(maxit):
 
     bform = BilinearForm(space)
     # (A(x)\nabla u, \nabla v)
-    D = ScalarDiffusionIntegrator(c=pde.diffusion_coefficient, q=p+3)
+    D = ScalarDiffusionIntegrator(q=p+3)
     # (b\cdot \nabla u, v)
     C = ScalarConvectionIntegrator(c=pde.convection_coefficient, q=p+3)
     # (r*u, v)
-    M = ScalarMassIntegrator(c=pde.reaction_coefficient, q=p+3)
+    M = ScalarMassIntegrator(q=p+3)
     # <kappa*u, v>
     R = ScalarRobinBoundaryIntegrator(pde.kappa,
             threshold=pde.is_robin_boundary, q=p+2)
