@@ -1671,12 +1671,17 @@ class TriangleMesh(Mesh, Plotable):
             isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
     @classmethod
-    def show_lattice(cls, p=1):
+    def show_lattice(cls, p=1, showmultiindex=False):
         """
         @brief 展示三角形上的单纯形格点
         """
         import matplotlib.pyplot as plt
         import matplotlib.tri as mtri
+
+        if showmultiindex:
+            n = 3
+        else:
+            n = 2
         
         mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
         node = mesh.entity('node')
@@ -1685,28 +1690,29 @@ class TriangleMesh(Mesh, Plotable):
         ips = ips[c2p].reshape(-1, 2)
 
         fig = plt.figure()
-        axes = fig.add_subplot(1, 3, 1)
+        axes = fig.add_subplot(1, n, 1)
         mesh.add_plot(axes)
         mesh.find_node(axes, showindex=True, fontcolor='k')
 
-        axes = fig.add_subplot(1, 3, 2)
+        axes = fig.add_subplot(1, n, 2)
         mesh.add_plot(axes)
         mesh.find_node(axes, node=ips, showindex=True)
         triangulation = mtri.Triangulation(ips[:, 0], ips[:, 1])
         axes.triplot(triangulation, color='black', linestyle='dashed')
 
-        axes = fig.add_subplot(1, 3, 3)
-        mesh.add_plot(axes)
-        mesh.find_node(axes, node=ips)
-        mi = mesh.multi_index_matrix(p, 2)
-        for i, idx in enumerate(mi):
-            s = str(idx).replace('[', '(')
-            s = s.replace(']', ')')
-            s = s.replace(' ', ',')
-            axes.text(ips[i, 0], ips[i, 1], s,
-                    multialignment='center',
-                    fontsize=12, 
-                    color='r')
+        if showmultiindex:
+            axes = fig.add_subplot(1, n, 3)
+            mesh.add_plot(axes)
+            mesh.find_node(axes, node=ips)
+            mi = mesh.multi_index_matrix(p, 2)
+            for i, idx in enumerate(mi):
+                s = str(idx).replace('[', '(')
+                s = s.replace(']', ')')
+                s = s.replace(' ', ',')
+                axes.text(ips[i, 0], ips[i, 1], s,
+                        multialignment='center',
+                        fontsize=12, 
+                        color='r')
         plt.show()
 
 
@@ -1765,6 +1771,17 @@ class TriangleMesh(Mesh, Plotable):
         plt.show()
 
     @classmethod
+    def show_global_basis_function(cls, p=3):
+        """
+        @brief 展示通过单元基函数的拼接+零扩展的方法获取整体基函数的过程
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        mesh = cls.from_unit_sq(nx=3, ny=3)
+        node = mesh.entity('node')
+
+    @classmethod
     def show_grad_shape_function(cls, p, funtype='L'):
         """
         """
@@ -1803,6 +1820,25 @@ class TriangleMesh(Mesh, Plotable):
                     units='xy')
             axes.set_title(f'$\\nabla\\phi_{{{i}}}$')
         plt.show()
+
+
+    @classmethod
+    def from_obj_file(cls, fname):
+        """
+        @brief 从一个 obj 文件中读取一个三角形网格面
+        """
+        nodes = []
+        cells = []
+        with open(fname, 'r') as file:
+            for line in file:
+                components = line.strip(' \n').split(' ')
+                if components[0] == 'v':
+                    nodes.append([float(components[1]), float(components[2]), float(components[3])])
+                elif components[0] == 'f':
+                    # Subtract 1 from each index to account for 1-based indexing in OBJ files
+                    cells.append([int(i) - 1 for i in components[1:]])
+
+        return cls(np.array(nodes), np.array(cells))
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -2132,7 +2168,7 @@ class TriangleMeshWithInfinityNode:
         self.ds = TriangleMeshDataStructure(NN+1, newCell)
 
         if bc:
-            self.center = np.append(mesh.entity_barycenter(),
+            self.center = np.append(mesh.entity_barycenter('cell'),
                     0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
         else:
             self.center = np.append(mesh.circumcenter(),
@@ -2140,25 +2176,14 @@ class TriangleMeshWithInfinityNode:
 
         self.meshtype = 'tri'
 
-    def number_of_nodes(self):
-        return self.node.shape[0]
-
-    def number_of_edges(self):
-        return self.ds.NE
-
-    def number_of_faces(self):
-        return self.ds.NE
-
-    def number_of_cells(self):
-        return self.ds.NC
 
     def is_infinity_cell(self):
-        N = self.number_of_nodes()
+        N = self.ds.number_of_nodes()
         cell = self.ds.cell
         return cell[:, 0] == N-1
 
     def is_boundary_edge(self):
-        NE = self.number_of_edges()
+        NE = self.ds.number_of_edges()
         cell2edge = self.ds.cell_to_edge()
         isInfCell = self.is_infinity_cell()
         isBdEdge = np.zeros(NE, dtype=np.bool_)
@@ -2166,7 +2191,7 @@ class TriangleMeshWithInfinityNode:
         return isBdEdge
 
     def is_boundary_node(self):
-        N = self.number_of_nodes()
+        N = self.ds.number_of_nodes()
         edge = self.ds.edge
         isBdEdge = self.is_boundary_edge()
         isBdNode = np.zeros(N, dtype=np.bool_)
@@ -2189,7 +2214,7 @@ class TriangleMeshWithInfinityNode:
         pnode = np.concatenate((self.center, self.node[isBdNode]), axis=0)
         PN = pnode.shape[0]
 
-        node2cell = self.ds.node_to_cell(return_localidx=True)
+        node2cell = self.ds.node_to_cell(return_local=True)
         NV = np.asarray((node2cell > 0).sum(axis=1)).reshape(-1)
         NV[isBdNode] += 1
         NV = NV[:-1]
@@ -2201,7 +2226,7 @@ class TriangleMeshWithInfinityNode:
 
 
         isBdEdge = self.is_boundary_edge()
-        NC = self.number_of_cells() - isBdEdge.sum()
+        NC = self.ds.number_of_cells() - isBdEdge.sum()
         cell = self.ds.cell
         currentCellIdx = np.zeros(PNC, dtype=self.itype)
         currentCellIdx[cell[:NC, 0]] = range(NC)
@@ -2210,7 +2235,7 @@ class TriangleMeshWithInfinityNode:
         pcell[pcellLocation[:-1]] = currentCellIdx
 
         currentIdx = pcellLocation[:-1]
-        N = self.number_of_nodes() - 1
+        N = self.ds.number_of_nodes() - 1
         currentNodeIdx = np.arange(N, dtype=self.itype)
         endIdx = pcellLocation[1:]
         cell2cell = self.ds.cell_to_cell()

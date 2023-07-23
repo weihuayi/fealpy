@@ -344,10 +344,14 @@ class EllipsoidSurface:
         return x**2/a**2 + y**2/b**2 + z**2/c**2 - 1 
  
     def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
     def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
@@ -359,6 +363,8 @@ class EllipsoidSurface:
         return grad
 
     def hessian(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         a, b, c = self.c
         x = p[..., 0]
         y = p[..., 1]
@@ -380,6 +386,8 @@ class EllipsoidSurface:
         return H
 
     def jacobi_matrix(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
@@ -389,6 +397,8 @@ class EllipsoidSurface:
         return J
 
     def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
         n = grad/l
@@ -945,3 +955,448 @@ class SaddleSurface:
         cell = np.array(data['elem'], dtype=np.int64)
         return TriangleMesh(node, cell)
    
+class Fisher_Koch_S:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return np.cos((4 * np.pi * x) / l) * np.sin((2 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l) \
+            + np.cos((4 * np.pi * y) / l) * np.sin((2 * np.pi * z) / l) * np.cos((2 * np.pi * x) / l) \
+            + np.cos((4 * np.pi * z) / l) * np.sin((2 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -2 * np.pi * np.sin(2 * np.pi * x / l) * np.sin(2 * np.pi * z / l) * np.cos(4 * np.pi * y / l) / l \
+                       - 4 * np.pi * np.sin(4 * np.pi * x / l) * np.sin(2 * np.pi * y / l) * np.cos(2 * np.pi * z / l) / l \
+                       + 2 * np.pi * np.cos(2 * np.pi * x / l) * np.cos(2 * np.pi * y / l) * np.cos(4 * np.pi * z / l) / l
+        grad[..., 1] = -2 * np.pi * np.sin(2 * np.pi * x / l) * np.sin(2 * np.pi * y / l) * np.cos(4 * np.pi * z / l) / l \
+                       - 4 * np.pi * np.sin(4 * np.pi * y / l) * np.sin(2 * np.pi * z / l) * np.cos(2 * np.pi * x / l) / l \
+                       + 2 * np.pi * np.cos(4 * np.pi * x / l) * np.cos(2 * np.pi * y / l) * np.cos(2 * np.pi * z / l) / l
+        grad[..., 2] = -4 * np.pi * np.sin(2 * np.pi * x / l) * np.sin(4 * np.pi * z / l) * np.cos(2 * np.pi * y / l) / l \
+                       - 2 * np.pi * np.sin(2 * np.pi * y / l) * np.sin(2 * np.pi * z / l) * np.cos(4 * np.pi * x / l) / l \
+                       + 2 * np.pi * np.cos(2 * np.pi * x / l) * np.cos(4 * np.pi * y / l) * np.cos(2 * np.pi * z / l) / l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')
+
+
+class F_RD:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return 4 * np.cos((2 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l) \
+            - np.cos((4 * np.pi * x) / l) * np.cos((4 * np.pi * y) / l) \
+            - np.cos((4 * np.pi * y) / l) * np.cos((4 * np.pi * z) / l) \
+            - np.cos((4 * np.pi * z) / l) * np.cos((4 * np.pi * x) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -8 * np.pi * np.sin(2 * np.pi * x / l) * np.cos(2 * np.pi * y / l) * np.cos(2 * np.pi * z / l) / l \
+                       + 4 * np.pi * np.sin(4 * np.pi * x / l) * np.cos(4 * np.pi * y / l) / l \
+                       + 4 * np.pi * np.sin(4 * np.pi * x / l) * np.cos(4 * np.pi * z / l) / l
+        grad[..., 1] = -8 * np.pi * np.sin(2 * np.pi * y / l) * np.cos(2 * np.pi * x / l) * np.cos(2 * np.pi * z / l) / l \
+                       + 4 * np.pi * np.sin(4 * np.pi * y / l) * np.cos(4 * np.pi * x / l) / l \
+                       + 4 * np.pi * np.sin(4 * np.pi * y / l) * np.cos(4 * np.pi * z / l) / l
+        grad[..., 2] = -8 * np.pi * np.sin(2 * np.pi * z / l) * np.cos(2 * np.pi * x / l) * np.cos(2 * np.pi * y / l) / l \
+                       + 4 * np.pi * np.sin(4 * np.pi * z / l) * np.cos(4 * np.pi * x / l) / l \
+                       + 4 * np.pi * np.sin(4 * np.pi * z / l) * np.cos(4 * np.pi * y / l) / l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')
+
+
+class Gyroid:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return np.sin((2 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l) \
+            + np.sin((2 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l) \
+            + np.sin((2 * np.pi * z) / l) * np.cos((2 * np.pi * x) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*z/l)/l \
+                       + 2*np.pi*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*y/l)/l
+        grad[..., 1] = -2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*y/l)/l \
+                       + 2*np.pi*np.cos(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l
+        grad[..., 2] = -2*np.pi*np.sin(2*np.pi*y/l)*np.sin(2*np.pi*z/l)/l \
+                       + 2*np.pi*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*z/l)/l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')
+
+
+class Neovius:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return 3 * (np.cos((2 * np.pi * x) / l) + np.cos((2 * np.pi * y) / l) + np.cos((2 * np.pi * z) / l)) \
+            + 4 * np.cos((2 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -8*np.pi*np.sin(2*np.pi*x/l)*np.cos(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l \
+                       - 6*np.pi*np.sin(2*np.pi*x/l)/l
+        grad[..., 1] = -8*np.pi*np.sin(2*np.pi*y/l)*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*z/l)/l \
+                       - 6*np.pi*np.sin(2*np.pi*y/l)/l
+        grad[..., 2] = -8*np.pi*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*y/l)/l \
+                       - 6*np.pi*np.sin(2*np.pi*z/l)/l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')
+
+
+class Schwarz_D:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return np.sin((2 * np.pi * x) / l) * np.sin((2 * np.pi * y) / l) * np.sin((2 * np.pi * z) / l) \
+            + np.sin((2 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l) \
+            + np.cos((2 * np.pi * x) / l) * np.sin((2 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l) \
+            + np.cos((2 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l) * np.sin((2 * np.pi * z) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l \
+                       - 2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*y/l)/l \
+                       + 2*np.pi*np.sin(2*np.pi*y/l)*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*x/l)/l \
+                       + 2*np.pi*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l
+        grad[..., 1] = -2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l \
+                       + 2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*y/l)/l \
+                       - 2*np.pi*np.sin(2*np.pi*y/l)*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*x/l)/l \
+                       + 2*np.pi*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l
+        grad[..., 2] = 2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l \
+                       - 2*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*y/l)/l \
+                       - 2*np.pi*np.sin(2*np.pi*y/l)*np.sin(2*np.pi*z/l)*np.cos(2*np.pi*x/l)/l \
+                       + 2*np.pi*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')
+
+
+class Schwarz_P:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return np.cos((2 * np.pi * x) / l) + np.cos((2 * np.pi * y) / l) + np.cos((2 * np.pi * z) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -2*np.pi*np.sin(2*np.pi*x/l)/l
+        grad[..., 1] = -2*np.pi*np.sin(2*np.pi*y/l)/l
+        grad[..., 2] = -2*np.pi*np.sin(2*np.pi*z/l)/l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')
+
+
+class C_I_2_Y:
+    def __init__(self, l=3):
+        self.box = [-3, 3, -3, 3, -3, 3]
+        self.l = l
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        l = self.l
+        return 2 * np.sin((4 * np.pi * x) / l) * np.cos((2 * np.pi * y) / l) * np.sin((2 * np.pi * z) / l) \
+            + 2 * np.sin((4 * np.pi * y) / l) * np.cos((2 * np.pi * z) / l) * np.sin((2 * np.pi * x) / l) \
+            + 2 * np.sin((4 * np.pi * z) / l) * np.cos((2 * np.pi * x) / l) * np.sin((2 * np.pi * y) / l) \
+            + np.cos((4 * np.pi * x) / l) * np.cos((4 * np.pi * y) / l) \
+            + np.cos((4 * np.pi * y) / l) * np.cos((4 * np.pi * z) / l) \
+            + np.cos((4 * np.pi * z) / l) * np.cos((4 * np.pi * x) / l)
+
+    def project(self, p, maxit=200, tol=1e-8):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        l = self.l
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -4*np.pi*np.sin(2*np.pi*x/l)*np.sin(2*np.pi*y/l)*np.sin(4*np.pi*z/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*x/l)*np.cos(4*np.pi*y/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*x/l)*np.cos(4*np.pi*z/l)/l \
+                       + 4*np.pi*np.sin(4*np.pi*y/l)*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*z/l)/l \
+                       + 8*np.pi*np.sin(2*np.pi*z/l)*np.cos(4*np.pi*x/l)*np.cos(2*np.pi*y/l)/l
+        grad[..., 1] = 8*np.pi*np.sin(2*np.pi*x/l)*np.cos(4*np.pi*y/l)*np.cos(2*np.pi*z/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*x/l)*np.sin(2*np.pi*y/l)*np.sin(2*np.pi*z/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*y/l)*np.cos(4*np.pi*x/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*y/l)*np.cos(4*np.pi*z/l)/l \
+                       + 4*np.pi*np.sin(4*np.pi*z/l)*np.cos(2*np.pi*x/l)*np.cos(2*np.pi*y/l)/l
+        grad[..., 2] = -4*np.pi*np.sin(2*np.pi*x/l)*np.sin(4*np.pi*y/l)*np.sin(2*np.pi*z/l)/l \
+                       + 4*np.pi*np.sin(4*np.pi*x/l)*np.cos(2*np.pi*y/l)*np.cos(2*np.pi*z/l)/l \
+                       + 8*np.pi*np.sin(2*np.pi*y/l)*np.cos(2*np.pi*x/l)*np.cos(4*np.pi*z/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*z/l)*np.cos(4*np.pi*x/l)/l \
+                       - 4*np.pi*np.sin(4*np.pi*z/l)*np.cos(4*np.pi*y/l)/l
+        return grad
+
+    def hessian(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def jacobi_matrix(self, p):
+        raise NotImplementedError('NotImplemented')
+
+    def unit_normal(self, p):
+        if p.ndim == 1:
+            p = p[np.newaxis, :]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad ** 2, axis=1, keepdims=True))
+        n = grad / l
+        return n
+
+    def init_mesh(self, meshdata=None):
+        raise NotImplementedError('NotImplemented')

@@ -3,7 +3,7 @@ from numpy.linalg import inv
 
 from .Function import Function
 from .scaled_monomial_space_2d import ScaledMonomialSpace2d
-
+from .vector_monomial_space_2d import VectorMonomialSpace2d 
 class CVVEDof2d:
     def __init__(self, mesh, p):
         self.mesh = mesh
@@ -131,6 +131,7 @@ class ConformingVectorVESpace2d:
         self.mesh = mesh
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q, bc=bc)
+        self.vmspace = VectorMonomialSpace2d(mesh, p, q=q, bc=bc)
 
         self.itype = mesh.itype
         self.ftype = mesh.ftype

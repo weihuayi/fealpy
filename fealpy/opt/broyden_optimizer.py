@@ -1,8 +1,5 @@
-import numpy as np
 
-from .optimizer_base import Optimizer, Problem
-
-class NewtonRaphsonOptimizer(Optimizer):
+class Broyden(Optimizer):
     def __init__(self, problem: Problem) -> None:
         super().__init__(problem)
         self.P = problem.Preconditioner
@@ -11,8 +8,9 @@ class NewtonRaphsonOptimizer(Optimizer):
         problem = self.problem
         x = problem.x0
         f, gradf = problem.objective(x)
+        K_inv = -self.P(x)
         for i in range(problem.MaxIters):
-            du = -self.P(x) @ gradf
+            du = K_inv @ gradf
             x += du
             _, gradf = problem.objective(x)
             f_new, grad_f_new = problem.objective(x)
@@ -28,5 +26,3 @@ class NewtonRaphsonOptimizer(Optimizer):
         f, gradf = f_new, grad_f_new
 
         return x, f, gradf 
-
-

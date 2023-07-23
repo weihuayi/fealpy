@@ -16,6 +16,7 @@ h = mgis_bv.Hypothesis.Tridimensional # 表示是三维
 b = mgis_bv.load(lib, "PhaseFieldDisplacementSpectralSplit", h)
 
 # 设置材料属性
+m = mgis_bv.MaterialDataManager(b, 1) # 2 表示积分点的个数
 E = 150e9
 nu = 0.3
 
@@ -41,7 +42,7 @@ it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
 dt = 0.1 
 mgis_bv.integrate(m, it, dt, 0, m.n)
 
-idx = mgis_bv.getVariableSize(b.thermodynamic_forces[0], h)
+#idx = mgis_bv.getVariableSize(b.thermodynamic_forces[0], h)
 sig = m.s1.thermodynamic_forces
 H = m.s1.internal_state_variables[0]
 

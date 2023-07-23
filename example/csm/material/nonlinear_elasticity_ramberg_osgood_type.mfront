@@ -1,0 +1,110 @@
+@DSL Default;
+@Behaviour RambergOsgoodNonLinearElasticity;
+@Author L. Gelebart/V. Duc Nguyen;
+@Description {
+  "Ramberg-Osgood model (non-(linear elastic formulation)"
+  "Eps = S:Sig +β.σ_eq^n. N"
+  "with:"
+  " - N = (3/2) Sig_dev / σ_eq"
+  " - σ_eq = rac((3/2)σ_dev:σ_dev))"
+  " - β = α⋅σ₀/E"
+}
+
+@MaterialProperty stress E;
+E.setGlossaryName("YoungModulus");
+
+@MaterialProperty real ν;
+ν.setGlossaryName("PoissonRatio");
+
+@MaterialProperty real n;
+n.setEntryName("n");
+@MaterialProperty real α;
+α.setEntryName("alpha");
+@MaterialProperty stress σ₀;
+σ₀.setGlossaryName("YieldStrength");
+
+//! Numerical threshold
+@Parameter real e_ε = 1e-12;
+e_ε.setEntryName("NumericalThreshold");
+
+//! the shear modulus
+@LocalVariable stress μ;
+//! the bulk modulus
+@LocalVariable stress K;
+//! an helper variable
+@LocalVariable real β;
+//! von Mises equivalent stress
+@LocalVariable stress σₑ;
+/*!
+ * derivative of the von Mises equivalent stress
+ * with respect to the equivalent strain
+ */
+@LocalVariable stress ∂σₑ∕∂εₑ;
+//! the equivalent strain
+@LocalVariable strain εₑ;
+//! inverse of the equivalent strain
+@LocalVariable real iεₑ;
+//! normal associated with the deviatoric part of the strain
+@LocalVariable StrainStensor ne;
+
+@InitLocalVariables {
+  μ = computeMu(E, ν);
+  K = E / (3 ⋅ (1 - 2 ⋅ ν));
+  β = α ⋅ σ₀ / E;
+  σₑ = stress{};
+  ∂σₑ∕∂εₑ = stress{};
+}
+
+@PredictionOperator{
+  const auto P = I₄ - (I₂ ⊗ I₂) / 3;
+  Dt = K ⋅ (I₂ ⊗ I₂) + 2 ⋅ μ ⋅ P;
+}
+
+@Integrator{
+    const auto ε = εᵗᵒ + Δεᵗᵒ;
+    const auto se = deviator(ε);
+    εₑ = sqrt(2 ⋅ (se | se) / 3);
+    iεₑ = 1 / max(εₑ, e_ε);
+    ne = 2 ⋅ se ⋅ (iεₑ / 3);
+
+    // computation of the equivalent stress
+    if (εₑ < e_ε) {
+        σₑ = 3 ⋅ μ ⋅ εₑ;
+        ∂σₑ∕∂εₑ = 3 ⋅ μ;
+    } else {
+        const auto e_σ = E ⋅ e_ε;
+        const auto i3μ = 1 / (3 ⋅ μ);
+        auto f = real{};
+        auto fidf = [&]() {
+          const auto rσₑⁿ = pow(σₑ / σ₀, n);
+          const auto iσₑ = 1 / max(e_σ, σₑ);
+          f = σₑ ⋅ i3μ + β ⋅ rσₑⁿ - εₑ;
+          ∂σₑ∕∂εₑ = 1 / max(i3μ + n ⋅ β ⋅ rσₑⁿ ⋅ iσₑ, i3μ ⋅ e_ε);
+          };
+        σₑ = σ₀ ⋅ pow(εₑ / β, 1 / n);
+        auto iter = int{};
+        fidf();
+        while (abs(f) > e_ε) {
+            fidf();
+            σₑ -= f ⋅ ∂σₑ∕∂εₑ;
+            if (++iter > 20) {
+                throw(DivergenceException());
+            }
+        }
+    }
+    // computation of the stress
+    σ = K ⋅ trace(ε) ⋅ I₂ + σₑ ⋅ ne;
+}
+
+@TangentOperator{
+    const auto P = I₄ - (I₂ ⊗ I₂) / 3;
+    if ((smt == ELASTIC) || (smt == SECANTOPERATOR)) {
+        Dt = K ⋅ (I₂ ⊗ I₂) + 2 ⋅ μ ⋅ P;
+    } else {
+        if (εₑ < e_ε) {
+            Dt = K ⋅ (I₂ ⊗ I₂) + 2 ⋅ μ ⋅ P;
+        } else {
+            Dt = K ⋅ (I₂ ⊗ I₂) + ∂σₑ∕∂εₑ ⋅ (ne ⊗ ne) + σₑ ⋅ iεₑ ⋅ (2 ⋅ P / 3 - (ne ⊗ ne));
+        }
+    }
+}

@@ -76,7 +76,7 @@ for i in range(maxit):
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
 
-    solver = GAMGSolver(ptype='W', sstep=3)
+    solver = GAMGSolver(ptype='W', sstep=2)
     solver.setup(A)
     uh[:] = solver.solve(F)
 

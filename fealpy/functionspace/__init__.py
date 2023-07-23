@@ -1,8 +1,11 @@
 # 新文件命名规则的空间类
 from .lagrange_fe_space import LagrangeFESpace
 from .bernstein_fe_space import BernsteinFESpace
+
 from .conforming_vector_ve_space_2d import ConformingVectorVESpace2d
 from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
+
+from .non_conforming_scalar_ve_space_2d import NonConformingScalarVESpace2d
 
 from .scaled_monomial_space_2d import ScaledMonomialSpace2d
 from .scaled_monomial_space_3d import ScaledMonomialSpace3d

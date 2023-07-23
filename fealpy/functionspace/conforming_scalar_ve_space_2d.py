@@ -47,7 +47,7 @@ class CSVEDof2d():
 
 
 class ConformingScalarVESpace2d():
-    def __init__(self, mesh, p=1, q=None, bc=None):
+    def __init__(self, mesh, p=1):
         """
         p: the space order
         q: the index of integral formular
@@ -55,7 +55,7 @@ class ConformingScalarVESpace2d():
         """
         self.mesh = mesh
         self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q, bc=bc)
+        self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.cellmeasure = self.smspace.cellmeasure
         self.dof = CSVEDof2d(mesh, p)
 

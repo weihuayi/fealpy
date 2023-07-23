@@ -74,11 +74,9 @@ class VTKPlotter(object):
         else:
             self.process = None
 
-    def show(
-            self,
-            actors=None,
-            at=None):
-
+    def show(self, actors=None, at=None):
+        """
+        """
         if at is None:
             at = 0
 

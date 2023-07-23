@@ -7,7 +7,8 @@ class TwoNonlinearSpingsProblem(Problem):
     def __init__(self):
         x0 = np.zeros(2, dtype=np.float64)
         MaxIters = 20
-        super().__init__(x0, self.energy, Preconditioner=self.tagnent_stiffness_matrix, MaxIters=MaxIters, )
+        super().__init__(x0, self.energy, 
+            Preconditioner=self.tagnent_stiffness_matrix, MaxIters=MaxIters, )
 
     def energy(self, x):
         F = np.array([0, 100])
@@ -26,9 +27,7 @@ def two_nonlinear_springs_opt():
     opt = NewtonRaphsonOptimizer(problem)
     x = opt.run()
     print("x:", x)
-    print("energy:", problem.energy)
-
-
+    
 
 if __name__ == "__main__":
     two_nonlinear_springs_opt()

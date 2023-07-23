@@ -60,7 +60,7 @@ class PolygonMesh(Mesh, Plotable):
         GD = self.geo_dimension()
 
         if etype in {'cell', 2}:
-            cell2node = self.ds.cell_to_node()
+            cell2node = self.ds.cell_to_node(return_sparse=True)
             NV = self.ds.number_of_vertices_of_cells().reshape(-1, 1)
             bc = cell2node*node/NV
         elif etype in {'edge', 'face', 1}:
@@ -269,7 +269,7 @@ class PolygonMesh(Mesh, Plotable):
         tri[:, 1, :] = bc + t[1]*h
         tri[:, 2, :] = bc + t[2]*h
 
-        bcs = self.multi_index_matrix(p-2)/(p-2)
+        bcs = self.multi_index_matrix(p-2, 2)/(p-2)
         ipoint[start:] = np.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
         return ipoint
 
@@ -372,6 +372,46 @@ class PolygonMesh(Mesh, Plotable):
         else:
             e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e
+
+    @classmethod
+    def show_cvem_dofs(cls, p=5):
+        """
+        @brief 显示多边形单元上的自由度
+        """
+        import matplotlib.pyplot as plt
+        mesh = cls.from_one_pentagon()
+
+        fig = plt.figure()
+        for i in range(p):
+            axes = fig.add_subplot(1, p, i+1)
+            mesh.add_plot(axes, cellcolor=[0.5, 0.9, 0.45], edgecolor='k')
+            ips = mesh.interpolation_points(p=i+1)
+            mesh.find_node(axes, node=ips)
+            axes.set_title(f'$k={i+1}$')
+
+        plt.show()
+
+    @classmethod
+    def from_unit_square(cls, nx=10, ny=10, threshold=None):
+        """
+        Generate a polygon mesh for a unit square.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TriangleMesh instance
+        """
+        return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
+
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        """
+        @brief Generate a polygon mesh for a box domain
+        """
+        from .triangle_mesh import TriangleMesh
+        tmesh = TriangleMesh.from_box(box, nx=nx, ny=ny, threshold=threshold)
+        mesh = cls.from_triangle_mesh_by_dual(tmesh)
+        return mesh
 
     @classmethod
     def from_quadtree(cls, qtree):
@@ -570,18 +610,15 @@ class PolygonMesh(Mesh, Plotable):
 
     @classmethod
     def from_mesh(cls, mesh: Mesh):
+        """
+        @brief 把一个由同一类型单元组成网格转化为多边形网格的格式
+        """
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         NC = mesh.number_of_cells()
         NV = cell.shape[1]
         cellLocation = np.arange(0, (NC+1)*NV, NV)
         return cls(node, cell.reshape(-1), cellLocation)
-
-    @classmethod
-    def from_quadtree(cls, quadtree):
-        node, cell, cellLocation = quadtree.to_pmesh()
-        return cls(node, cell, cellLocation)
-
 
     @classmethod
     def distorted_concave_rhombic_quadrilaterals_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, ratio=0.618):
@@ -827,6 +864,9 @@ class PolygonMeshDataStructure(MeshDataStructure):
     total_face = total_edge
 
     def construct(self):
+        """
+        @brief 构建多边形网格实体之间的邻接关系矩阵
+        """
         totalEdge = self.total_edge()
         _, i0, j = np.unique(np.sort(totalEdge, axis=1),
                 return_index=True,
@@ -850,6 +890,7 @@ class PolygonMeshDataStructure(MeshDataStructure):
         self.edge2cell[:, 1] = cellIdx[i1]
         self.edge2cell[:, 2] = localIdx[i0]
         self.edge2cell[:, 3] = localIdx[i1]
+        self.cell2edge = j
 
     @property
     def cell(self):
@@ -857,37 +898,59 @@ class PolygonMeshDataStructure(MeshDataStructure):
 
     ### cell ###
 
-    def cell_to_node(self):
+    def cell_to_node(self, return_sparse=False):
         """
         @brief 单元到节点的拓扑关系，默认返回稀疏矩阵
         @note 当获取单元实体时，请使用 `mesh.entity('cell')` 接口
         """
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
 
-        NV = self.number_of_vertices_of_cells()
-        I = np.repeat(range(NC), NV)
-        J = self._cell
+        if return_sparse:
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
 
-        val = np.ones(len(self._cell), dtype=np.bool_)
-        cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool_)
-        return cell2node
+            NV = self.number_of_vertices_of_cells()
+            I = np.repeat(range(NC), NV)
+            J = self._cell
 
-    def cell_to_edge(self) -> NDArray:
-        raise NotImplementedError
+            val = np.ones(len(self._cell), dtype=np.bool_)
+            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool_)
+            return cell2node
+        else:
+            return self.cell
+
+    def face_to_edge(self) -> NDArray:
+        NE = self.number_of_edges()
+        return np.arange(NE).reshape(-1, 1)
+
+    def cell_to_edge(self, return_sparse=False) -> NDArray:
+        """
+        @brief 获取网格单元与网格边的邻接关系
+        """
+        if return_sparse:
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+            J = np.arange(NE)
+            val = np.ones((NE,), dtype=np.bool_)
+            cell2edge  = coo_matrix((val, (self.edge2cell[:, 0], J)), shape=(NC, NE), dtype=np.bool_)
+            cell2edge += coo_matrix((val, (self.edge2cell[:, 1], J)), shape=(NC, NE), dtype=np.bool_)
+            return cell2edge.tocsr()
+        else:
+            return np.hsplit(self.cell2edge, self.cellLocation[1:-1])
 
     cell_to_face = cell_to_edge
 
     def edge_to_cell(self, return_sparse=False):
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        edge2cell = self.edge2cell
+        """
+        @brief 获取网格边与网格单元之间的邻接关系
+        """
         if return_sparse:
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
             val = np.ones(NE, dtype=np.bool_)
-            edge2cell = coo_matrix((val, (range(NE), edge2cell[:, 0])), shape=(NE, NC), dtype=np.bool_)
-            edge2cell+= coo_matrix((val, (range(NE), edge2cell[:, 1])), shape=(NE, NC), dtype=np.bool_)
+            edge2cell  = coo_matrix((val, (range(NE), self.edge2cell[:, 0])), shape=(NE, NC), dtype=np.bool_)
+            edge2cell += coo_matrix((val, (range(NE), self.edge2cell[:, 1])), shape=(NE, NC), dtype=np.bool_)
             return edge2cell.tocsr()
         else:
-            return edge2cell
+            return self.edge2cell
 
     face_to_cell = edge_to_cell

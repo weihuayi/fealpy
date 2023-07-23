@@ -7,8 +7,11 @@ class ScaledMonomialSpaceMassIntegrator2d:
     def __init__(self, q=3):
         self.q = q
 
-    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d):
-        p = space.p
+    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, p=None, index=np.s_[:]):
+        """
+        @brief 组装缩放单项式空间每个单元上的质量矩阵
+        """
+        p = space.p if p is None else p
         mesh = space.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -41,9 +44,9 @@ class ScaledMonomialSpaceMassIntegrator2d:
         multiIndex = space.dof.multi_index_matrix(p=p)
         q = np.sum(multiIndex, axis=1)
         H /= q + q.reshape(-1, 1) + 2
-        return H
+        return H[index]
 
-    def assembly_cell_matrix_numba(self, space):
+    def assembly_cell_matrix_numba(self, space: ScaledMonomialSpace2d, index=np.s_[:]):
         pass
 
 class ScaledMonomialSpaceMassIntegrator3d:
