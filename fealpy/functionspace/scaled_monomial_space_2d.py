@@ -189,7 +189,7 @@ class ScaledMonomialSpace2d():
     @barycentric
     def edge_basis_with_barycentric(self, bcs, p=None):
         """!
-        @brief 边上的中心坐标函数和缩放单项式函数有一定的关系
+        @brief 边上的重心坐标函数和缩放单项式函数有一定的关系
         @param bcs : (..., 2)
         @return phi : (..., p+1)
         """

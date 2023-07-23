@@ -115,6 +115,35 @@ class GAMGSolver():
             N = self.A[-1].shape[0]
             self.A[-1] += 1e-12*sp.eye(N)  
 
+    def construct_coarse_equation(self, A, F, level=1):
+        """
+        @brief 给定一个线性代数系统，利用已经有的延拓和限制算子，构造一个小规模
+               的问题
+        """
+        for i in range(level):
+            A = (self.R[i] @ A @ self.P[i]).tocsr()
+            F = self.R[i]@F
+
+        return A, F
+
+    def prolongate(self, uh, level): 
+        """
+        @brief 给定一个第 level 层的向量，延拓到最细层
+        """
+        assert level >= 1
+        for i in range(level-1, -1, -1):
+            uh = self.P[i]@uh
+        return uh
+
+    def restrict(self, uh, level):
+        """
+        @brief 给定一个最细层的向量，限制到第 level 层
+        """
+        for i in range(level):
+            uh = self.R[i]@uh
+        return uh
+
+
     def print(self):
         """
         @brief 打印代数多重网格的信息

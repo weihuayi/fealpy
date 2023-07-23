@@ -160,16 +160,16 @@ class UniformMesh1d(Mesh, Plotable):
         """
         在一维一致网格中生成一个动画
 
-        @param fig: matplotlib的Figure对象，用于绘制动画。
-        @param axes: matplotlib的Axes对象，用于设置坐标轴和画图。
-        @param box: 一个四元组，分别表示x轴的最小值、最大值和y轴的最小值、最大值。
-        @param advance: 一个函数，接受当前帧序号（和可选的其他参数），返回当前时间步的解和时间。
-        @param fname: 字符串，保存的视频文件的名称，默认为'test.mp4'。
-        @param init: 一个可选的函数，用于初始化线的数据，返回初始化的数据，默认为None。
-        @param fargs: 一个可选的元组，包含传递给init和advance函数的额外参数，默认为None。
-        @param frames: 整数，动画的帧数，默认为1000。
-        @param interval: 整数，动画中每帧之间的间隔（以毫秒为单位），默认为50。
-        @param kwargs: 其他的可选关键字参数，例如线的宽度（lw）、线的样式（linestyle）、线条上标记点的样式（marker）、线的颜色（color）等。
+        @param fig: matplotlib的Figure对象，用于绘制动画
+        @param axes: matplotlib的Axes对象，用于设置坐标轴和画图
+        @param box: 一个四元组，分别表示x轴的最小值、最大值和y轴的最小值、最大值
+        @param advance: 一个函数，接受当前帧序号（和可选的其他参数），返回当前时间步的解和时间
+        @param fname: 字符串，保存的视频文件的名称，默认为'test.mp4'
+        @param init: 一个可选的函数，用于初始化线的数据，返回初始化的数据，默认为None
+        @param fargs: 一个可选的元组，包含传递给init和advance函数的额外参数，默认为None
+        @param frames: 整数，动画的帧数，默认为1000
+        @param interval: 整数，动画中每帧之间的间隔（以毫秒为单位），默认为50
+        @param kwargs: 其他的可选关键字参数，例如线的宽度（lw）、线的样式（linestyle）、线条上标记点的样式（marker）、线的颜色（color）等
 
         @return: None
         """
@@ -477,7 +477,7 @@ class UniformMesh1d(Mesh, Plotable):
 
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, 
-        gD: Callable[[np.ndarray, Optional[float]], np.ndarray], 
+        gD: Callable[[np.ndarray], np.ndarray], 
         A: spmatrix, 
         f: np.ndarray, 
         uh: Union[np.ndarray, np.flatiter, None] = None, 
@@ -488,35 +488,34 @@ class UniformMesh1d(Mesh, Plotable):
 
         参数：
         gD : Callable[[np.ndarray, np.float64], np.ndarray]
-            描述 Dirichlet 边界条件的函数。
-            这个函数接收两个参数，一个是网格节点的坐标（numpy 数组），
-            另一个是时间 t（浮点数），并返回一个 numpy 数组，
-            数组中的值是在给定的网格节点和时间 t 上的 Dirichlet 边界条件的值。
+            描述 Dirichlet 边界条件的函数
+            这个函数接收两个参数，一个是网格节点的坐标（numpy 数组）
+            另一个是时间 t（浮点数），但在定义 gD 的时候已经把它，例如（t + tau）"硬编码"（即预先设定）进去了
+            并返回一个 numpy 数组，数组中的值是在给定的网格节点和时间 t 上的 Dirichlet 边界条件的值
 
         A : spmatrix
-            需要更新的矩阵。此函数将直接修改这个矩阵来应用 Dirichlet 边界条件。
+            需要更新的矩阵。此函数将直接修改这个矩阵来应用 Dirichlet 边界条件
 
         f : np.ndarray
-            需要更新的向量。此函数将直接修改这个向量来应用 Dirichlet 边界条件。
+            需要更新的向量。此函数将直接修改这个向量来应用 Dirichlet 边界条件
 
         uh : Union[np.ndarray, np.flatiter, None] = None
             表示网格上的函数值的 numpy 数组。
-            如果提供了此参数，则此函数将直接修改这个数组以应用 Dirichlet 边界条件。
-            如果此参数为 None（默认），则此函数将创建一个新的网格函数数组。
+            如果提供了此参数，则此函数将直接修改这个数组以应用 Dirichlet 边界条件
+            如果此参数为 None（默认），则此函数将创建一个新的网格函数数组
 
         threshold : Optional[Union[int, Callable[[np.ndarray], np.ndarray]]]
-            用于确定哪些网格节点应用 Dirichlet 边界条件。
-            如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上。
-            如果 threshold 是一个整数，则只将 Dirichlet 边界条件应用于具有该索引的节点上。
-            如果 threshold 是一个函数，则将该函数应用于网格节点的坐标，
-            并将 Dirichlet 边界条件应用于该函数返回 True 的所有节点上。
+            用于确定哪些网格节点应用 Dirichlet 边界条件
+            如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上
+            如果 threshold 是一个整数，则只将 Dirichlet 边界条件应用于具有该索引的节点上
+            如果 threshold 是一个函数，则将该函数应用于网格节点的坐标，并将 Dirichlet 边界条件应用于该函数返回 True 的所有节点上
 
         返回：
         A : np.ndarray
-            更新后的矩阵。
+            更新后的矩阵
 
         f : np.ndarray
-            更新后的向量。
+            更新后的向量
         """
         if uh is None:
             uh = self.function('node')
@@ -586,35 +585,39 @@ class UniformMesh1d(Mesh, Plotable):
 
 
     ## @ingroup FDMInterface
-    def update_dirichlet_bc(self, gD: Callable[[np.ndarray], np.ndarray], uh: np.ndarray, 
-                            threshold: Optional[Union[int, Callable[[np.ndarray], np.float64]]] = None) -> None:
+    def update_dirichlet_bc(self, 
+        gD: Callable[[np.ndarray], np.ndarray], 
+        uh: np.ndarray, 
+        threshold: Optional[Union[int, Callable[[np.ndarray], np.float64]]] = None) -> None:
         """
         更新网格函数 uh 的 Dirichlet 边界值
 
         参数：
         gD : Callable[[np.ndarray], np.ndarray]
-            描述 Dirichlet 边界条件的函数。这个函数接收两个参数，一个是网格节点的坐标（numpy 数组），另一个是时间 t（浮点数），并返回一个 numpy 数组，
-            数组中的值是在给定的网格节点和时间 t 上的 Dirichlet 边界条件的值
+            描述 Dirichlet 边界条件的函数
+            这个函数接收两个参数，一个是网格节点的坐标（numpy 数组）
+            另一个是时间 t（浮点数），但在定义 gD 的时候已经把它，例如（t + tau）"硬编码"（即预先设定）进去了
+            并返回一个 numpy 数组，数组中的值是在给定的网格节点和时间 t 上的 Dirichlet 边界条件的值
 
         uh : np.ndarray
-            表示网格上的函数值的 numpy 数组。此函数将更新这个数组的部分元素，以应用 Dirichlet 边界条件
+            表示网格上的函数值的 numpy 数组
+            此函数将更新这个数组的部分元素，以应用 Dirichlet 边界条件
 
         threshold : Optional[Union[int, Callable[[np.ndarray], np.ndarray]]]
-            用于确定哪些网格节点应用 Dirichlet 边界条件。如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上。
-            如果 threshold 是一个整数，则只将 Dirichlet 边界条件应用于具有该索引的节点上。如果 threshold 是一个函数，则将该函数应用于网格节点的坐标，
-            并将 Dirichlet 边界条件应用于该函数返回 True 的所有节点上
+            用于确定哪些网格节点应用 Dirichlet 边界条件
+            如果 threshold 是 None（默认），则应用 Dirichlet 边界条件到所有边界节点上
+            如果 threshold 是一个整数，则只将 Dirichlet 边界条件应用于具有该索引的节点上
+            如果 threshold 是一个函数，则将该函数应用于网格节点的坐标，并将 Dirichlet 边界条件应用于该函数返回 True 的所有节点上
 
         返回：
         None。这个函数直接修改传入的 uh 数组，而不返回任何值
         """
         node = self.node
-        # isBdNode = self.ds.boundary_node_flag()
-        # args = (node[isBdNode],) if t is None else (node[isBdNode], t)
         if threshold is None:
             isBdNode = self.ds.boundary_node_flag()
             uh[isBdNode]  = gD(node[isBdNode])
         elif isinstance(threshold, int):
-            uh[threshold] = gD(node[isBdNode])
+            uh[threshold] = gD(node[threshold])
         elif callable(threshold):
             isBdNode = threshold(node)
             uh[isBdNode]  = gD(node[isBdNode])
@@ -632,7 +635,7 @@ class UniformMesh1d(Mesh, Plotable):
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([1 - 2 * r], [0], shape=(NN, NN), format='csr')
+        A = diags([1 - 2 * r], 0, shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(r, (NN-1, ))
         I = k[1:]
@@ -652,7 +655,7 @@ class UniformMesh1d(Mesh, Plotable):
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([1+2*r], [0], shape=(NN, NN), format='csr')
+        A = diags([1+2*r], 0, shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(-r, (NN-1, ))
         I = k[1:]
@@ -672,14 +675,14 @@ class UniformMesh1d(Mesh, Plotable):
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([1 + r], [0], shape=(NN, NN), format='csr')
+        A = diags([1 + r], 0, shape=(NN, NN), format='csr')
         val = np.broadcast_to(-r/2, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        B = diags([1 - r], [0], shape=(NN, NN), format='csr')
+        B = diags([1 - r], 0, shape=(NN, NN), format='csr')
         val = np.broadcast_to(r/2, (NN-1, ))
         B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
