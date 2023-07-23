@@ -100,6 +100,7 @@ class ConformingScalarVESpace2d():
         isDDof = self.dof.is_boundary_dof(threshold=threshold)
         uh[isDDof] = gD(ipoints[:end][isDDof[:end]])
         return isDDof
+
     def project_to_smspace(self, uh, PI1):
         """
         Project a conforming vem function uh into polynomial space.
