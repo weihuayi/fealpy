@@ -5,7 +5,7 @@ class SinSinExpPDEData:
     def __init__(self, D=[0, 1, 0, 1], T=[0, 1]):
         """
         @brief 模型初始化函数
-        `
+        
         @param[in] D 模型空间定义域
         @param[in] T 模型时间定义域
         """
@@ -42,12 +42,12 @@ class SinSinExpPDEData:
     @cartesian
     def init_solution(self, p):
         """
-        @brief 真解函数
+        @brief 初始解
 
         @param[in] p numpy.ndarray, 空间点
         @param[in] t float, 时间点 
 
-        @return 真解函数值
+        @return 初始解函数值
         """
         pi = np.pi
         x = p[..., 0]
