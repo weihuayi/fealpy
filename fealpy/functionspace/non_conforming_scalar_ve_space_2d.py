@@ -255,14 +255,9 @@ class NonConformingScalarVESpace2d():
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        if iptype is True:
-            ipoint = self.dof.interpolation_points()
-            uI = self.function()
-            uI[:NE*p] = u(ipoint)
-        else:
-            phi = self.smspace.edge_basis
-            def f(x, index):
-                return np.einsum('ij, ij...->ij...', u(x), phi(x, index=index, p=p-1))
+        ipoint = self.dof.interpolation_points()
+        uI = self.function()
+        uI[:NE*p] = u(ipoint)
         if p > 1:
             phi = self.smspace.basis
 
