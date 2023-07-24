@@ -376,9 +376,9 @@ class UniformMesh1d(Mesh, Plotable):
     ## @ingroup FDMInterface
     def elliptic_operator(self, d=1, c=None, r=None):
         """
-        @brief Assemble the finite difference matrix for a general elliptic operator.
+        @brief 对于一般的椭圆算子组装有限差分矩阵
 
-        The elliptic operator has the form: -d(x) * u'' + c(x) * u' + r(x) * u.
+        椭圆算子的形式: -d(x) * u'' + c(x) * u' + r(x) * u.
 
         @param[in] d The diffusion coefficient, default is 1.
         @param[in] c The convection coefficient, default is None.

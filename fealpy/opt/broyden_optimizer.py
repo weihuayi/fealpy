@@ -1,3 +1,6 @@
+import numpy as np
+
+from .optimizer_base import Optimizer, Problem
 
 class Broyden(Optimizer):
     def __init__(self, problem: Problem) -> None:
@@ -10,7 +13,7 @@ class Broyden(Optimizer):
         f, gradf = problem.objective(x)
         K_inv = -self.P(x)
         for i in range(problem.MaxIters):
-            du = K_inv @ gradf
+            du = -K_inv @ gradf
             x += du
             _, gradf = problem.objective(x)
             f_new, grad_f_new = problem.objective(x)
