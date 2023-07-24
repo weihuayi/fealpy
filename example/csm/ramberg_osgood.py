@@ -8,7 +8,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.geometry import SquareWithCircleHoleDomain
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm
-#from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
+from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
 from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
@@ -97,24 +97,20 @@ class ramberg_osgood_integrator():
         for i in range(NC):
             m.s1.gradients[i:] = eto[i:, :]
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def tangent_matrix(self):
         m = self._m
         it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
         dt = 0.1 
         mgis_bv.integrate(m, it, dt, 0, m.n)
         sigma = m.s1.thermodynamic_forces
         M = m.K
-        print(M.shape)
 
         #将切算子矩阵转化为felapy中默认的储存顺序
         M = np.delete(M, 1, axis=1)
         M = np.delete(M, 1, axis=2)
         M[:, [1, 2], :] = M[:, [2, 1], :]
         M[:, :, [1, 2]] = M[:, :, [2, 1]]
-        # TODO 计算基函数梯度
-
-        out +=M
-        return out
+        return M
 
 #    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
     def source(self):
@@ -122,7 +118,7 @@ class ramberg_osgood_integrator():
         sigma = m.s1.thermodynamic_forces
         n = sigma.shape[0]
         
-        #将应力转化为felapy中默认的储存顺序, 即二维情况盈利默认储存为 NC*2*2 的矩阵
+        #将应力转化为felapy中默认的储存顺序, 即二维情况应力默认储存为 NC*2*2 的矩阵
 #        sigma = np.delete(sigma, 1, axis=1)
 #        sigma[:, [1, 2]] = sigma[:, [2, 1]]
         return sigma.reshape(n, 2, 2)
@@ -170,7 +166,8 @@ integrator.build_mfront()
 bform = BilinearForm(vspace)
 
 integrator.update_mfront(uh)
-bform.add_domain_integrator(integrator)
+D = integrator.tangent_matrix()
+bform.add_domain_integrator(ProvidesSymmetricTangentOperatorIntegrator(D))
 bform.assembly()
 A = bform.get_matrix()
 

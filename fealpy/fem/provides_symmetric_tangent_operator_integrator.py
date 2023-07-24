@@ -2,12 +2,71 @@
 import numpy as np
 
 class ProvidesSymmetricTangentOperatorIntegrator:
-    def __init__(self):
-        pass
+    def __init__(self, D, q: Optional[int]=None):
+        """
+        初始化 ProvidesSymmetricTangentOperatorIntegrator 类
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
+        参数:
+        D : 切算子矩阵
+        q (Optional[int]): 积分阶次，默认为 None
+        """
+        self._D = D
+
+    def assembly_cell_matrix(self, space: Tuple, index=np.s_[:], 
+                             cellmeasure: Optional[np.ndarray]=None, 
+                             out: Optional[np.ndarray]=None) -> Optional[np.ndarray]:
+        """
+        构建切算子有限元矩阵
+
+        参数:
+        space (Tuple): 有限元空间
+        index (Union[np.s_, np.ndarray]): 选定的单元索引，默认为全部单元
+        cellmeasure (Optional[np.ndarray]): 对应单元的度量，默认为 None
+        out (Optional[np.ndarray]): 输出矩阵，默认为 None
+
+        返回:
+        Optional[np.ndarray]: 如果 out 参数为 None，则返回线性弹性有限元矩阵，否则不返回
+        """
         self.space = space[0]
         self.mesh = space[0].mesh
+        ldof = space[0].number_of_local_dofs()
+        p = space[0].p # 空间的多项式阶数
+        GD = mesh.geo_dimension()
+        q = self.q if self.q is not None else p+1
+
+
+        if cellmeasure is None:
+            cellmeasure = mesh.entity_measure('cell', index=index)
+
+        A = []
+        D = self._D
+
+        qf =  mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = space[0].grad_basis(bcs, index=index) # (NQ, NC, ldof, GD)
+
+        NC = len(cellmeasure)
+
+        if out is None:
+            K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
+        else:
+            assert out.shape == (NC, GD*ldof, GD*ldof)
+            K = out
+
+        # 对于每一个设定的索引对，利用四边形积分公式和基函数的梯度来计算一个积分项
+        A = [np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], 
+                       cellmeasure, optimize=True) for i, j in idx]
+
+        if space[0].doforder == 'sdofs': # 标量自由度优先排序 
+            for i in range(GD):
+                for j in range(i, GD):
+
+        elif space[0].doforder == 'vdims':
+            for i in range(GD):
+                for j in range(i, GD):
+
+        if out is None:
+            return K
 
 
     def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):
