@@ -1,5 +1,6 @@
 
 import numpy as np
+from typing import Optional, Union, Tuple
 
 class ProvidesSymmetricTangentOperatorIntegrator:
     def __init__(self, D, q: Optional[int]=None):
@@ -11,6 +12,7 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         q (Optional[int]): 积分阶次，默认为 None
         """
         self._D = D
+        self.q = q
 
     def assembly_cell_matrix(self, space: Tuple, index=np.s_[:], 
                              cellmeasure: Optional[np.ndarray]=None, 
@@ -29,10 +31,20 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         """
         self.space = space[0]
         self.mesh = space[0].mesh
+        mesh = self.mesh
         ldof = space[0].number_of_local_dofs()
         p = space[0].p # 空间的多项式阶数
         GD = mesh.geo_dimension()
         q = self.q if self.q is not None else p+1
+
+        if GD == 2:
+            # 每个元组代表一个弹性张量的二阶导数的索引对
+            idx = [(0, 0), (0, 1),  (1, 1)]
+            # 将 idx 中的元组映射到一个整数上
+            imap = {(0, 0):0, (0, 1):1, (1, 1):2}
+        elif GD == 3:
+            idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+            imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
 
 
         if cellmeasure is None:
@@ -56,14 +68,33 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         # 对于每一个设定的索引对，利用四边形积分公式和基函数的梯度来计算一个积分项
         A = [np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], 
                        cellmeasure, optimize=True) for i, j in idx]
+        d00 = D[..., 0, 0]
+        d01 = D[..., 0, 1]
+        d02 = D[..., 0, 2]
+        d11 = D[..., 1, 1]
+        d12 = D[..., 1, 2]
+        d22 = D[..., 2, 2]
 
-        if space[0].doforder == 'sdofs': # 标量自由度优先排序 
-            for i in range(GD):
-                for j in range(i, GD):
-
-        elif space[0].doforder == 'vdims':
-            for i in range(GD):
-                for j in range(i, GD):
+        # 默认标量自由度排序优先
+        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d00, A[imap[(0, 0)]])
+        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]])
+        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]].transpose(0, 2, 1))
+        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(1, 1)]])
+        
+        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]])
+        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
+        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]].transpose(0, 2, 1))
+        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
+        
+        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]].transpose(0, 2, 1))
+        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
+        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]])
+        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
+        
+        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d11, A[imap[(1, 1)]])
+        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]])
+        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]].transpose(0, 2, 1))
+        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 0)]])
 
         if out is None:
             return K
