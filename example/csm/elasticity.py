@@ -9,9 +9,9 @@ lib = "./libElasticity.so"  # 用实际路径替换
 # 定义应变张量
 eto = np.zeros(4)
 eto[0] = 3.0
-eto[1] = 1.0
-eto[2] = 1.0
-eto[3] = 2.0
+eto[1] = 2.0
+#eto[2] = 2.0
+eto[3] = 1.0
 h = mgis_bv.Hypothesis.PlaneStrain # 平面
 #h = mgis_bv.Hypothesis.Tridimensional # 表示是三维
 
@@ -29,10 +29,10 @@ print('lam:', lam)
 print('mu:', mu)
 print('2mu+lam', 2*mu+lam)
 print('0:', eto[0]*2*mu+(eto[0]+eto[1])*lam)
-print('1:', eto[1]*2*mu+(eto[1]+eto[0])*lam)
-#print('1:', eto[2]*2*mu+(eto[2]+eto[0])*lam)
-#print('2:', eto[1]*2*mu)
+print('0:', eto[1]*2*mu+(eto[0]+eto[1])*lam)
+print('1:', eto[3]*2*mu)
 print('2:', eto[2]*2*mu)
+print('3:', eto[3]*2*mu+(eto[0]+eto[3])*lam)
 
 m = mgis_bv.MaterialDataManager(b, 1) # 2 表示要处理的材料数量
 mgis_bv.setMaterialProperty(m.s1, "YoungModulus", 150e9) # 设置材料属性
@@ -54,6 +54,6 @@ idx = mgis_bv.getVariableSize(b.thermodynamic_forces[0], h)
 print(b.thermodynamic_forces[0], idx)
 # 输出结果
 print('m.n', m.n)
-print("Predicted Stress:", m.s0.thermodynamic_forces)
 print("Predicted Stress:", m.s1.thermodynamic_forces)
 print("Tangent Stiffness:", m.K)
+print("predicted stress:", m.K@eto)

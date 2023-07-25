@@ -8,7 +8,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.geometry import SquareWithCircleHoleDomain
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm
-#from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
+from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
 from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import LinearForm
 from fealpy.fem import DirichletBC
@@ -97,35 +97,35 @@ class ramberg_osgood_integrator():
         for i in range(NC):
             m.s1.gradients[i:] = eto[i:, :]
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def tangent_matrix(self):
         m = self._m
         it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
         dt = 0.1 
         mgis_bv.integrate(m, it, dt, 0, m.n)
         sigma = m.s1.thermodynamic_forces
         M = m.K
-        print(M.shape)
+        print("MMMM:", M)
 
         #将切算子矩阵转化为felapy中默认的储存顺序
         M = np.delete(M, 1, axis=1)
         M = np.delete(M, 1, axis=2)
-        M[:, [1, 2], :] = M[:, [2, 1], :]
-        M[:, :, [1, 2]] = M[:, :, [2, 1]]
-        # TODO 计算基函数梯度
+        M[:, -1, -1] = M[:, -1, -1]/2
+#        M[:, [1, 2], :] = M[:, [2, 1], :]
+#        M[:, :, [1, 2]] = M[:, :, [2, 1]]
+        return M
 
-        out +=M
-        return out
-
-#    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
     def source(self):
         m = self._m
         sigma = m.s1.thermodynamic_forces
         n = sigma.shape[0]
         
-        #将应力转化为felapy中默认的储存顺序, 即二维情况盈利默认储存为 NC*2*2 的矩阵
-#        sigma = np.delete(sigma, 1, axis=1)
-#        sigma[:, [1, 2]] = sigma[:, [2, 1]]
-        return sigma.reshape(n, 2, 2)
+        #将应力转化为felapy中默认的储存顺序, 即二维情况应力默认储存为 NC*2*2 的矩阵
+        s = np.zeros((n, 2, 2), dtype=np.float_)
+        s[:, 0, 0] = sigma[:, 0]
+        s[:, 0, 1] = sigma[:, 3]
+        s[:, 1, 0] = sigma[:, 3]
+        s[:, 1, 1] = sigma[:, 1]
+        return s
 
     def strain(self, uh):
         """
@@ -142,13 +142,13 @@ class ramberg_osgood_integrator():
 
         s = np.zeros((NC, 4), dtype=np.float64)
         s[:, 0] = np.sum(uh[:, 0][cell] * gphi[:, :, 0], axis=-1)
-        s[:, 3] = np.sum(uh[:, 1][cell] * gphi[:, :, 1], axis=-1)
+        s[:, 1] = np.sum(uh[:, 1][cell] * gphi[:, :, 1], axis=-1)
 
         val = np.sum(uh[:, 0][cell] * gphi[:, :, 1], axis=-1)
         val += np.sum(uh[:, 1][cell] * gphi[:, :, 0], axis=-1)
         val /= 2.0
-        s[:, 1] = val
-        s[:, 2] = val
+        s[:, 3] = val
+        s[:, 0] = 0
         return s
 
 model = ramberg_osgood_model()
@@ -161,16 +161,14 @@ space = LagrangeFESpace(mesh, p=1, doforder='vdims')
 vspace  = GD*(space, )
 
 uh = space.function(dim=GD)
-node = mesh.entity('node')
-isRNode = model.is_right_boundary(node)
-uh[isRNode, 1] = 1e-5
 
 integrator = ramberg_osgood_integrator(mesh, model)
 integrator.build_mfront()
 bform = BilinearForm(vspace)
 
 integrator.update_mfront(uh)
-bform.add_domain_integrator(integrator)
+D = integrator.tangent_matrix()
+bform.add_domain_integrator(ProvidesSymmetricTangentOperatorIntegrator(D))
 bform.assembly()
 A = bform.get_matrix()
 
@@ -178,7 +176,6 @@ val = np.array([0.0, 0.0], dtype=np.float64)
 
 # 构建单线性型，表示问题的源项
 lform = LinearForm(vspace)
-print(-integrator.source())
 lform.add_domain_integrator(VectorSourceIntegrator(-integrator.source(), q=1))
 
 neumann = model.right_force_direction()[0]*model.right_force_direction()
@@ -191,11 +188,7 @@ F = lform.get_vector()
 
 bc = DirichletBC(vspace, val, threshold=model.is_dirichlet_boundary)
 A, F = bc.apply(A, F, uh)
-print('A:', A)
-print('F:', F)
 uh.flat[:] = spsolve(A, F)
-#ml = pyamg.ruge_stuben_solver(A)
-#uh.T.flat[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
