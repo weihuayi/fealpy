@@ -189,7 +189,6 @@ class UniformMesh2d(Mesh, Plotable):
         # 创建动画所需的类和函数
         import matplotlib.animation as animation
         # 绘制颜色条的类
-        # import matplotlib.colorbar as colorbar
         from matplotlib.contour import QuadContourSet
 
 
@@ -212,7 +211,7 @@ class UniformMesh2d(Mesh, Plotable):
             data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
             # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
             # 后续的代码中无需对颜色条进行额外的更新操作
-            cbar = fig.colorbar(data, ax=axes)
+            # cbar = fig.colorbar(data, ax=axes)
 
         def func(n, *fargs): # 根据当前帧序号计算数值解，更新图像对象的数值数组，显示当前帧序号和时刻
             nonlocal data # 声明 data 为非局部变量 这样在 func 函数内部对 data 进行的修改会影响到外部的 data 变量
@@ -793,6 +792,103 @@ class UniformMesh2d(Mesh, Plotable):
         return A, B
 
         A1 += csr_matrix((val, (J.flat, I.flat)), shape=(NN, NN), dtype=self.ftype)
+
+
+    ## @ingroup FDMInterface
+    def wave_operator_explicit(self, tau: float, a: float = 1.0):
+        """
+        @brief 生成波动方程的显格式离散矩阵
+
+        @param[in] tau float, 时间步长
+        @param[in] a float, 波速，默认值为 1
+
+        @return 离散矩阵 A
+        """
+        rx = a*tau/self.h[0]
+        ry = a*tau/self.h[1]
+
+        NN = self.number_of_nodes()
+        n0 = self.nx + 1
+        n1 = self.ny + 1
+        k = np.arange(NN).reshape(n0, n1)
+
+        A = diags([2*(1-rx**2-ry**2)], 0, shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(rx**2, (NN - n1,))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(ry**2, (NN - n0, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A
+
+
+    ## @ingroup FDMInterface
+    def wave_operator_implicit(self, tau, a=1, theta=0.25):
+        """
+        @brief 生成波动方程的隐格式离散矩阵
+
+        @param[in] tau float, 时间步长
+        @param[in] a float, 波速，默认值为 1
+        @param[in] theta float, 时间离散格式参数，默认值为 0.25
+
+        @return 三个离散矩阵 A0, A1, A2，分别对应于不同的时间步
+        """
+        rx = a*tau/self.h[0]
+        ry = a*tau/self.h[1]
+
+        NN = self.number_of_nodes()
+        n0 = self.nx + 1
+        n1 = self.ny + 1
+        k = np.arange(NN).reshape(n0, n1)
+
+        A0 = diags([1+2*rx**2*theta+2*ry**2*theta], 0, shape=(NN, NN), format='csr')
+        A1 = diags([2*(1-(rx**2+ry**2)*(1-2*theta))], 0, shape=(NN, NN), format='csr')
+        A2 = diags([-(1+2*rx**2*theta+2*ry**2*theta)], 0, shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(-rx**2, (NN-n1, ))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(-ry**2, (NN-n0, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(rx**2*(1-2*theta), (NN-n1, ))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(ry**2*(1-2*theta), (NN-n0, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(rx**2*theta, (NN-n1, ))
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(ry**2*theta, (NN-n0, ))
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A0, A1, A2
 
 
     ## @ingroup FDMInterface
