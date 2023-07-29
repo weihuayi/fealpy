@@ -154,6 +154,14 @@ class EdgeMesh(Mesh, Plotable):
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
+    @classmethod
+    def from_inp_file(cls, fname):
+        from .inp_file_reader import InpFileReader
+
+        reader = InpFileReader(fname)
+        reader.parse()
+
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_triangle_mesh(cls, mesh):
