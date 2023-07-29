@@ -1,8 +1,8 @@
 import numpy as np
 import pyamg
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import spsolve
 
+from scipy.sparse.linalg import spsolve
 from fealpy.mesh import TriangleMesh 
 
 from fealpy.geometry import SquareWithCircleHoleDomain
@@ -100,32 +100,27 @@ class ramberg_osgood_integrator():
     def tangent_matrix(self):
         m = self._m
         it = mgis_bv.IntegrationType.IntegrationWithTangentOperator
-        dt = 0.1 
+        dt = 0.0 
         mgis_bv.integrate(m, it, dt, 0, m.n)
-        sigma = m.s1.thermodynamic_forces
         M = m.K
-        print("MMMM:", M)
 
         #将切算子矩阵转化为felapy中默认的储存顺序
-        M = np.delete(M, 1, axis=1)
-        M = np.delete(M, 1, axis=2)
-        M[:, -1, -1] = M[:, -1, -1]/2
-#        M[:, [1, 2], :] = M[:, [2, 1], :]
-#        M[:, :, [1, 2]] = M[:, :, [2, 1]]
+        M = np.delete(M, 2, axis=1)
+        M = np.delete(M, 2, axis=2)
         return M
 
-    def source(self):
+    def sigma(self):
         m = self._m
         sigma = m.s1.thermodynamic_forces
-        n = sigma.shape[0]
+        shape = sigma.shape[0]
         
         #将应力转化为felapy中默认的储存顺序, 即二维情况应力默认储存为 NC*2*2 的矩阵
-        s = np.zeros((n, 2, 2), dtype=np.float_)
-        s[:, 0, 0] = sigma[:, 0]
-        s[:, 0, 1] = sigma[:, 3]
-        s[:, 1, 0] = sigma[:, 3]
-        s[:, 1, 1] = sigma[:, 1]
-        return s
+        S = np.zeros((shape, 2, 2), dtype=np.float_)
+        S[:, 0, 0] = sigma[:, 0]
+        S[:, 0, 1] = sigma[:, 3]
+        S[:, 1, 0] = sigma[:, 3]
+        S[:, 1, 1] = sigma[:, 1]
+        return S
 
     def strain(self, uh):
         """
@@ -133,7 +128,7 @@ class ramberg_osgood_integrator():
         
         ____
         Notes:
-        mfront 二维平面应变的默认保存顺序为[0, 0] [0, 1] [1, 0] [1, 1]
+        mfront 二维平面应变的默认保存顺序为[0, 0] [1, 1] 未知 [1, 0]
         ___
         """
         cell = self.mesh.entity('cell')
@@ -141,6 +136,7 @@ class ramberg_osgood_integrator():
         gphi = self.mesh.grad_lambda()  # NC x 3 x 2
 
         s = np.zeros((NC, 4), dtype=np.float64)
+        uh = uh.T
         s[:, 0] = np.sum(uh[:, 0][cell] * gphi[:, :, 0], axis=-1)
         s[:, 1] = np.sum(uh[:, 1][cell] * gphi[:, :, 1], axis=-1)
 
@@ -148,7 +144,7 @@ class ramberg_osgood_integrator():
         val += np.sum(uh[:, 1][cell] * gphi[:, :, 0], axis=-1)
         val /= 2.0
         s[:, 3] = val
-        s[:, 0] = 0
+        s[:, 2] = 0
         return s
 
 model = ramberg_osgood_model()
@@ -157,38 +153,52 @@ domain = SquareWithCircleHoleDomain()
 mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
 
 GD = mesh.geo_dimension()
-space = LagrangeFESpace(mesh, p=1, doforder='vdims')
+space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
 vspace  = GD*(space, )
 
 uh = space.function(dim=GD)
+du = space.function(dim=GD)
 
 integrator = ramberg_osgood_integrator(mesh, model)
 integrator.build_mfront()
-bform = BilinearForm(vspace)
 
-integrator.update_mfront(uh)
-D = integrator.tangent_matrix()
-bform.add_domain_integrator(ProvidesSymmetricTangentOperatorIntegrator(D))
-bform.assembly()
-A = bform.get_matrix()
-
+gN = model.right_boundary_force()
 val = np.array([0.0, 0.0], dtype=np.float64)
+node = mesh.entity('node')
+for i in range(1):
+    neumann = gN[i]*model.right_force_direction()
+    bi = VectorNeumannBCIntegrator(neumann, threshold=model.is_right_boundary, q=1)
+    lform = LinearForm(vspace)
+    lform.add_boundary_integrator(bi)
+    lform.assembly()
 
-# 构建单线性型，表示问题的源项
-lform = LinearForm(vspace)
-lform.add_domain_integrator(VectorSourceIntegrator(-integrator.source(), q=1))
+    F = lform.get_vector()
+#    RNode = model.is_right_boundary(node)
+#    uh[0, RNode] = 1e-5
+    k = 0
+    while k < 5:
+        print('i:', i)
+        print('k:', k)
 
-neumann = model.right_force_direction()[0]*model.right_force_direction()
-bi = VectorNeumannBCIntegrator(neumann, threshold=model.is_right_boundary, q=1)
-lform.add_boundary_integrator(bi)
-lform.assembly()
+        integrator.update_mfront(uh)
+        D = integrator.tangent_matrix()
+        bform = BilinearForm(vspace)
+        bform.add_domain_integrator(ProvidesSymmetricTangentOperatorIntegrator(D))
+        bform.assembly()
+        A = bform.get_matrix()
 
-A = bform.get_matrix()
-F = lform.get_vector()
+        R = F - A@uh.flat[:]
+        bc = DirichletBC(vspace, val, threshold=model.is_dirichlet_boundary)
+        A, R = bc.apply(A, R, du)
+        du.flat[:] = spsolve(A, R)
+        uh[:] += du
 
-bc = DirichletBC(vspace, val, threshold=model.is_dirichlet_boundary)
-A, F = bc.apply(A, F, uh)
-uh.flat[:] = spsolve(A, F)
+#        error0 = np.sum(R**2)/(1+np.sum(F**2))
+        error1 = np.max(np.abs(du))
+        print('error:', error1)
+        if error1 < 1e-8:
+            break
+        k +=1
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
