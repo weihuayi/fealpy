@@ -376,9 +376,9 @@ class UniformMesh1d(Mesh, Plotable):
     ## @ingroup FDMInterface
     def elliptic_operator(self, d=1, c=None, r=None):
         """
-        @brief Assemble the finite difference matrix for a general elliptic operator.
+        @brief 对于一般的椭圆算子组装有限差分矩阵
 
-        The elliptic operator has the form: -d(x) * u'' + c(x) * u' + r(x) * u.
+        椭圆算子的形式: -d(x) * u'' + c(x) * u' + r(x) * u.
 
         @param[in] d The diffusion coefficient, default is 1.
         @param[in] c The convection coefficient, default is None.
@@ -687,6 +687,72 @@ class UniformMesh1d(Mesh, Plotable):
         B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A, B
+
+
+    ## @ingroup FDMInterface
+    def wave_operator_explicit(self, tau: float, a: float = 1.0):
+        """
+        @brief 生成波动方程的显格式离散矩阵
+
+        @param[in] tau float, 时间步长
+        @param[in] a float, 波速，默认值为 1
+
+        @return 离散矩阵 A
+        """
+        r = a * tau / self.h 
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([2 - 2*r**2], 0, shape=(NN, NN), format='csr')
+
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(r**2, (NN-1, ))
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+
+        return A
+
+
+    ## @ingroup FDMInterface
+    def wave_operator_implicit(self, tau: float, a: float = 1.0, theta: float = 0.25):
+        """
+        @brief 生成波动方程的隐格式离散矩阵
+
+        @param[in] tau float, 时间步长
+        @param[in] a float, 波速，默认值为 1
+        @param[in] theta float, 时间离散格式参数，默认值为 0.25
+
+        @return 三个离散矩阵 A0, A1, A2，分别对应于不同的时间步
+        """
+        r = a * tau / self.h 
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A0 = diags([1 + 2 * r**2 * theta], 0, shape=(NN, NN), format='csr')
+        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], 0, shape=(NN, NN), format='csr')
+        A2 = diags([- 1 - 2 * r**2 * theta], 0, shape=(NN, NN), format='csr')
+
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(- r**2 * theta, (NN-1, ))
+        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(r**2 * (1 - 2 * theta), (NN-1, ))
+        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(r**2 * theta, (NN-1, ))
+        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A0, A1, A2
 
 
     ## @ingroup FDMInterface
