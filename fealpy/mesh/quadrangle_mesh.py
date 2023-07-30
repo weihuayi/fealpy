@@ -663,7 +663,7 @@ class QuadrangleMesh(Mesh, Plotable):
         cell2edge = mesh.ds.cell_to_edge()
 
         node = np.r_['0', node0, ec, cc]
-        cell = np.zeros((3*NC, 4), dtype=self.itype)
+        cell = np.zeros((3*NC, 4), dtype=np.int_)
         idx = np.arange(NC)
         cell[:NC, 0] = NN + NE + idx
         cell[:NC, 1] = cell2edge[:, 0] + NN
