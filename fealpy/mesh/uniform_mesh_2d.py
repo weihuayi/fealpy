@@ -13,7 +13,7 @@ from .mesh_base import Mesh, Plotable
 # 这个数据接口为有限元服务
 from .mesh_data_structure import StructureMesh2dDataStructure
 from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
-from ..geometry import project
+from ..geometry import project, find_cut_point, msign
 
 ## @defgroup FEMInterface
 ## @defgroup FDMInterface
@@ -1241,6 +1241,28 @@ class UniformMesh2d(Mesh, Plotable):
 
         return idxMap
 
+    def is_cut_cell(self, phi):
+        """
+        @brief 
+        """
+        phiSign = msign(phi)
+        cell = self.entity('cell')
+        isCutCell = np.abs(np.sum(phiSign[cell], axis=1)) < 4
+        return isCutCell
+
+    def compute_cut_point(self, phi):
+        """
+        """
+        edge = self.entity('edge') 
+        phiSign = msign(phi)
+        isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
+        A = node[edge[isCutEdge, 0]]
+        B = node[edge[isCutEdge, 1]]
+
+        interface = UniformMesh2dFunction(self, phi) 
+        cutNode = find_cut_point(interface, A, B)
+        return cutNode
+        
 UniformMesh2d.set_ploter('2d')
 
 class UniformMesh2dFunction():
