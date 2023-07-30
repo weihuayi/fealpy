@@ -48,8 +48,8 @@ class InpFileReader:
         self.cline = 0
         self.parts = {}
         self.materials = {}
+        self.assembly = {}
         self.step = {}
-        self.global_elem_index = 0  # 添加全局的单元编号计数器
 
     def parse(self):
         """
@@ -59,12 +59,12 @@ class InpFileReader:
         while line is not None:
             if line.startswith('*Part'):
                 self.parse_part_data()
-            #elif line.startswith('*Assembly'):
-            #    self.parse_assembly_data()
-            #elif line.startswith('*Step'):
-            #    self.parse_step_data()
-            #elif line.startswith('*Material'):
-            #    self.parse_material_data()
+            elif line.startswith('*Assembly'):
+                self.parse_assembly_data()
+            elif line.startswith('*Step'):
+                self.parse_step_data()
+            elif line.startswith('*Material'):
+                self.parse_material_data()
 
             self.cline += 1
             line = self.get_keyword_line() # 拿到下一个还没有处理的 keyword 行
@@ -80,7 +80,6 @@ class InpFileReader:
             for word in words[1:]:
                 s = word.strip().split('=')
                 d[s[0]] = s[1]
-
         return d
 
 
@@ -107,7 +106,7 @@ class InpFileReader:
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
 
-        self.parts[d['name']] = {'elem':{}}
+        self.parts[d['name']] = {'node':None, 'elem':{}, 'nset':{}, 'elset':{}}
         self.cline += 1
         line = self.get_keyword_line()
 
@@ -116,14 +115,14 @@ class InpFileReader:
                 self.parse_node_data(self.parts, d['name'])
             elif line.startswith('*Element'):
                 self.parse_elem_data(self.parts, d['name'])
-            #elif line.startswith('*Nset'):
-            #    self.parse_nset_data(self.parts, d['name'])
-            #elif line.startswith('*Elset'):
-            #    self.parse_elset_data(self.parts, d['name'])
+            elif line.startswith('*Nset'):
+                self.parse_nset_data(self.parts, d['name'])
+            elif line.startswith('*Elset'):
+                self.parse_elset_data(self.parts, d['name'])
             else:
                 print("we pass the keyword line:" + line)
+                self.cline += 1
 
-            self.cline += 1
             line = self.get_keyword_line() # 拿到下一个还没有处理的 keyword 行
 
 
@@ -146,39 +145,11 @@ class InpFileReader:
             self.cline += 1
             line = self.contents[self.cline]
 
-        self.cline -= 1 # 为下一次循环做准备
         parts[name]['node'] = (np.array(node, dtype=np.float64), nmap)
-
 
     def parse_elem_data(self, parts, name):
         """
-        @brief 处理单元编号数据
-        """
-        line = self.contents[self.cline]
-        d = self.parse_keyword_line(line)
-
-        elem = [] # 存储单元数据
-        emap = {} # 存储单元编号的映射
-
-        nmap = parts[name]['node'][1]
-
-        self.cline += 1
-        line = self.contents[self.cline]
-        while not line.startswith('*'):
-            ss = line.split(',')
-            elem.append([nmap[int(s)] for s in ss[1:]])
-            emap[int(ss[0])] = self.global_elem_index  # 使用全局的单元编号计数器
-            self.global_elem_index += 1  # 增加全局的单元编号计数器
-            
-            self.cline += 1
-            line = self.contents[self.cline]
-
-        self.cline -= 1  # 为下一次循环做准备
-        parts[name]['elem'][d['type']] = (np.array(elem, dtype=np.int_), emap)
-
-
-    def parse_elem_data_old(self, parts, name):
-        """
+        @brief 解析 
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
@@ -199,16 +170,50 @@ class InpFileReader:
             self.cline += 1
             line = self.contents[self.cline]
 
-        self.cline -= 1 # 为下一次循环做准备
         parts[name]['elem'][d['type']] = (np.array(elem, dtype=np.int_), emap)
 
-
-
     def parse_nset_data(self, parts, name):
-        pass
+        """
+        @brief 解析网格节点集合数据
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+
+        part = parts[name]
+        nmap = part['node'][1]
+        idx = []
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        while not line.startswith('*'):
+            ss = line.split(',')
+            idx += [nmap[int(s)] for s in ss]
+            self.cline += 1
+            line = self.contents[self.cline]
+
+        part['nset'][d['nset']] = np.array(idx, dtype=np.int_) 
+
 
     def parse_elset_data(self, parts, name):
-        pass
+        """
+        @brief 解析网格节点集合数据
+        @note 注意这里我们没有把原始单元的编号映射成当前连续的编号
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+
+        part = parts[name]
+        idx = []
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        while not line.startswith('*'):
+            ss = line.split(',')
+            idx += [int(s) for s in ss]
+            self.cline += 1
+            line = self.contents[self.cline]
+
+        part['nset'][d['elset']] = np.array(idx, dtype=np.int_) 
 
     def parse_assembly_data(self):
         line = self.contents[self.cline]
