@@ -161,6 +161,22 @@ class EdgeMesh(Mesh, Plotable):
         reader = InpFileReader(fname)
         reader.parse()
 
+        # 提取所需的数据
+        parts = reader.parts
+
+        # 从 parts 中获取 node 和 element 数据
+        part_name = next(iter(parts)) # 这是你的部分的名称，你需要根据你的 .inp 文件来选择正确的部分名称
+        part_data = parts[part_name]
+        node_data = part_data['node']
+        node = node_data[0]
+        print("node:", node)
+        element_data = part_data['elem']
+        # cell = {key: data[0] for key, data in element_data.items()}
+        cell = np.concatenate([data[0] for key, data in element_data.items()])
+        print("cell:", cell)
+        mesh = cls(node, cell)
+
+        return mesh
 
     ## @ingroup MeshGenerators
     @classmethod

@@ -1,6 +1,5 @@
 import numpy as np
 import re
-import ipdb
 
 """
 Abaqus 有限元模型简介
@@ -50,6 +49,7 @@ class InpFileReader:
         self.parts = {}
         self.materials = {}
         self.step = {}
+        self.global_elem_index = 0  # 添加全局的单元编号计数器
 
     def parse(self):
         """
@@ -59,12 +59,13 @@ class InpFileReader:
         while line is not None:
             if line.startswith('*Part'):
                 self.parse_part_data()
-            elif line.startswith('*Assembly'):
-                self.parse_assembly_data()
-            elif line.startswith('*Step'):
-                self.parse_step_data()
-            elif line.startswith('*Material'):
-                self.parse_material_data()
+            #elif line.startswith('*Assembly'):
+            #    self.parse_assembly_data()
+            #elif line.startswith('*Step'):
+            #    self.parse_step_data()
+            #elif line.startswith('*Material'):
+            #    self.parse_material_data()
+
             self.cline += 1
             line = self.get_keyword_line() # 拿到下一个还没有处理的 keyword 行
 
@@ -72,7 +73,7 @@ class InpFileReader:
         """
         @brief 解析一个 keyword line
         """
-        d={}
+        d = {}
         words  = line.split(',')
         d['keyword'] = words[0].strip()
         if len(words) > 1:
@@ -109,19 +110,22 @@ class InpFileReader:
         self.parts[d['name']] = {'elem':{}}
         self.cline += 1
         line = self.get_keyword_line()
+
         while not line.startswith('*End Part'):
             if line.startswith('*Node'):
                 self.parse_node_data(self.parts, d['name'])
             elif line.startswith('*Element'):
                 self.parse_elem_data(self.parts, d['name'])
-            elif line.startswith('*Nset'):
-                self.parse_nset_data(self.parts, d['name'])
-            elif line.startswith('*Elset'):
-                self.parse_elset_data(self.parts, d['name'])
+            #elif line.startswith('*Nset'):
+            #    self.parse_nset_data(self.parts, d['name'])
+            #elif line.startswith('*Elset'):
+            #    self.parse_elset_data(self.parts, d['name'])
             else:
                 print("we pass the keyword line:" + line)
+
             self.cline += 1
             line = self.get_keyword_line() # 拿到下一个还没有处理的 keyword 行
+
 
     def parse_node_data(self, parts, name):
         """
@@ -142,10 +146,38 @@ class InpFileReader:
             self.cline += 1
             line = self.contents[self.cline]
 
+        self.cline -= 1 # 为下一次循环做准备
         parts[name]['node'] = (np.array(node, dtype=np.float64), nmap)
 
 
     def parse_elem_data(self, parts, name):
+        """
+        @brief 处理单元编号数据
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+
+        elem = [] # 存储单元数据
+        emap = {} # 存储单元编号的映射
+
+        nmap = parts[name]['node'][1]
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        while not line.startswith('*'):
+            ss = line.split(',')
+            elem.append([nmap[int(s)] for s in ss[1:]])
+            emap[int(ss[0])] = self.global_elem_index  # 使用全局的单元编号计数器
+            self.global_elem_index += 1  # 增加全局的单元编号计数器
+            
+            self.cline += 1
+            line = self.contents[self.cline]
+
+        self.cline -= 1  # 为下一次循环做准备
+        parts[name]['elem'][d['type']] = (np.array(elem, dtype=np.int_), emap)
+
+
+    def parse_elem_data_old(self, parts, name):
         """
         """
         line = self.contents[self.cline]
@@ -167,7 +199,9 @@ class InpFileReader:
             self.cline += 1
             line = self.contents[self.cline]
 
+        self.cline -= 1 # 为下一次循环做准备
         parts[name]['elem'][d['type']] = (np.array(elem, dtype=np.int_), emap)
+
 
 
     def parse_nset_data(self, parts, name):
