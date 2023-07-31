@@ -1,5 +1,4 @@
 import numpy as np
-import re
 
 """
 Abaqus 有限元模型简介
@@ -41,6 +40,9 @@ Assembly 模型的三级结构：
 """
 
 class InpFileReader:
+    """ 
+    @brief 该类负责处理来自 Abaqus .inp 文件的数据
+    """
     def __init__(self, fname):
         with open(fname, 'r') as f:
             contents = f.read()
@@ -72,6 +74,8 @@ class InpFileReader:
     def parse_keyword_line(self, line):
         """
         @brief 解析一个 keyword line
+        @param line 要解析的 keyword line
+        @return 包含解析结果的字典
         """
         d = {}
         words  = line.split(',')
@@ -86,6 +90,7 @@ class InpFileReader:
     def get_keyword_line(self):
         """
         @brief 获取还没有处理的 keyword  行
+        @return 下一个未处理的 keyword 行，如果没有则返回 None
         """
         if self.cline < len(self.contents):
             line = self.contents[self.cline]
@@ -101,6 +106,7 @@ class InpFileReader:
 
     def parse_part_data(self):
         """
+        @brief 解析 part 数据
         """
 
         line = self.contents[self.cline]
@@ -110,7 +116,7 @@ class InpFileReader:
         self.cline += 1
         line = self.get_keyword_line()
 
-        while not line.startswith('*End Part'):
+        while line is not None and not line.startswith('*End Part'):
             if line.startswith('*Node'):
                 self.parse_node_data(self.parts, d['name'])
             elif line.startswith('*Element'):
@@ -129,6 +135,8 @@ class InpFileReader:
     def parse_node_data(self, parts, name):
         """
         @brief 处理节点坐标数据
+        @param parts 用于存储节点数据的字典
+        @param name 当前部分的名称
         """
         i = 0
         node = []
@@ -139,17 +147,20 @@ class InpFileReader:
         while not line.startswith('*'):
             s = line.split(',')
             node.append((float(s[1]), float(s[2]), float(s[3])))
-            nmap[int(s[0])] = i
+            nmap[int(s[0])] = i # 原始节点编号 1 被映射为目前节点编号 0，依次
             i += 1
 
             self.cline += 1
             line = self.contents[self.cline]
 
         parts[name]['node'] = (np.array(node, dtype=np.float64), nmap)
+        print("node:", parts[name]['node'])
 
     def parse_elem_data(self, parts, name):
         """
-        @brief 解析 
+        @brief 解析单元数据
+        @param parts 用于存储单元数据的字典
+        @param name 当前部分的名称
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
@@ -158,51 +169,57 @@ class InpFileReader:
         elem = []
         emap = {}
 
-        nmap = parts[name]['node'][1]
+        nmap = parts[name]['node'][1] # 原始节点编号 1 被映射为目前节点编号 0，依次
 
         self.cline += 1
         line = self.contents[self.cline]
         while not line.startswith('*'):
             ss = line.split(',')
             elem.append([nmap[int(s)] for s in ss[1:]])
-            emap[int(ss[0])] = i
+            emap[int(ss[0])] = i # 原始单元编号 1 被映射为原始单元编号 0，依次
             i += 1
             self.cline += 1
             line = self.contents[self.cline]
 
         parts[name]['elem'][d['type']] = (np.array(elem, dtype=np.int_), emap)
+        print("elem:", parts[name]['elem'][d['type']])
 
     def parse_nset_data(self, parts, name):
         """
         @brief 解析网格节点集合数据
+        @param parts 用于存储节点集合数据的字典
+        @param name 当前部分的名称
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
+        print("dnset:", d)
 
-        part = parts[name]
-        nmap = part['node'][1]
+        nmap = parts[name]['node'][1]
         idx = []
 
         self.cline += 1
         line = self.contents[self.cline]
         while not line.startswith('*'):
             ss = line.split(',')
-            idx += [nmap[int(s)] for s in ss]
+            idx += [nmap[int(s)] for s in ss] # 原始节点集合编号 1 被映射为目前节点集合编号 0，依次
             self.cline += 1
             line = self.contents[self.cline]
 
-        part['nset'][d['nset']] = np.array(idx, dtype=np.int_) 
+        parts[name]['nset'][d['nset']] = (np.array(idx, dtype=np.int_), nmap)
+        print("nset:", parts[name]['nset'][d['nset']])
 
 
     def parse_elset_data(self, parts, name):
         """
         @brief 解析网格节点集合数据
+        @param parts 用于存储元素集合数据的字典
+        @param name 当前部分的名称
         @note 注意这里我们没有把原始单元的编号映射成当前连续的编号
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
+        print("delset:", d)
 
-        part = parts[name]
         idx = []
 
         self.cline += 1
@@ -213,7 +230,8 @@ class InpFileReader:
             self.cline += 1
             line = self.contents[self.cline]
 
-        part['nset'][d['elset']] = np.array(idx, dtype=np.int_) 
+        parts[name]['elset'][d['elset']] = np.array(idx, dtype=np.int_) 
+        print("elset:", parts[name]['elset'][d['elset']])
 
     def parse_assembly_data(self):
         line = self.contents[self.cline]
