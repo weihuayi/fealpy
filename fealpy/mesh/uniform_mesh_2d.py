@@ -852,13 +852,13 @@ class UniformMesh2d(Mesh, Plotable):
         A1 = diags([2*(1-(rx**2+ry**2)*(1-2*theta))], 0, shape=(NN, NN), format='csr')
         A2 = diags([-(1+2*rx**2*theta+2*ry**2*theta)], 0, shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(-rx**2, (NN-n1, ))
+        val = np.broadcast_to(-rx**2*theta, (NN-n1, ))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(-ry**2, (NN-n0, ))
+        val = np.broadcast_to(-ry**2*theta, (NN-n0, ))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
