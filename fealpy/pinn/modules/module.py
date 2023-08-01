@@ -54,7 +54,7 @@ class TensorMapping(Module):
 
         @note: This is a method with coordtype 'cartesian'.
         """
-        pt = torch.from_numpy(ps).float()
+        pt = torch.from_numpy(ps)
         return self.forward(pt)
 
     from_numpy.__dict__['coordtype'] = 'cartesian'

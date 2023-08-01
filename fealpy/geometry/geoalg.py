@@ -1,6 +1,11 @@
 import numpy as np
 
 
+def msign(x, eps=1e-10):
+    flag = np.sign(x)
+    flag[np.abs(x) < eps] = 0
+    return flag
+
 def find_cut_point(phi, p0, p1):
     """ 
     @brief Find cutted point between edge `(p0, p1)` and the curve `phi`

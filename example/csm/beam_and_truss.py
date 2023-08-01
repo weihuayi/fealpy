@@ -1,9 +1,15 @@
 import sys
-from fealpy.mesh import InpFileReader
+import matplotlib.pyplot as plt
+from fealpy.mesh import EdgeMesh
 
 
 fname = sys.argv[1]
-reader = InpFileReader(fname)
-reader.parse()
 
-print(reader.parts)
+mesh = EdgeMesh.from_inp_file(fname)
+
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.add_plot(axes)
+plt.show()
+
+

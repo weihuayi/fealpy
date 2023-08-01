@@ -3,7 +3,7 @@ from .signed_distance_function import dcircle, drectangle, dpoly
 from .signed_distance_function import dsphere, dcuboid, dcylinder
 from .sizing_function import huniform
 
-from .geoalg import project, find_cut_point
+from .geoalg import project, find_cut_point, msign
 
 from .implicit_curve import (CircleCurve,
         FoldCurve,

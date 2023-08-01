@@ -2144,6 +2144,14 @@ class TriangleMesh(Mesh, Plotable):
         node = node - d[...,np.newaxis]*n
         return cls(node,cell)
 
+
+    @classmethod
+    def from_box_with_interface(cls, interface, box, nx=10, ny=10):
+        """
+        """
+        from scipy.spatial import Delaunay
+        from .uniform_mesh_2d import UniformMesh2d
+
 TriangleMesh.set_ploter('2d')
 
 
