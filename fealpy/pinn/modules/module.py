@@ -73,8 +73,7 @@ class TensorMapping(Module):
         pt = torch.from_numpy(ps)
         if device is None:
             device = self.get_device()
-        pt.to(device=device)
-        return self.forward(pt)
+        return self.forward(pt.to(device=device))
 
     from_numpy.__dict__['coordtype'] = 'cartesian'
 
