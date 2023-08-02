@@ -106,6 +106,7 @@ class LocalRandomFeature(TensorMapping):
         self.set_basis(bound)
         self.activate = activate
         self.uml = Linear(nf, 1, bias=False, device=device, dtype=dtype)
+        self.device = device
 
     @property
     def um(self):
@@ -198,7 +199,6 @@ class RandomFeatureFlat(TensorMapping):
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
         ret = self.global_(p)
-        # ret = torch.zeros((p.shape[0], 1), dtype=self.dtype)
         for i in range(self.number_of_partitions()):
             x = std[:, i, :] # (N, d)
             ret += self.partions[i](x) * self.pou(x) # (N, 1)

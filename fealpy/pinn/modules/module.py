@@ -1,6 +1,5 @@
 from typing import (
-    Optional, Tuple, Callable, Sequence, Union, Literal,
-    overload
+    Optional, Tuple, Callable, Sequence, Union
 )
 
 import numpy as np
