@@ -1,4 +1,6 @@
-from typing import Iterator, List
+"""Modules for the Random Feature Method"""
+
+from typing import List
 
 import torch
 from torch import Tensor
@@ -129,6 +131,11 @@ class RandomFeatureFlat(TensorMapping):
         @param nlrf: int. Number of local random features.
         @param nglf: int.
         @param centers: 2-d Tensor. Centers of partitions.
+        @param radius: float.
+        @param in_dim: int. Input dimension.
+        @param bound: float. Uniform distribution bound for feature weights and bias.
+        @param activate: Callable. The activation function after linear transforms.
+        @param print_status: bool.
         """
         super().__init__()
         self.in_dim = in_dim
@@ -196,23 +203,3 @@ class RandomFeatureFlat(TensorMapping):
             x = std[:, i, :] # (N, d)
             ret += self.partions[i](x) * self.pou(x) # (N, 1)
         return ret # (N, 1)
-
-
-# class RandomFeature(Module):
-#     def __init__(self, Jn: int, cs: Tensor, rs: float):
-#         super().__init__()
-#         self.Jn = Jn
-#         self.Mp = cs.shape[0]
-#         self.um = torch.empty((self.Mp, Jn), dtype=cs.dtype)
-#         self._rfs = []
-#         for i in range(self.Mp):
-#             rf = LocalRandomFeature(self.um[i, :], Jn, cs[i, :], rs)
-#             self._rfs.append(rf)
-#             self.add_module(f'{i}', rf)
-
-#     def forward(self, p: Tensor):
-#         rets = []
-#         for mod in self._rfs: # Mp
-#             rets.append(mod(p)) # (N, TD2)
-#         ret = torch.stack(rets, dim=1) # (N, Mp, TD2)
-#         return torch.sum(ret, dim=1) # (N, TD2)
