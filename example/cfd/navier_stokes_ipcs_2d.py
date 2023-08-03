@@ -88,34 +88,29 @@ p1 = pspace.function()
 
 dt = tmesh.dt
 
-# 第一个
+# 组装第一个方程的左端矩阵
 Vbform0 = BilinearForm(2*(uspace,))
 Vbform0.add_domain_integrator(VectorMassIntegrator(rho/dt))
-Vbform0.assembly()
-A1 = Vbform0.get_matrix()
+A1 = Vbform0.assembly()
 
 Vbform1 = BilinearForm(2*(uspace,))
-Vbform1.add_domain_integrator(VectorViscousWorkIntegrator(mu)) #TODO：命名
-Vbform1.assembly()
-A2 = Vbform1.get_matrix()
+Vbform1.add_domain_integrator(VectorViscousWorkIntegrator(mu)) 
+A2 = Vbform1.assembly()
 A = A1+A2
 
 Vbform3 = MixedBilinearForm((pspace,), 2*(uspace, ))
-Vbform3.add_domain_integrator(PressWorkIntegrator()) #TODO: 命名
-Vbform3.assembly()
-D = Vbform3.get_matrix()
+Vbform3.add_domain_integrator(PressWorkIntegrator()) 
+D = Vbform3.assembly()
 
 #组装第二个方程的左端矩阵
 Sbform = BilinearForm(pspace)
 Sbform.add_domain_integrator(ScalarDiffusionIntegrator(c=1))
-Sbform.assembly()
-B = Sbform.get_matrix()
+B = Sbform.assembly()
 
 #组装第三个方程的左端矩阵
 Vbform2 = BilinearForm(2*(uspace,))
 Vbform2.add_domain_integrator(VectorMassIntegrator(c=1))
-Vbform2.assembly()
-C = Vbform2.get_matrix()
+C = Vbform2.assembly()
 
 ctx = DMumpsContext()
 ctx.set_silent()
