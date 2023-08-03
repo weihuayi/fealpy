@@ -207,8 +207,9 @@ class BoxBoundarySampler(JoinedSampler):
         if t1.shape != t2.shape:
             raise ValueError
         data = torch.vstack([t1, t2]).T
-        range1, range2 = data.clone(), data.clone()
+
         for d in range(t1.shape[0]):
+            range1, range2 = data.clone(), data.clone()
             range1[d, :] = data[d, 0]
             range2[d, :] = data[d, 1]
             self.add(ISampler(m=m_edge, ranges=range1, dtype=dtype, requires_grad=requires_grad))

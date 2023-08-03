@@ -18,13 +18,16 @@ class StackStd(Module):
     then the shape of output is (N, M, D); where N is samples, M is number of
     centers to standardize and D is features.
     """
-    def __init__(self, centers: Tensor, radius: float):
+    def __init__(self, centers: Tensor, radius: float, device=None):
         super().__init__()
-        self.centers = centers
-        self.radius = radius
+        self.centers = Parameter(centers.to(device=device), requires_grad=False)
+        self.radius = Parameter(
+            torch.tensor(radius, device=self.centers.device),
+            requires_grad=False
+        )
 
     def forward(self, p: Tensor):
-        return (p[:, None, :] - self.centers[None, ...]) / self.radius
+        return (p[:, None, :] - self.centers[None, :, :]) / self.radius
 
 
 class MultiLinear(Module):
