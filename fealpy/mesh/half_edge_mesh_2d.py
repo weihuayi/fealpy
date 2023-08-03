@@ -467,6 +467,16 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
     def geo_dimension(self):
         return self.node.shape[1]
+    
+    def entity_measure(self, etype=2, index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.halfedge_length()[self.ds.hedge][index]
+        elif etype in {'node', 0}:
+            return 0
+        else:
+            raise ValueError(f"Invalid entity type '{etype}'.")
 
     def entity_barycenter(self, etype='cell', index=np.s_[:]):
         node = self.entity('node')
@@ -900,9 +910,10 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
             if ('HB' in options) and (options['HB'] is not None):
                 isNonMarkedCell = ~isMarkedCell
-                flag0 = isNonMarkedCell[cellstart:]
-                flag1 = isMarkedCell[cellstart:]
+                flag0 = isNonMarkedCell[cstart:]
+                flag1 = isMarkedCell[cstart:]
                 NHB0 = flag0.sum()
+                NHE = len(halfedge)
                 NHB = NHB0 + NHE
                 HB = np.zeros((NHB, 2), dtype=np.int)
                 HB[:, 0] = range(NHB)
@@ -2565,7 +2576,13 @@ class HalfEdgeMesh2dDataStructure():
 
     def number_of_all_cells(self):
         return len(self.subdomain)
+    
+    def number_of_cells(self):
+        return self.number_of_all_cells() - self.cellstart 
 
+    def number_of_edges(self):
+        return len(self.halfedge)//2
+    
     def number_of_vertices_of_all_cells(self):
         NC = self.number_of_all_cells()
         halfedge = self.halfedge
