@@ -168,6 +168,7 @@ class EdgeMesh(Mesh, Plotable):
         part_name = next(iter(parts)) # parts 的名称，需要根据 .inp 文件来选择正确的 parts 名称
         print("part_name:", part_name)
         part_data = parts[part_name]
+        print("part_data:", part_data)
         node_data = part_data['node']
         print("node_date:", node_data)
         node = node_data[0]
@@ -183,10 +184,25 @@ class EdgeMesh(Mesh, Plotable):
         cell = np.concatenate([data[0] for _, data in element_data.items()])
         mesh = cls(node, cell)
 
-        print("part_data:", part_data)
         nset_data = part_data['nset']
         print("nset_data:", nset_data)
         print("nset_nset:", list(nset_data.keys()))
+
+        elset_data = part_data['elset']
+        print("elset_data:", elset_data)
+        print("elset_elset:", list(elset_data.keys()))
+
+        orientation_data = part_data['orientation']
+        print("orientation_data:", orientation_data)
+        print("orientation_name:", list(orientation_data.keys()))
+
+        solid_section_data = part_data['solid_section']
+        print("solid_section_data:", solid_section_data)
+        print("solid_section_elset:", list(solid_section_data.keys()))
+
+        beam_section_data = part_data['beam_section']
+        print("beam_section_data:", beam_section_data)
+        print("beam_section_elset:", list(beam_section_data.keys()))
 
         return mesh
 

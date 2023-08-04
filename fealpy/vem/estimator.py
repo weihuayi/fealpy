@@ -33,16 +33,16 @@ class PoissonCVEMEstimator:
             return (f(x) + smspace.laplace_value(sh, x, index))**2
 
         e0 = mesh.integral(term0, q=p+3, celltype=True)
-        e0 *= cm
+        e0 *= cm**2
 
         NE = mesh.number_of_edges()
         node = mesh.entity('node')
         edge = mesh.entity('edge')
-        edge2cell = self.mesh.ds.edge_to_cell()
+        edge2cell = mesh.ds.edge_to_cell()
         isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
 
-        # 计算内部边跳量
         n = mesh.edge_unit_normal()
+        t = mesh.edge_unit_tangent()
         em = mesh.entity_measure('edge')
 
 
@@ -55,16 +55,25 @@ class PoissonCVEMEstimator:
         lgrad = sh.grad_value(ps, index=edge2cell[:, 0])
         rgrad = sh.grad_value(ps, index=edge2cell[:, 1])
         e1 = np.zeros(NE, dtype=mesh.ftype)
+        e2 = np.zeros(NE, dtype=mesh.ftype)
 
         t0 = np.einsum(
             'ijm, jm->j',
             lgrad[:, ~isBdEdge] - rgrad[:, ~isBdEdge],
             n[~isBdEdge])
+        
+        t1 = np.einsum('ijm, jm->j', lgrad[:, ~isBdEdge] - rgrad[:, ~isBdEdge], 
+                t[~isBdEdge])
 
-        e1[~isBdEdge] = t0**2*em[~isBdEdge]
+        e1[~isBdEdge] = (t0*em[~isBdEdge])**2
+        e2[~isBdEdge] = (t1*em[~isBdEdge])**2
 
         np.add.at(e0, edge2cell[:, 0], e1)
         np.add.at(e0, edge2cell[~isBdEdge, 1], e1[~isBdEdge])
+
+        np.add.at(e0, edge2cell[:, 0], e2)
+        np.add.at(e0, edge2cell[~isBdEdge, 1], e2[~isBdEdge])
+        return e0
 
 
 
