@@ -128,7 +128,22 @@ class MeshDataStructure():
                           reversed=True, return_local=return_local, dtype=self.itype)
 
     def node_to_node(self):
-        pass
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        edge = self.edge
+        node2node = csr_matrix(
+                (
+                    np.ones((2*NE,), dtype=np.bool_),
+                    (
+                        edge.flat,
+                        edge[:, [1, 0]].flat
+                    )
+                ), shape=(NN, NN), dtype=np.bool_)
+        return node2node
+
+    def edge_to_edge(self):
+        edge2node = self.edge_to_node(return_sparse=True)
+        return edge2node * edge2node.T
 
 
     # boundary flag
@@ -460,7 +475,54 @@ class HomogeneousMeshDS(MeshDataStructure):
 
     def cell_to_cell(self, return_sparse=False,
                      return_boundary=True, return_array=False):
-        pass
+        if return_array:
+            return_sparse = False
+            return_boundary = False
+
+        NC = self.number_of_cells()
+        NF = self.number_of_faces()
+
+        face2cell = self.face2cell
+        if (return_sparse is False) and (return_array is False):
+            NFC = self.number_of_faces_of_cells()
+            cell2cell = np.zeros((NC, NFC), dtype=self.itype)
+            cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
+            cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
+            return cell2cell
+
+        val = np.ones((NF, ), dtype=np.bool_)
+
+        if return_boundary:
+            cell2cell = coo_matrix(
+                    (val, (face2cell[:, 0], face2cell[:, 1])),
+                    shape=(NC, NC))
+            cell2cell += coo_matrix(
+                    (val, (face2cell[:, 1], face2cell[:, 0])),
+                    shape=(NC, NC))
+            return cell2cell.tocsr()
+
+        isInFace = (face2cell[:, 0] != face2cell[:, 1])
+        cell2cell = coo_matrix(
+                (
+                    val[isInFace],
+                    (face2cell[isInFace, 0], face2cell[isInFace, 1])
+                ),
+                shape=(NC, NC), dtype=np.bool_)
+        cell2cell += coo_matrix(
+                (
+                    val[isInFace],
+                    (face2cell[isInFace, 1], face2cell[isInFace, 0])
+                ), shape=(NC, NC), dtype=np.bool_)
+        cell2cell = cell2cell.tocsr()
+
+        if not return_array:
+            return cell2cell
+
+        nn = cell2cell.sum(axis=1).reshape(-1)
+        _, adj = cell2cell.nonzero()
+        adjLocation = np.zeros(NC+1, dtype=np.int32)
+        adjLocation[1:] = np.cumsum(nn)
+        return adj.astype(np.int32), adjLocation
 
 
 class StructureMeshDS(HomogeneousMeshDS):

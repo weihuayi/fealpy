@@ -9,7 +9,7 @@ from torch import Tensor, device
 from torch.nn import Module
 
 from ..tools import mkfs, proj
-from ..nntyping import VectorFunction, MeshLike
+from ..nntyping import VectorFunction
 
 
 class TensorMapping(Module):
@@ -17,6 +17,17 @@ class TensorMapping(Module):
     @brief A function whose input and output are tensors. The `forward` method\
            is not implemented, override it to build a function.
     """
+
+    def get_device(self):
+        """
+        @brief Get the device of the first parameter in this module. Return `None`\
+               if no parameters.
+        """
+        for param in self.parameters():
+            return param.device
+
+    ### features
+
     def mkfs(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
                    device: Optional[device]=None, **kwargs) -> Tensor:
         p = mkfs(*input, f_shape=f_shape, device=device)
@@ -44,18 +55,25 @@ class TensorMapping(Module):
         """
         return Extracted(self, idx)
 
-    def from_numpy(self, ps: NDArray) -> Tensor:
+    ### numpy & mesh
+
+    def from_numpy(self, ps: NDArray, device=None) -> Tensor:
         """
         @brief Accept numpy array as input, and return in Tensor type.
 
         @param ps: NDArray.
+        @param device: torch.device | None. Specify the device when making tensor\
+               from numpy array. Use the deivce of parameters in the module if\
+               `None`. If no parameters in the module, use cpu by default.
 
         @return: Tensor.
 
         @note: This is a method with coordtype 'cartesian'.
         """
-        pt = torch.from_numpy(ps).float()
-        return self.forward(pt)
+        pt = torch.from_numpy(ps)
+        if device is None:
+            device = self.get_device()
+        return self.forward(pt.to(device=device))
 
     from_numpy.__dict__['coordtype'] = 'cartesian'
 
@@ -69,15 +87,24 @@ class TensorMapping(Module):
         @return: Tensor with shape (b, c, ...). Outputs in every bc points and every cells.\
                  In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'\
                  is the shape of the function output.
-
-        @note: This is a method with coordtype 'barycentric'.
         """
         points = mesh.cell_bc_to_point(bc)
         return self.from_numpy(points)
 
-    from_cell_bc.__dict__['coordtype'] = 'barycentric'
+    def get_cell_bc_func(self, mesh):
+        """
+        @brief Generate a barycentric function for the module, defined in the\
+               given mesh cells.
 
-    def estimate_error(self, other: VectorFunction, mesh: Optional[MeshLike]=None, power: int=2, q: int=3,
+        @return: A function with coordtype `barycentric`.
+        """
+        def func(bc: NDArray) -> NDArray:
+            points = mesh.cell_bc_to_point(bc)
+            return self.from_numpy(points).detach().numpy()
+        func.__dict__['coordtype'] = 'barycentric'
+        return func
+
+    def estimate_error(self, other: VectorFunction, mesh=None, power: int=2, q: int=3,
                        split: bool=False, coordtype: str='b', squeeze: bool=False):
         """
         @brief Calculate error between the solution and `other` in finite element space `space`. Use this when all\

@@ -1,5 +1,4 @@
 import numpy as np
-import re
 
 """
 Abaqus 有限元模型简介
@@ -41,6 +40,9 @@ Assembly 模型的三级结构：
 """
 
 class InpFileReader:
+    """ 
+    @brief 该类负责处理来自 Abaqus .inp 文件的数据
+    """
     def __init__(self, fname):
         with open(fname, 'r') as f:
             contents = f.read()
@@ -72,6 +74,8 @@ class InpFileReader:
     def parse_keyword_line(self, line):
         """
         @brief 解析一个 keyword line
+        @param line 要解析的 keyword line
+        @return 包含解析结果的字典
         """
         d = {}
         words  = line.split(',')
@@ -86,6 +90,7 @@ class InpFileReader:
     def get_keyword_line(self):
         """
         @brief 获取还没有处理的 keyword  行
+        @return 下一个未处理的 keyword 行，如果没有则返回 None
         """
         if self.cline < len(self.contents):
             line = self.contents[self.cline]
@@ -101,16 +106,18 @@ class InpFileReader:
 
     def parse_part_data(self):
         """
+        @brief 解析 part 数据
         """
 
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
 
-        self.parts[d['name']] = {'node':None, 'elem':{}, 'nset':{}, 'elset':{}}
+        self.parts[d['name']] = {'node':None, 'elem':{}, 'nset':{}, 'elset':{},
+                                 'orientation':{}, 'solid_section':{}, 'beam_section':{}}
         self.cline += 1
         line = self.get_keyword_line()
 
-        while not line.startswith('*End Part'):
+        while line is not None and not line.startswith('*End Part'):
             if line.startswith('*Node'):
                 self.parse_node_data(self.parts, d['name'])
             elif line.startswith('*Element'):
@@ -119,6 +126,12 @@ class InpFileReader:
                 self.parse_nset_data(self.parts, d['name'])
             elif line.startswith('*Elset'):
                 self.parse_elset_data(self.parts, d['name'])
+            elif line.startswith('*Orientation'):
+                self.parse_orientation_data(self.parts, d['name'])
+            elif line.startswith('*Solid Section'):
+                self.parse_solid_section_data(self.parts, d['name'])
+            elif line.startswith('*Beam Section'):
+                self.parse_beam_section_data(self.parts, d['name'])
             else:
                 print("we pass the keyword line:" + line)
                 self.cline += 1
@@ -129,6 +142,8 @@ class InpFileReader:
     def parse_node_data(self, parts, name):
         """
         @brief 处理节点坐标数据
+        @param parts 用于存储节点数据的字典
+        @param name 当前部分的名称
         """
         i = 0
         node = []
@@ -139,17 +154,20 @@ class InpFileReader:
         while not line.startswith('*'):
             s = line.split(',')
             node.append((float(s[1]), float(s[2]), float(s[3])))
-            nmap[int(s[0])] = i
+            nmap[int(s[0])] = i # 原始节点编号 1 被映射为目前节点编号 0，依次
             i += 1
 
             self.cline += 1
             line = self.contents[self.cline]
 
         parts[name]['node'] = (np.array(node, dtype=np.float64), nmap)
+        # print("node:", parts[name]['node'])
 
     def parse_elem_data(self, parts, name):
         """
-        @brief 解析 
+        @brief 解析单元数据
+        @param parts 用于存储单元数据的字典
+        @param name 当前部分的名称
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
@@ -158,62 +176,163 @@ class InpFileReader:
         elem = []
         emap = {}
 
-        nmap = parts[name]['node'][1]
+        nmap = parts[name]['node'][1] # 原始节点编号 1 被映射为目前节点编号 0，依次
 
         self.cline += 1
         line = self.contents[self.cline]
         while not line.startswith('*'):
             ss = line.split(',')
             elem.append([nmap[int(s)] for s in ss[1:]])
-            emap[int(ss[0])] = i
+            emap[int(ss[0])] = i # 原始单元编号 1 被映射为原始单元编号 0，依次
             i += 1
             self.cline += 1
             line = self.contents[self.cline]
 
         parts[name]['elem'][d['type']] = (np.array(elem, dtype=np.int_), emap)
+        # print("elem:", parts[name]['elem'][d['type']])
 
     def parse_nset_data(self, parts, name):
         """
-        @brief 解析网格节点集合数据
+        @brief 解析网格节点集合数据，可以用于应用边界条件、载荷等
+
+        @param parts 用于存储节点集合数据的字典
+        @param name 当前部分的名称
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
+        # print("nset_data:", d)
 
-        part = parts[name]
-        nmap = part['node'][1]
+        nmap = parts[name]['node'][1]
         idx = []
 
         self.cline += 1
         line = self.contents[self.cline]
         while not line.startswith('*'):
             ss = line.split(',')
-            idx += [nmap[int(s)] for s in ss]
+            idx += [nmap[int(s)] for s in ss] # 原始节点集合编号 1 被映射为目前节点集合编号 0，依次
             self.cline += 1
             line = self.contents[self.cline]
 
-        part['nset'][d['nset']] = np.array(idx, dtype=np.int_) 
+        parts[name]['nset'][d['nset']] = (np.array(idx, dtype=np.int_), nmap)
+        # print("nset:", parts[name]['nset'][d['nset']])
 
 
     def parse_elset_data(self, parts, name):
         """
-        @brief 解析网格节点集合数据
+        @brief 解析网格单元集合数据，可以用于应用边界条件、载荷等
+
+        @param parts 用于存储单元集合数据的字典
+        @param name 当前部分的名称
+
         @note 注意这里我们没有把原始单元的编号映射成当前连续的编号
         """
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
+        # print("elset_d:", d)
 
-        part = parts[name]
         idx = []
 
         self.cline += 1
         line = self.contents[self.cline]
+        # print("elset_line:", line)
+        
         while not line.startswith('*'):
             ss = line.split(',')
+            # print("elset_ss:", ss)
             idx += [int(s) for s in ss]
             self.cline += 1
             line = self.contents[self.cline]
 
-        part['nset'][d['elset']] = np.array(idx, dtype=np.int_) 
+        parts[name]['elset'][d['elset']] = np.array(idx, dtype=np.int_) 
+        # print("elset:", parts[name]['elset'][d['elset']])
+
+
+    def parse_orientation_data(self, parts, name):
+        """
+        @brief 解析 parts 的坐标系数据
+        数值用于定义材料坐标系的方向
+        '1., 0., 1.'定义主方向向量，沿着 x 轴的方向
+        '0., 1., 0.'定义第二个向量，是在主方向向量所定义的平面内的向量，沿着 y 轴的方向
+        '1., 0.' 定义主方向向量和第二个向量之间的角度，主方向向量和第二个向量之间的角度是 1 弧度
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+
+        idx = []
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        # print("orientation_line:", line)
+
+        while not line.startswith('*'):
+            ss = line.split(',')
+            # print("orientation_ss:", ss)
+            idx += [float(s) for s in ss]
+            self.cline += 1
+            line = self.contents[self.cline]
+
+        parts[name]['orientation'][d['name']] = np.array(idx, dtype=np.float64) 
+        # print("orientation:", parts[name]['orientation'][d['name']])
+
+
+    def parse_solid_section_data(self, parts, name):
+        """
+        @brief 解析 parts 的实体截面数据
+        数值定义了一个实体截面，对应于元素集合 "Set-3"，材料为 "Material-1"
+        '1.' 代表实体截面的厚度
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+        # print("solid_section_d:", d)
+
+        idx = []
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        # print("solid_section_data:", line)
+
+        while not line.startswith('*'): 
+            ss = line.split(',') 
+            # print("solid_section_ss:", ss) 
+            idx += [float(s) for s in ss if s]
+            self.cline += 1
+
+            line = self.contents[self.cline]
+
+        solid_section_key = (d['elset'], d['material'])
+        parts[name]['solid_section'][solid_section_key] = np.array(idx, dtype=np.float64) 
+        # print("solid_section:", parts[name]['solid_section'][solid_section_key])
+
+
+    def parse_beam_section_data(self, parts, name):
+        """
+        @brief 解析 parts 的梁截面数据
+        数值定义了一个梁截面，对应于元素集合 "beam2"，材料为 "Material-1"，温度梯度为 "GRADIENTS"，剖面形状为 "PIPE"
+        '80., 10.' 梁截面的几何参数，具体含义取决于剖面形状， "PIPE" 表示管状剖面，80 是外径，10 是壁厚
+        '0.,0.,-1.' 梁元素的局部 z 轴方向，定义了截面的方向
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+        # print("beam_section_d:", d)
+
+        idx = []
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        # print("beam_section_data:", line)
+
+        while not line.startswith('*'):
+            ss = line.split(',')
+            # print("beam_section_ss:", ss)
+            idx += [float(s) for s in ss]
+            self.cline += 1
+
+            line = self.contents[self.cline]
+
+        beam_section_key = (d['elset'], d['material'], d['temperature'], d['section'])
+        parts[name]['beam_section'][beam_section_key] = np.array(idx, dtype=np.float64) 
+        # print("beam_section:", parts[name]['beam_section'][beam_section_key])
+
 
     def parse_assembly_data(self):
         line = self.contents[self.cline]

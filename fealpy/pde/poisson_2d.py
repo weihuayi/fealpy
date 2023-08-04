@@ -584,12 +584,15 @@ class KelloggData:
         """
         return self.solution(p)
 
-
 class LShapeRSinData:
     def __init__(self):
         pass
 
     def init_mesh(self, n=4, meshtype='tri'):
+        from fealpy.mesh import TriangleMesh 
+        from fealpy.mesh import QuadrangleMesh 
+        from fealpy.mesh import Quadtree 
+        from fealpy.mesh import Tritree 
         node = np.array([
             (-1, -1),
             (0, -1),
@@ -608,6 +611,14 @@ class LShapeRSinData:
                 (4, 7, 3),
                 (6, 3, 7)], dtype=np.int_)
             mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'quad':
+            cell = np.array([
+                (0, 1, 3, 2),
+                (2, 3, 6, 5),
+                (3, 4, 7, 6)], dtype=np.int_)
+            mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype == 'quadtree':
