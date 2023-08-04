@@ -9,8 +9,6 @@ from torch import Tensor, dtype
 import numpy as np
 from numpy.typing import NDArray
 
-from ..nntyping import MeshLike
-
 
 class Sampler():
     """
@@ -18,18 +16,19 @@ class Sampler():
     """
     m: int = 0
     nd: int = 0
-    def __init__(self, m: int=0, dtype: dtype=torch.float32, requires_grad: bool=False) -> None:
+    def __init__(self, m: int=0, dtype: dtype=torch.float64, requires_grad: bool=False) -> None:
         """
         @brief Initializes a Sampler instance.
 
         @param m: The number of samples to generate.
-        @param dtype: Data type of samples. Defaults to `torch.float32`.
+        @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param requires_grad: A boolean indicating whether the samples should\
                               require gradient computation. Defaults to `False`.
         """
         self.m = int(m)
         self.dtype = dtype
         self.requires_grad = bool(requires_grad)
+        self.weight = torch.tensor(1.0, dtype=self.dtype)
 
     def __and__(self, other):
         if isinstance(other, Sampler):
@@ -221,7 +220,7 @@ class BoxBoundarySampler(JoinedSampler):
 ##################################################
 
 class _MeshSampler(Sampler):
-    def __init__(self, m_cell: int, mesh: MeshLike, dtype: dtype=torch.float64,
+    def __init__(self, m_cell: int, mesh, dtype: dtype=torch.float64,
                  requires_grad: bool=False) -> None:
         """
         @brief Generate samples in every cells of a mesh.
@@ -334,14 +333,14 @@ DIRECTOR = {
     'UniformMesh2d': UniformMesh2dSampler
 }
 
-def get_mesh_sampler(m_cell: int, mesh: MeshLike, dtype: dtype=torch.float64,
+def get_mesh_sampler(m_cell: int, mesh, dtype: dtype=torch.float64,
                      requires_grad: bool=False) -> _MeshSampler:
     """
     @brief Get a sampler that generates samples in every cells of a mesh.
 
     @param m_cell: int. Number of samples in each cell.
     @param mesh: Mesh.
-    @param dtype: Data type of samples. Defaults to `torch.float32`.
+    @param dtype: Data type of samples. Defaults to `torch.float64`.
     @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
 
     @return: A mesh sampler works on the given mesh type.
