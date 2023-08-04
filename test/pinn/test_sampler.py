@@ -8,7 +8,6 @@ from fealpy.pinn.sampler import (
     QuadrangleMeshSampler
 )
 from fealpy.pinn.sampler.sampler import JoinedSampler, HybridSampler
-from fealpy.mesh import MeshFactory as Mf
 
 
 def _valified_range(t: torch.Tensor, low, high):
@@ -38,7 +37,9 @@ class TestSimple():
 
 
     def test_trisampler(self):
-        mesh = Mf.boxmesh2d([0, 2, 0, 3], nx=10, ny=10, meshtype='tri')
+        from fealpy.mesh import TriangleMesh
+
+        mesh = TriangleMesh.from_box([0, 2, 0, 3], nx=10, ny=10)
         s = get_mesh_sampler(10, mesh)
         assert isinstance(s, TMeshSampler)
         assert s.m == 2000
@@ -49,9 +50,13 @@ class TestSimple():
         _valified_range(out[:, 0], 0, 2)
         _valified_range(out[:, 1], 0, 3)
 
+        assert s.weight.shape == (2000, 1)
+
 
     def test_tetsampler(self):
-        mesh = Mf.boxmesh3d([0, 1, 1, 3, 2, 5], nx=5, ny=5, nz=5, meshtype='tet')
+        from fealpy.mesh import TetrahedronMesh
+
+        mesh = TetrahedronMesh.from_box([0, 1, 1, 3, 2, 5], nx=5, ny=5, nz=5)
         s = get_mesh_sampler(10, mesh)
         assert isinstance(s, TMeshSampler)
         assert s.m == 7500
@@ -63,9 +68,13 @@ class TestSimple():
         _valified_range(out[:, 1], 1, 3)
         _valified_range(out[:, 2], 2, 5)
 
+        assert s.weight.shape == (7500, 1)
+
 
     def test_quadsampler(self):
-        mesh = Mf.boxmesh2d([0, 1, 1, 2], nx=10, ny=10, meshtype='quad')
+        from fealpy.mesh import QuadrangleMesh
+
+        mesh = QuadrangleMesh.from_box([0, 1, 1, 2], nx=10, ny=10)
         s = get_mesh_sampler(10, mesh)
         assert isinstance(s, QuadrangleMeshSampler)
         assert s.m == 1000
@@ -75,6 +84,8 @@ class TestSimple():
         assert out.shape == (1000, 2)
         _valified_range(out[:, 0], 0, 1)
         _valified_range(out[:, 1], 1, 2)
+
+        assert s.weight.shape == (1000, 1)
 
 
 class TestCombiation():

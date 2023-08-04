@@ -4,23 +4,23 @@ import torch
 import torch.nn as nn
 
 from fealpy.pinn.modules import Solution
-from fealpy.mesh import MeshFactory as Mf
+from fealpy.mesh import TriangleMesh
 
 
 class TestMachine():
     def test_basic(self):
         net = nn.Sequential(
-            nn.Linear(2, 32),
+            nn.Linear(2, 32, dtype=torch.float64),
             nn.Tanh(),
-            nn.Linear(32, 16)
+            nn.Linear(32, 16, dtype=torch.float64)
         )
         s = Solution(net)
 
-        ps = torch.empty((15, 200, 2), dtype=torch.float32)
+        ps = torch.empty((15, 200, 2), dtype=torch.float64)
         assert s(ps).shape == (15, 200, 16)
 
-        mesh = Mf.boxmesh2d([0, 1, 0, 1], nx=10, ny=10)
-        bcs = np.empty((100, 3), dtype=np.float32)
+        mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
+        bcs = np.empty((100, 3), dtype=np.float64)
         assert s.from_cell_bc(bcs, mesh).shape == (100, 200, 16)
 
     def test_fix(self):
