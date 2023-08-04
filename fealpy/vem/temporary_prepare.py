@@ -19,7 +19,7 @@ def coefficient_of_div_VESpace_represented_by_SMSpace(space, M):
     cell = mesh.entity('cell')
     NC = mesh.number_of_cells()
     NV = mesh.number_of_vertices_of_cells()
-    hk = mesh.entity_measure()
+    hk = np.sqrt(mesh.cell_area())
     K = []
     for i in range(NC):
         cedge = np.zeros((NV[i], 2), dtype=np.int_)
