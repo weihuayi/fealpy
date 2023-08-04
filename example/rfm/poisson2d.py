@@ -12,6 +12,7 @@ from fealpy.pde.poisson_2d import CosCosData
 from fealpy.pinn.modules import RandomFeatureFlat, ScaledMSELoss
 from fealpy.pinn.sampler import BoxBoundarySampler, get_mesh_sampler
 from fealpy.pinn.grad import gradient
+from fealpy.pinn.integral import linf_error
 from fealpy.mesh import UniformMesh2d
 
 
@@ -31,7 +32,7 @@ def pde_part(p: torch.Tensor, u):
     u_xx, _ = gradient(u_x, p, create_graph=True, split=True)
     _, u_yy = gradient(u_y, p, create_graph=True, split=True)
 
-    return u_xx + u_yy + np.pi**2 * u
+    return u_xx + u_yy + 2 * np.pi**2 * u
 
 def bc(x: torch.Tensor, u):
     return u - pde.dirichlet(x)
@@ -42,28 +43,28 @@ H = 1/EXT
 mesh = UniformMesh2d((0, EXT, 0, EXT), h=(H, H), origin=(0.0, 0.0))
 node = torch.from_numpy(mesh.entity('node'))
 
-model = RandomFeatureFlat(50, 4, centers=node, radius=H/2, in_dim=2, bound=1,
-                          activate=torch.cos, print_status=True)
-sampler = get_mesh_sampler(40, mesh, requires_grad=True)
-sampler_bc = BoxBoundarySampler(1000, [0.0, 0.0], [1.0, 1.0], requires_grad=True)
+model = RandomFeatureFlat(48, 4, centers=node, radius=H/2, in_dim=2, bound=1,
+                          activate=torch.tanh, print_status=True)
+sampler = get_mesh_sampler(50, mesh, requires_grad=True)
+sampler_bc = BoxBoundarySampler(500, [0.0, 0.0], [1.0, 1.0], requires_grad=True)
 optim = Adam(model.ums, lr=1e-3)
 loss_fn = ScaledMSELoss()
+mesh = UniformMesh2d((0, 50, 0, 50), h=(0.02, 0.02), origin=(0.0, 0.0))
+err_sampler = get_mesh_sampler(10, mesh)
 
 
-MAX_ITER = 500
+MAX_ITER = 1000
 losses = []
 
 for epoch in range(MAX_ITER):
     optim.zero_grad()
 
     s = sampler.run()
-    out = model(s)
-    pde_out = pde_part(s, out)
+    pde_out = pde_part(s, model(s))
     loss_pde = loss_fn(pde_out, torch.zeros_like(pde_out))
 
     s = sampler_bc.run()
-    out = model(s)
-    bc_out = bc(s, out)
+    bc_out = bc(s, model(s))
     loss_bc = loss_fn(bc_out, torch.zeros_like(bc_out))
 
     loss = loss_bc + loss_pde
@@ -75,6 +76,10 @@ for epoch in range(MAX_ITER):
     if epoch % 50 == 49:
         with torch.no_grad():
             print(f"Epoch: {epoch+1}| Loss: {loss.data}")
+
+    if epoch % 50 == 49:
+        error = linf_error(model, pde.dirichlet, sampler=err_sampler)
+        print(f"error: {error[0]}")
 
 
 from matplotlib import pyplot as plt

@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple, Callable, Sequence, Type
+from typing import Union, Optional, Tuple, Callable, Sequence
 
 import torch
 from torch import Tensor, device
@@ -133,3 +133,19 @@ def proj(p: Tensor, comps: Sequence[Union[None, Tensor, float]]) -> Tensor:
             j += 1
 
     return projed
+
+
+from .nntyping import VectorFunction
+
+def as_tensor_func(fn: VectorFunction):
+    """
+    @brief Convert a numpy array function to a tensor function.
+
+    Caution: The result can not require gradient. The chain breaks.
+    """
+    def wrapped(p: Tensor) -> Tensor:
+        device = p.device
+        x = p.cpu().detach().numpy()
+        ret = fn(x)
+        return torch.from_numpy(ret).to(device=device)
+    return wrapped
