@@ -1253,7 +1253,6 @@ class UniformMesh2d(Mesh, Plotable):
     def compute_cut_point(self, phi):
         """
         """
-        node = self.entity('node')
         edge = self.entity('edge') 
         phiSign = msign(phi)
         isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
