@@ -77,11 +77,6 @@ class UniformMesh2d(Mesh, Plotable):
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
-    def geo_dimension(self):
-        """
-        @brief
-        """
-        return 2
 
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
@@ -160,9 +155,9 @@ class UniformMesh2d(Mesh, Plotable):
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
-    def show_animation(self, 
-                    fig: Figure, 
-                    axes: Union[Axes, Axes3D], 
+    def show_animation(self,
+                    fig: Figure,
+                    axes: Union[Axes, Axes3D],
                     box: List[float],
                     advance: Callable[[int], Tuple[np.ndarray, float]],
                     fname: str = 'test.mp4',
@@ -227,7 +222,7 @@ class UniformMesh2d(Mesh, Plotable):
                 elif plot_type == 'contourf':
                     data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
 
- 
+
             if isinstance(axes, Axes) and plot_type == 'imshow':
                 data.set_array(uh) # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
                 axes.set_aspect('equal') # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
@@ -255,7 +250,7 @@ class UniformMesh2d(Mesh, Plotable):
             axes.set_title(s) # 将格式化的字符串设置为坐标轴的标题
             return data
 
-        # 创建一个 funcanimation 对象 
+        # 创建一个 funcanimation 对象
         # fig 作为画布，func 作为帧更新函数
         # init_func 作为初始化函数，用于在动画开始之前设置图像的初始状态
         # fargs 作为一个元组，包含要传递给 func 函数的额外参数
@@ -535,9 +530,9 @@ class UniformMesh2d(Mesh, Plotable):
         return F
 
     ## @ingroup FDMInterface
-    def error(self, 
-        u: Callable, 
-        uh: np.ndarray, 
+    def error(self,
+        u: Callable,
+        uh: np.ndarray,
         errortype: str = 'all') -> Union[float, Tuple[np.float64, np.float64, np.float64]]:
 
         """
@@ -621,13 +616,13 @@ class UniformMesh2d(Mesh, Plotable):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, 
-        gD: Callable[[np.ndarray], np.ndarray], 
+    def apply_dirichlet_bc(self,
+        gD: Callable[[np.ndarray], np.ndarray],
         A: spmatrix,
-        f: np.ndarray, 
+        f: np.ndarray,
         uh: Optional[np.ndarray] = None,
         threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[spmatrix, np.ndarray]:
-        
+
         """
         @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界和向量型函数
 
@@ -656,7 +651,7 @@ class UniformMesh2d(Mesh, Plotable):
             isBdNode = threshold(node)
         else:
             raise ValueError(f"Invalid threshold: {threshold}")
-        
+
         uh[isBdNode]  = gD(node[isBdNode])
         f -= A@uh
         f[isBdNode] = uh[isBdNode]
@@ -1080,10 +1075,23 @@ class UniformMesh2d(Mesh, Plotable):
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):
-        pass
+        node = self.entity('node')
+        if isinstance(bc, tuple):
+            bc_0, bc_1 = bc
+            bcs = np.zeros((bc_0.shape[0], 4), dtype=self.ftype)
+            bcs[..., 0] = bc_0[..., 0] * bc_1[..., 0]
+            bcs[..., 1] = bc_0[..., 0] * bc_1[..., 1]
+            bcs[..., 2] = bc_0[..., 1] * bc_1[..., 0]
+            bcs[..., 3] = bc_0[..., 1] * bc_1[..., 1]
+            cell = self.entity('cell', index=index)
+            return np.einsum('...j, ijk->...ik', bcs, node[cell])
+        else:
+            bcs = bc
+            edge = self.entity('edge', index=index)
+            return np.einsum('...j, ijk->...ik', bcs, node[edge])
 
     ## @ingroup FEMInterface
-    def entity(self, etype):
+    def entity(self, etype, index=np.s_[:]):
         """
         @brief Get the entity (either cell or node) based on the given entity type.
 
@@ -1094,11 +1102,11 @@ class UniformMesh2d(Mesh, Plotable):
         @throws ValueError if the given etype is invalid.
         """
         if etype in {'cell', 2}:
-            return self.ds.cell
+            return self.ds.cell[index, ...]
         elif etype in {'edge', 'face', 1}:
-            return self.ds.edge
+            return self.ds.edge[index, ...]
         elif etype in {'node', 0}:
-            return self.node.reshape(-1, 2)
+            return self.node.reshape(-1, 2)[index, ...]
         else:
             raise ValueError("`etype` is wrong!")
 
@@ -1122,11 +1130,18 @@ class UniformMesh2d(Mesh, Plotable):
             raise ValueError('the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
-    #def entity_measure(self, etype):
-        #"""
-        #@brief
-        #"""
-        #pass
+    def entity_measure(self, etype, index=np.s_[:]):
+        """
+        @brief
+        """
+        TD = self.top_dimension()
+        if etype in {'cell', TD}:
+            return self.cell_area()
+        elif etype in {'edge', 'face', TD-1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return np.array(0.0, self.ftype)
+        raise ValueError(f"Invalid entity type: {type(etype).__name__}.")
 
     ## @ingroup FEMInterface
     def multi_index_matrix(self, p, etype=1):
@@ -1243,7 +1258,7 @@ class UniformMesh2d(Mesh, Plotable):
 
     def is_cut_cell(self, phi):
         """
-        @brief 
+        @brief
         """
         phiSign = msign(phi)
         cell = self.entity('cell')
@@ -1253,16 +1268,16 @@ class UniformMesh2d(Mesh, Plotable):
     def compute_cut_point(self, phi):
         """
         """
-        edge = self.entity('edge') 
+        edge = self.entity('edge')
         phiSign = msign(phi)
         isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
         A = node[edge[isCutEdge, 0]]
         B = node[edge[isCutEdge, 1]]
 
-        interface = UniformMesh2dFunction(self, phi) 
+        interface = UniformMesh2dFunction(self, phi)
         cutNode = find_cut_point(interface, A, B)
         return cutNode
-        
+
 UniformMesh2d.set_ploter('2d')
 
 class UniformMesh2dFunction():
