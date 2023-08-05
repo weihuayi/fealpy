@@ -5,16 +5,22 @@ from torch import Tensor, device
 
 
 def mkfs(*inputs: Union[Tensor, float], f_shape: Optional[Tuple[int, ...]]=None,
+         dtype=torch.float64,
          device: Optional[device]=None, requires_grad: bool=False) -> Tensor:
     """
     @brief Concatenate input tensors or floats into a single output tensor along the last dimension.
+
+    If no tensors are in inputs, param `f_shape`, `dtype`, `device` and\
+    `requires_grad` may need to specify, as a converting to tensor is unavoidable。
 
     @param *inputs: Union[Tensor, float]. Any number of tensors or floats to be concatenated\
                     into a single output tensor.
     @param f_shape: Tuple[int, ...], optional. If all the input(s) are float,\
                     each of them will be converted to a tensor with shape `f_shape`.\
                     If `f_shape` is not provided, the default shape is `(1,)`.
-    @param device: device, optional. Specify the device when convert floats to tensors.
+    @param dtype: dtype, optional. Specify the data type when converting floats to tensors.\
+                  If any Tensor in inputs, this will be ignored.
+    @param device: device, optional. Specify the device when converting floats to tensors.
     @param requires_grad: bool, defaults to `False`.
 
     @return: The concatenated output tensor, with the size of the last dimension equal to the sum\
@@ -37,7 +43,7 @@ def mkfs(*inputs: Union[Tensor, float], f_shape: Optional[Tuple[int, ...]]=None,
 
         if f_shape is None:
             f_shape = (1, )
-        return torch.tensor(float(a), device=device).expand(f_shape)
+        return torch.tensor(a, dtype=dtype, device=device).expand(f_shape)
 
     b = inputs[1]
 
@@ -45,19 +51,19 @@ def mkfs(*inputs: Union[Tensor, float], f_shape: Optional[Tuple[int, ...]]=None,
 
         if not isinstance(b, Tensor):
             shape = tuple(a.shape[:-1]) + (1, )
-            b = torch.tensor(b, device=device).expand(shape)
+            b = torch.tensor(b, dtype=a.dtype, device=device).expand(shape)
 
     else:
 
         if isinstance(b, Tensor):
             shape = tuple(b.shape[:-1]) + (1, )
-            a = torch.tensor(a, device=device).expand(shape)
+            a = torch.tensor(a, dtype=b.dtype, device=device).expand(shape)
 
         else:
             if f_shape is None:
                 f_shape = (1, )
-            a = torch.tensor(float(a), device=device, requires_grad=requires_grad).expand(f_shape)
-            b = torch.tensor(float(b), device=device, requires_grad=requires_grad).expand(f_shape)
+            a = torch.tensor(a, dtype=dtype, device=device, requires_grad=requires_grad).expand(f_shape)
+            b = torch.tensor(b, dtype=dtype, device=device, requires_grad=requires_grad).expand(f_shape)
 
     cated = torch.cat([a, b], dim=-1)
 

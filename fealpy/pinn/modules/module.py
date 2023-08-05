@@ -222,7 +222,8 @@ class Solution(TensorMapping):
 class Fixed(Solution):
     def __init__(self, net: Module,
                  idx: Sequence[int],
-                 values: Sequence[float]
+                 values: Sequence[float],
+                 dtype=torch.float64
         ) -> None:
         """
         @brief Fix some input features of `net`, as a wrapped module.
@@ -233,7 +234,7 @@ class Fixed(Solution):
         """
         super().__init__(net)
         self._fixed_idx = torch.tensor(idx, dtype=torch.long)
-        self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(0)
+        self._fixed_value = torch.tensor(values, dtype=dtype).unsqueeze(0)
 
     def forward(self, p: Tensor):
         total_feature = p.shape[-1] + len(self._fixed_idx)
