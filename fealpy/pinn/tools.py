@@ -11,7 +11,7 @@ def mkfs(*inputs: Union[Tensor, float], f_shape: Optional[Tuple[int, ...]]=None,
     @brief Concatenate input tensors or floats into a single output tensor along the last dimension.
 
     If no tensors are in inputs, param `f_shape`, `dtype`, `device` and\
-    `requires_grad` may need to specify, as a converting to tensor is unavoidable。
+    `requires_grad` may need to specify, as a converting to tensor is unavoidable.
 
     @param *inputs: Union[Tensor, float]. Any number of tensors or floats to be concatenated\
                     into a single output tensor.
@@ -88,8 +88,10 @@ def use_mkfs(func: Callable[..., Tensor]):
     and then `f` can be used like `f(x, y)`.
     """
     def wrapped(*input: Tensor, f_shape: Optional[Tuple[int, ...]]=None,
-                device: Optional[device]=None, requires_grad: bool=False, **kwargs):
-        p = mkfs(*input, f_shape=f_shape, device=device, requires_grad=requires_grad)
+                dtype=torch.float64, device: Optional[device]=None,
+                requires_grad: bool=False, **kwargs):
+        p = mkfs(*input, f_shape=f_shape, dtype=dtype, device=device,
+                 requires_grad=requires_grad)
         return func(p, **kwargs)
     return wrapped
 

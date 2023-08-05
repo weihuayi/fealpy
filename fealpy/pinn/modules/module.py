@@ -28,23 +28,20 @@ class TensorMapping(Module):
 
     ### features
 
-    def mkfs(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
-                   device: Optional[device]=None, **kwargs) -> Tensor:
-        p = mkfs(*input, f_shape=f_shape, device=device)
-        return self.__call__(p, **kwargs)
-
     __call__: Callable[..., Tensor]
 
-    def fixed(self, idx: Sequence[int], value: Sequence[float]):
+    def fixed(self, idx: Sequence[int], value: Sequence[float],
+                 dtype=torch.float64):
         """
         @brief Return a module wrapped from this, to make some input features fixed.\
                See `fealpy.pinn.modules.Fixed`.
 
         @param idx: Sequence[int]. The indices of features to be fixed.
         @param value: Sequence[int]. Values of data in fixed features.
+        @param dtype: dtype, optional.
         """
         assert len(idx) == len(value)
-        return Fixed(self, idx, value)
+        return Fixed(self, idx, value, dtype=dtype)
 
     def extracted(self, *idx: int):
         """

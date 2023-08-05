@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from fealpy.pinn.modules import Solution
 from fealpy.mesh import TriangleMesh
+from fealpy.pinn.tools import mkfs
 
 
 class TestMachine():
@@ -27,19 +28,11 @@ class TestMachine():
         s = Solution(nn.Linear(4, 2))
         px = torch.empty((100, 1), dtype=torch.float32)
         py = torch.empty((100, 1), dtype=torch.float32)
-        s1 = s.fixed([0, 2], [10, 20])
-        assert s1.mkfs(px, py).shape == (100, 2)
+        s1 = s.fixed([0, 2], [10, 20], dtype=torch.float32)
+        assert s1(mkfs(px, py)).shape == (100, 2)
 
     def test_extracted(self):
         s = Solution(nn.Linear(2, 3))
         ps = torch.empty((100, 2), dtype=torch.float32)
         s1 = s.extracted(0, 2)
         assert s1(ps).shape == (100, 2)
-
-    def test_mkfs(self):
-        s = Solution(nn.Linear(10, 2))
-        px = torch.empty((100, 3), dtype=torch.float32)
-        py = torch.empty((100, 2), dtype=torch.float32)
-        pz = torch.empty((100, 2), dtype=torch.float32)
-        ret = s.mkfs(0, px, py, 1, pz, 0)
-        assert ret.shape == (100, 2)
