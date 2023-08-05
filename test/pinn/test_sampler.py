@@ -50,7 +50,7 @@ class TestSimple():
         _valified_range(out[:, 0], 0, 2)
         _valified_range(out[:, 1], 0, 3)
 
-        assert s.weight.shape == (2000, 1)
+        assert s.weight().shape == (2000, 1)
 
 
     def test_tetsampler(self):
@@ -68,7 +68,7 @@ class TestSimple():
         _valified_range(out[:, 1], 1, 3)
         _valified_range(out[:, 2], 2, 5)
 
-        assert s.weight.shape == (7500, 1)
+        assert s.weight().shape == (7500, 1)
 
 
     def test_quadsampler(self):
@@ -85,7 +85,7 @@ class TestSimple():
         _valified_range(out[:, 0], 0, 1)
         _valified_range(out[:, 1], 1, 2)
 
-        assert s.weight.shape == (1000, 1)
+        assert s.weight().shape == (1000, 1)
 
 
 class TestCombiation():

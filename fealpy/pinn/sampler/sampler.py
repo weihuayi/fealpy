@@ -2,7 +2,6 @@ from typing import (
     List,
     Any,
     Generator,
-    Callable
 )
 import torch
 from torch import Tensor, dtype
@@ -28,7 +27,7 @@ class Sampler():
         self.m = int(m)
         self.dtype = dtype
         self.requires_grad = bool(requires_grad)
-        self.weight = torch.tensor(1.0, dtype=self.dtype)
+        self._weight = torch.tensor(torch.nan, dtype=self.dtype).broadcast_to(m, 1)
 
     def __and__(self, other):
         if isinstance(other, Sampler):
@@ -49,6 +48,15 @@ class Sampler():
         @return: A tensor with shape (m, nd) containing the generated samples.
         """
         raise NotImplementedError
+
+    def weight(self) -> Tensor:
+        """
+        @brief Get weights of the latest sample points. The weight of a sample is\
+               equal to the reciprocal of the sampling density.
+
+        @return: A tensor with shape (m, 1).
+        """
+        return self._weight
 
     def load(self, epoch: int=1) -> Generator[torch.Tensor, None, None]:
         """
@@ -92,6 +100,13 @@ class JoinedSampler(Sampler):
         """
         return torch.cat([s.run() for s in self.samplers], dim=0)
 
+    def weight(self) -> Tensor:
+        """
+        @brief Weight is not always available in joined case. Implement in\
+               subclasses. Raise `NotImplementedError`.
+        """
+        raise NotImplementedError("No weight provided.")
+
 
 class HybridSampler(Sampler):
     """Generate samples with features from different samplers in dim-1."""
@@ -123,6 +138,10 @@ class HybridSampler(Sampler):
         """
         return torch.cat([s.run() for s in self.samplers], dim=1)
 
+    def weight(self) -> Tensor:
+        raw = torch.cat([s.weight() for s in self.samplers], dim=1)
+        return torch.prod(raw, dim=1, keepdim=True)
+
 
 class ConstantSampler(Sampler):
     """
@@ -139,6 +158,7 @@ class ConstantSampler(Sampler):
         super().__init__(m=0, requires_grad=requires_grad)
         self.value = value
         self.m, self.nd = value.shape
+        self._weight[:] = torch.tensor(0.0, dtype=self.dtype)
 
     def run(self) -> Tensor:
         ret = self.value.clone()
@@ -166,14 +186,16 @@ class ISampler(Sampler):
         @throws ValueError: If `ranges` has an unexpected shape.
         """
         super().__init__(m=m, dtype=dtype, requires_grad=requires_grad)
-        ranges_arr = np.array(ranges, dtype=np.float64)
+        ranges_arr = torch.tensor(ranges, dtype=dtype)
         if len(ranges_arr.shape) == 2:
             self.nd = ranges_arr.shape[0]
         else:
             raise ValueError(f"Unexpected `ranges` shape {ranges_arr.shape}.")
+
         self.lows = ranges_arr[:, 0].reshape(1, self.nd)
         self.highs = ranges_arr[:, 1].reshape(1, self.nd)
         self.deltas = self.highs - self.lows
+        self._weight[:] = torch.prod(self.deltas, dtype=self.dtype)
 
     def run(self) -> Tensor:
         """
@@ -253,7 +275,7 @@ class _MeshSampler(Sampler):
             arr = torch.from_numpy(raw)[:, None]
         else:
             raise TypeError(f"Invalid return from cell_area method.")
-        self.weight = arr.repeat(1, self.m_cell).reshape(-1, 1)
+        self._weight = arr.repeat(1, self.m_cell).reshape(-1, 1)
 
     def cell_bc_to_point(self, bcs: NDArray) -> NDArray:
         """
