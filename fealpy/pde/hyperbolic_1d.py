@@ -1,12 +1,9 @@
 import numpy as np
-import numpy as np # 具体代码可参考 FEALPy 仓库
 
 from fealpy.decorator import cartesian
-from fealpy.decorator import cartesian
-from typing import Union, Tuple, List 
 
 class Hyperbolic1dPDEData:
-    def __init__(self, D: Union[Tuple[int, int], List[int]] = (0, 2), T: Union[Tuple[int, int], List[int]] = (0, 4)):
+    def __init__(self, D = (0, 2), T = (0, 4)):
         """
         @brief 模型初始化函数
         @param[in] D 模型空间定义域
@@ -15,20 +12,20 @@ class Hyperbolic1dPDEData:
         self._domain = D 
         self._duration = T 
 
-    def domain(self) -> Union[Tuple[float, float], List[float]]:
+    def domain(self):
         """
         @brief 空间区间
         """
         return self._domain
 
-    def duration(self)-> Union[Tuple[float, float], List[float]]:
+    def duration(self):
         """
         @brief 时间区间
         """
         return self._duration 
         
     @cartesian
-    def solution(self, p: np.ndarray, t: np.float64) -> np.ndarray:
+    def solution(self, p, t):
         """
         @brief 真解函数
 
@@ -49,13 +46,13 @@ class Hyperbolic1dPDEData:
         return val
 
     @cartesian
-    def init_solution(self, p: np.ndarray) -> np.ndarray:
+    def init_solution(self, p):
         """
-        @brief 真解函数
+        @brief 初始解
 
         @param[in] p numpy.ndarray, 空间点
 
-        @return 真解函数值
+        @return 初始解函数值
         """
         val = np.zeros_like(p)
         val = np.abs(p-1)
@@ -63,7 +60,7 @@ class Hyperbolic1dPDEData:
         return val
 
     @cartesian    
-    def dirichlet(self, p: np.ndarray, t: np.float64) -> np.ndarray:
+    def dirichlet(self, p, t):
         """
         @brief Dirichlet 边界条件
 
@@ -72,5 +69,5 @@ class Hyperbolic1dPDEData:
         """
         return np.ones(p.shape)
 
-    def a(self) -> np.float64:
+    def a(self):
         return 1

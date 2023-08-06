@@ -792,6 +792,8 @@ class UniformMesh1d(Mesh, Plotable):
 
         return A0, A1, A2
 
+
+    ## @ingroup FDMInterface
     def hyperbolic_operator_explicity_upwind(self, tau, a=1):
         """
         @brief 双曲方程的显式迎风格式
@@ -805,7 +807,7 @@ class UniformMesh1d(Mesh, Plotable):
         k = np.arange(NN)
 
         if a > 0:
-            A = diags([1 - r], [0], shape=(NN, NN), format='csr')
+            A = diags([1 - r], 0, shape=(NN, NN), format='csr')
 
             I = k[1:]
             J = k[0:-1]
@@ -815,7 +817,7 @@ class UniformMesh1d(Mesh, Plotable):
 
             return A
         else:
-            B = diags([1 + r], [0], shape=(NN, NN), format='csr')
+            B = diags([1 + r], 0, shape=(NN, NN), format='csr')
 
             I = k[1:]
             J = k[0:-1]
@@ -825,29 +827,32 @@ class UniformMesh1d(Mesh, Plotable):
 
             return B
 
-    def hyperbolic_operator_central(self, tau, a):
+
+    def hyperbolic_operator_central_upwind(self, tau, a=1):
         """
-        @brief 双曲方程的中心差分迭代矩阵
+        @brief 双曲方程的中心差分格式
+
         @param[in] tau float, 当前时间步长
+        NOTE 该格式不稳定
         """
         r = a*tau/self.h
-        if r > 1.0:
-            raise ValueError(f"The r: {r} should be smaller than 1.0")
         
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([1], [0], shape=(NN, NN), format='csr')
-        val = np.broadcast_to(-r/2, (NN-1, ))
+        A = diags([1], 0, shape=(NN, NN), format='csr')
+        val0 = np.broadcast_to(-r/2, (NN-1, ))
+        val1 = np.broadcast_to(r/2, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
-        A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
         return A
 
-    def hyperbolic_operator_explicity_upwind_with_viscous(self, a, tau):
+
+    def hyperbolic_operator_explicity_upwind_with_viscous(self, tau, a=1):
         """
-        @brief 带粘性项的显式迎风格式 
+        @brief 双曲方程带粘性项的显式迎风格式 
         """
         r = a*tau/self.h
     
@@ -857,18 +862,19 @@ class UniformMesh1d(Mesh, Plotable):
         NN = self.number_of_nodes()
         k = np.arange(NN)
     
-        A = diags([1-r], [0], shape=(NN, NN), format='csr')
+        A = diags([1-r], 0, shape=(NN, NN), format='csr')
         val0 = np.broadcast_to(0, (NN-1, ))
         val1 = np.broadcast_to(r, (NN-1, ))
 
         I = k[1:]
         J = k[0:-1]
-        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
 
         return A
 
-    def hyperbolic_operator_explicity_lax_friedrichs(self, a, tau):
+
+    def hyperbolic_operator_explicity_lax_friedrichs(self, tau, a=1):
         """
         @brief 积分守恒型 lax_friedrichs 格式
         """
@@ -880,15 +886,18 @@ class UniformMesh1d(Mesh, Plotable):
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([0], [0], shape=(NN, NN), format='csr')
-        val0 = np.broadcast_to(1/2 - r, (NN-1, ))
-        val1 = np.broadcast_to(1/2 + r, (NN-1, ))
+        A = diags([0], 0, shape=(NN, NN), format='csr')
+
+        val0 = np.broadcast_to(1/2*(1 - r), (NN-1, ))
+        val1 = np.broadcast_to(1/2*(1 + r), (NN-1, ))
+
         I = k[1:]
         J = k[0:-1]
-        A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
     
         return A
+
 
     def hyperbolic_operator_implicity_upwind(self, a, tau):
         """
