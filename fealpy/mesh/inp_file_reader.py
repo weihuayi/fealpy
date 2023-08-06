@@ -111,6 +111,7 @@ class InpFileReader:
 
         line = self.contents[self.cline]
         d = self.parse_keyword_line(line)
+        # print("part_data:", d)
 
         self.parts[d['name']] = {'node':None, 'elem':{}, 'nset':{}, 'elset':{},
                                  'orientation':{}, 'solid_section':{}, 'beam_section':{}}
@@ -193,7 +194,7 @@ class InpFileReader:
 
     def parse_nset_data(self, parts, name):
         """
-        @brief 解析网格节点集合数据，可以用于应用边界条件、载荷等
+        @brief 解析节点集合数据，可以用于应用边界条件、载荷等
 
         @param parts 用于存储节点集合数据的字典
         @param name 当前部分的名称
@@ -219,7 +220,7 @@ class InpFileReader:
 
     def parse_elset_data(self, parts, name):
         """
-        @brief 解析网格单元集合数据，可以用于应用边界条件、载荷等
+        @brief 解析单元集合数据，可以用于应用边界条件、载荷等
 
         @param parts 用于存储单元集合数据的字典
         @param name 当前部分的名称
@@ -335,8 +336,82 @@ class InpFileReader:
 
 
     def parse_assembly_data(self):
+        """
+        @brief 解析 assembly 数据
+        用于将所有的部件（Parts）组合在一起，创建整个模型
+        """
+
         line = self.contents[self.cline]
-        print(line)
+        d = self.parse_keyword_line(line)
+        print("assembly_d:", d)
+
+        self.assembly[d['name']] = {'instance':{}, 'nset':{}}
+        print("assembly_data:", self.assembly)
+        self.cline += 1
+        line = self.get_keyword_line()
+
+        while line is not None and not line.startswith('*End Assembly'):
+            if line.startswith('*Instance'):
+                self.parse_instance_data(self.assembly, d['name'])
+            elif line.startswith('*Nset'):
+                self.parse_nset_assembly_data(self.assembly, d['name'])
+            else:
+                print("we pass the keyword line:" + line)
+                self.cline += 1
+
+            line = self.get_keyword_line() # 拿到下一个还没有处理的 keyword 行
+
+
+    def parse_instance_data(self, assemblys, name):
+        """
+        @brief 解析 instance 数据
+        每一个部件在组装过程中都被称为一个实例
+
+        @param parts 用于存储节点集合数据的字典
+        @param name 当前部分的名称
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+        # print("instance_d:", d)
+
+        self.cline += 1
+        line = self.get_keyword_line()
+
+        instance_key = (d['name'], d['part'])
+        assemblys[name]['instance'][instance_key] = None
+        # print("instance:", assemblys[name]['instance'][instance_key])
+
+
+    def parse_nset_assembly_data(self, assemblys, name):
+        """
+        @brief 解析 nset 数据
+
+        @param parts 用于存储单元集合数据的字典
+        @param name 当前部分的名称
+
+        @note 注意这里我们没有把原始节点的编号映射成当前连续的编号
+        """
+        line = self.contents[self.cline]
+        d = self.parse_keyword_line(line)
+        # print("nset_assembly_d:", d)
+
+        idx = []
+
+        self.cline += 1
+        line = self.contents[self.cline]
+        # print("nset_assembly_line:", line)
+        
+        while not line.startswith('*'):
+            ss = line.split(',')
+            idx += [int(s) for s in ss]
+            self.cline += 1
+            line = self.contents[self.cline]
+
+        nset_assembly_key = (d['nset'], d['instance'])
+        assemblys[name]['nset'][nset_assembly_key] = np.array(idx, dtype=np.int_)
+        # print("nset_assembly:", assemblys[name]['nset'][nset_assembly_key])
+
+
 
     def parse_step_data(self):
         line = self.contents[self.cline]

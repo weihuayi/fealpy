@@ -204,6 +204,22 @@ class EdgeMesh(Mesh, Plotable):
         print("beam_section_data:", beam_section_data)
         print("beam_section_elset:", list(beam_section_data.keys()))
 
+        assemblys = reader.assembly
+
+        assembly_name = next(iter(assemblys)) # parts 的名称，需要根据 .inp 文件来选择正确的 parts 名称
+        print("assembly_name:", assembly_name)
+
+        assembly_data = assemblys[assembly_name]
+        print("assembly_data:", assembly_data)
+
+        instance_data = assembly_data['instance']
+        print("instance_data:", instance_data)
+        print("instance_name:", list(instance_data.keys()))
+
+        nset_assembly_data = assembly_data['nset']
+        print("nset_assembly_data:", nset_assembly_data)
+        print("nset_assembly_nset:", list(nset_assembly_data.keys()))
+
         return mesh
 
     ## @ingroup MeshGenerators

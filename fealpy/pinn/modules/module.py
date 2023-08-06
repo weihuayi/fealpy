@@ -28,23 +28,20 @@ class TensorMapping(Module):
 
     ### features
 
-    def mkfs(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
-                   device: Optional[device]=None, **kwargs) -> Tensor:
-        p = mkfs(*input, f_shape=f_shape, device=device)
-        return self.__call__(p, **kwargs)
-
     __call__: Callable[..., Tensor]
 
-    def fixed(self, idx: Sequence[int], value: Sequence[float]):
+    def fixed(self, idx: Sequence[int], value: Sequence[float],
+                 dtype=torch.float64):
         """
         @brief Return a module wrapped from this, to make some input features fixed.\
                See `fealpy.pinn.modules.Fixed`.
 
         @param idx: Sequence[int]. The indices of features to be fixed.
         @param value: Sequence[int]. Values of data in fixed features.
+        @param dtype: dtype, optional.
         """
         assert len(idx) == len(value)
-        return Fixed(self, idx, value)
+        return Fixed(self, idx, value, dtype=dtype)
 
     def extracted(self, *idx: int):
         """
@@ -222,7 +219,8 @@ class Solution(TensorMapping):
 class Fixed(Solution):
     def __init__(self, net: Module,
                  idx: Sequence[int],
-                 values: Sequence[float]
+                 values: Sequence[float],
+                 dtype=torch.float64
         ) -> None:
         """
         @brief Fix some input features of `net`, as a wrapped module.
@@ -233,7 +231,7 @@ class Fixed(Solution):
         """
         super().__init__(net)
         self._fixed_idx = torch.tensor(idx, dtype=torch.long)
-        self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(0)
+        self._fixed_value = torch.tensor(values, dtype=dtype).unsqueeze(0)
 
     def forward(self, p: Tensor):
         total_feature = p.shape[-1] + len(self._fixed_idx)
