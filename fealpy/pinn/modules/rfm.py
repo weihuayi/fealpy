@@ -40,7 +40,7 @@ class PoUSin(Module):
         l1 = 0.5 * (1 + torch.sin(2*torch.pi*x)) * f1
         l2 = f2.double()
         l3 = 0.5 * (1 - torch.sin(2*torch.pi*x)) * f3
-        ret = l1 + l2 + l3
+        ret = l1 + l2 + l3 + 0.0*x
         ret = torch.prod(ret, dim=-1, keepdim=self.keepdim)
         return ret
 
@@ -106,6 +106,7 @@ class LocalRandomFeature(TensorMapping):
         self.set_basis(bound)
         self.activate = activate
         self.uml = Linear(nf, 1, bias=False, device=device, dtype=dtype)
+        init.zeros_(self.uml.weight)
         self.device = device
 
     @property
@@ -122,6 +123,12 @@ class LocalRandomFeature(TensorMapping):
 
     def number_of_features(self):
         return self.nf
+
+    def basis_val(self, p: Tensor):
+        """
+        @brief Return values of basis, with shape (N, nf).
+        """
+        return self.activate(self.linear(p))
 
 
 class RandomFeatureFlat(TensorMapping):
@@ -160,6 +167,10 @@ class RandomFeatureFlat(TensorMapping):
                 )
             )
 
+        self.gc = torch.mean(centers, dim=0)
+        cmax, _ = torch.max(centers, dim=0)
+        cmin, _ = torch.min(centers, dim=0)
+        self.gr = 0.5 * torch.max(cmax - cmin)
         self.global_ = LocalRandomFeature(
             in_dim=in_dim, nf=ngrf,
             bound=bound, activate=activate,
@@ -170,11 +181,13 @@ class RandomFeatureFlat(TensorMapping):
 
     def status_string(self):
         return f"""Random Feature Module
-# Partitions: {self.number_of_partitions()},
-# Basis(local): {self.number_of_local_basis()},
-# Basis(global): {self.number_of_global_basis()},
-# Basis(total): {self.number_of_basis()},
-# Dimension(in): {self.in_dim}"""
+#Partitions: {self.number_of_partitions()},
+#Basis(local): {self.number_of_local_basis()},
+#Basis(global): {self.number_of_global_basis()},
+  - center: {self.gc},
+  - radius: {self.gr},
+#Basis(total): {self.number_of_basis()},
+#Dimension(in): {self.in_dim}"""
 
     def number_of_partitions(self):
         return self.std.centers.shape[0]
@@ -198,7 +211,7 @@ class RandomFeatureFlat(TensorMapping):
 
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
-        ret = self.global_(p)
+        ret = self.global_((p - self.gc[None, :])/self.gr)
         for i in range(self.number_of_partitions()):
             x = std[:, i, :] # (N, d)
             ret += self.partions[i](x) * self.pou(x) # (N, 1)

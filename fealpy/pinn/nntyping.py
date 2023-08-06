@@ -7,6 +7,7 @@ from typing import (
 )
 
 
+import numpy as np
 from torch import Tensor
 import numpy as np
 from numpy.typing import NDArray
@@ -31,3 +32,4 @@ class GeneralSampler(Protocol):
 class MeshLike(Protocol):
     """A simple protocal for meshes."""
     def entity(self, etype) -> Any: ...
+    def entity_measure(self, etype='cell', index=np.s_[:]) -> Union[NDArray, float]: ...
