@@ -10,6 +10,8 @@ class AutoTest():
     class HyperParams():
         def __init__(self, data: Dict[str, Any]) -> None:
             self.__data = data
+        def __len__(self):
+            return len(self.__data)
         def __getattr__(self, key):
             return self.__data.get(key, None)
 
