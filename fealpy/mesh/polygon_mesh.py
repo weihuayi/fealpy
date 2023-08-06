@@ -212,6 +212,7 @@ class PolygonMesh(Mesh, Plotable):
 
     face_to_ipoint = edge_to_ipoint
     
+
     def edge_normal(self, index=np.s_[:]):
         """
         @brief 计算二维网格中每条边上单位法线
@@ -220,6 +221,18 @@ class PolygonMesh(Mesh, Plotable):
         v = self.edge_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
+
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    face_normal = edge_normal
+    face_unit_normal = edge_unit_normal
 
 
     def interpolation_points(self, p: int,

@@ -16,3 +16,4 @@ from .scalar_source_integrator import ConformingVEMScalarSourceIntegrator2d
 from .scalar_source_integrator import NonConformingVEMScalarSourceIntegrator2d
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
+from .estimator import PoissonCVEMEstimator

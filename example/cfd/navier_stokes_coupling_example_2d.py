@@ -130,11 +130,11 @@ for i in range(0,3):
     D = D1 * np.broadcast_to(u0[...,0],D1.shape)+\
         D2 * np.broadcast_to(u0[...,1],D1.shape) 
     
-    print("asd",np.abs(DD).sum())
+    print("asd",np.abs(D1).sum())
     print("asd",np.abs(D).sum())
     print(np.sum(np.abs(D-DD))) 
     M = bmat([[E+A+D,None,-B1],[None,E+A+D,-B2],[-B1.T,-B2.T,None]],format='csr')
-     
+    ''' 
     if method == 'Netwon' :
         A = bmat([[1/dt*M + mu*S+D1+D2+E1, E2, -C1],\
                 [E3, 1/dt*M + mu*S +D1+D2+E4, -C2],\
@@ -147,11 +147,11 @@ for i in range(0,3):
         A = bmat([[1/dt*M + mu*S, None, -C1],\
                 [None, 1/dt*M + mu*S, -C2],\
                 [C1.T, C2.T, None]], format='csr')
-    
+    '''
     #右端项
     F = uspace.source_vector(pde.source,dim=udim) + E@u0
     FF = np.r_['0', F.T.flat, np.zeros(pgdof)]
-    
+    '''
     if method == 'Netwon' :
         b = 1/dt*fb1 + fb2
         b = np.hstack((b,[0]*pgdof))
@@ -161,7 +161,7 @@ for i in range(0,3):
     elif method == 'Eular':
         b =  1/dt*fb1 - fb2
         b = np.hstack((b,[0]*pgdof))
-
+    '''
     u_isBdDof = uspace.is_boundary_dof()
     #p_isBdDof = np.zeros(pgdof,dtype=np.bool)
     p_isBdDof = pspace.is_boundary_dof(threshold=pde.is_p_boundary)

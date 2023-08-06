@@ -22,14 +22,16 @@ class TestModel(TensorMapping):
         return torch.einsum('nm, m -> n', ret, weight).unsqueeze(-1)
 
 
-model = TestModel()
+if __name__ == '__main__':
 
-x = np.linspace(0, 1, 190)
-y = np.linspace(0, 1, 190)
-data, (mx, my) = model.meshgrid_mapping(x, y)
+    model = TestModel()
 
-fig = plt.figure("Test for PoU")
-axes = fig.add_subplot(111, projection='3d')
-axes.plot_surface(mx, my, data, cmap=cm.RdYlBu_r, edgecolor='blue',
-                  linewidth=0.0003, antialiased=True)
-plt.show()
+    x = np.linspace(0, 1, 190)
+    y = np.linspace(0, 1, 190)
+    data, (mx, my) = model.meshgrid_mapping(x, y)
+
+    fig = plt.figure("Test for PoU")
+    axes = fig.add_subplot(111, projection='3d')
+    axes.plot_surface(mx, my, data, cmap=cm.RdYlBu_r, edgecolor='blue',
+                    linewidth=0.0003, antialiased=True)
+    plt.show()

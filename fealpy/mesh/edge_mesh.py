@@ -154,6 +154,74 @@ class EdgeMesh(Mesh, Plotable):
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
+    @classmethod
+    def from_inp_file(cls, fname):
+        from .inp_file_reader import InpFileReader
+
+        reader = InpFileReader(fname)
+        reader.parse()
+
+        # 提取所需的数据
+        parts = reader.parts
+
+        # 从 parts 中获取 node 和 element 数据
+        part_name = next(iter(parts)) # parts 的名称，需要根据 .inp 文件来选择正确的 parts 名称
+        print("part_name:", part_name)
+        part_data = parts[part_name]
+        print("part_data:", part_data)
+        node_data = part_data['node']
+        print("node_date:", node_data)
+        node = node_data[0]
+        node_index = node_data[-1]
+        # print("node_index:", node_index)
+        element_data = part_data['elem']
+        print("element_data:", element_data)
+        print("element_type:", list(element_data.keys()))
+        element_1 = element_data[list(element_data.keys())[0]]
+        # print("element_1:", element_1)
+        element_2 = element_data[list(element_data.keys())[-1]]
+        # print("element_2:", element_2)
+        cell = np.concatenate([data[0] for _, data in element_data.items()])
+        mesh = cls(node, cell)
+
+        nset_data = part_data['nset']
+        print("nset_data:", nset_data)
+        print("nset_nset:", list(nset_data.keys()))
+
+        elset_data = part_data['elset']
+        print("elset_data:", elset_data)
+        print("elset_elset:", list(elset_data.keys()))
+
+        orientation_data = part_data['orientation']
+        print("orientation_data:", orientation_data)
+        print("orientation_name:", list(orientation_data.keys()))
+
+        solid_section_data = part_data['solid_section']
+        print("solid_section_data:", solid_section_data)
+        print("solid_section_elset:", list(solid_section_data.keys()))
+
+        beam_section_data = part_data['beam_section']
+        print("beam_section_data:", beam_section_data)
+        print("beam_section_elset:", list(beam_section_data.keys()))
+
+        assemblys = reader.assembly
+
+        assembly_name = next(iter(assemblys)) # parts 的名称，需要根据 .inp 文件来选择正确的 parts 名称
+        print("assembly_name:", assembly_name)
+
+        assembly_data = assemblys[assembly_name]
+        print("assembly_data:", assembly_data)
+
+        instance_data = assembly_data['instance']
+        print("instance_data:", instance_data)
+        print("instance_name:", list(instance_data.keys()))
+
+        nset_assembly_data = assembly_data['nset']
+        print("nset_assembly_data:", nset_assembly_data)
+        print("nset_assembly_nset:", list(nset_assembly_data.keys()))
+
+        return mesh
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_triangle_mesh(cls, mesh):

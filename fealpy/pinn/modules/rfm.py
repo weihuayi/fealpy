@@ -1,4 +1,6 @@
-from typing import Iterator, List
+"""Modules for the Random Feature Method"""
+
+from typing import List
 
 import torch
 from torch import Tensor
@@ -38,7 +40,7 @@ class PoUSin(Module):
         l1 = 0.5 * (1 + torch.sin(2*torch.pi*x)) * f1
         l2 = f2.double()
         l3 = 0.5 * (1 - torch.sin(2*torch.pi*x)) * f3
-        ret = l1 + l2 + l3
+        ret = l1 + l2 + l3 + 0.0*x
         ret = torch.prod(ret, dim=-1, keepdim=self.keepdim)
         return ret
 
@@ -104,6 +106,8 @@ class LocalRandomFeature(TensorMapping):
         self.set_basis(bound)
         self.activate = activate
         self.uml = Linear(nf, 1, bias=False, device=device, dtype=dtype)
+        init.zeros_(self.uml.weight)
+        self.device = device
 
     @property
     def um(self):
@@ -120,6 +124,12 @@ class LocalRandomFeature(TensorMapping):
     def number_of_features(self):
         return self.nf
 
+    def basis_val(self, p: Tensor):
+        """
+        @brief Return values of basis, with shape (N, nf).
+        """
+        return self.activate(self.linear(p))
+
 
 class RandomFeatureFlat(TensorMapping):
     def __init__(self, nlrf: int, ngrf: int, centers: Tensor, radius: float,
@@ -129,6 +139,11 @@ class RandomFeatureFlat(TensorMapping):
         @param nlrf: int. Number of local random features.
         @param nglf: int.
         @param centers: 2-d Tensor. Centers of partitions.
+        @param radius: float.
+        @param in_dim: int. Input dimension.
+        @param bound: float. Uniform distribution bound for feature weights and bias.
+        @param activate: Callable. The activation function after linear transforms.
+        @param print_status: bool.
         """
         super().__init__()
         self.in_dim = in_dim
@@ -152,6 +167,10 @@ class RandomFeatureFlat(TensorMapping):
                 )
             )
 
+        self.gc = torch.mean(centers, dim=0)
+        cmax, _ = torch.max(centers, dim=0)
+        cmin, _ = torch.min(centers, dim=0)
+        self.gr = 0.5 * torch.max(cmax - cmin)
         self.global_ = LocalRandomFeature(
             in_dim=in_dim, nf=ngrf,
             bound=bound, activate=activate,
@@ -162,11 +181,13 @@ class RandomFeatureFlat(TensorMapping):
 
     def status_string(self):
         return f"""Random Feature Module
-# Partitions: {self.number_of_partitions()},
-# Basis(local): {self.number_of_local_basis()},
-# Basis(global): {self.number_of_global_basis()},
-# Basis(total): {self.number_of_basis()},
-# Dimension(in): {self.in_dim}"""
+#Partitions: {self.number_of_partitions()},
+#Basis(local): {self.number_of_local_basis()},
+#Basis(global): {self.number_of_global_basis()},
+  - center: {self.gc},
+  - radius: {self.gr},
+#Basis(total): {self.number_of_basis()},
+#Dimension(in): {self.in_dim}"""
 
     def number_of_partitions(self):
         return self.std.centers.shape[0]
@@ -190,29 +211,8 @@ class RandomFeatureFlat(TensorMapping):
 
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
-        ret = self.global_(p)
-        # ret = torch.zeros((p.shape[0], 1), dtype=self.dtype)
+        ret = self.global_((p - self.gc[None, :])/self.gr)
         for i in range(self.number_of_partitions()):
             x = std[:, i, :] # (N, d)
             ret += self.partions[i](x) * self.pou(x) # (N, 1)
         return ret # (N, 1)
-
-
-# class RandomFeature(Module):
-#     def __init__(self, Jn: int, cs: Tensor, rs: float):
-#         super().__init__()
-#         self.Jn = Jn
-#         self.Mp = cs.shape[0]
-#         self.um = torch.empty((self.Mp, Jn), dtype=cs.dtype)
-#         self._rfs = []
-#         for i in range(self.Mp):
-#             rf = LocalRandomFeature(self.um[i, :], Jn, cs[i, :], rs)
-#             self._rfs.append(rf)
-#             self.add_module(f'{i}', rf)
-
-#     def forward(self, p: Tensor):
-#         rets = []
-#         for mod in self._rfs: # Mp
-#             rets.append(mod(p)) # (N, TD2)
-#         ret = torch.stack(rets, dim=1) # (N, Mp, TD2)
-#         return torch.sum(ret, dim=1) # (N, TD2)

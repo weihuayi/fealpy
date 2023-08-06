@@ -109,7 +109,7 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
         u = self.net
         c = self.boundary_condition
         b = self.boundary_box()
-        M = torch.zeros(shape_m, dtype=torch.float32, device=p.device)
+        M = torch.zeros(shape_m, dtype=p.dtype, device=p.device)
 
         if self.GD == 1:
             c1 = mkfs(b[0], f_shape=shape, device=p.device)
