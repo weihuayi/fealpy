@@ -100,14 +100,14 @@ def interfacemesh2d(box, phi, n):
     hy = (box[3] - box[2]) / n
     h = min(hx, hy)
 
-    mesh = UniformMesh2d(box, ((box[1] - box[0]) / n, (box[3] - box[2]) / n), (box[0], box[2]))
+    mesh = UniformMesh2d((0, n, 0, n), ((box[1] - box[0]) / n, (box[3] - box[2]) / n), (box[0], box[2]))
 
     N = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
     NE = mesh.number_of_edges()
 
-    node = mesh.node
-    cell = mesh.ds.cell
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')[:, [0, 2, 3, 1]]
 
     phiValue = phi(node)
     # phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
@@ -173,7 +173,7 @@ def interfacemesh2d(box, phi, n):
     pmesh.nodeMarker[:N] = phiSign
 
     pmesh.cellMarker = np.ones(pmesh.number_of_cells(), dtype=np.int)
-    pmesh.cellMarker[phi(pmesh.barycenter()) < 0] = -1
+    pmesh.cellMarker[phi(pmesh.entity_barycenter()) < 0] = -1
 
     return pmesh
 
@@ -281,7 +281,7 @@ class InterfaceMesh2d():
         pcell = np.zeros(NS * 4 + NT * 3, dtype=np.int)
         pcellLocation = np.zeros(NS + NT + 1, dtype=np.int)
 
-        cell = self.mesh.ds.cell
+        cell = self.mesh.ds.cell[:, [0, 2, 3, 1]]
         sview = pcell[:4 * NS].reshape(NS, 4)
         sview[:] = cell[~isCutCell, :]
 

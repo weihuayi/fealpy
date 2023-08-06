@@ -2152,6 +2152,55 @@ class TriangleMesh(Mesh, Plotable):
         from scipy.spatial import Delaunay
         from .uniform_mesh_2d import UniformMesh2d
 
+
+    @classmethod
+    def interfacemesh_generator(cls, box, nx, ny, phi):
+        """
+        @brief
+
+        @param
+        @param
+        @param
+        """
+        from scipy.spatial import Delaunay
+        from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+
+        mesh = UniformMesh2d((0, nx, 0, ny), ((box[1] - box[0]) / nx, (box[3] - box[2]) / ny), (box[0], box[2]))
+
+        interfaceNode, isInterfaceNode, isInterfaceCell, ncut, naux = mesh.find_interface_node(phi)
+
+        N = mesh.number_of_nodes()
+        cell = mesh.entity('cell')[:, [0, 2, 3, 1]]
+        node = mesh.entity('node')
+
+        dt = Delaunay(interfaceNode)
+        tri = dt.simplices
+        NI = np.sum(isInterfaceNode)
+        isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
+        tri = tri[~isUnnecessaryCell, :]
+
+        interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
+        interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode)
+        interfaceNodeIdx[NI:NI + ncut] = N + np.arange(ncut)
+        interfaceNodeIdx[NI + ncut:] = N + ncut + np.arange(naux)
+        tri = interfaceNodeIdx[tri]
+
+        NS = np.sum(~isInterfaceCell)
+        NT = tri.shape[0]
+        pnode = np.concatenate((node, interfaceNode[NI:]), axis=0)
+        pcell = np.zeros((NS * 2 + NT, 3), dtype=np.int)
+        temp = cell[~isInterfaceCell, :]
+        pcell[0:NS, :] = temp[:, [1, 2, 0]]
+        pcell[NS:2*NS, :] = temp[:, [3, 0, 2]]
+        pcell[2*NS:, :] = tri
+
+        pmesh = cls(pnode, pcell)
+
+        return pmesh
+
 TriangleMesh.set_ploter('2d')
 
 

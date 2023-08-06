@@ -15,6 +15,7 @@ from .mesh_data_structure import StructureMesh2dDataStructure
 from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 from ..geometry import project, find_cut_point, msign
 
+
 ## @defgroup FEMInterface
 ## @defgroup FDMInterface
 ## @defgroup GeneralInterface
@@ -22,12 +23,13 @@ class UniformMesh2d(Mesh, Plotable):
     """
     @brief A class for representing a two-dimensional structured mesh with uniform discretization in both x and y directions.
     """
+
     def __init__(self,
-            extent: Tuple[int, int, int, int],
-            h: Tuple[float, float] = (1.0, 1.0),
-            origin: Tuple[float, float] = (0.0, 0.0),
-            itype: type = np.int_,
-            ftype: type = np.float64):
+                 extent: Tuple[int, int, int, int],
+                 h: Tuple[float, float] = (1.0, 1.0),
+                 origin: Tuple[float, float] = (0.0, 0.0),
+                 itype: type = np.int_,
+                 ftype: type = np.float64):
         """
         @brief Initialize the 2D uniform mesh.
 
@@ -77,7 +79,6 @@ class UniformMesh2d(Mesh, Plotable):
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
-
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
@@ -95,8 +96,8 @@ class UniformMesh2d(Mesh, Plotable):
 
         """
         for i in range(n):
-            self.extent = [i*2 for i in self.extent]
-            self.h = [h/2.0 for h in self.h]
+            self.extent = [i * 2 for i in self.extent]
+            self.h = [h / 2.0 for h in self.h]
             self.nx = self.extent[1] - self.extent[0]
             self.ny = self.extent[3] - self.extent[2]
 
@@ -109,7 +110,7 @@ class UniformMesh2d(Mesh, Plotable):
         """
         @brief 返回单元的面积，注意这里只返回一个值（因为所有单元面积相同）
         """
-        return self.h[0]*self.h[1]
+        return self.h[0] * self.h[1]
 
     ## @ingroup GeneralInterface
     def edge_length(self, index=np.s_[:]):
@@ -130,8 +131,8 @@ class UniformMesh2d(Mesh, Plotable):
         ny = self.ds.ny
 
         v = p - np.array(self.origin, dtype=self.ftype)
-        n0 = v[..., 0]//hx
-        n1 = v[..., 1]//hy
+        n0 = v[..., 0] // hx
+        n1 = v[..., 1] // hy
 
         return n0.astype('int64'), n1.astype('int64')
 
@@ -151,22 +152,22 @@ class UniformMesh2d(Mesh, Plotable):
         axes.set_box_aspect(aspect)
         axes.set_proj_type('ortho')
 
-        node = self.node # 获取二维节点上的网格坐标
+        node = self.node  # 获取二维节点上的网格坐标
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
     def show_animation(self,
-                    fig: Figure,
-                    axes: Union[Axes, Axes3D],
-                    box: List[float],
-                    advance: Callable[[int], Tuple[np.ndarray, float]],
-                    fname: str = 'test.mp4',
-                    init: Optional[Callable] = None,
-                    fargs: Optional[Callable] = None,
-                    frames: int = 1000,
-                    interval: int = 50,
-                    plot_type: str = 'imshow',
-                    cmap='rainbow') -> None:
+                       fig: Figure,
+                       axes: Union[Axes, Axes3D],
+                       box: List[float],
+                       advance: Callable[[int], Tuple[np.ndarray, float]],
+                       fname: str = 'test.mp4',
+                       init: Optional[Callable] = None,
+                       fargs: Optional[Callable] = None,
+                       frames: int = 1000,
+                       interval: int = 50,
+                       plot_type: str = 'imshow',
+                       cmap='rainbow') -> None:
         """
         @brief 生成求解过程动画并保存为指定文件名的视频文件
 
@@ -186,17 +187,16 @@ class UniformMesh2d(Mesh, Plotable):
         # 绘制颜色条的类
         from matplotlib.contour import QuadContourSet
 
-
         # 初始化二维网格数据
         uh, _ = advance(0)
         if isinstance(axes, Axes) and plot_type == 'imshow':
             data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5],
-                    extent=box[0:4], interpolation='bicubic')
+                               extent=box[0:4], interpolation='bicubic')
         elif isinstance(axes, Axes3D) and plot_type == 'surface':
             X = self.node[..., 0]
             Y = self.node[..., 1]
             data = axes.plot_surface(X, Y, uh, linewidth=0, cmap=cmap, vmin=box[4],
-                                    vmax=box[5], rstride=1, cstride=1)
+                                     vmax=box[5], rstride=1, cstride=1)
             axes.set_xlim(box[0], box[1])
             axes.set_ylim(box[2], box[3])
             axes.set_zlim(box[4], box[5])
@@ -208,24 +208,23 @@ class UniformMesh2d(Mesh, Plotable):
             # 后续的代码中无需对颜色条进行额外的更新操作
             # cbar = fig.colorbar(data, ax=axes)
 
-        def func(n, *fargs): # 根据当前帧序号计算数值解，更新图像对象的数值数组，显示当前帧序号和时刻
-            nonlocal data # 声明 data 为非局部变量 这样在 func 函数内部对 data 进行的修改会影响到外部的 data 变量
-            uh, t = advance(n, *fargs) # 计算当前时刻的数值解并返回，uh 是数值解，t 是当前时刻
+        def func(n, *fargs):  # 根据当前帧序号计算数值解，更新图像对象的数值数组，显示当前帧序号和时刻
+            nonlocal data  # 声明 data 为非局部变量 这样在 func 函数内部对 data 进行的修改会影响到外部的 data 变量
+            uh, t = advance(n, *fargs)  # 计算当前时刻的数值解并返回，uh 是数值解，t 是当前时刻
 
             if data is None:
                 if isinstance(axes, Axes) and plot_type == 'imshow':
                     data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5],
-                               extent=box[0:4], interpolation='bicubic')
+                                       extent=box[0:4], interpolation='bicubic')
                 elif isinstance(axes, Axes3D) and plot_type == 'surface':
                     data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4],
-                                            vmax=box[5], rstride=1, cstride=1)
+                                             vmax=box[5], rstride=1, cstride=1)
                 elif plot_type == 'contourf':
                     data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
 
-
             if isinstance(axes, Axes) and plot_type == 'imshow':
-                data.set_array(uh) # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
-                axes.set_aspect('equal') # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
+                data.set_array(uh)  # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
+                axes.set_aspect('equal')  # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
 
             elif isinstance(axes, Axes3D) and plot_type == 'surface':
                 axes.clear()  # 清除当前帧的图像
@@ -245,9 +244,9 @@ class UniformMesh2d(Mesh, Plotable):
                 data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
                 axes.set_aspect('equal')
 
-            s = "frame=%05d, time=%0.8f"%(n, t) # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
+            s = "frame=%05d, time=%0.8f" % (n, t)  # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
             print(s)
-            axes.set_title(s) # 将格式化的字符串设置为坐标轴的标题
+            axes.set_title(s)  # 将格式化的字符串设置为坐标轴的标题
             return data
 
         # 创建一个 funcanimation 对象
@@ -257,7 +256,6 @@ class UniformMesh2d(Mesh, Plotable):
         # frames 为帧数，interval 为动画间隔时间
         ani = animation.FuncAnimation(fig, func, init_func=init, fargs=fargs, frames=frames, interval=interval)
         ani.save('{}_{}'.format(plot_type, fname))
-
 
     def show_animation_vtk(self):
         import vtkmodules.vtkInteractionStyle
@@ -275,7 +273,6 @@ class UniformMesh2d(Mesh, Plotable):
         )
         from vtk.util import numpy_support
 
-
     ## @ingroup GeneralInterface
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
@@ -285,11 +282,11 @@ class UniformMesh2d(Mesh, Plotable):
 
         nx = self.ds.nx
         ny = self.ds.ny
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1]]
+        box = [self.origin[0], self.origin[0] + nx * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1]]
 
-        x = np.linspace(box[0], box[1], nx+1)
-        y = np.linspace(box[2], box[3], ny+1)
+        x = np.linspace(box[0], box[1], nx + 1)
+        y = np.linspace(box[2], box[3], ny + 1)
         z = np.zeros(1)
         gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
@@ -315,8 +312,8 @@ class UniformMesh2d(Mesh, Plotable):
                self.origin[1], self.origin[1] + ny * self.h[1]]
         node = np.zeros((nx + 1, ny + 1, GD), dtype=self.ftype)
         node[..., 0], node[..., 1] = np.mgrid[
-                                     box[0]:box[1]:(nx + 1)*1j,
-                                     box[2]:box[3]:(ny + 1)*1j]
+                                     box[0]:box[1]:(nx + 1) * 1j,
+                                     box[2]:box[3]:(ny + 1) * 1j]
         return node
 
     ## @ingroup FDMInterface
@@ -327,12 +324,12 @@ class UniformMesh2d(Mesh, Plotable):
         GD = self.geo_dimension()
         nx = self.nx
         ny = self.ny
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
+        box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
+               self.origin[1] + self.h[1] / 2, self.origin[1] + self.h[1] / 2 + (ny - 1) * self.h[1]]
         bc = np.zeros((nx, ny, 2), dtype=self.ftype)
         bc[..., 0], bc[..., 1] = np.mgrid[
-                                 box[0]:box[1]:nx*1j,
-                                 box[2]:box[3]:ny*1j]
+                                 box[0]:box[1]:nx * 1j,
+                                 box[2]:box[3]:ny * 1j]
         return bc
 
     ## @ingroup FDMInterface
@@ -352,12 +349,12 @@ class UniformMesh2d(Mesh, Plotable):
         GD = self.geo_dimension()
         nx = self.nx
         ny = self.ny
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
-               self.origin[1],               self.origin[1] + ny*self.h[1]]
-        bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
+        box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1]]
+        bc = np.zeros((nx, ny + 1, 2), dtype=self.ftype)
         bc[..., 0], bc[..., 1] = np.mgrid[
-                                 box[0]:box[1]:nx*1j,
-                                 box[2]:box[3]:(ny+1)*1j]
+                                 box[0]:box[1]:nx * 1j,
+                                 box[2]:box[3]:(ny + 1) * 1j]
         return bc
 
     ## @ingroup FDMInterface
@@ -368,12 +365,12 @@ class UniformMesh2d(Mesh, Plotable):
         GD = self.geo_dimension()
         nx = self.nx
         ny = self.ny
-        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
-        bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
+        box = [self.origin[0], self.origin[0] + nx * self.h[0],
+               self.origin[1] + self.h[1] / 2, self.origin[1] + self.h[1] / 2 + (ny - 1) * self.h[1]]
+        bc = np.zeros((nx + 1, ny, 2), dtype=self.ftype)
         bc[..., 0], bc[..., 1] = np.mgrid[
-                                 box[0]:box[1]:(nx+1)*1j,
-                                 box[2]:box[3]:ny*1j]
+                                 box[0]:box[1]:(nx + 1) * 1j,
+                                 box[2]:box[3]:ny * 1j]
         return bc
 
     ## @ingroup FDMInterface
@@ -399,20 +396,20 @@ class UniformMesh2d(Mesh, Plotable):
         dtype = self.ftype if dtype is None else dtype
         if etype in {'node', 0}:
             if dim is None:
-                uh = np.zeros((nx+1+2*ex, ny+1+2*ex), dtype=dtype)
+                uh = np.zeros((nx + 1 + 2 * ex, ny + 1 + 2 * ex), dtype=dtype)
             else:
-                uh = np.zeros((nx+1+2*ex, ny+1+2*ex, dim), dtype=dtype)
+                uh = np.zeros((nx + 1 + 2 * ex, ny + 1 + 2 * ex, dim), dtype=dtype)
 
-        elif etype in {'edge','face', 1}:
-            ex = np.zeros((nx, ny+1), dtype=dtype)
-            ey = np.zeros((nx+1, ny), dtype=dtype)
+        elif etype in {'edge', 'face', 1}:
+            ex = np.zeros((nx, ny + 1), dtype=dtype)
+            ey = np.zeros((nx + 1, ny), dtype=dtype)
             uh = (ex, ey)
         elif etype in {'edgex'}:
-            uh = np.zeros((nx, ny+1), dtype=dtype)
+            uh = np.zeros((nx, ny + 1), dtype=dtype)
         elif etype in {'edgey'}:
-            uh = np.zeros((nx+1, ny), dtype=dtype)
+            uh = np.zeros((nx + 1, ny), dtype=dtype)
         elif etype in {'cell', 2}:
-            uh = np.zeros((nx+2*ex, ny+2*ex), dtype=dtype)
+            uh = np.zeros((nx + 2 * ex, ny + 2 * ex), dtype=dtype)
         else:
             raise ValueError(f'the entity `{etype}` is not correct!')
 
@@ -436,8 +433,8 @@ class UniformMesh2d(Mesh, Plotable):
 
         hx = self.h[0]
         hy = self.h[1]
-        f_xx,f_xy = np.gradient(f_x, hx, edge_order=order)
-        f_yx,f_yy = np.gradient(f_y, hy, edge_order=order)
+        f_xx, f_xy = np.gradient(f_x, hx, edge_order=order)
+        f_yx, f_yy = np.gradient(f_y, hy, edge_order=order)
         return f_xx + f_yy
 
     ## @ingroup FDMInterface
@@ -445,8 +442,8 @@ class UniformMesh2d(Mesh, Plotable):
         hx = self.h[0]
         hy = self.h[1]
         fx, fy = np.gradient(f, hx, hy, edge_order=order)
-        fxx,fxy = np.gradient(fx, hx, edge_order=order)
-        fyx,fyy = np.gradient(fy, hy, edge_order=order)
+        fxx, fxy = np.gradient(fx, hx, edge_order=order)
+        fyx, fyy = np.gradient(fy, hy, edge_order=order)
         return fxx + fyy
 
     ## @ingroup FDMInterface
@@ -475,8 +472,8 @@ class UniformMesh2d(Mesh, Plotable):
         y0 = j * hy + box[2]
         a = (p[..., 0] - x0) / hx
         b = (p[..., 1] - y0) / hy
-        F = f[i, j] * (1-a) * (1-b)  + f[i + 1, j] * a * (1-b) \
-            + f[i, j + 1] * (1-a) * b + f[i + 1, j + 1] * a * b
+        F = f[i, j] * (1 - a) * (1 - b) + f[i + 1, j] * a * (1 - b) \
+            + f[i, j + 1] * (1 - a) * b + f[i + 1, j + 1] * a * b
         return F
 
     ## @ingroup FDMInterface
@@ -531,9 +528,9 @@ class UniformMesh2d(Mesh, Plotable):
 
     ## @ingroup FDMInterface
     def error(self,
-        u: Callable,
-        uh: np.ndarray,
-        errortype: str = 'all') -> Union[float, Tuple[np.float64, np.float64, np.float64]]:
+              u: Callable,
+              uh: np.ndarray,
+              errortype: str = 'all') -> Union[float, Tuple[np.float64, np.float64, np.float64]]:
 
         """
         计算真实解和数值解之间的误差。
@@ -546,7 +543,7 @@ class UniformMesh2d(Mesh, Plotable):
                 如果errortype为'L2'，则返回L2误差；
                 如果errortype为'l2'，则返回l2误差。
         """
-        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
+        assert (uh.shape[0] == self.nx + 1) and (uh.shape[1] == self.ny + 1)
         hx = self.h[0]
         hy = self.h[1]
         nx = self.nx
@@ -594,20 +591,20 @@ class UniformMesh2d(Mesh, Plotable):
 
         n0 = self.ds.nx + 1
         n1 = self.ds.ny + 1
-        cx = 1/(self.h[0]**2)
-        cy = 1/(self.h[1]**2)
+        cx = 1 / (self.h[0] ** 2)
+        cy = 1 / (self.h[1] ** 2)
         NN = self.number_of_nodes()
         k = np.arange(NN).reshape(n0, n1)
 
-        A = diags([2*(cx+cy)], [0], shape=(NN, NN), format='csr')
+        A = diags([2 * (cx + cy)], [0], shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(-cx, (NN-n1, ))
+        val = np.broadcast_to(-cx, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(-cy, (NN-n0, ))
+        val = np.broadcast_to(-cy, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -617,11 +614,12 @@ class UniformMesh2d(Mesh, Plotable):
 
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self,
-        gD: Callable[[np.ndarray], np.ndarray],
-        A: spmatrix,
-        f: np.ndarray,
-        uh: Optional[np.ndarray] = None,
-        threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[spmatrix, np.ndarray]:
+                           gD: Callable[[np.ndarray], np.ndarray],
+                           A: spmatrix,
+                           f: np.ndarray,
+                           uh: Optional[np.ndarray] = None,
+                           threshold: Optional[Union[int, Callable[[np.ndarray], np.ndarray]]] = None) -> Tuple[
+        spmatrix, np.ndarray]:
 
         """
         @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界和向量型函数
@@ -637,9 +635,9 @@ class UniformMesh2d(Mesh, Plotable):
         if uh is None:
             uh = self.function('node').reshape(-1)
         else:
-            uh = uh.reshape(-1) # 展开为一维数组 TODO:向量型函数
+            uh = uh.reshape(-1)  # 展开为一维数组 TODO:向量型函数
 
-        f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
+        f = f.reshape(-1, )  # 展开为一维数组 TODO：向量型右端
 
         node = self.entity('node')
         # isBdNode = self.ds.boundary_node_flag()
@@ -652,15 +650,15 @@ class UniformMesh2d(Mesh, Plotable):
         else:
             raise ValueError(f"Invalid threshold: {threshold}")
 
-        uh[isBdNode]  = gD(node[isBdNode])
-        f -= A@uh
+        uh[isBdNode] = gD(node[isBdNode])
+        f -= A @ uh
         f[isBdNode] = uh[isBdNode]
 
         bdIdx = np.zeros(A.shape[0], dtype=self.itype)
         bdIdx[isBdNode] = 1
-        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D0 = spdiags(1 - bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        A = D0@A@D0 + D1
+        A = D0 @ A @ D0 + D1
         return A, f
 
     ## @ingroup FDMInterface
@@ -682,10 +680,10 @@ class UniformMesh2d(Mesh, Plotable):
 
         @param[in] tau float, 当前时间步长
         """
-        rx = tau/self.h[0]**2
-        ry = tau/self.h[1]**2
+        rx = tau / self.h[0] ** 2
+        ry = tau / self.h[1] ** 2
         if rx + ry > 0.5:
-            raise ValueError(f"The rx+ry: {rx+ry} should be smaller than 0.5")
+            raise ValueError(f"The rx+ry: {rx + ry} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
@@ -700,7 +698,7 @@ class UniformMesh2d(Mesh, Plotable):
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry, (NN - n0, ))
+        val = np.broadcast_to(ry, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -715,8 +713,8 @@ class UniformMesh2d(Mesh, Plotable):
 
         @param[in] tau float, 当前时间步长
         """
-        rx = tau/self.h[0]**2
-        ry = tau/self.h[1]**2
+        rx = tau / self.h[0] ** 2
+        ry = tau / self.h[1] ** 2
         if rx + ry > 1.5:
             raise ValueError(f"The sum rx + ry: {rx + ry} should be smaller than 0.5")
 
@@ -733,7 +731,7 @@ class UniformMesh2d(Mesh, Plotable):
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(-ry, (NN - n0, ))
+        val = np.broadcast_to(-ry, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -746,8 +744,8 @@ class UniformMesh2d(Mesh, Plotable):
 
         @param[in] tau float, 当前时间步长
         """
-        rx = tau/self.h[0]**2
-        ry = tau/self.h[1]**2
+        rx = tau / self.h[0] ** 2
+        ry = tau / self.h[1] ** 2
         if rx + ry > 1.5:
             raise ValueError(f"The sum rx + ry: {rx + ry} should be smaller than 1.5")
 
@@ -758,13 +756,13 @@ class UniformMesh2d(Mesh, Plotable):
 
         A = diags([1 + rx + ry], [0], shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(-rx/2, (NN-n1, ))
+        val = np.broadcast_to(-rx / 2, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(-ry/2, (NN-n0, ))
+        val = np.broadcast_to(-ry / 2, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -772,13 +770,13 @@ class UniformMesh2d(Mesh, Plotable):
 
         B = diags([1 - rx - ry], [0], shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(rx/2, (NN-n1, ))
+        val = np.broadcast_to(rx / 2, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry/2, (NN-n0, ))
+        val = np.broadcast_to(ry / 2, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -787,7 +785,6 @@ class UniformMesh2d(Mesh, Plotable):
         return A, B
 
         A1 += csr_matrix((val, (J.flat, I.flat)), shape=(NN, NN), dtype=self.ftype)
-
 
     ## @ingroup FDMInterface
     def wave_operator_explicit(self, tau: float, a: float = 1.0):
@@ -799,30 +796,29 @@ class UniformMesh2d(Mesh, Plotable):
 
         @return 离散矩阵 A
         """
-        rx = a*tau/self.h[0]
-        ry = a*tau/self.h[1]
+        rx = a * tau / self.h[0]
+        ry = a * tau / self.h[1]
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
         n1 = self.ny + 1
         k = np.arange(NN).reshape(n0, n1)
 
-        A = diags([2*(1-rx**2-ry**2)], 0, shape=(NN, NN), format='csr')
+        A = diags([2 * (1 - rx ** 2 - ry ** 2)], 0, shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(rx**2, (NN - n1,))
+        val = np.broadcast_to(rx ** 2, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry**2, (NN - n0, ))
+        val = np.broadcast_to(ry ** 2, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A
-
 
     ## @ingroup FDMInterface
     def wave_operator_implicit(self, tau, a=1, theta=0.25):
@@ -835,49 +831,49 @@ class UniformMesh2d(Mesh, Plotable):
 
         @return 三个离散矩阵 A0, A1, A2，分别对应于不同的时间步
         """
-        rx = a*tau/self.h[0]
-        ry = a*tau/self.h[1]
+        rx = a * tau / self.h[0]
+        ry = a * tau / self.h[1]
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
         n1 = self.ny + 1
         k = np.arange(NN).reshape(n0, n1)
 
-        A0 = diags([1+2*rx**2*theta+2*ry**2*theta], 0, shape=(NN, NN), format='csr')
-        A1 = diags([2*(1-(rx**2+ry**2)*(1-2*theta))], 0, shape=(NN, NN), format='csr')
-        A2 = diags([-(1+2*rx**2*theta+2*ry**2*theta)], 0, shape=(NN, NN), format='csr')
+        A0 = diags([1 + 2 * rx ** 2 * theta + 2 * ry ** 2 * theta], 0, shape=(NN, NN), format='csr')
+        A1 = diags([2 * (1 - (rx ** 2 + ry ** 2) * (1 - 2 * theta))], 0, shape=(NN, NN), format='csr')
+        A2 = diags([-(1 + 2 * rx ** 2 * theta + 2 * ry ** 2 * theta)], 0, shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(-rx**2*theta, (NN-n1, ))
+        val = np.broadcast_to(-rx ** 2 * theta, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(-ry**2*theta, (NN-n0, ))
+        val = np.broadcast_to(-ry ** 2 * theta, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(rx**2*(1-2*theta), (NN-n1, ))
+        val = np.broadcast_to(rx ** 2 * (1 - 2 * theta), (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry**2*(1-2*theta), (NN-n0, ))
+        val = np.broadcast_to(ry ** 2 * (1 - 2 * theta), (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(rx**2*theta, (NN-n1, ))
+        val = np.broadcast_to(rx ** 2 * theta, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry**2*theta, (NN-n0, ))
+        val = np.broadcast_to(ry ** 2 * theta, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -885,29 +881,28 @@ class UniformMesh2d(Mesh, Plotable):
 
         return A0, A1, A2
 
-
     ## @ingroup FDMInterface
     def wave_operator_explicity(self, tau, a=1):
         """
         @brief 用显格式求解波动方程
         """
-        rx = a*tau/self.h[0]
-        ry = a*tau/self.h[1]
+        rx = a * tau / self.h[0]
+        ry = a * tau / self.h[1]
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
         n1 = self.ny + 1
         k = np.arange(NN).reshape(n0, n1)
 
-        A = diags([2*(1 -  rx**2 - ry**2)], [0], shape=(NN, NN), format='csr')
+        A = diags([2 * (1 - rx ** 2 - ry ** 2)], [0], shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(rx**2, (NN - n1,))
+        val = np.broadcast_to(rx ** 2, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry**2, (NN - n0, ))
+        val = np.broadcast_to(ry ** 2, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -915,55 +910,54 @@ class UniformMesh2d(Mesh, Plotable):
 
         return A
 
-
     ## @ingroup FDMInterface
     def wave_operator_theta(self, tau, a=1, theta=0.5):
         """
         @brief 生成波动方程的离散矩阵
         """
-        rx = a*tau/self.h[0]
-        ry = a*tau/self.h[1]
+        rx = a * tau / self.h[0]
+        ry = a * tau / self.h[1]
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1
         n1 = self.ny + 1
         k = np.arange(NN).reshape(n0, n1)
 
-        A0 = diags([1 + 2*rx**2*theta + 2*ry**2*theta], [0], shape=(NN, NN), format='csr')
-        A1 = diags([2*(1 - (rx**2 + ry**2)*(1 - 2*theta))], [0], shape=(NN, NN), format='csr')
-        A2 = diags([-(1 + 2*rx**2*theta + 2*ry**2*theta)], [0], shape=(NN, NN), format='csr')
+        A0 = diags([1 + 2 * rx ** 2 * theta + 2 * ry ** 2 * theta], [0], shape=(NN, NN), format='csr')
+        A1 = diags([2 * (1 - (rx ** 2 + ry ** 2) * (1 - 2 * theta))], [0], shape=(NN, NN), format='csr')
+        A2 = diags([-(1 + 2 * rx ** 2 * theta + 2 * ry ** 2 * theta)], [0], shape=(NN, NN), format='csr')
 
-        val = np.broadcast_to(-rx**2, (NN-n1, ))
+        val = np.broadcast_to(-rx ** 2, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(-ry**2, (NN-n0, ))
+        val = np.broadcast_to(-ry ** 2, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(rx**2*(1 - 2*theta), (NN-n1, ))
+        val = np.broadcast_to(rx ** 2 * (1 - 2 * theta), (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry**2*(1 - 2*theta), (NN-n1, ))
+        val = np.broadcast_to(ry ** 2 * (1 - 2 * theta), (NN - n1,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(rx**2*theta, (NN-n1, ))
+        val = np.broadcast_to(rx ** 2 * theta, (NN - n1,))
         I = k[1:, :].flat
         J = k[0:-1, :].flat
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val = np.broadcast_to(ry**2*theta, (NN-n0, ))
+        val = np.broadcast_to(ry ** 2 * theta, (NN - n0,))
         I = k[:, 1:].flat
         J = k[:, 0:-1].flat
         A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -982,7 +976,7 @@ class UniformMesh2d(Mesh, Plotable):
         m = 2
         nx = self.ds.nx
         ny = self.ds.ny
-        k = nx/ny
+        k = nx / ny
         ns = ny
         h = self.h[0]
 
@@ -995,57 +989,57 @@ class UniformMesh2d(Mesh, Plotable):
         sign = np.sign(phi[1:-1, 1:-1])
 
         # 标记界面附近的点
-        isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
+        isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2 * h
         lsfun = UniformMesh2dFunction(self, phi[1:-1, 1:-1])
         _, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
-        phi[isNearNode] = np.abs(d) #界面附近的点用精确值
+        phi[isNearNode] = np.abs(d)  # 界面附近的点用精确值
         phi[~isNearNode] = m  # 其它点用一个比较大的值
 
-        a = np.zeros(ns+1, dtype=np.float64)
-        b = np.zeros(ns+1, dtype=np.float64)
-        c = np.zeros(ns+1, dtype=np.float64)
-        d = np.zeros(int(k*ns+1), dtype=np.float64)
-        e = np.zeros(int(k*ns+1), dtype=np.float64)
-        f = np.zeros(int(k*ns+1), dtype=np.float64)
+        a = np.zeros(ns + 1, dtype=np.float64)
+        b = np.zeros(ns + 1, dtype=np.float64)
+        c = np.zeros(ns + 1, dtype=np.float64)
+        d = np.zeros(int(k * ns + 1), dtype=np.float64)
+        e = np.zeros(int(k * ns + 1), dtype=np.float64)
+        f = np.zeros(int(k * ns + 1), dtype=np.float64)
 
         n = 0
-        for i in range(1, int(k*ns+2)):
-            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
-            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
-            flag = np.abs(a-b) >= h
+        for i in range(1, int(k * ns + 2)):
+            a[:] = np.minimum(phi[i - 1, 1:-1], phi[i + 1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns + 1], phi[i, 2:])
+            flag = np.abs(a - b) >= h
             c[flag] = np.minimum(a[flag], b[flag]) + h
-            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2 * h * h - (a[~flag] - b[~flag]) ** 2)) / 2
             phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
             n += 1
 
-        for i in range(int(k*ns+1), 0, -1):
-            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
-            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
-            flag = np.abs(a-b) >= h
+        for i in range(int(k * ns + 1), 0, -1):
+            a[:] = np.minimum(phi[i - 1, 1:-1], phi[i + 1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns + 1], phi[i, 2:])
+            flag = np.abs(a - b) >= h
             c[flag] = np.minimum(a[flag], b[flag]) + h
-            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2 * h * h - (a[~flag] - b[~flag]) ** 2)) / 2
             phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
             n += 1
 
-        for j in range(1, ns+2):
-            d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
-            e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
-            flag = np.abs(d-e) >= h
+        for j in range(1, ns + 2):
+            d[:] = np.minimum(phi[0:int(k * ns + 1), j], phi[2:, j])
+            e[:] = np.minimum(phi[1:-1, j - 1], phi[1:-1, j + 1])
+            flag = np.abs(d - e) >= h
             f[flag] = np.minimum(d[flag], e[flag]) + h
-            f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
+            f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2 * h * h - (d[~flag] - e[~flag]) ** 2)) / 2
             phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
             n += 1
 
-        for j in range(ns+1, 0, -1):
-            d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
-            e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
-            flag = np.abs(d-e) >= h
+        for j in range(ns + 1, 0, -1):
+            d[:] = np.minimum(phi[0:int(k * ns + 1), j], phi[2:, j])
+            e[:] = np.minimum(phi[1:-1, j - 1], phi[1:-1, j + 1])
+            flag = np.abs(d - e) >= h
             f[flag] = np.minimum(d[flag], e[flag]) + h
-            f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
+            f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2 * h * h - (d[~flag] - e[~flag]) ** 2)) / 2
             phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
             n += 1
 
-        return sign*phi[1:-1, 1:-1]
+        return sign * phi[1:-1, 1:-1]
 
     ## @ingroup FEMInterface
     def geo_dimension(self):
@@ -1137,7 +1131,7 @@ class UniformMesh2d(Mesh, Plotable):
         TD = self.top_dimension()
         if etype in {'cell', TD}:
             return self.cell_area()
-        elif etype in {'edge', 'face', TD-1}:
+        elif etype in {'edge', 'face', TD - 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
             return np.array(0.0, self.ftype)
@@ -1190,38 +1184,38 @@ class UniformMesh2d(Mesh, Plotable):
         """
         snx = self.ds.nx
         sny = self.ds.ny
-        idx1= np.arange(0,sny+1,2)+np.arange(0,(sny+1)*(snx+1),2*(sny+1)).reshape(-1,1)
+        idx1 = np.arange(0, sny + 1, 2) + np.arange(0, (sny + 1) * (snx + 1), 2 * (sny + 1)).reshape(-1, 1)
         idx1 = idx1.flatten()
-        a = np.array([1,sny+1,sny+2])
-        b = np.arange(0,sny,2).reshape(-1,1)
-        c = np.append(a+b,[(sny+1)*2-1])
-        e = np.arange(0,(sny+1)*snx,2*(sny+1)).reshape(-1,1)
-        idx2 = (e+c).flatten()
-        idx3  = np.arange((sny+1)*snx+1,(snx+1)*(sny+1),2)
-        idx = np.r_[idx1,idx2,idx3]
+        a = np.array([1, sny + 1, sny + 2])
+        b = np.arange(0, sny, 2).reshape(-1, 1)
+        c = np.append(a + b, [(sny + 1) * 2 - 1])
+        e = np.arange(0, (sny + 1) * snx, 2 * (sny + 1)).reshape(-1, 1)
+        idx2 = (e + c).flatten()
+        idx3 = np.arange((sny + 1) * snx + 1, (snx + 1) * (sny + 1), 2)
+        idx = np.r_[idx1, idx2, idx3]
         return idx
 
-    def  s2tidx(self):
+    def s2tidx(self):
         """
         @brief 已知结构四边形网格点的值，将其排列到结构三角形网格上
         @example a[s2tidx] = uh
         """
-        tnx = int(self.ds.nx/2)
-        tny = int(self.ds.ny/2)
-        a = np.arange(tny+1)
-        b = 3*np.arange(tny).reshape(-1,1)+(tnx+1)*(tny+1)
-        idx1 = np.zeros((tnx+1,2*tny+1))#sny+1
-        idx1[:,0::2] = a+np.arange(tnx+1).reshape(-1,1)*(tny+1)
-        idx1[:,1::2] = b.flatten()+np.arange(tnx+1).reshape(-1,1)*(2*tny+1+tny)
-        idx1[-1,1::2] = np.arange((2*tnx+1)*(2*tny+1)-tny,(2*tnx+1)*(2*tny+1))
-        c = np.array([(tnx+1)*(tny+1)+1,(tnx+1)*(tny+1)+2])
-        d = np.arange(tny)*3
-        d = 3*np.arange(tny).reshape(-1,1)+c
-        e = np.append(d.flatten(),[d.flatten()[-1]+1])
-        idx2 = np.arange(tnx).reshape(-1,1)*(2*tny+1+tny)+e
+        tnx = int(self.ds.nx / 2)
+        tny = int(self.ds.ny / 2)
+        a = np.arange(tny + 1)
+        b = 3 * np.arange(tny).reshape(-1, 1) + (tnx + 1) * (tny + 1)
+        idx1 = np.zeros((tnx + 1, 2 * tny + 1))  # sny+1
+        idx1[:, 0::2] = a + np.arange(tnx + 1).reshape(-1, 1) * (tny + 1)
+        idx1[:, 1::2] = b.flatten() + np.arange(tnx + 1).reshape(-1, 1) * (2 * tny + 1 + tny)
+        idx1[-1, 1::2] = np.arange((2 * tnx + 1) * (2 * tny + 1) - tny, (2 * tnx + 1) * (2 * tny + 1))
+        c = np.array([(tnx + 1) * (tny + 1) + 1, (tnx + 1) * (tny + 1) + 2])
+        d = np.arange(tny) * 3
+        d = 3 * np.arange(tny).reshape(-1, 1) + c
+        e = np.append(d.flatten(), [d.flatten()[-1] + 1])
+        idx2 = np.arange(tnx).reshape(-1, 1) * (2 * tny + 1 + tny) + e
 
-        idx = np.c_[idx1[:tnx],idx2]
-        idx = np.append(idx.flatten(),[idx1[-1,:]])
+        idx = np.c_[idx1[:tnx], idx2]
+        idx = np.append(idx.flatten(), [idx1[-1, :]])
         idx = idx.astype(int)
         return idx
 
@@ -1232,8 +1226,8 @@ class UniformMesh2d(Mesh, Plotable):
         dx = self.function(etype='cell')
         dy = self.function(etype='cell')
 
-        dx[:] = (Ex[:, :-1] + Ex[:, 1:])/2.0
-        dy[:] = (Ey[:-1, :] + Ey[1:, :])/2.0
+        dx[:] = (Ex[:, :-1] + Ex[:, 1:]) / 2.0
+        dy[:] = (Ey[:-1, :] + Ey[1:, :]) / 2.0
 
         return dx, dy
 
@@ -1250,8 +1244,8 @@ class UniformMesh2d(Mesh, Plotable):
         NN = self.number_of_nodes()
         idxMap = np.arange(NN)
 
-        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
-                ny+1, 2)
+        idx = np.arange(0, nx * (ny + 1), 2 * (ny + 1)).reshape(-1, 1) + np.arange(0,
+                                                                                   ny + 1, 2)
         idxMap[idx] = range(tmesh.number_of_nodes())
 
         return idxMap
@@ -1268,9 +1262,10 @@ class UniformMesh2d(Mesh, Plotable):
     def compute_cut_point(self, phi):
         """
         """
+        node = self.entity('node')
         edge = self.entity('edge')
         phiSign = msign(phi)
-        isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
+        isCutEdge = phiSign[edge[:, 0]] * phiSign[edge[:, 1]] < 0
         A = node[edge[isCutEdge, 0]]
         B = node[edge[isCutEdge, 1]]
 
@@ -1278,12 +1273,53 @@ class UniformMesh2d(Mesh, Plotable):
         cutNode = find_cut_point(interface, A, B)
         return cutNode
 
+    def find_interface_node(self, phi):
+        N = self.number_of_nodes()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        phiValue = phi(node)
+        # phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
+        phiSign = np.sign(phiValue)
+
+        # 寻找 cut 点
+        edge = self.entity('edge')
+        isCutEdge = phiSign[edge[:, 0]] * phiSign[edge[:, 1]] < 0
+        e0 = node[edge[isCutEdge, 0]]
+        e1 = node[edge[isCutEdge, 1]]
+        cutNode = find_cut_point(phi, e0, e1)
+        ncut = cutNode.shape[0]
+
+        # 界面单元与界面节点
+        isInterfaceCell = self.is_cut_cell(phiValue)
+        isInterfaceNode = np.zeros(N, dtype=np.bool_)
+        isInterfaceNode[cell[isInterfaceCell, :]] = True
+
+        # 需要处理的特殊单元，即界面经过两对顶点的单元
+        isSpecialCell = (np.sum(np.abs(phiSign[cell]), axis=1) == 2) \
+                        & (np.sum(phiSign[cell], axis=1) == 0)
+        scell = cell[isSpecialCell, :]
+
+        # 构建辅助点，即单元重心
+        auxNode = (node[scell[:, 0], :] + node[scell[:, 2], :]) / 2
+        naux = auxNode.shape[0]
+
+        # 拼接界面节点
+        interfaceNode = np.concatenate(
+            (node[isInterfaceNode, :], cutNode, auxNode),
+            axis=0)
+
+        return interfaceNode, isInterfaceNode, isInterfaceCell, ncut, naux
+
+
 UniformMesh2d.set_ploter('2d')
+
 
 class UniformMesh2dFunction():
     def __init__(self, mesh, f):
-        self.mesh = mesh # (nx+1, ny+1)
-        self.f = f   # (nx+1, ny+1)
+        self.mesh = mesh  # (nx+1, ny+1)
+        self.f = f  # (nx+1, ny+1)
         self.fx, self.fy = mesh.gradient(f)
 
     def __call__(self, p):

@@ -1942,8 +1942,8 @@ class TriangleMesh(Mesh2d):
     ## @ingroup MeshGenerators
     @classmethod
     def from_domain_distmesh(cls, domain, hmin, maxit=100):
-        from .DistMesher2d import DistMesher2d 
-        mesher = DistMesher2d(domain, hmin)
+        from .distmesh import DistMesh2d
+        mesher = DistMesher(domain, hmin)
         mesh = mesher.meshing(maxit=maxit)
         return mesh
 
