@@ -96,7 +96,6 @@ class ProvidesSymmetricTangentOperatorIntegrator:
             K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]])
             K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]].transpose(0, 2, 1))
             K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 0)]])
-
         elif space[0].doforder == 'vdims':
             K[:, 0::GD, 0::GD] += np.einsum('i,ijm->ijm', d00, A[imap[(0, 0)]])
             K[:, 0::GD, 0::GD] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]])

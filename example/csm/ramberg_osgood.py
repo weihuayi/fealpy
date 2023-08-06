@@ -107,6 +107,7 @@ class ramberg_osgood_integrator():
         #将切算子矩阵转化为felapy中默认的储存顺序
         M = np.delete(M, 2, axis=1)
         M = np.delete(M, 2, axis=2)
+        M[:, -1, -1] = M[:, -1, -1]/2
         return M
 
     def sigma(self):
