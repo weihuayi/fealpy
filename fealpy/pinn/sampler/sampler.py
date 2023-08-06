@@ -29,7 +29,7 @@ class Sampler():
         self.dtype = dtype
         self.device = device
         self.requires_grad = bool(requires_grad)
-        self._weight = torch.tensor(torch.nan, dtype=self.dtype).broadcast_to(m, 1)
+        self._weight = torch.tensor(torch.nan, dtype=dtype, device=device).broadcast_to(m, 1)
 
     def __and__(self, other):
         if isinstance(other, Sampler):
@@ -160,7 +160,7 @@ class ConstantSampler(Sampler):
         super().__init__(m=0, requires_grad=requires_grad)
         self.value = value
         self.m, self.nd = value.shape
-        self._weight[:] = torch.tensor(0.0, dtype=self.dtype)
+        self._weight[:] = torch.tensor(0.0, dtype=self.dtype, device=value.device)
 
     def run(self) -> Tensor:
         ret = self.value.clone()
@@ -281,7 +281,7 @@ class _MeshSampler(Sampler):
             arr = torch.from_numpy(raw)[:, None]
         else:
             raise TypeError(f"Invalid return from cell_area method.")
-        self._weight = arr.repeat(1, self.m_cell).reshape(-1, 1)
+        self._weight = arr.repeat(1, self.m_cell).reshape(-1, 1).to(device=self.device)
 
     def cell_bc_to_point(self, bcs: NDArray) -> NDArray:
         """
