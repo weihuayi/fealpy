@@ -6,6 +6,13 @@ import os
 
 
 class AutoTest():
+
+    class HyperParams():
+        def __init__(self, data: Dict[str, Any]) -> None:
+            self.__data = data
+        def __getattr__(self, key):
+            return self.__data.get(key, None)
+
     def __init__(self, settings: Dict[str, List]) -> None:
         self.keys = list(settings.keys())
         self.values = [settings[k] for k in self.keys]
@@ -129,7 +136,7 @@ class AutoTest():
             self.print_current_info()
 
             self._time_current = time()
-            yield self.get(*self._state)
+            yield AutoTest.HyperParams(self.as_dict(*self._state))
             print(f"该项结束，用时 {self.item_runtime():.3f} 秒")
             flag = self.next_idx()
 
