@@ -179,7 +179,9 @@ class ISampler(Sampler):
 
         @param m: The number of samples to generate.
         @param ranges: An object that can be converted to a `numpy.ndarray`,\
-                       representing the ranges in each sampling axis.
+                       representing the ranges in each sampling axis.\
+                       For example, if sampling x in [0, 1] and y in [4, 5],\
+                       use `ranges=[[0, 1], [4, 5]]`, or `ranges=[0, 1, 4, 5]`.
         @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param requires_grad: A boolean indicating whether the samples should\
                               require gradient computation. Defaults to `False`.\
@@ -188,14 +190,25 @@ class ISampler(Sampler):
         @throws ValueError: If `ranges` has an unexpected shape.
         """
         super().__init__(m=m, dtype=dtype, device=device, requires_grad=requires_grad)
-        ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
-        if len(ranges_arr.shape) == 2:
+        if isinstance(ranges, Tensor):
+            ranges_arr = ranges.detach().clone().to(device=device)
+        else:
+            ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
+
+        if ranges_arr.ndim == 2:
             self.nd = ranges_arr.shape[0]
+            self.lows = ranges_arr[:, 0].reshape(self.nd, )
+            self.highs = ranges_arr[:, 1].reshape(self.nd, )
+        elif ranges_arr.ndim == 1:
+            self.nd, mod = divmod(ranges_arr.shape[0], 2)
+            if mod != 0:
+                raise ValueError("If `ranges` is 1-dimensional, its length is"
+                                 f"expected to be even, but got {mod}.")
+            self.lows = ranges_arr[::2].reshape(self.nd, )
+            self.highs = ranges_arr[1::2].reshape(self.nd, )
         else:
             raise ValueError(f"Unexpected `ranges` shape {ranges_arr.shape}.")
 
-        self.lows = ranges_arr[:, 0].reshape(1, self.nd)
-        self.highs = ranges_arr[:, 1].reshape(1, self.nd)
         self.deltas = self.highs - self.lows
         self._weight[:] = torch.prod(self.deltas, dtype=self.dtype)
 
@@ -315,6 +328,8 @@ def random_weights(m: int, n: int):
 
 
 class TMeshSampler(_MeshSampler):
+    """Sampler in all homogeneous polytope meshes, such as triangle mesh and\
+        tetrahedron mesh."""
     def run(self) -> Tensor:
         self.bcs = random_weights(self.m_cell, self.NVC)
         ret = self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
