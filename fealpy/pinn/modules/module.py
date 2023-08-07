@@ -1,5 +1,5 @@
 from typing import (
-    Optional, Tuple, Callable, Sequence, Union
+    Optional, Callable, Sequence, Union
 )
 
 import numpy as np
@@ -8,8 +8,8 @@ import torch
 from torch import Tensor, device
 from torch.nn import Module
 
-from ..tools import mkfs, proj
-from ..nntyping import VectorFunction
+from ..tools import proj
+from ..nntyping import VectorFunction, TensorFunction
 
 
 class TensorMapping(Module):
@@ -18,17 +18,33 @@ class TensorMapping(Module):
            is not implemented, override it to build a function.
     """
 
-    def get_device(self):
+    def get_device(self) -> Union[device, None]:
         """
         @brief Get the device of the first parameter in this module. Return `None`\
                if no parameters.
+
+        If no submodule found, try to return `_device` attribute. This attribute\
+        can be set by the `set_device` method.
         """
         for param in self.parameters():
             return param.device
 
-    ### features
+        return getattr(self, '_device', None)
+
+    def set_device(self, device: device):
+        setattr(self, '_device', device)
+
+    ### module
 
     __call__: Callable[..., Tensor]
+
+    def diff(self, target: TensorFunction):
+        """
+        @brief Get a new module whose output is the difference.
+
+        This is useful when drawing the difference.
+        """
+        return DiffSolution(self, target)
 
     def fixed(self, idx: Sequence[int], value: Sequence[float],
                  dtype=torch.float64):
@@ -161,28 +177,60 @@ class TensorMapping(Module):
             return e
         return e.sum(axis=0)
 
+    ### plotting
+
     def meshgrid_mapping(self, *xi: NDArray):
         """
         @brief Calculate the function value in a meshgrid.
 
         @param *xi: ArrayLike. See `numpy.meshgrid`.
 
-        @return: outputs, (X1, X2, ..., Xn)
+        @return: tensor, (X1, X2, ..., Xn). For output having more than one\
+                 feature, return a list instead. Each element is a tensor,\
+                 containing values of a feature in the meshgrid.
         """
+        device_ = self.get_device()
+
         mesh = np.meshgrid(*xi)
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
-        mesh_pt = [torch.from_numpy(x) for x in flat_mesh]
-        pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
+
+        mesh_pt = torch.cat([torch.from_numpy(x) for x in flat_mesh], dim=-1)
+        pt_u: torch.Tensor = self.forward(mesh_pt.to(device=device_))
         u_plot: NDArray = pt_u.cpu().detach().numpy()
         assert u_plot.ndim == 2
         nf = u_plot.shape[-1]
+
         if nf <= 1:
             return u_plot.reshape(mesh[0].shape), mesh
         else:
             return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf, axis=-1)], mesh
 
-    def add_surface(self, axes):
-        pass
+    def add_surface(self, axes, box: Sequence[float], nums: Sequence[int],
+                    out_idx: Sequence[int]=[0, ],
+                    edgecolor='blue', linewidth=0.0003, cmap=None):
+        """
+        @brief Draw a surface for modules having 2 input features.
+
+        @param axes: Axes.
+        @param box: Seuqence[float]. Box of the plotting area. Like `[0, 1, 0, 1]`.
+        @param nums: Sequence[int]. Number of points in x and y direction.
+        @param out_idx: Sequence[int]. Specify the output feature(s) to plot the\
+               surface. Number of surfaces is equal to the number of output features.
+        """
+        from matplotlib import cm
+        if cmap is None:
+            cmap = cm.RdYlBu_r
+
+        x = np.linspace(box[0], box[1], nums[0])
+        y = np.linspace(box[2], box[3], nums[1])
+        u, (X, Y) = self.meshgrid_mapping(x, y)
+        if isinstance(u, list):
+            for idx in out_idx:
+                axes.plot_surface(X, Y, u[idx], cmap=cmap, edgecolor=edgecolor,
+                                  linewidth=linewidth, antialiased=True)
+        else:
+            axes.plot_surface(X, Y, u, cmap=cmap, edgecolor=edgecolor,
+                              linewidth=linewidth, antialiased=True)
 
 
 class ZeroMapping(Module):
@@ -194,7 +242,7 @@ class Solution(TensorMapping):
     """
     @brief A function based on a submodule.
     """
-    def __init__(self, net: Optional[Module]=None) -> None:
+    def __init__(self, net: Optional[TensorFunction]=None) -> None:
         """
         @brief Initialize a function based on a submodule.
                When `net` is a neural network module, this can be regarded as a sulotion of
@@ -212,8 +260,18 @@ class Solution(TensorMapping):
     def net(self):
         return self.__net
 
-    def forward(self, p: Tensor):
+    def forward(self, p: Tensor) -> Tensor:
         return self.__net(p)
+
+
+class DiffSolution(TensorMapping):
+    def __init__(self, fn1: TensorFunction, fn2: TensorFunction) -> None:
+        super().__init__()
+        self.__fn_1 = fn1
+        self.__fn_2 = fn2
+
+    def forward(self, p: Tensor):
+        return self.__fn_1(p) - self.__fn_2(p)
 
 
 class Fixed(Solution):
