@@ -27,9 +27,9 @@ class TestAutotest():
 
         assert len(out) == 18
         assert len(out[0]) == 3
-        assert out[0] == (1, 4, 7)
-        assert out[5] == (3, 5, 7)
-        assert out[17] == (3, 6, 8)
+        assert (out[0].a, out[0].b, out[0].c) == (1, 4, 7)
+        assert (out[5].a, out[5].b, out[5].c) == (3, 5, 7)
+        assert (out[17].a, out[17].b, out[17].c) == (3, 6, 8)
 
     def test_three(self):
         sets = {

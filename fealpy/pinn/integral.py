@@ -18,12 +18,20 @@ def integral(fn: TensorFunction, sampler: Sampler):
 
 
 def linf_error(fn: TensorFunction, target: TensorFunction, sampler: Sampler) -> Tensor:
+    """
+    @brief Estimate L-infinity error between fn and target by Monte Carlo method.
+
+    @note: Functions and the sampler should be in a same device.
+    """
     x = sampler.run()
     delta = fn(x) - target(x)
     return torch.norm(delta, p=torch.inf, dim=0)
 
 
 def l2_error(fn: TensorFunction, target: TensorFunction, sampler: Sampler) -> Tensor:
+    """
+    @brief Estimate L-2 error between fn and target by Monte Carlo method.
+    """
     x = sampler.run()
     delta = fn(x) - target(x)
     w = sampler.weight()

@@ -76,25 +76,47 @@ class ProvidesSymmetricTangentOperatorIntegrator:
         d22 = D[..., 2, 2]
 
         # 默认标量自由度排序优先
-        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d00, A[imap[(0, 0)]])
-        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]])
-        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]].transpose(0, 2, 1))
-        K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(1, 1)]])
-        
-        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]])
-        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
-        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]].transpose(0, 2, 1))
-        K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
-        
-        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]].transpose(0, 2, 1))
-        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
-        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]])
-        K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
-        
-        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d11, A[imap[(1, 1)]])
-        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]])
-        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]].transpose(0, 2, 1))
-        K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 0)]])
+        if space[0].doforder == 'sdofs': # 标量自由度优先排序 
+            K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d00, A[imap[(0, 0)]])
+            K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]])
+            K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, 0:ldof, 0:ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(1, 1)]])
+            
+            K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]])
+            K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
+            K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, 0:ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
+            
+            K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
+            K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
+            K[:, ldof:2*ldof, 0:ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]])
+            
+            K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d11, A[imap[(1, 1)]])
+            K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]])
+            K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, ldof:2*ldof, ldof:2*ldof] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 0)]])
+        elif space[0].doforder == 'vdims':
+            K[:, 0::GD, 0::GD] += np.einsum('i,ijm->ijm', d00, A[imap[(0, 0)]])
+            K[:, 0::GD, 0::GD] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]])
+            K[:, 0::GD, 0::GD] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, 0::GD, 0::GD] += np.einsum('i,ijm->ijm', d22, A[imap[(1, 1)]])
+            
+            K[:, 0::GD, 1::GD] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]])
+            K[:, 0::GD, 1::GD] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
+            K[:, 0::GD, 1::GD] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, 0::GD, 1::GD] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
+            
+            K[:, 1::GD, 0::GD] += np.einsum('i,ijm->ijm', d01, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, 1::GD, 0::GD] += np.einsum('i,ijm->ijm', d12, A[imap[(1, 1)]])
+            K[:, 1::GD, 0::GD] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 1)]])
+            K[:, 1::GD, 0::GD] += np.einsum('i,ijm->ijm', d02, A[imap[(0, 0)]])
+            
+            K[:, 1::GD, 1::GD] += np.einsum('i,ijm->ijm', d11, A[imap[(1, 1)]])
+            K[:, 1::GD, 1::GD] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]])
+            K[:, 1::GD, 1::GD] += np.einsum('i,ijm->ijm', d12, A[imap[(0, 1)]].transpose(0, 2, 1))
+            K[:, 1::GD, 1::GD] += np.einsum('i,ijm->ijm', d22, A[imap[(0, 0)]])
+
 
         if out is None:
             return K

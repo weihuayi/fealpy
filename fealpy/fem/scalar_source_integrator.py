@@ -65,10 +65,12 @@ class ScalarSourceIntegrator():
         if isinstance(val, (int, float)):
             bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
         else:
-            if val.shape[-1] == 1:
-                val = val[..., 0]
-            bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
-
+            if val.shape == (NC, ): 
+                bb += np.einsum('q, c, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
+            else:
+                if val.shape[-1] == 1:
+                    val = val[..., 0]
+                bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
         if out is None:
             return bb 
         
