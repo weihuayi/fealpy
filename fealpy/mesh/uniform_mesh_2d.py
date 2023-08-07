@@ -1256,7 +1256,7 @@ class UniformMesh2d(Mesh, Plotable):
         """
         phiSign = msign(phi)
         cell = self.entity('cell')
-        isCutCell = np.abs(np.sum(phiSign[cell], axis=1)) < 4
+        isCutCell = np.abs(np.sum(phiSign[cell], axis=1)) < 3
         return isCutCell
 
     def compute_cut_point(self, phi):
@@ -1275,12 +1275,12 @@ class UniformMesh2d(Mesh, Plotable):
 
     def find_interface_node(self, phi):
         N = self.number_of_nodes()
+        h = min(self.h)
 
         node = self.entity('node')
-        cell = self.entity('cell')
-
+        cell = self.entity('cell')[:, [0, 2, 3, 1]]
         phiValue = phi(node)
-        # phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
+        phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
         phiSign = np.sign(phiValue)
 
         # 寻找 cut 点
