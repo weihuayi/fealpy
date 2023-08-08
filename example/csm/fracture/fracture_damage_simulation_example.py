@@ -262,51 +262,6 @@ class fracture_damage_integrator():
         D = (D + D.swapaxes(1,2))/2
         return D
 
-    def disp_matrix(self, D):
-        NN = mesh.number_of_nodes()
-        cellmeasure = mesh.entity_measure('cell')
-       
-        qf = mesh.integrator(4, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = space.grad_basis(bcs)
-        
-        C00 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 0], grad[..., 0], cellmeasure)
-        C01 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 0], grad[..., 1], cellmeasure)
-        C11 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 1], grad[..., 1], cellmeasure)
-        C10 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 1], grad[..., 0], cellmeasure)
-
-        D00 = D[:, 0, 0][:, None, None] * C00
-        D00 += D[:, 0, 2][:, None, None] * (C01 + C10)
-        D00 += D[:, 2, 2][:, None, None] * C11
-
-        D01 = D[:, 0, 1][:, None, None] * C01
-        D01 += D[:, 1, 2][:, None, None] * C11
-        D01 += D[:, 0, 2][:, None, None] * C00
-        D01 += D[:, 2, 2][:, None, None] * C10
-
-        D10 = D[:, 0, 1][:, None, None] * C10
-        D10 += D[:, 1, 2][:, None, None] * C11
-        D10 += D[:, 0, 2][:, None, None] * C00
-        D10 += D[:, 2, 2][:, None, None] * C01
-
-        D11 = D[:, 1, 1][:, None, None] * C11
-        D11 += D[:, 1, 2][:, None, None] * (C01 + C10)
-        D11 += D[:, 2, 2][:, None, None] * C00
-
-        cell = mesh.entity('cell')
-        shape = D00.shape
-        I = np.broadcast_to(cell[:, None, :], shape=shape)
-        J = np.broadcast_to(cell[:, :, None], shape=shape)
-
-        D00 = csr_matrix((D00.flat, (I.flat, J.flat)), shape=(NN, NN))
-        D01 = csr_matrix((D01.flat, (I.flat, J.flat)), shape=(NN, NN))
-        D10 = csr_matrix((D10.flat, (I.flat, J.flat)), shape=(NN, NN))
-        D11 = csr_matrix((D11.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-        return bmat([[D00, D01], [D10, D11]], format='csr')
-
-
-
 
 model = Brittle_Facture_model()
 
@@ -323,20 +278,19 @@ space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
 
 d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
-#H = space.function()
 uh = space.function(dim=GD)
 du = space.function(dim=GD)
-dd = space.function()
 disp = model.top_boundary_disp()
+
+
 for i in range(len(disp)):
     node  = mesh.entity('node') 
     isTNode = model.is_top_boundary(node)
     uh[1, isTNode] = disp[i]
     isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
-    print('disp:', disp[i])
 
     k = 0
-    while k < 20:
+    while k < 50:
         print('i:', i)
         print('k:', k)
         
@@ -345,12 +299,10 @@ for i in range(len(disp)):
         ubform = BilinearForm(GD*(space, ))
 
         D = simulation.dsigma_depsilon(d, uh)
-        print('DDD:', D)
         integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
         ubform.add_domain_integrator(integrator)
         ubform.assembly()
         A0 = ubform.get_matrix()
-#        AA = simulation.disp_matrix(D)
         R0 = -A0@uh.flat[:]
         
         ubc = DirichletBC(vspace, 0, threshold=model.is_inter_boundary)
@@ -371,7 +323,6 @@ for i in range(len(disp)):
         strain = simulation.strain(uh)
         phip, _ = simulation.strain_energy_density_decomposition(strain)
         H[:] = np.fmax(H, phip)
-        print('H:', H)
 
         # 计算相场模型
         dbform = BilinearForm(space)
@@ -401,12 +352,12 @@ for i in range(len(disp)):
         print("error1:", error1)
         error = max(error0, error1)
         print("error:", error)
-        if error < 1e-9:
-            mesh.nodedata['damage'] = d
-            mesh.nodedata['uh'] = uh.T
-            fname = 'test' + str(i).zfill(10)  + '.vtu'
-            mesh.to_vtk(fname=fname)
+        if error < 1e-6:
             break
+        mesh.nodedata['damage'] = d
+        mesh.nodedata['uh'] = uh.T
+        fname = 'test' + str(i).zfill(10)  + '.vtu'
+        mesh.to_vtk(fname=fname)
         k += 1
 
 

@@ -109,7 +109,7 @@ class fracture_damage_integrator():
         # 初始化局部变量
         mgis_bv.update(m0) # 更新材料数据
         eto = self.strain(uh)
-        m0.s0.internal_state_variables[:, 0] = H
+#        m0.s0.internal_state_variables[:, 0] = H
         m0.s1.gradients[:] = eto
 
     def disp_tangent_matrix(self):
@@ -118,18 +118,32 @@ class fracture_damage_integrator():
         dt = 0.0 
         mgis_bv.integrate(m0, it, dt, 0, m0.n)
         M = m0.K
-        print('MMM:', M)
         #将切算子矩阵转化为felapy中默认的储存顺序
         M = np.delete(M, 2, axis=1)
         M = np.delete(M, 2, axis=2)
         M[:, -1, -1] = M[:, -1, -1]/2
-        print('MMM:', M)
         return M
     
     def history_function(self):
         m0 = self._m0
         H = m0.s1.internal_state_variables[:, 0]
         return H
+    
+    def get_stored_energy(self):
+        m0 = self._m0
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        val = m0.s1.stored_energies
+        stored = np.dot(val, cm)
+        return stored
+
+    def get_dissipated_energy(self):
+        m1 = self._m1
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        val = m1.s1.dissipated_energies
+        dissp = np.dot(val, cm)
+        return dissp
 
     def strain(self, uh):
         """
@@ -153,7 +167,7 @@ class fracture_damage_integrator():
         val += np.sum(uh[:, 1][cell] * gphi[:, :, 0], axis=-1)
         val /= 2.0
         s[:, 3] = val
-        s[:, 2] = 0
+        s[:, 2] = val
         return s
 
     def build_damage_mfront(self):
@@ -191,10 +205,7 @@ class fracture_damage_integrator():
         dt = 0.0 
         mgis_bv.integrate(m1, it, dt, 0, m1.n)
         M1 = m1.K
-        print('DDDD:', M1)
-        print('DDDD:', M1.shape)
-        return M1
-    
+        return M1[:, 0], M1[:, -1] 
 
 model = Brittle_Facture_model()
 
@@ -214,58 +225,103 @@ d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 uh = space.function(dim=GD)
 du = space.function(dim=GD)
-dd = space.function()
 disp = model.top_boundary_disp()
-#for i in range(len(disp)):
-node  = mesh.entity('node') 
-isTNode = model.is_top_boundary(node)
-uh[1, isTNode] = disp[0]
-isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
+stored_energy = np.zeros_like(disp)
+dissipated_energy = np.zeros_like(disp)
+for i in range(len(disp)):
+    node  = mesh.entity('node') 
+    isTNode = model.is_top_boundary(node)
+    uh[1, isTNode] = disp[i]
+    isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
 
-#    k = 0
-#    while k < 20:
-#        print('i:', i)
-#        print('k:', k)
+    k = 0
+    while k < 20:
+        print('i:', i)
+        print('k:', k)
 
-# 位移
-simulation.update_disp_mfront(uh, H, d)
-D0 = simulation.disp_tangent_matrix()
+        # 位移
+        simulation.update_disp_mfront(uh, H, d)
+        D0 = simulation.disp_tangent_matrix()
 
-vspace = (GD*(space, ))
-ubform = BilinearForm(GD*(space, ))
+        vspace = (GD*(space, ))
+        ubform = BilinearForm(GD*(space, ))
 
-integrator = ProvidesSymmetricTangentOperatorIntegrator(D0, q=4)
-ubform.add_domain_integrator(integrator)
-ubform.assembly()
-A0 = ubform.get_matrix()
-R0 = -A0@uh.flat[:]
+        integrator = ProvidesSymmetricTangentOperatorIntegrator(D0, q=4)
+        ubform.add_domain_integrator(integrator)
+        ubform.assembly()
+        A0 = ubform.get_matrix()
+        R0 = -A0@uh.flat[:]
 
-ubc = DirichletBC(vspace, 0, threshold=model.is_inter_boundary)
-A0, R0 = ubc.apply(A0, R0)
+        ubc = DirichletBC(vspace, 0, threshold=model.is_inter_boundary)
+        A0, R0 = ubc.apply(A0, R0)
 
-# 位移边界条件处理
-bdIdx = np.zeros(A0.shape[0], dtype=np.int_)
-bdIdx[isTDof] =1
-Tbd =spdiags(bdIdx, 0, A0.shape[0], A0.shape[0])
-T = spdiags(1-bdIdx, 0, A0.shape[0], A0.shape[0])
-A0 = T@A0@T + Tbd
-R0[isTDof] = du.flat[isTDof]
+        # 位移边界条件处理
+        bdIdx = np.zeros(A0.shape[0], dtype=np.int_)
+        bdIdx[isTDof] =1
+        Tbd =spdiags(bdIdx, 0, A0.shape[0], A0.shape[0])
+        T = spdiags(1-bdIdx, 0, A0.shape[0], A0.shape[0])
+        A0 = T@A0@T + Tbd
+        R0[isTDof] = du.flat[isTDof]
 
-du.flat[:] = spsolve(A0, R0)
-uh[:] += du
+        du.flat[:] = spsolve(A0, R0)
+        uh[:] += du
 
-# 更新最大历史应变场
-H = simulation.history_function()
-print(H)
-# 相场
-simulation.update_damage_mfront(H, d)
-D1 = simulation.damage_tangent_matrix()
+        # 更新最大历史应变场
+        H = simulation.history_function()
+        
+        # 相场
+        simulation.update_damage_mfront(H, d)
+        c0, c1 = simulation.damage_tangent_matrix()
+        dbform = BilinearForm(space)
+        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=c0))
+        dbform.add_domain_integrator(ScalarMassIntegrator(c=c1))
+        dbform.assembly()
+        A1 = dbform.get_matrix()
+
+        lform = LinearForm(space)
+        lform.add_domain_integrator(ScalarSourceIntegrator(2*H))
+        lform.assembly()
+        R1 = lform.get_vector()
+        R1 -= A1@d[:]
+        dbc = DirichletBC(space, 0, threshold=model.is_inter_boundary)
+        A1, R1 = dbc.apply(A1, R1)
+        d[:] += spsolve(A1, R1)
+        
+        # 计算残量误差
+        if k == 0:
+            er0 = np.linalg.norm(R0)
+            er1 = np.linalg.norm(R1)
+        error0 = np.linalg.norm(R0)/er0
+        print("error0:", error0)
+
+        error1 = np.linalg.norm(R1)/er1
+        print("error1:", error1)
+        error = max(error0, error1)
+        print("error:", error)
+        if error < 1e-9:
+            break
+        mesh.nodedata['damage'] = d
+        mesh.nodedata['uh'] = uh.T
+        fname = 'test' + str(i).zfill(10)  + '.vtu'
+        mesh.to_vtk(fname=fname)
+        
+        stored_energy[i] = simulation.get_stored_energy()
+        dissipated_energy[i] = simulation.get_dissipated_energy()
+
+        k += 1
 
 
-
-fig = plt.figure()
-axes = fig.add_subplot(111)
+fig1 = plt.figure()
+axes = fig1.add_subplot(111)
 mesh.node += uh[:, :NN].T
 mesh.add_plot(axes)
 plt.show()
 
+plt.figure()
+plt.plot(disp, stored_energy, label='stored_energy', marker='o')
+plt.plot(disp, dissipated_energy, label='dissipated_energy', marker='s')
+plt.xlabel('disp')
+plt.ylabel('energy')
+plt.grid(True)
+plt.legend()
+plt.show()
