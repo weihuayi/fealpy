@@ -47,27 +47,29 @@ class ConformingVectorVEML2Projector2d():
             cedge[:, 0] = cell[i]
             cedge[:-1, 1] = cell[i][1:]
             cedge[-1, -1] = cell[i][0] 
-
-
-            qf = GaussLobattoQuadrature(p + 1) # NQ
+            qf = GaussLobattoQuadrature(p + 2) # NQ
             bcs, ws = qf.quadpts, qf.weights
+
+            qf0 = GaussLobattoQuadrature(p+1)
+            phi = space.edge_basis(qf0.quadpts[:, 0], qf.quadpts[:, 0])
+            phi = np.tile(phi, (NV[i], 1, 1))
+
             ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p+1)
             v = node[cedge[:, 1]] - node[cedge[:, 0]]
             w = np.array([(0, -1), (1, 0)])
             nm = v@w
-            C11 = np.einsum('ijk, jl, i->kjil',smphi, nm, ws)
-
-            idx = np.zeros((C11.shape[1:]), dtype=np.int_)
+            CC1 = np.einsum('ijk, jim, jl, i->kjml', smphi, phi, nm, ws)
+            
+            idx = np.zeros((NV[i], p+1, 2), dtype=np.int_)
             idx1 = np.arange(0, NV[i]*2*p, 2*p).reshape(-1, 1) + np.arange(0, 2*p+1, 2)
             idx1[-1, -1] = 0
             idx[:, :, 0] = idx1
             idx[:, :, 1] = idx1+1
-
-            C1 = np.zeros(((p+2)*(p+3)//2, ldof[i]), dtype=np.float64)
-            np.add.at(C1, (np.s_[:], idx), C11)
-            C1 = A[i]@C1
+            CCC1 = np.zeros(((p+2)*(p+3)//2, ldof[i]), dtype=np.float64)
+            np.add.at(CCC1, (np.s_[:], idx), CC1)
+            C1 = A[i]@CCC1
 
             C2 = A[i]@M[i, :, :p*(p+1)//2]@K[i]
 
@@ -75,10 +77,12 @@ class ConformingVectorVEML2Projector2d():
             C3[:(p-1)*(p-2)//2, 2*p*NV[i]:2*p*NV[i]+(p-1)*(p-2)//2] = cellarea[i] * np.eye(((p-1)*(p-2)//2))
             C3[(p-2)*(p-1)//2:, :] = C31[i]@PI1[i]
             C3 = J@C3
-            CC = C1+C2+C3
+            CC = C1-C2+C3
             C.append(CC) 
         return C 
+
     def integrator(self, space: ConformingVectorVESpace2d):
+
         """
         @brief 计算上面矩阵的第三部分
         """
@@ -96,19 +100,16 @@ class ConformingVectorVEML2Projector2d():
             cedge[:-1, 1] = cell[i][1:]
             cedge[-1, -1] = cell[i][0] 
 
-            qf = GaussLegendreQuadrature(p+1) # NQ
+            qf = GaussLegendreQuadrature(p+2) # NQ
             bcs, ws = qf.quadpts, qf.weights
             ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p-1)[:, :, (p-2)*(p-1)//2:]
             t = np.zeros((ws.shape[0], NV[i], 2))
-            if p==1:
-                smphi1 = space.smspace.basis(ps, index=index, p=1)
-                t[:, :, 0] = smphi1[:, :, 2]
-                t[:, :, 1] = -smphi1[:, :, 1]
-            else:
-                t[:, :, 0] = smphi[:, :, 2]
-                t[:, :, 1] = -smphi[:, :, 1]
+
+            smphi1 = space.smspace.basis(ps, index=index, p=1)
+            t[:, :, 0] = smphi1[:, :, 2]
+            t[:, :, 1] = -smphi1[:, :, 1]
 
             vmphi = space.vmspace.basis(ps, index=index, p=p)
             H = np.einsum('ijl,ijk,ijml,i->jkm', t, smphi, vmphi, ws) #(NV[i], , 2*ldof)

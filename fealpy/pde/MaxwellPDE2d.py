@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.mesh import TriangleMesh, MeshFactory
+from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian, barycentric
 import sympy as sym
 from sympy.vector import CoordSys3D, Del, curl
@@ -129,7 +129,7 @@ class SinData(MaxwellPDE2d):
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):
         box = [0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh2d(box, nx=nx, ny=ny, meshtype=meshtype)
+        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         return mesh
 
 

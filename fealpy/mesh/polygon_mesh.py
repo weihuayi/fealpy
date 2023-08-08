@@ -828,6 +828,60 @@ class PolygonMesh(Mesh, Plotable):
         a /=2
         return a
 
+
+    @classmethod
+    def interfacemesh_generator(cls, box, nx, ny, phi):
+        """
+        @brief
+
+        @param
+        @param
+        @param
+        """
+        from scipy.spatial import Delaunay
+        from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+
+        mesh = UniformMesh2d((0, nx, 0, ny), ((box[1] - box[0]) / nx, (box[3] - box[2]) / ny), (box[0], box[2]))
+
+        interfaceNode, isInterfaceNode, isInterfaceCell, ncut, naux = mesh.find_interface_node(phi)
+
+        N = mesh.number_of_nodes()
+        cell = mesh.entity('cell')[:, [0, 2, 3, 1]]
+        node = mesh.entity('node')
+
+        dt = Delaunay(interfaceNode)
+        tri = dt.simplices
+        NI = np.sum(isInterfaceNode)
+        isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
+        tri = tri[~isUnnecessaryCell, :]
+
+        interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
+        interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode)
+        interfaceNodeIdx[NI:NI + ncut] = N + np.arange(ncut)
+        interfaceNodeIdx[NI + ncut:] = N + ncut + np.arange(naux)
+        tri = interfaceNodeIdx[tri]
+
+        NS = np.sum(~isInterfaceCell)
+        NT = tri.shape[0]
+        pnode = np.concatenate((node, interfaceNode[NI:]), axis=0)
+        pcell = np.zeros(NS * 4 + NT * 3, dtype=np.int)
+        pcellLocation = np.zeros(NS + NT + 1, dtype=np.int)
+
+        sview = pcell[:4 * NS].reshape(NS, 4)
+        sview[:] = cell[~isInterfaceCell, :]
+
+        tview = pcell[4 * NS:].reshape(NT, 3)
+        tview[:] = tri
+        pcellLocation[:NS] = range(0, 4 * NS, 4)
+        pcellLocation[NS:-1] = range(4 * NS, 4 * NS + 3 * NT, 3)
+        pcellLocation[-1] = 4 * NS + 3 * NT
+        pmesh = cls(pnode, pcell, pcellLocation)
+
+        return pmesh
+
 PolygonMesh.set_ploter('polygon2d')
 
 

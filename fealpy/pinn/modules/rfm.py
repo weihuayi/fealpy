@@ -155,17 +155,17 @@ class RandomFeatureFlat(TensorMapping):
         self.partions: List[LocalRandomFeature] = []
         self.pou = PoUSin(keepdim=True)
 
-        for _ in range(self.number_of_partitions()):
-            self.partions.append(
-                LocalRandomFeature(
+        for i in range(self.number_of_partitions()):
+            part = LocalRandomFeature(
                     in_dim=in_dim,
                     nf=nlrf,
                     bound=bound,
                     activate=activate,
                     dtype=centers.dtype,
                     device=centers.device
-                )
             )
+            self.partions.append(part)
+            self.add_module(f"part_{i}", part)
 
         self.gc = torch.mean(centers, dim=0)
         cmax, _ = torch.max(centers, dim=0)
