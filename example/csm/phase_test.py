@@ -22,8 +22,8 @@ from fealpy.csm.mfront import compile_mfront_file
 
 class Brittle_Facture_model():
     def __init__(self):
-        self.E = 210 # 杨氏模量
-        self.nu = 0.3 # 泊松比
+        self.E = 200 # 杨氏模量
+        self.nu = 0.2 # 泊松比
         self.Gc = 1 # 材料的临界能量释放率
         self.l0 = 0.02 # 尺度参数，断裂裂纹的宽度
 
@@ -63,7 +63,7 @@ class Brittle_Facture_model():
         -----
         内部圆周的点为 DirichletBC，相场值和位移均为 0
         """
-        return np.abs((p[..., 0]-0.5)**2 + np.abs(p[..., 1]-0.5)**2 - 0.04) < 0.001
+        return np.abs((p[..., 0]-0.5)**2 + np.abs(p[..., 1]-0.5)**2 - 0.04) < 0.05
     
     def is_below_boundary(self, p):
         """
@@ -105,11 +105,11 @@ class fracture_damage_integrator():
         bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         mgis_bv.setExternalStateVariable(m0.s1, "Damage", d(bc),
                 mgis_bv.MaterialStateManagerStorageMode.EXTERNAL_STORAGE) #设置外部状态变量
+        m0.s0.internal_state_variables[:, 0] = H
 
         # 初始化局部变量
         mgis_bv.update(m0) # 更新材料数据
         eto = self.strain(uh)
-#        m0.s0.internal_state_variables[:, 0] = H
         m0.s1.gradients[:] = eto
 
     def disp_tangent_matrix(self):
@@ -159,7 +159,7 @@ class fracture_damage_integrator():
         val += np.sum(uh[:, 1][cell] * gphi[:, :, 0], axis=-1)
         val /= 2.0
         s[:, 3] = val
-        s[:, 2] = val
+        s[:, 2] = 0
         return s
 
     def build_damage_mfront(self):
@@ -188,8 +188,8 @@ class fracture_damage_integrator():
         mgis_bv.update(m1) # 更新材料数据
         bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         g = d.grad_value(bc)
-        m1.s1.gradients[:, 0] = d(bc)
-        m1.s1.gradients[:, 1:] = g
+        m1.s0.gradients[:, 0] = d(bc)
+        m1.s0.gradients[:, 1:] = g
     
     def damage_tangent_matrix(self):
         m1 = self._m1
@@ -235,7 +235,7 @@ for i in range(len(disp)):
     isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
 
     k = 0
-    while k < 20:
+    while k < 30:
         print('i:', i)
         print('k:', k)
 
@@ -246,7 +246,7 @@ for i in range(len(disp)):
         vspace = (GD*(space, ))
         ubform = BilinearForm(GD*(space, ))
 
-        integrator = ProvidesSymmetricTangentOperatorIntegrator(D0, q=1)
+        integrator = ProvidesSymmetricTangentOperatorIntegrator(D0, q=4)
         ubform.add_domain_integrator(integrator)
         ubform.assembly()
         A0 = ubform.get_matrix()
@@ -273,13 +273,13 @@ for i in range(len(disp)):
         simulation.update_damage_mfront(H, d)
         c0, c1 = simulation.damage_tangent_matrix()
         dbform = BilinearForm(space)
-        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=c0))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=c1))
+        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=c0, q=4))
+        dbform.add_domain_integrator(ScalarMassIntegrator(c=c1, q=4))
         dbform.assembly()
         A1 = dbform.get_matrix()
 
         lform = LinearForm(space)
-        lform.add_domain_integrator(ScalarSourceIntegrator(2*H))
+        lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
         lform.assembly()
         R1 = lform.get_vector()
         R1 -= A1@d[:]
@@ -298,7 +298,7 @@ for i in range(len(disp)):
         print("error1:", error1)
         error = max(error0, error1)
         print("error:", error)
-        if error < 1e-9:
+        if error < 1e-7:
             break
         k += 1
     mesh.nodedata['damage'] = d

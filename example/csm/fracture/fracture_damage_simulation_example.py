@@ -290,7 +290,7 @@ for i in range(len(disp)):
     isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
 
     k = 0
-    while k < 50:
+    while k < 100:
         print('i:', i)
         print('k:', k)
         
@@ -326,14 +326,15 @@ for i in range(len(disp)):
 
         # 计算相场模型
         dbform = BilinearForm(space)
-        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0))
+        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
+            q=4))
+        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
 #        dbform.add_domain_integrator(ScalarMassIntegrator(c=model.Gc/model.l0))
         dbform.assembly()
         A1 = dbform.get_matrix()
 
         lform = LinearForm(space)
-        lform.add_domain_integrator(ScalarSourceIntegrator(2*H))
+        lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
         lform.assembly()
         R1 = lform.get_vector()
         R1 -= A1@d[:]
@@ -352,7 +353,7 @@ for i in range(len(disp)):
         print("error1:", error1)
         error = max(error0, error1)
         print("error:", error)
-        if error < 1e-6:
+        if error < 1e-5:
             break
         k += 1
     mesh.nodedata['damage'] = d
