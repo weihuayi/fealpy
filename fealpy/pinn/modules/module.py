@@ -32,6 +32,9 @@ class TensorMapping(Module):
         return getattr(self, '_device', None)
 
     def set_device(self, device: device):
+        """
+        @brief Set the default device. This can NOT set devices for submodules.
+        """
         setattr(self, '_device', device)
 
     ### module
@@ -173,8 +176,8 @@ class TensorMapping(Module):
         e = np.einsum('q, qc..., c -> c...', ws, diff, cellmeasure)
 
         if cell_type:
-            return np.sqrt(e, out=e)
-        return np.sqrt(e.sum(axis=0))
+            return np.power(e, 1/power, out=e)
+        return np.power(e.sum(axis=0), 1/power)
 
     ### plotting
 
