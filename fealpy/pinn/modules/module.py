@@ -239,16 +239,9 @@ class ZeroMapping(Module):
 
 class Solution(TensorMapping):
     """
-    @brief A function based on a submodule.
+    @brief Wrap a tensor function to be a TensorMapping object.
     """
     def __init__(self, net: Optional[TensorFunction]=None) -> None:
-        """
-        @brief Initialize a function based on a submodule.
-               When `net` is a neural network module, this can be regarded as a sulotion of
-               PDEs in PINN models.
-
-        @param net: A Module in torch. Defaults to `None`.
-        """
         super().__init__()
         if net:
             self.__net = net
@@ -274,7 +267,7 @@ class DiffSolution(TensorMapping):
 
 
 class Fixed(Solution):
-    def __init__(self, net: Module,
+    def __init__(self, net: TensorFunction,
                  idx: Sequence[int],
                  values: Sequence[float],
                  dtype=torch.float64
@@ -304,7 +297,7 @@ class Fixed(Solution):
 
 
 class Extracted(Solution):
-    def __init__(self, net: Module,
+    def __init__(self, net: TensorFunction,
                  idx: Sequence[int]
         ) -> None:
         """
@@ -321,7 +314,7 @@ class Extracted(Solution):
 
 
 class Projected(Solution):
-    def __init__(self, net: Module,
+    def __init__(self, net: TensorFunction,
                  comps: Sequence[Union[None, Tensor, float]]) -> None:
         """
         @brief Project the input features of `net` into a sub space, as a wrapped module.\
