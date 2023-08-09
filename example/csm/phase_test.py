@@ -137,14 +137,6 @@ class fracture_damage_integrator():
         stored = np.dot(val, cm)
         return stored
 
-    def get_dissipated_energy(self):
-        m1 = self._m1
-        mesh = self.mesh
-        cm = mesh.entity_measure('cell')
-        val = m1.s1.dissipated_energies
-        dissp = np.dot(val, cm)
-        return dissp
-
     def strain(self, uh):
         """
         @brief 给定一个位移，计算相应的应变，这里假设是线性元
@@ -207,6 +199,14 @@ class fracture_damage_integrator():
         M1 = m1.K
         return M1[:, 0], M1[:, -1] 
 
+    def get_dissipated_energy(self):
+        m1 = self._m1
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        val = m1.s1.dissipated_energies
+        dissp = np.dot(val, cm)
+        return dissp
+
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
@@ -246,7 +246,7 @@ for i in range(len(disp)):
         vspace = (GD*(space, ))
         ubform = BilinearForm(GD*(space, ))
 
-        integrator = ProvidesSymmetricTangentOperatorIntegrator(D0, q=4)
+        integrator = ProvidesSymmetricTangentOperatorIntegrator(D0, q=1)
         ubform.add_domain_integrator(integrator)
         ubform.assembly()
         A0 = ubform.get_matrix()
@@ -300,15 +300,15 @@ for i in range(len(disp)):
         print("error:", error)
         if error < 1e-9:
             break
-        mesh.nodedata['damage'] = d
-        mesh.nodedata['uh'] = uh.T
-        fname = 'test' + str(i).zfill(10)  + '.vtu'
-        mesh.to_vtk(fname=fname)
-        
-        stored_energy[i] = simulation.get_stored_energy()
-        dissipated_energy[i] = simulation.get_dissipated_energy()
-
         k += 1
+    mesh.nodedata['damage'] = d
+    mesh.nodedata['uh'] = uh.T
+    fname = 'test' + str(i).zfill(10)  + '.vtu'
+    mesh.to_vtk(fname=fname)
+    
+    stored_energy[i] = simulation.get_stored_energy()
+    dissipated_energy[i] = simulation.get_dissipated_energy()
+
 
 
 fig1 = plt.figure()

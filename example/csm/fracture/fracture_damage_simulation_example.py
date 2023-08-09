@@ -327,8 +327,8 @@ for i in range(len(disp)):
         # 计算相场模型
         dbform = BilinearForm(space)
         dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=model.Gc/model.l0))
+        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0))
+#        dbform.add_domain_integrator(ScalarMassIntegrator(c=model.Gc/model.l0))
         dbform.assembly()
         A1 = dbform.get_matrix()
 
@@ -354,11 +354,11 @@ for i in range(len(disp)):
         print("error:", error)
         if error < 1e-6:
             break
-        mesh.nodedata['damage'] = d
-        mesh.nodedata['uh'] = uh.T
-        fname = 'test' + str(i).zfill(10)  + '.vtu'
-        mesh.to_vtk(fname=fname)
         k += 1
+    mesh.nodedata['damage'] = d
+    mesh.nodedata['uh'] = uh.T
+    fname = 'test' + str(i).zfill(10)  + '.vtu'
+    mesh.to_vtk(fname=fname)
 
 
 fig = plt.figure()
