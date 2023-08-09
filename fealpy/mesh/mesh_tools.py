@@ -231,7 +231,7 @@ def show_halfedge_mesh(axes, mesh,
     halfedge = mesh.entity('halfedge')
 
     p1 = node[halfedge[:, 0]]
-    p0 = node[halfedge[halfedge[:, 4], 0]]
+    p0 = node[halfedge[halfedge[:, 3], 0]]
 
     w = np.array([(0,1),(-1,0)])
     v = p1 - p0

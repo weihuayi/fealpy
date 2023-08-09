@@ -5,7 +5,13 @@ import sympy as sym
 from sympy.vector import CoordSys3D, Del, curl
 
 class MaxwellPDE():
-    def __init__(self, f):
+    def __init__(self, f, beta=1, k=1):
+        """
+        @brief 求解方程 
+                             curl curl E - beta E = J     Omega
+                                       n \times E = g     Gamma0
+                 n \times (curl E + k n \times E) = f     Gamma1
+        """
         C = CoordSys3D('C')
         x = sym.symbols("x")
         y = sym.symbols("y")
@@ -37,6 +43,9 @@ class MaxwellPDE():
         self.curlcurlFx = sym.lambdify(('x', 'y', 'z'), ccfx, "numpy")
         self.curlcurlFy = sym.lambdify(('x', 'y', 'z'), ccfy, "numpy")
         self.curlcurlFz = sym.lambdify(('x', 'y', 'z'), ccfz, "numpy")
+
+        self.beta = beta
+        self.k = k
 
     def solution(self, p):
         x = p[..., 0, None]
@@ -89,11 +98,12 @@ class MaxwellPDE():
         if type(ccFz) is not np.ndarray:
             ccFz = np.ones(x.shape, dtype=np.float_)*ccFz
         ccf = np.c_[ccFx, ccFy, ccFz] 
-        return ccf - self.solution(p)
+        return ccf - self.beta*self.solution(p)
 
     @cartesian
-    def dirichlet(self, p):
-        return self.solution(p)
+    def dirichlet(self, p, n):
+        val = self.solution(p)
+        return np.cross(n, val)
 
     @cartesian
     def neumann(self, p, n):
@@ -116,30 +126,47 @@ class MaxwellPDE():
         cf = np.c_[cFx, cFy, cFz] #(..., NC, ldof, 3)
         return np.cross(n[None, :], cf)
 
+    def robin(self, p, n):
+        """!
+        @param p: (..., N, ldof, 3)
+        @param n: (N, 3)
+        """
+        cf = self.curl_solution(p)
+        fval = self.solution(p)
+        return np.cross(n[None, :], cf + self.k*np.cross(n[None, :], fval))
+
     def boundary_type(self, mesh):
         bdface = mesh.ds.boundary_face_index()
         f2n = mesh.face_unit_normal()[bdface]
-        neumannbd = np.abs(f2n[:, 2])<0.9
-        bd = {"neumann": bdface[neumannbd], "dirichlet": bdface[~neumannbd]}
+        isLeftBd   = np.abs(f2n[:, 0]+1)<1e-14
+        isRightBd  = np.abs(f2n[:, 0]-1)<1e-14
+        isFrontBd  = np.abs(f2n[:, 1]+1)<1e-14
+        isBackBd   = np.abs(f2n[:, 1]-1)<1e-14
+        isBottomBd = np.abs(f2n[:, 2]+1)<1e-14
+        isUpBd     = np.abs(f2n[:, 2]-1)<1e-14
+        bd = {"left": bdface[isLeftBd], "right": bdface[isRightBd], 
+              "front": bdface[isFrontBd], "back": bdface[isBackBd], 
+              "up": bdface[isUpBd], "bottom": bdface[isBottomBd], }
         return bd
 
 class SinData(MaxwellPDE):
-    def __init__(self):
+    def __init__(self, beta=1, k=1):
         C = CoordSys3D('C')
         #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.x*sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.z*C.k 
-        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        f = sym.sin(sym.pi*C.z)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.y)*C.k 
         #f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
         #f = C.y*C.i + 2*C.x*C.j + C.z*C.k
 
         #f = (C.x**2-C.x)**2*(C.y**2-C.y)**2*(C.z**2-C.z)**2
         #f = f*C.i + sym.sin(C.x)*f*C.j + sym.sin(C.y)*f*C.k
-        super(SinData, self).__init__(f)
+        super(SinData, self).__init__(f, beta, k)
 
     def init_mesh(self, n=1):
-        box = [0, 1, 0, 1, 0, 1]
+        box = [0, 1/2, 0, 1/2, 0, 1/2]
+        #box = [0, 1, 0, 1, 0, 1]
         mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
