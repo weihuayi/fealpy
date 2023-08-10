@@ -17,7 +17,7 @@ TensorOrArray = Union[Tensor, NDArray]
 
 TensorFunction = Callable[[Tensor], Tensor]
 VectorFunction = Callable[[NDArray], NDArray]
-Operator = Callable[[Tensor, TensorFunction], Tensor]
+Operator = Callable[[Tensor, Tensor], Tensor]
 
 
 class GeneralSampler(Protocol):

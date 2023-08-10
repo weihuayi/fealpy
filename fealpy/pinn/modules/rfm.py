@@ -7,6 +7,7 @@ from torch import Tensor
 from torch.nn import Module, Parameter, init, Linear
 from torch.nn.parameter import Parameter
 
+from ..nntyping import Operator
 from .linear import MultiLinear, StackStd
 from .module import TensorMapping
 
@@ -216,3 +217,16 @@ class RandomFeatureFlat(TensorMapping):
             x = std[:, i, :] # (N, d)
             ret += self.partions[i](x) * self.pou(x) # (N, 1)
         return ret # (N, 1)
+
+    def scale(self, p: Tensor, operator: Operator):
+        """
+        @brief Return the scale by basis and operator.
+        """
+        MP = self.number_of_partitions()
+        std = self.std(p)
+        partition_max = torch.zeros((MP, ), dtype=self.dtype)
+        for i in range(MP):
+            x = std[:, i, :]
+            psiphi = self.partions[i].basis_val(p=x) * self.pou(x) # (N, nf)
+            partition_max[i] = torch.max(operator(p, psiphi))
+        return torch.max(partition_max)

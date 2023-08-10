@@ -32,6 +32,9 @@ class TensorMapping(Module):
         return getattr(self, '_device', None)
 
     def set_device(self, device: device):
+        """
+        @brief Set the default device. This can NOT set devices for submodules.
+        """
         setattr(self, '_device', device)
 
     ### module
@@ -118,17 +121,16 @@ class TensorMapping(Module):
         return func
 
     def estimate_error(self, other: VectorFunction, mesh=None, power: int=2, q: int=3,
-                       split: bool=False, coordtype: str='b', squeeze: bool=False):
+                       cell_type: bool=False, coordtype: str='b', squeeze: bool=False):
         """
-        @brief Calculate error between the solution and `other` in finite element space `space`. Use this when all\
-               parameters are in CPU memory.
+        @brief Calculate error between the solution and `other` in finite element space `space`.
 
         @param other: VectorFunction. The function(target) to be compared with.
         @param mesh: MeshLike, optional. A mesh in which the error is estimated. If `other` is a function in finite\
                      element space, use mesh of the space instead and this parameter will be ignored.
         @param power: int. Defaults to 2, which means to measure L-2 error by default.
         @param q: int. The index of quadratures.
-        @param split: bool. Split error values from each cell if `True`, and the shape of return will be (NC, ...)\
+        @param cell_type: bool. Split error values from each cell if `True`, and the shape of return will be (NC, ...)\
                       where 'NC' refers to number of cells, and '...' is the shape of function output. If `False`,\
                       the output has the same shape to the funtion output. Defaults to `False`.
         @param coordtype: `'barycentric'`(`'b'`) or `'cartesian'`(`'c'`). Defaults to `'b'`. This parameter will be\
@@ -156,14 +158,14 @@ class TensorMapping(Module):
         if coordtype in {'cartesian', 'c'}:
 
             ps = mesh.cell_bc_to_point(bcs)
-            val = self.from_numpy(ps).detach().numpy()
+            val = self.from_numpy(ps).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
             diff = np.abs(val - other(ps))**power
 
         elif coordtype in {'barycentric', 'b'}:
 
-            val = self.from_cell_bc(bcs, mesh).detach().numpy()
+            val = self.from_cell_bc(bcs, mesh).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
             diff = np.abs(val - other(bcs))**power
@@ -173,9 +175,9 @@ class TensorMapping(Module):
 
         e = np.einsum('q, qc..., c -> c...', ws, diff, cellmeasure)
 
-        if split:
-            return e
-        return e.sum(axis=0)
+        if cell_type:
+            return np.power(e, 1/power, out=e)
+        return np.power(e.sum(axis=0), 1/power)
 
     ### plotting
 
@@ -240,16 +242,9 @@ class ZeroMapping(Module):
 
 class Solution(TensorMapping):
     """
-    @brief A function based on a submodule.
+    @brief Wrap a tensor function to be a TensorMapping object.
     """
     def __init__(self, net: Optional[TensorFunction]=None) -> None:
-        """
-        @brief Initialize a function based on a submodule.
-               When `net` is a neural network module, this can be regarded as a sulotion of
-               PDEs in PINN models.
-
-        @param net: A Module in torch. Defaults to `None`.
-        """
         super().__init__()
         if net:
             self.__net = net
@@ -275,7 +270,7 @@ class DiffSolution(TensorMapping):
 
 
 class Fixed(Solution):
-    def __init__(self, net: Module,
+    def __init__(self, net: TensorFunction,
                  idx: Sequence[int],
                  values: Sequence[float],
                  dtype=torch.float64
@@ -305,7 +300,7 @@ class Fixed(Solution):
 
 
 class Extracted(Solution):
-    def __init__(self, net: Module,
+    def __init__(self, net: TensorFunction,
                  idx: Sequence[int]
         ) -> None:
         """
@@ -322,7 +317,7 @@ class Extracted(Solution):
 
 
 class Projected(Solution):
-    def __init__(self, net: Module,
+    def __init__(self, net: TensorFunction,
                  comps: Sequence[Union[None, Tensor, float]]) -> None:
         """
         @brief Project the input features of `net` into a sub space, as a wrapped module.\
