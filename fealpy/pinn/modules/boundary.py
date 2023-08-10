@@ -157,7 +157,25 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
 
         elif self.GD == 3:
             raise NotImplementedError
+        
+class BoxNBCSolution(Solution, _BCSetter, _BoxSetter):
+    """
+    @brief A solution of problems with dirichlet boundary conditions in a box area.\
+           This is based on Theory of Functional Connection in 1d, 2d and 3d.
 
+    @note !Not Fully Implemented! Now only 1d and 2d are supported.
+    """
+    def __init__(self, net: Optional[Module] = None, time_idx: Optional[int]=None) -> None:
+        super().__init__(net)
+        self._time_idx = time_idx
+
+    def _space_fn(self, p: Tensor):
+        if self._time_idx is None:
+            return self.__net
+        else:
+            comps: List[Optional[Tensor]] = [None] * p.shape[-1]
+            comps[self._time_idx] = p[..., self._time_idx:self._time_idx+1]
+            return Projected(self.__net, comps=comps)
 
 ### old implementations
 def mkf(length: int, *inputs: Union[Tensor, float]):
