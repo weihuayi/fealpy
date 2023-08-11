@@ -3,9 +3,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from fealpy.pinn.modules import Solution
+from fealpy.ml.modules import Solution
 from fealpy.mesh import TriangleMesh
-from fealpy.pinn.tools import mkfs
+from fealpy.ml.tools import mkfs
 
 
 class TestMachine():

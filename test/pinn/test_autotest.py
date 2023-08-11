@@ -1,5 +1,5 @@
 
-from fealpy.pinn.hyperparams import AutoTest
+from fealpy.ml.hyperparams import AutoTest
 
 
 class TestAutotest():

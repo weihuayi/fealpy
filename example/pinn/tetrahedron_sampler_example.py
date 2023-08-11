@@ -1,11 +1,11 @@
 
 from matplotlib import pyplot as plt
 
-from fealpy.mesh import MeshFactory as Mf
-from fealpy.pinn.sampler import TetrahedronMeshSampler
+from fealpy.mesh import TetrahedronMesh
+from fealpy.ml.sampler import TetrahedronMeshSampler
 
 
-mesh = Mf.boxmesh3d([0, 1, 0, 1, 0, 1], nx=1, ny=1, nz=1, meshtype='tet')
+mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=1, ny=1, nz=1)
 sampler = TetrahedronMeshSampler(100, mesh)
 result = sampler.run()
 

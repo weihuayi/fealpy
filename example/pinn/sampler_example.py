@@ -1,16 +1,14 @@
 
-from fealpy.pinn.sampler import (
+from fealpy.ml.sampler import (
     TriangleMeshSampler,
-    ISampler,
-    JoinedSampler,
-    HybridSampler
+    ISampler
 )
-from fealpy.mesh import MeshFactory as Mf
+from fealpy.mesh import TriangleMesh
 
 
 print('1. 使用 TriangleMeshSampler 从三角形网格中取得样本（如图）')
 
-mesh = Mf.boxmesh2d([0, 1, 0, 1], nx=2, ny=2)
+mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=2)
 
 tms = TriangleMeshSampler(3, mesh=mesh)
 samples = tms.run()

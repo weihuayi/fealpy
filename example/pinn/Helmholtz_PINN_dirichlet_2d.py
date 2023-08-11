@@ -1,13 +1,18 @@
+
 import time
+
 import numpy as np
+from numpy.typing import NDArray
 import torch
 import torch.nn as nn
-from fealpy.mesh import TriangleMesh 
-from fealpy.pinn.grad import gradient
-from fealpy.pinn.modules import BoxDBCSolution
-from fealpy.pinn.sampler import  ISampler
-from matplotlib import pyplot as plt
 from torch.optim import Adam
+from matplotlib import pyplot as plt
+
+from fealpy.mesh import TriangleMesh
+from fealpy.ml.grad import gradient
+from fealpy.ml.modules import BoxDBCSolution
+from fealpy.ml.sampler import  ISampler
+
 
 num_of_point_pde = 50
 lr = 0.01
@@ -51,7 +56,7 @@ def c_real(p: torch.Tensor) -> torch.Tensor:
     c = torch.complex(torch.cos(k), torch.sin(
         k))/torch.complex(torch.special.bessel_j0(k), torch.special.bessel_j1(k))/k
     val -= c*torch.special.bessel_j0(k*r)
-    
+
     return torch.real(val)
 
 s_imag = BoxDBCSolution(net_imag)
@@ -68,7 +73,7 @@ def c(p: torch.Tensor) -> torch.Tensor:
     c = torch.complex(torch.cos(k), torch.sin(
         k))/torch.complex(torch.special.bessel_j0(k), torch.special.bessel_j1(k))/k
     val -= c*torch.special.bessel_j0(k*r)
-    
+
     return torch.imag(val)
 
 # 选择优化器和损失函数
@@ -96,12 +101,12 @@ def solution(p: torch.Tensor) -> torch.Tensor:
     val -= c*torch.special.bessel_j0(k*r)
     return val
 
-def solution_numpy_real(p: torch.Tensor):
+def solution_numpy_real(p: NDArray):
     sol = solution(torch.tensor(p))
     ret = torch.real(sol)
     return ret.detach().numpy()
 
-def solution_numpy_imag(p: torch.Tensor):
+def solution_numpy_imag(p: NDArray):
     sol = solution(torch.tensor(p))
     ret = torch.imag(sol)
     return ret.detach().numpy()
@@ -133,7 +138,7 @@ def pde_real(p: torch.Tensor) -> torch.Tensor:
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
-    
+
     u_x_real, u_y_real = gradient(torch.real(u), p, create_graph=True, split=True)
     u_x_imag, u_y_imag = gradient(torch.imag(u), p, create_graph=True, split=True)
     u_xx_real, _ = gradient(u_x_real, p, create_graph=True, split=True)
@@ -186,7 +191,7 @@ for epoch in range(iteration+1):
     mse_pde_real = mse_cost_func(outpde_real, torch.zeros_like(outpde_real))
     mse_pde_imag = mse_cost_func(outpde_imag, torch.zeros_like(outpde_imag))
 
-    loss = 0.5*mse_pde_real + 0.5*mse_pde_imag 
+    loss = 0.5*mse_pde_real + 0.5*mse_pde_imag
 
     loss.backward(retain_graph=True)
     optim_real.step()
@@ -195,7 +200,7 @@ for epoch in range(iteration+1):
     if epoch % 10 == 0:
         error_real = s_real.estimate_error(solution_numpy_real, mesh, coordtype='c')
         error_imag = s_imag.estimate_error(solution_numpy_imag, mesh, coordtype='c')
-        
+
         Error_real.append(error_real)
         Error_imag.append(error_imag)
 

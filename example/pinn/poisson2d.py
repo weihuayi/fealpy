@@ -1,12 +1,14 @@
-from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh import MeshFactory as Mf
-from fealpy.pinn import LearningMachine, gradient
-from fealpy.pinn.modules import Solution
-from fealpy.pinn.sampler import BoxBoundarySampler, TriangleMeshSampler
 
 import torch
 import torch.nn as nn
 import numpy as np
+
+from fealpy.pde.poisson_2d import CosCosData
+from fealpy.mesh import TriangleMesh
+from fealpy.ml import LearningMachine, gradient
+from fealpy.ml.modules import Solution
+from fealpy.ml.sampler import BoxBoundarySampler, TriangleMeshSampler
+
 
 class RecCosh(nn.Module):
     r"""Uses the element-wise activation function.
@@ -39,7 +41,7 @@ def bc(x: torch.Tensor, phi):
     return phi(x) - pde.dirichlet(x).unsqueeze(-1)
 
 
-mesh = Mf.boxmesh2d([0, 1, 0, 1], nx=10, ny=10)
+mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
 optim = torch.optim.Adam(pinn.parameters(), lr=0.01, weight_decay=0)
 s = Solution(pinn)
 lm = LearningMachine(s)
@@ -65,7 +67,7 @@ for epoch in range(1200):
 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
-mesh2 = Mf.boxmesh2d([0, 1, 0, 1], nx=10, ny=10)
+mesh2 = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
 space = LagrangeFiniteElementSpace(mesh2)
 error = s.estimate_error(pde.solution, mesh2, squeeze=True)
 

@@ -1,4 +1,4 @@
-from typing import Callable
+
 from time import time
 
 import numpy as np
@@ -7,12 +7,12 @@ from torch import nn
 from torch.nn import Sequential, Linear, Tanh
 from torch.autograd import Variable
 
-from fealpy.pinn import (
+from fealpy.ml import (
     LearningMachine,
     ISampler,
     grad_by_fts
 )
-from fealpy.pinn.modules import Solution
+from fealpy.ml.modules import Solution
 
 ### Load Feature Line Model
 
@@ -146,13 +146,13 @@ print(f"求解用时：{t2 - t1}")
 
 ### Estimate error
 
-from fealpy.mesh import MeshFactory as MF
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.functionspace.Function import Function
 
 
 domain = [0, 1, 0, 1]
-mesh = MF.boxmesh2d(domain, nx=100, ny=100, meshtype='tri')
+mesh = TriangleMesh.from_box(domain, nx=100, ny=100)
 space = LagrangeFiniteElementSpace(mesh, p=5)
 phi0 = Function(space, array=np.load('LevelSet2d_5.npy'))
 

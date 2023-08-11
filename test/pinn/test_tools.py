@@ -1,6 +1,6 @@
 
 import torch
-from fealpy.pinn.tools import mkfs
+from fealpy.ml.tools import mkfs
 
 
 class TestMkfs():
