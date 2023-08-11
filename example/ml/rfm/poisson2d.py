@@ -9,10 +9,10 @@ from torch.nn import MSELoss
 from torch.optim import Adam
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.pinn.modules import RandomFeatureFlat, ScaledMSELoss
-from fealpy.pinn.sampler import BoxBoundarySampler, get_mesh_sampler
-from fealpy.pinn.grad import gradient
-from fealpy.pinn.integral import linf_error
+from fealpy.ml.modules import RandomFeatureFlat, ScaledMSELoss
+from fealpy.ml.sampler import BoxBoundarySampler, get_mesh_sampler
+from fealpy.ml.grad import gradient
+from fealpy.ml.integral import linf_error
 from fealpy.mesh import UniformMesh2d
 
 

@@ -1,13 +1,17 @@
+
+import time
+
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.special import bessel_y0
-from fealpy.pinn.modules import Solution
-from fealpy.pinn.sampler import BoxBoundarySampler
 from torch.optim import Adam
-from fealpy.mesh import TriangleMesh
 from matplotlib import pyplot as plt
-import numpy as np
-import time
+
+from fealpy.ml.modules import Solution
+from fealpy.ml.sampler import BoxBoundarySampler
+from fealpy.mesh import TriangleMesh
+
 
 #方程形式
 """
@@ -24,7 +28,7 @@ iteration = 200
 class PIKF_layer(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-    
+
     def kernel_func(self, p:torch.Tensor) ->torch.Tensor:
 
         a = p[:, None, :] - source_nodes[None, :, :]
@@ -32,7 +36,7 @@ class PIKF_layer(nn.Module):
         val = bessel_y0(torch.sqrt(torch.tensor(200)) * r)/(2 * torch.pi)
 
         return val
-    
+
     def forward(self, p:torch.Tensor) ->torch.Tensor:
         return self.kernel_func(p)
 
@@ -76,7 +80,7 @@ def bc(p:torch.Tensor) ->torch.Tensor:
     return u - solution(p)
 
 #构建网格
-mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx = 320,ny = 320 )
+mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx = 320,ny = 320)
 
 # 训练过程
 start_time = time.time()

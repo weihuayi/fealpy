@@ -1,13 +1,13 @@
 
 import torch
-from fealpy.pinn.sampler import (
+from fealpy.ml.sampler import (
     ISampler,
     BoxBoundarySampler,
     get_mesh_sampler,
     TMeshSampler,
     QuadrangleMeshSampler
 )
-from fealpy.pinn.sampler.sampler import JoinedSampler, HybridSampler
+from fealpy.ml.sampler.sampler import JoinedSampler, HybridSampler
 
 
 def _valified_range(t: torch.Tensor, low, high):

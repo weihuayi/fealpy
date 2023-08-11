@@ -61,5 +61,5 @@ __pycache__
 *.mp4
 *.vtr
 *.pkl
-.mypy_cache/*
+.mypy_cache/
 *.so

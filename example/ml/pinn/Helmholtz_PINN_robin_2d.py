@@ -1,13 +1,17 @@
 import time
+
 import numpy as np
+from numpy.typing import NDArray
 import torch
 import torch.nn as nn
-from fealpy.mesh import TriangleMesh 
-from fealpy.pinn.grad import gradient
-from fealpy.pinn.modules import Solution
-from fealpy.pinn.sampler import BoxBoundarySampler, ISampler
-from matplotlib import pyplot as plt
 from torch.optim import Adam
+from matplotlib import pyplot as plt
+
+from fealpy.mesh import TriangleMesh
+from fealpy.ml.grad import gradient
+from fealpy.ml.modules import Solution
+from fealpy.ml.sampler import BoxBoundarySampler, ISampler
+
 
 # 超参数
 num_of_point_pde = 100
@@ -70,12 +74,12 @@ def solution(p: torch.Tensor) -> torch.Tensor:
     val -= c*torch.special.bessel_j0(k*r)
     return val
 
-def solution_numpy_real(p: torch.Tensor):
+def solution_numpy_real(p: NDArray):
     sol = solution(torch.tensor(p))
     ret = torch.real(sol)
     return ret.detach().numpy()
 
-def solution_numpy_imag(p: torch.Tensor):
+def solution_numpy_imag(p: NDArray):
     sol = solution(torch.tensor(p))
     ret = torch.imag(sol)
     return ret.detach().numpy()
@@ -189,10 +193,10 @@ for epoch in range(iteration+1):
 
         error_real = s_1.estimate_error(solution_numpy_real, mesh, coordtype='c')
         error_imag = s_2.estimate_error(solution_numpy_imag, mesh, coordtype='c')
-        
+
         Error_real.append(error_real)
         Error_imag.append(error_imag)
-        
+
         print(f"Epoch: {epoch}, Loss: {loss}")
         print(f"Error_real:{error_real}, Error_imag:{error_imag}")
         print('\n')

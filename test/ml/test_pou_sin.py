@@ -1,6 +1,6 @@
 import torch
 from fealpy.mesh import UniformMesh2d
-from fealpy.pinn.modules import PoUSin, StackStd, TensorMapping, PoU
+from fealpy.ml.modules import PoUSin, StackStd, TensorMapping, PoU
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
