@@ -13,6 +13,8 @@ from fealpy.ml.sampler import BoxBoundarySampler, get_mesh_sampler, ISampler
 from fealpy.ml.integral import linf_error
 from fealpy.mesh import TriangleMesh
 
+from  uniformly_placed import uniformed_nodes
+
 #方程形式
 """
     \Delta u(x,y) + 200 * u(x,y) = 0 ,   (x,y)\in \Omega
@@ -21,10 +23,10 @@ from fealpy.mesh import TriangleMesh
 """
 
 #超参数
-NN = 400
-NS = 400
+NN = 480
+NS = 480
 lr = 0.1
-iteration = 3000
+iteration = 2500
 
 class PIKF_layer(nn.Module):
     def __init__(self, source: Tensor) -> None:
@@ -40,10 +42,8 @@ class PIKF_layer(nn.Module):
 
     def forward(self, p: Tensor) -> torch.Tensor:
         return self.kernel_func(p)
-    
-sampler_s = BoxBoundarySampler(int(NS/4), [-2.5, -2.5], [2.5, 2.5], requires_grad=True)
-pikf_layer = PIKF_layer(sampler_s.run())
 
+pikf_layer = PIKF_layer(uniformed_nodes(-2.5, 2.5, NS))
 #定义PIKFNN的网络结构
 net_PIKFNN = nn.Sequential(
                            pikf_layer,
@@ -59,10 +59,11 @@ net_PIKFNN.apply(init_weights)
 #网络实例化
 s = Solution(net_PIKFNN)
 
-#定义优化器、采样器、损失函数
+#定义优化器、采样器、损失函数、网格
 optim = Adam(s.parameters(), lr = lr, betas=(0.9, 0.999) )
 sampler = BoxBoundarySampler(int(NN/4), [-1, -1], [1, 1], requires_grad=True)
 mse_cost_func = nn.MSELoss(reduction='mean')
+
 
 mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx=80, ny=80)
 sampler_err = get_mesh_sampler(10, mesh)
@@ -92,7 +93,8 @@ Loss = []
 for epoch in range(iteration):
 
     optim.zero_grad()
-    nodes_on_bc = sampler.run()
+    # nodes_on_bc = sampler.run()
+    nodes_on_bc = uniformed_nodes(-1, 1, NN)
     out_bc = bc(nodes_on_bc, s(nodes_on_bc))
 
     mse_bc = mse_cost_func(out_bc, torch.zeros_like(out_bc))
