@@ -10,12 +10,11 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 
 from fealpy.ml.modules import Solution
-from fealpy.ml.sampler import BoxBoundarySampler, get_mesh_sampler, ISampler
+from fealpy.ml.sampler import BoxBoundarySampler, get_mesh_sampler
 from fealpy.ml.integral import linf_error
 from fealpy.mesh import TriangleMesh
 
-from  uniformly_placed import uniformed_nodes
-
+from uniformly_placed import sample_points_on_square
 #方程形式
 """
     \Delta u(x,y) + 200 * u(x,y) = 0 ,   (x,y)\in \Omega
@@ -28,6 +27,7 @@ NN = 80
 NS = 80
 lr = 0.1
 iteration = 10000
+k = torch.tensor(200) #波数
 
 #PIKF层
 class PIKF_layer(nn.Module):
@@ -38,14 +38,14 @@ class PIKF_layer(nn.Module):
     def kernel_func(self, input: torch.Tensor) ->torch.Tensor:
         a = input[:, None, :] - self.source_nodes[None, :, :]
         r = torch.sqrt((a[..., 0:1]**2 + a[..., 1:2]**2).view(input.shape[0], -1))
-        val = bessel_y0(torch.sqrt(torch.tensor(200)) * r)/(2 * torch.pi)
+        val = bessel_y0(torch.sqrt(k) * r)/(2 * torch.pi)
 
         return val
 
     def forward(self, p: Tensor) -> torch.Tensor:
         return self.kernel_func(p)
     
-pikf_layer = PIKF_layer(uniformed_nodes(-2.5, 2.5, NS))#源点在虚假边界上采样
+pikf_layer = PIKF_layer(sample_points_on_square(-2.5, 2.5, NS))#源点在虚假边界上采样
 
 #PIKFNN的网络结构
 net_PIKFNN = nn.Sequential(
@@ -74,12 +74,7 @@ def solution(p:torch.Tensor) -> torch.Tensor:
     x = p[...,0:1]
     y = p[...,1:2]
 
-    return torch.sin(10*x + 10*y)
-
-def solution_numpy(p:np.ndarray) -> np.ndarray:
-
-    sol = solution(torch.tensor(p))
-    return sol.detach().numpy()
+    return torch.sin(torch.sqrt(k/2)*x + torch.sqrt(k/2)*y)
 
 #边界条件
 def bc(p:torch.Tensor, u) -> torch.Tensor:
@@ -93,11 +88,14 @@ sampler_err = get_mesh_sampler(10, mesh)
 start_time = time.time()
 Error = []
 Loss = []
+L2_Error = []
+
+nodes_on_bc = sample_points_on_square(-1, 1, NN)
 
 for epoch in range(iteration):
 
     optim.zero_grad()
-    nodes_on_bc = uniformed_nodes(-1, 1, NN)
+    
     out_bc = bc(nodes_on_bc, s(nodes_on_bc))
 
     mse_bc = mse_cost_func(out_bc, torch.zeros_like(out_bc))
@@ -110,13 +108,19 @@ for epoch in range(iteration):
     if epoch % 50 == 49:
 
         error = linf_error(s, solution, sampler=sampler_err)
+        L2_error = torch.sqrt(
+                               torch.sum((s(nodes_on_bc) - solution(nodes_on_bc))**2, dim = 0)\
+                              /torch.sum(solution(nodes_on_bc)**2, dim = 0)
+                             )
         Loss.append(loss.detach().numpy())
         Error.append(error.detach().numpy())
+        L2_Error.append(L2_error.detach().numpy())
 
         print(f"Epoch: {epoch+1}, Loss: {loss}")
         print(f"Error: {error}")
+        print(f"L2_Error: {L2_error}")
         print('\n')
-
+    
 end_time = time.time()     
 training_time = end_time - start_time   
 print("训练时间为：", training_time, "秒")
