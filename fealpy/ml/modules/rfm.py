@@ -226,7 +226,7 @@ class RandomFeatureUnit(TensorMapping):
                                 self.linear.weight[: idx[0]],
                                 self.linear.weight[: idx[1]])
         else:
-            raise ValueError("Derivatives higher than order 2 cannot be obtained。")
+            raise ValueError("Derivatives higher than order 2 cannot be obtained.")
 
 
 class LocalRandomFeature(RandomFeatureUnit):
@@ -284,6 +284,28 @@ class LocalRandomFeature(RandomFeatureUnit):
           * torch.einsum("nf, fd, fd -> nf", torch.cos(l),
                          self.linear.weight, self.linear.weight)
         return a + b + c
+
+    def basis_derivative(self, p: Tensor, *idx: int):
+        order = len(idx)
+        if order == 0:
+            return self.basis_value(p)
+        elif order == 1:
+            l = self.linear(p)
+            a = torch.einsum("n, nf -> nf", self.pou.gradient(p)[:, idx[0]], torch.cos(l))
+            b = -self.pou(p)\
+            * torch.einsum("nf, f -> nf", torch.sin(l), self.linear.weight[:, idx[0]])
+            return a + b
+        elif order == 2:
+            l = self.linear(p)
+            a = torch.einsum("n, nf -> nf", self.pou.hessian(p)[:, idx[0], idx[1]], torch.cos(l))
+            b = -2 * torch.einsum("n, nf, f -> nf", self.pou.gradient(p)[:, idx[0]],
+                                torch.sin(l), self.linear.weight[:, idx[1]])
+            c = -self.pou(p)\
+            * torch.einsum("nf, f, f -> nf", torch.cos(l),
+                            self.linear.weight[:, idx[0]], self.linear.weight[:, idx[1]])
+            return a + b + c
+        else:
+            raise ValueError("Derivatives higher than order 2 cannot be obtained.")
 
 
 class RandomFeature(TensorMapping):
@@ -386,22 +408,9 @@ class RandomFeature(TensorMapping):
             partition_max[idx] = torch.max(operator(p, psiphi))
         return torch.max(partition_max)
 
-    def matrix(self, content: str, input: Tensor):
-        if content in {'v', 'val', 'value'}:
-            key = 'basis_value'
-        elif content in {'g', 'grad', 'gradient'}:
-            key = 'basis_gradient'
-        elif content in {'h', 'hessian'}:
-            key = 'basis_hessian'
-        elif content in {'l', 'laplace'}:
-            key = 'basis_laplace'
-        else:
-            raise ValueError(f"Invalid content type '{content}'.")
-
     def basis_value(self, p: Tensor):
         """
-        @brief Return a matrix containing basis values of each sample, with\
-               shape (N, M), where M is total local basis.
+        @brief Return values of all basis functions.
 
         @note: This API is designed for the least squares method, therefore the\
                result does not require grad.
@@ -420,6 +429,9 @@ class RandomFeature(TensorMapping):
     U = basis_value
 
     def basis_laplace(self, p: Tensor):
+        """
+        @brief Return values of the Laplacian applied to all basis functions.
+        """
         N = p.shape[0]
         M = self.number_of_basis()
         Jn = self.nlrf
@@ -432,3 +444,22 @@ class RandomFeature(TensorMapping):
         return ret
 
     L = basis_laplace
+
+    def basis_derivative(self, p: Tensor, *idx: int):
+        """
+        @brief Return the partial derivatives of all basis functions\
+               with respect to the specified independent variables.
+        """
+        order = len(idx)
+        N = p.shape[0]
+        M = self.number_of_basis()
+        Jn = self.nlrf
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.get_device())
+        std = self.std(p)
+        for i, part in enumerate(self.partions):
+            x = std[:, i, :]
+            flag = part.flag(x) # Only take samples inside the supporting area
+            ret[flag, i*Jn:(i+1)*Jn] = part.basis_derivative(x[flag, ...], *idx)/self.std.radius[i]**order
+        return ret
+
+    D = basis_derivative

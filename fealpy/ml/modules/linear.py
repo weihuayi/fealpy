@@ -24,10 +24,7 @@ class StackStd(Module):
     def __init__(self, centers: Tensor, radius: Tensor, device=None):
         super().__init__()
         self.centers = Parameter(centers.to(device=device), requires_grad=False)
-        self.radius = Parameter(
-            torch.tensor(radius, device=self.centers.device),
-            requires_grad=False
-        )
+        self.radius = Parameter(radius.to(device=device), requires_grad=False)
 
     def forward(self, p: Tensor):
         return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, None]
