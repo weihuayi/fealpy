@@ -1,12 +1,13 @@
 import time
 
 import numpy as np
+from matplotlib import pyplot as plt
 import torch
 from torch import Tensor
 import torch.nn as nn
 from torch.special import bessel_y0
 from torch.optim import Adam
-from matplotlib import pyplot as plt
+from torch.optim.lr_scheduler import StepLR
 
 from fealpy.ml.modules import Solution
 from fealpy.ml.sampler import BoxBoundarySampler, get_mesh_sampler, ISampler
@@ -22,19 +23,20 @@ from  uniformly_placed import uniformed_nodes
 
 """
 
-#超参数
-NN = 480
-NS = 480
+#超参数(配置点个数、源点个数、学习率、迭代次数)
+NN = 80
+NS = 80
 lr = 0.1
-iteration = 2500
+iteration = 10000
 
+#PIKF层
 class PIKF_layer(nn.Module):
-    def __init__(self, source: Tensor) -> None:
+    def __init__(self, source_nodes: Tensor) -> None:
         super().__init__()
-        self.source = source
+        self.source_nodes = source_nodes
 
     def kernel_func(self, input: torch.Tensor) ->torch.Tensor:
-        a = input[:, None, :] - self.source[None, :, :]
+        a = input[:, None, :] - self.source_nodes[None, :, :]
         r = torch.sqrt((a[..., 0:1]**2 + a[..., 1:2]**2).view(input.shape[0], -1))
         val = bessel_y0(torch.sqrt(torch.tensor(200)) * r)/(2 * torch.pi)
 
@@ -42,9 +44,10 @@ class PIKF_layer(nn.Module):
 
     def forward(self, p: Tensor) -> torch.Tensor:
         return self.kernel_func(p)
+    
+pikf_layer = PIKF_layer(uniformed_nodes(-2.5, 2.5, NS))#源点在虚假边界上采样
 
-pikf_layer = PIKF_layer(uniformed_nodes(-2.5, 2.5, NS))
-#定义PIKFNN的网络结构
+#PIKFNN的网络结构
 net_PIKFNN = nn.Sequential(
                            pikf_layer,
                            nn.Linear(NS, 1, dtype=torch.float64, bias=False)
@@ -59,14 +62,11 @@ net_PIKFNN.apply(init_weights)
 #网络实例化
 s = Solution(net_PIKFNN)
 
-#定义优化器、采样器、损失函数、网格
+#优化算法、采样器、损失函数、采用学习率衰减策略
 optim = Adam(s.parameters(), lr = lr, betas=(0.9, 0.999) )
 sampler = BoxBoundarySampler(int(NN/4), [-1, -1], [1, 1], requires_grad=True)
 mse_cost_func = nn.MSELoss(reduction='mean')
-
-
-mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx=80, ny=80)
-sampler_err = get_mesh_sampler(10, mesh)
+scheduler = StepLR(optim, step_size=2000, gamma=0.85)
 
 #真解
 def solution(p:torch.Tensor) -> torch.Tensor:
@@ -85,7 +85,11 @@ def solution_numpy(p:np.ndarray) -> np.ndarray:
 def bc(p:torch.Tensor, u) -> torch.Tensor:
     return u - solution(p)
 
-# 训练过程
+#构建网格用于计算误差
+mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx=100, ny=100)
+sampler_err = get_mesh_sampler(10, mesh)
+
+# 训练网络
 start_time = time.time()
 Error = []
 Loss = []
@@ -93,7 +97,6 @@ Loss = []
 for epoch in range(iteration):
 
     optim.zero_grad()
-    # nodes_on_bc = sampler.run()
     nodes_on_bc = uniformed_nodes(-1, 1, NN)
     out_bc = bc(nodes_on_bc, s(nodes_on_bc))
 
@@ -102,8 +105,9 @@ for epoch in range(iteration):
 
     loss.backward(retain_graph=True)
     optim.step()
+    scheduler.step()
 
-    if epoch % 20 == 19:
+    if epoch % 50 == 49:
 
         error = linf_error(s, solution, sampler=sampler_err)
         Loss.append(loss.detach().numpy())
@@ -113,27 +117,34 @@ for epoch in range(iteration):
         print(f"Error: {error}")
         print('\n')
 
-end_time = time.time()     # 记录结束时间
-training_time = end_time - start_time   # 计算训练时间
+end_time = time.time()     
+training_time = end_time - start_time   
 print("训练时间为：", training_time, "秒")
 
-#可视化
+#可视化Loss曲线、误差曲线、PIKFNN数值解和真解图像
 plt.figure()
-y = range(1, 20*len(Loss) +1,20)
+plt.xlabel('Iteration')
+plt.ylabel('Loss')
+y = range(1, 50*len(Loss) +1,50)
 plt.plot(y, Loss)
 
+
 plt.figure()
-y = range(1, 20*len(Error) +1,20)
+plt.xlabel('Iteration')
+plt.ylabel('Error')
+y = range(1, 50*len(Error) +1,50)
 plt.plot(y, Error)
 
 bc_ = np.array([1/3, 1/3, 1/3])
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)
 
-u_na = torch.real(solution(ps)).detach().numpy()
+u = torch.real(solution(ps)).detach().numpy()
 u_PIKFNN = s(ps).detach().numpy()
 
 fig, axes = plt.subplots(1, 2)
-mesh.add_plot(axes[0], cellcolor=u_na, linewidths=0, aspect=1)
+mesh.add_plot(axes[0], cellcolor=u, linewidths=0, aspect=1)
 mesh.add_plot(axes[1], cellcolor=u_PIKFNN, linewidths=0, aspect=1)
+axes[0].set_title('u')
+axes[1].set_title('u_PIKFNN')
 
 plt.show()
