@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.mesh import TriangleMesh, MeshFactory
+from fealpy.mesh import TetrahedronMesh, HexahedronMesh
 from fealpy.decorator import cartesian, barycentric
 import sympy as sym
 from sympy.vector import CoordSys3D, Del, curl
@@ -167,7 +167,7 @@ class SinData(MaxwellPDE):
     def init_mesh(self, n=1):
         box = [0, 1/2, 0, 1/2, 0, 1/2]
         #box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
 
 class BubbleData(MaxwellPDE):
@@ -179,7 +179,7 @@ class BubbleData(MaxwellPDE):
 
     def init_mesh(self, n=1):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
 
 
@@ -214,7 +214,7 @@ class XXX3dData():
 
     def init_mesh(self, n=1):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
 
     def dirichlet(self, p):
@@ -250,7 +250,7 @@ class XXX3dData0():
 
     def init_mesh(self, n=1):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
 
     def dirichlet(self, p):
@@ -285,7 +285,7 @@ class Sin3dData():
 
     def init_mesh(self, n=1):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
 
     def dirichlet(self, p):
@@ -336,7 +336,7 @@ class Bubble3dData():
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
 
     def dirichlet(self, p):
