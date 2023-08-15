@@ -74,7 +74,6 @@ for i in range(maxit):
     mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
 
     space = ConformingScalarVESpace2d(mesh, p=degree)
-    uh = space.function()
     
     NDof[i] = space.number_of_global_dofs()
   
@@ -105,6 +104,7 @@ for i in range(maxit):
 
     #处理边界 
     bc = DirichletBC(space, pde.dirichlet)
+    uh = space.function()
     A, F = bc.apply(A, F, uh)
 
     uh[:] = spsolve(A, F)
