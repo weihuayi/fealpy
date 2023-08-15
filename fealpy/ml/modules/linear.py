@@ -10,24 +10,24 @@ from torch.nn.parameter import Parameter
 
 class StackStd(Module):
     """
-    Standardize the inputs with sequence of centers and radius.\
+    @brief: Standardize the inputs with sequence of centers and radius.\
     Stack the result in dim-1.
+
+    @param centers: Tensor with shape (M, GD).
+    @param radius: Tensor with shape (M,).
 
     @note:
     If shape of center and radius is (M, D) and shape of input is (N, D),
     then the shape of output is (N, M, D); where N is samples, M is number of
     centers to standardize and D is features.
     """
-    def __init__(self, centers: Tensor, radius: float, device=None):
+    def __init__(self, centers: Tensor, radius: Tensor, device=None):
         super().__init__()
         self.centers = Parameter(centers.to(device=device), requires_grad=False)
-        self.radius = Parameter(
-            torch.tensor(radius, device=self.centers.device),
-            requires_grad=False
-        )
+        self.radius = Parameter(radius.to(device=device), requires_grad=False)
 
     def forward(self, p: Tensor):
-        return (p[:, None, :] - self.centers[None, :, :]) / self.radius
+        return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, None]
 
 
 class MultiLinear(Module):
