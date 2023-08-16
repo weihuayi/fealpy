@@ -20,8 +20,8 @@ from fealpy.fem import DirichletBC
 
 class Brittle_Facture_model():
     def __init__(self):
-        self.E = 210 # 杨氏模量
-        self.nu = 0.3 # 泊松比
+        self.E = 200 # 杨氏模量
+        self.nu = 0.2 # 泊松比
         self.Gc = 1 # 材料的临界能量释放率
         self.l0 = 0.02 # 尺度参数，断裂裂纹的宽度
 
@@ -261,12 +261,43 @@ class fracture_damage_integrator():
             D[:, m, n] += d2 * val
         D = (D + D.swapaxes(1,2))/2
         return D
+    
+    def get_dissipated_energy(self, d):
+
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        g = d.grad_value(bc)
+
+        val = self.ka/2/self.l0*(d(bc)**2+self.l0**2*np.sum(g*g, axis=1))
+        dissipated = np.dot(val, cm)
+        return dissipated
+
+    
+    def get_stored_energy(self, psi_s, d):
+        eps = 1e-10
+
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        c0 = (1 - d(bc)) ** 2 + eps
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        val = c0*psi_s
+        stored = np.dot(val, cm)
+        return stored
+
+
+def recovery_estimate(phi):
+    space = phi.space
+    rgphi = space.grad_recovery(phi, method='simple')
+    eta = space.integralalg.error(rgphi.value, phi.grad_value, power=2,
+            celltype=True)
+    return eta
 
 
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
-mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
+mesh = TriangleMesh.from_domain_distmesh(domain, 0.02, maxit=100)
 #mesh = model.init_mesh(n=5)
 
 GD = mesh.geo_dimension()
@@ -282,6 +313,8 @@ uh = space.function(dim=GD)
 du = space.function(dim=GD)
 disp = model.top_boundary_disp()
 
+stored_energy = np.zeros_like(disp)
+dissipated_energy = np.zeros_like(disp)
 
 for i in range(len(disp)):
     node  = mesh.entity('node') 
@@ -323,6 +356,7 @@ for i in range(len(disp)):
         strain = simulation.strain(uh)
         phip, _ = simulation.strain_energy_density_decomposition(strain)
         H[:] = np.fmax(H, phip)
+        stored_energy[i] = simulation.get_stored_energy(phip, d)
 
         # 计算相场模型
         dbform = BilinearForm(space)
@@ -356,6 +390,8 @@ for i in range(len(disp)):
         if error < 1e-5:
             break
         k += 1
+    dissipated_energy[i] = simulation.get_dissipated_energy(d)
+
     mesh.nodedata['damage'] = d
     mesh.nodedata['uh'] = uh.T
     fname = 'test' + str(i).zfill(10)  + '.vtu'
@@ -367,3 +403,15 @@ axes = fig.add_subplot(111)
 mesh.node += uh[:, :NN].T
 mesh.add_plot(axes)
 plt.show()
+
+plt.figure()
+plt.plot(disp, stored_energy, label='stored_energy', marker='o')
+plt.plot(disp, dissipated_energy, label='dissipated_energy', marker='s')
+plt.plot(disp, dissipated_energy+stored_energy, label='total_energy',
+        marker='x')
+plt.xlabel('disp')
+plt.ylabel('energy')
+plt.grid(True)
+plt.legend()
+plt.show()
+

@@ -210,7 +210,7 @@ class fracture_damage_integrator():
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
-mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
+mesh = TriangleMesh.from_domain_distmesh(domain, 0.03, maxit=100)
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
@@ -320,6 +320,8 @@ plt.show()
 plt.figure()
 plt.plot(disp, stored_energy, label='stored_energy', marker='o')
 plt.plot(disp, dissipated_energy, label='dissipated_energy', marker='s')
+plt.plot(disp, dissipated_energy+stored_energy, label='total_energy',
+        marker='x')
 plt.xlabel('disp')
 plt.ylabel('energy')
 plt.grid(True)
