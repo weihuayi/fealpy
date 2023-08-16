@@ -89,6 +89,9 @@ class MPHTxtFileReader:
         self.cline += 1
         self.parse_vertices_data()
 
+        self.cline +=1
+        self.parse_element_data()
+
 
     def parse_vertices_data(self):
         """
@@ -112,8 +115,81 @@ class MPHTxtFileReader:
     def parse_element_data(self):
         """
         """
+        line = self.get_data_line()
+        self.mesh['element'] = {}
+        
+        NET = int(line.split('#')[0])
+        self.mesh['element']['NET'] = NET 
+        element_types = np.arange(NET)
+        
+        self.cline += 1
+        line = self.get_data_line()
+        ws = line.split(' ')
+        s = ws[1][0:int(ws[0])] # type name
+        self.mesh['element'][s]= {}
 
+        self.cline += 1 
+        line = self.get_data_line()
+        NVE = int(line.split('#')[0]) # number of vertices per element
+        
+        self.cline += 1
+        line = self.get_data_line()
+        NE = int(line.split('#')[0]) # number of elements
+        self.mesh['element'][s]['NE'] = NE
+        self.cline += 1
+        line = self.get_data_line()
+        idx = [list((map(int,t.split()))) for t in
+                self.contents[self.cline:self.cline + NE]] # Elements
+        idx = tuple(item for sublist in idx for item in sublist) 
+        self.mesh['element'][s]['idx'] = idx
+        self.cline += NE
 
+        self.cline += 1
+        line = self.get_data_line()
+        NGEI = int(line.split('#')[0]) # number of geometric entity indices
+        
+        self.cline +=1
+        line = self.get_data_line()
+        geo_idx = [list((map(int,t.split()))) for t in
+                self.contents[self.cline:self.cline + NGEI]]# Geometric entity indices
+        geo_idx = tuple(item for sublist in geo_idx for item in sublist)
+        self.mesh['element'][s]['geo_idx']=geo_idx
+        self.cline += NGEI 
+        
+        for i in range(1, NET):
+            self.cline += 1
+            line = self.get_data_line()
+            ws = line.split(' ')
+            s = ws[1][0:int(ws[0])] # type name
+            self.mesh['element'][s]= {}
+            
+            self.cline += 1 
+            line = self.get_data_line()
+            NVE = int(line.split('#')[0]) # number of vertices per element
+            
+            self.cline += 1
+            line = self.get_data_line()
+            NE = int(line.split('#')[0]) # number of elements
+            self.mesh['element'][s]['NE'] = NE
+
+            self.cline += 1
+            line = self.get_data_line()
+            Element = np.array([list(map(int, t.split())) for t in
+                self.contents[self.cline:self.cline + NE]]) #Element
+            self.mesh['element'][s]['Element'] = Element
+            self.cline += NE
+
+            self.cline +=1
+            line = self.get_data_line()
+            NGEI = int(line.split('#')[0]) # number of geometric entity indices
+
+            self.cline +=1
+            line = self.get_data_line()
+            geo_idx = [list((map(int,t.split()))) for t in
+                    self.contents[self.cline:self.cline + NGEI]]# Geometric entity indices
+            geo_idx = tuple(item for sublist in geo_idx for item in sublist)
+            self.mesh['element'][s]['geo_idx']=geo_idx
+            self.cline += NGEI            
 
     def print(self):
         """
@@ -121,8 +197,10 @@ class MPHTxtFileReader:
         print("Version: ", self.version)
         print("Tags:\n", self.tags)
         print("Types: \n", self.types)
-        print("Mesh:\n", self.mesh)
-
+        #print("Mesh:\n", self.mesh)
+        print("Geometric entity indices of tri:\n",self.mesh['element']['tri']['geo_idx'])
+        print("Number of TetElements:\n",self.mesh['element']['tet']['NE'])
+        print("Element of TetMesh:\n",self.mesh['element']['tet']['Element'])
 
 
 if __name__ == "__main__":
