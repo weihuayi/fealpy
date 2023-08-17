@@ -101,7 +101,7 @@ class PoissonPDEData:
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        val = -2*pi**2*np.cos(pi*x)*np.cos(pi*y)
+        val = 2*pi**2*np.cos(pi*x)*np.cos(pi*y)
         return val
 
     @cartesian
@@ -110,6 +110,16 @@ class PoissonPDEData:
         y = p[..., 1]
         pi = np.pi
         val = np.cos(pi*x)*np.cos(pi*y)
+        return val
+
+    @cartesian
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float64)
+        val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return val
 
     @cartesian

@@ -252,7 +252,7 @@ class EdgeMeshCFEDof():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = mesh.multi_index_matrix(p) 
+        self.multiIndex = mesh.multi_index_matrix(p, etype=mesh.top_dimension()) 
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
