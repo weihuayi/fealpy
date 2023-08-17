@@ -79,7 +79,7 @@ class VectorDiffusionIntegrator:
         if space[0].doforder == 'sdofs':
             for i in range(GD):
                 VD[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D
-        elif space0.doforder == 'vdims':
+        elif space[0].doforder == 'vdims':
             for i in range(GD):
                 VD[:, i::GD, i::GD] += D 
 
