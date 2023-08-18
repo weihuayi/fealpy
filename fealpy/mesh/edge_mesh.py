@@ -253,6 +253,22 @@ class EdgeMesh(Mesh, Plotable):
 
         return mesh 
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_four_truss(cls):
+        node = np.array([
+            [0, 0], [400, 0], 
+            [400, 300], [0, 300]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [2, 1], 
+            [0, 2], [3, 2]], dtype=np.int_)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
+
+        return mesh 
+
 
 EdgeMesh.set_ploter('1d')
 
