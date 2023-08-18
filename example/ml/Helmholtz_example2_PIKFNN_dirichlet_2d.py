@@ -73,8 +73,8 @@ def bc(p:torch.Tensor, u) -> torch.Tensor:
     return u - solution(p)
 
 #构建网格用于计算误差
-mesh = TriangleMesh.from_unit_circle_gmsh(0.018)
-sampler_err = get_mesh_sampler(20, mesh)
+mesh = TriangleMesh.from_unit_circle_gmsh(0.02)
+sampler_err = get_mesh_sampler(10, mesh)
 
 #提取网络层参数并更新
 weight = net_PIKFNN[1].weight
@@ -99,7 +99,8 @@ L2_error = torch.sqrt(
 print(f"L2_error: {L2_error}")
 error = linf_error(s, solution, sampler=sampler_err)
 print(f"error: {error}")
-  
+
+#可视化真解u和数值解u_PIKFNN
 bc_ = np.array([1/3, 1/3, 1/3])
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)
 
