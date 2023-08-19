@@ -6,7 +6,7 @@ from typing import List, Tuple, Union, Optional
 
 import torch
 from torch import Tensor
-from torch.nn import init, Linear
+from torch.nn import init, Linear, Module
 
 from ..nntyping import Operator
 from .linear import StackStd
@@ -21,7 +21,7 @@ PI = torch.pi
 ### Random Feature Models
 ################################################################################
 
-class RandomFeatureSpace():
+class RandomFeatureSpace(Module):
     def __init__(self, in_dim: int, nf: int,
                  activate: Activation,
                  bound: Tuple[float, float]=(1.0, PI),
@@ -135,12 +135,25 @@ class RFFunction(TensorMapping):
 
     @property
     def um(self):
+        """
+        @brief The `um` Tensor object inside the module, with shape (1, M).
+        """
         return self.uml.weight
+
+    def numpy(self):
+        """
+        @brief Return `um` as numpy array, with shape (M, ), where M is number of\
+               basis.
+        """
+        return self.um.detach().cpu().numpy()[0, :]
 
     def set_um_inplace(self, value: Tensor):
         """
-        @brief Set values of um inplace.
+        @brief Set values of um inplace. `value` must be in shape of (1, M) or\
+               (M, ), where M is the number of basis.
         """
+        if value.ndim == 1:
+            value = value[None, :]
         with torch.no_grad():
             self.uml.weight[:] = value
 
@@ -187,7 +200,7 @@ class LocalRandomFeatureSpace(RandomFeatureSpace):
         return ret
 
     def basis_laplace(self, p: Tensor):
-        ret = torch.einsum("ndd, nf -> nf", self.pou.hessian(p), super().basis_value())
+        ret = torch.einsum("ndd, nf -> nf", self.pou.hessian(p), super().basis_value(p))
         ret += 2 * torch.einsum("nd, nfd -> nf", self.pou.gradient(p),
                                 super().basis_gradient(p))
         ret += self.pou(p) * super().basis_laplace(p)
@@ -227,7 +240,7 @@ class LocalRandomFeatureSpace(RandomFeatureSpace):
         return ret
 
 
-class RandomFeaturePoUSpace():
+class RandomFeaturePoUSpace(Module):
     def __init__(self, in_dim: int, nlrf: int, activate: Activation, pou: PoU,
                  centers: Tensor, radius: Union[float, Tensor],
                  bound: Tuple[float, float]=(1.0, PI), print_status=False) -> None:
@@ -282,6 +295,10 @@ class RandomFeaturePoUSpace():
     def dtype(self):
         return self.std.centers.dtype
 
+    @property
+    def device(self):
+        return self.std.centers.device
+
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
         ret = torch.zeros((p.shape[0], 1), dtype=p.dtype, device=p.device)
@@ -299,7 +316,7 @@ class RandomFeaturePoUSpace():
         """
         MP = self.number_of_partitions()
         std = self.std(p)
-        partition_max = torch.zeros((MP, ), dtype=self.dtype, device=self.get_device())
+        partition_max = torch.zeros((MP, ), dtype=self.dtype, device=self.device)
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
             flag = part.flag(x) # Only take samples inside the supporting area
@@ -317,7 +334,7 @@ class RandomFeaturePoUSpace():
         N = p.shape[0]
         M = self.number_of_basis()
         Jn = self.nlrf
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.get_device())
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
         std = self.std(p)
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
@@ -334,7 +351,7 @@ class RandomFeaturePoUSpace():
         N = p.shape[0]
         M = self.number_of_basis()
         Jn = self.nlrf
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.get_device())
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
         std = self.std(p)
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
@@ -353,7 +370,7 @@ class RandomFeaturePoUSpace():
         N = p.shape[0]
         M = self.number_of_basis()
         Jn = self.nlrf
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.get_device())
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
         std = self.std(p)
         for i, part in enumerate(self.partions):
             x = std[:, i, :]
