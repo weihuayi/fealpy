@@ -216,7 +216,7 @@ class LocalRandomFeatureSpace(RandomFeatureSpace):
             ret[:] = self.basis_value(p)
         elif order == 1:
             ret += self.pou.derivative(p, idx[0]) * super().basis_value(p)
-            ret += self.pou(p) * super().basis_gradient(p, idx[0])
+            ret += self.pou(p) * super().basis_derivative(p, idx[0])
         elif order == 2:
             ret += self.pou.derivative(p, idx[0], idx[1]) * super().basis_value(p)
             ret += self.pou.derivative(p, idx[0]) * super().basis_derivative(p, idx[1])
