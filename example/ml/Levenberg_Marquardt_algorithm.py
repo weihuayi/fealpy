@@ -6,14 +6,14 @@ def minimize_levmarq(
     xs,
     ys,
     get_y_hat,
-    eps_metric=0.1,
+    eps_metric=1e-5,
     lam=1e-2,
     eps_grad=None,
     eps_x=None,
     eps_reduced_chi2=None,
     lam_decrease_factor=9.0,
     lam_increase_factor=11.0,
-    max_iters=10,
+    max_iters=10000,
     small_number=0.0,
     lam_min=1e-7,
     lam_max=1e7,
@@ -56,8 +56,8 @@ def minimize_levmarq(
     if len(xs) != len(ys):
         raise ValueError("x and y must having matching batch dimension")
 
-    b, n = xs.shape
-    m = ys.shape[1]
+    n = xs.shape[0]
+    m = ys.shape[0]
     
     if m - n + 1 <= 0:
         raise ValueError(
@@ -66,7 +66,6 @@ def minimize_levmarq(
         )
         
     J = jacobian(get_y_hat, xs).view(xs.shape[0], -1)
-    H_perturbation = small_number * torch.eye(n, device=xs.device).repeat(b, 1)
     chi2_p = ((ys - get_y_hat(xs)) ** 2).sum(-1)
     
     for _ in range(max_iters):
@@ -87,24 +86,25 @@ def minimize_levmarq(
 
         # Propose an update
         JTJ = J.T @ J
-        H_approxs = (lam * torch.diag_embed(torch.diagonal(JTJ))+ H_perturbation)
+        H_approxs = (lam * torch.diag_embed(torch.diagonal(JTJ)))
         dxs = torch.linalg.inv(JTJ + H_approxs) @ JT_d_y_yhat
         
         if eps_x is not None and (dxs / (xs + small_number)).abs().max() < eps_x:
             break
 
         x_new = xs + dxs
-        chi2 = ((ys - get_y_hat(x_new)) ** 2).sum()
+        chi2 = ((ys - get_y_hat(x_new)) ** 2).sum(-1)
         
         # Decide whether to accept update
         metrics = (chi2_p- chi2) / (
             (dxs.T @ JT_d_y_yhat) + (dxs.T @(H_approxs @ dxs))
         ).abs()
-        
+    
         if metrics.max() > eps_metric:
             xs = x_new
             chi2_p = chi2
             lam = max(lam / lam_decrease_factor, lam_min)
+
         else:
             lam = min(lam * lam_increase_factor, lam_max)
 
