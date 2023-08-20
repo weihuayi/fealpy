@@ -12,7 +12,9 @@ from fealpy.mesh import TriangleMesh
 
 from uniformly_placed import sample_points_on_circle
 from Levenberg_Marquardt_algorithm import minimize_levmarq
+
 #方程形式
+
 """
     \Delta u(x,y) + k**2 * u(x,y) = 0 ,   (x,y)\in \Omega
     u(x,y) = \sin(k*x + k*y) ,         (x,y)\in \partial\Omega
@@ -20,11 +22,13 @@ from Levenberg_Marquardt_algorithm import minimize_levmarq
 """
 
 #超参数(配置点个数、源点个数)
+
 NN = 300
 NS = 300
 k = torch.tensor(100) #波数
 
 #PIKF层
+
 class PIKF_layer(nn.Module):
     def __init__(self, source_nodes: Tensor) -> None:
         super().__init__()
@@ -41,10 +45,12 @@ class PIKF_layer(nn.Module):
         return self.kernel_func(p)
 
 #对配置点和源点进行采样
+
 source_nodes = sample_points_on_circle(0, 0, 3, NS)#源点在虚假边界上采样
 nodes_on_bc = sample_points_on_circle(0.0, 0.0, 1.0 , NN)
 
 #PIKFNN的网络结构
+
 pikf_layer = PIKF_layer(source_nodes)
 net_PIKFNN = nn.Sequential(
                            pikf_layer,
@@ -58,9 +64,11 @@ def init_weights(m):
 net_PIKFNN.apply(init_weights)
 
 #网络实例化
+
 s = Solution(net_PIKFNN)
 
 #真解
+
 def solution(p:torch.Tensor) -> torch.Tensor:
 
     x = p[...,0:1]
@@ -69,14 +77,17 @@ def solution(p:torch.Tensor) -> torch.Tensor:
     return torch.sin(k*x) + torch.cos(k*y)
 
 #边界条件
+
 def bc(p:torch.Tensor, u) -> torch.Tensor:
     return u - solution(p)
 
 #构建网格用于计算误差
+
 mesh = TriangleMesh.from_unit_circle_gmsh(0.02)
 sampler_err = get_mesh_sampler(10, mesh)
 
 #提取网络层参数并更新
+
 weight = net_PIKFNN[1].weight
 xs = weight.view(-1,1)
 basis = pikf_layer(nodes_on_bc)
@@ -92,6 +103,7 @@ weight_1 = net_PIKFNN[1].weight
 xs_new = weight_1.view(-1,1)
 
 #计算两种误差
+
 L2_error = torch.sqrt(
             torch.sum((basis @ xs_new - solution(nodes_on_bc))**2, dim = 0)\
             /torch.sum(solution(nodes_on_bc)**2, dim = 0)
@@ -101,6 +113,7 @@ error = linf_error(s, solution, sampler=sampler_err)
 print(f"error: {error}")
 
 #可视化真解u和数值解u_PIKFNN
+
 bc_ = np.array([1/3, 1/3, 1/3])
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)
 
