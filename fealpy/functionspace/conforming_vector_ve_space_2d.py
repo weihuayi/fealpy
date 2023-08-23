@@ -104,8 +104,8 @@ class CVVEDof2d:
             ipoint[egdof:,:] = (bc[:, None, :]+t1[None, :2, :]*h[:, :, None]).reshape(-1,GD)   
             return ipoint
 
-        bcs1 = self.mesh.multi_index_matrix(p-3)/(p-3)
-        bcs2 = (self.mesh.multi_index_matrix(p-1)/(p-1))[:-1, :]
+        bcs1 = self.mesh.multi_index_matrix(p-3, etype=2)/(p-3)
+        bcs2 = (self.mesh.multi_index_matrix(p-1, etype=2)/(p-1))[:-1, :]
         tri1 = bc[:, None, :]+t[None, :, :]*h[:, :, None]
         tri2 = bc[:, None, :]+t1[None, :, :]*h[:, :, None]
 
