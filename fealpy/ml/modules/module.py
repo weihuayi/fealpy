@@ -5,7 +5,7 @@ from typing import (
 import numpy as np
 from numpy.typing import NDArray
 import torch
-from torch import Tensor, device
+from torch import Tensor, device, float64
 from torch.nn import Module
 
 from ..tools import proj
@@ -178,6 +178,40 @@ class TensorMapping(Module):
         if cell_type:
             return np.power(e, 1/power, out=e)
         return np.power(e.sum(axis=0), 1/power)
+
+    def estimate_error_tensor(self, other: TensorFunction, mesh, *, power: int=2,
+                              q: int=3, cell_type: bool=False, dtype=float64):
+        """
+        @brief Estimate error between the function and another tensor function.
+
+        @param other: TensorFunction.
+        @param mesh: Mesh. The mesh to estimate error.
+        @param power: int, optional. The order of L-error, defaults to 2.
+        @param q: int, optional. The index of quadratures, defualts to 3.
+        @param cell_type: bool, optional.
+        """
+        device = self.get_device()
+        qf = mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ws = torch.from_numpy(ws).to(dtype=dtype).to(device=device)
+        _cm = mesh.entity_measure('cell')
+
+        if isinstance(_cm, float): # to tackle with the returns from cell_area of UniformMesh2d
+            NC = mesh.ds.number_of_cells()
+            cellmeasure = torch.tensor(_cm, dtype=dtype, device=device).broadcast_to((NC, ))
+        else:
+            cellmeasure = torch.from_numpy(_cm).to(dtype=dtype).to(device=device)
+
+        ps = torch.from_numpy(mesh.bc_to_point(bcs)).to(dtype=dtype).to(device=device)
+        original_shape = ps.shape[:-1]
+        ps = ps.reshape(-1, ps.shape[-1])
+        diff = torch.pow(torch.abs(self(ps) - other(ps)), power)
+        diff = diff.reshape(original_shape + (diff.shape[-1], ))
+        e = torch.einsum('q, qc..., c -> c...', ws, diff, cellmeasure)
+
+        if cell_type:
+            return torch.pow(e, 1/power, out=e)
+        return torch.pow(e.sum(dim=0), 1/power)
 
     ### plotting
 

@@ -1,202 +1,271 @@
-"""Modules for the Random Feature Method"""
+"""
+Modules for the Random Feature Method
+"""
 
-from typing import List, Optional
+from typing import List, Tuple, Union, Optional
 
 import torch
 from torch import Tensor
-from torch.nn import Module, init, Linear
+from torch.nn import init, Linear, Module
 
 from ..nntyping import Operator
 from .linear import StackStd
 from .module import TensorMapping
+from .activate import Activation
+from .pou import PoU
+
+PI = torch.pi
 
 
-class PoU(Module):
-    def __init__(self, keepdim=True) -> None:
-        super().__init__()
-        self.keepdim = keepdim
+################################################################################
+### Random Feature Models
+################################################################################
 
-    def forward(self, x: Tensor): # (..., d) -> (..., 1)
-        flag = (-1 <= x) * (x < 1)
-        flag = torch.prod(flag, dim=-1, keepdim=self.keepdim)
-        return flag.to(dtype=x.dtype)
-
-
-class _PouSin(PoU):
-    def forward(self, x: Tensor): # (..., d) -> (..., 1)
-        pi = torch.pi
-        f1 = (-1.25 <= x) * (x < -0.75)
-        f2 = (-0.75 <= x) * (x < 0.75)
-        f3 = (0.75 <= x) * (x < 1.25)
-        l1 = 0.5 * (1 + torch.sin(2*pi*x)) * f1
-        l2 = f2.to(dtype=x.dtype)
-        l3 = 0.5 * (1 - torch.sin(2*pi*x)) * f3
-        ret = l1 + l2 + l3
-        ret = torch.prod(ret, dim=-1, keepdim=self.keepdim)
-        return ret
-
-
-class PoUSin2d(_PouSin):
-    """
-    @brief Sin-style partition of unity.
-
-    For inputs with shape (..., 2), the output is like (..., ) or (..., 1),\
-    and values of each element is between 0 and 1.
-    """
-    def grad(self, x: Tensor):
-        pi = torch.pi
-
-        f1 = (-1.25 <= x) * (x < -0.75)
-        f2 = (-0.75 <= x) * (x < 0.75)
-        f3 = (0.75 <= x) * (x < 1.25)
-        pg = pi * torch.cos(2*pi*x) * f1 - pi * torch.cos(2*pi*x) * f3
-        l1 = 0.5 * (1 + torch.sin(2*pi*x)) * f1
-        l2 = f2.double()
-        l3 = 0.5 * (1 - torch.sin(2*pi*x)) * f3
-        p = l1 + l2 + l3
-        return pg * p[:, [1, 0]]
-
-    def hessian(self, x: Tensor):
-        pi = torch.pi
-
-        f1 = (-1.25 <= x) * (x < -0.75)
-        f2 = (-0.75 <= x) * (x < 0.75)
-        f3 = (0.75 <= x) * (x < 1.25)
-        ph = -2*pi**2 * torch.sin(2*pi*x) * f1 + 2*pi**2 * torch.sin(2*pi*x) * f3
-        pg = pi * torch.cos(2*pi*x) * f1 - pi * torch.cos(2*pi*x) * f3
-        l1 = 0.5 * (1 + torch.sin(2*pi*x)) * f1
-        l2 = f2.double()
-        l3 = 0.5 * (1 - torch.sin(2*pi*x)) * f3
-        p = l1 + l2 + l3
-        hes = torch.zeros((x.shape[0], 2, 2), dtype=x.dtype, device=x.device)
-        hes[:, 0, 0] = ph[:, 0] * p[:, 1]
-        hes[:, 0, 1] = pg[:, 0] * pg[:, 1]
-        hes[:, 1, 0] = pg[:, 0] * pg[:, 1]
-        hes[:, 1, 1] = p[:, 0] * ph[:, 1]
-        return hes
-
-
-class RandomFeature2d(TensorMapping):
-    def __init__(self, nf: int, bound: float=1.0,
+class RandomFeatureSpace(Module):
+    def __init__(self, in_dim: int, nf: int,
+                 activate: Activation,
+                 bound: Tuple[float, float]=(1.0, PI),
                  dtype=torch.float64, device=None) -> None:
         """
         @brief Construct a random feature model.
 
         @param in_dim: int. Dimension of inputs.
         @param nf: int. Number of random features.
-        @param bound: float. Bound of uniform distribution to initialize k, b in\
-                             the each random feature.
-        @param activate: Callable. Activation function after the linear layer.
+        @param activate: Activation.
+        @param bound: two floats. Bound of uniform distribution to initialize\
+               k, b in the each random feature.
         @param dtype: torch.dtype. Data type of inputs.
         @param device: torch.device.
         """
         super().__init__()
+        self.in_dim = in_dim
         self.out_dim = 1
         self.nf = nf
+        self.dtype = dtype
         self.device = device
 
-        self.linear = Linear(2, nf, device=device, dtype=dtype)
+        self.linear = Linear(in_dim, nf, device=device, dtype=dtype)
         self.linear.requires_grad_(False)
-        self.set_basis(bound)
+        self._set_basis(bound)
 
-        self.uml = Linear(nf, 1, bias=False, device=device, dtype=dtype)
-        init.zeros_(self.uml.weight)
+        self.activate = activate
 
-    @property
-    def um(self):
-        return self.uml.weight
+    def _set_basis(self, bound: Tuple[float, float]):
+        init.uniform_(self.linear.weight, -bound[0], bound[0])
+        init.uniform_(self.linear.bias, -bound[1], bound[1])
 
-    def set_um_inplace(self, value: Tensor):
-        self.uml.weight.requires_grad_(False)
-        self.uml.weight[:] = value
-        self.uml.weight.requires_grad_(True)
-
-    def set_basis(self, bound):
-        init.uniform_(self.linear.weight, -bound, bound)
-        init.uniform_(self.linear.bias, -bound, bound)
-
-    def forward(self, x: Tensor): # (N, 1)
-        ret = torch.cos(self.linear(x)) # (N, nf)
-        return self.uml(ret) # (N, 1)
-
-    def number_of_features(self):
+    def number_of_basis(self):
         return self.nf
 
-    def basis_val(self, p: Tensor):
+    def basis_value(self, p: Tensor) -> Tensor:
         """
         @brief Return values of basis, with shape (N, nf).
         """
-        return torch.cos(self.linear(p))
+        return self.activate(self.linear(p))
 
-    def basis_grad(self, p: Tensor):
+    def basis_gradient(self, p: Tensor) -> Tensor:
         """
-        @brief Return gradient vector of basis, with shape (N, nf, 2).
+        @brief Return gradient vector of basis, with shape (N, nf, GD).
         """
-        a = -torch.sin(self.linear(p))
+        a = self.activate.d1(self.linear(p))
         return torch.einsum("nf, fx -> nfx", a, self.linear.weight)
 
-    def basis_hessian(self, p: Tensor):
+    def basis_hessian(self, p: Tensor) -> Tensor:
         """
-        @brief Return hessian matrix of basis, with shape (N, nf, 2, 2).
+        @brief Return hessian matrix of basis, with shape (N, nf, GD, GD).
         """
-        a = -torch.cos(self.linear(p)) * self.linear.weight
-        return torch.einsum("nfx, fy -> nfxy", a, self.linear.weight)
+        a = self.activate.d2(self.linear(p))
+        return torch.einsum("nf, fx, fy -> nfxy", a,
+                            self.linear.weight, self.linear.weight)
+
+    def basis_laplace(self, p: Tensor) -> Tensor:
+        """
+        @brief Return basis evaluated by laplace operator, with shape (N, nf).
+        """
+        a = self.activate.d2(self.linear(p))
+        return torch.einsum("nf, fd, fd -> nf", a,
+                            self.linear.weight, self.linear.weight)
+
+    def basis_derivative(self, p: Tensor, *idx: int) -> Tensor:
+        """
+        @brief Return specified partial derivatives of basis, with shape (N, nf).
+
+        @param *idx: int. index of the independent variable to take partial derivatives.
+        """
+        order = len(idx)
+        if order == 0:
+            return self.activate(self.linear(p))
+        elif order == 1:
+            a = self.activate.d1(self.linear(p))
+            return torch.einsum("nf, f -> nf", a, self.linear.weight[:, idx[0]])
+        elif order == 2:
+            a = self.activate.d2(self.linear(p))
+            return torch.einsum("nf, f, f -> nf", a,
+                                self.linear.weight[:, idx[0]],
+                                self.linear.weight[:, idx[1]])
+        elif order == 3:
+            a = self.activate.d3(self.linear(p))
+            return torch.einsum("nf, f, f, f -> nf", a,
+                                self.linear.weight[:, idx[0]],
+                                self.linear.weight[:, idx[1]],
+                                self.linear.weight[:, idx[2]])
+        elif order == 4:
+            a = self.activate.d4(self.linear(p))
+            return torch.einsum("nf, f, f, f, f -> nf", a,
+                                self.linear.weight[:, idx[0]],
+                                self.linear.weight[:, idx[1]],
+                                self.linear.weight[:, idx[2]],
+                                self.linear.weight[:, idx[3]])
+        raise NotImplementedError("Derivatives higher than order 4 have not been implemented.")
 
 
-class LocalRandomFeature2d(RandomFeature2d):
+class RFFunction(TensorMapping):
+    def __init__(self, space: RandomFeatureSpace, um: Optional[Tensor]) -> None:
+        super().__init__()
+        dtype = space.dtype
+        device = space.device
+        M = space.number_of_basis()
+
+        self.space = space
+        self.uml = Linear(M, 1, bias=False, device=device, dtype=dtype)
+        if um is None:
+            init.zeros_(self.uml.weight)
+        else:
+            self.set_um_inplace(um)
+
+    @property
+    def um(self):
+        """
+        @brief The `um` Tensor object inside the module, with shape (1, M).
+        """
+        return self.uml.weight
+
+    def numpy(self):
+        """
+        @brief Return `um` as numpy array, with shape (M, ), where M is number of\
+               basis.
+        """
+        return self.um.detach().cpu().numpy()[0, :]
+
+    def set_um_inplace(self, value: Tensor):
+        """
+        @brief Set values of um inplace. `value` must be in shape of (1, M) or\
+               (M, ), where M is the number of basis.
+        """
+        if value.ndim == 1:
+            value = value[None, :]
+        with torch.no_grad():
+            self.uml.weight[:] = value
+
+    def forward(self, x: Tensor): # (N, 1)
+        return self.uml(self.space.basis_value(x)) # (N, 1)
+
+
+class LocalRandomFeatureSpace(RandomFeatureSpace):
     """
-    @brief Random feature 2d model with units of partitions.
+    @brief Random feature space in a single Partition.
     """
-    def __init__(self, nf: int, bound: float = 1, dtype=torch.float64, device=None) -> None:
-        super().__init__(nf, bound, dtype, device)
-        self.pou = PoUSin2d(keepdim=True)
+    def __init__(self, in_dim: int, nf: int,
+                 activate: Activation,
+                 pou: PoU,
+                 bound: Tuple[float, float]=(1.0, PI),
+                 dtype=torch.float64, device=None) -> None:
+        super().__init__(in_dim, nf, activate, bound, dtype, device)
+        self.pou = pou
 
-    def forward(self, p: Tensor): # (N, d)
-        ret = torch.cos(self.linear(p)) * self.pou(p)
-        return self.uml(ret) # (N, 1)
+    def flag(self, p: Tensor):
+        """
+        @brief Return a bool tensor with shape (N,) showing if samples in `p`\
+               is in the supporting area.
 
-    def basis_val(self, p: Tensor):
-        return torch.cos(self.linear(p)) * self.pou(p)
+        @note: For samples outside the supporting area, local random features\
+               always outputs zeros.
+        """
+        return self.pou.flag(p)
 
-    def basis_grad(self, p: Tensor):
-        l = self.linear(p)
-        a = torch.einsum("nd, nf -> nfd", self.pou.grad(p), torch.cos(l))
-        b = -self.pou(p)[..., None]\
-          * torch.einsum("nf, fd -> nfd", torch.sin(l), self.linear.weight)
-        return a + b
+    def basis_value(self, p: Tensor):
+        return super().basis_value(p) * self.pou(p)
+
+    def basis_gradient(self, p: Tensor):
+        ret = torch.einsum("nd, nf -> nfd", self.pou.gradient(p), super().basis_value(p))
+        ret += self.pou(p)[..., None] * super().basis_gradient(p)
+        return ret
 
     def basis_hessian(self, p: Tensor):
-        l = self.linear(p)
-        a = torch.einsum("nde, nf -> nfde", self.pou.hessian(p), torch.cos(l))
-        b = -2 * torch.einsum("nd, nf, fe -> nfde", self.pou.grad(p),
-                              torch.sin(l), self.linear.weight)
-        c = -self.pou(p)[..., None, None]\
-          * torch.einsum("nf, fd, fe -> nfde", torch.cos(l),
-                         self.linear.weight, self.linear.weight)
-        return a + b + c
+        ret = torch.einsum("nxy, nf -> nfxy", self.pou.hessian(p), super().basis_value(p))
+        cross = torch.einsum("nx, nfy -> nfxy", self.pou.gradient(p),
+                             super().basis_gradient(p))
+        ret += cross + torch.transpose(cross, -1, -2)
+        ret += self.pou(p)[..., None, None] * super().basis_hessian(p)
+        return ret
+
+    def basis_laplace(self, p: Tensor):
+        ret = torch.einsum("ndd, nf -> nf", self.pou.hessian(p), super().basis_value(p))
+        ret += 2 * torch.einsum("nd, nfd -> nf", self.pou.gradient(p),
+                                super().basis_gradient(p))
+        ret += self.pou(p) * super().basis_laplace(p)
+        return ret
+
+    def basis_derivative(self, p: Tensor, *idx: int):
+        N = p.shape[0]
+        nf = self.number_of_basis()
+        order = len(idx)
+        ret = torch.zeros((N, nf), dtype=self.dtype, device=self.device)
+
+        if order == 0:
+            ret[:] = self.basis_value(p)
+        elif order == 1:
+            ret += self.pou.derivative(p, idx[0]) * super().basis_value(p)
+            ret += self.pou(p) * super().basis_derivative(p, idx[0])
+        elif order == 2:
+            ret += self.pou.derivative(p, idx[0], idx[1]) * super().basis_value(p)
+            ret += self.pou.derivative(p, idx[0]) * super().basis_derivative(p, idx[1])
+            ret += self.pou.derivative(p, idx[1]) * super().basis_derivative(p, idx[0])
+            ret += self.pou(p) * super().basis_derivative(p, idx[0], idx[1])
+        elif order == 3:
+            ret += self.pou.derivative(p, idx[0], idx[1], idx[2]) * super().basis_value(p)
+            ret += self.pou.derivative(p, idx[0], idx[1]) * super().basis_derivative(p, idx[2])
+            ret += self.pou.derivative(p, idx[1], idx[2]) * super().basis_derivative(p, idx[0])
+            ret += self.pou.derivative(p, idx[2], idx[0]) * super().basis_derivative(p, idx[1])
+            ret += self.pou.derivative(p, idx[0]) * super().basis_derivative(p, idx[2], idx[1])
+            ret += self.pou.derivative(p, idx[1]) * super().basis_derivative(p, idx[0], idx[2])
+            ret += self.pou.derivative(p, idx[2]) * super().basis_derivative(p, idx[1], idx[0])
+            ret += self.pou(p) * super().basis_derivative(p, idx[0], idx[1], idx[2])
+
+        elif order == 4:
+            pass
+        # TODO: finish this
+        else:
+            raise NotImplementedError("Derivatives higher than order 4 have bot been implemented.")
+        return ret
 
 
-class RandomFeatureFlat(TensorMapping):
-    def __init__(self, nlrf: int, centers: Tensor, radius: float,
-                 bound: float=1.0, print_status=False) -> None:
+class RandomFeaturePoUSpace(Module):
+    def __init__(self, in_dim: int, nlrf: int, activate: Activation, pou: PoU,
+                 centers: Tensor, radius: Union[float, Tensor],
+                 bound: Tuple[float, float]=(1.0, PI), print_status=False) -> None:
         """
         @param nlrf: int. Number of local random features.
-        @param centers: 2-d Tensor. Centers of partitions.
-        @param radius: float.
-        @param bound: float. Uniform distribution bound for feature weights and bias.
+        @param centers: 2-d Tensor with shape (M, GD). Centers of partitions.
+        @param radius: float or Tensor with shape (M,). Radius of partitions.
+        @param bound: two floats. Uniform distribution bound for feature weights and bias.
         @param print_status: bool.
         """
         super().__init__()
+        self.in_dim = in_dim
         self.out_dim = 1
         self.nlrf = nlrf
-
+        if isinstance(radius, float):
+            radius = torch.tensor(radius, dtype=centers.dtype).broadcast_to((centers.shape[0],))
         self.std = StackStd(centers, radius)
-        self.partions: List[LocalRandomFeature2d] = []
-        self.pou = PoUSin2d(keepdim=True)
+        self.partions: List[LocalRandomFeatureSpace] = []
 
         for i in range(self.number_of_partitions()):
-            part = LocalRandomFeature2d(
+            part = LocalRandomFeatureSpace(
+                    in_dim=in_dim,
                     nf=nlrf,
+                    activate=activate,
+                    pou=pou,
                     bound=bound,
                     dtype=centers.dtype,
                     device=centers.device
@@ -217,7 +286,7 @@ class RandomFeatureFlat(TensorMapping):
         return self.std.centers.shape[0]
 
     def number_of_basis(self):
-        return self.nlrf * self.number_of_partitions()
+        return self.nlrf * self.std.centers.shape[0]
 
     def number_of_local_basis(self):
         return self.nlrf
@@ -227,27 +296,8 @@ class RandomFeatureFlat(TensorMapping):
         return self.std.centers.dtype
 
     @property
-    def ums(self):
-        return [x.um for x in self.partions]
-
-    def get_ums(self):
-        """
-        @brief Get um in each partition as a single tensor with shape (1, M).\
-               Where M is number of total basis, equaling to Mp*Jn.
-        """
-        device = self.get_device()
-        ret = torch.zeros((1, self.number_of_basis()), dtype=self.dtype, device=device)
-        for idx, part in enumerate(self.partions):
-            ret[:, idx*self.nlrf:(idx+1)*self.nlrf] = part.um
-        return ret
-
-    def set_ums_inplace(self, value: Tensor):
-        """
-        @brief Set um in each partition using a single tensor with shape (1, M).\
-               Where M is number of total basis, equaling to Mp*Jn.
-        """
-        for idx, part in enumerate(self.partions):
-            part.set_um_inplace(value[:, idx*self.nlrf:(idx+1)*self.nlrf])
+    def device(self):
+        return self.std.centers.device
 
     def forward(self, p: Tensor):
         std = self.std(p) # (N, d) -> (N, Mp, d)
@@ -266,61 +316,66 @@ class RandomFeatureFlat(TensorMapping):
         """
         MP = self.number_of_partitions()
         std = self.std(p)
-        partition_max = torch.zeros((MP, ), dtype=self.dtype, device=self.get_device())
-        for i in range(MP):
-            x = std[:, i, :]
-            psiphi = self.partions[i].basis_val(p=x) # (N, nf)
-            partition_max[i] = torch.max(operator(p, psiphi))
+        partition_max = torch.zeros((MP, ), dtype=self.dtype, device=self.device)
+        for idx, part in enumerate(self.partions):
+            x = std[:, idx, :]
+            flag = part.flag(x) # Only take samples inside the supporting area
+            psiphi = self.partions[idx].basis_value(x[flag, ...]) # (N, nf)
+            partition_max[idx] = torch.max(operator(p, psiphi))
         return torch.max(partition_max)
 
-    def value(self, p: Tensor):
+    def basis_value(self, p: Tensor):
         """
-        @brief Return a matrix containing basis values of each sample, with\
-               shape (N, M), where M is total local basis.
+        @brief Return values of all basis functions.
 
         @note: This API is designed for the least squares method, therefore the\
                result does not require grad.
         """
         N = p.shape[0]
         M = self.number_of_basis()
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.get_device())
+        Jn = self.nlrf
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
         std = self.std(p)
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
-            ret[:, idx*self.nlrf:(idx+1)*self.nlrf] = part.basis_val(x)
+            flag = part.flag(x) # Only take samples inside the supporting area
+            ret[flag, idx*Jn:(idx+1)*Jn] = part.basis_value(x[flag, ...])
         return ret
 
-    def grad(self, p: Tensor):
+    U = basis_value
+
+    def basis_laplace(self, p: Tensor):
         """
-        @brief
+        @brief Return values of the Laplacian applied to all basis functions.
         """
         N = p.shape[0]
         M = self.number_of_basis()
-        D = p.shape[-1]
-        ret = torch.zeros((N, M, D), dtype=self.dtype, device=self.get_device())
+        Jn = self.nlrf
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
         std = self.std(p)
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
-            ret[:, idx*self.nlrf:(idx+1)*self.nlrf, :] = part.basis_grad(x)/self.std.radius
+            flag = part.flag(x) # Only take samples inside the supporting area
+            ret[flag, idx*Jn:(idx+1)*Jn] = part.basis_laplace(x[flag, ...])/self.std.radius[idx]**2
         return ret
 
-    def hessian(self, p: Tensor):
+    L = basis_laplace
+
+    def basis_derivative(self, p: Tensor, *idx: int):
         """
-        @brief
+        @brief Return the partial derivatives of all basis functions\
+               with respect to the specified independent variables.
         """
+        order = len(idx)
         N = p.shape[0]
         M = self.number_of_basis()
-        D = p.shape[-1]
-        ret = torch.zeros((N, M, D, D), dtype=self.dtype, device=self.get_device())
+        Jn = self.nlrf
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
         std = self.std(p)
-        for idx, part in enumerate(self.partions):
-            x = std[:, idx, :]
-            ret[:, idx*self.nlrf:(idx+1)*self.nlrf, :, :] = part.basis_hessian(x)/self.std.radius**2
+        for i, part in enumerate(self.partions):
+            x = std[:, i, :]
+            flag = part.flag(x) # Only take samples inside the supporting area
+            ret[flag, i*Jn:(i+1)*Jn] = part.basis_derivative(x[flag, ...], *idx)/self.std.radius[i]**order
         return ret
 
-    def laplace(self, p: Tensor):
-        """
-        @brief
-        """
-        hessian = self.hessian(p)
-        return hessian[:, :, 0, 0] + hessian[:, :, 1, 1]
+    D = basis_derivative

@@ -9,6 +9,7 @@ def Line_GeneralEquation(line=[1, 1, 1, 2]):
     line = np.array([A, B, C])
     if B != 0:
         line = line / B
+    
     return line
 
 def SamplePointsOnLineSegment(point1, point2, distence):
@@ -36,6 +37,7 @@ def SamplePointsOnLineSegment(point1, point2, distence):
                 else:
                     newP.append([point1[0], point1[1] - i * dxy])
     newP.append([point2[0], point2[1]])  # 压入末端点
+    
     return np.array(newP)
 
 def multiLine2Points(lineXY, distence):
@@ -56,9 +58,10 @@ def multiLine2Points(lineXY, distence):
         if (newPoints[i, :] == newPoints[i + 1, :]).all():
             delInd.append(i)
     newPoints = np.delete(newPoints, delInd, axis=0)
+    
     return newPoints
 
-def uniformed_nodes(left:float, right:float, num):
+def sample_points_on_square(left:float, right:float, num_points:int) ->torch.Tensor:
     
     points = np.array(
                  [[left, left],
@@ -66,11 +69,20 @@ def uniformed_nodes(left:float, right:float, num):
                   [right, right],
                   [right, left]])
 
-    newPoints = multiLine2Points(points, 4*(right-left)/num)
+    newPoints = multiLine2Points(points, 4*(right-left)/num_points)
     unique_rows, _ = torch.unique(torch.tensor(newPoints), dim=0, return_counts=True)
-    unique_nodes = unique_rows.clone().detach()
-    return unique_nodes
+    points = unique_rows.clone().detach()
+    
+    return points
 
-# print(uniformed_nodes(-1,1,0.1).shape)
+def sample_points_on_circle(center_x:float, center_y:float, radius:float, num_points:int)->torch.Tensor:
+    
+    angles = torch.linspace(0, 2 * torch.pi, num_points+1)
+    x = center_x + radius * torch.cos(angles)
+    y = center_y + radius * torch.sin(angles)
+    points = torch.stack((x, y), dim=1).to(torch.float64)
+    
+    return points[:-1, ...]
+
 
 

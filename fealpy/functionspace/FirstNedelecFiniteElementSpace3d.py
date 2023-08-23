@@ -326,7 +326,7 @@ class FirstNedelecFiniteElementSpace3d:
             gval = gD(point, vec) #(NF, 3)
 
             face2dof = self.dof.face_to_dof()[index]
-            uh[face2dof] = gval 
+            uh[face2dof] = np.linalg.norm(gval,axis=2) 
         else: #积分型自由度
             bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
             ps = mesh.bc_to_point(bcs)[:, face2edge]

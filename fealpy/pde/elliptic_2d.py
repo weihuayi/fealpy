@@ -88,3 +88,41 @@ class CosCosPDEData:
     @cartesian
     def dirichlet(self, p):
         return self.solution(p)
+
+class PoissonPDEData:
+    """
+    真解为 u(x, y) = (cos\pi x \cos\pi y) 的 Poisson 方程
+    """
+    def domain(self):
+        return np.array([0, 1, 0, 1])
+    
+    @cartesian
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = 2*pi**2*np.cos(pi*x)*np.cos(pi*y)
+        return val
+
+    @cartesian
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.cos(pi*x)*np.cos(pi*y)
+        return val
+
+    @cartesian
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float64)
+        val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        return val
+
+    @cartesian
+    def dirichlet(self, p):
+        return self.solution(p)
+
