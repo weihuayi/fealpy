@@ -89,7 +89,8 @@ class MaxwellPDE2d():
     @cartesian
     def dirichlet(self, p, t):
         val = self.solution(p)
-        return np.einsum('...ed, ed->...e', val, t)
+        # return np.einsum('...ed, ed->...e', val, t)
+        return val
 
     @cartesian
     def neumann(self, p, n):
