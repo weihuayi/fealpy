@@ -95,28 +95,10 @@ class RandomFeatureSpace(Module):
         order = len(idx)
         if order == 0:
             return self.activate(self.linear(p))
-        elif order == 1:
-            a = self.activate.d1(self.linear(p))
-            return torch.einsum("nf, f -> nf", a, self.linear.weight[:, idx[0]])
-        elif order == 2:
-            a = self.activate.d2(self.linear(p))
-            return torch.einsum("nf, f, f -> nf", a,
-                                self.linear.weight[:, idx[0]],
-                                self.linear.weight[:, idx[1]])
-        elif order == 3:
-            a = self.activate.d3(self.linear(p))
-            return torch.einsum("nf, f, f, f -> nf", a,
-                                self.linear.weight[:, idx[0]],
-                                self.linear.weight[:, idx[1]],
-                                self.linear.weight[:, idx[2]])
-        elif order == 4:
-            a = self.activate.d4(self.linear(p))
-            return torch.einsum("nf, f, f, f, f -> nf", a,
-                                self.linear.weight[:, idx[0]],
-                                self.linear.weight[:, idx[1]],
-                                self.linear.weight[:, idx[2]],
-                                self.linear.weight[:, idx[3]])
-        raise NotImplementedError("Derivatives higher than order 4 have not been implemented.")
+        else:
+            a = self.activate.dn(self.linear(p), order)
+            b = torch.prod(self.linear.weight[:, idx], dim=-1, keepdim=False)
+            return torch.einsum("nf, f -> nf", a, b)
 
 
 class RFFunction(TensorMapping):
