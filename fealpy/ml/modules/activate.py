@@ -23,6 +23,20 @@ class Activation(Module):
             cls._instance = object.__new__(cls)
         return cls._instance
 
+    def dn(self, x: Tensor, order: int) -> Tensor:
+        """
+        @brief order-specified derivative
+        """
+        if order == 0:
+            return self.forward(x)
+        elif order >= 1:
+            fn = getattr(self, 'd'+str(order), None)
+            if fn is None:
+                raise NotImplementedError(f"{order}-order derivative has not been"
+                                          f"implemented in {self.__class__.__name__}.")
+            else:
+                return fn(x)
+
     def d1(self, p: Tensor) -> Tensor:
         """
         @brief 1-order derivative
@@ -52,6 +66,13 @@ class Sin(Activation):
     def forward(self, p: Tensor):
         return sin(p)
 
+    def dn(self, x: Tensor, order: int) -> Tensor:
+        a, b = divmod(order, 2)
+        if b == 0:
+            return (-1)**a * sin(x)
+        elif b == 1:
+            return (-1)**a * cos(x)
+
     def d1(self, p: Tensor):
         return cos(p)
 
@@ -68,6 +89,13 @@ class Sin(Activation):
 class Cos(Activation):
     def forward(self, p: Tensor):
         return cos(p)
+
+    def dn(self, x: Tensor, order: int) -> Tensor:
+        a, b = divmod(order, 2)
+        if b == 0:
+            return (-1)**a * cos(x)
+        elif b == 1:
+            return -(-1)**a * sin(x)
 
     def d1(self, p: Tensor):
         return -sin(p)
