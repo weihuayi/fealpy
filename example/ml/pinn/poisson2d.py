@@ -1,6 +1,7 @@
 """
 PINN for 2-d poisson equation
 """
+from time import time
 
 import torch
 import torch.nn as nn
@@ -11,7 +12,7 @@ from fealpy.mesh import TriangleMesh, UniformMesh2d
 from fealpy.ml import gradient
 from fealpy.ml.modules import Solution
 
-
+NEW_MODEL = True
 PI = torch.pi
 
 def exact_solution(p: Tensor):
@@ -35,6 +36,7 @@ def bc_part(p: Tensor, phi):
 EXTC = 100
 HC = 1/EXTC
 
+start_time = time()
 NN: int = 64
 pinn = nn.Sequential(
     nn.Linear(2, NN, dtype=float64),
@@ -45,6 +47,14 @@ pinn = nn.Sequential(
     nn.Tanh(),
     nn.Linear(NN//4, 1, dtype=float64)
 )
+
+if not NEW_MODEL:
+    try:
+        with open("pinn_poisson2d.pth", 'r') as a:
+            state_dict = torch.load(a)
+            pinn.load_state_dict(state_dict)
+    except:
+        pass
 
 mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
 optim = torch.optim.Adam(pinn.parameters(), lr=0.01, weight_decay=0)
@@ -77,21 +87,27 @@ for epoch in range(2000):
         if epoch % 100 == 99:
             print(f"Epoch: {epoch+1} | Loss: {loss.data}")
 
+end_time = time()
 
 ### Estimate error
 
 error = s.estimate_error_tensor(exact_solution, mesh_err)
 
-print(f"Error: {error.data}")
+print(f"L-2 error: {error.data}")
+print(f"Time: {end_time - start_time}")
+
+state_dict = pinn.state_dict()
+torch.save(state_dict, "pinn_poisson2d.pth")
 
 ### Draw the result
 
 import matplotlib.pyplot as plt
-fig = plt.figure()
+fig = plt.figure("PINN for 2d poisson equation")
 
-axes = fig.add_subplot(1, 1, 1, projection='3d')
-s.diff(exact_solution).add_surface(axes, [0, 1, 0, 1], nums=[40, 40])
+axes = fig.add_subplot(111)
+qm = s.diff(exact_solution).add_pcolor(axes, [0, 1, 0, 1], nums=[40, 40])
 axes.set_xlabel('t')
 axes.set_ylabel('x')
-axes.set_zlabel('u')
+fig.colorbar(qm)
+
 plt.show()

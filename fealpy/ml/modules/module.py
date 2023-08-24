@@ -243,15 +243,18 @@ class TensorMapping(Module):
 
     def add_surface(self, axes, box: Sequence[float], nums: Sequence[int],
                     out_idx: Sequence[int]=[0, ],
-                    edgecolor='blue', linewidth=0.0003, cmap=None):
+                    edgecolor='blue', linewidth=0.0003, cmap=None,
+                    vmin=None, vmax=None):
         """
         @brief Draw a surface for modules having 2 input features.
 
-        @param axes: Axes.
+        @param axes: Axes3D.
         @param box: Seuqence[float]. Box of the plotting area. Like `[0, 1, 0, 1]`.
         @param nums: Sequence[int]. Number of points in x and y direction.
         @param out_idx: Sequence[int]. Specify the output feature(s) to plot the\
                surface. Number of surfaces is equal to the number of output features.
+
+        @returns: None.
         """
         from matplotlib import cm
         if cmap is None:
@@ -263,10 +266,36 @@ class TensorMapping(Module):
         if isinstance(u, list):
             for idx in out_idx:
                 axes.plot_surface(X, Y, u[idx], cmap=cmap, edgecolor=edgecolor,
-                                  linewidth=linewidth, antialiased=True)
+                                  linewidth=linewidth, antialiased=True,
+                                  vmin=None, vmax=None)
         else:
             axes.plot_surface(X, Y, u, cmap=cmap, edgecolor=edgecolor,
-                              linewidth=linewidth, antialiased=True)
+                              linewidth=linewidth, antialiased=True,
+                              vmin=None, vmax=None)
+
+    def add_pcolor(self, axes, box: Sequence[float], nums: Sequence[int],
+                    out_idx=0, vmin=None, vmax=None, cmap=None):
+        """
+        @brief Call pcolormesh for modules having 2 input features.
+
+        @param axes: Axes.
+        @param box: Sequence[float].
+        @param nums: Sequence[int].
+        @param out_index: int, optional. Specify the output feature to plot.
+
+        @returns: matplotlib.collections.QuadMesh
+        """
+        from matplotlib import cm
+        if cmap is None:
+            cmap = cm.RdYlBu_r
+
+        x = np.linspace(box[0], box[1], nums[0])
+        y = np.linspace(box[2], box[3], nums[1])
+        u, (X, Y) = self.meshgrid_mapping(x, y)
+        if isinstance(u, list):
+            return axes.pcolormesh(X, Y, u[out_idx], cmap=cmap, vmin=vmin, vmax=vmax)
+        else:
+            return axes.pcolormesh(X, Y, u, cmap=cmap, vmin=vmin, vmax=vmax)
 
 
 class ZeroMapping(Module):
