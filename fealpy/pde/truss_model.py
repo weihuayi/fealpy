@@ -90,7 +90,7 @@ class Truss_3d_simple_truss():
     def __init__(self):
         self.A = 1.56 # 横截面积 in^2
         self.E = 10.6e6 # 弹性模量 lb/in^2
-        self.A, self.E = TrussBase.convert_units(self.A, self.E)
+        # self.A, self.E = TrussBase.convert_units(self.A, self.E)
 
     def init_mesh(self):
         mesh = EdgeMesh.from_simple_3d_truss()
@@ -157,7 +157,7 @@ class Truss_2d_balcony_truss(TrussBase):
     def __init__(self):
         self.A = 8 # 横截面积 in^2
         self.E = 1.9e6 # 弹性模量 lb/in^2
-        self.A, self.E = TrussBase.convert_units(self.A, self.E)
+        # self.A, self.E = TrussBase.convert_units(self.A, self.E)
 
     def init_mesh(self):
         mesh = EdgeMesh.from_balcony_truss()
