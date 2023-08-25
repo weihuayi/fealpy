@@ -9,7 +9,7 @@ from torch import Tensor, cos
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, RFFunction
+from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 NEW_BASIS = False
@@ -71,7 +71,7 @@ A = csr_matrix(A_tensor.cpu().numpy())
 b = csr_matrix(b_tensor.cpu().numpy())
 
 um = spsolve(A.T@A, A.T@b)
-solution = RFFunction(space, torch.from_numpy(um))
+solution = Function(space, torch.from_numpy(um))
 end_time = time()
 
 error = solution.estimate_error_tensor(real_solution, mesh=mesh_err)

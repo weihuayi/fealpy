@@ -9,7 +9,7 @@ from torch import Tensor, exp, sin
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, RFFunction
+from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 
@@ -64,7 +64,7 @@ A = csr_matrix(A_tensor.cpu().numpy())
 b = csr_matrix(b_tensor.cpu().numpy())
 
 um = spsolve(A.T@A, A.T@b)
-solution = RFFunction(space, torch.from_numpy(um))
+solution = Function(space, torch.from_numpy(um))
 
 
 error = solution.estimate_error_tensor(real_solution, mesh=mesh_err)
@@ -81,10 +81,10 @@ axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_zlabel('phi')
 
-axes = fig.add_subplot(122, projection='3d')
-solution.diff(real_solution).add_surface(axes, box=[0, 1, 0, 1], nums=[40, 40])
+axes = fig.add_subplot(122)
+qm = solution.diff(real_solution).add_pcolor(axes, box=[0, 1, 0, 1], nums=[40, 40])
 axes.set_xlabel('x')
 axes.set_ylabel('y')
-axes.set_zlabel('phi')
+fig.colorbar(qm)
 
 plt.show()
