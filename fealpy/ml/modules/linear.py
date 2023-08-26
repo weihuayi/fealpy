@@ -8,26 +8,46 @@ from torch.nn import Module, init
 from torch.nn.parameter import Parameter
 
 
-class StackStd(Module):
+class Standardize(Module):
     """
     @brief: Standardize the inputs with sequence of centers and radius.\
-    Stack the result in dim-1.
-
-    @param centers: Tensor with shape (M, GD).
-    @param radius: Tensor with shape (M,).
-
-    @note:
-    If shape of center and radius is (M, D) and shape of input is (N, D),
-    then the shape of output is (N, M, D); where N is samples, M is number of
-    centers to standardize and D is features.
+    Stack the result with shape like (#Samples, #Centers, #Dims).
     """
     def __init__(self, centers: Tensor, radius: Tensor, device=None):
+        """
+        @param centers: Tensor with shape (M, GD).
+        @param radius: Tensor with shape (M,).
+
+        @note:
+        If shape of center and radius is (M, D) and shape of input is (N, D),
+        then the shape of output is (N, M, D); where N is samples, M is number of
+        centers to standardize and D is features.
+        """
         super().__init__()
         self.centers = Parameter(centers.to(device=device), requires_grad=False)
         self.radius = Parameter(radius.to(device=device), requires_grad=False)
 
     def forward(self, p: Tensor):
         return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, None]
+
+
+class Distance(Module):
+    """
+    @brief Calculate the distances between inputs and source points.\
+    Return with shape like (#Samples, #Sources).
+    """
+    def __init__(self, sources: Tensor, p=2, device=None) -> None:
+        """
+        @param sources: Tensor with shape (M, GD).
+        @param p: int. The order of the norm. Defaults to 2.
+        """
+        super().__init__()
+        self.p = p
+        self.sources = Parameter(sources.to(device=device), requires_grad=False)
+
+    def forward(self, p: Tensor):
+        return torch.norm(p[:, None, :] - self.sources[None, :, :], self.p,
+                          dim=-1, keepdim=False)
 
 
 class MultiLinear(Module):

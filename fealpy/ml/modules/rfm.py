@@ -5,11 +5,11 @@ Modules for the Random Feature Method
 from typing import List, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, float64
 from torch.nn import init, Linear
 
 from ..nntyping import Operator
-from .linear import StackStd
+from .linear import Standardize
 from .function_space import TensorSpace
 from .activate import Activation
 from .pou import PoU
@@ -25,7 +25,7 @@ class RandomFeatureSpace(TensorSpace):
     def __init__(self, in_dim: int, nf: int,
                  activate: Activation,
                  bound: Tuple[float, float]=(1.0, PI),
-                 dtype=torch.float64, device=None) -> None:
+                 dtype=float64, device=None) -> None:
         """
         @brief Construct a random feature model.
 
@@ -197,7 +197,7 @@ class RandomFeaturePoUSpace(TensorSpace):
         self.nlrf = nlrf
         if isinstance(radius, float):
             radius = torch.tensor(radius, dtype=centers.dtype).broadcast_to((centers.shape[0],))
-        self.std = StackStd(centers, radius)
+        self.std = Standardize(centers, radius)
         self.partions: List[LocalRandomFeatureSpace] = []
 
         for i in range(self.number_of_partitions()):
