@@ -1,6 +1,5 @@
 import time
 
-import numpy as np
 from matplotlib import pyplot as plt
 import torch
 from torch import Tensor
@@ -66,10 +65,6 @@ net_PIKFNN.apply(init_weights)
 
 s = Solution(net_PIKFNN)
 
-#优化算法、采样器、损失函数、采用学习率衰减策略
-
-mse_cost_func = nn.MSELoss(reduction='mean')
-
 #真解
 
 def solution(p:torch.Tensor) -> torch.Tensor:
@@ -94,9 +89,8 @@ sampler_err = get_mesh_sampler(10, mesh)
 start_time = time.time()
 
 nodes_on_bc = sample_points_on_square(-1, 1, num_of_points_bd)
-
 weight = net_PIKFNN[1].weight
-xs = weight.view(-1,1)
+w = weight.view(-1,1)
 basis = pikf_layer(nodes_on_bc)
 
 def get_y_hat(x):
@@ -104,7 +98,7 @@ def get_y_hat(x):
     y_hat = torch.mm(basis,x)
     return y_hat
 
-new_weight = minimize_levmarq(xs, solution(nodes_on_bc), get_y_hat )
+new_weight = minimize_levmarq(w, solution(nodes_on_bc), get_y_hat )
 net_PIKFNN[1].weight.data = new_weight.view(1, -1)
 weight_1 = net_PIKFNN[1].weight
 xs_new = weight_1.view(-1,1)
@@ -121,13 +115,13 @@ print(f"error: {error}")
 
 end_time = time.time()     
 training_time = end_time - start_time   
-print("训练时间为：", training_time, "秒")
+print("计算时间为：", training_time, "秒")
 
 #可视化真解、PIKFNN数值解、误差图像
 
 fig = plt.figure()
 axes = fig.add_subplot(131)
-Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 200])
+Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('u')
