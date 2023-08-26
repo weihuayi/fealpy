@@ -26,7 +26,7 @@ from Levenberg_Marquardt_algorithm import minimize_levmarq
 
 #超参数(配置点个数、源点个数、学习率、迭代次数)
 
-num_of_points_in = 500
+num_of_points_bd = 500
 num_of_points_source = 500
 k = torch.tensor(100) #波数
 
@@ -93,7 +93,7 @@ sampler_err = get_mesh_sampler(10, mesh)
 
 start_time = time.time()
 
-nodes_on_bc = sample_points_on_square(-1, 1, num_of_points_in)
+nodes_on_bc = sample_points_on_square(-1, 1, num_of_points_bd)
 
 weight = net_PIKFNN[1].weight
 xs = weight.view(-1,1)
