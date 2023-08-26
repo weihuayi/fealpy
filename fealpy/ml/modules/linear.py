@@ -36,18 +36,23 @@ class Distance(Module):
     @brief Calculate the distances between inputs and source points.\
     Return with shape like (#Samples, #Sources).
     """
-    def __init__(self, sources: Tensor, p=2, device=None) -> None:
+    def __init__(self, sources: Tensor, device=None) -> None:
         """
-        @param sources: Tensor with shape (M, GD).
-        @param p: int. The order of the norm. Defaults to 2.
+        @param sources: Tensor with shape (#Sources, #Dims).
         """
         super().__init__()
-        self.p = p
         self.sources = Parameter(sources.to(device=device), requires_grad=False)
 
     def forward(self, p: Tensor):
-        return torch.norm(p[:, None, :] - self.sources[None, :, :], self.p,
+        return torch.norm(p[:, None, :] - self.sources[None, :, :], p=2,
                           dim=-1, keepdim=False)
+
+    def gradient(self, p: Tensor):
+        """
+        @brief Return the gradient with shape (#Samples, #Sources, #Dims).
+        """
+        dis = self.forward(p)[:, :, None]
+        return (p[:, None, :] - self.sources[None, :, :]) / dis
 
 
 class MultiLinear(Module):
