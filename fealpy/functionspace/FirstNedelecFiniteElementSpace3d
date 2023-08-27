@@ -1,0 +1,656 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
+import numpy as np
+from numpy.linalg import inv
+
+from scipy.sparse import csr_matrix, coo_matrix
+from ..decorator import barycentric
+from .Function import Function
+from ..quadrature import FEMeshIntegralAlg
+from ..decorator import timer
+from scipy.sparse.linalg import spsolve, cg
+
+class FNDof3d:
+    def __init__(self, mesh, p=1):
+        """
+        Parameters
+        ----------
+        mesh : TetrahedronMesh object
+
+        Notes
+        -----
+
+        Reference
+        ---------
+        """
+        self.p=p
+        self.mesh = mesh
+        self.cell2dof = self.cell_to_dof() 
+
+    def boundary_dof(self, threshold=None):
+        p=self.p
+        
+        isBdEdge=self.mesh.ds.boundary_edge_flag()
+        isBdFace=self.mesh.ds.boundary_face_flag()
+        if p==1:
+            return self.mesh.ds.boundary_edge_flag()
+        elif p==2:
+            return np.r_[np.tile(isBdEdge,(2,)),np.tile(isBdFace,(2,))]
+        
+    def is_boundary_dof(self, threshold=None):
+        p=self.p
+        isBdEdge=self.mesh.ds.boundary_edge_flag()
+        isBdFace=self.mesh.ds.boundary_face_flag()
+        if p==1:
+            return self.mesh.ds.boundary_edge_flag()
+        elif p==2:
+            return np.r_[np.tile(isBdEdge,(2,)),np.tile(isBdFace,(2,))]
+        
+    def edge_to_dof(self):
+        p=self.p
+        mesh = self.mesh
+        NE=mesh.number_of_edges()
+        
+        if p==1:
+            return np.arange(NE)
+    
+        elif p==2:
+            mesh = self.mesh
+            NE = mesh.number_of_edges()
+            edgedofs=np.arange(NE)[:,None]
+            return np.concatenate((edgedofs,edgedofs+NE),axis=1)
+
+    def face_to_dof(self):
+        p=self.p
+        mesh = self.mesh
+        face2edge=mesh.ds.face_to_edge()
+        if p==1:
+            return face2edge
+        elif p==2:
+            NE=mesh.number_of_edges()
+            NF=mesh.number_of_faces()
+            facedofs=np.arange(NF)[:,None]
+            return np.concatenate((face2edge,face2edge+NE,facedofs+2*NE,facedofs+2*NE+NF),axis=1)
+
+    def cell_to_dof(self):
+        p=self.p
+        mesh = self.mesh
+        if p==1:
+            return mesh.ds.cell_to_edge()
+        elif p==2:
+            cell2edge=mesh.ds.cell_to_edge()
+            cell2face=mesh.ds.cell_to_face()
+            NE=mesh.number_of_edges()
+            NF=mesh.number_of_faces()
+            return np.concatenate((cell2edge,cell2edge+NE,cell2face+2*NE,cell2face+2*NE+NF),axis=1)
+        
+    def number_of_local_dofs(self, doftype='all'):
+        p=self.p
+        if doftype == 'all': # number of all dofs on a cell 
+            if p==1:
+                return 6
+            elif p==2:
+                return 20
+        elif doftype in {'cell', 3}: # number of dofs inside the cell 
+            return 0 
+        elif doftype in {'face', 2}: # number of dofs on a face 
+            if p==1:
+                return 3
+            elif p==2:
+                return 8
+        elif doftype in {'edge', 1}: # number of dofs on a edge
+            if p== 1:
+                return 1
+            if p== 2:
+                return 2
+        elif doftype in {'node', 0}: # number of dofs on a node
+            return 0
+
+    def number_of_global_dofs(self):
+        p=self.p
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        NF=mesh.number_of_faces()
+        if p==1:
+            return NE
+        elif p==2:
+            return 2*NE+2*NF
+
+class FirstNedelecFiniteElementSpace3d:
+    def __init__(self, mesh, p = 1, q=None, dof=None):
+        """
+        """
+        self.p = p
+        self.mesh = mesh
+
+        if dof is None:
+            self.dof = FNDof3d(mesh,p)
+        else:
+            self.dof = dof
+
+        self.integralalg = FEMeshIntegralAlg(self.mesh, 2)
+        self.integrator = self.integralalg.integrator
+
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
+
+    def boundary_dof(self):
+        return self.dof.boundary_dof()
+
+    @barycentric
+    def face_basis(self, bc, index=np.s_[:], barycenter=True):
+        """!
+        bc:numpy.ndarray
+           the shape of bc is `(3,)` or `(NQ,3)` , barycentric coordinate of a point in face f, whose vertex's order is given by `face` 
+        """
+        p = self.p
+        mesh = self.mesh
+        localEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
+
+        n = mesh.face_unit_normal()[index] #(NF, 3)
+        fm = mesh.entity_measure("face")[index]
+        face = mesh.entity("face")[index]
+        node = mesh.entity("node")
+        e = node[face[:, localEdge[:, 1]]] - node[face[:, localEdge[:, 0]]] #(NF, 3, 3)
+
+        glambda = np.cross(n[:, None], e)/(2*fm[:, None, None]) #(NF, 3, 3)
+        
+        if p==1:
+            fphi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                    localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
+                    localEdge[:, 0]]
+            f2es = mesh.ds.face_to_edge_sign().astype(np.float_)[index]
+            f2es[f2es==0] = -1
+            return fphi*f2es[..., None]
+        
+        elif p==2:
+                fphi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                        localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
+                        localEdge[:, 0]]
+                f2es = mesh.ds.face_to_edge_sign().astype(np.float_)[index]
+                f2es[f2es==0] = -1
+                fphi=fphi*f2es[...,None]#(NQ,NF,3,3)
+
+                fpsi=bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                        localEdge[:, 1]] + bc[..., None, localEdge[:, 1], None]*glambda[:,
+                        localEdge[:, 0]]#(NQ,NF,3,3)
+
+                Face2SortedEdgeFaceInd=np.argsort(mesh.ds.face_to_edge()[index])#(NF,3)
+                NF=face.shape[0]
+                Face2SortedNodeFaceInd=np.argsort(face)#(NF,3)
+                NFInd=np.arange(NF)[:,None]
+
+                fchi_1=bc[...,Face2SortedNodeFaceInd[:,1].reshape(-1,1),None]*\
+                       fphi[:,NFInd,Face2SortedEdgeFaceInd[:,1].reshape(-1,1),:]
+                #(NQ,NF,1,3)
+
+                fchi_2=bc[...,Face2SortedNodeFaceInd[:,2].reshape(-1,1),None]*\
+                       fphi[:,NFInd,Face2SortedEdgeFaceInd[:,0].reshape(-1,1),:]
+                #(NQ,NF,1,3)
+                return np.concatenate((fphi,fpsi,fchi_1,fchi_2),axis=-2)
+    @barycentric
+    def edge_basis(self, bc, index=None, barycenter=True, left=True):
+        pass
+
+    @barycentric
+    def basis(self, bc, index=np.s_[:]):
+        """
+        compute the basis function values at barycentric point bc
+
+        Parameters
+        ----------
+        bc : numpy.ndarray
+            the shape of `bc` can be `(4,) or `(NQ, 4)` 
+        Returns
+        -------
+        phi : numpy.ndarray
+            the shape of 'phi' can be `(NC, ldof, 3)` or `(NQ, NC, ldof, 3)`
+        边和面在单元中的局部编号按照LocalEdge和LocalFace来，
+
+        See Also
+        --------
+
+        Notes
+        -----
+        (NC, NQ, ldof, 3)
+        (NC, ldof, NQ, 3)
+        """
+
+        p = self.p
+        mesh = self.mesh
+        cell=mesh.entity("cell")
+        if p == 1:
+            localEdge = mesh.ds.localEdge
+            glambda = mesh.grad_lambda()[index] # (NC, 4, 3)
+            phi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                    localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
+                    localEdge[:, 0]]
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)[index]
+            c2es[c2es==0] = -1
+            return phi*c2es[..., None]
+        
+        elif p==2:
+            
+            localEdge = mesh.ds.localEdge
+            glambda = mesh.grad_lambda()[index] # (NC, 4, 3)
+            phi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                    localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
+                    localEdge[:, 0]]#(NQ,NC,6,3)
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)[index]
+            c2es[c2es==0] = -1
+            phi=phi*c2es[...,None]
+            
+            psi=bc[..., None, localEdge[:, 0], None]*glambda[:,localEdge[:, 1]] +\
+                bc[..., None, localEdge[:, 1], None]*glambda[:,localEdge[:, 0]]
+            #(NQ,NC,6,3)
+            
+            
+            
+            #设面f三个顶点全局编号为i<j<k
+            
+            #Localface2SortedNodeCellInd  (NC,4,3) 最后一个维度分别给出i,j,k在单元中的局部编号
+            LocalFace=mesh.ds.localFace
+            Localface2node=cell[:,LocalFace]
+            Localface2SortedNodeFaceInd=np.argsort(Localface2node)
+            ind1=np.arange(4)[None,:,None]
+            LocalFace2SortedNodeCellInd=LocalFace[ind1,Localface2SortedNodeFaceInd]#(NC,4,3)
+            
+            #LocalNodes2LocalEdge给定一条边两顶点的单元局部编号,求该边在单元中的局部编号
+            LocalNodes2LocalEdge=np.array([[6,0,1,2],[0,6,3,4],[1,3,6,5],[2,4,5,6]],dtype=int)
+            #LocalFace2LocalEdge (NC,NF,3) 返回eij,eik,ejk在单元中的局部编号
+            LocalFace2LocalEdge=np.concatenate((LocalNodes2LocalEdge[LocalFace2SortedNodeCellInd[...,0],LocalFace2SortedNodeCellInd[...,1]][...,None],
+                                    LocalNodes2LocalEdge[LocalFace2SortedNodeCellInd[...,0],LocalFace2SortedNodeCellInd[...,2]][...,None],
+                                    LocalNodes2LocalEdge[LocalFace2SortedNodeCellInd[...,1],LocalFace2SortedNodeCellInd[...,2]][...,None]),axis=-1)
+            
+            NC=mesh.number_of_cells()
+            NCind=np.arange(NC)[:,None]
+            
+            chi_1=bc[...,LocalFace2SortedNodeCellInd[...,1],None]*phi[:,NCind,LocalFace2LocalEdge[...,1],:]
+            #(NQ,NC,4,3)
+        
+            chi_2=bc[...,LocalFace2SortedNodeCellInd[...,2],None]*phi[:,NCind,LocalFace2LocalEdge[...,0],:]
+            #(NQ,NC,4,3)
+            
+            Basis=np.concatenate((phi,psi,chi_1,chi_2),axis=-2)
+            
+            return Basis
+
+    @barycentric
+    def curl_basis(self, bc, index=np.s_[:]):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+
+        """
+        p = self.p
+        mesh = self.mesh
+        cell=mesh.entity("cell")
+        NC = mesh.number_of_cells()
+
+        if p == 1:
+            localEdge = mesh.ds.localEdge
+            glambda = mesh.grad_lambda() # (NC, 4, 3)
+            cphi = 2*np.cross(glambda[:, localEdge[:, 0]], glambda[:, localEdge[:, 1]])
+
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)
+            c2es[c2es==0] = -1
+            cphi = cphi*c2es[..., None]
+
+            shape = bc.shape[:-1] + cphi.shape
+            cphi = np.broadcast_to(cphi, shape)
+            return cphi
+        
+        elif p==2:
+            
+            localEdge = mesh.ds.localEdge
+            glambda = mesh.grad_lambda() # (NC, 4, 3)
+            cphi = 2*np.cross(glambda[:, localEdge[:, 0]], glambda[:, localEdge[:, 1]])
+
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)
+            c2es[c2es==0] = -1
+            cphi = cphi*c2es[..., None]
+
+            shape = bc.shape[:-1] + cphi.shape
+            cphi = np.broadcast_to(cphi, shape)
+            
+            
+            
+            cpsi=np.zeros(shape,dtype=np.float_)
+            
+            
+            LocalFace=mesh.ds.localFace
+            
+            #设面f三个顶点全局编号为i<j<k
+            
+            #Localface2SortedNodeCellInd  (NC,4,3) 最后一个维度分别给出i,j,k在单元中的局部编号
+            LocalFace=mesh.ds.localFace
+            Localface2node=cell[:,LocalFace]
+            Localface2SortedNodeFaceInd=np.argsort(Localface2node)
+            ind1=np.arange(4)[None,:,None]
+            LocalFace2SortedNodeCellInd=LocalFace[ind1,Localface2SortedNodeFaceInd]#(NC,4,3)
+            
+            #LocalNodes2LocalEdge给定一条边两顶点的单元局部编号,求该边在单元中的局部编号
+            LocalNodes2LocalEdge=np.array([[6,0,1,2],[0,6,3,4],[1,3,6,5],[2,4,5,6]],dtype=int)
+            #LocalFace2LocalEdge (NC,NF,3) 返回eij,eik,ejk在单元中的局部编号
+            LocalFace2LocalEdge=np.concatenate((LocalNodes2LocalEdge[LocalFace2SortedNodeCellInd[...,0],LocalFace2SortedNodeCellInd[...,1]][...,None],
+                                    LocalNodes2LocalEdge[LocalFace2SortedNodeCellInd[...,0],LocalFace2SortedNodeCellInd[...,2]][...,None],
+                                    LocalNodes2LocalEdge[LocalFace2SortedNodeCellInd[...,1],LocalFace2SortedNodeCellInd[...,2]][...,None]),axis=-1)
+            
+            NC=mesh.number_of_cells()
+            NCind=np.arange(NC)[:,None]
+            
+            
+            phi=self.basis(bc)
+            cchi_1=np.cross(glambda[NCind,LocalFace2SortedNodeCellInd[...,1],:], phi[:,NCind,LocalFace2LocalEdge[...,1],:])+\
+                   bc[:,LocalFace2SortedNodeCellInd[...,1],None]*cphi[:,NCind,LocalFace2LocalEdge[...,1],:]
+                
+            cchi_2=np.cross(glambda[NCind,LocalFace2SortedNodeCellInd[...,2],:], phi[:,NCind,LocalFace2LocalEdge[...,0],:])+\
+                   bc[:,LocalFace2SortedNodeCellInd[...,2],None]*cphi[:,NCind,LocalFace2LocalEdge[...,0],:]
+                
+            CurlBasis=np.concatenate((cphi,cpsi,cchi_1,cchi_2),axis=-2)
+            return CurlBasis
+
+
+    def cell_to_dof(self):
+        return self.dof.cell2dof
+
+    def number_of_global_dofs(self):
+        return self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self, doftype='all'):
+        return self.dof.number_of_local_dofs(doftype)
+
+    @barycentric
+    def value(self, uh, bc, index=np.s_[:]):
+        phi = self.basis(bc, index=index)
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[cell2dof[index]])
+        return val
+
+    @barycentric
+    def curl_value(self, uh, bc, index=np.s_[:]):
+        cphi = self.curl_basis(bc, index=index)
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, cphi, uh[cell2dof[index]])
+        return val
+
+    @barycentric
+    def edge_value(self, uh, bc, index=np.s_[:], left=True):
+        phi = self.edge_basis(bc, index=index, left=left)
+        edge2dof = self.dof.edge_to_dof()[index] 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[edge2dof])
+        return val
+
+    @barycentric
+    def grad_value(self, uh, bc, index=np.s_[:]):
+        pass
+
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, coordtype='barycentric',
+                dtype=dtype)
+
+    def project(self, u):
+        A = self.mass_matrix()
+        b = self.source_vector(u)
+        up = self.function()
+        up[:] = spsolve(A, b)
+        return up
+
+    def interpolation(self, u, node, edge, face, face2edge):
+        """
+       interpolates a given function u into the FirstNedelecFiniteElementSpace.
+       
+        Parameters
+        ----------
+        u : a function
+        in general case, node,edge,face,face2edge is given by self.mesh
+        However,when we consider interpolate a dirichlet term, edge, face ,face2edge are given by bdEdge,bdFace,bdFace2edge
+        ----------
+        
+        Returns
+        -------
+        uI : the coefficients in FiniteElementSpace
+             a numpy.ndarray, the shape of 'uI' is `(2NE+2NF, )` 
+        --------
+       """
+        p=self.p
+        Edge=np.sort(edge)
+        Face=np.sort(face)
+        Face2Edge=np.sort(face2edge)
+        #edges are enumerated by the dicitionary order of its vertex, so the edge with the smallest global ID is eij.
+       
+        NE=Edge.shape[0]
+        NF=Face.shape[0]
+        N=node.shape[0]
+        
+        if p==1:
+            uI=np.zeros(NE,dtype=np.float_)
+            et=node[Edge[:,1]]-node[Edge[:,0]]
+            point = (node[Edge[:, 0]]+node[Edge[:, 1]])/2
+ 
+            uI[:] = np.sum(u(point)*et, axis=-1)
+            return uI
+        
+        elif p==2:
+            uI=np.zeros(2*NE+2*NF,dtype=np.float_)
+            
+           # Evaluate function at vertices and middle points
+            mid=(node[Edge[:,0]]+node[Edge[:,1]])/2
+            uQ=u(np.r_[node,mid])
+            
+            
+           # Edge dof coefficients
+            et=node[Edge[:,1]]-node[Edge[:,0]]
+            uI[0:NE]=np.sum((uQ[Edge[:,1]]+4*uQ[N:N+NE]+uQ[Edge[:,0]])/6*et,axis=-1)
+            uI[NE:2*NE]=np.sum((uQ[Edge[:,0]]-uQ[Edge[:,1]])/2*et,axis=-1)
+            
+            
+           #Face dof coefficients
+        
+            eik=node[Face[:,2]]-node[Face[:,0]]
+            eij=node[Face[:,1]]-node[Face[:,0]]
+            uquadpts=uQ[N+face2edge[:,0]]+uQ[N+face2edge[:,1]]+uQ[N+face2edge[:,2]]
+            lf=np.c_[4*np.sum(eik*uquadpts,axis=-1),4*np.sum(eij*uquadpts,axis=-1)]#(NF,2)
+            face2edgeDofValue=np.c_[uI[Face2Edge[:,0:3]],uI[NE+Face2Edge[:,0:3]]]#(NF,6)
+            
+            localMatrix=np.transpose(np.array([[4,8,4,-4,0,4],[8,4,-4,0,-4,4]]))
+    
+            lf=lf-face2edgeDofValue@localMatrix
+            uI[2*NE:]=np.r_[2*lf[:,0]-lf[:,1],-lf[:,0]+2*lf[:,1]]/3
+            return uI
+
+    def mass_matrix(self, c=None, q=None, dtype=np.float_):
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        Basis = self.basis(bcs) #(NQ, NC, ldof, 3)
+        cm = self.mesh.cell_volume()
+        cell2dof = self.cell_to_dof()
+
+        val = np.einsum("qclg, qcmg, q, c->clm", Basis, Basis, ws, cm)
+        I = np.broadcast_to(cell2dof[..., None], val.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], val.shape)
+        gdof = self.dof.number_of_global_dofs()
+        return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
+                dtype=dtype)
+
+    def curl_matrix(self, c=None, q=None, dtype=np.float_):
+        """
+
+        Notes:
+
+        组装 (c*\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
+        """
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        curlBasis = self.curl_basis(bcs) #(NQ, NC, ldof, 3)
+        cm = self.mesh.cell_volume()
+        cell2dof = self.cell_to_dof()
+
+        val = np.einsum("qclg, qcmg, q, c->clm", curlBasis, curlBasis, ws, cm)
+        I = np.broadcast_to(cell2dof[..., None], val.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], val.shape)
+        gdof = self.dof.number_of_global_dofs()
+        return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
+                dtype=dtype)
+
+
+    def source_vector(self, f, dtype=np.float_):
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        Basis = self.basis(bcs) #(NQ, NC, ldof, 3)
+        cm = self.mesh.cell_volume()
+        cell2dof = self.cell_to_dof()
+
+        point = self.mesh.bc_to_point(bcs) 
+        fval = f(point) #(NQ, NC, 3)
+
+        val = np.einsum("qclg, qcg, q, c->cl", Basis, fval, ws, cm)
+        gdof = self.dof.number_of_global_dofs()
+        F = np.zeros(gdof, dtype=dtype)
+        np.add.at(F, cell2dof, val)
+        return F
+
+
+
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+        """
+        Parameters
+        ----------
+        threshold: a dirichlet face index array , its shape is (NDbdF,)
+        ----------
+        """
+        p=self.p
+        mesh = self.mesh
+        node = mesh.entity("node")
+        edge = mesh.entity("edge")
+        face = mesh.entity("face")
+        NE=mesh.number_of_edges()
+        NF=mesh.number_of_faces()
+        
+        #Find Dirichlet faces and edges 
+        if type(threshold) is np.ndarray:
+            bdfaceIndex = threshold
+        else:
+            bdfaceIndex = self.mesh.ds.boundary_face_index()
+            
+        bdFace=face[bdfaceIndex]
+        isBdFace=np.zeros(NF,dtype=np.bool_)
+        isBdFace[bdfaceIndex]=True
+        
+        bdFace2edge = mesh.ds.face_to_edge()[bdfaceIndex]
+
+        isBdEdge=np.zeros(NE,dtype=np.bool_)
+        isBdEdge[bdFace2edge]=True
+        bdEdge=edge[isBdEdge,:]
+        
+        
+        if p==1: 
+            isDDof=isBdEdge
+            uh[isDDof]=self.interpolation(gD,node,bdEdge,bdFace,bdFace2edge)
+            return isDDof
+        
+        elif p==2:
+            isDDof=np.r_[isBdEdge,isBdEdge,isBdFace,isBdFace]
+            
+            #这里要特别注意.原bdFace2edge每个元素的值是边的全局编号，而interpolation中的bdFace2edge需要边在bdEdge中的编号.
+            edgeIdxMap=np.zeros(NE,dtype=int)
+            edgeIdxMap[isBdEdge]=np.arange(bdEdge.shape[0])
+            bdFace2edge=edgeIdxMap[bdFace2edge]
+            
+            uh[isDDof]=self.interpolation(gD,node,bdEdge,bdFace,bdFace2edge)
+            
+            return isDDof
+
+    def set_neumann_bc(self, gN, F=None, threshold=None):
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷向量 F 中
+
+        """
+        p = self.p
+        mesh = self.mesh
+        gdof = self.number_of_global_dofs()
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+
+        face2dof = self.dof.face_to_dof()[index]
+
+        qf = self.integralalg.faceintegrator 
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        measure = mesh.entity_measure('face', index=index)
+
+        phi = self.face_basis(bcs)[:, index]
+        pp = mesh.bc_to_point(bcs, index=index)
+        n = mesh.face_unit_normal(index=index)
+
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        if F is None:
+            F = np.zeros((gdof, ), dtype=self.ftype)
+
+        bb = np.einsum('q, qfd, qfld, f->fl', ws, val, phi, measure)
+        np.add.at(F, face2dof, bb)
+        return F
+
+    def array(self, dim=None, dtype=np.float64):
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=dtype)
+
+    def show_basis(self, fig, index=0, box=None):
+        """
+        Plot quvier graph for every basis in a fig object
+        """
+        from .femdof import multi_index_matrix3d
+
+        p = self.p
+        mesh = self.mesh
+
+        ldof = self.number_of_local_dofs()
+
+        bcs = multi_index_matrix2d(10)/10
+        ps = mesh.bc_to_point(bcs)
+        phi = self.basis(bcs)
+
+        if p == 0:
+            m = 1
+            n = 3
+        elif p == 1:
+            m = 4 
+            n = 2 
+        elif p == 2:
+            m = 5 
+            n = 3 
+        for i in range(ldof):
+            axes = fig.add_subplot(m, n, i+1)
+            mesh.add_plot(axes, box=box)
+            node = ps[:, index, :]
+            uv = phi[:, index, i, :]
+            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1], 
+                    units='xy')
+
