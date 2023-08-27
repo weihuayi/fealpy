@@ -101,7 +101,6 @@ start_time = time.time()
 Loss = []
 Error= []
 
-
 for epoch in range(iteration+1):
 
     optim.zero_grad()
