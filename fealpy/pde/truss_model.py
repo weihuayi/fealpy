@@ -100,7 +100,7 @@ class Truss_3d_simple_truss():
 class Truss_2d_four_bar():
     def __init__(self):
         self.A = 100 # 横截面积 mm^2
-        self.E = 29.5e4 # 弹性模量 ton/mm^2
+        self.E = 29.5e4 # 弹性模量 newton/mm^2
 
     def init_mesh(self):
         mesh = EdgeMesh.from_four_bar()

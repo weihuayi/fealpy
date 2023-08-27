@@ -1,7 +1,7 @@
 import numpy as np
 
 class BeamStructureIntegrator:
-    def __init__(self, E, A, I, G, q :int = 3):
+    def __init__(self, E, A, I, G, q = 3):
         """
         BeamStructureIntegrator 类的初始化
 

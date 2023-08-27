@@ -308,7 +308,7 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_cantilever_beam_2d(cls):
+    def from_cantilever(cls):
         # 单位为 m
         node = np.array([
             [0], [5], [7.5]], dtype=np.float64)
@@ -324,7 +324,7 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_three_beam_2d(cls):
+    def from_three_beam(cls):
         # 单位为 m
         node = np.array([
             [0, 0.96], [1.44, 0.96], 
