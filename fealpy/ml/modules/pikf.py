@@ -19,9 +19,13 @@ class KernelFunctionSpace(TensorSpace):
         self.out_dim = 1
         self.ns = sources.shape[0]
 
-        self.radius_layer = Distance(sources=sources, p=2, device=device)
+        self.radius_layer = Distance(sources=sources, device=device)
 
         self.kernel = kernel
+
+    @property
+    def source(self):
+        return self.radius_layer.sources
 
     def number_of_basis(self) -> int:
         return self.ns

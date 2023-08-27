@@ -9,7 +9,7 @@ from torch import Tensor, cos
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function
+from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function, RandomFeatureSpace
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 NEW_BASIS = False
@@ -31,7 +31,7 @@ def source(p: Tensor):
 
 EXT = 1
 H = 1/EXT
-Jn = 128
+Jn = 64
 
 EXTC = 50
 HC = 1/EXTC
@@ -43,11 +43,22 @@ node = torch.from_numpy(mesh.entity('node')).clone()
 space = RandomFeaturePoUSpace(2, Jn, Cos(), PoUSin(), centers=node, radius=H/2,
                               bound=(PI, PI), print_status=True)
 
+def init_freq(model):
+    if isinstance(model, RandomFeatureSpace):
+        nf = model.number_of_basis()
+        # space.frequency[:] = sqrt(K**2/2)
+        model.frequency[:nf//4, 0] = PI/2
+        model.frequency[nf//4:nf//4*2, 1] = PI/2
+        model.frequency[nf//4*2:nf//4*3, :] = PI/2
+        model.frequency[nf//4*3:, 0] = PI/2
+        model.frequency[nf//4*3:, 1] = -PI/2
+
+space.apply(init_freq)
+
 if not NEW_BASIS:
     try:
-        with open("rfspace_poisson2d.pth", 'r') as a:
-            state_dict = torch.load(a)
-            space.load_state_dict(state_dict)
+        state_dict = torch.load("rfspace_poisson2d.pth")
+        space.load_state_dict(state_dict)
     except:
         pass
 

@@ -54,6 +54,14 @@ class RandomFeatureSpace(TensorSpace):
         init.uniform_(self.linear.weight, -bound[0], bound[0])
         init.uniform_(self.linear.bias, -bound[1], bound[1])
 
+    @property
+    def frequency(self):
+        return self.linear.weight
+
+    @property
+    def phrase(self):
+        return self.linear.bias
+
     def number_of_basis(self):
         return self.nf
 
