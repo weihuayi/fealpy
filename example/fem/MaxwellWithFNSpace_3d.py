@@ -20,7 +20,7 @@ from fealpy.pde.MaxwellPDE_3d import SinData as PDE
 pde = PDE()
 maxit = 5
 errorType = ['$|| E - E_h||_{\Omega,0}$']
-errorMatrix = np.zeros((1, maxit), dtype=np.float64)
+errorMatrix = np.zeros(maxit)
 NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
@@ -53,7 +53,10 @@ for i in range(maxit):
 
     Eh[:] = spsolve(B, b)
     # 计算误差
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, Eh)
+    errorMatrix[i] = space.integralalg.error(pde.solution, Eh)
+    print(errorMatrix[i])
 
-print(errorMatrix)
+print('ratio')
+for i in range(1,maxit):
+    print(errorMatrix[i-1]/errorMatrix[i])
 

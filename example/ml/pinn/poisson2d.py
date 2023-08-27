@@ -1,91 +1,113 @@
+"""
+PINN for 2-d poisson equation
+"""
+from time import time
 
 import torch
 import torch.nn as nn
-import numpy as np
+from torch import Tensor, cos, float64
+from torch.optim.lr_scheduler import ExponentialLR
 
-from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh import TriangleMesh
-from fealpy.ml import LearningMachine, gradient
+from fealpy.mesh import TriangleMesh, UniformMesh2d
+from fealpy.ml import gradient
 from fealpy.ml.modules import Solution
-from fealpy.ml.sampler import BoxBoundarySampler, TriangleMeshSampler
 
+NEW_MODEL = True
+PI = torch.pi
 
-class RecCosh(nn.Module):
-    r"""Uses the element-wise activation function.
-    """
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return 1/torch.cosh(input)
+def exact_solution(p: Tensor):
+    x = p[:, 0:1]
+    y = p[:, 1:2]
+    return cos(PI * x) * cos(PI * y)
 
-pde = CosCosData()
-
-NN: int = 64
-pinn = nn.Sequential(
-    nn.Linear(2, NN),
-    RecCosh(),
-    nn.Linear(NN, NN//2),
-    RecCosh(),
-    nn.Linear(NN//2, NN//4),
-    RecCosh(),
-    nn.Linear(NN//4, 1)
-)
-
-def pde_part(p: torch.Tensor, phi):
+def pde_part(p: Tensor, phi):
+    x = p[:, 0:1]
+    y = p[:, 1:2]
     u = phi(p)
     u_x, u_y = gradient(u, p, create_graph=True, split=True)
     u_xx, _ = gradient(u_x, p, create_graph=True, split=True)
     _, u_yy = gradient(u_y, p, create_graph=True, split=True)
+    return u_xx + u_yy + 2 * PI**2 * cos(PI * x) * cos(PI * y)
 
-    return u_xx + u_yy + np.pi**2 * u
+def bc_part(p: Tensor, phi):
+    return phi(p) - exact_solution(p)
 
-def bc(x: torch.Tensor, phi):
-    return phi(x) - pde.dirichlet(x).unsqueeze(-1)
 
+EXTC = 100
+HC = 1/EXTC
+
+start_time = time()
+NN: int = 64
+pinn = nn.Sequential(
+    nn.Linear(2, NN, dtype=float64),
+    nn.Tanh(),
+    nn.Linear(NN, NN//2, dtype=float64),
+    nn.Tanh(),
+    nn.Linear(NN//2, NN//4, dtype=float64),
+    nn.Tanh(),
+    nn.Linear(NN//4, 1, dtype=float64)
+)
+
+if not NEW_MODEL:
+    try:
+        with open("pinn_poisson2d.pth", 'r') as a:
+            state_dict = torch.load(a)
+            pinn.load_state_dict(state_dict)
+    except:
+        pass
 
 mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
 optim = torch.optim.Adam(pinn.parameters(), lr=0.01, weight_decay=0)
+lrs = ExponentialLR(optim, gamma=0.9977)
+loss_fn = nn.MSELoss()
 s = Solution(pinn)
-lm = LearningMachine(s)
-# sampler1 = ISampler(300, [[0, 1], [0, 1]], requires_grad=True)
-sampler1 = TriangleMeshSampler(5, mesh, requires_grad=True)
-sampler2 = BoxBoundarySampler(3000, [0, 0], [1, 1])
 
 
-for epoch in range(1200):
+mesh_col = UniformMesh2d((0, EXTC, 0, EXTC), (HC, HC), origin=(0, 0))
+_bd_node = mesh_col.ds.boundary_node_flag()
+col_in = torch.from_numpy(mesh_col.entity('node', index=~_bd_node))
+col_bd = torch.from_numpy(mesh_col.entity('node', index=_bd_node))
+col_in.requires_grad_(True)
+col_bd.requires_grad_(False)
+
+mesh_err = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
+
+for epoch in range(2000):
     optim.zero_grad()
-    mse_f = lm.loss(sampler1, pde_part)
-    mse_b = lm.loss(sampler2, bc)
+    out_pde = pde_part(col_in, pinn)
+    out_bc = bc_part(col_bd, pinn)
+    mse_f = loss_fn(out_pde, torch.zeros_like(out_pde))
+    mse_b = loss_fn(out_bc, torch.zeros_like(out_bc))
     loss = 0.1*mse_f + 0.9*mse_b
     loss.backward()
     optim.step()
+    lrs.step()
 
     with torch.autograd.no_grad():
-        if (epoch + 1) % 100 == 0:
-            print(f"Epoch: {epoch} | Loss: {loss.data}")
+        if epoch % 100 == 99:
+            print(f"Epoch: {epoch+1} | Loss: {loss.data}")
 
+end_time = time()
 
 ### Estimate error
 
-from fealpy.functionspace import LagrangeFiniteElementSpace
+error = s.estimate_error_tensor(exact_solution, mesh_err)
 
-mesh2 = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
-space = LagrangeFiniteElementSpace(mesh2)
-error = s.estimate_error(pde.solution, mesh2, squeeze=True)
+print(f"L-2 error: {error.data}")
+print(f"Time: {end_time - start_time}")
 
-print(f"Error: {np.sqrt(error)}")
+state_dict = pinn.state_dict()
+torch.save(state_dict, "pinn_poisson2d.pth")
 
 ### Draw the result
 
-from matplotlib import cm
 import matplotlib.pyplot as plt
-fig = plt.figure()
+fig = plt.figure("PINN for 2d poisson equation")
 
-x = np.linspace(0, 1, 30)
-y = np.linspace(0, 1, 30)
-u, (X, Y) = s.meshgrid_mapping(x, y)
-
-axes = fig.add_subplot(1, 1, 1, projection='3d')
-axes.plot_surface(X, Y, u, cmap=cm.RdYlBu_r, edgecolor='blue', linewidth=0.0003, antialiased=True)
+axes = fig.add_subplot(111)
+qm = s.diff(exact_solution).add_pcolor(axes, [0, 1, 0, 1], nums=[40, 40])
 axes.set_xlabel('t')
 axes.set_ylabel('x')
-axes.set_zlabel('u')
+fig.colorbar(qm)
+
 plt.show()

@@ -2,15 +2,15 @@
 Modules for the Random Feature Method
 """
 
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union
 
 import torch
-from torch import Tensor
-from torch.nn import init, Linear, Module
+from torch import Tensor, float64
+from torch.nn import init, Linear
 
 from ..nntyping import Operator
-from .linear import StackStd
-from .module import TensorMapping
+from .linear import Standardize
+from .function_space import TensorSpace
 from .activate import Activation
 from .pou import PoU
 
@@ -21,11 +21,11 @@ PI = torch.pi
 ### Random Feature Models
 ################################################################################
 
-class RandomFeatureSpace(Module):
+class RandomFeatureSpace(TensorSpace):
     def __init__(self, in_dim: int, nf: int,
                  activate: Activation,
                  bound: Tuple[float, float]=(1.0, PI),
-                 dtype=torch.float64, device=None) -> None:
+                 dtype=float64, device=None) -> None:
         """
         @brief Construct a random feature model.
 
@@ -95,70 +95,10 @@ class RandomFeatureSpace(Module):
         order = len(idx)
         if order == 0:
             return self.activate(self.linear(p))
-        elif order == 1:
-            a = self.activate.d1(self.linear(p))
-            return torch.einsum("nf, f -> nf", a, self.linear.weight[:, idx[0]])
-        elif order == 2:
-            a = self.activate.d2(self.linear(p))
-            return torch.einsum("nf, f, f -> nf", a,
-                                self.linear.weight[:, idx[0]],
-                                self.linear.weight[:, idx[1]])
-        elif order == 3:
-            a = self.activate.d3(self.linear(p))
-            return torch.einsum("nf, f, f, f -> nf", a,
-                                self.linear.weight[:, idx[0]],
-                                self.linear.weight[:, idx[1]],
-                                self.linear.weight[:, idx[2]])
-        elif order == 4:
-            a = self.activate.d4(self.linear(p))
-            return torch.einsum("nf, f, f, f, f -> nf", a,
-                                self.linear.weight[:, idx[0]],
-                                self.linear.weight[:, idx[1]],
-                                self.linear.weight[:, idx[2]],
-                                self.linear.weight[:, idx[3]])
-        raise NotImplementedError("Derivatives higher than order 4 have not been implemented.")
-
-
-class RFFunction(TensorMapping):
-    def __init__(self, space: RandomFeatureSpace, um: Optional[Tensor]) -> None:
-        super().__init__()
-        dtype = space.dtype
-        device = space.device
-        M = space.number_of_basis()
-
-        self.space = space
-        self.uml = Linear(M, 1, bias=False, device=device, dtype=dtype)
-        if um is None:
-            init.zeros_(self.uml.weight)
         else:
-            self.set_um_inplace(um)
-
-    @property
-    def um(self):
-        """
-        @brief The `um` Tensor object inside the module, with shape (1, M).
-        """
-        return self.uml.weight
-
-    def numpy(self):
-        """
-        @brief Return `um` as numpy array, with shape (M, ), where M is number of\
-               basis.
-        """
-        return self.um.detach().cpu().numpy()[0, :]
-
-    def set_um_inplace(self, value: Tensor):
-        """
-        @brief Set values of um inplace. `value` must be in shape of (1, M) or\
-               (M, ), where M is the number of basis.
-        """
-        if value.ndim == 1:
-            value = value[None, :]
-        with torch.no_grad():
-            self.uml.weight[:] = value
-
-    def forward(self, x: Tensor): # (N, 1)
-        return self.uml(self.space.basis_value(x)) # (N, 1)
+            a = self.activate.dn(self.linear(p), order)
+            b = torch.prod(self.linear.weight[:, idx], dim=-1, keepdim=False)
+            return torch.einsum("nf, f -> nf", a, b)
 
 
 class LocalRandomFeatureSpace(RandomFeatureSpace):
@@ -240,7 +180,7 @@ class LocalRandomFeatureSpace(RandomFeatureSpace):
         return ret
 
 
-class RandomFeaturePoUSpace(Module):
+class RandomFeaturePoUSpace(TensorSpace):
     def __init__(self, in_dim: int, nlrf: int, activate: Activation, pou: PoU,
                  centers: Tensor, radius: Union[float, Tensor],
                  bound: Tuple[float, float]=(1.0, PI), print_status=False) -> None:
@@ -257,7 +197,7 @@ class RandomFeaturePoUSpace(Module):
         self.nlrf = nlrf
         if isinstance(radius, float):
             radius = torch.tensor(radius, dtype=centers.dtype).broadcast_to((centers.shape[0],))
-        self.std = StackStd(centers, radius)
+        self.std = Standardize(centers, radius)
         self.partions: List[LocalRandomFeatureSpace] = []
 
         for i in range(self.number_of_partitions()):
@@ -298,14 +238,6 @@ class RandomFeaturePoUSpace(Module):
     @property
     def device(self):
         return self.std.centers.device
-
-    def forward(self, p: Tensor):
-        std = self.std(p) # (N, d) -> (N, Mp, d)
-        ret = torch.zeros((p.shape[0], 1), dtype=p.dtype, device=p.device)
-        for i in range(self.number_of_partitions()):
-            x = std[:, i, :] # (N, d)
-            ret += self.partions[i](x) # (N, 1)
-        return ret # (N, 1)
 
     def scale(self, p: Tensor, operator: Operator):
         """

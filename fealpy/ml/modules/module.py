@@ -37,9 +37,21 @@ class TensorMapping(Module):
         """
         setattr(self, '_device', device)
 
-    ### module
-
     __call__: Callable[..., Tensor]
+
+    ### dim operating
+
+    def last_dim(self, p: Tensor):
+        """
+        @brief Apply the model on the last dim/axis of the input `p`. Other dims\
+               will be preserved.
+        """
+        origin_shape = p.shape[:-1]
+        p = p.reshape(-1, p.shape[-1])
+        val = self(p)
+        return val.reshape(origin_shape + (val.shape[-1], ))
+
+    ### module wrapping
 
     def diff(self, target: TensorFunction):
         """
@@ -73,7 +85,7 @@ class TensorMapping(Module):
 
     ### numpy & mesh
 
-    def from_numpy(self, ps: NDArray, device=None) -> Tensor:
+    def from_numpy(self, ps: NDArray, device=None, last_dim=False) -> Tensor:
         """
         @brief Accept numpy array as input, and return in Tensor type.
 
@@ -81,6 +93,8 @@ class TensorMapping(Module):
         @param device: torch.device | None. Specify the device when making tensor\
                from numpy array. Use the deivce of parameters in the module if\
                `None`. If no parameters in the module, use cpu by default.
+        @param last_dim: bool. Apply the model on the last axis of the input if\
+               `True`, and other axis will be preserved. Defaults to `False`.
 
         @return: Tensor.
 
@@ -89,11 +103,13 @@ class TensorMapping(Module):
         pt = torch.from_numpy(ps)
         if device is None:
             device = self.get_device()
-        return self.forward(pt.to(device=device))
+        if last_dim:
+            return self.last_dim(pt.to(device=device))
+        return self(pt.to(device=device))
 
     from_numpy.__dict__['coordtype'] = 'cartesian'
 
-    def from_cell_bc(self, bc: NDArray, mesh) -> Tensor:
+    def from_cell_bc(self, bc: NDArray, mesh, device=None) -> Tensor:
         """
         @brief From bc in mesh cells to outputs of the solution.
 
@@ -105,38 +121,31 @@ class TensorMapping(Module):
                  is the shape of the function output.
         """
         points = mesh.cell_bc_to_point(bc)
-        return self.from_numpy(points)
+        return self.from_numpy(points, device=device, last_dim=True)
 
-    def get_cell_bc_func(self, mesh):
-        """
-        @brief Generate a barycentric function for the module, defined in the\
-               given mesh cells.
-
-        @return: A function with coordtype `barycentric`.
-        """
-        def func(bc: NDArray) -> NDArray:
-            points = mesh.cell_bc_to_point(bc)
-            return self.from_numpy(points).detach().numpy()
-        func.__dict__['coordtype'] = 'barycentric'
-        return func
+    ### error
 
     def estimate_error(self, other: VectorFunction, mesh=None, power: int=2, q: int=3,
-                       cell_type: bool=False, coordtype: str='b', squeeze: bool=False):
+                       cell_type: bool=False, coordtype: str='b', squeeze: bool=False,
+                       device=None):
         """
         @brief Calculate error between the solution and `other` in finite element space `space`.
 
         @param other: VectorFunction. The function(target) to be compared with.
         @param mesh: MeshLike, optional. A mesh in which the error is estimated. If `other` is a function in finite\
-                     element space, use mesh of the space instead and this parameter will be ignored.
+               element space, use mesh of the space instead and this parameter will be ignored.
         @param power: int. Defaults to 2, which means to measure L-2 error by default.
         @param q: int. The index of quadratures.
         @param cell_type: bool. Split error values from each cell if `True`, and the shape of return will be (NC, ...)\
-                      where 'NC' refers to number of cells, and '...' is the shape of function output. If `False`,\
-                      the output has the same shape to the funtion output. Defaults to `False`.
-        @param coordtype: `'barycentric'`(`'b'`) or `'cartesian'`(`'c'`). Defaults to `'b'`. This parameter will be\
-                          ignored if `other` has attribute `coordtype`.
+               where 'NC' refers to number of cells, and '...' is the shape of function output. If `False`,\
+               the output has the same shape to the funtion output. Defaults to `False`.
+        @param coordtype: `'barycentric'`(`'b'`) or `'cartesian'`(`'c'`). The coordtype\
+               of the target `other`. Defaults to `'b'`. This parameter will be\
+               ignored if `other` has attribute `coordtype`.
         @param squeeze: bool. Defaults to `False`. Squeeze the function output before calculation.\
-                        This is sometimes useful when estimating error for an 1-output network.
+               This is sometimes useful when estimating error for an 1-output network.
+        @param device: device | None. Use the device of the parameter in the model\
+               if `None`.
 
         @return: error.
         """
@@ -158,14 +167,14 @@ class TensorMapping(Module):
         if coordtype in {'cartesian', 'c'}:
 
             ps = mesh.cell_bc_to_point(bcs)
-            val = self.from_numpy(ps).cpu().detach().numpy()
+            val = self.from_numpy(ps, device=device, last_dim=True).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
             diff = np.abs(val - other(ps))**power
 
         elif coordtype in {'barycentric', 'b'}:
 
-            val = self.from_cell_bc(bcs, mesh).cpu().detach().numpy()
+            val = self.from_cell_bc(bcs, mesh, device=device).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
             diff = np.abs(val - other(bcs))**power
@@ -184,7 +193,7 @@ class TensorMapping(Module):
         """
         @brief Estimate error between the function and another tensor function.
 
-        @param other: TensorFunction.
+        @param other: TensorFunction. The target to compare with.
         @param mesh: Mesh. The mesh to estimate error.
         @param power: int, optional. The order of L-error, defaults to 2.
         @param q: int, optional. The index of quadratures, defualts to 3.
@@ -243,15 +252,18 @@ class TensorMapping(Module):
 
     def add_surface(self, axes, box: Sequence[float], nums: Sequence[int],
                     out_idx: Sequence[int]=[0, ],
-                    edgecolor='blue', linewidth=0.0003, cmap=None):
+                    edgecolor='blue', linewidth=0.0003, cmap=None,
+                    vmin=None, vmax=None):
         """
         @brief Draw a surface for modules having 2 input features.
 
-        @param axes: Axes.
+        @param axes: Axes3D.
         @param box: Seuqence[float]. Box of the plotting area. Like `[0, 1, 0, 1]`.
         @param nums: Sequence[int]. Number of points in x and y direction.
         @param out_idx: Sequence[int]. Specify the output feature(s) to plot the\
                surface. Number of surfaces is equal to the number of output features.
+
+        @returns: None.
         """
         from matplotlib import cm
         if cmap is None:
@@ -263,10 +275,36 @@ class TensorMapping(Module):
         if isinstance(u, list):
             for idx in out_idx:
                 axes.plot_surface(X, Y, u[idx], cmap=cmap, edgecolor=edgecolor,
-                                  linewidth=linewidth, antialiased=True)
+                                  linewidth=linewidth, antialiased=True,
+                                  vmin=None, vmax=None)
         else:
             axes.plot_surface(X, Y, u, cmap=cmap, edgecolor=edgecolor,
-                              linewidth=linewidth, antialiased=True)
+                              linewidth=linewidth, antialiased=True,
+                              vmin=None, vmax=None)
+
+    def add_pcolor(self, axes, box: Sequence[float], nums: Sequence[int],
+                    out_idx=0, vmin=None, vmax=None, cmap=None):
+        """
+        @brief Call pcolormesh for modules having 2 input features.
+
+        @param axes: Axes.
+        @param box: Sequence[float].
+        @param nums: Sequence[int].
+        @param out_index: int, optional. Specify the output feature to plot.
+
+        @returns: matplotlib.collections.QuadMesh
+        """
+        from matplotlib import cm
+        if cmap is None:
+            cmap = cm.RdYlBu_r
+
+        x = np.linspace(box[0], box[1], nums[0])
+        y = np.linspace(box[2], box[3], nums[1])
+        u, (X, Y) = self.meshgrid_mapping(x, y)
+        if isinstance(u, list):
+            return axes.pcolormesh(X, Y, u[out_idx], cmap=cmap, vmin=vmin, vmax=vmax)
+        else:
+            return axes.pcolormesh(X, Y, u, cmap=cmap, vmin=vmin, vmax=vmax)
 
 
 class ZeroMapping(Module):

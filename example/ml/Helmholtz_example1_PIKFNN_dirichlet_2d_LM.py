@@ -1,4 +1,5 @@
-import numpy as np
+import time
+
 from matplotlib import pyplot as plt
 import torch
 from torch import Tensor
@@ -10,21 +11,22 @@ from fealpy.ml.sampler import get_mesh_sampler
 from fealpy.ml.integral import linf_error
 from fealpy.mesh import TriangleMesh
 
-from uniformly_placed import sample_points_on_circle
+from uniformly_placed import sample_points_on_square
 from Levenberg_Marquardt_algorithm import minimize_levmarq
 
 #方程形式
 
 """
-    \Delta u(x,y) + k**2 * u(x,y) = 0 ,   (x,y)\in \Omega
-    u(x,y) = \sin(k*x + k*y) ,         (x,y)\in \partial\Omega
+
+    \Delta u(x,y) + k**2 * u(x,y) = 0 ,                            (x,y)\in \Omega
+    u(x,y) = \sin(\sqrt{k**2/2} * x + \sqrt{k**2/2} * y) ,         (x,y)\in \partial\Omega
 
 """
 
-#超参数(配置点个数、源点个数)
+#超参数(配置点个数、源点个数、学习率、迭代次数)
 
-NN = 300
-NS = 300
+num_of_points_bd = 500
+num_of_points_source = 500
 k = torch.tensor(100) #波数
 
 #PIKF层
@@ -37,24 +39,20 @@ class PIKF_layer(nn.Module):
     def kernel_func(self, input: torch.Tensor) ->torch.Tensor:
         a = input[:, None, :] - self.source_nodes[None, :, :]
         r = torch.sqrt((a[..., 0:1]**2 + a[..., 1:2]**2).view(input.shape[0], -1))
-        val = bessel_y0(k * r)/(2 * torch.pi)
+        val = bessel_y0(k* r)/(2 * torch.pi)
 
         return val
 
     def forward(self, p: Tensor) -> torch.Tensor:
         return self.kernel_func(p)
-
-#对配置点和源点进行采样
-
-source_nodes = sample_points_on_circle(0, 0, 3, NS)#源点在虚假边界上采样
-nodes_on_bc = sample_points_on_circle(0.0, 0.0, 1.0 , NN)
+    
+pikf_layer = PIKF_layer(sample_points_on_square(-2.5, 2.5, num_of_points_source))#源点在虚假边界上采样
 
 #PIKFNN的网络结构
 
-pikf_layer = PIKF_layer(source_nodes)
 net_PIKFNN = nn.Sequential(
                            pikf_layer,
-                           nn.Linear(NS, 1, dtype=torch.float64, bias=False)
+                           nn.Linear(num_of_points_source, 1, dtype=torch.float64, bias=False)
                            )
 
 def init_weights(m):
@@ -74,7 +72,7 @@ def solution(p:torch.Tensor) -> torch.Tensor:
     x = p[...,0:1]
     y = p[...,1:2]
 
-    return torch.sin(k*x) + torch.cos(k*y)
+    return torch.sin(torch.sqrt(k**2/2) * x + torch.sqrt(k**2/2) * y)
 
 #边界条件
 
@@ -83,13 +81,16 @@ def bc(p:torch.Tensor, u) -> torch.Tensor:
 
 #构建网格用于计算误差
 
-mesh = TriangleMesh.from_unit_circle_gmsh(0.02)
+mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx=100, ny=100)
 sampler_err = get_mesh_sampler(10, mesh)
 
-#提取网络层参数并更新
+# 提取网络参数并更新
 
+start_time = time.time()
+
+nodes_on_bc = sample_points_on_square(-1, 1, num_of_points_bd)
 weight = net_PIKFNN[1].weight
-xs = weight.view(-1,1)
+w = weight.view(-1,1)
 basis = pikf_layer(nodes_on_bc)
 
 def get_y_hat(x):
@@ -97,7 +98,7 @@ def get_y_hat(x):
     y_hat = torch.mm(basis,x)
     return y_hat
 
-new_weight = minimize_levmarq(xs, solution(nodes_on_bc), get_y_hat )
+new_weight = minimize_levmarq(w, solution(nodes_on_bc), get_y_hat )
 net_PIKFNN[1].weight.data = new_weight.view(1, -1)
 weight_1 = net_PIKFNN[1].weight
 xs_new = weight_1.view(-1,1)
@@ -105,25 +106,37 @@ xs_new = weight_1.view(-1,1)
 #计算两种误差
 
 L2_error = torch.sqrt(
-            torch.sum((basis @ xs_new - solution(nodes_on_bc))**2, dim = 0)\
+            torch.sum((s(nodes_on_bc) - solution(nodes_on_bc))**2, dim = 0)\
             /torch.sum(solution(nodes_on_bc)**2, dim = 0)
           )
 print(f"L2_error: {L2_error}")
 error = linf_error(s, solution, sampler=sampler_err)
 print(f"error: {error}")
 
-#可视化真解u和数值解u_PIKFNN
+end_time = time.time()     
+training_time = end_time - start_time   
+print("计算时间为：", training_time, "秒")
 
-bc_ = np.array([1/3, 1/3, 1/3])
-ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)
+#可视化真解、PIKFNN数值解、误差图像
 
-u = solution(ps).detach().numpy()
-u_PIKFNN = s(ps).detach().numpy()
+fig = plt.figure()
+axes = fig.add_subplot(131)
+Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+axes.set_xlabel('x')
+axes.set_ylabel('y')
+axes.set_title('u')
 
-fig, axes = plt.subplots(1, 2)
-mesh.add_plot(axes[0], cellcolor=u, linewidths=0, aspect=1)
-mesh.add_plot(axes[1], cellcolor=u_PIKFNN, linewidths=0, aspect=1)
-axes[0].set_title('u')
-axes[1].set_title('u_PIKFNN')
+axes = fig.add_subplot(132)
+s.add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+axes.set_xlabel('x')
+axes.set_ylabel('y')
+axes.set_title('u_PIKFNN')
+
+axes = fig.add_subplot(133)
+qm = s.diff(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+axes.set_xlabel('x')
+axes.set_ylabel('y')
+axes.set_title('diff')
+fig.colorbar(qm)
 
 plt.show()

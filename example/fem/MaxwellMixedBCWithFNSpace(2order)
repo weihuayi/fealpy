@@ -1,0 +1,76 @@
+
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.io import savemat
+# solver
+from scipy.sparse import bmat
+from scipy.sparse.linalg import spsolve, cg
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
+
+from fealpy.functionspace import FirstKindNedelecFiniteElementSpace3d
+from fealpy.fem import DirichletBC # 处理边界条件
+
+from fealpy.pde.MaxwellPDE_3d import Sin3dData as PDE
+from fealpy.tools.show import showmultirate, show_error_table
+
+
+pde = PDE()
+maxit = 4
+errorType = ['$|| E - E_h||_{\Omega,0}$']
+errorMatrix = np.zeros((1, maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
+
+for i in range(maxit):
+    print("The {}-th computation:".format(i))
+    mesh = pde.init_mesh(2**i)
+
+    #建立函数空间
+    space=FirstKindNedelecFiniteElementSpace3d.FirstNedelecFiniteElementSpace3d(mesh,p=2)
+    gdof=space.dof.number_of_global_dofs()
+    print("全局自由度个数:",gdof)
+    NDof[i] = gdof
+
+    #得到组装后的刚度矩阵A、质量矩阵M和载荷向量b
+    M = space.mass_matrix()
+    A=space.curl_matrix()
+    b = space.source_vector(pde.source)
+    B=A-M
+
+    ##施加边界条件,先施加Neumann边界条件再施加Dirichlet边界条件
+    Eh=space.function()
+
+    bdtype = pde.boundary_type(mesh)
+    neumannBD = bdtype["neumann"]
+    dirichletBD = bdtype["dirichlet"]
+
+    #Set non-zero Neumann Boundary Condition
+    b_corrected=space.set_neumann_bc(pde.neumann,b,threshold=neumannBD)
+    #Set non-zero Dirichlet Boundary Condition
+    isDDof = space.set_dirichlet_bc(pde.dirichlet, Eh,threshold=dirichletBD)
+    b_corrected=b_corrected-B@Eh
+    b_corrected[isDDof] = Eh[isDDof]
+    bdIdx = np.zeros(B.shape[0], dtype=np.int_)
+    bdIdx[isDDof] = 1
+    Tbd = spdiags(bdIdx, 0, B.shape[0], B.shape[0])
+    T = spdiags(1-bdIdx, 0, B.shape[0], B.shape[0])
+    bigBD = T@B@T + Tbd
+
+    #Solve the linear system
+    Eh[:] = spsolve(bigBD, b_corrected)
+    space.integralalg.error(pde.solution, Eh)
+
+    #evaluate the error
+    errorMatrix[0,i] = space.integralalg.error(pde.solution, Eh)
+    print('L2 Error:',errorMatrix[0,i])
+
+showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
+show_error_table(NDof, errorType, errorMatrix)
+
+fname = "Ord.png"
+plt.show()
+plt.savefig(fname, dpi=400)
+
+print('ratio')
+for i in range(1,maxit):
+    print(errorMatrix[0,i-1]/errorMatrix[0,i])

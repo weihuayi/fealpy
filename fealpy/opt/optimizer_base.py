@@ -1,8 +1,10 @@
-
 from typing import TypedDict, Callable, Tuple, Union
+
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import spmatrix
+
 from numpy.typing import NDArray
+
 import numpy as np
 
 
