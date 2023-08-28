@@ -10,7 +10,7 @@ from torch.nn import init, Linear
 
 from ..nntyping import Operator
 from .linear import Standardize
-from .function_space import TensorSpace
+from .function_space import FunctionSpaceBase
 from .activate import Activation
 from .pou import PoU
 
@@ -21,7 +21,7 @@ PI = torch.pi
 ### Random Feature Models
 ################################################################################
 
-class RandomFeatureSpace(TensorSpace):
+class RandomFeatureSpace(FunctionSpaceBase):
     def __init__(self, in_dim: int, nf: int,
                  activate: Activation,
                  bound: Tuple[float, float]=(1.0, PI),
@@ -56,29 +56,35 @@ class RandomFeatureSpace(TensorSpace):
 
     @property
     def frequency(self):
+        """
+        @brief The "frequency" of the basis. Shape: (nf, GD).
+        """
         return self.linear.weight
 
     @property
     def phrase(self):
+        """
+        @brief The "phrase" of the basis. Shape: (nf, ).
+        """
         return self.linear.bias
 
     def number_of_basis(self):
         return self.nf
 
-    def basis_value(self, p: Tensor) -> Tensor:
+    def basis(self, p: Tensor) -> Tensor:
         """
         @brief Return values of basis, with shape (N, nf).
         """
         return self.activate(self.linear(p))
 
-    def basis_gradient(self, p: Tensor) -> Tensor:
+    def grad_basis(self, p: Tensor) -> Tensor:
         """
         @brief Return gradient vector of basis, with shape (N, nf, GD).
         """
         a = self.activate.d1(self.linear(p))
         return torch.einsum("nf, fx -> nfx", a, self.linear.weight)
 
-    def basis_hessian(self, p: Tensor) -> Tensor:
+    def hessian_basis(self, p: Tensor) -> Tensor:
         """
         @brief Return hessian matrix of basis, with shape (N, nf, GD, GD).
         """
@@ -86,7 +92,7 @@ class RandomFeatureSpace(TensorSpace):
         return torch.einsum("nf, fx, fy -> nfxy", a,
                             self.linear.weight, self.linear.weight)
 
-    def basis_laplace(self, p: Tensor) -> Tensor:
+    def laplace_basis(self, p: Tensor) -> Tensor:
         """
         @brief Return basis evaluated by laplace operator, with shape (N, nf).
         """
@@ -94,7 +100,7 @@ class RandomFeatureSpace(TensorSpace):
         return torch.einsum("nf, fd, fd -> nf", a,
                             self.linear.weight, self.linear.weight)
 
-    def basis_derivative(self, p: Tensor, *idx: int) -> Tensor:
+    def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
         """
         @brief Return specified partial derivatives of basis, with shape (N, nf).
 
@@ -131,54 +137,54 @@ class LocalRandomFeatureSpace(RandomFeatureSpace):
         """
         return self.pou.flag(p)
 
-    def basis_value(self, p: Tensor):
-        return super().basis_value(p) * self.pou(p)
+    def basis(self, p: Tensor):
+        return super().basis(p) * self.pou(p)
 
-    def basis_gradient(self, p: Tensor):
-        ret = torch.einsum("nd, nf -> nfd", self.pou.gradient(p), super().basis_value(p))
-        ret += self.pou(p)[..., None] * super().basis_gradient(p)
+    def grad_basis(self, p: Tensor):
+        ret = torch.einsum("nd, nf -> nfd", self.pou.gradient(p), super().basis(p))
+        ret += self.pou(p)[..., None] * super().grad_basis(p)
         return ret
 
-    def basis_hessian(self, p: Tensor):
-        ret = torch.einsum("nxy, nf -> nfxy", self.pou.hessian(p), super().basis_value(p))
+    def hessian_basis(self, p: Tensor):
+        ret = torch.einsum("nxy, nf -> nfxy", self.pou.hessian(p), super().basis(p))
         cross = torch.einsum("nx, nfy -> nfxy", self.pou.gradient(p),
-                             super().basis_gradient(p))
+                             super().grad_basis(p))
         ret += cross + torch.transpose(cross, -1, -2)
-        ret += self.pou(p)[..., None, None] * super().basis_hessian(p)
+        ret += self.pou(p)[..., None, None] * super().hessian_basis(p)
         return ret
 
-    def basis_laplace(self, p: Tensor):
-        ret = torch.einsum("ndd, nf -> nf", self.pou.hessian(p), super().basis_value(p))
+    def laplace_basis(self, p: Tensor):
+        ret = torch.einsum("ndd, nf -> nf", self.pou.hessian(p), super().basis(p))
         ret += 2 * torch.einsum("nd, nfd -> nf", self.pou.gradient(p),
-                                super().basis_gradient(p))
-        ret += self.pou(p) * super().basis_laplace(p)
+                                super().grad_basis(p))
+        ret += self.pou(p) * super().laplace_basis(p)
         return ret
 
-    def basis_derivative(self, p: Tensor, *idx: int):
+    def derivative_basis(self, p: Tensor, *idx: int):
         N = p.shape[0]
         nf = self.number_of_basis()
         order = len(idx)
         ret = torch.zeros((N, nf), dtype=self.dtype, device=self.device)
 
         if order == 0:
-            ret[:] = self.basis_value(p)
+            ret[:] = self.basis(p)
         elif order == 1:
-            ret += self.pou.derivative(p, idx[0]) * super().basis_value(p)
-            ret += self.pou(p) * super().basis_derivative(p, idx[0])
+            ret += self.pou.derivative(p, idx[0]) * super().basis(p)
+            ret += self.pou(p) * super().derivative_basis(p, idx[0])
         elif order == 2:
-            ret += self.pou.derivative(p, idx[0], idx[1]) * super().basis_value(p)
-            ret += self.pou.derivative(p, idx[0]) * super().basis_derivative(p, idx[1])
-            ret += self.pou.derivative(p, idx[1]) * super().basis_derivative(p, idx[0])
-            ret += self.pou(p) * super().basis_derivative(p, idx[0], idx[1])
+            ret += self.pou.derivative(p, idx[0], idx[1]) * super().basis(p)
+            ret += self.pou.derivative(p, idx[0]) * super().derivative_basis(p, idx[1])
+            ret += self.pou.derivative(p, idx[1]) * super().derivative_basis(p, idx[0])
+            ret += self.pou(p) * super().derivative_basis(p, idx[0], idx[1])
         elif order == 3:
-            ret += self.pou.derivative(p, idx[0], idx[1], idx[2]) * super().basis_value(p)
-            ret += self.pou.derivative(p, idx[0], idx[1]) * super().basis_derivative(p, idx[2])
-            ret += self.pou.derivative(p, idx[1], idx[2]) * super().basis_derivative(p, idx[0])
-            ret += self.pou.derivative(p, idx[2], idx[0]) * super().basis_derivative(p, idx[1])
-            ret += self.pou.derivative(p, idx[0]) * super().basis_derivative(p, idx[2], idx[1])
-            ret += self.pou.derivative(p, idx[1]) * super().basis_derivative(p, idx[0], idx[2])
-            ret += self.pou.derivative(p, idx[2]) * super().basis_derivative(p, idx[1], idx[0])
-            ret += self.pou(p) * super().basis_derivative(p, idx[0], idx[1], idx[2])
+            ret += self.pou.derivative(p, idx[0], idx[1], idx[2]) * super().basis(p)
+            ret += self.pou.derivative(p, idx[0], idx[1]) * super().derivative_basis(p, idx[2])
+            ret += self.pou.derivative(p, idx[1], idx[2]) * super().derivative_basis(p, idx[0])
+            ret += self.pou.derivative(p, idx[2], idx[0]) * super().derivative_basis(p, idx[1])
+            ret += self.pou.derivative(p, idx[0]) * super().derivative_basis(p, idx[2], idx[1])
+            ret += self.pou.derivative(p, idx[1]) * super().derivative_basis(p, idx[0], idx[2])
+            ret += self.pou.derivative(p, idx[2]) * super().derivative_basis(p, idx[1], idx[0])
+            ret += self.pou(p) * super().derivative_basis(p, idx[0], idx[1], idx[2])
 
         elif order == 4:
             pass
@@ -188,7 +194,7 @@ class LocalRandomFeatureSpace(RandomFeatureSpace):
         return ret
 
 
-class RandomFeaturePoUSpace(TensorSpace):
+class RandomFeaturePoUSpace(FunctionSpaceBase):
     def __init__(self, in_dim: int, nlrf: int, activate: Activation, pou: PoU,
                  centers: Tensor, radius: Union[float, Tensor],
                  bound: Tuple[float, float]=(1.0, PI), print_status=False) -> None:
@@ -260,11 +266,11 @@ class RandomFeaturePoUSpace(TensorSpace):
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
             flag = part.flag(x) # Only take samples inside the supporting area
-            psiphi = self.partions[idx].basis_value(x[flag, ...]) # (N, nf)
+            psiphi = self.partions[idx].basis(x[flag, ...]) # (N, nf)
             partition_max[idx] = torch.max(operator(p, psiphi))
         return torch.max(partition_max)
 
-    def basis_value(self, p: Tensor):
+    def basis(self, p: Tensor):
         """
         @brief Return values of all basis functions.
 
@@ -279,12 +285,12 @@ class RandomFeaturePoUSpace(TensorSpace):
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
             flag = part.flag(x) # Only take samples inside the supporting area
-            ret[flag, idx*Jn:(idx+1)*Jn] = part.basis_value(x[flag, ...])
+            ret[flag, idx*Jn:(idx+1)*Jn] = part.basis(x[flag, ...])
         return ret
 
-    U = basis_value
+    U = basis
 
-    def basis_laplace(self, p: Tensor):
+    def laplace_basis(self, p: Tensor):
         """
         @brief Return values of the Laplacian applied to all basis functions.
         """
@@ -296,12 +302,12 @@ class RandomFeaturePoUSpace(TensorSpace):
         for idx, part in enumerate(self.partions):
             x = std[:, idx, :]
             flag = part.flag(x) # Only take samples inside the supporting area
-            ret[flag, idx*Jn:(idx+1)*Jn] = part.basis_laplace(x[flag, ...])/self.std.radius[idx]**2
+            ret[flag, idx*Jn:(idx+1)*Jn] = part.laplace_basis(x[flag, ...])/self.std.radius[idx]**2
         return ret
 
-    L = basis_laplace
+    L = laplace_basis
 
-    def basis_derivative(self, p: Tensor, *idx: int):
+    def derivative_basis(self, p: Tensor, *idx: int):
         """
         @brief Return the partial derivatives of all basis functions\
                with respect to the specified independent variables.
@@ -315,7 +321,7 @@ class RandomFeaturePoUSpace(TensorSpace):
         for i, part in enumerate(self.partions):
             x = std[:, i, :]
             flag = part.flag(x) # Only take samples inside the supporting area
-            ret[flag, i*Jn:(i+1)*Jn] = part.basis_derivative(x[flag, ...], *idx)/self.std.radius[i]**order
+            ret[flag, i*Jn:(i+1)*Jn] = part.derivative_basis(x[flag, ...], *idx)/self.std.radius[i]**order
         return ret
 
-    D = basis_derivative
+    D = derivative_basis
