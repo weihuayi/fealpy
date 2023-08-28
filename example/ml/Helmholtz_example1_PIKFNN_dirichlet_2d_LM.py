@@ -8,10 +8,6 @@ import torch.nn as nn
 from torch.special import bessel_y0
 
 from fealpy.ml.modules import Solution
-# from fealpy.ml.sampler import get_mesh_sampler
-# from fealpy.ml.integral import linf_error
-# from fealpy.mesh import TriangleMesh
-
 from uniformly_placed import sample_points_on_square
 from Levenberg_Marquardt_algorithm import minimize_levmarq
 
