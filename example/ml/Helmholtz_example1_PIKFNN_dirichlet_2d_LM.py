@@ -1,5 +1,6 @@
 import time
 
+import numpy as np
 from matplotlib import pyplot as plt
 import torch
 from torch import Tensor
@@ -7,10 +8,6 @@ import torch.nn as nn
 from torch.special import bessel_y0
 
 from fealpy.ml.modules import Solution
-from fealpy.ml.sampler import get_mesh_sampler
-from fealpy.ml.integral import linf_error
-from fealpy.mesh import TriangleMesh
-
 from uniformly_placed import sample_points_on_square
 from Levenberg_Marquardt_algorithm import minimize_levmarq
 
@@ -18,16 +15,16 @@ from Levenberg_Marquardt_algorithm import minimize_levmarq
 
 """
 
-    \Delta u(x,y) + k**2 * u(x,y) = 0 ,                            (x,y)\in \Omega
-    u(x,y) = \sin(\sqrt{k**2/2} * x + \sqrt{k**2/2} * y) ,         (x,y)\in \partial\Omega
+    \Delta u(x,y) + k^2 * u(x,y) = 0 ,                            (x,y)\in \Omega
+    u(x,y) = \sin(\sqrt{k^2/2} * x + \sqrt{k^2/2} * y) ,         (x,y)\in \partial\Omega
 
 """
 
-#超参数(配置点个数、源点个数、学习率、迭代次数)
+#超参数(配置点个数、源点个数、波数)
 
-num_of_points_bd = 500
-num_of_points_source = 500
-k = torch.tensor(100) #波数
+num_of_points_in = 6000
+num_of_points_source = 6000
+k = torch.tensor(1000, dtype=torch.float64) 
 
 #PIKF层
 
@@ -44,6 +41,7 @@ class PIKF_layer(nn.Module):
         return val
 
     def forward(self, p: Tensor) -> torch.Tensor:
+
         return self.kernel_func(p)
     
 pikf_layer = PIKF_layer(sample_points_on_square(-2.5, 2.5, num_of_points_source))#源点在虚假边界上采样
@@ -79,16 +77,12 @@ def solution(p:torch.Tensor) -> torch.Tensor:
 def bc(p:torch.Tensor, u) -> torch.Tensor:
     return u - solution(p)
 
-#构建网格用于计算误差
-
-mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx=100, ny=100)
-sampler_err = get_mesh_sampler(10, mesh)
-
 # 提取网络参数并更新
 
 start_time = time.time()
 
-nodes_on_bc = sample_points_on_square(-1, 1, num_of_points_bd)
+nodes_on_bc = sample_points_on_square(-1, 1, num_of_points_in)
+
 weight = net_PIKFNN[1].weight
 w = weight.view(-1,1)
 basis = pikf_layer(nodes_on_bc)
@@ -98,42 +92,30 @@ def get_y_hat(x):
     y_hat = torch.mm(basis,x)
     return y_hat
 
-new_weight = minimize_levmarq(w, solution(nodes_on_bc), get_y_hat )
+new_weight = minimize_levmarq(w, solution(nodes_on_bc), get_y_hat, max_iters=30 )
 net_PIKFNN[1].weight.data = new_weight.view(1, -1)
+del new_weight
 weight_1 = net_PIKFNN[1].weight
 xs_new = weight_1.view(-1,1)
+del weight_1
 
-#计算两种误差
+#计算L2相对误差
 
 L2_error = torch.sqrt(
             torch.sum((s(nodes_on_bc) - solution(nodes_on_bc))**2, dim = 0)\
             /torch.sum(solution(nodes_on_bc)**2, dim = 0)
           )
 print(f"L2_error: {L2_error}")
-error = linf_error(s, solution, sampler=sampler_err)
-print(f"error: {error}")
 
 end_time = time.time()     
 training_time = end_time - start_time   
-print("计算时间为：", training_time, "秒")
+print("训练时间为：", training_time, "秒")
 
-#可视化真解、PIKFNN数值解、误差图像
+#画出误差图像
 
 fig = plt.figure()
-axes = fig.add_subplot(131)
-Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
-axes.set_xlabel('x')
-axes.set_ylabel('y')
-axes.set_title('u')
-
-axes = fig.add_subplot(132)
-s.add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
-axes.set_xlabel('x')
-axes.set_ylabel('y')
-axes.set_title('u_PIKFNN')
-
-axes = fig.add_subplot(133)
-qm = s.diff(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+axes = fig.add_subplot()
+qm = s.diff(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[250, 250])
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('diff')
