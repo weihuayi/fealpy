@@ -319,7 +319,7 @@ class FirstNedelecFiniteElementSpace3d:
 
         face2edge = mesh.ds.face_to_edge()[index]
 
-        if 1: #节点型自由度
+        if 0: #节点型自由度
             locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
             point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
             vec = mesh.edge_tangent()[face2edge]

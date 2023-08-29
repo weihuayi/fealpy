@@ -17,8 +17,8 @@ class TrussStructureIntegrator:
 
     def assembly_cell_matrix(self, space: Tuple, 
                             index: Optional[Union[int, slice]] = np.s_[:],
-                            cellmeasure: Optional[np.ndarray] = None, 
-                            out: Optional[np.ndarray] = None):
+                            cellmeasure = None, 
+                            out = None):
         """
         组装单元网格的刚度矩阵
 
@@ -45,14 +45,12 @@ class TrussStructureIntegrator:
 
         c = self.E*self.A
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
-        print("tan_shape:", tan.shape)
-        print("tan:\n", tan)
+        print("坐标变换矩阵 T:\n", tan)
 
         R = np.einsum('ik, im->ikm', tan, tan)
-        print("R_shape:", R.shape)
-        print("R:\n", R)
         R *= c/cellmeasure[:, None, None]
-        print("R:\n", R)
+        print("局部单元刚度矩阵形状:", R.shape)
+        print("局部单元刚度矩阵 R:\n", R)
 
         ldof = 2 # 一个单元两个自由度, @TODO 高次元的情形？本科毕业论文
         if out is None:
@@ -75,13 +73,10 @@ class TrussStructureIntegrator:
                     # 同一方向上的自由度，对角块的元素都是正的
                     if i == j:
                         K[:, i*GD:(i+1)*GD, i*GD:(i+1)*GD] += R
-                        print("K1:\n", K)
                     # 不同方向上的自由度，非对角块的元素都是负的
                     else:
                         K[:, i*GD:(i+1)*GD, j*GD:(j+1)*GD] -= R
-                        print("K2:\n", K)
                         K[:, j*GD:(j+1)*GD, i*GD:(i+1)*GD] -= R
-                        print("K3:\n", K)
 
         if out is None:
             return K
