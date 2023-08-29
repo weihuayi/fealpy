@@ -1,7 +1,8 @@
 import numpy as np
-from scipy.sparse import csr_matrix
 
+from scipy.sparse import csr_matrix
 from numpy.typing import NDArray
+
 from typing import Union
 from types import ModuleType
 
