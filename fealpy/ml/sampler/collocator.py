@@ -2,17 +2,17 @@
 from typing import Tuple, List
 
 import torch
-from torch import device, Tensor
+from torch import device, Tensor, float64
 
-from .sampler import Sampler
+from .sampler import Sampler, _MeshSampler
 
 
 class Collocator(Sampler):
     """
-    Generate collocation points.
+    Generate collocation points uniformly in n-d rectangle.
     """
-    def __init__(self, box: Tuple[float], nums: Tuple[int],
-                 dtype=torch.float64,
+    def __init__(self, box: Tuple[float], steps: Tuple[int],
+                 dtype=float64,
                  device: device=None, requires_grad: bool=False) -> None:
         """
         @brief Prepare to generate collocation points.
@@ -27,14 +27,14 @@ class Collocator(Sampler):
         self.nd, r = divmod(len(box), 2)
         if r != 0:
             raise ValueError(f"Length of box must be even, but got {len(box)}.")
-        if self.nd != len(nums):
+        if self.nd != len(steps):
             raise ValueError(f"Length of nums must match the area dimension.")
 
         self.starts = box[::2]
         self.stops = box[1::2]
-        self.steps = nums
+        self.steps = steps
         from functools import reduce
-        m = reduce(lambda x, y: x*y, nums, 1)
+        m = reduce(lambda x, y: x*y, steps, 1)
         super().__init__(m, dtype, device, requires_grad)
 
     def run(self):
@@ -44,3 +44,20 @@ class Collocator(Sampler):
                                        dtype=self.dtype, device=self.device,
                                        requires_grad=self.requires_grad))
         return torch.stack(torch.meshgrid(*lins, indexing='ij'), dim=-1).reshape(-1, self.nd)
+
+
+class CircleCollocator(Sampler):
+    """
+    Generate collocation points uniformly on a 2-d circle.
+    """
+    def __init__(self, cx: float=0, cy: float=0, r: float=1, nums=10,
+                 dtype=float64, device=None, requires_grad=False) -> None:
+        super().__init__(nums, dtype, device, requires_grad)
+        self.cx, self.cy, self.r = cx, cy, r
+
+    def run(self):
+        angles = torch.linspace(0, 2*torch.pi, self.m+1)
+        x = self.cx + self.r * torch.cos(angles)
+        y = self.cy + self.r * torch.sin(angles)
+        points = torch.stack((x, y), dim=1).to(float64)
+        return points[:-1, ...]

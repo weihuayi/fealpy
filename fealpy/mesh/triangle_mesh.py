@@ -1948,9 +1948,9 @@ class TriangleMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_domain_distmesh(cls, domain, hmin, maxit=100):
+    def from_domain_distmesh(cls, domain, hmin, maxit=100, output=True):
         from .DistMesher2d import DistMesher2d
-        mesher = DistMesher2d(domain, hmin)
+        mesher = DistMesher2d(domain, hmin, output=output)
         mesh = mesher.meshing(maxit=maxit)
         return mesh
 

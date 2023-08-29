@@ -253,6 +253,91 @@ class EdgeMesh(Mesh, Plotable):
 
         return mesh 
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_four_bar(cls):
+        # 单位为 mm
+        node = np.array([
+            [0, 0], [400, 0], 
+            [400, 300], [0, 300]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [2, 1], 
+            [0, 2], [3, 2]], dtype=np.int_)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([0, 1, 3], dtype=np.int_), np.zeros(2))
+        mesh.meshdata['force_bc'] = (np.array([1, 2], dtype=np.int_), 
+                                     np.array([[2e4, 0], [0, -2.5e4]], dtype=np.float64))
+
+        return mesh 
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_balcony_truss(cls):
+        # 单位为英寸 in
+        node = np.array([
+            [0, 0], [36, 0], 
+            [0, 36], [36, 36], [72, 36]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [1, 2], [2, 3],
+            [1, 3], [1, 4], [3, 4]], dtype=np.int_)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([0, 2], dtype=np.int_), np.zeros(2))
+        mesh.meshdata['force_bc'] = (np.array([3, 4], dtype=np.int_), np.array([[0, -500], [0, -500]]))
+
+        return mesh 
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_simple_3d_truss(cls):
+        # 单位为英寸 in
+        node = np.array([
+            [0, 0, 36], [72, 0, 0], 
+            [0, 0, -36], [0, 72, 0]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [0, 2], [0, 3],
+            [1, 2], [1, 3], [2, 3]], dtype=np.int_)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
+
+        return mesh 
+
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_cantilever(cls):
+        # 单位为 m
+        node = np.array([
+            [0], [5], [7.5]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [1, 2]], dtype=np.int_)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
+
+        return mesh 
+
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_three_beam(cls):
+        # 单位为 m
+        node = np.array([
+            [0, 0.96], [1.44, 0.96], 
+            [0, 0], [1.44, 0]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [2, 0], [3, 1]], dtype=np.int_)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
+
+        return mesh 
+
 
 EdgeMesh.set_ploter('1d')
 

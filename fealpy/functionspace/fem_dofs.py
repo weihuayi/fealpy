@@ -252,7 +252,7 @@ class EdgeMeshCFEDof():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = mesh.multi_index_matrix(p) 
+        self.multiIndex = mesh.multi_index_matrix(p, etype=mesh.top_dimension()) 
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -300,7 +300,7 @@ class EdgeMeshDFEDof():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = mesh.multi_index_matrix() 
+        self.multiIndex = mesh.multi_index_matrix(p, etype=mesh.top_dimension()) 
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -334,7 +334,7 @@ class EdgeMeshDFEDof():
         cell2dof = np.arange(NC*(p+1)).reshape(NC, p+1)
         return cell2dof
 
-    def number_of_local_dofs(self, _):
+    def number_of_local_dofs(self, doftype='cell'):
         return self.p + 1
 
     def number_of_global_dofs(self):

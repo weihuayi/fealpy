@@ -15,7 +15,9 @@ from fealpy.ml.integral import linf_error
 from fealpy.mesh import TriangleMesh
 
 from uniformly_placed import sample_points_on_square
+
 #方程形式
+
 """
     \Delta u(x,y) + 200 * u(x,y) = 0 ,   (x,y)\in \Omega
     u(x,y) = \sin(10*x + 10*y) ,         (x,y)\in \partial\Omega
@@ -23,6 +25,7 @@ from uniformly_placed import sample_points_on_square
 """
 
 #超参数(配置点个数、源点个数、学习率、迭代次数)
+
 NN = 80
 NS = 80
 lr = 0.1
@@ -30,6 +33,7 @@ iteration = 10000
 k = torch.tensor(200) #波数
 
 #PIKF层
+
 class PIKF_layer(nn.Module):
     def __init__(self, source_nodes: Tensor) -> None:
         super().__init__()
@@ -48,6 +52,7 @@ class PIKF_layer(nn.Module):
 pikf_layer = PIKF_layer(sample_points_on_square(-2.5, 2.5, NS))#源点在虚假边界上采样
 
 #PIKFNN的网络结构
+
 net_PIKFNN = nn.Sequential(
                            pikf_layer,
                            nn.Linear(NS, 1, dtype=torch.float64, bias=False)
@@ -60,15 +65,18 @@ def init_weights(m):
 net_PIKFNN.apply(init_weights)
 
 #网络实例化
+
 s = Solution(net_PIKFNN)
 
 #优化算法、采样器、损失函数、采用学习率衰减策略
+
 optim = Adam(s.parameters(), lr = lr, betas=(0.9, 0.999) )
 sampler = BoxBoundarySampler(int(NN/4), [-1, -1], [1, 1], requires_grad=True)
 mse_cost_func = nn.MSELoss(reduction='mean')
 scheduler = StepLR(optim, step_size=2000, gamma=0.85)
 
 #真解
+
 def solution(p:torch.Tensor) -> torch.Tensor:
 
     x = p[...,0:1]
@@ -77,14 +85,17 @@ def solution(p:torch.Tensor) -> torch.Tensor:
     return torch.sin(torch.sqrt(k/2)*x + torch.sqrt(k/2)*y)
 
 #边界条件
+
 def bc(p:torch.Tensor, u) -> torch.Tensor:
     return u - solution(p)
 
 #构建网格用于计算误差
+
 mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx=100, ny=100)
 sampler_err = get_mesh_sampler(10, mesh)
 
 # 训练网络
+
 start_time = time.time()
 Error = []
 Loss = []
@@ -126,6 +137,7 @@ training_time = end_time - start_time
 print("训练时间为：", training_time, "秒")
 
 #可视化Loss曲线、误差曲线、PIKFNN数值解和真解图像
+
 plt.figure()
 plt.xlabel('Iteration')
 plt.ylabel('Loss')
