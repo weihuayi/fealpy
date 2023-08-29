@@ -16,7 +16,7 @@ from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
 
 from fealpy.fem import DirichletBC
-
+from fealpy.fem import recovery_alg
 from fealpy.mesh.adaptive_tools import mark
 
 
@@ -405,7 +405,8 @@ for i in range(len(disp)):
         dc2f = d[cell2dof]
         data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
 
-        eta = recovery_estimate(mesh, d)
+        recovery = recovery_alg(space)
+        eta = recovery.recovery_estimate(d)
 #        option = mesh.adaptive_options(data=data, disp=False)
 #        mesh.adaptive(eta, options=option)
 
