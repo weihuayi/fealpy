@@ -17,6 +17,8 @@ from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
 
 from fealpy.fem import DirichletBC
 
+from fealpy.mesh.adaptive_tools import mark
+
 
 class Brittle_Facture_model():
     def __init__(self):
@@ -286,13 +288,13 @@ class fracture_damage_integrator():
         return stored
 
 
-def recovery_estimate(phi):
-    space = phi.space
-    rgphi = space.grad_recovery(phi, method='simple')
-    eta = space.integralalg.error(rgphi.value, phi.grad_value, power=2,
+def recovery_estimate(mesh, d):
+    from fealpy.functionspace import LagrangeFiniteElementSpace
+    space0 = LagrangeFiniteElementSpace(mesh)
+    rgd = space0.grad_recovery(uh=d, method='simple')
+    eta = space0.integralalg.error(rgd.value, d.grad_value, power=2,
             celltype=True)
     return eta
-
 
 model = Brittle_Facture_model()
 
@@ -313,8 +315,8 @@ uh = space.function(dim=GD)
 du = space.function(dim=GD)
 disp = model.top_boundary_disp()
 
-stored_energy = np.zeros_like(disp)
-dissipated_energy = np.zeros_like(disp)
+stored_energy = np.zeros(len(disp)+1, dtype=np.float64)
+dissipated_energy = np.zeros(len(disp)+1, dtype=np.float64)
 
 for i in range(len(disp)):
     node  = mesh.entity('node') 
@@ -356,7 +358,6 @@ for i in range(len(disp)):
         strain = simulation.strain(uh)
         phip, _ = simulation.strain_energy_density_decomposition(strain)
         H[:] = np.fmax(H, phip)
-        stored_energy[i] = simulation.get_stored_energy(phip, d)
 
         # 计算相场模型
         dbform = BilinearForm(space)
@@ -390,13 +391,34 @@ for i in range(len(disp)):
         if error < 1e-5:
             break
         k += 1
-    dissipated_energy[i] = simulation.get_dissipated_energy(d)
+    stored_energy[i+1] = simulation.get_stored_energy(phip, d)
+    dissipated_energy[i+1] = simulation.get_dissipated_energy(d)
 
     mesh.nodedata['damage'] = d
     mesh.nodedata['uh'] = uh.T
     fname = 'test' + str(i).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
+    if i < len(disp) - 1:
+        cell2dof = mesh.cell_to_ipoint(p=1)
+        uh0c2f = uh[0, cell2dof]
+        uh1c2f = uh[1, cell2dof]
+        dc2f = d[cell2dof]
+        data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
 
+        eta = recovery_estimate(mesh, d)
+#        option = mesh.adaptive_options(data=data, disp=False)
+#        mesh.adaptive(eta, options=option)
+
+        isMarkedCell = mark(eta, theta = 0.2)
+        option = mesh.bisect_options(data=data, disp=False)
+        mesh.bisect(isMarkedCell, options=option)
+       
+        space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
+        cell2dof = space.cell_to_dof()
+        H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
+        uh[0, cell2dof.reshape(-1)] = option['data']['uh0'].reshape(-1)
+        uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
+        d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
