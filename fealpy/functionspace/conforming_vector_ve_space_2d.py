@@ -10,14 +10,17 @@ class CVVEDof2d:
         self.p = p
         self.itype = self.mesh.itype
         self.cell2dof = self.cell_to_dof()
-    def is_boundary_dof(self):
+    def is_boundary_dof(self, threshold=None):
         mesh = self.mesh
         gdof = self.number_of_global_dofs()
         edge2dof = self.edge_to_dof()
-        
         isBdDof = np.zeros(gdof, dtype=np.bool_)
-        isBdEdge = mesh.ds.boundary_edge_flag()
-        isBdDof[edge2dof[isBdEdge]] = True   
+        idx = mesh.ds.boundary_edge_flag()
+
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('edge')
+            idx = threshold(bc)
+        isBdDof[edge2dof[idx]] = True   
         return isBdDof
     def edge_to_dof(self, index=np.s_[:]):
         e2p = self.mesh.edge_to_ipoint(self.p, index=index)
@@ -145,6 +148,21 @@ class ConformingVectorVESpace2d:
 
     def interpolation_points(self, index=np.s_[:]):
         return self.dof.interpolation_points()
+
+    def array(self, dim=None, dtype=np.float64):
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=dtype)
+
+
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, coordtype='cartesian', dtype=dtype)
+
 
 
     def edge_basis(self, x, x0):
