@@ -68,7 +68,7 @@ class Brittle_Facture_model():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return np.concatenate((np.linspace(0, 70e-3, 6)[1:], np.linspace(70e-3,
+        return np.concatenate((np.linspace(0, 70e-3, 6), np.linspace(70e-3,
             125e-3, 26)[1:]))
 
     def top_disp_direction(self):
@@ -299,12 +299,11 @@ def recovery_estimate(mesh, d):
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
-mesh = TriangleMesh.from_domain_distmesh(domain, 0.02, maxit=100)
+mesh = TriangleMesh.from_domain_distmesh(domain, 0.03, maxit=100)
 #mesh = model.init_mesh(n=5)
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
-NN = mesh.number_of_nodes()
 
 simulation = fracture_damage_integrator(mesh, model)
 space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
@@ -312,17 +311,18 @@ space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
 d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 uh = space.function(dim=GD)
-du = space.function(dim=GD)
 disp = model.top_boundary_disp()
 
-stored_energy = np.zeros(len(disp)+1, dtype=np.float64)
-dissipated_energy = np.zeros(len(disp)+1, dtype=np.float64)
+stored_energy = np.zeros_like(disp)
+dissipated_energy = np.zeros_like(disp)
 
-for i in range(len(disp)):
+for i in range(len(disp)-1):
+    NN = mesh.number_of_nodes()
     node  = mesh.entity('node') 
     isTNode = model.is_top_boundary(node)
-    uh[1, isTNode] = disp[i]
+    uh[1, isTNode] = disp[i+1]
     isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
+    du = space.function(dim=GD)
 
     k = 0
     while k < 100:
@@ -405,6 +405,7 @@ for i in range(len(disp)):
         dc2f = d[cell2dof]
         data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
 
+        # 恢复型后验误差估计
         recovery = recovery_alg(space)
         eta = recovery.recovery_estimate(d)
 #        option = mesh.adaptive_options(data=data, disp=False)
@@ -413,16 +414,23 @@ for i in range(len(disp)):
         isMarkedCell = mark(eta, theta = 0.2)
         option = mesh.bisect_options(data=data, disp=False)
         mesh.bisect(isMarkedCell, options=option)
-       
+      
+        # 更新加密后的空间
         space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
         cell2dof = space.cell_to_dof()
-        H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
+        NC = mesh.number_of_cells()
+        uh = space.function(dim=GD)
+        d = space.function()
+        H = np.zeros(NC, dtype=np.float64)  # 分片常数
+
         uh[0, cell2dof.reshape(-1)] = option['data']['uh0'].reshape(-1)
         uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
         d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
+        H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
+NN = mesh.number_of_nodes()
 mesh.node += uh[:, :NN].T
 mesh.add_plot(axes)
 plt.show()

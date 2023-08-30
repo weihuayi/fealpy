@@ -1,19 +1,22 @@
 import numpy as np
-from ..quadrature import FEMeshIntegralAlg
 
 class recovery_alg:
-    def __init__(self, space):
+    def __init__(self, space, q=None, cellmeasure=None):
         self.space = space
         self.p = space.p
+        q = q if q is not None else self.p+3
+        self.q = q
         self.mesh = space.mesh
-        self.integralalg = FEMeshIntegralAlg(self.mesh, self.p+3)
+        self.integrator = self.mesh.integrator(q, etype='cell')
+        self.cellmeasure = cellmeasure if cellmeasure is not None else self.mesh.entity_measure('cell')
 
     def recovery_estimate(self, uh, method='simple'):
         """
         """
         space = self.space
         rguh = self.grad_recovery(uh, method=method)
-        eta = self.integralalg.error(rguh.value, uh.grad_value, power=2, celltype=True) # 计算单元上的恢复型误差
+        guh = uh.grad_value
+        eta = self.error(rguh.value, uh.grad_value, power=2, celltype=True) # 计算单元上的恢复型误差
         return eta
 
     def grad_recovery(self, uh, method='simple'):
@@ -35,9 +38,11 @@ class recovery_alg:
         bc = space.dof.multiIndex/p
         guh = uh.grad_value(bc)
         guh = guh.swapaxes(0, 1)
-        rguh = space.function(dim=GD)
         if space.doforder == 'sdofs':
-            rguh = rguh.T
+            rguh0 = space.function(dim=GD)
+            rguh = rguh0.T[:]
+        else:
+            rguh = space.function(dim=GD)
 
         if method == 'simple':
             deg = np.bincount(cell2dof.flat, minlength = gdof)
@@ -91,6 +96,68 @@ class recovery_alg:
                 np.add.at(rguh, cell2dof, guh)
         rguh /= deg.reshape(-1, 1)
         if space.doforder == 'sdofs':
-            rguh = rguh.T
-        return rguh
+            rguh0[:] = rguh.T
+            return rguh0
+        else:
+            return rguh
+    
+    def error(self, u, v, power=2, celltype=False, q=None):
+        """
+
+        @brief 给定两个函数，计算两个函数的之间的差，默认计算 L2 差（power=2)
+               power 的取值可以是任意的 p
+
+        TODO
+        ----
+        1. 考虑无穷范数的情形
+        """
+        mesh = self.mesh
+        space = self.space
+        GD = mesh.geo_dimension()
+
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs)
+        if callable(u):
+            if not hasattr(u, 'coordtype'): 
+                u = u(ps)
+            else:
+                if u.coordtype == 'cartesian':
+                    u = u(ps)
+                elif u.coordtype == 'barycentric':
+                    u = u(bcs)
+
+        if callable(v):
+            if not hasattr(v, 'coordtype'):
+                v = v(ps)
+            else:
+                if v.coordtype == 'cartesian':
+                    v = v(ps)
+                elif v.coordtype == 'barycentric':
+                    v = v(bcs)
+
+        if u.shape[-1] == 1:
+            u = u[..., 0]
+
+        if v.shape[-1] == 1:
+            v = v[..., 0]
+        
+        if space.doforder == 'sdofs':
+            u = np.transpose(u, (0, 2, 1))
+        f = np.power(np.abs(u - v), power) 
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.cellmeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.cellmeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.cellmeasure[:, None, None]*f
+            else:
+                e = np.einsum('q, qc..., c->c...', ws, f, self.cellmeasure)
+
+        if celltype == False:
+            e = np.power(np.sum(e), 1/power)
+        else:
+            e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e # float or (NC, )
 
