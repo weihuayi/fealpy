@@ -3,7 +3,6 @@ import gmsh
 import meshio
 from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian
-from fealpy.mesh import MeshFactory as MF
 #from fealpy.geometry import DistDomain2d
 #from fealpy.mesh import DistMesh2d
 from fealpy.geometry import dcircle,drectangle,ddiff,dmin
@@ -65,6 +64,7 @@ class Poisuille:
     """
     def __init__(self):
         self.box = [0, 1, 0, 1]
+        self.eps = 1e-8
 
     def domain(self):
         return self.box
@@ -90,12 +90,12 @@ class Poisuille:
         return val
 
     @cartesian
-    def is_p_boundary(p):
-        return (np.abs(p[..., 0]) < eps) | (np.abs(p[..., 0] - 1.0) < eps)
+    def is_p_boundary(self, p):
+        return (np.abs(p[..., 0]) < self.eps) | (np.abs(p[..., 0] - 1.0) < self.eps)
       
     @cartesian
-    def is_wall_boundary(p):
-        return (np.abs(p[..., 1]) < eps) | (np.abs(p[..., 1] - 1.0) < eps)
+    def is_wall_boundary(self, p):
+        return (np.abs(p[..., 1]) < self.eps) | (np.abs(p[..., 1] - 1.0) < self.eps)
 
     @cartesian
     def dirichlet(self, p):

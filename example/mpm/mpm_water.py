@@ -100,7 +100,6 @@ print(particles[0]["position"])
 # 初始化
 particles["position"] = 0.4*np.random.rand(num_particles, 2) + 0.2
 particles["velocity"] = np.array([0, -1])
-particles["rho"] = 1
 particles["rho"] = rho
 particles["mass"] = mass
 particles["vol"] = vol

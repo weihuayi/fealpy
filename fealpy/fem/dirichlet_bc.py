@@ -1,5 +1,7 @@
 import numpy as np
+
 from scipy.sparse import csr_matrix, spdiags, eye, bmat
+
 from typing import Optional, Union, Tuple, Callable, Any
 
 class DirichletBC():
@@ -15,6 +17,7 @@ class DirichletBC():
         self.gD = gD
         self.threshold = threshold
         self.bctype = 'Dirichlet'
+
 
     def apply(self, 
             A: csr_matrix, 
@@ -45,6 +48,7 @@ class DirichletBC():
 
             return self.apply_for_other_space(A, f, uh)
 
+
     def apply_for_other_space(self, A, f, uh) -> Tuple[csr_matrix, np.ndarray]:
         """
         @brief 处理基是向量函数的向量函数空间或标量函数空间的 Dirichlet 边界条件
@@ -64,7 +68,7 @@ class DirichletBC():
 
         return A, f 
 
-    def apply_for_vspace_with_scalar_basis(self, A, f, uh, dflag=None) -> Tuple[csr_matrix, np.ndarray]:
+    def apply_for_vspace_with_scalar_basis(self, A, f, uh, dflag=None):
         """
         @brief 处理基由标量函数组合而成的向量函数空间的 Dirichlet 边界条件
 
@@ -80,9 +84,9 @@ class DirichletBC():
         f = f - A@uh.flat # 注意这里不修改外界 f 的值
 
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        bdIdx[isDDof.flat] = 1
+        bdIdx[dflag.flat] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        f[dflag.flat] = uh.flat[dflag.flat]
+        f[dflag.flat] = uh.ravel()[dflag.flat]
         return A, f 

@@ -22,7 +22,7 @@ from fealpy.vem import NonConformingScalarVEML2Projector2d
 from fealpy.vem import NonConformingScalarVEMLaplaceIntegrator2d
 from fealpy.vem import NonConformingVEMScalarSourceIntegrator2d
 from fealpy.vem import PoissonCVEMEstimator
-
+from fealpy.mesh.adaptive_tools import mark
 # 双线性型
 from fealpy.vem import BilinearForm
 
@@ -39,55 +39,49 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--degree',
-        default=1, type=int,
+        default=4, type=int,
         help='虚单元空间的次数, 默认为 1 次.')
 
-parser.add_argument('--nx',
-        default=4, type=int,
-        help='x 方向剖分段数， 默认 4 段.')
-
-parser.add_argument('--ny',
-        default=4, type=int,
-        help='y 方向剖分段数， 默认 4 段.')
-
 parser.add_argument('--maxit',
-        default=8, type=int,
+        default=400, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
+parser.add_argument('--theta',
+        default=0.2, type=int,
+        help='自适应参数， 默认0.2')
 args = parser.parse_args()
 
 degree = args.degree
-nx = args.nx
-ny = args.ny
 maxit = args.maxit
+theta = args.theta
+
 
 #pde = CosCosData()
 pde = LShapeRSinData()
 domain = pde.domain()
 
-errorType = ['$|| u - \Pi u_h||_{\Omega,0}$',
-             '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$',
+errorType = ['$|| u - \Pi u_h||_{0,\Omega}$',
+             '$||\\nabla u -  \\nabla \Pi u_h||_{0, \Omega}$',
              '$\eta$']
+
 errorMatrix = np.zeros((3, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.float64)
 
-#mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
 mesh = pde.init_mesh(n = 1, meshtype='quad')
 mesh = PolygonMesh.from_mesh(mesh)
 Hmesh = HalfEdgeMesh2d.from_mesh(mesh)
+
 fig = plt.figure()
 axes  = fig.gca()
 mesh.add_plot(axes)
 plt.show()
 
 for i in range(maxit):
-    #mesh = pde.init_mesh(n = i+1, meshtype='tri')
-    #mesh = PolygonMesh.from_mesh(mesh)
     space = NonConformingScalarVESpace2d(mesh, p=degree)
     uh = space.function()
     
     NDof[i] = space.number_of_global_dofs()
-    print(NDof[i]) 
+    
     #组装刚度矩阵 A 
     m = ScaledMonomialSpaceMassIntegrator2d()
     M = m.assembly_cell_matrix(space.smspace)
@@ -123,23 +117,51 @@ for i in range(maxit):
     estimator = PoissonCVEMEstimator(space, M, PI1)
     eta = estimator.residual_estimate(uh, pde.source)
     
+    print(i,":",NDof[i],",",np.sqrt(np.sum(eta))) 
     errorMatrix[0, i] = mesh.error(pde.solution, sh.value)
     errorMatrix[1, i] = mesh.error(pde.gradient, sh.grad_value)
     errorMatrix[2, i] = np.sqrt(np.sum(eta))
+    
+    isMarkedCell = mark(eta, theta, 'L2')
+    Hmesh.adaptive_refine(isMarkedCell, method='poly')
+    newcell, cellocation = Hmesh.entity('cell')
+    newnode = Hmesh.entity("node")[:]
+    mesh = PolygonMesh(newnode, newcell, cellocation)
+    if NDof[i] > 1e4 :
+        iterations = i 
+        break
+    ''' 
+    if np.sqrt(np.sum(eta)) < 1e-3 :
+        print("eta", np.sqrt(np.sum(eta)))
+        iterations = i 
+        break
+    '''
+    
+    '''log 加密策略
     options = Hmesh.adaptive_options(HB=None)
     Hmesh.adaptive(eta, options)
     newcell, cellocation = Hmesh.entity('cell')
     newnode = Hmesh.entity("node")[:]
     mesh = PolygonMesh(newnode, newcell, cellocation)
-showmultirate(plt, maxit-2, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
+    '''
+
+#showmultirate(plt, maxit-10, NDof, errorMatrix, 
+#        errorType, propsize=20, lw=2, ms=4)
+
+showmultirate(plt, iterations-20, NDof[:iterations], errorMatrix[:,:iterations], 
+        errorType, propsize=20, lw=2, ms=4)
+np.savetxt("Ndof.txt", NDof[:iterations], delimiter=',')
+np.savetxt("errorMatrix.txt", errorMatrix[:,:iterations], delimiter=',')
+
+plt.xlabel('Number of d.o.f', fontdict={'family' : 'Times New Roman', 'size'   : 16})
+plt.ylabel('Error', fontdict={'family' : 'Times New Roman', 'size'   : 16})
+plt.savefig('error.jpg')
 plt.show()
-'''
+
 fig1 = plt.figure()
 axes  = fig1.gca()
 mesh.add_plot(axes)
 plt.show()
-'''
-
 
 
   
