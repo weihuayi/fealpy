@@ -37,7 +37,7 @@ class Function(TensorMapping):
     """
     @brief Scaler functions in a linear function space.
     """
-    def __init__(self, space: FunctionSpaceBase, um: Optional[Tensor]) -> None:
+    def __init__(self, space: FunctionSpaceBase, gd=1, um: Optional[Tensor]=None) -> None:
         """
         @brief Initialize a scaler function in a linear function space.
         """
@@ -47,7 +47,7 @@ class Function(TensorMapping):
         M = space.number_of_basis()
 
         self.space = space
-        self._tensor = Parameter(torch.empty((M, ), dtype=dtype, device=device))
+        self._tensor = Parameter(torch.empty((M, gd), dtype=dtype, device=device))
         if um is None:
             init.zeros_(self._tensor)
         else:
@@ -56,13 +56,17 @@ class Function(TensorMapping):
     @property
     def um(self):
         """
-        @brief The `um` Tensor object inside the module, with shape (M, ).
+        @brief The `um` Tensor object inside the module, with shape (M, GD).
         """
         return self._tensor
 
+    @property
+    def gd(self):
+        return self._tensor.shape[-1]
+
     def numpy(self):
         """
-        @brief Return `um` as numpy array, with shape (M, ), where M is number of\
+        @brief Return `um` as numpy array, with shape (M, GD), where M is number of\
                basis.
         """
         return self.um.detach().cpu().numpy()
@@ -70,13 +74,15 @@ class Function(TensorMapping):
     def set_um_inplace(self, value: Tensor):
         """
         @brief Set values of um inplace. `value` must be in shape of\
-               (M, ), where M is the number of basis.
+               (M, GD), where M is the number of basis.
         """
-        if value.ndim == 1:
+        if value.ndim >= 3:
+            raise RuntimeError("Value must be 1 or 2 dimensional.")
+        else:
+            if value.ndim == 1:
+                value = value[:, None]
             with torch.no_grad():
                 self._tensor[:] = value
-        else:
-            raise RuntimeError("Value must be 1-dimensional.")
 
     def forward(self, p: Tensor):
-        return torch.einsum("nf..., f -> n...", self.space.basis(p), self._tensor)
+        return torch.einsum("nf, fd -> nd", self.space.basis(p), self._tensor)
