@@ -9,7 +9,7 @@ from torch import Tensor, exp, sin
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function
+from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function, RandomFeatureSpace
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 
@@ -29,7 +29,7 @@ def source(p: Tensor):
 
 EXT = 1
 H = 1/EXT
-Jn = 128
+Jn = 32
 
 EXTC = 50
 HC = 1/EXTC
@@ -39,6 +39,13 @@ mesh = UniformMesh2d((0, EXT, 0, EXT), (H, H), origin=(0, 0))
 node = torch.from_numpy(mesh.entity('node')).clone()
 space = RandomFeaturePoUSpace(2, Jn, Cos(), PoUSin(), centers=node, radius=H/2,
                               bound=(PI, PI), print_status=True)
+
+def init_freq(model):
+    if isinstance(model, RandomFeatureSpace):
+        with torch.no_grad():
+            model.frequency[:, 1] = PI
+
+space.apply(init_freq)
 
 mesh_col = UniformMesh2d((0, EXTC, 0, EXTC), (HC, HC), origin=(0, 0))
 _bd_node = mesh_col.ds.boundary_node_flag()
@@ -77,14 +84,14 @@ from matplotlib import pyplot as plt
 fig = plt.figure()
 axes = fig.add_subplot(121, projection='3d')
 solution.add_surface(axes, box=[0, 1, 0, 1], nums=[40, 40])
-axes.set_xlabel('x')
-axes.set_ylabel('y')
+axes.set_xlabel('t')
+axes.set_ylabel('x')
 axes.set_zlabel('phi')
 
 axes = fig.add_subplot(122)
 qm = solution.diff(real_solution).add_pcolor(axes, box=[0, 1, 0, 1], nums=[40, 40])
-axes.set_xlabel('x')
-axes.set_ylabel('y')
+axes.set_xlabel('t')
+axes.set_ylabel('x')
 fig.colorbar(qm)
 
 plt.show()
