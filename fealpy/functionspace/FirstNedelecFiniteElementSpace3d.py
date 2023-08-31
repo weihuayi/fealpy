@@ -35,9 +35,9 @@ class FNDof3d:
         NE = mesh.number_of_edges()
         return np.arange(NE) 
 
-    def face_to_dof(self):
+    def face_to_dof(self, index=np.s_[:]):
         mesh = self.mesh
-        return mesh.ds.face_to_edge()
+        return mesh.ds.face_to_edge()[index]
 
     def cell_to_dof(self):
         mesh = self.mesh
@@ -96,13 +96,12 @@ class FirstNedelecFiniteElementSpace3d:
         face = mesh.entity("face")[index]
         node = mesh.entity("node")
         e = node[face[:, localEdge[:, 1]]] - node[face[:, localEdge[:, 0]]] #(NF, 3, 3)
-
         glambda = np.cross(n[:, None], e)/(2*fm[:, None, None]) #(NF, 3, 3)
         if p==1:
             fphi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
                     localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
                     localEdge[:, 0]]
-            f2es = mesh.ds.face_to_edge_sign().astype(np.float_)[index]
+            f2es = mesh.ds.face_to_edge_sign().astype(np.int_)[index]
             f2es[f2es==0] = -1
             return fphi*f2es[..., None]
 
@@ -200,6 +199,14 @@ class FirstNedelecFiniteElementSpace3d:
         return self.dof.number_of_local_dofs(doftype)
 
     @barycentric
+    def face_value(self, uh, bc, index=np.s_[:]):
+        phi = self.face_basis(bc, index=index) #(..., NF, ldof, 3)
+        face2dof = self.dof.face_to_dof() #(NF, ldof)
+        s1 = '...ijm, ij->...im'
+        val = np.einsum(s1, phi, uh[face2dof[index]])
+        return val
+
+    @barycentric
     def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
@@ -259,14 +266,29 @@ class FirstNedelecFiniteElementSpace3d:
     def mass_matrix(self, c=None, q=None, dtype=np.float_):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, 6, 3)
-        cm = self.mesh.cell_volume()
-        cell2dof = self.cell_to_dof()
+        cellmeasure = self.mesh.cell_volume()
+        if c is None:
+            val = np.einsum('q, qckd, qcmd, c->ckm', ws, phi, phi, cellmeasure, optimize=True)
+        else:
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    ps = self.mesh.bc_to_point(bcs)
+                    c = c(ps)
 
-        val = np.einsum("qclg, qcmg, q, c->clm", phi, phi, ws, cm)
-        I = np.broadcast_to(cell2dof[..., None], val.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], val.shape)
+            if isinstance(c, (int, float)):
+                M = np.einsum('q, qcld, qcmd, c->clm', c*ws, phi, phi, cellmeasure, optimize=True)
+            elif(len(c.shape)==4):
+                M = np.einsum('q, qcnd, qckn, qcmd, c->ckm', ws, c, phi, phi, cellmeasure, optimize=True)
+            else:
+                M = np.einsum('q, qc, qckn, qcmd, c->ckm', ws, c, phi, phi, cellmeasure, optimize=True)
+
+        cell2dof = self.cell_to_dof()
+        I = np.broadcast_to(cell2dof[..., None], M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], M.shape)
         gdof = self.dof.number_of_global_dofs()
-        return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
+        return csr_matrix((M.flat, (I.flat, J.flat)), shape = (gdof, gdof),
                 dtype=dtype)
 
     def curl_matrix(self, c=None, q=None, dtype=np.float_):
@@ -278,16 +300,68 @@ class FirstNedelecFiniteElementSpace3d:
         """
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.curl_basis(bcs) #(NQ, NC, 6, 3)
-        cm = self.mesh.cell_volume()
+        cellmeasure = self.mesh.cell_volume()
         cell2dof = self.cell_to_dof()
 
-        val = np.einsum("qclg, qcmg, q, c->clm", phi, phi, ws, cm)
-        I = np.broadcast_to(cell2dof[..., None], val.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], val.shape)
+        if c is None:
+            val = np.einsum('q, qckd, qcmd, c->ckm', ws, phi, phi, cellmeasure, optimize=True)
+        else:
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    ps = self.mesh.bc_to_point(bcs)
+                    c = c(ps)
+
+            if isinstance(c, (int, float)):
+                M = np.einsum('q, qcld, qcmd, c->clm', c*ws, phi, phi, cellmeasure, optimize=True)
+            else:
+                M = np.einsum('q, qcnd, qckn, qcmd, c->ckm', ws, c, phi, phi, cellmeasure, optimize=True)
+
+        I = np.broadcast_to(cell2dof[..., None], M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], M.shape)
         gdof = self.dof.number_of_global_dofs()
-        return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
+        return csr_matrix((M.flat, (I.flat, J.flat)), shape = (gdof, gdof),
                 dtype=dtype)
 
+    def face_mass_matrix(self, c = 1, index=np.s_[:]):
+        """
+        @brief (n \times u, n \times v)_{Gamma_{robin}}
+        @param c 系数, 现在只考虑了 c 是常数的情况
+        """
+        bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()
+        face2dof = self.dof.face_to_dof(index=index)
+        fm = self.mesh.entity_measure("face", index=index)
+        fphi = self.face_basis(bcs, index=index)
+
+        EMc = np.einsum('qflg, qfmg, q, f->flm', fphi, fphi, ws, fm)
+
+        gdof = self.dof.number_of_global_dofs()
+        I = np.broadcast_to(face2dof[..., None], EMc.shape)
+        J = np.broadcast_to(face2dof[:, None, :], EMc.shape)
+        EM = c*csr_matrix((EMc.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return EM
+
+    def robin_vector(self, f, isRobinFace):
+        """
+        @brief 计算 (f, n\times v)_{\Gamma_{robin}} 
+        """
+        isRobinFace = np.sort(isRobinFace)
+        bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()
+        n = self.mesh.face_unit_normal()[isRobinFace]
+        fm = self.mesh.entity_measure("face", index=isRobinFace)
+
+        point = self.mesh.bc_to_point(bcs, index=isRobinFace)
+        fval = f(point, n)
+        phi = self.face_basis(bcs, index=isRobinFace)
+
+        Fc = np.einsum('qfg, qflg, q, f->fl', fval, phi, ws, fm)
+
+        face2dof = self.dof.face_to_dof(index=isRobinFace)
+        gdof = self.dof.number_of_global_dofs()
+        F = np.zeros(gdof, dtype=np.float_)
+        np.add.at(F, face2dof, Fc)
+        return F
 
     def source_vector(self, f, dtype=np.float_):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
@@ -318,12 +392,14 @@ class FirstNedelecFiniteElementSpace3d:
             index = self.mesh.ds.boundary_face_index()
 
         face2edge = mesh.ds.face_to_edge()[index]
+        n = mesh.face_unit_normal(index=index) 
 
         if 0: #节点型自由度
             locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
-            point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
-            vec = mesh.edge_tangent()[face2edge]
-            gval = gD(point, vec) #(NF, 3)
+            point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2)) #(NF, 3, 3)
+            vec = mesh.edge_tangent()[face2edge] #(NF, 3, 3)
+
+            gval = gD(point, n[:, None, :]) #(NF, 3, 3)
 
             face2dof = self.dof.face_to_dof()[index]
             uh[face2dof] = np.linalg.norm(gval,axis=2) 

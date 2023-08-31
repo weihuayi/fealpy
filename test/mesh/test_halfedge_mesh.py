@@ -121,8 +121,8 @@ def test_simple():
 
 
 
-animation_plot()
-#circle_plot()
+#animation_plot()
+circle_plot()
 
 
 

@@ -180,15 +180,15 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         clevel = self.celldata['level']
         while True:
             NC = self.number_of_cells()
-            NE = self.number_of_edges()
+            NHE = self.ds.number_of_halfedges()
 
             end = halfedge[:, 0]
-            start = halfedge[halfedge[:, 4], 0]
+            start = halfedge[halfedge[:, 3], 0]
             vector = node[end] - node[start]#所有边的方向
             vectornex = vector[halfedge[:, 2]]#所有边的下一个边的方向
 
             angle0 = angle(vectornex, -vector)#所有边的反方向与下一个边的角度
-            badHEdge, = np.where(angle0 > np.pi*17/18)#夹角大于170度的半边
+            badHEdge, = np.where(angle0 > np.pi)#夹角大于170度的半边
             badCell, idx= np.unique(halfedge[badHEdge, 1], return_index=True)#每个单元每次只处理中的一个
             badHEdge = badHEdge[idx]#现在坏半边的单元都不同
             badNode = halfedge[badHEdge, 0]
@@ -218,24 +218,24 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             halfedgeNew[:NE1, 1] = halfedge[badHEdge, 1].copy()
             halfedgeNew[:NE1, 2] = halfedge[goodHEdge, 2].copy()
             halfedgeNew[:NE1, 3] = badHEdge.copy()
-            halfedgeNew[:NE1, 4] = np.arange(NE*2+NE1, NE*2+NE1*2)
+            halfedgeNew[:NE1, 4] = np.arange(NHE+NE1, NHE+NE1*2)
 
             halfedgeNew[NE1:, 0] = halfedge[badHEdge, 0].copy()
             halfedgeNew[NE1:, 1] = np.arange(NC, NC+NE1)
             halfedgeNew[NE1:, 2] = halfedge[badHEdge, 2].copy()
             halfedgeNew[NE1:, 3] = goodHEdge.copy()
-            halfedgeNew[NE1:, 4] = np.arange(NE*2, NE*2+NE1)
+            halfedgeNew[NE1:, 4] = np.arange(NHE, NHE+NE1)
 
-            halfedge[halfedge[goodHEdge, 2], 3] = np.arange(NE*2, NE*2+NE1)
-            halfedge[halfedge[badHEdge, 2], 3] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedge[badHEdge, 2] = np.arange(NE*2, NE*2+NE1)
-            halfedge[goodHEdge, 2] = np.arange(NE*2+NE1, NE*2+NE1*2)
+            halfedge[halfedge[goodHEdge, 2], 3] = np.arange(NHE, NHE+NE1)
+            halfedge[halfedge[badHEdge, 2], 3] = np.arange(NHE+NE1, NHE+NE1*2)
+            halfedge[badHEdge, 2] = np.arange(NHE, NHE+NE1)
+            halfedge[goodHEdge, 2] = np.arange(NHE+NE1, NHE+NE1*2)
             isNotOK = np.ones(NE1, dtype=np.bool_)
-            nex = halfedge[-NE1:, 2]
+            nex = halfedge[len(halfedge)-NE1:, 2]
             while isNotOK.any():
                 halfedge[nex[isNotOK], 1] = np.arange(NC, NC+NE1)[isNotOK]
                 nex = halfedge[nex, 2]
-                flag = (nex==np.arange(NE*2+NE1, NE*2+NE1*2)) & isNotOK
+                flag = (nex==np.arange(NHE+NE1, NHE+NE1*2)) & isNotOK
                 isNotOK[flag] = False
 
             #单元层
@@ -2134,19 +2134,15 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                     break
                 isMarkedCell = (options['numrefine'] < 0)
 
-    def adaptive_refine(self, isMarkedCell, method="nvb", options={}):
-        cstart = self.ds.cellstart
-        NC = self.number_of_all_cells()
-        isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
-        isMarkedCell0[cstart:] = isMarkedCell
+    def adaptive_refine(self, isMarkedCell, method="poly", options={}):
         if method=='nvb':
-            self.refine_triangle_nvb(isMarkedCell0, options=options)
+            self.refine_triangle_nvb(isMarkedCell, options=options)
         elif method=='rg':
-            self.refine_triangle_rg(isMarkedCell0, options=options)
+            self.refine_triangle_rg(isMarkedCell, options=options)
         elif method=='quad':
-            self.refine_quad(isMarkedCell0, options=options)
+            self.refine_quad(isMarkedCell, options=options)
         elif method=='poly':
-            self.refine_poly(isMarkedCell0, options=options)
+            self.refine_poly(isMarkedCell, options=options)
 
     def adaptive_coarsen(self, isMarkedCell, method="nvb", options={}):
         cstart = self.ds.cellstart
