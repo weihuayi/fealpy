@@ -36,6 +36,8 @@ class Activation(Module):
                                           f"implemented in {self.__class__.__name__}.")
             else:
                 return fn(x)
+        else:
+            raise ValueError(f"The order can not be negative.")
 
     def d1(self, p: Tensor) -> Tensor:
         """
@@ -70,7 +72,7 @@ class Sin(Activation):
         a, b = divmod(order, 2)
         if b == 0:
             return (-1)**a * sin(x)
-        elif b == 1:
+        else:
             return (-1)**a * cos(x)
 
     def d1(self, p: Tensor):
@@ -94,7 +96,7 @@ class Cos(Activation):
         a, b = divmod(order, 2)
         if b == 0:
             return (-1)**a * cos(x)
-        elif b == 1:
+        else:
             return -(-1)**a * sin(x)
 
     def d1(self, p: Tensor):

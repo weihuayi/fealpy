@@ -6,10 +6,10 @@ from torch import Tensor
 
 from ..nntyping import TensorFunction
 from .linear import Distance
-from .function_space import TensorSpace
+from .function_space import FunctionSpaceBase
 
 
-class KernelFunctionSpace(TensorSpace):
+class KernelFunctionSpace(FunctionSpaceBase):
     def __init__(self, sources: Tensor, kernel: TensorFunction, device=None) -> None:
         """
         @brief
@@ -19,12 +19,16 @@ class KernelFunctionSpace(TensorSpace):
         self.out_dim = 1
         self.ns = sources.shape[0]
 
-        self.radius_layer = Distance(sources=sources, p=2, device=device)
+        self.radius_layer = Distance(sources=sources, device=device)
 
         self.kernel = kernel
+
+    @property
+    def source(self):
+        return self.radius_layer.sources
 
     def number_of_basis(self) -> int:
         return self.ns
 
-    def basis_value(self, p: Tensor) -> Tensor:
+    def basis(self, p: Tensor) -> Tensor:
         return self.kernel(self.radius_layer(p))
