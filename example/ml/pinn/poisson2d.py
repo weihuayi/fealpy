@@ -33,6 +33,11 @@ def bc_part(p: Tensor, phi):
     return phi(p) - exact_solution(p)
 
 
+class Cos(nn.Module):
+    def forward(self, input: Tensor) -> Tensor:
+        return torch.cos(input)
+
+
 EXTC = 100
 HC = 1/EXTC
 
@@ -44,19 +49,18 @@ pinn = nn.Sequential(
     nn.Linear(NN, NN//2, dtype=float64),
     nn.Tanh(),
     nn.Linear(NN//2, NN//4, dtype=float64),
-    nn.Tanh(),
+    Cos(),
     nn.Linear(NN//4, 1, dtype=float64)
 )
 
 if not NEW_MODEL:
     try:
-        with open("pinn_poisson2d.pth", 'r') as a:
-            state_dict = torch.load(a)
-            pinn.load_state_dict(state_dict)
+        state_dict = torch.load("pinn_poisson2d.pth")
+        pinn.load_state_dict(state_dict)
     except:
         pass
 
-mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
+
 optim = torch.optim.Adam(pinn.parameters(), lr=0.01, weight_decay=0)
 lrs = ExponentialLR(optim, gamma=0.9977)
 loss_fn = nn.MSELoss()
@@ -93,7 +97,7 @@ end_time = time()
 
 error = s.estimate_error_tensor(exact_solution, mesh_err)
 
-print(f"L-2 error: {error.data}")
+print(f"L-2 error: {error.item()}")
 print(f"Time: {end_time - start_time}")
 
 state_dict = pinn.state_dict()
