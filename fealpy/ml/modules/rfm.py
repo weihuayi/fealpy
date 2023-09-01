@@ -37,12 +37,8 @@ class RandomFeatureSpace(FunctionSpaceBase):
         @param dtype: torch.dtype. Data type of inputs.
         @param device: torch.device.
         """
-        super().__init__()
-        self.in_dim = in_dim
-        self.out_dim = 1
+        super().__init__(in_dim, 1, dtype, device)
         self.nf = nf
-        self.dtype = dtype
-        self.device = device
 
         self.linear = Linear(in_dim, nf, device=device, dtype=dtype)
         self.linear.requires_grad_(False)

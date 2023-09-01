@@ -1,10 +1,13 @@
 """
 Partitions of Units
 """
+from typing import Union, List, Callable
 
 import torch
 from torch.nn import Module
 from torch import Tensor, sin, cos
+
+from .linear import Standardize
 
 PI = torch.pi
 
@@ -43,6 +46,8 @@ class _PoU_Fn(Module):
                 raise NotImplementedError(f"{order}-order derivative has not been implemented.")
             else:
                 return fn(x)
+        else:
+            raise ValueError(f"order can not be negative, but got {order}.")
 
     def d1(self, x: Tensor):
         """
@@ -219,3 +224,138 @@ class PoUSin(PoU):
         for i in range(x.shape[-1]):
             ret *= self.func.dn(x[:, i:i+1], order=os[i])
         return ret
+
+
+##################################################
+### PoU in Spaces
+##################################################
+
+from .function_space import FunctionSpaceBase
+
+class PoULocalSpace(FunctionSpaceBase):
+    def __init__(self, pou: PoU, space: FunctionSpaceBase) -> None:
+        super().__init__()
+        self.pou = pou
+        self.space = space
+
+    def flag(self, p: Tensor):
+        return self.pou.flag(p)
+
+    def number_of_basis(self) -> int:
+        return self.space.number_of_basis()
+
+    def basis(self, p: Tensor) -> Tensor:
+        return self.space.basis(p) * self.pou(p)
+
+    def grad_basis(self, p: Tensor) -> Tensor:
+        space = self.space
+        ret = torch.einsum("nd, nf -> nfd", self.pou.gradient(p), space.basis(p))
+        ret += self.pou(p)[..., None] * space.grad_basis(p)
+        return ret
+
+    def hessian_basis(self, p: Tensor) -> Tensor:
+        space = self.space
+        ret = torch.einsum("nxy, nf -> nfxy", self.pou.hessian(p), space.basis(p))
+        cross = torch.einsum("nx, nfy -> nfxy", self.pou.gradient(p),
+                             space.grad_basis(p))
+        ret += cross + torch.transpose(cross, -1, -2)
+        ret += self.pou(p)[..., None, None] * space.hessian_basis(p)
+        return ret
+
+    def laplace_basis(self, p: Tensor) -> Tensor:
+        pass
+
+    def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
+        pass
+
+
+SpaceFactory = Callable[[], FunctionSpaceBase]
+
+class PoUSpace(FunctionSpaceBase):
+    def __init__(self, space_factory: SpaceFactory, centers: Tensor, radius: Tensor,
+                 pou: PoU, print_status=False) -> None:
+        super().__init__()
+
+        self.std = Standardize(centers=centers, radius=radius)
+        self.partitions: List[PoULocalSpace] = []
+        self.in_dim = -1
+        self.out_dim = -1
+
+        for i in range(self.number_of_partitions()):
+            part = PoULocalSpace(pou=pou, space=space_factory())
+            if self.in_dim == -1:
+                self.in_dim = part.space.in_dim
+                self.out_dim = part.space.out_dim
+            else:
+                if self.in_dim != part.space.in_dim:
+                    raise RuntimeError("Can not group together local spaces with"
+                                       "different input dimension.")
+                if self.out_dim != part.space.out_dim:
+                    raise RuntimeError("Can not group together local spaces with"
+                                       "differnet output dimension.")
+
+            self.partitions.append(part)
+            self.add_module(f"part_{i}", part)
+
+        if print_status:
+            print(self.status_string)
+
+    @property
+    def status_string(self):
+        return f"""PoU Space Group
+#Partitions: {self.number_of_partitions()},
+#Basis: {self.number_of_basis()}"""
+
+    def number_of_partitions(self):
+        return self.std.centers.shape[0]
+
+    def number_of_basis(self):
+        return sum(p.number_of_basis() for p in self.partitions)
+
+    @property
+    def dtype(self):
+        return self.std.centers.dtype
+
+    @property
+    def device(self):
+        return self.std.centers.device
+
+    def _assemble(self, key: str, p: Tensor) -> Tensor:
+        N = p.shape[0]
+        M = self.number_of_basis()
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
+        std = self.std(p)
+        basis_cursor = 0
+
+        for idx, part in enumerate(self.partitions):
+            NF = part.number_of_basis()
+            x = std[:, idx, :]
+            flag = part.flag(x)
+            func = getattr(part, key, None)
+
+            if func is None:
+                raise ValueError(f"No method named {key} found in the partition.")
+
+            ret[flag, basis_cursor:basis_cursor+NF] += func(x[flag, ...])
+            basis_cursor += NF
+        return ret
+
+    def basis(self, p: Tensor) -> Tensor:
+        """
+        @brief
+        """
+        N = p.shape[0]
+        M = self.number_of_basis()
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
+        std = self.std(p)
+        basis_cursor = 0
+        for idx, part in enumerate(self.partitions):
+            NF = part.number_of_basis()
+            x = std[:, idx, :]
+            flag = part.flag(x)
+            ret[flag, basis_cursor:basis_cursor+NF] += part.basis(x[flag, ...])
+            basis_cursor += NF
+        return ret
+
+    def laplace_basis(self, p: Tensor) -> Tensor:
+        pass
