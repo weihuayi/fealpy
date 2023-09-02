@@ -10,7 +10,7 @@ class NonConservativeDCRPDEModel2d:
     """
     def __init__(self, 
             u='cos(pi*x)*cos(pi*y)', 
-            d=1,
+            A=1,
             b=[10, 10],
             c=1):
         x, y = sp.symbols('x, y')
@@ -20,13 +20,13 @@ class NonConservativeDCRPDEModel2d:
         du_dy = u.diff(y)
 
 
-        d = sp.sympify(d)
+        A = sp.sympify(A)
         c = sp.sympify(c)
 
         b0 = sp.sympify(b[0])
         b1 = sp.sympify(b[1])
 
-        s = -d*du_dx.diff(x) - d*du_dy.diff(y) + b0*du_dx + b1*du_dy + c*u 
+        s = -A*du_dx.diff(x) - A*du_dy.diff(y) + b0*du_dx + b1*du_dy + c*u 
 
         self._solution = sp.lambdify((x, y), u, "numpy")
         self._source = sp.lambdify((x, y), s, "numpy") 
@@ -34,7 +34,7 @@ class NonConservativeDCRPDEModel2d:
         self._du_dy = sp.lambdify((x, y), du_dy, "numpy")
         self._b0 = sp.lambdify((x, y), b0, "numpy")
         self._b1 = sp.lambdify((x, y), b1, "numpy")
-        self._d = sp.lambdify((x, y), d, "numpy")
+        self._A = sp.lambdify((x, y), A, "numpy")
         self._c = sp.lambdify((x, y), c, "numpy")
 
     def domain(self):
@@ -81,7 +81,7 @@ class NonConservativeDCRPDEModel2d:
         """
         x = p[..., 0]
         y = p[..., 1]
-        return self._d(x, y) 
+        return self._A(x, y) 
 
     @cartesian
     def convection_coefficient(self, p):

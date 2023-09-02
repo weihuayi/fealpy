@@ -41,25 +41,45 @@ parser = argparse.ArgumentParser(description=
         TriangleMesh 上线性有限元求解对流占优问题
         """)
 
+parser.add_argument('--solution',
+        default='cos(pi*x)*cos(pi*y)', type=str,
+        help='方程真解，默认为 cos(pi*x)*cos(pi*y)')
+
+parser.add_argument('--dcoef',
+        default='1', type=str,
+        help='扩散项系数，默认为 1')
+
+parser.add_argument('--ccoef',
+        default=('1', '1'), nargs=2, type=str,
+        help='对流项系数，默认为 (1, 1)')
+
+parser.add_argument('--rcoef',
+        default='1', type=str,
+        help='反应项系数，默认为 1')
+
 parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 args = parser.parse_args()
+u = args.solution
+A = args.dcoef
+b = args.ccoef
+c = args.rcoef
 maxit = args.maxit
 p = 1
 
 # 强对流、弱扩散的例子
-pde = NonConservativeDCRPDEModel2d(d=0.001, b=[1000, 1000]) 
+pde = NonConservativeDCRPDEModel2d(u=u, A=A, b=b, c=c) 
 domain = pde.domain()
 
 errorType = ['$|| u - u_h||_{\Omega,0}$', 
         '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 
-D = ScalarDiffusionIntegrator(q=p+3)
+D = ScalarDiffusionIntegrator(c=pde.diffusion_coefficient, q=p+3)
 C = ScalarConvectionIntegrator(c=pde.convection_coefficient, q=p+3)
-M = ScalarMassIntegrator(q=p+3)
+M = ScalarMassIntegrator(c=pde.reaction_coefficient, q=p+3)
 f = ScalarSourceIntegrator(pde.source, q=p+3)
 
 for i in range(maxit):
