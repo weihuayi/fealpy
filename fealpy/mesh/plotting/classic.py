@@ -128,7 +128,8 @@ class MeshPloter(Generic[_MT]):
 
 class EntityFinder(MeshPloter):
     def draw(self, etype_or_node: Union[int, str, NDArray], index=np.s_[:],
-                showindex: bool=False, color='r', marker='o', markersize=20,
+                showindex: bool=False, multiindex: Optional[Sequence[Any]]=None,
+                color='r', marker='o', markersize=20,
                 fontcolor='k', fontsize=24):
         """
         @brief Show the barycenter of each entity.
@@ -154,8 +155,12 @@ class EntityFinder(MeshPloter):
         A.scatter(axes=axes, points=bc, color=color,
                   marker=marker, markersize=markersize)
         if showindex:
-            A.show_index(axes=axes, location=bc, number=index,
-                         fontcolor=fontcolor, fontsize=fontsize)
+            if multiindex is None:
+                A.show_index(axes=axes, location=bc, number=index,
+                            fontcolor=fontcolor, fontsize=fontsize)
+            else:
+                A.show_multi_index(axes=axes, location=bc, text_list=multiindex,
+                                   fontcolor=fontcolor, fontsize=fontsize)
 
 EntityFinder.register('finder')
 
