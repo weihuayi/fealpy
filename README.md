@@ -79,8 +79,7 @@ H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://
 
 ```bibtex
 @misc{fealpy,
-	title = {FEALPy: Finite Element Analysis Library in Python. https://github.com/weihuayi/
-        fealpy},
+	title = {FEALPy: Finite Element Analysis Library in Python. https://github.com/weihuayi/fealpy},
 	url = {https://github.com/weihuayi/fealpy},
 	author = {Wei, Huayi and Huang, Yunqing},
     institution = {Xiangtan University},
