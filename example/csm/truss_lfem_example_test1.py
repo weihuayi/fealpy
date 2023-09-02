@@ -1,4 +1,5 @@
 # 导入相关模块
+from scipy.sparse.linalg import spsolve
 from fealpy.pde.truss_model import Truss_2d_four_bar
 
 from fealpy.functionspace import LagrangeFESpace
@@ -42,4 +43,8 @@ idx, disp = mesh.meshdata['disp_bc']
 bc = DirichletBC(vspace, disp, threshold=idx)
 
 # 求解
-A, F = bc.apply(K, F.flat, uh)
+idx1 = np.array([0, 1, 3, 6, 7])
+A, F = bc.apply(K, F.flat, uh, dflag=idx1)
+
+uh.flat[:] = spsolve(A, F)
+print("uh:", uh)
