@@ -17,6 +17,9 @@ from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 
+from .scalar_pgls_convection_integrator import ScalarPGLSConvectionIntegrator
+
+
 # Boundary integrator for scalar case
 # <kappa u, v>
 from .scalar_robin_boundary_integrator import ScalarRobinBoundaryIntegrator

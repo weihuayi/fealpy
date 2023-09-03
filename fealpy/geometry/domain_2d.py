@@ -177,3 +177,48 @@ class SquareWithCircleHoleDomain:
 
     def meshing_facet_1d(self, hmin, fh=None):
         pass
+
+class BoxWithCircleHolesDomain:
+    def __init__(self, box=[0, 1, 0, 1], circles=[(0.5, 0.5, 0.2)], fh=huniform):
+        """
+        """
+        self.fh = fh
+        self.box = box 
+        vertices = np.array([
+            (box[0], box[2]), 
+            (box[1], box[2]), 
+            (box[1], box[3]),
+            (box[0], box[3])],dtype=np.float64)
+
+        self.circles = []
+        for val in circles:
+            self.circles.append(lambda p: dcircle(p, val[0:2], val[2]))
+
+        def fd(p):
+            d0 = drectangle(p, box)
+            for circle in self.circles:
+                d0 = ddiff(d0, circle(p))
+
+            return d0
+        self.facets = {0:vertices, 1:fd}
+
+    def __call__(self, p):
+        """
+        @brief 符号距离函数
+        """
+        return self.facets[1](p) 
+
+    def signed_dist_function(self, p):
+        return self(p)
+
+    def sizing_function(self, p):
+        return self.fh(p)
+
+    def facet(self, dim):
+        return self.facets[dim]
+
+    def meshing_facet_0d(self):
+        return self.facets[0]
+
+    def meshing_facet_1d(self, hmin, fh=None):
+        pass
