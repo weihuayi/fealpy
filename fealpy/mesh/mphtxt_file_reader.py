@@ -208,39 +208,39 @@ class MPHTxtFileReader:
             line = self.get_data_line()
             ws = line.split(' ')
             s1 = ws[1][0:int(ws[0])]
-            assert s1 =="Selection"
+            assert s1 =="Selection" #必须是Selection类
             
             self.cline += 1
             line = self.get_data_line()
-            self.geometry[s]['version'] = line.split('#')[0]
+            self.geometry[s]['version'] = line.split('#')[0] # version
             
             self.cline += 1
             line = self.get_data_line()
             ws = line.split(' ')
             s2 = ws[1][0:int(ws[0])]
-            self.geometry[s]['Label'] = ws[1][0:int(ws[0])]
+            self.geometry[s]['Label'] = ws[1][0:int(ws[0])] # label
 
             self.cline += 1
             line = self.get_data_line()
             ws = line.split(' ')
             s2 = ws[1][0:int(ws[0])]
-            self.geometry[s]['meshtag'] = ws[1][0:int(ws[0])]
+            self.geometry[s]['meshtag'] = ws[1][0:int(ws[0])]# Geometry/mesh tag
 
             self.cline += 1
             line = self.get_data_line()
-            self.geometry[s]['dimension'] = int(line.split('#')[0])
+            self.geometry[s]['dimension'] = int(line.split('#')[0])# Dimension
 
             self.cline += 1
             line = self.get_data_line()
             NE = int(line.split('#')[0])
-            self.geometry[s]['NE'] = NE
+            self.geometry[s]['NE'] = NE # Number of geometry edge
             
             self.cline += 1
             line = self.get_data_line()
             idx = [list((map(int,t.split()))) for t in
                     self.contents[self.cline:self.cline+NE]] #Entities
             idx = tuple(item for sublist in idx for item in sublist)
-            self.geometry[s]['entities'] = idx
+            self.geometry[s]['entities'] = idx # The index of geometry edge
             self.cline += NE
         
     def print(self):
