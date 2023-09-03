@@ -2,13 +2,12 @@ import numpy as np
 import ipdb
 
 """
-
 http://victorsndvg.github.io/FEconv/formats/mphtxt.xhtml
 """
 
 class MPHTxtFileReader:
     """ 
-    @brief 该类负责处理来自 Abaqus .inp 文件的数据
+    @brief 该类负责处理来自 Comsol .mphtxt 文件的数据
     """
     def __init__(self, fname):
         with open(fname, 'r') as f:
@@ -18,7 +17,8 @@ class MPHTxtFileReader:
         self.version = None
         self.tags = [] 
         self.types = []
-        self.mesh = {} 
+        self.mesh = {}
+        self.geometry = {}
 
     def get_data_line(self):
         """
@@ -43,9 +43,12 @@ class MPHTxtFileReader:
         self.parse_header_data()
         self.cline += 1
         self.parse_mesh_data()
+        self.cline +=1
+        self.parse_geometry_data()
 
     def parse_header_data(self):
         """
+        @brief 解析文件开头的数据
         """
         line = self.get_data_line()
         self.version = line.replace(' ', '.')
@@ -70,6 +73,7 @@ class MPHTxtFileReader:
 
     def parse_mesh_data(self):
         """
+        @brief 解析网格数据
         """
         line = self.get_data_line()
         self.cline += 1 
@@ -92,9 +96,9 @@ class MPHTxtFileReader:
         self.cline +=1
         self.parse_element_data()
 
-
     def parse_vertices_data(self):
         """
+        @brief 解析节点数据
         """
         line = self.get_data_line()
         NV = int(line.split('#')[0])
@@ -114,6 +118,7 @@ class MPHTxtFileReader:
 
     def parse_element_data(self):
         """
+        @brief 解析单元数据
         """
         line = self.get_data_line()
         self.mesh['element'] = {}
@@ -190,7 +195,54 @@ class MPHTxtFileReader:
             geo_idx = tuple(item for sublist in geo_idx for item in sublist)
             self.mesh['element'][s]['geo_idx']=geo_idx
             self.cline += NGEI            
+    def parse_geometry_data(self):
+        """
+        @brief 解析几何信息数据
+        """
+    
+        for i in range(1,len(self.tags)):
+            s = self.tags[i]
+            self.geometry[s] = {}
+            line = self.get_data_line()
+            self.cline +=1
+            line = self.get_data_line()
+            ws = line.split(' ')
+            s1 = ws[1][0:int(ws[0])]
+            assert s1 =="Selection"
+            
+            self.cline += 1
+            line = self.get_data_line()
+            self.geometry[s]['version'] = line.split('#')[0]
+            
+            self.cline += 1
+            line = self.get_data_line()
+            ws = line.split(' ')
+            s2 = ws[1][0:int(ws[0])]
+            self.geometry[s]['Label'] = ws[1][0:int(ws[0])]
 
+            self.cline += 1
+            line = self.get_data_line()
+            ws = line.split(' ')
+            s2 = ws[1][0:int(ws[0])]
+            self.geometry[s]['meshtag'] = ws[1][0:int(ws[0])]
+
+            self.cline += 1
+            line = self.get_data_line()
+            self.geometry[s]['dimension'] = int(line.split('#')[0])
+
+            self.cline += 1
+            line = self.get_data_line()
+            NE = int(line.split('#')[0])
+            self.geometry[s]['NE'] = NE
+            
+            self.cline += 1
+            line = self.get_data_line()
+            idx = [list((map(int,t.split()))) for t in
+                    self.contents[self.cline:self.cline+NE]] #Entities
+            idx = tuple(item for sublist in idx for item in sublist)
+            self.geometry[s]['entities'] = idx
+            self.cline += NE
+        
     def print(self):
         """
         """
@@ -201,7 +253,7 @@ class MPHTxtFileReader:
         print("Geometric entity indices of tri:\n",self.mesh['element']['tri']['geo_idx'])
         print("Number of TetElements:\n",self.mesh['element']['tet']['NE'])
         print("Element of TetMesh:\n",self.mesh['element']['tet']['Element'])
-
+        print("Geometry Information:\n",self.geometry)
 
 if __name__ == "__main__":
     reader = MPHTxtFileReader("/home/why/Downloads/E_gnd_L2_msh.mphtxt")
