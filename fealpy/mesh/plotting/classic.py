@@ -1,9 +1,9 @@
 
 from typing import (
     Callable, Optional, TypeVar, Any, Union, Generic,
-    Dict, Type, Set
+    Dict, Type
 )
-from warnings import warn
+
 from types import ModuleType
 import numpy as np
 from numpy.typing import NDArray
@@ -108,15 +108,7 @@ class MeshPloter(Generic[_MT]):
         self.current_axes = axes
         self.args.update_(**kwargs)
 
-        ret = self.draw()
-
-        # not_accessed = set(kwargs.keys()).difference(self.args._accessed)
-        # if not_accessed:
-        #     warn(f"Ploter: arg(s) {', '.join(not_accessed)} was not accessed in "
-        #         f"{self.__class__.__name__}.")
-        # self.args._accessed.clear()
-
-        return ret
+        return self.draw()
 
     __call__ = _call_impl
 
