@@ -1,8 +1,9 @@
 
 from typing import (
-    Callable, Optional, TypeVar, Any, Union, Sequence, Generic,
+    Callable, Optional, TypeVar, Any, Union, Generic,
     Dict, Type
 )
+from warnings import warn
 from types import ModuleType
 import numpy as np
 from numpy.typing import NDArray
@@ -38,11 +39,52 @@ class MeshPloter(Generic[_MT]):
     _axes: Axes
     _mesh: _MT
 
+    class PlotArgs():
+        def __init__(self, **data: Any) -> None:
+            self._data = data
+            self._accessed = set()
+
+        def __getattr__(self, key):
+            self._accessed.add(key)
+            return self._data.get(key, None)
+
+        def update_(self, **data: Any):
+            self._data.update(data)
+
     def __init__(self, mesh: _MT) -> None:
         if not isinstance(mesh, Mesh):
             raise TypeError("MeshPloter only works for mesh type, "
                             f"but got {self.__class__.__name__}.")
         self._mesh = mesh
+
+        # This is the default parameter for ALL Ploters
+        self.args = MeshPloter.PlotArgs(
+            color='r',                  # color of markers
+            nodecolor='k',              # color of nodes
+            edgecolor='k',              # color of edges
+            facecolor='k',              # color of faces
+            cellcolor='k',              # color of cells
+            alpha=1.0,                  # alpha channel of cells in 3-d mesh
+
+            marker='o',                 # style of markers
+            markersize=20,              # size of markers
+            linewidths=1.0,             # width of lines(edges)
+            aspect='equal',             # aspect
+            showaxis=False,             # show the axis if True
+            colorbar=False,             # show color bar if True
+            colorbarshrink=1.0,         # colorbarshrink
+            cmap='jet',                 # color map
+
+            shownode=True,              # show nodes in 1-d, 3-d mesh if True
+            showedge=False,             # show edges in 3-d mesh if True
+
+            etype='cell',               # specify the entity for Finders
+            showindex=False,            # show the index of entity for Finders
+            index=np.s_[:],             # specify the index of entity to plot
+
+            fontcolor='k',              # color of text
+            fontsize=24                 # size of text
+        )
 
     @property
     def current_axes(self):
@@ -66,8 +108,16 @@ class MeshPloter(Generic[_MT]):
             axes = fig.add_subplot(1, 1, 1)
 
         self.current_axes = axes
+        self.args.update_(**kwargs)
 
-        return self.draw(*args, **kwargs)
+        ret = self.draw()
+        not_accessed = set(kwargs.keys()).difference(self.args._accessed)
+        if not_accessed:
+            warn(f"Ploter: arg(s) {', '.join(not_accessed)} was not accessed in "
+                 f"{self.__class__.__name__}.")
+        self.args._accessed.clear()
+
+        return ret
 
     __call__ = _call_impl
 
@@ -94,17 +144,6 @@ class MeshPloter(Generic[_MT]):
         else:
             self._axes.set_axis_off()
 
-    def set_box_aspect(self, aspect: Optional[Union[float, Sequence[float]]]=None):
-        if aspect is None:
-            from mpl_toolkits.mplot3d import Axes3D
-
-            if isinstance(self._axes, Axes3D):
-                self._axes.set_box_aspect((1.0, 1.0, 1.0))
-            else:
-                self._axes.set_box_aspect(1.0)
-        else:
-            self._axes.set_box_aspect(aspect=aspect)
-
     def set_lim(self, box: Optional[NDArray]=None, tol=0.1):
         from mpl_toolkits.mplot3d import Axes3D
 
@@ -127,10 +166,7 @@ class MeshPloter(Generic[_MT]):
 
 
 class EntityFinder(MeshPloter):
-    def draw(self, etype_or_node: Union[int, str, NDArray], index=np.s_[:],
-                showindex: bool=False, multiindex: Optional[Sequence[Any]]=None,
-                color='r', marker='o', markersize=20,
-                fontcolor='k', fontsize=24):
+    def draw(self):
         """
         @brief Show the barycenter of each entity.
         """
@@ -138,9 +174,10 @@ class EntityFinder(MeshPloter):
         from ..plotting.classic import array_color_map
 
         axes = self.current_axes
+        etype_or_node = self.args.etype
 
         if isinstance(etype_or_node, (int, str)):
-            bc = self.mesh.entity_barycenter(etype=etype_or_node, index=index)
+            bc = self.mesh.entity_barycenter(etype=etype_or_node, index=self.args.index)
         elif isinstance(etype_or_node, np.ndarray):
             bc = etype_or_node
         else:
@@ -148,19 +185,20 @@ class EntityFinder(MeshPloter):
         if bc.ndim == 1:
             bc = bc[:, None]
 
+        color = self.args.color
         if isinstance(color, np.ndarray) and np.isreal(color[0]):
             mapper = array_color_map(color, 'rainbow')
             color = mapper.to_rgba(color)
 
         A.scatter(axes=axes, points=bc, color=color,
-                  marker=marker, markersize=markersize)
-        if showindex:
-            if multiindex is None:
-                A.show_index(axes=axes, location=bc, number=index,
-                            fontcolor=fontcolor, fontsize=fontsize)
+                  marker=self.args.marker, markersize=self.args.markersize)
+        if self.args.showindex:
+            if self.args.multiindex is None:
+                A.show_index(axes=axes, location=bc, number=self.args.index,
+                            fontcolor=self.args.fontcolor, fontsize=self.args.fontsize)
             else:
-                A.show_multi_index(axes=axes, location=bc, text_list=multiindex,
-                                   fontcolor=fontcolor, fontsize=fontsize)
+                A.show_multi_index(axes=axes, location=bc, text_list=self.args.multiindex,
+                                   fontcolor=self.args.fontcolor, fontsize=self.args.fontsize)
 
 EntityFinder.register('finder')
 
@@ -171,58 +209,52 @@ EntityFinder.register('finder')
 
 
 class AddPlot1d(MeshPloter):
-    def draw(
-            self, nodecolor='k', cellcolor='k',
-            markersize=20, linewidths=1,
-            aspect=None,
-            shownode=True, showaxis=False,
-            box=None, **kwargs
-        ):
+    def draw(self):
         axes = self.current_axes
-        self.set_box_aspect(aspect)
-        self.set_show_axis(showaxis)
-        self.set_lim(box)
+        axes.set_aspect(self.args.aspect)
+        self.set_show_axis(self.args.showaxis)
+        self.set_lim(self.args.box)
 
         node: NDArray = self.mesh.entity('node')
 
         if node.ndim == 1:
             node = node[:, None]
 
-        if shownode:
-            A.scatter(axes=axes, points=node, color=nodecolor,
-                      markersize=markersize)
+        if self.args.shownode:
+            A.scatter(axes=axes, points=node, color=self.args.nodecolor,
+                      markersize=self.args.markersize)
 
         cell = self.mesh.entity('cell')
 
-        return A.line(axes=axes, points=node, struct=cell, color=cellcolor,
-                      linewidths=linewidths)
+        return A.line(axes=axes, points=node, struct=cell, color=self.args.cellcolor,
+                      linewidths=self.args.linewidths)
 
 AddPlot1d.register('1d')
 
 
 class AddPlot2dHomo(MeshPloter):
-    def draw(
-            self, edgecolor='k', cellcolor='#99BBF6',
-            linewidths: float=1.0, alpha: float=1.0,
-            aspect=None,
-            showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
-            cmax=None, cmin=None, cmap='jet', box=None, **kwargs
-        ):
+    def __init__(self, mesh: Any) -> None:
+        super().__init__(mesh)
+        self.args.update_(cellcolor='#99BBF6')
+
+    def draw(self):
         """
         @brief Add a mesh canvas to the given axes. Then the entities of mesh\
                (i.e. node, cell) can be found and shown in the mesh background.
         """
         axes = self.current_axes
-        self.set_box_aspect(aspect)
-        self.set_show_axis(showaxis)
-        self.set_lim(box)
+        axes.set_aspect(self.args.aspect)
+        self.set_show_axis(self.args.showaxis)
+        self.set_lim(self.args.box)
 
+        cellcolor = self.args.cellcolor
         if isinstance(cellcolor, np.ndarray) and np.isreal(cellcolor[0]):
-            mapper = array_color_map(cellcolor, cmap=cmap, cmax=cmax, cmin=cmin)
+            mapper = array_color_map(cellcolor, cmap=self.args.cmap,
+                                     cmax=self.args.cmax, cmin=self.args.cmin)
             cellcolor = mapper.to_rgba(cellcolor)
-            if colorbar:
+            if self.args.colorbar:
                 f = axes.get_figure()
-                f.colorbar(mapper, shrink=colorbarshrink, ax=self._axes)
+                f.colorbar(mapper, shrink=self.args.colorbarshrink, ax=self._axes)
 
         node = self.mesh.entity('node')
         cell = self.mesh.entity('cell')
@@ -231,71 +263,69 @@ class AddPlot2dHomo(MeshPloter):
             cell = cell[..., ccw]
 
         return A.poly(axes=axes, points=node, struct=cell,
-                      edgecolor=edgecolor, cellcolor=cellcolor,
-                      linewidths=linewidths, alpha=alpha)
+                      edgecolor=self.args.edgecolor, cellcolor=cellcolor,
+                      linewidths=self.args.linewidths, alpha=self.args.alpha)
 
 AddPlot2dHomo.register('2d')
 
 
 class AddPlot2dPoly(MeshPloter):
-    def draw(
-            self, edgecolor='k', cellcolor='#99BBF6',
-            linewidths: float=1.0, alpha: float=1.0,
-            aspect=None,
-            showaxis: bool=False, colorbar: bool=False, colorbarshrink=1.0,
-            cmax=None, cmin=None, cmap='jet', box=None, **kwargs
-        ):
+    def __init__(self, mesh: Any) -> None:
+        super().__init__(mesh)
+        self.args.update_(cellcolor='#99BBF6')
+
+    def draw(self):
         """
         @brief Add a mesh canvas to the given axes. Then the entities of mesh\
                (i.e. node, cell) can be found and shown in the mesh background.
         """
         axes = self.current_axes
-        self.set_box_aspect(aspect)
-        self.set_show_axis(showaxis)
-        self.set_lim(box)
+        axes.set_aspect(self.args.aspect)
+        self.set_show_axis(self.args.showaxis)
+        self.set_lim(self.args.box)
 
         if isinstance(cellcolor, np.ndarray) and np.isreal(cellcolor[0]):
-            mapper = array_color_map(cellcolor, cmap=cmap, cmax=cmax, cmin=cmin)
+            mapper = array_color_map(cellcolor, cmap=self.args.cmap,
+                                     cmax=self.args.cmax, cmin=self.args.cmin)
             cellcolor = mapper.to_rgba(cellcolor)
-            if colorbar:
+            if self.args.colorbar:
                 f = axes.get_figure()
-                f.colorbar(mapper, shrink=colorbarshrink, ax=self._axes)
+                f.colorbar(mapper, shrink=self.args.colorbarshrink, ax=self._axes)
 
         node = self.mesh.entity('node')
         cell = self.mesh.entity('cell') # A list containing indices of vertices.
 
         return A.poly_(axes=axes, points=node, struct_seq=cell,
-                       edgecolor=edgecolor, cellcolor=cellcolor,
-                      linewidths=linewidths, alpha=alpha)
+                       edgecolor=self.args.edgecolor, cellcolor=cellcolor,
+                       linewidths=self.args.linewidths, alpha=self.args.alpha)
 
 AddPlot2dPoly.register('polygon2d')
 
 
 class AddPlot3dHomo(MeshPloter):
-    def draw(
-            self, nodecolor='k', edgecolor='k', cellcolor='w',
-            markersize=20, linewidths=0.5, alpha=0.8,
-            aspect: Optional[Union[float, Sequence[float]]]=None,
-            showaxis=False, shownode=False, showedge=False, threshold=None,
-            box=None, **kwargs
-        ):
-        axes = self.current_axes
-        self.set_box_aspect(aspect)
-        self.set_show_axis(showaxis)
-        self.set_lim(box)
+    def __init__(self, mesh: Any) -> None:
+        super().__init__(mesh)
+        self.args.update_(cellcolor='w', alpha=0.8, linewidth=0.5)
 
+    def draw(self):
+        axes = self.current_axes
+        axes.set_aspect(self.args.aspect)
+        self.set_show_axis(self.args.showaxis)
+        self.set_lim(self.args.box)
+
+        nodecolor = self.args.nodecolor
         if isinstance(nodecolor, np.ndarray) and np.isreal(nodecolor[0]):
             mapper = array_color_map(nodecolor, cmap='rainbow')
             nodecolor = mapper.to_rgba(nodecolor)
 
         node = self.mesh.entity('node')
-        if shownode:
-            A.scatter(axes=axes, points=node, color=nodecolor, markersize=markersize)
+        if self.args.shownode:
+            A.scatter(axes=axes, points=node, color=nodecolor, markersize=self.args.markersize)
 
-        if showedge:
+        if self.args.showedge:
             edge = self.mesh.entity('edge')
-            A.line(axes=axes, points=node, struct=edge, color=edgecolor,
-                   linewidths=linewidths)
+            A.line(axes=axes, points=node, struct=edge, color=self.args.edgecolor,
+                   linewidths=self.args.linewidths)
 
         face = self.mesh.entity('face')
         ccw = getattr(self.mesh.ds, 'ccw', None)
@@ -303,17 +333,18 @@ class AddPlot3dHomo(MeshPloter):
             face = face[..., ccw]
         isBdFace = self.mesh.ds.boundary_face_flag()
 
-        if threshold is None:
+        if self.args.threshold is None:
             face = face[isBdFace]
         else:
             bc = self.mesh.entity_barycenter('cell')
-            isKeepCell = threshold(bc)
+            isKeepCell = self.args.threshold(bc)
             face2cell = self.mesh.ds.face_to_cell()
             isInterfaceFace = np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 1
             isBdFace = (np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 2) and isBdFace
             face = face[isBdFace | isInterfaceFace]
 
-        return A.poly(axes=axes, points=node, struct=face, edgecolor=edgecolor,
-                      cellcolor=cellcolor, linewidths=linewidths, alpha=alpha)
+        return A.poly(axes=axes, points=node, struct=face, edgecolor=self.args.edgecolor,
+                      cellcolor=self.args.cellcolor, linewidths=self.args.linewidths,
+                      alpha=self.args.alpha)
 
 AddPlot3dHomo.register('3d')
