@@ -1,7 +1,7 @@
 
 from typing import (
     Callable, Optional, TypeVar, Any, Union, Generic,
-    Dict, Type
+    Dict, Type, Set
 )
 from warnings import warn
 from types import ModuleType
@@ -42,10 +42,8 @@ class MeshPloter(Generic[_MT]):
     class PlotArgs():
         def __init__(self, **data: Any) -> None:
             self._data = data
-            self._accessed = set()
 
         def __getattr__(self, key):
-            self._accessed.add(key)
             return self._data.get(key, None)
 
         def update_(self, **data: Any):
@@ -108,14 +106,15 @@ class MeshPloter(Generic[_MT]):
             axes = fig.add_subplot(1, 1, 1)
 
         self.current_axes = axes
-        args.update_(**kwargs)
+        self.args.update_(**kwargs)
 
         ret = self.draw()
-        not_accessed = set(kwargs.keys()).difference(args._accessed)
-        if not_accessed:
-            warn(f"Ploter: arg(s) {', '.join(not_accessed)} was not accessed in "
-                 f"{self.__class__.__name__}.")
-        args._accessed.clear()
+
+        # not_accessed = set(kwargs.keys()).difference(self.args._accessed)
+        # if not_accessed:
+        #     warn(f"Ploter: arg(s) {', '.join(not_accessed)} was not accessed in "
+        #         f"{self.__class__.__name__}.")
+        # self.args._accessed.clear()
 
         return ret
 
