@@ -76,7 +76,7 @@ class Plotable():
         """
         if node is None:
             return self.find_entity(
-                    axes, etype_or_node='node', index=index,
+                    axes, etype='node', index=index,
                     showindex=showindex, multiindex=multiindex,
                     color=color,
                     marker=marker,
@@ -85,7 +85,7 @@ class Plotable():
                     fontcolor=fontcolor)
         else:
             return self.find_entity(
-                    axes, etype_or_node=node, index=index,
+                    axes, etype=node, index=index,
                     showindex=showindex,
                     color=color,
                     marker=marker,
@@ -99,7 +99,7 @@ class Plotable():
             color='g', marker='^', markersize=15,
             fontsize=15, fontcolor='g'):
         return self.find_entity(
-                axes, 'edge', index=index,
+                axes, etype='edge', index=index,
                 showindex=showindex, multiindex=multiindex,
                 color=color,
                 marker=marker,
@@ -113,7 +113,7 @@ class Plotable():
             color='#673AB7', marker='d', markersize=18,
             fontsize=18, fontcolor='#673AB7'):
         return self.find_entity(
-                axes, 'face', index=index,
+                axes, etype='face', index=index,
                 showindex=showindex, multiindex=multiindex,
                 color=color,
                 marker=marker,
@@ -127,7 +127,7 @@ class Plotable():
             color='b', marker='s', markersize=21,
             fontsize=21, fontcolor='b'):
         return self.find_entity(
-                axes, 'cell', index=index,
+                axes, etype='cell', index=index,
                 showindex=showindex, multiindex=multiindex,
                 color=color,
                 marker=marker,
