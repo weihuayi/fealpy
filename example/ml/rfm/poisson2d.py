@@ -9,10 +9,10 @@ from torch import Tensor, cos
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function, RandomFeatureSpace
+from fealpy.ml.modules import PoUSpace, PoUSin, Cos, Function, RandomFeatureSpace
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
-NEW_BASIS = False
+NEW_BASIS = True
 PI = torch.pi
 
 def exact_solution(p: Tensor):
@@ -38,10 +38,12 @@ HC = 1/EXTC
 
 start_time = time()
 
+def factory(i: int):
+    return RandomFeatureSpace(2, Jn, Cos(), bound=(0, PI))
+
 mesh = UniformMesh2d((0, EXT, 0, EXT), (H, H), origin=(0, 0))
 node = torch.from_numpy(mesh.entity('node')).clone()
-space = RandomFeaturePoUSpace(2, Jn, Cos(), PoUSin(), centers=node, radius=H/2,
-                              bound=(0, PI), print_status=True)
+space = PoUSpace(factory, pou=PoUSin(), centers=node, radius=H/2, print_status=True)
 
 def init_freq(model):
     if isinstance(model, RandomFeatureSpace):
@@ -69,8 +71,8 @@ col_bd = torch.from_numpy(mesh_col.entity('node', index=_bd_node))
 mesh_err = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
 
 
-laplace_phi = space.L(col_in) / sqrt(col_in.shape[0])
-phi = space.U(col_bd) / sqrt(col_bd.shape[0])
+laplace_phi = space.laplace_basis(col_in) / sqrt(col_in.shape[0])
+phi = space.basis(col_bd) / sqrt(col_bd.shape[0])
 
 A_tensor = torch.cat([-laplace_phi,
                       phi], dim=0)

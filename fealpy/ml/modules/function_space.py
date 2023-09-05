@@ -52,9 +52,9 @@ class FunctionSpaceBase(Module):
         raise NotImplementedError(f"hessian_basis is not supported by {self.__class__.__name__}"
                                   "or it has not been implmented.")
 
-    def laplace_basis(self, p: Tensor) -> Tensor:
+    def laplace_basis(self, p: Tensor, coef: Optional[Tensor]=None) -> Tensor:
         """
-        @brief
+        @brief Return value of the Laplace operator acting on the basis functions.
         """
         raise NotImplementedError(f"laplace_basis is not supported by {self.__class__.__name__}"
                                   "or it has not been implmented.")

@@ -1,7 +1,7 @@
 """
 Partitions of Units
 """
-from typing import Union, List, Callable
+from typing import Union, List, Callable, Any
 
 import torch
 from torch.nn import Module
@@ -262,19 +262,86 @@ class PoULocalSpace(FunctionSpaceBase):
         ret += self.pou(p)[..., None, None] * space.hessian_basis(p)
         return ret
 
-    def laplace_basis(self, p: Tensor) -> Tensor:
-        pass
+    def laplace_basis(self, p: Tensor, coef=None) -> Tensor:
+        space = self.space
+        if coef is None:
+            ret = torch.einsum("ndd, nf -> nf", self.pou.hessian(p), space.basis(p))
+            ret += 2 * torch.einsum("nd, nfd -> nf", self.pou.gradient(p),
+                                    space.grad_basis(p))
+        else:
+            ret = torch.einsum("ndd, nf, d -> nf", self.pou.hessian(p), space.basis(p), coef)
+            ret += 2 * torch.einsum("nd, nfd, d -> nf", self.pou.gradient(p),
+                                    space.grad_basis(p), coef)
+        ret += self.pou(p) * space.laplace_basis(p, coef=coef)
+        return ret
 
     def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
-        pass
+        N = p.shape[0]
+        nf = self.number_of_basis()
+        order = len(idx)
+        space = self.space
+        ret = torch.zeros((N, nf), dtype=self.dtype, device=self.device)
+
+        if order == 0:
+            ret[:] = self.basis(p)
+        elif order == 1:
+            ret += self.pou.derivative(p, idx[0]) * space.basis(p)
+            ret += self.pou(p) * space.derivative_basis(p, idx[0])
+        elif order == 2:
+            ret += self.pou.derivative(p, idx[0], idx[1]) * space.basis(p)
+            ret += self.pou.derivative(p, idx[0]) * space.derivative_basis(p, idx[1])
+            ret += self.pou.derivative(p, idx[1]) * space.derivative_basis(p, idx[0])
+            ret += self.pou(p) * space.derivative_basis(p, idx[0], idx[1])
+        elif order == 3:
+            ret += self.pou.derivative(p, idx[0], idx[1], idx[2]) * space.basis(p)
+            ret += self.pou.derivative(p, idx[0], idx[1]) * space.derivative_basis(p, idx[2])
+            ret += self.pou.derivative(p, idx[1], idx[2]) * space.derivative_basis(p, idx[0])
+            ret += self.pou.derivative(p, idx[2], idx[0]) * space.derivative_basis(p, idx[1])
+            ret += self.pou.derivative(p, idx[0]) * space.derivative_basis(p, idx[2], idx[1])
+            ret += self.pou.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], idx[2])
+            ret += self.pou.derivative(p, idx[2]) * space.derivative_basis(p, idx[1], idx[0])
+            ret += self.pou(p) * space.derivative_basis(p, idx[0], idx[1], idx[2])
+
+        elif order == 4:
+            pass
+        # TODO: finish this
+        else:
+            raise NotImplementedError("Derivatives higher than order 4 have bot been implemented.")
+        return ret
 
 
-SpaceFactory = Callable[[], FunctionSpaceBase]
+SpaceFactory = Callable[[int], FunctionSpaceBase]
+
+def assemble(func: Callable[['PoUSpace', int, Tensor], Tensor]):
+    """
+    @brief Assemble data from partitions.
+
+    The function that this decorator acts on must have at least two inputs:\
+    the partition index number and the input tensor. The functions that are\
+    acted upon by this decorator automatically collect the output of the\
+    original function within the partition and assemble it into a total matrix.
+    """
+    def wrapper(self, p: Tensor, *args, **kwargs) -> Tensor:
+        N = p.shape[0]
+        M = self.number_of_basis()
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
+        std = self.std(p)
+        basis_cursor = 0
+
+        for idx, part in enumerate(self.partitions):
+            NF = part.number_of_basis()
+            x = std[:, idx, :]
+            flag = part.flag(x)
+            ret[flag, basis_cursor:basis_cursor+NF] += func(self, idx, x[flag, ...], *args, **kwargs)
+            basis_cursor += NF
+        return ret
+    return wrapper
+
 
 class PoUSpace(FunctionSpaceBase):
-    def __init__(self, space_factory: SpaceFactory, centers: Tensor, radius: Tensor,
+    def __init__(self, space_factory: SpaceFactory, centers: Tensor, radius: Union[Tensor, Any],
                  pou: PoU, print_status=False) -> None:
-        super().__init__()
+        super().__init__(dtype=centers.dtype, device=centers.device)
 
         self.std = Standardize(centers=centers, radius=radius)
         self.partitions: List[PoULocalSpace] = []
@@ -282,7 +349,7 @@ class PoUSpace(FunctionSpaceBase):
         self.out_dim = -1
 
         for i in range(self.number_of_partitions()):
-            part = PoULocalSpace(pou=pou, space=space_factory())
+            part = PoULocalSpace(pou=pou, space=space_factory(i))
             if self.in_dim == -1:
                 self.in_dim = part.space.in_dim
                 self.out_dim = part.space.out_dim
@@ -312,50 +379,19 @@ class PoUSpace(FunctionSpaceBase):
     def number_of_basis(self):
         return sum(p.number_of_basis() for p in self.partitions)
 
-    @property
-    def dtype(self):
-        return self.std.centers.dtype
+    @assemble
+    def basis(self, idx: int, p: Tensor) -> Tensor:
+        return self.partitions[idx].basis(p)
 
-    @property
-    def device(self):
-        return self.std.centers.device
+    @assemble
+    def laplace_basis(self, idx: int, p: Tensor, coef=None) -> Tensor:
+        if coef is None:
+            scale = self.std.radius[idx, :]**2
+        else:
+            scale = self.std.radius[idx, :]**2 * coef
+        return self.partitions[idx].laplace_basis(p, coef=1/scale)
 
-    def _assemble(self, key: str, p: Tensor) -> Tensor:
-        N = p.shape[0]
-        M = self.number_of_basis()
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
-        std = self.std(p)
-        basis_cursor = 0
-
-        for idx, part in enumerate(self.partitions):
-            NF = part.number_of_basis()
-            x = std[:, idx, :]
-            flag = part.flag(x)
-            func = getattr(part, key, None)
-
-            if func is None:
-                raise ValueError(f"No method named {key} found in the partition.")
-
-            ret[flag, basis_cursor:basis_cursor+NF] += func(x[flag, ...])
-            basis_cursor += NF
-        return ret
-
-    def basis(self, p: Tensor) -> Tensor:
-        """
-        @brief
-        """
-        N = p.shape[0]
-        M = self.number_of_basis()
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
-        std = self.std(p)
-        basis_cursor = 0
-        for idx, part in enumerate(self.partitions):
-            NF = part.number_of_basis()
-            x = std[:, idx, :]
-            flag = part.flag(x)
-            ret[flag, basis_cursor:basis_cursor+NF] += part.basis(x[flag, ...])
-            basis_cursor += NF
-        return ret
-
-    def laplace_basis(self, p: Tensor) -> Tensor:
-        pass
+    @assemble
+    def derivative_basis(self, idx: int, p: Tensor, *dim: int) -> Tensor:
+        scale = torch.prod(self.std.radius[idx, dim], dim=-1)
+        return self.partitions[idx].derivative_basis(p, *dim) / scale
