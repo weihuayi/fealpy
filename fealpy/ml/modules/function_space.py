@@ -3,14 +3,21 @@ from typing import Optional
 
 import torch
 from torch import Tensor, dtype, device
-from torch.nn import Module, Linear, init, Parameter
+from torch.nn import Module, init, Parameter
 
 from .module import TensorMapping
 
 
 class FunctionSpaceBase(Module):
-    dtype: dtype
-    device: device
+    def __init__(self, in_dim: int=1, out_dim: int=1,
+                 dtype: dtype=None, device: device=None) -> None:
+        super().__init__()
+        assert in_dim >= 1, "Input dimension should be a positive integer."
+        assert out_dim >= 1, "Output dimension should be a positive integer."
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.dtype = dtype
+        self.device = device
 
     def number_of_basis(self) -> int:
         """
@@ -20,8 +27,7 @@ class FunctionSpaceBase(Module):
 
     def basis(self, p: Tensor) -> Tensor:
         """
-        @brief Return the value of basis, with shape (#samples, #basis, #dims),\
-               or (#samples, #basis).
+        @brief Return the value of basis, with shape (#samples, #basis).
         """
         raise NotImplementedError
 
@@ -32,14 +38,42 @@ class FunctionSpaceBase(Module):
         func = Function(self, um=um)
         return func(p)
 
+    def grad_basis(self, p: Tensor) -> Tensor:
+        """
+        @brief Return gradient vector of basis, with shape (#samples, #basis, #dims).
+        """
+        raise NotImplementedError(f"grad_basis is not supported by {self.__class__.__name__}"
+                                  "or it has not been implmented.")
+
+    def hessian_basis(self, p: Tensor) -> Tensor:
+        """
+        @brief
+        """
+        raise NotImplementedError(f"hessian_basis is not supported by {self.__class__.__name__}"
+                                  "or it has not been implmented.")
+
+    def laplace_basis(self, p: Tensor, coef: Optional[Tensor]=None) -> Tensor:
+        """
+        @brief Return value of the Laplace operator acting on the basis functions.
+        """
+        raise NotImplementedError(f"laplace_basis is not supported by {self.__class__.__name__}"
+                                  "or it has not been implmented.")
+
+    def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
+        """
+        @brief
+        """
+        raise NotImplementedError(f"derivative_basis is not supported by {self.__class__.__name__}"
+                                  "or it has not been implmented.")
+
 
 class Function(TensorMapping):
     """
-    @brief Scaler functions in a linear function space.
+    @brief Functions in a linear function space.
     """
     def __init__(self, space: FunctionSpaceBase, gd=1, um: Optional[Tensor]=None) -> None:
         """
-        @brief Initialize a scaler function in a linear function space.
+        @brief Initialize a function in a linear function space.
         """
         super().__init__()
         dtype = space.dtype
