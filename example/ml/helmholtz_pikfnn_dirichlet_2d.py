@@ -51,7 +51,7 @@ net_PIKFNN = nn.Sequential(
 
 s = Solution(net_PIKFNN)
 
-#真解
+#真解及边界条件
 
 def solution(p:torch.Tensor) -> torch.Tensor:
 
@@ -96,16 +96,19 @@ fig_2 = plt.figure()
 fig_3 = plt.figure()
 
 axes = fig_1.add_subplot()
-Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+qm = Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300],cmap = 'tab20')
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('u')
+fig_1.colorbar(qm)
 
 axes = fig_2.add_subplot()
-s.add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+qm = s.add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300],cmap='tab20')
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('u_PIKFNN')
+fig_2.colorbar(qm)
+
 axes = fig_3.add_subplot()
 qm = s.diff(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
 axes.set_xlabel('x')
@@ -114,3 +117,4 @@ axes.set_title('diff')
 fig_3.colorbar(qm)
 
 plt.show()
+
