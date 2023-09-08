@@ -32,13 +32,13 @@ class Sampler():
         self.requires_grad = bool(requires_grad)
         self._weight = torch.tensor(torch.nan, dtype=dtype, device=device).broadcast_to(m, 1)
 
-    def __and__(self, other):
+    def __and__(self, other) -> 'JoinedSampler':
         if isinstance(other, Sampler):
             return JoinedSampler(self, other)
         else:
             return NotImplemented
 
-    def __or__(self, other):
+    def __or__(self, other) -> 'HybridSampler':
         if isinstance(other, Sampler):
             return HybridSampler(self, other)
         else:
