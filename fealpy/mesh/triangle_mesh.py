@@ -916,7 +916,7 @@ class TriangleMesh(Mesh, Plotable):
                     else:
                         ldof = value.shape[-1]
                         p = int((np.sqrt(1+8*ldof)-3)//2)
-                        bc = self.multi_index_matrix(p, etype='cell')/p
+                        bc = self.multi_index_matrix(p, etype=2)/p
 
                         bcl = np.zeros_like(bc)
                         bcl[:, 0] = bc[:, 1]

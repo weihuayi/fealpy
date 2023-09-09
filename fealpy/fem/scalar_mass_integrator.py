@@ -41,11 +41,11 @@ class ScalarMassIntegrator:
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
-                    if coef.coordtype == 'barycentric':
-                        coef = coef(bcs)
-                    elif coef.coordtype == 'cartesian':
+                    if coef.coordtype == 'cartesian':
                         ps = mesh.bc_to_point(bcs, index=index)
                         coef = coef(ps)
+                    elif coef.coordtype == 'barycentric':
+                        coef = coef(bcs, index=index)
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
