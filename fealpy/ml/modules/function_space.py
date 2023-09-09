@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Optional, Generic, TypeVar
 
 import torch
 from torch import Tensor, dtype, device
@@ -52,6 +52,12 @@ class FunctionSpaceBase(Module):
         raise NotImplementedError(f"hessian_basis is not supported by {self.__class__.__name__}"
                                   "or it has not been implmented.")
 
+    def convect_basis(self, p: Tensor, coef: Tensor) -> Tensor:
+        """
+        @brief
+        """
+        return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p))
+
     def laplace_basis(self, p: Tensor, coef: Optional[Tensor]=None) -> Tensor:
         """
         @brief Return value of the Laplace operator acting on the basis functions.
@@ -67,11 +73,13 @@ class FunctionSpaceBase(Module):
                                   "or it has not been implmented.")
 
 
-class Function(TensorMapping):
+_FS = TypeVar('_FS', bound=FunctionSpaceBase)
+
+class Function(TensorMapping, Generic[_FS]):
     """
     @brief Functions in a linear function space.
     """
-    def __init__(self, space: FunctionSpaceBase, gd=1, um: Optional[Tensor]=None) -> None:
+    def __init__(self, space: _FS, gd=1, um: Optional[Tensor]=None) -> None:
         """
         @brief Initialize a function in a linear function space.
         """
