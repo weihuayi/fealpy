@@ -9,19 +9,19 @@ from torch import Tensor, cos
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import RandomFeaturePoUSpace, PoUSin, Cos, Function
+from fealpy.ml.modules import PoUSpace, PoUSin, Cos, Function, RandomFeatureSpace
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
-NEW_BASIS = False
+NEW_BASIS = True
 PI = torch.pi
 
-def real_solution(p: Tensor):
+def exact_solution(p: Tensor):
     x = p[:, 0:1]
     y = p[:, 1:2]
     return cos(PI * x) * cos(PI * y)
 
 def boundary(p: Tensor):
-    return real_solution(p)
+    return exact_solution(p)
 
 def source(p: Tensor):
     x = p[:, 0:1]
@@ -31,23 +31,35 @@ def source(p: Tensor):
 
 EXT = 1
 H = 1/EXT
-Jn = 128
+Jn = 8
 
 EXTC = 50
 HC = 1/EXTC
 
 start_time = time()
 
+def factory(i: int):
+    return RandomFeatureSpace(2, Jn, Cos(), bound=(0, PI))
+
 mesh = UniformMesh2d((0, EXT, 0, EXT), (H, H), origin=(0, 0))
 node = torch.from_numpy(mesh.entity('node')).clone()
-space = RandomFeaturePoUSpace(2, Jn, Cos(), PoUSin(), centers=node, radius=H/2,
-                              bound=(PI, PI), print_status=True)
+space = PoUSpace(factory, pou=PoUSin(), centers=node, radius=H/2, print_status=True)
+
+def init_freq(model):
+    if isinstance(model, RandomFeatureSpace):
+        nf = model.number_of_basis()
+        model.frequency[:nf//4, 0] = PI/2
+        model.frequency[nf//4:nf//4*2, 1] = PI/2
+        model.frequency[nf//4*2:nf//4*3, :] = PI/2
+        model.frequency[nf//4*3:, 0] = PI/2
+        model.frequency[nf//4*3:, 1] = -PI/2
+
+space.apply(init_freq)
 
 if not NEW_BASIS:
     try:
-        with open("rfspace_poisson2d.pth", 'r') as a:
-            state_dict = torch.load(a)
-            space.load_state_dict(state_dict)
+        state_dict = torch.load("rfspace_poisson2d.pth")
+        space.load_state_dict(state_dict)
     except:
         pass
 
@@ -59,8 +71,8 @@ col_bd = torch.from_numpy(mesh_col.entity('node', index=_bd_node))
 mesh_err = TriangleMesh.from_box([0, 1, 0, 1], nx=10, ny=10)
 
 
-laplace_phi = space.L(col_in) / sqrt(col_in.shape[0])
-phi = space.U(col_bd) / sqrt(col_bd.shape[0])
+laplace_phi = space.laplace_basis(col_in) / sqrt(col_in.shape[0])
+phi = space.basis(col_bd) / sqrt(col_bd.shape[0])
 
 A_tensor = torch.cat([-laplace_phi,
                       phi], dim=0)
@@ -71,11 +83,11 @@ A = csr_matrix(A_tensor.cpu().numpy())
 b = csr_matrix(b_tensor.cpu().numpy())
 
 um = spsolve(A.T@A, A.T@b)
-solution = Function(space, torch.from_numpy(um))
+solution = Function(space, 1, torch.from_numpy(um))
 end_time = time()
 
-error = solution.estimate_error_tensor(real_solution, mesh=mesh_err)
-print(f"L-2 error: {error.data}")
+error = solution.estimate_error_tensor(exact_solution, mesh=mesh_err)
+print(f"L-2 error: {error.item()}")
 print(f"Time: {end_time - start_time}")
 
 if NEW_BASIS:
@@ -88,7 +100,7 @@ from matplotlib import pyplot as plt
 fig = plt.figure("RFM for 2d poisson equation")
 
 axes = fig.add_subplot(111)
-qm = solution.diff(real_solution).add_pcolor(axes, box=[0, 1, 0, 1], nums=[40, 40])
+qm = solution.diff(exact_solution).add_pcolor(axes, box=[0, 1, 0, 1], nums=[40, 40])
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 fig.colorbar(qm)

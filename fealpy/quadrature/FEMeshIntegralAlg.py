@@ -51,7 +51,6 @@ class FEMeshIntegralAlg():
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs)
-
         if callable(u):
             if not hasattr(u, 'coordtype'): 
                 u = u(ps)

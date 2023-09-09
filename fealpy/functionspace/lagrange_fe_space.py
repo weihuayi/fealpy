@@ -208,7 +208,6 @@ class LagrangeFESpace():
             val = np.einsum(s1, gphi, uh[cell2dof[index], ...])
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
-
         return val
 
 

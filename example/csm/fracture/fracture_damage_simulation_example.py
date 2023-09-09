@@ -16,12 +16,14 @@ from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
 
 from fealpy.fem import DirichletBC
+from fealpy.fem import recovery_alg
+from fealpy.mesh.adaptive_tools import mark
 
 
 class Brittle_Facture_model():
     def __init__(self):
-        self.E = 210 # 杨氏模量
-        self.nu = 0.3 # 泊松比
+        self.E = 200 # 杨氏模量
+        self.nu = 0.2 # 泊松比
         self.Gc = 1 # 材料的临界能量释放率
         self.l0 = 0.02 # 尺度参数，断裂裂纹的宽度
 
@@ -66,7 +68,7 @@ class Brittle_Facture_model():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return np.concatenate((np.linspace(0, 70e-3, 6)[1:], np.linspace(70e-3,
+        return np.concatenate((np.linspace(0, 70e-3, 6), np.linspace(70e-3,
             125e-3, 26)[1:]))
 
     def top_disp_direction(self):
@@ -261,17 +263,47 @@ class fracture_damage_integrator():
             D[:, m, n] += d2 * val
         D = (D + D.swapaxes(1,2))/2
         return D
+    
+    def get_dissipated_energy(self, d):
 
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        g = d.grad_value(bc)
+
+        val = self.ka/2/self.l0*(d(bc)**2+self.l0**2*np.sum(g*g, axis=1))
+        dissipated = np.dot(val, cm)
+        return dissipated
+
+    
+    def get_stored_energy(self, psi_s, d):
+        eps = 1e-10
+
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        c0 = (1 - d(bc)) ** 2 + eps
+        mesh = self.mesh
+        cm = mesh.entity_measure('cell')
+        val = c0*psi_s
+        stored = np.dot(val, cm)
+        return stored
+
+
+def recovery_estimate(mesh, d):
+    from fealpy.functionspace import LagrangeFiniteElementSpace
+    space0 = LagrangeFiniteElementSpace(mesh)
+    rgd = space0.grad_recovery(uh=d, method='simple')
+    eta = space0.integralalg.error(rgd.value, d.grad_value, power=2,
+            celltype=True)
+    return eta
 
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
-mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
+mesh = TriangleMesh.from_domain_distmesh(domain, 0.03, maxit=100)
 #mesh = model.init_mesh(n=5)
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
-NN = mesh.number_of_nodes()
 
 simulation = fracture_damage_integrator(mesh, model)
 space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
@@ -279,18 +311,21 @@ space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
 d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 uh = space.function(dim=GD)
-du = space.function(dim=GD)
 disp = model.top_boundary_disp()
 
+stored_energy = np.zeros_like(disp)
+dissipated_energy = np.zeros_like(disp)
 
-for i in range(len(disp)):
+for i in range(len(disp)-1):
+    NN = mesh.number_of_nodes()
     node  = mesh.entity('node') 
     isTNode = model.is_top_boundary(node)
-    uh[1, isTNode] = disp[i]
+    uh[1, isTNode] = disp[i+1]
     isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
+    du = space.function(dim=GD)
 
     k = 0
-    while k < 50:
+    while k < 100:
         print('i:', i)
         print('k:', k)
         
@@ -326,14 +361,15 @@ for i in range(len(disp)):
 
         # 计算相场模型
         dbform = BilinearForm(space)
-        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=model.Gc/model.l0))
+        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
+            q=4))
+        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
+#        dbform.add_domain_integrator(ScalarMassIntegrator(c=model.Gc/model.l0))
         dbform.assembly()
         A1 = dbform.get_matrix()
 
         lform = LinearForm(space)
-        lform.add_domain_integrator(ScalarSourceIntegrator(2*H))
+        lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
         lform.assembly()
         R1 = lform.get_vector()
         R1 -= A1@d[:]
@@ -352,17 +388,61 @@ for i in range(len(disp)):
         print("error1:", error1)
         error = max(error0, error1)
         print("error:", error)
-        if error < 1e-6:
+        if error < 1e-5:
             break
-        mesh.nodedata['damage'] = d
-        mesh.nodedata['uh'] = uh.T
-        fname = 'test' + str(i).zfill(10)  + '.vtu'
-        mesh.to_vtk(fname=fname)
         k += 1
+    stored_energy[i+1] = simulation.get_stored_energy(phip, d)
+    dissipated_energy[i+1] = simulation.get_dissipated_energy(d)
 
+    mesh.nodedata['damage'] = d
+    mesh.nodedata['uh'] = uh.T
+    fname = 'test' + str(i).zfill(10)  + '.vtu'
+    mesh.to_vtk(fname=fname)
+    if i < len(disp) - 1:
+        cell2dof = mesh.cell_to_ipoint(p=1)
+        uh0c2f = uh[0, cell2dof]
+        uh1c2f = uh[1, cell2dof]
+        dc2f = d[cell2dof]
+        data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
+
+        # 恢复型后验误差估计
+        recovery = recovery_alg(space)
+        eta = recovery.recovery_estimate(d)
+#        option = mesh.adaptive_options(data=data, disp=False)
+#        mesh.adaptive(eta, options=option)
+
+        isMarkedCell = mark(eta, theta = 0.2)
+        option = mesh.bisect_options(data=data, disp=False)
+        mesh.bisect(isMarkedCell, options=option)
+      
+        # 更新加密后的空间
+        space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
+        cell2dof = space.cell_to_dof()
+        NC = mesh.number_of_cells()
+        uh = space.function(dim=GD)
+        d = space.function()
+        H = np.zeros(NC, dtype=np.float64)  # 分片常数
+
+        uh[0, cell2dof.reshape(-1)] = option['data']['uh0'].reshape(-1)
+        uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
+        d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
+        H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
+NN = mesh.number_of_nodes()
 mesh.node += uh[:, :NN].T
 mesh.add_plot(axes)
 plt.show()
+
+plt.figure()
+plt.plot(disp, stored_energy, label='stored_energy', marker='o')
+plt.plot(disp, dissipated_energy, label='dissipated_energy', marker='s')
+plt.plot(disp, dissipated_energy+stored_energy, label='total_energy',
+        marker='x')
+plt.xlabel('disp')
+plt.ylabel('energy')
+plt.grid(True)
+plt.legend()
+plt.show()
+

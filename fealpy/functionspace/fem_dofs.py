@@ -11,8 +11,11 @@ class LinearMeshCFEDof():
 
     def is_boundary_dof(self, threshold=None):
         TD = self.mesh.top_dimension()
+        gdof = self.number_of_global_dofs()
         if type(threshold) is np.ndarray:
             index = threshold
+            if (index.dtype == np.bool_) and (len(index) == gdof):
+                return index
         else:
             index = self.mesh.ds.boundary_face_index()
             if callable(threshold):
@@ -20,7 +23,6 @@ class LinearMeshCFEDof():
                 flag = threshold(bc)
                 index = index[flag]
 
-        gdof = self.number_of_global_dofs()
         face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
         isBdDof = np.zeros(gdof, dtype=np.bool_)
         isBdDof[face2dof] = True

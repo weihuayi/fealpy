@@ -42,7 +42,35 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
         return self.cell_to_edge(return_sparse=return_sparse)
 
 
-    # boundary, simplified for 1d
+class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
+    localEdge = np.array([(0, 1)])
+    localFace = np.array([(0,), (1,)])
+    face = ArrRedirector('_face')
+
+    @property
+    def _face(self):
+        NN = self.number_of_nodes()
+        return np.arange(NN).reshape(NN, 1)
+
+    @property
+    def face2cell(self) -> NDArray:
+        """
+        @TODO
+        """
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        assert NC + 1 == NN
+        I = np.arange(NC)
+        node2cell = np.zeros((NN, 4), dtype=self.itype)
+        node2cell[1:, 0] = I
+        node2cell[:-1, 1] = I
+        node2cell[1:, 2] = 1
+        node2cell[:-1, 3] = 0
+        node2cell[-1, 1] = NC - 1
+        node2cell[-1, 3] = 1
+        return node2cell
+
+    # boundary, simplified for 1d structure
 
     def boundary_node_flag(self):
         """
@@ -89,32 +117,3 @@ class Mesh1dDataStructure(HomogeneousMeshDS):
             An array containing the indices of the boundary cells.
         """
         return np.array([0, self.NC-1], dtype=self.itype)
-
-
-class StructureMesh1dDataStructure(StructureMeshDS, Mesh1dDataStructure):
-    localEdge = np.array([(0, 1)])
-    localFace = np.array([(0,), (1,)])
-    face = ArrRedirector('_face')
-
-    @property
-    def _face(self):
-        NN = self.number_of_nodes()
-        return np.arange(NN).reshape(NN, 1)
-
-    @property
-    def face2cell(self) -> NDArray:
-        """
-        @TODO
-        """
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        assert NC + 1 == NN
-        I = np.arange(NC)
-        node2cell = np.zeros((NN, 4), dtype=self.itype)
-        node2cell[1:, 0] = I
-        node2cell[:-1, 1] = I
-        node2cell[1:, 2] = 1
-        node2cell[:-1, 3] = 0
-        node2cell[-1, 1] = NC - 1
-        node2cell[-1, 3] = 1
-        return node2cell
