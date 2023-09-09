@@ -186,6 +186,7 @@ def usolution(p):
     u = np.zeros(p.shape)
     u[...,0] = 4*y*(1-y)
     return u
+
 '''
 如何把梯度写成函数
 def crosswlf(T,P,u):
@@ -235,11 +236,10 @@ T0 = space1.function()
 Ts = space1.function()
 T1 = space1.function()
 
-
 rhofun =  heaviside(phi0, dx, wrho, grho)
-Cfun =  heaviside(phi0, dx, wrho, grho)
+Cfun =  heaviside(phi0, dx, wC, gC)
 etafun =  heaviside(phi0, dx, wrho, grho)
-lambdafun =  heaviside(phi0, dx, wrho, grho)
+lambdafun =  heaviside(phi0, dx, wlambda, glambda)
 
 
 mesh.nodedata['velocity'] = u1
