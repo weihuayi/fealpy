@@ -103,6 +103,13 @@ class VectorSourceIntegrator():
                     bb += np.einsum('q, qcd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
                 elif space[0].doforder == 'vdims':
                     bb += np.einsum('q, qcd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            elif val.shape == (NQ, GD, NC):
+                if space[0].doforder == 'sdofs':
+                    bb += np.einsum('q, qdc, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                elif space[0].doforder == 'vdims':
+                    bb += np.einsum('q, qdc, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            else:
+                raise ValueError("coef 的维度超出了支持范围")
         if out is None:
             return bb 
 

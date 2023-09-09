@@ -1,7 +1,7 @@
 """
 Partitions of Units
 """
-from typing import Union, List, Callable, Any
+from typing import Union, List, Callable, Any, Generic, TypeVar
 
 import torch
 from torch.nn import Module
@@ -232,8 +232,10 @@ class PoUSin(PoU):
 
 from .function_space import FunctionSpaceBase
 
-class PoULocalSpace(FunctionSpaceBase):
-    def __init__(self, pou: PoU, space: FunctionSpaceBase) -> None:
+_FS = TypeVar('_FS', bound=FunctionSpaceBase)
+
+class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
+    def __init__(self, pou: PoU, space: _FS) -> None:
         super().__init__()
         self.pou = pou
         self.space = space
@@ -310,9 +312,9 @@ class PoULocalSpace(FunctionSpaceBase):
         return ret
 
 
-SpaceFactory = Callable[[int], FunctionSpaceBase]
+SpaceFactory = Callable[[int], _FS]
 
-def assemble(func: Callable[['PoUSpace', int, Tensor], Tensor]):
+def assemble(func: Callable[..., Tensor]):
     """
     @brief Assemble data from partitions.
 
@@ -338,13 +340,13 @@ def assemble(func: Callable[['PoUSpace', int, Tensor], Tensor]):
     return wrapper
 
 
-class PoUSpace(FunctionSpaceBase):
-    def __init__(self, space_factory: SpaceFactory, centers: Tensor, radius: Union[Tensor, Any],
+class PoUSpace(FunctionSpaceBase, Generic[_FS]):
+    def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor, radius: Union[Tensor, Any],
                  pou: PoU, print_status=False) -> None:
         super().__init__(dtype=centers.dtype, device=centers.device)
 
         self.std = Standardize(centers=centers, radius=radius)
-        self.partitions: List[PoULocalSpace] = []
+        self.partitions: List[PoULocalSpace[_FS]] = []
         self.in_dim = -1
         self.out_dim = -1
 
@@ -379,9 +381,27 @@ class PoUSpace(FunctionSpaceBase):
     def number_of_basis(self):
         return sum(p.number_of_basis() for p in self.partitions)
 
+    def partition_basis_slice(self, idx: int):
+        """
+        @brief Returns the index slice of the local basis function of the\
+               specified partition in the global model.
+
+        @param idx: int. The index of the partition.
+        """
+        assert idx >= 0
+        assert idx < self.number_of_partitions()
+
+        start = sum((p.number_of_basis() for p in self.partitions[:idx]), 0)
+        stop = start + self.partitions[idx].number_of_basis()
+        return slice(start, stop, None)
+
     @assemble
     def basis(self, idx: int, p: Tensor) -> Tensor:
         return self.partitions[idx].basis(p)
+
+    @assemble
+    def convect_basis(self, idx: int, p: Tensor, coef: Tensor) -> Tensor:
+        return self.partitions[idx].convect_basis(p, coef)
 
     @assemble
     def laplace_basis(self, idx: int, p: Tensor, coef=None) -> Tensor:

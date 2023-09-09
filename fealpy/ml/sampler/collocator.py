@@ -1,5 +1,5 @@
 
-from typing import Tuple, List
+from typing import List, Sequence
 
 import torch
 from torch import device, Tensor, float64
@@ -11,7 +11,7 @@ class Collocator(Sampler):
     """
     Generate collocation points uniformly in n-d rectangle.
     """
-    def __init__(self, box: Tuple[float], steps: Tuple[int],
+    def __init__(self, box: Sequence[float], steps: Sequence[int],
                  dtype=float64,
                  device: device=None, requires_grad: bool=False) -> None:
         """

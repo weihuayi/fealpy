@@ -13,4 +13,4 @@ from .sampler import (
     TetrahedronMeshSampler,
     QuadrangleMeshSampler
 )
-from .collocator import Collocator
+from .collocator import Collocator, CircleCollocator

@@ -979,6 +979,50 @@ class TetrahedronMesh(Mesh, Plotable):
 
         return cls(node, cell)
 
+    @classmethod
+    def from_step(cls,filename):
+        import os
+        import gmsh
+        gmsh.initialize()
+        gmsh.open(filename)
+        gmsh.option.setNumber('Mesh.MeshSizeFromCurvature', 10)
+        
+        #获取所有几何实体
+        ent = gmsh.model.getEntities()
+
+        physicals = {}
+        for e in ent:
+            n = gmsh.model.getEntityName(e[0], e[1])
+            # 获取从step读取的实体标签，并为在 / 分隔的标签路径中具有相同第三个
+            # 标签的所有实体创建一个物理组
+            if n:
+                print('Entity ' + str(e) + ' has label ' + n + ' (and mass ' +
+                      str(gmsh.model.occ.getMass(e[0], e[1])) + ')')
+                path = n.split('/')
+                if e[0] == 3 and len(path) > 3:
+                    if (path[2] not in physicals):
+                        physicals[path[2]] = []
+                    physicals[path[2]].append(e[1])
+        #创建物理组
+        for name, tags in physicals.items():
+            p = gmsh.model.addPhysicalGroup(3, tags)
+            gmsh.model.setPhysicalName(3, p, name)
+        gmsh.fltk.run()
+        gmsh.model.mesh.generate(3)
+
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
+        
+        #节点的编号映射 
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+        
+        # 获取四面体单元信息
+        tetrahedron_type = 4  # 四面体单元的类型编号为 4
+        tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
+        evid = np.array([nodetags_map[j] for j in tetrahedron_connectivity])
+        cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
+        return cls(node,cell)
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_domain_distmesh(cls, domain, hmin, maxit=100, output=False):
