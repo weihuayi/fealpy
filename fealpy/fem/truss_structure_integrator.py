@@ -43,7 +43,7 @@ class TrussStructureIntegrator:
 
         c = self.E*self.A
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
-        print("坐标变换矩阵 T:\n", tan)
+        print("坐标变换矩阵 T(NC, GD):\n", tan)
 
         R = np.einsum('ik, im->ikm', tan, tan)
         print("局部单元刚度矩阵形状:", R.shape)

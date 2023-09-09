@@ -1274,6 +1274,8 @@ class LagrangeFiniteElementSpace():
                 flag = threshold(bc)
                 index = index[flag]
 
+        print("index:", index)
+
         face2dof = self.face_to_dof()[index]
         n = mesh.face_unit_normal(index=index)
         measure = mesh.entity_measure('face', index=index)

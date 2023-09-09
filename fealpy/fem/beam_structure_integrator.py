@@ -113,14 +113,24 @@ class TimoshenkoBeamStructureIntegrator:
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
-        NC = len(cellmeasure)
+        # NC = len(cellmeasure)
 
-        K_truss = self.truss_integrator.assembly_cell_matrix(space, index, cellmeasure, out)
-        K_euler_bernoulli = self.euler_bernoulli_integrator.assembly_cell_matrix(space, index, cellmeasure, out)
-        print("K_truss:\n", K_truss)
-        print("K_euler_bernoulli:\n", K_euler_bernoulli)
+        # K_truss = self.truss_integrator.assembly_cell_matrix(space, index, cellmeasure, out)
+        # K_euler_bernoulli = self.euler_bernoulli_integrator.assembly_cell_matrix(space, index, cellmeasure, out)
+        # print("K_truss:\n", K_truss)
+        # print("K_euler_bernoulli:\n", K_euler_bernoulli)
 
-        c1 = self.E*self.A
-        c2 = self.E*self.I
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
-
+        print("tan:\n", tan)
+        alpha = np.arctan2(tan[0][1], tan[0][0])
+        print("alpha:", alpha)
+        T = np.zeros((6, 6))
+        
+        # Fill the transformation matrix based on the computed angle alpha
+        T[0, :2] = [np.cos(alpha), np.sin(alpha)]
+        T[1, :2] = [-np.sin(alpha), np.cos(alpha)]
+        T[2, 2] = 1
+        T[3, 3:5] = [np.cos(alpha), np.sin(alpha)]
+        T[4, 3:5] = [-np.sin(alpha), np.cos(alpha)]
+        T[5, 5] = 1
+        print("T:", T)
