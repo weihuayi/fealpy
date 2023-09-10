@@ -39,13 +39,11 @@ def show_index(axes: Axes, location: NDArray, number: Union[NDArray, slice],
     """
     @brief Show index numbers in the given locations in 2d or 3d.
     """
-    if number == np.s_[:]:
-        number = np.arange(location.shape[0])
-    elif isinstance(number, np.ndarray):
-        if (number.dtype is np.bool_):
+    if isinstance(number, np.ndarray):
+        if number.dtype == np.bool_:
             number, = np.nonzero(number)
     elif isinstance(number, slice):
-        number = np.arange(number.start, number.stop, number.step)
+        number = np.arange(location.shape[0])[number]
     else:
         raise TypeError("Unknown index number format.")
 
