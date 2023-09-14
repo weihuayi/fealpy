@@ -55,8 +55,7 @@ def grad(p: Tensor):
     t2 = t1 - t0
     val[..., 0:1] = t2*x
     val[..., 1:2] = t2*y
-    
-    return torch.real(val)
+    return val
 
 def grad_real(p: Tensor):
     return torch.real(grad(p))
