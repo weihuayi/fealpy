@@ -222,3 +222,59 @@ class BoxWithCircleHolesDomain:
 
     def meshing_facet_1d(self, hmin, fh=None):
         pass
+
+class BoxWithBoxHolesDomain:
+    def __init__(self, box=[-2, 2, -2, 2], boxs=[(-1, 1, -1, 1)], fh=huniform):
+        """
+        """
+        self.fh = fh
+        self.box = box 
+        self.boxs = boxs
+
+        nv = 4*(len(boxs)+1)
+        vertices = np.zeros((nv, 2), dtype=np.float64)
+        vertices[0:4] = np.array([
+            (box[0], box[2]), 
+            (box[1], box[2]), 
+            (box[1], box[3]),
+            (box[0], box[3])], dtype=np.float64)
+
+        start = 4
+        end = 8
+        for b in boxs:
+            vertices[start:end] = np.array([
+                (b[0], b[2]), 
+                (b[1], b[2]), 
+                (b[1], b[3]),
+                (b[0], b[3])], dtype=np.float64)
+            start = end
+            end += 4 
+
+        def fd(p):
+            d0 = drectangle(p, box)
+            for b in boxs:
+                d0 = ddiff(d0, drectangle(p, box))
+            return d0
+
+        self.facets = {0:vertices, 1:fd}
+
+    def __call__(self, p):
+        """
+        @brief 符号距离函数
+        """
+        return self.facets[1](p) 
+
+    def signed_dist_function(self, p):
+        return self(p)
+
+    def sizing_function(self, p):
+        return self.fh(p)
+
+    def facet(self, dim):
+        return self.facets[dim]
+
+    def meshing_facet_0d(self):
+        return self.facets[0]
+
+    def meshing_facet_1d(self, hmin, fh=None):
+        pass
