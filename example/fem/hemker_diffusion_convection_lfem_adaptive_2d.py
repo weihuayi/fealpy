@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 
 import numpy as np
-from fealpy.pde.diffusion_convection_reaction import  HemkerDCRModel2d as PDE
+from fealpy.pde.diffusion_convection_reaction import  HemkerDCRModelWithBoxHole2d as PDE
 
 # 三角形网格
 from fealpy.mesh import TriangleMesh
@@ -82,9 +82,12 @@ if pgls:
     C = ScalarPGLSConvectionIntegrator(A, np.array(b))
 else: # 否则用有限元
     C = ScalarConvectionIntegrator(c=pde.convection_coefficient, q=p+3)
+
 f = ScalarSourceIntegrator(pde.source, q=p+3)
 
-mesh = TriangleMesh.from_domain_distmesh(domain, h, output=False)
+
+
+mesh = TriangleMesh.from_box(domain.box, nx=60, ny=30, threshold= lambda p: pde.fd(p) < 0.0)
 
 node = mesh.entity('node')
 
@@ -102,10 +105,7 @@ l.add_domain_integrator(f)
 A = b.assembly() 
 F = l.assembly()
 
-node = mesh.entity('node')
-isDirichletNode = pde.is_dirichlet_boundary(node)
-
-bc = DirichletBC(space, pde.dirichlet, threshold=isDirichletNode) 
+bc = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
 uh = space.function() 
 A, F = bc.apply(A, F, uh) 
 uh[:] = spsolve(A, F)
