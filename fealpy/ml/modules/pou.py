@@ -442,9 +442,9 @@ class UniformPoUSpace(PoUSpace[_FS]):
         @param uniform_mesh: UniformMesh1d, 2d or 3d.
         @param pou: PoU. The PoU function.
         """
-        if location in {'node', }:
+        if location == 'node':
             ctrs = torch.from_numpy(uniform_mesh.entity('node'))
-        elif location in {'cell', }:
+        elif location == 'cell':
             ctrs = torch.from_numpy(uniform_mesh.entity_barycenter('cell'))
         else:
             raise ValueError(f"Invalid location center '{location}'")
@@ -485,13 +485,13 @@ class UniformPoUSpace(PoUSpace[_FS]):
         location = self.location
         mesh = self.mesh
         node = mesh.entity('node')
-        if location in {'node', }:
+        if location == 'node':
             edge = mesh.entity('edge')
             ctrsf = torch.from_numpy(mesh.entity_barycenter('edge'))
             R = np.array([[0.0, -mesh.h[1]/mesh.h[0]],
                           [mesh.h[0]/mesh.h[1], 0.0]], dtype=mesh.ftype)
             raw = np.einsum('nid, de -> nie', node[edge], R) #(NE, 2, GD)
-        elif location in {'cell', }:
+        elif location == 'cell':
             _bd_flag = mesh.ds.boundary_face_flag()
             edge = mesh.entity('edge')[~_bd_flag, :]
             ctrsf = torch.from_numpy(mesh.entity_barycenter('edge')[~_bd_flag, :])
@@ -508,8 +508,21 @@ class UniformPoUSpace(PoUSpace[_FS]):
         else:
             return points.reshape(-1, GD)
 
-    def sub_face_to_partition(self):
-        pass
+    def sub_to_partition(self):
+        """
+        @brief Return the relationship between sub-boundaries and partitions.
+
+        @return: `Tensor` with shape (#sub-boundaries, #partitions).
+        """
+        location = self.location
+        if location == 'node':
+            data = self.mesh.ds.face_to_node()
+        elif location == 'cell':
+            _bd_flag = self.mesh.ds.boundary_face_flag()
+            data = self.mesh.ds.face_to_cell()[~_bd_flag, 0:2]
+        else:
+            raise RuntimeError("Invalid location center.")
+        return torch.from_numpy(data).to(device=self.device)
 
 
 # class PoUTreeSpace(UniformPoUSpace[_FS]):
