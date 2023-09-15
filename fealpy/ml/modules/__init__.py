@@ -7,5 +7,5 @@ from .pikf import KernelFunctionSpace
 from .rfm import RandomFeatureSpace
 
 from .activate import Sin, Cos, Tanh, Besselj0
-from .pou import PoUA, PoUSin, PoUSpace
+from .pou import PoUA, PoUSin, PoUSpace, UniformPoUSpace
 from .loss import ScaledMSELoss

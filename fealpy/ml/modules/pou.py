@@ -1,8 +1,11 @@
 """
 Partitions of Units
 """
-from typing import Union, List, Callable, Any, Generic, TypeVar
+from typing import (
+    Union, List, Callable, Any, Generic, TypeVar, Optional, Tuple, Literal
+)
 
+import numpy as np
 import torch
 from torch.nn import Module
 from torch import Tensor, sin, cos
@@ -313,8 +316,7 @@ class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
 
 
 SpaceFactory = Callable[[int], _FS]
-
-def assemble(func: Callable[..., Tensor]):
+def assemble(dimension: int=0):
     """
     @brief Assemble data from partitions.
 
@@ -323,21 +325,26 @@ def assemble(func: Callable[..., Tensor]):
     acted upon by this decorator automatically collect the output of the\
     original function within the partition and assemble it into a total matrix.
     """
-    def wrapper(self, p: Tensor, *args, **kwargs) -> Tensor:
-        N = p.shape[0]
-        M = self.number_of_basis()
-        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
-        std = self.std(p)
-        basis_cursor = 0
+    def assemble_(func: Callable[..., Tensor]):
+        def wrapper(self, p: Tensor, *args, **kwargs) -> Tensor:
+            N = p.shape[0]
+            M = self.number_of_basis()
+            GD = p.shape[-1]
+            ret = torch.zeros((N, M) + (GD, )*dimension,
+                              dtype=self.dtype, device=self.device)
+            std = self.std(p)
+            basis_cursor = 0
 
-        for idx, part in enumerate(self.partitions):
-            NF = part.number_of_basis()
-            x = std[:, idx, :]
-            flag = part.flag(x)
-            ret[flag, basis_cursor:basis_cursor+NF] += func(self, idx, x[flag, ...], *args, **kwargs)
-            basis_cursor += NF
-        return ret
-    return wrapper
+            for idx, part in enumerate(self.partitions):
+                NF = part.number_of_basis()
+                x = std[:, idx, :]
+                flag = part.flag(x)
+                ret[flag, basis_cursor:basis_cursor+NF, ...]\
+                    += func(self, idx, x[flag, ...], *args, **kwargs)
+                basis_cursor += NF
+            return ret
+        return wrapper
+    return assemble_
 
 
 class PoUSpace(FunctionSpaceBase, Generic[_FS]):
@@ -346,6 +353,7 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
         super().__init__(dtype=centers.dtype, device=centers.device)
 
         self.std = Standardize(centers=centers, radius=radius)
+        self.pou = pou
         self.partitions: List[PoULocalSpace[_FS]] = []
         self.in_dim = -1
         self.out_dim = -1
@@ -395,15 +403,15 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
         stop = start + self.partitions[idx].number_of_basis()
         return slice(start, stop, None)
 
-    @assemble
+    @assemble(0)
     def basis(self, idx: int, p: Tensor) -> Tensor:
         return self.partitions[idx].basis(p)
 
-    @assemble
+    @assemble(0)
     def convect_basis(self, idx: int, p: Tensor, coef: Tensor) -> Tensor:
         return self.partitions[idx].convect_basis(p, coef)
 
-    @assemble
+    @assemble(0)
     def laplace_basis(self, idx: int, p: Tensor, coef=None) -> Tensor:
         if coef is None:
             scale = self.std.radius[idx, :]**2
@@ -411,7 +419,105 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
             scale = self.std.radius[idx, :]**2 * coef
         return self.partitions[idx].laplace_basis(p, coef=1/scale)
 
-    @assemble
+    @assemble(0)
     def derivative_basis(self, idx: int, p: Tensor, *dim: int) -> Tensor:
         scale = torch.prod(self.std.radius[idx, dim], dim=-1)
         return self.partitions[idx].derivative_basis(p, *dim) / scale
+
+    @assemble(1)
+    def grad_basis(self, idx: int, p: Tensor) -> Tensor:
+        return self.partitions[idx].grad_basis(p)
+
+
+class UniformPoUSpace(PoUSpace[_FS]):
+    """PoU space based on uniform mesh."""
+    def __init__(self, space_factory: SpaceFactory[_FS], uniform_mesh,
+                 location: Literal['node', 'cell'],
+                 pou: PoU, print_status=False, device=None) -> None:
+        """
+        @brief Construct PoU space from a uniform mesh. Centers of partitions\
+               are **nodes** of the mesh.
+
+        @param space_factory: A function generating spaces from indices.
+        @param uniform_mesh: UniformMesh1d, 2d or 3d.
+        @param pou: PoU. The PoU function.
+        """
+        if location in {'node', }:
+            ctrs = torch.from_numpy(uniform_mesh.entity('node'))
+        elif location in {'cell', }:
+            ctrs = torch.from_numpy(uniform_mesh.entity_barycenter('cell'))
+        length = torch.tensor(uniform_mesh.h, dtype=ctrs.dtype, device=device)
+        super().__init__(space_factory, ctrs, length/2, pou, print_status)
+        self.mesh = uniform_mesh
+
+    def collocate_interior(self, nx: Tuple[int], part_type=True):
+        """
+        @brief Collocate interior points in every partitions. Return `Tensor` with\
+               shape (N, M, D) if `part_type`, else (N*M, D).
+        """
+        GD = self.std.centers.shape[-1]
+        assert len(nx) == GD
+        rulers = tuple(torch.linspace(-1, 1, n+2)[1:-1] for n in nx)
+        loc = torch.stack(torch.meshgrid(rulers, indexing='ij'), dim=-1).reshape(-1, GD)
+        points = self.std.inverse(loc)
+        if part_type:
+            return points
+        else:
+            return points.reshape(-1, GD)
+
+    def collocate_boundary(self, n: int):
+        """
+        @brief
+        """
+        pass
+
+    def collocate_sub_boundary(self, n: int):
+        """
+        @brief
+        """
+        pass
+
+
+# class PoUTreeSpace(UniformPoUSpace[_FS]):
+#     partitions: List[PoULocalSpace[Union[_FS, 'PoUTreeSpace']]]
+
+#     def __init__(self, space_factory: SpaceFactory[_FS], uniform_mesh,
+#                  pou: PoU, parent=None, print_status=False, device=None) -> None:
+#         super().__init__(space_factory, uniform_mesh, pou, print_status, device)
+#         self.__parent = parent
+#         self._factory = space_factory
+#         self._MeshType = uniform_mesh.__class__
+
+#     @property
+#     def parent(self):
+#         return self.__parent
+
+#     def is_root(self):
+#         return self.parent is None
+
+#     def is_leaf_partition(self, idx: int):
+#         part = self.partitions[idx]
+#         if isinstance(part, PoUTreeSpace) and part.parent is self:
+#             return True
+#         return False
+
+#     def branch(self, idx: int, padding: int=0, space_factory: Optional[SpaceFactory[_FS]]=None):
+#         """
+#         @brief Refine the `idx`-th partition.
+#         """
+#         GD = self.std.centers.shape[-1]
+#         factory = space_factory if space_factory else lambda _:self._factory(idx)
+#         sub_ext = 1 + 2*padding
+#         sub_ori = 0.0 - sub_ext * 0.5
+#         sub_mesh = self._MeshType((0, sub_ext)*GD, (1.0, )*GD, origin=(sub_ori, )*GD)
+#         sub_space = PoUTreeSpace(factory, sub_mesh, self.pou, self, False, self.device)
+#         part = PoULocalSpace(pou=self.pou, space=sub_space)
+#         self.partitions[idx] = part
+#         return sub_space
+
+#     def cut(self, idx: int):
+#         """
+#         @brief Coarsen the `idx`-th partition.
+#         """
+#         part = PoULocalSpace(pou=self.pou, space=self._factory(idx))
+#         self.partitions[idx] = part
