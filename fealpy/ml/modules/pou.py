@@ -446,9 +446,12 @@ class UniformPoUSpace(PoUSpace[_FS]):
             ctrs = torch.from_numpy(uniform_mesh.entity('node'))
         elif location in {'cell', }:
             ctrs = torch.from_numpy(uniform_mesh.entity_barycenter('cell'))
+        else:
+            raise ValueError(f"Invalid location center '{location}'")
         length = torch.tensor(uniform_mesh.h, dtype=ctrs.dtype, device=device)
         super().__init__(space_factory, ctrs, length/2, pou, print_status)
         self.mesh = uniform_mesh
+        self.location = location
 
     def collocate_interior(self, nx: Tuple[int], part_type=True):
         """
@@ -471,10 +474,41 @@ class UniformPoUSpace(PoUSpace[_FS]):
         """
         pass
 
-    def collocate_sub_boundary(self, n: int):
+    def collocate_sub_edge(self, n: int, edge_type=True):
         """
-        @brief
+        @brief Collocate interior points in every sub-boundaries of partitions.\
+               Return `Tensor` with shape (N, NE, D) if `edge_type`, else (N*NE, D).
+
+        @note: Only works for 1-d boundary(edge).
         """
+        GD = self.mesh.geo_dimension()
+        location = self.location
+        mesh = self.mesh
+        node = mesh.entity('node')
+        if location in {'node', }:
+            edge = mesh.entity('edge')
+            ctrsf = torch.from_numpy(mesh.entity_barycenter('edge'))
+            R = np.array([[0.0, -mesh.h[1]/mesh.h[0]],
+                          [mesh.h[0]/mesh.h[1], 0.0]], dtype=mesh.ftype)
+            raw = np.einsum('nid, de -> nie', node[edge], R) #(NE, 2, GD)
+        elif location in {'cell', }:
+            _bd_flag = mesh.ds.boundary_face_flag()
+            edge = mesh.entity('edge')[~_bd_flag, :]
+            ctrsf = torch.from_numpy(mesh.entity_barycenter('edge')[~_bd_flag, :])
+            raw = node[edge] #(NE, 2, GD)
+        else:
+            raise RuntimeError("Invalid location center.")
+
+        vec = torch.from_numpy(raw[:, 1, :] - raw[:, 0, :]) #(NE, GD)
+        std_edge = Standardize(ctrsf, vec/2)
+        loc = torch.stack((torch.linspace(-1, 1, n+2)[1:-1], )*2, dim=-1)
+        points = std_edge.inverse(loc) #(N, NE, GD)
+        if edge_type:
+            return points
+        else:
+            return points.reshape(-1, GD)
+
+    def sub_face_to_partition(self):
         pass
 
 
