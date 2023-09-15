@@ -11,6 +11,7 @@ from fealpy.pde.diffusion_convection_reaction import  HemkerDCRModelWithBoxHole2
 
 # 三角形网格
 from fealpy.mesh import TriangleMesh
+from fealpy.mesh.adaptive_tools import mark
 
 # 拉格朗日有限元空间
 from fealpy.functionspace import LagrangeFESpace
@@ -26,6 +27,8 @@ from fealpy.fem import ScalarSourceIntegrator         # (f, v)
 from fealpy.fem import ScalarNeumannSourceIntegrator  # <g_N, v>
 from fealpy.fem import ScalarRobinSourceIntegrator    # <g_R, v>
 from fealpy.fem import ScalarRobinBoundaryIntegrator  # <kappa*u, v>
+
+from fealpy.fem import LinearRecoveryAlg
 
 # 双线性型
 from fealpy.fem import BilinearForm
@@ -60,15 +63,11 @@ parser.add_argument('--pgls',
         default=True, type=bool,
         help='是否采用 PGLS 方法， 默认采用')
 
-parser.add_argument('--meshsize',
-        default=0.3, type=float,
-        help='生成网格尺寸, 默认 0.3')
 
 args = parser.parse_args()
 p = args.order
 A = args.dcoef
 b = args.ccoef
-h = args.meshsize
 
 pgls = args.pgls
 
@@ -85,35 +84,42 @@ else: # 否则用有限元
 
 f = ScalarSourceIntegrator(pde.source, q=p+3)
 
-
-
 mesh = TriangleMesh.from_box(domain.box, nx=60, ny=30, threshold= lambda p: pde.fd(p) < 0.0)
 
-node = mesh.entity('node')
+maxit = 60
+theta = 0.2
+alg = LinearRecoveryAlg()
 
-isDirichletNode = pde.is_dirichlet_boundary(node)
+for i in range(maxit):
 
-space = LagrangeFESpace(mesh, p=p)
+    space = LagrangeFESpace(mesh, p=p)
 
-b = BilinearForm(space)
-b.add_domain_integrator([D, C]) 
+    b = BilinearForm(space)
+    b.add_domain_integrator([D, C]) 
 
-l = LinearForm(space)
-l.add_domain_integrator(f)
+    l = LinearForm(space)
+    l.add_domain_integrator(f)
 
+    A = b.assembly() 
+    F = l.assembly()
 
-A = b.assembly() 
-F = l.assembly()
-
-bc = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
-uh = space.function() 
-A, F = bc.apply(A, F, uh) 
-uh[:] = spsolve(A, F)
+    bc = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
+    uh = space.function() 
+    A, F = bc.apply(A, F, uh) 
+    uh[:] = spsolve(A, F)
+    print(uh[uh < 0.0])
+    print(i, ": ", "is there exsit value smaller than 0.0?", np.any(uh < 0.0))
+    eta = alg.recovery_estimate(uh, method='simple')
+    if i < maxit - 1:
+        isMarkedCell = mark(eta, theta=theta)
+        mesh.bisect(isMarkedCell, options={'disp':False})
+        mesh.add_plot(plt)
+        plt.savefig('./test-' + str(i+1) + '.png')
+        plt.close()
 
 fig = plt.figure()
 axes = fig.gca()
-mesh.add_plot(axes, aspect=0.5)
-mesh.find_node(axes, index=isDirichletNode)
+mesh.add_plot(axes)
 
 # viridis、plasma、inferno、magma
 mesh.show_function(plt, uh, cmap='rainbow')

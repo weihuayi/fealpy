@@ -178,7 +178,7 @@ class LagrangeFESpace():
             index: Union[np.ndarray, slice]=np.s_[:]
             ) -> np.ndarray:
         """
-        @note
+        @brief 
         """
         gdof = self.number_of_global_dofs()
         gphi = self.grad_basis(bc, index=index)
