@@ -172,13 +172,97 @@ class HemkerDCRModel2d:
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(x.shape, dtype=np.float64)
-        flag = np.isclose(x**2 + y**2, 1.0, atol=1e-12)
+        flag = x**2 + y**2 - 1 < 0.0 
         val[flag] = 1
         return val 
 
     @cartesian
     def is_dirichlet_boundary(self, p):
+        """
+        @brief 判断给定的边界点是否在 Dirichlet 边界内部
+        """
         x = p[..., 0]
         y = p[..., 1]
-        return np.isclose(x**2+y**2, 1.0, atol=1e-12) | np.isclose(x, -3.0, atol=1e-12)
+        return (x**2 + y**2 - 1 < 0.0) | np.isclose(x, -3.0, atol=1e-12)
+
+class HemkerDCRModelWithBoxHole2d:
+    def __init__(self, A=1.0, b=(1.0, 0.0)):
+        from fealpy.geometry import BoxWithBoxHolesDomain 
+        from fealpy.geometry import huniform
+        from fealpy.geometry import drectangle
+        self.A = A 
+        self.b = b
+        self._domain = BoxWithBoxHolesDomain(
+                box=[-3.0, 9.0, -3.0, 3.0],
+                boxs=[(-1.0, 1.0, -1.0, 1.0)], fh=huniform)
+        self.fd = lambda p: drectangle(p, [-1.0, 1.0, -1.0, 1.0])
+
+    def domain(self):
+        return self._domain
+
+    @cartesian
+    def solution(self, p):
+        """ 
+        @brief 真解
+        """
+        return 0.0
+
+    @cartesian
+    def source(self, p):
+        """ 
+        @brief 源项
+        """
+        return 0.0
+
+    @cartesian
+    def gradient(self, p):
+        """ 
+        @brief 真解的梯度
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float64)
+        return val
+
+    @cartesian
+    def diffusion_coefficient(self, p):
+        """
+        @brief 对流系数
+        """
+        return self.A
+
+    @cartesian
+    def convection_coefficient(self, p):
+        """
+        @brief 对流系数
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float64)
+        val[..., 0] = self.b[0] 
+        val[..., 1] = self.b[1]
+        return val 
+
+    @cartesian
+    def dirichlet(self, p):
+        """
+        @brief  边界条件
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(x.shape, dtype=np.float64)
+        flag = np.isclose(self.fd(p), 0.0, atol=1e-12)
+        val[flag] = 1
+        return val 
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        """
+        @brief 判断给定的边界点是否在 Dirichlet 边界内部
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        flag0 = np.isclose(self.fd(p), 0.0, atol=1e-12)
+        flag1 = np.isclose(x, -3.0, atol=1e-12)
+        return flag0 | flag1
 

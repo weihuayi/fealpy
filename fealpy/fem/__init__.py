@@ -56,5 +56,5 @@ from .vector_neumann_bc_integrator import VectorNeumannBCIntegrator
 from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
 from .dirichlet_bc import DirichletBC
-from .recovery_alg import recovery_alg
+from .recovery_alg import recovery_alg, LinearRecoveryAlg
 

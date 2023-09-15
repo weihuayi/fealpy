@@ -6,6 +6,6 @@ from .boundary import BoxDBCSolution, BoxDBCSolution1d, BoxDBCSolution2d, BoxNBC
 from .pikf import KernelFunctionSpace
 from .rfm import RandomFeatureSpace
 
-from .activate import Sin, Cos, Tanh
+from .activate import Sin, Cos, Tanh, Besselj0
 from .pou import PoUA, PoUSin, PoUSpace
 from .loss import ScaledMSELoss

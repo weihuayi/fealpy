@@ -1,5 +1,49 @@
 import numpy as np
 
+class LinearRecoveryAlg():
+
+    def recovery_estimate(self, uh, method='simple'):
+        """
+        """
+        mesh = uh.space.mesh
+        rguh = self.grad_recovery(uh, method=method)
+        eta = mesh.error(rguh.value, uh.grad_value, power=2, celltype=True) # 计算单元上的恢复型误差
+        return eta
+
+    def grad_recovery(self, uh, method='simple'):
+        """
+        @brief 输入一个线性有限元函数，把其梯度恢复到分片线性有限元空间
+        @todo 检查拉格朗日有限元空间中自由度排序的问题
+        """
+        space = uh.space
+        TD = space.top_dimension()
+        GD = space.geo_dimension()
+        gdof = space.number_of_global_dofs()
+        cell2dof = space.cell_to_dof()
+
+        bc = np.array([1/3]*(TD+1), dtype=np.float64)
+        guh = uh.grad_value(bc) # (NC, GD)
+
+        # 'sdofs': 标量自由度优先排序，例如 x_0, x_1, ..., y_0, y_1, ..., z_0, z_1, ...
+        # 'vdims': 向量分量优先排序，例如 x_0, y_0, z_0, x_1, y_1, z_1, ...
+
+        rguh = space.function(dim=GD) # 默认是 vdims, (gdof, GD)
+        deg = np.zeros(gdof, dtype=np.float64)
+
+        if method == 'simple':
+            np.add.at(deg, cell2dof, 1)
+            np.add.at(rguh, (cell2dof, np.s_[:]), guh[:, None, :])
+
+        elif method == 'area_harmonic':
+            val = 1.0/space.mesh.entity_measure('cell')
+            np.add.at(deg, cell2dof, val[:, None])
+            guh *= val[:, None] 
+            np.add.at(rguh, (cell2dof, np.s_[:]), guh[:, None, :])
+
+        rguh /= deg[:, None]
+        return rguh
+
+
 class recovery_alg:
     def __init__(self, space, q=None, cellmeasure=None):
         self.space = space
