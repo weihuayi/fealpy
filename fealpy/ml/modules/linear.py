@@ -35,6 +35,9 @@ class Standardize(Module):
     def forward(self, p: Tensor):
         return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, :]
 
+    def inverse(self, p: Tensor):
+        return p[:, None, :] * self.radius[None, :, :] + self.centers[None, :, :]
+
 
 class Distance(Module):
     """
