@@ -50,7 +50,7 @@ class TrussStructureIntegrator:
         print("局部单元刚度矩阵 R:\n", R)
         R *= c/cellmeasure[:, None, None]
 
-        ldof = 2 # 一个单元两个自由度, @TODO 高次元的情形？本科毕业论文
+        ldof = 2 # 一个单元两个自由度
         if out is None:
             K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
         else:

@@ -325,8 +325,8 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_three_beam(cls):
-        # 单位为 m
+    def from_three_beam_plane_frame(cls):
+        # Unit: m
         node = np.array([
             [0, 0.96], [1.44, 0.96], 
             [0, 0], [1.44, 0]], dtype=np.float64)
@@ -338,6 +338,18 @@ class EdgeMesh(Mesh, Plotable):
         mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
 
         return mesh 
+
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def plane_frame(cls):
+        # 单位为 m
+        node = np.array([[0, 6], [5, 6], [5, 3], [0, 3], [0, 0], [5, 9],
+                         [5, 0], [0, 9], [1, 6], [2, 6], [3, 6], [4, 6],
+                         [5, 4], [5, 5], [1, 3], [2, 3], [3, 3], [4, 3],
+                         [0, 1], [0, 2], [0, 4], [0, 5], [5, 7], [5, 8],
+                         [5, 1], [5, 2], [0, 7], [0, 8], [1, 9], [2, 9],
+                         [3, 9], [4, 9]])
 
 
 EdgeMesh.set_ploter('1d')
