@@ -34,7 +34,7 @@ class EulerBernoulliBeamStructureIntegrator:
         mesh = space0.mesh
         GD = mesh.geo_dimension()
 
-        assert  len(space) == GD
+        assert  len(space) == 3
 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
@@ -52,8 +52,8 @@ class EulerBernoulliBeamStructureIntegrator:
             K = out
 
         K0 = c0/(2*l)[:, np.newaxis, np.newaxis] * np.array([[1, -1], [-1, 1]])
-        print("K0:", K0.shape)
-        print("K0:\n", K0)
+        print("轴向刚度矩阵 K0:", K0.shape)
+        # print("K0:\n", K0)
 
         K1 = np.zeros((NC, GD*2, GD*2), dtype=np.float64)
 
@@ -77,8 +77,8 @@ class EulerBernoulliBeamStructureIntegrator:
 
         K1 *= (c1/l**3)[:, np.newaxis, np.newaxis]
 
-        print("K1:", K1.shape)
-        print("K1:\n", K1)
+        print("弯曲刚度矩阵 K1:", K1.shape)
+        # print("K1:\n", K1)
 
         # 使用 K0 填充对应的位置
         K[:, 0, 0] = K0[:, 0, 0]
@@ -92,12 +92,12 @@ class EulerBernoulliBeamStructureIntegrator:
         K[:, 4:6, 1:3] = K1[:, 2:4, 0:2]
         K[:, 4:6, 4:6] = K1[:, 2:4, 2:4]
 
-        print("三个局部单元刚度矩阵 K_shape:", K.shape)
-        print("K:\n", K)
+        print("局部坐标系下的单元刚度矩阵 K_shape:", K.shape)
+        # print("K:\n", K)
 
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
         print("tan_shape:", tan.shape)
-        print("tan:\n", tan)
+        # print("tan:\n", tan)
         C, S = tan[:, 0], tan[:, 1]
 
         T = np.zeros((NC, GD*ldof, GD*ldof))
@@ -114,11 +114,9 @@ class EulerBernoulliBeamStructureIntegrator:
         T[:, 5, 5] = 1
 
         print("单元的坐标变换矩阵 T_shape:", T.shape)
-        print("T:\n", T)
+        # print("T:\n", T)
 
-        K = np.einsum('nik, nkj, nlj -> nil', T, K, T)
-        print("三个全局坐标系下的单元刚度矩阵 K_shape:", K.shape)
-        print("K:\n", K)
+        K = np.einsum('nki, nkj, njl -> nil', T, K, T)
 
         if out is None:
             return K
