@@ -2,7 +2,7 @@
 Partitions of Units
 """
 from typing import (
-    Union, List, Callable, Any, Generic, TypeVar, Optional, Tuple, Literal
+    Union, List, Callable, Any, Generic, TypeVar, Tuple, Literal
 )
 
 import numpy as np
@@ -77,60 +77,46 @@ class _PoU_Fn(Module):
         raise NotImplementedError
 
 
-class PoU(Module):
+class PoUA(Module):
     """
-    Base class for Partitions of Unit (PoU) modules.
+    A-style PoU, base class for Partitions of Unit (PoU) modules.
     """
     def __init__(self, keepdim=True) -> None:
         super().__init__()
         self.keepdim = keepdim
 
-    def flag(self, x: Tensor) -> Tensor:
-        """
-        @brief Return a bool tensor with shape (N, ) showing if samples are in\
-               the supporting area.
-        """
-        raise NotImplementedError
-
-    def gradient(self, x: Tensor) -> Tensor:
-        """
-        @brief Return gradient vector of the function, with shape (N, GD).
-        """
-        raise NotImplementedError
-
-    def hessian(self, x: Tensor) -> Tensor:
-        """
-        @brief Return hessian matrix of the function, with shape (N, GD, GD).
-        """
-        raise NotImplementedError
-
-    def derivative(self, x: Tensor, *idx: int) -> Tensor:
-        """
-        @brief Return derivatives.
-        """
-        raise NotImplementedError
-
-
-class PoUA(PoU):
     def forward(self, x: Tensor): # (..., d) -> (..., 1)
-        flag = (-1 <= x) * (x <= 1)
+        flag = (x >= -1-1e-16) * (x < 1-1e-16)
         flag = torch.prod(flag, dim=-1, keepdim=self.keepdim)
         return flag.to(dtype=x.dtype)
         # Here we cast the data type after the operation for lower memory usage.
 
     def flag(self, x: Tensor):
-        flag = ((x >= -1) * (x <= 1))
+        """
+        @brief Return a bool tensor with shape (N, ) showing if samples are in\
+               the supporting area.
+        """
+        flag = (x >= -1-1e-16) * (x < 1-1e-16)
         return torch.prod(flag, dim=-1, dtype=torch.bool)
 
     def gradient(self, x: Tensor):
+        """
+        @brief Return gradient vector of the function, with shape (N, GD).
+        """
         N, GD = x.shape[0], x.shape[-1]
         return torch.tensor(0, dtype=x.dtype, device=x.device).broadcast_to(N, GD)
 
     def hessian(self, x: Tensor):
+        """
+        @brief Return hessian matrix of the function, with shape (N, GD, GD).
+        """
         N, GD = x.shape[0], x.shape[-1]
         return torch.tensor(0, dtype=x.dtype, device=x.device).broadcast_to(N, GD, GD)
 
     def derivative(self, x: Tensor, *idx: int):
+        """
+        @brief Return derivatives.
+        """
         order = len(idx)
         if order == 0:
             return self.forward(x)
@@ -175,7 +161,7 @@ class _PoU_Sin_Fn(_PoU_Fn):
         return 8*PI**4 * sin(2*PI*x) * f1 - 8*PI**4 * sin(2*PI*x) * f3
 
 
-class PoUSin(PoU):
+class PoUSin(PoUA):
     """
     @brief Sin-style partition of unity.
 
@@ -238,7 +224,7 @@ from .function_space import FunctionSpaceBase
 _FS = TypeVar('_FS', bound=FunctionSpaceBase)
 
 class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
-    def __init__(self, pou: PoU, space: _FS) -> None:
+    def __init__(self, pou: PoUA, space: _FS) -> None:
         super().__init__()
         self.pou = pou
         self.space = space
@@ -349,7 +335,7 @@ def assemble(dimension: int=0):
 
 class PoUSpace(FunctionSpaceBase, Generic[_FS]):
     def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor, radius: Union[Tensor, Any],
-                 pou: PoU, print_status=False) -> None:
+                 pou: PoUA, print_status=False) -> None:
         super().__init__(dtype=centers.dtype, device=centers.device)
 
         self.std = Standardize(centers=centers, radius=radius)
@@ -433,7 +419,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
     """PoU space based on uniform mesh."""
     def __init__(self, space_factory: SpaceFactory[_FS], uniform_mesh,
                  location: Literal['node', 'cell'],
-                 pou: PoU, print_status=False, device=None) -> None:
+                 pou: PoUA, print_status=False, device=None) -> None:
         """
         @brief Construct PoU space from a uniform mesh. Centers of partitions\
                are **nodes** of the mesh.
@@ -455,13 +441,19 @@ class UniformPoUSpace(PoUSpace[_FS]):
 
     def collocate_interior(self, nx: Tuple[int], part_type=True):
         """
-        @brief Collocate interior points in every partitions. Return `Tensor` with\
-               shape (N, M, D) if `part_type`, else (N*M, D).
+        @brief Collocate interior points in every partitions.
+
+        @param nx: Tuple[int]. The number of collocation points in axis of each\
+                   partition. Length of `nx` must match the geometry dimension.
+        @part_type: bool.
+
+        @return: `Tensor` with shape (N, #Parts, #Dims) if `part_type`, else\
+                 (N*#Parts, #Dims). Where N is the number of points in one partition.
         """
         GD = self.std.centers.shape[-1]
         assert len(nx) == GD
         rulers = tuple(torch.linspace(-1, 1, n+2)[1:-1] for n in nx)
-        loc = torch.stack(torch.meshgrid(rulers, indexing='ij'), dim=-1).reshape(-1, GD)
+        loc = torch.stack(torch.meshgrid(*rulers, indexing='ij'), dim=-1).reshape(-1, GD)
         points = self.std.inverse(loc)
         if part_type:
             return points
@@ -470,14 +462,20 @@ class UniformPoUSpace(PoUSpace[_FS]):
 
     def collocate_boundary(self, n: int):
         """
-        @brief
+        @brief Collocate interior points in every boundary faces of the **MESH**\
+               (not the boundaries of partitions).
         """
         pass
 
     def collocate_sub_edge(self, n: int, edge_type=True):
         """
-        @brief Collocate interior points in every sub-boundaries of partitions.\
-               Return `Tensor` with shape (N, NE, D) if `edge_type`, else (N*NE, D).
+        @brief Collocate interior points in every sub-boundaries of partitions.
+
+        @param n: int. The number of collocation points in each sub-boundary.
+        @param edge_type: bool.
+
+        @return: `Tensor` with shape (N, #Subs, #Dims) if `edge_type`,\
+                 else (N*#Subs, #Dims).
 
         @note: Only works for 1-d boundary(edge).
         """
@@ -492,7 +490,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
                           [mesh.h[0]/mesh.h[1], 0.0]], dtype=mesh.ftype)
             raw = np.einsum('nid, de -> nie', node[edge], R) #(NE, 2, GD)
         elif location == 'cell':
-            _bd_flag = mesh.ds.boundary_face_flag()
+            _bd_flag = mesh.ds.boundary_edge_flag()
             edge = mesh.entity('edge')[~_bd_flag, :]
             ctrsf = torch.from_numpy(mesh.entity_barycenter('edge')[~_bd_flag, :])
             raw = node[edge] #(NE, 2, GD)
@@ -512,7 +510,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
         """
         @brief Return the relationship between sub-boundaries and partitions.
 
-        @return: `Tensor` with shape (#sub-boundaries, #partitions).
+        @return: `Tensor` with shape (#Subs, 2).
         """
         location = self.location
         if location == 'node':
@@ -523,6 +521,86 @@ class UniformPoUSpace(PoUSpace[_FS]):
         else:
             raise RuntimeError("Invalid location center.")
         return torch.from_numpy(data).to(device=self.device)
+
+    # NOTE: We get basis value from the inner space(without PoU function).
+    # This continue matrix is mainly designed for PoUA.
+    def continue_matrix_0(self, points: Tensor, return_sparse=False):
+        """
+        @brief Construct the matrix of 0th order continuity condition between\
+               partitions(WITHOUT PoU function).
+
+        @param points: Tensor. Collocation points in sub-boundaries, must be with\
+               shape (N, #Subs, #Dims).
+
+        @return: `Tensor` with shape (N*#Subs, #Basis).
+        """
+        assert points.ndim == 3 #(NVS, #Subs, #Dims)
+        NVS = points.shape[0]
+        NS = points.shape[1]
+        N_basis = self.number_of_basis()
+        sub2part = self.sub_to_partition()
+        if return_sparse:
+            from scipy.sparse import csr_matrix
+            data = csr_matrix((NVS*NS, N_basis), dtype=points.cpu().detach().numpy().dtype)
+        else:
+            data = torch.zeros((NVS*NS, N_basis), dtype=self.dtype, device=self.device)
+        for idx in range(NS):
+            p = points[:, idx, :] #(NVS, #Dims)
+
+            left_idx: int = sub2part[idx, 0].item()
+            left_part = self.partitions[left_idx].space
+            basis_slice_l = self.partition_basis_slice(left_idx)
+            left_data = left_part.basis(self.std.single(p, left_idx))
+            data[idx*NVS:(idx+1)*NVS, basis_slice_l] = left_data
+
+            right_idx: int = sub2part[idx, 1].item()
+            right_part = self.partitions[right_idx].space
+            basis_slice_r = self.partition_basis_slice(right_idx)
+            right_data = right_part.basis(self.std.single(p, right_idx))
+            data[idx*NVS:(idx+1)*NVS, basis_slice_r] = -right_data
+        return data
+
+    def continue_matrix_1(self, points: Tensor, return_sparse=False):
+        """
+        @brief Construct the matrix of 1st order continuity condition between\
+               partitions(WITHOUT PoU function).
+
+        @param points: Tensor. Collocation points in sub-boundaries, must be with\
+               shape (N, #Subs, #Dims).
+
+        @return: `Tensor` with shape (2*N*#Subs, #Basis).
+        """
+        assert points.ndim == 3 #(NVS, #Subs, #Dims)
+        NVS = points.shape[0]
+        NS = points.shape[1]
+        N_basis = self.number_of_basis()
+        sub2part = self.sub_to_partition()
+        if return_sparse:
+            from scipy.sparse import csr_matrix
+            data = csr_matrix((NVS*NS*2, N_basis), dtype=points.cpu().detach().numpy().dtype)
+        else:
+            data = torch.zeros((NVS*NS*2, N_basis), dtype=self.dtype, device=self.device)
+        for idx in range(NS):
+            p = points[:, idx, :] #(NVS, #Dims)
+
+            left_idx: int = sub2part[idx, 0].item()
+            left_part = self.partitions[left_idx].space
+            basis_slice_l = self.partition_basis_slice(left_idx)
+            NPBL = left_part.number_of_basis()
+            left_data = torch.swapdims(
+                left_part.grad_basis(self.std.single(p, left_idx)), 1, 2
+            ).reshape(-1, NPBL)
+            data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_l] = left_data
+
+            right_idx: int = sub2part[idx, 1].item()
+            right_part = self.partitions[right_idx].space
+            basis_slice_r = self.partition_basis_slice(right_idx)
+            NPBR = right_part.number_of_basis()
+            right_data = torch.swapdims(
+                right_part.grad_basis(self.std.single(p, right_idx)), 1, 2
+            ).reshape(-1, NPBR)
+            data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_r] = -right_data
+        return data
 
 
 # class PoUTreeSpace(UniformPoUSpace[_FS]):
