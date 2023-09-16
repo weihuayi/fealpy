@@ -2,6 +2,7 @@ import numpy as np
 
 from scipy.sparse import csr_matrix
 
+
 class BilinearForm:
     def __init__(self, space, atype=None):
         """
@@ -129,7 +130,8 @@ class BilinearForm:
         assert isinstance(space, tuple) and not isinstance(space[0], tuple)
 
         mesh = space[0].mesh
-        GD = space[0].geo_dimension() # 如果是对称张量
+        # GD = space[0].geo_dimension() # 如果是对称张量
+        GD = len(space) # 几个分量，几维问题
         ldof = space[0].number_of_local_dofs()
         gdof = space[0].number_of_global_dofs()
         cell2dof = space[0].cell_to_dof() # 标量空间的自由度矩阵
