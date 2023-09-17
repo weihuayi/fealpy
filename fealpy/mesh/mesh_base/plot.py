@@ -49,13 +49,15 @@ class Plotable():
         from ..plotting.classic import get_ploter
         return get_ploter('finder')(self)
 
+### set different default values for entities
+
     def find_node(self, axes, *,
             node: Optional[NDArray]=None,
             index=np.s_[:],
+            multiindex=None,
             showindex=False,
             color='r', marker='o', markersize=12,
-            fontsize=12, fontcolor='r',
-            multi_index=None) -> None:
+            fontsize=12, fontcolor='r') -> None:
         """
         @brief Show nodes in the axes.
 
@@ -74,8 +76,8 @@ class Plotable():
         """
         if node is None:
             return self.find_entity(
-                    axes, etype_or_node='node', index=index,
-                    showindex=showindex,
+                    axes, etype='node', index=index,
+                    showindex=showindex, multiindex=multiindex,
                     color=color,
                     marker=marker,
                     markersize=markersize,
@@ -83,7 +85,7 @@ class Plotable():
                     fontcolor=fontcolor)
         else:
             return self.find_entity(
-                    axes, etype_or_node=node, index=index,
+                    axes, etype=node, index=index,
                     showindex=showindex,
                     color=color,
                     marker=marker,
@@ -91,42 +93,42 @@ class Plotable():
                     fontsize=fontsize,
                     fontcolor=fontcolor)
 
-    def find_edge(self, axes,
+    def find_edge(self, axes, *,
             index=np.s_[:],
-            showindex=False,
+            showindex=False, multiindex=None,
             color='g', marker='^', markersize=15,
             fontsize=15, fontcolor='g'):
         return self.find_entity(
-                axes, 'edge', index=index,
-                showindex=showindex,
+                axes, etype='edge', index=index,
+                showindex=showindex, multiindex=multiindex,
                 color=color,
                 marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
 
-    def find_face(self, axes,
+    def find_face(self, axes, *,
             index=np.s_[:],
-            showindex=False,
+            showindex=False, multiindex=None,
             color='#673AB7', marker='d', markersize=18,
             fontsize=18, fontcolor='#673AB7'):
         return self.find_entity(
-                axes, 'face', index=index,
-                showindex=showindex,
+                axes, etype='face', index=index,
+                showindex=showindex, multiindex=multiindex,
                 color=color,
                 marker=marker,
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
 
-    def find_cell(self, axes,
+    def find_cell(self, axes, *,
             index=np.s_[:],
-            showindex=False,
+            showindex=False, multiindex=None,
             color='b', marker='s', markersize=21,
             fontsize=21, fontcolor='b'):
         return self.find_entity(
-                axes, 'cell', index=index,
-                showindex=showindex,
+                axes, etype='cell', index=index,
+                showindex=showindex, multiindex=multiindex,
                 color=color,
                 marker=marker,
                 markersize=markersize,

@@ -1,24 +1,34 @@
 import numpy as np
+import ipdb
 
-class ScalarConvectionIntegrator:
+class ScalarPGLSConvectionIntegrator:
     """
     @note ( c \\cdot \\nabla u, v)
     """    
 
-    def __init__(self, c=None, q=3):
-        self.coef = c
+    def __init__(self, A, b, q=3):
+        self.A = A
+        self.b = b 
         self.q = q
 
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
             out=None):
 
         q = self.q
-        coef = self.coef
         mesh = space.mesh
+
+        A = self.A # 假设是一个标量, 扩散系数
+        b = self.b # 假设是一个二维向量, 对流系数
         
         GD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
+
+        h = cellmeasure**(1/TD) # 单元尺寸
+        v = np.sqrt(b[0]**2 + b[1]**2) # 对流系数模
+        pe = 0.5*v*h/A # peclet 数
+        tau = 0.5*h*(1/np.tanh(pe) - 1/pe)/v
 
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 
@@ -34,27 +44,11 @@ class ScalarConvectionIntegrator:
         
         gphi = space.grad_basis(bcs, index=index) 
         phi = space.basis(bcs, index=index) 
+
+        val = np.einsum('c, qcmn, n->qcm', tau, gphi, b)
+        val += phi
         
-        if callable(coef):
-            if hasattr(coef, 'coordtype'):
-                if coef.coordtype == 'barycentric':
-                    coef = coef(bcs, index)
-                elif coef.coordtype == 'cartesian':
-                    ps = mesh.bc_to_point(bcs, index=index)
-                    coef = coef(ps)
-            else:
-                ps = mesh.bc_to_point(bcs, index=index)
-                coef = coef(ps)
-        if coef.shape == (GD, ):
-            C += np.einsum('q, qck, n, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        elif coef.shape == (NC, GD):
-            C += np.einsum('q, qck, cn, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        elif coef.shape == (NQ, NC, GD): 
-            C += np.einsum('q, qck, qcn, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        elif coef.shape == (NQ, GD, NC): 
-            C += np.einsum('q, qck, qnc, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        else:
-            raise ValueError("coef 的维度超出了支持范围")
+        C += np.einsum('q, qck, n, qcmn, c->ckm', ws, val, b, gphi, cellmeasure) 
 
         if out is None:
             return C

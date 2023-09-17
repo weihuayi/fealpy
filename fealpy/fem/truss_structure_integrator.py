@@ -1,8 +1,8 @@
 import numpy as np
-from typing import Tuple, Optional, Union
+
 
 class TrussStructureIntegrator:
-    def __init__(self, E: float, A: float, q :int = 3):
+    def __init__(self, E, A, q = 3):
         """
         TrussStructureIntegrator 类的初始化
 
@@ -15,10 +15,8 @@ class TrussStructureIntegrator:
         self.A = A  # 单元横截面积
         self.q = q # 积分公式
 
-    def assembly_cell_matrix(self, space: Tuple, 
-                            index: Optional[Union[int, slice]] = np.s_[:],
-                            cellmeasure = None, 
-                            out = None):
+    def assembly_cell_matrix(self, space, index = np.s_[:],
+                            cellmeasure = None, out = None):
         """
         组装单元网格的刚度矩阵
 
@@ -45,14 +43,14 @@ class TrussStructureIntegrator:
 
         c = self.E*self.A
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
-        print("坐标变换矩阵 T:\n", tan)
+        print("坐标变换矩阵 T(NC, GD):\n", tan)
 
         R = np.einsum('ik, im->ikm', tan, tan)
-        R *= c/cellmeasure[:, None, None]
         print("局部单元刚度矩阵形状:", R.shape)
         print("局部单元刚度矩阵 R:\n", R)
+        R *= c/cellmeasure[:, None, None]
 
-        ldof = 2 # 一个单元两个自由度, @TODO 高次元的情形？本科毕业论文
+        ldof = 2 # 一个单元两个自由度
         if out is None:
             K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
         else:

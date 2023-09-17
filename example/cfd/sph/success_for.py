@@ -22,8 +22,8 @@ c0 = 10
 h_swl = 2
 g = np.array([0.0, -9.8])
 gamma = 7
-alpha = 0.3
-maxstep = 3000
+alpha = 0.1
+maxstep = 2000
 dtype = [("position", "float64", (2, )), 
          ("velocity", "float64", (2, )),
          ("rho", "float64"),
@@ -116,7 +116,7 @@ def change_position(particles, idx):
     for i in range(num):
         for j in idx[i]:
             rhoij = (rho[i] + rho[j])/2
-            vij = velocity[i] - velocity[j]
+            vij = velocity[j] - velocity[i]
             rij = position[i] - position[j]
             ke = kernel(rij, H)
             result[i] += 0.5*mass[j]*vij*ke/rhoij
@@ -208,7 +208,7 @@ def draw(particles, i):
     plt.scatter(particles['position'][:, 0], particles['position'][:, 1] ,c=c,cmap='jet' ,s=5)
     plt.colorbar(cmap='jet')
     plt.title(f"Time Step: {i}")
-    plt.pause(0.01)
+    plt.pause(0.005)
 
 for i in range(maxstep):
     print("i:", i)

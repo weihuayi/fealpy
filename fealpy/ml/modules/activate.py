@@ -2,7 +2,8 @@
 Activation Functions
 """
 
-from torch import Tensor, exp, sin, cos, tanh, abs
+from torch import Tensor, exp, sin, cos, tanh, abs, pi
+import scipy.special as sp
 from torch.nn import Module
 
 
@@ -36,6 +37,8 @@ class Activation(Module):
                                           f"implemented in {self.__class__.__name__}.")
             else:
                 return fn(x)
+        else:
+            raise ValueError(f"The order can not be negative.")
 
     def d1(self, p: Tensor) -> Tensor:
         """
@@ -70,7 +73,7 @@ class Sin(Activation):
         a, b = divmod(order, 2)
         if b == 0:
             return (-1)**a * sin(x)
-        elif b == 1:
+        else:
             return (-1)**a * cos(x)
 
     def d1(self, p: Tensor):
@@ -94,7 +97,7 @@ class Cos(Activation):
         a, b = divmod(order, 2)
         if b == 0:
             return (-1)**a * cos(x)
-        elif b == 1:
+        else:
             return -(-1)**a * sin(x)
 
     def d1(self, p: Tensor):
@@ -125,3 +128,20 @@ class Tanh(Activation):
 
     def d4(self, p: Tensor):
         return 16 * tanh(p) * sech(p)**4 - 8 * tanh(p)**3 * sech(p)**2
+
+
+class Besselj0(Activation):
+    def forward(self, p: Tensor):
+        return sp.jn(0, p)
+    
+    def d1(self, p: Tensor):
+        return -sp.jn(1, p)
+    
+    def d2(self, p: Tensor):
+        return 1/2 * (-sp.jn(0, p) + sp.jn(2, p))
+    
+    def d3(self, p: Tensor):
+        return 1/4 * (3 * sp.jn(1, p) - sp.jn(3, p))
+
+    def d4(self, p: Tensor):
+        return 1/8 * (3 * sp.jn(0, p) - 4 * sp.jn(3, p) + sp.jn(4, p))

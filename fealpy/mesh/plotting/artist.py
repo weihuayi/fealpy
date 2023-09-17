@@ -2,7 +2,7 @@
 Provide plotting tools for given points with structure.
 """
 
-from typing import Sequence, Union
+from typing import Sequence, Union, Any
 from numpy.typing import NDArray
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d import Axes3D
@@ -39,13 +39,11 @@ def show_index(axes: Axes, location: NDArray, number: Union[NDArray, slice],
     """
     @brief Show index numbers in the given locations in 2d or 3d.
     """
-    if number == np.s_[:]:
-        number = np.arange(location.shape[0])
-    elif isinstance(number, np.ndarray):
-        if (number.dtype is np.bool_):
+    if isinstance(number, np.ndarray):
+        if number.dtype == np.bool_:
             number, = np.nonzero(number)
     elif isinstance(number, slice):
-        number = np.arange(number.start, number.stop, number.step)
+        number = np.arange(location.shape[0])[number]
     else:
         raise TypeError("Unknown index number format.")
 
@@ -65,8 +63,22 @@ def show_index(axes: Axes, location: NDArray, number: Union[NDArray, slice],
                 fontsize=fontsize, color=fontcolor)
 
 
-def show_multi_index():
-    pass
+def show_multi_index(axes: Axes, location: NDArray, text_list: Sequence[Any],
+                     fontcolor='k', fontsize=14):
+    GD = location.shape[-1]
+    loc = _validate_geo_dim(axes, location)
+    if GD == 3:
+        for i, text in enumerate(text_list):
+            axes.text(loc[i, 0], loc[i, 1], loc[i, 2], text,
+                multialignment='center', fontsize=fontsize,
+                color=fontcolor)
+
+    else:
+        for i, text in enumerate(text_list):
+            axes.text(
+                loc[i, 0], loc[i, 1], text,
+                multialignment='center',
+                fontsize=fontsize, color=fontcolor)
 
 
 def scatter(axes: Axes, points: NDArray, color,

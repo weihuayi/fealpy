@@ -1,8 +1,10 @@
-import numpy as np
 
-from numpy.typing import NDArray
 from typing import Union
 from types import ModuleType
+
+import numpy as np
+from numpy.typing import NDArray
+from scipy.sparse import coo_matrix
 
 from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh1dDataStructure
@@ -14,6 +16,7 @@ class IntervalMeshDataStructure(Mesh1dDataStructure):
 
 
 class IntervalMesh(Mesh, Plotable):
+    ds: IntervalMeshDataStructure
     def __init__(self, node: NDArray, cell: NDArray):
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
@@ -68,7 +71,7 @@ class IntervalMesh(Mesh, Plotable):
         """
         """
         if etype in {1, 'cell', 'edge'}:
-            return self.cell_length(index=index, node=None)
+            return self.cell_length(index=index, node=node)
         elif etype in {0, 'face', 'node'}:
             return np.array([0.0], dtype=self.ftype)
         else:
@@ -100,20 +103,20 @@ class IntervalMesh(Mesh, Plotable):
         gdof0 = self.number_of_global_ipoints(p0)
         gdof1 = self.number_of_global_ipoints(p1)
 
-        # 1. 网格节点上的插值点 
+        # 1. 网格节点上的插值点
         NN = self.number_of_nodes()
         I = range(NN)
         J = range(NN)
         V = np.ones(NN, dtype=self.ftype)
         P = coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
-        # 2. 网格边内部的插值点 
-        NC = self.number_of_cells()
+        # 2. 网格边内部的插值点
+        NE = self.number_of_edges()
         # p1 元在边上插值点对应的重心坐标
-        bcs = self.multi_index_matrix(p1, TD)/p1 
+        bcs = self.multi_index_matrix(p1, TD)/p1
         # p0 元基函数在 p1 元对应的边内部插值点处的函数值
-        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)  
-       
+        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)
+
         e2p1 = self.cell_to_ipoint(p1)[:, 1:-1]
         e2p0 = self.cell_to_ipoint(p0)
         shape = (NE, ) + phi.shape
@@ -316,4 +319,3 @@ class IntervalMesh(Mesh, Plotable):
 
 
 IntervalMesh.set_ploter('1d')
-

@@ -1,5 +1,5 @@
 
-from typing import Sequence
+from typing import Sequence, Union, Any
 import math
 
 import torch
@@ -13,10 +13,11 @@ class Standardize(Module):
     @brief: Standardize the inputs with sequence of centers and radius.\
     Stack the result with shape like (#Samples, #Centers, #Dims).
     """
-    def __init__(self, centers: Tensor, radius: Tensor, device=None):
+    def __init__(self, centers: Tensor, radius: Union[Tensor, Any], device=None):
         """
         @param centers: Tensor with shape (M, GD).
-        @param radius: Tensor with shape (M,).
+        @param radius: Tensor with shape (M, GD) or (GD, ), or any other object\
+               can be converted to tensors.
 
         @note:
         If shape of center and radius is (M, D) and shape of input is (N, D),
@@ -25,10 +26,20 @@ class Standardize(Module):
         """
         super().__init__()
         self.centers = Parameter(centers.to(device=device), requires_grad=False)
-        self.radius = Parameter(radius.to(device=device), requires_grad=False)
+        if not isinstance(radius, Tensor):
+            rdata = torch.tensor(radius, dtype=centers.dtype, device=device)
+        else:
+            rdata = radius.to(device=device)
+        self.radius = Parameter(rdata.expand(centers.shape), requires_grad=False)
 
     def forward(self, p: Tensor):
-        return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, None]
+        return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, :]
+
+    def inverse(self, p: Tensor):
+        return p[:, None, :] * self.radius[None, :, :] + self.centers[None, :, :]
+
+    def single(self, p: Tensor, ctr_idx: int):
+        return (p - self.centers[None, ctr_idx, :]) / self.radius[None, ctr_idx, :]
 
 
 class Distance(Module):
