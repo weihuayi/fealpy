@@ -113,11 +113,11 @@ class fracture_damage_integrator():
             (0, 0, 0, 0, 0, 0),
             (0, 1, 0, 0, 1, 1),
             (0, 2, 0, 0, 0, 1),
-            (1, 0, 1, 1, 0, 0),
+#            (1, 0, 1, 1, 0, 0),
             (1, 1, 1, 1, 1, 1),
             (1, 2, 1, 1, 0, 1),
-            (2, 0, 0, 1, 0, 0),
-            (2, 1, 0, 1, 1, 1),
+#            (2, 0, 0, 1, 0, 0),
+#            (2, 1, 0, 1, 1, 1),
             (2, 2, 0, 1, 0, 1)], dtype=np.int_)
 
     def strain(self, uh):
@@ -216,7 +216,7 @@ class fracture_damage_integrator():
         @return D 单元刚度系数矩阵
         """
 
-        eps = 1e-10
+        eps = 1e-6
         la = self.la
         mu = self.mu
         s = self.strain(uh)
@@ -407,11 +407,12 @@ for i in range(len(disp)-1):
 
         # 恢复型后验误差估计
         recovery = recovery_alg(space)
+#        eta = recovery_estimate(mesh, d)
         eta = recovery.recovery_estimate(d)
 #        option = mesh.adaptive_options(data=data, disp=False)
 #        mesh.adaptive(eta, options=option)
 
-        isMarkedCell = mark(eta, theta = 0.2)
+        isMarkedCell = mark(eta, theta = 0.1)
         option = mesh.bisect_options(data=data, disp=False)
         mesh.bisect(isMarkedCell, options=option)
       
@@ -436,10 +437,9 @@ mesh.add_plot(axes)
 plt.show()
 
 plt.figure()
-plt.plot(disp, stored_energy, label='stored_energy', marker='o')
-plt.plot(disp, dissipated_energy, label='dissipated_energy', marker='s')
-plt.plot(disp, dissipated_energy+stored_energy, label='total_energy',
-        marker='x')
+plt.plot(disp, stored_energy, label='stored_energy')
+plt.plot(disp, dissipated_energy, label='dissipated_energy')
+plt.plot(disp, dissipated_energy+stored_energy, label='total_energy')
 plt.xlabel('disp')
 plt.ylabel('energy')
 plt.grid(True)
