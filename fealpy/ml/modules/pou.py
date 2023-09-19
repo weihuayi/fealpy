@@ -439,7 +439,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
         self.mesh = uniform_mesh
         self.location = location
 
-    def collocate_interior(self, nx: Tuple[int], part_type=True):
+    def collocate_interior(self, nx: Tuple[int, ...], part_type=True):
         """
         @brief Collocate interior points in every partitions.
 
