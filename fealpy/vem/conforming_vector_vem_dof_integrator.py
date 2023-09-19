@@ -1,4 +1,5 @@
 import numpy as np
+import numba as nb
 from fealpy.functionspace.conforming_vector_ve_space_2d import ConformingVectorVESpace2d
 from fealpy.quadrature import GaussLobattoQuadrature,GaussLegendreQuadrature 
 class ConformingVectorVEMDoFIntegrator2d:
@@ -42,7 +43,7 @@ class ConformingVectorVEMDoFIntegrator2d:
                 index = np.array([i]*NV[i]) 
 
                 smphi = space.smspace.basis(ps, index=index, p=1)
-                t = np.zeros((ws.shape[0], NV[i], 2))
+                t = np.zeros((ws.shape[0], NV[i], 2),dtype=np.float64)
                 t[..., 0] = smphi[..., 2]
                 t[..., 1] = -smphi[..., 1]
 

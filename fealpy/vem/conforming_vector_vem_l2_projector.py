@@ -47,7 +47,7 @@ class ConformingVectorVEML2Projector2d():
             cedge[:, 0] = cell[i]
             cedge[:-1, 1] = cell[i][1:]
             cedge[-1, -1] = cell[i][0] 
-            qf = GaussLobattoQuadrature(p + 2) # NQ
+            qf = GaussLobattoQuadrature(p + 4) # NQ
             bcs, ws = qf.quadpts, qf.weights
 
             qf0 = GaussLobattoQuadrature(p+1)
@@ -93,14 +93,14 @@ class ConformingVectorVEML2Projector2d():
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
         vmldof = space.vmspace.number_of_local_dofs()
-        C31 = np.zeros((NC, 2*p-1,vmldof))
+        C31 = np.zeros((NC, 2*p-1,vmldof),dtype=np.float64)
         for i in range(NC):
             cedge = np.zeros((NV[i], 2), dtype=np.int_)
             cedge[:, 0] = cell[i]
             cedge[:-1, 1] = cell[i][1:]
             cedge[-1, -1] = cell[i][0] 
 
-            qf = GaussLegendreQuadrature(p+2) # NQ
+            qf = GaussLegendreQuadrature(p+4) # NQ
             bcs, ws = qf.quadpts, qf.weights
             ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 

@@ -1,4 +1,5 @@
 import numpy as np
+import numba as nb
 from numpy.linalg import inv
 from fealpy.functionspace import ConformingScalarVESpace2d 
 from fealpy.functionspace.conforming_vector_ve_space_2d import ConformingVectorVESpace2d
@@ -8,7 +9,6 @@ from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
 import ipdb
 from fealpy.quadrature import GaussLobattoQuadrature, GaussLegendreQuadrature
 from fealpy.vem.temporary_prepare import coefficient_of_div_VESpace_represented_by_SMSpace ,vector_decomposition, laplace_coefficient 
-
 
 class ConformingVectorVEMH1Projector2d():
     def __init__(self, M):
@@ -27,7 +27,6 @@ class ConformingVectorVEMH1Projector2d():
         self.G = self.assembly_cell_left_hand_side(space) 
         g = lambda x: inv(x[0])@x[1]
         return list(map(g, zip(self.G, self.B)))
-
 
     def assembly_cell_right_hand_side(self, space: ConformingVectorVESpace2d):
         """
@@ -93,7 +92,7 @@ class ConformingVectorVEMH1Projector2d():
 
                 B2 = E[i,...]@A[i]@M[i]@K[i]
 
-                B3 = np.zeros(((p-1)*(p-2)//2, ldof[i]))
+                B3 = np.zeros(((p-1)*(p-2)//2, ldof[i]),dtype=np.float64)
                 B3[np.arange((p-1)*(p-2)//2), 2*p*NV[i]+np.arange((p-1)*(p-2)//2)] = cellarea[i] * 1
                 B3 = E[i,...]@-(C@B3)
                 
@@ -120,7 +119,7 @@ class ConformingVectorVEMH1Projector2d():
         NC = space.mesh.number_of_cells()
         NV = space.mesh.number_of_vertices_of_cells()
         vmldof = space.vmspace.number_of_local_dofs()
-        G = np.zeros((NC, vmldof, vmldof))
+        G = np.zeros((NC, vmldof, vmldof),dtype=np.float64)
 
         sspace = ConformingScalarVESpace2d(mesh, p) 
         d = ConformingVEMDoFIntegrator2d()

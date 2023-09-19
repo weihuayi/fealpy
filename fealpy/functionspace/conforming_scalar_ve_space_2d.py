@@ -110,6 +110,7 @@ class ConformingScalarVESpace2d():
         p = self.p
         g = lambda x: x[0]@uh[x[1]]
         S = self.smspace.function(dim=dim)
+        print(S.shape)
         S[:] = np.concatenate(list(map(g, zip(PI1, cell2dof))))
         return S
 
