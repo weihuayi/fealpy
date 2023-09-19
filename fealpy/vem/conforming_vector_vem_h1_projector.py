@@ -1,5 +1,4 @@
 import numpy as np
-import numba as nb
 from numpy.linalg import inv
 from fealpy.functionspace import ConformingScalarVESpace2d 
 from fealpy.functionspace.conforming_vector_ve_space_2d import ConformingVectorVESpace2d
@@ -58,7 +57,7 @@ class ConformingVectorVEMH1Projector2d():
 
             qf = GaussLobattoQuadrature(p + 1) # NQ
             bcs, ws = qf.quadpts, qf.weights
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p-1)
             vmgphi = space.vmspace.grad_basis(ps,index=index,p= p)
@@ -67,7 +66,7 @@ class ConformingVectorVEMH1Projector2d():
             nm = v@w 
             sl = np.sqrt(v[:, 0]**2+v[:, 1]**2) # 边长(NE,)
 
-            B11 = np.einsum('ijkmn,jm,i->kjin',vmgphi, nm, ws)#(2*ldof,NV[I],NQ,2)
+            B11 = np.einsum('ijkmn,jm,i->kjin',vmgphi, nm, ws, optimize=True)#(2*ldof,NV[I],NQ,2)
             idx = np.zeros((B11.shape[1:]), dtype=np.int_)
             idx1 = np.arange(0, NV[i]*2*p, 2*p).reshape(-1, 1) + np.arange(0, 2*p+1, 2)
             idx1[-1, -1] = 0
@@ -84,7 +83,7 @@ class ConformingVectorVEMH1Projector2d():
 
                 B.append(BB11)
             else:
-                B12 = np.einsum('ijk,jl,i->kjil', smphi, nm, ws)#(ldof,NV[I],NQ,2)
+                B12 = np.einsum('ijk,jl,i->kjil', smphi, nm, ws, optimize=True)#(ldof,NV[I],NQ,2)
                 BB12 = np.zeros((p*(p+1)//2, ldof[i]), dtype=np.float64)
                 np.add.at(BB12, (np.s_[:], idx), B12)
                 B12 = E[i, ...]@A[i, ...]@BB12
@@ -139,12 +138,12 @@ class ConformingVectorVEMH1Projector2d():
 
             qf = GaussLegendreQuadrature(p+1) # NQ
             bcs, ws = qf.quadpts, qf.weights
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             vmphi = space.vmspace.basis(ps, index=index, p=p)
             v = node[cedge[:, 1]] - node[cedge[:, 0]]
             sl = np.sqrt(v[:, 0]**2+v[:, 1]**2) # 边长(NE,)
-            G0 = np.einsum('ijkl,i,j->kl', vmphi, ws, sl) 
+            G0 = np.einsum('ijkl,i,j->kl', vmphi, ws, sl, optimize=True) 
 
             G[i, 0, :] = G0[:, 0]
             G[i, vmldof//2, :] = G0[:, 1]

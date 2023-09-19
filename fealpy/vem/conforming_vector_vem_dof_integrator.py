@@ -1,5 +1,4 @@
 import numpy as np
-import numba as nb
 from fealpy.functionspace.conforming_vector_ve_space_2d import ConformingVectorVESpace2d
 from fealpy.quadrature import GaussLobattoQuadrature,GaussLegendreQuadrature 
 class ConformingVectorVEMDoFIntegrator2d:
@@ -29,7 +28,7 @@ class ConformingVectorVEMDoFIntegrator2d:
 
             qf = GaussLobattoQuadrature(p + 1) # NQ
             bcs, ws = qf.quadpts, qf.weights
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             vmphi = space.vmspace.basis(ps, index=index, p=p)
             idx = np.arange(0, NV[i]*2*p, 2*p)+ np.arange(0, 2*p, 2).reshape(-1, 1) 
@@ -39,7 +38,7 @@ class ConformingVectorVEMDoFIntegrator2d:
             if p > 2:
                 qf = GaussLegendreQuadrature(p+1) # NQ
                 bcs, ws = qf.quadpts, qf.weights
-                ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+                ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
                 index = np.array([i]*NV[i]) 
 
                 smphi = space.smspace.basis(ps, index=index, p=1)
@@ -50,14 +49,14 @@ class ConformingVectorVEMDoFIntegrator2d:
                 smphi = space.smspace.basis(ps, index=index, p=p-3)
                 vmphi = space.vmspace.basis(ps, index=index, p=p)
 
-                KK3 = np.einsum('ijkl,ijl,ijn,i->jnk',vmphi,t,smphi,ws)
+                KK3 = np.einsum('ijkl,ijl,ijn,i->jnk',vmphi,t,smphi,ws, optimize=True)
 
                 v = node[cedge[:, 1]] - node[cedge[:, 0]]
                 w = np.array([(0, -1), (1, 0)])
                 nm = v@w 
                 b = node[cedge[:, 0]] - mesh.entity_barycenter()[i]
                 
-                K3 = np.einsum('ijk, il, il->jk', KK3, nm, b)
+                K3 = np.einsum('ijk, il, il->jk', KK3, nm, b, optimize=True)
 
                 multiIndex = space.smspace.dof.multi_index_matrix(p=p)
                 q = np.sum(multiIndex, axis=1)
@@ -69,7 +68,7 @@ class ConformingVectorVEMDoFIntegrator2d:
             if p > 1:
                 qf = GaussLegendreQuadrature(p+1) # NQ
                 bcs, ws = qf.quadpts, qf.weights
-                ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+                ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
                 index = np.array([i]*NV[i]) 
                 smphi = space.smspace.basis(ps, index=index, p=p-1)[..., 1:]
                 data = space.smspace.diff_index_1()
@@ -79,14 +78,14 @@ class ConformingVectorVEMDoFIntegrator2d:
                 dphi = np.concatenate((smphi1, smphi1), axis=2)
                 c = np.hstack((x[1], y[1]))/h[i]
 
-                KK4 = np.einsum('ijk,ijl,k,i->jlk',dphi, smphi, c, ws)
+                KK4 = np.einsum('ijk,ijl,k,i->jlk',dphi, smphi, c, ws, optimize=True)
 
                 v = node[cedge[:, 1]] - node[cedge[:, 0]]
                 w = np.array([(0, -1), (1, 0)])
                 nm = v@w 
                 b = node[cedge[:, 0]] - mesh.entity_barycenter()[i]
                 
-                K4 = np.einsum('ijk, il, il->jk', KK4, nm, b)
+                K4 = np.einsum('ijk, il, il->jk', KK4, nm, b, optimize=True)
 
                 multiIndex = space.smspace.dof.multi_index_matrix(p=p-1)
                 q = np.sum(multiIndex, axis=1)

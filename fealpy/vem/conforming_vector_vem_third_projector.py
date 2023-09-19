@@ -72,7 +72,7 @@ class ConformingVectorVEMThirdProjector2d():
 
             qf = GaussLobattoQuadrature(p + 1) # NQ
             bcs, ws = qf.quadpts, qf.weights
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p-1)
             tmphi = np.zeros((ws.shape[0], NV[i], p*(p+1)*2, 2, 2),dtype=np.float64) 
@@ -85,7 +85,7 @@ class ConformingVectorVEMThirdProjector2d():
             w = np.array([(0, -1), (1, 0)])
             nm = v@w            
 
-            AA2 = np.einsum('ijkmn,jm,i->kjin',tmphi, nm, ws)
+            AA2 = np.einsum('ijkmn,jm,i->kjin',tmphi, nm, ws, optimize=True)
             idx = np.zeros((NV[i], ws.shape[0], 2), dtype=np.int_)
             idx1 = np.arange(0, NV[i]*2*p, 2*p).reshape(-1, 1) + np.arange(0, 2*p+1, 2)
             idx1[-1, -1] = 0
