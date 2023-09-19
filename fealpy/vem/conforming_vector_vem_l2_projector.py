@@ -54,13 +54,13 @@ class ConformingVectorVEML2Projector2d():
             phi = space.edge_basis(qf0.quadpts[:, 0], qf.quadpts[:, 0])
             phi = np.tile(phi, (NV[i], 1, 1))
 
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p+1)
             v = node[cedge[:, 1]] - node[cedge[:, 0]]
             w = np.array([(0, -1), (1, 0)])
             nm = v@w
-            CC1 = np.einsum('ijk, jim, jl, i->kjml', smphi, phi, nm, ws)
+            CC1 = np.einsum('ijk, jim, jl, i->kjml', smphi, phi, nm, ws, optimize=True)
             
             idx = np.zeros((NV[i], p+1, 2), dtype=np.int_)
             idx1 = np.arange(0, NV[i]*2*p, 2*p).reshape(-1, 1) + np.arange(0, 2*p+1, 2)
@@ -93,7 +93,7 @@ class ConformingVectorVEML2Projector2d():
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
         vmldof = space.vmspace.number_of_local_dofs()
-        C31 = np.zeros((NC, 2*p-1,vmldof))
+        C31 = np.zeros((NC, 2*p-1,vmldof),dtype=np.float64)
         for i in range(NC):
             cedge = np.zeros((NV[i], 2), dtype=np.int_)
             cedge[:, 0] = cell[i]
@@ -102,7 +102,7 @@ class ConformingVectorVEML2Projector2d():
 
             qf = GaussLegendreQuadrature(p+2) # NQ
             bcs, ws = qf.quadpts, qf.weights
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p-1)[:, :, (p-2)*(p-1)//2:]
             t = np.zeros((ws.shape[0], NV[i], 2))
@@ -112,14 +112,14 @@ class ConformingVectorVEML2Projector2d():
             t[:, :, 1] = -smphi1[:, :, 1]
 
             vmphi = space.vmspace.basis(ps, index=index, p=p)
-            H = np.einsum('ijl,ijk,ijml,i->jkm', t, smphi, vmphi, ws) #(NV[i], , 2*ldof)
+            H = np.einsum('ijl,ijk,ijml,i->jkm', t, smphi, vmphi, ws, optimize=True) #(NV[i], , 2*ldof)
 
             v = node[cedge[:, 1]] - node[cedge[:, 0]]
             w = np.array([(0, -1), (1, 0)])
             nm = v@w 
             b = node[cedge[:, 0]] - mesh.entity_barycenter()[i]
             
-            C31[i] = np.einsum('ijk,il,il->jk', H, nm, b)
+            C31[i] = np.einsum('ijk,il,il->jk', H, nm, b, optimize=True)
             multiIndex = space.smspace.dof.multi_index_matrix(p=p)
             q = np.sum(multiIndex, axis=1)
             q = (q + q.reshape(-1, 1))[(p-2)*(p-1)//2:p*(p+1)//2, :] + 2 + 1

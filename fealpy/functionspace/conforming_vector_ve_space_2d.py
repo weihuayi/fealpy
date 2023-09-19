@@ -62,7 +62,8 @@ class CVVEDof2d:
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*(edof-2)).reshape(-1, 1) + np.arange(edof-2) 
-        cell2dof[idx] = edge2dof[isInEdge, :1:-1]
+        idx1 = (np.arange(-2,-edof,-2).reshape(-1,1)+np.array([0,1])).flatten()
+        cell2dof[idx] = edge2dof[isInEdge][:, idx1]
 
         NN = self.mesh.number_of_nodes()
         NV = self.mesh.ds.number_of_vertices_of_cells()
@@ -70,7 +71,6 @@ class CVVEDof2d:
         cdof = self.number_of_local_dofs(doftype='cell') 
         idx = (location[:-1] + NV*2*p).reshape(-1, 1) + np.arange(cdof)
         cell2dof[idx] = 2*NN + NE*2*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
-
         return np.hsplit(cell2dof, location[1:-1])[index]
 
     def number_of_global_dofs(self):
@@ -107,7 +107,6 @@ class CVVEDof2d:
             ipoint[egdof:,:] = (bc[:, None, :]+t1[None, :2, :]*h[:, :, None]).reshape(-1,GD)   
             return ipoint
 
-        bcs1 = self.mesh.multi_index_matrix(p-3, etype=2)/(p-3)
         bcs2 = (self.mesh.multi_index_matrix(p-1, etype=2)/(p-1))[:-1, :]
         tri1 = bc[:, None, :]+t[None, :, :]*h[:, :, None]
         tri2 = bc[:, None, :]+t1[None, :, :]*h[:, :, None]
@@ -117,6 +116,7 @@ class CVVEDof2d:
             ipoint[egdof+(p-2)*(p-1)//2*NC:,:]= np.einsum('ij,kjm->kim', bcs2, tri2).reshape(-1, GD)
             return ipoint
 
+        bcs1 = self.mesh.multi_index_matrix(p-3, etype=2)/(p-3)
         ipoint[egdof:egdof+(p-2)*(p-1)//2*NC, :] = np.einsum('ij,kjm->kim',
                 bcs1, tri1).reshape(-1, GD)
         ipoint[egdof+(p-2)*(p-1)//2*NC:, :]= np.einsum('ij,kjm->kim',
@@ -178,12 +178,25 @@ class ConformingVectorVESpace2d:
         A = x[:, None] - x[None, :]
         A[np.arange(len(A)), np.arange(len(A))] = 1.0
         A = np.prod(A, axis=1)
-        val = np.zeros((len(x0), len(x)), dtype=np.float_)
+        val = np.zeros((len(x0), len(x)), dtype=np.float64)
         for i in range(len(x)):
             flag = np.ones(len(x), dtype=np.bool_)
             flag[i] = False
             val[:, i] = np.prod(x0[:, None] - x[flag][None, :], axis=1)/A[i]
         return val
+
+    def project_to_vmspace(self, uh, PI1):
+        """
+        Project a conforming vem function uh into polynomial space.
+        """
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape)
+        p = self.p
+        g = lambda x: x[0]@uh[x[1]]
+        S = self.vmspace.function(dim=dim)
+        S[:] = np.concatenate(list(map(g, zip(PI1, cell2dof))))
+        return S
+
 
 
 
