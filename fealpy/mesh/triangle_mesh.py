@@ -907,7 +907,6 @@ class TriangleMesh(Mesh, Plotable):
 
             L = idx
             R = np.arange(NC, NC+nc)
-
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
                     if len(value.shape) == 1: # 分片常数
@@ -916,7 +915,7 @@ class TriangleMesh(Mesh, Plotable):
                     else:
                         ldof = value.shape[-1]
                         p = int((np.sqrt(1+8*ldof)-3)//2)
-                        bc = self.multi_index_matrix(p, etype='cell')/p
+                        bc = self.multi_index_matrix(p, etype=2)/p
 
                         bcl = np.zeros_like(bc)
                         bcl[:, 0] = bc[:, 1]
@@ -1670,6 +1669,28 @@ class TriangleMesh(Mesh, Plotable):
             NN = self.number_of_nodes()
             isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
+    def show_function(self, plot, uh, cmap=None):
+        """
+        """
+        from types import ModuleType
+        import matplotlib.colors as colors
+        import matplotlib.cm as cm
+        from mpl_toolkits.mplot3d import Axes3D
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = plot.axes(projection='3d')
+        else:
+            axes = plot
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cax = axes.plot_trisurf(
+                node[:, 0], node[:, 1],
+                uh, triangles=cell, cmap=cmap, lw=0.0)
+        axes.figure.colorbar(cax, ax=axes)
+        return axes
+
     @classmethod
     def show_lattice(cls, p=1, showmultiindex=False):
         """
@@ -1950,7 +1971,7 @@ class TriangleMesh(Mesh, Plotable):
     ## @ingroup MeshGenerators
     @classmethod
     def from_domain_distmesh(cls, domain, hmin, maxit=100, output=True):
-        from .DistMesher2d import DistMesher2d
+        from .distmesher_2d import DistMesher2d
         mesher = DistMesher2d(domain, hmin, output=output)
         mesh = mesher.meshing(maxit=maxit)
         return mesh

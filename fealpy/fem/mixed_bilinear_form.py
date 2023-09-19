@@ -124,14 +124,15 @@ class MixedBilinearForm:
                         J = np.broadcast_to(trial_cell2dof[:, None, :]+j*trial_gdof, shape=val.shape)
                         self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(test_D*test_gdof,trial_D*trial_gdof))
         
-        elif space[0].doforder == 'vdims': # 向量分量自由度排序优先
+        elif trial_space.doforder == 'vdims': # 向量分量自由度排序优先
             for i in range(test_D):
                 for j in range(trial_D):
                     val = CM[:, i::test_D, j::trial_D]
                     I = np.broadcast_to(test_D*test_cell2dof[:, :, None] + i, shape=val.shape)
                     J = np.broadcast_to(trial_D*trial_cell2dof[:, None, :] + j, shape=val.shape)
-                    self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(tets_D*test_gdof, trial_D*trial_gdof))
-
+                    self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(test_D*test_gdof, trial_D*trial_gdof))
+        
+        return self._M
 
 
     def fast_assembly(self):

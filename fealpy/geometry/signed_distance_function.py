@@ -40,24 +40,14 @@ def dpoly(p, poly):
 def ddiff(d0, d1):
     return np.maximum(d0, -d1)
 
-#def dunion(d0, d1):
-#    return np.minimum(d0, d1)
-
 def dunion(*args):
     d = np.array(args)
     return np.min(d, axis=0)
-
-#def dmin(d0, d1):
-#    dd = np.concatenate((d0.reshape((-1,1)), d1.reshape((-1,1))), axis=1)
-#    return dd.min(axis=1)
 
 def dmin(*args):
     d = np.array(args)
     return np.min(d, axis=0)
 
-#def dmax(d0, d1):
-#    dd = np.concatenate((d0.reshape((-1,1)), d1.reshape((-1,1))), axis=1)
-#    return dd.max(axis=1)
 
 def dmax(*args):
     d = np.array(args)

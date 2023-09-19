@@ -45,13 +45,14 @@ class ScalarConvectionIntegrator:
             else:
                 ps = mesh.bc_to_point(bcs, index=index)
                 coef = coef(ps)
-            
         if coef.shape == (GD, ):
             C += np.einsum('q, qck, n, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
         elif coef.shape == (NC, GD):
             C += np.einsum('q, qck, cn, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
         elif coef.shape == (NQ, NC, GD): 
             C += np.einsum('q, qck, qcn, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
+        elif coef.shape == (NQ, GD, NC): 
+            C += np.einsum('q, qck, qnc, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
         else:
             raise ValueError("coef 的维度超出了支持范围")
 

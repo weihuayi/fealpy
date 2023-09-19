@@ -53,6 +53,8 @@ from .domain_2d import (
         CircleDomain,
         LShapeDomain,
         SquareWithCircleHoleDomain,
+        BoxWithCircleHolesDomain,
+        BoxWithBoxHolesDomain,
         )
 
 # 3d Domain

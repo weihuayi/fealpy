@@ -116,8 +116,6 @@ ctx = DMumpsContext()
 ctx.set_silent()
 errorMatrix = np.zeros((2,nt),dtype=np.float64)
 
-
-
 for i in range(2): 
     # 下一个的时间层 t1
     t1 = tmesh.next_time_level()

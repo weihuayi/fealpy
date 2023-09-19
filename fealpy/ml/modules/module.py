@@ -61,6 +61,12 @@ class TensorMapping(Module):
         """
         return DiffSolution(self, target)
 
+    def real(self, dtype):
+        """
+        @brief
+        """
+        return RealSolution(self, dtype)
+
     def fixed(self, idx: Sequence[int], value: Sequence[float],
                  dtype=torch.float64):
         """
@@ -339,6 +345,16 @@ class DiffSolution(TensorMapping):
 
     def forward(self, p: Tensor):
         return self.__fn_1(p) - self.__fn_2(p)
+
+
+class RealSolution(TensorMapping):
+    def __init__(self, fn: TensorFunction, dtype) -> None:
+        super().__init__()
+        self.__fn = fn
+        self.dtype = dtype
+
+    def forward(self, p: Tensor):
+        return self.__fn(p.to(dtype=self.dtype)).real
 
 
 class Fixed(Solution):

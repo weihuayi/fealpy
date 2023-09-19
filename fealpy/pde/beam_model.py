@@ -1,6 +1,3 @@
-import numpy as np
-
-from ..decorator import cartesian 
 from ..mesh import EdgeMesh
 
 
@@ -26,11 +23,12 @@ class Beam_2d_cantilever():
         return mesh
 
 
-class Beam_2d_three_beam():
+class Three_beam_plane_frame():
     def __init__(self):
         self.I = 6.5e-7 # 惯性矩 m^4
-        self.E = 3e11 # 弹性模量 ton/m^2
+        self.A = 6.8e-4 # 截面面积 m^2
+        self.E = 3e11 # 弹性模量 newton/m^2
 
     def init_mesh(self):
-        mesh = EdgeMesh.from_three_beam()
+        mesh = EdgeMesh.from_three_beam_plane_frame()
         return mesh

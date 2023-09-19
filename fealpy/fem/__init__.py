@@ -17,6 +17,9 @@ from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 
+from .scalar_pgls_convection_integrator import ScalarPGLSConvectionIntegrator
+
+
 # Boundary integrator for scalar case
 # <kappa u, v>
 from .scalar_robin_boundary_integrator import ScalarRobinBoundaryIntegrator
@@ -41,7 +44,7 @@ VectorRobinSourceIntegrator = VectorBoundarySourceIntegrator
 
 # others
 from .truss_structure_integrator import TrussStructureIntegrator
-from .beam_structure_integrator import BeamStructureIntegrator
+from .beam_structure_integrator import EulerBernoulliBeamStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
 from .vector_convection_integrator import VectorConvectionIntegrator
 from .vector_viscous_work_integrator import VectorViscousWorkIntegrator
@@ -53,4 +56,5 @@ from .vector_neumann_bc_integrator import VectorNeumannBCIntegrator
 from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
 from .dirichlet_bc import DirichletBC
+from .recovery_alg import recovery_alg, LinearRecoveryAlg
 

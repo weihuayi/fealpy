@@ -6,7 +6,6 @@ This module provide mesh
 
 '''
 
-# 结构化网格
 from .interval_mesh import IntervalMesh
 from .polygon_mesh import PolygonMesh
 from .triangle_mesh import TriangleMesh, TriangleMeshWithInfinityNode
@@ -28,3 +27,6 @@ from .ccg_mesh_reader import CCGMeshReader
 from .fab_file_reader import FABFileReader
 from .poly_file_reader import PolyFileReader
 from .inp_file_reader  import InpFileReader
+
+from .distmesher_2d import DistMesher2d
+from .distmesher_3d import DistMesher3d

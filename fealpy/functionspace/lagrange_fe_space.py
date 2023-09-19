@@ -178,7 +178,7 @@ class LagrangeFESpace():
             index: Union[np.ndarray, slice]=np.s_[:]
             ) -> np.ndarray:
         """
-        @note
+        @brief 
         """
         gdof = self.number_of_global_dofs()
         gphi = self.grad_basis(bc, index=index)
@@ -208,7 +208,6 @@ class LagrangeFESpace():
             val = np.einsum(s1, gphi, uh[cell2dof[index], ...])
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
-
         return val
 
 
