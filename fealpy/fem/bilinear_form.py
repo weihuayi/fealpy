@@ -162,6 +162,8 @@ class BilinearForm:
                         J = np.broadcast_to(cell2dof[:, None, :]+i*gdof, shape=val.shape)
                         self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
         elif space[0].doforder == 'vdims': # 向量分量自由度排序优先
+            print("cell2dof_shape:", cell2dof.shape)
+            print("cell2dof:", cell2dof)
             for i in range(GD):
                 for j in range(i, GD):
                     if i==j:

@@ -40,6 +40,7 @@ class EulerBernoulliBeamStructureIntegrator:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         l = cellmeasure
+        print("l:", l)
         c0 = self.E*self.A
         c1 = self.E*self.I
         NC = len(cellmeasure)
@@ -51,7 +52,7 @@ class EulerBernoulliBeamStructureIntegrator:
             assert out.shape == (NC, GD*ldof, GD*ldof)
             K = out
 
-        K0 = c0/(2*l)[:, np.newaxis, np.newaxis] * np.array([[1, -1], [-1, 1]])
+        K0 = c0/(l)[:, np.newaxis, np.newaxis] * np.array([[1, -1], [-1, 1]])
         print("轴向刚度矩阵 K0:", K0.shape)
         # print("K0:\n", K0)
 
