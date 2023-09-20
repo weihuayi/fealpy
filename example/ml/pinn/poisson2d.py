@@ -9,7 +9,7 @@ from torch import Tensor, cos, float64
 from torch.optim.lr_scheduler import ExponentialLR
 
 from fealpy.mesh import TriangleMesh, UniformMesh2d
-from fealpy.ml import gradient
+from fealpy.ml.grad import gradient
 from fealpy.ml.modules import Solution
 
 NEW_MODEL = True

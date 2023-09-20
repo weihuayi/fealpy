@@ -4,7 +4,7 @@ from typing import List, Sequence
 import torch
 from torch import device, Tensor, float64
 
-from .sampler import Sampler, _MeshSampler
+from .sampler import Sampler
 
 
 class Collocator(Sampler):
