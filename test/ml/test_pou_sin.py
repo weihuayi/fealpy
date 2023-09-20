@@ -1,6 +1,6 @@
 import torch
 from fealpy.mesh import UniformMesh2d
-from fealpy.ml.modules import PoUSin, StackStd, TensorMapping, PoU
+from fealpy.ml.modules import PoUSin, Standardize, TensorMapping
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -9,10 +9,10 @@ from matplotlib import cm
 mesh = UniformMesh2d((0, 4, 0, 4), h=(0.25, 0.25), origin=(0.0, 0.0))
 node = torch.from_numpy(mesh.entity('node'))
 
-class TestModel(TensorMapping):
+class TheTestModel(TensorMapping):
     def __init__(self):
         super().__init__()
-        self.l1 = StackStd(centers=node, radius=0.125)
+        self.l1 = Standardize(centers=node, radius=0.125)
         self.l2 = PoUSin()
 
     def forward(self, p):
@@ -24,7 +24,7 @@ class TestModel(TensorMapping):
 
 if __name__ == '__main__':
 
-    model = TestModel()
+    model = TheTestModel()
 
     x = np.linspace(0, 1, 190)
     y = np.linspace(0, 1, 190)

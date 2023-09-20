@@ -3,7 +3,7 @@ import torch
 from fealpy.ml.sampler import (
     ISampler,
     BoxBoundarySampler,
-    get_mesh_sampler,
+    MeshSampler,
     TMeshSampler,
     QuadrangleMeshSampler
 )
@@ -40,7 +40,7 @@ class TestSimple():
         from fealpy.mesh import TriangleMesh
 
         mesh = TriangleMesh.from_box([0, 2, 0, 3], nx=10, ny=10)
-        s = get_mesh_sampler(10, mesh)
+        s = MeshSampler(10, mesh)
         assert isinstance(s, TMeshSampler)
         assert s.m == 2000
         assert s.nd == 2
@@ -57,7 +57,7 @@ class TestSimple():
         from fealpy.mesh import TetrahedronMesh
 
         mesh = TetrahedronMesh.from_box([0, 1, 1, 3, 2, 5], nx=5, ny=5, nz=5)
-        s = get_mesh_sampler(10, mesh)
+        s = MeshSampler(10, mesh)
         assert isinstance(s, TMeshSampler)
         assert s.m == 7500
         assert s.nd == 3
@@ -75,7 +75,7 @@ class TestSimple():
         from fealpy.mesh import QuadrangleMesh
 
         mesh = QuadrangleMesh.from_box([0, 1, 1, 2], nx=10, ny=10)
-        s = get_mesh_sampler(10, mesh)
+        s = MeshSampler(10, mesh)
         assert isinstance(s, QuadrangleMeshSampler)
         assert s.m == 1000
         assert s.nd == 2
