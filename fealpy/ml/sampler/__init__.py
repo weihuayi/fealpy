@@ -11,4 +11,4 @@ from .sampler import (
     TMeshSampler,
     QuadrangleMeshSampler
 )
-from .collocator import Collocator, CircleCollocator
+from .collocator import Collocator, CircleCollocator, LineCollocator, QuadrangleCollocator

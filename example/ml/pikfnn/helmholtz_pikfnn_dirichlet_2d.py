@@ -7,11 +7,9 @@ import torch.nn as nn
 from torch.special import bessel_j0
 
 from fealpy.ml.modules import Solution
-from uniformly_placed import sample_points_on_square
-from fealpy.ml.sampler import ISampler
+from fealpy.ml.sampler import ISampler, QuadrangleCollocator
 
 #方程形式
-
 """
 
     \Delta u(x,y) + k^2 * u(x,y) = 0 ,                            (x,y)\in \Omega
@@ -20,13 +18,11 @@ from fealpy.ml.sampler import ISampler
 """
 
 #超参数(配置点个数、源点个数、波数)
-
 num_of_col_bd = 5000
 num_of_source = 5000
 k = torch.tensor(1000, dtype=torch.float64)
 
 #PIKF层
-
 class PIKF_layer(nn.Module):
     def __init__(self, source_nodes: torch.Tensor) -> None:
         super().__init__()
@@ -42,17 +38,15 @@ class PIKF_layer(nn.Module):
 
         return self.kernel_func(p)
     
-source_nodes = sample_points_on_square(-2.5, 2.5, num_of_source)
+source_nodes = QuadrangleCollocator(num_of_source, [[-2.5, 2.5], [-2.5, 2.5]]).run()
 pikf_layer = PIKF_layer(source_nodes)
 net_PIKFNN = nn.Sequential(
                            pikf_layer,
                            nn.Linear(num_of_source, 1, dtype=torch.float64, bias=False)
                            )
-
 s = Solution(net_PIKFNN)
 
 #真解及边界条件
-
 def solution(p:torch.Tensor) -> torch.Tensor:
 
     x = p[...,0:1]
@@ -63,11 +57,9 @@ def dirichletBC(p:torch.Tensor) -> torch.Tensor:
     return solution(p)
 
 # 更新网络参数
-
 start_time = time.time()
 
-col_bd = sample_points_on_square(-1, 1, num_of_col_bd)
-
+col_bd = QuadrangleCollocator(num_of_source, [[-1, 1], [-1, 1]]).run()
 A = pikf_layer.kernel_func(col_bd).detach().numpy()
 b = dirichletBC(col_bd).detach().numpy()
 alpha = solve(A, b)
@@ -90,7 +82,6 @@ L2_error = torch.sqrt(
 print(f"L2_error: {L2_error}")
 
 #可视化数值解、真解以及两者偏差
-
 fig_1 = plt.figure()
 fig_2 = plt.figure()
 fig_3 = plt.figure()
@@ -117,4 +108,3 @@ axes.set_title('diff')
 fig_3.colorbar(qm)
 
 plt.show()
-
