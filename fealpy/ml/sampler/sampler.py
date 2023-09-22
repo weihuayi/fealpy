@@ -163,7 +163,8 @@ class BoxBoundarySampler(Sampler):
         if len(t1.shape) != 1:
             raise ValueError
         if t1.shape != t2.shape:
-            raise ValueError
+            raise ValueError("p1 and p2 should be in a same shape.")
+        self.nd = int(t1.shape[0])
         data = torch.vstack([t1, t2]).T
 
         self.subs: List[ISampler] = []
@@ -200,7 +201,7 @@ EType = Literal['cell', 'face', 'edge', 'node']
 
 class MeshSampler(Sampler):
     """
-    Sample in cells of a mesh.
+    Sample in the specified entity of a mesh.
     """
 
     DIRECTOR: Dict[Tuple[Optional[str], Optional[str]], Type['MeshSampler']] = {}
@@ -340,11 +341,7 @@ class _QuadSampler(MeshSampler):
     def run(self, mp: int) -> Tensor:
         bc_0 = random_weights(mp, 2)
         bc_1 = random_weights(mp, 2)
-        self.bcs = np.zeros((mp, self.NVC), dtype=np.float64)
-        self.bcs[..., 0] = bc_0[..., 0] * bc_1[..., 0]
-        self.bcs[..., 1] = bc_0[..., 1] * bc_1[..., 0]
-        self.bcs[..., 2] = bc_0[..., 1] * bc_1[..., 1]
-        self.bcs[..., 3] = bc_0[..., 0] * bc_1[..., 1]
+        self.bcs = np.einsum('na, nb -> nab', bc_0, bc_1).reshape(-1, 4)[:, [0, 2, 3, 1]]
         ret = self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
         if self.enable_weight:
             self._set_weight(mp)
@@ -360,11 +357,7 @@ class _Uniform2dSampler(MeshSampler):
     def run(self, mp: int) -> Tensor:
         bc_0 = random_weights(mp, 2)
         bc_1 = random_weights(mp, 2)
-        self.bcs = np.zeros((mp, self.NVC), dtype=np.float64)
-        self.bcs[..., 0] = bc_0[..., 0] * bc_1[..., 0]
-        self.bcs[..., 1] = bc_0[..., 0] * bc_1[..., 1]
-        self.bcs[..., 2] = bc_0[..., 1] * bc_1[..., 0]
-        self.bcs[..., 3] = bc_0[..., 1] * bc_1[..., 1]
+        self.bcs = np.einsum('na, nb -> nab', bc_0, bc_1).reshape(-1, 4)
         ret = self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
         if self.enable_weight:
             self._set_weight(mp)
