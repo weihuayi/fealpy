@@ -439,7 +439,7 @@ class TetrahedronMesh(Mesh, Plotable):
         print(cell.shape)
 
         cell = np.r_['1', np.zeros((NC, 1), dtype=cell.dtype), cell]
-        cell[:, 0] = 4
+        cell[:, 0] = cell.shape[1]-1
 
         if etype == 'cell':
             cellType = 10  # 四面体
