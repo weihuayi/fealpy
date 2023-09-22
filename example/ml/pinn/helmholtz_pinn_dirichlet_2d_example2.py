@@ -6,7 +6,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from matplotlib import pyplot as plt
 
-from fealpy.mesh import TriangleMesh 
+from fealpy.mesh import TriangleMesh
 from fealpy.ml.grad import gradient
 from fealpy.ml.modules import Solution
 from fealpy.ml.sampler import ISampler
@@ -22,9 +22,9 @@ from fealpy.ml.sampler import ISampler
 #超参数
 num_of_points_in = 50
 num_of_points_bd = 250
-lr = 0.01 
+lr = 0.01
 iteration = 3000
-k = torch.tensor(1)
+k = torch.tensor(1, dtype=torch.float64)
 NN = 64
 
 # 定义网络层结构
@@ -45,11 +45,8 @@ mse_cost_func = nn.MSELoss(reduction='mean')
 scheduler = StepLR(optim, step_size=100, gamma=0.8)
 
 # 采样器
-sampler_in = ISampler(
-    num_of_points_in, [[-1, 1], [-1, 1]], requires_grad=True)
-
-sampler_bd = ISampler(
-    num_of_points_bd, [[-1, 1], [-1, 1]], requires_grad=True)
+sampler_in = ISampler([[-1, 1], [-1, 1]], requires_grad=True)
+sampler_bd = ISampler([[-1, 1], [-1, 1]], requires_grad=True)
 
 #真解
 def solution(p: torch.Tensor) -> torch.Tensor:
@@ -59,11 +56,6 @@ def solution(p: torch.Tensor) -> torch.Tensor:
     val = torch.sin(torch.sqrt(k**2/2) * x + torch.sqrt(k**2/2) * y)
     return val
 
-def solution_numpy(p: torch.Tensor):
-    
-    sol = solution(torch.tensor(p))
-    return sol.detach().numpy()
-
 #定义pde
 def pde(p: torch.Tensor) -> torch.Tensor:
 
@@ -71,10 +63,10 @@ def pde(p: torch.Tensor) -> torch.Tensor:
     u_x1, u_x2 = gradient(u, p, create_graph=True, split=True)
     u_x1x1, _  = gradient(u_x1, p, create_graph=True, split=True)
     _ , u_x2x2 = gradient(u_x2, p, create_graph=True, split=True)
-    return u_x1x1 + u_x2x2 + k**2*u 
+    return u_x1x1 + u_x2x2 + k**2*u
 
 #定义边界条件
-def bc(p: torch.Tensor) ->torch.Tensor:
+def bc(p: torch.Tensor) -> torch.Tensor:
 
     x = p[..., 0:1]
     y = p[..., 1:2]
@@ -91,8 +83,8 @@ Error= []
 for epoch in range(iteration+1):
 
     optim.zero_grad()
-    nodes_in = sampler_in.run()
-    nodes_bd = sampler_bd.run()
+    nodes_in = sampler_in.run(num_of_points_in)
+    nodes_bd = sampler_bd.run(num_of_points_bd)
     output_in = pde(nodes_in)
     output_bd = bc(nodes_bd)
 
@@ -104,11 +96,11 @@ for epoch in range(iteration+1):
 
     if epoch % 10 == 0:
 
-        error = s.estimate_error(solution_numpy, mesh, coordtype='c')
-        Error.append(error)
+        error = s.estimate_error_tensor(solution, mesh)
+        Error.append(error.detach().numpy())
         Loss.append(loss.detach().numpy())
         print(f"Epoch: {epoch}, Loss: {loss}")
-        print(f"Error:{error}")
+        print(f"Error:{error.item()}")
         print('\n')
 
 end_time = time.time()     # 记录结束时间

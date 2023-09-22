@@ -64,7 +64,7 @@ col_left = Collocator([-3, -3, -3, 3], [1, N]).run()
 col_top = Collocator([-3, 9, 3, 3], [N*2, 1]).run()
 col_btm = Collocator([-3, 9, -3, -3], [N*2, 1]).run()
 col_right = Collocator([9, 9, -3, 3], [1, N]).run()
-col_cir = CircleCollocator(nums=N).run()
+col_cir = CircleCollocator().run(N)
 
 b_ = torch.cat([source(col_in),
                 boundary_left(col_left),

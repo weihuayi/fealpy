@@ -81,9 +81,9 @@ mse_cost_func = nn.MSELoss(reduction='mean')
 
 # 采样器
 samplerpde_real = ISampler(
-    num_of_point_pde, [[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
+    [[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
 samplerpde_imag = ISampler(
-    num_of_point_pde, [[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
+    [[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
 
 # 真解
 def solution(p: torch.Tensor) -> torch.Tensor:
@@ -166,8 +166,8 @@ for epoch in range(iteration+1):
     optim_real.zero_grad()
     optim_imag.zero_grad()
 
-    spde_1 = samplerpde_real.run()
-    spde_2 = samplerpde_imag.run()
+    spde_1 = samplerpde_real.run(num_of_point_pde)
+    spde_2 = samplerpde_imag.run(num_of_point_pde)
 
     outpde_real = pde_real(spde_1)
     outpde_imag = pde_imag(spde_2)

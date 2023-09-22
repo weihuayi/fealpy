@@ -35,15 +35,14 @@ class PIKF_layer(nn.Module):
         return val
 
     def forward(self, p: torch.Tensor) -> torch.Tensor:
-
         return self.kernel_func(p)
-    
-source_nodes = QuadrangleCollocator(num_of_source, [[-2.5, 2.5], [-2.5, 2.5]]).run()
+
+source_nodes = QuadrangleCollocator([[-2.5, 2.5], [-2.5, 2.5]]).run(num_of_source)
 pikf_layer = PIKF_layer(source_nodes)
 net_PIKFNN = nn.Sequential(
-                           pikf_layer,
-                           nn.Linear(num_of_source, 1, dtype=torch.float64, bias=False)
-                           )
+    pikf_layer,
+    nn.Linear(num_of_source, 1, dtype=torch.float64, bias=False)
+)
 s = Solution(net_PIKFNN)
 
 #真解及边界条件
@@ -59,27 +58,26 @@ def dirichletBC(p:torch.Tensor) -> torch.Tensor:
 # 更新网络参数
 start_time = time.time()
 
-col_bd = QuadrangleCollocator(num_of_source, [[-1, 1], [-1, 1]]).run()
+col_bd = QuadrangleCollocator([[-1, 1], [-1, 1]]).run(num_of_source)
 A = pikf_layer.kernel_func(col_bd).detach().numpy()
 b = dirichletBC(col_bd).detach().numpy()
 alpha = solve(A, b)
 net_PIKFNN[1].weight.data = torch.from_numpy(alpha).T
-del alpha 
+del alpha
 
-end_time = time.time()     
-time_of_computation = end_time - start_time   
+end_time = time.time()
+time_of_computation = end_time - start_time
 print("计算时间为：", time_of_computation, "秒")
 
 #计算L2相对误差
-test_nodes_sampler = ISampler(
-    1000, [[-1, 1], [-1, 1]], requires_grad=True)
-test_nodes = test_nodes_sampler.run()
+test_nodes_sampler = ISampler([[-1, 1], [-1, 1]], requires_grad=True)
+test_nodes = test_nodes_sampler.run(1000)
 
 L2_error = torch.sqrt(
-            torch.sum((s(test_nodes) - solution(test_nodes))**2, dim = 0)\
-            /torch.sum(solution(test_nodes)**2, dim = 0)
-          )
-print(f"L2_error: {L2_error}")
+    torch.sum((s(test_nodes) - solution(test_nodes))**2, dim = 0)\
+    /torch.sum(solution(test_nodes)**2, dim = 0)
+)
+print(f"L2_error: {L2_error.item()}")
 
 #可视化数值解、真解以及两者偏差
 fig_1 = plt.figure()
@@ -87,21 +85,21 @@ fig_2 = plt.figure()
 fig_3 = plt.figure()
 
 axes = fig_1.add_subplot()
-qm = Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300],cmap = 'tab20')
+qm = Solution(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[150, 150],cmap = 'tab20')
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('u')
 fig_1.colorbar(qm)
 
 axes = fig_2.add_subplot()
-qm = s.add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300],cmap='tab20')
+qm = s.add_pcolor(axes, box=[-1, 1, -1, 1], nums=[150, 150],cmap='tab20')
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('u_PIKFNN')
 fig_2.colorbar(qm)
 
 axes = fig_3.add_subplot()
-qm = s.diff(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[300, 300])
+qm = s.diff(solution).add_pcolor(axes, box=[-1, 1, -1, 1], nums=[150, 150])
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 axes.set_title('diff')

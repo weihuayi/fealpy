@@ -6,7 +6,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from matplotlib import pyplot as plt
 
-from fealpy.mesh import TriangleMesh 
+from fealpy.mesh import TriangleMesh
 from fealpy.ml.grad import gradient
 from fealpy.ml.modules import BoxDBCSolution, Solution
 from fealpy.ml.sampler import ISampler
@@ -44,8 +44,7 @@ mse_cost_func = nn.MSELoss(reduction='mean')
 scheduler = StepLR(optim, step_size=50, gamma=0.75)
 
 # 采样器
-sampler_in = ISampler(
-    num_of_points_in, [[-1, 1], [-1, 1]], requires_grad=True)
+sampler_in = ISampler([[-1, 1], [-1, 1]], requires_grad=True)
 
 #真解
 def solution(p: torch.Tensor) -> torch.Tensor:
@@ -55,8 +54,8 @@ def solution(p: torch.Tensor) -> torch.Tensor:
     val = torch.sin(torch.sqrt(k**2/2) * x + torch.sqrt(k**2/2) * y)
     return val
 
-def solution_numpy(p: torch.Tensor):
-    
+def solution_numpy(p):
+
     sol = solution(torch.tensor(p))
     return sol.detach().numpy()
 
@@ -67,7 +66,7 @@ def pde(p: torch.Tensor) -> torch.Tensor:
     u_x1, u_x2 = gradient(u, p, create_graph=True, split=True)
     u_x1x1, _  = gradient(u_x1, p, create_graph=True, split=True)
     _ , u_x2x2 = gradient(u_x2, p, create_graph=True, split=True)
-    return u_x1x1 + u_x2x2 + k**2*u 
+    return u_x1x1 + u_x2x2 + k**2*u
 
 #进行dirichlet边界封装
 s.set_box([-1, 1, -1, 1])
@@ -85,7 +84,7 @@ Error= []
 for epoch in range(iteration+1):
 
     optim.zero_grad()
-    nodes_in = sampler_in.run()
+    nodes_in = sampler_in.run(num_of_points_in)
     output_in = pde(nodes_in)
 
     loss =  mse_cost_func(output_in, torch.zeros_like(output_in))
