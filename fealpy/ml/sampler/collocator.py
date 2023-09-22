@@ -4,7 +4,7 @@ from typing import List, Sequence, Any
 import torch
 from torch import device, Tensor, float64, sqrt, dtype
 
-from fealpy.ml.sampler import Sampler
+from .sampler import Sampler
 
 
 class Collocator(Sampler):
