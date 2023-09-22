@@ -142,6 +142,7 @@ class BilinearForm:
         for di in self.dintegrators:
             di.assembly_cell_matrix(space, cellmeasure=cellmeasure, out=CM)
 
+        # print("CM_1:\n", CM)
         self._M = csr_matrix((GD*gdof, GD*gdof), dtype=space[0].ftype)
         if space[0].doforder == 'sdofs': # 标量自由度排序优先
             for i in range(GD):
@@ -166,8 +167,16 @@ class BilinearForm:
                 for j in range(i, GD):
                     if i==j:
                         val = CM[:, i::GD, i::GD]
+                        # print("val_shape:", val.shape)
+                        # print("val:\n", val)
                         I = np.broadcast_to(GD*cell2dof[:, :, None] + i, shape=val.shape)
+                        # print("GD:", GD)
+                        # print("cell2dof[:, :, None]:", cell2dof[:, :, None].shape)
+                        # print("i:", i)
+                        # print("GD*cell2dof[:, :, None] + i:", GD*cell2dof[:, :, None] + i)
+                        # print("I:\n", I)
                         J = np.broadcast_to(GD*cell2dof[:, None, :] + i, shape=val.shape)
+                        # print("J:\n", J)
                         self._M += csr_matrix((val.flat, (I.flat, J.flat)), shape=(GD*gdof, GD*gdof))
                     else:
                         val = CM[:, i::GD, j::GD] 
