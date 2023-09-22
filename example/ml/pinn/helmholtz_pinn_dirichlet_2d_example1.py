@@ -116,7 +116,6 @@ def solution_numpy_imag(p: NDArray):
 def f(p: torch.Tensor) -> torch.Tensor:
 
     k = torch.tensor(wavenum)
-
     solution_x_real, solution_y_real = gradient(torch.real(solution(p)), p, create_graph=True, split=True)
     solution_x_imag, solution_y_imag = gradient(torch.imag(solution(p)), p, create_graph=True, split=True)
     solution_xx_real, _ = gradient(solution_x_real, p, create_graph=True, split=True)
@@ -125,9 +124,7 @@ def f(p: torch.Tensor) -> torch.Tensor:
     _, solution_yy_imag = gradient(solution_y_imag, p, create_graph=True, split=True)
     solution_xx = torch.complex(solution_xx_real, solution_xx_imag)
     solution_yy = torch.complex(solution_yy_real, solution_yy_imag)
-
     val = - solution_xx - solution_yy - k**2*solution(p)
-
     return val
 
 # 定义pde
@@ -135,10 +132,6 @@ def pde_real(p: torch.Tensor) -> torch.Tensor:
 
     k = torch.tensor(wavenum)
     u = torch.complex(s_real(p), s_imag(p))
-    x = p[..., 0:1]
-    y = p[..., 1:2]
-    r = torch.sqrt(x**2 + y**2)
-
     u_x_real, u_y_real = gradient(torch.real(u), p, create_graph=True, split=True)
     u_x_imag, u_y_imag = gradient(torch.imag(u), p, create_graph=True, split=True)
     u_xx_real, _ = gradient(u_x_real, p, create_graph=True, split=True)
@@ -147,17 +140,12 @@ def pde_real(p: torch.Tensor) -> torch.Tensor:
     _, u_yy_imag = gradient(u_y_imag, p, create_graph=True, split=True)
     u_xx = torch.complex(u_xx_real, u_xx_imag)
     u_yy = torch.complex(u_yy_real, u_yy_imag)
-
     return torch.real(u_xx + u_yy + k**2*u + f(p))
 
 def pde_imag(p: torch.Tensor) -> torch.Tensor:
 
     k = torch.tensor(wavenum)
     u = torch.complex(s_real(p), s_imag(p))
-    x = p[..., 0:1]
-    y = p[..., 1:2]
-    r = torch.sqrt(x**2 + y**2)
-
     u_x_real, u_y_real = gradient(torch.real(u), p, create_graph=True, split=True)
     u_x_imag, u_y_imag = gradient(torch.imag(u), p, create_graph=True, split=True)
     u_xx_real, _ = gradient(u_x_real, p, create_graph=True, split=True)
@@ -166,15 +154,11 @@ def pde_imag(p: torch.Tensor) -> torch.Tensor:
     _, u_yy_imag = gradient(u_y_imag, p, create_graph=True, split=True)
     u_xx = torch.complex(u_xx_real, u_xx_imag)
     u_yy = torch.complex(u_yy_real, u_yy_imag)
-
     return torch.imag(u_xx + u_yy + k**2*u + f(p))
-
-# 构建网格和有限元空间
-mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx = 320,ny = 320 )
 
 # 训练过程
 start_time = time.time()
-
+mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx = 320,ny = 320)
 Error_real = []
 Error_imag = []
 
