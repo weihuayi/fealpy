@@ -1,18 +1,18 @@
 
 from fealpy.ml.sampler import (
-    TriangleMeshSampler,
+    MeshSampler,
     ISampler
 )
 from fealpy.mesh import TriangleMesh
 
 
-print('1. 使用 TriangleMeshSampler 从三角形网格中取得样本（如图）')
+print('1. 使用 MeshSampler 从网格中取得样本（如图）')
 
 mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=2)
 
-tms = TriangleMeshSampler(3, mesh=mesh)
-samples = tms.run()
-print(tms.run())
+tms = MeshSampler(mesh, 'cell')
+samples = tms.run(3)
+print(samples)
 
 
 ### Draw the result
@@ -27,17 +27,5 @@ plt.show()
 
 print('2. 使用 ISampler 取得各轴独立的样本')
 
-s2 = ISampler(10, [[0, 1], [2, 3], [4, 5]])
-print(s2.run())
-
-
-print('3. JoinedSampler 会拼接各子采样器的样本，但是子采样器必须产生相同的特征数')
-
-s3 = ISampler(5, [[0, 1]]) & ISampler(3, [[4, 6]])
-print(s3.run())
-
-
-print('4. HybridSampler 会拼接各子采样器的特征，但是子采样器必须产生相同的样本数')
-
-s4 = ISampler(5, [[0, 1], [6, 7]]) | ISampler(5, [[-1, -2]])
-print(s4.run())
+s2 = ISampler([[0, 1], [2, 3], [4, 5]])
+print(s2.run(10))
