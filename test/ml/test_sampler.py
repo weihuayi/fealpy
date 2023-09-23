@@ -35,7 +35,7 @@ class TestSimple():
         from fealpy.mesh import TriangleMesh
 
         mesh = TriangleMesh.from_box([0, 2, 0, 3], nx=10, ny=10)
-        s = MeshSampler(mesh, 'cell', enable_weight=True)
+        s = MeshSampler(mesh, 'cell')
         assert isinstance(s, _PolytopeSampler)
         assert s.nd == 2
 
@@ -44,14 +44,12 @@ class TestSimple():
         _valified_range(out[:, 0], 0, 2)
         _valified_range(out[:, 1], 0, 3)
 
-        assert s.weight().shape == (2000, 1)
-
 
     def test_tetsampler(self):
         from fealpy.mesh import TetrahedronMesh
 
         mesh = TetrahedronMesh.from_box([0, 1, 1, 3, 2, 5], nx=5, ny=5, nz=5)
-        s = MeshSampler(mesh, 'cell', enable_weight=True)
+        s = MeshSampler(mesh, 'cell')
         assert isinstance(s, _PolytopeSampler)
         assert s.nd == 3
 
@@ -61,14 +59,12 @@ class TestSimple():
         _valified_range(out[:, 1], 1, 3)
         _valified_range(out[:, 2], 2, 5)
 
-        assert s.weight().shape == (7500, 1)
-
 
     def test_quadsampler(self):
         from fealpy.mesh import QuadrangleMesh
 
         mesh = QuadrangleMesh.from_box([0, 1, 1, 2], nx=10, ny=10)
-        s = MeshSampler(mesh, 'cell', enable_weight=True)
+        s = MeshSampler(mesh, 'cell')
         assert isinstance(s, _QuadSampler)
         assert s.nd == 2
 
@@ -76,5 +72,3 @@ class TestSimple():
         assert out.shape == (1000, 2)
         _valified_range(out[:, 0], 0, 1)
         _valified_range(out[:, 1], 1, 2)
-
-        assert s.weight().shape == (1000, 1)
