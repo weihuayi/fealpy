@@ -90,8 +90,12 @@ class RandomFeatureSpace(FunctionSpaceBase):
             return torch.einsum("nf, fd, fd -> nf", a,
                                 self.linear.weight, self.linear.weight)
         else:
-            return torch.einsum("nf, d, fd, fd -> nf", a, coef,
-                                self.linear.weight, self.linear.weight)
+            if coef.ndim == 1:
+                return torch.einsum("nf, d, fd, fd -> nf", a, coef,
+                                    self.linear.weight, self.linear.weight)
+            else:
+                return torch.einsum("nf, nd, fd, fd -> nf", a, coef,
+                                    self.linear.weight, self.linear.weight)
 
     def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
         """

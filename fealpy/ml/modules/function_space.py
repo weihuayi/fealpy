@@ -56,7 +56,10 @@ class FunctionSpaceBase(Module):
         """
         @brief
         """
-        return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p))
+        if coef.ndim == 1:
+            return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p))
+        else:
+            return torch.einsum('nd, nfd -> nf', coef, self.grad_basis(p))
 
     def laplace_basis(self, p: Tensor, coef: Optional[Tensor]=None) -> Tensor:
         """
