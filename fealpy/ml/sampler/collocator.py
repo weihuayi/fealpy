@@ -1,11 +1,10 @@
 
-from typing import List, Sequence, Any
+from typing import List, Any, Sequence
 
 import torch
-from torch import device, Tensor, float64, sqrt, dtype
+from torch import device, Tensor, dtype, float64
 
 from .sampler import Sampler
-
 
 class Collocator(Sampler):
     """
@@ -70,6 +69,7 @@ class CircleCollocator(Sampler):
             self._weight = self._weight.broadcast_to(nums, 1)
         return points[:-1, ...]
 
+
 class LineCollocator(Sampler):
     """
     Generate collocation points uniformly on a line segment.
@@ -101,44 +101,12 @@ class LineCollocator(Sampler):
         else:
             raise ValueError(f"Unexpected `vertices` shape {vertices_arr.shape}.")
 
-    def standard_form_line(self, point_1: Tensor, point_2: Tensor):
-        A = point_2[:, 1] - point_1[:, 1]
-        B = point_1[:, 0] - point_2[:, 0]
-        C = point_2[:, 0] * point_1[:, 1] - point_1[:, 0] * point_2[:, 1]
-        val = torch.tensor([A, B, C])
-        if B != 0:
-            val = val / B
-        return val
-
-    def length(self):
-        val = int(sqrt((self.vertex_2[:, 0:1] - self.vertex_1[:, 0:1]) ** 2 + (self.vertex_2[:, 1:2] - self.vertex_1[:, 1:2]) ** 2))
-        return val
-
     def run(self, nums: int):
-        line = self.standard_form_line(self.vertex_1, self.vertex_2)
-        new_points = torch.zeros((nums - 2, 2))
-        if nums > 0:
-            d = self.length() / (nums -1)
-            for i in range(1, nums):
-                if line[1] != 0:
-                    alpha = torch.arctan(-line[0])
-                    dx = d * torch.cos(alpha)
-                    dy = d * torch.sin(alpha)
-                    if self.vertex_2[:, 0] - self.vertex_1[:, 0] > 0:
-                        new_points[i-1:, :] = torch.tensor([self.vertex_1[:, 0] + i * dx,
-                                                          self.vertex_1[:, 1] + i * dy], dtype=torch.float64)
-                    else:
-                        new_points[i-1:, :] = torch.tensor([self.vertex_1[:, 0] - i * dx,
-                                                          self.vertex_1[:, 1] - i * dy], dtype=torch.float64)
-                else:
-                    if self.vertex_2[:, 1] - self.vertex_1[:, 1] > 0:
-                        new_points[i-1:, :] = torch.tensor([self.vertex_1[:, 0],
-                                                          self.vertex_1[:, 1] + i * d], dtype=torch.float64)
-                    else:
-                        new_points[i-1:, :] = torch.tensor([self.vertex_1[:, 0],
-                                                          self.vertex_1[:, 1] - i * d], dtype=torch.float64)
-        val = torch.cat([self.vertex_1, new_points, self.vertex_2], dim = 0)
-        return val
+        points_dim = self.vertex_1.shape[-1]
+        new_points =torch.zeros((nums, self.vertex_1.shape[-1]), dtype = torch.float64)
+        for i in range(0, points_dim):
+            new_points[:, i:i+1] = torch.linspace(self.vertex_1[:, i].item(), self.vertex_2[:, i].item(), nums, dtype=torch.float64).reshape(-1, 1)
+        return new_points
 
 
 class QuadrangleCollocator(Sampler):
@@ -190,6 +158,43 @@ class QuadrangleCollocator(Sampler):
         points = LineCollocator(self.points[0:2]).run(nums // (self.points.shape[0] - 1) + 1)
         for i in range(1, self.points.shape[0] - 1):
             new_points = LineCollocator(self.points[i:i + 2]).run(nums // (self.points.shape[0] - 1) + 1)
+            points = torch.cat([points, new_points], dim = 0 )
+        unique_points = torch.unique(points, dim = 0)
+        return unique_points
+
+
+class PolygonCollocator(Sampler):
+    def __init__(self, vertices: Any, dtype: dtype=torch.float64,
+                 device: device=None, requires_grad: bool=False, **kwargs) -> None:
+        """
+        @brief Initializes an PolygonCollocator instance.
+        @param nums: The number of samples on each edge of the polygon to generate.
+        @param vertices: An object that can be converted to a `numpy.ndarray`,\
+               representing the vertices of the line segment.\
+               For example, if sampling on a polygon in three-dimensional space with vertices\
+               [1, 0, 0], [2, 0, 0], [1, 1, 1], [2, 1, 1] use `vertices=[[1, 0, 0], [2, 0, 0], [1, 1, 1], [2, 1, 1]]`.
+        @param dtype: Data type of samples. Defaults to `torch.float64`.
+        @param requires_grad: A boolean indicating whether the samples should\
+               require gradient computation. Defaults to `False`.\
+               See `torch.autograd.grad`
+        @throws ValueError: If `vertices` has an unexpected shape.
+        """
+        super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
+                         **kwargs)
+        if isinstance(vertices, Tensor):
+            self.vertices = vertices.detach().clone().to(device=device)
+        else:
+            self.vertices = torch.tensor(vertices, dtype=dtype, device=device)
+        if self.vertices.ndim == 2:
+            pass
+        else:
+            raise ValueError(f"Unexpected `vertices` shape {self.vertices.shape}.")
+        
+    def run(self, *nums: int) -> Tensor:
+        vertices_arr = torch.cat([self.vertices, self.vertices[0:1, :]], dim = 0)
+        points = LineCollocator(vertices_arr[0:2]).run(nums[0])
+        for i in range(1, vertices_arr.shape[0] - 1):
+            new_points = LineCollocator(vertices_arr[i:i + 2]).run(nums[i])
             points = torch.cat([points, new_points], dim = 0 )
         unique_points = torch.unique(points, dim = 0)
         return unique_points
