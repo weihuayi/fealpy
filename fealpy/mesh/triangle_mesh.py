@@ -1040,7 +1040,7 @@ class TriangleMesh(Mesh, Plotable):
             for key, value in options['data'].items():
                 ldof = value.shape[1]
                 p = int((np.sqrt(8*ldof+1) - 3)/2)
-                bc = self.multi_index_matrix(p=p)/p
+                bc = self.multi_index_matrix(p=p, etype=2)/p
                 bcl = np.zeros_like(bc)
                 bcl[:, 0] = 2*bc[:, 2]
                 bcl[:, 1] = bc[:, 0]

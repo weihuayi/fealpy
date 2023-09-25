@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix, bmat, spdiags
@@ -287,15 +288,6 @@ class fracture_damage_integrator():
         stored = np.dot(val, cm)
         return stored
 
-
-def recovery_estimate(mesh, d):
-    from fealpy.functionspace import LagrangeFiniteElementSpace
-    space0 = LagrangeFiniteElementSpace(mesh)
-    rgd = space0.grad_recovery(uh=d, method='simple')
-    eta = space0.integralalg.error(rgd.value, d.grad_value, power=2,
-            celltype=True)
-    return eta
-
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
@@ -304,6 +296,8 @@ mesh = TriangleMesh.from_domain_distmesh(domain, 0.03, maxit=100)
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
+cm = mesh.entity_measure() 
+hmin = np.min(cm)
 
 simulation = fracture_damage_integrator(mesh, model)
 space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
@@ -312,7 +306,7 @@ d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 uh = space.function(dim=GD)
 disp = model.top_boundary_disp()
-
+od = np.zeros_like(d)
 stored_energy = np.zeros_like(disp)
 dissipated_energy = np.zeros_like(disp)
 
@@ -393,30 +387,36 @@ for i in range(len(disp)-1):
         k += 1
     stored_energy[i+1] = simulation.get_stored_energy(phip, d)
     dissipated_energy[i+1] = simulation.get_dissipated_energy(d)
-
+    
+    # 恢复型后验误差估计
+    recovery = recovery_alg(space)
+    eta = recovery.recovery_estimate(d)
+    
+    # to vtk 画图
     mesh.nodedata['damage'] = d
     mesh.nodedata['uh'] = uh.T
+    mesh.celldata['eta'] = eta
     fname = 'test' + str(i).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
-    if i < len(disp) - 1:
+
+    if (i < len(disp) - 1) & (np.max(np.abs(d-od))>0.005):
+#        option = mesh.adaptive_options(data=data, disp=False)
+#        mesh.adaptive(eta, options=option)
+        cm = mesh.entity_measure() 
+        isMarkedCell = mark(eta, theta = 0.7, method='MAX')
+#        isMarkedCell = np.abs(eta) > np.min(np.abs(eta)*1.2
+        isMarkedCell = np.logical_and(~isMarkedCell, cm < hmin)
+        # 网格粗化
         cell2dof = mesh.cell_to_ipoint(p=1)
         uh0c2f = uh[0, cell2dof]
         uh1c2f = uh[1, cell2dof]
         dc2f = d[cell2dof]
         data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
 
-        # 恢复型后验误差估计
-        recovery = recovery_alg(space)
-#        eta = recovery_estimate(mesh, d)
-        eta = recovery.recovery_estimate(d)
-#        option = mesh.adaptive_options(data=data, disp=False)
-#        mesh.adaptive(eta, options=option)
-
-        isMarkedCell = mark(eta, theta = 0.1)
         option = mesh.bisect_options(data=data, disp=False)
-        mesh.bisect(isMarkedCell, options=option)
-      
-        # 更新加密后的空间
+        mesh.coarsen(isMarkedCell, options=option)
+        print('mesh coarsen is ok')      
+        # 更新粗化后的空间
         space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
         cell2dof = space.cell_to_dof()
         NC = mesh.number_of_cells()
@@ -428,6 +428,45 @@ for i in range(len(disp)-1):
         uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
         d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
         H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
+        
+        recovery = recovery_alg(space)
+        eta = recovery.recovery_estimate(d)
+            
+        while True:
+            isMarkedCell = mark(eta, theta = 0.7, method='MAX')
+
+            cm = mesh.cell_area() 
+            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/4)
+
+            cell2dof = mesh.cell_to_ipoint(p=1)
+            uh0c2f = uh[0, cell2dof]
+            uh1c2f = uh[1, cell2dof]
+            dc2f = d[cell2dof]
+            
+            data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof],
+                    'eta':eta[cell2dof]}
+            option = mesh.bisect_options(data=data, disp=False)
+            mesh.bisect(isMarkedCell, options=option)
+            print('mesh refine')      
+           
+            # 更新加密后的空间
+            space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
+            cell2dof = space.cell_to_dof()
+            NC = mesh.number_of_cells()
+            uh = space.function(dim=GD)
+            d = space.function()
+            H = np.zeros(NC, dtype=np.float64)  # 分片常数
+            eta = np.zeros(NC, dtype=np.float64)  # 分片常数
+
+            uh[0, cell2dof.reshape(-1)] = option['data']['uh0'].reshape(-1)
+            uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
+            d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
+            H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
+            eta[cell2dof.reshape(-1)] = option['data']['eta'].reshape(-1)
+            od = d[:].copy()
+            if np.all(~isMarkedCell):
+                print('mesh refine is ok')      
+                break;
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
