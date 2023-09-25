@@ -5,7 +5,8 @@ from torch.optim import Adam
 
 from fealpy.ml.machine import LearningMachine
 from fealpy.ml.boundary import TFC2dSpaceTimeDirichletBC
-from fealpy.ml import gradient, ISampler
+from fealpy.ml.grad import gradient
+from fealpy.ml.sampler import ISampler
 
 # 定义神经网络
 pinn = nn.Sequential(

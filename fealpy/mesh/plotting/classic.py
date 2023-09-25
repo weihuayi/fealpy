@@ -279,6 +279,7 @@ class AddPlot2dPoly(MeshPloter):
         self.set_show_axis(args.showaxis)
         self.set_lim(args.box)
 
+        cellcolor = args.cellcolor
         if isinstance(cellcolor, np.ndarray) and np.isreal(cellcolor[0]):
             mapper = array_color_map(cellcolor, cmap=args.cmap,
                                      cmax=args.cmax, cmin=args.cmin)

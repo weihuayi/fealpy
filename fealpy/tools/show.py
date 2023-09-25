@@ -3,6 +3,23 @@ import numpy as np
 from types import ModuleType
 
 
+def show_array_2d(ax, arr, title='Array', y=0.9):
+    """
+    @brief 显示一个二维数组
+    """
+
+    # 隐藏坐标轴
+    ax.axis('off')
+
+    table = ax.table(cellText=arr,
+            rowLabels=[f'{i}:' for i in range(arr.shape[0])],
+            colLabels=[f'{i}:' for i in range(arr.shape[1])],
+            cellLoc='center', loc='center')
+    ax.set_title(title, y=y)
+
+    # 设置表格单元格宽度
+    table.auto_set_column_width(col=list(range(arr.shape[1])))
+
 
 def show_error_table(N, errorType, errorMatrix, 
         f='e', pre=4, sep=' & ',

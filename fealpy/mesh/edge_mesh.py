@@ -334,7 +334,7 @@ class EdgeMesh(Mesh, Plotable):
             [0, 1], [2, 0], [3, 1]], dtype=np.int_)
         mesh = cls(node, cell)
 
-        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['disp_bc'] = (np.array([2, 3], dtype=np.int_), np.zeros(3))
         mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), 
                                      np.array([[3000, -3000, -720], 
                                                [0, -3000, 720]], dtype=np.float64))

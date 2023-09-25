@@ -60,22 +60,23 @@ space = UniformPoUSpace(factory, mesh, 'node', pou=PoUA(), print_status=True)
 mesh_col = UniformMesh2d((0, EXTC, 0, EXTC), (HC, HC), origin=(0, 0))
 _bd_node = mesh_col.ds.boundary_node_flag()
 col_in = torch.from_numpy(mesh_col.entity('node', index=~_bd_node))
+# col_in = space.collocate_interior((EXTC, EXTC), part_type=False)
 col_bd = torch.from_numpy(mesh_col.entity('node', index=_bd_node))
 del _bd_node, mesh_col
 col_sub = space.collocate_sub_edge(20)
 
 
-b_tensor = torch.cat([source(col_in) / sqrt(col_in.shape[0]),
-                      boundary(col_bd) / sqrt(col_bd.shape[0]),
+b_tensor = torch.cat([source(col_in),
+                      boundary(col_bd),
                       zeros(col_sub, expand=3)], dim=0)
 
 
-laplace_phi = space.laplace_basis(col_in) / sqrt(col_in.shape[0])
+laplace_phi = space.laplace_basis(col_in)
 del col_in
-phi = space.basis(col_bd) / sqrt(col_bd.shape[0])
+phi = space.basis(col_bd)
 del col_bd
-c0 = space.continue_matrix_0(col_sub) / sqrt(col_sub.shape[0])
-c1 = space.continue_matrix_1(col_sub) / sqrt(col_sub.shape[0]*2)
+c0 = space.continue_matrix_0(col_sub)
+c1 = space.continue_matrix_1(col_sub)
 
 A_tensor = torch.cat([-laplace_phi,
                       phi,
@@ -108,6 +109,8 @@ axes.set_xlabel('x')
 axes.set_ylabel('y')
 fig.colorbar(qm)
 
-mesh.find_node(axes, showindex=True)
+mesh.find_node(axes, showindex=True, fontsize=16)
+col_sub = col_sub.reshape(-1, col_sub.shape[-1])
+axes.scatter(col_sub[:, 0], col_sub[:, 1])
 
 plt.show()

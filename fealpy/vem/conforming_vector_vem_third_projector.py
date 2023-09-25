@@ -53,11 +53,11 @@ class ConformingVectorVEMThirdProjector2d():
         y = data['y']
         A = []
         for i in range(NC):
-            A11 = np.zeros((p*(p+1)//2, smldof))
+            A11 = np.zeros((p*(p+1)//2, smldof),dtype=np.float64)
             np.add.at(A11, (x[0],np.s_[:]), M[i]*(x[1]/h[i])[:, None])
-            A12 = np.zeros((p*(p+1)//2, smldof))
+            A12 = np.zeros((p*(p+1)//2, smldof),dtype=np.float64)
             np.add.at(A12, (y[0],np.s_[:]), M[i]*(y[1]/h[i])[:, None])
-            A1 = np.zeros((2*p*(p+1), 2*smldof))
+            A1 = np.zeros((2*p*(p+1), 2*smldof),dtype=np.float64)
             A1[:p*(p+1)//2, :smldof] = A11
             A1[p*(p+1)//2:p*(p+1), smldof:] = A11
             A1[p*(p+1):p*(p+1)*3//2, :smldof] = A12
@@ -72,10 +72,10 @@ class ConformingVectorVEMThirdProjector2d():
 
             qf = GaussLobattoQuadrature(p + 1) # NQ
             bcs, ws = qf.quadpts, qf.weights
-            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge]) # (NQ, NV[i], 2)
+            ps = np.einsum('ij, kjm->ikm', bcs, node[cedge], optimize=True) # (NQ, NV[i], 2)
             index = np.array([i]*NV[i]) 
             smphi = space.smspace.basis(ps, index=index, p=p-1)
-            tmphi = np.zeros((ws.shape[0], NV[i], p*(p+1)*2, 2, 2)) 
+            tmphi = np.zeros((ws.shape[0], NV[i], p*(p+1)*2, 2, 2),dtype=np.float64) 
             tmphi[:, :, :p*(p+1)//2, 0, 0] = smphi
             tmphi[:, :, p*(p+1)//2:p*(p+1), 0, 1] = smphi
             tmphi[:, :, p*(p+1):p*(p+1)*3//2, 1, 0] = smphi
@@ -85,13 +85,13 @@ class ConformingVectorVEMThirdProjector2d():
             w = np.array([(0, -1), (1, 0)])
             nm = v@w            
 
-            AA2 = np.einsum('ijkmn,jm,i->kjin',tmphi, nm, ws)
+            AA2 = np.einsum('ijkmn,jm,i->kjin',tmphi, nm, ws, optimize=True)
             idx = np.zeros((NV[i], ws.shape[0], 2), dtype=np.int_)
             idx1 = np.arange(0, NV[i]*2*p, 2*p).reshape(-1, 1) + np.arange(0, 2*p+1, 2)
             idx1[-1, -1] = 0
             idx[:, :, 0] = idx1
             idx[:, :, 1] = idx1+1
-            A2 = np.zeros((p*(p+1)*2, ldof[i]))
+            A2 = np.zeros((p*(p+1)*2, ldof[i]),dtype=np.float64)
             np.add.at(A2, (np.s_[:], idx), AA2)
             AA = A1 + A2
             A.append(AA)
@@ -110,7 +110,7 @@ class ConformingVectorVEMThirdProjector2d():
         M = self.M
         smldof = space.smspace.number_of_local_dofs(p=p-1)
         M = M[:, :smldof, :smldof]
-        F = np.zeros((NC, 4*smldof, 4*smldof))
+        F = np.zeros((NC, 4*smldof, 4*smldof),dtype=np.float64)
         F[:, :smldof, :smldof] = M
         F[:, smldof:2*smldof, smldof:2*smldof] = M
         F[:, 2*smldof:3*smldof, 2*smldof:3*smldof] = M

@@ -111,4 +111,4 @@ def test_assembly_cell_matrix(p):
 if __name__ == "__main__":
     #test_assembly_cell_righthand_side(2)
     #test_assembly_cell_left_hand_side(2)
-    test_assembly_cell_matrix(2)
+    test_assembly_cell_matrix(3)
