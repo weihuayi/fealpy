@@ -211,25 +211,27 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
 
     @assemble(0, use_coef=True)
     def convect_basis(self, idx: int, p: Tensor, coef: Tensor) -> Tensor:
-        scale = self.pou.grad_global_to_local(p, index=idx)[:, 0, :] # (samples, GD)
-        if coef is not None:
-            scale *= coef
-        return self.partitions[idx].convect_basis(p, coef=scale)
+        scale = self.pou.grad_global_to_local(p, index=idx)[0, :, :] # (lGD, gGD)
+        if coef is not None: # (n, gGD)
+            scale = torch.einsum('lg, ng -> nl', scale, coef) # (n, lGD)
+        return self.partitions[idx].convect_basis(p, coef=scale) # (samples, basis)
 
     @assemble(0, use_coef=True)
     def laplace_basis(self, idx: int, p: Tensor, coef: Tensor) -> Tensor:
-        scale = self.pou.grad_global_to_local(p, index=idx)[:, 0, :]**2 # (samples, GD)
+        scale = self.pou.grad_global_to_local(p, index=idx)[0, :, :]**2 # (lGD, gGD)
         if coef is not None:
             scale *= coef
-        return self.partitions[idx].laplace_basis(p, coef=scale)
+        return self.partitions[idx].laplace_basis(p, coef=scale) # (samples, basis)
 
-    @assemble(0)
+    @assemble(0) # TODO: Is this unable to be implemented?
     def derivative_basis(self, idx: int, p: Tensor, *dim: int) -> Tensor:
-        gg2l = self.pou.grad_global_to_local(p, index=idx) # (samples, 1, GD)
-        scale = torch.prod(gg2l[idx, dim], dim=-1) # (samples, 1)
+        gg2l = self.pou.grad_global_to_local(p, index=idx) # (parts, lGD, gGD)
+        scale = torch.prod(gg2l[idx, dim], dim=-1) # (parts, lGD)
         return self.partitions[idx].derivative_basis(p, *dim) * scale
 
     @assemble(1)
     def grad_basis(self, idx: int, p: Tensor) -> Tensor:
-        gg2l = self.pou.grad_global_to_local(p, index=idx) # (samples, 1, GD)
-        return self.partitions[idx].grad_basis(p) * gg2l # (samples, basis, GD)
+        gg2l = self.pou.grad_global_to_local(p, index=idx)[0, ...] # (lGD, gGD)
+        return torch.einsum('nfl, lg -> nfg',
+                            self.partitions[idx].grad_basis(p),
+                            gg2l) # (samples, basis, lGD), (lGD, gGD) -> (samples, basis, gGD)

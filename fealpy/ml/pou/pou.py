@@ -21,15 +21,21 @@ class PoU():
     def global_to_local(self, p: Tensor, index=S_) -> Tensor:
         """
         @brief Mapping from global to local. Return tensor with shape\
-               (#Samples, #Partitions, #Dims)"""
+               (#Samples, #Partitions, #Dims)
+        """
         raise NotImplementedError
 
     def local_to_global(self, p: Tensor, index=S_) -> Tensor:
         """Mapping from local to global."""
         raise NotImplementedError
 
+    # NOTE: PoUs are designed to perform linear transform to every partitions.
+    # So, gradients are relevant to only partitions and dims.
     def grad_global_to_local(self, p: Tensor, index=S_) -> Tensor:
-        """Gradient of mapping from global to local."""
+        """
+        @brief Gradient of mapping from global to local. Return tensor with shape\
+               (#Partitions, #OutDims, #InDims)
+        """
         raise NotImplementedError
 
     def grad_local_to_global(self, p: Tensor, index=S_) -> Tensor:
