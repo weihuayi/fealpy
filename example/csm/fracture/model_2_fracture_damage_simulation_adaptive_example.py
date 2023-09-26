@@ -349,8 +349,7 @@ for i in range(len(disp)-1):
         D = simulation.dsigma_depsilon(d, uh)
         integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
         ubform.add_domain_integrator(integrator)
-        ubform.assembly()
-        A0 = ubform.get_matrix()
+        A0 = ubform.assembly()
         R0 = -A0@uh.flat[:]
         
         force[i+1] = np.sum(-R0[isTDof])
@@ -379,13 +378,11 @@ for i in range(len(disp)-1):
         dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
             q=4))
         dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-        dbform.assembly()
-        A1 = dbform.get_matrix()
+        A1 = dbform.assembly()
 
         lform = LinearForm(space)
         lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
-        lform.assembly()
-        R1 = lform.get_vector()
+        R1 = lform.assembly()
         R1 -= A1@d[:]
         d[:] += spsolve(A1, R1)
 

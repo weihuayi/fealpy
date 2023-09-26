@@ -843,7 +843,7 @@ class TriangleMesh(Mesh, Plotable):
 
         cell2edge = self.ds.cell_to_edge()
         cell2cell = self.ds.cell_to_cell()
-
+        cell2ipoint = self.cell_to_ipoint(self.p)
         isCutEdge = np.zeros((NE,), dtype=np.bool_)
 
         if options['disp']:
@@ -909,9 +909,9 @@ class TriangleMesh(Mesh, Plotable):
             R = np.arange(NC, NC+nc)
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
-                    if len(value.shape) == 1: # 分片常数
-                        value = np.r_[value, value[idx]]
-                        options[key] = value
+                    if value.shape == (NC,): # 分片常数
+                        value= np.r_[value[:], value[idx]]
+                        options['data'][key] = value
                     else:
                         ldof = value.shape[-1]
                         p = int((np.sqrt(1+8*ldof)-3)//2)
@@ -934,7 +934,7 @@ class TriangleMesh(Mesh, Plotable):
 
                         phi = self.shape_function(bcl, p=p)
                         value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
-
+                        
                         options['data'][key] = value
 
 
