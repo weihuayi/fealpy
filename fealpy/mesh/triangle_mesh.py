@@ -912,6 +912,11 @@ class TriangleMesh(Mesh, Plotable):
                     if value.shape == (NC,): # 分片常数
                         value= np.r_[value[:], value[idx]]
                         options['data'][key] = value
+                    elif value.shape == (NN, ):
+                        print(key)
+                        value = np.r_['0', value, np.zeros((nn, ), dtype=self.ftype)]
+                        value[NN:] = 0.5*(value[edge[isCutEdge,0]] + value[edge[isCutEdge,1]])
+                        options['data'][key] = value
                     else:
                         ldof = value.shape[-1]
                         p = int((np.sqrt(1+8*ldof)-3)//2)
