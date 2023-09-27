@@ -1,5 +1,5 @@
 
-from typing import Union, Any, TypeVar, Generic
+from typing import Union, Any, TypeVar, Generic, Optional
 
 import torch
 from torch import Tensor, float64
@@ -31,18 +31,25 @@ class PoU():
 
     # NOTE: PoUs are designed to perform linear transform to every partitions.
     # So, gradients are relevant to only partitions and dims.
-    def grad_global_to_local(self, p: Tensor, index=S_) -> Tensor:
+    def grad_global_to_local(self, index=S_) -> Tensor:
         """
         @brief Gradient of mapping from global to local. Return tensor with shape\
                (#Partitions, #OutDims, #InDims)
         """
         raise NotImplementedError
 
-    def grad_local_to_global(self, p: Tensor, index=S_) -> Tensor:
+    def grad_local_to_global(self, index=S_) -> Tensor:
         """Gradient of mapping from local to global."""
         raise NotImplementedError
 
     __call__ = global_to_local
+
+    def grad_transform(self, trans: Optional[Tensor]=None):
+        trans_new = self.grad_global_to_local()
+        if trans is None:
+            return trans_new
+        else:
+            return trans_new @ trans
 
 
 class CRPoU(PoU):
@@ -61,11 +68,21 @@ class CRPoU(PoU):
     def local_to_global(self, p: Tensor, index=S_) -> Tensor:
         return p[:, None, :] * self.radius[None, index, :] + self.centers[None, index, :]
 
-    def grad_global_to_local(self, p: Tensor, index=S_) -> Tensor:
-        return (1 / self.radius[index, :]).broadcast_to(p.shape[0], -1, -1)
+    def grad_global_to_local(self, index=S_) -> Tensor:
+        data = 1 / self.radius[index, :] # (part, dim)
+        M, GD = data.shape
+        I = torch.arange(GD)
+        ret = torch.zeros((M, GD, GD), dtype=self.dtype, device=self.device)
+        ret[:, I, I] = data
+        return ret
 
-    def grad_local_to_global(self, p: Tensor, index=S_) -> Tensor:
-        return self.radius[index, :].broadcast_to(p.shape[0], -1, -1)
+    def grad_local_to_global(self, index=S_) -> Tensor:
+        data = self.radius[index, :] # (part, dim)
+        M, GD = data.shape
+        I = torch.arange(GD)
+        ret = torch.zeros((M, GD, GD), dtype=self.dtype, device=self.device)
+        ret[:, I, I] = data
+        return ret
 
 
 ##################################################
