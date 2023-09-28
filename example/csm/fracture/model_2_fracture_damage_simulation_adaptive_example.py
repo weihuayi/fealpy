@@ -70,8 +70,11 @@ class Brittle_Facture_model():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
+#        return np.linspace(0, 1.7e-2, 17001)
         return np.concatenate((np.linspace(0, 5e-3, 501), np.linspace(5e-3,
             6.1e-3, 1101)[1:]))
+#        return np.concatenate((np.linspace(0, 70e-3, 6), np.linspace(70e-3,
+#            125e-3, 26)[1:]))
 
     def top_disp_direction(self):
         """
@@ -131,7 +134,7 @@ class fracture_damage_integrator():
         gphi = mesh.grad_lambda()  # NC x 3 x 2
 
         s = np.zeros((NC, 2, 2), dtype=np.float64)
-        uh = uh.T
+#        uh = uh.T
         s[:, 0, 0] = np.sum(uh[:, 0][cell] * gphi[:, :, 0], axis=-1)
         s[:, 1, 1] = np.sum(uh[:, 1][cell] * gphi[:, :, 1], axis=-1)
 
@@ -314,9 +317,9 @@ cm = mesh.entity_measure()
 hmin = np.min(cm)
 
 simulation = fracture_damage_integrator(mesh, model)
-space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
+space = LagrangeFESpace(mesh, p=1, doforder='vdims')
 
-#recovery = LinearRecoveryAlg()
+recovery = LinearRecoveryAlg()
 
 d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
@@ -330,17 +333,18 @@ dissipated_energy = np.zeros_like(disp)
 force = np.zeros_like(disp)
 
 for i in range(len(disp)-1):
-    NN = mesh.number_of_nodes()
-    node  = mesh.entity('node') 
-    isTNode = model.is_top_boundary(node)
-    uh[1, isTNode] = disp[i+1]
-    isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
-    du = space.function(dim=GD)
 
     k = 0
     while k < 100:
         print('i:', i)
         print('k:', k)
+        NN = mesh.number_of_nodes()
+        node  = mesh.entity('node') 
+        isTNode = model.is_top_boundary(node)
+        uh[isTNode, 1] = disp[i+1]
+        isDof = np.c_[np.zeros(NN, dtype=np.bool_), isTNode]
+        isTDof = isDof.flat[:]
+        du = space.function(dim=GD)
         
         # 求解位移
         vspace = (GD*(space, ))
@@ -349,7 +353,8 @@ for i in range(len(disp)-1):
         D = simulation.dsigma_depsilon(d, uh)
         integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
         ubform.add_domain_integrator(integrator)
-        A0 = ubform.assembly()
+        ubform.assembly()
+        A0 = ubform.get_matrix()
         R0 = -A0@uh.flat[:]
         
         force[i+1] = np.sum(-R0[isTDof])
@@ -378,14 +383,47 @@ for i in range(len(disp)-1):
         dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
             q=4))
         dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-        A1 = dbform.assembly()
+        dbform.assembly()
+        A1 = dbform.get_matrix()
 
         lform = LinearForm(space)
         lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
-        R1 = lform.assembly()
+        lform.assembly()
+        R1 = lform.get_vector()
         R1 -= A1@d[:]
+#        dbc = DirichletBC(space, 0, threshold=model.is_inter_boundary)
+#        A1, R1 = dbc.apply(A1, R1)
         d[:] += spsolve(A1, R1)
+       
+        # 恢复型后验误差估计子
+        eta = recovery.recovery_estimate(d)
+            
+        isMarkedCell = mark(eta, theta = 0.2)
 
+        cm = mesh.cell_area() 
+        isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
+        
+        if np.any(isMarkedCell):
+            cell2dof = mesh.cell_to_ipoint(p=1)
+                       
+            data = {'uh0':uh[:, 0], 'uh1':uh[:, 1], 'd':d, 'H':H}
+            option = mesh.bisect_options(data=data, disp=False)
+            mesh.bisect(isMarkedCell, options=option)
+            print('mesh refine')      
+           
+            # 更新加密后的空间
+            space = LagrangeFESpace(mesh, p=1, doforder='vdims')
+            cell2dof = space.cell_to_dof()
+            NC = mesh.number_of_cells()
+            uh = space.function(dim=GD)
+            d = space.function()
+            H = np.zeros(NC, dtype=np.float64)  # 分片常数
+
+            uh[:, 0] = option['data']['uh0']
+            uh[:, 1] = option['data']['uh1']
+            d[:] = option['data']['d']
+            H = option['data']['H']
+        
         # 计算残量误差
         if k == 0:
             er0 = np.linalg.norm(R0)
@@ -400,28 +438,63 @@ for i in range(len(disp)-1):
         if error < 1e-5:
             break
         k += 1
-    stored_energy[i+1] = simulation.get_stored_energy(phip, d)
-    dissipated_energy[i+1] = simulation.get_dissipated_energy(d)
+#    stored_energy[i+1] = simulation.get_stored_energy(phip, d)
+#    dissipated_energy[i+1] = simulation.get_dissipated_energy(d)
     
-    mesh.nodedata['damage'] = d
-    mesh.nodedata['uh'] = uh.T
-    fname = 'test' + str(i).zfill(10)  + '.vtu'
-    mesh.to_vtk(fname=fname)
+    if i % 1 == 0:
+        mesh.nodedata['damage'] = d
+        mesh.nodedata['uh'] = uh
+        fname = 'test' + str(i).zfill(10)  + '.vtu'
+        mesh.to_vtk(fname=fname)
+        '''
+    if i < len(disp) - 1:
+        adaptive_mesh(mesh)
 
-    if (i < len(disp) - 1) & (force[i] > 1e-2):
+    if (i < len(disp) - 1) & (force[i]>1e-2):
+#        recovery = recovery_alg(space)
+        eta = recovery.recovery_estimate(d)
+        cm = mesh.entity_measure() 
+        isMarkedCell = mark(eta, theta = 0.2)
+        isMarkedCell = np.logical_and(~isMarkedCell, cm < hmin)
+        # 网格粗化
+        cell2dof = mesh.cell_to_ipoint(p=1)
+        uh0c2f = uh[0, cell2dof]
+        uh1c2f = uh[1, cell2dof]
+        dc2f = d[cell2dof]
+        data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
+
+        option = mesh.bisect_options(data=data, disp=False)
+        mesh.coarsen(isMarkedCell, options=option)
+        print('mesh coarsen is ok')      
+        # 更新粗化后的空间
+        space = LagrangeFESpace(mesh, p=1, doforder='sdofs')
+        cell2dof = space.cell_to_dof()
+        NC = mesh.number_of_cells()
+        uh = space.function(dim=GD)
+        d = space.function()
+        H = np.zeros(NC, dtype=np.float64)  # 分片常数
+
+        uh[0, cell2dof.reshape(-1)] = option['data']['uh0'].reshape(-1)
+        uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
+        d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
+        H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
+
         while True:
-            recovery = recovery_alg(space)
+#            recovery = recovery_alg(space)
             eta = recovery.recovery_estimate(d)
                 
-            isMarkedCell = mark(eta, theta = 0.1)
+            isMarkedCell = mark(eta, theta = 0.7, method='MAX')
 
             cm = mesh.cell_area() 
-            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
+            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) >
+                    model.l0/16)
 
             cell2dof = mesh.cell_to_ipoint(p=1)
             uh0c2f = uh[0, cell2dof]
             uh1c2f = uh[1, cell2dof]
             dc2f = d[cell2dof]
+            isMarkedCell = np.logical_and(isMarkedCell, np.mean(dc2f,
+                axis=-1)>0.05)
             
             data = {'uh0':uh0c2f, 'uh1':uh1c2f, 'd':dc2f, 'H':H[cell2dof]}
             option = mesh.bisect_options(data=data, disp=False)
@@ -435,14 +508,17 @@ for i in range(len(disp)-1):
             uh = space.function(dim=GD)
             d = space.function()
             H = np.zeros(NC, dtype=np.float64)  # 分片常数
+#            eta = np.zeros(NC, dtype=np.float64)  # 分片常数
 
             uh[0, cell2dof.reshape(-1)] = option['data']['uh0'].reshape(-1)
             uh[1, cell2dof.reshape(-1)] = option['data']['uh1'].reshape(-1)
             d[cell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
             H[cell2dof.reshape(-1)] = option['data']['H'].reshape(-1)
+#            eta[cell2dof.reshape(-1)] = option['data']['eta'].reshape(-1)
             if np.all(~isMarkedCell):
                 print('mesh refine is ok')      
                 break;
+        '''
 
 
 end = time.time()
@@ -450,7 +526,7 @@ print('time:', end-start)
 fig = plt.figure()
 axes = fig.add_subplot(111)
 NN = mesh.number_of_nodes()
-mesh.node += uh[:, :NN].T
+mesh.node += uh[:, :NN]
 mesh.add_plot(axes)
 plt.show()
 
