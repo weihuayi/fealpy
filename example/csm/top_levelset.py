@@ -10,15 +10,21 @@ from scipy.signal import convolve2d
 
 
 class TopologyOptimization:
-    def __init__(self, nelx=60, nely=30):
+
+    def __init__(self, nelx=60, nely=30, E=1.0, nu=0.3):
         self.nelx = nelx
         self.nely = nely
+
+        self.E = E
+        self.nu = nu
+
         self.struc = np.ones((nely, nelx))
         self.lsf = self.reinit(self.struc)
+
         self.shapeSens = np.zeros((nely, nelx))
         self.topSens = np.zeros((nely, nelx))        
-        self.KE, self.KTr, self.lambda_, self.mu = self.materialInfo(E, nu)
 
+        self.KE, self.KTr, self.lambda_, self.mu = self.materialInfo(E, nu)
 
 
     def reinit(self, struc):
@@ -28,7 +34,7 @@ class TopologyOptimization:
         dist_to_0 = ndimage.distance_transform_edt(strucFull)
         dist_to_1 = ndimage.distance_transform_edt(strucFull - 1)
         
-        lsf = (~strucFull.astype(bool)).astype(int) * (dist_to_1 - 0.5) - strucFull * (dist_to_0 - 0.5)
+        lsf = (~strucFull.astype(bool)).astype(int) * (dist_to_1-0.5) - strucFull * (dist_to_0-0.5)
 
         return lsf
 
@@ -46,7 +52,6 @@ class TopologyOptimization:
 
         return K
 
-
     def materialInfo(self, E, nu):
         lambda_ = E * nu / ((1 + nu) * (1 - nu))
         mu = E / (2 * (1 + nu))
@@ -59,6 +64,35 @@ class TopologyOptimization:
         KTr = E / (1 - nu) * stiffnessMatrix(k)
 
         return KE, KTr, lambda_, mu
+
+    def FE(self, struc, KE):
+        nely, nelx = struc.shape
+        K = lil_matrix((2*(nelx+1)*(nely+1), 2*(nelx+1)*(nely+1)))
+        F = lil_matrix((2*(nelx+1)*(nely+1), 1))
+        U = np.zeros(2*(nelx+1)*(nely+1))
+
+        for elx in range(nelx):
+            for ely in range(nely):
+                n1 = (nely + 1) * elx + ely
+                n2 = (nely + 1) * (elx + 1) + ely
+                edof = [2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n2+2, 2*n2+3, 2*n1+2, 2*n1+3]
+
+                K[np.ix_(edof, edof)] += max(struc[ely, elx], 0.0001) * KE
+
+        F[2 * (round(nelx/2)+1) * (nely+1)] = 1
+        
+        fixeddofs = list( range( 2*(nely+1)-2, 2*(nely+1) ) ) + list( range( 2*(nelx+1)*(nely+1)-2, 2*(nelx+1)*(nely+1) ) )
+        alldofs = list( range( 2*(nely+1)*(nelx+1) ) )
+        freedofs = list( set(alldofs) - set(fixeddofs) )
+
+        U[freedofs] = spsolve(csc_matrix(K[np.ix_(freedofs, freedofs)]), F[freedofs])
+
+        return U
+
+
+    def optimize(self, Num=200):
+        for iterNum in range(Num):
+            U = self.FE(self.struc, self.KE)
 
 
 nelx = 60
