@@ -204,9 +204,9 @@ class AddPlot1d(MeshPloter):
     def draw(self):
         axes = self.current_axes
         args = self.args
+        self.set_lim(args.box)
         axes.set_aspect(args.aspect)
         self.set_show_axis(args.showaxis)
-        self.set_lim(args.box)
 
         node: NDArray = self.mesh.entity('node')
 
@@ -237,9 +237,9 @@ class AddPlot2dHomo(MeshPloter):
         """
         axes = self.current_axes
         args = self.args
+        self.set_lim(args.box)
         axes.set_aspect(args.aspect)
         self.set_show_axis(args.showaxis)
-        self.set_lim(args.box)
 
         cellcolor = args.cellcolor
         if isinstance(cellcolor, np.ndarray) and np.isreal(cellcolor[0]):
@@ -275,10 +275,11 @@ class AddPlot2dPoly(MeshPloter):
         """
         axes = self.current_axes
         args = self.args
+        self.set_lim(args.box)
         axes.set_aspect(args.aspect)
         self.set_show_axis(args.showaxis)
-        self.set_lim(args.box)
 
+        cellcolor = args.cellcolor
         if isinstance(cellcolor, np.ndarray) and np.isreal(cellcolor[0]):
             mapper = array_color_map(cellcolor, cmap=args.cmap,
                                      cmax=args.cmax, cmin=args.cmin)
@@ -305,9 +306,9 @@ class AddPlot3dHomo(MeshPloter):
     def draw(self):
         axes = self.current_axes
         args = self.args
+        self.set_lim(args.box)
         axes.set_aspect(args.aspect)
         self.set_show_axis(args.showaxis)
-        self.set_lim(args.box)
 
         nodecolor = args.nodecolor
         if isinstance(nodecolor, np.ndarray) and np.isreal(nodecolor[0]):

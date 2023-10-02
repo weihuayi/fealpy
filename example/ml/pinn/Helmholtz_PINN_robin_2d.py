@@ -51,14 +51,10 @@ optim_2 = Adam(s_2.parameters(), lr=lr, betas=(0.9, 0.99))
 mse_cost_func = nn.MSELoss(reduction='mean')
 
 # 采样器
-samplerpde_1 = ISampler(
-    num_of_point_pde, [[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
-samplerpde_2 = ISampler(
-    num_of_point_pde, [[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
-samplerbc_1 = BoxBoundarySampler(
-    num_of_point_bc, [-0.5, -0.5], [0.5, 0.5], requires_grad=True)
-samplerbc_2 = BoxBoundarySampler(
-    num_of_point_bc, [-0.5, -0.5], [0.5, 0.5], requires_grad=True)
+samplerpde_1 = ISampler([[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
+samplerpde_2 = ISampler([[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
+samplerbc_1 = BoxBoundarySampler([-0.5, -0.5], [0.5, 0.5], requires_grad=True)
+samplerbc_2 = BoxBoundarySampler([-0.5, -0.5], [0.5, 0.5], requires_grad=True)
 
 # 真解
 def solution(p: torch.Tensor) -> torch.Tensor:
@@ -162,13 +158,13 @@ for epoch in range(iteration+1):
     optim_1.zero_grad()
     optim_2.zero_grad()
 
-    spde_1 = samplerpde_1.run()
-    sbc_1 = samplerbc_1.run()
+    spde_1 = samplerpde_1.run(num_of_point_pde)
+    sbc_1 = samplerbc_1.run(num_of_point_bc)
     outpde_1 = pde(spde_1)
     outbc_1 = bc(sbc_1)
 
-    spde_2 = samplerpde_2.run()
-    sbc_2 = samplerbc_2.run()
+    spde_2 = samplerpde_2.run(num_of_point_pde)
+    sbc_2 = samplerbc_2.run(num_of_point_bc)
     outpde_2 = pde(spde_2)
     outbc_2 = bc(sbc_2)
 

@@ -1,7 +1,7 @@
 import numpy as np
+import numba as nb
 from numpy.linalg import inv
 from fealpy.quadrature import GaussLobattoQuadrature
-
 
 
 def coefficient_of_div_VESpace_represented_by_SMSpace(space, M):
@@ -41,13 +41,12 @@ def coefficient_of_div_VESpace_represented_by_SMSpace(space, M):
         idx[:, :, 0] = idx1
         idx[:, :, 1] = idx1+1
 
-        b = np.zeros((smldof, ldof[i]))
+        b = np.zeros((smldof, ldof[i]),dtype=np.float64)
         b[1:, ldof[i]-(p*(p+1)//2-1):] = hk[i] * np.eye(p*(p+1)//2-1)
         np.add.at(b, (0, idx), val)
         k = inv(M[i])@b
         K.append(k)
     return K
-
 
 def vector_decomposition(space, p):
     """
@@ -70,7 +69,7 @@ def vector_decomposition(space, p):
     cols = np.hstack((x[0], y[0]))
     value = np.repeat(np.arange(1, p+2), np.arange(1, p+2))
     value = hk[:, None, None]/np.hstack((value, value))
-    A = np.zeros((NC, ldof, ldof1))   #(NC, 2n_k,n_{k+1})
+    A = np.zeros((NC, ldof, ldof1),dtype=np.float64)   #(NC, 2n_k,n_{k+1})
     np.add.at(A, (np.s_[:], row[None,:], cols[None,:]), value)
 
     data = space.smspace.diff_index_1(p)
@@ -80,9 +79,11 @@ def vector_decomposition(space, p):
     cols = np.hstack((np.arange(ldof2), np.arange(ldof2)))
     value = np.repeat(np.arange(2, p+2), np.arange(1, p+1))
     value = np.hstack((y[1], -x[1]))/np.hstack((value, value))
-    B = np.zeros((ldof, ldof2)) # (2n_k,n_{k-1})
+    B = np.zeros((ldof, ldof2),dtype=np.float64) # (2n_k,n_{k-1})
     B[row, cols] = value
     return A, B 
+
+
 def laplace_coefficient(space, p):
     mesh = space.mesh
     data = space.vmspace.diff_index_2() 

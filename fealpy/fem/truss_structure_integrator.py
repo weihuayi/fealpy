@@ -46,11 +46,11 @@ class TrussStructureIntegrator:
         print("坐标变换矩阵 T(NC, GD):\n", tan)
 
         R = np.einsum('ik, im->ikm', tan, tan)
-        print("局部单元刚度矩阵形状:", R.shape)
-        print("局部单元刚度矩阵 R:\n", R)
+        print("矩阵形状:", R.shape)
+        print("矩阵 R:\n", R)
         R *= c/cellmeasure[:, None, None]
 
-        ldof = 2 # 一个单元两个自由度, @TODO 高次元的情形？本科毕业论文
+        ldof = 2 # 一个单元两个自由度
         if out is None:
             K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
         else:

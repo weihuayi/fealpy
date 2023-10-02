@@ -6,13 +6,12 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from matplotlib import pyplot as plt
 
-from fealpy.mesh import TriangleMesh 
+from fealpy.mesh import TriangleMesh
 from fealpy.ml.grad import gradient
 from fealpy.ml.modules import BoxDBCSolution, Solution
 from fealpy.ml.sampler import ISampler
 
 #方程形式
-
 """
 
     \Delta u(x,y) + k**2 * u(x,y) = 0 ,                            (x,y)\in \Omega
@@ -21,7 +20,6 @@ from fealpy.ml.sampler import ISampler
 """
 
 #超参数
-
 num_of_points_in = 200
 lr = 0.01
 iteration = 300
@@ -29,7 +27,6 @@ k = torch.tensor(1)
 NN = 64
 
 # 定义网络层结构
-
 net = nn.Sequential(
     nn.Linear(2, NN, dtype=torch.float64),
     nn.Tanh(),
@@ -39,22 +36,17 @@ net = nn.Sequential(
 )
 
 # 网络实例化
-
 s = BoxDBCSolution(net)
 
 # 选择优化器和损失函数
-
 optim = Adam(s.parameters(), lr=lr, betas=(0.9, 0.99))
 mse_cost_func = nn.MSELoss(reduction='mean')
 scheduler = StepLR(optim, step_size=50, gamma=0.75)
 
 # 采样器
-
-sampler_in = ISampler(
-    num_of_points_in, [[-1, 1], [-1, 1]], requires_grad=True)
+sampler_in = ISampler([[-1, 1], [-1, 1]], requires_grad=True)
 
 #真解
-
 def solution(p: torch.Tensor) -> torch.Tensor:
 
     x = p[..., 0:1]
@@ -62,45 +54,37 @@ def solution(p: torch.Tensor) -> torch.Tensor:
     val = torch.sin(torch.sqrt(k**2/2) * x + torch.sqrt(k**2/2) * y)
     return val
 
-def solution_numpy(p: torch.Tensor):
-    
+def solution_numpy(p):
+
     sol = solution(torch.tensor(p))
     return sol.detach().numpy()
 
 #定义pde
-
 def pde(p: torch.Tensor) -> torch.Tensor:
 
     u = s(p)
     u_x1, u_x2 = gradient(u, p, create_graph=True, split=True)
     u_x1x1, _  = gradient(u_x1, p, create_graph=True, split=True)
     _ , u_x2x2 = gradient(u_x2, p, create_graph=True, split=True)
-    return u_x1x1 + u_x2x2 + k**2*u 
+    return u_x1x1 + u_x2x2 + k**2*u
 
 #进行dirichlet边界封装
-
 s.set_box([-1, 1, -1, 1])
 @s.set_bc
 def bc(p: torch.Tensor) -> torch.Tensor:
 
     return solution(p)
 
-
-# 构建网格
-
-mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx = 320,ny = 320 )
-
 # 训练过程
-
 start_time = time.time()
+mesh = TriangleMesh.from_box([-1 ,1, -1, 1], nx = 320,ny = 320)
 Loss = []
 Error= []
-
 
 for epoch in range(iteration+1):
 
     optim.zero_grad()
-    nodes_in = sampler_in.run()
+    nodes_in = sampler_in.run(num_of_points_in)
     output_in = pde(nodes_in)
 
     loss =  mse_cost_func(output_in, torch.zeros_like(output_in))
@@ -122,7 +106,6 @@ training_time = end_time - start_time   # 计算训练时间
 print("训练时间为：", training_time, "秒")
 
 #可视化
-
 fig_1 = plt.figure()
 axes = fig_1.add_subplot(121)
 plt.xlabel('Iteration')

@@ -1107,7 +1107,16 @@ class ScaledMonomialSpace2d():
         np.add.at(ruh, cell2dof, val.T)
         ruh /= deg
         return ruh
+    def error(self, u, uh):
+        """!
+        @brief 求 H1 误差
+        """
 
+        def f(p, index):
+            val = (u(p) - uh.value(p, index))**2
+            return val
+        err = np.sqrt(self.integralalg.integral(f))
+        return err
     def H1_error(self, u, uh):
         """!
         @brief 求 H1 误差

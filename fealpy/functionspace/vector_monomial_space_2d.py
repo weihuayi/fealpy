@@ -37,6 +37,14 @@ class VMDof2d():
         multiIndex[:, 0] = idx0 - multiIndex[:, 1]
         return multiIndex
 
+    def cell_to_dof(self, p=None):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
+        cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
+        return cell2dof
+
+
     def number_of_local_dofs(self, p=None, doftype='cell'):
         p = self.p if p is None else p
         if doftype in {'cell', 2}:
@@ -45,6 +53,14 @@ class VMDof2d():
             return (p+1) #需要改
         elif doftype in {'node', 0}:
             return 0 
+    def number_of_global_dofs(self, p=None, doftype='cell'):
+        ldof = self.number_of_local_dofs(p=p, doftype=doftype)
+        if doftype in {'cell', 2}:
+            N = self.mesh.number_of_cells()
+        elif doftype in {'face', 'edge', 1}:
+            N = self.mesh.number_of_edges()
+        return N*ldof
+
 
 
 class VectorMonomialSpace2d():
@@ -150,4 +166,36 @@ class VectorMonomialSpace2d():
 
     def number_of_local_dofs(self, p=None, doftype='cell'):
         return self.dof.number_of_local_dofs(p=p, doftype=doftype)
+
+    def number_of_global_dofs(self, p=None, doftype='cell'):
+        return self.dof.number_of_global_dofs(p=p, doftype=doftype)
+
+    def function(self, dim=None, array=None, dtype=None):
+        ftype = self.ftype if dtype is None else dtype
+        f = Function(self, dim=dim, array=array, coordtype='cartesian',
+                dtype=ftype)
+        return f
+
+    def array(self, dim=None, dtype=None):
+        ftype = self.ftype if dtype is None else dtype
+        gdof = self.number_of_global_dofs()
+        if dim in {None, 1}:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=dtype)
+
+    @cartesian
+    def value(self, uh, point, index=np.s_[:]):
+        phi = self.basis(point, index=index)
+        cell2dof = self.dof.cell_to_dof()[index]
+        dim = len(uh.shape) 
+        s0 = 'abcdefg'
+        s1 = '...ij{}, ij->...i{}'.format(s0[:dim], s0[:dim])
+        return np.einsum(s1, phi, uh[cell2dof])
+
+
+
 
