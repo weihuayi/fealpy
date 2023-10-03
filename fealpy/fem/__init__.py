@@ -44,6 +44,7 @@ VectorRobinSourceIntegrator = VectorBoundarySourceIntegrator
 
 # others
 from .truss_structure_integrator import TrussStructureIntegrator
+from .beam_structure_integrator import EulerBernoulliCantileverBeamStructureIntegrator
 from .beam_structure_integrator import EulerBernoulliBeamStructureIntegrator
 from .diffusion_integrator import DiffusionIntegrator
 from .vector_convection_integrator import VectorConvectionIntegrator
