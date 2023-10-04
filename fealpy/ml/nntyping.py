@@ -9,6 +9,7 @@ from typing import (
 
 import numpy as np
 from torch import Tensor
+from torch.nn import Module
 import numpy as np
 from numpy.typing import NDArray
 
@@ -17,6 +18,7 @@ TensorOrArray = Union[Tensor, NDArray]
 TensorFunction = Callable[[Tensor], Tensor]
 VectorFunction = Callable[[NDArray], NDArray]
 Operator = Callable[[Tensor, Tensor], Tensor]
+Activation = Union[TensorFunction, Module]
 Index = Union[int, bool, Tensor, slice, List, Tuple]
 S: Index = slice(None, None, None)
 

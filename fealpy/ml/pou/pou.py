@@ -32,16 +32,22 @@ class PoU():
         raise NotImplementedError
 
     # NOTE: PoUs are designed to perform linear transform to every partitions.
-    # So, gradients are relevant to only partitions and dims.
+    # So, gradients are relevant to only partitions and dims. And the transform
+    # should be independent in each dimension.
     def grad_global_to_local(self, index=S_) -> Tensor:
         """
-        @brief Gradient of mapping from global to local. Return tensor with shape\
-               (#partitions, #dims).
+        @brief Gradient of mapping from global to local in each feature.
+        @param index: indices of partitions.
+        @return: Tensor with shape (#partitions, #dims).
         """
         raise NotImplementedError
 
     def grad_local_to_global(self, index=S_) -> Tensor:
-        """Gradient of mapping from local to global."""
+        """
+        @brief Gradient of mapping from local to global in each feature.
+        @param index: indices of partitions.
+        @return: Tensor with shape (#partitions, #dims).
+        """
         raise NotImplementedError
 
     __call__ = global_to_local

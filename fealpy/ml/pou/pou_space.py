@@ -2,9 +2,9 @@
 from typing import TypeVar, Generic, Callable, List, Optional
 
 import torch
-from torch import Tensor
+from torch import Tensor, einsum
 
-from ..nntyping import S as _S
+from ..nntyping import S
 from ..modules.function_space import FunctionSpaceBase
 from .pou import PoU
 
@@ -58,7 +58,7 @@ def assemble(extra_dim: int=0, use_coef=False):
             return wrapper
     else:
         def assemble_(func: Callable[..., Tensor]):
-            def wrapper(self: "PoUSpace", p: Tensor, *, index=_S, **kwargs) -> Tensor:
+            def wrapper(self: "PoUSpace", p: Tensor, *, index=S, **kwargs) -> Tensor:
                 N = p.shape[0]
                 M = self.number_of_basis()
                 GD = p.shape[-1]
@@ -80,79 +80,83 @@ def assemble(extra_dim: int=0, use_coef=False):
 
 
 class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
-    def __init__(self, pou_fn, space: _FS) -> None:
+    def __init__(self, pou_fn, pou: PoU, space: _FS, idx: int) -> None:
         super().__init__()
         self.pou_fn = pou_fn
+        self.pou = pou
         self.space = space
-
-    def flag(self, p: Tensor):
-        return self.pou_fn.flag(p)
+        self.idx = idx
 
     def number_of_basis(self) -> int:
         return self.space.number_of_basis()
 
-    def basis(self, p: Tensor, *, index=_S) -> Tensor:
+    def flag(self, p: Tensor):
+        p = self.pou.global_to_local(p, index=self.idx)
+        return self.pou_fn.flag(p)
+
+    def basis(self, p: Tensor, *, index=S) -> Tensor:
+        p = self.pou.global_to_local(p)
         return self.space.basis(p, index=index) * self.pou_fn(p)
 
-    def grad_basis(self, p: Tensor, *, index=_S, trans=None) -> Tensor:
+    def grad_basis(self, p: Tensor, *, index=S) -> Tensor:
         space = self.space
-        ret = torch.einsum("nd, nf -> nfd", self.pou_fn.gradient(p), space.basis(p, index=index))
-        ret += self.pou_fn(p)[..., None] * space.grad_basis(p, index=index, trans=trans)
-        return ret
+        p = self.pou.global_to_local(p)
+        rs = self.pou.grad_global_to_local(self.idx)
+        ret = einsum("...d, ...f -> ...fd", self.pou_fn.gradient(p), space.basis(p))
+        ret += self.pou_fn(p)[..., None] * space.grad_basis(p)
+        return einsum('...d, d -> ...d', ret, rs)
 
-    def hessian_basis(self, p: Tensor, *, index=_S, trans=None) -> Tensor:
+    def hessian_basis(self, p: Tensor, *, index=S) -> Tensor:
         space = self.space
-        ret = torch.einsum("nxy, nf -> nfxy", self.pou_fn.hessian(p), space.basis(p, index=index))
-        cross = torch.einsum("nx, nfy -> nfxy", self.pou_fn.gradient(p),
-                             space.grad_basis(p, index=index, trans=trans))
+        p = self.pou.global_to_local(p)
+        rs = self.pou.grad_global_to_local(self.idx)
+        ret = einsum("...xy, ...f -> ...fxy", self.pou_fn.hessian(p), space.basis(p))
+        cross = einsum("...x, ...fy -> ...fxy", self.pou_fn.gradient(p), space.grad_basis(p))
         ret += cross + torch.transpose(cross, -1, -2)
-        ret += self.pou_fn(p)[..., None, None] * space.hessian_basis(p, index=index, trans=trans)
-        return ret
+        ret += self.pou_fn(p)[..., None, None] * space.hessian_basis(p)
+        return einsum('...xy, x, y -> ...xy', ret, rs, rs)
 
-    def laplace_basis(self, p: Tensor, *, coef: Optional[Tensor]=None,
-                      index=_S, trans=None) -> Tensor:
+    def laplace_basis(self, p: Tensor, *, index=S) -> Tensor:
         space = self.space
-        if coef is None:
-            ret = torch.einsum("ndd, nf -> nf", self.pou_fn.hessian(p), space.basis(p, index=index))
-            ret += 2 * torch.einsum("nd, nfd -> nf", self.pou_fn.gradient(p),
-                                    space.grad_basis(p, index=index, trans=trans))
-        else:
-            if coef.ndim == 1:
-                coef = coef[None, :].broadcast_to(p.shape[0], -1)
-            assert coef.shape[0] == p.shape[0]
-            ret = torch.einsum("ndd, nf, nd -> nf", self.pou_fn.hessian(p), space.basis(p, index=index), coef)
-            ret += 2 * torch.einsum("nd, nfd, nd -> nf", self.pou_fn.gradient(p),
-                                    space.grad_basis(p, index=index, trans=trans), coef)
-        ret += self.pou_fn(p) * space.laplace_basis(p, coef=coef, index=index, trans=trans)
+        p = self.pou.global_to_local(p)
+        rs = self.pou.grad_global_to_local(self.idx)**2
+        ret = einsum("...dd, ...f, d -> ...f", self.pou_fn.hessian(p),
+                     space.basis(p), rs)
+        ret += 2 * einsum("...d, ...fd, d -> ...f", self.pou_fn.gradient(p),
+                          space.grad_basis(p), rs)
+        ret += einsum("...fdd, d -> ...f",
+                      self.pou_fn(p)[..., None, None] * space.hessian_basis(p),
+                      rs)
         return ret
 
-    def derivative_basis(self, p: Tensor, *idx: int, index=_S, trans=None) -> Tensor:
+    def derivative_basis(self, p: Tensor, *idx: int, index=S) -> Tensor:
         N = p.shape[0]
         nf = self.number_of_basis()
         order = len(idx)
         space = self.space
+        p = self.pou.global_to_local(p)
+        rs = self.pou.grad_global_to_local(self.idx)
         ret = torch.zeros((N, nf), dtype=self.dtype, device=self.device)
-        kwargs = {index: index, trans: trans}
 
         if order == 0:
             ret[:] = self.basis(p)
         elif order == 1:
-            ret += self.pou_fn.derivative(p, idx[0]) * space.basis(p, index=index)
-            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], **kwargs)
+            ret += self.pou_fn.derivative(p, idx[0]) * space.basis(p)
+            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0])
         elif order == 2:
-            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.basis(p, index=index)
-            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[1], **kwargs)
-            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], **kwargs)
-            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1], **kwargs)
+            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.basis(p)
+            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[1])
+            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0])
+            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1])
         elif order == 3:
-            ret += self.pou_fn.derivative(p, idx[0], idx[1], idx[2]) * space.basis(p, index=index)
-            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.derivative_basis(p, idx[2], **kwargs)
-            ret += self.pou_fn.derivative(p, idx[1], idx[2]) * space.derivative_basis(p, idx[0], **kwargs)
-            ret += self.pou_fn.derivative(p, idx[2], idx[0]) * space.derivative_basis(p, idx[1], **kwargs)
-            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[2], idx[1], **kwargs)
-            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], idx[2], **kwargs)
-            ret += self.pou_fn.derivative(p, idx[2]) * space.derivative_basis(p, idx[1], idx[0], **kwargs)
-            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1], idx[2], **kwargs)
+            ret += self.pou_fn.derivative(p, idx[0], idx[1], idx[2]) * space.basis(p)
+            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.derivative_basis(p, idx[2])
+            ret += self.pou_fn.derivative(p, idx[1], idx[2]) * space.derivative_basis(p, idx[0])
+            ret += self.pou_fn.derivative(p, idx[2], idx[0]) * space.derivative_basis(p, idx[1])
+            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[2], idx[1])
+            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], idx[2])
+            ret += self.pou_fn.derivative(p, idx[2]) * space.derivative_basis(p, idx[1], idx[0])
+            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1], idx[2])
 
         elif order == 4:
             pass
@@ -160,6 +164,7 @@ class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
         else:
             raise NotImplementedError("Derivatives higher than order 4 have bot been implemented.")
         return ret
+
 
 
 class PoUSpace(FunctionSpaceBase, Generic[_FS]):
@@ -228,7 +233,7 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
         return ret
 
     @assemble(0, use_coef=True)
-    def convect_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=_S, trans=None) -> Tensor:
+    def convect_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=S, trans=None) -> Tensor:
         new_trans = self.pou.grad_global_to_local(index=idx)[0, :, :] # (lGD, gGD)
         if trans is None:
             trans = new_trans
@@ -237,7 +242,7 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
         return self.partitions[idx].convect_basis(p, coef=coef, index=index, trans=trans) # (samples, basis)
 
     @assemble(0, use_coef=True)
-    def laplace_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=_S, trans=None) -> Tensor:
+    def laplace_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=S, trans=None) -> Tensor:
         new_trans = self.pou.grad_global_to_local(index=idx)[0, :, :] # (lGD, gGD)
         if trans is None:
             trans = new_trans
@@ -246,12 +251,12 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
         return self.partitions[idx].laplace_basis(p, coef=coef, index=index, trans=trans) # (samples, basis)
 
     # NOTE: Is this unable to be implemented?
-    def derivative_basis(self, p: Tensor, *dim: int, index=_S, trans=None) -> Tensor:
+    def derivative_basis(self, p: Tensor, *dim: int, index=S, trans=None) -> Tensor:
         """NOT supported!"""
         raise NotImplementedError(f"derivative basis is not supported by PoUSpace.")
 
     @assemble(1)
-    def grad_basis(self, idx: int, p: Tensor, *, index=_S, trans=None) -> Tensor:
+    def grad_basis(self, idx: int, p: Tensor, *, index=S, trans=None) -> Tensor:
         gg2l = self.pou.grad_global_to_local(index=idx)[0, ...] # (lGD, gGD)
         return torch.einsum('nfl, lg -> nfg',
                             self.partitions[idx].grad_basis(p),

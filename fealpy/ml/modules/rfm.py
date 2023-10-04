@@ -65,50 +65,37 @@ class RandomFeatureSpace(FunctionSpaceBase):
     def _linear(self, p: Tensor, *, index=_S):
         return F.linear(p, self.linear.weight[index, :], self.linear.bias[index])
 
-    def _weight_transform(self, index=_S, trans=None):
-        if trans is None:
-            return self.linear.weight[index, :]
-        else:
-            return torch.einsum("fu, ux -> fx", self.linear.weight[index, :], trans)
-
     def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return values of basis, with shape (N, nf).
         """
         return self.activate(self._linear(p, index=index))
 
-    def grad_basis(self, p: Tensor, *, index=_S, trans=None) -> Tensor:
+    def grad_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return gradient vector of basis, with shape (N, nf, GD).
         """
         a = self.activate.d1(self._linear(p, index=index))
-        return torch.einsum("nf, fx -> nfx", a, self._weight_transform(index, trans))
+        grad = self.linear.weight[index, :]
+        return torch.einsum("...f, fx -> ...fx", a, grad)
 
-    def hessian_basis(self, p: Tensor, *, index=_S, trans=None) -> Tensor:
+    def hessian_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return hessian matrix of basis, with shape (N, nf, GD, GD).
         """
         a = self.activate.d2(self._linear(p, index=index))
-        grad = self._weight_transform(index, trans)
-        return torch.einsum("nf, fx, fy -> nfxy", a, grad, grad)
+        grad = self.linear.weight[index, :]
+        return torch.einsum("...f, fx, fy -> ...fxy", a, grad, grad)
 
-    def laplace_basis(self, p: Tensor, *, coef=None, index=_S, trans=None) -> Tensor:
+    def laplace_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return basis evaluated by laplace operator, with shape (N, nf).
         """
         a = self.activate.d2(self._linear(p, index=index))
-        grad = self._weight_transform(index, trans)
-        if coef is None:
-            return torch.einsum("nf, fd, fd -> nf", a, grad, grad)
-        else:
-            coef.squeeze_()
-            assert coef.ndim in {0, 1}
-            if coef.ndim == 0:
-                return torch.einsum("nf, fd, fd -> nf", a, grad, grad) * coef
-            else:
-                return torch.einsum("nf, n, fd, fd -> nf", a, coef, grad, grad)
+        grad = self.linear.weight[index, :]
+        return torch.einsum("...f, fd, fd -> ...f", a, grad, grad)
 
-    def derivative_basis(self, p: Tensor, *idx: int, index=_S, trans=None) -> Tensor:
+    def derivative_basis(self, p: Tensor, *idx: int, index=_S) -> Tensor:
         """
         @brief Return specified partial derivatives of basis, with shape (N, nf).
 
@@ -118,9 +105,8 @@ class RandomFeatureSpace(FunctionSpaceBase):
         if order == 0:
             return self.activate(self._linear(p, index=index))
         else:
-            grad = self._weight_transform(index, trans)
             a = self.activate.dn(self._linear(p, index=index), order)
-            b = torch.prod(grad[:, idx], dim=-1, keepdim=False)
+            b = torch.prod(self.linear.weight[:, idx], dim=-1, keepdim=False)
             return torch.einsum("nf, f -> nf", a, b)
 
 

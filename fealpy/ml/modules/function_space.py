@@ -1,5 +1,5 @@
 
-from typing import Optional, Generic, TypeVar
+from typing import Optional, Generic, TypeVar, Callable
 
 import torch
 from torch import Tensor, dtype, device
@@ -29,7 +29,8 @@ class FunctionSpaceBase(Module):
 
     def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return the value of basis, with shape (#samples, #basis).
+        @brief Return the value of basis, with shape (#samples, #basis) or\
+               (#basis, ).
 
         @param p: input Tensor.
         @param index: indices of basis.
@@ -47,7 +48,8 @@ class FunctionSpaceBase(Module):
 
     def grad_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return gradient vector of basis, with shape (#samples, #basis, #dims).
+        @brief Return gradient vector of basis, with shape (#samples, #basis, #dims)\
+               or (#basis, #dims).
 
         @param p: input Tensor.
         @param index: indices of basis.
@@ -55,46 +57,58 @@ class FunctionSpaceBase(Module):
         @return: Tensor.
         """
         func = lambda p: self.basis(p, index=index)
+        if p.ndim == 1:
+            return jacfwd(func)(p)
         return vmap(jacfwd(func), 0, 0)(p)
 
     def hessian_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return hessian matrix of basis, with shape (#samples, #basis, #dims, #dims).
+        @brief Return hessian matrix of basis, with shape (#samples, #basis, #dims, #dims)\
+               or (#basis, #dims, #dims).
+
+        @param p: input Tensor.
+        @param index: indices of basis.
+
+        @return: Tensor.
         """
         func = lambda p: self.basis(p, index=index)
+        if p.ndim == 1:
+            return hessian(func)(p)
         return vmap(hessian(func), 0, 0)(p)
 
     def convect_basis(self, p: Tensor, *, coef: Tensor, index=_S) -> Tensor:
         """
-        @brief Return convection item, with shape (#samples, #basis).
+        @brief Return convection item, with shape (#samples, #basis) or (#basis, ).
 
         @param p: input Tensor.
         @param coef: Tensor. The coefficient of the gradient term, or the velocity\
                of the flow field. `coef` must has shape (#dims, ) or (#samples, #dims).
         @param index: indices of basis.
-        @param trans: transform matrix.
 
         @return: Tensor.
         """
         if coef.ndim == 1:
+            if p.ndim == 1:
+                return torch.einsum('d, fd -> nf', coef, self.grad_basis(p, index=index))
             return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p, index=index))
         else:
             return torch.einsum('nd, nfd -> nf', coef, self.grad_basis(p, index=index))
 
-    def laplace_basis(self, p: Tensor, *, coef: Optional[Tensor]=None, index=_S) -> Tensor:
+    def laplace_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return value of the Laplace operator acting on the basis functions.
+        @brief Return value of the Laplace operator acting on the basis functions,\
+               with shape (#samples, #basis) or (#basis, ).
 
-        @oaram p: input Tensor.
-        @param coef: Tensor. The coefficient of the 2-order term, or the diffusion.\
-               `coef` must has shape () or (#samples, ).
+        @param p: input Tensor.
         @param index: indices of basis.
-        @param trans: transform matrix.
 
         @return: Tensor.
         """
-        raise NotImplementedError(f"laplace_basis is not supported by {self.__class__.__name__}"
-                                  "or it has not been implmented.")
+        hes_func = hessian(lambda p: self.basis(p, index=index))
+        lap_func = lambda x: torch.sum(torch.diagonal(hes_func(x), 0, -1, -2), dim=-1)
+        if p.ndim == 1:
+            return lap_func(p)
+        return vmap(lap_func, 0, 0)(p)
 
     def derivative_basis(self, p: Tensor, *idx: int, index=_S) -> Tensor:
         """
