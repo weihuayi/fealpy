@@ -4,7 +4,8 @@ from typing import TypeVar, Generic, Callable, List, Optional
 import torch
 from torch import Tensor
 
-from ..modules.function_space import FunctionSpaceBase, _S
+from ..nntyping import S as _S
+from ..modules.function_space import FunctionSpaceBase
 from .pou import PoU
 
 _FS = TypeVar('_FS', bound=FunctionSpaceBase)
@@ -117,7 +118,7 @@ class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
                                     space.grad_basis(p, index=index, trans=trans))
         else:
             if coef.ndim == 1:
-                    coef = coef[None, :].broadcast_to(p.shape[0], -1)
+                coef = coef[None, :].broadcast_to(p.shape[0], -1)
             assert coef.shape[0] == p.shape[0]
             ret = torch.einsum("ndd, nf, nd -> nf", self.pou_fn.hessian(p), space.basis(p, index=index), coef)
             ret += 2 * torch.einsum("nd, nfd, nd -> nf", self.pou_fn.gradient(p),
@@ -210,13 +211,25 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
         stop = start + self.partitions[idx].number_of_basis()
         return slice(start, stop, None)
 
-    @assemble(0)
-    def basis(self, idx: int, p: Tensor) -> Tensor:
-        return self.partitions[idx].basis(p)
+    def basis(self, p: Tensor, *, index=_S) -> Tensor:
+        N = p.shape[0]
+        M = self.number_of_basis()
+        ret = torch.zeros((N, M), dtype=self.dtype, device=self.device)
+        lp = self.pou.global_to_local(p)
+        basis_cursor = 0
+
+        for idx, part in enumerate(self.partitions):
+            NF = part.number_of_basis()
+            x = lp[:, idx, :]
+            flag = part.flag(x)
+            ret[flag, basis_cursor:basis_cursor+NF, ...]\
+                += part.basis(x[flag, ...], index=index)
+            basis_cursor += NF
+        return ret
 
     @assemble(0, use_coef=True)
     def convect_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=_S, trans=None) -> Tensor:
-        new_trans = self.pou.grad_global_to_local(p, index=idx)[0, :, :] # (lGD, gGD)
+        new_trans = self.pou.grad_global_to_local(index=idx)[0, :, :] # (lGD, gGD)
         if trans is None:
             trans = new_trans
         else:
@@ -225,7 +238,7 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
 
     @assemble(0, use_coef=True)
     def laplace_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=_S, trans=None) -> Tensor:
-        new_trans = self.pou.grad_global_to_local(p, index=idx)[0, :, :] # (lGD, gGD)
+        new_trans = self.pou.grad_global_to_local(index=idx)[0, :, :] # (lGD, gGD)
         if trans is None:
             trans = new_trans
         else:
@@ -239,7 +252,7 @@ class PoUSpace(FunctionSpaceBase, Generic[_FS]):
 
     @assemble(1)
     def grad_basis(self, idx: int, p: Tensor, *, index=_S, trans=None) -> Tensor:
-        gg2l = self.pou.grad_global_to_local(p, index=idx)[0, ...] # (lGD, gGD)
+        gg2l = self.pou.grad_global_to_local(index=idx)[0, ...] # (lGD, gGD)
         return torch.einsum('nfl, lg -> nfg',
                             self.partitions[idx].grad_basis(p),
                             gg2l) # (samples, basis, lGD), (lGD, gGD) -> (samples, basis, gGD)

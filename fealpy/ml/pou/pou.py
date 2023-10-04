@@ -1,14 +1,16 @@
 
-from typing import Union, Any, TypeVar, Generic, Optional
+from typing import Union, Any, TypeVar, Generic, Optional, Dict, Type, Literal
 
 import torch
 from torch import Tensor, float64
 
-S_ = slice(None, None, None)
+from ..nntyping import S as S_
+
 
 class PoU():
     """
-    @brief Base class for PoU. Provides linear mapping between local and global.
+    @brief Base class for PoU. Provides linear mapping between local and global.\
+           The mapping is **independent** in each geometry dimension.
     """
     def __init__(self, dtype, device, **kwargs) -> None:
         self.dtype = dtype
@@ -34,7 +36,7 @@ class PoU():
     def grad_global_to_local(self, index=S_) -> Tensor:
         """
         @brief Gradient of mapping from global to local. Return tensor with shape\
-               (#Partitions, #OutDims, #InDims)
+               (#partitions, #dims).
         """
         raise NotImplementedError
 
@@ -69,20 +71,10 @@ class CRPoU(PoU):
         return p[:, None, :] * self.radius[None, index, :] + self.centers[None, index, :]
 
     def grad_global_to_local(self, index=S_) -> Tensor:
-        data = 1 / self.radius[index, :] # (part, dim)
-        M, GD = data.shape
-        I = torch.arange(GD)
-        ret = torch.zeros((M, GD, GD), dtype=self.dtype, device=self.device)
-        ret[:, I, I] = data
-        return ret
+        return 1 / self.radius[index, :] # (part, dim)
 
     def grad_local_to_global(self, index=S_) -> Tensor:
-        data = self.radius[index, :] # (part, dim)
-        M, GD = data.shape
-        I = torch.arange(GD)
-        ret = torch.zeros((M, GD, GD), dtype=self.dtype, device=self.device)
-        ret[:, I, I] = data
-        return ret
+        return self.radius[index, :] # (part, dim)
 
 
 ##################################################
@@ -90,19 +82,28 @@ class CRPoU(PoU):
 ##################################################
 
 _MT = TypeVar('_MT')
+_pou_library: Dict[str, Type["MeshPoU"]] = {}
 
 
 class MeshPoU(PoU, Generic[_MT]):
-    def __new__(cls, mesh: _MT):
-        return super().__new__()
+    def __new__(cls, mesh: _MT, **kwargs):
+        key = mesh.__class__.__name__
+        _pou_class = cls._get_pou_class(key)
+        return super().__new__(_pou_class)
 
     @classmethod
     def _assigned(cls, mesh_name: str):
-        pass
+        if mesh_name in _pou_library:
+            raise KeyError(f"Mesh '{mesh_name}' has already been assigned to "
+                           f"PoU '{_pou_library[mesh_name].__name__}'.")
+        _pou_library[mesh_name] = cls
 
     @classmethod
     def _get_pou_class(cls, mesh_name: str):
-        pass
+        if mesh_name in _pou_library:
+            return _pou_library[mesh_name]
+        else:
+            raise KeyError("No PoU model found.")
 
     def __init__(self, mesh: _MT, dtype=float64, device=None, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -122,14 +123,25 @@ class MeshPoU(PoU, Generic[_MT]):
 
 
 class _UniformPoU(MeshPoU):
-    def __init__(self, mesh: Any, dtype=float64, device=None, **kwargs) -> None:
+    def __init__(self, mesh: Any, location: Literal['node', 'cell'],
+                 dtype=float64, device=None, **kwargs) -> None:
         super().__init__(mesh, dtype, device, **kwargs)
-        self.cell_ctrs = torch.tensor(
-            self.mesh.entity_barycenter('cell'),
-            dtype=dtype, device=device
-        )
+        if location == 'cell':
+            self.cell_ctrs = torch.tensor(
+                self.mesh.entity_barycenter('cell'),
+                dtype=dtype, device=device
+            )
+        elif location == 'node':
+            self.cell_ctrs = torch.tensor(
+                self.mesh.entity('node'),
+                dtype=dtype, device=device
+            )
+        else:
+            raise ValueError(f"Invalid location center '{location}'")
         self.cell_rds = torch.tensor(mesh.h, dtype=dtype, device=device) / 2
         self.cell_rds = self.cell_rds.broadcast_to(self.cell_ctrs.shape)
+        self.mesh = mesh
+        self.location = location
 
     def number_of_partitions(self) -> int:
         return self.mesh.ds.number_of_cells()
@@ -140,10 +152,10 @@ class _UniformPoU(MeshPoU):
     def local_to_global(self, p: Tensor, index=S_) -> Tensor:
         return p[:, None, :] * self.cell_rds[None, index, :] + self.cell_ctrs[None, index, :]
 
-    def grad_global_to_local(self, p: Tensor, index=S_) -> Tensor:
-        return (1 / self.cell_rds[index, :]).broadcast_to(p.shape[0], -1, -1)
+    def grad_global_to_local(self, index=S_) -> Tensor:
+        return (1 / self.cell_rds[index, :])
 
-    def grad_local_to_global(self, p: Tensor, index=S_) -> Tensor:
-        return self.cell_rds[index, :].broadcast_to(p.shape[0], -1, -1)
+    def grad_local_to_global(self, index=S_) -> Tensor:
+        return self.cell_rds[index, :]
 
 _UniformPoU._assigned('UniformMesh2d')

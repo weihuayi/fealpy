@@ -1,23 +1,24 @@
 from typing import (
+    List,
+    Tuple,
     Callable,
-    Optional,
     Union,
     Protocol,
     Any
 )
-
 
 import numpy as np
 from torch import Tensor
 import numpy as np
 from numpy.typing import NDArray
 
-dtype = Optional[bool]
 TensorOrArray = Union[Tensor, NDArray]
 
 TensorFunction = Callable[[Tensor], Tensor]
 VectorFunction = Callable[[NDArray], NDArray]
 Operator = Callable[[Tensor, Tensor], Tensor]
+Index = Union[int, bool, Tensor, slice, List, Tuple]
+S: Index = slice(None, None, None)
 
 
 class GeneralSampler(Protocol):

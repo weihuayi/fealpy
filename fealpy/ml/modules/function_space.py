@@ -1,14 +1,13 @@
 
-from typing import Optional, Generic, TypeVar, Union, List, Tuple
+from typing import Optional, Generic, TypeVar
 
 import torch
 from torch import Tensor, dtype, device
 from torch.nn import Module, init, Parameter
+from torch.func import vmap, jacfwd, hessian
 
+from ..nntyping import S as _S
 from .module import TensorMapping
-
-Indices = Union[int, slice, Tensor, List, Tuple]
-_S: Indices = slice(None, None, None)
 
 
 class FunctionSpaceBase(Module):
@@ -28,7 +27,7 @@ class FunctionSpaceBase(Module):
         """
         raise NotImplementedError
 
-    def basis(self, p: Tensor, *, index: Indices=_S) -> Tensor:
+    def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return the value of basis, with shape (#samples, #basis).
 
@@ -46,40 +45,58 @@ class FunctionSpaceBase(Module):
         func = Function(self, um=um)
         return func(p)
 
-    def grad_basis(self, p: Tensor, *, index: Indices=_S, trans: Optional[Tensor]=None) -> Tensor:
+    def grad_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return gradient vector of basis, with shape (#samples, #basis, #dims).
-        """
-        raise NotImplementedError(f"grad_basis is not supported by {self.__class__.__name__}"
-                                  "or it has not been implmented.")
 
-    def hessian_basis(self, p: Tensor, *, index: Indices=_S, trans: Optional[Tensor]=None) -> Tensor:
+        @param p: input Tensor.
+        @param index: indices of basis.
+
+        @return: Tensor.
+        """
+        func = lambda p: self.basis(p, index=index)
+        return vmap(jacfwd(func), 0, 0)(p)
+
+    def hessian_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
         @brief Return hessian matrix of basis, with shape (#samples, #basis, #dims, #dims).
         """
-        raise NotImplementedError(f"hessian_basis is not supported by {self.__class__.__name__}"
-                                  "or it has not been implmented.")
+        func = lambda p: self.basis(p, index=index)
+        return vmap(hessian(func), 0, 0)(p)
 
-    def convect_basis(self, p: Tensor, *, coef: Tensor, index: Indices=_S, trans: Optional[Tensor]=None) -> Tensor:
+    def convect_basis(self, p: Tensor, *, coef: Tensor, index=_S) -> Tensor:
         """
         @brief Return convection item, with shape (#samples, #basis).
 
         @param p: input Tensor.
-        @param coef: Tensor. The coefficient of the gradient term, or the velocity of the flow field.
+        @param coef: Tensor. The coefficient of the gradient term, or the velocity\
+               of the flow field. `coef` must has shape (#dims, ) or (#samples, #dims).
+        @param index: indices of basis.
+        @param trans: transform matrix.
+
+        @return: Tensor.
         """
         if coef.ndim == 1:
-            return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p, index=index, trans=trans))
+            return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p, index=index))
         else:
-            return torch.einsum('nd, nfd -> nf', coef, self.grad_basis(p, index=index, trans=trans))
+            return torch.einsum('nd, nfd -> nf', coef, self.grad_basis(p, index=index))
 
-    def laplace_basis(self, p: Tensor, *, coef: Optional[Tensor]=None, index: Indices=_S, trans: Optional[Tensor]=None) -> Tensor:
+    def laplace_basis(self, p: Tensor, *, coef: Optional[Tensor]=None, index=_S) -> Tensor:
         """
         @brief Return value of the Laplace operator acting on the basis functions.
+
+        @oaram p: input Tensor.
+        @param coef: Tensor. The coefficient of the 2-order term, or the diffusion.\
+               `coef` must has shape () or (#samples, ).
+        @param index: indices of basis.
+        @param trans: transform matrix.
+
+        @return: Tensor.
         """
         raise NotImplementedError(f"laplace_basis is not supported by {self.__class__.__name__}"
                                   "or it has not been implmented.")
 
-    def derivative_basis(self, p: Tensor, *idx: int, index: Indices=_S, trans: Optional[Tensor]=None) -> Tensor:
+    def derivative_basis(self, p: Tensor, *idx: int, index=_S) -> Tensor:
         """
         @brief
         """
