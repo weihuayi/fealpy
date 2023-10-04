@@ -309,15 +309,15 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_cantilever(cls):
-        # 单位为 m
+    def from_cantilever_simply_supported(cls):
+        # Unit m
         node = np.array([
             [0], [5], [7.5]], dtype=np.float64)
         cell = np.array([
             [0, 1], [1, 2]], dtype=np.int_)
         mesh = cls(node, cell)
 
-        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['disp_bc'] = (np.array([0, 1], dtype=np.int_), np.zeros(3))
         mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
 
         return mesh 
