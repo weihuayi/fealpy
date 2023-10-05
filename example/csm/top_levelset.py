@@ -11,7 +11,8 @@ from scipy.signal import convolve2d
 
 class TopLevelSet:
 
-    def __init__(self, nelx: int = 60, nely: int = 30, E: float = 1.0, nu: float = 0.3):
+    def __init__(self, nelx: int = 60, nely: int = 30, volReq: float = 0.3, 
+                E: float = 1.0, nu: float = 0.3):
         
         # Material Properties
         self._E = E
@@ -23,6 +24,7 @@ class TopLevelSet:
         self._nely = nely
         self._struc = np.ones((nely, nelx))
         self._lsf = self.reinit(self._struc)
+        self._volReq = volReq
 
         self._shapeSens = np.zeros((nely, nelx))
         self._topSens = np.zeros((nely, nelx))
@@ -98,6 +100,11 @@ class TopLevelSet:
     def optimize(self, Num: int = 200):
         self._objective = np.zeros(Num)
 
+        la = -0.01
+        La = 1000
+        alpha = 0.9
+
+
         for iterNum in range(Num):
             U = self.FE(self._struc, self.KE)
 
@@ -121,7 +128,12 @@ class TopLevelSet:
             volCurr = np.sum(self._struc) / (self._nelx * self._nely)
             print(f'Iter: {iterNum+1}, Compliance.: {self._objective[iterNum]:.4f}, Volfrac.: {volCurr:.3f}')
 
-            
+            if iterNum > 0:
+                la = la + 1/La * (volCurr - self._volReq)
+                La = alpha * La
+
+            self._shapeSens = self._shapeSens - la + 1/La * (volCurr - self._volReq)
+            self._topSens = self._topSens + np.pi * ( la - 1/La * (volCurr - self._volReq) )
 
 
 tls = TopLevelSet()
