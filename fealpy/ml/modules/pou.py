@@ -229,9 +229,9 @@ class PoUSin(PoUA):
 ### PoU in Spaces
 ##################################################
 
-from .function_space import FunctionSpaceBase
+from .function_space import FunctionSpace
 
-_FS = TypeVar('_FS', bound=FunctionSpaceBase)
+_FS = TypeVar('_FS', bound=FunctionSpace)
 
 # NOTE: Partition of Unity has 3 main functions: LocalMapping, PoUFunctions and
 # Assembling. We put LocalMapping and PoUFunction together in this PoULocalSpace
@@ -242,7 +242,7 @@ _FS = TypeVar('_FS', bound=FunctionSpaceBase)
 # (2) It is obvious that the gradient of small space is the gradient of product
 #     of PoU function and the original space. The same to hessian. This may contain
 #     so many codes that very bad to put in Assembling.
-class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
+class PoULocalSpace(FunctionSpace, Generic[_FS]):
     def __init__(self, pou_fn: PoUA, space: _FS, idx: int,
                  center: Tensor, radius: Tensor) -> None:
         super().__init__()
@@ -301,39 +301,43 @@ class PoULocalSpace(FunctionSpaceBase, Generic[_FS]):
         return ret
 
     def derivative_basis(self, p: Tensor, *idx: int, index=S) -> Tensor:
-        N = p.shape[0]
         nf = self.number_of_basis()
         order = len(idx)
         space = self.space
         p = self.global_to_local(p)
-        ret = torch.zeros((N, nf), dtype=self.dtype, device=self.device)
+        rs = torch.prod(1/self.radius[idx,], dim=-1)
+        if p.ndim == 1:
+            ret = torch.zeros((nf, ), dtype=self.dtype, device=self.device)
+        else:
+            N = p.shape[0]
+            ret = torch.zeros((N, nf), dtype=self.dtype, device=self.device)
 
         if order == 0:
-            ret[:] = self.basis(p)
+            ret[:] = self.basis(p, index=index)
         elif order == 1:
-            ret += self.pou_fn.derivative(p, idx[0]) * space.basis(p)
-            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0])
+            ret += self.pou_fn.derivative(p, idx[0]) * space.basis(p, index=index)
+            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], index=index)
         elif order == 2:
-            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.basis(p)
-            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[1])
-            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0])
-            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1])
+            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.basis(p, index=index)
+            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[1], index=index)
+            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], index=index)
+            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1], index=index)
         elif order == 3:
-            ret += self.pou_fn.derivative(p, idx[0], idx[1], idx[2]) * space.basis(p)
-            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.derivative_basis(p, idx[2])
-            ret += self.pou_fn.derivative(p, idx[1], idx[2]) * space.derivative_basis(p, idx[0])
-            ret += self.pou_fn.derivative(p, idx[2], idx[0]) * space.derivative_basis(p, idx[1])
-            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[2], idx[1])
-            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], idx[2])
-            ret += self.pou_fn.derivative(p, idx[2]) * space.derivative_basis(p, idx[1], idx[0])
-            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1], idx[2])
+            ret += self.pou_fn.derivative(p, idx[0], idx[1], idx[2]) * space.basis(p, index=index)
+            ret += self.pou_fn.derivative(p, idx[0], idx[1]) * space.derivative_basis(p, idx[2], index=index)
+            ret += self.pou_fn.derivative(p, idx[1], idx[2]) * space.derivative_basis(p, idx[0], index=index)
+            ret += self.pou_fn.derivative(p, idx[2], idx[0]) * space.derivative_basis(p, idx[1], index=index)
+            ret += self.pou_fn.derivative(p, idx[0]) * space.derivative_basis(p, idx[2], idx[1], index=index)
+            ret += self.pou_fn.derivative(p, idx[1]) * space.derivative_basis(p, idx[0], idx[2], index=index)
+            ret += self.pou_fn.derivative(p, idx[2]) * space.derivative_basis(p, idx[1], idx[0], index=index)
+            ret += self.pou_fn(p) * space.derivative_basis(p, idx[0], idx[1], idx[2], index=index)
 
         elif order == 4:
             pass
         # TODO: finish this
         else:
             raise NotImplementedError("Derivatives higher than order 4 have bot been implemented.")
-        return ret
+        return ret * rs
 
 
 SpaceFactory = Callable[[int], _FS]
@@ -366,7 +370,7 @@ def assemble(dimension: int=0):
     return assemble_
 
 
-class PoUSpace(FunctionSpaceBase, Generic[_FS]):
+class PoUSpace(FunctionSpace, Generic[_FS]):
     def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor, radius: Union[Tensor, Any],
                  pou: PoUA, print_status=False) -> None:
         super().__init__(dtype=centers.dtype, device=centers.device)

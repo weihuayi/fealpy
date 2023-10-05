@@ -4,12 +4,12 @@ Modules for the Physics-Informed Kernel Function Neural Networks
 
 from torch import Tensor
 
-from ..nntyping import TensorFunction
+from ..nntyping import TensorFunction, S
 from .linear import Distance
-from .function_space import FunctionSpaceBase
+from .function_space import FunctionSpace
 
 
-class KernelFunctionSpace(FunctionSpaceBase):
+class KernelFunctionSpace(FunctionSpace):
     def __init__(self, sources: Tensor, kernel: TensorFunction, device=None) -> None:
         """
         @brief
@@ -30,5 +30,5 @@ class KernelFunctionSpace(FunctionSpaceBase):
     def number_of_basis(self) -> int:
         return self.ns
 
-    def basis(self, p: Tensor) -> Tensor:
+    def basis(self, p: Tensor, *, index=S) -> Tensor:
         return self.kernel(self.radius_layer(p))

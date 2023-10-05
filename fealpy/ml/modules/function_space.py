@@ -1,18 +1,19 @@
 
-from typing import Optional, Generic, TypeVar, Callable
+from typing import Optional, Generic, TypeVar
 
 import torch
 from torch import Tensor, dtype, device
-from torch.nn import Module, init, Parameter
+from torch.nn import init, Parameter
 from torch.func import vmap, jacfwd, hessian
 
 from ..nntyping import S as _S
 from .module import TensorMapping
 
 
-class FunctionSpaceBase(Module):
+class FunctionSpace():
+    """The base class for all function spaces in ML module."""
     def __init__(self, in_dim: int=1, out_dim: int=1,
-                 dtype: dtype=None, device: device=None) -> None:
+                 dtype: dtype=None, device: device=None, **kwargs) -> None:
         super().__init__()
         assert in_dim >= 1, "Input dimension should be a positive integer."
         assert out_dim >= 1, "Output dimension should be a positive integer."
@@ -29,10 +30,9 @@ class FunctionSpaceBase(Module):
 
     def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return the value of basis, with shape (#samples, #basis) or\
-               (#basis, ).
+        @brief Return the value of basis, with shape (..., #basis).
 
-        @param p: input Tensor.
+        @param p: input Tensor. In the shape of (..., #dims).
         @param index: indices of basis.
 
         @return: Tensor.
@@ -48,10 +48,9 @@ class FunctionSpaceBase(Module):
 
     def grad_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return gradient vector of basis, with shape (#samples, #basis, #dims)\
-               or (#basis, #dims).
+        @brief Return gradient vector of basis, with shape (..., #basis, #dims).
 
-        @param p: input Tensor.
+        @param p: input Tensor. In the shape of (..., #dims).
         @param index: indices of basis.
 
         @return: Tensor.
@@ -63,10 +62,9 @@ class FunctionSpaceBase(Module):
 
     def hessian_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return hessian matrix of basis, with shape (#samples, #basis, #dims, #dims)\
-               or (#basis, #dims, #dims).
+        @brief Return hessian matrix of basis, with shape (..., #basis, #dims, #dims).
 
-        @param p: input Tensor.
+        @param p: input Tensor. In the shape of (..., #dims).
         @param index: indices of basis.
 
         @return: Tensor.
@@ -78,28 +76,26 @@ class FunctionSpaceBase(Module):
 
     def convect_basis(self, p: Tensor, *, coef: Tensor, index=_S) -> Tensor:
         """
-        @brief Return convection item, with shape (#samples, #basis) or (#basis, ).
+        @brief Return convection item, with shape (..., #basis).
 
-        @param p: input Tensor.
+        @param p: input Tensor. In the shape of (..., #dims).
         @param coef: Tensor. The coefficient of the gradient term, or the velocity\
-               of the flow field. `coef` must has shape (#dims, ) or (#samples, #dims).
+               of the flow field. `coef` must has shape (#dims, ) or (..., #dims).
         @param index: indices of basis.
 
         @return: Tensor.
         """
         if coef.ndim == 1:
-            if p.ndim == 1:
-                return torch.einsum('d, fd -> nf', coef, self.grad_basis(p, index=index))
-            return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p, index=index))
+            return torch.einsum('d, ...fd -> ...f', coef, self.grad_basis(p, index=index))
         else:
-            return torch.einsum('nd, nfd -> nf', coef, self.grad_basis(p, index=index))
+            return torch.einsum('...d, ...fd -> ...f', coef, self.grad_basis(p, index=index))
 
     def laplace_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return value of the Laplace operator acting on the basis functions,\
-               with shape (#samples, #basis) or (#basis, ).
+        @brief Return value of the Laplacian operator acting on the basis functions,\
+               with shape (..., #basis).
 
-        @param p: input Tensor.
+        @param p: input Tensor. In the shape of (..., #dims).
         @param index: indices of basis.
 
         @return: Tensor.
@@ -112,13 +108,18 @@ class FunctionSpaceBase(Module):
 
     def derivative_basis(self, p: Tensor, *idx: int, index=_S) -> Tensor:
         """
-        @brief
+        @brief Return specified partial derivatives of basis, with shape (..., #basis).
+
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param *idx: int. Index of the independent variable to take partial derivatives.
+
+        @return: Tensor.
         """
         raise NotImplementedError(f"derivative_basis is not supported by {self.__class__.__name__}"
                                   "or it has not been implmented.")
 
 
-_FS = TypeVar('_FS', bound=FunctionSpaceBase)
+_FS = TypeVar('_FS', bound=FunctionSpace)
 
 class Function(TensorMapping, Generic[_FS]):
     """
