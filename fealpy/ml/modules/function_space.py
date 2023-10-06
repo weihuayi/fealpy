@@ -3,14 +3,17 @@ from typing import Optional, Generic, TypeVar
 
 import torch
 from torch import Tensor, dtype, device
-from torch.nn import Module, init, Parameter
+from torch.nn import init, Parameter
+from torch.func import vmap, jacfwd, hessian
 
+from ..nntyping import S as _S
 from .module import TensorMapping
 
 
-class FunctionSpaceBase(Module):
+class FunctionSpace():
+    """The base class for all function spaces in ML module."""
     def __init__(self, in_dim: int=1, out_dim: int=1,
-                 dtype: dtype=None, device: device=None) -> None:
+                 dtype: dtype=None, device: device=None, **kwargs) -> None:
         super().__init__()
         assert in_dim >= 1, "Input dimension should be a positive integer."
         assert out_dim >= 1, "Output dimension should be a positive integer."
@@ -25,9 +28,14 @@ class FunctionSpaceBase(Module):
         """
         raise NotImplementedError
 
-    def basis(self, p: Tensor) -> Tensor:
+    def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return the value of basis, with shape (#samples, #basis).
+        @brief Return the value of basis, with shape (..., #basis).
+
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param index: indices of basis.
+
+        @return: Tensor.
         """
         raise NotImplementedError
 
@@ -38,42 +46,80 @@ class FunctionSpaceBase(Module):
         func = Function(self, um=um)
         return func(p)
 
-    def grad_basis(self, p: Tensor) -> Tensor:
+    def grad_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return gradient vector of basis, with shape (#samples, #basis, #dims).
-        """
-        raise NotImplementedError(f"grad_basis is not supported by {self.__class__.__name__}"
-                                  "or it has not been implmented.")
+        @brief Return gradient vector of basis, with shape (..., #basis, #dims).
 
-    def hessian_basis(self, p: Tensor) -> Tensor:
-        """
-        @brief
-        """
-        raise NotImplementedError(f"hessian_basis is not supported by {self.__class__.__name__}"
-                                  "or it has not been implmented.")
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param index: indices of basis.
 
-    def convect_basis(self, p: Tensor, coef: Tensor) -> Tensor:
+        @return: Tensor.
         """
-        @brief
-        """
-        return torch.einsum('d, nfd -> nf', coef, self.grad_basis(p))
+        func = lambda p: self.basis(p, index=index)
+        if p.ndim == 1:
+            return jacfwd(func)(p)
+        return vmap(jacfwd(func), 0, 0)(p)
 
-    def laplace_basis(self, p: Tensor, coef: Optional[Tensor]=None) -> Tensor:
+    def hessian_basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
-        @brief Return value of the Laplace operator acting on the basis functions.
-        """
-        raise NotImplementedError(f"laplace_basis is not supported by {self.__class__.__name__}"
-                                  "or it has not been implmented.")
+        @brief Return hessian matrix of basis, with shape (..., #basis, #dims, #dims).
 
-    def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param index: indices of basis.
+
+        @return: Tensor.
         """
-        @brief
+        func = lambda p: self.basis(p, index=index)
+        if p.ndim == 1:
+            return hessian(func)(p)
+        return vmap(hessian(func), 0, 0)(p)
+
+    def convect_basis(self, p: Tensor, *, coef: Tensor, index=_S) -> Tensor:
+        """
+        @brief Return convection item, with shape (..., #basis).
+
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param coef: Tensor. The coefficient of the gradient term, or the velocity\
+               of the flow field. `coef` must has shape (#dims, ) or (..., #dims).
+        @param index: indices of basis.
+
+        @return: Tensor.
+        """
+        if coef.ndim == 1:
+            return torch.einsum('d, ...fd -> ...f', coef, self.grad_basis(p, index=index))
+        else:
+            return torch.einsum('...d, ...fd -> ...f', coef, self.grad_basis(p, index=index))
+
+    def laplace_basis(self, p: Tensor, *, index=_S) -> Tensor:
+        """
+        @brief Return value of the Laplacian operator acting on the basis functions,\
+               with shape (..., #basis).
+
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param index: indices of basis.
+
+        @return: Tensor.
+        """
+        hes_func = hessian(lambda p: self.basis(p, index=index))
+        lap_func = lambda x: torch.sum(torch.diagonal(hes_func(x), 0, -1, -2), dim=-1)
+        if p.ndim == 1:
+            return lap_func(p)
+        return vmap(lap_func, 0, 0)(p)
+
+    def derivative_basis(self, p: Tensor, *idx: int, index=_S) -> Tensor:
+        """
+        @brief Return specified partial derivatives of basis, with shape (..., #basis).
+
+        @param p: input Tensor. In the shape of (..., #dims).
+        @param *idx: int. Index of the independent variable to take partial derivatives.
+
+        @return: Tensor.
         """
         raise NotImplementedError(f"derivative_basis is not supported by {self.__class__.__name__}"
                                   "or it has not been implmented.")
 
 
-_FS = TypeVar('_FS', bound=FunctionSpaceBase)
+_FS = TypeVar('_FS', bound=FunctionSpace)
 
 class Function(TensorMapping, Generic[_FS]):
     """
