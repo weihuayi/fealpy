@@ -1,13 +1,14 @@
 import numpy as np
 from typing import Optional, Union, Callable
 from .Function import Function
-from ..decorator import barycentric
+from ..decorator import barycentric, cartesian
 from .fem_dofs import *
 
 class LagrangeFESpace():
     DOF = { 'C': {
                 "IntervalMesh": IntervalMeshCFEDof,
                 "TriangleMesh": TriangleMeshCFEDof,
+                "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
                 "QuadrangleMesh" : QuadrangleMeshCFEDof,
                 "HexahedronMesh" : HexahedronMeshCFEDof,
@@ -16,6 +17,7 @@ class LagrangeFESpace():
             'D':{
                 "IntervalMesh": IntervalMeshDFEDof,
                 "TriangleMesh": TriangleMeshDFEDof,
+                "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
                 "QuadrangleMesh" : QuadrangleMeshDFEDof,
                 "HexahedronMesh" : HexahedronMeshDFEDof,
@@ -126,6 +128,22 @@ class LagrangeFESpace():
         p = self.p
         phi = self.mesh.face_shape_function(bc, p=p)
         return phi[..., None, :]
+
+    @cartesian
+    def function_value(self, uh, points, loc=None):
+        """
+        @brief 计算被给有限元函数的在 cartesian 坐标 points 处的函数值
+               注意，要求网格具有 find_node 函数
+        @param points: (NP, 2)
+        """
+        assert hasattr(self.mesh, 'find_point_in_triangle_mesh')
+        loc, bc = self.mesh.find_point_in_triangle_mesh(points, loc) #bc : (NP, 3)
+
+        TD = points.shape[-1]
+        phi = self.basis(bc) #(NP, ldof)
+        e2d = uh.space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
+        val = np.sum(phi[..., 0, :]*uh[e2d], axis=-1)
+        return loc, val 
 
     @barycentric
     def value(self, 
@@ -308,3 +326,20 @@ class LagrangeFESpace():
             return self.function(dim=dim, array=uI, dtype=uI.dtype)
         else:
             return self.function(dim=dim, array=uI, dtype=dtype)
+
+    def interpolation_fe_function(self, uh, dim=None, dtype=None):
+        """
+        @brief 对有限元函数 uh 进行插值 
+        """
+        assert callable(uh)
+
+        cell2dof = self.dof.cell2dof
+        ips = self.interpolation_points()[cell2dof] #(NC, ldof, 3)
+        uI = np.zeros(ips.shape[:-1], dtype=self.ftype)
+        loc = None
+        for i in range(ips.shape[1]):
+            loc, uI[:, i] = uh.space.function_value(uh, ips[:, i], loc)
+
+        uI0 = self.function()
+        uI0[cell2dof] = uI
+        return uI0 
