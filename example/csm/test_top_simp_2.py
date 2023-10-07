@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix, csc_matrix
 from scipy.sparse.linalg import spsolve
 
-class TopSimp:
+class TopSimp_2:
     '''
-    One load MBB-Beam
+    One load short cantilever
     '''
-    def __init__(self, nelx: int = 60, nely: int = 20, volfrac: float = 0.5, 
-                 E: float = 1.0, nu: float = 0.3, penal: float = 3.0, rmin: float = 1.5):
+    def __init__(self, nelx: int = 32, nely: int = 20, volfrac: float = 0.4, 
+                 E: float = 1.0, nu: float = 0.3, penal: float = 3.0, rmin: float = 1.2):
         self._nelx = nelx
         self._nely = nely
         self._volfrac = volfrac
@@ -47,11 +47,13 @@ class TopSimp:
                 n1 = (nely+1) * elx + ely
                 n2 = (nely+1) * (elx+1) + ely
                 edof = np.array([2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n2+2, 2*n2+3, 2*n1+2, 2*n1+3])
+                print("edof:", edof)
 
                 K[np.ix_(edof, edof)] += x[ely, elx] ** penal * KE
 
-        F[1] = -1
-        fixeddofs = np.union1d(np.arange(0, 2*(nely+1), 2), np.array([2*(nelx+1)*(nely+1) - 1]))
+        # print("K:\n", K.toarray().round(4))
+        F[2*(nelx+1)*(nely+1) - 1] = -1
+        fixeddofs = np.arange(2*(nely+1))
         alldofs = np.arange(2 * (nely+1) * (nelx+1))
         freedofs = np.setdiff1d(alldofs, fixeddofs)
         
@@ -112,6 +114,8 @@ class TopSimp:
             loop += 1
             xold = np.copy(x)
             U = self.FE(nelx, nely, penal, x)
+            # if loop == 1 or loop == 2:
+                # print(f"U for loop {loop}:", U.shape, U)
             KE = self.lk()
             c = 0 
             dc = np.zeros((nely, nelx)) 
@@ -129,17 +133,17 @@ class TopSimp:
             x = self.OC(nelx, nely, volfrac, x, dc)
 
             change = np.max(np.abs(x - xold))
-            print(f' Iter.: {loop:4d} Objective.: {c:10.4f} Volfrac.: {np.sum(x)/(nelx*nely):6.3f} change.: {change:6.3f}')
+            # print(f' Iter.: {loop:4d} Objective.: {c:10.4f} Volfrac.: {np.sum(x)/(nelx*nely):6.3f} change.: {change:6.3f}')
+            # 
+            # plt.imshow(-x, cmap='gray')
+            # plt.axis('off')
+            # plt.axis('equal')
+            # plt.draw()
+            # plt.pause(1e-5)
             
-            plt.imshow(-x, cmap='gray')
-            plt.axis('off')
-            plt.axis('equal')
-            plt.draw()
-            plt.pause(1e-5)
-            
-        plt.ioff()
-        plt.show()
+        # plt.ioff()
+        # plt.show()
 
 # 创建一个TopSimp对象实例
-tsp = TopSimp()
+tsp = TopSimp_2(nelx=6, nely=5)
 print(tsp.optimize())
