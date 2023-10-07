@@ -2,7 +2,7 @@
 Activation Functions
 """
 
-from torch import Tensor, exp, sin, cos, tanh, abs, pi
+from torch import Tensor, exp, sin, cos, tanh, abs
 import scipy.special as sp
 from torch.nn import Module
 
@@ -133,13 +133,13 @@ class Tanh(Activation):
 class Besselj0(Activation):
     def forward(self, p: Tensor):
         return sp.jn(0, p)
-    
+
     def d1(self, p: Tensor):
         return -sp.jn(1, p)
-    
+
     def d2(self, p: Tensor):
         return 1/2 * (-sp.jn(0, p) + sp.jn(2, p))
-    
+
     def d3(self, p: Tensor):
         return 1/4 * (3 * sp.jn(1, p) - sp.jn(3, p))
 

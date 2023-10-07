@@ -316,6 +316,25 @@ class TriangleMesh(Mesh, Plotable):
     face_normal = edge_normal
     face_unit_normal = edge_unit_normal
 
+    def sphere_surface_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算单位球面三角形网格中每个面上的单位法线
+        """
+        assert self.geo_dimension() == 3
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+
+        nv = np.cross(v1, v2)
+        length = np.linalg.norm(nv, axis=-1, keepdims=True)
+
+        n = nv/length
+        return 0
+
+
     def grad_lambda(self, index=np.s_[:]):
         node = self.entity('node')
         cell = self.entity('cell')
@@ -335,9 +354,9 @@ class TriangleMesh(Mesh, Plotable):
         elif GD == 3:
             length = np.linalg.norm(nv, axis=-1, keepdims=True)
             n = nv/length
-            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
-            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
-            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
+            Dlambda[:, 0] = np.cross(n, v0)/length
+            Dlambda[:, 1] = np.cross(n, v1)/length
+            Dlambda[:, 2] = np.cross(n, v2)/length
         return Dlambda
 
     def rot_lambda(self, index=np.s_[:]):

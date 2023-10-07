@@ -76,7 +76,7 @@ A = A_tensor.detach().cpu().numpy()
 b = b_tensor.detach().cpu().numpy()
 
 um = solve(A.T@A, A.T@b)
-solution = Function(space, 1, torch.from_numpy(um))
+solution = Function(space, torch.from_numpy(um))
 
 #计算L2误差
 error = solution.estimate_error_tensor(real_solution, mesh=mesh_err)

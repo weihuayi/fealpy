@@ -38,7 +38,6 @@ class DiffusionIntegrator:
         phi0 = space0.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
-
         if coef is None:
             D += np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
         else:

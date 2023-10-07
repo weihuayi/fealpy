@@ -102,7 +102,7 @@ b_ = csr_matrix(b_.detach().cpu().numpy())
 um = spsolve(A_.T@A_, A_.T@b_)
 del A_, b_
 
-model = Function(space, 1, torch.from_numpy(um))
+model = Function(space, torch.from_numpy(um))
 
 
 from matplotlib import pyplot as plt
