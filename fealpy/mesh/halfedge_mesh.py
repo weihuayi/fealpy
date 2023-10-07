@@ -295,6 +295,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             cell[jdx] = halfedge[halfedge[cell2hedge[idx, jdx], 4], 1]
         return cell
 
+########################### 三角形网格的接口 ####################################
     def find_point_in_triangle_mesh(self, points, start=None):
         """
         @brief 在三角形网格中查找给定点的位置单元格和重心坐标。
@@ -393,8 +394,53 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 # 更新未找到位置单元格的点的状态和起始单元格索引
                 isNotOK[:] = False
                 isNotOK[index] = True
+
                 start[index] = halfedge[halfedge[cell2hedge[current[idx], jdx], 4], 1]
             return start, bc
+
+    def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
+        """
+        @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
+        """
+        if self.ds.NV==3:
+            R = self._grad_shape_function(bc, p)
+            if variables == 'x':
+                Dlambda = self.grad_lambda(index=index)
+                gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
+                return gphi #(NQ, NC, ldof, GD)
+            elif variables == 'u':
+                return R #(NQ, ldof, TD+1)
+        else:
+            pass
+
+    def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
+        """
+        @brief 计算单元上所有形函数在边上的积分点处的导函数值
+
+        @param bc 边上的一组积分点
+        @param cindex 边所在的单元编号
+        @param lidx 边在该单元的局部编号
+        @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致
+        """
+
+        NC = len(cindex)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NC, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NC)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
+
+        return gphi
+
+    grad_shape_function_on_face = grad_shape_function_on_edge
 
     def line_to_cell(self, point, segment):
         """
@@ -2112,24 +2158,20 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             self.refine_triangle_nvb(isMarkedCell, options=options)
         elif method=='rg':
             self.refine_triangle_rg(isMarkedCell, options=options)
-        elif method=='quad':
-            self.refine_quad(isMarkedCell, options=options)
+        #elif method=='quad':
+        #    self.refine_quad(isMarkedCell, options=options)
         elif method=='poly':
             self.refine_poly(isMarkedCell, options=options)
 
     def adaptive_coarsen(self, isMarkedCell, method="nvb", options={}):
-        cstart = self.ds.cellstart
-        NC = self.number_of_all_cells()
-        isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
-        isMarkedCell0[cstart:] = isMarkedCell
         if method=='nvb':
-            self.coarsen_triangle_nvb(isMarkedCell0, options=options)
+            self.coarsen_triangle_nvb(isMarkedCell, options=options)
         elif method=='rg':
-            self.coarsen_triangle_rg(isMarkedCell0, options=options)
-        elif method=='quad':
-            self.coarsen_quad(isMarkedCell0, options=options)
+            self.coarsen_triangle_rg(isMarkedCell, options=options)
+        #elif method=='quad':
+        #    self.coarsen_quad(isMarkedCell, options=options)
         elif method=='poly':
-            self.coarsen_poly(isMarkedCell0, options=options)
+            self.coarsen_poly(isMarkedCell, options=options)
 
     def uniform_refine(self, n=1):
         if self.ds.NV == 3:
@@ -2385,39 +2427,28 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         writer.SetInputData(uGrid)
         writer.Write()
 
-    def grad_lambda(self):
-        """
-
-        Notes
-        -----
-
-        计算三角形网格上的重心坐标函数的梯度。
-        """
-
-        assert self.ds.NV == 3 # 必须是三角形网格
-
+    def grad_lambda(self, index=np.s_[:]):
         node = self.entity('node')
         cell = self.entity('cell')
-        NC = self.number_of_cells()
-
-        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
-        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
         GD = self.geo_dimension()
-        nv = np.cross(v2, -v1)
+        nv = np.cross(v1, v2)
         Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
         if GD == 2:
             length = nv
             W = np.array([[0, 1], [-1, 0]])
-            Dlambda[:, 0, :] = v0@W/length.reshape((-1, 1))
-            Dlambda[:, 1, :] = v1@W/length.reshape((-1, 1))
-            Dlambda[:, 2, :] = v2@W/length.reshape((-1, 1))
+            Dlambda[:, 0] = v0@W/length[:, None]
+            Dlambda[:, 1] = v1@W/length[:, None]
+            Dlambda[:, 2] = v2@W/length[:, None]
         elif GD == 3:
-            length = np.sqrt(np.square(nv).sum(axis=1))
-            n = nv/length.reshape((-1, 1))
-            Dlambda[:, 0, :] = np.cross(n, v0)/length.reshape((-1,1))
-            Dlambda[:, 1, :] = np.cross(n, v1)/length.reshape((-1,1))
-            Dlambda[:, 2, :] = np.cross(n, v2)/length.reshape((-1,1))
+            length = np.linalg.norm(nv, axis=-1, keepdims=True)
+            n = nv/length
+            Dlambda[:, 0] = np.cross(n, v0)/length
+            Dlambda[:, 1] = np.cross(n, v1)/length
+            Dlambda[:, 2] = np.cross(n, v2)/length
         return Dlambda
 
     ## @ingroup MeshGenerators
@@ -3089,28 +3120,39 @@ class HalfEdgeMesh2dDataStructure():
         """
         @brief 插值点总数
         """
-        gdof = self.NN 
-        if p > 1:
-            NE = self.number_of_edges()
-            NC = self.number_of_cells()
-            gdof += NE*(p-1) + NC*(p-1)*p//2
-        return gdof
+        if self.NV==3:
+            return self.NN + (p-1)*self.NE + (p-2)*(p-1)//2*self.NC
+        else:
+            gdof = self.NN 
+            if p > 1:
+                NE = self.number_of_edges()
+                NC = self.number_of_cells()
+                gdof += NE*(p-1) + NC*(p-1)*p//2
+            return gdof
 
     def number_of_local_ipoints(self,
             p: int, iptype: Union[int, str]='all') -> Union[NDArray, int]:
         """
         @brief 获取局部插值点的个数
         """
-        if iptype in {'all'}:
-            NV = self.ds.number_of_vertices_of_cells()
-            ldof = NV + (p-1)*NV + (p-1)*p//2
-            return ldof
-        elif iptype in {'cell', 2}:
-            return (p-1)*p//2
-        elif iptype in {'edge', 'face', 1}:
-            return (p+1)
-        elif iptype in {'node', 0}:
-            return 1
+        if self.NV==3:
+            if iptype in {'cell', 2}:
+                return (p+1)*(p+2)//2
+            elif iptype in {'face', 'edge',  1}: # 包括两个顶点
+                return p + 1
+            elif iptype in {'node', 0}:
+                return 1
+        else:
+            if iptype in {'all'}:
+                NV = self.ds.number_of_vertices_of_cells()
+                ldof = NV + (p-1)*NV + (p-1)*p//2
+                return ldof
+            elif iptype in {'cell', 2}:
+                return (p-1)*p//2
+            elif iptype in {'edge', 'face', 1}:
+                return (p+1)
+            elif iptype in {'node', 0}:
+                return 1
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
@@ -3237,6 +3279,19 @@ class HalfEdgeMesh2dDataStructure():
         isBdNode[halfedge[isBdHEdge, 0]] = True 
         return isBdNode
 
+    def nex_boundary_halfedge(self):
+        halfedge = self.halfedge
+        isBDHEdge = self.boundary_halfedge_flag()
+        bdHEdge = np.where(isBDHEdge)[0]
+        nex = 100000*np.ones(self.NHE, dtype=np.int_)
+        nex[bdHEdge] = halfedge[bdHEdge, 2]
+
+        isNotOK = np.ones(bdHEdge.shape, dtype=np.bool_)
+        while np.any(isNotOK):
+            nex[bdHEdge[isNotOK]] = halfedge[halfedge[nex[bdHEdge[isNotOK]], 4], 2]
+            isNotOK = ~isBDHEdge[nex[bdHEdge]]
+        return nex
+
     def boundary_halfedge_flag(self):
         return self.halfedge[:, 4]==np.arange(self.NHE)
 
@@ -3245,6 +3300,8 @@ class HalfEdgeMesh2dDataStructure():
         hedge = self.hedge
         isBdEdge = hedge[:] == halfedge[hedge, 4] 
         return isBdEdge 
+
+    boundary_face_flag = boundary_edge_flag
 
     def boundary_cell_flag(self):
         NN = self.NN
@@ -3264,6 +3321,13 @@ class HalfEdgeMesh2dDataStructure():
         isBdEdge = self.boundary_edge_flag()
         idx, = np.nonzero(isBdEdge)
         return idx
+
+    def boundary_halfedge_index(self):
+        isBdHEdge = self.boundary_halfedge_flag()
+        idx, = np.nonzero(isBdHEdge)
+        return idx
+
+    boundary_face_index = boundary_edge_index
 
     def boundary_cell_index(self):
         NN = self.NN

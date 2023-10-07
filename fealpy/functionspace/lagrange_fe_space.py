@@ -137,12 +137,22 @@ class LagrangeFESpace():
         @param points: (NP, 2)
         """
         assert hasattr(self.mesh, 'find_point_in_triangle_mesh')
-        loc, bc = self.mesh.find_point_in_triangle_mesh(points, loc) #bc : (NP, 3)
+        if isinstance(uh, list):
+            loc, bc = self.mesh.find_point_in_triangle_mesh(points, loc) #bc : (NP, 3)
 
-        TD = points.shape[-1]
-        phi = self.basis(bc) #(NP, ldof)
-        e2d = uh.space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
-        val = np.sum(phi[..., 0, :]*uh[e2d], axis=-1)
+            TD = points.shape[-1]
+            phi = self.basis(bc) #(NP, ldof)
+            e2d = uh[0].space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
+            val = np.zeros((len(uh), )+e2d.shape[:-1], dtype=np.float_)
+            for i in range(len(uh)):
+                val[i] = np.sum(phi[..., 0, :]*uh[i][e2d], axis=-1)
+        else:
+            loc, bc = self.mesh.find_point_in_triangle_mesh(points, loc) #bc : (NP, 3)
+
+            TD = points.shape[-1]
+            phi = self.basis(bc) #(NP, ldof)
+            e2d = uh.space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
+            val = np.sum(phi[..., 0, :]*uh[e2d], axis=-1)
         return loc, val 
 
     @barycentric
@@ -331,15 +341,27 @@ class LagrangeFESpace():
         """
         @brief 对有限元函数 uh 进行插值 
         """
-        assert callable(uh)
+        if isinstance(uh, list):
+            N = len(uh)
+            cell2dof = self.dof.cell2dof
+            ips = self.interpolation_points()[cell2dof] #(NC, ldof, 3)
+            uI = np.zeros((N, )+ips.shape[:-1], dtype=self.ftype)
+            loc, _ = uh[0].space.mesh.find_point_in_triangle_mesh(self.mesh.entity_barycenter("cell"))
+            for i in range(ips.shape[1]):
+                loc, uI[..., i] = uh[0].space.function_value(uh, ips[:, i], loc)
 
-        cell2dof = self.dof.cell2dof
-        ips = self.interpolation_points()[cell2dof] #(NC, ldof, 3)
-        uI = np.zeros(ips.shape[:-1], dtype=self.ftype)
-        loc = None
-        for i in range(ips.shape[1]):
-            loc, uI[:, i] = uh.space.function_value(uh, ips[:, i], loc)
+            uI0 = [self.function() for i in range(N)]
+            for i in range(N):
+                uI0[i][cell2dof] = uI[i]
+        else:
+            assert callable(uh)
+            cell2dof = self.dof.cell2dof
+            ips = self.interpolation_points()[cell2dof] #(NC, ldof, 3)
+            uI = np.zeros(ips.shape[:-1], dtype=self.ftype)
+            loc, _ = uh.space.mesh.find_point_in_triangle_mesh(self.mesh.entity_barycenter("cell"))
+            for i in range(ips.shape[1]):
+                loc, uI[:, i] = uh.space.function_value(uh, ips[:, i], loc)
 
-        uI0 = self.function()
-        uI0[cell2dof] = uI
+            uI0 = self.function()
+            uI0[cell2dof] = uI
         return uI0 
