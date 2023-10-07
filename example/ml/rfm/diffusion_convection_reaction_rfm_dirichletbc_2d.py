@@ -14,7 +14,7 @@ from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 PI = torch.pi
 
-d = torch.tensor([0.01, 0.01], dtype=torch.float64)
+d = torch.tensor(0.01, dtype=torch.float64)
 b = torch.tensor([10.0, 10.0], dtype=torch.float64)
 c = torch.tensor(1.0, dtype=torch.float64)
 
@@ -34,7 +34,7 @@ def boundary(p: Tensor):
 def source(p: Tensor):
     x = p[..., 0:1]
     y = p[..., 1:2]
-    return d[0] * PI**2 * cos(PI*x) * cos(PI*y) + d[1] * PI**2 * cos(PI*x) * cos(PI*y)\
+    return d * PI**2 * cos(PI*x) * cos(PI*y) + d * PI**2 * cos(PI*x) * cos(PI*y)\
            - b[0] * PI * sin(PI*x) * cos(PI*y) - b[1] * PI * cos(PI*x) * sin(PI*y)\
            + c * cos(PI*x) * cos(PI*y)
 
@@ -55,7 +55,7 @@ bdry_flag = mesh_col.ds.boundary_node_flag()
 col_in = torch.from_numpy(mesh_col.entity('node', index=~bdry_flag))
 col_bd = torch.from_numpy(mesh_col.entity('node', index=bdry_flag))
 
-diffusion = space.laplace_basis(col_in, coef=d)
+diffusion = space.laplace_basis(col_in) * d
 convection = torch.einsum("nfd, d -> nf", space.grad_basis(col_in), b)
 reaction = c * space.basis(col_in)
 
@@ -70,7 +70,7 @@ b_ = torch.cat([source(col_in) / QI,
                 boundary(col_bd) / QB], dim=0)
 
 um = torch.linalg.solve(A_.T@A_, A_.T@b_)
-model = Function(space, 1, um)
+model = Function(space, um)
 end_time = time()
 
 mesh_err = TriangleMesh.from_box([0, 1, 0, 1], nx=30, ny=30)
