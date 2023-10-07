@@ -13,13 +13,14 @@ class BeamBase:
         return length_in_mm, force_in_newtons
 
 
-class Beam_2d_cantilever():
+class Beam_2d_cantilever_simply_supported():
     def __init__(self):
         self.I = 118.6e-6 # 惯性矩 m^4
         self.E = 200e9 # 弹性模量 newton/m^2
+        self.A = 6650e-6 # 横截面积 m^2
 
     def init_mesh(self):
-        mesh = EdgeMesh.from_cantilever()
+        mesh = EdgeMesh.from_cantilever_simply_supported()
         return mesh
 
 

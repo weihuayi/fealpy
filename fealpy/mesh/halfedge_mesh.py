@@ -11,11 +11,14 @@ Authors
 
 import time
 import numpy as np
+import gmsh
+
 from typing import Union
 from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse.csgraph import minimum_spanning_tree
+from scipy.spatial import cKDTree
 
 from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
 from .mesh_base import Mesh, Plotable
@@ -59,7 +62,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         self.node = DynamicArray(node, dtype = node.dtype)
         self.ds = HalfEdgeMesh2dDataStructure(halfedge, NN = node.shape[0], NC=NC, NV=NV)
-        self.meshtype = 'halfedge2d'
+        self.meshtype = 'HalfEdgeMeshedge2d'
 
         self.celldata = {}
         self.nodedata = {}
@@ -77,6 +80,12 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         if initlevel:
             self.init_level_info()
+
+        if NV==3:
+            self.shape_function = self._shape_function
+            self.cell_shape_function = self._shape_function
+            self.face_shape_function = self._shape_function
+            self.edge_shape_function = self._shape_function
 
     @classmethod
     def from_mesh(cls, mesh, NV=None):
@@ -180,15 +189,15 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         clevel = self.celldata['level']
         while True:
             NC = self.number_of_cells()
-            NE = self.number_of_edges()
+            NHE = self.ds.number_of_halfedges()
 
             end = halfedge[:, 0]
-            start = halfedge[halfedge[:, 4], 0]
+            start = halfedge[halfedge[:, 3], 0]
             vector = node[end] - node[start]#所有边的方向
             vectornex = vector[halfedge[:, 2]]#所有边的下一个边的方向
 
             angle0 = angle(vectornex, -vector)#所有边的反方向与下一个边的角度
-            badHEdge, = np.where(angle0 > np.pi*17/18)#夹角大于170度的半边
+            badHEdge, = np.where(angle0 > np.pi)#夹角大于170度的半边
             badCell, idx= np.unique(halfedge[badHEdge, 1], return_index=True)#每个单元每次只处理中的一个
             badHEdge = badHEdge[idx]#现在坏半边的单元都不同
             badNode = halfedge[badHEdge, 0]
@@ -218,24 +227,24 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             halfedgeNew[:NE1, 1] = halfedge[badHEdge, 1].copy()
             halfedgeNew[:NE1, 2] = halfedge[goodHEdge, 2].copy()
             halfedgeNew[:NE1, 3] = badHEdge.copy()
-            halfedgeNew[:NE1, 4] = np.arange(NE*2+NE1, NE*2+NE1*2)
+            halfedgeNew[:NE1, 4] = np.arange(NHE+NE1, NHE+NE1*2)
 
             halfedgeNew[NE1:, 0] = halfedge[badHEdge, 0].copy()
             halfedgeNew[NE1:, 1] = np.arange(NC, NC+NE1)
             halfedgeNew[NE1:, 2] = halfedge[badHEdge, 2].copy()
             halfedgeNew[NE1:, 3] = goodHEdge.copy()
-            halfedgeNew[NE1:, 4] = np.arange(NE*2, NE*2+NE1)
+            halfedgeNew[NE1:, 4] = np.arange(NHE, NHE+NE1)
 
-            halfedge[halfedge[goodHEdge, 2], 3] = np.arange(NE*2, NE*2+NE1)
-            halfedge[halfedge[badHEdge, 2], 3] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedge[badHEdge, 2] = np.arange(NE*2, NE*2+NE1)
-            halfedge[goodHEdge, 2] = np.arange(NE*2+NE1, NE*2+NE1*2)
+            halfedge[halfedge[goodHEdge, 2], 3] = np.arange(NHE, NHE+NE1)
+            halfedge[halfedge[badHEdge, 2], 3] = np.arange(NHE+NE1, NHE+NE1*2)
+            halfedge[badHEdge, 2] = np.arange(NHE, NHE+NE1)
+            halfedge[goodHEdge, 2] = np.arange(NHE+NE1, NHE+NE1*2)
             isNotOK = np.ones(NE1, dtype=np.bool_)
-            nex = halfedge[-NE1:, 2]
+            nex = halfedge[len(halfedge)-NE1:, 2]
             while isNotOK.any():
                 halfedge[nex[isNotOK], 1] = np.arange(NC, NC+NE1)[isNotOK]
                 nex = halfedge[nex, 2]
-                flag = (nex==np.arange(NE*2+NE1, NE*2+NE1*2)) & isNotOK
+                flag = (nex==np.arange(NHE+NE1, NHE+NE1*2)) & isNotOK
                 isNotOK[flag] = False
 
             #单元层
@@ -251,23 +260,27 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             if len(badHEdge)==0:
                 break
 
-    def location(self, points):
+    def find_point(self, points, start=None): 
         """
-        @brief Find the location cell of given points in the grid.
+        @brief 在网格中查找给定点的位置单元格。
 
-        @param points numpy.ndarray An array of points with shape (NP, 2), 
-            where NP is the number of points.
+        @param points numpy.ndarray 具有形状 (NP, 2) 的点数组，其中 NP 是点的数量。
 
-        @return numpy.ndarray An array of integers representing the location 
-            cells for each point.
+        @param start numpy.ndarray 可选。具有形状 (NP,) 的整数数组，表示每个点的起始单元格索引。如果未提供，默认为零。
+
+        @param return_lambda bool 可选。如果为 True，则返回每个点 lambda 值，否则返回单元格索引。默认为 False。
+
+        @return numpy.ndarray 如果 return_lambda 为 True，则返回一个整数数组，表示每个点在所在单元的重心坐标。
         """
-
         halfedge = self.entity('halfedge')
         node = self.entity('node')
         hcell = self.ds.hcell
 
+        cm = self.entity_measure('cell')
+
         NP = points.shape[0]
-        cell = np.ones(NP, dtype=self.itype)
+        start = np.zeros(NP, dtype=self.itype) if start is None else start
+
         isNotOK = np.ones(NP, dtype=np.bool_)
         while isNotOK.any():
             cell2hedge = np.c_[hcell[cell],
@@ -281,6 +294,107 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             isNotOK[jdx]=True
             cell[jdx] = halfedge[halfedge[cell2hedge[idx, jdx], 4], 1]
         return cell
+
+    def find_point_in_triangle_mesh(self, points, start=None):
+        """
+        @brief 在三角形网格中查找给定点的位置单元格和重心坐标。
+
+        @param points numpy.ndarray 具有形状 (NP, 2) 的点数组，其中 NP 是点的数量。
+
+        @param start numpy.ndarray 可选。具有形状 (NP,) 的整数数组，表示每个点的起始单元格索引。如果未提供，默认为零。
+
+        @return numpy.ndarray 具有形状 (NP,) 的整数数组，表示每个点的位置单元格索引。
+                numpy.ndarray 具有形状 (NP, 3) 的浮点数数组，表示每个点的重心坐标（barycentric coordinates）。
+        """
+
+        # 获取网格的半边、节点和单元格信息
+        halfedge = self.entity('halfedge')
+        node = self.entity('node')
+        cell = self.entity('cell')
+        hcell = self.ds.hcell
+
+        # 计算每个单元格的测度（measure），并乘以2.0
+        cm = self.entity_measure('cell')[:, None] * 2.0
+
+        # 获取点的数量
+        NP = points.shape[0]
+        NC = hcell.shape[0]
+
+        if start is None: 
+            if self.ds.tree is None:
+                self.tree = cKDTree(node[halfedge[hcell, 0]])
+            start = self.tree.query(points, k=1)[1]
+
+        ## NP < NC//2 和 NP > NC//2, 出于效率的原因分成两个情况
+        if NP < NC//2:
+            # 创建用于存储计算结果的数组
+            cell2hedge = np.zeros((NP, 3), dtype=np.int_)
+            cell2vector = np.zeros((NP, 3, 2), dtype=np.float_)
+            vector = np.zeros((NP, 3, 2), dtype=np.float_)
+            bc = np.zeros((NP, 3), dtype=np.float_)
+
+            # 创建用于跟踪哪些点尚未找到其位置单元格的布尔数组
+            isNotOK = np.ones(NP, dtype=np.bool_)
+
+            # 进入循环，直到所有点都找到了位置单元格
+            while isNotOK.any():
+                # 计算每个点所在的单元格到其相邻半边的映射
+                cell2hedge[isNotOK, 0] = hcell[start[isNotOK]]
+                cell2hedge[isNotOK, 1] = halfedge[hcell[start[isNotOK]], 2]
+                cell2hedge[isNotOK, 2] = halfedge[hcell[start[isNotOK]], 3]
+
+                # 计算每个点到其相邻半边的向量以及到目标点的向量
+                cell2vector[isNotOK] = node[halfedge[cell2hedge[isNotOK], 0]] - node[
+                        halfedge[halfedge[cell2hedge[isNotOK], 3], 0]]
+                vector[isNotOK] = points[isNotOK][:, None] - node[
+                        halfedge[halfedge[cell2hedge[isNotOK], 3], 0]]
+
+                # 计算每个点的重心坐标（barycentric coordinates）
+                bc[isNotOK] = np.cross(cell2vector[isNotOK], vector[isNotOK]) / cm[start[isNotOK]]
+
+                # 找到重心坐标中小于零的点
+                idx, jdx = np.where(bc[isNotOK] < 0)
+                index = np.where(isNotOK)[0][idx]
+
+                # 更新未找到位置单元格的点的状态和起始单元格索引
+                isNotOK[:] = False
+                isNotOK[index] = True
+                start[index] = halfedge[halfedge[cell2hedge[index, jdx], 4], 1]
+            return start, bc
+        else:
+            cell2hedge = np.zeros((NC, 3), dtype=np.int_)
+            cell2hedge[:, 0] = hcell[:]
+            cell2hedge[:, 1] = halfedge[hcell[:], 2]
+            cell2hedge[:, 2] = halfedge[hcell[:], 3]
+
+            # 计算每个点到其相邻半边的向量以及到目标点的向量
+            #cell2vector = node[halfedge[cell2hedge, 0]] - node[
+            #        halfedge[halfedge[cell2hedge, 3], 0]]
+            cell2vector = node[cell[:, [2, 0, 1]]] - node[cell[:, [1, 2, 0]]]
+
+            bc = np.zeros((NP, 3), dtype=np.float_)
+
+            # 创建用于跟踪哪些点尚未找到其位置单元格的布尔数组
+            isNotOK = np.ones(NP, dtype=np.bool_)
+
+            # 进入循环，直到所有点都找到了位置单元格
+            while isNotOK.any():
+                # 计算每个点到其相邻半边的向量以及到目标点的向量
+                current = start[isNotOK]
+                vector = points[isNotOK][:, None] - node[cell[current][:, [1, 2, 0]]]
+
+                # 计算每个点的重心坐标（barycentric coordinates）
+                bc[isNotOK] = np.cross(cell2vector[current], vector)/cm[current]
+
+                # 找到重心坐标中小于零的点
+                idx, jdx = np.where(bc[isNotOK] < 0)
+                index = np.where(isNotOK)[0][idx]
+
+                # 更新未找到位置单元格的点的状态和起始单元格索引
+                isNotOK[:] = False
+                isNotOK[index] = True
+                start[index] = halfedge[halfedge[cell2hedge[current[idx], jdx], 4], 1]
+            return start, bc
 
     def line_to_cell(self, point, segment):
         """
@@ -421,89 +535,27 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         """
         @brief 插值点总数
         """
-        gdof = self.number_of_nodes()
-        if p > 1:
-            NE = self.number_of_edges()
-            NC = self.number_of_cells()
-            gdof += NE*(p-1) + NC*(p-1)*p//2
-        return gdof
+        return self.ds.number_of_global_ipoints(p)
 
     def number_of_local_ipoints(self,
             p: int, iptype: Union[int, str]='all') -> Union[NDArray, int]:
         """
         @brief 获取局部插值点的个数
         """
-        if iptype in {'all'}:
-            NV = self.ds.number_of_vertices_of_cells()
-            ldof = NV + (p-1)*NV + (p-1)*p//2
-            return ldof
-        elif iptype in {'cell', 2}:
-            return (p-1)*p//2
-        elif iptype in {'edge', 'face', 1}:
-            return (p+1)
-        elif iptype in {'node', 0}:
-            return 1
+        return self.ds.number_of_local_ipoints(p, iptype)
 
     def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
         @brief
         """
-        cell = self.entity('cell')
-        if p == 1:
-            return cell[index]
-        else:
-            NC = self.number_of_cells()
-            ldof = self.number_of_local_ipoints(p, iptype='all')
-
-            location = np.zeros(NC+1, dtype=self.itype)
-            location[1:] = np.add.accumulate(ldof)
-
-            cell2ipoint = np.zeros(location[-1], dtype=self.itype)
-
-            edge2ipoint = self.edge_to_ipoint(p)
-            edge2cell = self.ds.edge_to_cell()
-
-            idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-            cell2ipoint[idx] = edge2ipoint[:, 0:p]
-
-            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-            idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
-            cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
-
-            NN = self.number_of_nodes()
-            NV = self.ds.number_of_vertices_of_cells()
-            NE = self.number_of_edges()
-            cdof = self.number_of_local_ipoints(p, iptype='cell')
-            idx = (location[:-1] + NV*p).reshape(-1, 1) + np.arange(cdof)
-            cell2ipoint[idx] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
-            return np.hsplit(cell2ipoint, location[1:-1])[index]
+        return self.ds.cell_to_ipoint(p, index)
 
     def edge_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
         """
         @brief 获取网格边与插值点的对应关系
 
         """
-        if isinstance(index, slice) and index == slice(None):
-            NE = self.number_of_edges()
-            index = np.arange(NE)
-        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
-            index, = np.nonzero(index)
-            NE = len(index)
-        elif isinstance(index, list) and (type(index[0]) is np.bool_):
-            index, = np.nonzero(index)
-            NE = len(index)
-        else:
-            NE = len(index)
-
-        NN = self.number_of_nodes()
-
-        edge = self.entity('edge', index=index)
-        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
-        edge2ipoints[:, [0, -1]] = edge
-        if p > 1:
-            idx = NN + np.arange(p-1)
-            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx
-        return edge2ipoints
+        return self.ds.edge_to_ipoint(p, index)
 
     face_to_ipoint = edge_to_ipoint
 
@@ -593,6 +645,57 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         c[index] /=3*a[index, None]
         return c[index]
 
+    def interpolation_points(self, p: int, index=np.s_[:]):
+        assert self.ds.NV==3
+        cell = self.entity('cell')
+        node = self.entity('node')
+        if p == 1:
+            return node
+
+        if p > 1:
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+            GD = self.geo_dimension()
+
+            gdof = NN + NE*(p-1) + NC*(p-1)*(p-2)//2
+            ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoints[:NN, :] = node
+
+
+            edge = self.entity('edge')
+
+            w = np.zeros((p-1, 2), dtype=np.float64)
+            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w[:, 1] = w[-1::-1, 0]
+            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, GD)
+        if p > 2:
+            TD = self.top_dimension()
+            multiIndex = self.multi_index_matrix(p, TD)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
+                    isEdgeIPoints[:,2])
+            w = multiIndex[isInCellIPoints, :]/p
+
+            ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell, :]).reshape(-1, GD)
+        return ipoints # (gdof, GD)
+
+    def integrator(self, q, etype='cell'):
+        """
+        @brief 获取不同维度网格实体上的积分公式
+        """
+        if etype in {'cell', 2}:
+            from ..quadrature import TriangleQuadrature, PolygonMeshIntegralAlg 
+            if self.ds.NV==3: 
+                return TriangleQuadrature(q)
+            else:
+                return PolygonMeshIntegralAlg(q)
+        elif etype in {'edge', 'face', 1}:
+            from ..quadrature import GaussLegendreQuadrature
+            return GaussLegendreQuadrature(q)
+
     def delete_entity(self, isMarked, etype='node'):
         """
         @brief 删除 isMarked 对应的 etype 实体，调整 halfedge 中 etype 的编号
@@ -651,11 +754,10 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 if (~flag).all():
                     break
         elif method == 'rg':
-            color = self.hedgecolor
+            color = self.halfedgedata['color']
             isRedHEdge = color == 0
             isGreenHEdge = color == 1
             isOtherHEdge = (color == 2)|(color == 3)
-            halfedge = self.ds.halfedge
 
             # 当前半边的层标记小于等于所属单元的层标记
             flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0
@@ -680,7 +782,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 if (~flag).all():
                     break
         elif method == 'nvb':
-            color = self.hedgecolor
+            color = self.halfedgedata['color']
             isRedHEdge = color == 1
             isBlueHEdge = color == 0
             halfedge = self.entity('halfedge')
@@ -748,7 +850,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         hlevel.extend(np.zeros(NHE1, dtype=np.int_))
 
         self.ds.reinit()
-        return NE1
+        return NHE1
 
     def coarsen_halfedge(self, isMarkedHEdge):
         """
@@ -1007,6 +1109,503 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         flag = flag & (hlevel[:]==0) & (hlevel[halfedge[:, 2]]>0)
         self.coarsen_halfedge(flag)
 
+    def _refine_tri_cell_(self, isMarkedCell, isMarkedHEdge, options={}):
+        NC  = self.number_of_cells()
+        NC1 = isMarkedHEdge.sum()
+        NHE = self.ds.number_of_halfedges()
+
+        halfedge = self.entity("halfedge")
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+
+        current, = np.where(isMarkedHEdge)
+        pre = halfedge[current, 3]
+        ppre = halfedge[pre, 3]
+        nex = halfedge[current, 2]
+        nnex = halfedge[nex, 2]
+
+        cidx = halfedge[current, 1]
+        halfedge[nnex, 3] = np.arange(NHE+NC1, NHE+NC1*2)
+        halfedge[pre, 2] = np.arange(NHE+NC1, NHE+NC1*2)
+        halfedge[current, 1] = np.arange(NC, NC+NC1)
+        halfedge[current, 3] = np.arange(NHE, NHE+NC1)
+        halfedge[nex, 1] = np.arange(NC, NC+NC1)
+        halfedge[nex, 2] = np.arange(NHE, NHE+NC1)
+
+        halfedgeNew = halfedge.increase_size(NC1*2)
+        halfedgeNew[:NC1, 0] = halfedge[pre, 0]
+        halfedgeNew[:NC1, 1] = np.arange(NC, NC+NC1)
+        halfedgeNew[:NC1, 2] = current
+        halfedgeNew[:NC1, 3] = nex
+        halfedgeNew[:NC1, 4] = np.arange(NHE+NC1, NHE+NC1*2)
+
+        halfedgeNew[NC1:, 0] = halfedge[nex, 0]
+        halfedgeNew[NC1:, 1] = cidx
+        halfedgeNew[NC1:, 2] = nnex
+        halfedgeNew[NC1:, 3] = pre
+        halfedgeNew[NC1:, 4] = np.arange(NHE, NHE+NC1)
+
+        if ('HB' in options) and (options['HB'] is not None):
+            NC0 = NC-cstart
+            HB0 = np.zeros([NC0+NC1, 2], dtype=np.int_)
+            HB0[:, 0] = np.arange(NC0+NC1)
+            HB0[:NC0, 1] = np.arange(NC0)
+            HB0[NC0:, 1] = cidx-cstart
+            HB = options['HB']
+            HB0[:, 1] = HB[HB0[:, 1], 1]
+            options['HB'] = HB0
+
+        flag = isMarkedHEdge[halfedgeNew[NC1:, 2]]
+        current = np.where(flag)[0]+NC1
+        nexpre = halfedge[halfedgeNew[current, 2], 3]
+        prenex = halfedge[halfedgeNew[current, 3], 2]
+        halfedgeNew[current, 2] = halfedge[nexpre, 4]
+        halfedgeNew[current, 3] = halfedge[prenex, 4]
+
+        if ('numrefine' in options) & (NC1>0):
+            num = options['numrefine']
+            num = np.r_[num, np.zeros(NC1)]
+
+            #若加密次数小于等于0, 却被加密了, 子单元加密次数设为 0.
+            num[cidx]-=1
+            flag = np.zeros(len(num), dtype=np.bool_)
+            flag[cidx] = True
+            flag  = flag & (num<0)
+            num[flag]=0
+
+            num[-NC1:] = num[cidx]
+            options['numrefine'] = num
+
+        #单元层
+        clevelNew = clevel.increase_size(NC1)
+        clevel[cidx] +=1
+        clevelNew[:] = clevel[cidx]
+
+        #半边层
+        hlevel.extend(np.zeros(NC1*2, dtype=np.int_))
+
+        self.ds.reinit()
+
+    def _coarsen_triangle_cell_(self, isMarkedCell, isMarkedHEdge, options={}):
+        NC  = self.number_of_cells()
+        NHE = self.ds.number_of_halfedges()
+
+        halfedge = self.entity("halfedge")
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+
+        flag = (halfedge[:, 1]<halfedge[halfedge[:, 4], 1]) & isMarkedHEdge
+        isRCell = np.zeros(NC, dtype=np.bool_)
+        isRCell[halfedge[flag, 1]] = True
+
+        #修改下一个边和上一个边
+        for i in range(2):
+            nex = halfedge[:, 2]
+            pre = halfedge[:, 3]
+            opp = halfedge[:, 4]
+            flag1 = isMarkedHEdge[nex]
+            halfedge[flag1, 2] = nex[opp[nex[flag1]]]
+            flag2 = isMarkedHEdge[pre]
+            halfedge[flag2, 3] = pre[opp[pre[flag2]]]
+
+        #修改单元
+        flag = isRCell[halfedge[: ,1]] & isMarkedHEdge
+
+        nc = isRCell.sum()
+        opp = halfedge[:, 4]
+        cidxmap = np.arange(NC)
+        cidxmap[halfedge[opp[flag], 1]] = cidxmap[halfedge[flag, 1]]
+        halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+
+        cell0 = np.unique(halfedge[:, 1])
+        cidxmap0 = np.arange(NC)
+        cidxmap0[cell0] = np.arange(len(cell0))
+        halfedge[:, 1] = cidxmap0[halfedge[:, 1]]
+
+        if ('HB' in options) and (options['HB'] is not None):
+            HB = np.zeros((NC-cstart, 2), dtype=np.int)
+            HB[:, 0] = np.arange(NC-cstart)
+            HB[:, 1] = cidxmap0[cidxmap[cstart:]]-cstart
+            options['HB'] = HB
+
+        if 'numrefine' in options:
+            num = options['numrefine']
+            np.maximum.at(num, cidxmap, num)
+            num[halfedge[flag, 1]] += 1
+            options['numrefine'] = num[cell0]
+
+        #更新单元层
+        flag = cidxmap!=np.arange(NC)
+        clevel[isRCell]-=1
+        clevel.adjust_size(flag)
+
+        #更新半边层
+        hlevel.adjust_size(isMarkedHEdge)
+
+        # 对半边重新编号
+        self.delete_entity(isMarkedHEdge, etype='halfedge')
+
+        # 更新halfedge
+        halfedge.adjust_size(isMarkedHEdge)
+
+        self.ds.reinit()
+        return isMarkedHEdge
+
+    def refine_triangle_rg(self, isMarkedCell=None, options={}):
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NHE = self.ds.number_of_halfedges()
+
+        color = self.halfedgedata.get('color')
+        node = self.entity('node')
+        halfedge = self.entity("halfedge")
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+
+        hedge = self.ds.hedge
+        hcell = self.ds.hcell
+
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
+
+        if color is None:
+            color = np.zeros(NHE, dtype=np.int_)
+            self.halfedgedata['color'] = color
+
+
+        isBlueHEdge = color == 3
+        isYellowHedge = color == 2
+
+        #得到加密半边并加密
+        isMarkedHEdge0 = self.mark_halfedge(isMarkedCell, method='rg')
+        isMarkedHEdge = isMarkedHEdge0 & ((color==0)|(color==1))
+
+        NHE1 = self.refine_halfedge(isMarkedHEdge) # 加密半边得到的新半边的个数
+        isMainHEdge = self.ds.main_halfedge_flag()
+
+        color = np.r_[color, np.zeros(NHE1, dtype = np.int_)]
+
+        #标记的蓝色单元变成红色单元
+        flag = isBlueHEdge & isMarkedHEdge0
+        NE1 = flag.sum()
+
+        NHE = self.ds.number_of_halfedges()
+        ################## 绿色单元转变红色单元 ##################
+        halfedgeNew = halfedge.increase_size(NE1*4)
+        isMainHEdgeNew = np.zeros(NE1*4, dtype=np.bool_)
+
+        current, = np.where(flag)
+        pre = halfedge[current, 3]
+        ppre = halfedge[pre, 3]
+        pppre = halfedge[ppre, 3]
+        opp = halfedge[current, 4]
+
+        halfedge[current, 3] = ppre#修改蓝色半边位置
+        halfedge[current, 4] = np.arange(NHE, NHE+NE1)
+        halfedge[ppre, 2] = current
+        halfedge[pre, 1] = np.arange(NC, NC+NE1)
+        halfedge[pre, 2] = halfedge[opp, 2]
+        halfedge[pre, 3] = np.arange(NHE+NE1*2, NHE+NE1*3)
+        halfedgeNew[:NE1, 0] = halfedge[ppre, 0]
+        halfedgeNew[:NE1, 1] = np.arange(NC+NE1, NC+NE1*2)
+        halfedgeNew[:NE1, 2] = np.arange(NHE+NE1*3, NHE+NE1*4)
+        halfedgeNew[:NE1, 3] = np.arange(NHE+NE1, NHE+NE1*2)
+        halfedgeNew[:NE1, 4] = current
+        halfedgeNew[NE1*2:NE1*3, 0] = halfedge[ppre, 0]
+        halfedgeNew[NE1*2:NE1*3, 1] = np.arange(NC, NC+NE1)
+        halfedgeNew[NE1*2:NE1*3, 2] = pre
+        halfedgeNew[NE1*2:NE1*3, 3] = halfedge[opp, 2]
+        halfedgeNew[NE1*2:NE1*3, 4] = np.arange(NHE+NE1*3, NHE+NE1*4)
+        isMainHEdgeNew[:NE1] = ~isMainHEdge[current]
+        isMarkedHEdge[pre] = False
+
+        current = opp.copy()
+        nex = halfedge[current, 2]
+        nnex = halfedge[nex, 2]
+        nnnex = halfedge[nnex, 2]
+        opp = halfedge[current, 4]
+
+        halfedge[current, 0] = halfedge[nex, 0]#修改黄色半边位置
+        halfedge[current, 2] = nnex
+        halfedge[current, 4] = np.arange(NHE+NE1, NHE+NE1*2)
+        halfedge[nnex, 3] = current
+        halfedge[nex, 1] = np.arange(NC, NC+NE1)
+        halfedge[nex, 2] = np.arange(NHE+NE1*2, NHE+NE1*3)
+        halfedge[nex, 3] = pre
+        halfedgeNew[NE1:NE1*2, 0] = halfedge[opp, 0]
+        halfedgeNew[NE1:NE1*2, 1] = np.arange(NC+NE1, NC+NE1*2)
+        halfedgeNew[NE1:NE1*2, 2] = np.arange(NHE, NHE+NE1)
+        halfedgeNew[NE1:NE1*2, 3] = np.arange(NHE+NE1*3, NHE+NE1*4)
+        halfedgeNew[NE1:NE1*2, 4] = current
+        halfedgeNew[NE1*3:NE1*4, 0] = halfedge[nex, 0]
+        halfedgeNew[NE1*3:NE1*4, 1] = np.arange(NC+NE1, NC+NE1*2)
+        halfedgeNew[NE1*3:NE1*4, 2] = np.arange(NHE+NE1, NHE+NE1*2)
+        halfedgeNew[NE1*3:NE1*4, 3] = np.arange(NHE, NHE+NE1)
+        halfedgeNew[NE1*3:NE1*4, 4] = np.arange(NHE+NE1*2, NHE+NE1*3)
+        isMainHEdgeNew[NE1:NE1*2] = ~isMainHEdge[current]
+        isMainHEdgeNew[NE1*3:NE1*4] = True
+        isMarkedHEdge[nnex] = False
+
+        #中心单元编号最小
+        cidxmap = np.arange(NC+NE1*2)
+        cidxmap[halfedge[current, 1]] = np.arange(NC+NE1, NC+NE1*2)
+        cidxmap[NC+NE1:NC+NE1*2] = halfedge[current, 1]
+        halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+
+        #半边层
+        hlevel.extend(np.zeros(NE1*4, dtype=np.int_))
+
+        #单元层
+        clevel.extend(clevel[halfedge[opp, 1]])
+        clevel.extend(clevel[halfedge[opp, 1]])
+
+        #修改半边颜色
+        idx = np.r_[current, opp, nex, pre, ppre, nnex, pppre, nnnex]
+        color = np.r_[color, np.zeros(NE1*4, dtype=np.int_)]
+        color[idx] = 0
+
+        self.ds.reinit()
+        ##########################################################
+
+        #标记要生成新单元的单元
+        NV = self.ds.number_of_vertices_of_cells()
+        isBlueCell = NV == 4
+        isNewCell = (NV == 4)|(NV == 6)
+
+        NC+=NE1*2
+        isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NHE1+NE1*4, dtype=np.bool_)]
+
+        #修改半边颜色(1)
+        flag = isMarkedHEdge & isBlueCell[halfedge[:, 1]]
+        tmp = np.where(flag)[0]
+        #生成新单元
+        isMarkedHEdge = isMarkedHEdge & isNewCell[halfedge[:, 1]]#既是标记边又对应标记单元
+        NC1 = isMarkedHEdge.sum()
+        self._refine_tri_cell_(isNewCell, isMarkedHEdge, options=options)
+
+        #修改半边颜色
+        color = np.r_[color, np.zeros(NC1*2, dtype = np.int_)]
+        color[tmp] = 1
+        color[halfedge[tmp, 3]]=3
+        color[halfedge[color==3, 4]] = 2
+        color[halfedge[color==2, 3]] = 1
+        self.halfedgedata['color'] = color
+
+    def coarsen_triangle_rg(self, isMarkedCell, options={}):
+
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+
+        color = self.halfedgedata['color']
+        halfedge = self.entity('halfedge')
+
+        #标记红色单元要删除的半边
+        flag = (clevel[halfedge[:, 1]]==clevel[halfedge[halfedge[:, 4], 1]])
+        flag = (hlevel[:]==0) & (clevel[halfedge[:, 1]] >0) & flag & isMarkedCell[halfedge[:, 1]]
+        flag = flag & flag[halfedge[:, 4]]#自身和对边都是标记单元的半边
+
+        isRCell = np.ones(NC, dtype=np.bool_)
+        np.logical_and.at(isRCell, halfedge[:, 1], flag)#周围都被标记的中心单元
+
+        isMarkedHEdge = isRCell[halfedge[:, 1]]
+        isMarkedHEdge[halfedge[isMarkedHEdge, 4]] = True
+
+        #标记绿色单元要删除的半边
+        flag = ((color==2) | (color==3)) & isMarkedCell[halfedge[:, 1]]
+        flag = flag & flag[halfedge[:, 4]]
+        isMarkedHEdge[flag] = True
+
+        #删除单元
+        isMarkedHEdge = self._coarsen_triangle_cell_(isMarkedCell, isMarkedHEdge, options=options)
+
+        color = color[~isMarkedHEdge]#更新颜色
+        color[color==1] = 0
+        color[halfedge[color==3, 2]] = 1
+        color[halfedge[color==2, 3]] = 1
+
+        #进一步标记需要删除的边
+        isBDHEdge = self.ds.boundary_halfedge_flag()
+        NC = self.number_of_cells()
+        flag = (halfedge[halfedge[halfedge[halfedge[:, 2], 4], 2],
+            4]==np.arange(len(halfedge))) & (hlevel[halfedge[:, 4]]!=0)
+        flag = flag |(isBDHEdge & isBDHEdge[halfedge[:, 2]])
+        flag = flag & (hlevel[:]==0) & (hlevel[halfedge[:, 2]] > 0)
+
+        while True:
+            count = np.zeros(NC, dtype=np.int_)
+            np.add.at(count, halfedge[:, 1], flag)
+
+            NV = self.ds.number_of_vertices_of_cells()
+            flag0 = (count==1) & (NV==6)
+            flag[flag0[halfedge[:, 1]]] = False
+            flag[flag0[halfedge[halfedge[:, 4], 1]]] = False
+            if (~flag0).all():
+                break
+
+        #修改颜色
+        color[halfedge[flag, 4]] = 0
+        color = color[~flag]
+        self.coarsen_halfedge(flag)
+
+        #标记要生成新单元的单元
+        NV = self.ds.number_of_vertices_of_cells()
+        isBlueCell = NV==4
+        isRedCell = NV==6
+        isNewCell = (NV == 4)|(NV == 6)
+
+        #生成新单元
+        isBDHEdge = self.ds.boundary_halfedge_flag()
+        flag0 = (hlevel[:]>0) & (hlevel[halfedge[:, 3]]==0) 
+        flag1 = flag0 & (hlevel[:]!=hlevel[halfedge[:, 4]]) & (hlevel[halfedge[halfedge[:, 3], 4]]>0)
+        flag1 = (flag1 & (~isBDHEdge)) | (flag0 & isBDHEdge & isRedCell[halfedge[:, 1]])
+        flag = flag1 & isNewCell[halfedge[:, 1]]#既是标记边又对应标记单元
+        tmp = flag1 & isBlueCell[halfedge[:, 1]]#既是标记边又对应标记单元
+        tmp, = np.where(tmp)
+        NC1 = flag.sum()
+
+        flag = (hlevel[:]==0) & (hlevel[halfedge[:, 2]]>0) & (hlevel[halfedge[:,
+            4]]>0) & isBlueCell[halfedge[:, 1]]
+        flag = flag | ((hlevel[:]==0) & isRedCell[halfedge[:, 1]])
+        flag = flag[halfedge[:, 3]]
+
+        self._refine_tri_cell_(isNewCell, flag, options=options)
+
+        #修改半边颜色
+        color = np.r_[color, np.zeros(NC1*2, dtype = np.int_)]
+        color[tmp] = 1
+        color[halfedge[tmp, 3]]=3
+        color[halfedge[color==3, 4]] = 2
+        color[halfedge[color==2, 3]] = 1
+        self.halfedgedata['color'] = color
+
+    def refine_triangle_nvb(self, isMarkedCell=None, options={}):
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NHE = self.ds.number_of_halfedges()
+
+        color = self.halfedgedata.get('color')
+        node = self.entity('node')
+        halfedge = self.entity('halfedge')
+
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
+
+        if color is None:
+            color = np.zeros(NHE, dtype=np.int_)
+            nex = halfedge[:, 2]
+            pre = halfedge[:, 3]
+            l = node[halfedge[:, 0]]-node[halfedge[pre, 0]]
+            l = np.linalg.norm(l, axis=1)
+            color[(l>l[nex]) & (l>l[pre])] = 1
+            self.halfedgedata['color'] = color
+
+        hedge = self.ds.hedge
+        hcell = self.ds.hcell
+
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+
+        if ('HB' in options) and (options['HB'] is not None):
+            HB = np.zeros((NC, 2), dtype=np.int)
+            HB[:, 0] = np.arange(NC)
+            HB[:, 1] = np.arange(NC)
+            options['HB'] = HB
+
+        isMarkedHEdge = self.mark_halfedge(isMarkedCell, method='nvb')
+        flag = np.array(True)
+        while flag.any():
+            #加密半边
+            flag = isMarkedHEdge & (color==1)
+            flag = flag & flag[halfedge[:, 4]]
+
+            #加密半边
+            NE1 = self.refine_halfedge(flag)
+
+            #加密单元
+            NV = self.ds.number_of_vertices_of_cells()
+            isNewCell = NV==4
+
+            flag = np.r_[flag, np.zeros(NE1, dtype=np.bool_)]
+            #flag = flag & (halfedge[:, 1]>=cstart)
+
+            NE2 = flag.sum()
+            isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NE1+NE2*2, dtype=np.bool_)]
+
+            #修改半边颜色
+            color = np.r_[color, np.zeros(NE1, dtype=np.int)]
+            color[flag]=0
+            color[halfedge[flag, 2]] = 1
+            color[halfedge[halfedge[flag, 3], 3]] = 1
+            color = np.r_[color, np.zeros(NE2*2, dtype=np.int)]
+            self.halfedgedata['color'] = color
+
+            self._refine_tri_cell_(isNewCell, flag, options=options)
+
+
+    def coarsen_triangle_nvb(self, isMarkedCell, options={}):
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NHE = self.ds.number_of_halfedges()
+        hcell = self.ds.hcell
+        hedge = self.ds.hedge
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+
+        color = self.halfedgedata['color']
+        node = self.entity('node')
+        halfedge = self.entity('halfedge')
+        isMainHEdge = self.ds.main_halfedge_flag()
+
+        nex, pre, opp = halfedge[:, 2], halfedge[:, 3], halfedge[:, 4]
+
+        #标记要删除的半边
+        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (hlevel[:]==0) & (color[:]==0)
+        isMarkedHEdge = isMarkedHEdge & (clevel[halfedge[:, 1]]>0)
+        isMarkedHEdge = isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
+
+        #只考虑对着的四个四边形都被标记的情况或者两个边界上的三角形都被标记的情况
+        isMarkedHEdge = isMarkedHEdge & (color[halfedge[:, 3]] == 1)
+
+        isMarkedHEdge = isMarkedHEdge & (isMarkedHEdge[opp[nex[opp[nex]]]] | (opp[nex] == nex))
+        isMarkedHEdge[opp[isMarkedHEdge]] = True
+
+        if ('HB' in options) and (options['HB'] is not None):
+            HB = np.zeros((NC-cstart, 2), dtype=np.int)
+            HB[:, 0] = np.arange(NC-cstart)
+            HB[:, 1] = np.arange(NC-cstart)
+            options['HB'] = HB
+
+        isMarkedHEdge = self._coarsen_triangle_cell_(isMarkedCell, isMarkedHEdge, options=options)
+
+        #修改颜色
+        color = color[~isMarkedHEdge]
+        flag = (color==1) & (color==1)[halfedge[:, 2]]
+        color[flag] = 0
+        color[halfedge[flag, 2]] = 0
+        color[halfedge[flag, 3]] = 1
+
+        #进一步标记要移除的半边
+        NV = self.ds.number_of_vertices_of_cells()
+        nex = halfedge[:, 2]
+        opp = halfedge[:, 4]
+        isBDHEdge = self.ds.boundary_halfedge_flag()
+        flag = (opp[nex[opp[nex]]] == np.arange(len(halfedge))) |(isBDHEdge & isBDHEdge[nex])
+        flag = flag & (color==1)[halfedge[:, 2]] & (NV[halfedge[:, 1]]==4)
+        #flag[opp[nex[flag]]]=True
+
+        #粗化半边
+        self.coarsen_halfedge(flag)
+
+        #修改颜色
+        color = color[~flag]
+        self.halfedgedata['color'] = color
+
     def refine_cell(self, isMarked, isMarkedHEdge, method='quad',
             bc=None, options={}):
 
@@ -1129,270 +1728,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             self.ds.NC = (subdomain[:]>0).sum()
             self.ds.NE = halfedge.size//2
 
-        elif method=='tri':
-            isMarkedCell = isMarked
-            NN1 = isMarkedCell.sum()
-
-            current, = np.where(isMarkedHEdge)
-            pre = halfedge[current, 3]
-            ppre = halfedge[pre, 3]
-            nex = halfedge[current, 2]
-            nnex = halfedge[nex, 2]
-
-            cidx = halfedge[current, 1]
-            halfedge[nnex, 3] = np.arange(NE*2+NC1, NE*2+NC1*2)
-            halfedge[pre, 2] = np.arange(NE*2+NC1, NE*2+NC1*2)
-            halfedge[current, 1] = np.arange(NC, NC+NC1)
-            halfedge[current, 3] = np.arange(NE*2, NE*2+NC1)
-            halfedge[nex, 1] = np.arange(NC, NC+NC1)
-            halfedge[nex, 2] = np.arange(NE*2, NE*2+NC1)
-
-            halfedgeNew = halfedge.increase_size(NC1*2)
-            halfedgeNew[:NC1, 0] = halfedge[pre, 0]
-            halfedgeNew[:NC1, 1] = np.arange(NC, NC+NC1)
-            halfedgeNew[:NC1, 2] = current
-            halfedgeNew[:NC1, 3] = nex
-            halfedgeNew[:NC1, 4] = np.arange(NE*2+NC1, NE*2+NC1*2)
-
-            halfedgeNew[NC1:, 0] = halfedge[nex, 0]
-            halfedgeNew[NC1:, 1] = cidx
-            halfedgeNew[NC1:, 2] = nnex
-            halfedgeNew[NC1:, 3] = pre
-            halfedgeNew[NC1:, 4] = np.arange(NE*2, NE*2+NC1)
-
-            if ('HB' in options) and (options['HB'] is not None):
-                NC0 = NC-cstart
-                HB0 = np.zeros([NC0+NC1, 2], dtype=np.int_)
-                HB0[:, 0] = np.arange(NC0+NC1)
-                HB0[:NC0, 1] = np.arange(NC0)
-                HB0[NC0:, 1] = cidx-cstart
-                HB = options['HB']
-                HB0[:, 1] = HB[HB0[:, 1], 1]
-                options['HB'] = HB0
-
-            flag = isMarkedHEdge[halfedgeNew[NC1:, 2]]
-            current = np.where(flag)[0]+NC1
-            nexpre = halfedge[halfedgeNew[current, 2], 3]
-            prenex = halfedge[halfedgeNew[current, 3], 2]
-            halfedgeNew[current, 2] = halfedge[nexpre, 4]
-            halfedgeNew[current, 3] = halfedge[prenex, 4]
-
-            if ('numrefine' in options) & (NC1>0):
-                num = options['numrefine']
-                num = np.r_[num, np.zeros(NC1)]
-
-                #若加密次数小于等于0, 却被加密了, 子单元加密次数设为 0.
-                num[cidx]-=1
-                flag = np.zeros(len(num), dtype=np.bool_)
-                flag[cidx] = True
-                flag  = flag & (num<0)
-                num[flag]=0
-
-                num[-NC1:] = num[cidx]
-                options['numrefine'] = num
-
-            #增加主半边
-            hedge.extend(np.arange(NE*2, NE*2+NC1))
-
-            #更新subdomain
-            subdomainNew = subdomain.increase_size(NC1)
-            subdomainNew[:] = subdomain[cidx]
-
-            #更新起始边
-            hcell.increase_size(NC1)
-            hcell[halfedge[:, 1]] = range(len(halfedge)) # 的编号
-
-            #单元层
-            clevelNew = clevel.increase_size(NC1)
-            clevel[cidx] +=1
-            clevelNew[:] = clevel[cidx]
-
-            #半边层
-            hlevel.extend(np.zeros(NC1*2, dtype=np.int_))
-
-            self.ds.NN = self.node.size
-            self.ds.NC = (subdomain[:]>0).sum()
-            self.ds.NE = halfedge.size//2
-
-        elif method=='quad_coordinateCell':
-            # 标记的蓝色单元变成红色单元
-            flag = isMarked
-            NE1 = flag.sum()
-
-            halfedgeNew = halfedge.increase_size(NE1*2)
-            isMainHEdgeNew = np.zeros(NE1*2, dtype=np.bool_)
-
-            current, = np.where(flag)
-            pre = halfedge[current, 3]
-            ppre = halfedge[pre, 3]
-            opp = halfedge[current, 4]
-
-            halfedge[current, 3] = ppre# 修改蓝色半边位置
-            halfedge[current, 4] = np.arange(NE*2, NE*2+NE1)
-            halfedge[ppre, 2] = current
-            halfedge[pre, 1] = np.arange(NC, NC+NE1)
-            halfedge[pre, 2] = halfedge[opp, 2]
-            halfedge[pre, 3] = np.arange(NE*2, NE*2+NE1)
-            halfedgeNew[:NE1, 0] = halfedge[ppre, 0]
-            halfedgeNew[:NE1, 1] = np.arange(NC, NC+NE1)
-            halfedgeNew[:NE1, 2] = pre
-            halfedgeNew[:NE1, 3] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedgeNew[:NE1, 4] = current
-            isMainHEdgeNew[:NE1] = ~isMainHEdge[current]
-            isMarkedHEdge[pre] = False
-
-            current = opp.copy()
-            nex = halfedge[current, 2]
-            nnex = halfedge[nex, 2]
-            opp = halfedge[current, 4]
-
-            halfedge[current, 0] = halfedge[nex, 0]# 修改黄色半边位置
-            halfedge[current, 2] = nnex
-            halfedge[current, 4] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedge[nnex, 3] = current
-            halfedge[nex, 1] = np.arange(NC, NC+NE1)
-            halfedge[nex, 2] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedge[nex, 3] = pre
-            halfedgeNew[NE1:, 0] = halfedge[opp, 0]
-            halfedgeNew[NE1:, 1] = np.arange(NC, NC+NE1)
-            halfedgeNew[NE1:, 2] = np.arange(NE*2, NE*2+NE1)
-            halfedgeNew[NE1:, 3] = nex
-            halfedgeNew[NE1:, 4] = current
-            isMainHEdgeNew[NE1:] = ~isMainHEdge[current]
-            isMarkedHEdge[nnex] = False
-
-            if ('numrefine' in options) & (NE1>0):
-                opp = halfedge[:, 4]
-                num = options['numrefine']
-                num0 = num[halfedge[opp[-NE1*2:-NE1], 1]]
-                num1 = num[halfedge[opp[-NE1:], 1]]
-                num2 = np.maximum(num0, num1)
-                num = np.r_[num, num2]
-                options['numrefine'] = num
-
-            #半边层
-            hlevel.extend(np.zeros(NE1*2, dtype=np.int_))
-
-            #单元层
-            clevel.extend(clevel[halfedge[current, 1]])
-
-            #增加主半边
-            newHedge = hedge.increase_size(NE1)
-            newHedge[:] = np.where(isMainHEdgeNew)[0]+NE*2
-
-            #更新subdomain
-            subdomainNew = subdomain.increase_size(NE1)
-            subdomainNew[:] = subdomain[halfedge[current, 1]]
-
-            #更新起始边
-            hcell.increase_size(NE1)
-            hcell[halfedge[:, 1]] = range(len(halfedge))
-
-            self.ds.NN = self.node.size
-            self.ds.NC = (subdomain[:]>0).sum()
-            self.ds.NE = halfedge.size//2
-
-        elif method=='tri_coordinateCell':
-            flag = isMarked
-            NE1 = flag.sum()
-            halfedgeNew = halfedge.increase_size(NE1*4)
-            isMainHEdgeNew = np.zeros(NE1*4, dtype=np.bool_)
-
-            current, = np.where(flag)
-            pre = halfedge[current, 3]
-            ppre = halfedge[pre, 3]
-            pppre = halfedge[ppre, 3]
-            opp = halfedge[current, 4]
-
-            halfedge[current, 3] = ppre#修改蓝色半边位置
-            halfedge[current, 4] = np.arange(NE*2, NE*2+NE1)
-            halfedge[ppre, 2] = current
-            halfedge[pre, 1] = np.arange(NC, NC+NE1)
-            halfedge[pre, 2] = halfedge[opp, 2]
-            halfedge[pre, 3] = np.arange(NE*2+NE1*2, NE*2+NE1*3)
-            halfedgeNew[:NE1, 0] = halfedge[ppre, 0]
-            halfedgeNew[:NE1, 1] = np.arange(NC+NE1, NC+NE1*2)
-            halfedgeNew[:NE1, 2] = np.arange(NE*2+NE1*3, NE*2+NE1*4)
-            halfedgeNew[:NE1, 3] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedgeNew[:NE1, 4] = current
-            halfedgeNew[NE1*2:NE1*3, 0] = halfedge[ppre, 0]
-            halfedgeNew[NE1*2:NE1*3, 1] = np.arange(NC, NC+NE1)
-            halfedgeNew[NE1*2:NE1*3, 2] = pre
-            halfedgeNew[NE1*2:NE1*3, 3] = halfedge[opp, 2]
-            halfedgeNew[NE1*2:NE1*3, 4] = np.arange(NE*2+NE1*3, NE*2+NE1*4)
-            isMainHEdgeNew[:NE1] = ~isMainHEdge[current]
-            isMarkedHEdge[pre] = False
-
-            current = opp.copy()
-            nex = halfedge[current, 2]
-            nnex = halfedge[nex, 2]
-            nnnex = halfedge[nnex, 2]
-            opp = halfedge[current, 4]
-
-            halfedge[current, 0] = halfedge[nex, 0]#修改黄色半边位置
-            halfedge[current, 2] = nnex
-            halfedge[current, 4] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedge[nnex, 3] = current
-            halfedge[nex, 1] = np.arange(NC, NC+NE1)
-            halfedge[nex, 2] = np.arange(NE*2+NE1*2, NE*2+NE1*3)
-            halfedge[nex, 3] = pre
-            halfedgeNew[NE1:NE1*2, 0] = halfedge[opp, 0]
-            halfedgeNew[NE1:NE1*2, 1] = np.arange(NC+NE1, NC+NE1*2)
-            halfedgeNew[NE1:NE1*2, 2] = np.arange(NE*2, NE*2+NE1)
-            halfedgeNew[NE1:NE1*2, 3] = np.arange(NE*2+NE1*3, NE*2+NE1*4)
-            halfedgeNew[NE1:NE1*2, 4] = current
-            halfedgeNew[NE1*3:NE1*4, 0] = halfedge[nex, 0]
-            halfedgeNew[NE1*3:NE1*4, 1] = np.arange(NC+NE1, NC+NE1*2)
-            halfedgeNew[NE1*3:NE1*4, 2] = np.arange(NE*2+NE1, NE*2+NE1*2)
-            halfedgeNew[NE1*3:NE1*4, 3] = np.arange(NE*2, NE*2+NE1)
-            halfedgeNew[NE1*3:NE1*4, 4] = np.arange(NE*2+NE1*2, NE*2+NE1*3)
-            isMainHEdgeNew[NE1:NE1*2] = ~isMainHEdge[current]
-            isMainHEdgeNew[NE1*3:NE1*4] = True
-            isMarkedHEdge[nnex] = False
-
-            #中心单元编号最小
-            cidxmap = np.arange(NC+NE1*2)
-            cidxmap[halfedge[current, 1]] = np.arange(NC+NE1, NC+NE1*2)
-            cidxmap[NC+NE1:NC+NE1*2] = halfedge[current, 1]
-            halfedge[:, 1] = cidxmap[halfedge[:, 1]]
-
-            if 'numrefine' in options:
-                num = options['numrefine']
-                num0 = num[halfedge[halfedge[current, 4], 1]].copy()
-                num1 = num[halfedge[opp, 1]]
-                num2 = np.maximum(num0, num1)
-                num[halfedge[halfedge[current, 4], 1]] = num2
-
-                num = np.r_[num, num2, num0]
-                options['numrefine'] = num
-
-            color = np.r_[current, opp, nex, pre, ppre, nnex, pppre, nnnex]
-
-            #半边层
-            hlevel.extend(np.zeros(NE1*4, dtype=np.int_))
-
-            #单元层
-            clevel.extend(clevel[halfedge[opp, 1]])
-            clevel.extend(clevel[halfedge[opp, 1]])
-
-            #增加主半边
-            newHedge = hedge.increase_size(NE1*2)
-            newHedge[:] = np.where(isMainHEdgeNew)[0]+NE*2
-
-            #更新subdomain
-            subdomainNew = subdomain.increase_size(NE1*2)
-            subdomainNew[:NE1] = subdomain[halfedge[opp, 1]]
-            subdomainNew[NE1:] = subdomain[halfedge[opp, 1]]
-
-            #更新起始边
-            hcell.increase_size(NE1*2)
-            hcell[halfedge[:, 1]] = range(len(halfedge)) # 的编号
-
-            self.ds.NN = self.node.size
-            self.ds.NC = (subdomain[:]>0).sum()
-            self.ds.NE = halfedge.size//2
-            return color
-
     def coarsen_cell(self, isMarkedCell, isMarked, method='quad', options={}):
 
         NC = self.number_of_cells()
@@ -1489,77 +1824,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             return isMarkedHEdge, isRNode, newNode
 
         elif method=='tri':
-            isMarkedHEdge = isMarked
-
-            flag = (halfedge[:, 1]<halfedge[halfedge[:, 4], 1]) & isMarkedHEdge
-            isRCell = np.zeros(NC, dtype=np.bool_)
-            isRCell[halfedge[flag, 1]] = True
-
-            #修改下一个边和上一个边
-            for i in range(2):
-                nex = halfedge[:, 2]
-                pre = halfedge[:, 3]
-                opp = halfedge[:, 4]
-                flag1 = isMarkedHEdge[nex]
-                halfedge[flag1, 2] = nex[opp[nex[flag1]]]
-                flag2 = isMarkedHEdge[pre]
-                halfedge[flag2, 3] = pre[opp[pre[flag2]]]
-
-            #修改单元
-            flag = isRCell[halfedge[: ,1]] & isMarkedHEdge
-
-            nc = isRCell.sum()
-            opp = halfedge[:, 4]
-            cidxmap = np.arange(NC)
-            cidxmap[halfedge[opp[flag], 1]] = cidxmap[halfedge[flag, 1]]
-            halfedge[:, 1] = cidxmap[halfedge[:, 1]]
-
-            cell0 = np.unique(halfedge[:, 1])
-            cidxmap0 = np.arange(NC)
-            cidxmap0[cell0] = np.arange(len(cell0))
-            halfedge[:, 1] = cidxmap0[halfedge[:, 1]]
-
-            if ('HB' in options) and (options['HB'] is not None):
-                HB = np.zeros((NC-cstart, 2), dtype=np.int)
-                HB[:, 0] = np.arange(NC-cstart)
-                HB[:, 1] = cidxmap0[cidxmap[cstart:]]-cstart
-                options['HB'] = HB
-
-            if 'numrefine' in options:
-                num = options['numrefine']
-                np.maximum.at(num, cidxmap, num)
-                num[halfedge[flag, 1]] += 1
-                options['numrefine'] = num[cell0]
-
-            #更新subdomain
-            flag = cidxmap!=np.arange(NC)
-            subdomain.adjust_size(flag)
-
-            #更新单元层
-            clevel[isRCell]-=1
-            clevel.adjust_size(flag)
-
-            #更新半边层
-            hlevel.adjust_size(isMarkedHEdge)
-
-            # 对半边重新编号
-            self.adjust_number(isMarkedHEdge, method='halfedge')
-
-            # 更新halfedge
-            halfedge.adjust_size(isMarkedHEdge)
-
-            #更新起始边
-            hcell.decrease_size(NC-len(cell0))
-            hcell[halfedge[:, 1]] = range(len(halfedge))
-
-            # 更新主半边
-            hedge.decrease_size(isMarkedHEdge.sum()//2)
-            hedge[:], = np.where(isMainHEdge[~isMarkedHEdge])
-
-            self.ds.NN = self.node.size
-            self.ds.NC = (subdomain[:]>0).sum()
-            self.ds.NE = halfedge.size//2
-            return isMarkedHEdge
+            pass
 
     def refine_quad(self, isMarkedCell, options={}):
 
@@ -1733,299 +1998,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         self.hedgecolor['color'] = color
         self.hedgecolor['level'] = colorlevel
 
-    def refine_triangle_rg(self, isMarkedCell=None, options={}):
-        NC = self.number_of_all_cells()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
 
-        color = self.hedgecolor
-        node = self.entity('node')
-        halfedge = self.ds.halfedge
-        cstart = self.ds.cellstart
-        subdomain = self.ds.subdomain
-        hedge = self.ds.hedge
-        hcell = self.ds.hcell
-
-        if isMarkedCell is None:
-            isMarkedCell = np.ones(NC, dtype=np.bool_)
-
-        if self.hedgecolor is None:
-            color = np.zeros(NE*2, dtype=np.int_)
-            self.hedgecolor = color
-
-        hlevel = self.halfedgedata['level']
-        clevel = self.celldata['level']
-        isMarkedCell[:cstart] = False
-
-        isBlueHEdge = color == 3
-        isYellowHedge = color == 2
-
-        #得到加密半边并加密
-        isMarkedHEdge0 = self.mark_halfedge(isMarkedCell, method='rg')
-        isMarkedHEdge = isMarkedHEdge0 & ((color==0)|(color==1))
-
-        NN1 = self.refine_halfedge(isMarkedHEdge)
-        isMainHEdge = self.ds.main_halfedge_flag()
-        NNE = NE+NN1
-
-        color = np.r_[color, np.zeros(NN1*2, dtype = np.int_)]
-        #标记的蓝色单元变成红色单元
-        flag = isBlueHEdge & isMarkedHEdge0
-        NE1 = flag.sum()
-
-        color0 = self.refine_cell(flag, isMarkedHEdge,
-                method='tri_coordinateCell', options=options)
-
-        #修改半边颜色
-        color = np.r_[color, np.zeros(NE1*4, dtype=np.int_)]
-        color[color0] = 0
-
-        #标记要生成新单元的单元
-        NV = self.ds.number_of_vertices_of_all_cells()
-        isBlueCell = NV == 4
-        isNewCell = (NV == 4)|(NV == 6)
-        isNewCell[:cstart] = False
-
-        NC+=NE1*2
-        NNE+=NE1*2
-        isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NN1*2+NE1*4, dtype=np.bool_)]
-
-        #修改半边颜色(1)
-        flag = isMarkedHEdge & isBlueCell[halfedge[:, 1]]
-        tmp = np.where(flag)[0]
-        #生成新单元
-        flag = isMarkedHEdge & isNewCell[halfedge[:, 1]]#既是标记边又对应标记单元
-        NC1 = flag.sum()
-        self.refine_cell(isNewCell, flag, method='tri', options=options)
-
-        #修改半边颜色
-        color = np.r_[color, np.zeros(NC1*2, dtype = np.int_)]
-        color[tmp] = 1
-        color[halfedge[tmp, 3]]=3
-        color[halfedge[color==3, 4]] = 2
-        color[halfedge[color==2, 3]] = 1
-        self.hedgecolor = color
-
-    def coarsen_triangle_rg(self, isMarkedCell, options={}):
-
-        NC = self.number_of_all_cells()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        hlevel = self.halfedgedata['level']
-        clevel = self.celldata['level']
-
-        color = self.hedgecolor
-        halfedge = self.entity('halfedge')
-        cstart = self.ds.cellstart
-        isMarkedCell[:cstart] = True
-
-        #标记红色单元要删除的半边
-        flag = (clevel[halfedge[:, 1]]==clevel[halfedge[halfedge[:, 4], 1]])
-        flag = (hlevel[:]==0) & (clevel[halfedge[:, 1]]
-                >0) & flag & isMarkedCell[halfedge[:, 1]]
-        flag = flag & flag[halfedge[:, 4]]#自身和对边都是标记单元的半边
-
-        isRCell = np.ones(NC, dtype=np.bool_)
-        np.logical_and.at(isRCell, halfedge[:, 1], flag)#周围都被标记的中心单元
-
-        isMarkedHEdge = isRCell[halfedge[:, 1]]
-        isMarkedHEdge[halfedge[isMarkedHEdge, 4]] = True
-
-        #标记绿色单元要删除的半边
-        flag = ((color==2) | (color==3)) & isMarkedCell[halfedge[:, 1]]
-        flag = flag & flag[halfedge[:, 4]]
-        isMarkedHEdge[flag] = True
-
-        #删除单元
-        isMarkedHEdge = self.coarsen_cell(isMarkedCell, isMarkedHEdge, method='tri')
-
-        color = color[~isMarkedHEdge]#更新颜色
-        color[color==1] = 0
-        color[halfedge[color==3, 2]] = 1
-        color[halfedge[color==2, 3]] = 1
-
-        #进一步标记需要删除的边
-        NC = self.number_of_all_cells()
-        flag = (halfedge[halfedge[halfedge[halfedge[:, 2], 4], 2],
-            4]==np.arange(len(halfedge)))
-        flag = flag & (hlevel[:]==0) & (hlevel[halfedge[:, 4]]!=0)
-
-        while True:
-            count = np.zeros(NC, dtype=np.int_)
-            np.add.at(count, halfedge[:, 1], flag)
-
-            NV = self.ds.number_of_vertices_of_all_cells()
-            flag0 = (count==1) & (NV==6)
-            flag[flag0[halfedge[:, 1]]] = False
-            flag[flag0[halfedge[halfedge[:, 4], 1]]] = False
-            if (~flag0).all():
-                break
-
-        #修改颜色
-        color[halfedge[flag, 4]] = 0
-        color = color[~flag]
-        self.coarsen_halfedge(flag)
-
-        #标记要生成新单元的单元
-        NV = self.ds.number_of_vertices_of_all_cells()
-        isBlueCell = NV==4
-        isRedCell = NV==6
-        isNewCell = (NV == 4)|(NV == 6)
-        isNewCell[:cstart] = False
-        isRedCell[:cstart] = False
-
-        #生成新单元
-        flag1 = (hlevel[:]>0) & (hlevel[:]!=hlevel[halfedge[:, 4]])
-        flag1 = flag1 & (hlevel[halfedge[:, 3]]==0)
-        flag1 = flag1 & (hlevel[halfedge[halfedge[:, 3], 4]]>0)
-        flag = flag1 & isNewCell[halfedge[:, 1]]#既是标记边又对应标记单元
-        tmp = flag1 & isBlueCell[halfedge[:, 1]]#既是标记边又对应标记单元
-        tmp, = np.where(tmp)
-        NC1 = flag.sum()
-
-        flag = (hlevel[:]==0) & (hlevel[halfedge[:, 2]]>0) & (hlevel[halfedge[:,
-            4]]>0) & isBlueCell[halfedge[:, 1]]
-        flag = flag | ((hlevel[:]==0) & isRedCell[halfedge[:, 1]])
-        flag = flag[halfedge[:, 3]]
-
-        self.refine_cell(isNewCell, flag, method='tri', options=options)
-
-        #修改半边颜色
-        color = np.r_[color, np.zeros(NC1*2, dtype = np.int_)]
-        color[tmp] = 1
-        color[halfedge[tmp, 3]]=3
-        color[halfedge[color==3, 4]] = 2
-        color[halfedge[color==2, 3]] = 1
-        self.hedgecolor = color
-
-    def refine_triangle_nvb(self, isMarkedCell=None, options={}):
-        NC = self.number_of_all_cells()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-
-        color = self.hedgecolor
-        node = self.entity('node')
-        halfedge = self.ds.halfedge
-
-        if isMarkedCell is None:
-            isMarkedCell = np.ones(NC, dtype=np.bool_)
-
-        if color is None:
-            color = np.zeros(NE*2, dtype=np.int_)
-            nex = halfedge[:, 2]
-            pre = halfedge[:, 3]
-            l = node[halfedge[:, 0]]-node[halfedge[pre, 0]]
-            l = np.linalg.norm(l, axis=1)
-            color[(l>l[nex]) & (l>l[pre])] = 1
-            self.hedgecolor = color
-
-        cstart = self.ds.cellstart
-        subdomain = self.ds.subdomain
-        hedge = self.ds.hedge
-        hcell = self.ds.hcell
-
-        hlevel = self.halfedgedata['level']
-        clevel = self.celldata['level']
-        isMarkedCell[:cstart] = False
-
-        if ('HB' in options) and (options['HB'] is not None):
-            HB = np.zeros((NC-cstart, 2), dtype=np.int)
-            HB[:, 0] = np.arange(NC-cstart)
-            HB[:, 1] = np.arange(NC-cstart)
-            options['HB'] = HB
-
-        isMarkedHEdge = self.mark_halfedge(isMarkedCell, method='nvb')
-        flag = np.array(True)
-        while flag.any():
-            #加密半边
-            flag = isMarkedHEdge & ((color==1)|(halfedge[:, 1]<cstart))
-            flag = flag & flag[halfedge[:, 4]]
-
-            #加密半边
-            NE1 = self.refine_halfedge(flag)*2
-
-            #加密单元
-            NV = self.ds.number_of_vertices_of_all_cells()
-            isNewCell = NV==4
-
-            flag = np.r_[flag, np.zeros(NE1, dtype=np.bool_)]
-            flag = flag & (halfedge[:, 1]>=cstart)
-
-            NE2 = flag.sum()
-            isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NE1+NE2*2, dtype=np.bool_)]
-
-            #修改半边颜色
-            color = np.r_[color, np.zeros(NE1, dtype=np.int)]
-            color[flag]=0
-            color[halfedge[flag, 2]] = 1
-            color[halfedge[halfedge[flag, 3], 3]] = 1
-            color = np.r_[color, np.zeros(NE2*2, dtype=np.int)]
-            self.hedgecolor = color
-
-            self.refine_cell(isNewCell, flag, method='tri', options=options)
-
-
-    def coarsen_triangle_nvb(self, isMarkedCell, options={}):
-        NC = self.number_of_all_cells()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        hcell = self.ds.hcell
-        hedge = self.ds.hedge
-        hlevel = self.halfedgedata['level']
-        clevel = self.celldata['level']
-
-        color = self.hedgecolor
-        if color is None:
-            return 
-        node = self.entity('node')
-        halfedge = self.entity('halfedge')
-        cstart = self.ds.cellstart
-        subdomain = self.ds.subdomain
-        isMainHEdge = self.ds.main_halfedge_flag()
-        isMarkedCell[:cstart] = True
-
-        nex, pre, opp = halfedge[:, 2], halfedge[:, 3], halfedge[:, 4]
-
-        #标记要删除的半边
-        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (hlevel[:]==0) & (color[:]==0)
-        isMarkedHEdge = isMarkedHEdge & (clevel[halfedge[:, 1]]>0)
-        isMarkedHEdge = isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
-
-        #只考虑对着的四个四边形都被标记的情况或者两个边界上的三角形都被标记的情况
-        isMarkedHEdge = isMarkedHEdge & (color[halfedge[:, 3]] == 1)
-
-        isMarkedHEdge = isMarkedHEdge & (isMarkedHEdge[opp[nex[opp[nex]]]] | (halfedge[opp[nex], 1] < cstart))
-        isMarkedHEdge[opp[isMarkedHEdge]] = True
-
-        if ('HB' in options) and (options['HB'] is not None):
-            HB = np.zeros((NC-cstart, 2), dtype=np.int)
-            HB[:, 0] = np.arange(NC-cstart)
-            HB[:, 1] = np.arange(NC-cstart)
-            options['HB'] = HB
-
-        isMarkedHEdge = self.coarsen_cell(isMarkedCell, isMarkedHEdge, method='tri', options=options)
-
-        #修改颜色
-        color = color[~isMarkedHEdge]
-        flag = (color==1) & (color==1)[halfedge[:, 2]]
-        color[flag] = 0
-        color[halfedge[flag, 2]] = 0
-        color[halfedge[flag, 3]] = 1
-
-        #进一步标记要移除的半边
-        NV = self.ds.number_of_vertices_of_all_cells()
-        nex = halfedge[:, 2]
-        opp = halfedge[:, 4]
-        flag = (opp[nex[opp[nex]]] == np.arange(len(halfedge))) & (NV[halfedge[:, 1]]==4)
-        flag = flag & (color==1)[halfedge[:, 2]]
-        flag[opp[nex[flag]]]=True
-
-        #粗化半边
-        self.coarsen_halfedge(flag)
-
-        #修改颜色
-        color = color[~flag]
-        self.hedgecolor = color
 
     def adaptive_options(
             self,
@@ -2134,19 +2107,15 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                     break
                 isMarkedCell = (options['numrefine'] < 0)
 
-    def adaptive_refine(self, isMarkedCell, method="nvb", options={}):
-        cstart = self.ds.cellstart
-        NC = self.number_of_all_cells()
-        isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
-        isMarkedCell0[cstart:] = isMarkedCell
+    def adaptive_refine(self, isMarkedCell, method="poly", options={}):
         if method=='nvb':
-            self.refine_triangle_nvb(isMarkedCell0, options=options)
+            self.refine_triangle_nvb(isMarkedCell, options=options)
         elif method=='rg':
-            self.refine_triangle_rg(isMarkedCell0, options=options)
+            self.refine_triangle_rg(isMarkedCell, options=options)
         elif method=='quad':
-            self.refine_quad(isMarkedCell0, options=options)
+            self.refine_quad(isMarkedCell, options=options)
         elif method=='poly':
-            self.refine_poly(isMarkedCell0, options=options)
+            self.refine_poly(isMarkedCell, options=options)
 
     def adaptive_coarsen(self, isMarkedCell, method="nvb", options={}):
         cstart = self.ds.cellstart
@@ -2348,7 +2317,11 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         NC = self.number_of_cells()
 
         node = self.entity('node')
-        cell, cellLoc = self.ds.cell_to_node()
+        if self.ds.NV==3:
+            cells = self.ds.cell_to_node()
+        else:
+            cell, cellLoc = self.ds.cell_to_node()
+            cells = np.split(cell, cellLoc[1:-1])
 
         if node.shape[1] == 2:
             node = np.c_[node, np.zeros((len(node), 1), dtype=np.float_)]
@@ -2358,7 +2331,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         uGrid = vtk.vtkUnstructuredGrid()
         uGrid.SetPoints(points)
 
-        cells = np.split(cell, cellLoc[1:-1])
         vtk_cells = vtk.vtkCellArray()
         for c in cells:
             vtk_cell = vtk.vtkPolygon()
@@ -2572,6 +2544,42 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         mesh.init_level_info()
         return mesh
 
+    @classmethod
+    def from_box(cls, box = [0, 1, 0, 1], h=0.1):
+        gmsh.initialize()
+        gmsh.model.add("Box")
+
+        # 创建单位圆
+        gmsh.model.occ.addRectangle(box[0], box[2], 0.0, box[1]-box[0], box[3]-box[2])
+
+        # 同步几何模型
+        gmsh.model.occ.synchronize()
+
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),h)
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        nid2tag, node, _  = gmsh.model.mesh.get_nodes()
+        node = node.reshape(-1, 3)[:, :-1]
+        NN = node.shape[0]
+
+        tag2nid = np.zeros(int(np.max(nid2tag))+1, dtype = np.int_)
+        tag2nid[nid2tag] = np.arange(NN)
+
+        cell = gmsh.model.mesh.get_elements(2, -1)[2][0].reshape(-1, 3)
+        cell = tag2nid[cell]
+
+        gmsh.finalize()
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        return cls.from_mesh(TriangleMesh(node, cell), NV=3)
+
     def print(self):
         print("hcell:\n")
         for i, val in enumerate(self.ds.hcell):
@@ -2611,8 +2619,12 @@ class HalfEdgeMesh2dDataStructure():
         self.hnode = DynamicArray((0, ), dtype=self.itype)
         self.hedge = DynamicArray((0, ), dtype=self.itype)
 
+        self.cell2ipt = None # cell2ipoint
+        self.tree = None     # 网格节点构造的树结构
+
         self.reinit(NN=NN, NC=NC, NV=NV)
         self.NV = NV
+        self.TD = 2
 
     def reinit(self, NN=None, NC=None, NV=None):
         """
@@ -2623,6 +2635,10 @@ class HalfEdgeMesh2dDataStructure():
         self.hcell: 每个单元对应的一个半边
         self.hedge: 每条边对应的一条半边有性质 hedge >= halfedge[hedge, 4]
         """
+
+        self.cell2ipt = None # cell2ipoint
+        self.tree = None     # 网格节点构造的树结构
+
         halfedge = self.halfedge
 
         self.NHE = len(halfedge) # 半边个数
@@ -2653,6 +2669,9 @@ class HalfEdgeMesh2dDataStructure():
         flag = np.arange(self.NHE)-halfedge[:, 4] >= 0
         self.hedge[:] = np.arange(self.NHE)[flag]
 
+    def top_dimension(self):
+        return 2
+
     def number_of_edges(self):
         return self.NE 
 
@@ -2669,11 +2688,8 @@ class HalfEdgeMesh2dDataStructure():
         return self.NBE
 
     def number_of_vertices_of_cells(self):
-        if self.NV in {3, 4}:
-            return self.NV
-        else:
-            NV = np.zeros(self.NC, dtype=self.itype)
-            np.add.at(NV, self.halfedge[:, 1], 1)
+        NV = np.zeros(self.NC, dtype=self.itype)
+        np.add.at(NV, self.halfedge[:, 1], 1)
         return NV
 
     def number_of_nodes_of_cells(self):
@@ -3068,6 +3084,141 @@ class HalfEdgeMesh2dDataStructure():
             i += 1
         return halfedge2cellnum
 
+    ######################## 与插值点有关的接口 ######################
+    def number_of_global_ipoints(self, p: int) -> int:
+        """
+        @brief 插值点总数
+        """
+        gdof = self.NN 
+        if p > 1:
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+            gdof += NE*(p-1) + NC*(p-1)*p//2
+        return gdof
+
+    def number_of_local_ipoints(self,
+            p: int, iptype: Union[int, str]='all') -> Union[NDArray, int]:
+        """
+        @brief 获取局部插值点的个数
+        """
+        if iptype in {'all'}:
+            NV = self.ds.number_of_vertices_of_cells()
+            ldof = NV + (p-1)*NV + (p-1)*p//2
+            return ldof
+        elif iptype in {'cell', 2}:
+            return (p-1)*p//2
+        elif iptype in {'edge', 'face', 1}:
+            return (p+1)
+        elif iptype in {'node', 0}:
+            return 1
+
+    def cell_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
+        """
+        @brief
+        """
+        cell = self.cell_to_node()[index]
+        if p == 1:
+            return cell[index]
+        else:
+            if self.NV==3:
+                if self.cell2ipt is None:
+                    mi = Mesh.multi_index_matrix(p, 2)
+                    idx0, = np.nonzero(mi[:, 0] == 0)
+                    idx1, = np.nonzero(mi[:, 1] == 0)
+                    idx2, = np.nonzero(mi[:, 2] == 0)
+
+                    edge2cell = self.edge_to_cell()
+                    NN = self.NN
+                    NE = self.number_of_edges()
+                    NC = self.number_of_cells()
+
+                    e2p = self.edge_to_ipoint(p)
+                    ldof = (p+1)*(p+2)//2
+                    c2p = np.zeros((NC, ldof), dtype=self.itype)
+
+                    flag = edge2cell[:, 2] == 0
+                    c2p[edge2cell[flag, 0][:, None], idx0] = e2p[flag]
+
+                    flag = edge2cell[:, 2] == 1
+                    c2p[edge2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+
+                    flag = edge2cell[:, 2] == 2
+                    c2p[edge2cell[flag, 0][:, None], idx2] = e2p[flag]
+
+
+                    iflag = edge2cell[:, 0] != edge2cell[:, 1]
+
+                    flag = iflag & (edge2cell[:, 3] == 0)
+                    c2p[edge2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+
+                    flag = iflag & (edge2cell[:, 3] == 1)
+                    c2p[edge2cell[flag, 1][:, None], idx1] = e2p[flag]
+
+                    flag = iflag & (edge2cell[:, 3] == 2)
+                    c2p[edge2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+
+                    cdof = (p-1)*(p-2)//2
+                    flag = np.sum(mi > 0, axis=1) == 3
+                    c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
+                    
+                    self.cell2ipt = c2p
+                    return c2p[index]
+                else:
+                    return self.cell2ipt[index]
+            else:
+                NC = self.number_of_cells()
+                ldof = self.number_of_local_ipoints(p, iptype='all')
+
+                location = np.zeros(NC+1, dtype=self.itype)
+                location[1:] = np.add.accumulate(ldof)
+
+                cell2ipoint = np.zeros(location[-1], dtype=self.itype)
+
+                edge2ipoint = self.edge_to_ipoint(p)
+                edge2cell = self.edge_to_cell()
+
+                idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+                cell2ipoint[idx] = edge2ipoint[:, 0:p]
+
+                isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+                idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
+                cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
+
+                NN = self.number_of_nodes()
+                NV = self.number_of_vertices_of_cells()
+                NE = self.number_of_edges()
+                cdof = self.number_of_local_ipoints(p, iptype='cell')
+                idx = (location[:-1] + NV*p).reshape(-1, 1) + np.arange(cdof)
+                cell2ipoint[idx] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
+                return np.hsplit(cell2ipoint, location[1:-1])[index]
+
+    def edge_to_ipoint(self, p: int, index=np.s_[:]) -> NDArray:
+        """
+        @brief 获取网格边与插值点的对应关系
+
+        """
+        if isinstance(index, slice) and index == slice(None):
+            NE = self.number_of_edges()
+            index = np.arange(NE)
+        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        elif isinstance(index, list) and (type(index[0]) is np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        else:
+            NE = len(index)
+
+        NN = self.NN
+
+        edge = self.edge_to_node()[index]
+        edge2ipoints = np.zeros((NE, p+1), dtype=self.itype)
+        edge2ipoints[:, [0, -1]] = edge
+        if p > 1:
+            idx = NN + np.arange(p-1)
+            edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx
+        return edge2ipoints
+
     def halfedge_to_edge(self, index = np.s_[:]):
         halfedge = self.halfedge
         hedge = self.hedge
@@ -3085,6 +3236,9 @@ class HalfEdgeMesh2dDataStructure():
         isBDNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[halfedge[isBdHEdge, 0]] = True 
         return isBdNode
+
+    def boundary_halfedge_flag(self):
+        return self.halfedge[:, 4]==np.arange(self.NHE)
 
     def boundary_edge_flag(self):
         halfedge =  self.halfedge

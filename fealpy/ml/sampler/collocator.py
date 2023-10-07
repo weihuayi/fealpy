@@ -231,6 +231,6 @@ class SphereCollocator(Sampler):
             y = 1 - (indices / (nums - 1)) * 2  
             r = torch.sqrt(1 - y*y) * self.radius  
             theta = phi * indices 
-            x = self.center[0] + cos(theta) * r
+            x = self.center[0] + torch.cos(theta) * r
             z = self.center[2] + torch.sin(theta) * r
             return torch.stack((x, y + self.center[1], z), dim=1)
