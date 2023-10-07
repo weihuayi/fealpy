@@ -29,8 +29,8 @@ def random_weights(m: int, n: int, dtype=float64, device=None) -> Tensor:
 
 def multi_index(p: int, n: int, device=None) -> Tensor:
     """Return multiple indices."""
-    assert p >= 2
-    assert n >= 1
+    assert p >= 1, "`p` should be a positive integer."
+    assert n >= 1, "`n` should be a positive integer."
     sep = torch.tensor(
         tuple(combinations_with_replacement(range(p), n-1)),
         dtype=torch.int
@@ -45,7 +45,14 @@ def linspace_weights(p: int, n: int, dtype=float64, device=None) -> Tensor:
     """
     @brief Generate uniformly placed weights.
     """
-    return multi_index(p, n, device=device).to(dtype=dtype) / (p-1)
+    if p >= 2:
+        return multi_index(p, n, device=device).to(dtype=dtype) / (p-1)
+    elif p >= 1:
+        ret = torch.zeros((1, n), dtype=dtype, device=device)
+        ret[:, 0] = 1.0
+        return ret
+    else:
+        raise ValueError("`p` should be a positive integer.")
 
 
 def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
