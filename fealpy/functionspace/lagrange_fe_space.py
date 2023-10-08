@@ -1,13 +1,14 @@
 import numpy as np
 from typing import Optional, Union, Callable
 from .Function import Function
-from ..decorator import barycentric
+from ..decorator import barycentric, cartesian
 from .fem_dofs import *
 
 class LagrangeFESpace():
     DOF = { 'C': {
                 "IntervalMesh": IntervalMeshCFEDof,
                 "TriangleMesh": TriangleMeshCFEDof,
+                "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
                 "QuadrangleMesh" : QuadrangleMeshCFEDof,
                 "HexahedronMesh" : HexahedronMeshCFEDof,
@@ -16,6 +17,7 @@ class LagrangeFESpace():
             'D':{
                 "IntervalMesh": IntervalMeshDFEDof,
                 "TriangleMesh": TriangleMeshDFEDof,
+                "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
                 "QuadrangleMesh" : QuadrangleMeshDFEDof,
                 "HexahedronMesh" : HexahedronMeshDFEDof,
@@ -126,6 +128,32 @@ class LagrangeFESpace():
         p = self.p
         phi = self.mesh.face_shape_function(bc, p=p)
         return phi[..., None, :]
+
+    @cartesian
+    def function_value(self, uh, points, loc=None):
+        """
+        @brief 计算被给有限元函数的在 cartesian 坐标 points 处的函数值
+               注意，要求网格具有 find_node 函数
+        @param points: (NP, 2)
+        """
+        assert hasattr(self.mesh, 'find_point_in_triangle_mesh')
+        if isinstance(uh, list):
+            loc, bc = self.mesh.find_point_in_triangle_mesh(points, loc) #bc : (NP, 3)
+
+            TD = points.shape[-1]
+            phi = self.basis(bc) #(NP, ldof)
+            e2d = uh[0].space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
+            val = np.zeros((len(uh), )+e2d.shape[:-1], dtype=np.float_)
+            for i in range(len(uh)):
+                val[i] = np.sum(phi[..., 0, :]*uh[i][e2d], axis=-1)
+        else:
+            loc, bc = self.mesh.find_point_in_triangle_mesh(points, loc) #bc : (NP, 3)
+
+            TD = points.shape[-1]
+            phi = self.basis(bc) #(NP, ldof)
+            e2d = uh.space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
+            val = np.sum(phi[..., 0, :]*uh[e2d], axis=-1)
+        return loc, val 
 
     @barycentric
     def value(self, 
@@ -308,3 +336,32 @@ class LagrangeFESpace():
             return self.function(dim=dim, array=uI, dtype=uI.dtype)
         else:
             return self.function(dim=dim, array=uI, dtype=dtype)
+
+    def interpolation_fe_function(self, uh, dim=None, dtype=None):
+        """
+        @brief 对有限元函数 uh 进行插值 
+        """
+        if isinstance(uh, list):
+            N = len(uh)
+            cell2dof = self.dof.cell2dof
+            ips = self.interpolation_points()[cell2dof] #(NC, ldof, 3)
+            uI = np.zeros((N, )+ips.shape[:-1], dtype=self.ftype)
+            loc, _ = uh[0].space.mesh.find_point_in_triangle_mesh(self.mesh.entity_barycenter("cell"))
+            for i in range(ips.shape[1]):
+                loc, uI[..., i] = uh[0].space.function_value(uh, ips[:, i], loc)
+
+            uI0 = [self.function() for i in range(N)]
+            for i in range(N):
+                uI0[i][cell2dof] = uI[i]
+        else:
+            assert callable(uh)
+            cell2dof = self.dof.cell2dof
+            ips = self.interpolation_points()[cell2dof] #(NC, ldof, 3)
+            uI = np.zeros(ips.shape[:-1], dtype=self.ftype)
+            loc, _ = uh.space.mesh.find_point_in_triangle_mesh(self.mesh.entity_barycenter("cell"))
+            for i in range(ips.shape[1]):
+                loc, uI[:, i] = uh.space.function_value(uh, ips[:, i], loc)
+
+            uI0 = self.function()
+            uI0[cell2dof] = uI
+        return uI0 

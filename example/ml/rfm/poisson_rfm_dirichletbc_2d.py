@@ -87,7 +87,7 @@ b = csr_matrix(b_tensor.cpu().numpy())
 
 um = spsolve(A.T@A, A.T@b)
 del A, b, A_tensor, b_tensor
-solution = Function(space, 1, torch.from_numpy(um))
+solution = Function(space, torch.from_numpy(um))
 end_time = time()
 
 ### STEP 7: Estimate error and visualize

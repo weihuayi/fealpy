@@ -42,7 +42,7 @@ def solution_imag(p: Tensor) -> Tensor:
 
 #梯度
 def grad(p: Tensor):
-    
+
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -67,7 +67,7 @@ def grad_imag(p: Tensor):
 def n(p: Tensor) -> Tensor:
 
     x = p[..., 0]
-    y = p[..., 1] 
+    y = p[..., 1]
     n = torch.zeros_like(p,dtype=torch.float64)
     n[x > torch.abs(y), 0] = 1.0
     n[y > torch.abs(x), 1] = 1.0
@@ -77,7 +77,7 @@ def n(p: Tensor) -> Tensor:
 
 #robin边界边界条件
 def boundary_real(p: Tensor) -> Tensor:
-    
+
     val = (grad_real(p) * n(p)).sum(dim=-1, keepdim=True) - k * solution_imag(p)
     return val
 
@@ -88,7 +88,7 @@ def boundary_imag(p: Tensor) -> Tensor:
 
 #源项
 def source_real(p: torch.Tensor):
-    
+
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -133,9 +133,9 @@ A_tensor_bd_real = torch.cat([gradient_phi_bd, -k * phi_bd], dim = 1)
 A_tensor_bd_imag = torch.cat([k * phi_bd, gradient_phi_bd], dim = 1)
 A_tensor = torch.cat([
                       A_tensor_in_real,
-                      A_tensor_bd_real, 
-                      A_tensor_in_imag, 
-                      A_tensor_bd_imag 
+                      A_tensor_bd_real,
+                      A_tensor_in_imag,
+                      A_tensor_bd_imag
                       ], dim=0)
 b_tensor = torch.cat([
                       source_real(col_in) / sqrt(col_in.shape[0]),
@@ -145,21 +145,21 @@ b_tensor = torch.cat([
                       ], dim=0)
 
 A = csr_matrix(A_tensor.cpu().numpy())
-b = csr_matrix(b_tensor.cpu().numpy()) 
+b = csr_matrix(b_tensor.cpu().numpy())
 um= spsolve(A.T@A, A.T@b)
 um_real = um[:um.shape[0]//2]
 um_imag = um[um.shape[0]//2:]
-u_real = Function(space, 1, torch.from_numpy(um_real))
-u_imag = Function(space, 1, torch.from_numpy(um_imag))
+u_real = Function(space, torch.from_numpy(um_real))
+u_imag = Function(space, torch.from_numpy(um_imag))
 
-end_time = time.time()     
+end_time = time.time()
 time_of_computation = end_time - start_time
 
 #用网格计算误差
 mesh_err = TriangleMesh.from_box([-0.5, 0.5, -0.5, 0.5], nx=30, ny=30)
-error_real = u_real.estimate_error_tensor(solution_real, mesh_err) 
+error_real = u_real.estimate_error_tensor(solution_real, mesh_err)
 error_imag = u_imag.estimate_error_tensor(solution_imag, mesh_err)
-print(f"L-2 error: {error_real.item(),error_imag.item()}")  
+print(f"L-2 error: {error_real.item(),error_imag.item()}")
 print("Time:", time_of_computation, "s")
 
 # 可视化

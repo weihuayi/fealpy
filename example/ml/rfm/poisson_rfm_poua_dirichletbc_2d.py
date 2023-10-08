@@ -89,7 +89,7 @@ b = csr_matrix(b_tensor.cpu().numpy())
 
 um = spsolve(A.T@A, A.T@b)
 del A, b, A_tensor, b_tensor
-solution = Function(space, 1, torch.from_numpy(um))
+solution = Function(space, torch.from_numpy(um))
 end_time = time()
 
 mesh_err = TriangleMesh.from_box([0, 1.0, 0, 1.0], nx=10, ny=10)

@@ -9,6 +9,8 @@ import numpy as np
 
 from . import functional as F
 
+SampleMode = Literal['random', 'linspace']
+
 
 class Sampler():
     """
@@ -92,19 +94,20 @@ class ISampler(Sampler):
     """
     A sampler that generates samples independently in each axis.
     """
-    def __init__(self, ranges: Any, dtype=float64,
+    def __init__(self, ranges: Any, mode: SampleMode='random', dtype=float64,
                  device: device=None, requires_grad: bool=False, **kwargs) -> None:
         """
         @brief Initializes an ISampler instance.
 
         @param ranges: An object that can be converted to a `numpy.ndarray`,\
-                       representing the ranges in each sampling axis.\
-                       For example, if sampling x in [0, 1] and y in [4, 5],\
-                       use `ranges=[[0, 1], [4, 5]]`, or `ranges=[0, 1, 4, 5]`.
+               representing the ranges in each sampling axis.\
+               For example, if sampling x in [0, 1] and y in [4, 5],\
+               use `ranges=[[0, 1], [4, 5]]`, or `ranges=[0, 1, 4, 5]`.
+        @param mode: 'random' or 'linspace'. Defaults to 'random'.
         @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param requires_grad: A boolean indicating whether the samples should\
-                              require gradient computation. Defaults to `False`.\
-                              See `torch.autograd.grad`
+               require gradient computation. Defaults to `False`.\
+               See `torch.autograd.grad`
 
         @throws ValueError: If `ranges` has an unexpected shape.
         """
@@ -115,34 +118,46 @@ class ISampler(Sampler):
         else:
             ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
 
-        if ranges_arr.ndim == 2:
-            self.nd = ranges_arr.shape[0]
-            self.lows = ranges_arr[:, 0].reshape(self.nd, )
-            self.highs = ranges_arr[:, 1].reshape(self.nd, )
-        elif ranges_arr.ndim == 1:
+        if ranges_arr.ndim == 1:
             self.nd, mod = divmod(ranges_arr.shape[0], 2)
             if mod != 0:
                 raise ValueError("If `ranges` is 1-dimensional, its length is"
                                  f"expected to be even, but got {mod}.")
-            self.lows = ranges_arr[::2].reshape(self.nd, )
-            self.highs = ranges_arr[1::2].reshape(self.nd, )
-        else:
-            raise ValueError(f"Unexpected `ranges` shape {ranges_arr.shape}.")
+            ranges_arr = ranges_arr.reshape(-1, 2)
+        assert ranges_arr.ndim == 2
+        self.nodes = ranges_arr # (GD, 2)
+        self.mode = mode
 
-        self.deltas = self.highs - self.lows
-
-    def run(self, n: int) -> Tensor:
+    def run(self, *m: int) -> Tensor:
         """
         @brief Generates independent samples in each axis.
 
-        @return: A tensor with shape (n, GD) containing the generated samples.
+        @param *m: int. In 'random' mode, only one single int `m` is required, saying\
+               the number of samples. In 'linspace' mode, number of `m` must match\
+               the dimension, saying number of steps in each dimension.
+
+        @return: A tensor with shape (#samples, GD) containing the generated samples.
         """
-        ret = torch.rand((n, self.nd), dtype=self.dtype, device=self.device)\
-            * self.deltas + self.lows
-        ret.requires_grad = self.requires_grad
+        if self.mode == 'random':
+            ruler = torch.stack(
+                [F.random_weights(m[0], 2, dtype=self.dtype, device=self.device)
+                 for _ in range(self.nd)],
+                dim=0
+            ) # (GD, m, 2)
+            ret = torch.einsum('db, dmb -> md', self.nodes, ruler)
+        elif self.mode == 'linspace':
+            assert len(m) == self.nd, "Length of `m` must match the dimension."
+            ps = [torch.einsum(
+                'b, mb -> m',
+                self.nodes[i, :],
+                F.linspace_weights(m[i], 2, dtype=self.dtype, device=self.device)
+            ) for i in range(self.nd)]
+            ret = torch.stack(torch.meshgrid(*ps, indexing='ij'), dim=-1).reshape(-1, self.nd)
+        else:
+            raise ValueError(f"Invalid sampling mode '{self.mode}'.")
         if self.enable_weight:
-            self._weight[:] = 1/n
-            self._weight = self._weight.broadcast_to(n, self.nd)
+            self._weight[:] = 1/ret.shape[0]
+            self._weight = self._weight.broadcast_to(ret.shape[0])
         return ret
 
 
@@ -155,7 +170,7 @@ class BoxBoundarySampler(Sampler):
         @brief Generate samples on the boundaries of a multidimensional rectangle.
 
         @param p1, p2: Object that can be converted to `torch.Tensor`.\
-                       Points at both ends of the diagonal.
+               Points at both ends of the diagonal.
         @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
         """
@@ -180,11 +195,14 @@ class BoxBoundarySampler(Sampler):
             self.subs.append(ISampler(ranges=range2, dtype=dtype,
                               device=device, requires_grad=requires_grad))
 
-    def run(self, mb: int) -> Tensor:
+    def run(self, mb: int, bd_type=False) -> Tensor:
         """
         @brief Generate samples on the boundaries of a multidimensional rectangle.
 
         @param mb: int. Number of samples in each boundary.
+        @param bd_type: bool. Separate samples in each boundary if `True`, and\
+               the output shape will be (#boundaries, #samples, #dims).
+               Defaults to `False`.
 
         @return: Tensor.
         """
@@ -192,6 +210,8 @@ class BoxBoundarySampler(Sampler):
             b = len(self.subs)
             self._weight[:] = 1/mb/b
             self._weight = self._weight.broadcast_to(mb * b, self.nd)
+        if bd_type:
+            return torch.stack([s.run(mb) for s in self.subs], dim=0)
         return torch.cat([s.run(mb) for s in self.subs], dim=0)
 
 
