@@ -102,13 +102,13 @@ class Polygon():
 
     def __call__(self, p):
         NP = len(p)
-        NE = len(self.frature_points)
+        NE = len(self.feature_points)
 
         sign = np.ones(NP, dtype=np.bool_)
         dist = 10000*np.ones(NP, dtype=np.float_)
         for i in range(NE):
-            p0 = self.frature_points[i, None]
-            p1 = self.frature_points[(i+1)%NE, None]
+            p0 = self.feature_points[i, None]
+            p1 = self.feature_points[(i+1)%NE, None]
             v0 = p - p0
             v1 = p1 - p0
             h = np.cross(v1, v0)/np.linalg.norm(v1[0])
