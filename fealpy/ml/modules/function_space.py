@@ -29,8 +29,8 @@ class FunctionSpace(Module):
         """
         raise NotImplementedError
 
-    def function(self, um: Tensor):
-        return Function(self, um)
+    def function(self, um: Tensor, *, keepdim=True, requires_grad=False):
+        return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
 
     def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
@@ -122,7 +122,7 @@ class Function(TensorMapping, Generic[_FS]):
     """
     @brief Functions in a linear function space.
     """
-    def __init__(self, space: _FS, um: Tensor, keepdim=True, requires_grad=False) -> None:
+    def __init__(self, space: _FS, um: Tensor, *, keepdim=True, requires_grad=False) -> None:
         """
         @brief Initialize a function in a linear function space.
 
