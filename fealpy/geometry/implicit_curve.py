@@ -90,6 +90,52 @@ class CircleCurve():
         p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
         return p, d 
 
+class Polygon():
+    """
+    @brief 一个多边形的符号距离函数
+    """
+    def __init__(self, points):
+        self.feature_points = points
+
+    def init_mesh(self, n):
+        pass
+
+    def __call__(self, p):
+        NP = len(p)
+        NE = len(self.frature_points)
+
+        sign = np.ones(NP, dtype=np.bool_)
+        dist = 10000*np.ones(NP, dtype=np.float_)
+        for i in range(NE):
+            p0 = self.frature_points[i, None]
+            p1 = self.frature_points[(i+1)%NE, None]
+            v0 = p - p0
+            v1 = p1 - p0
+            h = np.cross(v1, v0)/np.linalg.norm(v1[0])
+
+            sign = sign & (h>0)
+            dist = np.minimum(dist, np.abs(h))
+
+        dist[~sign] *= -1
+        return dist 
+
+    def value(self, p):
+        return self(p)
+
+    def gradient(self, p):
+        pass
+
+    def distvalue(self, p):
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        return d, n
+
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
+
 class DoubleCircleCurve():
     """
     @brief 两个圆相交的曲线

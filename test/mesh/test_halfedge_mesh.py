@@ -304,13 +304,54 @@ def test_find_node_in_triangle_mesh():
                 ha='center', color='r', fontsize=40)
     plt.show()
 
-animation_plot('nvb')
-circle_plot('nvb')
-rg_refine_test()
-rg_coarsen_test()
-test_find_node_in_triangle_mesh()
-nvb_refine_test()
-nvb_coarsen_test()
+def test_cut_mesh():
+    from fealpy.geometry import CircleCurve, Polygon
+    #interface = CircleCurve([0, 0], np.sqrt(2))
+    points = np.zeros([7, 2], dtype=np.float_)
+    points[:, 0] = np.cos(np.arange(7)*np.pi/3.5)*np.sqrt(3)/2
+    points[:, 1] = np.sin(np.arange(7)*np.pi/3.5)*np.sqrt(3)/2
+    points[0, 1] = 0.01
+    interface = Polygon(points) 
+    hmesh = HalfEdgeMesh2d.from_interface_cut_box(interface, [-1.4, 1.4, -1.4, 1.4],
+            23, 20, keep_feature=True)
+    fig = plt.figure()
+    axes = fig.gca()
+    hmesh.add_plot(axes)
+    axes.scatter(points[:, 0], points[:, 1], color='r')
+    #hmesh.find_cell(axes, showindex=True)
+    plt.show()
+
+def test_find_node():
+    mesh = QuadrangleMesh.from_box([0, 2, 0, 1], nx=20, ny=10)
+    hmesh = HalfEdgeMesh2d.from_mesh(mesh)
+
+    points = np.random.rand(16, 2)
+    #points = np.array([[1.2, 1/9]])
+    points[:, 0] *= 2
+    c = hmesh.find_point(points)
+    print(c)
+
+    fig = plt.figure()
+    axes = fig.gca()
+    hmesh.add_plot(axes)
+    hmesh.find_cell(axes, showindex=True)
+    #hmesh.add_halfedge_plot(axes, showindex=True)
+    axes.scatter(points[:, 0], points[:, 1], color='r')
+    for i in range(len(points)):
+        plt.annotate(i, points[i], textcoords="offset points", xytext=(0, 10),
+                ha='center', color='r', fontsize=40)
+    plt.show()
+
+
+#animation_plot('nvb')
+#circle_plot('nvb')
+#rg_refine_test()
+#rg_coarsen_test()
+#test_find_node_in_triangle_mesh()
+#nvb_refine_test()
+#nvb_coarsen_test()
+test_cut_mesh()
+#test_find_node()
 
 
 

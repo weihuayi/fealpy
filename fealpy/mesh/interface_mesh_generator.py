@@ -74,7 +74,7 @@ def find_cut_point(phi, p0, p1):
     return cutPoint
 
 
-def interfacemesh2d(box, phi, n):
+def interfacemesh2d(box, phi, nx, ny):
     """ Generate a interface-fitted mesh 
 
     Parameters
@@ -96,11 +96,12 @@ def interfacemesh2d(box, phi, n):
         'h' is the split step 
     """
 
-    hx = (box[1] - box[0]) / n
-    hy = (box[3] - box[2]) / n
+    hx = (box[1] - box[0]) / nx
+    hy = (box[3] - box[2]) / ny
     h = min(hx, hy)
 
-    mesh = UniformMesh2d((0, n, 0, n), ((box[1] - box[0]) / n, (box[3] - box[2]) / n), (box[0], box[2]))
+    mesh = UniformMesh2d((0, nx, 0, ny), ((box[1] - box[0]) / nx, (box[3] -
+        box[2]) / ny), (box[0], box[2]))
 
     N = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
