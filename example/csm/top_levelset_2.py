@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy import ndimage
-from scipy.sparse.linalg import eigs
+
 from scipy.sparse import lil_matrix, csc_matrix
 from scipy.sparse.linalg import spsolve
 from scipy.signal import convolve2d
@@ -10,8 +10,8 @@ from scipy.signal import convolve2d
 
 class TopLevelSet:
 
-    def __init__(self, nelx: int = 60, nely: int = 30, volReq: float = 0.3, 
-                 stepLength: int = 3, numReinit: int = 2, topWeight: int = 2):
+    def __init__(self, nelx: int = 32, nely: int = 20, volReq: float = 0.4, 
+                 stepLength: int = 2, numReinit: int = 3, topWeight: int = 2):
 
         # Structure and Optimization
         self._nelx = nelx
@@ -84,12 +84,11 @@ class TopLevelSet:
 
                 K[np.ix_(edof, edof)] += max(struc[ely, elx], 0.0001) * KE
 
-        F[2 * (round(nelx/2)+1) * (nely+1) - 1] = 1
+        F[2 * (nelx+1) * (nely+1) - 1] = 1
         
-        fixeddofs = np.concatenate( [np.arange( 2*(nely+1)-2, 2*(nely+1) ), 
-                                np.arange( 2*(nelx+1)*(nely+1)-2, 2*(nelx+1)*(nely+1) )] )
-        alldofs = np.arange( 2*(nely+1)*(nelx+1) )
-        freedofs = np.setdiff1d(alldofs, fixeddofs)
+        fixeddofs = list( range( 2*(nely+1) ) )
+        alldofs = list( range( 2*(nely+1)*(nelx+1) ) )
+        freedofs = list( set(alldofs) - set(fixeddofs) )
 
         U[freedofs] = spsolve(csc_matrix(K[np.ix_(freedofs, freedofs)]), F[freedofs])
 
@@ -100,6 +99,7 @@ class TopLevelSet:
         gFull = np.pad(g, ((1,1),(1,1)), mode='constant', constant_values=0)
 
         dt = 0.1 / np.max(np.abs(v))
+
         for _ in range(int(10 * stepLength)):
             dpx = np.roll(lsf, shift=(0, -1), axis=(0, 1)) - lsf
             dmx = lsf - np.roll(lsf, shift=(0, 1), axis=(0, 1))
@@ -115,7 +115,7 @@ class TopLevelSet:
         
         return struc, lsf
 
-    def updateStep(self, iterNum, lsf, shapeSens, topSens, stepLength, topWeight):
+    def updateStep(self, lsf, shapeSens, topSens, stepLength, topWeight):
         kernel = 1/6 * np.array([[0, 1, 0], 
                                 [1, 2, 1], 
                                 [0, 1, 0]])
@@ -127,18 +127,9 @@ class TopLevelSet:
         shapeSens_smoothed = convolve2d(shapeSens_padded, kernel, mode='valid')
         topSens_smoothed = convolve2d(topSens_padded, kernel, mode='valid')
 
-        # Load bearing pixels must remain solid - Bridge
-        key_positions = [0, round((shapeSens_smoothed.shape[1]-1)/2), round((shapeSens_smoothed.shape[1]-1)/2) + 1, -1]
-
-        shapeSens_smoothed[-1, key_positions] = 0
-        topSens_smoothed[-1, key_positions] = 0
-
-        #if iterNum == 1:
-        #    plt.figure(figsize=(8, 5))
-        #    plt.imshow(shapeSens_smoothed, cmap="viridis")
-        #    plt.colorbar()
-        #    plt.title(f"Smoothed shapeSens at iteration {iterNum + 1}")
-        #    plt.show()
+        # Load bearing pixels must remain solid - Cantilever
+        shapeSens_smoothed[-1, -1] = 0
+        topSens_smoothed[-1, -1] = 0
 
         struc, lsf = self.evolve(-shapeSens_smoothed, topSens_smoothed*(lsf[1:-1, 1:-1] < 0), lsf, stepLength, topWeight)
 
@@ -191,13 +182,7 @@ class TopLevelSet:
             shapeSens = shapeSens + la + 1/La * (volCurr - volReq)
             topSens = topSens - np.pi * ( la + 1/La * (volCurr - volReq) )
 
-            #if iterNum == 1:
-            #    plt.figure(figsize=(8, 5))
-            #    plt.imshow(shapeSens, cmap="viridis")
-            #    plt.colorbar()
-            #    plt.title(f"Original shapeSens at iteration {iterNum + 1}")
-
-            struc, lsf = self.updateStep(iterNum, lsf, shapeSens, topSens, stepLength, topWeight)
+            struc, lsf = self.updateStep(lsf, shapeSens, topSens, stepLength, topWeight)
 
             if iterNum % numReinit == 0:
                 lsf = self.reinit(struc)
