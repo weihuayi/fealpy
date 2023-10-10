@@ -29,8 +29,8 @@ class FunctionSpace(Module):
         """
         raise NotImplementedError
 
-    def function(self, um: Tensor):
-        return Function(self, um)
+    def function(self, um: Tensor, *, keepdim=True, requires_grad=False):
+        return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
 
     def basis(self, p: Tensor, *, index=_S) -> Tensor:
         """
@@ -122,7 +122,7 @@ class Function(TensorMapping, Generic[_FS]):
     """
     @brief Functions in a linear function space.
     """
-    def __init__(self, space: _FS, um: Tensor, keepdim=True) -> None:
+    def __init__(self, space: _FS, um: Tensor, *, keepdim=True, requires_grad=False) -> None:
         """
         @brief Initialize a function in a linear function space.
 
@@ -138,7 +138,8 @@ class Function(TensorMapping, Generic[_FS]):
         assert um.shape[0] == M, "shape in dim-0 should match the number of basis."
 
         self.space = space
-        self._tensor = Parameter(torch.empty(um.shape, dtype=dtype, device=device))
+        self._tensor = Parameter(torch.empty(um.shape, dtype=dtype, device=device),
+                                 requires_grad=requires_grad)
         self.set_um_inplace(um)
         self.keepdim=keepdim
 

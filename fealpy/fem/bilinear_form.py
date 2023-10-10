@@ -139,6 +139,7 @@ class BilinearForm:
         cellmeasure = mesh.entity_measure()
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
+        print("CM:", CM.shape)
         for di in self.dintegrators:
             di.assembly_cell_matrix(space, cellmeasure=cellmeasure, out=CM)
 

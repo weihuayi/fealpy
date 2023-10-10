@@ -332,7 +332,7 @@ class TriangleMesh(Mesh, Plotable):
         length = np.linalg.norm(nv, axis=-1, keepdims=True)
 
         n = nv/length
-        return 0
+        return n
 
 
     def grad_lambda(self, index=np.s_[:]):

@@ -32,6 +32,7 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
         space0 = space[0]
         mesh = space0.mesh
         GD = mesh.geo_dimension()
+        print("GD:", GD)
 
         assert len(space) == 2
 
