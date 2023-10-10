@@ -9,7 +9,6 @@ Exact solution:
 """
 
 from time import time
-from math import sqrt
 
 import torch
 from torch import Tensor, exp
@@ -17,7 +16,7 @@ from torch.nn import init
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import UniformPoUSpace, PoUA, Cos, Function, RandomFeatureSpace
+from fealpy.ml.modules import UniformPoUSpace, PoUA, Cos, RandomFeatureSpace
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 PI = torch.pi
@@ -82,18 +81,17 @@ A_tensor = torch.cat([-laplace_phi,
                       phi,
                       c0,
                       c1], dim=0)
-del laplace_phi, phi
+del laplace_phi, phi, c0, c1
 
 A = csr_matrix(A_tensor.cpu().numpy())
 b = csr_matrix(b_tensor.cpu().numpy())
 
-um = spsolve(A.T@A, A.T@b)
+um = space.function(torch.from_numpy(spsolve(A.T@A, A.T@b)))
 del A, b, A_tensor, b_tensor
-solution = Function(space, torch.from_numpy(um))
 end_time = time()
 
 mesh_err = TriangleMesh.from_box([0, 1.0, 0, 1.0], nx=10, ny=10)
-error = solution.estimate_error_tensor(exact_solution, mesh=mesh_err)
+error = um.estimate_error_tensor(exact_solution, mesh=mesh_err)
 print(f"L-2 error: {error.item()}")
 print(f"Time: {end_time - start_time}")
 
@@ -104,13 +102,9 @@ from matplotlib import pyplot as plt
 fig = plt.figure("RFM for 2d poisson equation")
 
 axes = fig.add_subplot(111)
-qm = solution.diff(exact_solution).add_pcolor(axes, box=[0, 1.0, 0, 1.0], nums=[100, 100])
+qm = um.diff(exact_solution).add_pcolor(axes, box=[0, 1.0, 0, 1.0], nums=[100, 100])
 axes.set_xlabel('x')
 axes.set_ylabel('y')
 fig.colorbar(qm)
-
-mesh.find_node(axes, showindex=True, fontsize=16)
-col_sub = col_sub.reshape(-1, col_sub.shape[-1])
-axes.scatter(col_sub[:, 0], col_sub[:, 1])
 
 plt.show()
