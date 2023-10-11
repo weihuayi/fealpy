@@ -280,20 +280,25 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         NP = points.shape[0]
         start = np.zeros(NP, dtype=self.itype) if start is None else start
+        cellstart = start.copy()
 
         isNotOK = np.ones(NP, dtype=np.bool_)
         while isNotOK.any():
-            cell2hedge = np.c_[hcell[cell],
-                    halfedge[hcell[cell], 2], halfedge[hcell[cell], 3]].T
-            cell2vector = node[halfedge[cell2hedge, 0]] - node[halfedge[
-                halfedge[cell2hedge, 3], 0]]
-            vector = x - node[halfedge[halfedge[cell2hedge, 3], 0]]
-            area = np.cross(cell2vector, vector)
-            idx, jdx = np.where(area<0)
-            isNotOK[:] = False
-            isNotOK[jdx]=True
-            cell[jdx] = halfedge[halfedge[cell2hedge[idx, jdx], 4], 1]
-        return cell
+            idx = np.where(isNotOK)[0]
+            p1 = node[halfedge[start[isNotOK], 0]]
+            p0 = node[halfedge[halfedge[start[isNotOK], 3], 0]]
+
+            v0 = p1 - p0
+            v1 = points[idx] - p0
+            flag = np.cross(v0, v1)>0
+
+            start[idx[flag]] = halfedge[start[idx[flag]], 2]
+            cellstart[idx[~flag]] = halfedge[start[idx[~flag]], 4]
+            start[idx[~flag]] = halfedge[halfedge[start[idx[~flag]], 4], 2]
+
+            isNotOK[idx] = cellstart[idx]!=start[idx]
+
+        return halfedge[start, 1]
 
 ########################### 三角形网格的接口 ####################################
     def find_point_in_triangle_mesh(self, points, start=None):
@@ -728,19 +733,20 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                     node[cell, :]).reshape(-1, GD)
         return ipoints # (gdof, GD)
 
-    def integrator(self, q, etype='cell'):
+    def integrator(self, q, etype='cell', qtype='legendre'):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
         if etype in {'cell', 2}:
-            from ..quadrature import TriangleQuadrature, PolygonMeshIntegralAlg 
-            if self.ds.NV==3: 
-                return TriangleQuadrature(q)
-            else:
-                return PolygonMeshIntegralAlg(q)
+            from ..quadrature import TriangleQuadrature
+            return TriangleQuadrature(q)
         elif etype in {'edge', 'face', 1}:
-            from ..quadrature import GaussLegendreQuadrature
-            return GaussLegendreQuadrature(q)
+            if qtype in {'legendre'}:
+                from ..quadrature import GaussLegendreQuadrature
+                return GaussLegendreQuadrature(q)
+            elif qtype in {'lobatto'}:
+                from ..quadrature import GaussLobattoQuadrature
+                return GaussLobattoQuadrature(q)
 
     def delete_entity(self, isMarked, etype='node'):
         """
@@ -2359,11 +2365,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         NC = self.number_of_cells()
 
         node = self.entity('node')
-        if self.ds.NV==3:
-            cells = self.ds.cell_to_node()
-        else:
-            cell, cellLoc = self.ds.cell_to_node()
-            cells = np.split(cell, cellLoc[1:-1])
+        cells = self.ds.cell_to_node()
 
         if node.shape[1] == 2:
             node = np.c_[node, np.zeros((len(node), 1), dtype=np.float_)]
@@ -2453,7 +2455,8 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_interface_cut_box(cls, interface, box, nx=10, ny=10):
+    def from_interface_cut_box(cls, interface, box, nx=10, ny=10,
+            keep_feature=False):
         """
         @brief 生成界面网格, 要求每个单元与界面只能交两个点或者不想交。
             步骤为:
@@ -2466,7 +2469,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 2. 相交的单元会被分为两个单元，界面内部的单元将继承原来单元的编号
         """
 
-        from .QuadrangleMesh import QuadrangleMesh
+        from .quadrangle_mesh import QuadrangleMesh
         from .interface_mesh_generator import find_cut_point 
 
         ## 1. 生成笛卡尔网格
@@ -2487,7 +2490,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         mesh = cls.from_mesh(QuadrangleMesh(node, cell))
 
         NN = mesh.number_of_nodes()
-        NC = mesh.number_of_all_cells()
+        NC = mesh.number_of_cells()
         NE = mesh.number_of_edges()
 
         node = mesh.node
@@ -2501,7 +2504,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         # 2. 找到相交的半边
         edge = mesh.entity('edge')
-        isCutHEdge = phiValue[halfedge[:, 0]]*phiValue[halfedge[halfedge[:, 4], 0]] < 0 
+        isCutHEdge = phiValue[halfedge[:, 0]]*phiValue[halfedge[halfedge[:, 3], 0]] < 0 
 
         cutHEdge, = np.where(isCutHEdge&isMainHEdge)
         cutEdge = mesh.ds.halfedge_to_edge(cutHEdge)
@@ -2512,7 +2515,21 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         mesh.refine_halfedge(isCutHEdge, newnode = cutNode)
 
+        NHE = mesh.ds.number_of_halfedges()
         newHE = np.where((halfedge[:, 0] >= NN))[0]
+
+        if keep_feature & (hasattr(interface, "feature_points")):
+            c = mesh.find_point(interface.feature_points)
+            isCutCell = np.zeros(NC, dtype=np.bool_)
+            isCutCell[halfedge[newHE, 1]] = True
+
+            if ~np.all(isCutCell[c]):
+                print("!!!!!!!! 请调整网格的重新 cut !!!!!!!!!")
+            isFratrueCell = np.zeros(NC, dtype=np.bool_)
+            isFratrueCell[c] = True
+
+            fcidx = np.argsort(c)
+
         ## 注意这里要把 newHE 区分为界面内部和界面外部的
         cen = mesh.entity_barycenter('halfedge', index=newHE)
         isinnewHE = interface(cen)<0
@@ -2527,8 +2544,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         ################################################
 
         ne = len(newHE)
-        NE = len(halfedge)//2
-
         mesh.number_cut_cell = ne
 
         halfedgeNew = halfedge.increase_size(ne*2)
@@ -2536,41 +2551,33 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         halfedgeNew[:ne, 1] = halfedge[newHE[:, 1], 1]
         halfedgeNew[:ne, 2] = halfedge[newHE[:, 1], 2]
         halfedgeNew[:ne, 3] = newHE[:, 0] 
-        halfedgeNew[:ne, 4] = np.arange(NE*2+ne, NE*2+ne*2)
+        halfedgeNew[:ne, 4] = np.arange(NHE+ne, NHE+ne*2)
 
         halfedgeNew[ne:, 0] = halfedge[newHE[:, 0], 0]
         halfedgeNew[ne:, 1] = np.arange(NC, NC+ne)
         halfedgeNew[ne:, 2] = halfedge[newHE[:, 0], 2]
         halfedgeNew[ne:, 3] = newHE[:, 1] 
-        halfedgeNew[ne:, 4] = np.arange(NE*2, NE*2+ne) 
+        halfedgeNew[ne:, 4] = np.arange(NHE, NHE+ne) 
 
-        halfedge[halfedge[newHE[:, 0], 2], 3] = np.arange(NE*2+ne, NE*2+ne*2)
-        halfedge[halfedge[newHE[:, 1], 2], 3] = np.arange(NE*2, NE*2+ne)
-        halfedge[newHE[:, 0], 2] = np.arange(NE*2, NE*2+ne)
-        halfedge[newHE[:, 1], 2] = np.arange(NE*2+ne, NE*2+ne*2)
+        halfedge[halfedge[newHE[:, 0], 2], 3] = np.arange(NHE+ne, NHE+ne*2)
+        halfedge[halfedge[newHE[:, 1], 2], 3] = np.arange(NHE, NHE+ne)
+        halfedge[newHE[:, 0], 2] = np.arange(NHE, NHE+ne)
+        halfedge[newHE[:, 1], 2] = np.arange(NHE+ne, NHE+ne*2)
 
         isNotOK = np.ones(ne, dtype=np.bool_)
-        current = np.arange(NE*2+ne, NE*2+ne*2)
+        current = np.arange(NHE+ne, NHE+ne*2)
         while np.any(isNotOK):
             halfedge[current[isNotOK], 1] = np.arange(NC, NC+ne)[isNotOK]
             current[isNotOK] = halfedge[current[isNotOK], 2]
-            isNotOK = current != np.arange(NE*2+ne, NE*2+ne*2)
-
-
-        #增加主半边
-        mesh.ds.hedge.extend(np.arange(NE*2, NE*2+ne))
-
-        #更新subdomain
-        subdomainNew = mesh.ds.subdomain.increase_size(ne)
-        subdomainNew[:] = mesh.ds.subdomain[halfedge[newHE[:, 0], 1]]
-
-        #更新起始边
-        mesh.ds.hcell.increase_size(ne)
-        mesh.ds.hcell[halfedge[:, 1]] = np.arange(len(halfedge)) # 的编号
-
-        mesh.ds.NN = mesh.node.size
-        mesh.ds.NC += ne 
-        mesh.ds.NE = halfedge.size//2
+            isNotOK = current != np.arange(NHE+ne, NHE+ne*2)
+        mesh.ds.reinit()
+        mesh.init_level_info()
+        if keep_feature:
+            flag = isFratrueCell[halfedgeNew[:ne, 1]]
+            isMarkedHEdge = np.zeros(mesh.ds.NHE, dtype=np.bool_)
+            isMarkedHEdge[np.arange(mesh.ds.NHE-2*ne, mesh.ds.NHE-ne)[flag]] = True
+            isMarkedHEdge[halfedge[isMarkedHEdge, 4]] = True
+            mesh.refine_halfedge(isMarkedHEdge, newnode=interface.feature_points[fcidx])
 
         mesh.init_level_info()
         return mesh
@@ -2931,7 +2938,7 @@ class HalfEdgeMesh2dDataStructure():
         halfedge = self.halfedge
         hedge = self.hedge
 
-        J = np.zeros(NHE, dtype=self.itype)
+        J = np.zeros(NHE, dtype=self.itype) # halfedge to edge
         J[hedge] = np.arange(NE)
         J[halfedge[hedge, 4]] = np.arange(NE)
 
@@ -2948,11 +2955,13 @@ class HalfEdgeMesh2dDataStructure():
             while np.any(isNotOK):
                 idx = J[current[isNotOK]]
                 flag = isMainHEdge[current[isNotOK]]
-                edge2cell[idx[flag], 2:]  = lidx[isNotOK][flag][:, None]
+                edge2cell[idx[flag], 2]  = lidx[isNotOK][flag]#[:, None]
                 edge2cell[idx[~flag], 3] = lidx[isNotOK][~flag]
                 current[isNotOK] = halfedge[current[isNotOK], 2]
                 lidx[isNotOK] += 1
                 isNotOK = (current != end)
+            flag = edge2cell[:, -1]==-1
+            edge2cell[flag, -1] = edge2cell[flag, -2]
 
         elif self.NV == 3:
             current = self.hcell[:]
@@ -3264,7 +3273,7 @@ class HalfEdgeMesh2dDataStructure():
     def halfedge_to_edge(self, index = np.s_[:]):
         halfedge = self.halfedge
         hedge = self.hedge
-        NE = halfedge.shape[0]//2
+        NE = self.NE
 
         halfedge2edge = np.zeros(len(halfedge), dtype=np.int_)
         halfedge2edge[hedge] = np.arange(NE)

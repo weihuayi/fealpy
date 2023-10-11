@@ -1891,7 +1891,12 @@ class TriangleMesh(Mesh, Plotable):
         """
         @brief 把一个四边形网格中每个单元分成两个三角形
         """
-        pass
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+        localCell = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int_)
+        cell = cell[:, localCell].reshape(-1, 3)
+        tmesh = cls(node, cell)
+        return tmesh
 
     ## @ingroup MeshGenerators
     @classmethod
