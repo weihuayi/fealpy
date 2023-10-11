@@ -31,8 +31,7 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
         assert isinstance(space, tuple)
         space0 = space[0]
         mesh = space0.mesh
-        GD = mesh.geo_dimension()
-        print("GD:", GD)
+        GD = 2
 
         assert len(space) == 2
 
@@ -53,13 +52,17 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
 
         K = np.zeros((NC, GD*2, GD*2), dtype=np.float64)
 
+        K[:, 0, 0] = 12
         K[:, 0, 1] = 6 * l
+        K[:, 0, 2] = -12
         K[:, 0, 3] = 6 * l
         K[:, 1, 0] = 6 * l
         K[:, 1, 1] = 4 * l**2
         K[:, 1, 2] = -6 * l
         K[:, 1, 3] = 2 * l**2
+        K[:, 2, 0] = -12
         K[:, 2, 1] = -6 * l
+        K[:, 2, 2] = 12
         K[:, 2, 3] = -6 * l
         K[:, 3, 0] = 6 * l
         K[:, 3, 1] = 2 * l**2
@@ -72,18 +75,14 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
 
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切矢量
         print("单位切矢量 tan:", tan)
-        C, S = tan[:, 0], tan[:, 1]
+        C = tan[:, 0]
 
         T = np.zeros((NC, GD*ldof, GD*ldof))
 
-        T[:, 0, 0] = C
-        T[:, 0, 1] = S
-        T[:, 1, 0] = -S
-        T[:, 1, 1] = C
-        T[:, 2, 2] = C
-        T[:, 2, 3] = S
-        T[:, 3, 2] = -S
-        T[:, 3, 3] = C
+        T[:, 0, 0] = 1/C
+        T[:, 1, 1] = 1
+        T[:, 2, 2] = 1/C
+        T[:, 3, 3] = 1
         print("单元的坐标变换矩阵T:", T)
 
         K[:] = np.einsum('nki, bkj, njl -> nil', T, K, T)
@@ -130,7 +129,6 @@ class EulerBernoulliBeamStructureIntegrator:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         l = cellmeasure
-        print("l:", l)
         c0 = self.E*self.A
         c1 = self.E*self.I
         NC = len(cellmeasure)
@@ -187,8 +185,7 @@ class EulerBernoulliBeamStructureIntegrator:
         print("K:\n", K)
 
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
-        print("tan_shape:", tan.shape)
-        # print("tan:\n", tan)
+        print("tan_shape:", tan.shape, tan)
         C, S = tan[:, 0], tan[:, 1]
 
         T = np.zeros((NC, GD*ldof, GD*ldof))
@@ -205,7 +202,6 @@ class EulerBernoulliBeamStructureIntegrator:
         T[:, 5, 5] = 1
 
         print("单元的坐标变换矩阵 T_shape:", T.shape)
-        # print("T:\n", T)
 
         K[:] = np.einsum('nki, nkj, njl -> nil', T, K, T)
 
