@@ -307,19 +307,51 @@ def test_find_node_in_triangle_mesh():
 def test_cut_mesh():
     from fealpy.geometry import CircleCurve, Polygon
     #interface = CircleCurve([0, 0], np.sqrt(2))
-    points = np.zeros([7, 2], dtype=np.float_)
-    points[:, 0] = np.cos(np.arange(7)*np.pi/3.5)*np.sqrt(3)/2
-    points[:, 1] = np.sin(np.arange(7)*np.pi/3.5)*np.sqrt(3)/2
-    points[0, 1] = 0.01
+
+    #points = np.array([[8/11, 0.3], [1.6, 1/3], [2, 4/11], [2.4, 1/3], [4-8/11, 0.5], 
+    #                   [2.4, 8/11], [2, 2/3], [1.6, 2.5/3]])
+    #points = np.array([[np.sqrt(2), 0.5], [np.sqrt(2)*1.2, 1/9],
+    #    [np.sqrt(2)*2.1, 0.5], [np.sqrt(2)*1.5, 22/23]])
+    #t = np.linspace(0, 2 * np.pi, 1000)
+    #x = 16 * (np.sin(t) ** 3)
+    #y = 13 * np.cos(t) - 5 * np.cos(2*t) - 2 * np.cos(3*t) - np.cos(4*t)
+    #points = np.c_[x[:, None], y[:, None]]
+    points = np.array([[311+2/3, 50], [290+0.625, 47+2/3], [225, 68+1/39], 
+                 [206.25, 19+1/3], [200, 66+2/3], [178.125, 15+1/3], [175+1/3, 62+1/3],
+                 [100+1/3, 69-1/4], [243.75, 82+1/3], [287.5, 52+1/3]])/100
+
+    points = np.array([[311+2/3, 50], [290+0.625, 47+2/3], [225, 68+1/39], 
+                 [206.25, 19+1/3], [198.05, 66+2/3], [178.125, 15+1/3], [175+1/3, 62+1/3],
+                 [100+1/3, 69-1/4], [243.75, 82+1/3], [287.5, 52+1/3]])/100
+    points[:, 1] = 1-points[:, 1]
+    #fpidx = np.array([2, 6, 8, 9])
+    #isMarked = np.ones(10, dtype=np.bool_)
+    #isMarked[[2, 4, 6]] = False
+    #points = points[isMarked]
+    #points = np.array([[0.99, 0.50001], [1.233, 0.1001], [2.999, 0.8778123],
+    #    [1.2, 0.602], [1.9, 0.502333]])
+
     interface = Polygon(points) 
-    hmesh = HalfEdgeMesh2d.from_interface_cut_box(interface, [-1.4, 1.4, -1.4, 1.4],
-            23, 20, keep_feature=True)
-    fig = plt.figure()
-    axes = fig.gca()
-    hmesh.add_plot(axes)
-    axes.scatter(points[:, 0], points[:, 1], color='r')
-    #hmesh.find_cell(axes, showindex=True)
-    plt.show()
+
+    hmesh = HalfEdgeMesh2d.from_interface_cut_box(interface, [0, 4, 0, 1],
+            2**12, 2**10, keep_feature=False)
+    #hmesh = HalfEdgeMesh2d.from_mesh(QuadrangleMesh.from_box([0, 4, 0, 1],
+    #    2**10, 2**8))
+
+    v = interface(hmesh.node)
+    hmesh.nodedata['val'] = np.sign(v)
+    hmesh.to_vtk(fname='aaa.vtu')
+    #fig = plt.figure()
+    #axes = fig.gca()
+    #hmesh.add_plot(axes)
+    #axes.scatter(points[:, 0], points[:, 1], color='r')
+    #for i in range(len(points)):
+    #    plt.annotate(i, points[i], textcoords="offset points", xytext=(0, 10),
+    #            ha='center', color='r', fontsize=40)
+    #points = np.r_[points, points[0, None]]
+    #axes.plot(points[:, 0], points[:, 1], color='r')
+    #hmesh.find_node(axes, showindex=True)
+    #plt.show()
 
 def test_find_node():
     mesh = QuadrangleMesh.from_box([0, 2, 0, 1], nx=20, ny=10)
