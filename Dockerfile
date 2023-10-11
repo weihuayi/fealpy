@@ -2,7 +2,7 @@
 FROM ubuntu:22.04
 
 # install app dependencies
-RUN apt-get update && apt-get install -y python3 python3-pip
+RUN apt-get update && apt-get install -y python3 python3-pip && apt-get install -y ffmpeg
 
 WORKDIR /data/fealpy
 ADD requirements-full.txt ./
