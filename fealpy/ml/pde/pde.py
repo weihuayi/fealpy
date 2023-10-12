@@ -30,7 +30,7 @@ class PDE():
 
     def gradient(self, p: Tensor) -> Tensor:
         """
-        @brief Return the gradient of solution at `p`, qith shape (..., #dims).
+        @brief Return the gradient of solution at `p`, with shape (..., #dims).
         """
         raise NotImplementedError
 
@@ -53,4 +53,4 @@ class PDE():
         @brief Robin boundary condition at `p`, with shape (..., 1).
         """
         grad = self.gradient(p)
-        return torch.sum(grad*n, dim=-1) + kappa * self.solution(p)
+        return torch.sum(grad*n, dim=-1, keepdim=True) + kappa * self.solution(p)
