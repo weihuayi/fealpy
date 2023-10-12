@@ -50,7 +50,7 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
             assert out.shape == (NC, GD*ldof, GD*ldof)
             K = out
 
-        K = np.zeros((NC, GD*2, GD*2), dtype=np.float64)
+        # K = np.zeros((NC, GD*2, GD*2), dtype=np.float64)
 
         K[:, 0, 0] = 12
         K[:, 0, 1] = 6 * l
@@ -71,10 +71,10 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
 
         K *=(c/l**3)[:, np.newaxis, np.newaxis]
 
-        print("刚度矩阵 K:", K)
+        print("局部坐标系下的单元刚度矩阵 K:\n", K)
 
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切矢量
-        print("单位切矢量 tan:", tan)
+        print("单元的单位切矢量 tan:\n", tan)
         C = tan[:, 0]
 
         T = np.zeros((NC, GD*ldof, GD*ldof))
@@ -83,12 +83,13 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
         T[:, 1, 1] = 1
         T[:, 2, 2] = 1/C
         T[:, 3, 3] = 1
-        print("单元的坐标变换矩阵T:", T)
+        print("单元的坐标变换矩阵T:\n", T)
 
-        K[:] = np.einsum('nki, bkj, njl -> nil', T, K, T)
+        K[:] = np.einsum('nki, nkj, njl -> nil', T, K, T)
 
         if out is None:
             return K
+
 
 class EulerBernoulliBeamStructureIntegrator:
     def __init__(self, E, I, A):
@@ -207,5 +208,3 @@ class EulerBernoulliBeamStructureIntegrator:
 
         if out is None:
             return K
-
-
