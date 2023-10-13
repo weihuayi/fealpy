@@ -45,10 +45,10 @@ class FunctionSpace(Module):
         """
         return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
 
-    def interpolate(self, sample: Tensor, func: TensorFunction, *, keepdim=True,
-                    requires_grad=False):
+    def fit(self, sample: Tensor, func: TensorFunction, *, keepdim=True,
+            requires_grad=False):
         """
-        @brief Interpolate a function in the space. This is done by solving linear\
+        @brief Fit a function in the space. This is done by solving linear\
                equations, using `spsolve`.
 
         @param sample: collocation points Tensor for building linear equations.

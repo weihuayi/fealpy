@@ -1,53 +1,109 @@
 
-from typing import Union, Tuple, Sequence, List
+from functools import reduce
+from typing import Union, Tuple, Sequence, List, overload, Literal, Optional
 import torch
 from torch import Tensor
-
+from scipy.sparse import lil_matrix, csr_matrix
 from fealpy.ml.modules import Function, FunctionSpace
 from .nntyping import TensorFunction, S
 from .modules import FunctionSpace, Function
 
 FuncOrTensor = Union[TensorFunction, Tensor]
 
-def _to_tensor(sample: Tensor, func_or_tensor: Union[FuncOrTensor, None]):
+def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensor], gd=1):
     N = sample.shape[0]
     if func_or_tensor is None:
-        return torch.tensor(0.0, dtype=sample.dtype, device=sample.device).broadcast_to(N, 1)
+        ret = torch.tensor(0.0, dtype=sample.dtype, device=sample.device)
     elif callable(func_or_tensor):
-        return func_or_tensor(sample).broadcast_to(N, 1)
+        ret = func_or_tensor(sample)
     else:
-        return func_or_tensor.broadcast_to(N, 1)
+        ret = func_or_tensor
+    if ret.ndim in {0, 1}:
+        return ret.broadcast_to(N, gd)
+    else:
+        return ret
 
 
 class Form():
     def __init__(self, space: FunctionSpace) -> None:
         self.space = space
-        self.A_list: List[Tensor] = []
-        self.b_list: List[Tensor] = []
+        self.samples: List[Tensor] = []
+        self.operators: List[Tuple[Operator, ...]] = []
+        self.sources: List[Tensor] = []
 
-    def add(self, sample: Tensor, operators: Sequence["Operator"],
-            source: Union[FuncOrTensor, None]=None):
+    @overload
+    def add(self, sample: Tensor, operator: "Operator",
+            source: Optional[FuncOrTensor]=None): ...
+    @overload
+    def add(self, sample: Tensor, operator: Sequence["Operator"],
+            source: Optional[FuncOrTensor]=None): ...
+    def add(self, sample: Tensor, operator: Union[Sequence["Operator"], "Operator"],
+            source: Optional[FuncOrTensor]=None):
         """
-        @brief
+        @brief Add a condition.
+
+        @param sample: collocation points Tensor.
+        @param operator: one or sequence of operator applying to the space.
+        @param source: function or Tensor of source.
         """
         assert sample.ndim == 2
-        current_idx = len(self.A_list)
-        b = _to_tensor(sample, source)
-        self.b_list.append(b)
-        op = operators[0]
-        A = op.assembly(sample, self.space)
-        assert b.shape[0] == A.shape[0]
-        self.A_list.append(A)
-        del A, b
-        for op in operators[1:]:
-            self.A_list[current_idx] += op.assembly(sample, self.space)
+        self.samples.append(sample)
 
-    def assembly(self) -> Tuple[Tensor, Tensor]:
+        if isinstance(operator, Operator):
+            self.operators.append((operator, ))
+        else:
+            self.operators.append(tuple(operator))
+
+        b = _to_tensor(sample, source)
+        assert sample.shape[0] == b.shape[0]
+        self.sources.append(b)
+
+    @overload
+    def assembly(self) -> Tuple[csr_matrix, csr_matrix]: ...
+    @overload
+    def assembly(self, return_sparse: Literal[True]) -> Tuple[csr_matrix, csr_matrix]: ...
+    @overload
+    def assembly(self, return_sparse: Literal[False]) -> Tuple[Tensor, Tensor]: ...
+    def assembly(self, return_sparse=True):
         """
-        @brief
+        @brief Assemble linear equations for the least-square problem.
+
+        @param return_sparse: bool. Return in csr_matrix type if `True`.
+
+        @return: Tuple[Tensor, Tensor] or Tuple[csr_matrix, csr_matrix].\
         """
-        A = torch.cat(self.A_list, dim=0)
-        b = torch.cat(self.b_list, dim=0)
+        space = self.space
+        NF = space.number_of_basis()
+        assert len(self.sources) >= 1
+        src0 = self.sources[0]
+
+        if src0.ndim == 1:
+            bshape: Tuple[int, ...] = (NF, )
+        else:
+            bshape = (NF, src0.shape[-1])
+
+        if return_sparse:
+            dtype = src0.cpu().detach().numpy().dtype
+            A = lil_matrix((NF, NF), dtype=dtype)
+            b = lil_matrix(bshape, dtype=dtype)
+        else:
+            A = torch.zeros((NF, NF), dtype=space.dtype, device=space.device)
+            b = torch.zeros(bshape, dtype=space.dtype, device=space.device)
+
+        for i in range(len(self.samples)):
+            pts = self.samples[i]
+            ops = self.operators[i]
+            basis = reduce(torch.add, (op.assembly(pts, space) for op in ops))
+            src = self.sources[i]
+            if return_sparse:
+                A[:] += (basis.T@basis).detach().cpu().numpy()
+                b[:] += (basis.T@src).detach().cpu().numpy()
+            else:
+                A[:] += basis.T@basis
+                b[:] += basis.T@src
+
+        if return_sparse:
+            return A.tocsr(), b.tocsr()
         return A, b
 
 
@@ -86,7 +142,7 @@ class ScalerDiffusion(ScalerOperator):
     """
     @brief -c\\Delta \\phi
     """
-    def __init__(self, coef: FuncOrTensor) -> None:
+    def __init__(self, coef: Optional[FuncOrTensor]=None) -> None:
         """
         @brief Initialize a scaler diffusion operator.
 
@@ -96,14 +152,10 @@ class ScalerDiffusion(ScalerOperator):
         self.coef = coef
 
     def assembly(self, p: Tensor, space: FunctionSpace, *, index=S):
+        if self.coef is None:
+            return -space.laplace_basis(p, index=index)
         coef = _to_tensor(p, self.coef)
-        if coef.ndim == 0:
-            return -space.laplace_basis(p, index=index) * coef
-        elif coef.ndim == 1:
-            return -space.laplace_basis(p, index=index) * coef[:, None]
-        else:
-            raise ValueError("coef for diffusion should be 0 or 1-dimensional, "
-                             f"but got Tensor with shape {coef.shape}.")
+        return -space.laplace_basis(p, index=index) * coef
 
 
 class ScalerConvection(ScalerOperator):
@@ -122,19 +174,15 @@ class ScalerConvection(ScalerOperator):
         self.coef = coef
 
     def assembly(self, p: Tensor, space: FunctionSpace, *, index=S):
-        coef = _to_tensor(p, self.coef)
-        if coef.ndim in {1, 2}:
-            return space.convect_basis(p, coef=coef, index=index)
-        else:
-            raise ValueError("coef for convection should be 1 or 2-dimensional, "
-                             f"but got Tensor with shape {coef.shape}.")
+        coef = _to_tensor(p, self.coef, gd=p.shape[-1])
+        return space.convect_basis(p, coef=coef, index=index)
 
 
 class ScalerMass(ScalerOperator):
     """
     @brief c \\phi
     """
-    def __init__(self, coef: FuncOrTensor) -> None:
+    def __init__(self, coef: Optional[FuncOrTensor]=None) -> None:
         """
         @brief Initialize a scaler mass operator.
 
@@ -144,14 +192,10 @@ class ScalerMass(ScalerOperator):
         self.coef = coef
 
     def assembly(self, p: Tensor, space: FunctionSpace, *, index=S):
+        if self.coef is None:
+            return space.basis(p, index=index)
         coef = _to_tensor(p, self.coef)
-        if coef.ndim == 0:
-            return space.basis(p, index=index) * coef
-        elif coef.ndim == 1:
-            return space.basis(p, index=index) * coef[:, None]
-        else:
-            raise ValueError("coef for mass should be 0 or 1-dimensional, "
-                             f"but got Tensor with shape {coef.shape}.")
+        return space.basis(p, index=index) * coef
 
 
 class Integrator(ScalerOperator):
