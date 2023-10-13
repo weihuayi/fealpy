@@ -1,4 +1,5 @@
 
+from warnings import warn
 from typing import Generic, TypeVar, Optional
 
 import torch
@@ -7,6 +8,7 @@ from torch.nn import Module, Parameter
 from torch.func import vmap, jacfwd, hessian
 
 from ..nntyping import S as _S
+from ..nntyping import TensorFunction
 from .module import TensorMapping
 
 
@@ -41,6 +43,48 @@ class FunctionSpace(Module):
 
         @return: Function.
         """
+        return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
+
+    def interpolate(self, sample: Tensor, func: TensorFunction, *, keepdim=True,
+                    requires_grad=False):
+        """
+        @brief Interpolate a function in the space. This is done by solving linear\
+               equations, using `spsolve`.
+
+        @param sample: collocation points Tensor for building linear equations.
+        @param func: target function. This callable should receive one single\
+               Tensor and return also a single Tensor.
+        @param keepdim: bool. See `Function.__init__`.
+        @param requires_grad: bool.
+
+        @return: Function.
+        """
+        from scipy.sparse import csr_matrix
+        from scipy.sparse.linalg import spsolve
+
+        assert sample.ndim == 2
+        N = sample.shape[0]
+        basis = self.basis(sample)
+        NF = basis.shape[-1]
+        if N < NF:
+            warn(f"Only {N} sample point(s) provided for space with {NF} basis.")
+        active_basis_flag = torch.any(torch.abs(basis) > 1e-8, dim=0)
+        A = csr_matrix(basis[:, active_basis_flag])
+        source = func(sample)
+
+        # for scaler functions
+        if source.ndim == 1 or source.shape[-1] == 1:
+            b = source
+            um = torch.zeros((NF, ), dtype=sample.dtype, device=sample.device)
+            um[active_basis_flag] = torch.from_numpy(spsolve(A.T@A, A.T@b))
+
+        # for vector functions
+        else:
+            NS = source.shape[-1]
+            b = csr_matrix(source)
+            um = torch.zeros((NF, NS), dtype=sample.dtype, device=sample.device)
+            um[active_basis_flag, :] = torch.from_numpy(spsolve(A.T@A, A.T@b).toarray())
+
         return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
 
     def basis(self, p: Tensor, *, index=_S) -> Tensor:

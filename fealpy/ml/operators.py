@@ -1,9 +1,9 @@
 
-from typing import Any, Union, Tuple, Sequence, List
+from typing import Union, Tuple, Sequence, List
 import torch
 from torch import Tensor
 
-from fealpy.ml.modules import FunctionSpace
+from fealpy.ml.modules import Function, FunctionSpace
 from .nntyping import TensorFunction, S
 from .modules import FunctionSpace, Function
 
@@ -30,6 +30,7 @@ class Form():
         """
         @brief
         """
+        assert sample.ndim == 2
         current_idx = len(self.A_list)
         b = _to_tensor(sample, source)
         self.b_list.append(b)
@@ -55,7 +56,7 @@ class Operator():
     def __hash__(self) -> int:
         return id(self)
 
-    def __call__(self, func: Function) -> TensorFunction:
+    def __call__(self, func) -> TensorFunction:
         raise NotImplementedError
 
     def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
@@ -83,7 +84,7 @@ class ScalerOperator(Operator):
 
 class ScalerDiffusion(ScalerOperator):
     """
-    @brief -d\\Delta \\phi
+    @brief -c\\Delta \\phi
     """
     def __init__(self, coef: FuncOrTensor) -> None:
         """
@@ -107,14 +108,14 @@ class ScalerDiffusion(ScalerOperator):
 
 class ScalerConvection(ScalerOperator):
     """
-    @brief \\nabla \\phi \\cdot n
+    @brief \\nabla \\phi \\cdot c
     """
     def __init__(self, coef: FuncOrTensor) -> None:
         """
         @brief Initialize a scaler convection operator.
 
         @param coef: 1-d or 2-d Tensor, or a function. Velosity of the fluent\
-               (Convection coefficient), or direction of boundaries,\
+               (Convection coefficient), or the normal direction of boundaries,\
                with shape (GD, ) or (N, GD). See `space.convect_basis`.
         """
         super().__init__()
@@ -130,6 +131,9 @@ class ScalerConvection(ScalerOperator):
 
 
 class ScalerMass(ScalerOperator):
+    """
+    @brief c \\phi
+    """
     def __init__(self, coef: FuncOrTensor) -> None:
         """
         @brief Initialize a scaler mass operator.
