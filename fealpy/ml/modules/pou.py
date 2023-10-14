@@ -354,13 +354,14 @@ def assemble(dimension: int=0):
     """
     def assemble_(func: Callable[..., Tensor]):
         def wrapper(self, p: Tensor, *args, **kwargs) -> Tensor:
-            N = p.shape[0]
+            N = p.shape[0:-1]
             M = self.number_of_basis()
             GD = p.shape[-1]
-            ret = torch.zeros((N, M) + (GD, )*dimension,
+            ret = torch.zeros(N + (M, ) + (GD, )*dimension,
                               dtype=self.dtype, device=self.device)
             basis_cursor = 0
 
+            # NOTE: This works well for p with shape (N, GD) and (GD, ).
             for idx, part in enumerate(self.partitions):
                 NF = part.number_of_basis()
                 flag, data = func(self, idx, p, *args, **kwargs)
