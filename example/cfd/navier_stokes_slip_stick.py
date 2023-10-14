@@ -128,18 +128,10 @@ maxit = 3  #非线性迭代次数
 step = 5
 output = './'
 
-wrho = 1020
-grho = wrho*0.001
-wC = 1700
-gC = 0.588*wC
-wlambda = 0.173
-glambda = 0.139*wlambda
-geta = 1.792e-5
-weta = geta/0.0001
-We = 8995
-Pe = 2505780.347
-Re = 0.01
-Br = 147398.844
+wrho = 1
+grho = 1
+wmu = 0.01
+gmu = 0.01
 
 
 @cartesian
@@ -166,23 +158,39 @@ def is_stick_boundary(p):
     result = ((val > mn) & (val < mx)).any(1)
     result2 = ((y - domain[3]) < eps) | ((y- domain[2]) < eps)
     return (result) & (result2)
-
-@cartesian
-def dist(p):
-    x = p[...,0]
-    y = p[...,1]
-    #val =  (x-h) - 2*h*y*(h-y)/h**2
-    val =  x-0.1
-    return val
            
 @cartesian
 def u_inflow_dirichlet(p):
     x = p[...,0]
     y = p[...,1]
     value = np.zeros(p.shape)
-    value[...,0] = 5
+    value[...,0] = 2*y*(h-y)
     value[...,1] = 0
     return value
+
+
+def dist(p):
+    x = p[...,0]
+    y = p[...,1]
+    #val =  (x-h) - 2*h*y*(h-y)/h**2
+    val =  x-0.1
+    return val
+
+def changemu(s0,bcs): 
+    H = s0(bcs)
+    tag_m = np.sign(H)<0
+    tag_g = np.sign(H)>0
+    H[tag_m] = mu_melt
+    H[tag_g] = mu_gas
+    return H
+
+def changerho(s0,bcs):
+    H = s0(bcs)
+    tag_m = np.sign(H)>0
+    tag_g = np.sign(H)<0
+    H[tag_m] = rho_melt
+    H[tag_g] = rho_gas
+    return H
 
 def level_x(phi,y):
     ns = min(phi.space.mesh.entity_measure('edge'))
@@ -192,15 +200,13 @@ def level_x(phi,y):
     x = point[near][a[:,1]==y][:,0]
     return np.mean(x)
 
-space2 = LagrangeFESpace(mesh, p=2, doforder='sdofs')
-space1 = LagrangeFESpace(mesh, p=1)
 
-nuspace = LagrangeFiniteElementSpace(mesh, p=2)
-npspace = LagrangeFiniteElementSpace(mesh, p=1)
-ntspace = LagrangeFiniteElementSpace(mesh, p=1)
+space2 = LagrangeFiniteElementSpace(mesh, p=2)
+space1 = LagrangeFiniteElementSpace(mesh, p=1)
 
+'''
 ## 加密
-phi0 = space2.interpolate(dist)
+phi0 = space2.interpolation(dist)
 for i in range(5):
     cell2dof = mesh.cell_to_ipoint(2)
     phi0c2f = phi0[cell2dof]
@@ -209,47 +215,40 @@ for i in range(5):
     option = mesh.bisect_options(data=data, disp=False)
     mesh.bisect(isMark,options=option)
 
-    space2 = LagrangeFESpace(mesh, p=2, doforder='sdofs')
-    space1 = LagrangeFESpace(mesh,p=1)
+    space2 = LagrangeFiniteElementSpace(mesh, p=2)
+    space1 = LagrangeFiniteElementSpace(mesh, p=1)
     cell2dof = space2.cell_to_dof()
     phi0 = space2.function()
     phi0[cell2dof.reshape(-1)] = option['data']['phi0'].reshape(-1)
-
-
-## 初始网格
+'''
 u0 = space2.function(dim=2)
-#u0 = space2.interpolate(usolution, dim=2)
 us = space2.function(dim=2)
 u1 = space2.function(dim=2)
 p0 = space1.function()
 p1 = space1.function()
-T0 = space1.function()
-T1 = space1.function()
-phi0 = space2.interpolate(dist)
+phi0 = space2.interpolation(dist)
 
-rhofun =  heaviside(phi0, epsilon, wrho, grho)
-Cfun =  heaviside(phi0, epsilon, wC, gC)
-lambdafun =  heaviside(phi0, epsilon, wlambda, glambda)
-etafun2 =  heaviside(phi0, epsilon, weta, geta)
-mesh.nodedata['velocity'] = u0.T
-mesh.nodedata['pressure'] = p0
-mesh.nodedata['tempture'] = T0
-mesh.nodedata['rho'] = rhofun
-mesh.nodedata['surface'] = phi0
-mesh.nodedata['比热容'] = Cfun
-mesh.nodedata['热扩散系数'] = lambdafun
-mesh.nodedata['粘度系数'] = etafun2
 
-fname = output + 'test_0000000000.vtu'
-#fname = output + 'test_.vtu'
-mesh.to_vtk(fname=fname)
+## 初始网格
 ctx = DMumpsContext()
 ctx.set_silent()
 
-for i in range(3):
+for i in range(10):
     # 下一个的时间层 t1
     t1 = tmesh.next_time_level()
     print("t1=", t1)
+    
+    rhofun =  heaviside(phi0, epsilon, wrho, grho)
+    mufun =  heaviside(phi0, epsilon, wmu, gmu)
+
+    if i%1 == 0:
+        fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
+        mesh.nodedata['velocity'] = u1
+        mesh.nodedata['pressure'] = p1
+        mesh.nodedata['rho'] = rhofun
+        mesh.nodedata['surface'] = phi0
+        mesh.nodedata['mu'] = mufun
+        mesh.to_vtk(fname=fname)
      
     gdof2 = space2.number_of_global_dofs()
     gdof1 = space1.number_of_global_dofs()
@@ -262,25 +261,7 @@ for i in range(3):
     @barycentric 
     def dt_rho(bcs, index):
         return 1/dt*rhofun(bcs, index)
-    BF0.add_domain_integrator(ScalarMassIntegrator(dt_rho)) 
-    
-    @barycentric
-    def etafun(bcs, index):
-        # crosswlf
-        eta0 = 1.9e11*np.exp(-27.396*(T0(bcs, index)-417.15)/(51.6+(T0(bcs, index)-417.15)))
-        deformnation = u0.grad_value(bcs, index)
-        deformnation = 1/2*(deformnation + deformnation.transpose(0,2,1,3))
-        gamma = np.sqrt(2*np.einsum('ijkl,ikjl->il',deformnation,deformnation))
-        result = eta0/(1+(eta0*gamma/182680)**(1-0.574))
-        #heaviside
-        pbcs = phi0(bcs,index) 
-        tag = (-epsilon<= pbcs)  & (pbcs <= epsilon)
-        tag1 = pbcs > epsilon
-        result[tag1] = geta
-        result[tag] = 0.5*(1+pbcs[tag]/epsilon) 
-        result[tag] += 0.5*np.sin(np.pi*pbcs[tag]/epsilon)/np.pi
-        return  result
-        
+    BF0.add_domain_integrator(ScalarMassIntegrator(dt_rho))  
     
     @barycentric
     def Reetafun(bcs, index):
