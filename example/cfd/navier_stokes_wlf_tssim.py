@@ -30,6 +30,8 @@ from scipy.sparse.linalg import spsolve
 from fealpy.mesh.vtk_extent import write_to_vtu
 from scipy.sparse import csr_matrix
 
+from tssim.part import *
+
 def level_set(dt, phi0, u,  M=None): 
     space = phi0.space
     BF = BilinearForm(space)
@@ -113,7 +115,7 @@ def heaviside(phi, epsilon, lvalue, rvalue):
     return fun 
 
 
-T = 5
+T = 10
 nt = 2000
 ns = 10
 h = 1
@@ -127,6 +129,9 @@ epsilon = dx  #界面一半的厚度
 maxit = 3  #非线性迭代次数
 step = 5
 output = './'
+udegree = 2
+pdegree = 1
+tdegree = 2
 
 wrho = 1020
 grho = wrho*0.001
@@ -135,12 +140,11 @@ gC = 0.588*wC
 wlambda = 0.173
 glambda = 0.139*wlambda
 geta = 1.792e-5
-weta = geta/0.0001
+weta = geta/0.001
 We = 8995
 Pe = 2505780.347
 Re = 0.01
 Br = 147398.844
-
 
 @cartesian
 def is_outflow_boundary(p):
@@ -192,15 +196,12 @@ def level_x(phi,y):
     x = point[near][a[:,1]==y][:,0]
     return np.mean(x)
 
-space2 = LagrangeFESpace(mesh, p=2, doforder='sdofs')
-space1 = LagrangeFESpace(mesh, p=1)
 
-nuspace = LagrangeFiniteElementSpace(mesh, p=2)
-npspace = LagrangeFiniteElementSpace(mesh, p=1)
-ntspace = LagrangeFiniteElementSpace(mesh, p=1)
+space2 = LagrangeFiniteElementSpace(mesh, p=2)
+space1 = LagrangeFiniteElementSpace(mesh, p=1)
 
 ## 加密
-phi0 = space2.interpolate(dist)
+phi0 = space2.interpolation(dist)
 for i in range(5):
     cell2dof = mesh.cell_to_ipoint(2)
     phi0c2f = phi0[cell2dof]
@@ -209,142 +210,115 @@ for i in range(5):
     option = mesh.bisect_options(data=data, disp=False)
     mesh.bisect(isMark,options=option)
 
-    space2 = LagrangeFESpace(mesh, p=2, doforder='sdofs')
-    space1 = LagrangeFESpace(mesh,p=1)
+    space2 = LagrangeFiniteElementSpace(mesh, p=2)
+    space1 = LagrangeFiniteElementSpace(mesh, p=1)
     cell2dof = space2.cell_to_dof()
     phi0 = space2.function()
     phi0[cell2dof.reshape(-1)] = option['data']['phi0'].reshape(-1)
 
-
-## 初始网格
 u0 = space2.function(dim=2)
-#u0 = space2.interpolate(usolution, dim=2)
 us = space2.function(dim=2)
 u1 = space2.function(dim=2)
 p0 = space1.function()
 p1 = space1.function()
-T0 = space1.function()
-T1 = space1.function()
-phi0 = space2.interpolate(dist)
+T0 = space2.function()
+Ts = space2.function()
+T1 = space2.function()
+phi0 = space2.interpolation(dist)
 
-rhofun =  heaviside(phi0, epsilon, wrho, grho)
-Cfun =  heaviside(phi0, epsilon, wC, gC)
-lambdafun =  heaviside(phi0, epsilon, wlambda, glambda)
-etafun2 =  heaviside(phi0, epsilon, weta, geta)
-mesh.nodedata['velocity'] = u0.T
-mesh.nodedata['pressure'] = p0
-mesh.nodedata['tempture'] = T0
-mesh.nodedata['rho'] = rhofun
-mesh.nodedata['surface'] = phi0
-mesh.nodedata['比热容'] = Cfun
-mesh.nodedata['热扩散系数'] = lambdafun
-mesh.nodedata['粘度系数'] = etafun2
 
-fname = output + 'test_0000000000.vtu'
-#fname = output + 'test_.vtu'
-mesh.to_vtk(fname=fname)
+## 初始网格
 ctx = DMumpsContext()
 ctx.set_silent()
 
-for i in range(3):
+for i in range(nt):
     # 下一个的时间层 t1
     t1 = tmesh.next_time_level()
     print("t1=", t1)
+    
+    rhofun =  heaviside(phi0, epsilon, wrho, grho)
+    Cfun =  heaviside(phi0, epsilon, wC, gC)
+    lambdafun =  heaviside(phi0, epsilon, wlambda, glambda)
+    etafun =  heaviside(phi0, epsilon, weta, geta)
+
+    if i%1 == 0:
+        fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
+        mesh.nodedata['velocity'] = u1
+        mesh.nodedata['pressure'] = p1
+        mesh.nodedata['tempture'] = T1
+        mesh.nodedata['rho'] = rhofun
+        mesh.nodedata['surface'] = phi0
+        mesh.nodedata['比热容'] = Cfun
+        mesh.nodedata['热扩散系数'] = lambdafun
+        mesh.to_vtk(fname=fname)
+    
+    qf = mesh.integrator(5)
+    bcs,ws = qf.get_quadrature_points_and_weights()
+    assemble = Assemble(mesh, 5)
      
     gdof2 = space2.number_of_global_dofs()
     gdof1 = space1.number_of_global_dofs()
-    gdof = 2*gdof2 + 2*gdof1
+    gdof = 2*gdof2 + gdof1 + gdof2
     us[:] = u0
+    Ts[:] = T0
     
-    # 动量方程矩阵
-    BF0 = BilinearForm(space2)        
+    M = assemble.matrix([udegree, 0], [udegree, 0], rhofun(bcs))
+    Sx = assemble.matrix([pdegree,0],[udegree,1])
+    Sy = assemble.matrix([pdegree,0],[udegree,2])
+ 
+    MT = assemble.matrix([tdegree, 0], [tdegree, 0], rhofun(bcs)*Cfun(bcs))
+    #MT = Pe*assemble.matrix([tdegree, 0], [tdegree, 0], rhofun(bcs)*Cfun(bcs))
+    ST0 = assemble.matrix([tdegree,1], [tdegree,1], lambdafun(bcs)) 
+    ST1 = assemble.matrix([tdegree,2], [tdegree,2], lambdafun(bcs))
+    ST = ST0+ST1
     
-    @barycentric 
-    def dt_rho(bcs, index):
-        return 1/dt*rhofun(bcs, index)
-    BF0.add_domain_integrator(ScalarMassIntegrator(dt_rho)) 
+    SP = space1.stiff_matrix()
     
     @barycentric
-    def etafun(bcs, index):
+    def etafun2(bcs):
         # crosswlf
-        eta0 = 1.9e11*np.exp(-27.396*(T0(bcs, index)-417.15)/(51.6+(T0(bcs, index)-417.15)))
-        deformnation = u0.grad_value(bcs, index)
-        deformnation = 1/2*(deformnation + deformnation.transpose(0,2,1,3))
-        gamma = np.sqrt(2*np.einsum('ijkl,ikjl->il',deformnation,deformnation))
+        eta0 = 1.9e11*np.exp(-27.396*(T0(bcs )-417.15)/(51.6+(T0(bcs )-417.15)))
+        deformnation = u0.grad_value(bcs )
+        deformnation = 1/2*(deformnation + deformnation.transpose(0,1,3,2))
+        gamma = np.sqrt(2*np.einsum('ijkl,ijlk->ij',deformnation,deformnation))
         result = eta0/(1+(eta0*gamma/182680)**(1-0.574))
         #heaviside
-        pbcs = phi0(bcs,index) 
+        pbcs = phi0(bcs) 
         tag = (-epsilon<= pbcs)  & (pbcs <= epsilon)
         tag1 = pbcs > epsilon
         result[tag1] = geta
         result[tag] = 0.5*(1+pbcs[tag]/epsilon) 
         result[tag] += 0.5*np.sin(np.pi*pbcs[tag]/epsilon)/np.pi
         return  result
-        
+    S1 = assemble.matrix([udegree,1], [udegree,1], etafun(bcs))
+    S2 = assemble.matrix([udegree,2], [udegree,2], etafun(bcs))
+    #S = (S1+S2)/Re
+    S = S1+S2
+    
+    #组装右端 
+    bu = 1/dt*np.hstack((M@u0[:,0],M@u0[:,1])).T
+    bp = np.zeros(gdof1)
     
     @barycentric
-    def Reetafun(bcs, index):
-        return etafun2(bcs, index)/Re
-    BF0.add_domain_integrator(ScalarDiffusionIntegrator(Reetafun)) 
-    AU = BF0.assembly() 
+    def bT_source(bcs):
+        gradu = u0.grad_value(bcs)
+        D = 1/2*(gradu + gradu.transpose(0,1,3,2))
+        etaD = np.einsum('ij,ijkl->ijkl',etafun(bcs), D)
+        etaD[:,:,0,0] -= p0(bcs)
+        etaD[:,:,1,1] -= p0(bcs)
+        val1 = np.einsum('ijkc,ijkc->ij',etaD, gradu)
+        return val1
+    bT = assemble.vector([tdegree, 0],bT_source(bcs))
+    bT += 1/dt*(MT@T0)
     
-    # 连续方程矩阵 
-    BF1 = MixedBilinearForm((space1,), 2*(space2,)) 
-    BF1.add_domain_integrator(PressWorkIntegrator()) 
-    AP = BF1.assembly()
-    
-    BF2 = BilinearForm(space1)
-    BF2.add_domain_integrator(ScalarDiffusionIntegrator())
-    ASP = BF2.assembly()  
-    
-    # 能量方程矩阵
-    BF3 = BilinearForm(space1)
-    
-    @barycentric 
-    def dt_rho_C(bcs,index):
-        return Pe*rhofun(bcs,index)*Cfun(bcs,index) /dt
-    BF3.add_domain_integrator(ScalarMassIntegrator(dt_rho_C))
-    BF3.add_domain_integrator(ScalarDiffusionIntegrator(lambdafun)) 
-    
-    AT = BF3.assembly() 
-    
-    # 右端向量
-    LFU = LinearForm(2*(space2,))
-    
-    @barycentric 
-    def dt_rho_u0(bcs, index):
-        result = np.einsum('ik, ijk->ijk', rhofun(bcs, index), u0(bcs, index))
-        return result/dt
-    
-    LFU.add_domain_integrator(VectorSourceIntegrator(dt_rho_u0))
-    bu = LFU.assembly()
-    bp = np.zeros(space1.number_of_global_dofs())
-    ## 能量方程右端向量 
-    LFT = LinearForm(space1) 
-    @barycentric
-    def bT_source(bcs, index=np.s_[:]):
-        val0 = 1/dt * T0(bcs, index) 
-        gradu = u0.grad_value(bcs, index)
-        D = gradu + gradu.transpose(0,2,1,3)
-        etaD = np.einsum('il,ijkl->ijkl',etafun2(bcs, index), D)
-        etaD[:,0,0,:] +=p0(bcs, index)
-        etaD[:,1,1,:] +=p0(bcs, index)
-        val1 = np.einsum('ijkc,ijkc->ic',etaD, gradu)
-        return Br*val1
-    LFT.add_domain_integrator(ScalarSourceIntegrator(bT_source)) 
-    
-    @barycentric 
-    def dt_rho_C_T0(bcs,index):
-        return Pe*rhofun(bcs,index)*Cfun(bcs,index)*T0(bcs,index)/dt 
-    LFT.add_domain_integrator(ScalarSourceIntegrator(dt_rho_C_T0))
-    bT = LFT.assembly() 
     b = np.hstack([bu,bp,bT])
     
+         
     # 边界处理
     is_ux_bdof = space2.is_boundary_dof()
     is_uy_bdof = space2.is_boundary_dof()
     is_p_bdof = space1.is_boundary_dof()
-    is_T_bdof = space1.is_boundary_dof()
+    is_T_bdof = space2.is_boundary_dof()
     xux = np.zeros_like(is_ux_bdof, np.float64)
     xuy = np.zeros_like(is_uy_bdof, np.float64)
     xp = np.zeros_like(is_p_bdof, np.float64)
@@ -357,7 +331,9 @@ for i in range(3):
     is_ux_bdof[is_uout_bdof] = False 
     is_uy_bdof[is_uout_bdof] = False 
     
-    xux[is_uin_bdof] = 5
+    is_ux_bdof[is_uin_bdof] = False 
+    is_uy_bdof[is_uin_bdof] = False 
+    #xux[is_uin_bdof] = 5
     ## 压力边界条件处理
     @cartesian
     def is_melt_boundary(p):
@@ -369,14 +345,15 @@ for i in range(3):
     is_pmelt_bdof = space1.is_boundary_dof(threshold = is_melt_boundary) 
     is_pmelt_bdof = is_pmelt_bdof & is_pwall_bdof        
     
-    is_p_bdof[is_pmelt_bdof] = False 
-    #xp[is_pin_bdof] = 8
-    #xp[is_pout_bdof] = 0
+    #is_p_bdof[is_pmelt_bdof] = False 
+    is_p_bdof[is_pwall_bdof] = False 
+    xp[is_pin_bdof] = 8
+    xp[is_pout_bdof] = 0
 
     ## 温度边界条件处理   
-    is_Tout_bdof = space1.is_boundary_dof(threshold = is_outflow_boundary)
-    is_Tin_bdof = space1.is_boundary_dof(threshold = is_inflow_boundary)
-    is_Twall_bdof = space1.is_boundary_dof(threshold = is_wall_boundary)
+    is_Tout_bdof = space2.is_boundary_dof(threshold = is_outflow_boundary)
+    is_Tin_bdof = space2.is_boundary_dof(threshold = is_inflow_boundary)
+    is_Twall_bdof = space2.is_boundary_dof(threshold = is_wall_boundary)
     
     is_T_bdof[is_Tout_bdof] = False 
     xT[is_Tin_bdof] = 525
@@ -391,37 +368,24 @@ for i in range(3):
     Tbd = spdiags(bdIdx, 0, gdof, gdof)
     T = spdiags(1-bdIdx, 0, gdof, gdof)
     for zz in range(maxit):
-        BF0C = BilinearForm(space2)
-
-        @barycentric 
-        def rho_u(bcs,index):
-            result = np.einsum('ik,ijk->ijk',rhofun(bcs,index),us(bcs,index))
-            return result
-        BF0C.add_domain_integrator(ScalarConvectionIntegrator(rho_u))
-        AUC = BF0C.assembly()
-
+        D0 = assemble.matrix([udegree,1], [udegree,0], rhofun(bcs)*us(bcs)[...,0])
+        D1 = assemble.matrix([udegree,2], [udegree,0], rhofun(bcs)*us(bcs)[...,1])
         '''
-        SS = nuspace.stiff_matrix(etafun)
-        MM = nuspace.mass_matrix(dt_rho)
-        CC = nuspace.convection_matrix(rho_u)
-        AA = SS+MM+CC
+        grad_Ts = Ts.grad_value(bcs) 
+        DT0 = assemble.matrix([udegree,0], [tdegree, 0], grad_Ts[...,0]*rhofun(bcs)*Cfun(bcs)) 
+        DT1 = assemble.matrix([udegree,0], [tdegree, 0], grad_Ts[...,1]*rhofun(bcs)*Cfun(bcs)) 
+        A = bmat([[1/dt*M + S+D0+D1, None, -Sx, None],\
+                [None, 1/dt*M + S +D0+D1, -Sy, None],\
+                [Sx.T, Sy.T, None, None],\
+                [DT0, DT1, None, 1/dt*MT+ST]], format='csr')
         '''
         
-        BF3C = BilinearForm(space1)
-        @barycentric 
-        def rho_C_u(bcs,index):
-            result = rhofun(bcs,index)*Cfun(bcs,index)
-            result = np.einsum('ik,ijk->ijk',result,us(bcs,index))
-            return Pe*result
-        BF3C.add_domain_integrator(ScalarConvectionIntegrator(c=rho_C_u))
-        ATU = BF3C.assembly() 
-        
-        
-        A0 = bmat([[AU+AUC, None],[None, AU+AUC]], format='csr')  
-        A = bmat([[A0,  -AP, None],\
-                [AP.T, 1e-8*ASP, None],\
-                [None,None,AT+ATU]], format='csr')
-        
+        DT0 = assemble.matrix([tdegree,1], [tdegree, 0], us(bcs)[...,0]*rhofun(bcs)*Cfun(bcs)) 
+        DT1 = assemble.matrix([tdegree,2], [tdegree, 0], us(bcs)[...,1]*rhofun(bcs)*Cfun(bcs)) 
+        A = bmat([[1/dt*M + S+D0+D1, None, -Sx, None],\
+                [None, 1/dt*M + S +D0+D1, -Sy, None],\
+                [Sx.T, Sy.T, None, None],\
+                [None, None, None, 1/dt*MT+ST+DT0+DT1]], format='csr')
         
         A = T@A + Tbd
         b[isBdDof] = xx[isBdDof]
@@ -429,22 +393,27 @@ for i in range(3):
         x = b.copy()
         ctx.set_rhs(x)
         ctx.run(job=6)
-         
-        u1[0,:] = x[0:gdof2]
-        u1[1,:] = x[gdof2:2*gdof2]
-        p1[:] = x[2*gdof2:-gdof1]
-        T1[:] = x[-gdof1:]
+        
+        u1[:,0] = x[0:gdof2]
+        u1[:,1] = x[gdof2:2*gdof2]
+        p1[:] = x[2*gdof2:-gdof2]
+        T1[:] = x[-gdof2:]
     
         us[:] = u1 
+        Ts[:] = T1 
     
+
     phi0 = level_set(dt, phi0, u1)     
+    if i%5 == 0 and i!=0:
+        cellscale = np.sqrt(np.min(mesh.entity_measure('cell')))
+        phi0 = rein(phi0, cellscale)
     # 网格细化
     for j in range(5): 
         cell2dof2 = space2.cell_to_dof()
         cell2dof1 = space1.cell_to_dof()
         phi0c2f = phi0[cell2dof2]
-        u1xc2f = u1[0,:][cell2dof2]
-        u1yc2f = u1[1,:][cell2dof2]
+        u1xc2f = u1[:,0][cell2dof2]
+        u1yc2f = u1[:,1][cell2dof2]
         p1c2f = p1[cell2dof1]
         T1c2f = T1[cell2dof1]
         cellmeasure = mesh.entity_measure('cell')
@@ -455,17 +424,17 @@ for i in range(3):
         option = mesh.bisect_options(data=data,disp=False)
         mesh.bisect(isMark,options=option)
 
-        space2 = LagrangeFESpace(mesh, p=2, doforder='sdofs')
-        space1 = LagrangeFESpace(mesh,p=1)
+        space2 = LagrangeFiniteElementSpace(mesh, p=2)
+        space1 = LagrangeFiniteElementSpace(mesh, p=1)
         cell2dof2 = space2.cell_to_dof()
         cell2dof1 = space1.cell_to_dof()
         phi0 = space2.function()
         u1 = space2.function(dim=2)
         p1 = space1.function()
-        T1 = space1.function()
+        T1 = space2.function()
         phi0[cell2dof2.reshape(-1)] = option['data']['phi0'].reshape(-1)
-        u1[0,:][cell2dof2.reshape(-1)] = option['data']['u1x'].reshape(-1)
-        u1[1,:][cell2dof2.reshape(-1)] = option['data']['u1y'].reshape(-1)
+        u1[:,0][cell2dof2.reshape(-1)] = option['data']['u1x'].reshape(-1)
+        u1[:,1][cell2dof2.reshape(-1)] = option['data']['u1y'].reshape(-1)
         p1[cell2dof1.reshape(-1)] = option['data']['p1'].reshape(-1)
         T1[cell2dof1.reshape(-1)] = option['data']['T1'].reshape(-1)
     
@@ -475,8 +444,8 @@ for i in range(3):
         cell2dof2 = space2.cell_to_dof()
         cell2dof1 = space1.cell_to_dof()
         phi0c2f = phi0[cell2dof2]
-        u1xc2f = u1[0,:][cell2dof2]
-        u1yc2f = u1[1,:][cell2dof2]
+        u1xc2f = u1[:,0][cell2dof2]
+        u1yc2f = u1[:,1][cell2dof2]
         p1c2f = p1[cell2dof1]
         T1c2f = T1[cell2dof1]
         cellmeasure = mesh.entity_measure('cell')
@@ -486,84 +455,32 @@ for i in range(3):
         option = mesh.bisect_options(data=data,disp=False)
         mesh.coarsen(isMark,options=option)
 
-        space2 = LagrangeFESpace(mesh, p=2, doforder='sdofs')
-        space1 = LagrangeFESpace(mesh,p=1)
+        space2 = LagrangeFiniteElementSpace(mesh, p=2)
+        space1 = LagrangeFiniteElementSpace(mesh, p=1)
         cell2dof2 = space2.cell_to_dof()
         cell2dof1 = space1.cell_to_dof()
         phi0 = space2.function()
         u1 = space2.function(dim=2)
         p1 = space1.function()
-        T1 = space1.function()
+        T1 = space2.function()
         phi0[cell2dof2.reshape(-1)] = option['data']['phi0'].reshape(-1)
-        u1[0,:][cell2dof2.reshape(-1)] = option['data']['u1x'].reshape(-1)
-        u1[1,:][cell2dof2.reshape(-1)] = option['data']['u1y'].reshape(-1)
+        u1[:,0][cell2dof2.reshape(-1)] = option['data']['u1x'].reshape(-1)
+        u1[:,1][cell2dof2.reshape(-1)] = option['data']['u1y'].reshape(-1)
         p1[cell2dof1.reshape(-1)] = option['data']['p1'].reshape(-1)
         T1[cell2dof1.reshape(-1)] = option['data']['T1'].reshape(-1)
 
-    rhofun =  heaviside(phi0, epsilon, wrho, grho)
-    Cfun =  heaviside(phi0, epsilon, wC, gC)
-    lambdafun =  heaviside(phi0, epsilon, wlambda, glambda)
-    etafun2 =  heaviside(phi0, epsilon, weta, geta)
-    #if i%step == 0 and i!=0:
-    if i%1 == 0:
-        cellscale = np.sqrt(np.min(mesh.entity_measure('cell')))
-        #phi0 = rein(phi0, cellscale)
-        fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
-        mesh.nodedata['velocity'] = u1.T
-        mesh.nodedata['pressure'] = p1
-        mesh.nodedata['tempture'] = T1
-        mesh.nodedata['rho'] = rhofun
-        mesh.nodedata['surface'] = phi0
-        mesh.nodedata['比热容'] = Cfun
-        mesh.nodedata['热扩散系数'] = lambdafun
-        mesh.nodedata['粘度系数'] = etafun2
-        mesh.to_vtk(fname=fname)
     
     
     u0 = space2.function(dim=2) 
     p0 = space1.function() 
-    T0 = space1.function() 
+    T0 = space2.function() 
     u0[:] = u1 
     p0[:] = p1
     T0[:] = T1
     us = space2.function(dim=2)
+    Ts = space2.function()
     # 时间步进一层 
     tmesh.advance()
-    '''
-    mass = nuspace.mass_matrix()
-    mass2 = bmat([[mass, None], \
-            [None, mass]], format='csr')
-    BF12 = BilinearForm(2*(space2,))
-    BF12.add_domain_integrator(VectorMassIntegrator())
-    
-    A1SP = BF12.assembly()
-    b00 = A1SP@u0.flatten()
-    print(np.sum(np.abs(b00-b0)))
-    '''
-    '''
-    验证ASP
-    qf = mesh.integrator(4)
-    bcs,ws = qf.get_quadrature_points_and_weights()
-    cellmeasure = mesh.entity_measure('cell')
-    ucell2dof = nuspace.cell_to_dof()
-    pcell2dof = npspace.cell_to_dof()
-    gphi = nuspace.grad_basis(bcs)
-    phi = npspace.basis(bcs)
-    ugdof = nuspace.number_of_global_dofs() 
-    pgdof = npspace.number_of_global_dofs() 
-    
-    ggphi = np.concatenate((gphi[:,:,:,0],gphi[:,:,:,1]),2)
-
-    ugdof = nuspace.number_of_global_dofs()
-    S = np.einsum('i,ijk,ijm,j->jkm',ws, gphi[:,:,:,0], phi,cellmeasure)      
-    S2 = np.einsum('i,ijk,ijm,j->jkm',ws, gphi[:,:,:,1], phi,cellmeasure)      
-    I = np.broadcast_to(ucell2dof[:,:,None],shape = S.shape)
-    J = np.broadcast_to(pcell2dof[:,None,:],shape = S.shape)
-    S = csr_matrix((S.flat,(I.flat,J.flat)),shape=(ugdof,pgdof))
-    S2 = csr_matrix((S2.flat,(I.flat,J.flat)),shape=(ugdof,pgdof))
-    SS = np.vstack((S.toarray(),S2.toarray())) 
-    print(np.sum(SS-AP.toarray()))
-    '''
 ctx.destroy()
 
 '''

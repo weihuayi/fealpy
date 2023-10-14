@@ -130,7 +130,6 @@ class BilinearForm:
         assert isinstance(space, tuple) and not isinstance(space[0], tuple)
 
         mesh = space[0].mesh
-        # GD = space[0].geo_dimension() # 如果是对称张量
         GD = len(space) # 几个分量，几维问题
         ldof = space[0].number_of_local_dofs()
         gdof = space[0].number_of_global_dofs()
@@ -139,10 +138,10 @@ class BilinearForm:
         cellmeasure = mesh.entity_measure()
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
-        print("CM:", CM.shape)
+        print("CM", CM.shape, ":\n", CM)
         for di in self.dintegrators:
             di.assembly_cell_matrix(space, cellmeasure=cellmeasure, out=CM)
-
+            print("CM", CM.shape, ":\n", CM)
         self._M = csr_matrix((GD*gdof, GD*gdof), dtype=space[0].ftype)
         if space[0].doforder == 'sdofs': # 标量自由度排序优先
             for i in range(GD):
