@@ -367,6 +367,7 @@ class FirstNedelecFiniteElementSpace2d:
                     M = np.einsum('i, ijdl, ijkd, ijml, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
+        print("mass : ", M[15792])
 
         I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
         J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
@@ -451,6 +452,7 @@ class FirstNedelecFiniteElementSpace2d:
 
         I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
         J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+        print(M[15792])
 
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M

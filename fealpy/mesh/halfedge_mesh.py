@@ -2202,7 +2202,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         node = self.entity('node')
         halfedge = self.entity('halfedge')
 
-        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 4], 0]]
+        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 3], 0]]
         return v
 
     def halfedge_length(self):
