@@ -229,6 +229,16 @@ class Function(TensorMapping, Generic[_FS]):
     def gd(self):
         return self._tensor.shape[-1]
 
+    def is_scaler(self):
+        """
+        @brief If this is a scaler function.
+        """
+        um = self._tensor
+        if um.ndim > 1 and um.shape[1] >= 2:
+            return False
+        else:
+            return True
+
     def numpy(self):
         """
         @brief Return `um` as numpy array, with shape (M, GD), where M is number of\

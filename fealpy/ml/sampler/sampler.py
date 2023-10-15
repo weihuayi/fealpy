@@ -24,11 +24,10 @@ class Sampler():
         """
         @brief Initializes a Sampler instance.
 
-        @param m: The number of samples to generate.
         @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param device: device.
         @param requires_grad: A boolean indicating whether the samples should\
-                              require gradient computation. Defaults to `False`.
+               require gradient computation. Defaults to `False`.
         """
         self.enable_weight = enable_weight
         self.dtype = dtype
