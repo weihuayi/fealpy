@@ -490,7 +490,8 @@ class FirstNedelecFiniteElementSpace2d:
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()
         idx = edge2dof[index].reshape(-1)
-        uh[idx] = np.einsum('q, qe, e->e', ws, val, measure, optimize=True)[:, None].squeeze()
+        uh[idx] = np.einsum('q, qe, e->e', ws, val, measure, optimize=True)[:,
+                None]#.squeeze()
         isDDof = np.zeros(gdof, dtype=np.bool_)
         isDDof[idx] = True
         return isDDof

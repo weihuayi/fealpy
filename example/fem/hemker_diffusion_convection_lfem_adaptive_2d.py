@@ -63,13 +63,22 @@ parser.add_argument('--pgls',
         default=True, type=bool,
         help='是否采用 PGLS 方法， 默认采用')
 
+parser.add_argument('--maxit',
+        default=50, type=int,
+        help='自适应迭代的次数，默认 50 次迭代')
+
+parser.add_argument('--theta',
+        default=0.2, type=float,
+        help='自适应迭代参数，默认 0.2')
+
 
 args = parser.parse_args()
 p = args.order
 A = args.dcoef
 b = args.ccoef
-
 pgls = args.pgls
+maxit = args.maxit
+theta = args.theta
 
 # 强对流、弱扩散的例子
 pde = PDE(A=A, b=b) 
@@ -86,8 +95,6 @@ f = ScalarSourceIntegrator(pde.source, q=p+3)
 
 mesh = TriangleMesh.from_box(domain.box, nx=60, ny=30, threshold= lambda p: pde.fd(p) < 0.0)
 
-maxit = 60
-theta = 0.2
 alg = LinearRecoveryAlg()
 
 for i in range(maxit):
@@ -109,7 +116,7 @@ for i in range(maxit):
     uh[:] = spsolve(A, F)
     print(uh[uh < 0.0])
     print(i, ": ", "is there exsit value smaller than 0.0?", np.any(uh < 0.0))
-    eta = alg.recovery_estimate(uh, method='simple')
+    eta = alg.recovery_estimate(uh, method='harmonic')
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
         mesh.bisect(isMarkedCell, options={'disp':False})

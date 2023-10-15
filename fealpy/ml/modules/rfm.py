@@ -7,30 +7,37 @@ from typing import Tuple
 import torch
 from torch import Tensor, float64
 from torch.nn import init, Linear
+from torch.nn import functional as F
 
-from .function_space import FunctionSpaceBase
+from ..nntyping import S as _S
+from .function_space import FunctionSpace
 from .activate import Activation
 
 PI = torch.pi
 
 
-class RandomFeatureSpace(FunctionSpaceBase):
+class RandomFeatureSpace(FunctionSpace):
+    """
+    The random feature space is a function space whose basis functions are\
+    random features.
+    """
     def __init__(self, in_dim: int, nf: int,
                  activate: Activation,
                  bound: Tuple[float, float]=(1.0, PI),
                  dtype=float64, device=None) -> None:
         """
-        @brief Construct a random feature model.
+        @brief Construct a random feature space.
 
-        @param in_dim: int. Dimension of inputs.
-        @param nf: int. Number of random features.
-        @param activate: Activation.
-        @param bound: two floats. Bound of uniform distribution to initialize\
+        @param in_dim: int. The geometry dimension of inputs.
+        @param nf: int. Number of random features (basis functions).
+        @param activate: Activation. The activation function after the linear\
+               transformation.
+        @param bound: two floats. Bounds of uniform distribution to initialize\
                k, b in the each random feature.
         @param dtype: torch.dtype. Data type of inputs.
         @param device: torch.device.
         """
-        super().__init__(in_dim, 1, dtype, device)
+        super().__init__(in_dim=in_dim, out_dim=1, dtype=dtype, device=device)
         self.nf = nf
 
         self.linear = Linear(in_dim, nf, device=device, dtype=dtype)
@@ -60,52 +67,35 @@ class RandomFeatureSpace(FunctionSpaceBase):
     def number_of_basis(self):
         return self.nf
 
-    def basis(self, p: Tensor) -> Tensor:
-        """
-        @brief Return values of basis, with shape (N, nf).
-        """
-        return self.activate(self.linear(p))
+    def _linear(self, p: Tensor, *, index=_S):
+        return F.linear(p, self.linear.weight[index, :], self.linear.bias[index])
 
-    def grad_basis(self, p: Tensor) -> Tensor:
-        """
-        @brief Return gradient vector of basis, with shape (N, nf, GD).
-        """
-        a = self.activate.d1(self.linear(p))
-        return torch.einsum("nf, fx -> nfx", a, self.linear.weight)
+    def basis(self, p: Tensor, *, index=_S) -> Tensor:
+        return self.activate(self._linear(p, index=index))
 
-    def hessian_basis(self, p: Tensor) -> Tensor:
-        """
-        @brief Return hessian matrix of basis, with shape (N, nf, GD, GD).
-        """
-        a = self.activate.d2(self.linear(p))
-        return torch.einsum("nf, fx, fy -> nfxy", a,
-                            self.linear.weight, self.linear.weight)
+    def grad_basis(self, p: Tensor, *, index=_S) -> Tensor:
+        a = self.activate.d1(self._linear(p, index=index))
+        grad = self.linear.weight[index, :]
+        return torch.einsum("...f, fx -> ...fx", a, grad)
 
-    def laplace_basis(self, p: Tensor, coef=None) -> Tensor:
-        """
-        @brief Return basis evaluated by laplace operator, with shape (N, nf).
-        """
-        a = self.activate.d2(self.linear(p))
-        if coef is None:
-            return torch.einsum("nf, fd, fd -> nf", a,
-                                self.linear.weight, self.linear.weight)
-        else:
-            return torch.einsum("nf, d, fd, fd -> nf", a, coef,
-                                self.linear.weight, self.linear.weight)
+    def hessian_basis(self, p: Tensor, *, index=_S) -> Tensor:
+        a = self.activate.d2(self._linear(p, index=index))
+        grad = self.linear.weight[index, :]
+        return torch.einsum("...f, fx, fy -> ...fxy", a, grad, grad)
 
-    def derivative_basis(self, p: Tensor, *idx: int) -> Tensor:
-        """
-        @brief Return specified partial derivatives of basis, with shape (N, nf).
+    def laplace_basis(self, p: Tensor, *, index=_S) -> Tensor:
+        a = self.activate.d2(self._linear(p, index=index))
+        grad = self.linear.weight[index, :]
+        return torch.einsum("...f, fd, fd -> ...f", a, grad, grad)
 
-        @param *idx: int. index of the independent variable to take partial derivatives.
-        """
+    def derivative_basis(self, p: Tensor, *idx: int, index=_S) -> Tensor:
         order = len(idx)
         if order == 0:
-            return self.activate(self.linear(p))
+            return self.activate(self._linear(p, index=index))
         else:
-            a = self.activate.dn(self.linear(p), order)
+            a = self.activate.dn(self._linear(p, index=index), order)
             b = torch.prod(self.linear.weight[:, idx], dim=-1, keepdim=False)
-            return torch.einsum("nf, f -> nf", a, b)
+            return torch.einsum("...f, f -> ...f", a, b)
 
 
 #     def scale(self, p: Tensor, operator: Operator):

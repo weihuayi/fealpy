@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.pde.truss_model import Truss_2d, Truss_3d
+from fealpy.pde.truss_model import Truss_3d
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm
 from fealpy.fem import TrussStructureIntegrator
@@ -74,6 +74,8 @@ bc = DirichletBC(vspace, disp, threshold=idx)
 A, F = bc.apply(K, F.flat, uh)
 
 uh.flat[:] = spsolve(A, F)
+
+print(uh)
 
 fig = plt.figure()
 axes = fig.add_subplot(1, 1, 1, projection='3d') 

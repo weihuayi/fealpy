@@ -379,6 +379,9 @@ class Mesh():
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
 
+    def integral(self, fun, q=3, celltype=False):
+        pass
+
     def error(self, u, v, q=3, power=2, celltype=False):
         """
         @brief Calculate the error between two functions.

@@ -19,6 +19,7 @@ from .implicit_curve import (CircleCurve,
         SpiricSectionsCurve,
         DoubleCircleCurve,
         DoubleBandY,
+        Polygon
         )
 
 from .implicit_surface import (ScaledSurface, 

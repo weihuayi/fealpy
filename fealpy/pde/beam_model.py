@@ -13,22 +13,24 @@ class BeamBase:
         return length_in_mm, force_in_newtons
 
 
-class Beam_2d_cantilever():
+class CantileveredSimplySupportedBeam():
     def __init__(self):
-        self.I = 118.6e-6 # 惯性矩 m^4
-        self.E = 200e9 # 弹性模量 newton/m^2
+        self.I = 1.186e-4 # Moment of Inertia - m^4
+        self.A = 6650e-6 # Cross-sectional area - m^2
+        self.E = 200e9 # Elastic Modulus-newton - m^2
 
     def init_mesh(self):
-        mesh = EdgeMesh.from_cantilever()
+        mesh = EdgeMesh.generate_cantilevered_mesh()
         return mesh
 
 
-class Three_beam_plane_frame():
+class PlanarBeam():
     def __init__(self):
-        self.I = 6.5e-7 # 惯性矩 m^4
-        self.A = 6.8e-4 # 截面面积 m^2
-        self.E = 3e11 # 弹性模量 newton/m^2
+        self.I = 6.5e-7 # Moment of Inertia - m^4
+        self.A = 6.8e-4 # Cross-sectional area - m^2
+        self.E = 3e11 # Elastic Modulus-newton - m^2
+
 
     def init_mesh(self):
-        mesh = EdgeMesh.from_three_beam_plane_frame()
+        mesh = EdgeMesh.generate_tri_beam_frame_mesh()
         return mesh

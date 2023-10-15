@@ -34,7 +34,7 @@ class LinearRecoveryAlg():
             np.add.at(deg, cell2dof, 1)
             np.add.at(rguh, (cell2dof, np.s_[:]), guh[:, None, :])
 
-        elif method == 'area_harmonic':
+        elif method == 'harmonic':
             val = 1.0/space.mesh.entity_measure('cell')
             np.add.at(deg, cell2dof, val[:, None])
             guh *= val[:, None] 

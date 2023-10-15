@@ -13,17 +13,16 @@ from scipy.spatial import cKDTree
 import time
 import numba
 from numba.typed import List  
-dx = 0.05
-dy = 0.05
+dx = 0.02
+dy = 0.02
 rho0 = 1000
 H = 0.92*np.sqrt(dx**2+dy**2)
 dt = 0.001
 c0 = 10
-h_swl = 2
-g = np.array([0.0, -9.8])
+g = np.array([0.0, 0.0])
 gamma = 7
 alpha = 0.1
-maxstep = 2000
+maxstep = 20
 dtype = [("position", "float64", (2, )), 
          ("velocity", "float64", (2, )),
          ("rho", "float64"),
@@ -32,35 +31,50 @@ dtype = [("position", "float64", (2, )),
          ("sound", "float64"),
          ("isBd", "bool")]
 
-def initial_position(dx, dy): 
-    pp = np.mgrid[2*dx:1+dx:dx, 2*dy:2+dy:dy].reshape(2, -1).T
-    
-    x0 = np.arange(0, 4+dx, dx)
-    x1 = np.arange(-dx/2, 4+dx+dx/2, dx) 
-    y = np.arange(dy, 4+dy, dx)
-    
-    bp0 = np.column_stack((x0, np.zeros_like(x0)))
-    bp1 = np.column_stack((x1, np.full_like(x1, dx)))
-    bp = np.vstack((bp0,bp1))
-    
-    lp0 = np.column_stack((np.zeros_like(y), y))
-    lp1 = np.column_stack((np.full_like(y, dy), y+dy/2))
-    lp = np.vstack((lp0,lp1))
+#生成粒子位置
+def initial_position(dx,dy):
 
-    rp0 = np.column_stack((np.full_like(y, 4), y)) 
-    rp1 = np.column_stack((np.full_like(y, 4-dy), y+dy/2)) 
-    rp = np.vstack((rp0,rp1))
-    bpp = np.vstack((bp,lp,rp))
-    return pp, bpp
+    x0 = np.arange(0,10,dx)
+    x1 = np.arange(-dx/2,10+dx,dx)
+
+    b0 = np.column_stack((x0,np.zeros_like(x0)))
+    b1 = np.column_stack((x1,np.full_like(x1,-dy)))
+    b = np.vstack((b0,b1))
+
+    u0 = np.column_stack((x0,np.full_like(x0,1)))
+    u1 = np.column_stack((x1,np.full_like(x1,1+dy)))
+    u = np.vstack((u0,u1))
+    bm = np.vstack((b,u))
+
+    return bm
+
+#新增粒子
+def add_particles_at_surface(particles,dy):
+    y = np.arange(dy/2,1-dy/2,0.5*dy)
+    lp = np.column_stack((np.full_like(y, dx), y))
+    new_particles = np.zeros(lp.shape[0],dtype=dtype)
+    new_particles['rho'] = rho0
+    new_particles['position'] = lp
+    new_particles['velocity'] = np.array([2,0],dtype=np.float64)
+    new_particles['isBd'] = False
+    particles = np.concatenate((particles,new_particles), axis = 0)
+    return particles
+
+
+
+#删除粒子
+def remove_particles(particles):
+    condition = particles['position'][:, 0] <= 10.0
+    particles = particles[condition]
+    return particles
 
 # 初始化
-pp,bpp = initial_position(dx, dy)
-num_particles = pp.shape[0] + bpp.shape[0]
+bm = initial_position(dx, dy)
+num_particles = bm.shape[0]
 particles = np.zeros(num_particles, dtype=dtype)
 particles["rho"] = rho0
-particles['position'] = np.vstack((pp,bpp))
-particles['isBd'][pp.shape[0]:] = True
-particles['isBd'][:pp.shape[0]] = False
+particles['position'] = bm
+particles['isBd'] = True
 # Visualization
 color = np.where(particles['isBd'], 'red', 'blue')
 plt.scatter(particles['position'][:, 0], particles['position'][:, 1] ,c=color ,s=5)
@@ -126,7 +140,8 @@ def change_position(particles, idx):
     particles['position'][~tag] += dt * result[~tag] 
 
 def change_p(particles,i):
-    B = c0**2*rho0/gamma
+    #B = c0**2*rho0/gamma
+    B = 4*rho0/gamma
     particles['pressure'] = B * ((particles['rho']/rho0)**gamma - 1)
     particles['sound'] = (B*gamma/rho0 * (particles['rho']/rho0)**(gamma-1))**0.5 
     '''2010   
@@ -212,7 +227,7 @@ def draw(particles, i):
 
 for i in range(maxstep):
     print("i:", i)
-    #print(np.sum(np.abs(particles['position'])))
+    particles = add_particles_at_surface(particles,dy) 
     idx = find_neighbors_within_distance(particles["position"], 2*H)
     idx = List([np.array(neighbors) for neighbors in idx])
     change_rho(particles, idx)
@@ -221,18 +236,15 @@ for i in range(maxstep):
     change_position(particles,idx)
     if i%30==0 and i!=0:
         rein_rho(particles, idx)
+    #particles = remove_particles(particles)
     draw(particles, i)
 
-
-
-#color = np.where(particles['isBd'], 'red', 'blue')
+plt.clf()
 tag = np.where(particles['isBd'])
-c = particles['velocity'][:,0]
-#c = particles['pressure']
+#c = particles['velocity'][:,0]
+c = particles['pressure']
 #c = particles['rho']
-c[tag] = max(c)
+c[tag] = 0
 plt.scatter(particles['position'][:, 0], particles['position'][:, 1] ,c=c,cmap='jet' ,s=5)
 plt.colorbar(cmap='jet')
-plt.clim(0, 7) 
-plt.grid(True)
 plt.show()

@@ -30,7 +30,7 @@ class Standardize(Module):
             rdata = torch.tensor(radius, dtype=centers.dtype, device=device)
         else:
             rdata = radius.to(device=device)
-        self.radius = Parameter(rdata.expand(centers.shape), requires_grad=False)
+        self.radius = Parameter(rdata.expand(centers.shape).clone(), requires_grad=False)
 
     def forward(self, p: Tensor):
         return (p[:, None, :] - self.centers[None, :, :]) / self.radius[None, :, :]

@@ -309,23 +309,24 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_cantilever(cls):
-        # 单位为 m
+    def generate_cantilevered_mesh(cls):
+        # Unit m
         node = np.array([
             [0], [5], [7.5]], dtype=np.float64)
         cell = np.array([
             [0, 1], [1, 2]], dtype=np.int_)
         mesh = cls(node, cell)
 
-        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
-        mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
+        mesh.meshdata['disp_bc'] = (np.array([0, 1], dtype = np.int_), np.zeros(2))
+        mesh.meshdata['force_bc'] = (np.array([0, 1, 2], dtype = np.int_), 
+                                     np.array([[-62500, -52083], [-93750, 39062], [-31250, 13021]], dtype = np.int_))
 
         return mesh 
 
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_three_beam_plane_frame(cls):
+    def generate_tri_beam_frame_mesh(cls):
         # Unit: m
         node = np.array([
             [0, 0.96], [1.44, 0.96], 

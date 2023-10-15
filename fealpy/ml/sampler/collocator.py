@@ -1,6 +1,7 @@
 
 from typing import List, Any, Sequence
 
+import numpy as np
 import torch
 from torch import device, Tensor, dtype, float64
 
@@ -198,3 +199,38 @@ class PolygonCollocator(Sampler):
             points = torch.cat([points, new_points], dim = 0 )
         unique_points = torch.unique(points, dim = 0)
         return unique_points
+    
+
+class SphereCollocator(Sampler):
+    def __init__(self, center, radius, method='fibonacci', dtype:dtype=torch.float64,
+                 device: device=None, requires_grad: bool=False, **kwargs) -> None:
+        """
+        @brief Initializes an SphereCollocator instance.
+        @param nums: The number of samples to generate.
+        @param center: An object that can be converted to a `numpy.ndarray`,\
+               representing the ranges in each sampling axis.\
+               For example, if sampling on a spherical with center [0, 0, 0]\
+               use `center=[0, 0, 0]`.
+        @param radius: Radius of ball.
+        @param dtype: Data type of samples. Defaults to `torch.float64`.
+        @param requires_grad: A boolean indicating whether the samples should\
+                              require gradient computation. Defaults to `False`.\
+                              See `torch.autograd.grad`
+        """
+        super().__init__(dtype=dtype, device=device, requires_grad=requires_grad, **kwargs)  
+        self.center = torch.tensor(center, dtype=torch.float64)
+        self.radius = radius
+        if method in {'fibonacci', }:
+            self.method = method
+        else:
+            raise ValueError("Unsupported method. Method 'fibonacci' is the default sampling method ")
+
+    def run(self, nums: int ):
+            phi = torch.tensor(np.pi * (3. - np.sqrt(5.)))
+            indices = torch.arange(nums, dtype=torch.float64) + 0.5
+            y = 1 - (indices / (nums - 1)) * 2  
+            r = torch.sqrt(1 - y*y) * self.radius  
+            theta = phi * indices 
+            x = self.center[0] + torch.cos(theta) * r
+            z = self.center[2] + torch.sin(theta) * r
+            return torch.stack((x, y + self.center[1], z), dim=1)
