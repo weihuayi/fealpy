@@ -34,3 +34,5 @@ class PlanarBeam():
     def init_mesh(self):
         mesh = EdgeMesh.generate_tri_beam_frame_mesh()
         return mesh
+
+
