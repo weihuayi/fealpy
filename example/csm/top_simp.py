@@ -140,6 +140,5 @@ class TopSimp:
         plt.ioff()
         plt.show()
 
-# 创建一个TopSimp对象实例
 tsp = TopSimp()
 print(tsp.optimize())
