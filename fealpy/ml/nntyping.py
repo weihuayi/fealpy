@@ -17,7 +17,6 @@ TensorOrArray = Union[Tensor, NDArray]
 
 TensorFunction = Callable[[Tensor], Tensor]
 VectorFunction = Callable[[NDArray], NDArray]
-Operator = Callable[[Tensor, Tensor], Tensor]
 
 Index = Union[int, bool, Tensor, slice, List, Tuple]
 S: Index = slice(None, None, None)

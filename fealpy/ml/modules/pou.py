@@ -446,6 +446,8 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
     def convect_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=S) -> Tuple[Tensor, Tensor]:
         part = self.partitions[idx]
         flag = part.flag(p)
+        if coef.ndim == 1:
+            coef = coef.broadcast_to(p.shape[0], coef.shape[-1])
         return flag, self.partitions[idx].convect_basis(p[flag, ...], coef=coef[flag, ...], index=index)
 
     @assemble(0)
