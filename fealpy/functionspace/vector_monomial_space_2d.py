@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 from numpy.linalg import inv
 from fealpy.functionspace.Function import Function
@@ -195,6 +196,37 @@ class VectorMonomialSpace2d():
         s0 = 'abcdefg'
         s1 = '...ij{}, ij->...i{}'.format(s0[:dim], s0[:dim])
         return np.einsum(s1, phi, uh[cell2dof])
+    def show_function_image(self, u, uh):
+        mesh = uh.space.mesh
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.add_subplot(121, projection='3d')
+        axes1 = fig.add_subplot(122, projection='3d')
+
+        NE = mesh.number_of_edges()
+        mid = mesh.entity_barycenter("cell")
+        node = mesh.entity("node")
+        edge = mesh.entity("edge")
+        edge2cell = mesh.ds.edge_to_cell()
+
+        coor = np.zeros([2*NE, 3, 2], dtype=np.float_)
+        coor[:NE, :2] = node[edge]
+        coor[:NE, 2] = mid[edge2cell[:, 0]] 
+        coor[NE:, :2] = node[edge]
+        coor[NE:, 2] = mid[edge2cell[:, 1]] 
+
+        val = np.zeros([2*NE, 3, 2])
+        val[:NE] = uh(coor[:NE].swapaxes(0, 1), index=edge2cell[:, 0]).swapaxes(0 ,1)
+        val[NE:] = uh(coor[NE:].swapaxes(0, 1), index=edge2cell[:, 1]).swapaxes(0 ,1)
+
+        fval = u(coor.swapaxes(0, 1)).swapaxes(0, 1)
+        for ii in range(2*NE):
+            axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], val[ii, :, 0], color = 'r', lw=0.0)#数值解图像
+            axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], fval[ii, :, 0], color = 'b', lw=0.0)#真解图像
+            axes1.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], val[ii, :, 1], color = 'r', lw=0.0)#数值解图像
+            axes1.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], fval[ii, :, 1], color = 'b', lw=0.0)#真解图像
+        plt.show()
+        return
 
 
 
