@@ -881,6 +881,12 @@ class PolygonMesh(Mesh, Plotable):
         pmesh = cls(pnode, pcell, pcellLocation)
 
         return pmesh
+    def is_boundary_edge(self, threshold=None):
+        isbdedge = self.ds.boundary_edge_flag()
+        if threshold is not None:
+            bc = self.entity_barycenter('edge')
+            isbdedge = threshold(bc) 
+        return isbdedge
 
 PolygonMesh.set_ploter('polygon2d')
 
@@ -1021,3 +1027,4 @@ class PolygonMeshDataStructure(MeshDataStructure):
             return self.edge2cell
 
     face_to_cell = edge_to_cell
+
