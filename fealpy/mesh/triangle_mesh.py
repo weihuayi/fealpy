@@ -316,6 +316,25 @@ class TriangleMesh(Mesh, Plotable):
     face_normal = edge_normal
     face_unit_normal = edge_unit_normal
 
+    def sphere_surface_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算单位球面三角形网格中每个面上的单位法线
+        """
+        assert self.geo_dimension() == 3
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+
+        nv = np.cross(v1, v2)
+        length = np.linalg.norm(nv, axis=-1, keepdims=True)
+
+        n = nv/length
+        return n
+
+
     def grad_lambda(self, index=np.s_[:]):
         node = self.entity('node')
         cell = self.entity('cell')
@@ -335,9 +354,9 @@ class TriangleMesh(Mesh, Plotable):
         elif GD == 3:
             length = np.linalg.norm(nv, axis=-1, keepdims=True)
             n = nv/length
-            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
-            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
-            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
+            Dlambda[:, 0] = np.cross(n, v0)/length
+            Dlambda[:, 1] = np.cross(n, v1)/length
+            Dlambda[:, 2] = np.cross(n, v2)/length
         return Dlambda
 
     def rot_lambda(self, index=np.s_[:]):
@@ -843,7 +862,7 @@ class TriangleMesh(Mesh, Plotable):
 
         cell2edge = self.ds.cell_to_edge()
         cell2cell = self.ds.cell_to_cell()
-
+        cell2ipoint = self.cell_to_ipoint(self.p)
         isCutEdge = np.zeros((NE,), dtype=np.bool_)
 
         if options['disp']:
@@ -909,9 +928,14 @@ class TriangleMesh(Mesh, Plotable):
             R = np.arange(NC, NC+nc)
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
-                    if len(value.shape) == 1: # 分片常数
-                        value = np.r_[value, value[idx]]
-                        options[key] = value
+                    if value.shape == (NC,): # 分片常数
+                        value= np.r_[value[:], value[idx]]
+                        options['data'][key] = value
+                    elif value.shape == (NN+k*nn, ):
+                        if k == 0:
+                            value = np.r_['0', value, np.zeros((nn, ), dtype=self.ftype)]
+                            value[NN:] = 0.5*(value[edge[isCutEdge,0]] + value[edge[isCutEdge,1]])
+                            options['data'][key] = value
                     else:
                         ldof = value.shape[-1]
                         p = int((np.sqrt(1+8*ldof)-3)//2)
@@ -934,7 +958,7 @@ class TriangleMesh(Mesh, Plotable):
 
                         phi = self.shape_function(bcl, p=p)
                         value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
-
+                        
                         options['data'][key] = value
 
 
@@ -1040,7 +1064,7 @@ class TriangleMesh(Mesh, Plotable):
             for key, value in options['data'].items():
                 ldof = value.shape[1]
                 p = int((np.sqrt(8*ldof+1) - 3)/2)
-                bc = self.multi_index_matrix(p=p)/p
+                bc = self.multi_index_matrix(p=p, etype=2)/p
                 bcl = np.zeros_like(bc)
                 bcl[:, 0] = 2*bc[:, 2]
                 bcl[:, 1] = bc[:, 0]
@@ -1867,7 +1891,12 @@ class TriangleMesh(Mesh, Plotable):
         """
         @brief 把一个四边形网格中每个单元分成两个三角形
         """
-        pass
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+        localCell = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int_)
+        cell = cell[:, localCell].reshape(-1, 3)
+        tmesh = cls(node, cell)
+        return tmesh
 
     ## @ingroup MeshGenerators
     @classmethod
