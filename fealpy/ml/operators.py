@@ -1,31 +1,34 @@
 
+from typing import Generic, TypeVar
 from functools import reduce
 from typing import Union, Tuple, Sequence, List, overload, Literal, Optional
 import torch
 from torch import Tensor
 from scipy.sparse import lil_matrix, csr_matrix
-from fealpy.ml.modules import Function, FunctionSpace
+from scipy.sparse.linalg import spsolve
+from fealpy.ml.modules import Function, FunctionSpace, PoUSpace
 from .nntyping import TensorFunction, S
 from .modules import FunctionSpace, Function
 
-FuncOrTensor = Union[TensorFunction, Tensor]
+FuncOrTensor = Union[TensorFunction, Tensor, list, tuple]
+FuncOrNumber = Union[TensorFunction, Tensor, float, int]
+FuncOrTensorLike = Union[FuncOrNumber, FuncOrTensor]
 
-def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensor], gd=1):
-    N = sample.shape[0]
+def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensorLike], gd=1):
+    if callable(func_or_tensor):
+        func_or_tensor = func_or_tensor(sample)
     if func_or_tensor is None:
         ret = torch.tensor(0.0, dtype=sample.dtype, device=sample.device)
-    elif callable(func_or_tensor):
-        ret = func_or_tensor(sample)
+    elif isinstance(func_or_tensor, (float, int, list, tuple)):
+        ret = torch.tensor(func_or_tensor, dtype=sample.dtype, device=sample.device)
     else:
         ret = func_or_tensor
-    if ret.ndim in {0, 1}:
-        return ret.broadcast_to(N, gd)
-    else:
-        return ret
+    return ret
 
+_FS = TypeVar('_FS', bound=FunctionSpace)
 
-class Form():
-    def __init__(self, space: FunctionSpace) -> None:
+class Form(Generic[_FS]):
+    def __init__(self, space: _FS) -> None:
         self.space = space
         self.samples: List[Tensor] = []
         self.operators: List[Tuple[Operator, ...]] = []
@@ -33,42 +36,44 @@ class Form():
 
     @overload
     def add(self, sample: Tensor, operator: "Operator",
-            source: Optional[FuncOrTensor]=None): ...
+            source: Optional[FuncOrNumber]=None): ...
     @overload
     def add(self, sample: Tensor, operator: Sequence["Operator"],
-            source: Optional[FuncOrTensor]=None): ...
+            source: Optional[FuncOrNumber]=None): ...
     def add(self, sample: Tensor, operator: Union[Sequence["Operator"], "Operator"],
-            source: Optional[FuncOrTensor]=None):
+            source: Optional[FuncOrNumber]=None):
         """
         @brief Add a condition.
 
         @param sample: collocation points Tensor.
-        @param operator: one or sequence of operator applying to the space.
-        @param source: function or Tensor of source.
+        @param operator: one or sequence of operator(s) applying to the space.
+        @param source: function or Tensor of source, optional. Source defaults to\
+               zero if not provided.
         """
-        assert sample.ndim == 2
         self.samples.append(sample)
-
+        # NOTE: samples are allow to have more than 2 dims.
         if isinstance(operator, Operator):
             self.operators.append((operator, ))
         else:
             self.operators.append(tuple(operator))
-
         b = _to_tensor(sample, source)
-        assert sample.shape[0] == b.shape[0]
+        # NOTE: Here we did not check the shape of sample and source, as the number
+        # of conditions may not match the number of samples.
         self.sources.append(b)
 
     @overload
-    def assembly(self) -> Tuple[csr_matrix, csr_matrix]: ...
+    def assembly(self, *, rescale=100.0) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
-    def assembly(self, return_sparse: Literal[True]) -> Tuple[csr_matrix, csr_matrix]: ...
+    def assembly(self, *, rescale=100.0, return_sparse: Literal[True]=True) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
-    def assembly(self, return_sparse: Literal[False]) -> Tuple[Tensor, Tensor]: ...
-    def assembly(self, return_sparse=True):
+    def assembly(self, *, rescale=100.0, return_sparse: Literal[False]=False) -> Tuple[Tensor, Tensor]: ...
+    def assembly(self, *, rescale=100.0, return_sparse=True):
         """
         @brief Assemble linear equations for the least-square problem.
 
-        @param return_sparse: bool. Return in csr_matrix type if `True`.
+        @param rescale: float.
+        @param return_sparse: bool, optional. Return in csr_matrix type if `True`.\
+               Defaults to `True`.
 
         @return: Tuple[Tensor, Tensor] or Tuple[csr_matrix, csr_matrix].\
         """
@@ -78,23 +83,22 @@ class Form():
         src0 = self.sources[0]
 
         if src0.ndim == 1:
-            bshape: Tuple[int, ...] = (NF, )
+            bshape: Tuple[int, ...] = (NF, 1)
         else:
             bshape = (NF, src0.shape[-1])
 
-        if return_sparse:
-            dtype = src0.cpu().detach().numpy().dtype
-            A = lil_matrix((NF, NF), dtype=dtype)
-            b = lil_matrix(bshape, dtype=dtype)
-        else:
-            A = torch.zeros((NF, NF), dtype=space.dtype, device=space.device)
-            b = torch.zeros(bshape, dtype=space.dtype, device=space.device)
+        A = torch.zeros((NF, NF), dtype=space.dtype, device=space.device)
+        b = torch.zeros(bshape, dtype=space.dtype, device=space.device)
 
         for i in range(len(self.samples)):
             pts = self.samples[i]
             ops = self.operators[i]
             basis = reduce(torch.add, (op.assembly(pts, space) for op in ops))
-            src = self.sources[i]
+            ratio = rescale / basis.abs().max(dim=-1, keepdim=True)[0]
+            basis *= ratio
+            src = self.sources[i] * ratio
+            if src.ndim == 1:
+                src.unsqueeze_(-1)
             if return_sparse:
                 A[:] += (basis.T@basis).detach().cpu().numpy()
                 b[:] += (basis.T@src).detach().cpu().numpy()
@@ -103,12 +107,18 @@ class Form():
                 b[:] += basis.T@src
 
         if return_sparse:
-            return A.tocsr(), b.tocsr()
+            return csr_matrix(A.detach().cpu()), csr_matrix(b.detach().cpu())
         return A, b
 
+    def spsolve(self, rescale=100.0):
+        A_, b_ = self.assembly(rescale=rescale)
+        um = torch.from_numpy(spsolve(A_, b_))
+        return self.space.function(um)
+
+### Operators
 
 class Operator():
-    """Operator for functions in space."""
+    """Abstract base class of Operator for functions in space."""
     def __hash__(self) -> int:
         return id(self)
 
@@ -125,6 +135,7 @@ class Operator():
 
 
 class ScalerOperator(Operator):
+    """Abstract class for scaler operators. Only for typing."""
     def __call__(self, func: Function) -> TensorFunction:
         space = func.space
         um = func.um
@@ -142,7 +153,7 @@ class ScalerDiffusion(ScalerOperator):
     """
     @brief -c\\Delta \\phi
     """
-    def __init__(self, coef: Optional[FuncOrTensor]=None) -> None:
+    def __init__(self, coef: Optional[FuncOrNumber]=None) -> None:
         """
         @brief Initialize a scaler diffusion operator.
 
@@ -182,7 +193,7 @@ class ScalerMass(ScalerOperator):
     """
     @brief c \\phi
     """
-    def __init__(self, coef: Optional[FuncOrTensor]=None) -> None:
+    def __init__(self, coef: Optional[FuncOrNumber]=None) -> None:
         """
         @brief Initialize a scaler mass operator.
 
@@ -209,10 +220,76 @@ class Integrator(ScalerOperator):
         basis = space.basis(p, index=index)
         return torch.mean(basis, dim=0, keepdim=True)
 
+### Continuous Operators
 
-class Continuous0(Operator):
-    pass
+class ContinuousOperator(ScalerOperator):
+    def __init__(self, sub_to_partition: Tensor) -> None:
+        """
+        @brief Initialize a scaler operator to assemble continuous matrix.
+        """
+        super().__init__()
+        self.sub2part = sub_to_partition
 
 
-class Continuous1(Operator):
-    pass
+class Continuous0(ContinuousOperator):
+    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        if not isinstance(space, PoUSpace):
+            raise TypeError("Continuous0 is designed for PoUSpace, but applied "
+                            f"to {space.__class__.__name__}.")
+        assert p.ndim == 3 #(NVS, #Subs, #Dims)
+        NVS = p.shape[0]
+        NS = p.shape[1]
+        N_basis = space.number_of_basis()
+        sub2part = self.sub2part
+        data = torch.zeros((NVS*NS, N_basis), dtype=p.dtype, device=p.device)
+        for idx in range(NS):
+            sp = p[:, idx, :] #(NVS, #Dims)
+
+            left_idx = int(sub2part[idx, 0].item())
+            left_part = space.partitions[left_idx]
+            basis_slice_l = space.partition_basis_slice(left_idx)
+            left_data = left_part.space.basis(left_part.global_to_local(sp))
+            data[idx*NVS:(idx+1)*NVS, basis_slice_l] = left_data
+
+            right_idx = int(sub2part[idx, 1].item())
+            right_part = space.partitions[right_idx]
+            basis_slice_r = space.partition_basis_slice(right_idx)
+            right_data = right_part.space.basis(right_part.global_to_local(sp))
+            data[idx*NVS:(idx+1)*NVS, basis_slice_r] = -right_data
+        return data
+
+
+class Continuous1(ContinuousOperator):
+    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        if not isinstance(space, PoUSpace):
+            raise TypeError("Continuous1 is designed for PoUSpace, but applied "
+                            f"to {space.__class__.__name__}.")
+        assert p.ndim == 3 #(NVS, #Subs, #Dims)
+        NVS = p.shape[0]
+        NS = p.shape[1]
+        N_basis = space.number_of_basis()
+        sub2part = self.sub2part
+        data = torch.zeros((NVS*NS*2, N_basis), dtype=p.dtype, device=p.device)
+        for idx in range(NS):
+            sp = p[:, idx, :] #(NVS, #Dims)
+
+            left_idx = int(sub2part[idx, 0].item())
+            left_part = space.partitions[left_idx]
+            basis_slice_l = space.partition_basis_slice(left_idx)
+            NPBL = left_part.number_of_basis()
+            x = left_part.global_to_local(sp)
+            grad = torch.einsum('...fd, d -> ...fd', left_part.space.grad_basis(x),
+                                1/left_part.radius)
+            left_data = torch.swapdims(grad, 1, 2).reshape(-1, NPBL)
+            data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_l] = left_data
+
+            right_idx = int(sub2part[idx, 1].item())
+            right_part = space.partitions[right_idx]
+            basis_slice_r = space.partition_basis_slice(right_idx)
+            NPBR = right_part.number_of_basis()
+            x = right_part.global_to_local(sp)
+            grad = torch.einsum('...fd, d -> ...fd', right_part.space.grad_basis(x),
+                                1/right_part.radius)
+            right_data = torch.swapdims(grad, 1, 2).reshape(-1, NPBR)
+            data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_r] = -right_data
+        return data

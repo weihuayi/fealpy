@@ -5,9 +5,10 @@ from typing import (
     Union,
     Protocol,
     Any,
-    Literal
+    Literal,
+    TypeVar
 )
-
+from warnings import warn
 import numpy as np
 from torch import Tensor
 import numpy as np
@@ -36,3 +37,15 @@ class MeshLike(Protocol):
     """A simple protocal for meshes. This is not runtime-checkable."""
     def entity(self, etype) -> Any: ...
     def entity_measure(self, etype='cell', index=np.s_[:]) -> Union[NDArray, float]: ...
+
+_F = TypeVar("_F", bound=Callable[..., Any])
+
+def deprecated(version: str, instead: str):
+    def deprecated_(func: _F) -> _F:
+        def wrapper(*args, **kwargs):
+            obj = func.__class__.__name__ + "." + func.__name__
+            msg = f"{obj} will be deprecated in version {version}, use {instead} instead."
+            warn(msg, DeprecationWarning)
+            return func(*args, **kwargs)
+        return wrapper
+    return deprecated_
