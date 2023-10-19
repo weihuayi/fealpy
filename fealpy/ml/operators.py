@@ -4,7 +4,7 @@ from functools import reduce
 from typing import Union, Tuple, Sequence, List, overload, Literal, Optional
 import torch
 from torch import Tensor
-from scipy.sparse import lil_matrix, csr_matrix
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 from fealpy.ml.modules import Function, FunctionSpace, PoUSpace
 from .nntyping import TensorFunction, S
@@ -28,8 +28,9 @@ def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensorLike], gd=1)
 _FS = TypeVar('_FS', bound=FunctionSpace)
 
 class Form(Generic[_FS]):
-    def __init__(self, space: _FS) -> None:
+    def __init__(self, space: _FS, gd=1) -> None:
         self.space = space
+        self.gd = gd
         self.samples: List[Tensor] = []
         self.operators: List[Tuple[Operator, ...]] = []
         self.sources: List[Tensor] = []
@@ -61,13 +62,29 @@ class Form(Generic[_FS]):
         # of conditions may not match the number of samples.
         self.sources.append(b)
 
+    def get_matrix(self, rescale: Optional[float]=100.0):
+        space = self.space
+        for i in range(len(self.samples)):
+            pts = self.samples[i]
+            ops = self.operators[i]
+            basis = reduce(torch.add, (op.assembly(pts, space) for op in ops))
+            src = self.sources[i].broadcast_to(basis.shape[0], self.gd)
+            if rescale is None:
+                yield basis, src
+            else:
+                ratio = rescale / (basis.abs().max(dim=-1, keepdim=True)[0] + 1e-4)
+                basis *= ratio
+                yield basis, src * ratio
+
     @overload
-    def assembly(self, *, rescale=100.0) -> Tuple[csr_matrix, csr_matrix]: ...
+    def assembly(self, *, rescale: Optional[float]=100.0) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
-    def assembly(self, *, rescale=100.0, return_sparse: Literal[True]=True) -> Tuple[csr_matrix, csr_matrix]: ...
+    def assembly(self, *, rescale: Optional[float]=100.0,
+                 return_sparse: Literal[True]=True) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
-    def assembly(self, *, rescale=100.0, return_sparse: Literal[False]=False) -> Tuple[Tensor, Tensor]: ...
-    def assembly(self, *, rescale=100.0, return_sparse=True):
+    def assembly(self, *, rescale: Optional[float]=100.0,
+                 return_sparse: Literal[False]=False) -> Tuple[Tensor, Tensor]: ...
+    def assembly(self, *, rescale: Optional[float]=100.0, return_sparse=True):
         """
         @brief Assemble linear equations for the least-square problem.
 
@@ -80,40 +97,32 @@ class Form(Generic[_FS]):
         space = self.space
         NF = space.number_of_basis()
         assert len(self.sources) >= 1
-        src0 = self.sources[0]
-
-        if src0.ndim == 1:
-            bshape: Tuple[int, ...] = (NF, 1)
-        else:
-            bshape = (NF, src0.shape[-1])
+        bshape = (NF, self.gd)
 
         A = torch.zeros((NF, NF), dtype=space.dtype, device=space.device)
         b = torch.zeros(bshape, dtype=space.dtype, device=space.device)
 
-        for i in range(len(self.samples)):
-            pts = self.samples[i]
-            ops = self.operators[i]
-            basis = reduce(torch.add, (op.assembly(pts, space) for op in ops))
-            ratio = rescale / basis.abs().max(dim=-1, keepdim=True)[0]
-            basis *= ratio
-            src = self.sources[i] * ratio
-            if src.ndim == 1:
-                src.unsqueeze_(-1)
-            if return_sparse:
-                A[:] += (basis.T@basis).detach().cpu().numpy()
-                b[:] += (basis.T@src).detach().cpu().numpy()
-            else:
-                A[:] += basis.T@basis
-                b[:] += basis.T@src
+        for basis, src in self.get_matrix(rescale):
+            A[:] += basis.T@basis
+            b[:] += basis.T@src
 
         if return_sparse:
             return csr_matrix(A.detach().cpu()), csr_matrix(b.detach().cpu())
         return A, b
 
-    def spsolve(self, rescale=100.0):
+    def spsolve(self, *, rescale: Optional[float]=100.0):
         A_, b_ = self.assembly(rescale=rescale)
-        um = torch.from_numpy(spsolve(A_, b_))
-        return self.space.function(um)
+        um = spsolve(A_, b_)
+        return self.space.function(torch.from_numpy(um))
+
+    def residual(self, um: Tensor, rescale: Optional[float]=None):
+        ress: List[Tensor] = []
+        for basis, src in self.get_matrix(rescale):
+            if um.ndim == 1:
+                src.squeeze_(-1)
+            ress.append(basis@um - src)
+        return torch.cat(ress, dim=0)
+
 
 ### Operators
 
