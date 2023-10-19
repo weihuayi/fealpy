@@ -1,4 +1,5 @@
 import argparse 
+import os
 import numpy as np
 
 from fealpy.mesh.triangle_mesh import TriangleMesh
@@ -46,10 +47,7 @@ parser.add_argument('--step',
         default=10, type=int,
         help='')
 
-
 args = parser.parse_args()
-
-import os
 
 # Check if the directory exists, if not, create it
 if not os.path.exists(args.output):
