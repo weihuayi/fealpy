@@ -256,7 +256,7 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_four_bar(cls):
+    def generate_four_bar_mesh(cls):
         # 单位为 mm
         node = np.array([
             [0, 0], [400, 0], 
@@ -274,7 +274,7 @@ class EdgeMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_balcony_truss(cls):
+    def generate_balcony_truss_mesh(cls):
         # 单位为英寸 in
         node = np.array([
             [0, 0], [36, 0], 
