@@ -169,7 +169,10 @@ class EntityFinder(MeshPloter):
         etype_or_node = args.etype
 
         if isinstance(etype_or_node, (int, str)):
-            bc = self.mesh.entity_barycenter(etype=etype_or_node, index=args.index)
+            # NOTE: Here we slice the entity after generated, because the fucking
+            # uniform mesh does not implement the index arg in entity_barycenter.
+            # The index arg can be accept, but ignored.
+            bc = self.mesh.entity_barycenter(etype=etype_or_node)[args.index]
         elif isinstance(etype_or_node, np.ndarray):
             bc = etype_or_node
         else:
