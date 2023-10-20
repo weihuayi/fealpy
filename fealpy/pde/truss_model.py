@@ -11,8 +11,8 @@ class Truss_3d():
 
         在此函数中设置桁架模型的基本参数
         """
-        self.A0: float = 2000 # 横截面积 mm^2
-        self.E: float = 1500 # 弹性模量 ton/mm^2
+        self.A: float = 2000 # Cross-sectional area - mm^2
+        self.E: float = 1500 # Elastic Modulus newton - ton/mm^2
 
     def init_mesh(self):
         """
@@ -26,22 +26,6 @@ class Truss_3d():
         mesh = EdgeMesh.from_tower()
 
         return mesh
-
-    @cartesian
-    def displacement(self, p):
-        pass
-
-    @cartesian
-    def jacobian(self, p):
-        pass
-
-    @cartesian
-    def strain(self, p):
-        pass
-
-    @cartesian
-    def stress(self, p):
-        pass
 
     @cartesian
     def source(self, p):
@@ -121,22 +105,6 @@ class Truss_2d_old():
             [1, 5], [2, 3], [2, 4], [3, 4], [4, 5]], dtype=np.int_)
         mesh = EdgeMesh(node, edge)
         return mesh
-
-    @cartesian
-    def displacement(self, p):
-        pass
-
-    @cartesian
-    def jacobian(self, p):
-        pass
-
-    @cartesian
-    def strain(self, p):
-        pass
-
-    @cartesian
-    def stress(self, p):
-        pass
 
     @cartesian
     def source(self, p):

@@ -91,7 +91,7 @@ class CosCosPDEData:
 
 class PoissonPDEData:
     """
-    真解为 u(x, y) = (cos\pi x \cos\pi y) 的 Poisson 方程
+    真解为 u(x, y) = (\cos\pi x \cos\pi y) 的 Poisson 方程
     """
     def domain(self):
         return np.array([0, 1, 0, 1])
