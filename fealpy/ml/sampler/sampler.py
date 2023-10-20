@@ -118,12 +118,13 @@ class ISampler(Sampler):
             ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
 
         if ranges_arr.ndim == 1:
-            self.nd, mod = divmod(ranges_arr.shape[0], 2)
+            _, mod = divmod(ranges_arr.shape[0], 2)
             if mod != 0:
                 raise ValueError("If `ranges` is 1-dimensional, its length is"
                                  f"expected to be even, but got {mod}.")
             ranges_arr = ranges_arr.reshape(-1, 2)
         assert ranges_arr.ndim == 2
+        self.nd = ranges_arr.shape[0]
         self.nodes = ranges_arr # (GD, 2)
         self.mode = mode
 
@@ -157,6 +158,7 @@ class ISampler(Sampler):
         if self.enable_weight:
             self._weight[:] = 1/ret.shape[0]
             self._weight = self._weight.broadcast_to(ret.shape[0])
+        ret.requires_grad_(self.requires_grad)
         return ret
 
 

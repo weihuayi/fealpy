@@ -1,44 +1,45 @@
 
 import torch
+from torch import Tensor, float64, sin, exp
 import torch.nn as nn
 from torch.optim import Adam
 
-from fealpy.ml.machine import LearningMachine
-from fealpy.ml.boundary import TFC2dSpaceTimeDirichletBC
+from fealpy.ml.modules import BoxTimeDBCSolution2d, Solution
 from fealpy.ml.grad import gradient
 from fealpy.ml.sampler import ISampler
 
+PI = torch.pi
+
 # 定义神经网络
 pinn = nn.Sequential(
-    nn.Linear(2, 32),
+    nn.Linear(2, 32, dtype=float64),
     nn.Tanh(),
-    nn.Linear(32, 16),
+    nn.Linear(32, 16, dtype=float64),
     nn.Tanh(),
-    nn.Linear(16, 8),
+    nn.Linear(16, 8, dtype=float64),
     nn.Tanh(),
-    nn.Linear(8, 4),
+    nn.Linear(8, 4, dtype=float64),
     nn.Tanh(),
-    nn.Linear(4, 1)
+    nn.Linear(4, 1, dtype=float64)
 )
 
 # 定义优化器、采样器、训练器
 optimizer = Adam(pinn.parameters(), lr=0.001)
-sampler = ISampler(1000, [[0, 1], [0, 2]], requires_grad=True)
-
-s = TFC2dSpaceTimeDirichletBC(pinn)
-lm = LearningMachine(s)
+mse_fn = nn.MSELoss()
+sampler = ISampler([[0, 1], [0, 2]], requires_grad=True)
+s = BoxTimeDBCSolution2d(pinn)
 
 # 设置初边值条件
-@s.set_initial
-def inital(x: torch.Tensor):
-    return torch.sin(torch.pi * x)
+@s.set_ic
+def inital(p: Tensor):
+    _, x = torch.split(p, 1, dim=-1)
+    return sin(PI * x)
 
-@s.set_left_edge(x=0.0)
-def left_edge(t: torch.Tensor):
-    return torch.zeros_like(t)
+s.set_box([0.0, 2.0])
 
-@s.set_right_edge(x=2.0)
-def right_edge(t: torch.Tensor):
+@s.set_bc
+def boundary(p: Tensor):
+    t, _ = torch.split(p, 1, dim=-1)
     return torch.zeros_like(t)
 
 # 定义 PDE
@@ -48,34 +49,42 @@ def heat_equation(p: torch.Tensor, u):
     _, phi_xx = gradient(phi_x, p, create_graph=True, split=True)
     return phi_t - 0.1*phi_xx
 
-
 # 开始训练
-for epoch in range(1000):
+for epoch in range(1, 1001):
     optimizer.zero_grad()
-    mse_f = lm.loss(sampler, heat_equation)
-    mse_f.backward()
+    pts = sampler.run(1000)
+    output = heat_equation(pts, s)
+    loss = mse_fn(output, torch.zeros_like(output))
+    loss.backward()
     optimizer.step()
 
     if epoch % 100 == 0:
         with torch.no_grad():
-            print(f"Epoch: {epoch}| Loss: {mse_f.data}")
+            print(f"Epoch: {epoch}| Loss: {loss.item()}")
 
 
 ### Draw the result
 
+def exact_solution(p: Tensor):
+    t, x = torch.split(p, 1, dim=-1)
+    return exp(-0.1 * PI**2 * t) * sin(PI * x)
+
+
 from matplotlib import pyplot as plt
-from matplotlib import cm
-import numpy as np
 
-t = np.linspace(0, 1, 20, dtype=np.float32)
-x = np.linspace(0, 2, 20, dtype=np.float32)
+fig = plt.figure("PINN(with TFC) for the heat equation")
+axes = fig.add_subplot(121, projection='3d')
+s.add_surface(axes, box=[0, 1, 0, 2], nums=[100, 200])
+axes.set_title('solution')
+axes.set_xlabel('t')
+axes.set_ylabel('x')
+axes.set_zlabel('phi')
 
-phi, (mt, mx) = s.meshgrid_mapping(t, x)
+axes = fig.add_subplot(122)
+qm = s.diff(exact_solution).add_pcolor(axes, box=[0, 1, 0, 2], nums=[100, 200])
+fig.colorbar(qm)
+axes.set_title('bias')
+axes.set_xlabel('t')
+axes.set_ylabel('x')
 
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-ax.plot_surface(mt, mx, phi, cmap=cm.RdYlBu_r, edgecolor='blue', linewidth=0.0003, antialiased=True)
-ax.set_xlabel('t')
-ax.set_ylabel('x')
-ax.set_zlabel('phi')
 plt.show()
