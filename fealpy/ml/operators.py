@@ -62,9 +62,13 @@ class Form(Generic[_FS]):
         # of conditions may not match the number of samples.
         self.sources.append(b)
 
-    def get_matrix(self, rescale: Optional[float]=100.0):
+    def get_matrix(self, rescale: Optional[float]=1.0, op_idx=S):
         space = self.space
-        for i in range(len(self.samples)):
+        if isinstance(op_idx, int):
+            sub_list = [op_idx, ]
+        else:
+            sub_list = range(len(self.samples))[op_idx]
+        for i in sub_list:
             pts = self.samples[i]
             ops = self.operators[i]
             basis = reduce(torch.add, (op.assembly(pts, space) for op in ops))
@@ -77,14 +81,14 @@ class Form(Generic[_FS]):
                 yield basis, src * ratio
 
     @overload
-    def assembly(self, *, rescale: Optional[float]=100.0) -> Tuple[csr_matrix, csr_matrix]: ...
+    def assembly(self, *, rescale: Optional[float]=1.0) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
-    def assembly(self, *, rescale: Optional[float]=100.0,
+    def assembly(self, *, rescale: Optional[float]=1.0,
                  return_sparse: Literal[True]=True) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
-    def assembly(self, *, rescale: Optional[float]=100.0,
+    def assembly(self, *, rescale: Optional[float]=1.0,
                  return_sparse: Literal[False]=False) -> Tuple[Tensor, Tensor]: ...
-    def assembly(self, *, rescale: Optional[float]=100.0, return_sparse=True):
+    def assembly(self, *, rescale: Optional[float]=1.0, return_sparse=True):
         """
         @brief Assemble linear equations for the least-square problem.
 
@@ -110,18 +114,28 @@ class Form(Generic[_FS]):
             return csr_matrix(A.detach().cpu()), csr_matrix(b.detach().cpu())
         return A, b
 
-    def spsolve(self, *, rescale: Optional[float]=100.0):
-        A_, b_ = self.assembly(rescale=rescale)
+    def spsolve(self, *, rescale: Optional[float]=1.0, ridge: Optional[float]=None):
+        A_, b_ = self.assembly(rescale=rescale, return_sparse=False)
+        if ridge is not None:
+            assert ridge >= 0.0
+            A_ += torch.eye(A_.shape[0], dtype=A_.dtype, device=A_.device) * ridge
+        A_ = csr_matrix(A_)
+        b_ = csr_matrix(b_)
         um = spsolve(A_, b_)
         return self.space.function(torch.from_numpy(um))
 
-    def residual(self, um: Tensor, rescale: Optional[float]=None):
+    def residual(self, um: Tensor, op_index=S, rescale: Optional[float]=None):
         ress: List[Tensor] = []
-        for basis, src in self.get_matrix(rescale):
+        for basis, src in self.get_matrix(rescale, op_idx=op_index):
             if um.ndim == 1:
                 src.squeeze_(-1)
             ress.append(basis@um - src)
         return torch.cat(ress, dim=0)
+
+    def sample(self, op_idx=S):
+        in_feature = self.samples[0].shape[-1]
+        data = [s.reshape(-1, in_feature) for s in self.samples[op_idx]]
+        return torch.cat(data, dim=0)
 
 
 ### Operators
