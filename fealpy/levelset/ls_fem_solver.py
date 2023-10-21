@@ -3,9 +3,11 @@ import numpy as np
 from ..fem import BilinearForm
 from ..fem import ScalarConvectionIntegrator
 from ..fem import ScalarMassIntegrator
-from scipy.sparse.linalg import lgmres
 
 from .ls_solver import LSSolver
+
+from scipy.sparse.linalg import lgmres
+
 
 class IterationCounter(object):
     def __init__(self, disp=True):
@@ -41,15 +43,16 @@ class LSFEMSolver(LSSolver):
             bform = BilinearForm(space)
             bform.add_domain_integrator(ScalarConvectionIntegrator(c = u))
             C = bform.assembly()
-        A = M + C 
-        b = M@phi0 - C@phi0
+        A = M + (dt/2) * C 
+        b = M @ phi0 - (dt/2) * C @ phi0
 
-        x, info = lgmres(self.A, b, tol=tol, callback=counter)
+        counter = IterationCounter(disp = False)
+        x, info = lgmres(A, b, tol = tol, callback = counter)
         print("Convergence info:", info)
         print("Number of iteration of gmres:", counter.niter)
         return x
 
-    def reinit(self, phi0):
+    def reinit(self):
         """
         @brief 重新初始化水平集函数为符号距离函数
         """
