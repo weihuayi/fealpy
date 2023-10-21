@@ -71,10 +71,10 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
 
         K *=(c/l**3)[:, np.newaxis, np.newaxis]
 
-        print("局部坐标系下的单元刚度矩阵 K:\n", K)
+        # print("局部坐标系下的单元刚度矩阵 K:\n", K)
 
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切矢量
-        print("单元的单位切矢量 tan:\n", tan)
+        # print("单元的单位切矢量 tan:\n", tan)
         C = tan[:, 0]
 
         T = np.zeros((NC, GD*ldof, GD*ldof))
@@ -83,7 +83,7 @@ class EulerBernoulliCantileverBeamStructureIntegrator:
         T[:, 1, 1] = 1
         T[:, 2, 2] = 1/C
         T[:, 3, 3] = 1
-        print("单元的坐标变换矩阵T:\n", T)
+        # print("单元的坐标变换矩阵T:\n", T)
 
         K[:] = np.einsum('nki, nkj, njl -> nil', T, K, T)
 
@@ -142,7 +142,7 @@ class EulerBernoulliBeamStructureIntegrator:
             K = out
 
         K0 = c0/(l)[:, np.newaxis, np.newaxis] * np.array([[1, -1], [-1, 1]])
-        print("轴向刚度矩阵 K0:", K0.shape)
+        # print("轴向刚度矩阵 K0:", K0.shape)
         # print("K0:\n", K0)
 
         K1 = np.zeros((NC, GD*2, GD*2), dtype=np.float64)
@@ -167,7 +167,7 @@ class EulerBernoulliBeamStructureIntegrator:
 
         K1 *= (c1/l**3)[:, np.newaxis, np.newaxis]
 
-        print("弯曲刚度矩阵 K1:", K1.shape)
+        # print("弯曲刚度矩阵 K1:", K1.shape)
         # print("K1:\n", K1)
 
         # 使用 K0 填充对应的位置
@@ -182,11 +182,11 @@ class EulerBernoulliBeamStructureIntegrator:
         K[:, 4:6, 1:3] = K1[:, 2:4, 0:2]
         K[:, 4:6, 4:6] = K1[:, 2:4, 2:4]
 
-        print("局部坐标系下的单元刚度矩阵 K_shape:", K.shape)
-        print("K:\n", K)
+        # print("局部坐标系下的单元刚度矩阵 K_shape:", K.shape)
+        # print("K:\n", K)
 
         tan = mesh.cell_unit_tangent(index=index) # 计算单元的单位切向矢量（即轴线方向余弦）
-        print("tan_shape:", tan.shape, tan)
+        # print("tan_shape:", tan.shape, tan)
         C, S = tan[:, 0], tan[:, 1]
 
         T = np.zeros((NC, GD*ldof, GD*ldof))
@@ -202,7 +202,7 @@ class EulerBernoulliBeamStructureIntegrator:
         T[:, 4, 4] = C
         T[:, 5, 5] = 1
 
-        print("单元的坐标变换矩阵 T_shape:", T.shape)
+        # print("单元的坐标变换矩阵 T_shape:", T.shape)
 
         K[:] = np.einsum('nki, nkj, njl -> nil', T, K, T)
 
