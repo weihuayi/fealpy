@@ -17,7 +17,7 @@ class CantileveredSimplySupportedBeam():
     def __init__(self):
         self.I = 1.186e-4 # Moment of Inertia - m^4
         self.A = 6650e-6 # Cross-sectional area - m^2
-        self.E = 200e9 # Elastic Modulus-newton - m^2
+        self.E = 200e9 # Elastic Modulus newton - m^2
 
     def init_mesh(self):
         mesh = EdgeMesh.generate_cantilevered_mesh()
