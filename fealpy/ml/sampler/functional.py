@@ -56,18 +56,25 @@ def linspace_weights(p: int, n: int, dtype=float64, device=None) -> Tensor:
 
 
 def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
-                order: Optional[Sequence[int]]=None) -> Tensor:
+             order: Optional[Sequence[int]]=None,
+             dtype=float64, device=None) -> Tensor:
     """
     @brief Multiply bcs in different directions.
 
     @param *bcs: NDArray. Bcs operands for multiplying.
     @param mode: 'dot' or 'cross'.
     @param order: Sequence[int] | None.
+    @param dtype: the default data type, for the output tensor([[1.]]) if no\
+           `bcs` provided.
+    @param device: the default device, for the output tensor([[1.]]) if no `bcs`\
+           provided. `dtype` and `device` will be ignored if there are any `bcs`.
 
     @return: NDArray.
     """
     D = len(bcs)
     assert D <= 5
+    if D == 0:
+        return torch.ones((1, 1), dtype=dtype, device=device)
     NVC = reduce(lambda x,y: x*y, (bc.shape[-1] for bc in bcs), 1)
     desp1 = 'mnopq'
     desp2 = 'abcde'

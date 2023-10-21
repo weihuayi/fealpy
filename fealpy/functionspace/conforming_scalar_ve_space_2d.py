@@ -20,8 +20,8 @@ class CSVEDof2d():
         idx = self.mesh.ds.boundary_edge_index()
         if threshold is not None:
             bc = self.mesh.entity_barycenter('edge', index=idx)
-            flag = threshold(bc)
-            idx  = idx[flag]
+            idx = threshold(bc)
+            #idx  = idx[flag]
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()

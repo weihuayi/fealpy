@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy import ndimage
-from scipy.sparse.linalg import eigs
 from scipy.sparse import lil_matrix, csc_matrix
 from scipy.sparse.linalg import spsolve
 from scipy.signal import convolve2d
@@ -133,13 +132,7 @@ class TopLevelSet:
         shapeSens_smoothed[-1, key_positions] = 0
         topSens_smoothed[-1, key_positions] = 0
 
-        #if iterNum == 1:
-        #    plt.figure(figsize=(8, 5))
-        #    plt.imshow(shapeSens_smoothed, cmap="viridis")
-        #    plt.colorbar()
-        #    plt.title(f"Smoothed shapeSens at iteration {iterNum + 1}")
-        #    plt.show()
-
+        print("lsf:", lsf.shape)
         struc, lsf = self.evolve(-shapeSens_smoothed, topSens_smoothed*(lsf[1:-1, 1:-1] < 0), lsf, stepLength, topWeight)
 
         return struc, lsf
@@ -191,12 +184,6 @@ class TopLevelSet:
             shapeSens = shapeSens + la + 1/La * (volCurr - volReq)
             topSens = topSens - np.pi * ( la + 1/La * (volCurr - volReq) )
 
-            #if iterNum == 1:
-            #    plt.figure(figsize=(8, 5))
-            #    plt.imshow(shapeSens, cmap="viridis")
-            #    plt.colorbar()
-            #    plt.title(f"Original shapeSens at iteration {iterNum + 1}")
-
             struc, lsf = self.updateStep(iterNum, lsf, shapeSens, topSens, stepLength, topWeight)
 
             if iterNum % numReinit == 0:
@@ -216,4 +203,4 @@ class TopLevelSet:
 
 
 tls = TopLevelSet()
-print(tls.optimize(Num = 200))
+print(tls.optimize(Num = 2))
