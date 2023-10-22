@@ -1,7 +1,9 @@
 
-from typing import Generic, TypeVar
 from functools import reduce
-from typing import Union, Tuple, Sequence, List, overload, Literal, Optional
+from typing import (
+    List, Union, Tuple, Sequence, Literal, Optional, Generator,
+    Generic, TypeVar, overload
+)
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
@@ -9,12 +11,13 @@ from scipy.sparse.linalg import spsolve
 from fealpy.ml.modules import Function, FunctionSpace, PoUSpace
 from .nntyping import TensorFunction, S
 from .modules import FunctionSpace, Function
+from . import solvertools as ST
 
 FuncOrTensor = Union[TensorFunction, Tensor, list, tuple]
 FuncOrNumber = Union[TensorFunction, Tensor, float, int]
 FuncOrTensorLike = Union[FuncOrNumber, FuncOrTensor]
 
-def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensorLike], gd=1):
+def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensorLike]):
     if callable(func_or_tensor):
         func_or_tensor = func_or_tensor(sample)
     if func_or_tensor is None:
@@ -62,7 +65,7 @@ class Form(Generic[_FS]):
         # of conditions may not match the number of samples.
         self.sources.append(b)
 
-    def get_matrix(self, rescale: Optional[float]=1.0, op_idx=S):
+    def apply_all(self, op_idx=S) -> Generator[Tuple[Tensor, Tensor], None, None]:
         space = self.space
         if isinstance(op_idx, int):
             sub_list = [op_idx, ]
@@ -71,14 +74,9 @@ class Form(Generic[_FS]):
         for i in sub_list:
             pts = self.samples[i]
             ops = self.operators[i]
-            basis = reduce(torch.add, (op.assembly(pts, space) for op in ops))
+            basis = reduce(torch.add, (op.apply(pts, space) for op in ops))
             src = self.sources[i].broadcast_to(basis.shape[0], self.gd)
-            if rescale is None:
-                yield basis, src
-            else:
-                ratio = rescale / (basis.abs().max(dim=-1, keepdim=True)[0] + 1e-4)
-                basis *= ratio
-                yield basis, src * ratio
+            yield basis, src
 
     @overload
     def assembly(self, *, rescale: Optional[float]=1.0) -> Tuple[csr_matrix, csr_matrix]: ...
@@ -106,9 +104,14 @@ class Form(Generic[_FS]):
         A = torch.zeros((NF, NF), dtype=space.dtype, device=space.device)
         b = torch.zeros(bshape, dtype=space.dtype, device=space.device)
 
-        for basis, src in self.get_matrix(rescale):
-            A[:] += basis.T@basis
-            b[:] += basis.T@src
+        for phi, src in self.apply_all():
+            if rescale is not None:
+                # NOTE: `src` may be from broadcasting, so we clone the `src`
+                # to avoid inplace operations. While `phi` is calculated by
+                # basis in a space, so it can support inplace operation.
+                phi, src = ST.rescale(phi, src.clone(), rescale)
+            A[:] += phi.T@phi
+            b[:] += phi.T@src
 
         if return_sparse:
             return csr_matrix(A.detach().cpu()), csr_matrix(b.detach().cpu())
@@ -117,16 +120,15 @@ class Form(Generic[_FS]):
     def spsolve(self, *, rescale: Optional[float]=1.0, ridge: Optional[float]=None):
         A_, b_ = self.assembly(rescale=rescale, return_sparse=False)
         if ridge is not None:
-            assert ridge >= 0.0
-            A_ += torch.eye(A_.shape[0], dtype=A_.dtype, device=A_.device) * ridge
+            ST.ridge(A_, ridge)
         A_ = csr_matrix(A_)
         b_ = csr_matrix(b_)
         um = spsolve(A_, b_)
         return self.space.function(torch.from_numpy(um))
 
-    def residual(self, um: Tensor, op_index=S, rescale: Optional[float]=None):
+    def residual(self, um: Tensor, op_index=S):
         ress: List[Tensor] = []
-        for basis, src in self.get_matrix(rescale, op_idx=op_index):
+        for basis, src in self.apply_all(op_idx=op_index):
             if um.ndim == 1:
                 src.squeeze_(-1)
             ress.append(basis@um - src)
@@ -148,11 +150,17 @@ class Operator():
     def __call__(self, func) -> TensorFunction:
         raise NotImplementedError
 
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         """
-        @brief Assemble matrix for a function space, with shape (N, nf, ...).
+        @brief Apply to a function space, and return with shape (N, nf, ...).
 
         @note: Return shape is (N, nf) for `ScalerOperator`.
+        """
+        raise NotImplementedError
+
+    def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        """
+        @brief Assemble matrix for weak form, and return with shape (nf, nf).
         """
         raise NotImplementedError
 
@@ -164,7 +172,7 @@ class ScalerOperator(Operator):
         um = func.um
         keepdim = func.keepdim
         def new_func(p: Tensor):
-            basis = self.assembly(p, space)
+            basis = self.apply(p, space)
             if um.ndim == 1:
                 ret = torch.einsum("...f, f -> ...", basis, um)
                 return ret.unsqueeze(-1) if keepdim else ret
@@ -185,11 +193,17 @@ class ScalerDiffusion(ScalerOperator):
         super().__init__()
         self.coef = coef
 
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S):
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S):
         if self.coef is None:
             return -space.laplace_basis(p, index=index)
         coef = _to_tensor(p, self.coef)
         return -space.laplace_basis(p, index=index) * coef
+
+    def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        gphi = space.grad_basis(p, index=index)
+        N = p.shape[0]
+        coef = _to_tensor(p, self.coef).broadcast_to((N, ))
+        return torch.einsum('ngd, nfd, n -> gf', gphi, gphi, coef)
 
 
 class ScalerConvection(ScalerOperator):
@@ -207,9 +221,16 @@ class ScalerConvection(ScalerOperator):
         super().__init__()
         self.coef = coef
 
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S):
-        coef = _to_tensor(p, self.coef, gd=p.shape[-1])
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S):
+        coef = _to_tensor(p, self.coef)
         return space.convect_basis(p, coef=coef, index=index)
+
+    def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        phi = space.basis(p, index=index)
+        gphi = space.grad_basis(p, index=index)
+        N, gd = p.shape
+        coef = _to_tensor(p, self.coef).broadcast_to(N, gd)
+        return torch.einsum('ngd, nf, nd -> gf', gphi, phi, coef)
 
 
 class ScalerMass(ScalerOperator):
@@ -225,11 +246,17 @@ class ScalerMass(ScalerOperator):
         super().__init__()
         self.coef = coef
 
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S):
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S):
         if self.coef is None:
             return space.basis(p, index=index)
         coef = _to_tensor(p, self.coef)
         return space.basis(p, index=index) * coef
+
+    def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        phi = space.basis(p, index=index)
+        N = p.shape[0]
+        coef = _to_tensor(p, self.coef).broadcast_to((N, ))
+        return torch.einsum('ng, nf, n -> gf', phi, phi, coef)
 
 
 class Integrator(ScalerOperator):
@@ -239,7 +266,7 @@ class Integrator(ScalerOperator):
         """
         super().__init__()
 
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         basis = space.basis(p, index=index)
         return torch.mean(basis, dim=0, keepdim=True)
 
@@ -255,7 +282,7 @@ class ContinuousOperator(ScalerOperator):
 
 
 class Continuous0(ContinuousOperator):
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         if not isinstance(space, PoUSpace):
             raise TypeError("Continuous0 is designed for PoUSpace, but applied "
                             f"to {space.__class__.__name__}.")
@@ -283,7 +310,7 @@ class Continuous0(ContinuousOperator):
 
 
 class Continuous1(ContinuousOperator):
-    def assembly(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+    def apply(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         if not isinstance(space, PoUSpace):
             raise TypeError("Continuous1 is designed for PoUSpace, but applied "
                             f"to {space.__class__.__name__}.")
@@ -316,3 +343,44 @@ class Continuous1(ContinuousOperator):
             right_data = torch.swapdims(grad, 1, 2).reshape(-1, NPBR)
             data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_r] = -right_data
         return data
+
+
+### Sources
+
+class Source():
+    """Abstract base class of Source."""
+    def __init__(self, source: FuncOrNumber) -> None:
+        super().__init__()
+        self.source = source
+
+    def __hash__(self):
+        return id(self)
+
+    def apply(self, p: Tensor) -> Tensor:
+        """
+        @brief Apply the source function to samples. The result will be broadcasted\
+               to (N, #out), where '#out' is the output dimension of the source.\
+               For 0-d and 1-d source Tensors, broadcasts to (N, 1).
+        """
+        ret = _to_tensor(p, self.source)
+        if ret.ndim <= 1:
+            N = p.shape[0]
+            return ret.broadcast_to(N, 1)
+        return ret
+
+    __call__ = apply
+
+    def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        """
+        @brief Assemble matrix for weak form, and return with shape (nf, #out).\
+               Where '#out' is the output dimension of the source.
+        """
+        raise NotImplementedError
+
+# NOTE: 'scaler' here means the basis in space are scaler basis. The source
+# function may not be scaler.
+class ScalerSource(Source):
+    def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
+        phi = space.basis(p, index=index)
+        src = self.apply(p)
+        return torch.einsum('ng, n... -> g...', phi, src)
