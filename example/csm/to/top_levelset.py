@@ -1,9 +1,7 @@
 import numpy as np
-
 import matplotlib.pyplot as plt
 
 from scipy import ndimage
-
 from scipy.sparse import lil_matrix, csc_matrix
 from scipy.sparse.linalg import spsolve
 from scipy.signal import convolve2d
@@ -87,9 +85,10 @@ class TopLevelSet:
 
         F[2 * (round(nelx/2)+1) * (nely+1) - 1] = 1
         
-        fixeddofs = list( range( 2*(nely+1)-2, 2*(nely+1) ) ) + list( range( 2*(nelx+1)*(nely+1)-2, 2*(nelx+1)*(nely+1) ) )
-        alldofs = list( range( 2*(nely+1)*(nelx+1) ) )
-        freedofs = list( set(alldofs) - set(fixeddofs) )
+        fixeddofs = np.concatenate( [np.arange( 2*(nely+1)-2, 2*(nely+1) ), 
+                                np.arange( 2*(nelx+1)*(nely+1)-2, 2*(nelx+1)*(nely+1) )] )
+        alldofs = np.arange( 2*(nely+1)*(nelx+1) )
+        freedofs = np.setdiff1d(alldofs, fixeddofs)
 
         U[freedofs] = spsolve(csc_matrix(K[np.ix_(freedofs, freedofs)]), F[freedofs])
 
@@ -100,12 +99,11 @@ class TopLevelSet:
         gFull = np.pad(g, ((1,1),(1,1)), mode='constant', constant_values=0)
 
         dt = 0.1 / np.max(np.abs(v))
-
         for _ in range(int(10 * stepLength)):
-            dpx = np.roll(lsf, shift=-1, axis=1) - lsf
-            dmx = lsf - np.roll(lsf, shift=1, axis=1)
-            dpy = np.roll(lsf, shift=-1, axis=0) - lsf
-            dmy = lsf - np.roll(lsf, shift=1, axis=0)
+            dpx = np.roll(lsf, shift=(0, -1), axis=(0, 1)) - lsf
+            dmx = lsf - np.roll(lsf, shift=(0, 1), axis=(0, 1))
+            dpy = np.roll(lsf, shift=(-1, 0), axis=(0, 1)) - lsf
+            dmy = lsf - np.roll(lsf, shift=(1, 0), axis=(0, 1))
             
             lsf = lsf - dt * np.minimum(vFull, 0) * np.sqrt( np.minimum(dmx, 0)**2 + np.maximum(dpx, 0)**2 + np.minimum(dmy, 0)**2 + np.maximum(dpy, 0)**2 ) \
                     - dt * np.maximum(vFull, 0) * np.sqrt( np.maximum(dmx, 0)**2 + np.minimum(dpx, 0)**2 + np.maximum(dmy, 0)**2 + np.minimum(dpy, 0)**2 ) \
@@ -116,7 +114,7 @@ class TopLevelSet:
         
         return struc, lsf
 
-    def updateStep(self, lsf, shapeSens, topSens, stepLength, topWeight):
+    def updateStep(self, iterNum, lsf, shapeSens, topSens, stepLength, topWeight):
         kernel = 1/6 * np.array([[0, 1, 0], 
                                 [1, 2, 1], 
                                 [0, 1, 0]])
@@ -128,10 +126,14 @@ class TopLevelSet:
         shapeSens_smoothed = convolve2d(shapeSens_padded, kernel, mode='valid')
         topSens_smoothed = convolve2d(topSens_padded, kernel, mode='valid')
 
-        shapeSens_smoothed[-1, [0, round((shapeSens_smoothed.shape[1]-1)/2), round((shapeSens_smoothed.shape[1]-1)/2) + 1, -1]] = 0
-        topSens_smoothed[-1, [0, round((topSens_smoothed.shape[1]-1)/2), round((topSens_smoothed.shape[1]-1)/2) + 1, -1]] = 0
+        # Load bearing pixels must remain solid - Bridge
+        key_positions = [0, round((shapeSens_smoothed.shape[1]-1)/2), round((shapeSens_smoothed.shape[1]-1)/2) + 1, -1]
 
-        struc, lsf = self.evolve(-shapeSens_smoothed, topSens_smoothed * (lsf[1:-1, 1:-1] < 0), lsf, stepLength, topWeight)
+        shapeSens_smoothed[-1, key_positions] = 0
+        topSens_smoothed[-1, key_positions] = 0
+
+        print("lsf:", lsf.shape)
+        struc, lsf = self.evolve(-shapeSens_smoothed, topSens_smoothed*(lsf[1:-1, 1:-1] < 0), lsf, stepLength, topWeight)
 
         return struc, lsf
 
@@ -159,7 +161,7 @@ class TopLevelSet:
                 for ely in range(nely):
                     n1 = (nely + 1) * elx + ely
                     n2 = (nely + 1) * (elx + 1) + ely
-                    Ue = U[np.array([2 * n1, 2 * n1 + 1, 2 * n2, 2 * n2 + 1, 2 * n2 + 2, 2 * n2 + 3, 2 * n1 + 2, 2 * n1 + 3])]
+                    Ue = U[np.array([2*n1, 2*n1+1, 2*n2, 2*n2+1, 2*n2+2, 2*n2+3, 2*n1+2, 2*n1+3])]
 
                     shapeSens[ely, elx] = -max(struc[ely, elx], 0.0001) * Ue.T @ KE @ Ue
                     
@@ -168,22 +170,6 @@ class TopLevelSet:
                     additional_term = (lambda_ - mu) * Ue.T @ KTr @ Ue
                     topSens[ely, elx] = struc[ely, elx] * coeff * UeT_KE_Ue * (UeT_KE_Ue + additional_term)
 
-            # print("shapeSens:\n", shapeSens.round(4))
-            # print("topSens:\n", topSens.round(4))
-
-            #plt.figure(figsize=(10,5))
-            #plt.subplot(1,2,1)
-            #plt.imshow(shapeSens, cmap='coolwarm')
-            #plt.title('Shape Sensitivity')
-            #plt.colorbar()
-
-            #plt.subplot(1,2,2)
-            #plt.imshow(topSens, cmap='coolwarm')
-            #plt.title('Topology Sensitivity')
-            #plt.colorbar()
-
-            #plt.tight_layout()
-            #plt.show()
 
             objective[iterNum] = -np.sum(shapeSens)
             volCurr = np.sum(struc) / (nelx * nely)
@@ -198,26 +184,23 @@ class TopLevelSet:
             shapeSens = shapeSens + la + 1/La * (volCurr - volReq)
             topSens = topSens - np.pi * ( la + 1/La * (volCurr - volReq) )
 
-            struc, lsf = self.updateStep(lsf, shapeSens, topSens, stepLength, topWeight)
+            struc, lsf = self.updateStep(iterNum, lsf, shapeSens, topSens, stepLength, topWeight)
 
             if iterNum % numReinit == 0:
                 lsf = self.reinit(struc)
         
             print(f'Iter: {iterNum+1}, Compliance.: {objective[iterNum]:.4f}, Volfrac.: {volCurr:.3f}, la: {la:.3f}, La: {La:.3f}')
 
-            #plt.imshow(-struc, cmap='gray', vmin=-1, vmax=0)
-            #plt.axis('off')
-            #plt.axis('equal')
-            #plt.draw()
-            #plt.pause(1e-5)
+            plt.imshow(-struc, cmap='gray', vmin=-1, vmax=0)
+            plt.axis('off')
+            plt.axis('equal')
+            plt.draw()
+            plt.pause(1e-5)
 
-        #plt.ioff()
-        #plt.show()
+        plt.ioff()
+        plt.show()
 
 
 
 tls = TopLevelSet()
-print(tls.optimize(Num = 1))
-# print(test_reinit)
-# test_u = tls.FE(tls._struc, tls.KE)
-# print(test_u)
+print(tls.optimize(Num = 2))

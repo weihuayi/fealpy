@@ -50,7 +50,6 @@ class ScalarDiffusionIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
-
             if np.isscalar(coef):
                 D += coef*np.einsum('q, qcid, qcjd, c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
