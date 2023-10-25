@@ -950,7 +950,7 @@ class TriangleMesh(Mesh, Plotable):
                         bcr[:, 0] = bc[:, 2]
                         bcr[:, 1] = 1/2*bc[:, 0]
                         bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
-
+                        
                         value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
 
                         phi = self.shape_function(bcr, p=p)

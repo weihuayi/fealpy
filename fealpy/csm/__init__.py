@@ -1,1 +1,3 @@
-from .fracture_damage_integrator import fracture_damage_integrator
+from .fracture_damage_integrator import spectral_decomposition_integrator
+from .fracture_damage_integrator import volume_bias_strain_decomposition_integrator
+from .afem_phase_field_crack_propagation_problem_2d import AFEMPhaseFieldCrackPropagationProblem2d

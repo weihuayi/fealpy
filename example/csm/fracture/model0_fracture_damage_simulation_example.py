@@ -5,6 +5,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix, bmat, spdiags
 
 from fealpy.mesh import TriangleMesh 
+from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 from fealpy.geometry import SquareWithCircleHoleDomain
 
 from fealpy.csm import fracture_damage_integrator
@@ -78,6 +79,7 @@ model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
 mesh = TriangleMesh.from_domain_distmesh(domain, 0.03, maxit=100)
+mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
@@ -125,6 +127,8 @@ for i in range(len(disp)-1):
         ubform.assembly()
         A0 = ubform.get_matrix()
         R0 = -A0@uh.flat[:]
+        
+        force[i+1] = np.sum(-R0[isTDof])
         
         ubc = DirichletBC(vspace, 0, threshold=model.is_inter_boundary)
         A0, R0 = ubc.apply(A0, R0)
@@ -190,12 +194,22 @@ for i in range(len(disp)-1):
     fname = 'test' + str(i).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
 
+
 fig = plt.figure()
 axes = fig.add_subplot(111)
 NN = mesh.number_of_nodes()
-mesh.node += uh[:, :NN].T
+mesh.node += uh[:, :NN]
 mesh.add_plot(axes)
-plt.show()
+#plt.show()
+
+plt.figure()
+plt.plot(disp, force, label='Force')
+plt.xlabel('disp')
+plt.ylabel('Force')
+plt.grid(True)
+plt.legend()
+plt.savefig('model0_force.png', dpi=300)
+#plt.show()
 
 plt.figure()
 plt.plot(disp, stored_energy, label='stored_energy')
@@ -205,5 +219,7 @@ plt.xlabel('disp')
 plt.ylabel('energy')
 plt.grid(True)
 plt.legend()
+plt.savefig('model0_energy.png', dpi=300)
 plt.show()
+
 

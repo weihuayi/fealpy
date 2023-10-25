@@ -11,18 +11,8 @@ from ..decorator import barycentric
 
 from .ls_solver import LSSolver
 
-from scipy.sparse.linalg import lgmres
 from scipy.sparse.linalg import spsolve
 
-
-class IterationCounter(object):
-    def __init__(self, disp=True):
-        self._disp = disp
-        self.niter = 0
-    def __call__(self, rk=None):
-        self.niter += 1
-        if self._disp:
-            print('iter %3i' % (self.niter))
 
 class LSFEMSolver(LSSolver):
     def __init__(self, space, u=None):
@@ -52,10 +42,8 @@ class LSFEMSolver(LSSolver):
         A = M + (dt/2) * C 
         b = M @ phi0 - (dt/2) * C @ phi0
 
-        counter = IterationCounter(disp = False)
-        phi0, info = lgmres(A, b, tol = tol, callback = counter)
-        # print("Convergence info:", info)
-        # print("Number of iteration of gmres:", counter.niter)
+        phi0 = self.solve_system(A, b, tol = tol)
+
         return phi0
 
     def reinit(self, phi0, dt = 0.0001, eps = 5e-6, nt = 4, alpha = None):
