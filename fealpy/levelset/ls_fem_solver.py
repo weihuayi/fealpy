@@ -54,18 +54,21 @@ class LSFEMSolver(LSSolver):
 
         counter = IterationCounter(disp = False)
         phi0, info = lgmres(A, b, tol = tol, callback = counter)
-        print("Convergence info:", info)
-        print("Number of iteration of gmres:", counter.niter)
+        # print("Convergence info:", info)
+        # print("Number of iteration of gmres:", counter.niter)
         return phi0
 
-    def reinit(self, phi0, cellscale, dt = 0.0001, eps = 5e-6, nt = 4, alpha = None):
-        """
-        @brief 重新初始化水平集函数为符号距离函数
-        """
+    def reinit(self, phi0, dt = 0.0001, eps = 5e-6, nt = 4, alpha = None):
+        '''
+        TODO wrong!
+        '''
+        space = self.space
+        mesh = space.mesh
+
+        cellscale = np.max(mesh.entity_measure('cell'))
         if alpha is None:
             alpha = 0.0625*cellscale
 
-        space = self.space
         phi1 = space.function()
         phi1[:] = phi0
         phi2 = space.function()
@@ -81,15 +84,15 @@ class LSFEMSolver(LSSolver):
         for _ in range(nt):
 
             @barycentric
-            def f(bcs):
+            def f(bcs, index):
                 grad = phi1.grad_value(bcs)
                 val = 1 - np.sqrt(np.sum(grad**2, -1))
                 val *= np.sign(phi0(bcs))
                 return val
             
-            LF = LinearForm(space)
-            LF.add_domain_integrator( ScalarSourceIntegrator(f = f) )
-            b0 = LF.assembly()
+            lform = LinearForm(space)
+            lform.add_domain_integrator( ScalarSourceIntegrator(f = f) )
+            b0 = lform.assembly()
             b = M @ phi1 + dt * b0 - dt * alpha * (S @ phi1)
 
             phi2[:] = spsolve(M, b)
