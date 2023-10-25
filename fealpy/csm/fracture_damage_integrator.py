@@ -1,6 +1,6 @@
 import numpy as np
 
-class fracture_damage_integrator():
+class spectral_decomposition_integrator():
     def __init__(self, mesh, lam=121.15, mu=80.77, Gc=2.7e-3, l0=0.015):
         self.lam = lam
         self.mu = mu
@@ -188,5 +188,17 @@ class fracture_damage_integrator():
         val = c0*psi_s
         stored = np.dot(val, cm)
         return stored
+
+class volume_bias_strain_decomposition_integrator():
+    def __init__(self, mesh, lam=121.15, mu=80.77, Gc=2.7e-3, l0=0.015):
+        self.lam = lam
+        self.mu = mu
+        self.Gc = Gc
+        self.l0 = l0
+        
+        self.mesh = mesh
+        
+
+
 
 
