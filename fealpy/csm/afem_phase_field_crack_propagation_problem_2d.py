@@ -23,8 +23,11 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
         self.uh = self.space.function(dim=2)
         self.d = self.space.function()
         self.H = np.zeros(NC)
-
+        
+        node = mesh.entity('node')
         # 初始化 self.uh
+        isDB = model.is_disp_boundary(node)
+        DD = model.is_disp_direction()
 
         self.index = np.array([
             (0, 0, 0, 0, 0, 0),
