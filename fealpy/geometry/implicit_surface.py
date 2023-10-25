@@ -125,7 +125,7 @@ class SphereSurface():
                 [4,11, 9],
                 [8, 4, 9],
                 [5, 7,11],
-                [10,9,11]], dtype=np.int)
+                [10,9,11]], dtype=np.int_)
             node, d = self.project(node)
             if returnnc:
                 return node, cell
