@@ -22,35 +22,25 @@ space = LagrangeFESpace(mesh, p=p)
 ipoint = mesh.interpolation_points(p=p)
 u = space.function()
 u[:] = dis(ipoint)
-NC = mesh.number_of_cells()
-H = np.zeros(NC, dtype=np.float64)
-
-cell = mesh.entity(etype=2)
-H = np.sum(u[:][cell], axis=-1)
 
 mesh.nodedata['uh'] = u
-mesh.celldata['h'] = H
 fname = 'test0.vtu'
 mesh.to_vtk(fname=fname)
 
 cell2dof = mesh.cell_to_ipoint(p=p)
 
 isMarkedCell = np.abs(np.sum(u[cell2dof], axis=-1))>1.5
-data = {'uh':u, 'H':H}
+data = {'uh':u[cell2dof]}
 option = mesh.bisect_options(disp=False, data=data)
 mesh.bisect(isMarkedCell, options=option)
 
 space = LagrangeFESpace(mesh, p=p)
 cell2dof = space.cell_to_dof()
 u = space.function()
-NC = mesh.number_of_cells()
-H = np.zeros(NC, dtype=np.float64)
 
-u = option['data']['uh']
-H = option['data']['H']
+u[cell2dof] = option['data']['uh']
 
 mesh.nodedata['uh'] = u
-mesh.celldata['h'] = H
 fname = 'test1.vtu'
 mesh.to_vtk(fname=fname)
 
