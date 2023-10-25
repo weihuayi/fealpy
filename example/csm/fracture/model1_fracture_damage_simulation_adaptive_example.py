@@ -8,7 +8,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.geometry import SquareWithCircleHoleDomain
 
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.csm import fracture_damage_integrator
+from fealpy.csm import spectral_decomposition_integrator as fracture_damage_integrator
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 
