@@ -282,7 +282,7 @@ class MeshSampler(Sampler):
         self.node = self.node.reshape(-1, self.nd)
         try:
             if etype == 'node':
-                self.cell = torch.arange(self.node.shape[0]).unsqueeze(-1)
+                self.cell = torch.arange(self.node.shape[0])[index].unsqueeze(-1)
             else:
                 self.cell = torch.tensor(mesh.entity(etype, index=index), device=device)
         except TypeError:
