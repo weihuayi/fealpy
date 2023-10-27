@@ -2455,6 +2455,24 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
+    def from_interface_cut_box_tri(cls, interface, box, nx=10, ny=10,
+            keep_feature=False):
+        """
+        @brief 生成界面网格, 要求每个单元与界面只能交两个点或者不想交。
+            步骤为:
+                1. 生成笛卡尔网格
+                2. 找到相交的半边
+                3. 加密相交的半边
+                4. 找到新生成的半边
+                5. 对新生成的半边添加下一条半边或上一条半边
+        @note : 1. 每个单元与界面只能交两个点或者不相交
+                2. 相交的单元会被分为两个单元，界面内部的单元将继承原来单元的编号
+        """
+        from .interface_mesh_generator import find_cut_point, interfacemesh2d
+        return cls.from_mesh(interfacemesh2d(box, interface, nx, ny))
+
+    ## @ingroup MeshGenerators
+    @classmethod
     def from_interface_cut_box(cls, interface, box, nx=10, ny=10,
             keep_feature=False):
         """

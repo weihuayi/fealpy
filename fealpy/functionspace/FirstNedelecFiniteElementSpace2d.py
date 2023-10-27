@@ -488,6 +488,8 @@ class FirstNedelecFiniteElementSpace2d:
         t = mesh.edge_unit_tangent(index=index)
         ps = mesh.bc_to_point(bcs, index=index)
         val = gD(ps, t) # (NQ, NBE)
+        if len(val.shape)==3:
+            val = np.einsum('...ed, ed->...e', val, t)
 
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()
