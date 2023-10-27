@@ -6,7 +6,7 @@ from torch import Tensor
 
 from ..nntyping import TensorFunction
 from ..tools import mkfs
-from .module import Solution, Projected
+from .module import Solution
 
 
 ### Boundary setting tools
@@ -27,19 +27,16 @@ class _BCSetter():
         return fn
 
 
-class _LSSetter():
-    _ls: Optional[TensorFunction] = None
-    def level_set(self, p:Tensor):
-        if self._ls is not None:
-            return self._ls(p)
+class _ICSetter():
+    _ic: Optional[TensorFunction] = None
+    def initial_condition(self, p: Tensor):
+        if self._ic is not None:
+            return self._ic(p)
         else:
             raise NotImplementedError
 
-    def set_level_set(self, fn: TensorFunction):
-        """
-        @brief Use a level-set function to locate the boundary.
-        """
-        self._ls = fn
+    def set_ic(self, fn: TensorFunction):
+        self._ic = fn
         return fn
 
 
@@ -67,18 +64,21 @@ class _BoxSetter():
 
 ### TFC applications
 
-class LevelSetDBCSolution(Solution, _BCSetter, _LSSetter):
-    """
-    @brief A solution of problems with dirichlet boundary conditions, and the boundary\
-           is given through a level-set function. Use the decorators `@set_bc` and\
-           `@set_level_set` to set the boundary infomation before training.
-    """
-    def forward(self, p: Tensor):
-        lsv = self.level_set(p)
-        return -lsv * self.__net(p) + (1+lsv) * self.boundary_condition(p)
+class BoxDirichletBC(Solution, _BCSetter, _BoxSetter):
+    def __new__(cls, func, in_feature=1) -> "BoxDirichletBC":
+        if in_feature == 1:
+            return object.__new__(BoxDBCSolution1d)
+        elif in_feature == 2:
+            return object.__new__(BoxDBCSolution2d)
+        else:
+            raise NotImplementedError
+
+    def __init__(self, func: TensorFunction, in_feature=1) -> None:
+        super().__init__(func)
+        self.in_feature = in_feature
 
 
-class BoxDBCSolution1d(Solution, _BCSetter, _BoxSetter):
+class BoxDBCSolution1d(BoxDirichletBC):
     """
     @brief A model wrapper of dirichlet boundary conditions in an 1d box area.\
            This is based on Theory of Functional Connection.
@@ -105,7 +105,7 @@ class BoxDBCSolution1d(Solution, _BCSetter, _BoxSetter):
         return torch.einsum("i...f, ...i -> ...f", M, vp)
 
 
-class BoxDBCSolution2d(Solution, _BCSetter, _BoxSetter):
+class BoxDBCSolution2d(BoxDirichletBC):
     """
     @brief A model wrapper of dirichlet boundary conditions in an 2d box area.\
            This is based on Theory of Functional Connection in 1d, 2d and 3d.
@@ -151,8 +151,6 @@ class BoxDBCSolution2d(Solution, _BCSetter, _BoxSetter):
         return torch.einsum("ij...f, ...i, ...j -> ...f", M, vx, vy)
 
 
-BoxDBCSolution = BoxDBCSolution2d
-
 class BoxNBCSolution(Solution, _BCSetter, _BoxSetter):
     """
     @brief A solution of problems with dirichlet boundary conditions in a box area.\
@@ -160,14 +158,38 @@ class BoxNBCSolution(Solution, _BCSetter, _BoxSetter):
 
     @note !Not Fully Implemented! Now only 1d and 2d are supported.
     """
-    def __init__(self, net: Optional[TensorFunction] = None, time_idx: Optional[int]=None) -> None:
-        super().__init__(net)
-        self._time_idx = time_idx
+    def forward(self): ...
 
-    def _space_fn(self, p: Tensor):
-        if self._time_idx is None:
-            return self.__net
-        else:
-            comps: List[Optional[Tensor]] = [None] * p.shape[-1]
-            comps[self._time_idx] = p[..., self._time_idx:self._time_idx+1]
-            return Projected(self.__net, comps=comps)
+
+class TimeBoxDirichletBC(Solution, _ICSetter, _BCSetter, _BoxSetter):
+    pass
+
+
+class BoxTimeDBCSolution2d(TimeBoxDirichletBC):
+    """
+    Solution on space(1d)-time(1d) domain with dirichlet boundary conditions,
+    based on Theory of Functional Connections.
+    """
+    def forward(self, p: Tensor) -> Tensor:
+        shape = p.shape[:-1] + (1,)
+
+        u = self.net
+        c = self.boundary_condition
+        ic = self.initial_condition
+        b = self.boundary_box()
+
+        l = b[1] - b[0]
+        t = p[..., 0:1]
+        x = p[..., 1:2]
+        x_0 = mkfs(0.0, x)
+        t_0 = mkfs(t, b[0])
+        t_1 = mkfs(t, b[1])
+        c_0 = mkfs(0.0, b[0], f_shape=shape, device=p.device)
+        c_1 = mkfs(0.0, b[1], f_shape=shape, device=p.device)
+
+        return u(p)\
+            + (b[1]-x)/l * (c(t_0)-ic(c_0))\
+            + (x-b[0])/l * (c(t_1)-ic(c_1))\
+            + ic(x_0) - u(x_0)\
+            - (b[1]-x)/l * (u(t_0)-u(c_0))\
+            - (x-b[0])/l * (u(t_1)-u(c_1))

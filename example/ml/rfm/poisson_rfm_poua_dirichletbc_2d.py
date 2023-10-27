@@ -59,7 +59,6 @@ space = UniformPoUSpace(factory, mesh, 'node', pou=PoUA(), print_status=True)
 mesh_col = UniformMesh2d((0, EXTC, 0, EXTC), (HC, HC), origin=(0, 0))
 _bd_node = mesh_col.ds.boundary_node_flag()
 col_in = torch.from_numpy(mesh_col.entity('node', index=~_bd_node))
-# col_in = space.collocate_interior((EXTC, EXTC), part_type=False)
 col_bd = torch.from_numpy(mesh_col.entity('node', index=_bd_node))
 del _bd_node, mesh_col
 col_sub = space.collocate_sub_edge(20)
@@ -74,13 +73,16 @@ laplace_phi = space.laplace_basis(col_in)
 del col_in
 phi = space.basis(col_bd)
 del col_bd
-c0 = space.continue_matrix_0(col_sub)
-c1 = space.continue_matrix_1(col_sub)
+c0: Tensor = space.continue_matrix_0(col_sub)
+c1: Tensor = space.continue_matrix_1(col_sub)
 
 A_tensor = torch.cat([-laplace_phi,
                       phi,
                       c0,
                       c1], dim=0)
+ratio = 100.0/A_tensor.max(dim=-1, keepdim=True)[0]
+A_tensor *= ratio
+b_tensor *= ratio
 del laplace_phi, phi, c0, c1
 
 A = csr_matrix(A_tensor.cpu().numpy())

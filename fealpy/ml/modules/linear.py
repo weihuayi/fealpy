@@ -1,11 +1,11 @@
 
 from typing import Sequence, Union, Any
-import math
 
 import torch
-from torch import Tensor
-from torch.nn import Module, init
+from torch import Tensor, float64, device
+from torch.nn import Module, init, MSELoss
 from torch.nn.parameter import Parameter
+from torch.nn import functional as F
 
 
 class Standardize(Module):
@@ -68,7 +68,8 @@ class Distance(Module):
 
 class MultiLinear(Module):
     def __init__(self, in_features: int, out_features: int, parallel: Sequence[int],
-                 bias: bool=True, device=None, dtype=None, requires_grad=True) -> None:
+                 bias: bool=True, dtype=float64, device: device=None,
+                 requires_grad=True) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__()
         self.ni = in_features
@@ -103,3 +104,28 @@ class MultiLinear(Module):
     def forward(self, x: Tensor):
         ret = torch.einsum('...io, n...i -> n...o', self.weight, x)
         return self.bias[None, ...] + ret
+
+
+class LeastSquare(Module):
+    def __init__(self, ndof: int, gd: int=1, dtype=float64, device: device=None) -> None:
+        """
+        @brief Construct a least-square model.
+
+        @param ndof: int. Number of variables.
+        @param gd: int. Number of output features.
+        """
+        super().__init__()
+        self.x_ = Parameter(torch.empty((ndof, gd), dtype=dtype, device=device))
+        self.loss_fn = MSELoss(reduction='mean')
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.normal_(self.x_, 0.0, 0.1)
+
+    def forward(self, A_: Tensor):
+        # NOTE: A_ has shape (N, nf); x_ has shape (nf, gd)
+        # The output has shape (N, gd)
+        return F.linear(A_, self.x_.T).T
+
+    def mse_loss(self, A_: Tensor, b_: Tensor):
+        return self.loss_fn(self(A_), b_)
