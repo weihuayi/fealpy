@@ -9,10 +9,9 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
-from fealpy.ml.modules import Function, FunctionSpace, PoUSpace
 
 from .nntyping import TensorFunction, S
-from .modules import FunctionSpace, Function
+from .modules import FunctionSpace, Function, PoUSpace
 from . import solvertools as ST
 
 
@@ -33,8 +32,21 @@ def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensorLike]):
 
 _FS = TypeVar('_FS', bound=FunctionSpace)
 
+
 class Form(Generic[_FS]):
-    def __init__(self, space: _FS, gd=1) -> None:
+    """
+    @brief Forms for collecting conditions.
+
+    1. use the `add` method to collect samples, operators and sources.
+    2. use the `assembly` method to generate A.T@A and A.T@b.
+    """
+    def __init__(self, space: _FS, gd: int=1) -> None:
+        """
+        @brief Build a form to collecting conditions.
+
+        @param space: FunctionSpace.
+        @param gd: int. Dimension of the source, used for initializing.
+        """
         self.space = space
         self.gd = gd
         self.samples: List[Tensor] = []
@@ -50,12 +62,12 @@ class Form(Generic[_FS]):
     def add(self, sample: Tensor, operator: Union[Sequence["Operator"], "Operator"],
             source: Optional[FuncOrNumber]=None):
         """
-        @brief Add a condition.
+        @brief Add a condition to the form.
 
         @param sample: collocation points Tensor.
         @param operator: one or sequence of operator(s) applying to the space.
         @param source: function or Tensor of source, optional. Source defaults to\
-               zero if not provided.
+               zero(s) if not provided.
         """
         self.samples.append(sample)
         # NOTE: samples are allow to have more than 2 dims.
@@ -91,7 +103,7 @@ class Form(Generic[_FS]):
                  return_sparse: Literal[False]=False, allow_inplace=True) -> Tuple[Tensor, Tensor]: ...
     def assembly(self, *, rescale: Optional[float]=1.0, return_sparse=True, allow_inplace=True):
         """
-        @brief Assemble linear equations for the least-square problem.
+        @brief Assemble least-square matrix for the linear equations.
 
         @param rescale: float.
         @param return_sparse: bool, optional. Return in csr_matrix type if `True`.\
@@ -383,7 +395,7 @@ class Continuous1(ContinuousOperator):
         tensor([[0., -1.],
                 [0., -1.],
                 [1., 0.],
-                [1., 0.]], dtype=torh.float64)
+                [1., 0.]], dtype=torch.float64)
         ```
         @note: The order of sub_boundaries in `sub_to_part`, `sub_normal` and\
                samples should match.
