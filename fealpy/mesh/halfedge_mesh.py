@@ -403,6 +403,33 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 start[index] = halfedge[halfedge[cell2hedge[current[idx], jdx], 4], 1]
             return start, bc
 
+    def interpolation_cell_data(self, mesh, datakey, itype="max"):
+        """
+        @brief 在网格中进行单元数据的插值。
+
+        @param
+          mesh: 网格对象，包含了要进行插值的数据。
+          datakey: 一个包含要插值的数据键的列表。
+          itype: 插值类型，可以是 'max'（最大值）、'average'（平均值）或 'min'（最小值）之一。
+        """
+        NC = self.number_of_cells()
+        fun = {'max' : np.max, 'average' : np.average, 'min' : np.min} # 定义插值函数（最大值、平均值和最小值）
+        bcs = np.array([[1/12, 1/24, 7/8], [5/6, 1/24, 1/8],
+                        [11/32, 5/12, 23/96], [1/24, 5/6, 1/8]]) # 定义四个插值点的重心坐标
+        loc = None # 初始化loc
+        celldata = {s: np.zeros((4, NC), dtype=mesh.celldata[s].dtype) for s in datakey} # 创建用于存储插值结果的字典
+        for i in range(4): # 遍历四个插值点
+            points = self.bc_to_point(bcs[i, None, :])[0] # 根据重心坐标计算插值点的实际坐标
+            loc, _ = mesh.find_point_in_triangle_mesh(points, start=loc) # 在网格中查找最接近的点
+
+            for key in datakey: # 针对每个数据键进行插值
+                odata = mesh.celldata[key]
+                celldata[key][i] = odata[loc]
+
+        for key in datakey: # 根据插值类型计算插值结果
+            self.celldata[key] = fun[itype](celldata[key], axis=0)
+
+
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
@@ -2202,7 +2229,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         node = self.entity('node')
         halfedge = self.entity('halfedge')
 
-        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 4], 0]]
+        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 3], 0]]
         return v
 
     def halfedge_length(self):
@@ -2452,6 +2479,24 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             Dlambda[:, 1] = np.cross(n, v1)/length
             Dlambda[:, 2] = np.cross(n, v2)/length
         return Dlambda
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_interface_cut_box_tri(cls, interface, box, nx=10, ny=10,
+            keep_feature=False):
+        """
+        @brief 生成界面网格, 要求每个单元与界面只能交两个点或者不想交。
+            步骤为:
+                1. 生成笛卡尔网格
+                2. 找到相交的半边
+                3. 加密相交的半边
+                4. 找到新生成的半边
+                5. 对新生成的半边添加下一条半边或上一条半边
+        @note : 1. 每个单元与界面只能交两个点或者不相交
+                2. 相交的单元会被分为两个单元，界面内部的单元将继承原来单元的编号
+        """
+        from .interface_mesh_generator import find_cut_point, interfacemesh2d
+        return cls.from_mesh(interfacemesh2d(box, interface, nx, ny))
 
     ## @ingroup MeshGenerators
     @classmethod
