@@ -8,7 +8,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 from fealpy.geometry import SquareWithCircleHoleDomain
 
-from fealpy.csm import fracture_damage_integrator
+from fealpy.csm import SpectralDecomposition
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
@@ -78,15 +78,13 @@ class Brittle_Facture_model():
 model = Brittle_Facture_model()
 
 domain = SquareWithCircleHoleDomain() 
-mesh = TriangleMesh.from_domain_distmesh(domain, 0.03, maxit=100)
+mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
 mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
-cm = mesh.entity_measure() 
-hmin = np.min(cm)
 
-simulation = fracture_damage_integrator(mesh, lam=model.lam, mu=model.mu,
+simulation = SpectralDecomposition(mesh, lam=model.lam, mu=model.mu,
         Gc=model.Gc, l0=model.l0)
 space = LagrangeFESpace(mesh, p=1, doforder='vdims')
 recovery = LinearRecoveryAlg()
@@ -95,28 +93,28 @@ d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 uh = space.function(dim=GD)
 disp = model.boundary_disp()
-od = np.zeros_like(d)
 stored_energy = np.zeros_like(disp)
 dissipated_energy = np.zeros_like(disp)
+force = np.zeros_like(disp)
 
 for i in range(len(disp)-1):
-    NN = mesh.number_of_nodes()
-    node  = mesh.entity('node') 
-    isTNode = model.is_disp_boundary(node)
-    if space.doforder == 'vdims':
-        uh[isTNode, 1] = disp[i+1]
-        isDof = np.c_[np.zeros(NN, dtype=np.bool_), isTNode]
-        isTDof = isDof.flat[:]
-    else:
-        uh[1, isTNode] = disp[i+1]
-        isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
-    du = space.function(dim=GD)
-
     k = 0
     while k < 100:
         print('i:', i)
         print('k:', k)
         
+        NN = mesh.number_of_nodes()
+        node  = mesh.entity('node') 
+        isTNode = model.is_disp_boundary(node)
+        if space.doforder == 'vdims':
+            uh[isTNode, 1] = disp[i+1]
+            isDof = np.c_[np.zeros(NN, dtype=np.bool_), isTNode]
+            isTDof = isDof.flat[:]
+        else:
+            uh[1, isTNode] = disp[i+1]
+            isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
+        du = space.function(dim=GD)
+    
         # 求解位移
         vspace = (GD*(space, ))
         ubform = BilinearForm(GD*(space, ))
@@ -169,6 +167,46 @@ for i in range(len(disp)-1):
         stored_energy[i+1] = simulation.get_stored_energy(phip, d)
         dissipated_energy[i+1] = simulation.get_dissipated_energy(d)
         
+        # 恢复型后验误差估计子
+        eta = recovery.recovery_estimate(d)
+            
+        isMarkedCell = mark(eta, theta = 0.2)
+
+        cm = mesh.cell_area() 
+        isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
+                
+        if np.any(isMarkedCell):
+            mesh.celldata['H'] = H
+            mesho = copy.deepcopy(mesh)
+            spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
+            uh0 = spaceo.function()
+            uh1 = spaceo.function()
+            d0 = spaceo.function()
+            uh0[:] = uh[:, 0]
+            uh1[:] = uh[:, 1]
+            d0[:] = d[:]
+
+            mesh.refine_triangle_rg(isMarkedCell)
+            print('mesh refine')      
+           
+            # 更新加密后的空间
+            space = LagrangeFESpace(mesh, p=1, doforder='vdims')
+            NC = mesh.number_of_cells()
+            uh = space.function(dim=GD)
+            d = space.function()
+            H = np.zeros(NC, dtype=np.float64)  # 分片常数
+            
+            uh[:, 0] = space.interpolation_fe_function(uh0)
+            uh[:, 1] = space.interpolation_fe_function(uh1)
+            print('interpolation function uh:', uh.shape)      
+            
+            d[:] = space.interpolation_fe_function(d0)
+            print('interpolation function d:', d.shape)      
+            
+            mesh.interpolation_cell_data(mesho, datakey=['H'])
+            print('interpolation cell data:', NC)      
+#            mesho = copy.deepcopy(mesh) 
+
         # 计算残量误差
         if k == 0:
             er0 = np.linalg.norm(R0)
@@ -189,8 +227,8 @@ for i in range(len(disp)-1):
     
     # to vtk 画图
     mesh.nodedata['damage'] = d
-    mesh.nodedata['uh'] = uh.T
-    mesh.celldata['eta'] = eta
+    mesh.nodedata['uh'] = uh
+    mesh.celldata['H'] = H
     fname = 'test' + str(i).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
 

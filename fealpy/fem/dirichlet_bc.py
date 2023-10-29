@@ -34,15 +34,15 @@ class DirichletBC():
         if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
             # 由标量函数空间组成的向量函数空间
             gdof = self.space[0].number_of_global_dofs()
-            GD = A.shape[0]//gdof
+            GD = int(A.shape[0]//gdof)
             if uh is None:
-                uh = self.space[0].function(dim=GD)  
+                uh = self.space[0].function(dim=GD)
 
             return self.apply_for_vspace_with_scalar_basis(A, f, uh, dflag=dflag)
         else:
             # 标量函数空间或基是向量函数的向量函数空间
             gdof = self.space.number_of_global_dofs()
-            GD = A.shape[0]//gdof
+            GD = int(A.shape[0]//gdof)
             if uh is None:
                 uh = self.space.function(dim=GD)  
 
