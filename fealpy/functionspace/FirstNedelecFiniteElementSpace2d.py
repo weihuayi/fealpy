@@ -363,7 +363,6 @@ class FirstNedelecFiniteElementSpace2d:
                 if len(c.shape)==2:
                     M = np.einsum('i, ij, ijkd, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
                 elif len(c.shape)==4:
-                    print("aaa")
                     M = np.einsum('i, ijdl, ijkd, ijml, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
@@ -443,7 +442,6 @@ class FirstNedelecFiniteElementSpace2d:
             if isinstance(c, (int, float)):
                 M = np.einsum('i, ijk, ijm, j->jkm', c * ws, phi, phi, cellmeasure, optimize=True)
             else:
-                print("aaa")
                 M = np.einsum('q, qc, qck..., qcm..., c->ckm', ws, c, phi, phi, cellmeasure, optimize=True)
 
         cell2dof = self.cell_to_dof()
@@ -486,6 +484,8 @@ class FirstNedelecFiniteElementSpace2d:
         t = mesh.edge_unit_tangent(index=index)
         ps = mesh.bc_to_point(bcs, index=index)
         val = gD(ps, t) # (NQ, NBE)
+        if len(val.shape)==3:
+            val = np.einsum('...ed, ed->...e', val, t)
 
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()

@@ -12,7 +12,7 @@ import sympy as sp
 from fealpy.decorator import cartesian
 
 class SphereSurfacePDEData:
-    def __init__(self, u):
+    def __init__(self, F, u):
 
         x, y, z = sp.symbols('x, y, z', real=True)
 
@@ -38,7 +38,7 @@ class SphereSurfacePDEData:
 
         # 方程右端项 
         f = sp.diff(projection[0], x) + sp.diff(projection[1], y) + sp.diff(projection[2], z) 
-        print(f)
+        #print(f)
         self.u = sp.lambdify((x, y, z), u, "numpy")
         self.f = sp.lambdify((x, y, z), f, "numpy")
         self.gradF = sp.lambdify((x, y, z), grad_F, "numpy")
@@ -80,18 +80,3 @@ class SphereSurfacePDEData:
 
         fval = self.f(x, y, z)
         return fval
-
-'''
-# 做一些测试
-x, y, z = sp.symbols('x, y, z', real=True)
-p0 = np.array([1.0, 0.0, 0.0])
-p1 = np.array([0.0, 1.0, 0.0])
-
-u = x*y
-pde = SphereSurfacePDEData(u)
-sdiff0 = pde.graddient(p0)
-sdiff1 = pde.graddient(p1)
-
-print('sdiff0:', sdiff0)
-print('sdiff1:', sdiff1)
-'''

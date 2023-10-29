@@ -5,10 +5,10 @@ import sympy as sym
 from sympy.vector import CoordSys3D, Del, curl
 
 class MaxwellPDE2d():
-    def __init__(self, f, beta = 1, k = 1):
+    def __init__(self, f, eps = 1, k = 1):
         """
         @brief 求解方程 
-                curl curl E - beta E = J     Omega
+                curl curl E - eps E = J     Omega
                           n \times E = g     Gamma0
              - curl E - k n \times E = f     Gamma1
         """
@@ -35,7 +35,7 @@ class MaxwellPDE2d():
         self.curlcurlFx = sym.lambdify(('x', 'y'), ccfx, "numpy")
         self.curlcurlFy = sym.lambdify(('x', 'y'), ccfy, "numpy")
 
-        self.beta = beta
+        self.eps = eps
         self.k = k
 
     @cartesian
@@ -84,12 +84,12 @@ class MaxwellPDE2d():
         if type(ccFy) is not np.ndarray:
             ccFy = np.ones(x.shape, dtype=np.float_)*ccFy
         ccf = np.c_[ccFx, ccFy] 
-        return ccf - self.beta * self.solution(p)
+        return ccf - self.eps * self.solution(p)
 
     @cartesian
     def dirichlet(self, p, t):
         val = self.solution(p)
-        # return np.einsum('...ed, ed->...e', val, t)
+        #return np.einsum('...ed, ed->...e', val, t)
         return val
 
     @cartesian
@@ -121,12 +121,12 @@ class MaxwellPDE2d():
         return bd
 
 class SinData(MaxwellPDE2d):
-    def __init__(self, beta = 1, k = 1):
+    def __init__(self, eps = 1, k = 1):
         C = CoordSys3D('C')
         f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j
         #f = sym.sin(C.y)*C.i + sym.sin(C.x)*C.j
         #f = C.x*C.y*(1-C.x)*(1-C.y)*C.i + sym.sin(sym.pi*C.x)*sym.sin(sym.pi*C.y)*C.j
-        super(SinData, self).__init__(f, beta, k)
+        super(SinData, self).__init__(f, eps, k)
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):
         box = [0, 1, 0, 1]
