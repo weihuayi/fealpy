@@ -1,14 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 import time
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import spdiags
 
 from fealpy.mesh import TriangleMesh 
-from fealpy.geometry import SquareWithCircleHoleDomain
+from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.csm import spectral_decomposition_integrator as fracture_damage_integrator
+from fealpy.csm import SpectralDecomposition
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 
@@ -27,7 +28,7 @@ class Brittle_Facture_model():
         self.E = 210 # 杨氏模量
         self.nu = 0.3 # 泊松比
         self.Gc = 2.7e-3 # 材料的临界能量释放率
-        self.l0 = 0.0133 # 尺度参数，断裂裂纹的宽度
+        self.l0 = 0.015 # 尺度参数，断裂裂纹的宽度
 
         self.mu = self.E / (1 + self.nu) / 2.0 # 剪切模量
         self.lam = self.E * self.nu / (1 + self.nu) / (1- 2*self.nu) # 拉梅常数
@@ -70,9 +71,9 @@ class Brittle_Facture_model():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-#        return np.linspace(0, 1.7e-2, 17001)
-        return np.concatenate((np.linspace(0, 5e-3, 501), np.linspace(5e-3,
-            6.1e-3, 1101)[1:]))
+        return np.linspace(0, 1.7e-2, 1701)
+#        return np.concatenate((np.linspace(0, 5e-3, 501), np.linspace(5e-3,
+#            6.1e-3, 1101)[1:]))
 
     def top_disp_direction(self):
         """
@@ -119,13 +120,12 @@ start = time.time()
 
 model = Brittle_Facture_model()
 mesh = model.init_mesh(n=4)
+mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
-cm = mesh.entity_measure() 
-hmin = np.min(cm)
 
-simulation = fracture_damage_integrator(mesh, lam=model.lam, mu=model.mu,
+simulation = SpectralDecomposition (mesh, lam=model.lam, mu=model.mu,
         Gc=model.Gc, l0=model.l0)
 space = LagrangeFESpace(mesh, p=1, doforder='vdims')
 
@@ -135,7 +135,6 @@ d = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 uh = space.function(dim=GD)
 
-hmin = np.min(cm)
 
 disp = model.top_boundary_disp()
 stored_energy = np.zeros_like(disp)
@@ -149,11 +148,12 @@ for i in range(len(disp)-1):
         print('i:', i)
         print('k:', k)
         NN = mesh.number_of_nodes()
+        print('NN:', NN)
         node  = mesh.entity('node') 
         isTNode = model.is_top_boundary(node)
         if space.doforder == 'vdims':
             uh[isTNode, 1] = disp[i+1]
-            isDof = np.c_[np.zeros(NN, dtype=np.bool_), isTNode]
+            isDof = np.c_[isTNode, np.zeros(NN, dtype=np.bool_)]
             isTDof = isDof.flat[:]
         else:
             uh[1, isTNode] = disp[i+1]
@@ -220,9 +220,17 @@ for i in range(len(disp)-1):
         isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
         
         if np.any(isMarkedCell):
-            data = {'uh0':uh[:, 0], 'uh1':uh[:, 1], 'd':d, 'H':H}
-            option = mesh.bisect_options(data=data, disp=False)
-            mesh.bisect(isMarkedCell, options=option)
+            mesh.celldata['H'] = H
+            mesho = copy.deepcopy(mesh)
+            spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
+            uh0 = spaceo.function()
+            uh1 = spaceo.function()
+            d0 = spaceo.function()
+            uh0[:] = uh[:, 0]
+            uh1[:] = uh[:, 1]
+            d0[:] = d[:]
+
+            mesh.refine_triangle_rg(isMarkedCell)
             print('mesh refine')      
            
             # 更新加密后的空间
@@ -231,11 +239,16 @@ for i in range(len(disp)-1):
             uh = space.function(dim=GD)
             d = space.function()
             H = np.zeros(NC, dtype=np.float64)  # 分片常数
-
-            uh[:, 0] = option['data']['uh0']
-            uh[:, 1] = option['data']['uh1']
-            d[:] = option['data']['d']
-            H = option['data']['H']
+            
+            uh[:, 0] = space.interpolation_fe_function(uh0)
+            uh[:, 1] = space.interpolation_fe_function(uh1)
+            print('interpolation function uh:', uh.shape)      
+            
+            d[:] = space.interpolation_fe_function(d0)
+            print('interpolation function d:', d.shape)      
+            
+            mesh.interpolation_cell_data(mesho, datakey=['H'])
+            print('interpolation cell data:', NC)      
 
         # 计算残量误差
         if k == 0:
