@@ -94,30 +94,49 @@ class Polygon():
     """
     @brief 一个多边形的符号距离函数
     """
-    def __init__(self, points):
-        self.feature_points = points
+    def __init__(self, points, feature_idx=np.s_[:]):
+        self.points = points
+        self.feature_points = points[feature_idx]
 
     def init_mesh(self, n):
         pass
 
     def __call__(self, p):
+        pshape = p.shape[:-1]
+        p = p.reshape(-1, 2)
         NP = len(p)
-        NE = len(self.feature_points)
+        NE = len(self.points)
 
-        sign = np.ones(NP, dtype=np.bool_)
+        num = np.zeros(NP, dtype=np.int_)
+        h   = np.zeros(NP, dtype=np.float_)
         dist = 10000*np.ones(NP, dtype=np.float_)
         for i in range(NE):
-            p0 = self.feature_points[i, None]
-            p1 = self.feature_points[(i+1)%NE, None]
+            xx0, yy0 = self.points[i]
+            xx1, yy1 = self.points[(i+1)%NE]
+            if xx0 < xx1:
+                x0 = xx0; y0 = yy0; x1 = xx1; y1 = yy1;
+            else:
+                x0 = xx1; y0 = yy1; x1 = xx0; y1 = yy0;
+            b = (x1-x0)*y0 - (y1-y0)*x0
+
+            p0 = self.points[i, None]
+            p1 = self.points[(i+1)%NE, None]
             v0 = p - p0
             v1 = p1 - p0
-            h = np.cross(v1, v0)/np.linalg.norm(v1[0])
 
-            sign = sign & (h>0)
+            val = (x1-x0)*p[:, 1] - (y1-y0)*p[:, 0] - b
+            flag = (min(x0, x1) <= p[:, 0]) & (max(x0, x1) > p[:, 0])
+            h[flag] = np.cross(v1, v0[flag])/np.linalg.norm(v1[0])
+            h[~flag] = np.minimum(np.linalg.norm(p[~flag]-p0), np.linalg.norm(p[~flag]-p1)) 
+
+            flag = flag & (val < 0)
+            num[flag] += 1
+
             dist = np.minimum(dist, np.abs(h))
 
-        dist[~sign] *= -1
-        return dist 
+        flag = (num%2) == 0
+        dist[flag] *= -1
+        return dist.reshape(pshape)
 
     def value(self, p):
         return self(p)

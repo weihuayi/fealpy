@@ -327,9 +327,13 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         NC = hcell.shape[0]
 
         if start is None: 
+            isBdNode = self.ds.boundary_node_flag()
+            isBDCell = np.any(isBdNode[cell], axis=1)
+            isNotBDCell = np.where(~isBDCell)[0]
             if self.ds.tree is None:
-                self.tree = cKDTree(node[halfedge[hcell, 0]])
-            start = self.tree.query(points, k=1)[1]
+                self.tree = cKDTree(node[halfedge[hcell[isNotBDCell], 0]])
+            start = isNotBDCell[self.tree.query(points, k=1)[1]]
+            print("start : ::::", start[2])
 
         ## NP < NC//2 和 NP > NC//2, 出于效率的原因分成两个情况
         if NP < NC//2:
@@ -343,6 +347,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             isNotOK = np.ones(NP, dtype=np.bool_)
 
             # 进入循环，直到所有点都找到了位置单元格
+            k = 2
             while isNotOK.any():
                 # 计算每个点所在的单元格到其相邻半边的映射
                 cell2hedge[isNotOK, 0] = hcell[start[isNotOK]]
@@ -359,13 +364,19 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 bc[isNotOK] = np.cross(cell2vector[isNotOK], vector[isNotOK]) / cm[start[isNotOK]]
 
                 # 找到重心坐标中小于零的点
-                idx, jdx = np.where(bc[isNotOK] < 0)
+                idx, jdx = np.where(bc[isNotOK] < -1e-12)
                 index = np.where(isNotOK)[0][idx]
 
                 # 更新未找到位置单元格的点的状态和起始单元格索引
                 isNotOK[:] = False
                 isNotOK[index] = True
-                start[index] = halfedge[halfedge[cell2hedge[index, jdx], 4], 1]
+                newstart = halfedge[halfedge[cell2hedge[index, jdx], 4], 1]
+                isFaultPoint = index[newstart==start[index]]
+                start[index] = newstart
+                if len(isFaultPoint)>0:
+                    start[isFaultPoint] = isNotBDCell[self.tree.query(points[isFaultPoint], k=k)[1][:, -1]]
+                    k += 1
+
             return start, bc
         else:
             cell2hedge = np.zeros((NC, 3), dtype=np.int_)
@@ -382,7 +393,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
             # 创建用于跟踪哪些点尚未找到其位置单元格的布尔数组
             isNotOK = np.ones(NP, dtype=np.bool_)
-
+            k=2
             # 进入循环，直到所有点都找到了位置单元格
             while isNotOK.any():
                 # 计算每个点到其相邻半边的向量以及到目标点的向量
@@ -393,15 +404,47 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 bc[isNotOK] = np.cross(cell2vector[current], vector)/cm[current]
 
                 # 找到重心坐标中小于零的点
-                idx, jdx = np.where(bc[isNotOK] < 0)
+                idx, jdx = np.where(bc[isNotOK] < -1e-12)
                 index = np.where(isNotOK)[0][idx]
 
                 # 更新未找到位置单元格的点的状态和起始单元格索引
                 isNotOK[:] = False
                 isNotOK[index] = True
 
-                start[index] = halfedge[halfedge[cell2hedge[current[idx], jdx], 4], 1]
+                newstart = halfedge[halfedge[cell2hedge[current[idx], jdx], 4], 1]
+                isFaultPoint = index[newstart==start[index]]
+                start[index] = newstart
+                if len(isFaultPoint)>0:
+                    start[isFaultPoint] = isNotBDCell[self.tree.query(points[isFaultPoint], k=k)[1][:, -1]]
+                    k += 1
             return start, bc
+
+    def interpolation_cell_data(self, mesh, datakey, itype="max"):
+        """
+        @brief 在网格中进行单元数据的插值。
+
+        @param
+          mesh: 网格对象，包含了要进行插值的数据。
+          datakey: 一个包含要插值的数据键的列表。
+          itype: 插值类型，可以是 'max'（最大值）、'average'（平均值）或 'min'（最小值）之一。
+        """
+        NC = self.number_of_cells()
+        fun = {'max' : np.max, 'average' : np.average, 'min' : np.min} # 定义插值函数（最大值、平均值和最小值）
+        bcs = np.array([[1/12, 1/24, 7/8], [5/6, 1/24, 1/8],
+                        [11/32, 5/12, 23/96], [1/24, 5/6, 1/8]]) # 定义四个插值点的重心坐标
+        loc = None # 初始化loc
+        celldata = {s: np.zeros((4, NC), dtype=mesh.celldata[s].dtype) for s in datakey} # 创建用于存储插值结果的字典
+        for i in range(4): # 遍历四个插值点
+            points = self.bc_to_point(bcs[i, None, :])[0] # 根据重心坐标计算插值点的实际坐标
+            loc, _ = mesh.find_point_in_triangle_mesh(points, start=loc) # 在网格中查找最接近的点
+
+            for key in datakey: # 针对每个数据键进行插值
+                odata = mesh.celldata[key]
+                celldata[key][i] = odata[loc]
+
+        for key in datakey: # 根据插值类型计算插值结果
+            self.celldata[key] = fun[itype](celldata[key], axis=0)
+
 
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
         """
@@ -2202,7 +2245,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         node = self.entity('node')
         halfedge = self.entity('halfedge')
 
-        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 4], 0]]
+        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 3], 0]]
         return v
 
     def halfedge_length(self):
@@ -2452,6 +2495,24 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             Dlambda[:, 1] = np.cross(n, v1)/length
             Dlambda[:, 2] = np.cross(n, v2)/length
         return Dlambda
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_interface_cut_box_tri(cls, interface, box, nx=10, ny=10,
+            keep_feature=False):
+        """
+        @brief 生成界面网格, 要求每个单元与界面只能交两个点或者不想交。
+            步骤为:
+                1. 生成笛卡尔网格
+                2. 找到相交的半边
+                3. 加密相交的半边
+                4. 找到新生成的半边
+                5. 对新生成的半边添加下一条半边或上一条半边
+        @note : 1. 每个单元与界面只能交两个点或者不相交
+                2. 相交的单元会被分为两个单元，界面内部的单元将继承原来单元的编号
+        """
+        from .interface_mesh_generator import find_cut_point, interfacemesh2d
+        return cls.from_mesh(interfacemesh2d(box, interface, nx, ny))
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -3283,8 +3344,8 @@ class HalfEdgeMesh2dDataStructure():
     def boundary_node_flag(self):
         NN = self.NN
         halfedge =  self.halfedge # DynamicArray
-        isBdHEdge = halfedge[:, 4]==np.arange(NHE)
-        isBDNode = np.zeros(NN, dtype=np.bool_)
+        isBdHEdge = halfedge[:, 4]==np.arange(self.NHE)
+        isBdNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[halfedge[isBdHEdge, 0]] = True 
         return isBdNode
 
@@ -3313,17 +3374,17 @@ class HalfEdgeMesh2dDataStructure():
     boundary_face_flag = boundary_edge_flag
 
     def boundary_cell_flag(self):
-        NN = self.NN
+        NC = self.NC
         halfedge =  self.halfedge
-        isBdHEdge = halfedge[:, 4]==np.arange(NHE)
-        isBDCell = np.zeros(NN, dtype=np.bool_)
-        isBdCell[halfedge[isBdHEdge, 1]] = True 
-        return isBdCell
+        isBdHEdge = halfedge[:, 4]==np.arange(self.NHE)
+        isBDCell = np.zeros(NC, dtype=np.bool_)
+        isBDCell[halfedge[isBdHEdge, 1]] = True 
+        return isBDCell
 
     def boundary_node_index(self):
         NN = self.NN
         halfedge =  self.halfedge # DynamicArray
-        isBdHEdge = halfedge[:, 4]==np.arange(NHE)
+        isBdHEdge = halfedge[:, 4]==np.arange(self.NHE)
         return halfedge[isBdHEdge, 0]
 
     def boundary_edge_index(self):
@@ -3341,7 +3402,7 @@ class HalfEdgeMesh2dDataStructure():
     def boundary_cell_index(self):
         NN = self.NN
         halfedge =  self.halfedge # DynamicArray
-        isBdHEdge = halfedge[:, 4]==np.arange(NHE)
+        isBdHEdge = halfedge[:, 4]==np.arange(self.NHE)
         return halfedge[isBdHEdge, 1]
 
     def main_halfedge_flag(self):
