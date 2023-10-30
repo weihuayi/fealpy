@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 import time
+import gmsh
+
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import spdiags
 
@@ -27,41 +29,58 @@ class Brittle_Facture_model():
     def __init__(self):
         self.E = 210 # 杨氏模量
         self.nu = 0.3 # 泊松比
-        self.Gc = 2.7e-3 # 材料的临界能量释放率
-        self.l0 = 0.015 # 尺度参数，断裂裂纹的宽度
+        self.Gc = 5e-4 # 材料的临界能量释放率
+        self.l0 = 0.06 # 尺度参数，断裂裂纹的宽度
 
-        self.mu = self.E / (1 + self.nu) / 2.0 # 剪切模量
-        self.lam = self.E * self.nu / (1 + self.nu) / (1- 2*self.nu) # 拉梅常数
+        self.mu = 8 # 剪切模量
+        self.lam = 12 # 拉梅常数
         self.kappa = self.lam + 2 * self.mu /3 # 压缩模量
 
-    def init_mesh(self, n=3):
+    def init_mesh(self):
         """
         @brief 生成实始网格
         """
-        node = np.array([
-            [0.0, 0.0],
-            [0.0, 0.5],
-            [0.0, 0.5],
-            [0.0, 1.0],
-            [0.5, 0.0],
-            [0.5, 0.5],
-            [0.5, 1.0],
-            [1.0, 0.0],
-            [1.0, 0.5],
-            [1.0, 1.0]], dtype=np.float64)
+        gmsh.initialize()
 
-        cell = np.array([
-            [1, 0, 5],
-            [4, 5, 0],
-            [2, 5, 3],
-            [6, 3, 5],
-            [4, 7, 5],
-            [8, 5, 7],
-            [6, 5, 9],
-            [8, 9, 5]], dtype=np.int_)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n=n)
-        mesh.ds.NV = 3
+        gmsh.model.geo.addPoint(0,0,0,tag = 1)
+        gmsh.model.geo.addPoint(8,0,0,tag = 2)
+        gmsh.model.geo.addPoint(8,2,0,tag = 3)
+        gmsh.model.geo.addPoint(0,2,0,tag = 4)
+        gmsh.model.geo.addPoint(3.9,0,0,tag = 5)
+        gmsh.model.geo.addPoint(4.1,0,0,tag = 6)
+        gmsh.model.geo.addPoint(4.0,0.4,0,tag = 7)
+
+        gmsh.model.geo.addLine(1,5,1)
+        gmsh.model.geo.addLine(5,7,2)
+        gmsh.model.geo.addLine(7,6,3)
+        gmsh.model.geo.addLine(6,2,4)
+        gmsh.model.geo.addLine(2,3,5)
+        gmsh.model.geo.addLine(3,4,6)
+        gmsh.model.geo.addLine(4,1,7)
+
+        gmsh.model.geo.addCurveLoop([1,2,3,4,5,6,7],1)
+        gmsh.model.geo.addPlaneSurface([1], 1)
+
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), 0.1)
+        gmsh.model.mesh.generate(2)
+
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = node_coords.reshape((-1,3))[:,:2]
+
+        # 节点编号映射
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2 # 三角形单元的类型编号为 2
+        cell_tags,cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        gmsh.finalize()
+        # 节点编号映射到单元
+        evid = np.array([nodetags_map[j] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1],-1))
+        mesh = TriangleMesh(node,cell)
+
         return mesh
 
     def top_boundary_disp(self):
@@ -71,9 +90,8 @@ class Brittle_Facture_model():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return np.linspace(0, 1.7e-2, 1701)
-#        return np.concatenate((np.linspace(0, 5e-3, 501), np.linspace(5e-3,
-#            6.1e-3, 1101)[1:]))
+        return -np.concatenate((np.linspace(0, 3.6e-2, 361), np.linspace(3.6e-2,
+            1e-1, 64000)[1:]))
 
     def top_disp_direction(self):
         """
@@ -88,7 +106,7 @@ class Brittle_Facture_model():
         """
         @brief 标记上边界, y = 1 时的边界点
         """
-        return np.abs(p[..., 1] - 1) < 1e-12 
+        return (np.abs(p[..., 1] - 2) < 1e-12 ) & (np.abs(p[..., 0]-4)<1e-5)
 
     def is_inter_boundary(self, p):
         """
@@ -103,7 +121,10 @@ class Brittle_Facture_model():
         """
         @brief 标记位移加载边界条件，该模型是下边界
         """
-        return np.abs(p[..., 1]) < 1e-12
+        x_condition = (p[:, 0] == 0)
+        y_condition = (p[:, 1] == 0) | (p[:, 1] == 8)
+        result = np.logical_and(x_condition, y_condition)
+        return result
 
 
 def adaptive_mesh(mesh, d0=0.49, d1=1.01, h=0.005):
@@ -119,8 +140,8 @@ def adaptive_mesh(mesh, d0=0.49, d1=1.01, h=0.005):
 start = time.time()
 
 model = Brittle_Facture_model()
-mesh = model.init_mesh(n=4)
-mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
+mesh = model.init_mesh()
+#mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
 
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
@@ -144,15 +165,16 @@ force = np.zeros_like(disp)
 for i in range(len(disp)-1):
 
     k = 0
-    while k < 100:
+    while k < 20:
         print('i:', i)
         print('k:', k)
         NN = mesh.number_of_nodes()
+        print('NN:', NN)
         node  = mesh.entity('node') 
         isTNode = model.is_top_boundary(node)
         if space.doforder == 'vdims':
-            uh[isTNode, 0] = disp[i+1]
-            isDof = np.c_[isTNode, np.zeros(NN, dtype=np.bool_)]
+            uh[isTNode, 1] = disp[i+1]
+            isDof = np.c_[np.zeros(NN, dtype=np.bool_), isTNode]
             isTDof = isDof.flat[:]
         else:
             uh[1, isTNode] = disp[i+1]
@@ -219,17 +241,9 @@ for i in range(len(disp)-1):
         isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
         
         if np.any(isMarkedCell):
-            mesh.celldata['H'] = H
-            mesho = copy.deepcopy(mesh)
-            spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
-            uh0 = spaceo.function()
-            uh1 = spaceo.function()
-            d0 = spaceo.function()
-            uh0[:] = uh[:, 0]
-            uh1[:] = uh[:, 1]
-            d0[:] = d[:]
-
-            mesh.refine_triangle_rg(isMarkedCell)
+            data = {'uh0':uh[:, 0], 'uh1':uh[:, 1], 'd':d, 'H':H}
+            option = mesh.bisect_options(data=data, disp=False)
+            mesh.bisect(isMarkedCell, options=option)
             print('mesh refine')      
            
             # 更新加密后的空间
@@ -238,16 +252,11 @@ for i in range(len(disp)-1):
             uh = space.function(dim=GD)
             d = space.function()
             H = np.zeros(NC, dtype=np.float64)  # 分片常数
-            
-            uh[:, 0] = space.interpolation_fe_function(uh0)
-            uh[:, 1] = space.interpolation_fe_function(uh1)
-            print('interpolation function uh:', uh.shape)      
-            
-            d[:] = space.interpolation_fe_function(d0)
-            print('interpolation function d:', d.shape)      
-            
-            mesh.interpolation_cell_data(mesho, datakey=['H'])
-            print('interpolation cell data:', NC)      
+
+            uh[:, 0] = option['data']['uh0']
+            uh[:, 1] = option['data']['uh1']
+            d[:] = option['data']['d']
+            H = option['data']['H']
 
         # 计算残量误差
         if k == 0:
@@ -265,6 +274,7 @@ for i in range(len(disp)-1):
         k += 1
     mesh.nodedata['damage'] = d
     mesh.nodedata['uh'] = uh
+    mesh.celldata['H'] = H
     fname = 'test' + str(i).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
 
