@@ -453,8 +453,6 @@ def test_interpolation_data(method='rg'):
             mesh.to_vtk(fname='out_ref_'+str(fff).zfill(3)+".vtu")
 
 
-
-
 #animation_plot('nvb')
 #circle_plot('nvb')
 #rg_refine_test()
@@ -464,7 +462,8 @@ def test_interpolation_data(method='rg'):
 #nvb_coarsen_test()
 #test_cut_mesh()
 #test_find_node()
-test_interpolation_data()
+#test_interpolation_data()
+test_domain_with_hole()
 
 
 
