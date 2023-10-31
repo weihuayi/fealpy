@@ -113,7 +113,7 @@ class ISampler(Sampler):
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
         if isinstance(ranges, Tensor):
-            ranges_arr = ranges.detach().clone().to(device=device)
+            ranges_arr = ranges.detach().clone().to(device=device).to(dtype=dtype)
         else:
             ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
 

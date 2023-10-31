@@ -2,7 +2,7 @@
 Partitions of Units
 """
 from typing import (
-    Union, List, Callable, Any, Generic, TypeVar, Tuple, Literal, Optional
+    Union, List, Callable, Any, Generic, TypeVar, Tuple, Literal, Optional,
 )
 
 import numpy as np
@@ -129,6 +129,7 @@ class PoU(TensorMapping):
             return torch.tensor(0, dtype=x.dtype, device=x.device).broadcast_to(N, 1)
 
 PoUA = PoU
+POU_DEFAULT = PoU()
 
 ### Sin-style PoU function & module
 
@@ -379,8 +380,10 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
     """
     @brief Partitions of Unity
     """
-    def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor, radius: Union[Tensor, Any],
-                 pou: Optional[PoU]=None, print_status=False) -> None:
+    def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor,
+                 radius: Union[Tensor, Any],
+                 pou: Union[PoU, List[PoU], None]=None,
+                 print_status=False) -> None:
         """
         @brief Construct a function space by sub-spaces, using Partitions of Unity.
 
@@ -388,13 +391,19 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
                local spaces by their indices.
         @param centers: position Tensor with shape (#parts, GD).
         @param radius: Tensor, float, or sequence of floats.
-        @param pou: PoU, optional. Continuous real valued functions. Use the\
-               indicator functions of partitions by default (then continuous\
+        @param pou: PoU or list of PoU, optional. Continuous real valued functions.\
+               Use the indicator functions of partitions by default (then continuous\
                conditions between partitions are required).
         """
         super().__init__(dtype=centers.dtype, device=centers.device)
 
-        self.pou = pou if pou else PoU()
+        # NOTE: pou(s) are not necessary to add to sub-modules.
+        if isinstance(pou, list):
+            self.pou = pou
+        else:
+            pou_ = pou if pou else POU_DEFAULT
+            self.pou = [pou_, ] * centers.shape[0]
+
         self.partitions: List[PoULocalSpace[_FS]] = []
         self.in_dim = -1
         self.out_dim = -1
@@ -406,7 +415,7 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
         radius = rdata.expand(centers.shape)
 
         for i in range(centers.shape[0]):
-            part = PoULocalSpace(pou_fn=self.pou, space=space_factory(i), idx=i,
+            part = PoULocalSpace(pou_fn=self.pou[i], space=space_factory(i), idx=i,
                                  center=centers[i, :], radius=radius[i, :])
             if self.in_dim == -1:
                 self.in_dim = part.space.in_dim
