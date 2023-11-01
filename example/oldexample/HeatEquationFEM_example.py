@@ -2,8 +2,6 @@
 # 
 
 import argparse
-
-
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,11 +11,10 @@ rc('text', usetex=True)
 # 装饰子：指明被装饰函数输入的是笛卡尔坐标点
 from fealpy.decorator import cartesian
 
-# 网格工厂：生成常用的简单区域上的网格
-from fealpy.mesh import MeshFactory as MF
-
 # 均匀剖分的时间离散
 from fealpy.timeintegratoralg import UniformTimeLine
+
+from fealpy.mesh import TriangleMesh
 
 # 热传导 pde 模型
 from fealpy.pde.heatequation_model_2d import SinSinExpData, ExpCosData
@@ -56,7 +53,6 @@ parser.add_argument('--nt',
         default=100, type=int,
         help='时间剖分段数，默认剖分 100 段.')
 
-
 args = parser.parse_args()
 
 degree = args.degree
@@ -66,12 +62,11 @@ nt = args.nt
 
 pde = SinSinExpData(k=1/16)
 domain = pde.domain()
-smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
+smesh = TriangleMesh.from_box(domain, ns, ns)
 tmesh = UniformTimeLine(0, 1, nt) # 均匀时间剖分
 
 space = LagrangeFiniteElementSpace(smesh, p=degree)
-
-mmesh = smesh.copy()
+mmesh = copy.deepcopy(smesh)
 NN = mmesh.number_of_nodes()
 cell = mmesh.entity("cell")
 mmesh.node = np.c_[mmesh.node, np.zeros((NN, 1), dtype=np.float_)]
