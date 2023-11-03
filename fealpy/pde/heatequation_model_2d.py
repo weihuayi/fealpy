@@ -1,15 +1,15 @@
 import numpy as np
 
 from fealpy.decorator import cartesian, barycentric
-from fealpy.mesh.TriangleMesh import TriangleMesh
-from fealpy.mesh.Quadtree import Quadtree
-from fealpy.mesh.QuadrangleMesh import QuadrangleMesh
-from fealpy.mesh.Tritree import Tritree
-from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
-from fealpy.mesh.TriangleMesh import TriangleMesh
-from fealpy.mesh.TriangleMesh import TriangleMeshWithInfinityNode
-from fealpy.mesh.PolygonMesh import PolygonMesh
-from fealpy.mesh.HalfEdgeMesh2d import HalfEdgeMesh2d
+from fealpy.mesh import TriangleMesh
+from fealpy.mesh import Quadtree
+from fealpy.mesh import QuadrangleMesh
+from fealpy.mesh import Tritree
+from fealpy.mesh import UniformMesh2d
+from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TriangleMeshWithInfinityNode
+from fealpy.mesh import PolygonMesh
+from fealpy.mesh import HalfEdgeMesh2d
 
 class ExpExpData:
     '''
