@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -19,6 +20,8 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
         self.model = model
         self.mesh = mesh
         self.p = p
+        self.GD = mesh.geo_dimension()
+    
 
         NC = mesh.number_of_cells()
 
@@ -43,19 +46,18 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             (2, 2, 0, 1, 0, 1)], dtype=np.int_)
 
 
-    def newton_raphson(self, disp):
+    def newton_raphson(self, disp, dirichlet_phase=False, refine='nvp'):
         mesh = self.mesh
         space = self.space
         model = self.model
-        GD = mesh.geo_dimension()
-        
-        uh = self.uh
-        d = self.d
-        H = self.H
-        
+        GD = self.GD 
         k = 0
         while k < 100:
             print('k:', k)
+            uh = self.uh
+            d = self.d
+            H = self.H
+            
             node = mesh.entity('node')
             isDDof = model.is_disp_boundary(node)
             uh[isDDof] = disp
@@ -72,7 +74,7 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             A0 = ubform.get_matrix()
             R0 = -A0@uh.flat[:]
             
-            force = np.sum(-R0[isDDof.flat])
+            self.force = np.sum(-R0[isDDof.flat])
             
             ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
             A0, R0 = ubc.apply(A0, R0) 
@@ -100,13 +102,21 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             R1 = lform.get_vector()
             R1 -= A1@d[:]
 
+            if dirichlet_phase:
+                dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
+                A1, R1 = dbc.apply(A1, R1)
+
             d[:] += spsolve(A1, R1)
         
-            stored_energy = self.get_stored_energy(phip, d)
-            dissipated_energy = self.get_dissipated_energy(d)
+            self.stored_energy = self.get_stored_energy(phip, d)
+            self.dissipated_energy = self.get_dissipated_energy(d)
+            
+            self.uh = uh
+            self.d = d
+            self.H = H
 
             # 恢复型后验误差估计子
-            eta = self.recovery.recovery_estimate(d)
+            eta = self.recovery.recovery_estimate(self.d)
                 
             isMarkedCell = mark(eta, theta = 0.2)
 
@@ -114,22 +124,10 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
             
             if np.any(isMarkedCell):
-                data = {'uh0':uh[:, 0], 'uh1':uh[:, 1], 'd':d, 'H':H}
-                option = mesh.bisect_options(data=data, disp=False)
-                mesh.bisect(isMarkedCell, options=option)
-                print('mesh refine')      
-               
-                # 更新加密后的空间
-                space = LagrangeFESpace(mesh, p=self.p)
-                NC = mesh.number_of_cells()
-                uh = space.function(dim=GD)
-                d = space.function()
-                H = np.zeros(NC, dtype=np.float64)  # 分片常数
-
-                uh[:, 0] = option['data']['uh0']
-                uh[:, 1] = option['data']['uh1']
-                d[:] = option['data']['d']
-                H = option['data']['H']
+                if refine == 'nvp':
+                    self.bisect_refine(isMarkedCell)
+                elif refine == 'rg':
+                    self.redgreen_refine(isMarkedCell)
             
             # 计算残量误差
             if k == 0:
@@ -146,12 +144,55 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
                 break
             k += 1
         
-            self.uh = uh
-            self.d = d
-            self.H = H
-        return force, stored_energy, dissipated_energy
 
-    
+    def bisect_refine(self, isMarkedCell):
+        data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 'd':self.d,
+                'H':self.H}
+        option = self.mesh.bisect_options(data=data, disp=False)
+        self.mesh.bisect(isMarkedCell, options=option)
+        print('mesh refine')      
+       
+        # 更新加密后的空间
+        self.space = LagrangeFESpace(self.mesh, p=self.p)
+        NC = self.mesh.number_of_cells()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.space.function()
+        self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
+
+        self.uh[:, 0] = option['data']['uh0']
+        self.uh[:, 1] = option['data']['uh1']
+        self.d[:] = option['data']['d']
+        self.H = option['data']['H']
+   
+    def redgreen_refine(self, isMarkedCell):
+        self.mesh.celldata['H'] = self.H
+        mesho = copy.deepcopy(self.mesh)
+        spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
+        uh0 = spaceo.function()
+        uh1 = spaceo.function()
+        d0 = spaceo.function()
+        uh0[:] = self.uh[:, 0]
+        uh1[:] = self.uh[:, 1]
+        d0[:] = self.d[:]
+
+        self.mesh.refine_triangle_rg(isMarkedCell)
+        print('mesh refine')      
+       
+        # 更新加密后的空间
+        self.space = LagrangeFESpace(self.mesh, p=1, doforder='vdims')
+        NC = self.mesh.number_of_cells()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.space.function()
+        self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
+        
+        self.uh[:, 0] = self.space.interpolation_fe_function(uh0)
+        self.uh[:, 1] = self.space.interpolation_fe_function(uh1)
+        
+        self.d[:] = self.space.interpolation_fe_function(d0)
+        
+        self.mesh.interpolation_cell_data(mesho, datakey=['H'])
+        print('interpolation cell data:', NC)      
+
     def strain(self, uh):
         """
         @brief 给定一个位移，计算相应的应变，这里假设是线性元

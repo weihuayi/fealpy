@@ -80,7 +80,6 @@ model = Brittle_Facture_model()
 domain = SquareWithCircleHoleDomain() 
 mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
 mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
-
 GD = mesh.geo_dimension()
 NC = mesh.number_of_cells()
 
@@ -96,6 +95,12 @@ disp = model.boundary_disp()
 stored_energy = np.zeros_like(disp)
 dissipated_energy = np.zeros_like(disp)
 force = np.zeros_like(disp)
+
+mesh.nodedata['damage'] = d
+mesh.nodedata['uh'] = uh
+mesh.celldata['H'] = H
+fname = 'test' + str(0).zfill(10)  + '.vtu'
+mesh.to_vtk(fname=fname)
 
 for i in range(len(disp)-1):
     k = 0
@@ -229,7 +234,7 @@ for i in range(len(disp)-1):
     mesh.nodedata['damage'] = d
     mesh.nodedata['uh'] = uh
     mesh.celldata['H'] = H
-    fname = 'test' + str(i).zfill(10)  + '.vtu'
+    fname = 'test' + str(i+1).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
 
 

@@ -76,7 +76,7 @@ class Brittle_Facture_model():
         isDDof = np.c_[np.zeros(p.shape[0], dtype=np.bool_), isDNode]
         return isDDof
 
-    def is_inter_boundary(self, p):
+    def is_boundary_phase(self, p):
         """
         @brief 标记内部边界, 内部圆的点
         Notes
@@ -117,7 +117,12 @@ force = np.zeros_like(disp)
 
 for i in range(len(disp)-1):
     print('i:', i)
-    force[i+1], stored_energy[i+1], dissipated_energy[i+1] = simulation.newton_raphson(disp[i+1])
+    simulation.newton_raphson(disp[i+1])
+
+    force[i+1] = simulation.force
+    stored_energy[i+1] = simulation.stored_energy
+    dissipated_energy[i+1] = simulation.dissipated_energy
+
     mesh.nodedata['damage'] = simulation.d
     mesh.nodedata['uh'] = simulation.uh
     mesh.celldata['H'] = simulation.H
