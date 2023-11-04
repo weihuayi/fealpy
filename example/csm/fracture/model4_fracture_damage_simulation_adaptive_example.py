@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 import time
+import gmsh
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import spdiags
 
@@ -25,43 +26,79 @@ from fealpy.mesh.adaptive_tools import mark
 
 class Brittle_Facture_model():
     def __init__(self):
-        self.E = 210 # 杨氏模量
-        self.nu = 0.3 # 泊松比
-        self.Gc = 2.7e-3 # 材料的临界能量释放率
-        self.l0 = 0.015 # 尺度参数，断裂裂纹的宽度
+#        self.E = 210 # 杨氏模量
+#        self.nu = 0.3 # 泊松比
+        self.Gc = 2.28e-3 # 材料的临界能量释放率
+        self.l0 = 0.1 # 尺度参数，断裂裂纹的宽度
 
-        self.mu = self.E / (1 + self.nu) / 2.0 # 剪切模量
-        self.lam = self.E * self.nu / (1 + self.nu) / (1- 2*self.nu) # 拉梅常数
+        self.mu = 2.45 # 剪切模量
+        self.lam = 1.94 # 拉梅常数
         self.kappa = self.lam + 2 * self.mu /3 # 压缩模量
 
     def init_mesh(self, n=3):
         """
         @brief 生成实始网格
         """
-        node = np.array([
-            [0.0, 0.0],
-            [0.0, 0.5],
-            [0.0, 0.5],
-            [0.0, 1.0],
-            [0.5, 0.0],
-            [0.5, 0.5],
-            [0.5, 1.0],
-            [1.0, 0.0],
-            [1.0, 0.5],
-            [1.0, 1.0]], dtype=np.float64)
+        gmsh.initialize()
 
-        cell = np.array([
-            [1, 0, 5],
-            [4, 5, 0],
-            [2, 5, 3],
-            [6, 3, 5],
-            [4, 7, 5],
-            [8, 5, 7],
-            [6, 5, 9],
-            [8, 9, 5]], dtype=np.int_)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n=n)
-        mesh.ds.NV = 3
+        gmsh.model.geo.addPoint(10,65,0,tag = 1)
+        gmsh.model.geo.addPoint(0,65,0,tag = 2)
+        gmsh.model.geo.addPoint(0,0,0,tag = 3)
+        gmsh.model.geo.addPoint(65,0,0,tag = 4)
+        gmsh.model.geo.addPoint(65,120,0,tag = 5)
+        gmsh.model.geo.addPoint(0,120,0,tag = 6)
+
+        gmsh.model.geo.addLine(1,2,1)
+        gmsh.model.geo.addLine(2,3,2)
+        gmsh.model.geo.addLine(3,4,3)
+        gmsh.model.geo.addLine(4,5,4)
+        gmsh.model.geo.addLine(5,6,5)
+        gmsh.model.geo.addLine(6,2,6)
+        gmsh.model.geo.addCurveLoop([1,2,3,4,5,6,-1],1)
+
+        gmsh.model.geo.addPoint(20,20,0,tag=7)
+        gmsh.model.geo.addPoint(15,20,0,tag=8)
+        gmsh.model.geo.addPoint(25,20,0,tag=9)
+        gmsh.model.geo.addCircleArc(8,7,9,tag=7)
+        gmsh.model.geo.addCircleArc(9,7,8,tag=8)
+        gmsh.model.geo.addCurveLoop([7,8],2)
+
+        gmsh.model.geo.addPoint(20,100,0,tag=10)
+        gmsh.model.geo.addPoint(15,100,0,tag=11)
+        gmsh.model.geo.addPoint(25,100,0,tag=12)
+        gmsh.model.geo.addCircleArc(11,10,12,tag=9)
+        gmsh.model.geo.addCircleArc(12,10,11,tag=10)
+        gmsh.model.geo.addCurveLoop([9,10],3)
+
+        gmsh.model.geo.addPoint(36.5,51,0,tag=13)
+        gmsh.model.geo.addPoint(26.5,51,0,tag=14)
+        gmsh.model.geo.addPoint(46.5,51,0,tag=15)
+        gmsh.model.geo.addCircleArc(14,13,15,tag=11)
+        gmsh.model.geo.addCircleArc(15,13,14,tag=12)
+        gmsh.model.geo.addCurveLoop([11,12],4)
+
+        gmsh.model.geo.addPlaneSurface([1,2,3,4], 1)
+
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), 2)
+        gmsh.model.mesh.generate(2)
+
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = node_coords.reshape((-1,3))[:,:2]
+
+        # 节点编号映射
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2 # 三角形单元的类型编号为 2
+        cell_tags,cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        gmsh.finalize()
+        # 节点编号映射到单元
+        evid = np.array([nodetags_map[j] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1],-1))
+        mesh = TriangleMesh(node,cell)
+
         return mesh
 
     def top_boundary_disp(self):
@@ -71,25 +108,14 @@ class Brittle_Facture_model():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return np.linspace(0, 1.7e-2, 1701)
-#        return np.concatenate((np.linspace(0, 5e-3, 501), np.linspace(5e-3,
-#            6.1e-3, 1101)[1:]))
-
-    def top_disp_direction(self):
-        """
-        @brief 上边界位移的方向
-        Notes
-        -----
-        位移方向沿 (0, 1) 方向，即仅在 y 方向的位移变化
-        """
-        return np.array([0, 1], np.float_)
+        return np.linspace(0, 2, 2001)
 
     def is_top_boundary(self, p):
         """
         @brief 标记上边界, y = 1 时的边界点
         """
-        return np.abs(p[..., 1] - 1) < 1e-12 
-
+        return np.abs((p[..., 0]-20)**2 + np.abs(p[..., 1]-100)**2 - 25) < 0.001
+    
     def is_inter_boundary(self, p):
         """
         @brief 标记内部边界, 内部圆的点
@@ -97,24 +123,18 @@ class Brittle_Facture_model():
         -----
         内部圆周的点为 DirichletBC，相场值和位移均为 0
         """
-        return np.abs((p[..., 0]-0.5)**2 + np.abs(p[..., 1]-0.5)**2 - 0.04) < 0.001
+        x_condition = np.abs((p[..., 0]-20)**2 + np.abs(p[..., 1]-100)**2 - 25) < 0.001
+        y_condition = np.abs((p[..., 0]-20)**2 + np.abs(p[..., 1]-20)**2 - 25) < 0.001
+        result = np.logical_and(x_condition, y_condition)
+        return result
     
+
     def is_below_boundary(self, p):
         """
         @brief 标记位移加载边界条件，该模型是下边界
         """
-        return np.abs(p[..., 1]) < 1e-12
+        return np.abs((p[..., 0]-20)**2 + np.abs(p[..., 1]-20)**2 - 25) < 0.001
 
-
-def adaptive_mesh(mesh, d0=0.49, d1=1.01, h=0.005):
-    cell = mesh.entity("cell")
-    node = mesh.entity("node")
-    isMarkedCell = mesh.cell_area() > 0.00001
-    isMarkedCell = isMarkedCell & (np.min(np.abs(node[cell, 1] - 0.5),
-                                          axis=-1) < h)
-    isMarkedCell = isMarkedCell & (np.min(node[cell, 0], axis=-1) > d0) & (
-            np.min(node[cell, 0], axis=-1) < d1)
-    return isMarkedCell
 
 start = time.time()
 
@@ -151,8 +171,8 @@ for i in range(len(disp)-1):
         node  = mesh.entity('node') 
         isTNode = model.is_top_boundary(node)
         if space.doforder == 'vdims':
-            uh[isTNode, 0] = disp[i+1]
-            isDof = np.c_[isTNode, np.zeros(NN, dtype=np.bool_)]
+            uh[isTNode, 1] = disp[i+1]
+            isDof = np.c_[np.zeros(NN, dtype=np.bool_), isTNode]
             isTDof = isDof.flat[:]
         else:
             uh[1, isTNode] = disp[i+1]
