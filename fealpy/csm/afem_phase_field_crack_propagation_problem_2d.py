@@ -17,6 +17,8 @@ from scipy.sparse.linalg import spsolve
 
 class AFEMPhaseFieldCrackPropagationProblem2d():
     def __init__(self, model, mesh, p=1):
+        """
+        """
         self.model = model
         self.mesh = mesh
         self.p = p
@@ -46,13 +48,19 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             (2, 2, 0, 1, 0, 1)], dtype=np.int_)
 
 
-    def newton_raphson(self, disp, dirichlet_phase=False, refine='nvp'):
+    def newton_raphson(self, 
+            disp, 
+            dirichlet_phase=False, 
+            refine='nvp', 
+            maxit=100):
+        """
+        """
         mesh = self.mesh
         space = self.space
         model = self.model
         GD = self.GD 
         k = 0
-        while k < 100:
+        while k < maxit:
             print('k:', k)
             uh = self.uh
             d = self.d
@@ -146,6 +154,8 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
         
 
     def bisect_refine(self, isMarkedCell):
+        """
+        """
         data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 'd':self.d,
                 'H':self.H}
         option = self.mesh.bisect_options(data=data, disp=False)
