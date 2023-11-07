@@ -5,7 +5,6 @@ from typing import (
 from math import log2
 import torch
 from torch import Tensor, float64, device
-import numpy as np
 
 from . import functional as F
 
@@ -113,7 +112,7 @@ class ISampler(Sampler):
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
         if isinstance(ranges, Tensor):
-            ranges_arr = ranges.detach().clone().to(device=device)
+            ranges_arr = ranges.detach().clone().to(device=device).to(dtype=dtype)
         else:
             ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
 
@@ -220,6 +219,7 @@ class BoxBoundarySampler(Sampler):
 ### Mesh samplers
 ##################################################
 
+from ..nntyping import S
 EType = Literal['cell', 'face', 'edge', 'node']
 
 class MeshSampler(Sampler):
@@ -229,7 +229,7 @@ class MeshSampler(Sampler):
 
     DIRECTOR: Dict[Tuple[Optional[str], Optional[str]], Type['MeshSampler']] = {}
 
-    def __new__(cls, mesh, etype: EType, index=np.s_[:],
+    def __new__(cls, mesh, etype: EType, index=S,
                 mode: Literal['random', 'linspace']='random',
                 dtype=float64, device: device=None,
                 requires_grad: bool=False):
@@ -262,7 +262,7 @@ class MeshSampler(Sampler):
                                               "has not been implemented.")
         return ms_class
 
-    def __init__(self, mesh, etype: EType, index=np.s_[:],
+    def __init__(self, mesh, etype: EType, index=S,
                  mode: Literal['random', 'linspace']='random',
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
@@ -282,7 +282,7 @@ class MeshSampler(Sampler):
         self.node = self.node.reshape(-1, self.nd)
         try:
             if etype == 'node':
-                self.cell = torch.arange(self.node.shape[0]).unsqueeze(-1)
+                self.cell = torch.arange(self.node.shape[0])[index].unsqueeze(-1)
             else:
                 self.cell = torch.tensor(mesh.entity(etype, index=index), device=device)
         except TypeError:
@@ -331,8 +331,8 @@ class MeshSampler(Sampler):
 
 
 class _PolytopeSampler(MeshSampler):
-    """Sampler in all homogeneous polytope mesh cells, such as triangle mesh and\
-        tetrahedron mesh."""
+    """Sampler in all homogeneous polytope entities, such as triangle cells\
+        and tetrahedron cells."""
     def run(self, mp: int) -> Tensor:
         self.bcs = self.get_bcs(mp, self.NVC)
         return self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
@@ -346,7 +346,7 @@ _PolytopeSampler._assigned('PolygonMesh', 'face')
 
 
 class _QuadSampler(MeshSampler):
-    """Sampler in a quadrangle mesh."""
+    """Sampler in a quadrangle entity."""
     def run(self, mp: int) -> Tensor:
         bc_0 = self.get_bcs(mp, 2)
         bc_1 = self.get_bcs(mp, 2)
@@ -361,7 +361,7 @@ _QuadSampler._assigned('HexahedronMesh', 'face')
 
 
 class _UniformSampler(MeshSampler):
-    """Sampler in a 2-d uniform mesh."""
+    """Sampler in a n-d uniform mesh."""
     def run(self, mp: int, *, entity_type=False) -> Tensor:
         ND = int(log2(self.NVC))
         bc_list = [self.get_bcs(mp, 2) for _ in range(ND)]
