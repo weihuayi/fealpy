@@ -230,33 +230,38 @@ class TensorMapping(Module):
 
     ### plotting
 
-    def meshgrid_mapping(self, *xi: NDArray):
+    def meshgrid_mapping(self, *xi: Tensor, detach=True):
         """
         @brief Calculate the function value in a meshgrid.
 
-        @param *xi: ArrayLike. See `numpy.meshgrid`.
+        @param *xi: Tensor. See `torch.meshgrid`.
+        @param detach: bool, optional.
 
         @return: tensor, (X1, X2, ..., Xn). For output having more than one\
                  feature, return a list instead. Each element is a tensor,\
                  containing values of a feature in the meshgrid.
         """
-        device_ = self.get_device()
+        mesh = torch.meshgrid(*xi, indexing='ij')
+        origin = mesh[0].shape
+        flat_mesh = [torch.ravel(x).reshape(-1, 1) for x in mesh]
+        mesh_pt = torch.cat(flat_mesh, dim=-1)
+        mesh_pt = mesh_pt.to(device=self.get_device())
 
-        mesh = np.meshgrid(*xi)
-        flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
+        val: Tensor = self(mesh_pt)
 
-        mesh_pt = torch.cat([torch.from_numpy(x) for x in flat_mesh], dim=-1)
-        pt_u: torch.Tensor = self.forward(mesh_pt.to(device=device_))
-        u_plot: NDArray = pt_u.cpu().detach().numpy()
-        assert u_plot.ndim == 2
-        nf = u_plot.shape[-1]
+        if detach:
+            val = val.cpu().detach()
 
-        if nf <= 1:
-            return u_plot.reshape(mesh[0].shape), mesh
+        assert val.ndim in (1, 2)
+        nf = val.shape[-1]
+
+        if val.ndim == 1 or nf <= 1:
+            return val.reshape(origin), mesh
         else:
-            return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf, axis=-1)], mesh
+            return [sub_u.reshape(origin) for sub_u in torch.split(val, nf, dim=-1)], mesh
 
     def add_surface(self, axes, box: Sequence[float], nums: Sequence[int],
+                    dtype=float64,
                     out_idx: Sequence[int]=[0, ],
                     edgecolor='blue', linewidth=0.0003, cmap=None,
                     vmin=None, vmax=None):
@@ -275,21 +280,22 @@ class TensorMapping(Module):
         if cmap is None:
             cmap = cm.RdYlBu_r
 
-        x = np.linspace(box[0], box[1], nums[0])
-        y = np.linspace(box[2], box[3], nums[1])
+        x = torch.linspace(box[0], box[1], nums[0], dtype=dtype)
+        y = torch.linspace(box[2], box[3], nums[1], dtype=dtype)
         u, (X, Y) = self.meshgrid_mapping(x, y)
         if isinstance(u, list):
             for idx in out_idx:
                 axes.plot_surface(X, Y, u[idx], cmap=cmap, edgecolor=edgecolor,
                                   linewidth=linewidth, antialiased=True,
-                                  vmin=None, vmax=None)
+                                  vmin=vmin, vmax=vmax)
         else:
             axes.plot_surface(X, Y, u, cmap=cmap, edgecolor=edgecolor,
                               linewidth=linewidth, antialiased=True,
-                              vmin=None, vmax=None)
+                              vmin=vmin, vmax=vmax)
 
     def add_pcolor(self, axes, box: Sequence[float], nums: Sequence[int],
-                    out_idx=0, vmin=None, vmax=None, cmap=None):
+                   dtype=float64,
+                   out_idx=0, vmin=None, vmax=None, cmap=None):
         """
         @brief Call pcolormesh for modules having 2 input features.
 
@@ -304,8 +310,8 @@ class TensorMapping(Module):
         if cmap is None:
             cmap = cm.RdYlBu_r
 
-        x = np.linspace(box[0], box[1], nums[0])
-        y = np.linspace(box[2], box[3], nums[1])
+        x = torch.linspace(box[0], box[1], nums[0], dtype=dtype)
+        y = torch.linspace(box[2], box[3], nums[1], dtype=dtype)
         u, (X, Y) = self.meshgrid_mapping(x, y)
         if isinstance(u, list):
             return axes.pcolormesh(X, Y, u[out_idx], cmap=cmap, vmin=vmin, vmax=vmax)
