@@ -465,16 +465,8 @@ class TetrahedronMesh(Mesh, Plotable):
         """
         import subprocess
         self.to_vtk(fname="test.vtu")
-        pv_script = """
-from paraview.simple import *
-data = XMLUnstructuredGridReader(FileName='test.vtu')
-Show(data)
-Render()
-        """
-        with open('load_vtu.py', 'w') as f:
-            f.write(pv_script)
         pvpython_path = subprocess.check_output(['which', 'pvpython']).decode().strip()
-        subprocess.run([pvpython_path, 'load_vtu.py'])
+        subprocess.run([pvpython_path, '/home/why/fealpy/fealpy/plotter/load_vtu.py'])
 
     def location(self, points):
 
