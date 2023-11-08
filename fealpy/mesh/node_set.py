@@ -7,7 +7,7 @@ class NodeSet:
     def __init__(self, node, capacity=None):
         self.node = node
         self.tree = cKDTree(node)
-
+        self.is_boundary = np.zeros(self.number_of_nodes(), dtype=bool)
         self.nodedata = {}
 
     def dimension(self):
@@ -16,15 +16,19 @@ class NodeSet:
     def number_of_nodes(self):
         return len(self.node)
 
-    def add_node_data(self, name, dtype=np.float64):
-        NN = self.number_of_nodes()
-        self.nodedata[name] = np.zeros(NN, dtype=dtype)
+    def is_boundary_node(self):
+        return self.is_boundary
 
-    def node_data(self, name, subname=None):
-        if subname is None:
-            return self.nodedata[name]
-        else:
-            return self.nodedata[name][subname]
+    def add_node_data(self, name ,dtype=np.float64):
+        NN = self.number_of_nodes()
+        self.nodedata.update({names:np.zeros(NN,dtypes) 
+            for names,dtypes in zip(name,dtype)})
+        
+    def node_data(self, name):
+        return self.nodedata[name]
+    
+    def set_node_data(self, name, val):
+        self.nodedata[name][:] = val
 
     def add_plot(self, axes, color='k', markersize=20):
         axes.set_aspect('equal')
@@ -39,12 +43,28 @@ class NodeSet:
 
     @classmethod
     def from_dam_break_domain(cls, dx=0.02, dy=0.02):
-        nx = int(1/dx) + 1
-        ny = int(2/dy) + 1
-        mesh = UniformMesh2d([1, nx, 1, ny], h=(dx, dy), origin=(dx, dy))
-
-        wnode = mesh.entity('node')
-
-        return cls(wnode)
+        pp = np.mgrid[dx:1+dx:dx, dy:2+dy:dy].reshape(2, -1).T
+        
+        #下
+        bp0 = np.mgrid[0:4+dx:dx, 0:dy:dy].reshape(2, -1).T
+        bp1 = np.mgrid[-dx/2:4+dx/2:dx, -dy/2:dy/2:dy].reshape(2, -1).T
+        bp = np.vstack((bp0,bp1))
+         
+        #左
+        lp0 = np.mgrid[0:dx:dx, dy:4+dy:dy].reshape(2, -1).T
+        lp1 = np.mgrid[-dx/2:dx/2:dx, dy-dy/2:4+dy/2:dy].reshape(2, -1).T
+        lp = np.vstack((lp0,lp1))
+        
+        #右
+        rp0 = np.mgrid[4:4+dx/2:dx, dy:4+dy:dy].reshape(2, -1).T
+        rp1 = np.mgrid[4+dx/2:4+dx:dx, dy-dy/2:4+dy/2:dy].reshape(2, -1).T
+        rp = np.vstack((rp0,rp1))
+        
+        boundaryp = np.vstack((bp,lp,rp))
+        node = np.vstack((pp,boundaryp))
+ 
+        result = cls(node)
+        result.is_boundary[pp.shape[0]:] = True 
+        return result
 
 
