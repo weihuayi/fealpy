@@ -10,19 +10,22 @@ class NSMacSolver():
         self.umesh = umesh
         self.vmesh = vmesh
         self.pmesh = pmesh
-'''    
+        
+
     def grad_ux(self):
-        mesh = self.mesh
+        mesh = self.umesh
+        dx = mesh.h[0]
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
         N = Nrow*Ncol
 
         result = diags([1, -1],[Nrow, -Nrow],(N,N), format='csr')
 
-        return result
+        return result/(2*dx)
 
     def grad_uy(self):
-        mesh = self.mesh  
+        mesh = self.umesh
+        dy = mesh.h[1]
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
         N = Nrow*Ncol
@@ -37,9 +40,10 @@ class NSMacSolver():
         result[index, index] = -2
         result[index, index-1] = -2/3
         result[index[:-1], index[:-1]+1] = 0
-
+        return result/(2*dy)
+    
     def Tuv(self):
-        mesh  = self.mesh
+        mesh  = self.umesh
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
         N = Nrow*Ncol
@@ -49,10 +53,11 @@ class NSMacSolver():
         result[index,index+index//Nrow+1] = 1
         result[index,index+index//Nrow-Nrow-1] = 1
         result[index,index+index//Nrow-Nrow] = 1
-        return result
+        return result/4
     
     def laplace_u(self):
-        mesh = self.mesh
+        mesh = self.umesh
+        dx,dy = mesh.h
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
         N = Nrow*Ncol
@@ -66,26 +71,22 @@ class NSMacSolver():
         result[index, index+1] = 4/3
         result[index[2:]-1, index[2:]-2] = 4/3
 
-        return result
+        return result/(dx*dy)
     
     def grand_uxp(self):
-        mesh = self.mesh
+        mesh = self.pmesh
+        dx = mesh.h[0]
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
         N = Nrow*Ncol
         result = diags([1, -1],[0, -Nrow],(N,N), format='lil')
         A = lil_matrix((Nrow, N))
         result1 = vstack([result, A], format='lil')   
-        return result1
+        return result1/dx
     
-    def source_F(self, mesh, t):
-        mesh_p = mesh
-        nodes_p = mesh_p.entity('node')
-        num_nodes_p = nodes_p.shape[0]
-        # 初始化数组，存储体积力
-        result = np.zeros((num_nodes_p, 1))
-        source_p = pde.source_F(nu, t) 
-        result += source_p * np.ones((num_nodes_p, 1))
-        return result
+    def source_Fx(self, pde ,t):
+        mesh = self.umesh
+        nodes = mesh.entity('node')
+        source = pde.source_F(nodes,t) 
+        return source
 
-'''

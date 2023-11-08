@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import numpy as np
 class taylor_greenData:
-    def __init__(self, D=[0,2*np.pi,0,2*np.pi], T=[0, 5]):
+    def __init__(self, Re=1, D=[0,2*np.pi,0,2*np.pi], T=[0, 5]):
         """
         @brief 模型初始化函数
         @param[in] D 模型空间定义域
@@ -9,6 +9,8 @@ class taylor_greenData:
         """
         self._domain = D 
         self._duration = T 
+        self.Re = Re
+        self.nu = 1/Re
     
     def domain(self):
         """
@@ -31,6 +33,7 @@ class taylor_greenData:
 
         @return 真解函数值
         """
+        nu = self.nu        
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
@@ -60,6 +63,7 @@ class taylor_greenData:
 
         @return 真解函数值
         """
+        nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
@@ -89,6 +93,7 @@ class taylor_greenData:
 
         @return 真解函数值
         """
+        nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
@@ -109,12 +114,17 @@ class taylor_greenData:
         val = -(np.cos(2*x)+np.cos(2*y))/4
         return val
     
-    def source_F(self,nu,t):
+    def source_F(self, node, t):
         """
         @brief 体积力
         @param[in] t float, 时间点 
         """
-        return np.exp(-2*nu*t)
+        x = node[..., 0]
+        y = node[..., 1]
+        nu = self.nu
+        val = np.ones_like(node)
+        val *= np.exp(-2*nu*t)
+        return val
 
     def source(self, m, t):
         """
@@ -125,6 +135,7 @@ class taylor_greenData:
 
         @return 方程右端函数值
         """
+        nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
@@ -142,6 +153,7 @@ class taylor_greenData:
 
         @return 真解导函数值
         """
+        nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
@@ -159,6 +171,7 @@ class taylor_greenData:
 
         @return 真解导函数值
         """
+        nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
@@ -176,6 +189,7 @@ class taylor_greenData:
 
         @return 真解导函数值
         """
+        nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
