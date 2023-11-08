@@ -16,21 +16,29 @@ from ..mesh.adaptive_tools import mark
 from scipy.sparse.linalg import spsolve
 
 class AFEMPhaseFieldCrackPropagationProblem2d():
+    """
+    @brief 线性自适应有限元相场方法求解 2D 裂纹传播问题
+    """
     def __init__(self, model, mesh, p=1):
         """
+        @brief 
+
+        @param[in] model 算例模型
+        @param[in] mesh 连续体离散网格
+        @param[in] p 有限元空间次数
         """
         self.model = model
         self.mesh = mesh
         self.p = p
         self.GD = mesh.geo_dimension()
-    
 
         NC = mesh.number_of_cells()
 
         self.space = LagrangeFESpace(mesh, p=p)
-        self.uh = self.space.function(dim=2)
-        self.d = self.space.function()
-        self.H = np.zeros(NC)
+
+        self.uh = self.space.function(dim=2) # 位移场
+        self.d = self.space.function() # 相场
+        self.H = np.zeros(NC) # 最大历史应变场
         
         disp = model.is_boundary_disp()
 
@@ -52,9 +60,12 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             disp, 
             dirichlet_phase=False, 
             refine='nvp', 
-            maxit=100):
+            maxit=100,
+            theta=0.2):
         """
+        @brief 给定位移条件，用 Newton Raphson 方法求解
         """
+
         mesh = self.mesh
         space = self.space
         model = self.model
@@ -78,16 +89,18 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             D = self.dsigma_depsilon(d, uh)
             integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
             ubform.add_domain_integrator(integrator)
-            ubform.assembly()
-            A0 = ubform.get_matrix()
+            A0 = ubform.assembly()
             R0 = -A0@uh.flat[:]
             
             self.force = np.sum(-R0[isDDof.flat])
             
             ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
+
+            # 这里为什么做两次边界条件处理？
             A0, R0 = ubc.apply(A0, R0) 
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
            
+            # TODO：更快的求解方法
             du.flat[:] = spsolve(A0, R0)
             uh[:] += du
             
@@ -101,19 +114,19 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
                 q=4))
             dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-            dbform.assembly()
-            A1 = dbform.get_matrix()
+            # TODO：快速组装程序
+            A1 = dbform.assembly()
 
             lform = LinearForm(space)
             lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
-            lform.assembly()
-            R1 = lform.get_vector()
+            R1 = lform.assembly()
             R1 -= A1@d[:]
 
             if dirichlet_phase:
                 dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
                 A1, R1 = dbc.apply(A1, R1)
 
+            # TODO：快速求解程序
             d[:] += spsolve(A1, R1)
         
             self.stored_energy = self.get_stored_energy(phip, d)
@@ -123,10 +136,10 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
             self.d = d
             self.H = H
 
-            # 恢复型后验误差估计子
+            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
             eta = self.recovery.recovery_estimate(self.d)
                 
-            isMarkedCell = mark(eta, theta = 0.2)
+            isMarkedCell = mark(eta, theta = theta) # TODO：
 
             cm = mesh.cell_area() 
             isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
@@ -155,6 +168,7 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
 
     def bisect_refine(self, isMarkedCell):
         """
+        @brief 二分法加密策略
         """
         data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 'd':self.d,
                 'H':self.H}
@@ -175,6 +189,9 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
         self.H = option['data']['H']
    
     def redgreen_refine(self, isMarkedCell):
+        """
+        @brief 红绿加密策略
+        """
         self.mesh.celldata['H'] = self.H
         mesho = copy.deepcopy(self.mesh)
         spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
