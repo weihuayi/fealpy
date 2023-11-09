@@ -459,14 +459,6 @@ class TetrahedronMesh(Mesh, Plotable):
                     nodedata=self.nodedata,
                     celldata=celldata)
 
-    def paraview(self): 
-        """
-        @brief 调用 ParaView 进行可视化
-        """
-        import subprocess
-        self.to_vtk(fname="test.vtu")
-        pvpython_path = subprocess.check_output(['which', 'pvpython']).decode().strip()
-        subprocess.run([pvpython_path, '/home/why/fealpy/fealpy/plotter/load_vtu.py'])
 
     def location(self, points):
 

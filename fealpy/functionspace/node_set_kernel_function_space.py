@@ -2,8 +2,8 @@ import numba
 import numpy as np
 
 class NodeSetKernelSpace:
-
-    def __init__(self, mesh, ker='Quintic'):
+    
+    def __init__(self, mesh, ker='Quintic', H=1):
         """
         @brief 
 
@@ -12,10 +12,17 @@ class NodeSetKernelSpace:
         """
         self.mesh = mesh
         self.ker = ker
-        
-    def kernel(self, method=ker):
-        print(method)
-        return 
+        self.H = H
+         
+    @numba.jit(nopython=True)
+    def kernel(self, r):
+        choose = self.ker
+        d = np.sqrt(np.sum(r**2, axis=-1))
+        H = self.H
+        q = d/H
+        if choose == 'Quintic':
+            val = 7 * (1-q/2)**4 * (2*q+1) / (4*np.pi*H**2)        
+        return val
 
     @numba.jit(nopython=True)
     def Quintic_kernel(self, r):
@@ -26,13 +33,18 @@ class NodeSetKernelSpace:
 
     def grad_kernel(self, r):
         d = np.sqrt(np.sum(r**2))
+        H = self.H
         q = d/H
-        val = -35/(4*np.pi*H**3) * q * (1-q/2)**3 
-        if d==0:
-            val = 0
-        else :
-            val /= d
-        return r*val
+        choose = self.ker
+
+        if choose == 'Quintic':
+            val = -35/(4*np.pi*H**3) * q * (1-q/2)**3
+            val *= r
+            if d==0:
+                val = 0
+            else :
+                val /= d
+        return val
 
     def value(self, u, points):
         """
