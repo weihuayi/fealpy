@@ -9,7 +9,7 @@
 '''  
 import numpy as np
 from fealpy.mesh import NodeSet 
-from fealpy.functionspace import 
+from fealpy.functionspace import NodeSetKernelSpace 
 import matplotlib.pyplot as plt
 
 dx = 0.025
@@ -36,9 +36,17 @@ dtype = [("float64", (2, )),
          ("float64"),
          ("float64")]
 
+
+
+
 mesh.add_node_data(name, dtype)
 mesh.set_node_data("rho", rho0)
 NN = mesh.number_of_nodes()
 NB = np.sum(mesh.is_boundary_node())
 NF = NN - NB
 mesh.set_node_data("mass", 2*rho0/NF)
+
+space = NodeSetKernelSpace(mesh, H=H)
+
+re = space.kernel(0.02)
+print(re)
