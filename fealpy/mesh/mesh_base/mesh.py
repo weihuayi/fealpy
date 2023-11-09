@@ -436,12 +436,16 @@ class Mesh():
         return e # float or (NC, )
 
     def paraview(self, file_name = "temp.vtu", 
-            background_color='white', 
-            show_edges=True, 
-            save_image_path=None):
+            background_color='1.0, 1.0, 1.0', 
+            show_type='Surface With Edges',
+            ):
         """
         @brief 调用 ParaView 进行可视化
+
+        @param[in] show_type : 
         """
+        import subprocess
+        import os
         # 尝试找到pvpython的路径
         try:
             pvpython_path = subprocess.check_output(['which', 'pvpython']).decode().strip()
@@ -466,13 +470,12 @@ class Mesh():
 
         # 构建load_vtk.py的相对路径
         # 假设当前文件在 fealpy/mesh/mesh_base/mesh.py
-        load_vtk_path = os.path.join(current_dir, '..', '..', 'plotter', 'load_vtk.py')
+        load_vtk_path = os.path.join(current_dir, '..', '..', 'plotter',
+                'paraview_plotting.py')
 
         command = [
             pvpython_path, load_vtk_path, file_name,
-            '--background_color', background_color,
-            '--show_edges', str(show_edges),
-            '--save_image_path', save_image_path
+            '--show_type', show_type,
         ]
 
         # 移除 None 参数
