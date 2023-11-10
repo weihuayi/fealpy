@@ -16,7 +16,7 @@ from scipy.sparse.linalg import spsolve
 
 class AFEMPhaseFieldCrackPropagationProblem():
     """
-    @brief 线性自适应有限元相场方法求解 2D 和 3D 裂纹传播问题
+    @brief 自适应线性有限元相场方法求解 2D 和 3D 裂纹传播问题
     """
     def __init__(self, model, mesh, p=1):
         """
@@ -40,25 +40,25 @@ class AFEMPhaseFieldCrackPropagationProblem():
 
     def get_dissipated_energy(self, d):
         """
-        @brief 
+        @brief 计算耗散能量
         """
         model = self.model
-        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         mesh = self.mesh
+
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         cm = mesh.entity_measure('cell')
         g = d.grad_value(bc)
 
-        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=1))
+        val = model.kappa/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=1))
         dissipated = np.dot(val, cm)
         return dissipated
 
     
     def get_stored_energy(self, psi_s, d):
         """
-        @brief 
+        @brief  
         """
         eps = 1e-10
-
         bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         c0 = (1 - d(bc)) ** 2 + eps
         mesh = self.mesh

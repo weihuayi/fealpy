@@ -379,8 +379,40 @@ class Mesh():
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
 
-    def integral(self, fun, q=3, celltype=False):
-        pass
+    def integral(self, f, q=3, celltype=False):
+        """
+        @brief 在网格中数值积分一个函数
+        """
+        GD = self.geo_dimension()
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        if callable(f):
+            if not hasattr(f, 'coordtype'):
+                f = f(ps)
+            else:
+                if f.coordtype == 'cartesian':
+                    f = f(ps)
+                elif f.coordtype == 'barycentric':
+                    f = f(bcs)
+
+        cm = self.entity_measure('cell')
+
+        if isinstance(f, (int, float)): #  u 为标量常函数
+            e = f*cm
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = np.einsum('q, qc..., c->c...', ws, f, cm)
+
+        if celltype:
+            return e 
+        else:
+            return np.sum(e) 
 
     def error(self, u, v, q=3, power=2, celltype=False):
         """
@@ -442,7 +474,8 @@ class Mesh():
         """
         @brief 调用 ParaView 进行可视化
 
-        @param[in] show_type : 
+        @param[in] file_name str 网格子类可以设置不同的 vtk 文件后缀名
+        @param[in] show_type str 
         """
         import subprocess
         import os
@@ -463,7 +496,8 @@ class Mesh():
             return  # 退出函数
 
         # 将网格数据转换为VTU文件
-        self.to_vtk(fname=file_name)
+        fname = "/tmp/" + file_name
+        self.to_vtk(fname=fname)
 
         # 获取当前文件的绝对路径
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -474,7 +508,7 @@ class Mesh():
                 'paraview_plotting.py')
 
         command = [
-            pvpython_path, load_vtk_path, file_name,
+            pvpython_path, load_vtk_path, fname,
             '--show_type', show_type,
         ]
 
@@ -483,3 +517,4 @@ class Mesh():
 
         # 调用 pvpython 执行画图脚本，并传递参数
         subprocess.run(command)
+        os.remove(fname)

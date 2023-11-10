@@ -320,14 +320,14 @@ class AFEMPhaseFieldCrackPropagationProblem2d():
         """
 
         eps = 1e-10
-        lam = self.model.lam
-        mu = self.model.mu
-        s = self.strain(uh)
+        lam = self.model.lam # 拉梅第一参数
+        mu = self.model.mu # 拉梅第二参数
+        s = self.strain(uh) # 计算应变
 
         NC = len(s)
         D = np.zeros((NC, 3, 3), dtype=np.float64)
 
-        ts = np.trace(s, axis1=1, axis2=2)
+        ts = np.trace(s, axis1=1, axis2=2) # 计算应变的迹
         w, v = self.strain_eigs(s)
         hwp = self.heaviside(w)
         hwm = self.heaviside(-w)
