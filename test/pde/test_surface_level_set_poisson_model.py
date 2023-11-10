@@ -10,9 +10,10 @@
 import pytest
 import numpy as np
 import sympy as sp
+from fealpy.pde.surface_level_set_poisson_model import SurfaceLevelSetPDEData
 
+@pytest
 def test_surface_level_set_poisson_model():
-    from fealpy.pde.surface_level_set_poisson_model import SurfaceLevelSetPDEData
 
     x, y, z = sp.symbols('x, y, z', real=True)
 

@@ -35,7 +35,7 @@ class SurfaceLevelSetPDEData:
 
         # 方程右端项 
         f = sp.diff(projection[0], x) + sp.diff(projection[1], y) + sp.diff(projection[2], z)
-
+         
         self.F = sp.lambdify((x, y, z), F, "numpy")
         self.u = sp.lambdify((x, y, z), u, "numpy")
 
@@ -44,40 +44,40 @@ class SurfaceLevelSetPDEData:
         self.gradu = sp.lambdify((x, y, z), grad_u, "numpy")
         self.udiff = sp.lambdify((x, y, z), projection, "numpy")
 
-        @cartesian
-        def levelset(self, p):
-            """
-            @berif 曲面的水平集表达式
-            """
-            x, y, z = p[..., 0], p[..., 1], p[..., 2]
+    @cartesian
+    def levelset(self, p):
+        """
+        @berif 曲面的水平集表达式
+        """
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
 
-            return self.F(x, y, z)
-        @cartesian
-        def solution(self, p):
-            """
-            @berif 真解函数
-            """
-            x, y, z = p[..., 0], p[..., 1], p[..., 2]
+        return self.F(x, y, z)
 
-            return self.u(x, y, z)
+    @cartesian
+    def solution(self, p):
+        """
+        @berif 真解函数
+        """
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
 
-        @cartesian
-        def graddient(self, p):
-            """
-            @berif 真解在曲面S上的梯度 
-            """
-            x, y, z = p[..., 0], p[..., 1], p[..., 2]
-            gradient_su = self.udiff(x, y, z)
+        return self.u(x, y, z)
 
-            return gradient_su
+    @cartesian
+    def graddient(self, p):
+        """
+        @berif 真解在曲面S上的梯度 
+        """
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
+        gradient_su = self.udiff(x, y, z)
 
-        @cartesian
-        def source(self, p):
-            """
-            @berif 方程右端项
-            """
-            x, y, z = p[..., 0], p[..., 1], p[..., 2]
-            fval = self.f(x, y, z)
+        return gradient_su
 
-            return fval
+    @cartesian
+    def source(self, p):
+        """
+        @berif 方程右端项
+        """
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
+        fval = self.f(x, y, z)
 
+        return fval
