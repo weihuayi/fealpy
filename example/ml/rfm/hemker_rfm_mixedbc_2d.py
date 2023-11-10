@@ -7,42 +7,31 @@ Equation:
 import torch
 from torch import Tensor
 from torch.nn import init
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
 
 from fealpy.mesh import UniformMesh2d
 from fealpy.ml.modules import (
-    RandomFeatureSpace, PoUSpace, Cos, PoUSin, Function,
-    Solution
+    RandomFeatureSpace, PoUSpace, Cos, PoUSin, Solution
 )
 from fealpy.ml.sampler import Collocator, CircleCollocator
+from fealpy.ml.operators import (
+    ScalerDiffusion, ScalerConvection, ScalerMass, Form
+)
 
 PI = torch.pi
-
-ep = torch.tensor(0.01, dtype=torch.float64)
+ep = torch.tensor(0.1, dtype=torch.float64)
 b = torch.tensor([1.0, 0.0], dtype=torch.float64)
 
-def boundary_left(p: Tensor):
-    return torch.zeros((p.shape[0], 1), dtype=p.dtype)
-
-def boundary_t_b_r(p: Tensor):
-    return torch.zeros((p.shape[0], 1), dtype=p.dtype)
 
 def boundary_circle(p: Tensor):
     return torch.ones((p.shape[0], 1), dtype=p.dtype)
 
-def source(p: Tensor):
-    return torch.zeros((p.shape[0], 1), dtype=p.dtype)
 
-Jn = 50
-
-mesh = UniformMesh2d((0, 6, 0, 3), (2, 2), origin=(-3, -3))
-node = torch.from_numpy(mesh.entity('node'))
+Jn = 64
 
 def factory(i: int):
     if i in {5, 6, 9, 10}:
-        sp = RandomFeatureSpace(2, Jn*4, Cos(), bound=(16.0, PI))
-        init.normal_(sp.frequency, 0, 8)
+        sp = RandomFeatureSpace(2, Jn*4, Cos(), bound=(8.0, PI))
+        init.normal_(sp.frequency, 0, 8.0)
     elif i in {0, 1, 2, 3}:
         sp = RandomFeatureSpace(2, 8, Cos(), bound=(0.5, PI))
         init.normal_(sp.frequency, 0, 0.5)
@@ -51,8 +40,8 @@ def factory(i: int):
         init.normal_(sp.frequency, 0, 4.0)
     return sp
 
-space = PoUSpace(factory, centers=node, radius=1.0, pou=PoUSin(), print_status=True)
-
+mesh = UniformMesh2d((0, 6, 0, 3), (2, 2), origin=(-3, -3))
+space = PoUSpace.from_uniform_mesh(factory, mesh, 'node', pou=PoUSin(), print_status=True)
 
 ### generate collocation points
 
@@ -66,44 +55,16 @@ col_btm = Collocator([-3, 9, -3, -3], [N*2, 1]).run()
 col_right = Collocator([9, 9, -3, 3], [1, N]).run()
 col_cir = CircleCollocator().run(N)
 
-b_ = torch.cat([source(col_in),
-                boundary_left(col_left),
-                boundary_t_b_r(col_top),
-                boundary_t_b_r(col_btm),
-                boundary_t_b_r(col_right),
-                boundary_circle(col_cir)], dim=0)
+form = Form(space)
+form.add(col_in, (ScalerDiffusion(ep), ScalerConvection(b)))
+form.add(col_left, ScalerMass())
+form.add(col_right, ScalerConvection([1., 0.]))
+form.add(col_btm, ScalerConvection([0., -1.]))
+form.add(col_top, ScalerConvection([0., 1.]))
+form.add(col_cir, ScalerMass(), 1.0)
 
-diffusion = -ep * space.laplace_basis(col_in)
-convection = space.convect_basis(col_in, coef=b)
-del col_in
-value_left = space.basis(col_left)
-del col_left
-grad_value_top = space.convect_basis(col_top, coef=torch.tensor([0, 1], dtype=torch.float64))
-del col_top
-grad_value_btm = space.convect_basis(col_btm, coef=torch.tensor([0, -1], dtype=torch.float64))
-del col_btm
-grad_value_right = space.convect_basis(col_right, coef=torch.tensor([1, 0], dtype=torch.float64))
-del col_right
-value_cir = space.basis(col_cir)
-del col_cir
-
-A_ = torch.cat([(diffusion + convection)/64,
-                value_left,
-                grad_value_top/8,
-                grad_value_btm/8,
-                grad_value_right/8,
-                value_cir], dim=0)
-
-del diffusion, convection, value_left, grad_value_top, grad_value_btm, grad_value_right, value_cir
-
-A_ = csr_matrix(A_.detach().cpu().numpy())
-b_ = csr_matrix(b_.detach().cpu().numpy())
-
-um = spsolve(A_.T@A_, A_.T@b_)
-del A_, b_
-
-model = Function(space, torch.from_numpy(um))
-
+model = form.spsolve(rescale=100, ridge=1e-6)
+um = model.um
 
 from matplotlib import pyplot as plt
 fig = plt.figure("RFM for Hemker")
