@@ -7,6 +7,14 @@ from .optimizer_base import ObjFunc, Float
 
 
 def show_line_fun(axes, fun, a, b, n=100):
+    """
+    @brief 绘制函数曲线
+    @param axes matplotlib axes对象
+    @param fun 函数对象
+    @param a 起始点
+    @param b 终止点
+    @param n 样条数
+    """
     t = np.linspace(a, b, n)
     F = np.zeros(t.shape)
     for i, ti in enumerate(t):
@@ -14,93 +22,16 @@ def show_line_fun(axes, fun, a, b, n=100):
         F[i] = f
     axes.plot(t, F)
 
-def quadratic_search(fun, f0, g0, alpha=2):
-    t0 = 0
-    t1 = alpha
-
-    minf = f0
-    alpha = 0
-
-    NF = 0
-    [f1, g1] = fun(t1)
-    print("t1:", t1, "f1:", f1)
-    NF += 1
-
-    if minf > f1:
-        alpha = t1
-        minf = f1
-        print("alpha:", alpha, "f:", minf)
-
-    k = 0
-    while k < 2:
-        k += 1
-        t = g1 - (f1 - f0)/(t1 - t0)
-        t2 = t1 - 0.5*(t1 - t0)*g1/t
-
-        if t2 < 0:
-            break
-
-        [f, g] = fun(t2)
-        print("t2:", t2, "f2:", f)
-
-        NF += 1
-        if minf > f:
-            alpha = t2
-            minf = f
-            print("alpha:", alpha, "f:", minf)
-
-        t0 = t1
-        f0 = f1
-        g0 = g1
-
-        t1 = t2
-        f1 = f
-        g1 = g
-
-    return alpha, NF
-
-def golden_section_search(fun, a, b, tol=1e-5):
-    phi0 = (np.sqrt(5) - 1)/2
-    phi1 = (3 - np.sqrt(5))/2
-    a, b = min(a, b), max(a, b)
-    h = b - a
-    if h <= tol:
-        return (a+b)/2
-    n = int(np.ceil(np.log(tol/h)/np.log(phi0)))
-    c = a + phi1*h
-    d = a + phi0*h
-    yc = fun(c)
-    yd = fun(d)
-
-    for k in range(n):
-        if yc < yd:
-            b = d
-            d = c
-            yd = yc
-            h = phi0*h
-            c = a + phi1*h
-            yc = fun(c)
-            print("yc:%12.11g"%(yc))
-        else:
-            a = c
-            c = d
-            yc = yd
-            h = phi0*h
-            d = a + phi0*h
-            yd = fun(d)
-            print("yd:%12.11g"%(yd))
-    if yc < yd:
-        return (a+d)/2
-    else:
-        return (c+b)/2
-
-
-def line_search(x0: NDArray, f: np.float_, d: NDArray, fun: ObjFunc,
+def quadratic_search(x0: NDArray, f: np.float_, d: NDArray, fun: ObjFunc,
                 alpha: Optional[float]=None) -> Tuple[Optional[float], NDArray, np.floating, NDArray]:
     """
-    @brief
-
-    @return: alpha, x, f, g
+    @brief 二次搜索算法
+    @param x0 初始点
+    @param f 初始点函数值
+    @param d 搜索方向
+    @param fun 目标函数
+    @param alpha 初始步长
+    @return 最优步长alpha, 最优点x, 最优点函数值f, 最优点梯度g
     """
     a0 = 0.0
 
@@ -135,14 +66,65 @@ def line_search(x0: NDArray, f: np.float_, d: NDArray, fun: ObjFunc,
             return alpha, x, f, g
     return alpha, x, f, g
 
+def golden_section_search(fun, a, b, tol=1e-5):
+    '''
+    @brief 黄金分割搜索算法
+    @param fun 函数对象, 这里的函数是关于步长alpha的函数
+    @param a 区间下界
+    @param b 区间上界
+    @param tol 精度要求
+
+    @return  最优步长
+    '''
+    phi0 = (np.sqrt(5) - 1)/2
+    phi1 = (3 - np.sqrt(5))/2
+    a, b = min(a, b), max(a, b)
+    h = b - a
+    if h <= tol:
+        return (a+b)/2
+    n = int(np.ceil(np.log(tol/h)/np.log(phi0)))
+    c = a + phi1*h
+    d = a + phi0*h
+    yc = fun(c)
+    yd = fun(d)
+
+    for k in range(n):
+        if yc < yd:
+            b = d
+            d = c
+            yd = yc
+            h = phi0*h
+            c = a + phi1*h
+            yc = fun(c)
+            print("yc:%12.11g"%(yc))
+        else:
+            a = c
+            c = d
+            yc = yd
+            h = phi0*h
+            d = a + phi0*h
+            yd = fun(d)
+            print("yd:%12.11g"%(yd))
+    if yc < yd:
+        return (a+d)/2
+    else:
+        return (c+b)/2
 
 def zoom(x: NDArray, s: Float, d: NDArray,
             fun: ObjFunc, alpha_0: Float, alpha_1: Float, f0: Float,
             fl: Float, c1: float, c2: float) -> Tuple[Float, NDArray, np.floating, NDArray]:
     """
-    @brief
-
-    @return alpha, xc, fc, gc
+    @brief 在区间内找到满足Wolfe条件的步长
+    @param x 当前点 
+    @param s 方向导数
+    @param d 搜索方向
+    @param fun 目标函数  
+    @param alpha_0 区间下界
+    @param alpha_1 区间上界
+    @param f0 初始函数值
+    @param fl 区间上界点函数值
+    @param c1, c2 zoom算法参数
+    @return 最优步长alpha, 最优点xc, 最优点函数值fc, 最优点梯度gc
     """
     iter_ = 0
     while iter_ < 20:
@@ -164,14 +146,18 @@ def zoom(x: NDArray, s: Float, d: NDArray,
         iter_ += 1
     return alpha, xc, fc, gc
 
-
 def wolfe_line_search(x: NDArray, f: Float, s: Float,
                       d: NDArray, fun: ObjFunc,
                       alpha0: Float) -> Tuple[Float, NDArray, np.floating, NDArray]:
     """
-    @brief
-
-    @return: alpha, xc, fc, gc
+    @brief 强Wolfe线搜索
+    @param x 当前点
+    @param f 当前点函数值
+    @param s 方向导数
+    @param d 搜索方向
+    @param fun 目标函数
+    @param alpha0 初始步长
+    @return: 最优步长alpha, 最优点xc, 最优点函数值fc, 最优点梯度gc
     """
     c1, c2 = 0.001, 0.1
     alpha = alpha0
