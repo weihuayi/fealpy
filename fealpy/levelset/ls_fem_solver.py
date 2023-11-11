@@ -28,6 +28,9 @@ class LSFEMSolver(LSSolver):
             self.C = bform.assembly() # TODO：实现快速组装方法
 
     def solve(self, phi0, dt, u=None, tol=1e-8):
+        '''
+        PDE_solve
+        '''
         space = self.space
         M = self.M
 
@@ -48,7 +51,7 @@ class LSFEMSolver(LSSolver):
 
     def reinit(self, phi0, dt = 0.0001, eps = 5e-6, nt = 4, alpha = None):
         '''
-        TODO wrong!
+        PDE_reinit
         '''
         space = self.space
         mesh = space.mesh
