@@ -1,5 +1,4 @@
 import numpy as np
-import numba as nb
 from numpy.linalg import inv
 from fealpy.quadrature import GaussLobattoQuadrature
 
