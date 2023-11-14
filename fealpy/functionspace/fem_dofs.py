@@ -1,4 +1,6 @@
 import numpy as np
+from functools import reduce
+import operator as op
 from typing import Optional, Union, Callable
 
 class LinearMeshCFEDof():
@@ -141,10 +143,11 @@ class LinearMeshDFEDof():
     间断单元自由度管理基类.
     """
     def __init__(self, mesh, p):
+        TD = mesh.top_dimension()
         self.mesh = mesh
         self.p = p
         if p > 0:
-            self.multiIndex = mesh.multi_index_matrix(self.p)
+            self.multiIndex = mesh.multi_index_matrix(self.p, TD)
         else:
             TD = mesh.top_dimension()
             self.multiIndex = np.array((TD+1)*(0,), dtype=mesh.itype)
