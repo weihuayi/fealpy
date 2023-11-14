@@ -50,7 +50,7 @@ class LSSolver():
         magnitude = np.linalg.norm(grad_phi, axis=-1)
 
         # Compute the difference between the magnitude and 1
-        diff = np.abs(magnitude - 1)
+        diff = np.abs(magnitude) - 1
 
         diff_avg = np.mean(diff)
         diff_max = np.max(diff)

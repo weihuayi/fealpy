@@ -87,7 +87,7 @@ def test_LSFEMSolver_solve(ls_fem_solver_setup):
 
 
 def test_LSFEMSolver_reinit(ls_fem_solver_setup):
-    space, u, _ = ls_fem_solver_setup
+    space, u, phi0 = ls_fem_solver_setup
 
     # 提供一个非符号距离函数 phi0
     @cartesian
@@ -97,10 +97,6 @@ def test_LSFEMSolver_reinit(ls_fem_solver_setup):
         return (x - 0.5)**2 + (y - 0.5)**2  # 一个非符号距离函数的平方形式
 
     phi0 = space.interpolate(non_sdf)
-    print("phi0:", phi0)
-
-    # Instantiate the solver with the velocity field.
-    solver_with_u = LSFEMSolver(space, u=u)
 
     solver = LSSolver(space, phi0, u)
 
@@ -108,10 +104,11 @@ def test_LSFEMSolver_reinit(ls_fem_solver_setup):
     print("diff_avg_0:", diff_avg)
     print("diff_max_0:", diff_max)
 
+    # Instantiate the solver with the velocity field.
+    solver_with_u = LSFEMSolver(space, u=u)
 
     # 执行重置化
     phi1 = solver_with_u.reinit(phi0)
-    print("phi1:", phi1)
 
     # Call the check_gradient_norm method which calculates the average and maximum difference from 1.
     diff_avg, diff_max = solver.check_gradient_norm(phi = phi1)
