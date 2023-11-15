@@ -16,18 +16,17 @@ class IterationCounter(object):
 
 
 class LSSolver():
-    def __init__(self, space, phi0, u, output_dir):
+    def __init__(self, space, phi0, u):
         self.space = space
         self.phi0 = phi0
         self.u = u
-        self.output_dir = output_dir
 
-    def output(self, timestep):
+    def output(self, timestep, output_dir, filename_prefix):
         mesh = self.space.mesh
-        if self.output_dir != 'None':
+        if output_dir != 'None':
             mesh.nodedata['phi'] = self.phi0
             mesh.nodedata['velocity'] = self.u
-            fname = os.path.join(self.output_dir, f'test_{timestep:010}.vtu')
+            fname = os.path.join(output_dir, f'{filename_prefix}_{timestep:010}.vtu')
             mesh.to_vtk(fname=fname)
 
     def check_gradient_norm(self, phi):
@@ -51,7 +50,7 @@ class LSSolver():
         magnitude = np.linalg.norm(grad_phi, axis=-1)
 
         # Compute the difference between the magnitude and 1
-        diff = np.abs(magnitude - 1)
+        diff = np.abs(magnitude) - 1
 
         diff_avg = np.mean(diff)
         diff_max = np.max(diff)
@@ -60,7 +59,7 @@ class LSSolver():
 
     def solve_system(self, A, b, tol=1e-8):
         counter = IterationCounter(disp = False)
-        result, info = lgmres(A, b, tol = tol, callback = counter)
+        result, info = lgmres(A, b, tol = tol, atol = tol, callback = counter)
         # print("Convergence info:", info)
         # print("Number of iteration of gmres:", counter.niter)
         return result
