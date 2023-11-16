@@ -128,7 +128,7 @@ class TriangleMesh(Mesh, Plotable):
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
-        @brief 
+        @brief
         """
         if iptype in {'cell', 2}:
             return (p+1)*(p+2)//2
@@ -154,20 +154,20 @@ class TriangleMesh(Mesh, Plotable):
         gdof0 = self.number_of_global_ipoints(p0)
         gdof1 = self.number_of_global_ipoints(p1)
 
-        # 1. 网格节点上的插值点 
+        # 1. 网格节点上的插值点
         NN = self.number_of_nodes()
         I = range(NN)
         J = range(NN)
         V = np.ones(NN, dtype=self.ftype)
         P = coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
-        # 2. 网格边内部的插值点 
+        # 2. 网格边内部的插值点
         NE = self.number_of_edges()
         # p1 元在边上插值点对应的重心坐标
-        bcs = self.multi_index_matrix(p1, TD-1)/p1 
+        bcs = self.multi_index_matrix(p1, TD-1)/p1
         # p0 元基函数在 p1 元对应的边内部插值点处的函数值
-        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)  
-       
+        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)
+
         e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
         e2p0 = self.edge_to_ipoint(p0)
         shape = (NE, ) + phi.shape
@@ -950,7 +950,7 @@ class TriangleMesh(Mesh, Plotable):
                         bcr[:, 0] = bc[:, 2]
                         bcr[:, 1] = 1/2*bc[:, 0]
                         bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
-                        
+
                         value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
 
                         phi = self.shape_function(bcr, p=p)
@@ -958,7 +958,7 @@ class TriangleMesh(Mesh, Plotable):
 
                         phi = self.shape_function(bcl, p=p)
                         value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
-                        
+
                         options['data'][key] = value
 
 
@@ -1727,7 +1727,7 @@ class TriangleMesh(Mesh, Plotable):
             n = 3
         else:
             n = 2
-        
+
         mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
         node = mesh.entity('node')
         ips = mesh.interpolation_points(p)
@@ -1756,7 +1756,7 @@ class TriangleMesh(Mesh, Plotable):
                 s = s.replace(' ', ',')
                 axes.text(ips[i, 0], ips[i, 1], s,
                         multialignment='center',
-                        fontsize=12, 
+                        fontsize=12,
                         color='r')
         plt.show()
 
@@ -1861,7 +1861,7 @@ class TriangleMesh(Mesh, Plotable):
             axes = fig.add_subplot(m, n, i+1)
             mesh.add_plot(axes)
             mesh.find_node(axes, node=ips, showindex=True)
-            axes.quiver(ps[:, 0], ps[:, 1], gphi[:, 0, i, 0], gphi[:, 0, i, 1], 
+            axes.quiver(ps[:, 0], ps[:, 1], gphi[:, 0, i, 0], gphi[:, 0, i, 1],
                     units='xy')
             axes.set_title(f'$\\nabla\\phi_{{{i}}}$')
         plt.show()
@@ -2215,9 +2215,6 @@ class TriangleMesh(Mesh, Plotable):
         from scipy.spatial import Delaunay
         from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 
-        hx = (box[1] - box[0]) / nx
-        hy = (box[3] - box[2]) / ny
-
         mesh = UniformMesh2d((0, nx, 0, ny), ((box[1] - box[0]) / nx, (box[3] - box[2]) / ny), (box[0], box[2]))
 
         interfaceNode, isInterfaceNode, isInterfaceCell, ncut, naux = mesh.find_interface_node(phi)
@@ -2232,7 +2229,7 @@ class TriangleMesh(Mesh, Plotable):
         isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
         tri = tri[~isUnnecessaryCell, :]
 
-        interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
+        interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int_)
         interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode)
         interfaceNodeIdx[NI:NI + ncut] = N + np.arange(ncut)
         interfaceNodeIdx[NI + ncut:] = N + ncut + np.arange(naux)
@@ -2241,7 +2238,7 @@ class TriangleMesh(Mesh, Plotable):
         NS = np.sum(~isInterfaceCell)
         NT = tri.shape[0]
         pnode = np.concatenate((node, interfaceNode[NI:]), axis=0)
-        pcell = np.zeros((NS * 2 + NT, 3), dtype=np.int)
+        pcell = np.zeros((NS * 2 + NT, 3), dtype=np.int_)
         temp = cell[~isInterfaceCell, :]
         pcell[0:NS, :] = temp[:, [1, 2, 0]]
         pcell[NS:2*NS, :] = temp[:, [3, 0, 2]]
