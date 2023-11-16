@@ -494,6 +494,26 @@ class QuadrangleMesh(Mesh, Plotable):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
 
+    def show_function(self, plot, uh, cmap=None):
+        """
+        """
+        from types import ModuleType
+        import matplotlib.colors as colors
+        import matplotlib.cm as cm
+        from mpl_toolkits.mplot3d import Axes3D
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = plot.axes(projection='3d')
+        else:
+            axes = plot
+
+        node = self.entity('node')
+        cax = axes.plot_trisurf(
+                node[:, 0], node[:, 1],
+                uh, cmap=cmap, lw=0.0)
+        axes.figure.colorbar(cax, ax=axes)
+        return axes
 
     ## @ingroup MeshGenerators
     @classmethod

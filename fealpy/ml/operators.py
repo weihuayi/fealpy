@@ -4,14 +4,16 @@ from typing import (
     List, Union, Tuple, Sequence, Literal, Optional, Generator,
     Generic, TypeVar, overload
 )
+
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
-from fealpy.ml.modules import Function, FunctionSpace, PoUSpace
+
 from .nntyping import TensorFunction, S
-from .modules import FunctionSpace, Function
+from .modules import FunctionSpace, Function, PoUSpace
 from . import solvertools as ST
+
 
 FuncOrTensor = Union[TensorFunction, Tensor, list, tuple]
 FuncOrNumber = Union[TensorFunction, Tensor, float, int]
@@ -30,8 +32,21 @@ def _to_tensor(sample: Tensor, func_or_tensor: Optional[FuncOrTensorLike]):
 
 _FS = TypeVar('_FS', bound=FunctionSpace)
 
+
 class Form(Generic[_FS]):
-    def __init__(self, space: _FS, gd=1) -> None:
+    """
+    @brief Forms for collecting conditions.
+
+    1. use the `add` method to collect samples, operators and sources.
+    2. use the `assembly` method to generate A.T@A and A.T@b.
+    """
+    def __init__(self, space: _FS, gd: int=1) -> None:
+        """
+        @brief Build a form to collecting conditions.
+
+        @param space: FunctionSpace.
+        @param gd: int. Dimension of the source, used for initializing.
+        """
         self.space = space
         self.gd = gd
         self.samples: List[Tensor] = []
@@ -47,12 +62,12 @@ class Form(Generic[_FS]):
     def add(self, sample: Tensor, operator: Union[Sequence["Operator"], "Operator"],
             source: Optional[FuncOrNumber]=None):
         """
-        @brief Add a condition.
+        @brief Add a condition to the form.
 
         @param sample: collocation points Tensor.
         @param operator: one or sequence of operator(s) applying to the space.
         @param source: function or Tensor of source, optional. Source defaults to\
-               zero if not provided.
+               zero(s) if not provided.
         """
         self.samples.append(sample)
         # NOTE: samples are allow to have more than 2 dims.
@@ -79,20 +94,22 @@ class Form(Generic[_FS]):
             yield basis, src
 
     @overload
-    def assembly(self, *, rescale: Optional[float]=1.0) -> Tuple[csr_matrix, csr_matrix]: ...
+    def assembly(self, *, rescale: Optional[float]=1.0, allow_inplace=True) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
     def assembly(self, *, rescale: Optional[float]=1.0,
-                 return_sparse: Literal[True]=True) -> Tuple[csr_matrix, csr_matrix]: ...
+                 return_sparse: Literal[True]=True, allow_inplace=True) -> Tuple[csr_matrix, csr_matrix]: ...
     @overload
     def assembly(self, *, rescale: Optional[float]=1.0,
-                 return_sparse: Literal[False]=False) -> Tuple[Tensor, Tensor]: ...
-    def assembly(self, *, rescale: Optional[float]=1.0, return_sparse=True):
+                 return_sparse: Literal[False]=False, allow_inplace=True) -> Tuple[Tensor, Tensor]: ...
+    def assembly(self, *, rescale: Optional[float]=1.0, return_sparse=True, allow_inplace=True):
         """
-        @brief Assemble linear equations for the least-square problem.
+        @brief Assemble least-square matrix for the linear equations.
 
         @param rescale: float.
         @param return_sparse: bool, optional. Return in csr_matrix type if `True`.\
                Defaults to `True`.
+        @param allow_inplace: bool, optional. Set `False` to avoid in-place operation\
+               in assembling. Defaults to `True`.
 
         @return: Tuple[Tensor, Tensor] or Tuple[csr_matrix, csr_matrix].\
         """
@@ -109,7 +126,7 @@ class Form(Generic[_FS]):
                 # NOTE: `src` may be from broadcasting, so we clone the `src`
                 # to avoid inplace operations. While `phi` is calculated by
                 # basis in a space, so it can support inplace operation.
-                phi, src = ST.rescale(phi, src.clone(), rescale)
+                phi, src = ST.rescale(phi, src.clone(), rescale, inplace=allow_inplace)
             A[:] += phi.T@phi
             b[:] += phi.T@src
 
@@ -154,13 +171,14 @@ class Operator():
         """
         @brief Apply to a function space, and return with shape (N, nf, ...).
 
-        @note: Return shape is (N, nf) for `ScalerOperator`.
+        @note: Return shape is (N, nf) for `ScalerOperator`, where 'nf' is the\
+               number of features.
         """
         raise NotImplementedError
 
     def integrate(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         """
-        @brief Assemble matrix for weak form, and return with shape (nf, nf).
+        @brief Assemble matrix for weak formulation, and return with shape (nf, nf).
         """
         raise NotImplementedError
 
@@ -273,15 +291,45 @@ class Integrator(ScalerOperator):
 ### Continuous Operators
 
 class ContinuousOperator(ScalerOperator):
-    def __init__(self, sub_to_partition: Tensor) -> None:
-        """
-        @brief Initialize a scaler operator to assemble continuous matrix.
-        """
-        super().__init__()
-        self.sub2part = sub_to_partition
+    """Abstract class for continuity conditions. Only for typing."""
+    pass
 
 
 class Continuous0(ContinuousOperator):
+    """
+    @brief 0-order continuity condition. Samples should be a Tensor with shape\
+           (NVS, NS, GD), where NVS is the number of points in each sub-boundary\
+           and NS is the number of sub-boundaries.
+    """
+    def __init__(self, sub_to_part: Tensor) -> None:
+        """
+        @brief Initialize a scaler operator to assemble continuous matrix. These\
+               continuous conditions are designed for PoUSpace (or DGSpace).
+
+        @param sub_to_part: Tensor. Topology relationship between sub-boundaries\
+               and partitions(sub-domains). This tensor should be with shape\
+               (#subs, 2) that each row represents a sub-boundary, containing\
+               global indices of the two neighbor partitions.
+
+        @example: For example, the partitions\n
+        ```
+            *----*----*
+            |  1 |  3 |
+            *----*----*
+            |  0 |  2 |
+            *----*----*
+        ```
+        may have a `sub_to_part` tensor like:
+        ```
+        tensor([[1, 0],
+                [3, 2]
+                [0, 2]
+                [1, 3]], dtype=torch.int32)
+        ```
+        """
+        super().__init__()
+        self.sub2part = sub_to_part
+
     def apply(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         if not isinstance(space, PoUSpace):
             raise TypeError("Continuous0 is designed for PoUSpace, but applied "
@@ -310,6 +358,52 @@ class Continuous0(ContinuousOperator):
 
 
 class Continuous1(ContinuousOperator):
+    """
+    @brief 1-order continuity condition. Samples should be a Tensor with shape\
+           (NVS, NS, GD), where NVS is the number of points in each sub-boundary\
+           and NS is the number of sub-boundaries.
+    """
+    def __init__(self, sub_to_part: Tensor, sub_normal: Tensor) -> None:
+        """
+        @brief Initialize a scaler operator to assemble continuous matrix. These\
+               continuous conditions are designed for PoUSpace (or DGSpace).
+
+        @param sub_to_part: Tensor. Topology relationship between sub-boundaries\
+               and partitions(sub-domains). This tensor should be with shape\
+               (#subs, 2) that each row represents a sub-boundary, containing\
+               global indices of the two neighbor partitions.
+        @param sub_normal: Tensor. Unit normal direction of sub-boundaries, being\
+               with shape (#subs, GD).
+
+        @example: For example, the partitions\n
+        ```
+            *----*----*
+            |  1 |  3 |
+            *----*----*
+            |  0 |  2 |
+            *----*----*
+        ```
+        may have a `sub_to_part` tensor like:
+        ```
+        tensor([[1, 0],
+                [3, 2]
+                [0, 2]
+                [1, 3]], dtype=torch.int32)
+        ```
+        and the `sub_normal` may be:
+        ```
+        tensor([[0., -1.],
+                [0., -1.],
+                [1., 0.],
+                [1., 0.]], dtype=torch.float64)
+        ```
+        @note: The order of sub_boundaries in `sub_to_part`, `sub_normal` and\
+               samples should match.
+        """
+        super().__init__()
+        self.sub2part = sub_to_part
+        self.sub2normal = sub_normal
+
     def apply(self, p: Tensor, space: FunctionSpace, *, index=S) -> Tensor:
         if not isinstance(space, PoUSpace):
             raise TypeError("Continuous1 is designed for PoUSpace, but applied "
@@ -319,29 +413,26 @@ class Continuous1(ContinuousOperator):
         NS = p.shape[1]
         N_basis = space.number_of_basis()
         sub2part = self.sub2part
-        data = torch.zeros((NVS*NS*2, N_basis), dtype=p.dtype, device=p.device)
+        data = torch.zeros((NVS*NS, N_basis), dtype=p.dtype, device=p.device)
         for idx in range(NS):
             sp = p[:, idx, :] #(NVS, #Dims)
+            n = self.sub2normal[idx, :] #(GD, )
 
             left_idx = int(sub2part[idx, 0].item())
             left_part = space.partitions[left_idx]
             basis_slice_l = space.partition_basis_slice(left_idx)
-            NPBL = left_part.number_of_basis()
             x = left_part.global_to_local(sp)
-            grad = torch.einsum('...fd, d -> ...fd', left_part.space.grad_basis(x),
-                                1/left_part.radius)
-            left_data = torch.swapdims(grad, 1, 2).reshape(-1, NPBL)
-            data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_l] = left_data
+            left_data = torch.einsum('...fd, d, d -> ...f', left_part.space.grad_basis(x),
+                                     1/left_part.radius, n)
+            data[idx*NVS:(idx+1)*NVS, basis_slice_l] = left_data
 
             right_idx = int(sub2part[idx, 1].item())
             right_part = space.partitions[right_idx]
             basis_slice_r = space.partition_basis_slice(right_idx)
-            NPBR = right_part.number_of_basis()
             x = right_part.global_to_local(sp)
-            grad = torch.einsum('...fd, d -> ...fd', right_part.space.grad_basis(x),
-                                1/right_part.radius)
-            right_data = torch.swapdims(grad, 1, 2).reshape(-1, NPBR)
-            data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_r] = -right_data
+            right_data = torch.einsum('...fd, d, d -> ...f', right_part.space.grad_basis(x),
+                                      1/right_part.radius, n)
+            data[idx*NVS:(idx+1)*NVS, basis_slice_r] = -right_data
         return data
 
 

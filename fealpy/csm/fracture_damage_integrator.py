@@ -1,6 +1,6 @@
 import numpy as np
 
-class spectral_decomposition_integrator():
+class SpectralDecomposition():
     def __init__(self, mesh, lam=121.15, mu=80.77, Gc=2.7e-3, l0=0.015):
         self.lam = lam
         self.mu = mu
@@ -189,7 +189,7 @@ class spectral_decomposition_integrator():
         stored = np.dot(val, cm)
         return stored
 
-class volume_bias_strain_decomposition_integrator():
+class VolumeBiasStrainDecomposition():
     def __init__(self, mesh, lam=121.15, mu=80.77, Gc=2.7e-3, l0=0.015):
         self.lam = lam
         self.mu = mu

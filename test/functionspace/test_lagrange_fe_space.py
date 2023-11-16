@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import matplotlib.pyplot as plt
 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.functionspace import LagrangeFESpace
@@ -180,7 +181,29 @@ def test_interpolation_fe_function(p=1, method='rg'):
             print("err0 : ", err0)
             print(mesho.number_of_cells())
 
+def test_domain_with_hole():
+    from fealpy.geometry import SquareWithCircleHoleDomain
+    domain = SquareWithCircleHoleDomain() 
+    mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
+    mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
+
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
+    mesh.find_cell(axes)
+    #hmesh.add_halfedge_plot(axes, showindex=True)
+    #axes.scatter(points[:, 0], points[:, 1], color='r')
+    #for i in range(len(points)):
+    #    plt.annotate(i, points[i], textcoords="offset points", xytext=(0, 10),
+    #            ha='center', color='r', fontsize=40)
+    plt.show()
+
+
+
+
+
 if __name__ == '__main__':
     #test_triangle_mesh(2)
-    test_interpolation_fe_function(p=1, method='nvb')
+    #test_interpolation_fe_function(p=1, method='nvb')
+    test_domain_with_hole()
 
