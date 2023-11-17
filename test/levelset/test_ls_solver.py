@@ -19,7 +19,7 @@ def ls_solver_setup():
     def circle_phi(p):
         x = p[...,0]
         y = p[...,1]
-        val = np.sqrt((x-0.5)**2+(y-0.75)**2) - 0.15
+        val = np.sqrt((x - 0.5)**2 + (y - 0.75)**2) - 0.15
         return val
 
     phi = space.interpolate(circle_phi)
@@ -62,9 +62,9 @@ def test_compute_zero_level_set_area(ls_solver_setup):
     solver = LSSolver(space)
 
     computed_area = solver.compute_zero_level_set_area(phi)
-    print(computed_area)
 
     radius = 0.15
     theoretical_area = np.pi * radius**2
+    print(computed_area - theoretical_area)
 
-    assert np.isclose(computed_area, theoretical_area, atol=0.01), f"Computed area ({computed_area}) does not match theoretical area ({theoretical_area})"
+    assert np.isclose(computed_area, theoretical_area, atol=0.001), f"Computed area ({computed_area}) does not match theoretical area ({theoretical_area})"
