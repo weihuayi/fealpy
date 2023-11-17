@@ -64,3 +64,26 @@ class LSSolver():
         result, _ = lgmres(A, b, tol = tol, atol = tol, callback = counter)
 
         return result
+
+    def compute_zero_level_set_area(self, phi0):
+        """
+        Compute the area of the zero level set of the level set function.
+
+        Parameters:
+        - phi0: The level set function evaluated at grid points.
+
+        Returns:
+        - area: The computed area of the zero level set.
+        """
+        mesh = self.space.mesh
+        measure = self.space.function()
+        measure[phi0 > 0] = 0
+        measure[phi0 <= 0] = 1
+        
+        qf = mesh.integrator(3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cellmeasure = mesh.entity_measure('cell')
+        
+        area = np.einsum('i, ij, j ->', ws, measure(bcs), cellmeasure)
+
+        return area

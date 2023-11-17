@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 from ..fem import BilinearForm
 from ..fem import LinearForm
@@ -88,6 +89,59 @@ class LSFEMSolver(LSSolver):
 
         # Solve the linear system to find the updated level set function.
         phi0 = self.solve_system(A, b, tol = tol)
+
+        return phi0
+
+    def solve_measure(self, phi0, dt, u=None, tol=1e-8):
+        """
+        Solve the level set evolution equation for one time step using the
+        provided initial condition and velocity field.
+
+        Parameters:
+        - phi0 : The initial condition for the level set function.
+        - dt : Time step size for the evolution.
+        - u : (Optional) Updated velocity field for the evolution.
+        - tol : Tolerance for the linear system solver.
+
+        The function solves for phi^{n+1} given phi^n (phi0) using the
+        discretized Crank-Nicolson scheme. It returns the updated level set
+        function after one time step.
+        """
+        space = self.space
+        start_time_M = time.time()
+        M = self.M
+        end_time_M = time.time()
+        time_M = end_time_M - start_time_M
+
+        start_time_C = time.time()
+        # Use the provided velocity field u for this time step if given, otherwise use the previously stored velocity field.
+        if u is None:
+            C = self.C 
+            if C is None:
+                raise ValueError(" Velocity `u` is None! You must offer velocity!")
+        else:
+            bform = BilinearForm(space)
+            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u))
+            C = bform.assembly()
+        end_time_C = time.time()
+        time_C = end_time_C - start_time_C
+
+        # The system matrix A is composed of the mass matrix and the convection matrix.
+        # It represents the Crank-Nicolson discretization of the PDE.
+        A = M + (dt/2) * C 
+
+        # The right-hand side vector b for the linear system includes the effect of the previous time step's level set function and the convection.
+        b = M @ phi0 - (dt/2) * C @ phi0
+
+        start_time_solve = time.time()
+        # Solve the linear system to find the updated level set function.
+        phi0 = self.solve_system(A, b, tol = tol)
+        end_time_solve = time.time()
+        time_solve = end_time_solve - start_time_solve
+
+        print(f"Time to assemble M: {time_M} seconds")
+        print(f"Time to assemble C: {time_C} seconds")
+        print(f"Time to solve linear system: {time_solve} seconds")
 
         return phi0
 
