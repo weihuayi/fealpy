@@ -176,6 +176,20 @@ class NSMacSolver():
         source = pde.source_F(nodes,t) 
         return source
     
+    def grad_pux(self):
+        mesh = self.umesh
+        dx = mesh.h[0]
+        Nrow = mesh.node.shape[1]
+        Ncol = mesh.node.shape[0]
+        N = Nrow*Ncol
+        result = diags([1,1],[0,Nrow],(N-Nrow,N), format='lil')
+        return result/dx
     
-
-
+    def grad_pvy(self):
+        mesh = self.vmesh
+        dy = mesh.h[1]
+        Nrow = mesh.node.shape[1]
+        Ncol = mesh.node.shape[0]
+        N = Nrow*Ncol
+        result = diags([1,1],[0,1],(N-Ncol,N), format='lil')
+        return result/dy
