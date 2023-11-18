@@ -379,8 +379,40 @@ class Mesh():
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
 
-    def integral(self, fun, q=3, celltype=False):
-        pass
+    def integral(self, f, q=3, celltype=False):
+        """
+        @brief 在网格中数值积分一个函数
+        """
+        GD = self.geo_dimension()
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        if callable(f):
+            if not hasattr(f, 'coordtype'):
+                f = f(ps)
+            else:
+                if f.coordtype == 'cartesian':
+                    f = f(ps)
+                elif f.coordtype == 'barycentric':
+                    f = f(bcs)
+
+        cm = self.entity_measure('cell')
+
+        if isinstance(f, (int, float)): #  u 为标量常函数
+            e = f*cm
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = np.einsum('q, qc..., c->c...', ws, f, cm)
+
+        if celltype:
+            return e 
+        else:
+            return np.sum(e) 
 
     def error(self, u, v, q=3, power=2, celltype=False):
         """
@@ -434,3 +466,55 @@ class Mesh():
         else:
             e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
+
+    def paraview(self, file_name = "temp.vtu", 
+            background_color='1.0, 1.0, 1.0', 
+            show_type='Surface With Edges',
+            ):
+        """
+        @brief 调用 ParaView 进行可视化
+
+        @param[in] file_name str 网格子类可以设置不同的 vtk 文件后缀名
+        @param[in] show_type str 
+        """
+        import subprocess
+        import os
+        # 尝试找到pvpython的路径
+        try:
+            pvpython_path = subprocess.check_output(['which', 'pvpython']).decode().strip()
+            # 确保路径不为空
+            if not pvpython_path:
+                raise Exception("pvpython path is empty.")
+        except subprocess.CalledProcessError as e:
+            print("pvpython was not found. Please make sure ParaView is installed.")
+            print("On Ubuntu, you can install ParaView using the following commands:")
+            print("sudo apt-get update")
+            print("sudo apt-get install paraview python3-paraview")
+            print("\nAdditionally, you may need to set the PYTHONPATH environment variable to include the path to the ParaView Python modules.")
+            print("You can do this by adding the following line to your .bashrc file:")
+            print("export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages")
+            return  # 退出函数
+
+        # 将网格数据转换为VTU文件
+        fname = "/tmp/" + file_name
+        self.to_vtk(fname=fname)
+
+        # 获取当前文件的绝对路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # 构建load_vtk.py的相对路径
+        # 假设当前文件在 fealpy/mesh/mesh_base/mesh.py
+        load_vtk_path = os.path.join(current_dir, '..', '..', 'plotter',
+                'paraview_plotting.py')
+
+        command = [
+            pvpython_path, load_vtk_path, fname,
+            '--show_type', show_type,
+        ]
+
+        # 移除 None 参数
+        command = [str(arg) for arg in command if arg is not None]
+
+        # 调用 pvpython 执行画图脚本，并传递参数
+        subprocess.run(command)
+        os.remove(fname)

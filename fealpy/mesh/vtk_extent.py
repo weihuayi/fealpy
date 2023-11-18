@@ -144,6 +144,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
                 cdata.AddArray(d)
     writer = vtk.vtkXMLUnstructuredGridWriter()
     writer.SetFileName(fname)
+    writer.SetDataMode(vtk.VTK_BINARY)
     writer.SetInputData(mesh)
     writer.Write()
 

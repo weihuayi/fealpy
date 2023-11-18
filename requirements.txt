@@ -1,5 +1,6 @@
 numpy>=1.21
 scipy
+numba
 gmsh
 matplotlib
 vtk
