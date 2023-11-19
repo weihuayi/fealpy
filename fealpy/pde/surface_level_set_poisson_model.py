@@ -10,19 +10,20 @@
 import numpy as np
 import sympy as sp
 from fealpy.decorator import cartesian
+import ipdb
 
 class SurfaceLevelSetPDEData:
     def __init__(self, F, u):
 
         x, y, z = sp.symbols('x, y, z', real=True)
 
-        # 计算曲面上的单位法向量
+        # 计算曲面上的单位外法向量
         grad_Fx = sp.diff(F, x)
         grad_Fy = sp.diff(F, y)
         grad_Fz = sp.diff(F, z)
-        grad_F = -sp.Matrix([grad_Fx, grad_Fy, grad_Fz])
+        grad_F = sp.Matrix([grad_Fx, grad_Fy, grad_Fz])
 
-        unit_normal_vector = grad_F / grad_F.norm() 
+        unit_normal_vector = grad_F / grad_F.norm()
 
         #计算u在曲面上的梯度
         grad_ux = sp.diff(u, x)
@@ -31,11 +32,26 @@ class SurfaceLevelSetPDEData:
         grad_u = sp.Matrix([grad_ux, grad_uy, grad_uz])
         
         projection = grad_u - (grad_u.dot(unit_normal_vector)) * unit_normal_vector 
-        
 
-        # 方程右端项 
-        f = sp.diff(projection[0], x) + sp.diff(projection[1], y) + sp.diff(projection[2], z)
-         
+        # 方程右端项
+        laplacian_u = sp.diff(grad_ux, x)+sp.diff(grad_uy, y)+sp.diff(grad_uz, z)
+
+        nx = sp.diff(unit_normal_vector, x)[0]
+        ny = sp.diff(unit_normal_vector, y)[1]
+        nz = sp.diff(unit_normal_vector, z)[2]
+        
+        #ipdb.set_trace()
+        div_n = nx + ny + nz
+        dot_product = grad_u.dot(unit_normal_vector) * div_n
+        
+        H_u = sp.Matrix([[sp.diff(grad_ux, x), sp.diff(grad_ux, y), sp.diff(grad_ux, z)],
+                [sp.diff(grad_uy, x), sp.diff(grad_uy, y), sp.diff(grad_uy, z)],
+                [sp.diff(grad_uz, x), sp.diff(grad_uz, y), sp.diff(grad_uz, z)]])
+        nH_u = unit_normal_vector.T * H_u * unit_normal_vector
+        trace_nH_u = sp.trace(nH_u)
+
+        f = laplacian_u - dot_product - trace_nH_u  
+
         self.F = sp.lambdify((x, y, z), F, "numpy")
         self.u = sp.lambdify((x, y, z), u, "numpy")
 
