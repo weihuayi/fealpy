@@ -1,5 +1,6 @@
 import numpy as np
-from typing import Optional, Union, Callable
+from numpy.typing import NDArray
+from typing import Union, Callable
 from .Function import Function
 from ..decorator import barycentric, cartesian
 from .fem_dofs import *
@@ -13,7 +14,7 @@ class LagrangeFESpace():
                 "QuadrangleMesh" : QuadrangleMeshCFEDof,
                 "HexahedronMesh" : HexahedronMeshCFEDof,
                 "EdgeMesh": EdgeMeshCFEDof,
-                }, 
+                },
             'D':{
                 "IntervalMesh": IntervalMeshDFEDof,
                 "TriangleMesh": TriangleMeshDFEDof,
@@ -21,14 +22,14 @@ class LagrangeFESpace():
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
                 "QuadrangleMesh" : QuadrangleMeshDFEDof,
                 "HexahedronMesh" : HexahedronMeshDFEDof,
-                "EdgeMesh": EdgeMeshDFEDof, 
+                "EdgeMesh": EdgeMeshDFEDof,
                 }
-        } 
-        
-    def __init__(self, 
-            mesh, 
-            p: int=1, 
-            spacetype: str='C', 
+        }
+
+    def __init__(self,
+            mesh,
+            p: int=1,
+            spacetype: str='C',
             doforder: str='vdims'):
         """
         @brief Initialize the Lagrange finite element space.
@@ -43,7 +44,7 @@ class LagrangeFESpace():
         """
         self.mesh = mesh
         self.p = p
-        assert spacetype in {'C', 'D'} 
+        assert spacetype in {'C', 'D'}
         self.spacetype = spacetype
         self.doforder = doforder
 
@@ -98,12 +99,12 @@ class LagrangeFESpace():
 
         @param[in] 粗空间次数列表
         """
-        assert self.spacetype == 'C' 
+        assert self.spacetype == 'C'
         p = self.p
         Ps = []
         for c in cdegree[-1::-1]:
             Ps.append(self.mesh.prolongation_matrix(c, p))
-            p = c 
+            p = c
         return Ps
 
     @barycentric
@@ -115,11 +116,11 @@ class LagrangeFESpace():
     @barycentric
     def grad_basis(self, bc, index=np.s_[:]):
         """
-        @brief 
+        @brief
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
-    
+
     @barycentric
     def face_basis(self, bc, index=np.s_[:]):
         """
@@ -153,12 +154,12 @@ class LagrangeFESpace():
             phi = self.basis(bc) #(NP, ldof)
             e2d = uh.space.dof.entity_to_dof(etype=TD)[loc] #(NP, ldof)
             val = np.sum(phi[..., 0, :]*uh[e2d], axis=-1)
-        return loc, val 
+        return loc, val
 
     @barycentric
-    def value(self, 
-            uh: np.ndarray, 
-            bc: np.ndarray, 
+    def value(self,
+            uh: np.ndarray,
+            bc: np.ndarray,
             index: Union[np.ndarray, slice]=np.s_[:]
             ) -> np.ndarray:
         """
@@ -200,15 +201,14 @@ class LagrangeFESpace():
 
 
     @barycentric
-    def grad_value(self, 
-            uh: np.ndarray, 
-            bc: np.ndarray, 
-            index: Union[np.ndarray, slice]=np.s_[:]
-            ) -> np.ndarray:
+    def grad_value(self,
+            uh: NDArray,
+            bc: NDArray,
+            index: Union[NDArray, slice]=np.s_[:]
+            ) -> NDArray:
         """
-        @brief 
+        @brief
         """
-        gdof = self.number_of_global_dofs()
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
@@ -219,7 +219,7 @@ class LagrangeFESpace():
             # uh.shape == (gdof, )
             # uh[cell2dof].shape == (NC, ldof)
             # val.shape == (NQ, NC, GD)
-            val = np.einsum('...cim, ci->...cm', gphi, uh[cell2dof[index]])
+            val = np.einsum('...cim, ci->...cm', gphi, uh[cell2dof])
         elif self.doforder == 'sdofs':
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (..., gdof)
@@ -233,15 +233,15 @@ class LagrangeFESpace():
             # uh[cell2dof, ...].shape == (NC, ldof, ...)
             # val.shape == (NQ, NC, ..., GD)
             s1 = '...cim, ci{}->...c{}m'.format(s0[:dim], s0[:dim])
-            val = np.einsum(s1, gphi, uh[cell2dof[index], ...])
+            val = np.einsum(s1, gphi, uh[cell2dof, ...])
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
         return val
 
 
-    def boundary_interpolate(self, 
-            gD: Union[Callable, int, float, np.ndarray], 
-            uh: np.ndarray, 
+    def boundary_interpolate(self,
+            gD: Union[Callable, int, float, np.ndarray],
+            uh: np.ndarray,
             threshold: Union[Callable, np.ndarray, None]=None) -> np.ndarray:
         """
         @brief Set the first type (Dirichlet) boundary conditions.
@@ -259,17 +259,17 @@ class LagrangeFESpace():
         isDDof = self.is_boundary_dof(threshold=threshold)
         GD = self.geo_dimension()
 
-        if callable(gD): 
+        if callable(gD):
             gD = gD(ipoints[isDDof])
 
 
         if (len(uh.shape) == 1) or (self.doforder == 'vdims'):
             if len(uh.shape) == 1 and gD.shape[-1] == 1:
                 gD = gD[..., 0]
-            uh[isDDof] = gD 
+            uh[isDDof] = gD
         elif self.doforder == 'sdofs':
             if isinstance(gD, (int, float)):
-                uh[..., isDDof] = gD 
+                uh[..., isDDof] = gD
             elif isinstance(gD, np.ndarray):
                 if gD.shape == (GD, ):
                     uh[..., isDDof] = gD[:, None]
@@ -283,20 +283,20 @@ class LagrangeFESpace():
                 shape = (len(uh.shape)-1)*(1, ) + isDDof.shape
             elif self.doforder == 'vdims':
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
-            isDDof = np.broadcast_to(isDDof.reshape(shape), shape=uh.shape) 
+            isDDof = np.broadcast_to(isDDof.reshape(shape), shape=uh.shape)
         return isDDof
 
-    set_dirichlet_bc = boundary_interpolate 
+    set_dirichlet_bc = boundary_interpolate
 
 
     def function(self, dim=None, array=None, dtype=np.float64):
-        return Function(self, dim=dim, array=array, 
+        return Function(self, dim=dim, array=array,
                 coordtype='barycentric', dtype=dtype)
 
     def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim is None:
-            dim = tuple() 
+            dim = tuple()
         if type(dim) is int:
             dim = (dim, )
 
@@ -309,14 +309,14 @@ class LagrangeFESpace():
     def show_function(self, axes):
         pass
 
-    
-    def interpolate(self, u, dim=None, dtype=None):
+
+    def interpolate(self, u: Callable[[NDArray], NDArray], dim=None, dtype=None):
         """
-        @brief 
+        @brief
         """
         assert callable(u)
 
-        if not hasattr(u, 'coordtype'): 
+        if not hasattr(u, 'coordtype'):
             ips = self.interpolation_points()
             uI = u(ips)
         else:
@@ -326,9 +326,9 @@ class LagrangeFESpace():
             elif u.coordtype == 'barycentric':
                 TD = self.TD
                 p = self.p
-                bcs = multi_index_matrix[TD](p)/p
+                bcs = self.mesh.multi_index_matrix(p, TD)/p
                 uI = u(bcs)
-        
+
         if self.doforder == 'sdofs':
             uI = uI.swapaxes(uI.ndim-1,uI.ndim-2)
 
@@ -339,7 +339,7 @@ class LagrangeFESpace():
 
     def interpolation_fe_function(self, uh, dim=None, dtype=None):
         """
-        @brief 对有限元函数 uh 进行插值 
+        @brief 对有限元函数 uh 进行插值
         """
         if isinstance(uh, list):
             N = len(uh)
@@ -364,4 +364,4 @@ class LagrangeFESpace():
 
             uI0 = self.function()
             uI0[cell2dof] = uI
-        return uI0 
+        return uI0
