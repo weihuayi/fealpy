@@ -98,7 +98,7 @@ def change_p(particles,idx):
     Ftag = ~Btag & ~Htag & ~Gtag
     FGtag = ~Btag & ~Htag 
     # 计算流体粒子的压强
-    particles['pressure'][FGtag] = B * (np.exp((1-rho0/rho[Ftag])/c1) -1)
+    particles['pressure'][FGtag] = B * (np.exp((1-rho0/rho[FGtag])/c1) -1)
     pressure = particles['pressure']
     particles['sound'][FGtag] = np.sqrt(B * rho0/(c1*rho[FGtag]**2) \
                                 * np.exp((1-rho0/rho[FGtag])/c1))
@@ -128,9 +128,9 @@ def continue_equation(particles, idx, rho):
     num = particles.shape[0]
     position = particles["position"]
     velocity = particles["velocity"]
+    mass = particles['mass']
     pressure = particles["pressure"]
     c = particles["sound"]
-    mass = rho * dx**2  
     Btag = particles['isBd']
     Htag = particles['isHd']
     Gtag = particles['isGate']
@@ -286,8 +286,8 @@ def free_surface(particles, idx):
             gwij = gradkernel(xij)
             C += mass[j] * wij /rho[j]
             gradC += mass[j] * gwij /rho[j]
-        '''
-        if C < 0.75:
+        ''''
+        if C < 0.85:
             print("asd")
             FreeTag[i] = True
             As = np.zeros((2,2))
@@ -300,7 +300,7 @@ def free_surface(particles, idx):
             print(normal)
         '''
         #找界面粒子
-        if C < 0.8:
+        if C < 0.85:
             As = np.zeros((2,2))
             for k in idx[i]:
                 xik = position[i] - position[k]
@@ -457,7 +457,7 @@ def initial_position(dx):
     
     # gate particles
     gp = np.mgrid[-dx:-dx-4*H:-dx, \
-            init_domain[2]+dx:init_domain[3]:dx].reshape(2,-1).T
+            domain[2]+dx:domain[3]:dx].reshape(2,-1).T
     return fp,wp,dp,gp
 
 fp,wp,dp,gp = initial_position(dx)
@@ -465,8 +465,7 @@ num_particles = gp.shape[0] + fp.shape[0] + wp.shape[0] + dp.shape[0]
 particles = np.zeros(num_particles,dtype=dtype)
 particles['rho'] = rho0
 particles['position'] = np.vstack((fp,wp,dp,gp))
-particles['mass'] = dx**2 * rho0
-
+#particles['mass'] = rho0*dx**2
 #打标签
 particles['isBd'][fp.shape[0]:fp.shape[0]+wp.shape[0]] = True
 particles['isHd'][fp.shape[0]+wp.shape[0]:-gp.shape[0]] = True
@@ -475,6 +474,8 @@ Btag = particles['isBd']
 Gtag = particles['isGate']
 Htag = particles['isHd']
 Ftag = ~Btag & ~Htag & ~Gtag
+particles['mass'][~Gtag] = rho0 * (init_domain[1]- init_domain[0]) * (init_domain[3]-init_domain[2]) /fp.shape[0]
+particles['mass'][Gtag] = rho0 * 6*dx * (domain[3]-domain[2]) / gp.shape[0]
 
 #生成墙粒子和虚粒子关系
 tree = cKDTree(particles['position'][Btag])
@@ -490,7 +491,7 @@ idx = List([np.array(neighbors) for neighbors in idx])
 particles['velocity'][Htag] = wall_extrapolation(particles,idx,particles['velocity'])[dummy_idx]
 
 isfree = free_surface(particles, idx)
-print(particles['position'][isfree])
+#print(particles['position'][isfree])
 '''
 shifting(particles, idx, particles['position'])
 测试外推
@@ -499,16 +500,16 @@ particles['pressure'][Htag] = particles['pressure'][Btag][dummy_idx]
 '''
 
 #可视化
-#plt.figure(figsize=(20, 2), dpi=120)
-#plt.xlim(doddmain[0], domain[1])
-#plt.ylim(domain[2], domain[3])
 color = np.where(Btag, 'red', np.where(Htag, 'green', np.where(Gtag, 'black', \
         np.where(isfree, 'orange', 'blue'))))
 #color = np.where(Btag, 'red', np.where(Htag, 'green', np.where(Gtag, 'black', 'blue')))
+#color = particles['mass']
 plt.scatter(particles['position'][:, 0], particles['position'][:, 1] ,c=color,s=5)
+plt.colorbar(cmap='jet')
 plt.grid(True)
+ax = plt.gca()
+ax.set_aspect('equal')
 plt.show()
-'''
 for i in range(100):
     print("i:", i)
     particles = gate_change(particles) 
@@ -519,40 +520,38 @@ for i in range(100):
     Gtag = particles['isGate']
     Ftag = ~Btag & ~Htag & ~Gtag
     
+    # 更新半步压力和声速
+    change_p(particles,idx)
+    
     #更新索引
     idx = find_neighbors_within_distance(particles["position"], 2*H)
     idx = List([np.array(neighbors) for neighbors in idx])
-    
-
-    # 更新半步压力和声速
-    change_p(particles,idx)
 
     # 更新半步密度和半步质量
-    rho_0 = particles['rho']
+    rho_0 = particles['rho'].copy()
     F_rho_0 = continue_equation(particles, idx, rho_0)
     rho_1 = rho_0 + 0.5*dt*F_rho_0
 
     #更新半步速度
-    velocity_0 = particles['velocity']
+    velocity_0 = particles['velocity'].copy()
     F_velocity_0 = momentum_equation(particles, idx, velocity_0)
     velocity_1 = velocity_0 + 0.5*dt*F_velocity_0
     velocity_1[Htag] = wall_extrapolation(particles,idx,velocity_1)[dummy_idx]
     
+    
+    '''
     #更新半步位置
     position_0 = particles['position']
     is_free_particles = free_surface(particles, idx)
     #F_position_0 = change_position(particles, idx, position_0)
     F_position_0 = shifting(particles, idx, position_0, is_free_particles)
     position_1 = position_0 + 0.5*dt*F_position_0
-    print(particles['position'][is_free_particles])
-
+    '''
     particles['rho'] = rho_1
-    particles['mass'] = dx**2 * particles['rho']
     particles['velocity'] = velocity_1
     particles['velocity'][Htag] = wall_extrapolation(particles,idx,velocity_1)[dummy_idx]
-    particles['position'] = position_1
+    #particles['position'] = position_1
     
-
     # 更新压力和声速
     change_p(particles,idx)
 
@@ -564,12 +563,11 @@ for i in range(100):
     
     #更新半步位置
     #F_position_1 = change_position(particles, idx, position_1)
-    F_position_1 = shifting(particles, idx, position_1, is_free_particles)
+    F_position_1 = shifting(particles, idx, particles['position'], is_free_particles)
 
     particles['rho'] = rho_0 + 0.5*dt*(F_rho_1+F_rho_0)
-    particles['mass'] = dx**2 * particles['rho']
     particles['velocity'] = velocity_0 + 0.5*dt*(F_velocity_0 + F_velocity_1)
     particles['velocity'][Htag] = wall_extrapolation(particles,idx,particles['velocity'])[dummy_idx]
-    particles['position'] = position_0 + 0.5*dt*(F_position_0 + F_position_1)
+    #particles['position'] = position_0 + 0.5*dt*(F_position_0 + F_position_1)
+    particles['position'] = position_0 + F_position_1
     draw(particles, i)
-'''

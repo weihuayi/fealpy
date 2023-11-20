@@ -95,15 +95,26 @@ class TopLevelSet:
         return U
 
     def evolve(self, v, g, lsf, stepLength, w):
-        vFull = np.pad(v, ((1,1),(1,1)), mode='constant', constant_values=0)
-        gFull = np.pad(g, ((1,1),(1,1)), mode='constant', constant_values=0)
+        vFull = np.pad(v, ((1,1), (1,1)), mode='constant', constant_values=0)
+        gFull = np.pad(g, ((1,1), (1,1)), mode='constant', constant_values=0)
 
         dt = 0.1 / np.max(np.abs(v))
-        for _ in range(int(10 * stepLength)):
-            dpx = np.roll(lsf, shift=(0, -1), axis=(0, 1)) - lsf
-            dmx = lsf - np.roll(lsf, shift=(0, 1), axis=(0, 1))
+        for _ in range(int(1)):
+            dpx = np.roll(lsf, shift=(0, -1), axis=(0, 1)) - lsf # forward difference in x
+            print(np.roll(lsf, shift=(0, -1), axis=(0, 1)).round(4))
+            print("dpx:\n", dpx.round(4))
+
+            dmx = lsf - np.roll(lsf, shift=(0, 1), axis=(0, 1)) # backward difference in x
+            print(np.roll(lsf, shift=(0, 1), axis=(0, 1)).round(4))
+            print("dmx:\n", dpx.round(4))
+
             dpy = np.roll(lsf, shift=(-1, 0), axis=(0, 1)) - lsf
+            print(np.roll(lsf, shift=(-1, 0), axis=(0, 1)).round(4))
+            print("dpy:\n", dpx.round(4))
+
             dmy = lsf - np.roll(lsf, shift=(1, 0), axis=(0, 1))
+            print(np.roll(lsf, shift=(1, 0), axis=(0, 1)).round(4))
+            print("dmy:\n", dpx.round(4))
             
             lsf = lsf - dt * np.minimum(vFull, 0) * np.sqrt( np.minimum(dmx, 0)**2 + np.maximum(dpx, 0)**2 + np.minimum(dmy, 0)**2 + np.maximum(dpy, 0)**2 ) \
                     - dt * np.maximum(vFull, 0) * np.sqrt( np.maximum(dmx, 0)**2 + np.minimum(dpx, 0)**2 + np.maximum(dmy, 0)**2 + np.minimum(dpy, 0)**2 ) \
@@ -114,7 +125,7 @@ class TopLevelSet:
         
         return struc, lsf
 
-    def updateStep(self, iterNum, lsf, shapeSens, topSens, stepLength, topWeight):
+    def updateStep(self, lsf, shapeSens, topSens, stepLength, topWeight):
         kernel = 1/6 * np.array([[0, 1, 0], 
                                 [1, 2, 1], 
                                 [0, 1, 0]])
@@ -132,7 +143,6 @@ class TopLevelSet:
         shapeSens_smoothed[-1, key_positions] = 0
         topSens_smoothed[-1, key_positions] = 0
 
-        print("lsf:", lsf.shape)
         struc, lsf = self.evolve(-shapeSens_smoothed, topSens_smoothed*(lsf[1:-1, 1:-1] < 0), lsf, stepLength, topWeight)
 
         return struc, lsf
@@ -147,6 +157,7 @@ class TopLevelSet:
 
         KE, KTr, lambda_, mu = self. materialInfo()
         lsf = self.reinit(struc)
+        print("lsf:\n", lsf.round(4))
         
         objective = np.zeros(Num)
 
@@ -184,7 +195,7 @@ class TopLevelSet:
             shapeSens = shapeSens + la + 1/La * (volCurr - volReq)
             topSens = topSens - np.pi * ( la + 1/La * (volCurr - volReq) )
 
-            struc, lsf = self.updateStep(iterNum, lsf, shapeSens, topSens, stepLength, topWeight)
+            struc, lsf = self.updateStep(lsf, shapeSens, topSens, stepLength, topWeight)
 
             if iterNum % numReinit == 0:
                 lsf = self.reinit(struc)
@@ -202,5 +213,5 @@ class TopLevelSet:
 
 
 
-tls = TopLevelSet()
-print(tls.optimize(Num = 2))
+tls = TopLevelSet(nelx = 6, nely = 3)
+print(tls.optimize(Num = 1))

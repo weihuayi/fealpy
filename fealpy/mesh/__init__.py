@@ -23,6 +23,8 @@ from .uniform_mesh_1d import UniformMesh1d
 from .uniform_mesh_2d import UniformMesh2d
 from .uniform_mesh_3d import UniformMesh3d
 
+from .node_set import NodeSet
+
 from .ccg_mesh_reader import CCGMeshReader
 from .fab_file_reader import FABFileReader
 from .poly_file_reader import PolyFileReader

@@ -601,6 +601,9 @@ class FirstKindNedelecFiniteElementSpace2d:
         t = mesh.edge_unit_tangent(index=index)
         ps = mesh.bc_to_point(bcs, index=index)
         val = gD(ps, t)
+        print(ps.shape)
+        if len(val.shape)==3:
+            val = np.einsum('...ed, ed->...e', val, t)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]

@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 from numpy.linalg import inv
 from .Function import Function
@@ -451,6 +452,40 @@ class ScaledMonomialSpace2d():
 
     def number_of_global_dofs(self, p=None):
         return self.dof.number_of_global_dofs(p=p)
+    def show_function_image(self, u, uh, t=None, plot_solution=True):
+        mesh = uh.space.mesh
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = plt.axes(projection='3d')
+
+        NE = mesh.number_of_edges()
+        mid = mesh.entity_barycenter("cell")
+        node = mesh.entity("node")
+        edge = mesh.entity("edge")
+        edge2cell = mesh.ds.edge_to_cell()
+
+        coor = np.zeros([2*NE, 3, 2], dtype=np.float_)
+        coor[:NE, :2] = node[edge]
+        coor[:NE, 2] = mid[edge2cell[:, 0]] 
+        coor[NE:, :2] = node[edge]
+        coor[NE:, 2] = mid[edge2cell[:, 1]] 
+
+        val = np.zeros([2*NE, 3])
+        val[:NE] = uh(coor[:NE].swapaxes(0, 1), index=edge2cell[:, 0]).swapaxes(0 ,1)
+        val[NE:] = uh(coor[NE:].swapaxes(0, 1), index=edge2cell[:, 1]).swapaxes(0 ,1)
+
+        for ii in range(2*NE):
+            axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], val[ii], color = 'r', lw=0.0)#数值解图像
+        if plot_solution:
+            if t is not None:
+                fval = u(coor.swapaxes(0, 1), t).swapaxes(0, 1)
+            else:
+                fval = u(coor.swapaxes(0, 1)).swapaxes(0, 1)
+            for ii in range(2*NE):
+                axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], fval[ii], color = 'b', lw=0.0)#真解图像
+        plt.show()
+        return
+
 
 
     def cell_mass_matrix(self, p=None):

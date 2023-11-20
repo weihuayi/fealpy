@@ -1,7 +1,8 @@
 import argparse 
+import os
 import numpy as np
 
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh.triangle_mesh import TriangleMesh
 
 from fealpy.timeintegratoralg import UniformTimeLine
 
@@ -46,10 +47,7 @@ parser.add_argument('--step',
         default=10, type=int,
         help='')
 
-
 args = parser.parse_args()
-
-import os
 
 # Check if the directory exists, if not, create it
 if not os.path.exists(args.output):
@@ -122,8 +120,8 @@ dt = timeline.dt
 space = LagrangeFESpace(mesh, p=degree)
 
 # Initialize the level set function $phi0$ and velocity field $u$ on the mesh nodes
-phi0 = space.interpolate(circle)
-u = space.interpolate(velocity_field, dim=2)
+phi0 = space.interpolate(circle) # phi0.shape = (10201, )
+u = space.interpolate(velocity_field, dim=2) # u.shape = (10201, 2)
 u[:] = (dt/2) * u
 
 # Assemble the matrices for the problem using bilinear forms

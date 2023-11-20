@@ -2,7 +2,7 @@
 Partitions of Units
 """
 from typing import (
-    Union, List, Callable, Any, Generic, TypeVar, Tuple, Literal
+    Union, List, Callable, Any, Generic, TypeVar, Tuple, Literal, Optional,
 )
 
 import numpy as np
@@ -10,7 +10,7 @@ import torch
 from torch.nn import Module, Parameter
 from torch import Tensor, sin, cos, einsum
 
-from ..nntyping import S
+from ..nntyping import S, deprecated
 from .module import TensorMapping
 from .linear import Standardize
 
@@ -79,9 +79,11 @@ class _PoU_Fn(Module):
         raise NotImplementedError
 
 
-class PoUA(TensorMapping):
+class PoU(TensorMapping):
     """
-    A-style PoU, base class for Partitions of Unit (PoU) modules.
+    Base class of non-negative functions for Partitions of Unity (PoU),\
+    usually denoted as $\psi$. This base class using the indicator function of\
+    each partition.
     """
     def __init__(self, keepdim=True) -> None:
         super().__init__()
@@ -126,6 +128,8 @@ class PoUA(TensorMapping):
             N, _ = x.shape[0], x.shape[-1]
             return torch.tensor(0, dtype=x.dtype, device=x.device).broadcast_to(N, 1)
 
+PoUA = PoU
+POU_DEFAULT = PoU()
 
 ### Sin-style PoU function & module
 
@@ -163,7 +167,7 @@ class _PoU_Sin_Fn(_PoU_Fn):
         return 8*PI**4 * sin(2*PI*x) * f1 - 8*PI**4 * sin(2*PI*x) * f3
 
 
-class PoUSin(PoUA):
+class PoUSin(PoU):
     """
     @brief Sin-style partition of unity.
 
@@ -243,7 +247,7 @@ _FS = TypeVar('_FS', bound=FunctionSpace)
 #     of PoU function and the original space. The same to hessian. This may contain
 #     so many codes that very bad to put in Assembling.
 class PoULocalSpace(FunctionSpace, Generic[_FS]):
-    def __init__(self, pou_fn: PoUA, space: _FS, idx: int,
+    def __init__(self, pou_fn: PoU, space: _FS, idx: int,
                  center: Tensor, radius: Tensor) -> None:
         super().__init__()
         self.pou_fn = pou_fn
@@ -373,13 +377,33 @@ def assemble(dimension: int=0):
 
 
 class PoUSpace(FunctionSpace, Generic[_FS]):
-    def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor, radius: Union[Tensor, Any],
-                 pou: PoUA, print_status=False) -> None:
+    """
+    @brief Partitions of Unity
+    """
+    def __init__(self, space_factory: SpaceFactory[_FS], centers: Tensor,
+                 radius: Union[Tensor, Any],
+                 pou: Union[PoU, List[PoU], None]=None,
+                 print_status=False) -> None:
+        """
+        @brief Construct a function space by sub-spaces, using Partitions of Unity.
+
+        @param space_factory: (int -> FunctionSpace). A function returning\
+               local spaces by their indices.
+        @param centers: position Tensor with shape (#parts, GD).
+        @param radius: Tensor, float, or sequence of floats.
+        @param pou: PoU or list of PoU, optional. Continuous real valued functions.\
+               Use the indicator functions of partitions by default (then continuous\
+               conditions between partitions are required).
+        """
         super().__init__(dtype=centers.dtype, device=centers.device)
 
-        # TODO: remove this standardize
-        self.std = Standardize(centers=centers, radius=radius)
-        self.pou = pou
+        # NOTE: pou(s) are not necessary to add to sub-modules.
+        if isinstance(pou, list):
+            self.pou = pou
+        else:
+            pou_ = pou if pou else POU_DEFAULT
+            self.pou = [pou_, ] * centers.shape[0]
+
         self.partitions: List[PoULocalSpace[_FS]] = []
         self.in_dim = -1
         self.out_dim = -1
@@ -391,7 +415,7 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
         radius = rdata.expand(centers.shape)
 
         for i in range(centers.shape[0]):
-            part = PoULocalSpace(pou_fn=pou, space=space_factory(i), idx=i,
+            part = PoULocalSpace(pou_fn=self.pou[i], space=space_factory(i), idx=i,
                                  center=centers[i, :], radius=radius[i, :])
             if self.in_dim == -1:
                 self.in_dim = part.space.in_dim
@@ -412,7 +436,7 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
 
     @property
     def status_string(self):
-        return f"""PoU Space Group
+        return f"""PoU Space
 #Partitions: {self.number_of_partitions()},
 #Basis: {self.number_of_basis()}"""
 
@@ -446,6 +470,8 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
     def convect_basis(self, idx: int, p: Tensor, *, coef: Tensor, index=S) -> Tuple[Tensor, Tensor]:
         part = self.partitions[idx]
         flag = part.flag(p)
+        if coef.ndim == 1:
+            coef = coef.broadcast_to(p.shape[0], coef.shape[-1])
         return flag, self.partitions[idx].convect_basis(p[flag, ...], coef=coef[flag, ...], index=index)
 
     @assemble(0)
@@ -466,62 +492,64 @@ class PoUSpace(FunctionSpace, Generic[_FS]):
         flag = part.flag(p)
         return flag, self.partitions[idx].grad_basis(p[flag, ...], index=index)
 
+    @classmethod
+    def from_uniform_mesh(cls, space_factory: SpaceFactory[_FS], uniform_mesh,
+                          part_loc: Literal['node', 'cell'], pou: Optional[PoU]=None,
+                          print_status=False, device=None):
+        """
+        @brief Construct PoU space from a uniform mesh.
+
+        @param space_factory: A function generating spaces from indices.
+        @param uniform_mesh: UniformMesh1d, 2d or 3d.
+        @param part_loc: 'node' or 'cell'. Saying where the center of partition locates.
+        @param pou: PoU, optional. Continuous real valued functions. Use the\
+               indicator functions of partitions by default (then continuous\
+               conditions between partitions are required).
+        """
+        if part_loc == 'node':
+            ctrs = torch.from_numpy(uniform_mesh.entity('node'))
+        elif part_loc == 'cell':
+            ctrs = torch.from_numpy(uniform_mesh.entity_barycenter('cell'))
+        else:
+            raise ValueError(f"Invalid location center '{part_loc}'")
+        length = torch.tensor(uniform_mesh.h, dtype=ctrs.dtype, device=device)
+        return cls(space_factory, ctrs, length/2, pou, print_status)
+
 
 class UniformPoUSpace(PoUSpace[_FS]):
-    """PoU space based on uniform mesh."""
+    """
+    Deprecated. Use `PoUSpace.from_uniform_mesh` instead.\n
+    PoU space based on uniform mesh.
+    """
     def __init__(self, space_factory: SpaceFactory[_FS], uniform_mesh,
-                 location: Literal['node', 'cell'],
-                 pou: PoUA, print_status=False, device=None) -> None:
+                 part_loc: Literal['node', 'cell'], pou: PoUA,
+                 print_status=False, device=None) -> None:
         """
-        @brief Construct PoU space from a uniform mesh. Centers of partitions\
+        @brief Deprecated. Use `PoUSpace.from_uniform_mesh` instead.\
+               Construct PoU space from a uniform mesh. Centers of partitions\
                are **nodes** of the mesh.
 
         @param space_factory: A function generating spaces from indices.
         @param uniform_mesh: UniformMesh1d, 2d or 3d.
         @param pou: PoU. The PoU function.
+        @param part_loc: 'node' or 'cell'.
         """
-        if location == 'node':
+        if part_loc == 'node':
             ctrs = torch.from_numpy(uniform_mesh.entity('node'))
-        elif location == 'cell':
+        elif part_loc == 'cell':
             ctrs = torch.from_numpy(uniform_mesh.entity_barycenter('cell'))
         else:
-            raise ValueError(f"Invalid location center '{location}'")
+            raise ValueError(f"Invalid location center '{part_loc}'")
         length = torch.tensor(uniform_mesh.h, dtype=ctrs.dtype, device=device)
         super().__init__(space_factory, ctrs, length/2, pou, print_status)
         self.mesh = uniform_mesh
-        self.location = location
+        self.location = part_loc
 
-    def collocate_interior(self, nx: Tuple[int, ...], part_type=True):
-        """
-        @brief Collocate interior points in every partitions.
-
-        @param nx: Tuple[int]. The number of collocation points in axis of each\
-                   partition. Length of `nx` must match the geometry dimension.
-        @part_type: bool.
-
-        @return: `Tensor` with shape (N, #Parts, #Dims) if `part_type`, else\
-                 (N*#Parts, #Dims). Where N is the number of points in one partition.
-        """
-        GD = self.std.centers.shape[-1]
-        assert len(nx) == GD
-        rulers = tuple(torch.linspace(-1, 1, n+2)[1:-1] for n in nx)
-        loc = torch.stack(torch.meshgrid(*rulers, indexing='ij'), dim=-1).reshape(-1, GD)
-        points = self.std.inverse(loc)
-        if part_type:
-            return points
-        else:
-            return points.reshape(-1, GD)
-
-    def collocate_boundary(self, n: int):
-        """
-        @brief Collocate interior points in every boundary faces of the **MESH**\
-               (not the boundaries of partitions).
-        """
-        pass
-
+    @deprecated("2.1.0", "sampler.InterfaceSampler")
     def collocate_sub_edge(self, n: int, edge_type=True):
         """
-        @brief Collocate interior points in every sub-boundaries of partitions.
+        @brief Collocate interior points in every sub-boundaries of partitions.\
+               This is deprecated, use `sampler.InterfaceSampler` instead.
 
         @param n: int. The number of collocation points in each sub-boundary.
         @param edge_type: bool.
@@ -558,6 +586,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
         else:
             return points.reshape(-1, GD)
 
+    @deprecated("2.1.0", "sampler.InterfaceSampler")
     def sub_to_partition(self):
         """
         @brief Return the relationship between sub-boundaries and partitions.
@@ -576,6 +605,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
 
     # NOTE: We get basis value from the inner space(without PoU function).
     # This continue matrix is mainly designed for PoUA.
+    @deprecated("2.1.0", "operators.Continuous0")
     def continue_matrix_0(self, points: Tensor, return_sparse=False):
         """
         @brief Construct the matrix of 0th order continuity condition between\
@@ -612,6 +642,7 @@ class UniformPoUSpace(PoUSpace[_FS]):
             data[idx*NVS:(idx+1)*NVS, basis_slice_r] = -right_data
         return data
 
+    @deprecated("2.1.0", "operators.Continuous1")
     def continue_matrix_1(self, points: Tensor, return_sparse=False):
         """
         @brief Construct the matrix of 1st order continuity condition between\
@@ -655,48 +686,3 @@ class UniformPoUSpace(PoUSpace[_FS]):
             right_data = torch.swapdims(grad, 1, 2).reshape(-1, NPBR)
             data[idx*NVS*2:(idx+1)*NVS*2, basis_slice_r] = -right_data
         return data
-
-
-# class PoUTreeSpace(UniformPoUSpace[_FS]):
-#     partitions: List[PoULocalSpace[Union[_FS, 'PoUTreeSpace']]]
-
-#     def __init__(self, space_factory: SpaceFactory[_FS], uniform_mesh,
-#                  pou: PoU, parent=None, print_status=False, device=None) -> None:
-#         super().__init__(space_factory, uniform_mesh, pou, print_status, device)
-#         self.__parent = parent
-#         self._factory = space_factory
-#         self._MeshType = uniform_mesh.__class__
-
-#     @property
-#     def parent(self):
-#         return self.__parent
-
-#     def is_root(self):
-#         return self.parent is None
-
-#     def is_leaf_partition(self, idx: int):
-#         part = self.partitions[idx]
-#         if isinstance(part, PoUTreeSpace) and part.parent is self:
-#             return True
-#         return False
-
-#     def branch(self, idx: int, padding: int=0, space_factory: Optional[SpaceFactory[_FS]]=None):
-#         """
-#         @brief Refine the `idx`-th partition.
-#         """
-#         GD = self.std.centers.shape[-1]
-#         factory = space_factory if space_factory else lambda _:self._factory(idx)
-#         sub_ext = 1 + 2*padding
-#         sub_ori = 0.0 - sub_ext * 0.5
-#         sub_mesh = self._MeshType((0, sub_ext)*GD, (1.0, )*GD, origin=(sub_ori, )*GD)
-#         sub_space = PoUTreeSpace(factory, sub_mesh, self.pou, self, False, self.device)
-#         part = PoULocalSpace(pou=self.pou, space=sub_space)
-#         self.partitions[idx] = part
-#         return sub_space
-
-#     def cut(self, idx: int):
-#         """
-#         @brief Coarsen the `idx`-th partition.
-#         """
-#         part = PoULocalSpace(pou=self.pou, space=self._factory(idx))
-#         self.partitions[idx] = part

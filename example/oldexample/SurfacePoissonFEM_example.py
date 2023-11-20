@@ -9,7 +9,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.surface_poisson import SphereSinSinSinData  as PDE
-from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
+from fealpy.functionspace import ParametricLagrangeFESpace
+
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver

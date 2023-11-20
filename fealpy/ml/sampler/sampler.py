@@ -5,7 +5,6 @@ from typing import (
 from math import log2
 import torch
 from torch import Tensor, float64, device
-import numpy as np
 
 from . import functional as F
 
@@ -24,11 +23,10 @@ class Sampler():
         """
         @brief Initializes a Sampler instance.
 
-        @param m: The number of samples to generate.
         @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param device: device.
         @param requires_grad: A boolean indicating whether the samples should\
-                              require gradient computation. Defaults to `False`.
+               require gradient computation. Defaults to `False`.
         """
         self.enable_weight = enable_weight
         self.dtype = dtype
@@ -114,17 +112,18 @@ class ISampler(Sampler):
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
         if isinstance(ranges, Tensor):
-            ranges_arr = ranges.detach().clone().to(device=device)
+            ranges_arr = ranges.detach().clone().to(device=device).to(dtype=dtype)
         else:
             ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
 
         if ranges_arr.ndim == 1:
-            self.nd, mod = divmod(ranges_arr.shape[0], 2)
+            _, mod = divmod(ranges_arr.shape[0], 2)
             if mod != 0:
                 raise ValueError("If `ranges` is 1-dimensional, its length is"
                                  f"expected to be even, but got {mod}.")
             ranges_arr = ranges_arr.reshape(-1, 2)
         assert ranges_arr.ndim == 2
+        self.nd = ranges_arr.shape[0]
         self.nodes = ranges_arr # (GD, 2)
         self.mode = mode
 
@@ -158,6 +157,7 @@ class ISampler(Sampler):
         if self.enable_weight:
             self._weight[:] = 1/ret.shape[0]
             self._weight = self._weight.broadcast_to(ret.shape[0])
+        ret.requires_grad_(self.requires_grad)
         return ret
 
 
@@ -219,6 +219,7 @@ class BoxBoundarySampler(Sampler):
 ### Mesh samplers
 ##################################################
 
+from ..nntyping import S
 EType = Literal['cell', 'face', 'edge', 'node']
 
 class MeshSampler(Sampler):
@@ -228,7 +229,7 @@ class MeshSampler(Sampler):
 
     DIRECTOR: Dict[Tuple[Optional[str], Optional[str]], Type['MeshSampler']] = {}
 
-    def __new__(cls, mesh, etype: EType, index=np.s_[:],
+    def __new__(cls, mesh, etype: EType, index=S,
                 mode: Literal['random', 'linspace']='random',
                 dtype=float64, device: device=None,
                 requires_grad: bool=False):
@@ -261,7 +262,7 @@ class MeshSampler(Sampler):
                                               "has not been implemented.")
         return ms_class
 
-    def __init__(self, mesh, etype: EType, index=np.s_[:],
+    def __init__(self, mesh, etype: EType, index=S,
                  mode: Literal['random', 'linspace']='random',
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
@@ -280,7 +281,10 @@ class MeshSampler(Sampler):
         self.nd = self.node.shape[-1]
         self.node = self.node.reshape(-1, self.nd)
         try:
-            self.cell = torch.tensor(mesh.entity(etype, index=index), device=device)
+            if etype == 'node':
+                self.cell = torch.arange(self.node.shape[0])[index].unsqueeze(-1)
+            else:
+                self.cell = torch.tensor(mesh.entity(etype, index=index), device=device)
         except TypeError:
             warn(f"{mesh.__class__.__name__}.entity() does not support the 'index' "
                  "parameter. The entity is sliced after returned.")
@@ -327,8 +331,8 @@ class MeshSampler(Sampler):
 
 
 class _PolytopeSampler(MeshSampler):
-    """Sampler in all homogeneous polytope mesh cells, such as triangle mesh and\
-        tetrahedron mesh."""
+    """Sampler in all homogeneous polytope entities, such as triangle cells\
+        and tetrahedron cells."""
     def run(self, mp: int) -> Tensor:
         self.bcs = self.get_bcs(mp, self.NVC)
         return self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
@@ -342,7 +346,7 @@ _PolytopeSampler._assigned('PolygonMesh', 'face')
 
 
 class _QuadSampler(MeshSampler):
-    """Sampler in a quadrangle mesh."""
+    """Sampler in a quadrangle entity."""
     def run(self, mp: int) -> Tensor:
         bc_0 = self.get_bcs(mp, 2)
         bc_1 = self.get_bcs(mp, 2)
@@ -357,15 +361,18 @@ _QuadSampler._assigned('HexahedronMesh', 'face')
 
 
 class _UniformSampler(MeshSampler):
-    """Sampler in a 2-d uniform mesh."""
-    def run(self, mp: int) -> Tensor:
+    """Sampler in a n-d uniform mesh."""
+    def run(self, mp: int, *, entity_type=False) -> Tensor:
         ND = int(log2(self.NVC))
         bc_list = [self.get_bcs(mp, 2) for _ in range(ND)]
         if self.mode == 'linspace':
             self.bcs = F.multiply(*bc_list, mode='cross')
         else:
             self.bcs = F.multiply(*bc_list, mode='dot')
-        return self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
+        ret = self.cell_bc_to_point(self.bcs)
+        if entity_type:
+            return ret
+        return ret.reshape((-1, self.nd))
 
 _UniformSampler._assigned('UniformMesh1d', None)
 _UniformSampler._assigned('UniformMesh2d', None)
