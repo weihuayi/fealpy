@@ -288,6 +288,23 @@ class FirstNedelecFiniteElementSpace3d:
         return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
                 dtype=dtype)
 
+    def face_mass_matrix(self, c = 1, index=np.s_[:]):
+        """
+        @brief (n \times u, n \times v)_{Gamma_{robin}}
+        @param c 系数, 现在只考虑了 c 是常数的情况
+        """
+        bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()
+        face2dof = self.dof.face_to_dof()[index]
+        fm = self.mesh.entity_measure("face", index=index)
+        fphi = self.face_basis(bcs, index=index)
+
+        EMc = np.einsum('qflg, qfmg, q, f->flm', fphi, fphi, ws, fm)
+
+        gdof = self.dof.number_of_global_dofs()
+        I = np.broadcast_to(face2dof[..., None], EMc.shape)
+        J = np.broadcast_to(face2dof[:, None, :], EMc.shape)
+        EM = c*csr_matrix((EMc.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return EM
 
     def source_vector(self, f, dtype=np.float_):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()

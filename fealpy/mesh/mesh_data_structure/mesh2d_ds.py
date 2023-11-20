@@ -74,6 +74,10 @@ class Mesh2dDataStructure(HomogeneousMeshDS):
     ### General Topology APIs ###
 
     def cell_to_edge_sign(self):
+        """
+        @return (NC, NEC) : cell2edgeSign[i, j] = True 表示第 i 个单元的第 j
+            条边的全局边方向与在本单元中的局部方向不同
+        """
         NC = self.number_of_cells()
         NEC = self.number_of_edges_of_cells()
 
