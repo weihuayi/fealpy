@@ -51,7 +51,7 @@ class SurfaceLevelSetPDEData:
         trace_nH_u = sp.trace(nH_u)
 
         f = laplacian_u - dot_product - trace_nH_u  
-
+        
         self.F = sp.lambdify((x, y, z), F, "numpy")
         self.u = sp.lambdify((x, y, z), u, "numpy")
 
