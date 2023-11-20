@@ -1,7 +1,12 @@
 import numpy as np
 import time
+import string
 from ..decorator import barycentric
 from .fem_dofs import *
+from .Function import Function
+from ..common.tensor import *
+
+from scipy.special import factorial, comb
 from scipy.sparse import csc_matrix, csr_matrix
 
 class BernsteinFESpace:
@@ -71,7 +76,7 @@ class BernsteinFESpace:
         -----
 
         """
-        if p==None:
+        if p is None:
             p = self.p
 
         NQ = bc.shape[0]
@@ -248,20 +253,20 @@ class BernsteinFESpace:
             P.append(M)
         return P
 
-    def grad_m_basis(self, m, bcs):
+    def grad_m_basis_0(self, bcs, m):
         """!
         @brief m=3时导数排列顺序: [xxx, yxx, yxy, yyy]
                导数按顺序每个对应一个 A_d^m 的多重指标，对应 alpha 的导数有
                m!/alpha! 个.
         """
         mesh = self.mesh
-        phi = self.basis(bcs)[:, 0] # (NQ, ldof)
+        phi = self.basis(bcs) # (NQ, 1, ldof)
+        if m==0: return phi # 函数值
+        phi = phi[:, 0] # 去掉单元轴更方便
+
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
-        t = time.time()
         P = self.partial_matrix()
-        s = time.time()
-        print(s-t)
         f = lambda x: np.array([int(ss) for ss in '0'*(m-len(np.base_repr(x, GD)))+np.base_repr(x, GD) ], dtype=np.int_)
         idx = np.array(list(map(f, np.arange(GD**m))))
 
@@ -286,6 +291,59 @@ class BernsteinFESpace:
                 gmphi[q, ..., i] = (M@phi[q]).reshape(NC, -1)
         return gmphi
 
+    def grad_m_basis(self, bcs, m):
+        """!
+        @brief m=3时导数排列顺序: [xxx, yxx, yxy, yyy]
+               导数按顺序每个对应一个 A_d^m 的多重指标，对应 alpha 的导数有
+               m!/alpha! 个.
+        """
+        p = self.p
+        p0 = p-m
+        phi = self.basis(bcs, p=p0)
+        NQ = bcs.shape[0]
+
+        mesh = self.mesh
+        if m==0: return phi # 函数值
+        phi = phi[:, 0] # 去掉单元轴更方便
+
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        ldof = self.dof.number_of_local_dofs('cell')
+        glambda = mesh.grad_lambda()
+
+        ## 获得张量对称部分的索引
+        f = lambda x: np.array([int(ss) for ss in '0'*(m-len(np.base_repr(x,
+            GD)))+np.base_repr(x, GD) ], dtype=np.int_)
+        idx = np.array(list(map(f, np.arange(GD**m))))
+        flag = np.ones(len(idx), dtype=np.bool_)
+        for i in range(m-1):
+            flag = flag & (idx[:, i]>=idx[:, i+1])
+
+        ## 计算多重指标编号
+        if GD==2:
+            midx2num = lambda a : (a[:, 1]+a[:, 2])*(1+a[:, 1]+a[:, 2])//2 + a[:, 2]
+        elif GD==3:
+            midx2num = lambda a : (a[:, 1]+a[:, 2]+a[:, 3])*(1+a[:, 1]+a[:,
+                2]+a[:, 3])*(2+a[:, 1]+a[:, 2]+a[:, 3])//6 + (a[:, 2]+a[:,
+                    3])*(a[:, 2]+a[:, 3]+1)//2 + a[:, 3]
+
+        midxp_0 = mesh.multi_index_matrix(p, GD) # p   次多重指标
+        midxp_1 = mesh.multi_index_matrix(m, GD) # m   次多重指标
+
+        N, N1 = flag.sum(), midxp_1.shape[0]
+        B = np.zeros((N1, NQ, ldof), dtype=np.float_)
+        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float_)
+        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float_)
+        for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
+            midxp_0 -= beta[None, :]
+            idx = np.where(np.all(midxp_0>-1, axis=1))[0]
+            num = midx2num(midxp_0[idx]) 
+            symi[:] = symmetry_span_array(glambda, beta).reshape(NC, -1)[:, flag] #(NC, N)
+            c = (factorial(m)**2)*comb(p, m)/np.prod(factorial(beta)) # 数
+            Bi[:, idx] = c*phi[:, num] #(NQ, ldof)
+            midxp_0 += beta[None, :]
+        gmphi = np.einsum('iql, icn->qcln', B, symLambdaBeta, optimize=True)
+        return gmphi
 
     @barycentric
     def value(self, 
@@ -376,7 +434,7 @@ class BernsteinFESpace:
                 coordtype='barycentric', dtype=dtype)
 
     def array(self, dim=None, dtype=np.float64):
-        gdof = self.number_of_global_dofs()
+        gdof = self.dof.number_of_global_dofs()
         if dim is None:
             dim = tuple() 
         if type(dim) is int:
