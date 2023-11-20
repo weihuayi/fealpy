@@ -372,6 +372,8 @@ class TriangleMesh(Mesh, Plotable):
         """
         @brief
 
+        @param index: int, NDArray or slice.
+
         @return: An array with shape (NC, 3, GD).
         """
         node = self.entity('node')
@@ -387,7 +389,6 @@ class TriangleMesh(Mesh, Plotable):
             length = nv
         elif GD == 3:
             length = np.linalg.norm(nv, axis=-1)
-            # length = np.sqrt(np.sum(nv**2, axis=-1))
 
         Rlambda[:,0,:] = v0/length.reshape((-1, 1))
         Rlambda[:,1,:] = v1/length.reshape((-1, 1))
