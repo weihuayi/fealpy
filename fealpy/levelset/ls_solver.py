@@ -3,6 +3,7 @@ import numpy as np
 
 from scipy.sparse.linalg import lgmres
 
+from mumps import DMumpsContext
 
 class LSSolver():
     def __init__(self, space):
@@ -64,6 +65,15 @@ class LSSolver():
         result, _ = lgmres(A, b, tol = tol, atol = tol, callback = counter)
 
         return result
+
+    def mumps_solve_system(self, A, b):
+        ctx = DMumpsContext()
+        ctx.set_silent()
+        ctx.set_centralized_sparse(A)
+        ctx.set_rhs(b)
+        ctx.run(job=6)
+
+        return b
 
     def compute_zero_level_set_area(self, phi0):
         """
