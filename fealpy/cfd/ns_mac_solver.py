@@ -195,7 +195,7 @@ class NSMacSolver():
         return result/dy
 
     def laplaplace_phi(self):
-        mesh = self.pmeshmesh
+        mesh = self.pmesh
         dx,dy = mesh.h
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
