@@ -176,6 +176,42 @@ class NSMacSolver():
         source = pde.source_F(nodes,t) 
         return source
     
+    def grad_pux(self):
+        mesh = self.umesh
+        dx = mesh.h[0]
+        Nrow = mesh.node.shape[1]
+        Ncol = mesh.node.shape[0]
+        N = Nrow*Ncol
+        result = diags([1,1],[0,Nrow],(N-Nrow,N), format='lil')
+        return result/dx
     
+    def grad_pvy(self):
+        mesh = self.vmesh
+        dy = mesh.h[1]
+        Nrow = mesh.node.shape[1]
+        Ncol = mesh.node.shape[0]
+        N = Nrow*Ncol
+        result = diags([1,1],[0,1],(N-Ncol,N), format='lil')
+        return result/dy
 
-
+    def laplaplace_phi(self):
+        mesh = self.pmesh
+        dx,dy = mesh.h
+        Nrow = mesh.node.shape[1]
+        Ncol = mesh.node.shape[0]
+        N = Nrow*Ncol
+        result = diags([-4,1,1,1,1],[0,1,-1,Nrow,-Nrow],(N,N), format='lil')
+        index = np.arange(0,N)
+        index0 = np.where(index%Nrow ==0)
+        index1 = np.ones_like(index0)
+        result[index0,index0-index1] = 0
+        result[index0-index1,index0] = 0
+        result[index[:Nrow],index[:Nrow]] = -3
+        result[index[-Nrow:],index[-Nrow:]] = -3
+        result[index0,index0] = -3
+        result[index0-index1,index0-index1] = -3
+        result[0,0] = -2
+        result[Nrow-1,Nrow-1] = -2
+        result[N-1,N-1] = -2
+        result[N-Nrow,N-Nrow] = -2
+        return result/(dx*dy)

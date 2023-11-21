@@ -18,8 +18,8 @@ def test_triangle_mesh_init():
     assert mesh.ftype == np.float64
     assert mesh.p == 1
 
-    assert mesh.ds.NN == 3
-    assert mesh.ds.NC == 1
+    assert mesh.ds.number_of_nodes() == 3
+    assert mesh.ds.number_of_cells() == 1
 
 def test_triangle_mesh_interpolate():
     mesh = TriangleMesh.from_one_triangle()
@@ -82,6 +82,15 @@ def test_from_torus_surface(R, r, Nu, Nv):
     axes = fig.add_subplot(111, projection='3d')
     mesh.add_plot(axes)
     plt.show()
+
+def test_lambda():
+    mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=16, ny=16)
+    flag = mesh.ds.boundary_cell_flag()
+    NC = np.sum(flag)
+    val = mesh.grad_lambda(index=flag)
+    assert val.shape == (NC, 3, 2)
+    val = mesh.rot_lambda(index=flag)
+    assert val.shape == (NC, 3, 2)
 
 
 if __name__ == "__main__":
