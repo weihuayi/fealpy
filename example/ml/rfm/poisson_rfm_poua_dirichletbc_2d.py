@@ -12,11 +12,14 @@ from time import time
 
 import torch
 from torch import Tensor, exp
-from torch.nn import init
 from scipy.sparse.linalg import spsolve
-from scipy.sparse import csr_matrix
 
-from fealpy.ml.modules import UniformPoUSpace, PoUA, Cos, RandomFeatureSpace
+from fealpy.ml.modules import PoUSpace, Cos, RandomFeatureSpace
+from fealpy.ml.operators import (
+    Form, ScalerDiffusion, ScalerMass,
+    Continuous0, Continuous1
+)
+from fealpy.ml.sampler import ISampler, InterfaceSampler
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 PI = torch.pi
@@ -42,57 +45,43 @@ def zeros(p: Tensor, expand: int=1):
 EXT = 3
 H = 1.0/EXT
 Jn = 100
-
-EXTC = 100
-HC = 1.0/EXTC
+N = 100
 
 start_time = time()
 
 def factory(i: int):
-    sp = RandomFeatureSpace(2, Jn, Cos(), bound=(1, PI))
-    init.normal_(sp.frequency, 0.0, 0.5)
+    sp = RandomFeatureSpace(2, Jn, Cos(), bound=(PI/2, PI))
     return sp
 
+# 按均匀网格分区 构建 RFM 模型
 mesh = UniformMesh2d((0, EXT, 0, EXT), (H, H), origin=(0, 0))
-space = UniformPoUSpace(factory, mesh, 'node', pou=PoUA(), print_status=True)
+space = PoUSpace.from_uniform_mesh(factory, mesh, part_loc='node', print_status=True)
 
-mesh_col = UniformMesh2d((0, EXTC, 0, EXTC), (HC, HC), origin=(0, 0))
-_bd_node = mesh_col.ds.boundary_node_flag()
-col_in = torch.from_numpy(mesh_col.entity('node', index=~_bd_node))
-col_bd = torch.from_numpy(mesh_col.entity('node', index=_bd_node))
-del _bd_node, mesh_col
-col_sub = space.collocate_sub_edge(20)
+# 获得采样点
+col_in = ISampler([0, 1, 0, 1], mode='linspace').run(N, N)
+col_left = ISampler([0, 0, 0, 1], mode='linspace').run(1, N)
+col_right = ISampler([1, 1, 0, 1], mode='linspace').run(1, N)
+col_btm = ISampler([0, 1, 0, 0], mode='linspace').run(N, 1)
+col_top = ISampler([0, 1, 1, 1], mode='linspace').run(N, 1)
+col_bd = torch.cat([col_left, col_right, col_btm, col_top], dim=0)
 
+_css = InterfaceSampler(mesh, part_loc='node', mode='linspace')
+col_sub = _css.run(20, entity_type=True)
+sub2part, sub2normal = _css.sub_to_part(return_normal=True)
 
-b_tensor = torch.cat([source(col_in),
-                      boundary(col_bd),
-                      zeros(col_sub, expand=3)], dim=0)
+# 组装矩阵 求解
+form = Form(space)
+form.add(col_in, ScalerDiffusion(), source)
+form.add(col_bd, ScalerMass(), boundary)
+form.add(col_sub, Continuous0(sub2part))
+form.add(col_sub, Continuous1(sub2part, sub2normal))
 
+A, b = form.assembly(rescale=100.)
+um = space.function(torch.from_numpy(spsolve(A, b)))
 
-laplace_phi = space.laplace_basis(col_in)
-del col_in
-phi = space.basis(col_bd)
-del col_bd
-c0: Tensor = space.continue_matrix_0(col_sub)
-c1: Tensor = space.continue_matrix_1(col_sub)
-
-A_tensor = torch.cat([-laplace_phi,
-                      phi,
-                      c0,
-                      c1], dim=0)
-ratio = 100.0/A_tensor.max(dim=-1, keepdim=True)[0]
-A_tensor *= ratio
-b_tensor *= ratio
-del laplace_phi, phi, c0, c1
-
-A = csr_matrix(A_tensor.cpu().numpy())
-b = csr_matrix(b_tensor.cpu().numpy())
-
-um = space.function(torch.from_numpy(spsolve(A.T@A, A.T@b)))
-del A, b, A_tensor, b_tensor
 end_time = time()
 
-mesh_err = TriangleMesh.from_box([0, 1.0, 0, 1.0], nx=10, ny=10)
+mesh_err = TriangleMesh.from_box([0., 1., 0., 1.], nx=16, ny=16)
 error = um.estimate_error_tensor(exact_solution, mesh=mesh_err)
 print(f"L-2 error: {error.item()}")
 print(f"Time: {end_time - start_time}")
