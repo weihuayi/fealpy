@@ -19,7 +19,7 @@ from fealpy.ml.operators import (
     Form, ScalerDiffusion, ScalerMass,
     Continuous0, Continuous1
 )
-from fealpy.ml.sampler import ISampler, InterfaceSampler
+from fealpy.ml.sampler import ISampler, InterfaceSampler, BoxBoundarySampler
 from fealpy.mesh import UniformMesh2d, TriangleMesh
 
 
@@ -62,11 +62,7 @@ tmr.send("model")
 
 # 获得采样点
 col_in = ISampler([0, 1, 0, 1], mode='linspace').run(N, N)
-col_left = ISampler([0, 0, 0, 1], mode='linspace').run(1, N)
-col_right = ISampler([1, 1, 0, 1], mode='linspace').run(1, N)
-col_btm = ISampler([0, 1, 0, 0], mode='linspace').run(N, 1)
-col_top = ISampler([0, 1, 1, 1], mode='linspace').run(N, 1)
-col_bd = torch.cat([col_left, col_right, col_btm, col_top], dim=0)
+col_bd = BoxBoundarySampler([0, 0], [1, 1], mode='linspace').run(N, N)
 
 _css = InterfaceSampler(mesh, part_loc='node', mode='linspace')
 col_sub = _css.run(20, entity_type=True)
