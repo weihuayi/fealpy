@@ -85,14 +85,18 @@ class PLBFGS(Optimizer):
             gtd = np.dot(g, d)
 
             if gtd >= 0 or np.isnan(gtd):
-                print('Not descent direction, quit at iteration {i} witht statt {f:%12.11g}, grad:{gnorm:%12.11g}, diff:{diff:%12.11g}')
+                print(f'Not descent direction, quit at iteration {i} witht statt {f}, grad:{gnorm}')
                 break
 
             pg = g
 
             alpha, xalpha, falpha, galpha = wolfe_line_search(x, f, gtd, d, self.fun, alpha)
-            if np.abs(falpha - f) < 1e-4:
+            if np.abs(falpha - f) < self.problem.FunValDiff:
+                print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
                 flag = 1
+                x = xalpha
+                f = falpha
+                g = galpha
                 break
 
             if alpha > self.problem.StepLengthTol:

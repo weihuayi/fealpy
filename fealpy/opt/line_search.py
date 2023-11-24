@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable, Dict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -23,7 +23,7 @@ def show_line_fun(axes, fun, a, b, n=100):
     axes.plot(t, F)
 
 def quadratic_search(x0: NDArray, f: np.float_, d: NDArray, fun: ObjFunc,
-                alpha: Optional[float]=None) -> Tuple[Optional[float], NDArray, np.floating, NDArray]:
+                alpha: Optional[float]=None,**kwargs) -> Tuple[Optional[float], NDArray, np.floating, NDArray]:
     """
     @brief 二次搜索算法
     @param x0 初始点
@@ -146,9 +146,9 @@ def zoom(x: NDArray, s: Float, d: NDArray,
         iter_ += 1
     return alpha, xc, fc, gc
 
-def wolfe_line_search(x: NDArray, f: Float, s: Float,
+def wolfe_line_search(x0: NDArray, f: Float, s: Float,
                       d: NDArray, fun: ObjFunc,
-                      alpha0: Float) -> Tuple[Float, NDArray, np.floating, NDArray]:
+                      alpha0: Float,**kwargs) -> Tuple[Float, NDArray, np.floating, NDArray]:
     """
     @brief 强Wolfe线搜索
     @param x 当前点
@@ -169,7 +169,7 @@ def wolfe_line_search(x: NDArray, f: Float, s: Float,
     iter_ = 0
 
     while iter_ < 10:
-        xc = x + alpha_1*d
+        xc = x0 + alpha_1*d
         fc, gc = fun(xc)
         sc = np.sum(gc*d)
 
@@ -178,7 +178,7 @@ def wolfe_line_search(x: NDArray, f: Float, s: Float,
             (iter_ > 0) and (fc >= fx)
         ):
             alpha, xc, fc, gc = zoom(
-                x, s, d, fun, alpha_0, alpha_1, f0, fc, c1, c2
+                x0, s, d, fun, alpha_0, alpha_1, f0, fc, c1, c2
             )
             break
 
@@ -188,7 +188,7 @@ def wolfe_line_search(x: NDArray, f: Float, s: Float,
 
         if (sc >= 0):
             alpha, xc, fc, gc = zoom(
-                x, s, d, fun, alpha_1, alpha_0, f0, fc, c1, c2
+                x0, s, d, fun, alpha_1, alpha_0, f0, fc, c1, c2
             )
             break
 
@@ -197,3 +197,14 @@ def wolfe_line_search(x: NDArray, f: Float, s: Float,
         fx = fc
         iter_ = iter_ + 1
     return alpha, xc, fc, gc
+
+def get_linesearch(key:str) -> Callable:
+    if key in _linesearch_map_:
+        return _linesearch_map_[key]
+    else:
+        raise KeyError(f"Can not find a ploter class that key '{key}' mapping to. ")
+
+_linesearch_map_: Dict[str,Callable]={
+        'wolfe':wolfe_line_search,
+        'quadratic':quadratic_search}
+
