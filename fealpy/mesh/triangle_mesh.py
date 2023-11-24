@@ -584,7 +584,7 @@ class TriangleMesh(Mesh, Plotable):
         """
         Notes
         -----
-        给定一组点 p ， 找到这些点所在的单元
+        给定一组点 p , 找到这些点所在的单元
 
         这里假设：
 

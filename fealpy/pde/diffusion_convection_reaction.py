@@ -77,7 +77,7 @@ class NonConservativeDCRPDEModel2d:
     @cartesian
     def diffusion_coefficient(self, p):
         """
-        @brief 对流系数
+        @brief 扩散系数
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -98,7 +98,7 @@ class NonConservativeDCRPDEModel2d:
     @cartesian
     def reaction_coefficient(self, p):
         """
-        @brief 对流系数
+        @brief 反应系数
         """
         x = p[..., 0]
         y = p[..., 1]
@@ -148,7 +148,7 @@ class HemkerDCRModel2d:
     @cartesian
     def diffusion_coefficient(self, p):
         """
-        @brief 对流系数
+        @brief 扩散系数
         """
         return self.A
 
@@ -227,7 +227,7 @@ class HemkerDCRModelWithBoxHole2d:
     @cartesian
     def diffusion_coefficient(self, p):
         """
-        @brief 对流系数
+        @brief 扩散系数
         """
         return self.A
 
