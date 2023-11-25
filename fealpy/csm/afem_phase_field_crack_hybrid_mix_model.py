@@ -45,10 +45,11 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
         self.recovery = LinearRecoveryAlg()
 
-    def solver(self, 
+    def newton_raphson(self, 
             disp, 
             dirichlet_phase=False, 
             refine='nvp', 
+            maxit=100,
             theta=0.2):
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
@@ -57,81 +58,102 @@ class AFEMPhaseFieldCrackHybridMixModel():
         mesh = self.mesh
         space = self.space
         model = self.model
-        GD = self.GD 
-        uh = self.uh
-        d = self.d
-        H = self.H
-        
-        node = mesh.entity('node')
-        isDDof = model.is_disp_boundary(node)
-        uh[isDDof] = disp
-
-        # 求解位移
-        vspace = (GD*(space, ))
-        ubform = BilinearForm(GD*(space, ))
-
-        ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
-            model.mu))
-        ubform.assembly()
-        A0 = ubform.assembly()
-        R0 = -A0@uh.flat[:]
-        
-        self.force = np.sum(-R0[isDDof.flat])
-        
-        ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
-
-#        A0, R0 = ubc.apply(A0, R0) 
-        A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
-       
-        # TODO：更快的求解方法
-        du.flat[:] = spsolve(A0, R0)
-        uh[:] += du
-        
-        # 更新参数
-        strain = self.strain(uh)
-        phip, _ = self.strain_energy_density_decomposition(strain)
-        H[:] = np.fmax(H, phip)
-
-        # 计算相场模型
-        dbform = BilinearForm(space)
-        dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
-            q=4))
-        dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-        # TODO：快速组装程序
-        A1 = dbform.assembly()
-
-        lform = LinearForm(space)
-        lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
-        R1 = lform.assembly()
-        R1 -= A1@d[:]
-
-        if dirichlet_phase:
-            dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
-            A1, R1 = dbc.apply(A1, R1)
-
-        # TODO：快速求解程序
-        d[:] += spsolve(A1, R1)
-    
-        self.stored_energy = self.get_stored_energy(phip, d)
-        self.dissipated_energy = self.get_dissipated_energy(d)
-        
-        self.uh = uh
-        self.d = d
-        self.H = H
-
-        # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
-        eta = self.recovery.recovery_estimate(self.d)
+        GD = self.GD
+        D0 = self.linear_tangent_matrix()
+        k = 0
+        while k < maxit:
+            print('k:', k)
+            uh = self.uh
+            d = self.d
+            H = self.H
             
-        isMarkedCell = mark(eta, theta = theta) # TODO：
+            node = mesh.entity('node')
+            isDDof = model.is_disp_boundary(node)
+            uh[isDDof] = disp
+            du = space.function(dim=GD)
 
-        cm = mesh.cell_area() 
-        isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
+            # 求解位移
+            vspace = (GD*(space, ))
+            ubform = BilinearForm(GD*(space, ))
+
+            D = self.dsigma_depsilon(d, D0)
+            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
+            ubform.add_domain_integrator(integrator)
+            A0 = ubform.assembly()
+            R0 = -A0@uh.flat[:]
+            
+            self.force = np.sum(-R0[isDDof.flat])
+            
+            ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
+
+            # 这里为什么做两次边界条件处理？
+            A0, R0 = ubc.apply(A0, R0) 
+            A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
+           
+            # TODO：更快的求解方法
+            du.flat[:] = spsolve(A0, R0)
+            uh[:] += du
+            
+            # 更新参数
+            strain = self.strain(uh)
+            phip, _ = self.strain_energy_density_decomposition(strain)
+            H[:] = np.fmax(H, phip)
+
+            # 计算相场模型
+            dbform = BilinearForm(space)
+            dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
+                q=4))
+            dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
+            # TODO：快速组装程序
+            A1 = dbform.assembly()
+
+            lform = LinearForm(space)
+            lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
+            R1 = lform.assembly()
+            R1 -= A1@d[:]
+
+            if dirichlet_phase:
+                dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
+                A1, R1 = dbc.apply(A1, R1)
+
+            # TODO：快速求解程序
+            d[:] += spsolve(A1, R1)
         
-        if np.any(isMarkedCell):
-            if refine == 'nvp':
-                self.bisect_refine(isMarkedCell)
-            elif refine == 'rg':
-                self.redgreen_refine(isMarkedCell)
+            self.stored_energy = self.get_stored_energy(phip, d)
+            self.dissipated_energy = self.get_dissipated_energy(d)
+            
+            self.uh = uh
+            self.d = d
+            self.H = H
+
+            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
+            eta = self.recovery.recovery_estimate(self.d)
+                
+            isMarkedCell = mark(eta, theta = theta) # TODO：
+
+            cm = mesh.cell_area() 
+            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
+            
+            if np.any(isMarkedCell):
+                if refine == 'nvp':
+                    self.bisect_refine(isMarkedCell)
+                elif refine == 'rg':
+                    self.redgreen_refine(isMarkedCell)
+            
+            # 计算残量误差
+            if k == 0:
+                er0 = np.linalg.norm(R0)
+                er1 = np.linalg.norm(R1)
+            error0 = np.linalg.norm(R0)/er0
+            print("error0:", error0)
+
+            error1 = np.linalg.norm(R1)/er1
+            print("error1:", error1)
+            error = max(error0, error1)
+            print("error:", error)
+            if error < 1e-5:
+                break
+            k += 1
         
 
     def bisect_refine(self, isMarkedCell):
@@ -271,6 +293,39 @@ class AFEMPhaseFieldCrackHybridMixModel():
         phi_p = lam * tp ** 2 / 2.0 + mu * tsp
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm
         return phi_p, phi_m
+    
+    def dsigma_depsilon(self, phi, D0):
+        """
+        @brief 计算应力关于应变的导数矩阵
+        @param phi 单元重心处的相场函数值, (NC, )
+        @param uh 位移
+        @return D 单元刚度系数矩阵
+        """
+        eps = 1e-10
+
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        c0 = (1 - phi(bc)) ** 2 + eps
+        D = np.einsum('i, jk -> ijk', c0, D0)
+        return D
+    
+    def linear_tangent_matrix(self):
+        lam = self.model.lam # 拉梅第一参数
+        mu = self.model.mu # 拉梅第二参数
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        n = GD*(GD+1)//2
+        D = np.zeros((n, n), dtype=np.float_)
+        for i in range(n):
+            D[i, i] += mu
+        for i in range(GD):
+            for j in range(i, GD):
+                if i == j:
+                    D[i, i] += mu+lam
+                else:
+                    D[i, j] += lam
+                    D[j, i] += lam
+        return D
+
 
     def strain_eigs(self, s):
         """
