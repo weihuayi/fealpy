@@ -3,63 +3,97 @@ import numpy as np
 
 from scipy.sparse.linalg import lgmres
 
-
-class IterationCounter(object):
-    def __init__(self, disp=True):
-        self._disp = disp
-        self.niter = 0
-
-    def __call__(self, rk=None):
-        self.niter += 1
-        if self._disp:
-            print('iter %3i' % (self.niter))
-
+from mumps import DMumpsContext
 
 class LSSolver():
-    def __init__(self, space, phi0, u):
+    def __init__(self, space):
         self.space = space
-        self.phi0 = phi0
-        self.u = u
 
-    def output(self, timestep, output_dir, filename_prefix):
+    def output(self, phi, u, timestep, output_dir, filename_prefix):
         mesh = self.space.mesh
         if output_dir != 'None':
-            mesh.nodedata['phi'] = self.phi0
-            mesh.nodedata['velocity'] = self.u
+            mesh.nodedata['phi'] = phi
+            mesh.nodedata['velocity'] = u
             fname = os.path.join(output_dir, f'{filename_prefix}_{timestep:010}.vtu')
             mesh.to_vtk(fname=fname)
 
-    def check_gradient_norm(self, phi):
+    def check_gradient_norm_at_interface(self, phi, tolerance=1e-3):
         """
-        Check the gradient magnitude of the level set function.
+        Check the gradient magnitude of the level set function at the interface.
 
         Parameters:
-        - phi: The level set function.
+        - phi: The level set function evaluated at quadrature points.
+        - tolerance: The tolerance within which a point is considered part of the interface.
 
         Returns:
-        - diff_avg: The average difference between the gradient magnitude and 1.
-        - diff_max: The maximum difference between the gradient magnitude and 1.
+        - diff_avg: The average difference between the gradient magnitude and 1 at the interface.
+        - diff_max: The maximum difference between the gradient magnitude and 1 at the interface.
         """
-        # Compute the gradient of phi at quadrature points
+        # Compute phi and the gradient of phi at quadrature points
         mesh = self.space.mesh
         qf = mesh.integrator(3)
         bcs, _ = qf.get_quadrature_points_and_weights()
-        grad_phi = self.space.grad_value(uh=phi, bc=bcs)
+        phi_quad = self.space.value(uh=phi, bc=bcs)
+        grad_phi_quad = self.space.grad_value(uh=phi, bc=bcs)
 
-        # Compute the magnitude of the gradient
-        magnitude = np.linalg.norm(grad_phi, axis=-1)
+        # Compute the magnitude of the gradient at quadrature points
+        magnitude = np.linalg.norm(grad_phi_quad, axis=-1)
 
-        # Compute the difference between the magnitude and 1
-        diff = np.abs(magnitude - 1)
+        # Identify points at the interface
+        at_interface_mask = np.abs(phi_quad) <= tolerance
 
-        diff_avg = np.mean(diff)
-        diff_max = np.max(diff)
+        # Compute the difference between the magnitude and 1 at the interface
+        diff = np.abs(magnitude[at_interface_mask]) - 1
+
+        diff_avg = np.mean(diff) if np.any(at_interface_mask) else 0
+        diff_max = np.max(diff) if np.any(at_interface_mask) else 0
 
         return diff_avg, diff_max
 
+    class IterationCounter(object):
+        def __init__(self, disp=True):
+            self._disp = disp
+            self.niter = 0
+
+        def __call__(self, rk=None):
+            self.niter += 1
+            if self._disp:
+                print('iter %3i' % (self.niter))
+
     def solve_system(self, A, b, tol=1e-8):
-        counter = IterationCounter(disp = False)
-        result, info = lgmres(A, b, tol = tol, atol = tol, callback = counter)
-        # print("Convergence info:", info)
-        # print("Number of iteration of gmres:", counter.niter)
+        counter = self.IterationCounter(disp = False)
+        result, _ = lgmres(A, b, tol = tol, atol = tol, callback = counter)
+
         return result
+
+    def mumps_solve_system(self, A, b):
+        ctx = DMumpsContext()
+        ctx.set_silent()
+        ctx.set_centralized_sparse(A)
+        ctx.set_rhs(b)
+        ctx.run(job=6)
+
+        return b
+
+    def compute_zero_level_set_area(self, phi0):
+        """
+        Compute the area of the zero level set of the level set function.
+
+        Parameters:
+        - phi0: The level set function evaluated at grid points.
+
+        Returns:
+        - area: The computed area of the zero level set.
+        """
+        mesh = self.space.mesh
+        measure = self.space.function()
+        measure[phi0 > 0] = 0
+        measure[phi0 <= 0] = 1
+        
+        qf = mesh.integrator(3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cellmeasure = mesh.entity_measure('cell')
+        
+        area = np.einsum('i, ij, j ->', ws, measure(bcs), cellmeasure)
+
+        return area

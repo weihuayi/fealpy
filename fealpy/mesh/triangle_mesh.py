@@ -1,3 +1,4 @@
+from typing import Sequence
 import numpy as np
 import warnings
 from scipy.sparse import coo_matrix, csr_matrix, bmat, eye
@@ -90,7 +91,7 @@ class TriangleMesh(Mesh, Plotable):
         R = self._grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
             return gphi #(NQ, NC, ldof, GD)
         elif variables == 'u':
             return R #(NQ, ldof, TD+1)
@@ -128,7 +129,7 @@ class TriangleMesh(Mesh, Plotable):
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
-        @brief 
+        @brief
         """
         if iptype in {'cell', 2}:
             return (p+1)*(p+2)//2
@@ -154,20 +155,20 @@ class TriangleMesh(Mesh, Plotable):
         gdof0 = self.number_of_global_ipoints(p0)
         gdof1 = self.number_of_global_ipoints(p1)
 
-        # 1. 网格节点上的插值点 
+        # 1. 网格节点上的插值点
         NN = self.number_of_nodes()
         I = range(NN)
         J = range(NN)
         V = np.ones(NN, dtype=self.ftype)
         P = coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
-        # 2. 网格边内部的插值点 
+        # 2. 网格边内部的插值点
         NE = self.number_of_edges()
         # p1 元在边上插值点对应的重心坐标
-        bcs = self.multi_index_matrix(p1, TD-1)/p1 
+        bcs = self.multi_index_matrix(p1, TD-1)/p1
         # p0 元基函数在 p1 元对应的边内部插值点处的函数值
-        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)  
-       
+        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)
+
         e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
         e2p0 = self.edge_to_ipoint(p0)
         shape = (NE, ) + phi.shape
@@ -336,18 +337,26 @@ class TriangleMesh(Mesh, Plotable):
 
 
     def grad_lambda(self, index=np.s_[:]):
+        """
+        @brief Calculate the gradient of the barycenter coordinates in each cell.
+
+        @param index: int, NDArray or slice.
+
+        @return: An array with shape (NC, 3, GD).
+        """
         node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
-        v0 = node[cell[index, 2]] - node[cell[index, 1]]
-        v1 = node[cell[index, 0]] - node[cell[index, 2]]
-        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+        cell = self.entity('cell', index=index)
+        NC = cell.shape[0]
+        v0 = node[cell[..., 2]] - node[cell[..., 1]]
+        v1 = node[cell[..., 0]] - node[cell[..., 2]]
+        v2 = node[cell[..., 1]] - node[cell[..., 0]]
         GD = self.geo_dimension()
         nv = np.cross(v1, v2)
         Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+
         if GD == 2:
             length = nv
-            W = np.array([[0, 1], [-1, 0]])
+            W = np.array([[0, 1], [-1, 0]], dtype=self.ftype)
             Dlambda[:, 0] = v0@W/length[:, None]
             Dlambda[:, 1] = v1@W/length[:, None]
             Dlambda[:, 2] = v2@W/length[:, None]
@@ -360,19 +369,26 @@ class TriangleMesh(Mesh, Plotable):
         return Dlambda
 
     def rot_lambda(self, index=np.s_[:]):
+        """
+        @brief
+
+        @param index: int, NDArray or slice.
+
+        @return: An array with shape (NC, 3, GD).
+        """
         node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
-        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
-        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
-        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
+        cell = self.entity('cell', index=index)
+        NC = cell.shape[0]
+        v0 = node[cell[..., 2]] - node[cell[..., 1]]
+        v1 = node[cell[..., 0]] - node[cell[..., 2]]
+        v2 = node[cell[..., 1]] - node[cell[..., 0]]
         GD = self.geo_dimension()
         nv = np.cross(v2, -v1)
         Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
         if GD == 2:
             length = nv
         elif GD == 3:
-            length = np.sqrt(np.sum(nv**2, axis=-1))
+            length = np.linalg.norm(nv, axis=-1)
 
         Rlambda[:,0,:] = v0/length.reshape((-1, 1))
         Rlambda[:,1,:] = v1/length.reshape((-1, 1))
@@ -568,7 +584,7 @@ class TriangleMesh(Mesh, Plotable):
         """
         Notes
         -----
-        给定一组点 p ， 找到这些点所在的单元
+        给定一组点 p , 找到这些点所在的单元
 
         这里假设：
 
@@ -950,7 +966,7 @@ class TriangleMesh(Mesh, Plotable):
                         bcr[:, 0] = bc[:, 2]
                         bcr[:, 1] = 1/2*bc[:, 0]
                         bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
-                        
+
                         value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
 
                         phi = self.shape_function(bcr, p=p)
@@ -958,7 +974,7 @@ class TriangleMesh(Mesh, Plotable):
 
                         phi = self.shape_function(bcl, p=p)
                         value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
-                        
+
                         options['data'][key] = value
 
 
@@ -1727,7 +1743,7 @@ class TriangleMesh(Mesh, Plotable):
             n = 3
         else:
             n = 2
-        
+
         mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
         node = mesh.entity('node')
         ips = mesh.interpolation_points(p)
@@ -1756,7 +1772,7 @@ class TriangleMesh(Mesh, Plotable):
                 s = s.replace(' ', ',')
                 axes.text(ips[i, 0], ips[i, 1], s,
                         multialignment='center',
-                        fontsize=12, 
+                        fontsize=12,
                         color='r')
         plt.show()
 
@@ -1861,7 +1877,7 @@ class TriangleMesh(Mesh, Plotable):
             axes = fig.add_subplot(m, n, i+1)
             mesh.add_plot(axes)
             mesh.find_node(axes, node=ips, showindex=True)
-            axes.quiver(ps[:, 0], ps[:, 1], gphi[:, 0, i, 0], gphi[:, 0, i, 1], 
+            axes.quiver(ps[:, 0], ps[:, 1], gphi[:, 0, i, 0], gphi[:, 0, i, 1],
                     units='xy')
             axes.set_title(f'$\\nabla\\phi_{{{i}}}$')
         plt.show()
@@ -2204,19 +2220,18 @@ class TriangleMesh(Mesh, Plotable):
 
 
     @classmethod
-    def interfacemesh_generator(cls, box, nx, ny, phi):
+    def interfacemesh_generator(cls, box: Sequence[float], nx: int, ny: int, phi):
         """
-        @brief
+        @brief Generate a triangle mesh fitting the interface.
 
-        @param
-        @param
-        @param
+        @param box:
+        @param nx, ny:
+        @param phi:
+
+        @return: TriangleMesh.
         """
         from scipy.spatial import Delaunay
         from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
-
-        hx = (box[1] - box[0]) / nx
-        hy = (box[3] - box[2]) / ny
 
         mesh = UniformMesh2d((0, nx, 0, ny), ((box[1] - box[0]) / nx, (box[3] - box[2]) / ny), (box[0], box[2]))
 
@@ -2232,7 +2247,7 @@ class TriangleMesh(Mesh, Plotable):
         isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
         tri = tri[~isUnnecessaryCell, :]
 
-        interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
+        interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int_)
         interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode)
         interfaceNodeIdx[NI:NI + ncut] = N + np.arange(ncut)
         interfaceNodeIdx[NI + ncut:] = N + ncut + np.arange(naux)
@@ -2241,7 +2256,7 @@ class TriangleMesh(Mesh, Plotable):
         NS = np.sum(~isInterfaceCell)
         NT = tri.shape[0]
         pnode = np.concatenate((node, interfaceNode[NI:]), axis=0)
-        pcell = np.zeros((NS * 2 + NT, 3), dtype=np.int)
+        pcell = np.zeros((NS * 2 + NT, 3), dtype=np.int_)
         temp = cell[~isInterfaceCell, :]
         pcell[0:NS, :] = temp[:, [1, 2, 0]]
         pcell[NS:2*NS, :] = temp[:, [3, 0, 2]]

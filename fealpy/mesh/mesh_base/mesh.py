@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 from numpy.typing import NDArray
 import numpy as np
 
@@ -97,7 +97,7 @@ class Mesh():
         """
         @brief
 
-        @param[in] bc 
+        @param[in] bc
         """
         if p == 1:
             return bc
@@ -156,7 +156,7 @@ class Mesh():
 
     def _bernstein_shape_function(self, bc: NDArray, p: int=1, mi: NDArray=None):
         """
-        @brief 
+        @brief
         """
         TD = bc.shape[1]-1
         if mi is None:
@@ -173,7 +173,7 @@ class Mesh():
         P = np.cumprod(P)
         B /= P[:, None]
 
-        # B : (NQ, p+1, TD+1) 
+        # B : (NQ, p+1, TD+1)
         # B[:, multiIndex, np.arange(TD+1).reshape(1, -1)]: (NQ, ldof, TD+1)
         phi = P[-1]*np.prod(B[:, mi, np.arange(TD+1).reshape(1, -1)], axis=-1)
 
@@ -182,7 +182,7 @@ class Mesh():
     def _grad_bernstein_shape_function(self, bc: NDArray, p: int=1, mi:
             NDArray=None):
         """
-        @brief 
+        @brief
         """
 
         TD = bc.shape[1]-1
@@ -260,7 +260,7 @@ class Mesh():
         p = np.einsum('...j, ijk -> ...ik', bc, node[entity])
         return p
 
-    def number_of_entities(self, etype, index=np.s_[:]):
+    def number_of_entities(self, etype: Union[int, str], index=np.s_[:]) -> int:
         raise NotImplementedError
 
     def entity(self, etype: Union[int, str], index=np.s_[:]) -> NDArray:
@@ -357,22 +357,39 @@ class Mesh():
             edge2ipoints[:, 1:-1] =  (p-1)*index[:, None] + idx
         return edge2ipoints
 
-    def edge_length(self, index=np.s_[:], node=None):
+    def edge_length(self, index=np.s_[:], node: Optional[NDArray]=None):
         """
-        @brief
+        @brief Calculate the length of each edge.
+
+        @param index: int, NDArray or slice.
+        @param node: NDArray, optional. Use the nodes of the mesh if not provided.
+
+        @return: An array with shape (NE, ).
         """
         node = self.entity('node') if node is None else node
         edge = self.entity('edge', index=index)
-        v = node[edge[:, 1]] - node[edge[:,0]]
+        v = node[edge[:, 1]] - node[edge[:, 0]]
         return np.linalg.norm(v, axis=1)
 
-    def edge_tangent(self, index=np.s_[:], node=None):
+    def edge_tangent(self, index=np.s_[:], node: Optional[NDArray]=None):
+        """
+        @brief Calculate the tangent vector of each edge.
+
+        @param index: int, NDArray or slice.
+        @param node: NDArray, optional. Use the nodes of the mesh if not provided.
+
+        @return: An array with shape (NE, GD).
+        """
         node = self.entity('node') if node is None else node
         edge = self.entity('edge', index)
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
         return v
 
-    def edge_unit_tangent(self, index=np.s_[:], node=None):
+    def edge_unit_tangent(self, index=np.s_[:], node: Optional[NDArray]=None):
+        """
+        @brief Calculate the tangent vector with unit length of each edge.\
+               See `Mesh.edge_tangent`.
+        """
         node = self.entity('node') if node is None else node
         edge = self.entity('edge', index=index)
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
@@ -408,11 +425,13 @@ class Mesh():
                 e = cm[:, None, None]*f
             else:
                 e = np.einsum('q, qc..., c->c...', ws, f, cm)
+        else:
+            raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
 
         if celltype:
-            return e 
+            return e
         else:
-            return np.sum(e) 
+            return np.sum(e)
 
     def error(self, u, v, q=3, power=2, celltype=False):
         """
@@ -467,15 +486,15 @@ class Mesh():
             e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
 
-    def paraview(self, file_name = "temp.vtu", 
-            background_color='1.0, 1.0, 1.0', 
+    def paraview(self, file_name = "temp.vtu",
+            background_color='1.0, 1.0, 1.0',
             show_type='Surface With Edges',
             ):
         """
         @brief 调用 ParaView 进行可视化
 
         @param[in] file_name str 网格子类可以设置不同的 vtk 文件后缀名
-        @param[in] show_type str 
+        @param[in] show_type str
         """
         import subprocess
         import os

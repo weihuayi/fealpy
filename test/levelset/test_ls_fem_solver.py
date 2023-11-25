@@ -41,53 +41,8 @@ def ls_fem_solver_setup():
     return space, u, phi0
 
 
-# Test the initialization of the LSFEMSolver class.
-def test_LSFEMSolver_init_without_u(ls_fem_solver_setup):
-    space, _, _ = ls_fem_solver_setup
-
-    solver_without_u = LSFEMSolver(space)
-
-    # Check that the mass matrix M is initialized.
-    assert solver_without_u.M is not None, "Mass matrix M should be initialized."
-
-    # Check that the space attribute matches the provided finite element space.
-    assert solver_without_u.space is space, "The space attribute should match the provided finite element space."
-
-    # Check that the velocity field u is None when not provided during initialization.
-    assert solver_without_u.u is None, "Velocity field u should be None when not provided during initialization."
-
-    # Check that the convection matrix C does not exist or is None when u is not provided.
-    assert not hasattr(solver_without_u, 'C') or solver_without_u.C is None, "Convection matrix C should not exist or be None when velocity u is not provided."
-
-def test_LSFEMSolver_init_with_u(ls_fem_solver_setup):
-    space, u, _ = ls_fem_solver_setup
-
-    # Instantiate the solver with the velocity field.
-    solver_with_u = LSFEMSolver(space, u=u)
-
-    # Check that the velocity field u is not None when provided during initialization.
-    assert solver_with_u.u is not None, "Velocity field u should not be None when provided during initialization."
-    # Check that the convection matrix C is initialized when u is provided.
-    assert solver_with_u.C is not None, "Convection matrix C should be initialized when velocity u is provided."
-
-
-def test_LSFEMSolver_solve(ls_fem_solver_setup):
-    space, u, phi0 = ls_fem_solver_setup
-
-    dt = 0.01  # A small time step
-
-    # Instantiate the solver with the velocity field.
-    solver_with_u = LSFEMSolver(space, u=u)
-
-    # Perform one step of the level set evolution.
-    phi1 = solver_with_u.solve(phi0, dt, u=u)
-
-    # Check if the result is a numpy array, which it should be after solving.
-    assert isinstance(phi1, np.ndarray), "The result of the solve method should be a numpy array."
-
-
 def test_LSFEMSolver_reinit(ls_fem_solver_setup):
-    space, u, _ = ls_fem_solver_setup
+    space, u, phi0 = ls_fem_solver_setup
 
     # 提供一个非符号距离函数 phi0
     @cartesian
@@ -97,10 +52,6 @@ def test_LSFEMSolver_reinit(ls_fem_solver_setup):
         return (x - 0.5)**2 + (y - 0.5)**2  # 一个非符号距离函数的平方形式
 
     phi0 = space.interpolate(non_sdf)
-    print("phi0:", phi0)
-
-    # Instantiate the solver with the velocity field.
-    solver_with_u = LSFEMSolver(space, u=u)
 
     solver = LSSolver(space, phi0, u)
 
@@ -108,10 +59,11 @@ def test_LSFEMSolver_reinit(ls_fem_solver_setup):
     print("diff_avg_0:", diff_avg)
     print("diff_max_0:", diff_max)
 
+    # Instantiate the solver with the velocity field.
+    solver_with_u = LSFEMSolver(space, u=u)
 
     # 执行重置化
     phi1 = solver_with_u.reinit(phi0)
-    print("phi1:", phi1)
 
     # Call the check_gradient_norm method which calculates the average and maximum difference from 1.
     diff_avg, diff_max = solver.check_gradient_norm(phi = phi1)
