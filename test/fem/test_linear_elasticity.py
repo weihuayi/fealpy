@@ -165,4 +165,4 @@ def test_linear_elasticity_lfem_3d(p, n):
 
 if __name__ == "__main__":
     test_linear_elasticity_lfem_2d(1, 10)
-    # test_linear_elasticity_lfem_3d(1, 1)
+    #test_linear_elasticity_lfem_3d(1, 1)
