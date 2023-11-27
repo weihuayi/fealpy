@@ -1,4 +1,4 @@
-from typing import TypedDict, Callable, Tuple, Union
+from typing import TypedDict, Callable, Tuple, Union, Optional
 
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import spmatrix
@@ -30,7 +30,8 @@ class Problem():
         StepLength: float = 1.0,
         StepLengthTol: float = 1e-8,
         NumGrad: int = 10,
-        Print: bool = True
+        Print: bool = True,
+        Linesearch: Optional[str] = None 
     ):
         self.x0 = x0
         self.objective = objective
@@ -43,6 +44,7 @@ class Problem():
         self.StepLengthTol = StepLengthTol
         self.NumGrad = NumGrad
         self.Print = Print
+        self.Linesearch = Linesearch
 
 class Optimizer():
     def __init__(self, problem: Problem) -> None:
