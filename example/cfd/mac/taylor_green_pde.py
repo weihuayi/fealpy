@@ -114,34 +114,20 @@ class taylor_greenData:
         val = -(np.cos(2*x)+np.cos(2*y))/4
         return val
     
-    def source_F(self, node, t):
+    def source_F(self, m, t):
         """
         @brief 体积力
-        @param[in] t float, 时间点 
-        """
-        x = node[..., 0]
-        y = node[..., 1]
-        nu = self.nu
-        val = np.ones_like(node)
-        val *= np.exp(-2*nu*t)
-        return val
-
-    def source(self, m, t):
-        """
-        @brief 方程右端项 
 
         @param[in] m numpy.ndarray, 空间点
         @param[in] t float, 时间点 
-
-        @return 方程右端函数值
         """
         nu = self.nu
         Ft = np.exp(-2*nu*t)
         x = m[..., 0]
         y = m[..., 1]
-        val = np.zeros(m.shape, dtype=np.float64)
-        val[..., 0] = -2*nu*np.cos(x)*np.sin(y)*Ft+np.sin(2*x)*Ft**2
-        val[..., 1] = 2*nu*np.sin(x)*np.cos(y)*Ft+np.sin(2*y)*Ft**2
+        val = np.zeros(m.shape,dtype=np.float64)
+        val[...,0] = 2*np.sin(x)*np.cos(x)*Ft**2
+        val[...,1] = 2*np.sin(y)*np.cos(y)*Ft**2
         return val
     
     def gradient_u(self, m, t):
@@ -162,9 +148,9 @@ class taylor_greenData:
         val[..., 1] = np.cos(x)*np.cos(y)*Ft
         return val
     
-    def gradient_u(self, m, t):
+    def gradient_v(self, m, t):
         """
-        @brief 真解u导数 
+        @brief 真解v导数 
 
         @param[in] m numpy.ndarray, 空间点
         @param[in] t float, 时间点 
