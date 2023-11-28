@@ -1,3 +1,4 @@
+from typing import Sequence
 import numpy as np
 import warnings
 from scipy.sparse import coo_matrix, csr_matrix, bmat, eye
@@ -90,7 +91,7 @@ class TriangleMesh(Mesh, Plotable):
         R = self._grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
             return gphi #(NQ, NC, ldof, GD)
         elif variables == 'u':
             return R #(NQ, ldof, TD+1)
@@ -336,18 +337,26 @@ class TriangleMesh(Mesh, Plotable):
 
 
     def grad_lambda(self, index=np.s_[:]):
+        """
+        @brief Calculate the gradient of the barycenter coordinates in each cell.
+
+        @param index: int, NDArray or slice.
+
+        @return: An array with shape (NC, 3, GD).
+        """
         node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
-        v0 = node[cell[index, 2]] - node[cell[index, 1]]
-        v1 = node[cell[index, 0]] - node[cell[index, 2]]
-        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+        cell = self.entity('cell', index=index)
+        NC = cell.shape[0]
+        v0 = node[cell[..., 2]] - node[cell[..., 1]]
+        v1 = node[cell[..., 0]] - node[cell[..., 2]]
+        v2 = node[cell[..., 1]] - node[cell[..., 0]]
         GD = self.geo_dimension()
         nv = np.cross(v1, v2)
         Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+
         if GD == 2:
             length = nv
-            W = np.array([[0, 1], [-1, 0]])
+            W = np.array([[0, 1], [-1, 0]], dtype=self.ftype)
             Dlambda[:, 0] = v0@W/length[:, None]
             Dlambda[:, 1] = v1@W/length[:, None]
             Dlambda[:, 2] = v2@W/length[:, None]
@@ -360,19 +369,26 @@ class TriangleMesh(Mesh, Plotable):
         return Dlambda
 
     def rot_lambda(self, index=np.s_[:]):
+        """
+        @brief
+
+        @param index: int, NDArray or slice.
+
+        @return: An array with shape (NC, 3, GD).
+        """
         node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
-        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
-        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
-        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
+        cell = self.entity('cell', index=index)
+        NC = cell.shape[0]
+        v0 = node[cell[..., 2]] - node[cell[..., 1]]
+        v1 = node[cell[..., 0]] - node[cell[..., 2]]
+        v2 = node[cell[..., 1]] - node[cell[..., 0]]
         GD = self.geo_dimension()
         nv = np.cross(v2, -v1)
         Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
         if GD == 2:
             length = nv
         elif GD == 3:
-            length = np.sqrt(np.sum(nv**2, axis=-1))
+            length = np.linalg.norm(nv, axis=-1)
 
         Rlambda[:,0,:] = v0/length.reshape((-1, 1))
         Rlambda[:,1,:] = v1/length.reshape((-1, 1))
@@ -2204,13 +2220,15 @@ class TriangleMesh(Mesh, Plotable):
 
 
     @classmethod
-    def interfacemesh_generator(cls, box, nx, ny, phi):
+    def interfacemesh_generator(cls, box: Sequence[float], nx: int, ny: int, phi):
         """
-        @brief
+        @brief Generate a triangle mesh fitting the interface.
 
-        @param
-        @param
-        @param
+        @param box:
+        @param nx, ny:
+        @param phi:
+
+        @return: TriangleMesh.
         """
         from scipy.spatial import Delaunay
         from fealpy.mesh.uniform_mesh_2d import UniformMesh2d

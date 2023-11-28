@@ -688,7 +688,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             e0 = halfedge[halfedge[:, 3], 0]
             e1 = halfedge[:, 0]
 
-            w = np.array([[0, -1], [1, 0]], dtype=np.int)
+            w = np.array([[0, -1], [1, 0]], dtype=np.int_)
             v = (node[e1] - node[e0])@w
             val = np.sum(v*node[e0], axis=1)
 
@@ -726,7 +726,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         e0 = halfedge[halfedge[hflag, 3], 0]
         e1 = halfedge[hflag, 0]
-        w  = np.array([[0, -1], [1, 0]], dtype=np.int)
+        w  = np.array([[0, -1], [1, 0]], dtype=np.int_)
         v  = (node[e1] - node[e0])@w
         va = np.sum(v*node[e0], axis=1)
         ec = va.reshape(-1, 1)*(node[e1]+node[e0])/2
