@@ -1,6 +1,6 @@
 from warnings import warn
 from typing import (
-    Tuple, List, Dict, Any, Generator, Type, Optional, Literal
+    Tuple, List, Dict, Any, Generator, Type, Optional, Literal, Sequence
 )
 from math import log2
 import torch
@@ -9,6 +9,14 @@ from torch import Tensor, float64, device
 from . import functional as F
 
 SampleMode = Literal['random', 'linspace']
+
+
+def _as_tensor(__sequence: Sequence, dtype=float64, device: device=None):
+    seq = __sequence
+    if isinstance(seq, Tensor):
+        return seq.detach().clone().to(device=device).to(dtype=dtype)
+    else:
+        return torch.tensor(seq, dtype=dtype, device=device)
 
 
 class Sampler():
@@ -111,10 +119,7 @@ class ISampler(Sampler):
         """
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
-        if isinstance(ranges, Tensor):
-            ranges_arr = ranges.detach().clone().to(device=device).to(dtype=dtype)
-        else:
-            ranges_arr = torch.tensor(ranges, dtype=dtype, device=device)
+        ranges_arr = _as_tensor(ranges, dtype=dtype, device=device)
 
         if ranges_arr.ndim == 1:
             _, mod = divmod(ranges_arr.shape[0], 2)
@@ -163,7 +168,7 @@ class ISampler(Sampler):
 
 class BoxBoundarySampler(Sampler):
     """Generate samples on the boundaries of a multidimensional rectangle."""
-    def __init__(self, p1: List[float], p2: List[float],
+    def __init__(self, p1: Sequence[float], p2: Sequence[float], mode: SampleMode='random',
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
         """
@@ -171,48 +176,73 @@ class BoxBoundarySampler(Sampler):
 
         @param p1, p2: Object that can be converted to `torch.Tensor`.\
                Points at both ends of the diagonal.
+        @param mode: 'random' or 'linspace'. Defaults to 'random'.
         @param dtype: Data type of samples. Defaults to `torch.float64`.
         @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
         """
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
-        t1, t2 = torch.tensor(p1), torch.tensor(p2)
+        t1 = _as_tensor(p1, dtype=dtype, device=device)
+        t2 = _as_tensor(p2, dtype=dtype, device=device)
         if len(t1.shape) != 1:
             raise ValueError
         if t1.shape != t2.shape:
             raise ValueError("p1 and p2 should be in a same shape.")
         self.nd = int(t1.shape[0])
+        self.mode = mode
+
+        # NOTE: the data is like
+        # [[x_min, x_max]
+        #  [y_min, y_max]
+        #  [z_min, z_max]]
         data = torch.vstack([t1, t2]).T
 
         self.subs: List[ISampler] = []
 
         for d in range(t1.shape[0]):
             range1, range2 = data.clone(), data.clone()
-            range1[d, :] = data[d, 0]
-            range2[d, :] = data[d, 1]
-            self.subs.append(ISampler(ranges=range1, dtype=dtype,
+            range1[d, 1] = data[d, 0]
+            range2[d, 0] = data[d, 1]
+            self.subs.append(ISampler(ranges=range1, mode=mode, dtype=dtype,
                               device=device, requires_grad=requires_grad))
-            self.subs.append(ISampler(ranges=range2, dtype=dtype,
+            self.subs.append(ISampler(ranges=range2, mode=mode, dtype=dtype,
                               device=device, requires_grad=requires_grad))
 
-    def run(self, mb: int, bd_type=False) -> Tensor:
+    def run(self, *mb: int, bd_type=False) -> Tensor:
         """
         @brief Generate samples on the boundaries of a multidimensional rectangle.
 
-        @param mb: int. Number of samples in each boundary.
+        @param *mb: int. Number of `mb` must match the dimension. In 'random' mode,\
+               these are numbers of sample points on the boundary perpendicular\
+               to each dimension. In 'linspace' mode, these are numbers of steps\
+               in each dimension.
         @param bd_type: bool. Separate samples in each boundary if `True`, and\
-               the output shape will be (#boundaries, #samples, #dims).
+               the output shape will be (#boundaries, #samples, #dims).\
                Defaults to `False`.
 
         @return: Tensor.
         """
-        if self.enable_weight:
-            b = len(self.subs)
-            self._weight[:] = 1/mb/b
-            self._weight = self._weight.broadcast_to(mb * b, self.nd)
+        assert len(mb) * 2 == len(self.subs)
+        results: List[Tensor] = []
+
+        if self.mode == 'linspace':
+            for idx, m in enumerate(mb):
+                mb_proj = list(mb)
+                mb_proj[idx] = 1
+                results.append(self.subs[idx*2].run(*mb_proj))
+                results.append(self.subs[idx*2+1].run(*mb_proj))
+
+        elif self.mode == 'random':
+            for idx, m in enumerate(mb):
+                results.append(self.subs[idx*2].run(m))
+                results.append(self.subs[idx*2+1].run(m))
+
+        else:
+            raise ValueError(f"Invalid sampling mode '{self.mode}'.")
+
         if bd_type:
-            return torch.stack([s.run(mb) for s in self.subs], dim=0)
-        return torch.cat([s.run(mb) for s in self.subs], dim=0)
+            return torch.stack(results, dim=0)
+        return torch.cat(results, dim=0)
 
 
 ##################################################

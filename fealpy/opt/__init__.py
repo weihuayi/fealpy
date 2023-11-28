@@ -7,3 +7,4 @@ from .GradientDescentAlg import GradientDescentAlg
 from .NonlinearConjugateGradientAlg import NonlinearConjugateGradientAlg
 from .MatrixVectorProductGradientOptimizer import MatrixVectorProductGradientOptimizer
 from .newton_raphson_optimizer import NewtonRaphsonOptimizer
+from .PLBFGSAlg import PLBFGS
