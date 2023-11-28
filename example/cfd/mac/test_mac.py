@@ -4,7 +4,7 @@ from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from fealpy.cfd import NSMacSolver
-from tarlor_green_pde import taylor_greenData 
+from taylor_green_pde import taylor_greenData 
 from scipy.sparse import spdiags
 from scipy.sparse import diags
 from fealpy.timeintegratoralg import UniformTimeLine
@@ -103,12 +103,12 @@ def result_phi(p,mesh):
     phi = K.reshape((Nrow,Nrow)).T[::-1] #改变形状为(4,4)并且每个值对应网格节点上的phi值
     return phi
 
-for i in range(nt):
+solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+for i in range(5):
     # 下一个的时间层 ti
     tl = tmesh.next_time_level()
     print("tl=", tl)
-
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    print("i=", i)
 
     #0时间层的值
     def solution_u_0(p):
@@ -124,7 +124,6 @@ for i in range(nt):
     M = v_ub0.shape[0] // 2
     v_ub0[:M] *= -1
     
-    #这里的形状不是很懂
     solution_u = mesh_u.interpolate(solution_u_0) #[4,5]
     solution_u_values0 = solution_u.reshape(-1)
     solution_v = mesh_v.interpolate(solution_v_0)
@@ -291,8 +290,13 @@ for i in range(nt):
     gradpy = np.gradient(reshape_p,axis=0) #压力在y方向上的梯度(4,4)
     grad_px = gradpx[::-1].flatten('F') #(16,1)gradpx0-gradpx15
     grad_py = gradpy[::-1].flatten('F') #(16,1)gradpy0-gradpy15
-    print(w_2)
-    print(solution_p_values2)
+    
+    uu = pde.solution_u(nodes_u,tl)
+    vv = pde.solution_v(nodes_v,tl)
+    pp = pde.solution_p(nodes_p,tl)
+    erru = np.sqrt((uu-w_2[:.0])**2+(vv-w_2[:,1])**2)
+    print(erru)
+    
 
      # 时间步进一层 
     tmesh.advance()
