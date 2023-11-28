@@ -233,6 +233,40 @@ class DoubleCircleCurve():
         p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
         return p, d 
 
+class BandY():
+    def __init__(self, ylist=[0.24, 0.26, 0.74, 0.76]):
+        self.ylist = np.array(ylist)
+
+    def init_mesh(self, n):
+        pass
+
+    def __call__(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        distan = np.min(np.abs(np.tile(y[:, None], (1, len(self.ylist))) - self.ylist[None, :]), axis=1)
+        for i in range(len(self.ylist))[::2]:
+            flag = (self.ylist[i] < y) & (y < self.ylist[i+1])
+            distan[flag] *= -1
+        return distan 
+
+    def value(self, p):
+        return self(p)
+
+    def gradient(self, p):
+        pass
+
+    def distvalue(self, p):
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        return d, n
+
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
+
 class DoubleBandY():
     def __init__(self, ylist=[0.24, 0.26, 0.74, 0.76]):
         self.ylist = ylist
