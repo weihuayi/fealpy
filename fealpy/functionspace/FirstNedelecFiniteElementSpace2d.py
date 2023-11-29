@@ -262,7 +262,8 @@ class FirstNedelecFiniteElementSpace2d:
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof[index]])
+        val = np.einsum('qclg, cl->qcg', phi, uh[cell2dof[index]])
+        print(">>> , ", val.shape)
         return val
 
     @barycentric
@@ -538,3 +539,35 @@ class FirstNedelecFiniteElementSpace2d:
             uv = phi[:, index, i, :]
             axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1],
                         units='xy')
+
+    def curl_error(self, u, uh, celltype=False):
+
+        mesh = self.mesh
+        cellmeasure = mesh.entity_measure('cell')
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        point = mesh.bc_to_point(bcs)
+        uval = u(point)
+        uhval = uh(bcs)
+        val = uhval-uval
+        error = np.einsum('q, qc, qc, c->c', ws, val, val, cellmeasure, optimize=True)
+        if celltype:
+            return error
+        else:
+            return np.sqrt(error.sum())
+
+    def error(self, u, uh, celltype=False):
+        mesh = self.mesh
+        cellmeasure = mesh.entity_measure('cell')
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        point = mesh.bc_to_point(bcs)
+        uval = u(point)
+        uhval = uh(bcs)
+        val = uhval-uval
+        error = np.einsum('q, qcl, qcl, c->c', ws, val, val, cellmeasure, optimize=True)
+        if celltype:
+            return error
+        else:
+            return np.sqrt(error.sum())
+

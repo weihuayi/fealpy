@@ -453,11 +453,11 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
-    def entity(self, etype=2):
+    def entity(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
             return self.ds.cell_to_node()
         elif etype in {'edge', 'face', 1}:
-            return self.ds.edge_to_node()
+            return self.ds.edge_to_node()[index]
         elif etype in {'halfedge'}:
             return self.ds.halfedge # DynamicArray
         elif etype in {'node', 0}:
@@ -2526,6 +2526,8 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         print('cellLocation:', cellLocation)
         cell2edge, cellLocation = self.ds.cell_to_edge()
         print("cell2edge:", cell2edge)
+
+HalfEdgeMesh2d.set_ploter('polygon2d')
 
 class HalfEdgeMesh2dDataStructure():
     def __init__(self, halfedge, subdomain, NN=None, NV=None):

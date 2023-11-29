@@ -467,6 +467,7 @@ class Mesh():
         if v.shape[-1] == 1:
            v = v[..., 0]
 
+        print(v.shape)
         cm = self.entity_measure('cell')
 
         f = np.power(np.abs(u - v), power)
