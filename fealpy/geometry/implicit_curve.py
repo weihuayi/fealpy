@@ -244,10 +244,11 @@ class BandY():
         x = p[..., 0]
         y = p[..., 1]
 
-        distan = np.min(np.abs(np.tile(y[:, None], (1, len(self.ylist))) - self.ylist[None, :]), axis=1)
+        distan = np.min(np.abs(np.tile(y[..., None], len(self.ylist)) -
+            self.ylist[None, :]), axis=-1)
         for i in range(len(self.ylist))[::2]:
             flag = (self.ylist[i] < y) & (y < self.ylist[i+1])
-            distan[flag] *= -1
+            distan[flag] = -distan[flag]
         return distan 
 
     def value(self, p):

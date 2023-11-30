@@ -9,7 +9,7 @@ from fealpy.pde.poisson_2d import LShapeRSinData
 
 # 网格
 from fealpy.mesh import PolygonMesh
-from fealpy.mesh import HalfEdgeMesh2d
+from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 
 # 协调有限元空间
 from fealpy.functionspace import ConformingScalarVESpace2d
@@ -72,22 +72,22 @@ errorType = ['$|| u - \Pi u_h||_{\Omega,0}$',
              '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$',
              '$\eta $']
 errorMatrix = np.zeros((3, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
 
 #mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
-mesh = pde.init_mesh(n = 1, meshtype='tri')
+mesh = pde.init_mesh(n = 1, meshtype='quad')
 mesh = PolygonMesh.from_mesh(mesh)
 Hmesh = HalfEdgeMesh2d.from_mesh(mesh)
 fig = plt.figure()
 axes  = fig.gca()
 mesh.add_plot(axes)
-plt.show()
+#plt.show()
 
 for i in range(maxit):
     #mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
     #mesh = pde.init_mesh(n = i+1, meshtype='tri')
     #mesh = PolygonMesh.from_mesh(mesh)
-    space = ConformingScalarVESpace2d(mesh, p=degree)
+    space = ConformingScalarVESpace2d(Hmesh, p=degree)
     uh = space.function()
     
     NDof[i] = space.number_of_global_dofs()
@@ -131,11 +131,13 @@ for i in range(maxit):
     errorMatrix[1, i] = mesh.error(pde.gradient, sh.grad_value)
     errorMatrix[2, i] = np.sqrt(np.sum(eta))
     options = Hmesh.adaptive_options(HB=None)
+    print("refine")
     Hmesh.adaptive(eta, options)
-    newcell, cellocation = Hmesh.entity('cell')
+    newcell = Hmesh.entity('cell')
     newnode = Hmesh.entity("node")[:]
-    mesh = PolygonMesh(newnode, newcell, cellocation)
+    mesh = PolygonMesh(newnode, newcell)
 showmultirate(plt, maxit-2, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
+print(errorMatrix)
 plt.show()
 fig1 = plt.figure()
 axes  = fig1.gca()
