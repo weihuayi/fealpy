@@ -271,7 +271,7 @@ class HemkerDCRModelWithBoxHole2d:
 
 class PMLPDEModel2d:
     def __init__(self, 
-                 level_set:Callable[[NDArray], NDArray],
+                 levelset:Callable[[NDArray], NDArray],
                  domain:Sequence[float],
                  qs:int, 
                  u_inc:str,
@@ -304,7 +304,7 @@ class PMLPDEModel2d:
         self.k = k  
         self.d = d
         self.qs = qs
-        self.level_set = level_set
+        self.levelset = levelset
         self.domain = domain
         self.refractive_index = refractive_index
         self._source = sp.lambdify((x, y, n), s, "numpy")
@@ -402,7 +402,7 @@ class PMLPDEModel2d:
         origin = p.shape[:-1]
         p = p.reshape(-1, 2)
         x = p[..., 0]
-        flag = self.level_set(p)< 0. # (NC, )
+        flag = self.levelset(p)< 0. # (NC, )
         n = np.empty((x.shape[-1], ), dtype=np.float64)
         n[flag] = self.refractive_index[1]
         n[~flag] = self.refractive_index[0]
