@@ -49,7 +49,7 @@ class LSFEMSolver(LSSolver):
             bform = BilinearForm(space)
 
             # The convection integrator accounts for the transport effect of the velocity field on the level set function.
-            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u))
+            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u, q = 4))
             self.C = bform.assembly() # TODO:Implement a fast assembly method
 
     def solve(self, phi0, dt, u=None, tol=1e-8):
@@ -77,7 +77,7 @@ class LSFEMSolver(LSSolver):
                 raise ValueError(" Velocity `u` is None! You must offer velocity!")
         else:
             bform = BilinearForm(space)
-            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u))
+            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u, q = 4))
             C = bform.assembly()
 
         # The system matrix A is composed of the mass matrix and the convection matrix.
@@ -117,7 +117,7 @@ class LSFEMSolver(LSSolver):
                 raise ValueError(" Velocity `u` is None! You must offer velocity!")
         else:
             bform = BilinearForm(space)
-            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u))
+            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u, q = 4))
             C = bform.assembly()
 
         # The system matrix A is composed of the mass matrix and the convection matrix.
