@@ -94,6 +94,32 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
     return axes
 
 def showrate(axes, k, N, error, option, label=None, lw=1, ms=4, computerate=True):
+    pres = '$CN^' if isinstance(N[0], np.int_) else  '$Ch^'
+    line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
+    if computerate:
+        if isinstance(k, int):
+            c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
+            s = 0.75*error[k]/N[k]**c[0]
+            line1, = axes.loglog(N[k:], s*N[k:]**c[0], label=pres+'{%0.2f}$'%(c[0]),
+                    lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+        else:
+            c = np.polyfit(np.log(N[k]), np.log(error[k]), 1)
+            s = 0.75*error[k[0]]/N[k[0]]**c[0]
+            line1, = axes.loglog(N[k], s*N[k]**c[0], label=pres+'{%0.2f}$'%(c[0]),
+                    lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+
+    if isinstance(N[0], np.int_):
+        axes.set_xlim(left=N[0]/2, right=N[-1]*2)
+    elif isinstance(N[0], np.float_):
+        from matplotlib.ticker import LogLocator, NullFormatter
+        axes.set_xlim(left=N[-1]/1.2, right=N[0]*1.2)
+        axes.set_xscale("log", base=2) 
+        axes.xaxis.set_minor_formatter(NullFormatter())
+        minor_locator = LogLocator(base=2, subs=2**np.linspace(-1, 0, 10))
+        axes.xaxis.set_minor_locator(minor_locator)
+"""
+
+def showrate(axes, k, N, error, option, label=None, lw=1, ms=4, computerate=True):
     axes.set_xlim(left=N[0]/2, right=N[-1]*2)
     line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
     if computerate:
@@ -107,4 +133,4 @@ def showrate(axes, k, N, error, option, label=None, lw=1, ms=4, computerate=True
             s = 0.75*error[k[0]]/N[k[0]]**c[0]
             line1, = axes.loglog(N[k], s*N[k]**c[0], label='C$N^{%0.4f}$'%(c[0]),
                     lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
-
+"""
