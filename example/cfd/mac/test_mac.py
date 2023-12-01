@@ -17,8 +17,8 @@ pde = taylor_greenData(Re,T=[0,T])
 domain = pde.domain()
 
 #空间离散
-nx = 4
-ny = 4
+nx = 5
+ny = 5
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
 mesh_u = UniformMesh2d([0, nx, 0, ny-1], h=(hx, hy), origin=(domain[0], domain[2]+hy/2))
@@ -104,7 +104,48 @@ def result_phi(p,mesh):
     return phi
 
 solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
-for i in range(5):
+'''
+def solution_u_0(p):
+    return pde.solution_u(p,t=0)
+def solution_v_0(p):
+    return pde.solution_v(p,t=0)
+def solution_p_0(p):
+    return pde.solution_p(p,t=0)
+solution_u = mesh_u.interpolate(solution_u_0)
+solution_u_values0 = solution_u.reshape(-1)
+solution_v = mesh_v.interpolate(solution_v_0)
+solution_v_values0 = solution_v.reshape(-1)
+solution_p = mesh_p.interpolate(solution_p_0)
+solution_p_values0 = solution_p.reshape(-1)
+uu = pde.solution_u(nodes_u,0)
+vv = pde.solution_v(nodes_v,0)
+pp = pde.solution_p(nodes_p,0)
+erru0 = np.sum(np.sqrt((uu-solution_u_values0)**2+(vv-solution_v_values0)**2))
+errp0 = pp-solution_p_values0
+print(erru0)
+print(errp0)
+def solution_u_1(p):
+    return pde.solution_u(p,t=tau)
+def solution_v_1(p):
+    return pde.solution_v(p,t=tau)
+def solution_p_1(p):
+    return pde.solution_p(p,t=tau)
+solution_u = mesh_u.interpolate(solution_u_1)
+solution_u_values1 = solution_u.reshape(-1)
+solution_v = mesh_v.interpolate(solution_v_1)
+solution_v_values1 = solution_v.reshape(-1)
+solution_p = mesh_p.interpolate(solution_p_1)
+solution_p_values1 = solution_p.reshape(-1)
+uu = pde.solution_u(nodes_u,tau)
+vv = pde.solution_v(nodes_v,tau)
+pp = pde.solution_p(nodes_p,tau)
+erru1 = np.sum(np.sqrt((uu-solution_u_values1)**2+(vv-solution_v_values1)**2))
+errp1 = pp-solution_p_values1
+print(erru1)
+print(errp1)
+'''
+
+for i in range(nt):
     # 下一个的时间层 ti
     tl = tmesh.next_time_level()
     print("tl=", tl)
@@ -143,8 +184,8 @@ for i in range(5):
     laplacev = solver.laplace_v()
     #0时间层的 Adams-Bashforth 公式逼近的对流导数
     AD_xu_0 = solution_u_values0 * gradux0 + Tuv0 * graduy0
-    BD_yv_0 = solution_v_values0 * gradvy0 + Tvu0 * gradvx0
-    
+    BD_yv_0 = Tvu0 * gradvx0 + solution_v_values0 * gradvy0
+
     #tau时间层的值
     def solution_u_1(p):
         return pde.solution_u(p,t=(i+1)*tau)
@@ -178,8 +219,8 @@ for i in range(5):
     Tvu1 = solver.Tvu() @ solution_u_values1
     #tau时间层的 Adams-Bashforth 公式逼近的对流导数
     AD_xu_1 = solution_u_values1 * gradux1 + Tuv1 * graduy1
-    BD_yv_1 = solution_v_values1 * gradvy1 + Tvu1 * gradvx1
-    
+    BD_yv_1 = Tvu1 * gradvx1 + solution_v_values1 * gradvy1
+
     #组装A、b矩阵
     I = np.zeros_like(laplaceu.toarray())
     row1, col1 = np.diag_indices_from(I)
@@ -187,7 +228,7 @@ for i in range(5):
     A = I - (nu*tau*laplaceu)/2
     F = solver.source_Fx(pde,t=(i+1)*tau)
     Fx = F[:,0]
-    b = tau*(-3/2*AD_xu_1-1/2*AD_xu_0+nu/2*(laplaceu@solution_u_values1 + (8*u_ub11/3)/(hx*hy))+Fx-solver.grand_uxp()@solution_p_values1)
+    b = tau*(-3/2*AD_xu_1-1/2*AD_xu_0+nu/2*(laplaceu@solution_u_values1 + (8*u_ub11/3)/(hx*hy))+Fx-solver.grand_uxp()@solution_p_values1)+solution_u_values1
 
     #组装B、c矩阵
     E = np.zeros_like(laplacev.toarray())
@@ -195,14 +236,14 @@ for i in range(5):
     E[row2,col2] = 1
     B = E - (nu*tau*laplacev)/2
     Fy = F[:,1]
-    c = tau*(-3/2*BD_yv_1-1/2*BD_yv_0+nu/2*(laplacev@solution_v_values1 + (8*v_ub11/3)/(hx*hy))+Fy-solver.grand_vyp()@solution_p_values1)
+    c = tau*(-3/2*BD_yv_1-1/2*BD_yv_0+nu/2*(laplacev@solution_v_values1 + (8*v_ub11/3)/(hx*hy))+Fy-solver.grand_vyp()@solution_p_values1)+solution_v_values1
     
-    #A,b矩阵边界处理并解方程（时间层用0还是tau？）
+    #A,b矩阵边界处理并解方程
     nxu = mesh_u.node.shape[1]
     is_boundaryu = np.zeros(num_nodes_u,dtype='bool')
     is_boundaryu[:nxu] = True
     is_boundaryu[-nxu:] = True
-    dirchiletu = pde.dirichlet_u(nodes_u[is_boundaryu], i*tau)
+    dirchiletu = pde.dirichlet_u(nodes_u[is_boundaryu], (i+2)*tau)
     b[is_boundaryu] = dirchiletu
 
     bdIdxu = np.zeros(A.shape[0], dtype=np.int_)
@@ -211,14 +252,14 @@ for i in range(5):
     T1 = spdiags(1-bdIdxu, 0, A.shape[0], A.shape[0])
     A = A@T1 + Tbdu
     u_1 = spsolve(A, b) #(20,)
-
-    #B,c矩阵边界处理并解方程（时间层用0还是tau？）
+    
+    #B,c矩阵边界处理并解方程
     nyv = mesh_v.node.shape[1]
     is_boundaryv = np.zeros(num_nodes_v,dtype='bool')
     is_boundaryv[(np.arange(num_nodes_v) % nyv == 0)] = True
     indices = np.where(is_boundaryv)[0] - 1
     is_boundaryv[indices] = True
-    dirchiletv = pde.dirichlet_v(nodes_v[is_boundaryv], i*tau)
+    dirchiletv = pde.dirichlet_v(nodes_v[is_boundaryv], (i+2)*tau)
     c[is_boundaryv] = dirchiletv
 
     bdIdyv = np.zeros(B.shape[0],dtype=np.int_)
@@ -231,14 +272,14 @@ for i in range(5):
     u_1_reshape = u_1.reshape(-1,1) #(20,1)
     v_1_reshape = v_1.reshape(-1,1) #(20,1)
     w_1 = np.concatenate((u_1_reshape,v_1_reshape),axis=1) #(20,2)
-
+    
     #求解修正项
     H = laplaplace_phi(mesh_p).toarray()
     M = np.dot(solver.grad_pux().toarray(),u_1)+np.dot(solver.grad_pvy().toarray(),v_1)
     L = M.reshape(-1,1)/tau
     K = spsolve(H,L) #(16,1)
     phi = result_phi(K,mesh_p)
-    
+   
     #计算修正项的梯度
     grad_phix = np.gradient(phi,axis=1) #x方向(4,4)
     grad_phiy = np.gradient(phi,axis=0)  #y方向(4,4)
@@ -276,7 +317,7 @@ for i in range(5):
     solution_v_values2 = w_1[:,1].reshape(-1,1)-tau*phi_y #(20,1)
 
     w_2 = np.concatenate((solution_u_values2,solution_v_values2),axis=1)
-
+    
     #更新压力及其梯度
     solution_p_values2 = solution_p_values1+K-(nu*tau*M)/2
     def reshape_p(p,mesh):
@@ -294,7 +335,7 @@ for i in range(5):
     uu = pde.solution_u(nodes_u,tl)
     vv = pde.solution_v(nodes_v,tl)
     pp = pde.solution_p(nodes_p,tl)
-    erru = np.sqrt((uu-w_2[:.0])**2+(vv-w_2[:,1])**2)
+    erru = np.sum(np.sqrt((uu-w_2[:,0])**2+(vv-w_2[:,1])**2))
     print(erru)
     
 
