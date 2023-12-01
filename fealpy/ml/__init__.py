@@ -12,3 +12,7 @@ Contents
 4. PDE preset classes
 
 """
+
+from .solvertools import rescale, ridge
+from .hyperparams import AutoTest, timer
+from .tools import mkfs, use_mkfs, proj, as_tensor_func

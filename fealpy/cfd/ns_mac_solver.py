@@ -127,7 +127,7 @@ class NSMacSolver():
         Nrow = mesh.node.shape[1]
         Ncol = mesh.node.shape[0]
         N = Nrow*Ncol
-        result = diags([-1, 1, 1, 1, 1],[0, 1, -1, Nrow, -Nrow],(N,N), format='lil')
+        result = diags([-4, 1, 1, 1, 1],[0, 1, -1, Nrow, -Nrow],(N,N), format='lil')
 
         index = np.arange(0,N)
         result[index[:Nrow],index[:Nrow]] = -6
