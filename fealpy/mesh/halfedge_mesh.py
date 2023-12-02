@@ -1767,7 +1767,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         clevel = self.celldata['level']
 
         if ('HB' in options) and (options['HB'] is not None):
-            HB = np.zeros((NC, 2), dtype=np.int)
+            HB = np.zeros((NC, 2), dtype=np.int_)
             HB[:, 0] = np.arange(NC)
             HB[:, 1] = np.arange(NC)
             options['HB'] = HB
@@ -1793,11 +1793,11 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NE1+NE2*2, dtype=np.bool_)]
 
             #修改半边颜色
-            color = np.r_[color, np.zeros(NE1, dtype=np.int)]
+            color = np.r_[color, np.zeros(NE1, dtype=np.int_)]
             color[flag]=0
             color[halfedge[flag, 2]] = 1
             color[halfedge[halfedge[flag, 3], 3]] = 1
-            color = np.r_[color, np.zeros(NE2*2, dtype=np.int)]
+            color = np.r_[color, np.zeros(NE2*2, dtype=np.int_)]
             self.halfedgedata['color'] = color
 
             self._refine_tri_cell_(isNewCell, flag, options=options)
