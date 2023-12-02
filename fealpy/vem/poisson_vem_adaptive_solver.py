@@ -102,7 +102,7 @@ class PoissonACVEMSolver:
         self._NF += 1
         return uh
 
-    def adaptive_solve(self, maxit=40, theta=0.2, save_data=False,meshfilepath="./",equfilepath="./"):
+    def adaptive_solve(self, maxit=40, theta=0.2, method='L2',save_data=False,meshfilepath="./",equfilepath="./"):
         '''
         自适应求解
 
@@ -116,9 +116,6 @@ class PoissonACVEMSolver:
         Returns:
             None
         '''
-        errorType = ['$|| u - \Pi u_h||_{\Omega,0}$',
-         '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$',
-         '$\eta $']
         errorMatrix = np.zeros((3,maxit),dtype=np.float64)
         Hmesh = self.Hmesh
         pde = self.pde
@@ -134,11 +131,17 @@ class PoissonACVEMSolver:
             errorMatrix[1, i] = self.mesh.error(pde.gradient, sh.grad_value)
 
             errorMatrix[2, i] = np.sqrt(np.sum(eta))
-            # L2标记策略加密
-            isMarkedCell = mark(eta, theta=theta)
-            Hmesh.adaptive_refine(isMarkedCell, method='poly')
-            #options = Hmesh.adaptive_options(theta=theta,HB=None)
-            #Hmesh.adaptive(eta, options)# 这是log标记策略加密
+            # L2 标记策略加密
+            if method=='L2':
+                isMarkedCell = mark(eta, theta=theta)
+                Hmesh.adaptive_refine(isMarkedCell, method='poly')
+            # Log 标记策略
+            elif method=='Log':
+                options = Hmesh.adaptive_options(theta=theta,HB=None)
+                Hmesh.adaptive(eta, options)
+            else:
+                raise ValueError("Wrong marking method!\"L2\" or \"Log\"")
+
             newcell = Hmesh.entity('cell')
             newnode = Hmesh.entity("node")[:]
             self.mesh = PolygonMesh(newnode, newcell)
@@ -147,8 +150,26 @@ class PoissonACVEMSolver:
                 cell = np.concatenate(newcell)
                 cellLocation = self.mesh.ds.cellLocation
                 np.savez(meshfilepath+f"mesh{i+1}.npz",node=newnode,cell=cell,cellLocation=cellLocation)
-        showmultirate(plt, maxit-10, np.array(self.NDof), errorMatrix, errorType, propsize=20, lw=2, ms=4)
-        print(errorMatrix)
+        self.errorMatrix = errorMatrix
+        self.maxit = maxit
+        
+    def showresult(self,select_number=4):
+        '''
+        展示求解结果
+
+        Parameters:
+            select_number: 选取最后几次迭代的结果次数计算收敛阶，默认为4
+
+        Returns:
+            None
+        '''
+
+        errorType = ['$|| u - \Pi u_h||_{\Omega,0}$',
+         '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$',
+         '$\eta $']
+
+        showmultirate(plt, self.maxit-select_number, np.array(self.NDof), self.errorMatrix, errorType, propsize=20, lw=2, ms=4)
+        print(self.errorMatrix)
         plt.show()
         fig1 = plt.figure()
         axes  = fig1.gca()
