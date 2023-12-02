@@ -17,6 +17,29 @@ def test_interval_domain():
     plt.show()
 
 
+def test_mesh_boundary():
+    from fealpy.mesh import (
+        TriangleMesh,
+        UniformMesh2d
+    )
+    fig = plt.figure("Interval Mesh Test")
+    axes = fig.add_subplot(121)
+    other_mesh = TriangleMesh.from_one_triangle()
+    other_mesh.uniform_refine(1)
+    mesh = IntervalMesh.from_mesh_boundary(other_mesh)
+    mesh.add_plot(axes, showaxis=True)
+    mesh.find_node(axes, showindex=True)
+    mesh.find_cell(axes, showindex=True)
+
+    axes = fig.add_subplot(122)
+    other_mesh = UniformMesh2d([0, 8, 0, 8], h=[0.25, 0.25], origin=[-1, -1])
+    mesh = IntervalMesh.from_mesh_boundary(other_mesh)
+    mesh.add_plot(axes, showaxis=True)
+    mesh.find_node(axes, showindex=True)
+    mesh.find_cell(axes, showindex=True)
+    plt.show()
+
+
 def test_circle_boundary():
     mesh = IntervalMesh.from_circle_boundary([0, 0], radius=1.45, n=20)
     fig = plt.figure("Interval Mesh Test")
@@ -51,4 +74,5 @@ class TestDataStructure():
 
 if __name__ == '__main__':
     test_interval_domain()
+    test_mesh_boundary()
     test_circle_boundary()
