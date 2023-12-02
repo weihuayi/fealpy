@@ -292,7 +292,7 @@ class BernsteinFESpace:
         return gmphi
 
     def grad_m_basis(self, bcs, m):
-        """!
+        """
         @brief m=3时导数排列顺序: [xxx, yxx, yxy, yyy]
                导数按顺序每个对应一个 A_d^m 的多重指标，对应 alpha 的导数有
                m!/alpha! 个.

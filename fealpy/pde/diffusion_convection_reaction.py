@@ -291,12 +291,12 @@ class PMLPDEModel2d:
         u_inc = sp.sympify(u_inc)
         
         A = sp.sympify(A)
-        k = sp.sympify(k)
+        K = sp.sympify(k)
        
         du_inc_dx = u_inc.diff(x)
         du_inc_dy = u_inc.diff(y)
   
-        s = A * du_inc_dx.diff(x) + A * du_inc_dy.diff(y) + k**2 * n * u_inc
+        s = A * du_inc_dx.diff(x) + A * du_inc_dy.diff(y) + K**2 * n * u_inc
         
         self.absortion_constant = absortion_constant 
         self.lx = lx 
@@ -319,7 +319,7 @@ class PMLPDEModel2d:
         b1 = domain[1] - d_x
 
         x = p[..., 0]
-        sigma_x = np.zeros_like(x, dtype=np.float64)
+        sigma_x = np.zeros_like(x, dtype=np.complex128)
 
         idx_1 = (x > domain[0]) & (x < a1)
         idx_2 = (x > a1) & (x < b1)
@@ -341,7 +341,7 @@ class PMLPDEModel2d:
         b1 = domain[1] - d_x
 
         x = p[..., 0]
-        sigma_x_d_x = np.zeros_like(x, dtype=np.float64)
+        sigma_x_d_x = np.zeros_like(x, dtype=np.complex128)
 
         idx_1 = (x > domain[0]) & (x < a1)
         idx_2 = (x > a1) & (x < b1)
@@ -363,7 +363,7 @@ class PMLPDEModel2d:
         b2 = domain[3] - d_y
 
         y = p[..., 1]
-        sigma_y = np.zeros_like(y)
+        sigma_y = np.zeros_like(y, dtype=np.complex128)
 
         idx_1 = (y > domain[2]) & (y < a2)
         idx_2 = (y > a2) & (y < b2)
@@ -385,7 +385,7 @@ class PMLPDEModel2d:
         b2 = domain[3] - d_y
 
         y = p[..., 1]
-        sigma_y_d_y = np.zeros_like(y)
+        sigma_y_d_y = np.zeros_like(y, dtype=np.complex128)
 
         idx_1 = (y > domain[2]) & (y < a2)
         idx_2 = (y > a2) & (y < b2)
@@ -403,7 +403,7 @@ class PMLPDEModel2d:
         p = p.reshape(-1, 2)
         x = p[..., 0]
         flag = self.levelset(p)< 0. # (NC, )
-        n = np.empty((x.shape[-1], ), dtype=np.float64)
+        n = np.empty((x.shape[-1], ), dtype=np.complex128)
         n[flag] = self.refractive_index[1]
         n[~flag] = self.refractive_index[0]
         n = n.reshape(origin)
