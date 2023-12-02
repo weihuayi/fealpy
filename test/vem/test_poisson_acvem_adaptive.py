@@ -11,7 +11,7 @@ equfilepath = './data/equ/' # # 需要创建相应的文件夹
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=1,meshtype='quad')
 solver = PoissonACVEMSolver(pde,mesh)
-solver.adaptive_solve(maxit=4,save_data=True,meshfilepath=meshfilepath,equfilepath=equfilepath)
+solver.adaptive_solve(maxit =40,theta=0.2,save_data=True,meshfilepath=meshfilepath,equfilepath=equfilepath)
 
 # 读取保存的数据
 data = np.load(meshfilepath+"mesh1.npz")

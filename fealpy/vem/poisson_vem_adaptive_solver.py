@@ -102,7 +102,7 @@ class PoissonACVEMSolver:
         self._NF += 1
         return uh
 
-    def adaptive_solve(self, maxit=40, theta=1.0, save_data=False,meshfilepath="./",equfilepath="./"):
+    def adaptive_solve(self, maxit=40, theta=0.2, save_data=False,meshfilepath="./",equfilepath="./"):
         '''
         自适应求解
 
@@ -134,10 +134,11 @@ class PoissonACVEMSolver:
             errorMatrix[1, i] = self.mesh.error(pde.gradient, sh.grad_value)
 
             errorMatrix[2, i] = np.sqrt(np.sum(eta))
-            #isMarkedCell = mark(eta, theta=theta)
-            #Hmesh.adaptive_refine(isMarkedCell, method='nvb')
-            options = Hmesh.adaptive_options(theta=theta,HB=None)
-            Hmesh.adaptive(eta, options)
+            # L2标记策略加密
+            isMarkedCell = mark(eta, theta=theta)
+            Hmesh.adaptive_refine(isMarkedCell, method='poly')
+            #options = Hmesh.adaptive_options(theta=theta,HB=None)
+            #Hmesh.adaptive(eta, options)# 这是log标记策略加密
             newcell = Hmesh.entity('cell')
             newnode = Hmesh.entity("node")[:]
             self.mesh = PolygonMesh(newnode, newcell)
@@ -146,7 +147,7 @@ class PoissonACVEMSolver:
                 cell = np.concatenate(newcell)
                 cellLocation = self.mesh.ds.cellLocation
                 np.savez(meshfilepath+f"mesh{i+1}.npz",node=newnode,cell=cell,cellLocation=cellLocation)
-        showmultirate(plt, maxit-4, np.array(self.NDof), errorMatrix, errorType, propsize=20, lw=2, ms=4)
+        showmultirate(plt, maxit-10, np.array(self.NDof), errorMatrix, errorType, propsize=20, lw=2, ms=4)
         print(errorMatrix)
         plt.show()
         fig1 = plt.figure()
