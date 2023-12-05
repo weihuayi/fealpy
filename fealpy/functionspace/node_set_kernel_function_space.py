@@ -6,7 +6,6 @@ class NodeSetKernelSpace:
     def __init__(self, mesh, ker='Quintic', H=1):
         """
         @brief 
-
         @param[in] mesh NodeSet 类型的网格
         @param[in] ker str kernel 函数计算的字符串
         """
@@ -14,7 +13,7 @@ class NodeSetKernelSpace:
         self.ker = ker
         self.H = H
          
-    @numba.jit(nopython=True)
+    #@numba.jit(nopython=True)
     def kernel(self, r):
         choose = self.ker
         d = np.sqrt(np.sum(r**2, axis=-1))
@@ -23,13 +22,15 @@ class NodeSetKernelSpace:
         if choose == 'Quintic':
             val = 7 * (1-q/2)**4 * (2*q+1) / (4*np.pi*H**2)        
         return val
-
+    
+    '''
     @numba.jit(nopython=True)
     def Quintic_kernel(self, r):
         d = np.sqrt(np.sum(r**2, axis=-1))
         q = d/H
         val = 7 * (1-q/2)**4 * (2*q+1) / (4*np.pi*H**2)
         return val
+    '''
 
     def grad_kernel(self, r):
         d = np.sqrt(np.sum(r**2))
