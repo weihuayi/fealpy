@@ -137,7 +137,7 @@ class NSMacSolver():
 
         return result/(dx*dy) 
     
-    def grand_uxp(self):
+    def grad_uxp(self):
         mesh = self.pmesh
         dx = mesh.h[0]
         Nrow = mesh.node.shape[1]
@@ -148,7 +148,7 @@ class NSMacSolver():
         result1 = vstack([result, A], format='lil')   
         return result1/dx
     
-    def grand_vyp(self):
+    def grad_vyp(self):
         mesh = self.pmesh
         dx = mesh.h[0]
         Nrow = mesh.node.shape[1]

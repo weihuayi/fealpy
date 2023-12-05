@@ -119,7 +119,8 @@ axes = fig.gca()
 mesh_v.add_plot(axes)
 mesh_v.find_node(axes,showindex=True)
 np.set_printoptions(linewidth=1000)
-for i in range(1):
+
+for i in range(5):
     # 下一个的时间层 ti
     tl = tmesh.next_time_level()
     print("tl=", tl)
@@ -158,7 +159,7 @@ for i in range(1):
     gradvx0 = solver.grad_vx() @ solution_v_values0 + (8*v_ub0/3)/(2*hx)
     gradvy0 = solver.grad_vy() @ solution_v_values0
     Tvu0 = solver.Tvu() @ solution_u_values0
-    BD_yv_0 = Tvu0 * gradvx0 + solution_v_values0 * gradvy0
+    AD_yv_0 = Tvu0 * gradvx0 + solution_v_values0 * gradvy0
 
     #n时间层的值
     def solution_u_1(p):
@@ -193,7 +194,7 @@ for i in range(1):
     Tvu1 = solver.Tvu() @ solution_u_values1
     #tau时间层的 Adams-Bashforth 公式逼近的对流导数
     AD_xu_1 = solution_u_values1 * gradux1 + Tuv1 * graduy1
-    BD_yv_1 = Tvu1 * gradvx1 + solution_v_values1 * gradvy1
+    AD_yv_1 = Tvu1 * gradvx1 + solution_v_values1 * gradvy1
 
     #组装A_u、b_u矩阵
     laplaceu = solver.laplace_u()
@@ -204,33 +205,33 @@ for i in range(1):
     F = solver.source_Fx(pde,t=(i+1)*tau)
     Fx = F[:,0]
     b_u = tau*(-3/2*AD_xu_1-1/2*AD_xu_0+nu/2*(laplaceu@solution_u_values1 \
-            + (8*u_ub11/3)/(hx*hy))+Fx-solver.grand_uxp()@solution_p_values1)+solution_u_values1
+            + (8*u_ub11/3)/(hx*hy))+Fx-solver.grad_uxp()@solution_p_values1)+solution_u_values1
     
     #组装A_v、b_v矩阵
     laplacev = solver.laplace_v()
-    E = np.zeros_like(laplacev.toarray())
-    row2, col2 = np.diag_indices_from(E)
-    E[row2,col2] = 1
-    B = E - (nu*tau*laplacev)/2
+    A_v = - (nu*tau*laplacev)/2
+    diagonal = A_v.diagonal()
+    diagonal += 1
+    A_v.setdiag(diagonal)
     Fy = F[:,1]
-    c = tau*(-3/2*BD_yv_1-1/2*BD_yv_0+nu/2*(laplacev@solution_v_values1 + (8*v_ub11/3)/(hx*hy))+Fy-solver.grand_vyp()@solution_p_values1)+solution_v_values1
+    b_v = tau*(-3/2*AD_yv_1-1/2*AD_yv_0+nu/2*(laplacev@solution_v_values1 \
+            + (8*v_ub11/3)/(hx*hy))+Fy-solver.grad_vyp()@solution_p_values1)+solution_v_values1
     
-    #A,b矩阵边界处理并解方程
+    #A_u,b_u矩阵边界处理并解方程
     nxu = mesh_u.node.shape[1]
     is_boundaryu = np.zeros(num_nodes_u,dtype='bool')
     is_boundaryu[:nxu] = True
     is_boundaryu[-nxu:] = True
     dirchiletu = pde.dirichlet_u(nodes_u[is_boundaryu], (i+2)*tau)
-    b[is_boundaryu] = dirchiletu
+    b_u[is_boundaryu] = dirchiletu
 
-    bdIdxu = np.zeros(A.shape[0], dtype=np.int_)
+    bdIdxu = np.zeros(A_u.shape[0], dtype=np.int_)
     bdIdxu[is_boundaryu] = 1
-    Tbdu = spdiags(bdIdxu, 0, A.shape[0], A.shape[0])
-    T1 = spdiags(1-bdIdxu, 0, A.shape[0], A.shape[0])
-    A = A@T1 + Tbdu
-    #A = csr_matrix(A)
-    u_1 = spsolve(A, b) #(20,)
-    ''' 
+    Tbdu = spdiags(bdIdxu, 0, A_u.shape[0], A_u.shape[0])
+    T1 = spdiags(1-bdIdxu, 0, A_u.shape[0], A_u.shape[0])
+    A_u = A_u@T1 + Tbdu
+    u_1 = spsolve(A_u, b_u) #(20,)
+    
     #B,c矩阵边界处理并解方程
     nyv = mesh_v.node.shape[1]
     is_boundaryv = np.zeros(num_nodes_v,dtype='bool')
@@ -238,14 +239,14 @@ for i in range(1):
     indices = np.where(is_boundaryv)[0] - 1
     is_boundaryv[indices] = True
     dirchiletv = pde.dirichlet_v(nodes_v[is_boundaryv], (i+2)*tau)
-    c[is_boundaryv] = dirchiletv
+    b_v[is_boundaryv] = dirchiletv
 
-    bdIdyv = np.zeros(B.shape[0],dtype=np.int_)
+    bdIdyv = np.zeros(A_v.shape[0],dtype=np.int_)
     bdIdyv[is_boundaryv] = 1
-    Tbdv = spdiags(bdIdyv,0,B.shape[0],B.shape[0])
-    T2 = spdiags(1-bdIdyv,0,B.shape[0],B.shape[0])
-    B = B@T2 + Tbdv
-    v_1 = spsolve(B,c) #(20,)
+    Tbdv = spdiags(bdIdyv,0,A_v.shape[0],A_v.shape[0])
+    T2 = spdiags(1-bdIdyv,0,A_v.shape[0],A_v.shape[0])
+    A_v = A_v@T2 + Tbdv
+    v_1 = spsolve(A_v,b_v) #(20,)
     #中间速度
     u_1_reshape = u_1.reshape(-1,1) #(20,1)
     v_1_reshape = v_1.reshape(-1,1) #(20,1)
@@ -315,7 +316,7 @@ for i in range(1):
     pp = pde.solution_p(nodes_p,tl)
     erru = np.sum(np.sqrt((uu-w_2[:,0])**2+(vv-w_2[:,1])**2))
     print(erru)
-    ''' 
+    
 
      # 时间步进一层 
     tmesh.advance()
