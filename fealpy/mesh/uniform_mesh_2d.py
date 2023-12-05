@@ -1243,10 +1243,7 @@ class UniformMesh2d(Mesh, Plotable):
         gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
 
         n = phi0.shape[0]*phi1.shape[0] # 张量积分点的个数
-        ldof = phi0.shape
-[-1]
-*phi1.shape
-[-1]
+        ldof = phi0.shape[-1]*phi1.shape[-1]
 
         shape = (n, ldof, 2)
         gphi = np.zeros(shape, dtype=self.ftype)
@@ -1279,8 +1276,7 @@ class UniformMesh2d(Mesh, Plotable):
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。
         """
-        TD = J.shape
-[-1]
+        TD = J.shape[-1]
 
         shape = J.shape[0:-2] + (TD, TD)
         G = np.zeros(shape, dtype=self.ftype)
@@ -1425,9 +1421,7 @@ class UniformMesh2d(Mesh, Plotable):
         c = np.array([(tnx + 1) * (tny + 1) + 1, (tnx + 1) * (tny + 1) + 2])
         d = np.arange(tny) * 3
         d = 3 * np.arange(tny).reshape(-1, 1) + c
-        e = np.append(d.flatten(), [d.flatten()
-[-1]
- + 1])
+        e = np.append(d.flatten(), [d.flatten()[-1]+ 1])
         idx2 = np.arange(tnx).reshape(-1, 1) * (2 * tny + 1 + tny) + e
 
         idx = np.c_[idx1[:tnx], idx2]
