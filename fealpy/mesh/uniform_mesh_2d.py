@@ -129,14 +129,27 @@ class UniformMesh2d(Mesh, Plotable):
         """
         hx = self.h[0]
         hy = self.h[1]
-        nx = self.ds.nx
-        ny = self.ds.ny
 
-        v = p - np.array(self.origin, dtype=self.ftype)
+        v = p - np.array(self.origin, dtype=p.dtype)
         n0 = v[..., 0] // hx
         n1 = v[..., 1] // hy
 
         return n0.astype('int64'), n1.astype('int64')
+    
+    ## @ingroup GeneralInterface
+    def point_to_bc(self, p):
+
+        x = p[..., 0]
+        y = p[..., 1]
+        cell_location_ = self.cell_location(p)
+        location = cell_location_[0] * self.ny + cell_location_[1]
+        cell_x = self.origin[0] + (location // self.ny) * self.h[0]
+        cell_y = self.origin[1] + (location % self.nx) * self.h[1]  
+        
+        bc_x = np.array([[(x - cell_x)/self.h[0], (cell_x - x)/self.h[0] + 1]], dtype=np.float64)
+        bc_y = np.array([[(y - cell_y)/self.h[1], (cell_y - y)/self.h[1] + 1]], dtype=np.float64)
+        val = (bc_x, bc_y)
+        return val
 
     ## @ingroup GeneralInterface
     def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
