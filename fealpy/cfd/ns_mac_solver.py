@@ -12,7 +12,7 @@ class NSMacSolver():
         self.pmesh = pmesh
         
 
-    def grad_ux(self):
+    def du_dx(self):
         mesh = self.umesh
         dx = mesh.h[0]
         Nrow = mesh.node.shape[1]
