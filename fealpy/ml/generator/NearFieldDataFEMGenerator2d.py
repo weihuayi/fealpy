@@ -59,7 +59,7 @@ class NearFieldDataFEMGenerator2d:
         qf = self.mesh.integrator(self.q, 'cell')
         self.bc, _ = qf.get_quadrature_points_and_weights()
 
-    def get_nearfield_data(self, k:Sequence[float], d:Sequence[float]):
+    def get_nearfield_data(self, k:float, d:Sequence[float]):
 
         k_index = (self.k).index(k)
         d_index = (self.d).index(d)
@@ -100,17 +100,16 @@ class NearFieldDataFEMGenerator2d:
 
         x = p[..., 0]
         y = p[..., 1]
-        cell_length_x = (domain[1] - domain[0])/nx
-        cell_length_y = (domain[3] - domain[2])/ny
-        index_x = (x - domain[0])//cell_length_x
-        index_y = (y - domain[2])//cell_length_y
-        
+        cell_length_x = (domain[1] - domain[0]) / nx
+        cell_length_y = (domain[3] - domain[2]) / ny
+        index_x = (x - domain[0]) // cell_length_x
+        index_y = (y - domain[2]) // cell_length_y
         location = int(index_x * ny + index_y)
-        cell_x = domain[0] + (location // ny) * cell_length_x
-        cell_y = domain[2] + (location % nx) * cell_length_y   
-        
-        bc_x = np.array([[(x - cell_x)/cell_length_x, (cell_x - x)/cell_length_x + 1 ]], dtype=np.float64)
-        bc_y = np.array([[(y - cell_y)/cell_length_y, (cell_y - y)/cell_length_y + 1]], dtype=np.float64)
+
+        bc_x_ = ((x - domain[0]) / cell_length_x) % 1
+        bc_y_ = ((y - domain[2]) / cell_length_y) % 1
+        bc_x = np.array([bc_x_, 1 - bc_x_], dtype=np.float64)
+        bc_y = np.array([bc_y_, 1 - bc_y_], dtype=np.float64)
         bc = (bc_x, bc_y)
         return location, bc
 
