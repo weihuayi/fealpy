@@ -37,8 +37,6 @@ dtype = [("float64", (2, )),
          ("float64")]
 
 
-
-
 mesh.add_node_data(name, dtype)
 mesh.set_node_data("rho", rho0)
 NN = mesh.number_of_nodes()
