@@ -142,7 +142,7 @@ class UniformMesh2d(Mesh, Plotable):
         x = p[..., 0]
         y = p[..., 1]
         cell_location_ = self.cell_location(p)
-        location = cell_location_[0] * self.ny + cell_location_[1]
+        location = int(cell_location_[0] * self.ny + cell_location_[1])
         cell_x = self.origin[0] + (location // self.ny) * self.h[0]
         cell_y = self.origin[1] + (location % self.nx) * self.h[1]  
         

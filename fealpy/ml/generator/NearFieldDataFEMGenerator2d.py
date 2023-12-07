@@ -108,8 +108,8 @@ class NearFieldDataFEMGenerator2d:
 
         bc_x_ = ((x - domain[0]) / cell_length_x) % 1
         bc_y_ = ((y - domain[2]) / cell_length_y) % 1
-        bc_x = np.array([bc_x_, 1 - bc_x_], dtype=np.float64)
-        bc_y = np.array([bc_y_, 1 - bc_y_], dtype=np.float64)
+        bc_x = np.array([[bc_x_, 1 - bc_x_]], dtype=np.float64)
+        bc_y = np.array([[bc_y_, 1 - bc_y_]], dtype=np.float64)
         bc = (bc_x, bc_y)
         return location, bc
 
