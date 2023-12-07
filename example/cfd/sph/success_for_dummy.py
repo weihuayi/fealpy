@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 import time
 import numba
 from numba.typed import List  
+
 dx = 0.025
 dy = 0.025
 rho0 = 1000
@@ -24,6 +25,7 @@ g = np.array([0.0, -9.8])
 gamma = 7
 alpha = 0.3
 maxstep = 10000
+
 dtype = [("position", "float64", (2, )), 
          ("velocity", "float64", (2, )),
          ("rho", "float64"),
