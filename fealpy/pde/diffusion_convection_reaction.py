@@ -273,7 +273,6 @@ class PMLPDEModel2d:
     def __init__(self, 
                  levelset:Callable[[NDArray], NDArray],
                  domain:Sequence[float],
-                 qs:int, 
                  u_inc:str,
                  A:float,
                  k:float,
@@ -303,7 +302,6 @@ class PMLPDEModel2d:
         self.ly = ly
         self.k = k  
         self.d = d
-        self.qs = qs
         self.levelset = levelset
         self.domain = domain
         self.refractive_index = refractive_index
@@ -429,7 +427,7 @@ class PMLPDEModel2d:
         GD = 2
         e_x = self.e_x(p)
         e_y = self.e_y(p)
-        val = np.zeros((self.qs, x.shape[-1], GD, GD), dtype=np.complex128)
+        val = np.zeros((p.shape[0], x.shape[-1], GD, GD), dtype=np.complex128)
         val[:, :, 0, 0] = e_y/e_x
         val[:, :, 1, 1] = e_x/e_y
         return val

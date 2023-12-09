@@ -79,6 +79,8 @@ class UniformMesh2d(Mesh, Plotable):
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
+        self.face_to_ipoint = self.edge_to_ipoint
+
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
@@ -127,14 +129,27 @@ class UniformMesh2d(Mesh, Plotable):
         """
         hx = self.h[0]
         hy = self.h[1]
-        nx = self.ds.nx
-        ny = self.ds.ny
 
-        v = p - np.array(self.origin, dtype=self.ftype)
+        v = p - np.array(self.origin, dtype=p.dtype)
         n0 = v[..., 0] // hx
         n1 = v[..., 1] // hy
 
         return n0.astype('int64'), n1.astype('int64')
+    
+    ## @ingroup GeneralInterface
+    def point_to_bc(self, p):
+
+        x = p[..., 0]
+        y = p[..., 1]
+        cell_location_ = self.cell_location(p)
+        location = int(cell_location_[0] * self.ny + cell_location_[1])
+        cell_x = self.origin[0] + (location // self.ny) * self.h[0]
+        cell_y = self.origin[1] + (location % self.nx) * self.h[1]  
+        
+        bc_x = np.array([[(x - cell_x)/self.h[0], (cell_x - x)/self.h[0] + 1]], dtype=np.float64)
+        bc_y = np.array([[(y - cell_y)/self.h[1], (cell_y - y)/self.h[1] + 1]], dtype=np.float64)
+        val = (bc_x, bc_y)
+        return val
 
     ## @ingroup GeneralInterface
     def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
@@ -153,6 +168,8 @@ class UniformMesh2d(Mesh, Plotable):
         axes.set_proj_type('ortho')
 
         node = self.node  # 获取二维节点上的网格坐标
+        if uh.ndim == 1:
+            uh = uh.reshape(self.nx+1, self.ny+1)
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
@@ -627,7 +644,7 @@ class UniformMesh2d(Mesh, Plotable):
         @param[in] gD  表示 Dirichlet 边界值函数
         @param[in] A  (NN, NN), 稀疏矩阵
         @param[in] f  可能是一维数组（标量型右端项）或二维数组（向量型右端项）
-        @param[in, optional] uh  默认为 None，表示网格函数，如果为 None 则创建一个新的网格函数
+        @param[in, optional] uh  默认为 None,表示网格函数,如果为 None 则创建一个新的网格函数
         @param[in, optional] threshold 用于确定哪些网格节点应用 Dirichlet 边界条件
 
         @return Tuple[spmatrix, np.ndarray], 返回处理后的稀疏矩阵 A 和数组 f
@@ -1069,20 +1086,27 @@ class UniformMesh2d(Mesh, Plotable):
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
+        """
         node = self.entity('node')
         if isinstance(bc, tuple):
-            bc_0, bc_1 = bc
-            bcs = np.zeros((bc_0.shape[0], 4), dtype=self.ftype)
-            bcs[..., 0] = bc_0[..., 0] * bc_1[..., 0]
-            bcs[..., 1] = bc_0[..., 0] * bc_1[..., 1]
-            bcs[..., 2] = bc_0[..., 1] * bc_1[..., 0]
-            bcs[..., 3] = bc_0[..., 1] * bc_1[..., 1]
-            cell = self.entity('cell', index=index)
-            return np.einsum('...j, ijk->...ik', bcs, node[cell])
+            assert len(bc) == 2
+            cell = self.entity('cell')[index]
+
+            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
+            bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+
+            # node[cell].shape == (NC, 4, 2)
+            # bc.shape == (NQ, 4)
+            p = np.einsum('...j, cjk->...ck', bc, node[cell[:]]) # (NQ, NC, 2)
+            if p.shape[0] == 1: # 如果只有一个积分点
+                p = p.reshape(-1, 2)
         else:
-            bcs = bc
-            edge = self.entity('edge', index=index)
-            return np.einsum('...j, ijk->...ik', bcs, node[edge])
+            edge = self.entity('edge')[index]
+            p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        return p
 
     ## @ingroup FEMInterface
     def entity(self, etype, index=np.s_[:]):
@@ -1138,35 +1162,194 @@ class UniformMesh2d(Mesh, Plotable):
         raise ValueError(f"Invalid entity type: {type(etype).__name__}.")
 
     ## @ingroup FEMInterface
-    def multi_index_matrix(self, p, etype=1):
-        pass
+    def prolongation_matrix(self, p0:int, p1:int):
+        """
+        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
+        """
+
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()
+
+        gdof1 = self.number_of_global_ipoints(p1)
+        gdof0 = self.number_of_global_ipoints(p0)
+
+        # 1. 网格节点上的插值点 
+        NN = self.number_of_nodes()
+        I = range(NN)
+        J = range(NN)
+        V = np.ones(NN, dtype=self.ftype)
+        P = coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
+
+        # 2. 网格边内部的插值点 
+        NE = self.number_of_edges()
+        # p1 元在边上插值点对应的重心坐标
+        bcs = self.multi_index_matrix(p1, 1)/p1 
+        # p0 元基函数在 p1 元对应的边内部插值点处的函数值
+        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)  
+
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE, ) + phi.shape
+
+        I = np.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J = np.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V = np.broadcast_to( phi[None, :, :], shape=shape).flat
+
+        P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
+
+        # 3. 单元内部的插值点
+        NC = self.number_of_cells()
+        # p1 元在单元上对应插值点的重心坐标
+        bcs = self.multi_index_matrix(p1, 1)/p1
+        # p0 元基函数在 p1 元对应的单元内部插值点处的函数值
+        phi = self.cell_shape_function((bcs[1:-1], bcs[1:-1]), p=p0) #
+        c2p1 = self.cell_to_ipoint(p1).reshape(NC, p1+1, p1+1)[:, 1:-1, 1:-1]
+        c2p1 = c2p1.reshape(NC, -1)
+        c2p0 = self.cell_to_ipoint(p0)
+
+        shape = (NC, ) + phi.shape
+
+        I = np.broadcast_to(c2p1[:, :, None], shape=shape).flat
+        J = np.broadcast_to(c2p0[:, None, :], shape=shape).flat
+        V = np.broadcast_to( phi[None, :, :], shape=shape).flat
+
+        P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
+
+        return P.tocsr()
 
     ## @ingroup FEMInterface
     def shape_function(self, bc, p=1):
-        pass
+        """
+        @brief 四边形单元上的形函数
+        """
+        assert isinstance(bc, tuple)
+        GD = len(bc)
+        phi = [self._shape_function(val, p=p) for val in bc]
+        ldof = (p+1)**GD
+        return np.einsum('im, jn->ijmn', phi[0], phi[1]).reshape(-1, ldof)
+
 
     ## @ingroup FEMInterface
-    def grad_shape_function(self, bc, p=1):
-        pass
+    def grad_shape_function(self, bc, p=1, variables='x', index=np.s_[:]):
+        """
+        @brief  四边形单元形函数的导数
+
+        @note 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+
+        bc 是一个长度为 2 的 tuple
+
+        bc[i] 是一个一维积分公式的重心坐标数组
+
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
+        """
+        assert isinstance(bc, tuple) and len(bc) == 2
+
+        Dlambda = np.array([-1, 1], dtype=self.ftype)
+
+        phi0 = self._shape_function(bc[0], p=p)
+        R0 = self._grad_shape_function(bc[0], p=p)
+        gphi0 = np.einsum('...ij, j->...i', R0, Dlambda) # (..., ldof)
+
+        phi1 = self._shape_function(bc[1], p=p)
+        R1 = self._grad_shape_function(bc[1], p=p)
+        gphi1 = np.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
+
+        n = phi0.shape[0]*phi1.shape[0] # 张量积分点的个数
+        ldof = phi0.shape[-1]*phi1.shape[-1]
+
+        shape = (n, ldof, 2)
+        gphi = np.zeros(shape, dtype=self.ftype)
+
+        gphi[..., 0] = np.einsum('im, kn->ikmn', gphi0, phi1).reshape(-1, ldof)
+        gphi[..., 1] = np.einsum('im, kn->ikmn', phi0, gphi1).reshape(-1, ldof)
+
+        if variables == 'u':
+            return gphi
+        elif variables == 'x':
+            J = self.jacobi_matrix(bc, index=index)
+            G = self.first_fundamental_form(J)
+            G = np.linalg.inv(G)
+            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
+            return gphi
+
+    def jacobi_matrix(self, bc, index=np.s_[:]):
+        """
+        @brief 计算参考单元 (xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
+
+        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """
+        node = self.entity('node')
+        cell = self.entity('cell', index=index)
+        gphi = self.grad_shape_function(bc, p=1, variables='u', index=index)
+        J = np.einsum( 'cim, ...in->...cmn', node[cell[:]], gphi)
+        return J
+
+    def first_fundamental_form(self, J):
+        """
+        @brief 由 Jacobi 矩阵计算第一基本形式。
+        """
+        TD = J.shape[-1]
+
+        shape = J.shape[0:-2] + (TD, TD)
+        G = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD):
+            G[..., i, i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
+            for j in range(i+1, TD):
+                G[..., i, j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
+                G[..., j, i] = G[..., i, j]
+        return G
 
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
-        pass
+        if iptype in {'cell', 2}:
+            return (p+1)*(p+1)
+        elif iptype in {'face', 'edge',  1}:
+            return p + 1
+        elif iptype in {'node', 0}:
+            return 1
 
     ## @ingroup FEMInterface
     def number_of_global_ipoints(self, p):
-        pass
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-1)*(p-1)*NC
 
     ## @ingroup FEMInterface
-    def interpolation_points(self, p):
-        pass
+    def interpolation_points(self, p, index=np.s_[:]):
+        """
+        @brief 获取四边形网格上所有 p 次插值点
+        """
+        cell = self.entity('cell')
+        node = self.entity('node')
+        if p == 1:
+            return node
+
+        NN = self.number_of_nodes()
+        GD = self.geo_dimension()
+
+        gdof = self.number_of_global_ipoints(p)
+        ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+        ipoints[:NN, :] = node
+
+        NE = self.number_of_edges()
+
+        edge = self.entity('edge')
+
+        multiIndex = self.multi_index_matrix(p, 1)
+        w = multiIndex[1:-1, :]/p
+        ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                node[edge,:]).reshape(-1, GD)
+
+        w = np.einsum('im, jn->ijmn', w, w).reshape(-1, 4)
+        ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                node[cell[:]]).reshape(-1, GD)
+
+        return ipoints
 
     ## @ingroup FEMInterface
     def node_to_ipoint(self, p):
-        pass
-
-    ## @ingroup FEMInterface
-    def edge_to_ipoint(self, p):
         pass
 
     ## @ingroup FEMInterface
@@ -1174,8 +1357,48 @@ class UniformMesh2d(Mesh, Plotable):
         pass
 
     ## @ingroup FEMInterface
-    def cell_to_ipoint(self, p):
-        pass
+    def cell_to_ipoint(self, p, index=np.s_[:]):
+        """
+        @brief 获取单元上的双 p 次插值点
+        """
+
+        cell = self.entity('cell')
+
+        if p==1:
+            return cell[index] # 先排 y 方向，再排 x 方向
+
+        edge2cell = self.ds.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        cell2ipoint = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
+        c2p= cell2ipoint.reshape((NC, p+1, p+1))
+
+        e2p = self.edge_to_ipoint(p)
+        flag = edge2cell[:, 2] == 0
+        c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+        flag = edge2cell[:, 2] == 1
+        c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+        flag = edge2cell[:, 2] == 2
+        c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+        flag = edge2cell[:, 2] == 3
+        c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        flag = iflag & (edge2cell[:, 3] == 0)
+        c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+        flag = iflag & (edge2cell[:, 3] == 3)
+        c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+        c2p[:, 1:-1, 1:-1] = NN + NE*(p-1) + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
+
+        return cell2ipoint[index]
 
     def t2sidx(self):
         """
@@ -1211,7 +1434,7 @@ class UniformMesh2d(Mesh, Plotable):
         c = np.array([(tnx + 1) * (tny + 1) + 1, (tnx + 1) * (tny + 1) + 2])
         d = np.arange(tny) * 3
         d = 3 * np.arange(tny).reshape(-1, 1) + c
-        e = np.append(d.flatten(), [d.flatten()[-1] + 1])
+        e = np.append(d.flatten(), [d.flatten()[-1]+ 1])
         idx2 = np.arange(tnx).reshape(-1, 1) * (2 * tny + 1 + tny) + e
 
         idx = np.c_[idx1[:tnx], idx2]
