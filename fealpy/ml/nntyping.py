@@ -3,21 +3,19 @@ from typing import (
     Tuple,
     Callable,
     Union,
-    Protocol,
     Any,
     Literal,
     TypeVar
 )
 from warnings import warn
-import numpy as np
 from torch import Tensor
-import numpy as np
 from numpy.typing import NDArray
 
 TensorOrArray = Union[Tensor, NDArray]
 
 TensorFunction = Callable[[Tensor], Tensor]
 VectorFunction = Callable[[NDArray], NDArray]
+TensorOrFunc = Union[TensorFunction, Tensor]
 
 Index = Union[int, bool, Tensor, slice, List, Tuple]
 S: Index = slice(None, None, None)
