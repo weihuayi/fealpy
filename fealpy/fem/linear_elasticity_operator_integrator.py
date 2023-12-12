@@ -73,7 +73,8 @@ class LinearElasticityOperatorIntegrator:
         D = 0
         for i in range(GD):
             D += mu*A[imap[(i, i)]]
-        
+        print("D_shape:", D.shape)
+        print("D:\n", D)
         if space[0].doforder == 'sdofs': # 标量自由度优先排序 
             for i in range(GD):
                 for j in range(i, GD):
