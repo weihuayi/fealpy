@@ -258,7 +258,7 @@ class TensorMapping(Module):
         if val.ndim == 1 or nf <= 1:
             return val.reshape(origin), mesh
         else:
-            return [sub_u.reshape(origin) for sub_u in torch.split(val, nf, dim=-1)], mesh
+            return [sub_u.reshape(origin) for sub_u in torch.split(val, 1, dim=-1)], mesh
 
     def add_surface(self, axes, box: Sequence[float], nums: Sequence[int],
                     dtype=float64,
