@@ -350,8 +350,8 @@ class BernsteinFESpace:
         @brief 将 Bernstein 基函数转换为 lagrange 基函数。即 b_i = l_j A_{ji}
             其中 b_i 为 Bernstein 基函数，l_i 为 lagrange 基函数.
         '''
-        bcs = mesh.multi_index_matrix(p, TD)/p # p   次多重指标
-        return self.basis(bcs)[0]
+        bcs = self.mesh.multi_index_matrix(p, TD)/p # p   次多重指标
+        return self.basis(bcs, p=p)[:, 0]
         
 
     def bernstein_to_lagrange(self, p=1, TD=1):
