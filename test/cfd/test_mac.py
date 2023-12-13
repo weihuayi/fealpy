@@ -1,7 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt  
 from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 from fealpy.cfd import NSMacSolver
-from tarlor_green_pde import taylor_greenData 
+from fealpy.pde.taylor_green_pde import taylor_greenData 
 from scipy.sparse import diags, lil_matrix
 from scipy.sparse import vstack
 import pytest
@@ -16,19 +17,34 @@ nx = 4
 ny = 4
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
-mesh_u = UniformMesh2d([0, nx, 0, ny-1], h=(hx, hy), origin=(domain[0], domain[2]+hy/2))
-mesh_v = UniformMesh2d([0, nx-1, 0, ny], h=(hx, hy), origin=(domain[0]+hx/2, domain[2]))
-mesh_p = UniformMesh2d([0, nx-1, 0, ny-1], h=(hx, hy), origin=(domain[0]+hx/2, domain[2]+hy/2))
+mesh = UniformMesh2d([0,nx,0,ny],h=(hx,hy),origin=(domain[0],domain[2]))
+umesh = UniformMesh2d([0, nx, 0, ny-1], h=(hx, hy), origin=(domain[0], domain[2]+hy/2))
+vmesh = UniformMesh2d([0, nx-1, 0, ny], h=(hx, hy), origin=(domain[0]+hx/2, domain[2]))
+pmesh = UniformMesh2d([0, nx-1, 0, ny-1], h=(hx, hy), origin=(domain[0]+hx/2, domain[2]+hy/2))
+
+def plot_mesh():
+    solver = NSMacSolver(Re, mesh)
+    umesh = solver.umesh
+    vmesh = solver.vmesh
+    pmesh = solver.pmesh
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
+    mesh.find_node(axes, color='y')
+    umesh.find_node(axes, color='r')
+    vmesh.find_node(axes, color='b')
+    pmesh.find_node(axes, color='g')
+    plt.show()
 
 def test_grad_ux():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.grad_ux()
     result1 = diags([1, -1],[4, -4],(20,20), format='csr')
     result1 = result1/np.pi
     np.allclose(result.toarray(),result1.toarray())
 
 def test_grad_vx():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.grad_vx()
     result1 = diags([1, -1],[4, -4],(20,20), format='csr')
     index = np.arange(0,20)
@@ -40,7 +56,7 @@ def test_grad_vx():
     np.allclose(result.toarray(),result1.toarray())
 
 def test_grad_uy():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.grad_uy()
     result1 = diags([1, -1],[1, -1],(20,20), format='lil')
     index = np.arange(0,20,4)
@@ -55,14 +71,14 @@ def test_grad_uy():
     np.allclose(result.toarray(),result1.toarray())
 
 def test_grad_vy():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.grad_vy()
     result1 = diags([1, -1],[1, -1],(20,20), format='lil')
     result1 = result1/np.pi
     np.allclose(result.toarray(),result1.toarray())
 
 def test_Tuv():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.Tuv()
     result1 = np.zeros((20,20))
     index = np.arange(16)
@@ -74,7 +90,7 @@ def test_Tuv():
     np.allclose(result,result1)
 
 def test_Tvu():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.Tvu()
     result1 = np.zeros((20,20))
     arr = np.arange(0,20)
@@ -97,7 +113,7 @@ def test_Tvu():
     np.allclose(result,result1) 
 
 def test_laplace_u():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.laplace_u()
     result1 = diags([-4, 1, 1, 1, 1],[0, 1, -1, 4, -4],(20,20), format='lil')
     index = np.arange(0,20,4)
@@ -111,7 +127,7 @@ def test_laplace_u():
     np.allclose(result.toarray(),result1.toarray()) 
 
 def test_laplace_v():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.laplace_v()
     result1 = diags([-1, 1, 1, 1, 1],[0, 1, -1, 5, -5],(20,20), format='lil')
     index = np.arange(0,20)
@@ -123,7 +139,7 @@ def test_laplace_v():
     np.allclose(result.toarray(),result1.toarray()) 
 
 def test_grand_uxp():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.grand_uxp()
     result1 = diags([1, -1],[0, -4],(16,16), format='lil')
     A = lil_matrix((4, 16))
@@ -132,7 +148,7 @@ def test_grand_uxp():
     np.allclose(result.toarray(),result1.toarray()) 
 
 def test_grand_vyp():
-    solver = NSMacSolver(mesh_u, mesh_v, mesh_p)
+    solver = NSMacSolver(Re,mesh)
     result = solver.grand_vyp()
     result1 = diags([0],[0],(20,16), format='lil')
     arr = np.arange(0,20)
