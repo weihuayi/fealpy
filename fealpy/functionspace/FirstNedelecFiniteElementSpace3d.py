@@ -141,7 +141,7 @@ class FirstNedelecFiniteElementSpace3d:
             phi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
                     localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
                     localEdge[:, 0]]
-            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)[index]
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.int_)[index]
             c2es[c2es==0] = -1
             return phi*c2es[..., None]
         else:
@@ -204,9 +204,7 @@ class FirstNedelecFiniteElementSpace3d:
         phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
-        s0 = 'abcdefg'
-        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof[index]])
+        val = np.einsum("qcld, cl->qcd", phi, uh[cell2dof[index]])
         return val
 
     @barycentric
@@ -335,6 +333,7 @@ class FirstNedelecFiniteElementSpace3d:
             index = self.mesh.ds.boundary_face_index()
 
         face2edge = mesh.ds.face_to_edge()[index]
+        isBdEdge = self.mesh.ds.boundary_edge_flag()
 
         if 0: #节点型自由度
             locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
@@ -346,19 +345,17 @@ class FirstNedelecFiniteElementSpace3d:
             uh[face2dof] = np.linalg.norm(gval,axis=2) 
         else: #积分型自由度
             bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
-            ps = mesh.bc_to_point(bcs)[:, face2edge]
+            ps = mesh.bc_to_point(bcs)[:, isBdEdge]
 
-            vec = mesh.edge_tangent()[face2edge]
-            gval = gD(ps, vec)
+            vec = mesh.edge_tangent()[isBdEdge]
             l = np.linalg.norm(vec, axis=-1)
+            gval = gD(ps, vec)
 
-            face2dof = self.dof.face_to_dof()[index]
-            uh[face2dof] = np.einsum("qfed, fed, q->fe", gval, vec, ws) 
+            uh[isBdEdge] = np.einsum("qed, ed, q->e", gval, vec, ws) 
 
-        gdof = self.dof.number_of_global_dofs()
-        isDDof = np.zeros(gdof, dtype=np.bool_)
-        isDDof[face2dof] = True
-        return isDDof
+        return isBdEdge
+
+    boundary_interpolate = set_dirichlet_bc
 
     def set_neumann_bc(self, gN, F=None, threshold=None):
         """
