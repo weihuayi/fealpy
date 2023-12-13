@@ -83,7 +83,7 @@ class BoxDomainData():
         @param[in] n 网格加密的次数，默认值为 1
         @return 返回一个初始化后的网格对象
         """
-        h = 0.1
+        h = 0.5
         domain = RectangleDomain()
         mesh = TriangleMesh.from_domain_distmesh(domain, h, output=False)
         mesh.uniform_refine(n)
@@ -97,6 +97,7 @@ class BoxDomainData():
 
         node = np.transpose(data_1['p'])
         cell = np.transpose(data_2['t'][:3, ]) - 1
+        cell = cell.astype(np.uint32)
         mesh = TriangleMesh(node, cell)
 
         return mesh
