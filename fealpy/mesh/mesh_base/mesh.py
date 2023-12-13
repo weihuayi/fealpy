@@ -116,6 +116,7 @@ class Mesh():
         phi = np.prod(A[..., mi, idx], axis=-1)
         return phi
 
+
     def _grad_shape_function(self, bc: NDArray, p: int =1, mi: NDArray=None) -> NDArray:
         """
         @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
@@ -153,6 +154,78 @@ class Mesh():
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return R # (..., ldof, TD+1)
+
+    def _tensor_shape_function(self, bc: tuple, p: int =1, mi: NDArray=None):
+        """
+        @brief 四边形和六面体参考单元上的形函数
+
+        @param[in] bc
+        """
+        TD = len(bc)
+        phi = self._shape_function(bc[0], p) # 线上的形函数
+        if TD == 2: # 面上的形函数
+            phi = np.einsum('im, jn->ijmn', phi, phi)
+            shape = phi.shape[:-2] + (-1, )
+            phi = phi.reshape(shape) # 展平自由度
+            shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
+            phi = phi.reshape(shape) # 展平积分点
+        elif TD == 3: # 体上的形函数
+            phi = np.einsum('il, jm, kn->ijklmn', phi, phi, phi)
+            shape = phi.shape[:-3] + (-1, )
+            phi = phi.reshape(shape) # 展平自由度
+            shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
+            phi = phi.reshape(shape) # 展平积分点
+        return phi 
+
+    def _grad_tensor_shape_function(self, bc: tuple, p: int=1, index=np.s_[:]):
+        """
+
+        Notes
+        -----
+        计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+
+        bc 是一个长度为 TD 的 tuple
+
+        bc[i] 是一个一维积分公式的重心坐标数组
+
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
+
+        """
+        p = self.p if p is None else p
+        TD = len(bc)
+        Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+
+        # 一维基函数值
+        # (NQ, p+1)
+        phi = self._shape_function(bc[0], p)  
+
+        # 关于**一维变量重心坐标**的导数
+        # lambda_0 = 1 - xi
+        # lambda_1 = xi
+        # (NQ, ldof, 2) 
+        R = self._grad_shape_function(bc[0], p)  
+
+        # 关于**一维变量**的导数
+        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, 1)
+
+        if TD == 2:
+            gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
+            gphi1 = np.einsum('kn, imt->kinm', phi, gphi)
+            n = gphi0.shape[0]*gphi0.shape[1]
+            shape = (n, (p+1)*(p+1), TD)
+            gphi = np.zeros(shape, dtype=self.ftype)
+            gphi[..., 0].flat = gphi0.flat
+            gphi[..., 1].flat = gphi1.flat
+        elif TD == 3:
+            gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
+            gphi1 = np.einsum('kn, imt->kinm', phi, gphi)
+            n = gphi0.shape[0]*gphi0.shape[1]
+            shape = (n, (p+1)*(p+1), TD)
+            gphi = np.zeros(shape, dtype=self.ftype)
+            gphi[..., 0].flat = gphi0.flat
+            gphi[..., 1].flat = gphi1.flat
+
+        return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
 
     def _bernstein_shape_function(self, bc: NDArray, p: int=1, mi: NDArray=None):
         """

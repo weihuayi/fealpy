@@ -1,174 +1,218 @@
 import numpy as np
 from scipy.sparse import diags
-from scipy.sparse import diags, lil_matrix
+from scipy.sparse import diags, lil_matrix,csr_matrix
 from scipy.sparse import vstack
 from scipy.sparse.linalg import spsolve
+from ..mesh import UniformMesh2d
 
 
 class NSMacSolver():
-    def __init__(self, umesh, vmesh, pmesh):
-        self.umesh = umesh
-        self.vmesh = vmesh
-        self.pmesh = pmesh
+    def __init__(self,Re, mesh):
+        self.ftype = np.float64
+        self.mesh = mesh
+        nx = int(mesh.ds.nx)
+        ny = int(mesh.ds.ny)
+        hx = mesh.h[0]
+        hy = mesh.h[1]
+        self.umesh = UniformMesh2d([0, nx, 0, ny-1], h=(hx, hy), origin=(0, 0+hy/2))
+        self.vmesh = UniformMesh2d([0, nx-1, 0, ny], h=(hx, hy), origin=(0+hx/2, 0))
+        self.pmesh = UniformMesh2d([0, nx-1, 0, ny-1], h=(hx, hy), origin=(0+hx/2, 0+hy/2))
+
+    def du(self):
+        mesh = self.umesh
+        n0 = mesh.ds.nx+1 #5
+        n1 = mesh.ds.ny+1 #4
+        cx = 1/(2*mesh.h[0])
+        cy = 1/(2*mesh.h[1])
+        NN = mesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        A = diags([-cx,cx],[-n1,n1],shape=(NN,NN),format='csr')
+        B = diags([0,cy,-cy],[0,1,-1],shape=(NN,NN),format='csr')
+
+        val0 = np.broadcast_to(2*cy,(n0,))
+        I0 = k[:,0]
+        I_0 = k[:,-1]
+        B += csr_matrix((val0,(I0,I0)),shape=(NN,NN),dtype=self.ftype)
+        B += csr_matrix((-val0,(I_0,I_0)),shape=(NN,NN),dtype=self.ftype)
         
+        val1 = np.broadcast_to(-cy/3,(n0,))
+        J1 = k[:,1]
+        J_1 = k[:,-2]
+        B += csr_matrix((val1,(I0,J1)),shape=(NN,NN),dtype=self.ftype)
+        B += csr_matrix((-val1,(I_0,J_1)),shape=(NN,NN),dtype=self.ftype)
+        
+        val2 = np.broadcast_to(cy,(n0-1,))
+        J0m = k[1:,0]
+        J1m = k[:-1,-1]
+        JNm = k[:-1,-1]
+        B += csr_matrix((val2,(J0m,JNm)),shape=(NN,NN),dtype=self.ftype)
+        B += csr_matrix((-val2,(J1m,J0m)),shape=(NN,NN),dtype=self.ftype)
+        return A,B
 
-    def du_dx(self):
-        mesh = self.umesh
-        dx = mesh.h[0]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-
-        result = diags([1, -1],[Nrow, -Nrow],(N,N), format='csr')
-
-        return result/(2*dx)
-    
-    def grad_vx(self):
+    def dv(self):
         mesh = self.vmesh
-        dx = mesh.h[0]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-
-        result = diags([1, -1],[Nrow, -Nrow],(N,N), format='csr')
-        index = np.arange(0,N)
-        result[index[:Nrow],index[:Nrow]] = 2
-        result[index[:Nrow],index[:Nrow]+Nrow] = 2/3
-        result[index[-Nrow:],index[-Nrow:]] = -2
-        result[index[-Nrow:],index[-Nrow:]-Nrow] = -2/3
-        return result/(2*dx)
-
-    def grad_uy(self):
-        mesh = self.umesh
-        dy = mesh.h[1]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([1, -1],[1, -1],(N,N), format='lil')
-
-        index = np.arange(0, N, Nrow)
-        result[index, index] = 2
-        result[index, index+1] = 2/3
-        result[index[1:], index[1:]-1] = 0
-
-        index = np.arange(Nrow-1, N, Nrow)
-        result[index, index] = -2
-        result[index, index-1] = -2/3
-        result[index[:-1], index[:-1]+1] = 0
-        return result/(2*dy)
-    
-    def grad_vy(self):
-        mesh = self.vmesh
-        dy = mesh.h[1]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([1, -1],[1, -1],(N,N), format='lil')
-        return result/(2*dy)
+        n0 = mesh.ds.nx+1 #4
+        n1 = mesh.ds.ny+1 #5
+        cx = 1/(2*mesh.h[0])
+        cy = 1/(2*mesh.h[1])
+        NN = mesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        A = diags([0,cx,-cx],[0,n1,-n1],shape=(NN,NN), format='csr')
+        B = diags([0,cx,-cx],[0,1,-1],shape=(NN,NN), format='csr')
+        
+        val0 = np.broadcast_to(2*cx,(n1,))
+        val1 = np.broadcast_to(-cx/3,(n1,))
+        I0 = k[0,:]
+        I_0 = k[-1,:]
+        J1 = k[1,:]
+        J_1 = k[-2,:]
+        A += csr_matrix((val0, (I0,I0)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I0,J1)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((-val0, (I_0,I_0)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((-val1, (I_0,J_1)), shape=(NN,NN), dtype=self.ftype)   
+        return A,B
     
     def Tuv(self):
-        mesh  = self.umesh
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = np.zeros((N,N))
-        index = np.arange(N-Nrow)
-        result[index,index+index//Nrow] = 1
-        result[index,index+index//Nrow+1] = 1
-        result[index,index+index//Nrow-Nrow-1] = 1
-        result[index,index+index//Nrow-Nrow] = 1
-        return result/4
+        vmesh = self.vmesh
+        umesh = self.umesh
+        vn0 = vmesh.ds.nx+1 #4
+        vn1 = vmesh.ds.ny+1 #5
+        un0 = umesh.ds.nx+1 #5
+        un1 = umesh.ds.ny+1 #4
+        NN = umesh.number_of_nodes()
+        vk = np.arange(NN).reshape(vn0,vn1)
+        uk = np.arange(NN).reshape(un0,un1)
+        A = diags([0], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(1/4, (NN-2*un1,))
+        Iu = uk[1:un0-1,:].flat
+        Jv0 = vk[:vn0-1,1:].flat
+        Jv1 = vk[1:,1:].flat
+        Jv2 = vk[1:,:vn1-1].flat
+        Jv3 = vk[:vn0-1,:vn1-1].flat
+        A += csr_matrix((val, (Iu, Jv0)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (Iu, Jv1)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (Iu, Jv2)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (Iu, Jv3)), shape=(NN, NN), dtype=self.ftype)
+        return A
     
     def Tvu(self):
-        mesh = self.vmesh
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = np.zeros((N,N))
-        arr = np.arange(0,N)
-        split_array = np.array_split(arr,Ncol)
-        lists = [sub_array.tolist() for sub_array in split_array]
-        num = len(lists)
-        for i in range(num):
-            i_array = np.ones_like(lists[i])
-            result[lists[i],lists[i]-i*i_array] = 1
-            result[lists[i],lists[i]-i*i_array-1] = 1
-        for i in range(num-1):
-            i_array = np.ones_like(lists[i])
-            result[lists[i],lists[i]-i*i_array+Ncol*i_array] = 1
-            result[lists[i],lists[i]-i*i_array-1+Ncol*i_array] = 1
-        index = lists[-1][:Nrow-1]
-        N_array = np.ones_like(index)
-        result[index,index] = 1
-        result[index,index+N_array] = 1
-        return result/4
-    
-    def laplace_u(self):
+        vmesh = self.vmesh
+        umesh = self.umesh
+        vn0 = vmesh.ds.nx+1 #4
+        vn1 = vmesh.ds.ny+1 #5
+        un0 = umesh.ds.nx+1 #5
+        un1 = umesh.ds.ny+1 #4
+        NN = umesh.number_of_nodes()
+        vk = np.arange(NN).reshape(vn0,vn1)
+        uk = np.arange(NN).reshape(un0,un1)
+        A = diags([0], [0], shape=(NN, NN), format='csr')
+        
+        val = np.broadcast_to(1/4, (NN-2*vn0,))
+        Iv = vk[:,1:vn1-1].flat
+        Ju0 = uk[:un0-1,1:].flat
+        Ju1 = uk[1:,1:].flat
+        Ju2 = uk[1:,:un1-1].flat
+        Ju3 = uk[:un0-1,:un1-1].flat
+        A += csr_matrix((val, (Iv, Ju0)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (Iv, Ju1)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (Iv, Ju2)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (Iv, Ju3)), shape=(NN, NN), dtype=self.ftype)
+        return A
+        
+    def laplace_u(self,c=None):
         mesh = self.umesh
-        dx,dy = mesh.h
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([-4, 1, 1, 1, 1],[0, 1, -1, Nrow, -Nrow],(N,N), format='lil')
+        n0 = mesh.ds.nx+1 #5
+        n1 = mesh.ds.ny+1 #4
+        cx = 1/(mesh.h[0])
+        cy = 1/(mesh.h[1])
+        NN = mesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        A = diags([-4*cx*cy,cx*cy,cx*cy,cx*cy,cx*cy], [0,1,-1,n1,-n1], shape=(NN, NN), format='csr')
+        
+        val0 = np.broadcast_to(-2*cx*cy,(n0,))
+        I0 = k[:,0]
+        I_0 = k[:,-1]
+        A += csr_matrix((val0, (I0,I0)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val0, (I_0,I_0)), shape=(NN,NN), dtype=self.ftype)
+        
+        val1 = np.broadcast_to((1/3)*cx*cy,(n0,))
+        J1 = k[:,1]
+        J_1 = k[:,-2]
+        A += csr_matrix((val1, (I0,J1)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I_0,J_1)), shape=(NN,NN), dtype=self.ftype)
+        
+        val2 = np.broadcast_to(-cx*cy,(n0-1,))
+        I0m = k[1:,0]
+        J_0m = k[:-1,-1]
+        J0m = k[1:,0]
+        A += csr_matrix((val2, (I0m,J_0m)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val2, (J_0m,J0m)), shape=(NN,NN), dtype=self.ftype)
+        if c == None:
+            return A
+        else:
+            return c*A
 
-        index = np.arange(0,N, Nrow)
-        result[index, index] = -6
-        result[index[2:]-1, index[2:]-1] = -6
-        result[index[1:], index[1:]-1] = 0
-        result[index[2:]-1, index[2:]] = 0
-        result[index, index+1] = 4/3
-        result[index[2:]-1, index[2:]-2] = 4/3
-
-        return result/(dx*dy)
-    
-    def laplace_v(self):
+    def laplace_v(self,c=None):
         mesh = self.vmesh
-        dx,dy = mesh.h
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([-4, 1, 1, 1, 1],[0, 1, -1, Nrow, -Nrow],(N,N), format='lil')
+        n0 = mesh.ds.nx+1 #4
+        n1 = mesh.ds.ny+1 #5
+        cx = 1/(mesh.h[0])
+        cy = 1/(mesh.h[1])
+        NN = mesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        A = diags([-4*cx*cy,cx*cy,cx*cy,cx*cy,cx*cy], [0,1,-1,n1,-n1], shape=(NN, NN), format='csr')
 
-        index = np.arange(0,N)
-        result[index[:Nrow],index[:Nrow]] = -6
-        result[index[-Nrow:],index[-Nrow:]] = -6
-        result[index[:Nrow],index[:Nrow]+Nrow] = 4/3
-        result[index[-Nrow:],index[-Nrow:]-Nrow] = 4/3
+        val0 = np.broadcast_to(-2*cx*cy, (n1,))
+        val1 = np.broadcast_to((1/3)*cx*cy, (n1,))
+        I0 = k[0,:]
+        I_0 = k[-1,:]
+        J0m = k[1,:]
+        J_0m = k[-2,:]
+        A += csr_matrix((val0, (I0,I0)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val0, (I_0,I_0)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I0,J0m)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I_0,J_0m)), shape=(NN,NN), dtype=self.ftype)
+        if c == None:
+            return A
+        else:
+            return c*A
+    
+    def dp_u(self):
+        mesh = self.pmesh
+        n0 = mesh.ds.nx+1 #4
+        n1 = mesh.ds.ny+1 #4
+        cx = 1/(mesh.h[0])
+        cy = 1/(mesh.h[1])
+        NN = mesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        A0 = diags([cx,-cx], [0,-n1], shape=(NN, NN), format='csr')
+        A1 = diags([0], [0], shape=(n1, NN), format='csr')
+        A = vstack([A0, A1], format='csr')   
+        return A
+    
+    def dp_v(self):
+        vmesh = self.vmesh
+        pmesh = self.pmesh
+        vn0 = vmesh.ds.nx+1 #4
+        vn1 = vmesh.ds.ny+1 #5
+        pn0 = pmesh.ds.nx+1 #4
+        pn1 = pmesh.ds.ny+1 #4
+        NNv = vmesh.number_of_nodes()
+        NNp = pmesh.number_of_nodes()
+        cx = 1/(pmesh.h[0])
+        cy = 1/(pmesh.h[1])
+        vk = np.arange(NNv).reshape(vn0,vn1)
+        pk = np.arange(NNp).reshape(pn0,pn1)
+        A = diags([0], [0], shape=(NNv, NNp), format='csr')
 
-        return result/(dx*dy) 
-    
-    def grad_uxp(self):
-        mesh = self.pmesh
-        dx = mesh.h[0]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([1, -1],[0, -Nrow],(N,N), format='lil')
-        A = lil_matrix((Nrow, N))
-        result1 = vstack([result, A], format='lil')   
-        return result1/dx
-    
-    def grad_vyp(self):
-        mesh = self.pmesh
-        dx = mesh.h[0]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        N1 = Nrow*Ncol + Nrow
-        result = diags([0],[0],(N1,N), format='lil')
-        arr = np.arange(0,N1)
-        split_array = np.array_split(arr,Nrow)
-        lists = [sub_array.tolist() for sub_array in split_array]
-        num = len(lists)
-        for i in range(num-1):
-            i_array= np.ones_like(lists[i])
-            result[lists[i],lists[i]-i*i_array] = 1
-            result[lists[i],lists[i]-i*i_array-1] = -1
-        index = lists[-1][:Nrow]
-        num_array = np.ones_like(index)
-        result[index,index-(num-1)*num_array] = 1
-        result[index,index-(num-1)*num_array-1] = -1
-        return result/dx
+        val = np.broadcast_to(cy, (NNv-2*vn0,))
+        Iv = vk[:,1:vn1-1].flat
+        Jp0 = pk[:,:pn1-1].flat
+        Jp1 = pk[:,1:].flat
+        A += csr_matrix((val, (Iv, Jp1)), shape=(NNv, NNp), dtype=self.ftype)
+        A += csr_matrix((-val, (Iv, Jp0)), shape=(NNv, NNp), dtype=self.ftype)
+        return A
     
     def source_Fx(self, pde ,t):
         mesh = self.umesh
@@ -176,42 +220,95 @@ class NSMacSolver():
         source = pde.source_F(nodes,t) 
         return source
     
-    def grad_pux(self):
-        mesh = self.umesh
-        dx = mesh.h[0]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([1,1],[0,Nrow],(N-Nrow,N), format='lil')
-        return result/dx
-    
-    def grad_pvy(self):
-        mesh = self.vmesh
-        dy = mesh.h[1]
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([1,1],[0,1],(N-Ncol,N), format='lil')
-        return result/dy
+    def dpm(self):
+        vmesh = self.vmesh
+        umesh = self.umesh
+        pmesh = self.pmesh
+        cx = 1 / (umesh.h[0])
+        cy = 1 / (vmesh.h[1])
+        vn0 = vmesh.ds.nx+1 #4
+        vn1 = vmesh.ds.ny+1 #5
+        un0 = umesh.ds.nx+1 #5
+        un1 = umesh.ds.ny+1 #4
+        NN = umesh.number_of_nodes()
+        NNp = pmesh.number_of_nodes()
+        vk = np.arange(NN).reshape(vn0,vn1)
+        uk = np.arange(NN).reshape(un0,un1)
+        A = diags([cx,1], [0,un1], shape=(NNp, NN), format='csr')
+        B = diags([cy,1], [0,1], shape=(NNp, NN), format='csr')
+        return A,B
 
-    def laplaplace_phi(self):
+    def laplace_phi(self):
         mesh = self.pmesh
-        dx,dy = mesh.h
-        Nrow = mesh.node.shape[1]
-        Ncol = mesh.node.shape[0]
-        N = Nrow*Ncol
-        result = diags([-4,1,1,1,1],[0,1,-1,Nrow,-Nrow],(N,N), format='lil')
-        index = np.arange(0,N)
-        index0 = np.where(index%Nrow ==0)
-        index1 = np.ones_like(index0)
-        result[index0,index0-index1] = 0
-        result[index0-index1,index0] = 0
-        result[index[:Nrow],index[:Nrow]] = -3
-        result[index[-Nrow:],index[-Nrow:]] = -3
-        result[index0,index0] = -3
-        result[index0-index1,index0-index1] = -3
-        result[0,0] = -2
-        result[Nrow-1,Nrow-1] = -2
-        result[N-1,N-1] = -2
-        result[N-Nrow,N-Nrow] = -2
-        return result/(dx*dy)
+        n0 = mesh.ds.nx+1 #4
+        n1 = mesh.ds.ny+1 #4
+        cx = 1/(mesh.h[0])
+        cy = 1/(mesh.h[1])
+        NN = mesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        A = diags([-4*cx*cy,cx*cy,cx*cy,cx*cy,cx*cy], [0,1,-1,n1,-n1], shape=(NN, NN), format='csr')
+        
+        val0 = np.broadcast_to(2*cx*cy,(4,))
+        val1 = np.broadcast_to(1*cx*cy,(n1-2,))
+        val2 = np.broadcast_to(-1*cx*cy,(n1-1,))
+        I0c = [k[0,0],k[0,-1],k[-1,0],k[-1,-1]]
+        I0l = k[0,1:n1-1]
+        I0r = k[-1,1:n1-1]
+        I0d = k[1:n1-1,0]
+        I0u = k[1:n1-1,-1]
+        J0m = k[1:,0]
+        J_0m = k[:-1,-1]
+        A += csr_matrix((val0, (I0c, I0c)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I0l, I0l)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I0r, I0r)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I0d, I0d)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val1, (I0u, I0u)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val2, (J_0m, J0m)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val2, (J0m, J_0m)), shape=(NN, NN), dtype=self.ftype)
+        return A.toarray()
+
+    #找v网格边界点位置
+    def vnodes_ub(self):
+        mesh = self.mesh
+        n0 = mesh.ds.nx+1 #5
+        n1 = mesh.ds.ny+1 #5
+        vmesh = self.vmesh
+        vn0 = vmesh.ds.nx+1 #4
+        vn1 = vmesh.ds.ny+1 #5
+        nodes = mesh.entity('node')
+        vnodes = vmesh.entity('node')
+        NN = mesh.number_of_nodes()
+        NNv = vmesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        kv = np.arange(NNv).reshape(vn0,vn1)
+        A0 = nodes[1:vn1-1,:] 
+        A1 = nodes[NN-vn1+1:-1,:]
+        I0 = kv[0,1:vn1-1]
+        I1 = kv[-1,1:vn1-1]
+        vnodes[I0,[0]] = A0[:,0]
+        vnodes[I1,[0]] = A1[:,0]
+        return vnodes
+
+    #找u网格边界点位置
+    def unodes_ub(self):
+        mesh = self.mesh
+        n0 = mesh.ds.nx+1 #5
+        n1 = mesh.ds.ny+1 #5
+        umesh = self.umesh
+        un0 = umesh.ds.nx+1 #5
+        un1 = umesh.ds.ny+1 #4
+        nodes = mesh.entity('node')
+        unodes = umesh.entity('node')
+        NN = mesh.number_of_nodes()
+        NNu = umesh.number_of_nodes()
+        k = np.arange(NN).reshape(n0,n1)
+        ku = np.arange(NNu).reshape(un0,un1)
+        I_0 = k[1:n0-1,0]
+        I_1 = k[1:n0-1,-1]
+        A0 = nodes[I_0,:]
+        A1 = nodes[I_1,:]
+        I0 = ku[1:un0-1,0]
+        I1 = ku[1:un0-1,-1]
+        unodes[I0,1] = A0[:,1]
+        unodes[I1,1] = A1[:,1]
+        return unodes
