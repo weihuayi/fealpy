@@ -8,7 +8,7 @@ from torch.nn import Module, Parameter
 from torch.func import vmap, jacfwd, hessian
 
 from ..nntyping import S as _S
-from ..nntyping import TensorFunction
+from ..nntyping import TensorOrFunc
 from .module import TensorMapping
 
 
@@ -45,11 +45,11 @@ class FunctionSpace(Module):
         """
         return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
 
-    def fit(self, sample: Tensor, func: TensorFunction, *, keepdim=True,
-            requires_grad=False):
+    def fit(self, sample: Tensor, func: TensorOrFunc, *, weight_decay=0.,
+            keepdim=True, requires_grad=False):
         """
         @brief Fit a function in the space. This is done by solving linear\
-               equations, using `spsolve`.
+               equations, using `torch.linalg.solve`.
 
         @param sample: collocation points Tensor for building linear equations.
         @param func: target function. This callable should receive one single\
@@ -59,8 +59,8 @@ class FunctionSpace(Module):
 
         @return: Function.
         """
-        from scipy.sparse import csr_matrix
-        from scipy.sparse.linalg import spsolve
+        from torch.linalg import solve
+        from ..solvertools import ridge
 
         assert sample.ndim == 2
         N = sample.shape[0]
@@ -69,21 +69,26 @@ class FunctionSpace(Module):
         if N < NF:
             warn(f"Only {N} sample point(s) provided for space with {NF} basis.")
         active_basis_flag = torch.any(torch.abs(basis) > 1e-8, dim=0)
-        A = csr_matrix(basis[:, active_basis_flag])
-        source = func(sample)
+        A = basis[:, active_basis_flag]
+        A_ = ridge(A.T@A, lambda_=weight_decay, inplace=False)
+
+        if callable(func):
+            source = func(sample)
+        else:
+            source = func
 
         # for scaler functions
         if source.ndim == 1 or source.shape[-1] == 1:
             b = source
             um = torch.zeros((NF, ), dtype=sample.dtype, device=sample.device)
-            um[active_basis_flag] = torch.from_numpy(spsolve(A.T@A, A.T@b))
+            um[active_basis_flag] = solve(A_, A.T@b)
 
         # for vector functions
         else:
             NS = source.shape[-1]
-            b = csr_matrix(source)
+            b = source
             um = torch.zeros((NF, NS), dtype=sample.dtype, device=sample.device)
-            um[active_basis_flag, :] = torch.from_numpy(spsolve(A.T@A, A.T@b).toarray())
+            um[active_basis_flag, :] = solve(A_, A.T@b)
 
         return Function(self, um, keepdim=keepdim, requires_grad=requires_grad)
 

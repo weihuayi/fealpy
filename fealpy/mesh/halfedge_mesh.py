@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial import cKDTree
+import inspect
 
 from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
 from .mesh_base import Mesh, Plotable
@@ -62,7 +63,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         self.node = DynamicArray(node, dtype = node.dtype)
         self.ds = HalfEdgeMesh2dDataStructure(halfedge, NN = node.shape[0], NC=NC, NV=NV)
-        self.meshtype = 'HalfEdgeMeshedge2d'
+        self.meshtype = 'halfedge2d'
 
         self.celldata = {}
         self.nodedata = {}
@@ -566,7 +567,10 @@ class HalfEdgeMesh2d(Mesh, Plotable):
     def entity_barycenter(self, etype='cell', index=np.s_[:]):
         node = self.entity('node')
         if etype in {'cell', 2}:
-            return self.cell_barycenter(index=index)
+            cell2node = self.ds.cell_to_node(return_sparse=True)
+            NV = self.ds.number_of_vertices_of_cells().reshape(-1, 1)
+            bc = cell2node*node/NV
+            return bc
         elif etype in {'edge', 'face', 1}:
             GD = self.geo_dimension()
             edge = self.ds.edge_to_node()[index]
@@ -2983,9 +2987,10 @@ class HalfEdgeMesh2dDataStructure():
         NC = self.NC
         halfedge = self.halfedge
         if return_sparse:
-            val = np.ones(NC, dtype=np.bool_)
-            I = halfedge[hflag, 1]
-            J = halfedge[hflag, 0]
+            NHE = self.number_of_halfedges()
+            val = np.ones(NHE, dtype=np.bool_)
+            I = halfedge[:, 1]
+            J = halfedge[:, 0]
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             return cell2node
         elif self.NV is None: # polygon mesh

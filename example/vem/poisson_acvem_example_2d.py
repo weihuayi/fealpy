@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
+import copy
 
 # 模型数据
 from fealpy.pde.poisson_2d import CosCosData
@@ -76,11 +77,11 @@ NDof = np.zeros(maxit, dtype=np.int_)
 
 #mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
 mesh = pde.init_mesh(n = 1, meshtype='quad')
-mesh = PolygonMesh.from_mesh(mesh)
+#mesh = PolygonMesh.from_mesh(mesh)
 Hmesh = HalfEdgeMesh2d.from_mesh(mesh)
 fig = plt.figure()
 axes  = fig.gca()
-mesh.add_plot(axes)
+Hmesh.add_plot(axes)
 #plt.show()
 
 for i in range(maxit):
@@ -127,19 +128,18 @@ for i in range(maxit):
     estimator = PoissonCVEMEstimator(space, M, PI1)
     eta = estimator.residual_estimate(uh, pde.source)
     
-    errorMatrix[0, i] = mesh.error(pde.solution, sh.value)
-    errorMatrix[1, i] = mesh.error(pde.gradient, sh.grad_value)
+    errorMatrix[0, i] = Hmesh.error(pde.solution, sh.value)
+    errorMatrix[1, i] = Hmesh.error(pde.gradient, sh.grad_value)
     errorMatrix[2, i] = np.sqrt(np.sum(eta))
     options = Hmesh.adaptive_options(HB=None)
-    print("refine")
     Hmesh.adaptive(eta, options)
     newcell = Hmesh.entity('cell')
     newnode = Hmesh.entity("node")[:]
-    mesh = PolygonMesh(newnode, newcell)
-showmultirate(plt, maxit-2, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
+    #mesh = PolygonMesh(newnode, newcell)
+showmultirate(plt, maxit-4, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
 print(errorMatrix)
 plt.show()
 fig1 = plt.figure()
 axes  = fig1.gca()
-mesh.add_plot(axes)
+Hmesh.add_plot(axes)
 plt.show()
