@@ -146,7 +146,7 @@ def get_gN_func(omega: int):
 
 class LaplaceDataGenerator2d():
     """
-    A 2-d GD & GD generator based on FEM.
+    A 2-d GD & GN generator based on FEM.
     """
     def __init__(self, box: Tuple[float, float, float, float],
                  nx: int, ny: int,
