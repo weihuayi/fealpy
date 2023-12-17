@@ -15,9 +15,9 @@ class VectorMassIntegrator:
         @note 没有参考单元的组装方式
         """
         if isinstance(space, tuple): # 由标量空间组合而成的空间
-            self.assembly_cell_matrix_for_scalar_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
+            return self.assembly_cell_matrix_for_scalar_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
         else: # 空间基函数是向量函数
-            self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
+            return self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
 
     def assembly_cell_matrix_for_vector_basis_vspace(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
@@ -61,6 +61,7 @@ class VectorMassIntegrator:
         GD = space[0].geo_dimension()
         assert len(space) == GD
         
+        mesh =space[0].mesh
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
         ldof = space[0].number_of_local_dofs()
@@ -71,7 +72,7 @@ class VectorMassIntegrator:
         NC = len(cellmeasure)
 
         if out is None:
-            VD = n.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
+            VD = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
         else:
             assert out.shape == (NC, GD*ldof, GD*ldof)
             VD = out

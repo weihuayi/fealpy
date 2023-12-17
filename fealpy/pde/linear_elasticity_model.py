@@ -112,7 +112,7 @@ class BoxDomainData():
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape, dtype=np.float64)
-        val[..., 0] = 35/13*y - 35/13*y**2 + 10/13*x**2
+        val[..., 0] = 35/13*y - 35/13*y**2 + 10/13*x - 10/13*x**2
         val[..., 1] = -25/26*(-1+2*y) * (-1+2*x)
 
         return val
