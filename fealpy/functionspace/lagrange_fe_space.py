@@ -12,6 +12,7 @@ class LagrangeFESpace():
                 "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
                 "QuadrangleMesh" : QuadrangleMeshCFEDof,
+                "UniformMesh2d" : QuadrangleMeshCFEDof,
                 "HexahedronMesh" : HexahedronMeshCFEDof,
                 "EdgeMesh": EdgeMeshCFEDof,
                 },
@@ -21,6 +22,7 @@ class LagrangeFESpace():
                 "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
                 "QuadrangleMesh" : QuadrangleMeshDFEDof,
+                "UniformMesh2d" : QuadrangleMeshDFEDof,
                 "HexahedronMesh" : HexahedronMeshDFEDof,
                 "EdgeMesh": EdgeMeshDFEDof,
                 }

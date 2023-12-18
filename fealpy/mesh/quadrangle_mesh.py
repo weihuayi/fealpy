@@ -1,6 +1,7 @@
 import numpy as np
 from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
+from scipy.sparse import coo_matrix
 
 
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
@@ -177,7 +178,7 @@ class QuadrangleMesh(Mesh, Plotable):
 
     def jacobi_matrix(self, bc, index=np.s_[:]):
         """
-        @brief 计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
+        @brief 计算参考单元 (xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
