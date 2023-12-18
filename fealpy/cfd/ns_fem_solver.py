@@ -9,6 +9,7 @@ from ..fem import VectorViscousWorkIntegrator, PressWorkIntegrator
 from ..fem import BilinearForm, MixedBilinearForm
 from ..fem import LinearForm
 from ..fem import VectorSourceIntegrator, ScalarSourceIntegrator
+from ..fem import VectorConvectionIntegrator
 
 class NSFEMSolver:
     def __init__(self, mesh, p=(2, 1), rho=1.0, mu=1.0, q=5):
@@ -21,18 +22,21 @@ class NSFEMSolver:
         bform = BilinearForm(self.uspace)
         bform.add_domain_integrator(ScalarMassIntegrator())
         self.M = bform.assembly() 
-
+        
+        ##(\nabla u, \nabla v)
         bform = BilinearForm(self.uspace)
         bform.add_domain_integrator(ScalarDiffusionIntegrator())
         self.S = bform.assembly() 
-        
-    
+            
         bform = MixedBilinearForm((pspace,), 2*(uspace,)) 
         bform.add_domain_integrator(PressWorkIntegrator()) 
         self.AP = bform.assembly()
     
     def ossen_A(self,u0):
-        M = self.M 
+        M = self.M
+        bform = BilinearForm((self.uspace,)*2)
+        bform.add_domain_integrator(VectorConvectionIntegrator(c=u0))
+        C = bform.assembly() 
 
         A0 = bmat([[AU+S+AUC, None],[None, AU+S+AUC]], format='csr')  
         

@@ -9,6 +9,7 @@
 '''  
 import pytest
 import numpy as np
+from scipy.sparse import spdiags, bmat, csr_matrix, hstack, vstack
 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -22,38 +23,35 @@ from tssim.part import *
 from tssim.part.Assemble import Assemble
 from tssim.part.Level_Set import Level_Set
 
+@cartesian
+def velocity_field(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    u = np.zeros(p.shape)
+    u[..., 0] = np.sin(np.pi * x) ** 2 * np.sin(2 * np.pi * y)
+    u[..., 1] = -np.sin(np.pi * y) ** 2 * np.sin(2 * np.pi * x)
+    return u
+
 @pytest.fixture
 def ns_solver_setup():
     q = 4
-    mesh = TriangleMesh.from_box([0, 10, 0, 1], nx = 10, ny = 100)
-    ouspace = LagrangeFiniteElementSpace(mesh,p=2)
-    opspace = LagrangeFiniteElementSpace(mesh,p=1)
-    
-    uspace = LagrangeFESpace(mesh, p=2)
-    pspace = LagrangeFESpace(mesh, p=1)
-    
+    mesh = TriangleMesh.from_box([0, 10, 0, 1], nx = 10, ny = 100) 
     assemble0 =  Assemble(mesh,q)
     
-    @cartesian
-    def velocity_field(p):
-        x = p[..., 0]
-        y = p[..., 1]
-        u = np.zeros(p.shape)
-        u[..., 0] = np.sin(np.pi * x) ** 2 * np.sin(2 * np.pi * y)
-        u[..., 1] = -np.sin(np.pi * y) ** 2 * np.sin(2 * np.pi * x)
-        return u
-    u0 = uspace.interpolate(velocity_field, dim=2)
-    return assemble0,u0
+    return assemble0
 
 def test_A(ns_solver_setup):
+    assemble = ns_solver_setup
     udegree = 2
     pdegree = 1
     mu = 0.1
     mesh = TriangleMesh.from_box([0, 10, 0, 1], nx = 10, ny = 100)
-    assemble = ns_solver_setup, u0
+    uspace = LagrangeFESpace(mesh, p=2)
+    pspace = LagrangeFESpace(mesh, p=1)
     q = 4
     dt = 0.1
 
+    u0 = uspace.interpolate(velocity_field, dim=2)
     ## 老接口
     M = assemble.matrix([udegree, 0],[udegree, 0])
 
