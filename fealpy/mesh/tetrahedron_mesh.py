@@ -884,12 +884,16 @@ class TetrahedronMesh(Mesh, Plotable):
         if returnim is True:
             return IM
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, returnim=False):
         """
         Perform uniform refinement on the tetrahedral mesh.
 
         @param n Number of refinement iterations (default: 1)
         """
+        if returnim:
+            nodeIMatrix = []
+            cellIMatrix = []
+
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -904,6 +908,16 @@ class TetrahedronMesh(Mesh, Plotable):
             newNode = (node[edge[:, 0], :]+node[edge[:, 1], :])/2.0
 
             self.node = np.concatenate((node, newNode), axis=0)
+
+            if returnim:
+                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                nodeIMatrix.append(A.tocsr())
+
+                B = eye(NC, dtype=self.ftype)
+                B = bmat([[B], [B], [B], [B], [B], [B], [B], [B]])
+                cellIMatrix.append(B.tocsr())
 
             p = edge2newNode[cell2edge]
             newCell = np.zeros((8*NC, 4), dtype=self.itype)
@@ -949,6 +963,9 @@ class TetrahedronMesh(Mesh, Plotable):
             newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
 
             self.ds.reinit(NN+NE, newCell)
+
+        if returnim:
+            return nodeIMatrix, cellIMatrix
 
     def is_valid(self, threshold=1e-15):
         """

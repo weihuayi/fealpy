@@ -24,7 +24,7 @@ class PolygonMesh(Mesh, Plotable):
                 for i in range(len(cell)):
                     cellLocation[i+1] = cellLocation[i]+len(cell[i])
                 cell = np.concatenate(cell)
-            elif isinstance(cell, np.ndarray) == 2:
+            elif isinstance(cell, np.ndarray) and len(cell.shape)== 2:
                 NC = cell.shape[0]
                 NV = cell.shape[1]
                 cell = cell.reshape(-1)
