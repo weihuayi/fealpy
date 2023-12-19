@@ -141,14 +141,13 @@ class UniformMesh2d(Mesh, Plotable):
 
         x = p[..., 0]
         y = p[..., 1]
-        cell_location_ = self.cell_location(p)
-        location = int(cell_location_[0] * self.ny + cell_location_[1])
-        cell_x = self.origin[0] + (location // self.ny) * self.h[0]
-        cell_y = self.origin[1] + (location % self.nx) * self.h[1]  
         
-        bc_x = np.array([[(x - cell_x)/self.h[0], (cell_x - x)/self.h[0] + 1]], dtype=np.float64)
-        bc_y = np.array([[(y - cell_y)/self.h[1], (cell_y - y)/self.h[1] + 1]], dtype=np.float64)
+        bc_x_ = ((x - self.origin[0]) / self.h[0]) % 1
+        bc_y_ = ((y - self.origin[1]) / self.h[1]) % 1
+        bc_x = np.array([[bc_x_, 1 - bc_x_]], dtype=np.float64)
+        bc_y = np.array([[bc_y_, 1 - bc_y_]], dtype=np.float64)
         val = (bc_x, bc_y)
+        
         return val
 
     ## @ingroup GeneralInterface
