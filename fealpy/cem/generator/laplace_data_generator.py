@@ -4,7 +4,7 @@ import numpy as np
 from numpy import float32
 from numpy.typing import NDArray
 from scipy.sparse.linalg import splu
-from scipy.sparse import lil_matrix, spdiags
+from scipy.sparse import spdiags, hstack, vstack, csr_matrix
 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.mesh import TriangleMesh, UniformMesh2d
@@ -97,15 +97,11 @@ class LaplaceFEMSolver():
 
     def _init_gn(self):
         space = self.space
-        ndof = self.ndof
         A_ = self.A_
         C_ = ScalarNeumannSourceIntegrator(1.).assembly_face_vector(space)
 
-        A_C = lil_matrix((ndof+1, ndof+1), dtype=A_.dtype)
-        A_C[0:-1, 0:-1] = A_
-        A_C[0:-1, -1] = C_
-        A_C[-1, 0:-1] = C_
-        A_C[-1, -1] = 0.
+        A_C = hstack([A_, C_.reshape(-1, 1)])
+        A_C = vstack([A_C, hstack([C_.reshape(1, -1), csr_matrix((1, 1), dtype=space.ftype)])])
 
         self.AC_lu = splu(A_C.tocsc())
 
