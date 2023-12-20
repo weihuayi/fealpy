@@ -5,7 +5,7 @@ from scipy.sparse.linalg import spsolve
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.linear_elasticity_model import BoxDomainData2d, BoxDomainData3d
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh, TetrahedronMesh
 from fealpy.functionspace import LagrangeFESpace as Space
 
 from fealpy.fem import LinearElasticityOperatorIntegrator
@@ -52,11 +52,12 @@ doforder = args.doforder
 
 if GD == 2:
     pde = BoxDomainData2d()
+    mesh = pde.init_mesh(n=n)
 elif GD == 3:
     pde = BoxDomainData3d()
+    mesh = TetrahedronMesh.from_box()
 
 domain = pde.domain()
-mesh = pde.init_mesh(n=n)
 NN = mesh.number_of_nodes()
 
 # 新接口程序
@@ -84,7 +85,10 @@ if hasattr(pde, 'dirichlet'):
     A, F = bc.apply(A, F, uh)
 
 uh.flat[:] = spsolve(A, F)
+mesh.nodedata['uh'] = uh
+mesh.to_vtk(fname='linear_lfem.vtu')
 
+'''
 # 画出原始网格
 mesh.add_plot(plt)
 
@@ -98,4 +102,4 @@ elif doforder == 'vdims':
     mesh.add_plot(plt)
 
 plt.show()
-
+'''
