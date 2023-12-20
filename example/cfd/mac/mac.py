@@ -18,8 +18,8 @@ pde = taylor_greenData(Re,T=[0,T])
 domain = pde.domain()
 
 #空间离散
-nx = 4
-ny = 4
+nx = 10
+ny = 10
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
 mesh = UniformMesh2d([0,nx,0,ny],h=(hx,hy),origin=(0,0))
@@ -67,7 +67,7 @@ def result_phi(p,mesh):
     phi = p.reshape((Nrow,Nrow)).T[::-1] #改变形状为(4,4)并且从下往上，从左往右排列
     return phi
 
-for i in range(nt):
+for i in range(100):
     # 下一个的时间层 ti
     tl = tmesh.next_time_level()
     print("tl=", tl)
@@ -147,14 +147,14 @@ for i in range(nt):
     F = solver.source_Fx(pde,t=(i+1)*tau)
     Fx = F[:,0]
     b_u = uvalues1+tau*(-3*ADxu1/2+ADxu0/2-nu*solver.dp_u()@pvalues1\
-        +nu/2*(laplaceu@uvalues1+(8*u_ub11/3)/(hx*hy))+Fx)
+        +nu/2*(laplaceu@uvalues1+(8*u_ub11/3)/(hx*hy))+nu*Fx)
 
     #组装A_v、b_v矩阵
     laplacev = solver.laplace_v()
     A_v = solver.laplace_v(1-tau/(2*Re))
     Fy = F[:,1]
     b_v = vvalues1+tau*(-3*ADyv1/2+ADyv0/2-nu*solver.dp_v()@pvalues1\
-        +nu/2*(laplacev@vvalues1+(8*v_ub11/3)/(hx*hy))+Fy)
+        +nu/2*(laplacev@vvalues1+(8*v_ub11/3)/(hx*hy))+nu*Fy)
     
     ##A_u,b_u矩阵边界处理并解方程
     nxu = solver.umesh.node.shape[1]
@@ -236,12 +236,13 @@ for i in range(nt):
     uvvalues2 = np.stack((uvalues2,vvalues2),axis=1)
     
     #更新压力及其梯度
-    pvalues2 = pvalues1+K-(nu*tau*M)/2
+    pvalues2 = pvalues1+K-(nu*tau*(dpm_u*u_1+dpm_v*v_1))/2
 
     uu = pde.solution_u(nodes_u,tl)
     vv = pde.solution_v(nodes_v,tl)
     pp = pde.solution_p(nodes_p,tl)
     erru = np.sum(np.sqrt((uu-uvalues2)**2+(vv-vvalues2)**2))
-    print(erru)
+    errp = np.sum(np.sqrt(pp-pvalues2)**2)
+    errp1 = pp-pvalues2
      # 时间步进一层 
     tmesh.advance()
