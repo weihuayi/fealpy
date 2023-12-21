@@ -60,7 +60,7 @@ class LSSolver():
             if self._disp:
                 print('iter %3i' % (self.niter))
 
-    def solve_system(self, A, b, tol=1e-8):
+    def lgmres_solve_system(self, A, b, tol=1e-8):
         counter = self.IterationCounter(disp = False)
         result, _ = lgmres(A, b, tol = tol, atol = tol, callback = counter)
 
