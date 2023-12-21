@@ -118,13 +118,14 @@ class BoxDomainData():
         return val
 
     @cartesian
-    def dirichlet(self):
+    def dirichlet(self, p):
         """
         @brief 返回 Dirichlet 边界上的给定点的位移
         @param[in] p 一个表示空间点坐标的数组
         @return 返回位移值，这里返回常数向量 [0.0, 0.0]
         """
-        val = np.array([0.0, 0.0], dtype=np.float64)
+        val = np.zeros((p.shape[0], 2), dtype=np.float64)
+        # val = np.array([0.0, 0.0], dtype=np.float64)
 
         return val
 
@@ -139,11 +140,11 @@ class BoxDomainData():
         y = p[..., 1]
         flag1 = np.abs(x) < 1e-13
         flag2 = np.abs(x - 1) < 1e-13
-        flagx = np.logical_and(flag1, flag2)
+        flagx = np.logical_or(flag1, flag2)
         flag3 = np.abs(y) < 1e-13
         flag4 = np.abs(y - 1) < 1e-13
-        flagy = np.logical_and(flag3, flag4)
-        flag = np.logical_and(flagx, flagy)
+        flagy = np.logical_or(flag3, flag4)
+        flag = np.logical_or(flagx, flagy)
 
         return flag
 
