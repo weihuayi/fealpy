@@ -38,21 +38,25 @@ def ns_solver_setup():
     mesh = TriangleMesh.from_box([0, 10, 0, 1], nx = 10, ny = 100) 
     assemble0 =  Assemble(mesh,q)
     
-    return assemble0
+    mesh = TriangleMesh.from_box([0, 10, 0, 1], nx = 10, ny = 100)
+    Ouspace = LagrangeFiniteElementSpace(mesh, p=2)
+    q = 4
+    
+    Vfield = Ouspace.interpolation(velocity_field, dim=2)
 
-def test_A(ns_solver_setup):
-    assemble = ns_solver_setup
+    uspace = LagrangeFESpace(mesh, p=2, doforder='sdofs')
+    pspace = LagrangeFESpace(mesh, p=1, doforder='sdofs')
+    solver = NSFEMSolver(mesh,0.1,uspace,pspace,1,0.1)
+    return assemble0, Vfield, solver
+
+def test_ossen_A(ns_solver_setup):
+    assemble, Vfield, solver= ns_solver_setup
+    mu = 0.1
+    dt = 0.1
+    
+    ## 老接口
     udegree = 2
     pdegree = 1
-    mu = 0.1
-    mesh = TriangleMesh.from_box([0, 10, 0, 1], nx = 10, ny = 100)
-    uspace = LagrangeFESpace(mesh, p=2)
-    pspace = LagrangeFESpace(mesh, p=1)
-    q = 4
-    dt = 0.1
-
-    u0 = uspace.interpolate(velocity_field, dim=2)
-    ## 老接口
     M = assemble.matrix([udegree, 0],[udegree, 0])
 
     C1 = assemble.matrix([pdegree, 0],[udegree, 1])
@@ -62,16 +66,34 @@ def test_A(ns_solver_setup):
     S2 = assemble.matrix([udegree, 2], [udegree, 2], mu)
     S = S1+S2
     
-    D1 = assemble.matrix([udegree, 1], [udegree, 0], u0(assemble.bcs)[...,0])
-    D2 = assemble.matrix([udegree, 2], [udegree, 0], u0(assemble.bcs)[...,1])
+    D1 = assemble.matrix([udegree, 1], [udegree, 0], Vfield(assemble.bcs)[...,0])
+    D2 = assemble.matrix([udegree, 2], [udegree, 0], Vfield(assemble.bcs)[...,1])
     D = D1+D2
-
     A = bmat([[1/dt*M+S+D, None,       -C1],\
             [None,         1/dt*M+S+D, -C2],\
             [C1.T,         C2.T,       None]],format = 'csr')
     
     ## 新接口
-    solver = NSFEMSolver(mesh)
-    AA = solver.ossen_A(1)
+    AA = solver.ossen_A(Vfield)
 
-    assert np.abs(np.sum(np.abs(A-AA))) < 0.01, "Average difference is too large"
+    assert np.abs(np.sum(np.abs(A-AA))) < 1e-10
+
+def test_ossen_b(ns_solver_setup):
+    assemble, Vfield, solver= ns_solver_setup
+
+    ## 老接口
+    udegree = 2
+    pdegree = 1
+    dt = 0.1
+    pgdof = assemble.mesh.number_of_global_ipoints(p=pdegree)
+    M = assemble.matrix([udegree, 0],[udegree, 0])
+    b = np.hstack((M@Vfield[..., 0], M@Vfield[..., 1]))    
+    b = np.hstack((b, [0]*pgdof))
+    b *= 1/dt
+    
+    ## 新接口
+    uspace = LagrangeFESpace(assemble.mesh, p=2, doforder='sdofs')
+    u0 = uspace.interpolate(velocity_field, dim=2)
+    bb = solver.Ossen_b(u0)
+
+    assert np.sum(np.abs(b-bb))< 1e-10
