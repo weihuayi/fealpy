@@ -1,5 +1,6 @@
 import numpy as np
 
+from .scalar_convection_integrator import ScalarConvectionIntegrator 
 
 class VectorConvectionIntegrator:
     """
@@ -63,7 +64,7 @@ class VectorConvectionIntegrator:
         GD = space[0].geo_dimension()
         ldof = space[0].number_of_local_dofs()
 
-        integrator = ScalarDiffusionIntegrator(self.coef, self.q)
+        integrator = ScalarConvectionIntegrator(self.coef, self.q)
         # 组装标量的单元扩散矩阵
         # D.shape == (NC, ldof, ldof)
         D = integrator.assembly_cell_matrix(space[0], index=index, cellmeasure=cellmeasure)
