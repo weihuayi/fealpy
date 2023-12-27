@@ -10,14 +10,16 @@ from matplotlib import pyplot as plt
 
 from fealpy.mesh import TriangleMesh
 from fealpy.ml.grad import gradient
-from fealpy.ml.modules import BoxDBCSolution
-from fealpy.ml.sampler import  ISampler
+from fealpy.ml.modules import BoxDirichletBC
+from fealpy.ml.sampler import ISampler
 
-#超参数
+
+# 超参数
 num_of_point_pde = 50
 lr = 0.01
-iteration = 150
-wavenum = float(1)
+iteration = 120
+wavenum = 1.
+k = torch.tensor(wavenum, dtype=torch.float64)
 NN = 64
 
 # 定义网络层结构，用两个网络分别训练实部和虚部。
@@ -41,13 +43,13 @@ net_imag = nn.Sequential(
     nn.Linear(NN//4, 1, dtype=torch.float64)
 )
 
-#分别对实部和虚部封装dirichlet边界条件
-s_real = BoxDBCSolution(net_real)
+
+# 分别对实部和虚部封装 dirichlet 边界条件
+s_real = BoxDirichletBC(net_real, 2)
 s_real.set_box([-0.5, 0.5, -0.5, 0.5])
 @s_real.set_bc
 def c_real(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -58,12 +60,11 @@ def c_real(p: torch.Tensor) -> torch.Tensor:
     val -= c*torch.special.bessel_j0(k*r)
     return torch.real(val)
 
-s_imag = BoxDBCSolution(net_imag)
+s_imag = BoxDirichletBC(net_imag, 2)
 s_imag.set_box([-0.5, 0.5, -0.5, 0.5])
 @s_imag.set_bc
 def c(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -88,7 +89,6 @@ samplerpde_imag = ISampler(
 # 真解
 def solution(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -110,10 +110,9 @@ def solution_numpy_imag(p: NDArray):
     return ret.detach().numpy()
 
 
-#根据真解求源项
+# 根据真解求源项
 def f(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     solution_x_real, solution_y_real = gradient(torch.real(solution(p)), p, create_graph=True, split=True)
     solution_x_imag, solution_y_imag = gradient(torch.imag(solution(p)), p, create_graph=True, split=True)
     solution_xx_real, _ = gradient(solution_x_real, p, create_graph=True, split=True)
@@ -125,10 +124,9 @@ def f(p: torch.Tensor) -> torch.Tensor:
     val = - solution_xx - solution_yy - k**2*solution(p)
     return val
 
-# 定义pde
+# 定义 pde
 def pde_real(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     u = torch.complex(s_real(p), s_imag(p))
     u_x_real, u_y_real = gradient(torch.real(u), p, create_graph=True, split=True)
     u_x_imag, u_y_imag = gradient(torch.imag(u), p, create_graph=True, split=True)
@@ -142,7 +140,6 @@ def pde_real(p: torch.Tensor) -> torch.Tensor:
 
 def pde_imag(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     u = torch.complex(s_real(p), s_imag(p))
     u_x_real, u_y_real = gradient(torch.real(u), p, create_graph=True, split=True)
     u_x_imag, u_y_imag = gradient(torch.imag(u), p, create_graph=True, split=True)
@@ -155,13 +152,14 @@ def pde_imag(p: torch.Tensor) -> torch.Tensor:
 
     return torch.imag(u_xx + u_yy + k**2*u + f(p))
 
+
 # 训练过程
 start_time = time.time()
-mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx = 320,ny = 320 )
+mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx=64, ny=64)
 Error_real = []
 Error_imag = []
 
-for epoch in range(iteration+1):
+for epoch in range(1, iteration+1):
 
     optim_real.zero_grad()
     optim_imag.zero_grad()
@@ -189,19 +187,20 @@ for epoch in range(iteration+1):
 
         print(f"Epoch: {epoch}, Loss: {loss}")
         print(f"Error_real:{error_real}, Error_imag:{error_imag}")
-        print('\n')
+
 
 end_time = time.time()     # 记录结束时间
 training_time = end_time - start_time   # 计算训练时间
 print("训练时间为：", training_time, "秒")
 
-#可视化
-y_real = range(1, 10*len(Error_real) +1,10)
-y_imag = range(1, 10*len(Error_imag) +1,10)
+
+# 可视化
+y_real = range(1, 10*len(Error_real) + 1, 10)
+y_imag = range(1, 10*len(Error_imag) + 1, 10)
 plt.plot(y_real, Error_real)
 plt.plot(y_imag, Error_imag)
 
-bc_ = np.array([1/3, 1/3, 1/3])
+bc_ = np.array([1/3, 1/3, 1/3], dtype=np.float64)
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)
 
 u_real = torch.real(solution(ps)).detach().numpy()

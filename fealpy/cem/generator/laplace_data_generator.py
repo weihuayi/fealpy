@@ -130,13 +130,13 @@ class LaplaceFEMSolver():
             yield self.solve_from_gn(gN_)
 
 
-def get_gN_func(omega: int):
+def get_gN_func(freq: int, phrase: float=0.):
     """
-    @brief Define a gN function.
+    @brief Define a 2D gN function.
     """
     def gN(p, *args):
         theta = np.arctan2(p[..., 1], p[..., 0])
-        return np.cos(omega * theta)
+        return np.cos(freq * theta + phrase)
     return gN
 
 
@@ -195,8 +195,11 @@ class LaplaceDataGenerator2d():
 
     @classmethod
     def from_cos(cls, box, nx: int, ny: int, levelset: ArrayFunction,
-                 sigma_vals: Tuple[float, float], omega_vals: Iterable[int]):
-        gn_list = [get_gN_func(o) for o in omega_vals]
+                 sigma_vals: Tuple[float, float],
+                 freq: Iterable[int], phrase: Iterable[float]):
+
+        gn_list = [get_gN_func(f, p) for f in freq for p in phrase]
+
         return cls(box=box, nx=nx, ny=ny, levelset=levelset, sigma_vals=sigma_vals,
                    gn_funcs=gn_list)
 
