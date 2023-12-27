@@ -7,6 +7,7 @@ class ScalarDiffusionIntegrator:
     def __init__(self, c=None, q=None):
         self.coef = c
         self.q = q
+        self.type = "BL0"
 
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
