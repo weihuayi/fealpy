@@ -884,12 +884,16 @@ class TetrahedronMesh(Mesh, Plotable):
         if returnim is True:
             return IM
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, returnim=False):
         """
         Perform uniform refinement on the tetrahedral mesh.
 
         @param n Number of refinement iterations (default: 1)
         """
+        if returnim:
+            nodeIMatrix = []
+            cellIMatrix = []
+
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -904,6 +908,16 @@ class TetrahedronMesh(Mesh, Plotable):
             newNode = (node[edge[:, 0], :]+node[edge[:, 1], :])/2.0
 
             self.node = np.concatenate((node, newNode), axis=0)
+
+            if returnim:
+                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                nodeIMatrix.append(A.tocsr())
+
+                B = eye(NC, dtype=self.ftype)
+                B = bmat([[B], [B], [B], [B], [B], [B], [B], [B]])
+                cellIMatrix.append(B.tocsr())
 
             p = edge2newNode[cell2edge]
             newCell = np.zeros((8*NC, 4), dtype=self.itype)
@@ -949,6 +963,9 @@ class TetrahedronMesh(Mesh, Plotable):
             newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
 
             self.ds.reinit(NN+NE, newCell)
+
+        if returnim:
+            return nodeIMatrix, cellIMatrix
 
     def is_valid(self, threshold=1e-15):
         """
@@ -1228,6 +1245,86 @@ class TetrahedronMesh(Mesh, Plotable):
         mesh.meshdata["upface"]     = bdface[isUpBd]
         mesh.meshdata["bottomface"] = bdface[isBottomBd]
         return mesh
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_carck_box(cls, box=[0, 2, 0, 5, 0, 10], nx=2, ny=5, nz=10,
+            threshold=None):
+        """
+        Generate a tetrahedral mesh for a box domain.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param nz Number of divisions along the z-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TetrahedronMesh instance
+        """
+        NN = (nx+1)*(ny+1)*(nz+1)
+        NC = nx*ny*nz
+        node = np.zeros((NN, 3), dtype=np.float64)
+        X, Y, Z = np.mgrid[
+                box[0]:box[1]:(nx+1)*1j,
+                box[2]:box[3]:(ny+1)*1j,
+                box[4]:box[5]:(nz+1)*1j
+                ]
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
+        node[:, 2] = Z.flat
+
+        idx = np.arange(NN).reshape(nx+1, ny+1, nz+1)
+        c = idx[:-1, :-1, :-1]
+
+        cell = np.zeros((NC, 8), dtype=np.int_)
+        nyz = (ny + 1)*(nz + 1)
+        cell[:, 0] = c.flatten()
+        cell[:, 1] = cell[:, 0] + nyz
+        cell[:, 2] = cell[:, 1] + nz + 1
+        cell[:, 3] = cell[:, 0] + nz + 1
+        cell[:, 4] = cell[:, 0] + 1
+        cell[:, 5] = cell[:, 4] + nyz
+        cell[:, 6] = cell[:, 5] + nz + 1
+        cell[:, 7] = cell[:, 4] + nz + 1
+
+        localCell = np.array([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int_)
+        cell = cell[:, localCell].reshape(-1, 4)
+
+        if threshold is not None:
+            NN = len(node)
+            bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = np.zeros(NN, dtype=np.bool_)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = np.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+            cell = idxMap[cell]
+
+        # 切口节点重复
+        NN = node.shape[0]
+        # 找到切口处 node
+        nidx = np.where((np.abs(node[:, 2] - 5)<1e-5) & (node[:, 1] > 2.99))[0]
+        # 找到切口处节点所在单元
+        cidx = np.where(np.any(np.isin(cell, nidx), axis=1))[0]
+        # 计算 z 坐标平均值
+        mz = np.mean(node[cell[cidx, :], 2], axis=1)
+        # 判断是否是切面上方的单元
+        cidx = cidx[mz>5]
+        # 更新切面上方单元对应节点编号
+        for i, j in enumerate(nidx):
+            for k in range(4):  # 假设每个单元格有4个节点
+                if cell[j, k] in nidx:
+                    cell[j, k] = NN + i
+        node = np.r_[node, node[nidx]]
+        mesh = TetrahedronMesh(node, cell)
+        return mesh
+
 
     def print_cformat(self):
         def print_cpp_array(arr):

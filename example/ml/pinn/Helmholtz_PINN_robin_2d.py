@@ -18,7 +18,8 @@ num_of_point_pde = 100
 num_of_point_bc = 50
 lr = 0.01
 iteration = 150
-wavenum = float(1)
+wavenum = 1.
+k = torch.tensor(wavenum)
 NN = 64
 
 # 定义网络层结构
@@ -59,7 +60,6 @@ samplerbc_2 = BoxBoundarySampler([-0.5, -0.5], [0.5, 0.5], requires_grad=True)
 # 真解
 def solution(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -80,10 +80,9 @@ def solution_numpy_imag(p: NDArray):
     ret = torch.imag(sol)
     return ret.detach().numpy()
 
-# 定义pde
+# 定义 pde
 def pde(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     u = torch.complex(s_1(p), s_2(p))
     x = p[..., 0:1]
     y = p[..., 1:2]
@@ -109,7 +108,6 @@ def grad(p: torch.Tensor):
     x*(I*sin(k) + cos(k))*besselj(1, R*k)/(R*(besselj(0, k) + I*besselj(1, k))) - x*sin(R*k)/R
     y*(I*sin(k) + cos(k))*besselj(1, R*k)/(R*(besselj(0, k) + I*besselj(1, k))) - y*sin(R*k)/R
     """
-    k = torch.tensor(wavenum)
     x = p[..., 0:1]
     y = p[..., 1:2]
     r = torch.sqrt(x**2 + y**2)
@@ -126,7 +124,6 @@ def grad(p: torch.Tensor):
 
 def bc(p: torch.Tensor) -> torch.Tensor:
 
-    k = torch.tensor(wavenum)
     u = torch.complex(s_1(p), s_2(p))
     x = p[..., 0]
     y = p[..., 1]
@@ -146,7 +143,7 @@ def bc(p: torch.Tensor) -> torch.Tensor:
     return (grad_u*n).sum(dim=-1, keepdim=True) + kappa * u - g
 
 # 构建网格和有限元空间
-mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx = 320,ny = 320 )
+mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx=64, ny=64)
 
 # 训练过程
 start_time = time.time()
@@ -159,12 +156,12 @@ for epoch in range(iteration+1):
     optim_2.zero_grad()
 
     spde_1 = samplerpde_1.run(num_of_point_pde)
-    sbc_1 = samplerbc_1.run(num_of_point_bc)
+    sbc_1 = samplerbc_1.run(num_of_point_bc, num_of_point_bc)
     outpde_1 = pde(spde_1)
     outbc_1 = bc(sbc_1)
 
     spde_2 = samplerpde_2.run(num_of_point_pde)
-    sbc_2 = samplerbc_2.run(num_of_point_bc)
+    sbc_2 = samplerbc_2.run(num_of_point_bc, num_of_point_bc)
     outpde_2 = pde(spde_2)
     outbc_2 = bc(sbc_2)
 
@@ -197,6 +194,7 @@ for epoch in range(iteration+1):
         print(f"Error_real:{error_real}, Error_imag:{error_imag}")
         print('\n')
 
+
 end_time = time.time()     # 记录结束时间
 training_time = end_time - start_time   # 计算训练时间
 print("训练时间为：", training_time, "秒")
@@ -206,7 +204,7 @@ y_imag = range(1, 10*len(Error_imag) +1,10)
 plt.plot(y_real, Error_real)
 plt.plot(y_imag, Error_imag)
 
-bc_ = np.array([1/3, 1/3, 1/3])
+bc_ = np.array([1/3, 1/3, 1/3], dtype=np.float64)
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)
 
 u_real = torch.real(solution(ps)).detach().numpy()
@@ -214,7 +212,7 @@ u_imag = torch.imag(solution(ps)).detach().numpy()
 up_real = s_1(ps).detach().numpy()
 up_imag = s_2(ps).detach().numpy()
 
-#可视化
+# 可视化
 fig, axes = plt.subplots(2, 2)
 mesh.add_plot(axes[0, 0], cellcolor=u_real, linewidths=0, aspect=1)
 mesh.add_plot(axes[0, 1], cellcolor=u_imag, linewidths=0, aspect=1)
@@ -222,4 +220,3 @@ mesh.add_plot(axes[1, 0], cellcolor=up_real, linewidths=0, aspect=1)
 mesh.add_plot(axes[1, 1], cellcolor=up_imag, linewidths=0, aspect=1)
 
 plt.show()
-
