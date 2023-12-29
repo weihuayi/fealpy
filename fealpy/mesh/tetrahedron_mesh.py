@@ -1231,7 +1231,7 @@ class TetrahedronMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_carck_box(cls, box=[0, 2, 0, 5, 0, 10], nx=2, ny=5, nz=10,
+    def from_crack_box(cls, box=[0, 2, 0, 5, 0, 10], nx=2, ny=5, nz=10,
             threshold=None):
         """
         Generate a tetrahedral mesh for a box domain.
@@ -1292,18 +1292,15 @@ class TetrahedronMesh(Mesh, Plotable):
         # 切口节点重复
         NN = node.shape[0]
         # 找到切口处 node
-        nidx = np.where((np.abs(node[:, 2] - 5)<1e-5) & (node[:, 1] > 2.99))[0]
+        nidx = np.where((np.abs(node[:, 2] - 5)<1e-5) & (node[:, 1] > 3.01))[0]
         # 找到切口处节点所在单元
-        cidx = np.where(np.any(np.isin(cell, nidx), axis=1))[0]
+        nidxmap = np.arange(NN, dtype=np.int_)
+
+        nidxmap[nidx] = NN+np.arange(len(nidx))
         # 计算 z 坐标平均值
-        mz = np.mean(node[cell[cidx, :], 2], axis=1)
-        # 判断是否是切面上方的单元
-        cidx = cidx[mz>5]
-        # 更新切面上方单元对应节点编号
-        for i, j in enumerate(nidx):
-            for k in range(4):  # 假设每个单元格有4个节点
-                if cell[j, k] in nidx:
-                    cell[j, k] = NN + i
+        flag = np.mean(node[:, 2][cell], axis=1)>5
+        cell[flag] = nidxmap[cell[flag]]
+
         node = np.r_[node, node[nidx]]
         mesh = TetrahedronMesh(node, cell)
         return mesh

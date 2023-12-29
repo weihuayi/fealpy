@@ -1,6 +1,5 @@
 import numpy as np
 import copy
-import time
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -15,9 +14,9 @@ from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
-from scipy.sparse.linalg import spsolve, lgmres
+from scipy.sparse.linalg import spsolve
 
-class AFEMPhaseFieldCrackHybridMixModel2d():
+class AFEMPhaseFieldCrackHybridMixModel():
     """
     @brief 线性自适应有限元相场方法混合模型求解裂纹传播问题
     """
@@ -60,117 +59,45 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         space = self.space
         model = self.model
         GD = self.GD
-        k = 0
-        while k < maxit:
-            print('k:', k)
-            uh = self.uh
-            d = self.d
-            H = self.H
-            
-            node = mesh.entity('node')
-            isDDof = model.is_disp_boundary(node)
-            uh[isDDof] = disp
-            du = space.function(dim=GD)
-
-            # 求解位移
-            vspace = (GD*(space, ))
-            ubform = BilinearForm(vspace)
-            
-#            D = self.dsigma_depsilon(d)
-#            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
-#            ubform.add_domain_integrator(integrator)
-            gd = self.energy_degradation_function(d)
-            start0 = time.time()
-            ubform = BilinearForm(vspace)
-            ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
-                model.mu, c=gd))
-            A0 = ubform.assembly()
-            end0 = time.time()
-            print('matrix:', end0-start0)
-            R0 = -A0@uh.flat[:]
-            
-            self.force = np.sum(-R0[isDDof.flat])
-            
-            ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
-
-            # 这里为什么做两次边界条件处理？
-#            A0, R0 = ubc.apply(A0, R0) 
-            A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
-            start1 = time.time() 
-            # TODO：更快的求解方法
-#            du.flat[:] = spsolve(A0, R0)
-            du = self.solve_system(A0, R0)
-            uh[:].flat += du
-            
-            end1 = time.time()
-            print('solve:', end1-start1)
-            # 更新参数
-            
-            strain = self.strain(uh)
-            phip, _ = self.strain_energy_density_decomposition(strain)
-            H[:] = np.fmax(H, phip)
-
-            # 计算相场模型
-            dbform = BilinearForm(space)
-            dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
-                q=4))
-            dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-            # TODO：快速组装程序
-            A1 = dbform.assembly()
-
-            lform = LinearForm(space)
-            lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
-            R1 = lform.assembly()
-            R1 -= A1@d[:]
-
-            if dirichlet_phase:
-                dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
-                A1, R1 = dbc.apply(A1, R1)
-
-            # TODO：快速求解程序
-#            d[:] += spsolve(A1, R1)
-            d[:] += self.solve_system(A1, R1)
+        uh = self.uh
+        d = self.d
+        H = self.H
         
-            self.stored_energy = self.get_stored_energy(phip, d)
-            self.dissipated_energy = self.get_dissipated_energy(d)
-            
-            self.uh = uh
-            self.d = d
-            self.H = H
+        node = mesh.entity('node')
+        isDDof = model.is_disp_boundary(node)
+        uh[isDDof] = disp
+        du = space.function(dim=GD)
 
-            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
-            eta = self.recovery.recovery_estimate(self.d)
-                
-            isMarkedCell = mark(eta, theta = theta) # TODO：
+        # 求解位移
+        vspace = (GD*(space, ))
+        ubform = BilinearForm(vspace)
+        
+#        gd = self.energy_degradation_function(d)
+        ubform = BilinearForm(vspace)
+        ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
+            model.mu))
+        A0 = ubform.assembly()
+        R0 = -A0@uh.flat[:]
+        
+        self.force = np.sum(-R0[isDDof.flat])
+        
+        ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
 
-            cm = mesh.entity_measure('cell') 
-            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
-            
-            if np.any(isMarkedCell):
-                if refine == 'nvp':
-                    self.bisect_refine(isMarkedCell)
-                elif refine == 'rg':
-                    self.redgreen_refine(isMarkedCell)
-            
-            # 计算残量误差
-            if k == 0:
-                er0 = np.linalg.norm(R0)
-                er1 = np.linalg.norm(R1)
-            error0 = np.linalg.norm(R0)/er0
-            print("error0:", error0)
+        # 这里为什么做两次边界条件处理？
+        A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
+       
+        # TODO：更快的求解方法
+        du.flat[:] = spsolve(A0, R0)
+        uh[:] += du
+        self.uh = uh
+        
+        # 更新参数
+        
+        strain = self.strain(uh)
+        phip, _ = self.strain_energy_density_decomposition(strain)
+        H[:] = np.fmax(H, phip)
 
-            error1 = np.linalg.norm(R1)/er1
-            print("error1:", error1)
-            error = max(error0, error1)
-            print("error:", error)
-            if error < 1e-5:
-                break
-            k += 1
-    
-    def solve_system(self, A, F, tol=1e-8):
-        counter = IterationCounter(disp = False)
-        result, info = lgmres(A, F, tol = tol, callback = counter)
-        return result
+
 
     def bisect_refine(self, isMarkedCell):
         """
@@ -377,37 +304,25 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
 
     def get_dissipated_energy(self, d):
         model = self.model
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         mesh = self.mesh
-        qf =  mesh.integrator(1, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights()
         cm = mesh.entity_measure('cell')
         g = d.grad_value(bc)
 
-        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=-1))
+        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=1))
         dissipated = np.dot(val, cm)
         return dissipated
 
     
     def get_stored_energy(self, psi_s, d):
         eps = 1e-10
-        mesh = self.mesh
 
-        qf =  mesh.integrator(1, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights()
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         c0 = (1 - d(bc)) ** 2 + eps
+        mesh = self.mesh
         cm = mesh.entity_measure('cell')
         val = c0*psi_s
         stored = np.dot(val, cm)
         return stored
 
-
-class IterationCounter(object):
-    def __init__(self, disp=True):
-        self._disp = disp
-        self.niter = 0
-
-    def __call__(self, rk=None):
-        self.niter += 1
-        if self._disp:
-            print('iter %3i' % (self.niter))
 
