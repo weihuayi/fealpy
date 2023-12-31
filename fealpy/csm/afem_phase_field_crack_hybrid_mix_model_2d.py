@@ -1,6 +1,5 @@
 import numpy as np
-import copy
-import time
+import numpy as np
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -15,7 +14,7 @@ from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
-from scipy.sparse.linalg import spsolve, lgmres
+from scipy.sparse.linalg import spsolve
 
 class AFEMPhaseFieldCrackHybridMixModel2d():
     """
@@ -36,12 +35,12 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
 
         NC = mesh.number_of_cells()
 
-        self.space = LagrangeFESpace(mesh, p=p, doforder='vdims')
+        self.space = LagrangeFESpace(mesh, p=p)
 
         self.uh = self.space.function(dim=self.GD) # 位移场
         self.d = self.space.function() # 相场
         self.H = np.zeros(NC) # 最大历史应变场
-
+        
         disp = model.is_boundary_disp()
 
         self.recovery = LinearRecoveryAlg()
@@ -50,7 +49,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             disp, 
             dirichlet_phase=False, 
             refine='nvp', 
-            maxit=50,
+            maxit=100,
             theta=0.2):
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
@@ -60,6 +59,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         space = self.space
         model = self.model
         GD = self.GD
+        D0 = self.linear_tangent_matrix()
         k = 0
         while k < maxit:
             print('k:', k)
@@ -74,19 +74,12 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
 
             # 求解位移
             vspace = (GD*(space, ))
-            ubform = BilinearForm(vspace)
-            
-#            D = self.dsigma_depsilon(d)
-#            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
-#            ubform.add_domain_integrator(integrator)
-            gd = self.energy_degradation_function(d)
-            start0 = time.time()
-            ubform = BilinearForm(vspace)
-            ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
-                model.mu, c=gd))
+            ubform = BilinearForm(GD*(space, ))
+
+            D = self.dsigma_depsilon(d, D0)
+            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
+            ubform.add_domain_integrator(integrator)
             A0 = ubform.assembly()
-            end0 = time.time()
-            print('matrix:', end0-start0)
             R0 = -A0@uh.flat[:]
             
             self.force = np.sum(-R0[isDDof.flat])
@@ -94,18 +87,14 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
 
             # 这里为什么做两次边界条件处理？
-#            A0, R0 = ubc.apply(A0, R0) 
+            A0, R0 = ubc.apply(A0, R0) 
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
-            start1 = time.time() 
+           
             # TODO：更快的求解方法
-#            du.flat[:] = spsolve(A0, R0)
-            du = self.solve_system(A0, R0)
-            uh[:].flat += du
+            du.flat[:] = spsolve(A0, R0)
+            uh[:] += du
             
-            end1 = time.time()
-            print('solve:', end1-start1)
             # 更新参数
-            
             strain = self.strain(uh)
             phip, _ = self.strain_energy_density_decomposition(strain)
             H[:] = np.fmax(H, phip)
@@ -128,8 +117,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
                 A1, R1 = dbc.apply(A1, R1)
 
             # TODO：快速求解程序
-#            d[:] += spsolve(A1, R1)
-            d[:] += self.solve_system(A1, R1)
+            d[:] += spsolve(A1, R1)
         
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
@@ -143,7 +131,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
                 
             isMarkedCell = mark(eta, theta = theta) # TODO：
 
-            cm = mesh.entity_measure('cell') 
+            cm = mesh.cell_area() 
             isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
             
             if np.any(isMarkedCell):
@@ -166,11 +154,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             if error < 1e-5:
                 break
             k += 1
-    
-    def solve_system(self, A, F, tol=1e-8):
-        counter = IterationCounter(disp = False)
-        result, info = lgmres(A, F, tol = tol, callback = counter)
-        return result
+        
 
     def bisect_refine(self, isMarkedCell):
         """
@@ -249,7 +233,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             uh = uh.T
         for i in range(GD):
             for j in range(i, GD):
-                if i == j:
+                if i ==j:
                     s[:, i, i] = np.sum(uh[:, i][cell] * gphi[:, :, i], axis=-1)
                 else:
                     val = np.sum(uh[:, i][cell] * gphi[:, :, j], axis=-1)
@@ -259,14 +243,6 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
                     s[:, j, i] = val
         return s
     
-    def energy_degradation_function(self, d):
-        eps = 1e-10
-        gd = np.zeros_like(d)
-        qf =  self.mesh.integrator(2, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights()
-        gd = (1 - d(bc)) ** 2 + eps
-        return gd
-
     def macaulay_operation(self, alpha):
         """
         @brief 麦考利运算
@@ -318,7 +294,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm
         return phi_p, phi_m
     
-    def dsigma_depsilon(self, phi):
+    def dsigma_depsilon(self, phi, D0):
         """
         @brief 计算应力关于应变的导数矩阵
         @param phi 单元重心处的相场函数值, (NC, )
@@ -326,15 +302,9 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         @return D 单元刚度系数矩阵
         """
         eps = 1e-10
-        lam = self.model.lam # 拉梅第一参数
-        mu = self.model.mu # 拉梅第二参数
-        
-        qf =  self.mesh.integrator(4, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights()
-#        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         c0 = (1 - phi(bc)) ** 2 + eps
-        D0 = np.array([[2*mu+lam, lam, 0], [lam, 2*mu+lam, 0], [0, 0, mu]],
-                dtype=np.float_)
         D = np.einsum('i, jk -> ijk', c0, D0)
         return D
     
@@ -377,37 +347,24 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
 
     def get_dissipated_energy(self, d):
         model = self.model
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         mesh = self.mesh
-        qf =  mesh.integrator(1, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights()
         cm = mesh.entity_measure('cell')
         g = d.grad_value(bc)
 
-        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=-1))
+        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=1))
         dissipated = np.dot(val, cm)
         return dissipated
 
     
     def get_stored_energy(self, psi_s, d):
         eps = 1e-10
-        mesh = self.mesh
 
-        qf =  mesh.integrator(1, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights()
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         c0 = (1 - d(bc)) ** 2 + eps
+        mesh = self.mesh
         cm = mesh.entity_measure('cell')
         val = c0*psi_s
         stored = np.dot(val, cm)
         return stored
-
-
-class IterationCounter(object):
-    def __init__(self, disp=True):
-        self._disp = disp
-        self.niter = 0
-
-    def __call__(self, rk=None):
-        self.niter += 1
-        if self._disp:
-            print('iter %3i' % (self.niter))
 
