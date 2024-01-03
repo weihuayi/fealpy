@@ -55,6 +55,7 @@ class UniformMesh3d(Mesh, Plotable):
 
         self.ftype = ftype
         self.itype = itype
+        self.type = "U3D"
 
         # Mesh dimensions
         self.nx = extent[1] - extent[0]
