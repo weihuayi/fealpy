@@ -44,6 +44,7 @@ class BernsteinFESpace:
         self.p = p
         assert spacetype in {'C', 'D'} 
         self.spacetype = spacetype
+        self.btype = "BS"   # 基函数类型 BS, BR, BC
         self.doforder = doforder
 
         mname = type(mesh).__name__

@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse import spdiags, bmat
+import os
 
 from fealpy.decorator import barycentric
 from ..functionspace import LagrangeFESpace
@@ -46,7 +47,7 @@ class NSFEMSolver:
         self.AP = bform.assembly()
     
     #u \cdot u   \approx   u^n \cdot u^{n+1}
-    def ossen_A(self,u0):
+    def ossen_A(self,un):
         M = self.M
         AP = self.AP
         rho = self.rho
@@ -57,9 +58,9 @@ class NSFEMSolver:
         @barycentric
         def coef(bcs, index):
             if callable(rho):
-                return rho(bcs,index)*u0(bcs,index)
+                return rho(bcs,index)[:,None,:]*un(bcs,index)
             else:
-                return rho*u0(bcs,index)
+                return rho*un(bcs,index)
             
         bform = BilinearForm((self.uspace,)*2)
         bform.add_domain_integrator(VectorConvectionIntegrator(c=coef, q=self.q))
@@ -70,7 +71,7 @@ class NSFEMSolver:
                 [AP.T, None]], format='csr')
         return A
 
-    def Ossen_b(self, un): 
+    def ossen_b(self, un): 
         dt = self.dt
         pgdof = self.pspace.number_of_global_dofs()
         M = self.M
@@ -79,13 +80,52 @@ class NSFEMSolver:
         b = np.hstack((b,[0]*pgdof))
         return b
     
-    def slip_stick_boundary(self, stick_area=None):
+    def slip_stick_boundary(self, A, b, stick_dof=None):
         pass
+    
+    def netwon_sigma(self, u, mu):
+        doforder = self.uspace.doforder
+        mid_bcs = np.array([1/3,1/3,1/3],dtype=np.float64)
+        if doforder == 'sdofs':
+            result = mu(mid_bcs)*u.grad_value(mid_bcs) + mu(mid_bcs)*u.grad_value(mid_bcs).transpose(1,0,2)
+        else:
+            print("还没开发")
+        return result
 
-    def output(self, phi, u, timestep, output_dir=',/', filename_prefix='test'):
-        mesh = self.space.mesh
-        if output_dir != 'None':
-            mesh.nodedata['phi'] = phi
-            mesh.nodedata['velocity'] = u
-            fname = os.path.join(output_dir, f'{filename_prefix}_{timestep:010}.vtu')
-            mesh.to_vtk(fname=fname)
+    def netwon_A(self, u0)
+        M = self.M
+        AP = self.AP
+        rho = self.rho
+        S = self.S
+        SP = self.SP
+        dt = self.dt
+ 
+        @barycentric
+        def coef(bcs, index):
+            if callable(rho):
+                return rho(bcs,index)[:,None,:]*un(bcs,index)
+            else:
+                return rho*un(bcs,index)
+            
+        bform = BilinearForm((self.uspace,)*2)
+        bform.add_domain_integrator(VectorConvectionIntegrator(c=coef, q=self.q))
+        C = bform.assembly() 
+
+        A0 = 1/dt*M+S+C
+        A = bmat([[1/dt*M+S+C,  -AP],\
+                [AP.T, None]], format='csr')
+        return A
+
+
+    def output(self, name, variable, timestep, output_dir='./', filename_prefix='test'):
+        mesh = self.mesh
+        gdof = self.uspace.number_of_global_dofs()
+        NC = mesh.number_of_cells()
+        assert len(variable) == len(name)
+        for i in range(len(name)):
+            if variable[i].shape[-1] == gdof:
+                mesh.nodedata[name[i]] = np.swapaxes(variable[i],0,-1)
+            elif variable[i].shape[-1] == NC:
+                mesh.celldata[name[i]] = variable[i] 
+        fname = os.path.join(output_dir, f'{filename_prefix}_{timestep:010}.vtu')
+        mesh.to_vtk(fname=fname)

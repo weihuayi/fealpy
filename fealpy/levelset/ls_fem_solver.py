@@ -231,8 +231,8 @@ class LSFEMSolver(LSSolver):
         bform.add_domain_integrator(ScalarDiffusionIntegrator())
         S = bform.assembly()
 
-         # Initialize the old error to zero.
-        eold = 0
+         # Initialize the old error.
+        eold = 1e10
 
         # Iterate for a fixed number of pseudo-time steps or until the error is below a threshold.
         for _ in range(nt):
@@ -261,7 +261,7 @@ class LSFEMSolver(LSSolver):
             print("Reinitialization error:", error) 
 
             # If the error starts increasing or is below the threshold, break the loop.
-            if eold < error and error< eps :
+            if eold < error or error< eps :
                 break
             else:
                 phi1[:] = phi2
