@@ -25,6 +25,7 @@ class IntervalMesh(Mesh, Plotable):
 
         self.ds = IntervalMeshDataStructure(len(node), cell)
         self.meshtype = 'interval'
+        self.meshtype = 'INT'
 
         self.nodedata = {}
         self.celldata = {}
@@ -258,6 +259,22 @@ class IntervalMesh(Mesh, Plotable):
         return cls(node, cell)
 
     from_interval = from_interval_domain
+
+    @classmethod
+    def from_mesh_boundary(cls, mesh):
+        assert mesh.top_dimension() == 2
+        itype = mesh.itype
+        is_bd_node = mesh.ds.boundary_node_flag()
+        is_bd_face = mesh.ds.boundary_face_flag()
+        node = mesh.entity('node', index=is_bd_node)
+        face = mesh.entity('face', index=is_bd_face)
+        NN = mesh.number_of_nodes()
+        NN_bd = node.shape[0]
+
+        I = np.zeros((NN, ), dtype=itype)
+        I[is_bd_node] = np.arange(NN_bd, dtype=itype)
+        face2bdnode = I[face]
+        return cls(node=node, cell=face2bdnode)
 
     @classmethod
     def from_circle_boundary(cls, center=(0, 0), radius=1.0, n=10):

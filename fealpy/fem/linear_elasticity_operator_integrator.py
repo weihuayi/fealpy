@@ -2,7 +2,8 @@ import numpy as np
 from typing import Optional, Union, Tuple
 
 class LinearElasticityOperatorIntegrator:
-    def __init__(self, lam: float, mu: float, q: Optional[int]=None):
+    def __init__(self, lam: float, mu: float, q: Optional[int]=None,
+            c:Optional[np.array]=None):
         """
         初始化 LinearElasticityOperatorIntegrator 类
 
@@ -14,6 +15,7 @@ class LinearElasticityOperatorIntegrator:
         self.lam = lam
         self.mu = mu
         self.q = q 
+        self.c = c
 
     def assembly_cell_matrix(self, space: Tuple, index=np.s_[:], 
                              cellmeasure: Optional[np.ndarray]=None, 
@@ -38,7 +40,7 @@ class LinearElasticityOperatorIntegrator:
         p = space[0].p # 空间的多项式阶数
         GD = mesh.geo_dimension()
         q = self.q if self.q is not None else p+1
-
+        NC = mesh.number_of_cells()
 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
@@ -73,7 +75,6 @@ class LinearElasticityOperatorIntegrator:
         D = 0
         for i in range(GD):
             D += mu*A[imap[(i, i)]]
-        
         if space[0].doforder == 'sdofs': # 标量自由度优先排序 
             for i in range(GD):
                 for j in range(i, GD):
@@ -97,6 +98,9 @@ class LinearElasticityOperatorIntegrator:
 
                         K[:, j::GD, i::GD] += lam*A[imap[(i, j)]].transpose(0, 2, 1)
                         K[:, j::GD, i::GD] += mu*A[imap[(i, j)]]
+        if self.c is not None:
+            if len(self.c) == NC:
+                K = np.einsum('i, ijk -> ijk', self.c, K)
         if out is None:
             return K
 

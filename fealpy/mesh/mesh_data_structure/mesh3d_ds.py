@@ -97,7 +97,7 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
 
     def cell_to_edge_sign(self, cell=None):
         """
-        TODO: check here
+        TODO: true 代表相同方向
         """
         if cell==None:
             cell = self.cell
@@ -106,8 +106,11 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
         cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
         localEdge = self.localEdge
         E = localEdge.shape[0]
-        for i, (j, k) in zip(range(E), localEdge):
-            cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
+        #for i, (j, k) in zip(range(E), localEdge):
+        #    cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
+        edge = self.edge
+        c2e = self.cell_to_edge()
+        cell2edgeSign = edge[c2e, 0]==cell[:, localEdge[:, 0]]
         return cell2edgeSign
 
     def cell_to_face_sign(self):

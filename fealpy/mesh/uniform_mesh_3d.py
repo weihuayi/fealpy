@@ -55,6 +55,7 @@ class UniformMesh3d(Mesh, Plotable):
 
         self.ftype = ftype
         self.itype = itype
+        self.type = "U3D"
 
         # Mesh dimensions
         self.nx = extent[1] - extent[0]
@@ -689,11 +690,40 @@ class UniformMesh3d(Mesh, Plotable):
 
     ## @ingroup FEMInterface
     def integrator(self, q, etype='cell'):
-        pass
+        """
+        @brief 获取不同维度网格实体上的积分公式
+        """
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        qf = GaussLegendreQuadrature(q)
+        if etype in {'cell', 3}:
+            return TensorProductQuadrature((qf, qf, qf))
+        elif etype in {'face', 2}:
+            return TensorProductQuadrature((qf, qf))
+        elif etype in {'edge', 1}:
+            return qf
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):
-        pass
+        """
+        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
+        """
+        node = self.entity('node')
+        if isinstance(bc, tuple):
+            assert len(bc) == 3
+            cell = self.entity('cell')[index]
+
+            bc0 = bc[0].reshape(-1, 2)  # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2)  # (NQ1, 2)
+            bc2 = bc[2].reshape(-1, 2)  # (NQ2, 2)
+            bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
+
+            p = np.einsum('...j, cjk->...ck', bc, node[cell[:]])  # (NQ, NC, 3)
+            if p.shape[0] == 1:  # 如果只有一个积分点
+                p = p.reshape(-1, 3)
+        else:
+            edge = self.entity('edge')[index]
+            p = np.einsum('...j, ejk->...ek', bc, node[edge])  # (NQ, NE, 3)
+        return p
 
     ## @ingroup FEMInterface
     def entity(self, etype):

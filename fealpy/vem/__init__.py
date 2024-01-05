@@ -17,3 +17,5 @@ from .scalar_source_integrator import NonConformingVEMScalarSourceIntegrator2d
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
 from .estimator import PoissonCVEMEstimator
+
+from .poisson_vem_adaptive_solver import PoissonACVEMSolver

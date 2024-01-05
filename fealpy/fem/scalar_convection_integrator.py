@@ -18,7 +18,11 @@ class ScalarConvectionIntegrator:
         
         GD = mesh.geo_dimension()
         if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
+            if mesh.meshtype == 'UniformMesh2d':
+                 NC = mesh.number_of_cells()
+                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
+            else:
+                cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 

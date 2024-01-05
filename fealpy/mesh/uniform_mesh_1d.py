@@ -66,7 +66,7 @@ class UniformMesh1d(Mesh, Plotable):
 
         self.itype = itype
         self.ftype = ftype
-
+        self.type = "U1D"
         # Data structure for finite element computation
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 

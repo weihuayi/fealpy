@@ -7,6 +7,7 @@ class ScalarDiffusionIntegrator:
     def __init__(self, c=None, q=None):
         self.coef = c
         self.q = q
+        self.type = "BL0"
 
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
@@ -20,7 +21,11 @@ class ScalarDiffusionIntegrator:
         GD = mesh.geo_dimension()
 
         if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
+            if mesh.meshtype == 'UniformMesh2d':
+                 NC = mesh.number_of_cells()
+                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
+            else:
+                cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 
@@ -75,7 +80,7 @@ class ScalarDiffusionIntegrator:
     def assembly_cell_matrix_fast(self, space, index=np.s_[:], cellmeasure=None):
         """
         """
-        mesh = space0.mesh 
+        mesh = space.mesh 
         assert mesh.meshtype in ['tri', 'tet']
 
 

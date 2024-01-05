@@ -332,6 +332,7 @@ class EdgeMeshDFEDof():
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell', 'edge', and 1.")
 
     def cell_to_dof(self):
+        NC = self.mesh.number_of_cells()
         p = self.p
         mesh = self.mesh
         cell = mesh.entity('cell')

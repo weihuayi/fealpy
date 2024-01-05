@@ -271,9 +271,8 @@ class HemkerDCRModelWithBoxHole2d:
 
 class PMLPDEModel2d:
     def __init__(self, 
-                 level_set:Callable[[NDArray], NDArray],
+                 levelset:Callable[[NDArray], NDArray],
                  domain:Sequence[float],
-                 qs:int, 
                  u_inc:str,
                  A:float,
                  k:float,
@@ -291,20 +290,19 @@ class PMLPDEModel2d:
         u_inc = sp.sympify(u_inc)
         
         A = sp.sympify(A)
-        k = sp.sympify(k)
+        K = sp.sympify(k)
        
         du_inc_dx = u_inc.diff(x)
         du_inc_dy = u_inc.diff(y)
   
-        s = A * du_inc_dx.diff(x) + A * du_inc_dy.diff(y) + k**2 * n * u_inc
+        s = A * du_inc_dx.diff(x) + A * du_inc_dy.diff(y) + K**2 * n * u_inc
         
         self.absortion_constant = absortion_constant 
         self.lx = lx 
         self.ly = ly
         self.k = k  
         self.d = d
-        self.qs = qs
-        self.level_set = level_set
+        self.levelset = levelset
         self.domain = domain
         self.refractive_index = refractive_index
         self._source = sp.lambdify((x, y, n), s, "numpy")
@@ -319,7 +317,7 @@ class PMLPDEModel2d:
         b1 = domain[1] - d_x
 
         x = p[..., 0]
-        sigma_x = np.zeros_like(x, dtype=np.float64)
+        sigma_x = np.zeros_like(x, dtype=np.complex128)
 
         idx_1 = (x > domain[0]) & (x < a1)
         idx_2 = (x > a1) & (x < b1)
@@ -341,7 +339,7 @@ class PMLPDEModel2d:
         b1 = domain[1] - d_x
 
         x = p[..., 0]
-        sigma_x_d_x = np.zeros_like(x, dtype=np.float64)
+        sigma_x_d_x = np.zeros_like(x, dtype=np.complex128)
 
         idx_1 = (x > domain[0]) & (x < a1)
         idx_2 = (x > a1) & (x < b1)
@@ -363,7 +361,7 @@ class PMLPDEModel2d:
         b2 = domain[3] - d_y
 
         y = p[..., 1]
-        sigma_y = np.zeros_like(y)
+        sigma_y = np.zeros_like(y, dtype=np.complex128)
 
         idx_1 = (y > domain[2]) & (y < a2)
         idx_2 = (y > a2) & (y < b2)
@@ -385,7 +383,7 @@ class PMLPDEModel2d:
         b2 = domain[3] - d_y
 
         y = p[..., 1]
-        sigma_y_d_y = np.zeros_like(y)
+        sigma_y_d_y = np.zeros_like(y, dtype=np.complex128)
 
         idx_1 = (y > domain[2]) & (y < a2)
         idx_2 = (y > a2) & (y < b2)
@@ -402,8 +400,8 @@ class PMLPDEModel2d:
         origin = p.shape[:-1]
         p = p.reshape(-1, 2)
         x = p[..., 0]
-        flag = self.level_set(p)< 0. # (NC, )
-        n = np.empty((x.shape[-1], ), dtype=np.float64)
+        flag = self.levelset(p)< 0. # (NC, )
+        n = np.empty((x.shape[-1], ), dtype=np.complex128)
         n[flag] = self.refractive_index[1]
         n[~flag] = self.refractive_index[0]
         n = n.reshape(origin)
@@ -429,7 +427,7 @@ class PMLPDEModel2d:
         GD = 2
         e_x = self.e_x(p)
         e_y = self.e_y(p)
-        val = np.zeros((self.qs, x.shape[-1], GD, GD), dtype=np.complex128)
+        val = np.zeros((p.shape[0], x.shape[-1], GD, GD), dtype=np.complex128)
         val[:, :, 0, 0] = e_y/e_x
         val[:, :, 1, 1] = e_x/e_y
         return val

@@ -43,6 +43,61 @@ class LagrangeTriangleMesh(Mesh):
         self.edgedata = {}
         self.celldata = {}
         self.meshdata = {}
+        
+        self.edge_bc_to_point = self.bc_to_point
+        self.cell_bc_to_point = self.bc_to_point
+        self.face_to_ipoint = self.edge_to_ipoint
+
+        self.shape_function = self._shape_function
+        self.cell_shape_function = self._shape_function
+        self.face_shape_function = self._shape_function
+        self.edge_shape_function = self._shape_function
+
+    def ref_cell_measure(self):
+        return 0.5
+
+    def ref_face_measure(self):
+        return 1.0
+ 
+    def integrator(self, q, etype='cell'):
+        """
+        @brief 获取不同维度网格实体上的积分公式
+        """
+        if etype in {'cell', 2}:
+            from ..quadrature import TriangleQuadrature
+            return TriangleQuadrature(q)
+        elif etype in {'edge', 'face', 1}:
+            from ..quadrature import GaussLegendreQuadrature
+            return GaussLegendreQuadrature(q)
+
+    def entity_measure(self, etype=2, index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        else:
+            raise ValueError(f"Invalid entity type '{etype}'.")
+
+        
+    def sphere_surface_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算单位球面三角形网格中每个面上的单位法线
+        """
+        assert self.geo_dimension() == 3
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+
+        nv = np.cross(v1, v2)
+        length = np.linalg.norm(nv, axis=-1, keepdims=True)
+
+        n = nv/length
+        return n
 
     def vtk_cell_type(self, etype='cell'):
         """

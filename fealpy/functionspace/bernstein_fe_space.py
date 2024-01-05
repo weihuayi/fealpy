@@ -44,6 +44,7 @@ class BernsteinFESpace:
         self.p = p
         assert spacetype in {'C', 'D'} 
         self.spacetype = spacetype
+        self.btype = "BS"   # 基函数类型 BS, BR, BC
         self.doforder = doforder
 
         mname = type(mesh).__name__
@@ -292,7 +293,7 @@ class BernsteinFESpace:
         return gmphi
 
     def grad_m_basis(self, bcs, m):
-        """!
+        """
         @brief m=3时导数排列顺序: [xxx, yxx, yxy, yyy]
                导数按顺序每个对应一个 A_d^m 的多重指标，对应 alpha 的导数有
                m!/alpha! 个.
@@ -344,6 +345,23 @@ class BernsteinFESpace:
             midxp_0 += beta[None, :]
         gmphi = np.einsum('iql, icn->qcln', B, symLambdaBeta, optimize=True)
         return gmphi
+
+    def lagrange_to_bernstein(self, p = 1, TD = 1):
+        '''
+        @brief 将 Bernstein 基函数转换为 lagrange 基函数。即 b_i = l_j A_{ji}
+            其中 b_i 为 Bernstein 基函数，l_i 为 lagrange 基函数.
+        '''
+        bcs = self.mesh.multi_index_matrix(p, TD)/p # p   次多重指标
+        return self.basis(bcs, p=p)[:, 0]
+        
+
+    def bernstein_to_lagrange(self, p=1, TD=1):
+        '''
+        @brief 将 Bernstein 基函数转换为 lagrange 基函数。即 l_i = b_j A_{ji}
+            其中 b_i 为 Bernstein 基函数，l_i 为 lagrange 基函数.
+        '''
+        return np.linalg.inv(self.lagrange_to_bernstein(p, TD))
+        
 
     @barycentric
     def value(self, 

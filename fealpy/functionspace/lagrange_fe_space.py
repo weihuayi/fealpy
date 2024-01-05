@@ -12,6 +12,7 @@ class LagrangeFESpace():
                 "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshCFEDof,
                 "QuadrangleMesh" : QuadrangleMeshCFEDof,
+                "UniformMesh2d" : QuadrangleMeshCFEDof,
                 "HexahedronMesh" : HexahedronMeshCFEDof,
                 "EdgeMesh": EdgeMeshCFEDof,
                 },
@@ -21,6 +22,7 @@ class LagrangeFESpace():
                 "HalfEdgeMesh2d": TriangleMeshCFEDof,
                 "TetrahedronMesh": TetrahedronMeshDFEDof,
                 "QuadrangleMesh" : QuadrangleMeshDFEDof,
+                "UniformMesh2d" : QuadrangleMeshDFEDof,
                 "HexahedronMesh" : HexahedronMeshDFEDof,
                 "EdgeMesh": EdgeMeshDFEDof,
                 }
@@ -30,6 +32,7 @@ class LagrangeFESpace():
             mesh,
             p: int=1,
             spacetype: str='C',
+            ctype: str = 'C', 
             doforder: str='vdims'):
         """
         @brief Initialize the Lagrange finite element space.
@@ -47,6 +50,10 @@ class LagrangeFESpace():
         assert spacetype in {'C', 'D'}
         self.spacetype = spacetype
         self.doforder = doforder
+
+        assert ctype in {'C', 'D'}
+        self.ctype = ctype # 空间连续性类型
+        self.btype = "LS"   # 基函数类型 LS, LR, LC
 
         mname = type(mesh).__name__
         self.dof = self.DOF[spacetype][mname](mesh, p)

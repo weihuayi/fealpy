@@ -69,8 +69,11 @@ class LinearForm:
         """
         space = self.space
         mesh = space.mesh
-
-        cellmeasure = mesh.entity_measure()
+        if mesh.meshtype == 'UniformMesh2d':
+            NC = mesh.number_of_cells()
+            cellmeasure = np.broadcast_to(mesh.entity_measure('cell'), (NC,))
+        else:
+            cellmeasure = mesh.entity_measure()
 
         NC = mesh.number_of_cells()
         gdof = space.number_of_global_dofs()
