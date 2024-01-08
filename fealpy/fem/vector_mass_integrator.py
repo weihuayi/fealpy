@@ -58,6 +58,7 @@ class VectorMassIntegrator:
         @brief 标量空间拼成的向量空间 
         """
         
+        mesh = space[0].mesh
         GD = space[0].geo_dimension()
         assert len(space) == GD
         
@@ -76,13 +77,11 @@ class VectorMassIntegrator:
         else:
             assert out.shape == (NC, GD*ldof, GD*ldof)
             VD = out
-        
         if space[0].doforder == 'sdofs':
             for i in range(GD):
                 VD[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D
         elif space[0].doforder == 'vdims':
             for i in range(GD):
                 VD[:, i::GD, i::GD] += D 
-
         if out is None:
             return VD

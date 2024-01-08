@@ -333,7 +333,8 @@ class FirstNedelecFiniteElementSpace3d:
             index = self.mesh.ds.boundary_face_index()
 
         face2edge = mesh.ds.face_to_edge()[index]
-        isBdEdge = self.mesh.ds.boundary_edge_flag()
+        isBdEdge = np.full(mesh.ds.edge.shape[0],False)
+        isBdEdge[face2edge] = True
 
         if 0: #节点型自由度
             locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)

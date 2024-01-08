@@ -36,6 +36,7 @@ class TriangleMesh(Mesh, Plotable):
         self.ds = TriangleMeshDataStructure(NN, cell)
 
         self.meshtype = 'tri'
+        self.type = "TRI"
 
         self.itype = cell.dtype
         self.ftype = node.dtype

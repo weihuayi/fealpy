@@ -1,5 +1,5 @@
 import numpy as np
-import numpy as np
+import copy
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -16,7 +16,7 @@ from ..mesh.adaptive_tools import mark
 
 from scipy.sparse.linalg import spsolve
 
-class AFEMPhaseFieldCrackHybridMixModel():
+class AFEMPhaseFieldCrackHybridMixModel2d():
     """
     @brief 线性自适应有限元相场方法混合模型求解裂纹传播问题
     """
@@ -35,12 +35,12 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
         NC = mesh.number_of_cells()
 
-        self.space = LagrangeFESpace(mesh, p=p)
+        self.space = LagrangeFESpace(mesh, p=p, doforder='vdims')
 
         self.uh = self.space.function(dim=self.GD) # 位移场
         self.d = self.space.function() # 相场
         self.H = np.zeros(NC) # 最大历史应变场
-        
+
         disp = model.is_boundary_disp()
 
         self.recovery = LinearRecoveryAlg()
@@ -49,7 +49,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
             disp, 
             dirichlet_phase=False, 
             refine='nvp', 
-            maxit=100,
+            maxit=50,
             theta=0.2):
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
@@ -59,7 +59,6 @@ class AFEMPhaseFieldCrackHybridMixModel():
         space = self.space
         model = self.model
         GD = self.GD
-        D0 = self.linear_tangent_matrix()
         k = 0
         while k < maxit:
             print('k:', k)
@@ -74,12 +73,17 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             # 求解位移
             vspace = (GD*(space, ))
-            ubform = BilinearForm(GD*(space, ))
-
-            D = self.dsigma_depsilon(d, D0)
-            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
-            ubform.add_domain_integrator(integrator)
+            ubform = BilinearForm(vspace)
+            
+#            D = self.dsigma_depsilon(d)
+#            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
+#            ubform.add_domain_integrator(integrator)
+            gd = self.energy_degradation_function(d)
+            ubform = BilinearForm(vspace)
+            ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
+                model.mu, c=gd))
             A0 = ubform.assembly()
+            print(A0)
             R0 = -A0@uh.flat[:]
             
             self.force = np.sum(-R0[isDDof.flat])
@@ -95,6 +99,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
             uh[:] += du
             
             # 更新参数
+            
             strain = self.strain(uh)
             phip, _ = self.strain_energy_density_decomposition(strain)
             H[:] = np.fmax(H, phip)
@@ -233,7 +238,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
             uh = uh.T
         for i in range(GD):
             for j in range(i, GD):
-                if i ==j:
+                if i == j:
                     s[:, i, i] = np.sum(uh[:, i][cell] * gphi[:, :, i], axis=-1)
                 else:
                     val = np.sum(uh[:, i][cell] * gphi[:, :, j], axis=-1)
@@ -243,6 +248,14 @@ class AFEMPhaseFieldCrackHybridMixModel():
                     s[:, j, i] = val
         return s
     
+    def energy_degradation_function(self, d):
+        eps = 1e-10
+        gd = np.zeros_like(d)
+        qf =  self.mesh.integrator(2, 'cell')
+        bc, ws = qf.get_quadrature_points_and_weights()
+        gd = (1 - d(bc)) ** 2 + eps
+        return gd
+
     def macaulay_operation(self, alpha):
         """
         @brief 麦考利运算
@@ -294,7 +307,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm
         return phi_p, phi_m
     
-    def dsigma_depsilon(self, phi, D0):
+    def dsigma_depsilon(self, phi):
         """
         @brief 计算应力关于应变的导数矩阵
         @param phi 单元重心处的相场函数值, (NC, )
@@ -302,9 +315,15 @@ class AFEMPhaseFieldCrackHybridMixModel():
         @return D 单元刚度系数矩阵
         """
         eps = 1e-10
-
-        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        lam = self.model.lam # 拉梅第一参数
+        mu = self.model.mu # 拉梅第二参数
+        
+        qf =  self.mesh.integrator(4, 'cell')
+        bc, ws = qf.get_quadrature_points_and_weights()
+#        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         c0 = (1 - phi(bc)) ** 2 + eps
+        D0 = np.array([[2*mu+lam, lam, 0], [lam, 2*mu+lam, 0], [0, 0, mu]],
+                dtype=np.float_)
         D = np.einsum('i, jk -> ijk', c0, D0)
         return D
     
