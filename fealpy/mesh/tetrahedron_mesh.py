@@ -54,6 +54,7 @@ class TetrahedronMesh(Mesh, Plotable):
         self.ds = TetrahedronMeshDataStructure(NN, cell)
 
         self.meshtype = 'tet'
+        self.type = 'TET'
         self.p = 1
 
         self.itype = cell.dtype

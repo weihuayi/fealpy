@@ -37,7 +37,7 @@ class CosCosData:
         y = p[..., 1]
         pi = np.pi
         val = 2*pi*pi*np.cos(pi*x)*np.cos(pi*y)
-        return val-self.solution(p)
+        return val#-self.solution(p)
 
     @cartesian
     def gradient(self, p):

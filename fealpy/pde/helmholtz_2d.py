@@ -66,9 +66,9 @@ class HelmholtzData2d():
         y = p[..., 1]
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
-        kappa = np.broadcast_to(np.complex(0.0, k), shape=x.shape)
+        kappa = np.broadcast_to(np.complex_(0.0 + 1j * k), shape=x.shape)
         val += kappa*self.solution(p) 
-        return val, kappa
+        return val
 
 
     def symbolic_com(self):

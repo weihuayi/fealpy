@@ -25,6 +25,7 @@ class IntervalMesh(Mesh, Plotable):
 
         self.ds = IntervalMeshDataStructure(len(node), cell)
         self.meshtype = 'interval'
+        self.meshtype = 'INT'
 
         self.nodedata = {}
         self.celldata = {}
