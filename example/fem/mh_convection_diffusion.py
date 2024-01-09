@@ -96,15 +96,13 @@ for i in range(k):
     grad_uh = space.grad_value(uh, bc) #(NC,2)
     u = np.zeros(uh.shape)
     u[:] = uh
+print('计算结果最小值',np.min(uh))
+print('计算结果最大值',np.max(uh))
 
 
 # 绘图
 fig = plt.figure()
-ax1 = Axes3D(fig)
-xx = ipoint[..., 0]
-yy = ipoint[..., 1]
-X = xx.reshape(nx+1, ny+1)
-Y = yy.reshape(ny+1, ny+1)
-Z = u.reshape(nx+1, ny+1)
-ax1.plot_surface(X,Y,Z,cmap='rainbow')
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.show_function(plt, uh, cmap='rainbow')
 plt.show()
