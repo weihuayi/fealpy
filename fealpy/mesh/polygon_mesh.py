@@ -893,6 +893,7 @@ class PolygonMesh(Mesh, Plotable):
             isbdedge = threshold(bc) 
         return isbdedge
 
+
 PolygonMesh.set_ploter('polygon2d')
 
 
