@@ -4,7 +4,7 @@ from scipy.sparse import spdiags, eye, tril, triu, bmat
 from scipy.spatial import KDTree
 from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh3dDataStructure
-
+from .mphtxt_file_reader import MPHTxtFileReader
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     OFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -997,6 +997,13 @@ class TetrahedronMesh(Mesh, Plotable):
         cell = np.array(mesh.elements, dtype=np.int_)
 
         return cls(node, cell)
+    @classmethod
+    def from_mphtxt(cls,filename):
+        reader = MPHTxtFileReader(filename)
+        reader.parse()
+        node = reader.mesh['vertices']
+        cell = reader.mesh['element']['tet']['Element']
+        return cls(node,cell)
 
     @classmethod
     def from_step(cls,filename):
