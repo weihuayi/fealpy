@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import diags
 from scipy.sparse import diags, lil_matrix,csr_matrix
-from scipy.sparse import vstack
+from scipy.sparse import vstack,hstack
 from scipy.sparse.linalg import spsolve
 from ..mesh import UniformMesh2d
 
@@ -20,8 +20,8 @@ class NSMacSolver():
 
     def du(self):
         mesh = self.umesh
-        n0 = mesh.ds.nx+1 #5
-        n1 = mesh.ds.ny+1 #4
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         cx = 1/(2*mesh.h[0])
         cy = 1/(2*mesh.h[1])
         NN = mesh.number_of_nodes()
@@ -51,8 +51,8 @@ class NSMacSolver():
 
     def dv(self):
         mesh = self.vmesh
-        n0 = mesh.ds.nx+1 #4
-        n1 = mesh.ds.ny+1 #5
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         cx = 1/(2*mesh.h[0])
         cy = 1/(2*mesh.h[1])
         NN = mesh.number_of_nodes()
@@ -75,14 +75,13 @@ class NSMacSolver():
     def Tuv(self):
         vmesh = self.vmesh
         umesh = self.umesh
-        vn0 = vmesh.ds.nx+1 #4
-        vn1 = vmesh.ds.ny+1 #5
-        un0 = umesh.ds.nx+1 #5
-        un1 = umesh.ds.ny+1 #4
+        vn0 = vmesh.ds.nx+1 
+        vn1 = vmesh.ds.ny+1 
+        un0 = umesh.ds.nx+1 
+        un1 = umesh.ds.ny+1 
         NN = umesh.number_of_nodes()
         vk = np.arange(NN).reshape(vn0,vn1)
         uk = np.arange(NN).reshape(un0,un1)
-        A = diags([0], [0], shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(1/4, (NN-2*un1,))
         Iu = uk[1:un0-1,:].flat
@@ -90,7 +89,7 @@ class NSMacSolver():
         Jv1 = vk[1:,1:].flat
         Jv2 = vk[1:,:vn1-1].flat
         Jv3 = vk[:vn0-1,:vn1-1].flat
-        A += csr_matrix((val, (Iu, Jv0)), shape=(NN, NN), dtype=self.ftype)
+        A = csr_matrix((val, (Iu, Jv0)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (Iu, Jv1)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (Iu, Jv2)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (Iu, Jv3)), shape=(NN, NN), dtype=self.ftype)
@@ -99,14 +98,13 @@ class NSMacSolver():
     def Tvu(self):
         vmesh = self.vmesh
         umesh = self.umesh
-        vn0 = vmesh.ds.nx+1 #4
-        vn1 = vmesh.ds.ny+1 #5
-        un0 = umesh.ds.nx+1 #5
-        un1 = umesh.ds.ny+1 #4
+        vn0 = vmesh.ds.nx+1 
+        vn1 = vmesh.ds.ny+1 
+        un0 = umesh.ds.nx+1 
+        un1 = umesh.ds.ny+1 
         NN = umesh.number_of_nodes()
         vk = np.arange(NN).reshape(vn0,vn1)
         uk = np.arange(NN).reshape(un0,un1)
-        A = diags([0], [0], shape=(NN, NN), format='csr')
         
         val = np.broadcast_to(1/4, (NN-2*vn0,))
         Iv = vk[:,1:vn1-1].flat
@@ -114,7 +112,7 @@ class NSMacSolver():
         Ju1 = uk[1:,1:].flat
         Ju2 = uk[1:,:un1-1].flat
         Ju3 = uk[:un0-1,:un1-1].flat
-        A += csr_matrix((val, (Iv, Ju0)), shape=(NN, NN), dtype=self.ftype)
+        A = csr_matrix((val, (Iv, Ju0)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (Iv, Ju1)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (Iv, Ju2)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (Iv, Ju3)), shape=(NN, NN), dtype=self.ftype)
@@ -122,8 +120,8 @@ class NSMacSolver():
         
     def laplace_u(self,c=None):
         mesh = self.umesh
-        n0 = mesh.ds.nx+1 #5
-        n1 = mesh.ds.ny+1 #4
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         cx = 1/(mesh.h[0])
         cy = 1/(mesh.h[1])
         NN = mesh.number_of_nodes()
@@ -155,8 +153,8 @@ class NSMacSolver():
 
     def laplace_v(self,c=None):
         mesh = self.vmesh
-        n0 = mesh.ds.nx+1 #4
-        n1 = mesh.ds.ny+1 #5
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         cx = 1/(mesh.h[0])
         cy = 1/(mesh.h[1])
         NN = mesh.number_of_nodes()
@@ -180,8 +178,8 @@ class NSMacSolver():
     
     def dp_u(self):
         mesh = self.pmesh
-        n0 = mesh.ds.nx+1 #4
-        n1 = mesh.ds.ny+1 #4
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         cx = 1/(mesh.h[0])
         cy = 1/(mesh.h[1])
         NN = mesh.number_of_nodes()
@@ -194,23 +192,22 @@ class NSMacSolver():
     def dp_v(self):
         vmesh = self.vmesh
         pmesh = self.pmesh
-        vn0 = vmesh.ds.nx+1 #4
-        vn1 = vmesh.ds.ny+1 #5
-        pn0 = pmesh.ds.nx+1 #4
-        pn1 = pmesh.ds.ny+1 #4
+        vn0 = vmesh.ds.nx+1 
+        vn1 = vmesh.ds.ny+1 
+        pn0 = pmesh.ds.nx+1 
+        pn1 = pmesh.ds.ny+1 
         NNv = vmesh.number_of_nodes()
         NNp = pmesh.number_of_nodes()
         cx = 1/(pmesh.h[0])
         cy = 1/(pmesh.h[1])
         vk = np.arange(NNv).reshape(vn0,vn1)
         pk = np.arange(NNp).reshape(pn0,pn1)
-        A = diags([0], [0], shape=(NNv, NNp), format='csr')
 
         val = np.broadcast_to(cy, (NNv-2*vn0,))
         Iv = vk[:,1:vn1-1].flat
         Jp0 = pk[:,:pn1-1].flat
         Jp1 = pk[:,1:].flat
-        A += csr_matrix((val, (Iv, Jp1)), shape=(NNv, NNp), dtype=self.ftype)
+        A = csr_matrix((val, (Iv, Jp1)), shape=(NNv, NNp), dtype=self.ftype)
         A += csr_matrix((-val, (Iv, Jp0)), shape=(NNv, NNp), dtype=self.ftype)
         return A
     
@@ -226,22 +223,31 @@ class NSMacSolver():
         pmesh = self.pmesh
         cx = 1 / (umesh.h[0])
         cy = 1 / (vmesh.h[1])
-        vn0 = vmesh.ds.nx+1 #4
-        vn1 = vmesh.ds.ny+1 #5
-        un0 = umesh.ds.nx+1 #5
-        un1 = umesh.ds.ny+1 #4
+        vn0 = vmesh.ds.nx+1 
+        vn1 = vmesh.ds.ny+1 
+        un0 = umesh.ds.nx+1 
+        un1 = umesh.ds.ny+1 
+        pn0 = pmesh.ds.nx+1 
+        pn1 = pmesh.ds.ny+1 
         NN = umesh.number_of_nodes()
         NNp = pmesh.number_of_nodes()
         vk = np.arange(NN).reshape(vn0,vn1)
         uk = np.arange(NN).reshape(un0,un1)
-        A = diags([cx,1], [0,un1], shape=(NNp, NN), format='csr')
-        B = diags([cy,1], [0,1], shape=(NNp, NN), format='csr')
+        pk = np.arange(NNp).reshape(pn0,pn1)
+        A = diags([-cx,cx], [0,un1], shape=(NNp, NN), format='csr')
+
+        val = np.broadcast_to(cy, (NN-vn0,))
+        I = pk.flat
+        J0m = vk[:,:-1].flat
+        J_0m = vk[:,1:].flat
+        B = csr_matrix((val, (I,J_0m)), shape=(NNp, NN), dtype=self.ftype)
+        B += csr_matrix((-val, (I,J0m)), shape=(NNp, NN), dtype=self.ftype)
         return A,B
 
     def laplace_phi(self):
         mesh = self.pmesh
-        n0 = mesh.ds.nx+1 #4
-        n1 = mesh.ds.ny+1 #4
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         cx = 1/(mesh.h[0])
         cy = 1/(mesh.h[1])
         NN = mesh.number_of_nodes()
@@ -270,11 +276,11 @@ class NSMacSolver():
     #找v网格边界点位置
     def vnodes_ub(self):
         mesh = self.mesh
-        n0 = mesh.ds.nx+1 #5
-        n1 = mesh.ds.ny+1 #5
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         vmesh = self.vmesh
-        vn0 = vmesh.ds.nx+1 #4
-        vn1 = vmesh.ds.ny+1 #5
+        vn0 = vmesh.ds.nx+1 
+        vn1 = vmesh.ds.ny+1 
         nodes = mesh.entity('node')
         vnodes = vmesh.entity('node')
         NN = mesh.number_of_nodes()
@@ -287,16 +293,18 @@ class NSMacSolver():
         I1 = kv[-1,1:vn1-1]
         vnodes[I0,[0]] = A0[:,0]
         vnodes[I1,[0]] = A1[:,0]
+        vnodes[kv[1:-1,:],0] = 0
+        vnodes[kv[1:-1,:],1] = 0
         return vnodes
 
     #找u网格边界点位置
     def unodes_ub(self):
         mesh = self.mesh
-        n0 = mesh.ds.nx+1 #5
-        n1 = mesh.ds.ny+1 #5
+        n0 = mesh.ds.nx+1 
+        n1 = mesh.ds.ny+1 
         umesh = self.umesh
-        un0 = umesh.ds.nx+1 #5
-        un1 = umesh.ds.ny+1 #4
+        un0 = umesh.ds.nx+1 
+        un1 = umesh.ds.ny+1 
         nodes = mesh.entity('node')
         unodes = umesh.entity('node')
         NN = mesh.number_of_nodes()
@@ -311,4 +319,29 @@ class NSMacSolver():
         I1 = ku[1:un0-1,-1]
         unodes[I0,1] = A0[:,1]
         unodes[I1,1] = A1[:,1]
+        unodes[ku[:,1:-1],0] = 0
+        unodes[ku[:,1:-1],1] = 0
         return unodes
+
+    def update_x(self,p,mesh):
+        Nrow = mesh.node.shape[1] 
+        Ncol = mesh.node.shape[0] 
+        N = Nrow*Ncol 
+        L = np.zeros((Nrow,))
+        phi_x = np.concatenate((p,L))
+        index = np.arange(0,N)
+        phi_x[index[:Nrow]] = 0
+        return phi_x
+
+    def update_y(self,p,mesh):
+        Nrow = mesh.node.shape[1] 
+        Ncol = mesh.node.shape[0] 
+        N = Nrow*Ncol 
+        phi_y = np.zeros((N,))
+        index0 = np.arange(N)
+        index0 = np.where(index0 % Nrow != Nrow-1)
+        phi_y[index0] = p
+        index1 = np.arange(N)
+        index1 = np.where(index1 % Nrow == 0)
+        phi_y[index1] = 0
+        return phi_y
