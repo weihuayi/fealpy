@@ -14,7 +14,7 @@ from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, lgmres
 
 class AFEMPhaseFieldCrackHybridMixModel2d():
     """
@@ -91,8 +91,12 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
            
             # TODO：更快的求解方法
-            du.flat[:] = spsolve(A0, R0)
-            uh[:] += du
+#            du.flat[:] = spsolve(A0, R0)
+#            uh[:] += du
+            du, info = lgmres(A0, R0)
+            print('duinfo:', info)
+            uh[:].flat += du
+            
             
             # 更新参数
             strain = self.strain(uh)
@@ -117,7 +121,11 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
                 A1, R1 = dbc.apply(A1, R1)
 
             # TODO：快速求解程序
-            d[:] += spsolve(A1, R1)
+#            d[:] += spsolve(A1, R1)
+            dd, info = lgmres(A1, R1)
+            d[:] += dd
+            print('dinfo:', info)
+        
         
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)

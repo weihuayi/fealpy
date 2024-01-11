@@ -99,7 +99,8 @@ class AFEMPhaseFieldCrackHybridMixModel():
             start1 = time.time() 
             # TODO：更快的求解方法
 #            du.flat[:] = spsolve(A0, R0)
-            du = self.solve_system(A0, R0)
+            du, info = lgmres(A0, R0)
+            print('duinfo:', info)
             uh[:].flat += du
             
             end1 = time.time()
@@ -133,7 +134,9 @@ class AFEMPhaseFieldCrackHybridMixModel():
             # TODO：快速求解程序
 #            d[:] += spsolve(A1, R1)
             start3 = time.time()
-            d[:] += self.solve_system(A1, R1)
+            dd, info = lgmres(A1, R1)
+            d[:] += dd
+            print('dinfo:', info)
         
             end3 = time.time()
             print('solve:', end3-start3)
@@ -174,11 +177,6 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 break
             k += 1
     
-    def solve_system(self, A, F, tol=1e-8):
-        counter = IterationCounter(disp = False)
-        result, info = lgmres(A, F, tol = tol, callback = counter)
-        return result
-
     def bisect_refine(self, isMarkedCell):
         """
         @brief 二分法加密策略
@@ -406,15 +404,4 @@ class AFEMPhaseFieldCrackHybridMixModel():
         val = c0*psi_s
         stored = np.dot(val, cm)
         return stored
-
-
-class IterationCounter(object):
-    def __init__(self, disp=True):
-        self._disp = disp
-        self.niter = 0
-
-    def __call__(self, rk=None):
-        self.niter += 1
-        if self._disp:
-            print('iter %3i' % (self.niter))
 
