@@ -23,6 +23,7 @@ class QuadrangleMesh(Mesh, Plotable):
         self.ds = QuadrangleMeshDataStructure(NN, cell)
 
         self.meshtype = 'quad'
+        self.type = 'QUAD'
         self.p = 1 # 最低次的四边形
 
         self.itype = cell.dtype

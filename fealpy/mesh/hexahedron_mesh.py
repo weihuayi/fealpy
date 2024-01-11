@@ -36,6 +36,7 @@ class HexahedronMesh(Mesh, Plotable):
         self.ds = HexahedronMeshDataStructure(NN, cell)
 
         self.meshtype = 'hex'
+        self.meshtype = 'HEX'
 
         self.itype = cell.dtype
         self.ftype = node.dtype

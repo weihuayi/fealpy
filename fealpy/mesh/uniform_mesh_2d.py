@@ -75,6 +75,7 @@ class UniformMesh2d(Mesh, Plotable):
         self.ftype: type = ftype
 
         self.meshtype = 'UniformMesh2d'
+        self.type = 'U2d'
 
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
