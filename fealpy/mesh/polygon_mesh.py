@@ -1034,3 +1034,24 @@ class PolygonMeshDataStructure(MeshDataStructure):
 
     face_to_cell = edge_to_cell
 
+    def cell_to_edge_sign(self, return_sparse=True):
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
+        edge2cell = self.edge2cell
+        cellLocation = self.cellLocation
+        if return_sparse:
+            val = np.ones((NE,), dtype=np.bool_)
+            cell2edgeSign = csr_matrix((val, (edge2cell[:,0], range(NE))), shape=(NC,NE), dtype=np.bool_)
+            return cell2edgeSign
+        else:
+            cell2edgeSign = np.zeros(self._cell.shape[0], dtype=self.itype)
+            print("edge2cell:\n", edge2cell)
+            isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+            print("test1:\n", cellLocation)
+            print("test2:\n", cellLocation[edge2cell[:, 0]])
+            print("test3:\n", cellLocation[edge2cell[:, 0]] + edge2cell[:, 2])
+            cell2edgeSign[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]] = 1
+            print("cell2edgeSign:\n", cell2edgeSign)
+            cell2edgeSign[cellLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]] = -1
+
+            return cell2edgeSign
