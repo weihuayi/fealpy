@@ -20,7 +20,7 @@ def sincos(p):
 ns = 5
 mesh = QuadrangleMesh.from_box(box=[0,1,0,1],nx=ns,ny=ns)
 DI = ScalarDiffusionIntegrator(mesh)
-DM,Db = DI.cell_center_matrix()
+#DM,Db = DI.cell_center_matrix()
 
 b = mesh.integral(sincos, celltype=True)
 bcs = (np.array([1/2,1/2]),np.array([1/2,1/2]))
@@ -31,7 +31,6 @@ print(edgemeasure)
 bpoint = mesh.bc_to_point([1/2,1/2])
 edge = mesh.ds.boundary_edge_flag()
 print(cpoint)
-
 
 fig = plt.figure()
 axes  = fig.gca()

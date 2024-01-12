@@ -92,7 +92,7 @@ class NSFEMSolver:
             print("还没开发")
         return result
 
-    def netwon_A(self, u0)
+    def netwon_A(self, u0):
         M = self.M
         AP = self.AP
         rho = self.rho
