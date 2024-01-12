@@ -16,8 +16,8 @@ from fealpy.ml.sampler import ISampler
 
 # 超参数
 num_of_point_pde = 50
-lr = 0.01
-iteration = 120
+lr = 0.005
+iteration = 80
 wavenum = 1.
 k = torch.tensor(wavenum, dtype=torch.float64)
 NN = 64
@@ -156,6 +156,7 @@ def pde_imag(p: torch.Tensor) -> torch.Tensor:
 # 训练过程
 start_time = time.time()
 mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx=64, ny=64)
+Loss = []
 Error_real = []
 Error_imag = []
 
@@ -178,12 +179,13 @@ for epoch in range(1, iteration+1):
     optim_real.step()
     optim_imag.step()
 
-    if epoch % 10 == 0:
+    if epoch % 1 == 0:
         error_real = s_real.estimate_error(solution_numpy_real, mesh, coordtype='c')
         error_imag = s_imag.estimate_error(solution_numpy_imag, mesh, coordtype='c')
 
         Error_real.append(error_real)
         Error_imag.append(error_imag)
+        Loss.append(loss.detach().numpy())
 
         print(f"Epoch: {epoch}, Loss: {loss}")
         print(f"Error_real:{error_real}, Error_imag:{error_imag}")
@@ -195,10 +197,20 @@ print("训练时间为：", training_time, "秒")
 
 
 # 可视化
-y_real = range(1, 10*len(Error_real) + 1, 10)
-y_imag = range(1, 10*len(Error_imag) + 1, 10)
-plt.plot(y_real, Error_real)
-plt.plot(y_imag, Error_imag)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+y_real = range(1, 1*len(Error_real) +1,1)
+y_imag = range(1, 1*len(Error_imag) +1,1)
+ax1.plot(y_real, Error_real, label='Real Part')
+ax1.plot(y_imag, Error_imag, label='Imaginary Part')
+ax1.set_ylim(0, 0.005)
+ax1.legend()
+
+y_loss = range(1, 1 * len(Loss) + 1, 1)
+ax2.plot(y_loss, Loss, label='Loss')
+ax2.set_ylim(0, 1e-3)
+ax2.legend() 
+
+plt.tight_layout()
 
 bc_ = np.array([1/3, 1/3, 1/3], dtype=np.float64)
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)

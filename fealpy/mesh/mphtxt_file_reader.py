@@ -1,5 +1,4 @@
 import numpy as np
-import ipdb
 
 """
 http://victorsndvg.github.io/FEconv/formats/mphtxt.xhtml
@@ -255,8 +254,4 @@ class MPHTxtFileReader:
         print("Element of TetMesh:\n",self.mesh['element']['tet']['Element'])
         print("Geometry Information:\n",self.geometry)
 
-if __name__ == "__main__":
-    reader = MPHTxtFileReader("/home/why/Downloads/E_gnd_L2_msh.mphtxt")
-    reader.parse()
-    reader.print()
 
