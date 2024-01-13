@@ -56,3 +56,17 @@ def symmetry_span_array(arr, alpha):
             break
     return ret
 
+def symmetry_index(d, r):
+    """
+    @brief d 维 r 阶张量的对称部分，当张量拉长以后的索引
+    """
+    mapp = lambda x: np.array([int(ss) for ss in '0'*(r-len(np.base_repr(x,
+        d)))+np.base_repr(x, d) ], dtype=np.int_)
+    idx = np.array(list(map(mapp, np.arange(d**r))))
+    flag = np.ones(len(idx), dtype=np.bool_)
+    for i in range(r-1):
+        flag = flag & (idx[:, i]>=idx[:, i+1])
+    return np.where(flag)[0]
+
+
+
