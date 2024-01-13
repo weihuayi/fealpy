@@ -4,7 +4,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 # 模型数据
-from fealpy.pde.poisson_2d import CosCosData
+from fealpy.pde.poisson_2d import SinSinData 
 
 # 网格
 from fealpy.mesh import PolygonMesh
@@ -28,7 +28,7 @@ from fealpy.vem import LinearForm
 
 # 边界条件
 from fealpy.boundarycondition import DirichletBC 
-from fealpy.tools.show import showmultirate
+from fealpy.tools.show import showmultirate, show_error_table
 
 
 ## 参数解析
@@ -60,12 +60,11 @@ nx = args.nx
 ny = args.ny
 maxit = args.maxit
 
-pde = CosCosData()
-domain = pde.domain()
+pde = SinSinData()
+domain = [0, 1, 0, 1]
 
-
-errorType = ['$|| u - \Pi u_h||_{\Omega,0}$',
-             '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$'
+errorType = ['$\Vert u - \Pi u_h\Vert_{\Omega,0}$',
+             '$\Vert\\nabla u - \Pi \\nabla u_h\Vert_{\Omega, 0}$'
              ]
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.float64)
@@ -75,7 +74,7 @@ for i in range(maxit):
 
     space = ConformingScalarVESpace2d(mesh, p=degree)
     
-    NDof[i] = space.number_of_global_dofs()
+    NDof[i] = 1/nx
   
     #组装刚度矩阵 A 
     m = ScaledMonomialSpaceMassIntegrator2d()
@@ -117,4 +116,5 @@ for i in range(maxit):
     ny *= 2
     
 showmultirate(plt, maxit-2, NDof, errorMatrix, errorType, propsize=20, lw=2, ms=4)
+show_error_table(NDof, errorType, errorMatrix)
 plt.show()
