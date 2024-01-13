@@ -43,9 +43,6 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
         c2f_glo = face[c2f.reshape(-1)]
         c2f_loc = cell[:, self.localFace].reshape(-1, 3)
 
-        AA = c2f_glo.copy()
-        BB = c2f_loc.copy()
-
         c2f_glo = np.argsort(c2f_glo, axis=1)
         c2f_glo = np.argsort(c2f_glo, axis=1)
         c2f_loc = np.argsort(c2f_loc, axis=1)
