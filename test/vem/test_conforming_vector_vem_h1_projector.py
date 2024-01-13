@@ -26,7 +26,7 @@ def test_assembly_cell_righthand_side(p):
     m = ScaledMonomialSpaceMassIntegrator2d()
     M = m.assembly_cell_matrix(space.smspace) #(n_{k-1}, n_{k-1})
     projector = ConformingVectorVEMH1Projector2d(M)
-    #ipdb.set_trace()
+    ipdb.set_trace()
     B = projector.assembly_cell_right_hand_side(space) 
 def test_assembly_cell_left_hand_side(p):
     node = np.array([
@@ -83,6 +83,6 @@ def test_assembly_cell_matrix(p):
 
 
 if __name__ == "__main__":
-    #test_assembly_cell_righthand_side(3)
+    test_assembly_cell_righthand_side(4)
     #test_assembly_cell_left_hand_side(3)
     test_assembly_cell_matrix(1)

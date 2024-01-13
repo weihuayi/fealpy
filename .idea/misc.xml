@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="ProjectRootManager" version="2" project-jdk-name="ck_conda (2)" project-jdk-type="Python SDK" />
+  <component name="Black">
+    <option name="sdkName" value="fealpy_env" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="fealpy_env" project-jdk-type="Python SDK" />
 </project>

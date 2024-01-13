@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from matplotlib import pyplot as plt
+from torch.optim.lr_scheduler import StepLR
 
 from fealpy.mesh import TriangleMesh
 from fealpy.ml.grad import gradient
@@ -14,13 +15,13 @@ from fealpy.ml.sampler import BoxBoundarySampler, ISampler
 
 
 # 超参数
-num_of_point_pde = 100
-num_of_point_bc = 50
+num_of_point_pde = 200
+num_of_point_bc = 100
 lr = 0.01
-iteration = 150
+iteration = 350
 wavenum = 1.
 k = torch.tensor(wavenum)
-NN = 64
+NN = 32
 
 # 定义网络层结构
 net_1 = nn.Sequential(
@@ -50,6 +51,8 @@ s_2= Solution(net_2)
 optim_1 = Adam(s_1.parameters(), lr=lr, betas=(0.9, 0.99))
 optim_2 = Adam(s_2.parameters(), lr=lr, betas=(0.9, 0.99))
 mse_cost_func = nn.MSELoss(reduction='mean')
+scheduler_1 = StepLR(optim_1, step_size=50, gamma=0.9)
+scheduler_2 = StepLR(optim_2, step_size=50, gamma=0.9)
 
 # 采样器
 samplerpde_1 = ISampler([[-0.5, 0.5], [-0.5, 0.5]], requires_grad=True)
@@ -147,6 +150,7 @@ mesh = TriangleMesh.from_box([-0.5 ,0.5, -0.5, 0.5], nx=64, ny=64)
 
 # 训练过程
 start_time = time.time()
+Loss = []
 Error_real = []
 Error_imag = []
 
@@ -175,12 +179,13 @@ for epoch in range(iteration+1):
     mse_bc_real = mse_cost_func(outbc_real, torch.zeros_like(outbc_real))
     mse_bc_imag = mse_cost_func(outbc_imag, torch.zeros_like(outbc_imag))
 
-    loss = 0.5*(0.05 * mse_pde_real + 0.95 * mse_bc_real) +\
-            0.5*(0.05* mse_pde_imag + 0.95 * mse_bc_imag)
-
+    loss = 0.5*(0.5 * mse_pde_real + 0.5 * mse_bc_real) +\
+            0.5*(0.5* mse_pde_imag + 0.5 * mse_bc_imag)
     loss.backward(retain_graph=True)
     optim_1.step()
+    scheduler_1.step()
     optim_2.step()
+    scheduler_2.step()
 
     if epoch % 10 == 0:
 
@@ -189,6 +194,7 @@ for epoch in range(iteration+1):
 
         Error_real.append(error_real)
         Error_imag.append(error_imag)
+        Loss.append(loss.detach().numpy())
 
         print(f"Epoch: {epoch}, Loss: {loss}")
         print(f"Error_real:{error_real}, Error_imag:{error_imag}")
@@ -199,10 +205,20 @@ end_time = time.time()     # 记录结束时间
 training_time = end_time - start_time   # 计算训练时间
 print("训练时间为：", training_time, "秒")
 
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 y_real = range(1, 10*len(Error_real) +1,10)
 y_imag = range(1, 10*len(Error_imag) +1,10)
-plt.plot(y_real, Error_real)
-plt.plot(y_imag, Error_imag)
+ax1.plot(y_real, Error_real, label='Real Part')
+ax1.plot(y_imag, Error_imag, label='Imaginary Part')
+ax1.set_ylim(0, 0.2)  # 设置第一个子图的 y 轴范围
+ax1.legend()  # 添加图例
+
+y_loss = range(1, 10 * len(Loss) + 1, 10)
+ax2.plot(y_loss, Loss, label='Loss')
+ax2.set_ylim(0, 5*1e-4)  # 设置第二个子图的 y 轴范围
+ax2.legend()  # 添加图例
+
+plt.tight_layout()
 
 bc_ = np.array([1/3, 1/3, 1/3], dtype=np.float64)
 ps = torch.tensor(mesh.bc_to_point(bc_), dtype=torch.float64)

@@ -8,6 +8,7 @@ from fealpy.pde.poisson_2d import CosCosData
 
 # 网格
 from fealpy.mesh import PolygonMesh
+from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 
 # 协调有限元空间
 from fealpy.functionspace import ConformingScalarVESpace2d
@@ -68,10 +69,11 @@ errorType = ['$|| u - \Pi u_h||_{\Omega,0}$',
              '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$'
              ]
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
     mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
+    mesh = HalfEdgeMesh2d.from_mesh(mesh)
 
     space = ConformingScalarVESpace2d(mesh, p=degree)
     
