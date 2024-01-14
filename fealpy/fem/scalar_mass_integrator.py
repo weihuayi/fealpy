@@ -106,12 +106,14 @@ class ScalarMassIntegrator:
         else:
             M = out
         
-        print("cellmeasure:\n", cellmeasure)
-        print("data[dataindex]\n", data[dataindex])
+        print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
+        print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
         if coef is None:
-            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+        elif coef is 
         else:
-            raise ValueError("coef is not correct!")
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+            M *= coef
 
         if out is None:
             return M
