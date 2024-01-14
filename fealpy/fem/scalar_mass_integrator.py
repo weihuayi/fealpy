@@ -90,6 +90,7 @@ class ScalarMassIntegrator:
         Itype = self.type 
         dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
                 str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
+        print("dataindex:\n", dataindex)
 
         if cellmeasure is None:
             if mesh.meshtype == 'UniformMesh2d':
@@ -105,10 +106,14 @@ class ScalarMassIntegrator:
         else:
             M = out
         
+        print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
+        print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
         if coef is None:
-            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+        elif coef is 
         else:
-            raise ValueError("coef is not correct!")
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+            M *= coef
 
         if out is None:
             return M

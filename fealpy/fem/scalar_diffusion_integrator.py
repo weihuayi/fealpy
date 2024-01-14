@@ -1,5 +1,7 @@
 import numpy as np
 
+from fealpy.fem.precomp_data import data
+
 class ScalarDiffusionIntegrator:
     """
     @note (c \\grad u, \\grad v)
@@ -77,11 +79,55 @@ class ScalarDiffusionIntegrator:
             return D
 
 
-    def assembly_cell_matrix_fast(self, space, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix_fast(self, trialspace, testspace=None, index=np.s_[:],
+            cellmeasure=None, out=None):
         """
+        @brief 基于无数值积分的组装方式
         """
-        mesh = space.mesh 
-        assert mesh.meshtype in ['tri', 'tet']
+        #mesh = space.mesh 
+        #assert mesh.meshtype in ['tri', 'tet']
+        coef = self.coef
+        mesh = trialspace.mesh 
+        meshtype = mesh.type
+
+        TAFtype = trialspace.btype
+        TAFdegree = trialspace.p
+        TAFldof = trialspace.number_of_local_dofs()  
+        TSFtype = TAFtype
+        TSFdegree = TAFdegree
+        TSFldof = TAFldof
+        if testspace is not None:
+            TSFtype = testspace.btype
+            TSFdegree = testspace.p 
+            TSFldof = testspace.number_of_local_dofs()
+        Itype = self.type 
+        dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
+                str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
+        print("dataindex:\n", dataindex)
+
+        if cellmeasure is None:
+            if mesh.meshtype == 'UniformMesh2d':
+                 NC = mesh.number_of_cells()
+                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
+            else:
+                 cellmeasure = mesh.entity_measure('cell', index=index)
+        
+        NC = len(cellmeasure)
+
+        if out is None:
+            M = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
+        else:
+            M = out
+        
+        print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
+        print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
+        if coef is None:
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+        else:
+            raise ValueError("coef is not correct!")
+
+        if out is None:
+            return M
 
 
     def assembly_cell_matrix_ref(self, space, index=np.s_[:], cellmeasure=None):
