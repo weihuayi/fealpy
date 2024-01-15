@@ -14,7 +14,7 @@ from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
-from scipy.sparse.linalg import spsolve, lgmres
+from scipy.sparse.linalg import spsolve, lgmres, cg
 
 class AFEMPhaseFieldCrackHybridMixModel2d():
     """
@@ -40,6 +40,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         self.uh = self.space.function(dim=self.GD) # 位移场
         self.d = self.space.function() # 相场
         self.H = np.zeros(NC) # 最大历史应变场
+        self.D0 = self.linear_tangent_matrix()
         
         disp = model.is_boundary_disp()
 
@@ -59,7 +60,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         space = self.space
         model = self.model
         GD = self.GD
-        D0 = self.linear_tangent_matrix()
+        D0 = self.D0
         k = 0
         while k < maxit:
             print('k:', k)
@@ -70,16 +71,24 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             node = mesh.entity('node')
             isDDof = model.is_disp_boundary(node)
             uh[isDDof] = disp
-            du = space.function(dim=GD)
 
+            du = np.zeros_like(uh)
+            dd = np.zeros_like(d)
             # 求解位移
             vspace = (GD*(space, ))
             ubform = BilinearForm(GD*(space, ))
-
-            D = self.dsigma_depsilon(d, D0)
-            integrator = ProvidesSymmetricTangentOperatorIntegrator(D, q=4)
-            ubform.add_domain_integrator(integrator)
+            
+            gd = self.energy_degradation_function(d)
+            ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
+                model.mu, c=gd))
             A0 = ubform.assembly()
+
+#            D = self.dsigma_depsilon(d, D0)
+#            integrator = ProvidesSymmetricTangentOperatorIntegrator(D)
+#            ubform.add_domain_integrator(integrator)
+#            A0 = ubform.assembly()
+#            print('aaa:', np.max(np.abs(A-A0)))
+#            print('aaaaaaaaa:', A-A0)
             R0 = -A0@uh.flat[:]
             
             self.force = np.sum(-R0[isDDof.flat])
@@ -93,9 +102,8 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             # TODO：更快的求解方法
 #            du.flat[:] = spsolve(A0, R0)
 #            uh[:] += du
-            du, info = lgmres(A0, R0)
-            print('duinfo:', info)
-            uh[:].flat += du
+            du.flat[:],_ = lgmres(A0, R0, atol=1e-15)
+            uh[:] += du
             
             
             # 更新参数
@@ -121,11 +129,9 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
                 A1, R1 = dbc.apply(A1, R1)
 
             # TODO：快速求解程序
-#            d[:] += spsolve(A1, R1)
-            dd, info = lgmres(A1, R1)
+#            dd[:] += spsolve(A1, R1)
+            dd, info = lgmres(A1, R1, atol=1e-15)
             d[:] += dd
-            print('dinfo:', info)
-        
         
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
@@ -224,6 +230,15 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         
         self.mesh.interpolation_cell_data(mesho, datakey=['H'])
         print('interpolation cell data:', NC)      
+    
+    def energy_degradation_function(self, d):
+        eps = 1e-10
+        gd = np.zeros_like(d)
+        qf =  self.mesh.integrator(1, 'cell')
+        bc, ws = qf.get_quadrature_points_and_weights()
+        gd = (1 - d(bc[-1])) ** 2 + eps
+        return gd
+
 
     def strain(self, uh):
         """
@@ -310,10 +325,19 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         @return D 单元刚度系数矩阵
         """
         eps = 1e-10
+        lam = self.model.lam # 拉梅第一参数
+        mu = self.model.mu # 拉梅第二参数
+        
+        qf =  self.mesh.integrator(1, 'cell')
+        bc, ws = qf.get_quadrature_points_and_weights()
 
-        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
-        c0 = (1 - phi(bc)) ** 2 + eps
+#        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        c0 = (1 - phi(bc[-1])) ** 2 + eps
         D = np.einsum('i, jk -> ijk', c0, D0)
+#        c0 = (1 - phi(bc)) ** 2 + eps
+#        D0 = np.array([[2*mu+lam, lam, 0], [lam, 2*mu+lam, 0], [0, 0, mu]],
+#                dtype=np.float_)
+#        D = np.einsum('i, jk -> ijk', c0, D0)
         return D
     
     def linear_tangent_matrix(self):
@@ -352,8 +376,34 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         val[np.abs(x) < 1e-13] = 0.5
         val[x < -1e-13] = 0
         return val
-
+    
     def get_dissipated_energy(self, d):
+        model = self.model
+        mesh = self.mesh
+        qf =  mesh.integrator(1, 'cell')
+        bc, ws = qf.get_quadrature_points_and_weights()
+        cm = mesh.entity_measure('cell')
+        g = d.grad_value(bc[-1])
+
+        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=-1))
+        dissipated = np.dot(val, cm)
+        return dissipated
+
+    
+    def get_stored_energy(self, psi_s, d):
+        eps = 1e-10
+        mesh = self.mesh
+
+        qf =  mesh.integrator(1, 'cell')
+        bc, ws = qf.get_quadrature_points_and_weights()
+        c0 = (1 - d(bc[-1])) ** 2 + eps
+        cm = mesh.entity_measure('cell')
+        val = c0*psi_s
+        stored = np.dot(val, cm)
+        return stored
+
+
+    def get_dissipated_energy_2d(self, d):
         model = self.model
         bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         mesh = self.mesh
@@ -365,7 +415,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
         return dissipated
 
     
-    def get_stored_energy(self, psi_s, d):
+    def get_stored_energy_2d(self, psi_s, d):
         eps = 1e-10
 
         bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)

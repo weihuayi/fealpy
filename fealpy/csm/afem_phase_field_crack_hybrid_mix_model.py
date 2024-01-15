@@ -15,7 +15,7 @@ from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
-from scipy.sparse.linalg import spsolve, lgmres
+from scipy.sparse.linalg import spsolve, lgmres, cg
 
 class AFEMPhaseFieldCrackHybridMixModel():
     """
@@ -99,9 +99,8 @@ class AFEMPhaseFieldCrackHybridMixModel():
             start1 = time.time() 
             # TODO：更快的求解方法
 #            du.flat[:] = spsolve(A0, R0)
-            du, info = lgmres(A0, R0)
-            print('duinfo:', info)
-            uh[:].flat += du
+            du.flat[:],_ = lgmres(A0, R0, atol=1e-15)
+            uh[:] += du
             
             end1 = time.time()
             print('solve:', end1-start1)
@@ -134,9 +133,8 @@ class AFEMPhaseFieldCrackHybridMixModel():
             # TODO：快速求解程序
 #            d[:] += spsolve(A1, R1)
             start3 = time.time()
-            dd, info = lgmres(A1, R1)
+            dd,_ = lgmres(A1, R1, atol=1e-15)
             d[:] += dd
-            print('dinfo:', info)
         
             end3 = time.time()
             print('solve:', end3-start3)
