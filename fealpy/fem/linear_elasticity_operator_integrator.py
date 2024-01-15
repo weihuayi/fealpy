@@ -35,6 +35,7 @@ class LinearElasticityOperatorIntegrator:
         ...
         lam = self.lam
         mu = self.mu
+        c = self.c
         mesh = space[0].mesh
         ldof = space[0].number_of_local_dofs()
         p = space[0].p # 空间的多项式阶数
@@ -98,9 +99,9 @@ class LinearElasticityOperatorIntegrator:
 
                         K[:, j::GD, i::GD] += lam*A[imap[(i, j)]].transpose(0, 2, 1)
                         K[:, j::GD, i::GD] += mu*A[imap[(i, j)]]
-        if self.c is not None:
-            if len(self.c) == NC:
-                K = np.einsum('i, ijk -> ijk', self.c, K)
+        if c is not None:
+            if len(c) == NC:
+                K = np.einsum('i, ijk -> ijk', c, K)
         if out is None:
             return K
 
