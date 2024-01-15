@@ -91,7 +91,7 @@ class BoxDomainData():
         return mesh 
 
     def triangle_mesh(self):
-        mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=4, ny=4)
+        mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=2, ny=2)
 
         return mesh
 
