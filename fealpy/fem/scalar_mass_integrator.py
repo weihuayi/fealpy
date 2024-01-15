@@ -42,7 +42,7 @@ class ScalarMassIntegrator:
 
         phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof)
         if coef is None:
-            M += np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+            M += np.einsum('q, qci, qcj, c -> cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
@@ -58,9 +58,9 @@ class ScalarMassIntegrator:
                 M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ):
-                    M += np.einsum('q, c, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                    M += np.einsum('q, c, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
                 else:
-                    M += np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                    M += np.einsum('q, qc, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
 
@@ -121,7 +121,7 @@ class ScalarMassIntegrator:
                 if hasattr(coef, 'coordtype'):
                     if coef.coordtype == 'barycentric':
                         coef = coef(bcs, index=index)
-                    else:
+                    elif coef.coordtype == 'cartesian':
                         ps = mesh.bc_to_point(bcs, index=index)
                         coef = coef(ps)
                 else:
@@ -137,27 +137,6 @@ class ScalarMassIntegrator:
                     M += np.einsum('qc, c, cij -> cij', coef, cellmeasure, data[dataindex], optimize=True)
             else:
                 raise ValueError("coef is not correct!")
-        #if coef is None:
-        #    M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
-        #elif np.isscalar(coef):
-        #    M += coef * np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
-        #elif isinstance(coef, np.ndarray):
-        #    if coef.shape == (NC, ):
-        #        M += np.einsum('c, c, cij -> cij', coef, cellmeasure, data[dataindex], optimize=True)
-        #    else:
-        #        M += np.einsum('qc, c, cij -> cij', coef, cellmeasure, data[dataindex], optimize=True)
-        #elif callable(coef):
-        #    if hasattr(coef, 'coordtype'):
-        #        if coef.coordtype == 'barycentric':
-        #            coef = coef(bcs, index=index)
-        #        else:
-        #            ps = mesh.bc_to_point(bcs, index=index)
-        #            coef = coef(ps)
-        #    else:
-        #        ps = mesh.bc_to_point(bcs, index=index)
-        #        coef = coef(ps)
-        #else:
-        #    raise ValueError("coef is not correct!")
 
         if out is None:
             return M

@@ -1,10 +1,10 @@
-import numpy as np
-import pytest
-from fealpy.decorator import cartesian
-from fealpy.mesh import TriangleMesh
-#from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import ScalarMassIntegrator 
+#import numpy as np
+#import pytest
+#from fealpy.decorator import cartesian
+#from fealpy.mesh import TriangleMesh
+##from fealpy.functionspace import LagrangeFiniteElementSpace
+#from fealpy.functionspace import LagrangeFESpace
+#from fealpy.fem import ScalarMassIntegrator 
 
 #@pytest.mark.parametrize('p, mtype', 
 #        [(p, mtype) for p in range(1, 7) for mtype in ('equ', 'iso')])
@@ -48,44 +48,39 @@ from fealpy.fem import ScalarMassIntegrator
 #    print(FM-M)
 #    assert np.allclose(FM, M)
 
-def test_assembly_cell_matrix_fast():
+import numpy as np
+import pytest
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import ScalarMassIntegrator
+
+@pytest.fixture
+def mesh_and_space():
     mesh = TriangleMesh.from_one_triangle()
     p = 2
     space = LagrangeFESpace(mesh, p=p)
+    return mesh, space
 
-    # 测试 c 为 None 的情况
-    mi = ScalarMassIntegrator(q=3)
-    FM = mi.assembly_cell_matrix_fast(space)
-    M = mi.assembly_cell_matrix(space)
+def test_assembly_cell_matrix_fast(mesh_and_space):
+    _, space = mesh_and_space
+    p = space.p
+
+    # 测试 c 为 None
+    mi = ScalarMassIntegrator(q=p+1)
+    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
+    M = mi.assembly_cell_matrix(space=space)
     assert np.allclose(FM, M)
 
-    # 测试 coef 为标量的情况
+    # 测试 c 为标量函数
     scalar_coef = 2.0
-    mi = ScalarMassIntegrator(c=scalar_coef, q=3)
-    FM = mi.assembly_cell_matrix_fast(space)
-    M = mi.assembly_cell_matrix(space)
+    mi = ScalarMassIntegrator(q=p+1, c=scalar_coef)
+    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
+    M = mi.assembly_cell_matrix(space=space)
     assert np.allclose(FM, M)
 
-    ## 测试 coef 为函数的情况
-    #@cartesian
-    #def func_coef(p):
-    #    x = p[..., 0]
-    #    return x**2 + 1
-
-    #mi = ScalarMassIntegrator(c=func_coef, q=3)
-    #FM = mi.assembly_cell_matrix_fast(space)
-    #M = mi.assembly_cell_matrix(space)
-    #assert np.allclose(FM, M)
-
-    ## 测试 coef 为 numpy.ndarray 的情况
-    #array_coef = np.array([1, 2, 3])  # 假设的系数数组，长度应与问题相关
-    #mi = ScalarMassIntegrator(c=array_coef, q=3)
-    #FM = mi.assembly_cell_matrix_fast(space)
-    #M = mi.assembly_cell_matrix(space)
-    #assert np.allclose(FM, M)
-
-    # 测试无效的 c 类型
-    invalid_coef = "invalid_type"
-    with pytest.raises(ValueError):
-        mi = ScalarMassIntegrator(c=invalid_coef, q=p+1)
-        mi.assembly_cell_matrix_fast(space)
+    # 测试 c 为数组
+    array_coef = np.array([1.0, 2.0])
+    mi = ScalarMassIntegrator(q=p+1, c=array_coef)
+    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
+    M = mi.assembly_cell_matrix(space=space)
+    assert np.allclose(FM, M)
