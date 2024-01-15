@@ -62,7 +62,7 @@ def mesh_and_space():
     return mesh, space
 
 def test_assembly_cell_matrix_fast(mesh_and_space):
-    _, space = mesh_and_space
+    mesh, space = mesh_and_space
     p = space.p
 
     # 测试 c 为 None
@@ -79,8 +79,28 @@ def test_assembly_cell_matrix_fast(mesh_and_space):
     assert np.allclose(FM, M)
 
     # 测试 c 为数组
-    array_coef = np.array([1.0, 2.0])
+    NC = mesh.number_of_cells()
+    array_coef = np.full(NC, 1)
     mi = ScalarMassIntegrator(q=p+1, c=array_coef)
     FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
     M = mi.assembly_cell_matrix(space=space)
     assert np.allclose(FM, M)
+
+    # 测试 c 为函数
+    from fealpy.decorator import cartesian
+    @cartesian
+    def func_coef(p):
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.sin(x) + np.cos(y)
+
+    mi = ScalarMassIntegrator(q=p+1, c=func_coef)
+    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
+    M = mi.assembly_cell_matrix(space=space)
+    assert np.allclose(FM, M)
+
+    ## 测试无效的 c 类型
+    #invalid_coef = "invalid_type"
+    #with pytest.raises(ValueError):
+    #    mi = ScalarMassIntegrator(q=p+1, c=invalid_coef)
+    #    mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
