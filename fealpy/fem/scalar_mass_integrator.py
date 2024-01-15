@@ -73,7 +73,9 @@ class ScalarMassIntegrator:
         """
         @brief 基于无数值积分的组装方式
         """
+        q = self.q if self.q is not None else trialspace.p+1
         coef = self.coef
+
         mesh = trialspace.mesh 
         meshtype = mesh.type
 
@@ -90,6 +92,7 @@ class ScalarMassIntegrator:
         Itype = self.type 
         dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
                 str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
+        print("dataindex:\n", dataindex)
 
         if cellmeasure is None:
             if mesh.meshtype == 'UniformMesh2d':
@@ -105,10 +108,36 @@ class ScalarMassIntegrator:
         else:
             M = out
         
+        print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
+        print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
+
+        qf = mesh.integrator(q, 'cell')
+        bcs, _ = qf.get_quadrature_points_and_weights()
+
         if coef is None:
-            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
         else:
-            raise ValueError("coef is not correct!")
+            if callable(coef):
+                if hasattr(coef, 'coordtype'):
+                    if coef.coordtype == 'barycentric':
+                        coef = coef(bcs, index=index)
+                    else:
+                        ps = mesh.bc_to_point(bcs, index=index)
+                        coef = coef(ps)
+                else:
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    coef = coef(ps)
+            if np.isscalar(coef):
+                M += coef * np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+            elif isinstance(coef, np.ndarray):
+                if coef.shape == (NC, ):
+                    M += np.einsum('c, c, cij -> cij', coef, cellmeasure, data[dataindex], optimize=True)
+                else:
+                    M += np.einsum('qc, c, cij -> cij', coef, cellmeasure, data[dataindex], optimize=True)
+            else:
+                raise ValueError("coef is not correct!")
+
+
 
         if out is None:
             return M

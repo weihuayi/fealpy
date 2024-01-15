@@ -1,5 +1,7 @@
 import numpy as np
 
+from fealpy.fem.precomp_data import data
+
 from .scalar_mass_integrator import ScalarMassIntegrator
 
 class VectorMassIntegrator:
@@ -9,6 +11,7 @@ class VectorMassIntegrator:
     def __init__(self, c=None, q=None):
         self.coef = c
         self.q = q
+        self.type = 'BL11'
 
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
@@ -85,3 +88,48 @@ class VectorMassIntegrator:
                 VD[:, i::GD, i::GD] += D 
         if out is None:
             return VD
+
+    def assembly_cell_matrix_for_scalar_basis_vspace_fast(self, trialspace, testspace=None, index=np.s_[:], 
+            cellmeasure=None, out=None):
+        """
+        @brief 基于无数值积分的组装方式
+        """
+        coef = self.coef
+        mesh = trialspace.mesh 
+        meshtype = mesh.type
+
+        TAFtype = trialspace.btype
+        TAFdegree = trialspace.p
+        TAFldof = trialspace.number_of_local_dofs()  
+        TSFtype = TAFtype
+        TSFdegree = TAFdegree
+        TSFldof = TAFldof
+        if testspace is not None:
+            TSFtype = testspace.btype
+            TSFdegree = testspace.p 
+            TSFldof = testspace.number_of_local_dofs()
+        Itype = self.type 
+        dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
+                str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
+
+        if cellmeasure is None:
+            if mesh.meshtype == 'UniformMesh2d':
+                 NC = mesh.number_of_cells()
+                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
+            else:
+                 cellmeasure = mesh.entity_measure('cell', index=index)
+        
+        NC = len(cellmeasure)
+
+        if out is None:
+            M = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
+        else:
+            M = out
+        
+        if coef is None:
+            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
+        else:
+            raise ValueError("coef is not correct!")
+
+        if out is None:
+            return M
