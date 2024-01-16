@@ -179,7 +179,7 @@ class BilinearForm:
             self._M += bi.assembly_face_matrix(space)
         return self._M
 
-    def fast_assembly(self, trialspace, testspace, coefspace):
+    def fast_assembly(self, trialspace=None, testspace=None, coefspace=None):
         """
         @brief 免数值积分组装
 
