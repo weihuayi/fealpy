@@ -70,8 +70,8 @@ class LinearElasticityOperatorIntegrator:
             K = out
 
         # 对于每一个设定的索引对，利用四边形积分公式和基函数的梯度来计算一个积分项
-        A = [np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], 
-                       cellmeasure, optimize=True) for i, j in idx]
+        A = [np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure, optimize=True) for i, j in idx]
+        print("A:", len(A), "\n", A)
 
         D = 0
         for i in range(GD):
