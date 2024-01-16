@@ -101,7 +101,7 @@ class LinearElasticityOperatorIntegrator:
                         K[:, j::GD, i::GD] += mu*A[imap[(i, j)]]
         if c is not None:
             if len(c) == NC:
-                K = np.einsum('i, ijk -> ijk', c, K)
+                K[:] = np.einsum('i, ijk -> ijk', c, K)
         if out is None:
             return K
 
