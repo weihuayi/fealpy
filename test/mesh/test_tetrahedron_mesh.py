@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
+import copy
 from fealpy.mesh import TetrahedronMesh 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
@@ -57,6 +58,51 @@ def test_mesh_generation_by_meshpy():
     mesh.add_plot(plt)
     plt.show()
 
+def tet_volume(node):
+    v01 = node[1] - node[0]
+    v02 = node[2] - node[0]
+    v03 = node[3] - node[0]
+    return np.sum(np.cross(v01, v02)*v03)/6
+
+def is_in_the_tetrahedron(point, node):
+    node = np.r_[node, point[None, :]]
+    localCell = np.array([[0, 1, 2, 4], 
+                          [1, 3, 2, 4], 
+                          [0, 3, 1, 4], 
+                          [2, 3, 0, 4]], dtype=np.int_)
+    for i in range(4):
+        tau = localCell[i]
+        v = tet_volume(node[tau])
+        if v < 0:
+            print(i)
+            return False
+    return True
+
+def test_bisect():
+    mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], 5, 5, 5)
+    NC = mesh.number_of_cells()
+    isMarkedCell = np.zeros(NC, dtype=np.bool_) 
+    isMarkedCell[[1, 10, 14, 26, 24, 12, 100, 50]] = True
+
+    mesh_copy = copy.deepcopy(mesh)
+    cell_copy = mesh_copy.entity('cell')
+    node_copy = mesh_copy.entity('node')
+
+    options = mesh.bisect_options(HB=True)
+    mesh.bisect(isMarkedCell, options=options)
+    NC = mesh.number_of_cells()
+
+    cbar = mesh.entity_barycenter("cell")
+    HB = options['HB']
+    for i in range(NC):
+        c0 = HB[i, 0]
+        c1 = HB[i, 1]
+        p = cbar[c0]
+        n = node_copy[cell_copy[c1]]
+        flag = is_in_the_tetrahedron(p, n)
+        if(not flag):
+            print("ERROR", i, c0, c1)
 
 if __name__ == "__main__":
-    test_mesh_generation_by_meshpy()
+    #test_mesh_generation_by_meshpy()
+    test_bisect()

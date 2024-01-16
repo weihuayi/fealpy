@@ -456,7 +456,6 @@ class TetrahedronMesh(Mesh, Plotable):
 
         cell = self.entity(etype)[index]
         NC = len(cell)
-        print(cell.shape)
 
         cell = np.r_['1', np.zeros((NC, 1), dtype=cell.dtype), cell]
         cell[:, 0] = cell.shape[1]-1
@@ -740,10 +739,20 @@ class TetrahedronMesh(Mesh, Plotable):
         for i in range(n):
             self.bisect()
 
-    def bisect(self, isMarkedCell=None, data=None, returnim=False):
+    def bisect_options(self, HB = None):
+        options = {"HB" : HB}
+        return options
+
+    def bisect(self, isMarkedCell=None, data=None, returnim=False, options={}):
+
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
+
+        if("HB" in options) & (options["HB"] is not None):
+            HB = np.tile(np.arange(NC*4)[:, None], (1, 2))
+            options["HB"] = HB
+            print(HB.shape)
 
         if isMarkedCell is None: # 加密所有的单元
             markedCell = np.arange(NC, dtype=self.itype)
@@ -865,6 +874,10 @@ class TetrahedronMesh(Mesh, Plotable):
             cell[NC:NC+nMarked, 2] = p3
             cell[NC:NC+nMarked, 3] = p4
 
+            if("HB" in options) & (options["HB"] is not None):
+                HB = options['HB']
+                HB[NC:NC+nMarked, 1] = HB[markedCell, 1]
+
             for key in self.celldata:
                 data = self.celldata[key]
                 data[NC:NC+nMarked] = data[markedCell]
@@ -900,6 +913,10 @@ class TetrahedronMesh(Mesh, Plotable):
 
         for key in self.celldata:
             self.celldata[key] = self.celldata[key][:NC]
+
+        if("HB" in options) & (options["HB"] is not None):
+            HB = options['HB']
+            HB = HB[:NC]
 
         if returnim is True:
             return IM

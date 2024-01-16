@@ -539,7 +539,7 @@ class LagrangeFiniteElementSpace():
 
         Q = A[..., multiIndex, range(TD+1)]
         M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_dofs()
+        ldof = [(p+1), (p+1)*(p+2)//2, (p+1)*(p+2)*(p+3)//6][TD-1]
         shape = bc.shape[:-1]+(ldof, TD+1)
         R = np.zeros(shape, dtype=self.ftype)
         for i in range(TD+1):

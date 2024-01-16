@@ -1011,6 +1011,13 @@ class SinSinData:
         return u
 
     @cartesian
+    def flux(self, p):
+        """
+        @brief 真解通量
+        """
+        return -self.gradient(p)
+
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -1021,7 +1028,6 @@ class SinSinData:
         pi = np.pi
         rhs = 2*pi*pi*np.sin(pi*x)*np.sin(pi*y)
         return rhs
-
 
     @cartesian
     def dirichlet(self, p):
