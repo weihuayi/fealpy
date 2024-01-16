@@ -42,7 +42,7 @@ class ScalarMassIntegrator:
 
         phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof)
         if coef is None:
-            M += np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+            M += np.einsum('q, qci, qcj, c -> cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
@@ -54,13 +54,14 @@ class ScalarMassIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
+
             if np.isscalar(coef):
                 M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ):
-                    M += np.einsum('q, c, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                    M += np.einsum('q, c, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
                 else:
-                    M += np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                    M += np.einsum('q, qc, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
 
@@ -68,12 +69,13 @@ class ScalarMassIntegrator:
             return M
         
     
-    def assembly_cell_matrix_fast(self, trialspace, testspace=None, index=np.s_[:], 
-            cellmeasure=None, out=None):
+    def assembly_cell_matrix_fast(self, trialspace, testspace=None, coefspace=None,
+            index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 基于无数值积分的组装方式
         """
         coef = self.coef
+
         mesh = trialspace.mesh 
         meshtype = mesh.type
 
@@ -87,6 +89,13 @@ class ScalarMassIntegrator:
             TSFtype = testspace.btype
             TSFdegree = testspace.p 
             TSFldof = testspace.number_of_local_dofs()
+        COFtype = TAFtype
+        COFdegree = TAFdegree
+        COFldof = TAFldof
+        if coefspace is not None:
+            COFtype = coefspace.btype
+            COFdegree = coefspace.p 
+            COFldof = coefspace.number_of_local_dofs()
         Itype = self.type 
         dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
                 str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
@@ -104,11 +113,22 @@ class ScalarMassIntegrator:
             M = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
         else:
             M = out
-        
+
         if coef is None:
-            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
         else:
-            raise ValueError("coef is not correct!")
+            if callable(coef):
+                u = coefspace.interpolate(coef)
+                cell2dof = coefspace.cell_to_dof()
+                coef = u[cell2dof]
+            if np.isscalar(coef):
+                M += coef * np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+            elif coef.shape == (NC, COFldof):
+                dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
+                print("dataindex:\n", data[dataindex])
+                M += np.einsum('c, ijk, ck-> cij', cellmeasure, data[dataindex], coef, optimize=True)
+            else:
+                raise ValueError("coef is not correct!")
 
         if out is None:
             return M

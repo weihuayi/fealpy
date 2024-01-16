@@ -44,12 +44,12 @@ class HuZhangFiniteElementSpace():
         gdim = self.geo_dimension()
         tdim = self.tensor_dimension()
         gdof = self.number_of_global_dofs()
-        self.Tensor_Frame = np.zeros((gdof,tdim),dtype=np.float) #self.Tensor_Frame[i,:]表示第i个基函数第标架
+        self.Tensor_Frame = np.zeros((gdof,tdim),dtype=np.float64) #self.Tensor_Frame[i,:]表示第i个基函数第标架
 
         
         NE = mesh.number_of_edges()
         idx = np.array([(0, 0), (1, 1), (0, 1)])
-        TE = np.zeros((NE, 3, 3), dtype=np.float)
+        TE = np.zeros((NE, 3, 3), dtype=np.float64)
         self.T = np.array([[(1, 0), (0, 0)], [(0, 0), (0, 1)], [(0, 1), (1, 0)]])
 
         t = mesh.edge_unit_tangent() 
@@ -63,7 +63,7 @@ class HuZhangFiniteElementSpace():
         base0 = 0
 
         #顶点标架
-        T = np.eye(tdim,dtype=np.float)
+        T = np.eye(tdim,dtype=np.float64)
         T[gdim:] = T[gdim:]/np.sqrt(2)
         NN = mesh.number_of_nodes()
         shape = (NN,tdim,tdim)
@@ -113,7 +113,7 @@ class HuZhangFiniteElementSpace():
         frame = frame[:,[1,0],:]
         frame[:,1,:] = bd_n
 
-        bdTF = np.zeros((NFbd, tdim, tdim), dtype=np.float)
+        bdTF = np.zeros((NFbd, tdim, tdim), dtype=np.float64)
         for i, (j, k) in enumerate(idx):
             bdTF[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
         bdTF[:, gdim:] *=np.sqrt(2)
@@ -213,7 +213,7 @@ class HuZhangFiniteElementSpace():
        
         c2d = dof.cell2dof[..., np.newaxis]
         ldof = dof.number_of_local_dofs() # ldof : 标量空间单元上自由度个数
-        cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int) # 每个标量自由度变成 tdim 个自由度
+        cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int_) # 每个标量自由度变成 tdim 个自由度
         base0 = 0
         base1 = 0
 
@@ -270,7 +270,7 @@ class HuZhangFiniteElementSpace():
             dof = self.dof # 标量空间自由度管理对象
             e2d = dof.edge_to_dof()[...,np.newaxis]
             ldof = dof.number_of_local_dofs(doftype='edge')
-            edge2dof = np.zeros((NE,ldof,tdim),dtype=np.int)-1# 每个标量自由度变成 tdim 个自由度
+            edge2dof = np.zeros((NE,ldof,tdim),dtype=np.int_)-1# 每个标量自由度变成 tdim 个自由度
 
             dofFlags = self.edge_dof_falgs_1() # 把不同类型的自由度区分开来
             idx, = np.nonzero(dofFlags[0])# 局部顶点自由度的编号
