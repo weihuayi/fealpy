@@ -89,47 +89,36 @@ class VectorMassIntegrator:
         if out is None:
             return VD
 
-    def assembly_cell_matrix_for_scalar_basis_vspace_fast(self, trialspace, testspace=None, index=np.s_[:], 
-            cellmeasure=None, out=None):
+    def assembly_cell_matrix_for_scalar_basis_vspace_fast(self, trialspace, testspace=None, coefspace=None,
+            index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 基于无数值积分的组装方式
         """
-        coef = self.coef
-        mesh = trialspace.mesh 
-        meshtype = mesh.type
-
-        TAFtype = trialspace.btype
-        TAFdegree = trialspace.p
-        TAFldof = trialspace.number_of_local_dofs()  
-        TSFtype = TAFtype
-        TSFdegree = TAFdegree
-        TSFldof = TAFldof
-        if testspace is not None:
-            TSFtype = testspace.btype
-            TSFdegree = testspace.p 
-            TSFldof = testspace.number_of_local_dofs()
-        Itype = self.type 
-        dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
-                str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
-
-        if cellmeasure is None:
-            if mesh.meshtype == 'UniformMesh2d':
-                 NC = mesh.number_of_cells()
-                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
-            else:
-                 cellmeasure = mesh.entity_measure('cell', index=index)
+        mesh = space[0].mesh
+        GD = space[0].geo_dimension()
+        assert len(space) == GD
         
+        mesh =space[0].mesh
+        if cellmeasure is None:
+            cellmeasure = mesh.entity_measure('cell', index=index)
+        ldof = space[0].number_of_local_dofs()
+        integrator = ScalarMassIntegrator(self.coef, self.q)
+        # 组装标量的单元扩散矩阵
+        # D.shape == (NC, ldof, ldof)
+        D = integrator.assembly_cell_matrix_fast(space[0], index=index, cellmeasure=cellmeasure)
         NC = len(cellmeasure)
 
         if out is None:
-            M = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
+            VD = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
         else:
-            M = out
-        
-        if coef is None:
-            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
-        else:
-            raise ValueError("coef is not correct!")
-
+            assert out.shape == (NC, GD*ldof, GD*ldof)
+            VD = out
+        if space[0].doforder == 'sdofs':
+            for i in range(GD):
+                VD[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D
+        elif space[0].doforder == 'vdims':
+            for i in range(GD):
+                VD[:, i::GD, i::GD] += D 
         if out is None:
-            return M
+            return VD
+

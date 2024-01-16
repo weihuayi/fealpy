@@ -123,9 +123,6 @@ class ScalarDiffusionIntegrator:
         else:
             D = out
         
-        print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
-        print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
-        print("glambda:", mesh.grad_lambda().shape, "\n", mesh.grad_lambda())
         glambda = mesh.grad_lambda()
         if coef is None:
             D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], optimize=True)
@@ -141,7 +138,6 @@ class ScalarDiffusionIntegrator:
                 D *= coef
             elif coef.shape == (NC, COFldof):
                 dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
-                print("dataindex:\n", data[dataindex])
                 D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], coef, optimize=True)
                 D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], coef, optimize=True)
             else:

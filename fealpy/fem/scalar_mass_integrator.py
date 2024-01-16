@@ -125,7 +125,6 @@ class ScalarMassIntegrator:
                 M += coef * np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
             elif coef.shape == (NC, COFldof):
                 dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
-                print("dataindex:\n", data[dataindex])
                 M += np.einsum('c, ijk, ck-> cij', cellmeasure, data[dataindex], coef, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
