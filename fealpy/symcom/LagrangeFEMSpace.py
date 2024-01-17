@@ -197,5 +197,5 @@ class LagrangeFEMSpace:
 if __name__ == "__main__":
     from sympy import *
     space = LagrangeFEMSpace(2)
-    M = space.gphi_gphi_phi_matrix(2, 2, 2)
+    M = space.gphi_gphi_matrix(1,1)
     print(M)
