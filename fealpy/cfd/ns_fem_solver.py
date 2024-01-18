@@ -47,11 +47,24 @@ class NSFEMSolver:
         self.AP = bform.assembly()
     
     #u \cdot u   \approx   u^n \cdot u^{n+1}
-    def ossen_A(self,un):
+    def ossen_A(self,un, mu=None ,rho=None):
         M = self.M
         AP = self.AP
-        rho = self.rho
+        if rho is None:
+            rho = self.rho
+        
+        bform = BilinearForm((self.uspace,)*2)
+        bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=q))
+        M = bform.assembly() 
+        
         S = self.S
+        if mu is not None:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorDiffusionIntegrator(c=mu, q=self.q))
+            S = bform.assembly()
+        else:
+            print("暂时未开发")
+
         SP = self.SP
         dt = self.dt
  
@@ -115,8 +128,28 @@ class NSFEMSolver:
         A = bmat([[1/dt*M+S+C,  -AP],\
                 [AP.T, None]], format='csr')
         return A
+    
+    def cross_wlf(self, p, u, bcs, T=200):
+        #参数选择为PC的参数
+        D1 = 1.9e11
+        D2 = 417.15
+        D3 = 0
+        A1 = 27.396
+        A2_wave = 51.6
+        tau = 182680
+        n = 0.574
+        lam = 0.173 
+        
+        deformnation = u.grad_value(bcs)
+        deformnation = 0.5*(deformnation + deformnation.transpose(0,2,1,3))
+        gamma = np.sqrt(2*np.einsum('iklj,iklj->ij',deformnation,deformnation))
 
-
+        T_s = D2 + D3*p(bcs)
+        A2 = A2_wave + D3*p(bcs)
+        eta0 = D1 * np.exp(-A1*(T-T_s)/(A2 + (T-T_s))) 
+        eta = eta0/(1 + (eta0 * gamma/tau)**(1-n))
+        return eta
+    
     def output(self, name, variable, timestep, output_dir='./', filename_prefix='test'):
         mesh = self.mesh
         gdof = self.uspace.number_of_global_dofs()

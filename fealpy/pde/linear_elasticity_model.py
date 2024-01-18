@@ -90,6 +90,11 @@ class BoxDomainData():
 
         return mesh 
 
+    def triangle_mesh(self):
+        mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=2, ny=2)
+
+        return mesh
+
     def delaunay_mesh(self):
         import scipy.io as io
         data_1 = io.loadmat('p.mat')

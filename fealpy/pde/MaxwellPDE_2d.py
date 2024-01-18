@@ -123,9 +123,9 @@ class MaxwellPDE2d():
 class SinData(MaxwellPDE2d):
     def __init__(self, eps = 1, k = 1):
         C = CoordSys3D('C')
-        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j
+        #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j
         #f = sym.sin(C.y)*C.i + sym.sin(C.x)*C.j
-        #f = C.x*C.y*(1-C.x)*(1-C.y)*C.i + sym.sin(sym.pi*C.x)*sym.sin(sym.pi*C.y)*C.j
+        f = C.x*C.y*(1-C.x)*(1-C.y)*C.i + sym.sin(sym.pi*C.x)*sym.sin(sym.pi*C.y)*C.j
         super(SinData, self).__init__(f, eps, k)
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):

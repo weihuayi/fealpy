@@ -26,7 +26,6 @@ class Mimetic():
         edge_measure = mesh.entity_measure(etype=1)
         cell_measure = mesh.entity_measure(etype=2)
         result = np.zeros((NE,NE))
-        #result2 = np.zeros((NE,NE))
         if ac is None:
             ac = cell_measure
         
@@ -35,24 +34,21 @@ class Mimetic():
             R = np.zeros((LNE, 2))
             N = np.zeros((LNE, 2))
             for j,edge_index in enumerate(cell2edge[i]):
-                R[j, :] = (edge_centers[edge_index,:] - cell_centers[i,:]) * edge_measure[edge_index]
-                N[j, :] = norm_flag[i,edge_index]*norm[edge_index]
-            M_consistency = R@R.T/cell_measure[i]
-            M_stability = ac[i] * (np.eye(LNE) - N @ np.linalg.inv(N.T @ N) @ N.T)
-            if np.linalg.det(N.T@N) == 0:
-                M_stability = 0
-                print("Asdasasdasdasdadasasddasas")
+                #R[j, :] = (edge_centers[edge_index,:] - cell_centers[i,:]) * edge_measure[edge_index]
+                #N[j, :] = norm_flag[i,edge_index]*norm[edge_index]
+                R[j, :] = norm_flag[i,edge_index]*(edge_centers[edge_index,:] - cell_centers[i,:]) * edge_measure[edge_index]
+                N[j, :] = norm[edge_index]
+            #M_consistency = R@R.T/cell_measure[i]
+            M_consistency = R@np.linalg.inv(R.T@N)@R.T
+            #M_stability = ac[i] * (np.eye(LNE) - N @ np.linalg.inv(N.T @ N) @ N.T)
+            M_stability = np.trace(R@R.T) /cell_measure[i] * (np.eye(LNE) - N @ np.linalg.inv(N.T @ N) @ N.T)
             M = M_consistency + M_stability  
-            #print(np.max(np.abs(M@N-R)))
             '''
             print(f"第{i}个单元")
             print(np.linalg.eigvals(M))
             print(np.max(np.abs(M-M.T)))
             print(np.max(np.abs(M@N-R)))
             A  = np.zeros((LNE, NE))
-            for j, edge_index in enumerate(cell2edge[i]):
-                A[j,edge_index] = 1
-            result2 += A.T@M@A 
             '''
             indexi,indexj = np.meshgrid(cell2edge[i],cell2edge[i])
             result[indexi,indexj] += M 
@@ -85,19 +81,21 @@ class Mimetic():
         mesh = self.mesh
         NE = mesh.number_of_edges()
         cell_centers = mesh.entity_barycenter(etype=2)
+        cell_measure = mesh.entity_measure('cell') 
+        
         edge_measure = mesh.entity_measure('edge') 
         edge_centers = mesh.entity_barycenter(etype=1)
         #result = mesh.integral(fun,q=5,celltype=True)
 
         f = fun(cell_centers)
-        cell_measure = mesh.entity_measure('cell')
-        result = cell_measure*f
-        
+        b = cell_measure*f
+
         gamma = np.zeros(NE)
         gamma[gddof] = edge_measure[gddof]*D(edge_centers[gddof])
-        result = np.hstack((-gamma,-result))
+        result = np.hstack((-gamma,-b))
         return result
     
+
     def boundary_treatment(self, A, b, Df, isDcelldof, Nf=None, isNedgedof=None, so=None):
         mesh = self.mesh
         NE = mesh.number_of_edges()
@@ -120,11 +118,10 @@ class Mimetic():
         xx[:NE] = 0
         if isNedgedof is not None:
             xx[0:NE][isNedgedof] = Nf(edge_centers[isNedgedof])
-        #xx[NE:][isDcelldof] = Df(cell_centers[isDcelldof])
-        xx[NE:][isDcelldof] = so[isDcelldof]
+        xx[NE:][isDcelldof] = Df(cell_centers[isDcelldof])
+        #xx[NE:][isDcelldof] = so[isDcelldof]
         b[isBdDof] = xx[isBdDof]
         return A,b
-
 
     def cell_out_normal(self):
         mesh = self.mesh

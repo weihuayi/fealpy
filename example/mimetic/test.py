@@ -18,11 +18,14 @@ import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 from fealpy.decorator import cartesian
 from scipy.interpolate import griddata
+from mumps import DMumpsContext
+from scipy.sparse import csr_matrix
 @cartesian
 def source(p, index=None):
     x = p[...,0]
     y = p[...,1]
-    val = 2*np.pi*np.pi*np.sin(np.pi*x) * np.sin(np.pi*y)
+    #val = 2*np.pi*np.pi*np.sin(np.pi*x) * np.sin(np.pi*y)
+    val = -5 * np.pi**2 *np.sin(2*np.pi*x) * np.sin(np.pi*y)
     return val
 
 @cartesian
@@ -36,7 +39,8 @@ def Dirchlet(p):
 def solution(p, index=None):
     x = p[...,0]
     y = p[...,1]
-    val = np.sin(np.pi*x) * np.sin(np.pi*y)
+    #val = np.sin(np.pi*x) * np.sin(np.pi*y)
+    val = np.sin(2*np.pi*x) * np.sin(np.pi*y)
     return val
 
 @cartesian
@@ -46,6 +50,15 @@ def gradient_u(p, index=None):
     value = np.zeros_like(p)
     value[...,0] = np.pi*np.cos(np.pi*x)*np.sin(np.pi*y)
     value[...,1] = np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
+    return value
+
+@cartesian
+def div_u(p, index=None):
+    x = p[...,0]
+    y = p[...,1]
+    value0 = np.pi*np.cos(np.pi*x)*np.sin(np.pi*y)
+    value1 = np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
+    value = value0+value1
     return value
 
 node = np.array([[0.0, 0.0], [0.0, 0.5], [0.0, 1.0],
@@ -65,9 +78,11 @@ EDdof = mesh.ds.boundary_edge_index()
 div_operate = solver.div_operate()
 M_c = solver.M_c()
 M_f = solver.M_f()
-b = solver.source(source, EDdof, Dirchlet)[NE:]
+b = solver.source(source, EDdof, Dirchlet)
+A10 = -M_c@div_operate
+A = np.bmat([[M_f, A10.T], [A10, np.zeros((NC,NC))]])
 
-'''
+
 qf = mesh.integrator(5,etype='edge')
 bcs,ws = qf.get_quadrature_points_and_weights()
 carpoint = mesh.edge_bc_to_point(bcs)
@@ -75,40 +90,50 @@ edge_measure = mesh.entity_measure(etype=1)
 cell_measure = mesh.entity_measure(etype=2)
 normal = mesh.edge_unit_normal()
 
-u = np.einsum('i, ijk, jk-> j', ws, gradient_u(carpoint), normal)
-p = mesh.integral(solution,q=5,celltype=True)/cell_measure
-A10 = -M_c@div_operate
-b = -M_c@b
-
-
-
-print("div_operate 验算", np.max(np.abs(A10@u - b)))
-print("M_f 验算", np.max(np.abs(A10.T@p - M_f@u)))
 '''
+u = np.einsum('i, ijk, jk-> j', ws, gradient_u(carpoint), normal)
+p = mesh.integral(solution,q=5,celltype=True)
+divp = mesh.integral(div_u,q=5,celltype=True)
+b = mesh.integral(source,q=5,celltype=True)
+print(np.max(np.abs(M_c@div_operate@u-M_c@b)))
+x = np.hstack((u,p))
+error = np.einsum('ij,j->i',A,x) - b
+print(np.sqrt(np.sum(error**2)/(NC+NE)))
+'''
+#print("div_operate 验算", np.max(np.abs(A10@u - b)))
+#print("M_f 验算", np.max(np.abs(A10.T@p - M_f@u)))
 
-
-b = solver.source(source, EDdof, Dirchlet)
-A10 = -M_c@div_operate
-A = np.bmat([[M_f, A10.T], [A10, np.zeros((NC,NC))]])
-#print(A10)
 #print('单元中点',mesh.entity_barycenter(etype=2))
 #print('边中点',mesh.entity_barycenter(etype=1))
 #print('单元面积',mesh.entity_measure('cell'))
 #print('边长度',mesh.entity_measure('edge'))
 #print('边法向',mesh.edge_unit_normal())
-p = mesh.integral(solution,q=4,celltype=True)/mesh.entity_measure('cell')
 #p = solution(mesh.entity_barycenter(etype=2))
+
 Ddof = mesh.ds.boundary_cell_flag()
-#A,b = solver.boundary_treatment(A,b, Dirchlet, Ddof, so=u)
+p = mesh.integral(solution,q=5,celltype=True)/mesh.entity_measure('cell')
+A,b = solver.boundary_treatment(A,b, Dirchlet, Ddof, so=p)
+
 x = np.linalg.solve(A,b)
-ph = x[NE:]
+'''
+A = csr_matrix(A)
+ctx = DMumpsContext()
+ctx.set_silent()
+x = b.copy()
+ctx.set_centralized_sparse(A)
+ctx.set_rhs(x)
+ctx.run(job=6)
+'''
+ph = x[-NC:]
+
 error = p-ph
-print(np.max(np.abs(p-ph)))
+print(np.max(np.abs(error[Ddof])))
+print(np.max(np.abs(error)))
 cc = mesh.entity_barycenter(etype=2)
 x = cc[:,0]
 y = cc[:,1]
 x, y = np.meshgrid(x, y)
-z = griddata(cc, ph, (x, y), method='linear')
+z = griddata(cc, error, (x, y), method='linear')
 
 # 创建图形
 fig = plt.figure()
@@ -127,5 +152,5 @@ mesh.add_plot(axes)
 mesh.find_node(axes, showindex=True, color='r', marker='o', markersize=16, fontsize=32, fontcolor='r')
 mesh.find_cell(axes, showindex=True, color='b', marker='o', markersize=16, fontsize=32, fontcolor='b')
 mesh.find_edge(axes, showindex=True, color='g', marker='o', markersize=16, fontsize=32, fontcolor='g')
-plt.show()
+#plt.show()
 '''
