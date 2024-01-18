@@ -192,7 +192,7 @@ class BilinearForm:
         """
         if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
             # 由标量函数空间组成的向量函数空间
-            return self.fast_assembly_for_vspace_with_scalar_basis()
+            return self.fast_assembly_for_vspace_with_scalar_basis(trialspace, testspace, coefspace)
         else:
             # 标量函数空间或基是向量函数的向量函数空间
             return self.fast_assembly_for_sspace_and_vspace_with_vector_basis(trialspace, testspace, coefspace)
@@ -222,7 +222,7 @@ class BilinearForm:
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, ldof, ldof), dtype=space.ftype)
         for di in self.dintegrators:
-            di.assembly_cell_matrix_fast(trialspace, testspace, coefspace, out=CM)
+            di.assembly_cell_matrix_fast(space, trialspace, testspace, coefspace, out=CM)
 
         cell2dof = space.cell_to_dof()
         I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
@@ -234,7 +234,7 @@ class BilinearForm:
 
         return self._M
 
-    def fast_assembly_for_vspace_with_scalar_basis(self) -> None:
+    def fast_assembly_for_vspace_with_scalar_basis(self, trialspace, testspace, coefspace) -> None:
         """
         免数值积分组装基函数由标量函数组合而成的向量函数空间的矩阵
 
@@ -263,7 +263,7 @@ class BilinearForm:
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
         for di in self.dintegrators:
-            di.assembly_cell_matrix(space, cellmeasure=cellmeasure, out=CM)
+            di.assembly_cell_matrix_fast(space, trialspace, testspace, coefspace, cellmeasure=cellmeasure, out=CM)
         self._M = csr_matrix((GD*gdof, GD*gdof), dtype=space[0].ftype)
         if space[0].doforder == 'sdofs': # 标量自由度排序优先
             for i in range(GD):

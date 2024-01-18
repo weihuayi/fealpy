@@ -1,3 +1,4 @@
+from mpmath.functions.rszeta import coef
 import numpy as np
 
 from fealpy.fem.precomp_data import data
@@ -65,7 +66,6 @@ class VectorMassIntegrator:
         GD = space[0].geo_dimension()
         assert len(space) == GD
         
-        mesh =space[0].mesh
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
         ldof = space[0].number_of_local_dofs()
@@ -89,10 +89,23 @@ class VectorMassIntegrator:
         if out is None:
             return VD
 
-    def assembly_cell_matrix_for_scalar_basis_vspace_fast(self, trialspace, testspace=None, coefspace=None,
+    def assembly_cell_matrix_fast(self, space, trialspace=None, testspace=None, coefspace=None, index=np.s_[:], cellmeasure=None, out=None):
+        """
+        @note 基于无数值积分的组装方式
+        """
+        self.space = space
+        if isinstance(space, tuple): # 由标量空间组合而成的空间
+            return self.assembly_cell_matrix_for_scalar_basis_vspace_fast(space, trialspace, testspace, coefspace,
+                                                                        index=index, cellmeasure=cellmeasure, out=out)
+        else: # 空间基函数是向量函数
+            return self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
+
+
+    def assembly_cell_matrix_for_scalar_basis_vspace_fast(self, space,
+            trialspace, testspace, coefspace,
             index=np.s_[:], cellmeasure=None, out=None):
         """
-        @brief 基于无数值积分的组装方式
+        @brief 标量空间拼成的向量空间 
         """
         mesh = space[0].mesh
         GD = space[0].geo_dimension()
@@ -105,7 +118,7 @@ class VectorMassIntegrator:
         integrator = ScalarMassIntegrator(self.coef, self.q)
         # 组装标量的单元扩散矩阵
         # D.shape == (NC, ldof, ldof)
-        D = integrator.assembly_cell_matrix_fast(space[0], index=index, cellmeasure=cellmeasure)
+        D = integrator.assembly_cell_matrix_fast(space[0], trialspace, testspace, coefspace, index=index, cellmeasure=cellmeasure)
         NC = len(cellmeasure)
 
         if out is None:
@@ -121,4 +134,11 @@ class VectorMassIntegrator:
                 VD[:, i::GD, i::GD] += D 
         if out is None:
             return VD
+
+    def assembly_cell_matrix_for_vector_basis_vspace_fast(self, space, index=np.s_[:], cellmeasure=None, out=None):
+        """
+        @brief 空间基函数是向量型
+        """
+        pass
+
 
