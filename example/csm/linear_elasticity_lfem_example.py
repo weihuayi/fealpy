@@ -87,19 +87,3 @@ if hasattr(pde, 'dirichlet'):
 uh.flat[:] = spsolve(A, F)
 mesh.nodedata['uh'] = uh
 mesh.to_vtk(fname='linear_lfem.vtu')
-
-'''
-# 画出原始网格
-mesh.add_plot(plt)
-
-if doforder == 'sdofs':
-    # 画出变形网格
-    mesh.node += scale*uh[:, :NN].T
-    mesh.add_plot(plt)
-elif doforder == 'vdims':
-    # 画出变形网格
-    mesh.node += scale*uh[:NN]
-    mesh.add_plot(plt)
-
-plt.show()
-'''
