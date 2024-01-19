@@ -179,7 +179,7 @@ class BilinearForm:
             self._M += bi.assembly_face_matrix(space)
         return self._M
 
-    def fast_assembly(self):
+    def fast_assembly(self, trialspace=None, testspace=None, coefspace=None):
         """
         @brief 免数值积分组装
 
@@ -195,9 +195,9 @@ class BilinearForm:
             return self.fast_assembly_for_vspace_with_scalar_basis()
         else:
             # 标量函数空间或基是向量函数的向量函数空间
-            return self.fast_assembly_for_sspace_and_vspace_with_vector_basis()
+            return self.fast_assembly_for_sspace_and_vspace_with_vector_basis(trialspace, testspace, coefspace)
 
-    def fast_assembly_for_sspace_and_vspace_with_vector_basis(self) -> None:
+    def fast_assembly_for_sspace_and_vspace_with_vector_basis(self, trialspace, testspace, coefspace) -> None:
         """
         免数值积分组装标量空间（其基函数为标量函数）和向量空间（其基函数为向量函数）的矩阵的方法
 
@@ -212,6 +212,9 @@ class BilinearForm:
 
         """
         space = self.space
+        trialspace = trialspace
+        testspace = testspace
+        coefspace = coefspace
         ldof = space.number_of_local_dofs()
         gdof = space.number_of_global_dofs()
 
@@ -219,7 +222,7 @@ class BilinearForm:
         NC = mesh.number_of_cells()
         CM = np.zeros((NC, ldof, ldof), dtype=space.ftype)
         for di in self.dintegrators:
-            di.assembly_cell_matrix_fast(space, out=CM)
+            di.assembly_cell_matrix_fast(trialspace, testspace, coefspace, out=CM)
 
         cell2dof = space.cell_to_dof()
         I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)

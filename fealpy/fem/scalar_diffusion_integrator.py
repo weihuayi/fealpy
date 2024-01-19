@@ -43,7 +43,6 @@ class ScalarDiffusionIntegrator:
         phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, GD)
         phi1 = phi0
 
-
         if coef is None:
             D += np.einsum('q, qcid, qcjd, c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
         else:
@@ -73,20 +72,19 @@ class ScalarDiffusionIntegrator:
                 else:
                     raise ValueError(f"coef with shape {coef.shape}! Now we just support shape: (NC, ), (NQ, NC), (GD, GD), (NC, GD, GD) or NQ, NC, GD, GD)")
             else:
-                raise ValueError("coef不支持该类型")
+                raise ValueError("coef 不支持该类型")
 
         if out is None:
             return D
 
 
-    def assembly_cell_matrix_fast(self, trialspace, testspace=None, index=np.s_[:],
-            cellmeasure=None, out=None):
+    def assembly_cell_matrix_fast(self, trialspace, testspace=None, coefspace=None,
+            index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 基于无数值积分的组装方式
         """
-        #mesh = space.mesh 
-        #assert mesh.meshtype in ['tri', 'tet']
         coef = self.coef
+
         mesh = trialspace.mesh 
         meshtype = mesh.type
 
@@ -100,10 +98,16 @@ class ScalarDiffusionIntegrator:
             TSFtype = testspace.btype
             TSFdegree = testspace.p 
             TSFldof = testspace.number_of_local_dofs()
+        COFtype = TAFtype
+        COFdegree = TAFdegree
+        COFldof = TAFldof
+        if coefspace is not None:
+            COFtype = coefspace.btype
+            COFdegree = coefspace.p 
+            COFldof = coefspace.number_of_local_dofs()
         Itype = self.type 
         dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
                 str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
-        print("dataindex:\n", dataindex)
 
         if cellmeasure is None:
             if mesh.meshtype == 'UniformMesh2d':
@@ -115,19 +119,36 @@ class ScalarDiffusionIntegrator:
         NC = len(cellmeasure)
 
         if out is None:
-            M = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
+            D = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
         else:
-            M = out
+            D = out
         
         print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
         print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
+        print("glambda:", mesh.grad_lambda().shape, "\n", mesh.grad_lambda())
+        glambda = mesh.grad_lambda()
         if coef is None:
-            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+            D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], optimize=True)
+            D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], optimize=True)
         else:
-            raise ValueError("coef is not correct!")
+            if callable(coef):
+                u = coefspace.interpolate(coef)
+                cell2dof = coefspace.cell_to_dof()
+                coef = u[cell2dof]
+            if np.isscalar(coef):
+                D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], optimize=True)
+                D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], optimize=True)
+                D *= coef
+            elif coef.shape == (NC, COFldof):
+                dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
+                print("dataindex:\n", data[dataindex])
+                D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], coef, optimize=True)
+                D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], coef, optimize=True)
+            else:
+                raise ValueError("coef is not correct!")
 
         if out is None:
-            return M
+            return D
 
 
     def assembly_cell_matrix_ref(self, space, index=np.s_[:], cellmeasure=None):
