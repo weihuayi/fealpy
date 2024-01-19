@@ -78,33 +78,47 @@ class ScalarDiffusionIntegrator:
             return D
 
 
-    def assembly_cell_matrix_fast(self, trialspace, testspace=None, coefspace=None,
+    def assembly_cell_matrix_fast(self, space,
+            trialspace=None, testspace=None, coefspace=None,
             index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 基于无数值积分的组装方式
         """
         coef = self.coef
 
-        mesh = trialspace.mesh 
+        mesh = space.mesh 
         meshtype = mesh.type
 
-        TAFtype = trialspace.btype
-        TAFdegree = trialspace.p
-        TAFldof = trialspace.number_of_local_dofs()  
-        TSFtype = TAFtype
-        TSFdegree = TAFdegree
-        TSFldof = TAFldof
-        if testspace is not None:
+        if trialspace is None:
+            trialspace = space
+            TAFtype = space.btype
+            TAFdegree = space.p
+            TAFldof = space.number_of_local_dofs()
+        else:
+            TAFtype = trialspace.btype
+            TAFdegree = trialspace.p
+            TAFldof = trialspace.number_of_local_dofs()  
+
+        if testspace is None:
+            testspace = trialspace
+            TSFtype = TAFtype
+            TSFdegree = TAFdegree
+            TSFldof = TAFldof
+        else:
             TSFtype = testspace.btype
             TSFdegree = testspace.p 
             TSFldof = testspace.number_of_local_dofs()
-        COFtype = TAFtype
-        COFdegree = TAFdegree
-        COFldof = TAFldof
-        if coefspace is not None:
+
+        if coefspace is None:
+            coefspace = testspace
+            COFtype = TSFtype
+            COFdegree = TSFdegree
+            COFldof = TSFldof
+        else:
             COFtype = coefspace.btype
             COFdegree = coefspace.p 
             COFldof = coefspace.number_of_local_dofs()
+
         Itype = self.type 
         dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
                 str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
@@ -123,9 +137,6 @@ class ScalarDiffusionIntegrator:
         else:
             D = out
         
-        print("cellmeasure:", cellmeasure.shape, "\n",cellmeasure)
-        print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
-        print("glambda:", mesh.grad_lambda().shape, "\n", mesh.grad_lambda())
         glambda = mesh.grad_lambda()
         if coef is None:
             D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], optimize=True)
@@ -141,7 +152,6 @@ class ScalarDiffusionIntegrator:
                 D *= coef
             elif coef.shape == (NC, COFldof):
                 dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
-                print("dataindex:\n", data[dataindex])
                 D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], coef, optimize=True)
                 D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], coef, optimize=True)
             else:
