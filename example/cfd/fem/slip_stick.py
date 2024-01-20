@@ -96,6 +96,21 @@ def changemu(fun, s0):
     fun[tag_g] = mu_gas
     return fun
 
+def level_x(phi, y):
+    ipoint = phi.space.interpolation_points()
+    y_indices = np.where(ipoint[:, 1]==y)[0]
+    phi_y = phi[y_indices]
+    sort_indeces = np.argsort(np.abs(phi_y))[:2]
+    indices = y_indices[sort_indeces]
+    if phi[indices[0]] < 1e-8:
+        return ipoint[indices[0],0]
+    else :
+        zong = np.abs(phi[indices[0]]) + np.abs(phi[indices[1]])
+        ws0 = 1 - np.abs(phi[indices[0]])/zong
+        ws1 = 1 - np.abs(phi[indices[1]])/zong
+        val = ws0 * ipoint[indices[0], 0] + ws1*ipoint[indices[1],0]
+        return val
+
 uspace = LagrangeFESpace(mesh,p=udegree, doforder='sdofs')
 pspace = LagrangeFESpace(mesh,p=pdegree, doforder='sdofs')
 u0 = uspace.function(dim = udim)
@@ -144,7 +159,7 @@ isBdDof = np.hstack([is_ux_bdof, is_u_bdof, is_p_bdof])
 for i in range(0, nt):
     #下一个时间层
     t1 = tmesh.next_time_level()
-    print("t1", t1)
+    print("t1=", t1)
 
     A = NSSolver.ossen_A(u0)
     b = NSSolver.ossen_b(u0)
@@ -166,6 +181,9 @@ for i in range(0, nt):
     #levelset
     phi0[:] = LSSolver.mumps_solve(4, phi0, dt, u1)
     
+    xxx = level_x(phi0, 0)
+    print("边界点位置:",xxx)
+
     mu = changemu(mu,phi0)
     rho = changerho(rho,phi0)
     

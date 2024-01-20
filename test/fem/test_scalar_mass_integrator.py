@@ -67,14 +67,14 @@ def test_assembly_cell_matrix_fast(mesh_and_space):
 
     # 测试 c 为 None
     mi = ScalarMassIntegrator(q=p+2)
-    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
+    FM = mi.assembly_cell_matrix_fast(space=space)
     M = mi.assembly_cell_matrix(space=space)
     assert np.allclose(FM, M)
 
     # 测试 c 为标量
     scalar_coef = 2.0
     mi = ScalarMassIntegrator(q=p+2, c=scalar_coef)
-    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space)
+    FM = mi.assembly_cell_matrix_fast(space=space)
     M = mi.assembly_cell_matrix(space=space)
     assert np.allclose(FM, M)
 
@@ -87,6 +87,6 @@ def test_assembly_cell_matrix_fast(mesh_and_space):
         return x + y
 
     mi = ScalarMassIntegrator(c=func_coef, q=p+2)
-    FM = mi.assembly_cell_matrix_fast(trialspace=space, testspace=space, coefspace=space)
+    FM = mi.assembly_cell_matrix_fast(space=space)
     M = mi.assembly_cell_matrix(space=space)
     assert np.allclose(FM, M)

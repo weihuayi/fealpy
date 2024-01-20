@@ -1,8 +1,8 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-import mpl_toolkits.mplot3d as a3
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
+#import mpl_toolkits.mplot3d as a3
+#from mpl_toolkits.mplot3d.art3d import Line3DCollection
 import matplotlib.colors as colors
 from matplotlib.tri import Triangulation
 
