@@ -138,34 +138,26 @@ class ScalarDiffusionIntegrator:
             D = out
         
         glambda = mesh.grad_lambda()
-        print("glambda:", glambda.shape)
+        #print("glambda:", glambda.shape)
         if coef is None:
-            print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
-            D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], optimize=True)
-            D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], optimize=True)
-            D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 2], glambda[..., 2], optimize=True)
+            #print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
+            D += np.einsum('ijkl, c, ckm, clm -> cij', data[dataindex], cellmeasure, glambda, glambda, optimize=True)
         else:
             if callable(coef):
                 u = coefspace.interpolate(coef)
                 cell2dof = coefspace.cell_to_dof()
                 coef = u[cell2dof]
             if np.isscalar(coef):
-                print("data[dataindex]:", data[dataindex].shape)
-                D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], optimize=True)
-                D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], optimize=True)
-                D += np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., 2], glambda[..., 2], optimize=True)
+                #print("data[dataindex]:", data[dataindex].shape)
+                D += np.einsum('ijkl, c, ckm, clm -> cij', data[dataindex], cellmeasure, glambda, glambda, optimize=True)
                 D *= coef
             elif coef.shape == (NC, COFldof):
                 dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
-                print("data[dataindex]:", data[dataindex].shape)
-                D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], coef, optimize=True)
-                D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], coef, optimize=True)
-                D += np.einsum('ijkmn, c, cm, cn, ck -> cij', data[dataindex], cellmeasure, glambda[..., 2], glambda[..., 2], coef, optimize=True)
+                #print("data[dataindex]:", data[dataindex].shape)
+                D += np.einsum('ijkmn, c, cml, cnl, ck -> cij', data[dataindex], cellmeasure, glambda, glambda, coef, optimize=True)
             elif coef.shape == (NC, ):
                 print("data[dataindex]:", data[dataindex].shape)
-                D += np.einsum('ijkl, c, ck, cl, c -> cij', data[dataindex], cellmeasure, glambda[..., 0], glambda[..., 0], coef, optimize=True)
-                D += np.einsum('ijkl, c, ck, cl, c -> cij', data[dataindex], cellmeasure, glambda[..., 1], glambda[..., 1], coef, optimize=True)
-                D += np.einsum('ijkl, c, ck, cl, c -> cij', data[dataindex], cellmeasure, glambda[..., 2], glambda[..., 2], coef, optimize=True)
+                D += np.einsum('ijkl, c, ckm, clm, c -> cij', data[dataindex], cellmeasure, glambda, glambda, coef, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
 
