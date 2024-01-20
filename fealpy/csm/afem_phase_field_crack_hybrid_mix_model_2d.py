@@ -78,14 +78,22 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             vspace = (GD*(space, ))
             ubform = BilinearForm(GD*(space, ))
             
-            start0 = time.time()
             gd = self.energy_degradation_function(d)
             ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
                 model.mu, c=gd))
-            A0 = ubform.assembly()
+            
+            start0 = time.time()
+            A = ubform.fast_assembly()
             end0 = time.time()
-            print('matrix:', end0-start0)
+            print('fast matrix0:', end0-start0)
 
+            
+            start0 = time.time()
+            A0 = ubform?!?jedi=0, .assembly()?!? (*_*a: ArrayLike*_*, axis: None | _ShapeLike=..., out: _ArrayType=..., keepdims: bool=..., initial: _NumberLike_co=..., where: _ArrayLikeBool_co=...) ?!?jedi?!?
+            end0 = time?!?jedi=0, .time()?!? (*_*a: ArrayLike*_*, axis: None | _ShapeLike=..., out: None=..., keepdims: bool=..., initial: _NumberLike_co=..., where: _ArrayLikeBool_co=...) ?!?jedi?!?
+            print('matrix0:', end0-start0)
+?!?jedi=0, ?!?                        (*_*a: _ArrayLike[_SCT]*_*, axis: None=..., out: None=..., keepdims: Literal[False]=..., initial: _NumberLike_co=..., where: _ArrayLikeBool_co=...) ?!?jedi?!?
+            print(np.max(np.abs()))
 #            D = self.dsigma_depsilon(d, D0)
 #            integrator = ProvidesSymmetricTangentOperatorIntegrator(D)
 #            ubform.add_domain_integrator(integrator)
@@ -101,12 +109,11 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
            
             start1 = time.time() 
-            # TODO：更快的求解方法
 #            du.flat[:] = spsolve(A0, R0)
 #            uh[:] += du
             du.flat[:],_ = lgmres(A0, R0, atol=1e-18)
             uh[:] += du
-            print('du:', np.sum(np.abs(du)))
+            
             end1 = time.time()
             print('solve:', end1-start1)
             
@@ -115,14 +122,19 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             strain = self.strain(uh)
             phip, _ = self.strain_energy_density_decomposition(strain)
             H[:] = np.fmax(H, phip)
-
-            # 计算相场模型
-            start2 = time.time()
+            
             dbform = BilinearForm(space)
             dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
                 q=4))
             dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-            # TODO：快速组装程序
+
+            # 计算相场模型
+#            start2 = time.time()
+#            A1 = dbform.fast_assembly()
+#            end2 = time.time()
+#            print('fast matrix2:', end2-start2)
+
+            start2 = time.time()
             A1 = dbform.assembly()
             end2 = time.time()
             print('matrix2:', end2-start2)
@@ -143,9 +155,7 @@ class AFEMPhaseFieldCrackHybridMixModel2d():
             d[:] += dd
             end3 = time.time()
             print('solve:', end3-start3)
-            print('dd:', np.sum(np.abs(dd)))
             
-        
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
             
