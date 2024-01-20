@@ -40,10 +40,12 @@ mesh = QuadrangleMesh.from_box(box=domain,nx=nx,ny=nx)
 h = (domain[1]-domain[0])/nx
 
 DI = ScalarDiffusionIntegrator(mesh)
+
 DM,Db = DI.cell_center_matrix(dirichlet, is_dirichlet_boundary)
 
 bb = mesh.integral(source, celltype=True)
 uh = spsolve(DM, bb+Db)
+
 
 
 ipoint = mesh.entity_barycenter('cell')
@@ -51,7 +53,6 @@ u = solution(ipoint)
 e = u - uh
 print('emax', np.max(np.abs(u-uh)))
 print('eL2', np.sqrt(np.sum(h*h*e**2)))
-
 
 fig = plt.figure()
 ax1 = fig.add_subplot(111,projection='3d')
