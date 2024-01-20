@@ -128,7 +128,6 @@ class LinearElasticityOperatorIntegrator:
 
                         K[:, j::GD, i::GD] += lam*A[imap[(i, j)]].transpose(0, 2, 1)
                         K[:, j::GD, i::GD] += mu*A[imap[(i, j)]]
-
         if out is None:
             return K
 
