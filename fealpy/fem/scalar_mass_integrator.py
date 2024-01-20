@@ -137,10 +137,13 @@ class ScalarMassIntegrator:
                 cell2dof = coefspace.cell_to_dof()
                 coef = u[cell2dof]
             if np.isscalar(coef):
-                M += coef * np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
+                M += coef * np.einsum('c, aij -> cij', cellmeasure, data[dataindex], optimize=True)
             elif coef.shape == (NC, COFldof):
                 dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
-                M += np.einsum('c, ijk, ck-> cij', cellmeasure, data[dataindex], coef, optimize=True)
+                #print("data[dataindex]:", data[dataindex].shape)
+                M += np.einsum('c, ijk, ck -> cij', cellmeasure, data[dataindex], coef, optimize=True)
+            elif coef.shape == (NC, ):
+                M += np.einsum('c, aij, c -> cij', cellmeasure, data[dataindex], coef, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
 
