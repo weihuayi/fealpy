@@ -1045,13 +1045,8 @@ class PolygonMeshDataStructure(MeshDataStructure):
             return cell2edgeSign
         else:
             cell2edgeSign = np.zeros(self._cell.shape[0], dtype=self.itype)
-            print("edge2cell:\n", edge2cell)
             isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
-            print("test1:\n", cellLocation)
-            print("test2:\n", cellLocation[edge2cell[:, 0]])
-            print("test3:\n", cellLocation[edge2cell[:, 0]] + edge2cell[:, 2])
             cell2edgeSign[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]] = 1
-            print("cell2edgeSign:\n", cell2edgeSign)
             cell2edgeSign[cellLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]] = -1
 
             return cell2edgeSign

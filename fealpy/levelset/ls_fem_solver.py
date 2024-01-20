@@ -188,7 +188,7 @@ class LSFEMSolver(LSSolver):
         return phi0
 
 
-    def reinit(self, phi0, dt = 0.0001, eps = 5e-6, nt = 4, alpha = None):
+    def reinit(self, phi0, dt = 0.0001, eps = 5e-6, nt = 4, alpha = None, show=False):
         '''
         Reinitialize the level set function to a signed distance function using the PDE-based reinitialization approach.
 
@@ -258,10 +258,12 @@ class LSFEMSolver(LSSolver):
 
             # Calculate the error between the new and old level set function.
             error = space.mesh.error(phi2, phi1)
-            print("Reinitialization error:", error) 
+            if show == True:
+                print("Reinitialization error:", error) 
 
             # If the error starts increasing or is below the threshold, break the loop.
             if eold < error or error< eps :
+                print("Reinitialization success")
                 break
             else:
                 phi1[:] = phi2

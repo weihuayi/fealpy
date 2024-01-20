@@ -97,3 +97,23 @@ class LSSolver():
         area = np.einsum('i, ij, j ->', ws, measure(bcs), cellmeasure)
 
         return area
+
+    
+
+    def level_x(self, phi, y):
+        '''
+        计算界面与水平直线y交点的x值
+        '''
+        ipoint = phi.space.interpolation_points()
+        y_indices = np.where(ipoint[:, 1]==y)[0]
+        phi_y = phi[y_indices]
+        sort_indeces = np.argsort(np.abs(phi_y))[:2]
+        indices = y_indices[sort_indeces]
+        if phi[indices[0]] < 1e-8:
+            return ipoint[indices[0],0]
+        else :
+            zong = np.abs(phi[indices[0]]) + np.abs(phi[indices[1]])
+            ws0 = 1 - np.abs(phi[indices[0]])/zong
+            ws1 = 1 - np.abs(phi[indices[1]])/zong
+            val = ws0 * ipoint[indices[0], 0] + ws1*ipoint[indices[1],0]
+            return val
