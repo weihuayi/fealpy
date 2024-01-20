@@ -27,9 +27,19 @@ step = 5
 
 # 模型参数
 alpha = 0.625/ns
-rho_gas = 0.001*rho_melt
+'''
 rho_melt = 1020
+#rho_gas = 0.001*rho_melt
+rho_gas = rho_melt
 mu_gas = 1.792e-5
+#mu_melt = 4.7e-5
+mu_melt = mu_gas
+'''
+rho_gas = 1
+rho_melt = 1
+#mu_gas = 1.792e-5
+mu_gas = 0.01
+mu_melt = 0.01
 
 # 定义网格、空间
 udim = 2
@@ -91,11 +101,31 @@ def changerho(fun, s0):
     return fun
 
 def changemu(mufun, s0):
+    tag_m = s0 <=0
     tag_g = s0 >  0
     mufun[tag_g] = mu_gas
+    mufun[tag_m] = mu_melt
     return mufun
 
 uspace = LagrangeFESpace(mesh,p=udegree, doforder='sdofs')
+phi0 = uspace.interpolate(dist)
+
+## 初始网格
+## 加密
+for i in range(5):
+    cell2dof = mesh.cell_to_ipoint(udegree)
+    phi0c2f = phi0[cell2dof]
+    isMark = np.abs(np.mean(phi0c2f,axis=-1))< 0.05
+    data = {'phi0':phi0c2f} 
+    option = mesh.bisect_options(data=data)
+    mesh.bisect(isMark,options=option)
+
+    uspace = LagrangeFESpace(mesh,p=udegree,doforder='sdofs')
+    cell2dof = uspace.cell_to_dof()
+    phi0 = uspace.function()
+    phi0[cell2dof.reshape(-1)] = option['data']['phi0'].reshape(-1)
+
+phi0 = uspace.interpolate(dist)
 pspace = LagrangeFESpace(mesh,p=pdegree, doforder='sdofs')
 
 u0 = uspace.function(dim = udim)
@@ -103,8 +133,6 @@ u1 = uspace.function(dim = udim)
 
 p0 = pspace.function()
 p1 = pspace.function()
-
-phi0 = uspace.interpolate(dist)
 
 mu = uspace.function()
 rho = uspace.function()
@@ -120,42 +148,40 @@ variable = [u0,mu,phi0,rho,stress[0,0,:],
         stress[1,1,:],stress[0,1,:],stress[0,0,:]-stress[1,1,:]]
 NSSolver.output(name,variable,0)
 
-##边界条件
-ugdof = uspace.number_of_global_dofs()
-gdof = 2*uspace.number_of_global_dofs() + pspace.number_of_global_dofs()
-xx = np.zeros(gdof, np.float64)
-
-is_u_bdof = uspace.is_boundary_dof()
-is_ux_bdof = uspace.is_boundary_dof()
-is_uslip_bdof = uspace.is_boundary_dof(threshold = is_slip_boundary)
-is_uin_bdof = uspace.is_boundary_dof(threshold = is_inflow_boundary)
-is_uout_bdof = uspace.is_boundary_dof(threshold = is_outflow_boundary)
-is_p_bdof = pspace.is_boundary_dof(threshold = is_outflow_boundary)
-
-is_u_bdof[is_uout_bdof] = False
-is_ux_bdof[is_uout_bdof] = False
-is_ux_bdof[is_uslip_bdof] = False
-
-ipoint = uspace.interpolation_points()[is_uin_bdof]
-uinflow = u_inflow_dirichlet(ipoint)
-xx[0:ugdof][is_uin_bdof] = uinflow[:, 0]
-xx[ugdof:2*ugdof][is_uin_bdof] = uinflow[:,1]
-isBdDof = np.hstack([is_ux_bdof, is_u_bdof, is_p_bdof])
 
 for i in range(0, nt):
     #下一个时间层
     t1 = tmesh.next_time_level()
     print("t1=", t1)
+ 
+    ##边界条件
+    ugdof = uspace.number_of_global_dofs()
+    gdof = 2*uspace.number_of_global_dofs() + pspace.number_of_global_dofs()
+    xx = np.zeros(gdof, np.float64)
 
+    is_u_bdof = uspace.is_boundary_dof()
+    is_ux_bdof = uspace.is_boundary_dof()
+    is_uslip_bdof = uspace.is_boundary_dof(threshold = is_slip_boundary)
+    is_uin_bdof = uspace.is_boundary_dof(threshold = is_inflow_boundary)
+    is_uout_bdof = uspace.is_boundary_dof(threshold = is_outflow_boundary)
+    is_p_bdof = pspace.is_boundary_dof(threshold = is_outflow_boundary)
+
+    is_u_bdof[is_uout_bdof] = False
+    is_ux_bdof[is_uout_bdof] = False
+    #is_ux_bdof[is_uslip_bdof] = False
+
+    ipoint = uspace.interpolation_points()[is_uin_bdof]
+    uinflow = u_inflow_dirichlet(ipoint)
+    xx[0:ugdof][is_uin_bdof] = uinflow[:, 0]
+    xx[ugdof:2*ugdof][is_uin_bdof] = uinflow[:,1]
+    isBdDof = np.hstack([is_ux_bdof, is_u_bdof, is_p_bdof])
+    
     @barycentric
     def cross_mu(bcs, index=None):
-        return self.cross_wlf(p0, u0, bcs, T=200)
-    mu = uspace.interpolate(cross_mu)
-    mu = changemu(mu, phi0)
-    rho = changerho(rho,phi0)
-
-    A = NSSolver.ossen_A(u0, mu)
-    b = NSSolver.ossen_b(u0)
+        return NSSolver.cross_wlf(p0, u0, bcs, T=200)
+     
+    A = NSSolver.ossen_A(u0, mu, rho)
+    b = NSSolver.ossen_b(u0, rho)
 
     ## 边界条件处理
     b -= A@xx
@@ -173,21 +199,79 @@ for i in range(0, nt):
     #levelset
     phi0[:] = LSSolver.mumps_solve(4, phi0, dt, u1)
     
-    xxx = level_x(phi0, 0)
-    print("边界点位置:",xxx)
+    ucell2dof = uspace.cell_to_dof()
+    pcell2dof = pspace.cell_to_dof()
+    for j in range(5): 
+        phi0c2f = phi0[ucell2dof]
+        u1xc2f = u1[0,:][ucell2dof]
+        u1yc2f = u1[1,:][ucell2dof]
+        p1c2f = p1[pcell2dof]
+        cellmeasure = mesh.entity_measure('cell')
+        isMark = np.abs(np.mean(phi0c2f,axis=-1))<0.05
+        isMark = np.logical_and(np.mean(phi0c2f,axis=-1)>-0.01,isMark)
+        isMark = np.logical_and(isMark,cellmeasure>4e-5)
+        data = {'phi0':phi0c2f,'u1x':u1xc2f,'u1y':u1yc2f,'p1':p1c2f} 
+        option = mesh.bisect_options(data=data,disp=False)
+        mesh.bisect(isMark,options=option)
 
-    mu = changemu(mu,phi0)
-    rho = changerho(rho,phi0)
+        uspace = LagrangeFESpace(mesh,p=udegree, doforder='sdofs')
+        pspace = LagrangeFESpace(mesh,p=pdegree, doforder='sdofs')
+        ucell2dof = uspace.cell_to_dof()
+        pcell2dof = pspace.cell_to_dof()
+        phi0 = uspace.function()
+        u1 = uspace.function(dim=2)
+        p1 = pspace.function()
+        phi0[ucell2dof.reshape(-1)] = option['data']['phi0'].reshape(-1)
+        u1[0,:][ucell2dof.reshape(-1)] = option['data']['u1x'].reshape(-1)
+        u1[1,:][ucell2dof.reshape(-1)] = option['data']['u1y'].reshape(-1)
+        p1[pcell2dof.reshape(-1)] = option['data']['p1'].reshape(-1)
     
+    
+    #重新粗化
+    for j in range(5):
+        phi0c2f = phi0[ucell2dof]
+        u1xc2f = u1[0,:][ucell2dof]
+        u1yc2f = u1[1,:][ucell2dof]
+        p1c2f = p1[pcell2dof]
+        cellmeasure = mesh.entity_measure('cell')
+        isMark = np.abs(np.mean(phi0c2f,axis=-1))>0.05
+        isMark = np.logical_and(np.mean(phi0c2f,axis=-1)<0.01,isMark)
+        data = {'phi0':phi0c2f,'u1x':u1xc2f,'u1y':u1yc2f,'p1':p1c2f} 
+        option = mesh.bisect_options(data=data,disp=False)
+        mesh.coarsen(isMark,options=option)
+
+        uspace = LagrangeFESpace(mesh,p=udegree, doforder='sdofs')
+        pspace = LagrangeFESpace(mesh,p=pdegree, doforder='sdofs')
+        ucell2dof = uspace.cell_to_dof()
+        pcell2dof = pspace.cell_to_dof()
+        phi0 = uspace.function()
+        u1 = uspace.function(dim=2)
+        p1 = pspace.function()
+        phi0[ucell2dof.reshape(-1)] = option['data']['phi0'].reshape(-1)
+        u1[0,:][ucell2dof.reshape(-1)] = option['data']['u1x'].reshape(-1)
+        u1[1,:][ucell2dof.reshape(-1)] = option['data']['u1y'].reshape(-1)
+        p1[pcell2dof.reshape(-1)] = option['data']['p1'].reshape(-1)
+ 
+    u0 = uspace.function(dim = udim)
+    p0 = pspace.function()
+    u0[:] = u1 
+    p0[:] = p1
+    
+    NSSolver = NSFEMSolver(mesh, dt, uspace, pspace)
+    LSSolver = LSFEMSolver(uspace)
+    mu = uspace.function()
+    rho = uspace.function()
+    rho = changerho(rho,phi0)
+    mu = changemu(mu, phi0)
+    
+    #mu[uspace.cell_to_dof()] = uspace.interpolate(cross_mu)
     if i%step == 0:
-        stress = NSSolver.netwon_sigma(u0, mu)
+        stress = NSSolver.netwon_sigma(u1, mu)
         phi0 = LSSolver.reinit(phi0=phi0, dt=0.0001,eps=2e-4, nt=100, alpha=alpha)
         name = ['velocity','mu','phi','rho','D00','D11','D01','minus']
         variable = [u0,mu,phi0,rho,stress[0,0,:],
                 stress[1,1,:],stress[0,1,:],stress[0,0,:]-stress[1,1,:]]
         NSSolver.output(name,variable,i)
     
-    u0[:] = u1 
-    p0[:] = p1
     # 时间步进一层 
     tmesh.advance()

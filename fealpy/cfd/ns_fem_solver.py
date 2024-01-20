@@ -48,26 +48,24 @@ class NSFEMSolver:
     
     #u \cdot u   \approx   u^n \cdot u^{n+1}
     def ossen_A(self,un, mu=None ,rho=None):
-        M = self.M
         AP = self.AP
         if rho is None:
-            rho = self.rho
-        
-        bform = BilinearForm((self.uspace,)*2)
-        bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=q))
-        M = bform.assembly() 
-        
-        S = self.S
-        if mu is not None:
+            M = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            M = bform.assembly() 
+
+        if mu is None:
+            S = self.S
+        else:
             bform = BilinearForm((self.uspace,)*2)
             bform.add_domain_integrator(VectorDiffusionIntegrator(c=mu, q=self.q))
             S = bform.assembly()
-        else:
-            print("暂时未开发")
 
         SP = self.SP
         dt = self.dt
- 
+        
         @barycentric
         def coef(bcs, index):
             if callable(rho):
@@ -84,10 +82,15 @@ class NSFEMSolver:
                 [AP.T, None]], format='csr')
         return A
 
-    def ossen_b(self, un): 
+    def ossen_b(self, un, rho=None): 
         dt = self.dt
         pgdof = self.pspace.number_of_global_dofs()
-        M = self.M
+        if rho is None:
+            M = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            M = bform.assembly() 
         
         b = 1/dt * M@un.flatten()
         b = np.hstack((b,[0]*pgdof))
