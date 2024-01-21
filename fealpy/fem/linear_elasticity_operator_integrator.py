@@ -208,7 +208,7 @@ class LinearElasticityOperatorIntegrator:
         # 对于每一个设定的索引对，利用四边形积分公式和基函数的梯度来计算一个积分项
         glambda = mesh.grad_lambda()
         if c is None:
-            A  = [np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., i], glambda[..., j],
+            A = [np.einsum('ijkl, c, ck, cl -> cij', data[dataindex], cellmeasure, glambda[..., i], glambda[..., j],
                 optimize=True) for i, j in idx]
         else:
             if callable(c):
