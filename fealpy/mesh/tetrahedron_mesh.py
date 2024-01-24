@@ -34,25 +34,17 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
         return face2edgeSign
 
-<<<<<<< .merge_file_hU20Cf
     def cell_to_face_permutation(self, locFace = None):
         if locFace is None:
             locFace = self.localFace
 
-=======
-    def cell_to_face_permutation(self):
->>>>>>> .merge_file_BJIsbF
         c2f  = self.cell_to_face()
         cell = self.cell
         face = self.face
         face_g_idx = np.argsort(face)
 
         c2f_glo = face[c2f.reshape(-1)]
-<<<<<<< .merge_file_hU20Cf
         c2f_loc = cell[:, locFace].reshape(-1, 3)
-=======
-        c2f_loc = cell[:, self.localFace].reshape(-1, 3)
->>>>>>> .merge_file_BJIsbF
 
         c2f_glo = np.argsort(c2f_glo, axis=1)
         c2f_glo = np.argsort(c2f_glo, axis=1)
@@ -986,7 +978,6 @@ class TetrahedronMesh(Mesh, Plotable):
                 fval[cell] = fval0 
                 ret["nodedata"].append(fval)
         return ret
-
     def uniform_refine(self, n=1, returnim=False):
         """
         Perform uniform refinement on the tetrahedral mesh.
