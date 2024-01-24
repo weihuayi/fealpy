@@ -44,8 +44,7 @@ class LagrangeMesh(Mesh):
             return J, gphi
 
     def shape_function(self, bc, p=None, index=np.s_[:]):
-
-        pass
+        raise NotImplementedError
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:]):
         raise NotImplementedError
