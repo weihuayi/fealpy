@@ -704,47 +704,45 @@ class QuadrangleMesh(Mesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def polygon_domain_generator(cls, num_vertices=20, radius=1.0):
+    def polygon_domain_generator(cls, num_vertices=20, radius=1.0, center=[0.0, 0.0]):
         from scipy.spatial import ConvexHull
-        points = np.random.rand(num_vertices, 2)
+        points = np.random.rand(num_vertices, 2) * 2 * radius -radius +center
 
         # 构建凸包
         hull = ConvexHull(points)
 
         # 获取凸包上的点
-        boundary_points = np.vstack((hull.points[hull.vertices], hull.points[hull.vertices[0]]))
+        boundary_points = hull.points[hull.vertices]
 
-        angles = np.linspace(0, 2 * np.pi, len(boundary_points), endpoint=False)
-        x = radius * boundary_points[:, 0]
-        y = radius * boundary_points[:, 1]
-        c_x = np.mean(x)
-        c_y = np.mean(y)
+        return boundary_points
 
-        # 对点进行一些变换，使其形成非凸多边形
-        x += np.random.normal(0, radius * 0.0382, len(boundary_points))
-        y += np.random.normal(0, radius * 0.0382, len(boundary_points))
-
-        # 首尾相接，形成封闭多边形
-        x = np.append(x, x[0])
-        y = np.append(y, y[0])
-
-        return np.column_stack((x, y))
     @classmethod
-    def rand_quad_mesh_generator(cls, num, filename, h=0.382, radius=1.0):
+    def rand_quad_mesh_generator(cls, num, filename=None, h=0.382, radius=0.5, center=[0.5, 0.5]):
+        """
+        @brief 随机生成指定区域的，指定数量的，随机四边形网格
+
+        @param num: 需要生成的网格数量
+        @param filename: 输出文件名，如果非 None，输出文件，如果为 None，返回网格列表
+        @param h: 网格密度
+        @param radius: 区域半径
+        @param center: 区域中点坐标
+
+        @return: None 或网格列表
+        """
         from scipy.interpolate import BSpline
         mesh_list = []
 
         for i in range(num):
             # 生成封闭的多边形
-            num_vertices = 8 * (int(radius)) + 1
-            control_points = cls.polygon_domain_generator(num_vertices)
+            num_vertices = 8 * (int(radius) + 1)
+            control_points = cls.polygon_domain_generator(num_vertices, radius)
 
             degree = np.random.randint(1, 3)
 
             bspline_curve = BSpline(np.arange(len(control_points) + degree + 1), control_points, degree,
                                     extrapolate=False)
 
-            t_vals = np.linspace(0, len(control_points) - degree, 25 * (int(radius)) + 1)
+            t_vals = np.linspace(0, len(control_points) - degree, 25 * (int(radius) + 1))
             curve_points = bspline_curve(t_vals, extrapolate='periodic')
 
             mesh = QuadrangleMesh.from_polygon_gmsh(curve_points[:-1], h=0.1)
