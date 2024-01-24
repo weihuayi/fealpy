@@ -34,14 +34,17 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
         return face2edgeSign
 
-    def cell_to_face_permutation(self):
+    def cell_to_face_permutation(self, locFace = None):
+        if locFace is None:
+            locFace = self.localFace
+
         c2f  = self.cell_to_face()
         cell = self.cell
         face = self.face
         face_g_idx = np.argsort(face)
 
         c2f_glo = face[c2f.reshape(-1)]
-        c2f_loc = cell[:, self.localFace].reshape(-1, 3)
+        c2f_loc = cell[:, locFace].reshape(-1, 3)
 
         c2f_glo = np.argsort(c2f_glo, axis=1)
         c2f_glo = np.argsort(c2f_glo, axis=1)
@@ -453,7 +456,6 @@ class TetrahedronMesh(Mesh, Plotable):
 
         cell = self.entity(etype)[index]
         NC = len(cell)
-        print(cell.shape)
 
         cell = np.r_['1', np.zeros((NC, 1), dtype=cell.dtype), cell]
         cell[:, 0] = cell.shape[1]-1
@@ -737,11 +739,32 @@ class TetrahedronMesh(Mesh, Plotable):
         for i in range(n):
             self.bisect()
 
-    def bisect(self, isMarkedCell=None, data=None, returnim=False):
+    def bisect_options(self, HB = None, data=None, disp=None):
+        options = {'HB' : HB, 'data': data, 'disp': disp}
+        return options
+
+    def bisect(self, isMarkedCell=None, data=None, returnim=False, options={'disp': True}):
+
+        if options['disp']:
+            print('Bisection begining.......')
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
+        NE = self.number_of_edges()
 
+        if options['disp']:
+            print('Current number of nodes:', NN)
+            print('Current number of edges:', NE)
+            print('Current number of cells:', NC)
+
+        if ('data' in options) and (options['data'] is not None):
+            oldnode = self.entity('node')
+            oldcell = self.entity('cell')
+        
+        if("HB" in options) & (options["HB"] is not None):
+            HB = np.tile(np.arange(NC*4)[:, None], (1, 2))
+            options["HB"] = HB
+   
         if isMarkedCell is None: # 加密所有的单元
             markedCell = np.arange(NC, dtype=self.itype)
         else:
@@ -866,6 +889,10 @@ class TetrahedronMesh(Mesh, Plotable):
                 data = self.celldata[key]
                 data[NC:NC+nMarked] = data[markedCell]
 
+            if("HB" in options) and (options["HB"] is not None):
+                HB = options['HB']
+                HB[NC:NC+nMarked, 1] = HB[markedCell, 1]
+            
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3, p4
 
@@ -897,10 +924,60 @@ class TetrahedronMesh(Mesh, Plotable):
 
         for key in self.celldata:
             self.celldata[key] = self.celldata[key][:NC]
+            
+
+        if("HB" in options) & (options["HB"] is not None):
+            options['HB'] = options['HB'][:NC]
+
+        if ('data' in options) and (options['data'] is not None):
+            options['data'] = self.interpolation_with_HB(oldnode, oldcell, options['HB'], options['data'])
+            
 
         if returnim is True:
             return IM
 
+    def interpolation_with_HB(self, oldnode, oldcell, HB, data={}):
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        v01 = oldnode[oldcell[..., 1]] - oldnode[oldcell[..., 0]]
+        v02 = oldnode[oldcell[..., 2]] - oldnode[oldcell[..., 0]]
+        v03 = oldnode[oldcell[..., 3]] - oldnode[oldcell[..., 0]]
+        volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
+        
+        idx = HB[..., 1]
+        ret = {"nodedata": [], "celldata": []}
+
+        for u0 in data['celldata']: 
+            fval = u0[idx]
+            ret["celldata"].append(fval)
+
+        if 'nodedata' in data:
+            lambdai = np.zeros((NC, 4, 4), dtype=np.float64)
+
+            # 计算所有单元的第 j 个点的第 i 个重心坐标分量
+            for j in range(4):
+                flag = node[cell[:, j]]
+                localface = np.array([[2, 1, 3], [2, 3, 0], [1, 0, 3], [0, 1, 2]])
+                for i in range(4):
+                    v1 = oldnode[oldcell[idx, localface[i, 0]]] - flag
+                    v2 = oldnode[oldcell[idx, localface[i, 1]]] - flag
+                    v3 = oldnode[oldcell[idx, localface[i, 2]]] - flag
+                    volume1 = np.sum(np.cross(v2, v1)*v3, axis=-1)/6
+                    lambdai[:, j, i] = volume1/volume[idx]
+
+            fval0 = np.zeros((NC, 4), dtype=np.float64)
+            for u0 in data['nodedata']: 
+                fval = np.zeros((NN), dtype=np.float64)
+                for i in range(4):
+                    w = lambdai[:, i, :]
+                    fval0[:, i] = np.sum(w*u0[oldcell[idx]], axis=1) 
+                fval[cell] = fval0 
+                ret["nodedata"].append(fval)
+        return ret
     def uniform_refine(self, n=1, returnim=False):
         """
         Perform uniform refinement on the tetrahedral mesh.
