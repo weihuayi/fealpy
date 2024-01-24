@@ -21,8 +21,8 @@ def test_init(p):
     GD = mesh.geo_dimension()
     TD = mesh.top_dimension()
 
-    #fname = f"test_{p}.vtu"
-    #mesh.to_vtk(fname=fname)
+    fname = f"test_{p}.vtu"
+    mesh.to_vtk(fname=fname)
     
     assert mesh.itype == cell.dtype
     assert mesh.ftype == node.dtype
