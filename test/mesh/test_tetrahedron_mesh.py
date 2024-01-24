@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import pytest
 import copy
 from fealpy.mesh import TetrahedronMesh 
-from fealpy.functionspace import LagrangeFiniteElementSpace
-
+from fealpy.functionspace import LagrangeFESpace
 import ipdb
 
 @pytest.mark.parametrize("n", [0, 1, 2, 3, 4])
@@ -24,7 +23,7 @@ def test_interpolate(p):
 
     ips0 = mesh.interpolation_points(p)
 
-    space = LagrangeFiniteElementSpace(mesh, p=p)
+    space = LagrangeFESpace(mesh, p=p)
     ips1 = space.interpolation_points()
 
     assert np.allclose(ips0, ips1)
@@ -103,6 +102,43 @@ def test_bisect():
         if(not flag):
             print("ERROR", i, c0, c1)
 
+def dis(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    z = p[..., 2]
+    val = np.sin(x)*np.sin(y)*np.sin(z)
+    return val
+
+def test_interplation_weith_HB():
+
+    mesh = TetrahedronMesh.from_unit_cube()
+    space = LagrangeFESpace(mesh, p=1)
+
+    volume = mesh.entity_measure()
+
+    NC = mesh.number_of_cells()
+    
+    u0 = space.interpolate(dis)
+    H = np.zeros(NC, dtype=np.float64)
+
+    error0 = mesh.error(u0, dis) 
+    print('error0:', error0)
+
+    cell2dof = mesh.cell_to_ipoint(p=1)
+ 
+    isMarkedCell = np.abs(np.sum(u0[cell2dof], axis=-1)) > 1
+    data = {'nodedata': [u0], 'celldata': [H]}
+    options = mesh.bisect_options(data=data, HB=True)
+    mesh.bisect(isMarkedCell, options=options)
+    
+    data = options['data']
+    fval = data['nodedata'][0]
+    fval = space.function(array=fval)
+
+    error = mesh.error(fval, dis)
+    print('error:', error)
+
 if __name__ == "__main__":
     #test_mesh_generation_by_meshpy()
-    test_bisect()
+    #test_bisect()
+    test_interplation_weith_HB()

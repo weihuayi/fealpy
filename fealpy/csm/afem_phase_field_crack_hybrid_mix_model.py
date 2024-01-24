@@ -1,5 +1,8 @@
 import numpy as np
 import time
+import cupy as cp
+import cupyx.scipy.sparse.linalg as cpx
+from cupyx.scipy.sparse.linalg import LinearOperator as CuPyLinearOperator
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -15,6 +18,7 @@ from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
 from scipy.sparse.linalg import spsolve, lgmres, cg
+from scipy.sparse import csr_matrix, save_npz, load_npz
 
 class AFEMPhaseFieldCrackHybridMixModel():
     """
@@ -158,6 +162,150 @@ class AFEMPhaseFieldCrackHybridMixModel():
             d[:] += dd
             end3 = time.time()
             print('d_solve:', end3-start3)
+            
+            self.stored_energy = self.get_stored_energy(phip, d)
+            self.dissipated_energy = self.get_dissipated_energy(d)
+            
+            self.uh = uh
+            self.d = d
+            self.H = H
+
+            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
+            eta = self.recovery.recovery_estimate(self.d)
+                
+            isMarkedCell = mark(eta, theta = theta) # TODO：
+
+            cm = mesh.entity_measure('cell') 
+            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
+            
+            if np.any(isMarkedCell):
+                if refine == 'nvp':
+                    self.bisect_refine(isMarkedCell)
+                elif refine == 'rg':
+                    self.redgreen_refine(isMarkedCell)
+            
+            # 计算残量误差
+            if k == 0:
+                er0 = np.linalg.norm(R0)
+                er1 = np.linalg.norm(R1)
+            error0 = np.linalg.norm(R0)/er0
+            print("error0:", error0)
+
+            error1 = np.linalg.norm(R1)/er1
+            print("error1:", error1)
+            error = max(error0, error1)
+            print("error:", error)
+            if error < 1e-5:
+                break
+            k += 1
+        
+
+    def newton_raphson_gpu(self, 
+            disp, 
+            dirichlet_phase=False, 
+            refine='nvp', 
+            maxit=100,
+            theta=0.2):
+        """
+        @brief 给定位移条件，用 Newton Raphson 方法求解
+        """
+        mesh = self.mesh
+        space = self.space
+        model = self.model
+        GD = self.GD
+        D0 = self.D0
+        k = 0
+        while k < maxit:
+            print('k:', k)
+            uh = self.uh
+            d = self.d
+            H = self.H
+            
+            node = mesh.entity('node')
+            isDDof = model.is_disp_boundary(node)
+            uh[isDDof] = disp
+
+#            du = np.zeros_like(uh)
+            
+            # 求解位移
+            vspace = (GD*(space, ))
+            ubform = BilinearForm(GD*(space, ))
+            
+            gd = self.energy_degradation_function(d)
+            ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
+                model.mu, c=gd))
+            
+            start0 = time.time()
+            # 无数值积分矩阵组装
+            A0 = ubform.fast_assembly()
+            end0 = time.time()
+            print('fast matrix0:', end0-start0)
+
+            R0 = -A0@uh.flat[:]
+            
+            self.force = np.sum(-R0[isDDof.flat])
+            
+            ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
+
+            A0, R0 = ubc.apply(A0, R0) 
+            A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
+            
+            # 转换到GPU
+            A0_gpu = cp.sparse.csr_matrix(A0.astype(cp.float64))
+            b0_gpu = cp.array(R0, dtype=cp.float64)
+
+            # 在GPU上求解，并计时
+            start_time_gpu = time.time()
+            x0_gpu, info = cpx.cg(A0_gpu, b0_gpu, atol=1e-18)
+            end_time_gpu = time.time()
+
+            # 输出GPU求解时间
+            gpu_time = end_time_gpu - start_time_gpu
+            print("uh GPU time: {:.5f} seconds".format(gpu_time))
+
+            uh[:].flat += x0_gpu.get()
+            
+            # 更新应变和最大历史应变场参数
+            strain = self.strain(uh)
+            phip, _ = self.strain_energy_density_decomposition(strain)
+            H[:] = np.fmax(H, phip)
+
+            # 相场模型计算
+            dbform = BilinearForm(space)
+            dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
+                q=4))
+            dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
+
+            start2 = time.time()
+            # 无数值积分矩阵组装
+            A1 = dbform.fast_assembly()
+            end2 = time.time()
+            print('fast matrix1:', end2-start2)
+
+            # 线性积分子
+            lform = LinearForm(space)
+            lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
+            R1 = lform.assembly()
+            R1 -= A1@d[:]
+
+            if dirichlet_phase:
+                dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
+                A1, R1 = dbc.apply(A1, R1)
+            
+            # 转换到GPU
+            A1_gpu = cp.sparse.csr_matrix(A1.astype(cp.float64))
+            b1_gpu = cp.array(R1, dtype=cp.float64)
+
+            # 在GPU上求解，并计时
+            start_time_gpu = time.time()
+            x1_gpu, info = cpx.gmres(A1_gpu, b1_gpu, atol=1e-20)
+            end_time_gpu = time.time()
+
+            # 输出GPU求解时间
+            gpu_time = end_time_gpu - start_time_gpu
+            print("GPU time2: {:.5f} seconds".format(gpu_time))
+
+            d[:] += x1_gpu.get()
             
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
