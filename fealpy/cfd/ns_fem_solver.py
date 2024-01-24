@@ -47,14 +47,25 @@ class NSFEMSolver:
         self.AP = bform.assembly()
     
     #u \cdot u   \approx   u^n \cdot u^{n+1}
-    def ossen_A(self,un):
-        M = self.M
+    def ossen_A(self,un, mu=None ,rho=None):
         AP = self.AP
-        rho = self.rho
-        S = self.S
+        if rho is None:
+            M = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            M = bform.assembly() 
+
+        if mu is None:
+            S = self.S
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorDiffusionIntegrator(c=mu, q=self.q))
+            S = bform.assembly()
+
         SP = self.SP
         dt = self.dt
- 
+        
         @barycentric
         def coef(bcs, index):
             if callable(rho):
@@ -71,10 +82,15 @@ class NSFEMSolver:
                 [AP.T, None]], format='csr')
         return A
 
-    def ossen_b(self, un): 
+    def ossen_b(self, un, rho=None): 
         dt = self.dt
         pgdof = self.pspace.number_of_global_dofs()
-        M = self.M
+        if rho is None:
+            M = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            M = bform.assembly() 
         
         b = 1/dt * M@un.flatten()
         b = np.hstack((b,[0]*pgdof))
@@ -92,7 +108,7 @@ class NSFEMSolver:
             print("还没开发")
         return result
 
-    def netwon_A(self, u0)
+    def netwon_A(self, u0):
         M = self.M
         AP = self.AP
         rho = self.rho
@@ -115,8 +131,28 @@ class NSFEMSolver:
         A = bmat([[1/dt*M+S+C,  -AP],\
                 [AP.T, None]], format='csr')
         return A
+    
+    def cross_wlf(self, p, u, bcs, T=200):
+        #参数选择为PC的参数
+        D1 = 1.9e11
+        D2 = 417.15
+        D3 = 0
+        A1 = 27.396
+        A2_wave = 51.6
+        tau = 182680
+        n = 0.574
+        lam = 0.173 
+        
+        deformnation = u.grad_value(bcs)
+        deformnation = 0.5*(deformnation + deformnation.transpose(0,2,1,3))
+        gamma = np.sqrt(2*np.einsum('iklj,iklj->ij',deformnation,deformnation))
 
-
+        T_s = D2 + D3*p(bcs)
+        A2 = A2_wave + D3*p(bcs)
+        eta0 = D1 * np.exp(-A1*(T-T_s)/(A2 + (T-T_s))) 
+        eta = eta0/(1 + (eta0 * gamma/tau)**(1-n))
+        return eta
+    
     def output(self, name, variable, timestep, output_dir='./', filename_prefix='test'):
         mesh = self.mesh
         gdof = self.uspace.number_of_global_dofs()

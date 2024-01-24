@@ -1,4 +1,5 @@
 import numpy as np
+from pyamg import test
 from fealpy.fem.precomp_data import data
 
 class ScalarMassIntegrator:
@@ -42,7 +43,7 @@ class ScalarMassIntegrator:
 
         phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof)
         if coef is None:
-            M += np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+            M += np.einsum('q, qci, qcj, c -> cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
@@ -54,13 +55,14 @@ class ScalarMassIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
+
             if np.isscalar(coef):
                 M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ):
-                    M += np.einsum('q, c, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                    M += np.einsum('q, c, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
                 else:
-                    M += np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+                    M += np.einsum('q, qc, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef is not correct!")
 
@@ -68,25 +70,47 @@ class ScalarMassIntegrator:
             return M
         
     
-    def assembly_cell_matrix_fast(self, trialspace, testspace=None, index=np.s_[:], 
-            cellmeasure=None, out=None):
+    def assembly_cell_matrix_fast(self, space,
+            trialspace=None, testspace=None, coefspace=None,
+            index=np.s_[:], cellmeasure=None, out=None):
         """
         @brief 基于无数值积分的组装方式
         """
         coef = self.coef
-        mesh = trialspace.mesh 
+
+        mesh = space.mesh 
         meshtype = mesh.type
 
-        TAFtype = trialspace.btype
-        TAFdegree = trialspace.p
-        TAFldof = trialspace.number_of_local_dofs()  
-        TSFtype = TAFtype
-        TSFdegree = TAFdegree
-        TSFldof = TAFldof
-        if testspace is not None:
+        if trialspace is None:
+            trialspace = space
+            TAFtype = space.btype
+            TAFdegree = space.p
+            TAFldof = space.number_of_local_dofs()
+        else:
+            TAFtype = trialspace.btype
+            TAFdegree = trialspace.p
+            TAFldof = trialspace.number_of_local_dofs()  
+
+        if testspace is None:
+            testspace = trialspace
+            TSFtype = TAFtype
+            TSFdegree = TAFdegree
+            TSFldof = TAFldof
+        else:
             TSFtype = testspace.btype
             TSFdegree = testspace.p 
             TSFldof = testspace.number_of_local_dofs()
+
+        if coefspace is None:
+            coefspace = testspace
+            COFtype = TSFtype
+            COFdegree = TSFdegree
+            COFldof = TSFldof
+        else:
+            COFtype = coefspace.btype
+            COFdegree = coefspace.p 
+            COFldof = coefspace.number_of_local_dofs()
+
         Itype = self.type 
         dataindex = Itype + "_" + meshtype + "_TAF_" + TAFtype + "_" + \
                 str(TAFdegree) + "_TSF_" + TSFtype + "_" + str(TSFdegree)
@@ -104,11 +128,24 @@ class ScalarMassIntegrator:
             M = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
         else:
             M = out
-        
+
         if coef is None:
-            M += np.einsum('c,cij->cij', cellmeasure, data[dataindex], optimize=True)
+            M += np.einsum('c, cij -> cij', cellmeasure, data[dataindex], optimize=True)
         else:
-            raise ValueError("coef is not correct!")
+            if callable(coef):
+                u = coefspace.interpolate(coef)
+                cell2dof = coefspace.cell_to_dof()
+                coef = u[cell2dof]
+            if np.isscalar(coef):
+                M += coef * np.einsum('c, aij -> cij', cellmeasure, data[dataindex], optimize=True)
+            elif coef.shape == (NC, COFldof):
+                dataindex += "_COF_" + COFtype + "_" + str(COFdegree)
+                #print("data[dataindex]:", data[dataindex].shape)
+                M += np.einsum('c, ijk, ck -> cij', cellmeasure, data[dataindex], coef, optimize=True)
+            elif coef.shape == (NC, ):
+                M += np.einsum('c, aij, c -> cij', cellmeasure, data[dataindex], coef, optimize=True)
+            else:
+                raise ValueError("coef is not correct!")
 
         if out is None:
             return M

@@ -97,7 +97,7 @@ class LagrangeFEMSpace:
         M = sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2),(1,ldof1,ldof2))
         for i in range(ldof1):
             for j in range(ldof2):
-                M[0,i, j] = self.integrate(phi1[i]*phi2[j])
+                M[0, i, j] = self.integrate(phi1[i]*phi2[j])
         return M
 
     def gphi_gphi_matrix(self, p1, p2):
@@ -196,6 +196,20 @@ class LagrangeFEMSpace:
         return S
 if __name__ == "__main__":
     from sympy import *
+<<<<<<< HEAD
+    space = LagrangeFEMSpace(GD=3)
+=======
+<<<<<<< HEAD
+    space = LagrangeFEMSpace(2)
+    M = space.gphi_gphi_matrix(1,1)
+    print(M)
+||||||| ee57c3c1
     space = LagrangeFEMSpace(2)
     M = space.gphi_gphi_phi_matrix(2, 2, 2)
     print(M)
+=======
+    space = LagrangeFEMSpace(GD=2)
+>>>>>>> upstream/master
+    M = space.gphi_gphi_phi_matrix(1, 1, 1)
+    print("M:", M.shape, "\n", M)
+>>>>>>> upstream/master
