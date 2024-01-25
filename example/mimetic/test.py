@@ -24,8 +24,8 @@ from scipy.sparse import csr_matrix
 def source(p, index=None):
     x = p[...,0]
     y = p[...,1]
-    #val = 2*np.pi*np.pi*np.sin(np.pi*x) * np.sin(np.pi*y)
-    val = -5 * np.pi**2 *np.sin(2*np.pi*x) * np.sin(np.pi*y)
+    val = 2*np.pi*np.pi*np.sin(np.pi*x) * np.sin(np.pi*y)
+    #val = 5 * np.pi**2 *np.sin(2*np.pi*x) * np.sin(np.pi*y)
     return val
 
 @cartesian
@@ -39,8 +39,8 @@ def Dirchlet(p):
 def solution(p, index=None):
     x = p[...,0]
     y = p[...,1]
-    #val = np.sin(np.pi*x) * np.sin(np.pi*y)
-    val = np.sin(2*np.pi*x) * np.sin(np.pi*y)
+    val = np.sin(np.pi*x) * np.sin(np.pi*y)
+    #val = np.sin(2*np.pi*x) * np.sin(np.pi*y)
     return val
 
 @cartesian
@@ -68,7 +68,7 @@ node = np.array([[0.0, 0.0], [0.0, 0.5], [0.0, 1.0],
 cell = np.array([0, 3, 4, 1, 3, 6, 7, 4, 1, 4, 5, 2, 4, 7, 8, 4, 8, 5], dtype=np.int_)
 cellLocation = np.array([0, 4, 8, 12, 15, 18], dtype=np.int_)
 #mesh = PolygonMesh(node=node, cell=cell, cellLocation=cellLocation)
-n=20
+n=10
 mesh = PolygonMesh.from_unit_square(nx=n,ny=n)
 NC = mesh.number_of_cells()
 NE = mesh.number_of_edges()
@@ -78,6 +78,7 @@ EDdof = mesh.ds.boundary_edge_index()
 div_operate = solver.div_operate()
 M_c = solver.M_c()
 M_f = solver.M_f()
+print("M_f:", M_f.shape, "\n", M_f)
 b = solver.source(source, EDdof, Dirchlet)
 A10 = -M_c@div_operate
 A = np.bmat([[M_f, A10.T], [A10, np.zeros((NC,NC))]])
