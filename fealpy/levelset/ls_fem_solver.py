@@ -43,6 +43,7 @@ class LSFEMSolver(LSSolver):
         self.M = bform.assembly() # TODO:Implement a fast assembly method
 
         self.u = u
+        self.p = space.p
 
         # Assemble the convection matrix only if a velocity field is provided.
         if u is not None:
@@ -52,13 +53,12 @@ class LSFEMSolver(LSSolver):
             bform.add_domain_integrator(ScalarConvectionIntegrator(c = u, q = 4))
             self.C = bform.assembly() # TODO:Implement a fast assembly method
 
-    def lgmres_solve(self, q, phi0, dt, u=None, tol=1e-8):
+    def lgmres_solve(self, phi0, dt, u=None, tol=1e-8):
         """
         Solve the level set evolution equation for one time step using the
         provided initial condition and velocity field.
 
         Parameters:
-        - q : 积分精度
         - phi0 : The initial condition for the level set function.
         - dt : Time step size for the evolution.
         - u : (Optional) Updated velocity field for the evolution.
@@ -78,7 +78,7 @@ class LSFEMSolver(LSSolver):
                 raise ValueError(" Velocity `u` is None! You must offer velocity!")
         else:
             bform = BilinearForm(space)
-            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u, q = q))
+            bform.add_domain_integrator(ScalarConvectionIntegrator(c = u, q = self.p+2))
             C = bform.assembly()
 
         # The system matrix A is composed of the mass matrix and the convection matrix.
