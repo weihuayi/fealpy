@@ -58,7 +58,6 @@ def div_u(p, index=None):
     value1 = np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
     value = value0+value1
     return value
-
 n=10
 mesh = PolygonMesh.from_unit_square(nx=n,ny=n)
 
@@ -67,6 +66,7 @@ EDdof = mesh.ds.boundary_edge_index()
 div_operate = solver.div_operate()
 M_c = solver.M_c()
 M_f = solver.M_f()
+print("M_f:", M_f.shape, "\n", M_f)
 b = solver.source(source, EDdof, Dirchlet)
 A10 = -M_c@div_operate
 NC = mesh.number_of_cells()
