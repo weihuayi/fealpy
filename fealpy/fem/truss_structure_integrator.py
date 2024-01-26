@@ -15,8 +15,7 @@ class TrussStructureIntegrator:
         self.A = A  # 单元横截面积
         self.q = q # 积分公式
 
-    def assembly_cell_matrix(self, space, index = np.s_[:],
-                            cellmeasure = None, out = None):
+    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         组装单元网格的刚度矩阵
 
