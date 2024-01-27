@@ -1,8 +1,8 @@
 import numpy as np
 import time
-import cupy as cp
-import cupyx.scipy.sparse.linalg as cpx
-from cupyx.scipy.sparse.linalg import LinearOperator as CuPyLinearOperator
+#import cupy as cp
+#import cupyx.scipy.sparse.linalg as cpx
+#from cupyx.scipy.sparse.linalg import LinearOperator as CuPyLinearOperator
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -18,7 +18,8 @@ from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
 from scipy.sparse.linalg import spsolve, lgmres, cg
-from scipy.sparse import csr_matrix, save_npz, load_npz
+from scipy.sparse import csr_matrix, coo_matrix
+
 
 class AFEMPhaseFieldCrackHybridMixModel():
     """
@@ -55,7 +56,9 @@ class AFEMPhaseFieldCrackHybridMixModel():
             dirichlet_phase=False, 
             refine='nvp', 
             maxit=100,
-            theta=0.2):
+            theta=0.2,
+            atype='fast',
+            solve='lgmres'):
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
@@ -85,18 +88,12 @@ class AFEMPhaseFieldCrackHybridMixModel():
             gd = self.energy_degradation_function(d)
             ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
                 model.mu, c=gd))
-            
-            start0 = time.time()
-            # 无数值积分矩阵组装
-            A0 = ubform.fast_assembly()
-            end0 = time.time()
-            print('fast matrix0:', end0-start0)
-
-                       
-#            start0 = time.time()
-#            A0 = ubform.assembly()
-#            end0 = time.time()
-#            print('matrix0:', end0-start0)
+           
+            if atype == 'fast':
+                # 无数值积分矩阵组装
+                A0 = ubform.fast_assembly()
+            else:
+                A0 = ubform.assembly()
 
             # 使用切算子计算来组装单元刚度矩阵，暂时仅能计算二维
 #            D = self.dsigma_depsilon(d, D0)
@@ -112,17 +109,22 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             A0, R0 = ubc.apply(A0, R0) 
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
-           
-            start1 = time.time() 
-#            du.flat[:] = spsolve(A0, R0)
-#            uh[:] += du
-            du.flat[:],_ = lgmres(A0, R0, atol=1e-18)
+            
+            # 选择合适的解法器
+            if solve == 'spsolve':
+                du.flat[:] = spsolve(A0, R0)
+            elif solve == 'lgmres':
+                du.flat[:],_ = lgmres(A0, R0, atol=1e-18)
+            elif solve == 'cg':
+                du.flat[:],_ = cg(A0, R0, atol=1e-18)
+            elif solve == 'GPU':
+                from ..solver.cupy_solver import CupySolver
+                du.flat[:] = CupySolver.cg_solver(A0, b0, atol=1e-18)
+            else:
+                print("We don't have this solver yet")
+
             uh[:] += du
             
-            end1 = time.time()
-            print('uh_solve:', end1-start1)
-            
-            
             # 更新应变和最大历史应变场参数
             strain = self.strain(uh)
             phip, _ = self.strain_energy_density_decomposition(strain)
@@ -135,16 +137,12 @@ class AFEMPhaseFieldCrackHybridMixModel():
             dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
 
             start2 = time.time()
-            # 无数值积分矩阵组装
-            A1 = dbform.fast_assembly()
-            end2 = time.time()
-            print('fast matrix1:', end2-start2)
+            if atype == 'fast':
+                # 无数值积分矩阵组装
+                A1 = dbform.fast_assembly()
+            else:
+                A1 = dbform.assembly()
 
-#            start2 = time.time()
-#            A1 = dbform.assembly()
-#            end2 = time.time()
-#            print('matrix1:', end2-start2)
-            
             # 线性积分子
             lform = LinearForm(space)
             lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
@@ -155,13 +153,19 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
                 A1, R1 = dbc.apply(A1, R1)
 
-            # TODO：快速求解程序
-            start3 = time.time()
-#            dd[:] += spsolve(A1, R1)
-            dd, _ = lgmres(A1, R1, atol=1e-20)
+            # 选择合适的解法器
+            if solve == 'spsolve':
+                dd = spsolve(A1, R1)
+            elif solve == 'lgmres':
+                dd,_ = lgmres(A1, R1, atol=1e-20)
+            elif solve == 'cg':
+                dd,_ = cg(A1, R1, atol=1e-20)
+            elif solve == 'GPU':
+                dd = CupySolver.gmres_solver(A1, b1, atol=1e-20)
+            else:
+                print("We don't have this solver yet")
+
             d[:] += dd
-            end3 = time.time()
-            print('d_solve:', end3-start3)
             
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
@@ -179,10 +183,15 @@ class AFEMPhaseFieldCrackHybridMixModel():
             isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
             
             if np.any(isMarkedCell):
-                if refine == 'nvp':
-                    self.bisect_refine(isMarkedCell)
-                elif refine == 'rg':
-                    self.redgreen_refine(isMarkedCell)
+                if GD == 2:
+                    if refine == 'nvp':
+                        self.bisect_refine_2d(isMarkedCell)
+                    elif refine == 'rg':
+                        self.redgreen_refine_2d(isMarkedCell)
+                elif GD == 3:
+                        self.bisect_refine_3d(isMarkedCell)
+                else:
+                    print("GD is not 2 or 3, it is incorrect")
             
             # 计算残量误差
             if k == 0:
@@ -200,161 +209,35 @@ class AFEMPhaseFieldCrackHybridMixModel():
             k += 1
         
 
-    def newton_raphson_gpu(self, 
-            disp, 
-            dirichlet_phase=False, 
-            refine='nvp', 
-            maxit=100,
-            theta=0.2):
+    def bisect_refine_3d(self, isMarkedCell):
         """
-        @brief 给定位移条件，用 Newton Raphson 方法求解
+        @brief 四面体二分法加密策略
         """
-        mesh = self.mesh
-        space = self.space
-        model = self.model
-        GD = self.GD
-        D0 = self.D0
-        k = 0
-        while k < maxit:
-            print('k:', k)
-            uh = self.uh
-            d = self.d
-            H = self.H
-            
-            node = mesh.entity('node')
-            isDDof = model.is_disp_boundary(node)
-            uh[isDDof] = disp
+        data = {'nodedata':[self.uh[:, 0], self.uh[:, 1], self.uh[:, 2],
+            self.d], 'celldata':[self.H]}
+        option = self.mesh.bisect_options(data=data, disp=False, HB=True)
+        self.mesh.bisect(isMarkedCell, options=option)
+        print('mesh refine')      
+       
+        # 更新加密后的空间
+        self.space = LagrangeFESpace(self.mesh, p=self.p)
+        NC = self.mesh.number_of_cells()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.space.function()
+        self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
 
-#            du = np.zeros_like(uh)
-            
-            # 求解位移
-            vspace = (GD*(space, ))
-            ubform = BilinearForm(GD*(space, ))
-            
-            gd = self.energy_degradation_function(d)
-            ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
-                model.mu, c=gd))
-            
-            start0 = time.time()
-            # 无数值积分矩阵组装
-            A0 = ubform.fast_assembly()
-            end0 = time.time()
-            print('fast matrix0:', end0-start0)
-
-            R0 = -A0@uh.flat[:]
-            
-            self.force = np.sum(-R0[isDDof.flat])
-            
-            ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
-
-            A0, R0 = ubc.apply(A0, R0) 
-            A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
-            
-            # 转换到GPU
-            A0_gpu = cp.sparse.csr_matrix(A0.astype(cp.float64))
-            b0_gpu = cp.array(R0, dtype=cp.float64)
-
-            # 在GPU上求解，并计时
-            start_time_gpu = time.time()
-            x0_gpu, info = cpx.cg(A0_gpu, b0_gpu, atol=1e-18)
-            end_time_gpu = time.time()
-
-            # 输出GPU求解时间
-            gpu_time = end_time_gpu - start_time_gpu
-            print("uh GPU time: {:.5f} seconds".format(gpu_time))
-
-            uh[:].flat += x0_gpu.get()
-            
-            # 更新应变和最大历史应变场参数
-            strain = self.strain(uh)
-            phip, _ = self.strain_energy_density_decomposition(strain)
-            H[:] = np.fmax(H, phip)
-
-            # 相场模型计算
-            dbform = BilinearForm(space)
-            dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
-                q=4))
-            dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
-
-            start2 = time.time()
-            # 无数值积分矩阵组装
-            A1 = dbform.fast_assembly()
-            end2 = time.time()
-            print('fast matrix1:', end2-start2)
-
-            # 线性积分子
-            lform = LinearForm(space)
-            lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
-            R1 = lform.assembly()
-            R1 -= A1@d[:]
-
-            if dirichlet_phase:
-                dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
-                A1, R1 = dbc.apply(A1, R1)
-            
-            # 转换到GPU
-            A1_gpu = cp.sparse.csr_matrix(A1.astype(cp.float64))
-            b1_gpu = cp.array(R1, dtype=cp.float64)
-
-            # 在GPU上求解，并计时
-            start_time_gpu = time.time()
-            x1_gpu, info = cpx.gmres(A1_gpu, b1_gpu, atol=1e-20)
-            end_time_gpu = time.time()
-
-            # 输出GPU求解时间
-            gpu_time = end_time_gpu - start_time_gpu
-            print("GPU time2: {:.5f} seconds".format(gpu_time))
-
-            d[:] += x1_gpu.get()
-            
-            self.stored_energy = self.get_stored_energy(phip, d)
-            self.dissipated_energy = self.get_dissipated_energy(d)
-            
-            self.uh = uh
-            self.d = d
-            self.H = H
-
-            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
-            eta = self.recovery.recovery_estimate(self.d)
-                
-            isMarkedCell = mark(eta, theta = theta) # TODO：
-
-            cm = mesh.entity_measure('cell') 
-            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
-            
-            if np.any(isMarkedCell):
-                if refine == 'nvp':
-                    self.bisect_refine(isMarkedCell)
-                elif refine == 'rg':
-                    self.redgreen_refine(isMarkedCell)
-            
-            # 计算残量误差
-            if k == 0:
-                er0 = np.linalg.norm(R0)
-                er1 = np.linalg.norm(R1)
-            error0 = np.linalg.norm(R0)/er0
-            print("error0:", error0)
-
-            error1 = np.linalg.norm(R1)/er1
-            print("error1:", error1)
-            error = max(error0, error1)
-            print("error:", error)
-            if error < 1e-5:
-                break
-            k += 1
-        
-
-    def bisect_refine(self, isMarkedCell):
+        self.uh[:, 0] = option['data']['nodedata'][0]
+        self.uh[:, 1] = option['data']['nodedata'][1]
+        self.uh[:, 2] = option['data']['nodedata'][2]
+        self.d[:] = option['data']['nodedata'][3]
+        self.H = option['data']['celldata'][0]
+   
+    def bisect_refine_2d(self, isMarkedCell):
         """
         @brief 二分法加密策略
         """
-        GD = self.GD
-        if GD == 2:
-            data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 'd':self.d,
-                    'H':self.H}
-        elif GD == 3:
-            data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 
-                    'ud2':self.uh[:, 2], 'd':self.d, 'H':self.H}
+        data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 'd':self.d,
+                'H':self.H}
         option = self.mesh.bisect_options(data=data, disp=False)
         self.mesh.bisect(isMarkedCell, options=option)
         print('mesh refine')      
@@ -368,12 +251,10 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
         self.uh[:, 0] = option['data']['uh0']
         self.uh[:, 1] = option['data']['uh1']
-        if GD == 3:
-            self.uh[:, 2] = option['data']['uh2']
         self.d[:] = option['data']['d']
         self.H = option['data']['H']
    
-    def redgreen_refine(self, isMarkedCell):
+    def redgreen_refine_2d(self, isMarkedCell):
         """
         @brief 红绿加密策略
         """
@@ -408,11 +289,10 @@ class AFEMPhaseFieldCrackHybridMixModel():
     def energy_degradation_function(self, d):
         eps = 1e-10
         gd = np.zeros_like(d)
-        qf =  self.mesh.integrator(1, 'cell')
+        qf = self.mesh.integrator(1, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
         gd = (1 - d(bc[-1])) ** 2 + eps
         return gd
-
 
     def strain(self, uh):
         """
@@ -502,10 +382,9 @@ class AFEMPhaseFieldCrackHybridMixModel():
         lam = self.model.lam # 拉梅第一参数
         mu = self.model.mu # 拉梅第二参数
         
-        qf =  self.mesh.integrator(1, 'cell')
+        qf = self.mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
 
-#        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
         c0 = (1 - phi(bc[-1])) ** 2 + eps
         D = np.einsum('i, jk -> ijk', c0, D0)
 #        c0 = (1 - phi(bc)) ** 2 + eps
@@ -554,7 +433,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
     def get_dissipated_energy(self, d):
         model = self.model
         mesh = self.mesh
-        qf =  mesh.integrator(1, 'cell')
+        qf = mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
         cm = mesh.entity_measure('cell')
         g = d.grad_value(bc[-1])
@@ -568,33 +447,9 @@ class AFEMPhaseFieldCrackHybridMixModel():
         eps = 1e-10
         mesh = self.mesh
 
-        qf =  mesh.integrator(1, 'cell')
+        qf = mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
         c0 = (1 - d(bc[-1])) ** 2 + eps
-        cm = mesh.entity_measure('cell')
-        val = c0*psi_s
-        stored = np.dot(val, cm)
-        return stored
-
-
-    def get_dissipated_energy_2d(self, d):
-        model = self.model
-        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
-        mesh = self.mesh
-        cm = mesh.entity_measure('cell')
-        g = d.grad_value(bc)
-
-        val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=1))
-        dissipated = np.dot(val, cm)
-        return dissipated
-
-    
-    def get_stored_energy_2d(self, psi_s, d):
-        eps = 1e-10
-
-        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
-        c0 = (1 - d(bc)) ** 2 + eps
-        mesh = self.mesh
         cm = mesh.entity_measure('cell')
         val = c0*psi_s
         stored = np.dot(val, cm)
