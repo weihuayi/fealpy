@@ -676,6 +676,7 @@ class UniformMesh2d(Mesh, Plotable):
         D0 = spdiags(1 - bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0 @ A @ D0 + D1
+
         return A, f
 
     ## @ingroup FDMInterface
