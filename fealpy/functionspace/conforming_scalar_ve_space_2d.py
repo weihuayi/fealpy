@@ -113,4 +113,91 @@ class ConformingScalarVESpace2d():
         S[:] = np.concatenate(list(map(g, zip(PI1, cell2dof))))
         return S
 
+    def grad_recovery(self, uh):
 
+        p = self.p
+        smldof = self.smspace.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        h = self.smspace.cellsize
+
+        s = self.project_to_smspace(uh,uh.PI1).reshape(-1, smldof)
+        sx = np.zeros((NC, smldof), dtype=self.ftype)
+        sy = np.zeros((NC, smldof), dtype=self.ftype)
+
+        start = 1
+        r = np.arange(1, p+1)
+        for i in range(p):
+            sx[:, start-i-1:start] = r[i::-1]*s[:, start:start+i+1]
+            sy[:, start-i-1:start] = r[0:i+1]*s[:, start+1:start+i+2]
+            start += i+2
+
+        sx /= h.reshape(-1, 1)
+        sy /= h.reshape(-1, 1)
+
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        NC = len(cell2dofLocation) - 1
+        #cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        cd = cell2dof
+        #DD = np.vsplit(uh.D, cell2dofLocation[1:-1])
+        DD = uh.D
+
+        f1 = lambda x: x[0]@x[1]
+        sx = np.concatenate(list(map(f1, zip(DD, sx))))
+        sy = np.concatenate(list(map(f1, zip(DD, sy))))
+
+        ldof = self.number_of_local_dofs()
+        w = np.repeat(1/self.smspace.cellsize, ldof)
+        sx *= w
+        sy *= w
+
+        uh = self.function(dim=2)
+        ws = np.zeros(uh.shape[0], dtype=self.ftype)
+        np.add.at(uh[:, 0], np.concatenate(cell2dof), sx)
+        np.add.at(uh[:, 1], np.concatenate(cell2dof), sy)
+        np.add.at(ws, np.concatenate(cell2dof), w)
+        uh /=ws.reshape(-1, 1)
+        return uh
+
+    def interpolation(self, u, HB=None):
+        """
+        u: 可以是一个连续函数， 也可以是一个缩放单项式函数
+        """
+        if HB is None:
+            mesh = self.mesh
+            NN = mesh.number_of_nodes()
+            NE = mesh.number_of_edges()
+            p = self.p
+            ipoint = self.dof.interpolation_points()
+            uI = self.function()
+            uI[:NN+(p-1)*NE] = u(ipoint)
+            if p > 1:
+                phi = self.smspace.basis
+                def f(x, index):
+                    return np.einsum(
+                            'ij, ij...->ij...',
+                            u(x), phi(x, index=index, p=p-2))
+                bb = self.integralalg.integral(f, celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
+                uI[NN+(p-1)*NE:] = bb.reshape(-1)
+            return uI
+        else:
+            uh = self.smspace.interpolation(u, HB)
+
+            cell2dof, cell2dofLocation = self.cell_to_dof()
+            NC = len(cell2dofLocation) - 1
+            cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+            DD = np.vsplit(self.D, cell2dofLocation[1:-1])
+
+            smldof = self.smspace.number_of_local_dofs()
+            f1 = lambda x: x[0]@x[1]
+            uh = np.concatenate(list(map(f1, zip(DD, uh.reshape(-1, smldof)))))
+
+            ldof = self.number_of_local_dofs()
+            w = np.repeat(1/self.smspace.cellmeasure, ldof)
+            uh *= w
+
+            uI = self.function()
+            ws = np.zeros(uI.shape[0], dtype=self.ftype)
+            np.add.at(uI, cell2dof, uh)
+            np.add.at(ws, cell2dof, w)
+            uI /=ws
+            return uI
