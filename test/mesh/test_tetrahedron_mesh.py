@@ -120,6 +120,7 @@ def test_interplation_weith_HB():
     
     u0 = space.interpolate(dis)
     H = np.zeros(NC, dtype=np.float64)
+    H[:] = dis(mesh.entity_barycenter("cell"))
 
     error0 = mesh.error(u0, dis) 
     print('error0:', error0)
@@ -134,6 +135,14 @@ def test_interplation_weith_HB():
     data = options['data']
     fval = data['nodedata'][0]
     fval = space.function(array=fval)
+
+    H = data["celldata"][0]
+    error_H = H - dis(mesh.entity_barycenter("cell"))
+    print(np.max(np.abs(error_H)))
+
+    error_u0 = fval - dis(mesh.entity("node"))
+    print(np.max(np.abs(error_u0)))
+
 
     error = mesh.error(fval, dis)
     print('error:', error)
