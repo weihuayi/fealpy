@@ -1,5 +1,6 @@
 import cupy as cp
 import numpy as np
+from scipy.sparse import issparse
 import cupyx.scipy.sparse.linalg as cpx
 import time
 
