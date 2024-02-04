@@ -1,6 +1,6 @@
 import cupy as cp
 import numpy as np
-import scipy.sparse import issparse
+from scipy.sparse import issparse
 import cupyx.scipy.sparse.linalg as cpx
 from cupyx.scipy.sparse.linalg import LinearOperator as CuPyLinearOperator
 
