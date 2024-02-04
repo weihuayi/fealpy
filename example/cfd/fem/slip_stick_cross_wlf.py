@@ -136,11 +136,17 @@ p1 = pspace.function()
 
 mu = uspace.function()
 rho = uspace.function()
-mu = changemu(mu,phi0)
 rho = changerho(rho,phi0)
 
 NSSolver = NSFEMSolver(mesh, dt,uspace,pspace,rho)
 LSSolver = LSFEMSolver(uspace)
+@barycentric
+def cross_mu(bcs, index=None):
+    return NSSolver.cross_wlf(p0, u0, bcs, T=200)
+
+#mu = changemu(mu,phi0)
+mu[uspace.cell_to_dof()] = uspace.interpolate(cross_mu)
+
 
 stress = NSSolver.netwon_sigma(u0, mu)
 name = ['velocity','mu','phi','rho','D00','D11','D01','minus']
@@ -262,9 +268,9 @@ for i in range(0, nt):
     mu = uspace.function()
     rho = uspace.function()
     rho = changerho(rho,phi0)
-    mu = changemu(mu, phi0)
+    #mu = changemu(mu, phi0)
     
-    #mu[uspace.cell_to_dof()] = uspace.interpolate(cross_mu)
+    mu[uspace.cell_to_dof()] = uspace.interpolate(cross_mu)
     if i%step == 0:
         stress = NSSolver.netwon_sigma(u1, mu)
         phi0 = LSSolver.reinit(phi0=phi0, dt=0.0001,eps=2e-4, nt=100, alpha=alpha)

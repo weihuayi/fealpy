@@ -2275,7 +2275,7 @@ class TriangleMesh(Mesh, Plotable):
         @param start_cell: 初始点所在的单元索引
         @param start_point: 初始点
 
-        @return: 流线上的一系列问题
+        @return: 流线上的一系列点坐标
         """
         cells = self.entity('cell')
         nodes = self.entity('node')
@@ -2283,60 +2283,63 @@ class TriangleMesh(Mesh, Plotable):
         edge2cell = self.ds.edge_to_cell()
         bd_cell_index = self.ds.boundary_cell_index()
 
-        start_point_weight = np.linalg.solve(np.concatenate((nodes[cells[start_cell]].T, np.ones((1, 3))), axis=0),
-                                             np.concatenate((start_point, np.ones(1))))
-        # 计算流线
-        current_cell = start_cell
-        current_point = start_point_weight
-
         point_list = []
-        point_list.append(current_point @ nodes[cells[current_cell]].tolist())
 
-        while True:
-            A = np.concatenate((nodes[cells[current_cell]].T, np.ones((1, 3))), axis=0)
-            W = np.concatenate((vector_field[cells[current_cell]].T, np.zeros((1, 3))), axis=0)
-            B = np.linalg.inv(A) @ W
+        for i in range(len(start_point)):
+            start_point_weight = np.linalg.solve(
+                np.concatenate((nodes[cells[start_cell[i]]].T, np.ones((1, 3))), axis=0),
+                np.concatenate((start_point[i], np.ones(1))))
+            # 计算流线
+            current_cell = start_cell[i]
+            current_point = start_point_weight
 
-            # 计算下一个点的参数
-            C = np.zeros((3, 3))
-            C[:, 0] = np.einsum('ik, kj, j -> i', B, B, current_point) / 2
-            C[:, 1] = np.einsum('ij, j -> i', B, current_point)
-            C[:, 2] = current_point
-            # C[:, 2] = np.ones(3)
+            point_list.append([])
+            point_list[i].append(current_point @ nodes[cells[current_cell]].tolist())
 
-            # 获取参数 h 的最小实根
-            temp_hc = np.apply_along_axis(np.roots, axis=1, arr=C).flatten()
-            real = np.real(temp_hc)
-            img = np.imag(temp_hc)
-            hc = np.min(real[(real > 1e-13) & (np.abs(img) < 1e-13)])
+            while True:
+                A = np.concatenate((nodes[cells[current_cell]].T, np.ones((1, 3))), axis=0)
+                W = np.concatenate((vector_field[cells[current_cell]].T, np.zeros((1, 3))), axis=0)
+                B = np.linalg.inv(A) @ W
 
-            current_point = (np.eye(3) + hc * B + hc ** 2 / 2 * B @ B) @ current_point
+                # 计算下一个点的参数
+                C = np.zeros((3, 3))
+                C[:, 0] = np.einsum('ik, kj, j -> i', B, B, current_point) / 2
+                C[:, 1] = np.einsum('ij, j -> i', B, current_point)
+                C[:, 2] = current_point
 
-            local_edge_index = np.where(current_point < 1e-13)[0][0]
-            adj_info = edge2cell[cell2edge[current_cell][local_edge_index]]
+                # 获取参数 h 的最小实根
+                temp_hc = np.apply_along_axis(np.roots, axis=1, arr=C).flatten()
+                real = np.real(temp_hc)
+                img = np.imag(temp_hc)
+                hc = np.min(real[(real > 1e-13) & (np.abs(img) < 1e-13)])
 
-            # 确定下一个单元编号，获取所在边局部索引
-            if adj_info[0] != current_cell:
-                current_cell, out_edge_index = adj_info[0], adj_info[2]
-            else:
-                current_cell, out_edge_index = adj_info[1], adj_info[3]
+                current_point = (np.eye(3) + hc * B + hc ** 2 / 2 * B @ B) @ current_point
 
-            # 相邻单元间重心坐标转换
-            in_node_index1 = (local_edge_index + 1) % 3
-            in_node_index2 = (local_edge_index + 2) % 3
+                local_edge_index = np.where(current_point < 1e-13)[0][0]
+                adj_info = edge2cell[cell2edge[current_cell][local_edge_index]]
 
-            out_node_index1 = (out_edge_index + 1) % 3
-            out_node_index2 = (out_edge_index + 2) % 3
+                # 确定下一个单元编号，获取所在边局部索引
+                if adj_info[0] != current_cell:
+                    current_cell, out_edge_index = adj_info[0], adj_info[2]
+                else:
+                    current_cell, out_edge_index = adj_info[1], adj_info[3]
 
-            temp_weight = current_point[in_node_index1]
-            current_point[out_node_index1] = current_point[in_node_index2]
-            current_point[out_node_index2] = temp_weight
-            current_point[out_edge_index] = 0
+                # 相邻单元间重心坐标转换
+                in_node_index1 = (local_edge_index + 1) % 3
+                in_node_index2 = (local_edge_index + 2) % 3
 
-            point_list.append(current_point @ nodes[cells[current_cell]].tolist())
+                out_node_index1 = (out_edge_index + 1) % 3
+                out_node_index2 = (out_edge_index + 2) % 3
 
-            if current_cell in bd_cell_index:
-                break
+                temp_weight = current_point[in_node_index1]
+                current_point[out_node_index1] = current_point[in_node_index2]
+                current_point[out_node_index2] = temp_weight
+                current_point[out_edge_index] = 0
+
+                point_list[i].append(current_point @ nodes[cells[current_cell]].tolist())
+
+                if current_cell in bd_cell_index:
+                    break
 
         return point_list
 

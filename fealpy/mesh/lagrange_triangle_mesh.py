@@ -13,8 +13,7 @@ class LagrangeTriangleMeshDataStructure():
     def number_of_cells(self):
         return self.cell.shape[0]
 
-class LagrangeTriangleMesh(Mesh):
-
+class LagrangeTriangleMesh(Mesh): 
     def __init__(self, node, cell, surface=None, p=1):
 
         mesh = TriangleMesh(node, cell)
@@ -80,10 +79,54 @@ class LagrangeTriangleMesh(Mesh):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
 
-        
-    def sphere_surface_unit_normal(self, index=np.s_[:]):
+    def shape_function(self):
         """
-        @brief 计算单位球面三角形网格中每个面上的单位法线
+        @brief 网格空间基函数
+        """
+        pass
+
+    def grad_shape_function(self):
+        """
+        @brief 网格空间基函数的梯度
+        """
+        pass
+
+    def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
+        """
+        @brief 计算单元边上所有形函数在边上的积分点处的导函数值
+        @param bc 边上的一组积分点
+        @param cindex 边所在的单元编号
+        @param lidx 边在该单元的局部编号
+        @param direction Ture 表示边的方向和单元的逆时针方向一致，False 表示不一致
+        """
+        pass
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        """
+        @brief 
+        """
+        pass
+    def number_of_global_ipoints(self, p):
+        """
+        @berif
+
+        """
+        pass
+
+    def interpolation_points(self, p:int, index=np.s_[:]):
+        """
+        @berif 获取三角形网格上所有 p 次插值点 
+        """
+        pass
+
+    def cell_to_ipoint(self, p, index=np.s_[:]):
+        """
+        @berif 
+        """
+        pass
+
+    def surface_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算曲面三角形网格中每个面上的单位法线
         """
         assert self.geo_dimension() == 3
         node = self.entity('node')
@@ -98,6 +141,23 @@ class LagrangeTriangleMesh(Mesh):
 
         n = nv/length
         return n
+
+    def grad_lambda(self, index=np.s_[:]):
+        """
+        @berif 计算每个单元格中重心坐标的梯度
+        """
+        pass
+    
+    def rot_lambda(self, index=np.s_[:]):
+        """
+        @berif 
+        """
+        pass
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+        """
+        @berif 一致加密三角形网格
+        """
+        pass
 
     def vtk_cell_type(self, etype='cell'):
         """

@@ -11,6 +11,9 @@ import numpy as np
 from scipy.sparse import diags, lil_matrix,csr_matrix
 from scipy.sparse import spdiags
 class Mimetic():
+# 改成稀疏矩阵
+# 画图问题：多边形网格变成三角形网格，每个三角形上一个值
+# solver问题
     def __init__(self, mesh):
         self.mesh = mesh
     
@@ -28,28 +31,17 @@ class Mimetic():
         result = np.zeros((NE,NE))
         if ac is None:
             ac = cell_measure
-        
+ 
         for i in range(NC):
             LNE = len(cell2edge[i])
             R = np.zeros((LNE, 2))
             N = np.zeros((LNE, 2))
             for j,edge_index in enumerate(cell2edge[i]):
-                #R[j, :] = (edge_centers[edge_index,:] - cell_centers[i,:]) * edge_measure[edge_index]
-                #N[j, :] = norm_flag[i,edge_index]*norm[edge_index]
                 R[j, :] = norm_flag[i,edge_index]*(edge_centers[edge_index,:] - cell_centers[i,:]) * edge_measure[edge_index]
                 N[j, :] = norm[edge_index]
-            #M_consistency = R@R.T/cell_measure[i]
             M_consistency = R@np.linalg.inv(R.T@N)@R.T
-            #M_stability = ac[i] * (np.eye(LNE) - N @ np.linalg.inv(N.T @ N) @ N.T)
             M_stability = np.trace(R@R.T) /cell_measure[i] * (np.eye(LNE) - N @ np.linalg.inv(N.T @ N) @ N.T)
             M = M_consistency + M_stability  
-            '''
-            print(f"第{i}个单元")
-            print(np.linalg.eigvals(M))
-            print(np.max(np.abs(M-M.T)))
-            print(np.max(np.abs(M@N-R)))
-            A  = np.zeros((LNE, NE))
-            '''
             indexi,indexj = np.meshgrid(cell2edge[i],cell2edge[i])
             result[indexi,indexj] += M 
         return result
@@ -68,7 +60,6 @@ class Mimetic():
         cell_measure = mesh.entity_measure(etype=2)
         edge_measure = mesh.entity_measure(etype=1)
         cell2edge = mesh.ds.cell_to_edge()
-        cell_out_normal = self.cell_out_normal()
         flag = np.where(mesh.ds.cell_to_edge_sign().toarray(), 1, -1)
         result = np.zeros((NC, NE))
         for i in range(NC):
@@ -85,17 +76,14 @@ class Mimetic():
         
         edge_measure = mesh.entity_measure('edge') 
         edge_centers = mesh.entity_barycenter(etype=1)
-        #result = mesh.integral(fun,q=5,celltype=True)
-
-        f = fun(cell_centers)
-        b = cell_measure*f
+        b = mesh.integral(fun,q=4,celltype=True) 
 
         gamma = np.zeros(NE)
         gamma[gddof] = edge_measure[gddof]*D(edge_centers[gddof])
         result = np.hstack((-gamma,-b))
         return result
     
-
+    '''
     def boundary_treatment(self, A, b, Df, isDcelldof, Nf=None, isNedgedof=None, so=None):
         mesh = self.mesh
         NE = mesh.number_of_edges()
@@ -123,6 +111,7 @@ class Mimetic():
         b[isBdDof] = xx[isBdDof]
         return A,b
 
+    ## (NC,LNE)
     def cell_out_normal(self):
         mesh = self.mesh
         
@@ -134,5 +123,6 @@ class Mimetic():
         osign = [flag[i, edges] for i, edges in enumerate(cell2edge)]
         celloutnormal = [arr1 * arr2[:,None] for arr1, arr2 in zip(cellnormal, osign)]
         return celloutnormal
+    '''
 
 

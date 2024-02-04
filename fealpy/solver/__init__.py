@@ -1,7 +1,8 @@
 import platform
 
 from .solve import solve, active_set_solver
-from .gamg_solver import GAMGSolver
+#from .gamg_solver import GAMGSolver
+from .cupy_solver import CupySolver
 
 try:
     from .matlab_solver import MatlabSolver
