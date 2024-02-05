@@ -1,3 +1,4 @@
+
 import pytest
 import ipdb
 
@@ -6,29 +7,26 @@ import jax.numpy as jnp
 
 from fealpy.mesh import TriangleMesh as Mesh
 from fealpy.jax.mesh import TriangleMesh as TriangleMesh
+from fealpy.jax.functionspace import LagrangeFESpace
 from fealpy.jax import logger
 
 
-def test_cell_area():
+def test_lagrange_fe_space():
     mesh = Mesh.from_box(nx=1, ny=1)
     node = jnp.array(mesh.entity('node'))
     cell = jnp.array(mesh.entity('cell'))
 
     jmesh = TriangleMesh(node, cell)
 
-    a0 = jmesh.cell_area()
-    a1, jac = jmesh.cell_area_with_jac()
+    space = LagrangeFESpace(jmesh, p=1)
 
-    print(a0)
-    print(a1)
-    print(jac)
-    print(jmesh.ds.edge)
-    print(jmesh.ds.edge2cell)
+    bc = jnp.array([[0.1, 0.2, 0.7]], dtype=jnp.float64)
+
+    print(space.basis(bc))
+    print(space.grad_basis(bc))
+
 
 
 
 if __name__ == "__main__":
-    test_cell_area()
-
-
-
+    test_lagrange_fe_space()

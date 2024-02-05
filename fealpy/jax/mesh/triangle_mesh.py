@@ -1,5 +1,4 @@
 from typing import Any, Callable, Optional, List, Union
-import functools
 
 import numpy as np
 import jax
@@ -7,7 +6,7 @@ import jax.numpy as jnp
 
 from fealpy import logger
 
-from .triangle_mesh_kernel import *
+from .mesh_kernel import *
 from .mesh_base import MeshBase
 
 
@@ -25,6 +24,32 @@ class TriangleMeshDataStructure():
         self.NN = NN
         self.cell = cell
         self.TD = 2
+        self.itype = cell.dtype
+        self.construct()
+
+    def total_face(self):
+        return self.cell[..., self.localFace].reshape(-1, 2)
+
+    def construct(self) -> None:
+        NC = self.cell.shape[0]
+        NFC = self.cell.shape[1]
+
+        totalFace = self.total_face() 
+        _, i0, j = jnp.unique(
+            jnp.sort(totalFace, axis=1),
+            return_index=True,
+            return_inverse=True,
+            axis=0
+        )
+        self.face = totalFace[i0, :]
+        self.edge = self.face
+        NF = i0.shape[0]
+
+        i1 = np.zeros(NF, dtype=self.itype)
+        i1[j] = np.arange(3*NC, dtype=self.itype)
+
+        self.face2cell = jnp.vstack([i0//3, i1//3, i0%3, i1%3]).T
+        self.edge2cell = self.face2cell
 
 
 class TriangleMesh(MeshBase):
@@ -43,6 +68,8 @@ class TriangleMesh(MeshBase):
 
         self.shape_function = self._shape_function
 
+        self._edge_length = jax.jit(jax.vmap(edge_length))
+
         if GD == 2:
             self._cell_area = jax.jit(jax.vmap(tri_area_2d))
             self._cell_area_with_jac = jax.jit(jax.vmap(tri_area_2d_with_jac))
@@ -54,12 +81,6 @@ class TriangleMesh(MeshBase):
 
         self._quality = jax.jit(jax.vmap(tri_quality_radius_ratio))
         self._quality_with_jac = jax.jit(jax.vmap(tri_quality_radius_ratio_with_jac))
-
-    def number_of_nodes(self):
-        return len(self.node)
-
-    def number_of_cells(self):
-        return len(self.ds.cell)
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
@@ -95,8 +116,21 @@ class TriangleMesh(MeshBase):
 
     cell_grad_shape_function = grad_shape_function
 
+    def entity_measure(self, etype=2, index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return 0
+        else:
+            raise ValueError(f"Invalid entity type '{etype}'.")
+
     def cell_area(self, index=jnp.s_[:]):
         return self._cell_area(self.node[self.ds.cell[index]]) 
+
+    def edge_length(self, index=jnp.s_[:]):
+        return self._edge_length(self.node[self.ds.edge[index]]) 
 
     def cell_area_with_jac(self, index=jnp.s_[:]):
         return self._cell_area_with_jac(self.node[self.ds.cell[index]]) 

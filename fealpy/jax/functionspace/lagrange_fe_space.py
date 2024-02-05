@@ -27,3 +27,9 @@ class LagrangeFESpace():
         """
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
 
+
+    def value(self, uh, bc, index=np.s_[:]):
+        """
+        @brief
+        """
+        pass

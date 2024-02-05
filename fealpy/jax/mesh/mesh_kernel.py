@@ -1,3 +1,4 @@
+import functools
 import jax
 import jax.numpy as jnp
 
@@ -7,6 +8,12 @@ def value_and_jacfwd(f, x):
     y, jac = jax.vmap(pushfwd, out_axes=(None, -1))((basis, ))
     return y, jac
 
+# edge 
+def edge_length(points):
+    return jnp.norm(points[1] - points[0])
+
+
+# triangle 
 def tri_area_2d(points):
     """
     @brief 给定一个单元的三个顶点的坐标，计算三角形的面积
@@ -86,3 +93,6 @@ def tri_grad_lambda_3d(points):
     n2 = jnp.cross(n, v2)
     Dlambda = jnp.array([n0, n1, n2], dtype=jnp.float64)/length
     return Dlambda 
+
+
+# tetrahedron
