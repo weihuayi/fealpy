@@ -24,6 +24,18 @@ class MeshBase():
         """
         return self.ds.TD
 
+    def number_of_nodes(self) -> int:
+        return len(self.node)
+
+    def number_of_faces(self) -> int:
+        return len(self.ds.face)
+
+    def number_of_edges(self) -> int:
+        return len(self.ds.edge)
+
+    def number_of_cells(self) -> int:
+        return len(self.ds.cell)
+
     @staticmethod
     def multi_index_matrix(p: int, etype: int):
         """
@@ -82,6 +94,25 @@ class MeshBase():
         elif etype in {'face', TD-1}: # Try 'face' in the last
             return self.ds.face[index]
         raise ValueError(f"Invalid etype '{etype}'.")
+
+    def entity_barycenter(self, etype: Union[int, str], index=jnp.s_[:]):
+        """
+        @brief Calculate barycenters of entities.
+        """
+        node = self.entity('node')
+        TD = self.ds.TD
+        if etype in {'cell', TD}:
+            cell = self.ds.cell
+            return jnp.sum(node[cell[index], :], axis=1) / cell.shape[1]
+        elif etype in {'edge', 1}:
+            edge = self.ds.edge
+            return jnp.sum(node[edge[index], :], axis=1) / edge.shape[1]
+        elif etype in {'node', 0}:
+            return node[index]
+        elif etype in {'face', TD-1}: # Try 'face' in the last
+            face = self.ds.face
+            return jnp.sum(node[face[index], :], axis=1) / face.shape[1]
+        raise ValueError(f"Invalid entity type '{etype}'.")
 
     def bc_to_point(self, bc: NDArray, index=np.s_[:]) -> NDArray:
         """
