@@ -3,5 +3,5 @@ import jax
 import jax.numpy as jnp
 
 class ScalarDiffusionIntegrator:
-    def assembly_cell_matrix(self, gphi, w, cellmeasure):
+    def assembly_cell_matrix(self, space, index=jnp.s_[:], cellmeasure):
         pass

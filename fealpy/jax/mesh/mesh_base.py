@@ -7,6 +7,8 @@ from numpy.typing import NDArray
 import jax
 import jax.numpy as jnp
 
+from .mesh_kernel import edge_to_ipoint
+
 class MeshBase():
     """
     @brief The base class for mesh.
@@ -114,7 +116,7 @@ class MeshBase():
             return jnp.sum(node[face[index], :], axis=1) / face.shape[1]
         raise ValueError(f"Invalid entity type '{etype}'.")
 
-    def bc_to_point(self, bc: NDArray, index=np.s_[:]) -> NDArray:
+    def bc_to_point(self, bcs, index=jnp.s_[:]):
         """
         @brief Convert barycenter coordinate points to cartesian coordinate points\
                on mesh entities.
@@ -130,68 +132,26 @@ class MeshBase():
         @return: Cartesian coordinate points array, with shape (NQ, GD).
         """
         node = self.entity('node')
-        TD = bc.shape[-1] - 1
+        TD = bcs.shape[-1] - 1
         entity = self.entity(TD, index=index)
         p = jnp.einsum('...j, ijk -> ...ik', bc, node[entity])
         return p
 
-    def _shape_function(self, bc: NDArray, p: int =1, mi: NDArray=None):
+    def edge_to_ipoint(self, p: int, index=np.s_[:]):
         """
-        @brief
-
-        @param[in] bc
+        @brief 获取网格边与插值点的对应关系
         """
-        if p == 1:
-            return bc
-        TD = bc.shape[-1] - 1
-        if mi is None:
-            mi = self.multi_index_matrix(p, etype=TD)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., mi, idx], axis=-1)
-        return jnp.array(phi)
-
-
-    def _grad_shape_function(self, bc: NDArray, p: int =1):
-        """
-        @brief 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次 Lagrange 形函数值关于该重心坐标的梯度。
-        """
-        TD = bc.shape[-1] - 1
-        mi = self.multi_index_matrix(p, etype=TD)
-        ldof = mi.shape[0] # p 次 Lagrange 形函数的个数
-
-        c = np.arange(1, p+1)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=bc.dtype)
-        A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=bc.dtype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., mi, range(TD+1)]
-        M = F[..., mi, range(TD+1)]
-
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=bc.dtype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return jnp.array(R) # (..., ldof, TD+1)
+        if isinstance(index, slice) and index == slice(None):
+            NE = self.number_of_edges()
+            index = np.arange(NE)
+        elif isinstance(index, np.ndarray) and (index.dtype == np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        elif isinstance(index, list) and (type(index[0]) is np.bool_):
+            index, = np.nonzero(index)
+            NE = len(index)
+        else:
+            NE = len(index)
+        NN = self.number_of_nodes()
+        edges = self.entity('edge')[index]
+        return edge_to_ipoint(edges, index, p, NN)

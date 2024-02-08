@@ -14,16 +14,16 @@ def test_cell_area():
     node = jnp.array(mesh.entity('node'))
     cell = jnp.array(mesh.entity('cell'))
 
-    jmesh = TriangleMesh(node, cell)
+    mesh = TriangleMesh(node, cell)
 
     a0 = jmesh.cell_area()
-    a1, jac = jmesh.cell_area_with_jac()
+    a1, jac = mesh.cell_area_with_jac()
 
     print(a0)
     print(a1)
     print(jac)
-    print(jmesh.ds.edge)
-    print(jmesh.ds.edge2cell)
+    print(mesh.ds.edge)
+    print(mesh.ds.edge2cell)
 
 
 
