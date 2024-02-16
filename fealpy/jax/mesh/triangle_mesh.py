@@ -114,7 +114,7 @@ class TriangleMesh(MeshBase):
         """
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
-        R = grad_simplex_shape_function(bcs, mi, p, 1) 
+        R = grad_simplex_shape_function(bcs, mi, p, 1) # (NQ, ldof, TD+1) 
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = jnp.einsum('...ij, kjm->k...im', R, Dlambda, optimize=True)

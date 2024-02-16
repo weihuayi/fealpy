@@ -61,6 +61,8 @@ class LagrangeFESpace():
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
+    def cell_to_dof(self):
+        return self.dof.cell2dof
 
     def basis(self, bc, index=np.s_[:]):
         p = self.p
