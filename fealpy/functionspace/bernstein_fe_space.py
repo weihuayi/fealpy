@@ -194,7 +194,7 @@ class BernsteinFESpace:
             midxp_0[:, i] += 1
 
         P = np.transpose(P, (3, 0, 1, 2))
-        P = np.einsum('gcij, jk->gcik', P, involve, optimize=True)
+        #P = np.einsum('gcij, jk->gcik', P, involve, optimize=True)
         return P
 
     def partial_matrix(self):

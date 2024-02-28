@@ -29,7 +29,7 @@ class ConformingVEMScalarSourceIntegrator2d():
         bb = space.mesh.integral(u, q=p+3, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
-        return self.c*bb
+        return self.coef*bb
 
 class NonConformingVEMScalarSourceIntegrator2d():
     def __init__(self, f: Union[Callable, int, float, NDArray], PI0):

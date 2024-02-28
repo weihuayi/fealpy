@@ -151,7 +151,8 @@ class SinSinData:
         y = p[..., 1]
         pi = np.pi
         val = 2*pi*pi*np.sin(pi*x)*np.sin(pi*y)
-        return val
+        print("asdasdasd")
+        return val+self.solution(p)
 
     @cartesian
     def gradient(self, p):
@@ -1027,7 +1028,7 @@ class SinSinData:
         y = p[..., 1]
         pi = np.pi
         rhs = 2*pi*pi*np.sin(pi*x)*np.sin(pi*y)
-        return rhs
+        return rhs + self.solution(p)
 
     @cartesian
     def dirichlet(self, p):

@@ -174,14 +174,13 @@ class BubbleData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
         f = (C.x**2-C.x)*(C.y**2-C.y)*(C.z**2-C.z)
-        u = f*C.i + sym.sin(C.x)*f*C.j + sym.sin(C.y)*f*C.k
+        u = f*C.i + sym.sin(np.pi*C.x)*f*C.j + sym.sin(np.pi*C.y)*f*C.k
         super(BubbleData, self).__init__(u)
 
     def init_mesh(self, n=1):
         box = [0, 1, 0, 1, 0, 1]
         mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
-
 
 class XXX3dData():
     def __init__(self, n=2):
