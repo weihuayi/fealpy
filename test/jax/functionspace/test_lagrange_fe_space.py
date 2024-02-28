@@ -20,10 +20,13 @@ def test_lagrange_fe_space():
 
     space = LagrangeFESpace(jmesh, p=1)
 
-    bc = jnp.array([[0.1, 0.2, 0.7]], dtype=jnp.float64)
+    bcs = jnp.array([[0.1, 0.2, 0.7]], dtype=jnp.float64)
 
-    print(space.basis(bc))
-    print(space.grad_basis(bc))
+    phi = space.basis(bcs)
+    gphi = space.grad_basis(bcs)
+
+    print(phi)
+    print(gphi)
 
 
 

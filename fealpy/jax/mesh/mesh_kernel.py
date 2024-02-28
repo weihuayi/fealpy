@@ -1,4 +1,5 @@
-import functools
+import numpy as np
+from functools import partial
 import jax
 import jax.numpy as jnp
 
@@ -8,9 +9,58 @@ def value_and_jacfwd(f, x):
     y, jac = jax.vmap(pushfwd, out_axes=(None, -1))((basis, ))
     return y, jac
 
+# simplex 
+def _simplex_shape_function(bc, mi, p):
+    """
+    @brief 给定一组重心坐标点 `bc`, 计算单纯形单元上 `p` 次 Lagrange
+    基函数在这一组重心坐标点处的函数值
+
+    @param[in] bc : (TD+1, )
+    @param[in] p : 基函数的次数，为正整数
+    @param[in] mi : p 次的多重指标矩阵
+
+    @return phi : 形状为 (NQ, ldof)
+    """
+    TD = bc.shape[-1] - 1
+    c = jnp.arange(1, p+1)
+    P = 1.0/jnp.cumprod(c)
+    t = jnp.arange(0, p)
+    A = p*bc - jnp.arange(0, p).reshape(-1, 1)
+    A = P.reshape(-1, 1)*jnp.cumprod(A, axis=-2) # (p, TD+1)
+    B = jnp.ones((p+1, TD+1), dtype=A.dtype)
+    B = B.at[1:, :].set(A)
+    idx = jnp.arange(TD+1)
+    phi = jnp.prod(B[mi, idx], axis=-1)
+    return phi
+
+def _grad_simplex_shape_function(bc, mi, p, n):
+    fn = _simplex_shape_function
+    for i in range(n):
+        fn = jax.jacfwd(fn)
+    return fn(bc, mi, p)
+
+@partial(jax.jit, static_argnums=(2, ))
+def simplex_shape_function(bcs, mi, p):
+    fn = jax.vmap(_simplex_shape_function, in_axes=(0, None, None))
+    return fn(bcs, mi, p)
+
+@partial(jax.jit, static_argnums=(2, 3))
+def grad_simplex_shape_function(bcs, mi, p, n): 
+    return jax.vmap(
+            _grad_simplex_shape_function, 
+            in_axes=(0, None, None, None)
+            )(bcs, mi, p, n)
+
 # edge 
 def edge_length(points):
     return jnp.norm(points[1] - points[0])
+
+@jax.jit
+def edge_to_ipoint(edges, indices, p, NN):
+    return jnp.hstack([
+        edge[:, 0].reshape(-1, 1), 
+        (p-1)*indices.reshape(-1, 1) + jnp.arange(p-1),
+        edge[:, 1].reshape(-1, 1)])
 
 
 # triangle 
