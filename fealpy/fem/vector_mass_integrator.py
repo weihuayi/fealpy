@@ -1,4 +1,3 @@
-from mpmath.functions.rszeta import coef
 import numpy as np
 
 from fealpy.fem.precomp_data import data
