@@ -743,21 +743,14 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         c[index] /=3*a[index, None]
         return c[index]
 
-    def edge_normal(self, index=np.s_[:], node=None):
+    def edge_normal(self, index=np.s_[:]):
         """
-        @brief Calculate the tangent vector of each edge.
-
-        @param index: int, NDArray or slice.
-        @param node: NDArray, optional. Use the nodes of the mesh if not provided.
-
-        @return: An array with shape (NE, GD).
+        @brief 计算二维网格中每条边上单位法线
         """
-        node = self.entity('node') if node is None else node
-        edge = self.entity('edge', index)
-        v = node[edge[:, 1], :] - node[edge[:, 0], :]
-        v = v[..., [1, 0]]
-        v[..., 0] *= -1
-        return v
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
     def edge_unit_normal(self, index=np.s_[:], node=None):
         """
