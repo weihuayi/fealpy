@@ -164,7 +164,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         halfedge = self.ds.halfedge
         v0 = node[halfedge[halfedge[:, 2], 0]] - node[halfedge[:, 0]]
         v1 = node[halfedge[halfedge[:, 3], 0]] - node[halfedge[:, 0]]
-
         angle = np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1)*np.sum(v1**2, axis=1))
         self.halfedgedata['level'][(angle < -0.98)] = 1 
 
