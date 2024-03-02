@@ -179,10 +179,10 @@ class SquareWithCircleHoleDomain:
         pass
 
 class BoxWithCircleHolesDomain:
-    def __init__(self, box=[0, 1, 0, 1], circles=[(0.5, 0.5, 0.2)], fh=huniform):
+    def __init__(self, box=[0, 1, 0, 1], circles=[(0.5, 0.5, 0.2)], hmin=0.003,
+            hmax=0.01):
         """
         """
-        self.fh = fh
         self.box = box 
         vertices = np.array([
             (box[0], box[2]), 
@@ -198,8 +198,17 @@ class BoxWithCircleHolesDomain:
             d0 = drectangle(p, box)
             for circle in self.circles:
                 d0 = ddiff(d0, circle(p))
-
             return d0
+
+        def fh(p):
+            d0 = 1e10 
+            for circle in self.circles:
+                d0 = np.minimum(d0, circle(p))
+            h = hmin + 0.05*d0
+            h[h>hmax] = hmax 
+            return h
+
+        self.fh = fh
         self.facets = {0:vertices, 1:fd}
 
     def __call__(self, p):
