@@ -2016,9 +2016,9 @@ class TriangleMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_domain_distmesh(cls, domain, hmin, maxit=100, output=False):
+    def from_domain_distmesh(cls, domain, maxit=100, output=False):
         from .distmesher_2d import DistMesher2d
-        mesher = DistMesher2d(domain, hmin, output=output)
+        mesher = DistMesher2d(domain, domain.hmin, output=output)
         mesh = mesher.meshing(maxit=maxit)
         return mesh
 
