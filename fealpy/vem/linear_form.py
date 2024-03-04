@@ -45,6 +45,8 @@ class LinearForm:
         """
         space = self.space
         bb = self.dintegrators[0].assembly_cell_vector(space)
+        for i in range(len(self.dintegrators))[1:]:
+            bb += self.dintegrators[i].assembly_cell_vector(space)
         gdof = space.number_of_global_dofs()
         self._V = np.bincount(np.concatenate(space.dof.cell2dof), weights=bb, minlength=gdof)
         return self._V

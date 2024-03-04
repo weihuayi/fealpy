@@ -217,7 +217,6 @@ class PolygonMesh(Mesh, Plotable):
 
     face_to_ipoint = edge_to_ipoint
     
-
     def edge_normal(self, index=np.s_[:]):
         """
         @brief 计算二维网格中每条边上单位法线

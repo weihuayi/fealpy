@@ -2,6 +2,9 @@ import cupy as cp
 import numpy as np
 from scipy.sparse import issparse
 import cupyx.scipy.sparse.linalg as cpx
+import time
+
+from scipy.sparse import issparse
 from cupyx.scipy.sparse.linalg import LinearOperator as CuPyLinearOperator
 
 class CupySolver():

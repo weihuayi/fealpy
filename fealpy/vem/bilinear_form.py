@@ -63,6 +63,8 @@ class BilinearForm:
         space = self.space
         cell2dof = space.cell_to_dof() 
         K = self.dintegrators[0].assembly_cell_matrix(space)
+        for i in range(len(self.dintegrators))[1:]:
+            self.dintegrators[i].assembly_cell_matrix(space, out=K)
 
         f2 = lambda x: np.repeat(x, x.shape[0])
         f3 = lambda x: np.tile(x, x.shape[0])
