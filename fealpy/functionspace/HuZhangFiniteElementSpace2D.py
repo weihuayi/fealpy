@@ -24,13 +24,13 @@ class HuZhangFiniteElementSpace():
         self.fdof = (p-1)*(p-2)//2
         self.cdof = (p-1)*(p-2)//2
 
-        
         self.init_edge_to_dof()
         self.init_face_to_dof()
         self.init_cell_to_dof()
         self.init_orth_matrices()
         self.integralalg = self.space.integralalg
         self.integrator = self.integralalg.integrator
+
 
 
 
@@ -762,9 +762,9 @@ class HuZhangFiniteElementSpace():
             f = Function(self)
         return f
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float_):
         gdof = self.number_of_global_dofs()
-        return np.zeros(gdof, dtype=np.float)
+        return np.zeros(gdof, dtype=np.float_)
 
     def function(self, dim=None):
         f = Function(self)
@@ -811,7 +811,7 @@ class HuZhangFiniteElementSpace():
         ipoint = ipoint[f2dbd] #(NEbd,ldof,gdim)
         facebd2dof = self.face2dof[index] #(NEbd,ldof,tdim)
         #print(f2dbd,index.shape,facebd2dof.shape)
-        frame = np.zeros((NFbd,2,2),dtype=np.float)
+        frame = np.zeros((NFbd,2,2),dtype=np.float_)
         frame[:,0] = n
         frame[:,1] = t
 
@@ -939,7 +939,7 @@ class HuZhangFiniteElementSpace():
 
   
         ##两边都是Neumann边界, 要做准插值
-        T = np.eye(tdim,dtype=np.float)
+        T = np.eye(tdim,dtype=np.float_)
         T[gdim:] = T[gdim:]/np.sqrt(2)
         for i in range(len(Corner_point_index)):
             corner_point = Corner_point_index[i][0] #该角点
@@ -1085,7 +1085,7 @@ class HuZhangFiniteElementSpace():
         phi = self.face_basis(bcs)[:,index,...] #(NQ,NFbd,ldof,tdim,tdim)
         shape = list(phi.shape)
         shape[-1] = gdim
-        phin = np.zeros(shape,dtype=np.float) #sigam*n, (NQ,NFbd,ldof,tdim,gdim)
+        phin = np.zeros(shape,dtype=np.float_) #sigam*n, (NQ,NFbd,ldof,tdim,gdim)
 
         phin[...,0] = np.einsum('...ijlk,ik->...ijl',phi[...,[0,2]],n)
         phin[...,1] = np.einsum('...ijlk,ik->...ijl',phi[...,[2,1]],n)
@@ -1095,7 +1095,7 @@ class HuZhangFiniteElementSpace():
         val = gD(pp,n=n,t=t) #(NQ,NFbd,gdim) 此时gD函数,可能给法向分量，也可能给切向分量，具体形式在gD中体现
         bb = np.einsum('m,mil,mijkl,i->ijk', ws, val, phin, measure) #(NFbd,ldof,tdim)
         idx = bd2dof>=0 #标记出连续边界
-        F = np.zeros(gdof,dtype=np.float)
+        F = np.zeros(gdof,dtype=np.float_)
         np.add.at(F,bd2dof[idx],bb[idx])
         return F
 

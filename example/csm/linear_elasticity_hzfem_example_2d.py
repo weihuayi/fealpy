@@ -7,8 +7,7 @@ from scipy.sparse.linalg import spsolve
 
 import matplotlib.pyplot as plt
 
-
-import fealpy.mesh.MeshFactory as mf
+#import fealpy.mesh.MeshFactory as mf
 from fealpy.mesh import TriangleMesh
 
 ## function space
@@ -20,14 +19,10 @@ from fealpy.pde.linear_elasticity_model import QiModel3d, PolyModel3d, Model2d, 
 from fealpy.pde.linear_elasticity_model2D import GenLinearElasticitymodel2D
 
 #solver 
-from fealpy.solver.fast_solver import LinearElasticityHZFEMFastSolve
-
-
+#from fealpy.solver.fast_solver import LinearElasticityHZFEMFastSolve
 
 ## error anlysis tool
 from fealpy.tools.show import showmultirate
-
-
 
 
 ##  参数解析
@@ -35,7 +30,6 @@ parser = argparse.ArgumentParser(description=
         """
         三角形网格上用胡张元求解线弹性力学问题
         """)
-
 
 parser.add_argument('--degree',
         default=3, type=int,
@@ -107,7 +101,8 @@ elif bdtype =='stress_and_displacement_corner_point':
 
 
 
-mesh = mf.boxmesh2d(pde.domain(),nx=1,ny=1,meshtype='tri')
+#mesh = mf.boxmesh2d(pde.domain(),nx=1,ny=1,meshtype='tri')
+mesh = TriangleMesh.from_box(pde.domain(), nx=1, ny=1)
 mesh.uniform_refine(nrefine)
 
 
@@ -117,14 +112,14 @@ errorType = ['$||\sigma - \sigma_h ||_{0}$',
         '$||u - u_h||_{0}$'
         ]
 Ndof = np.zeros((maxit,))
-errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
 gdim = 2
 
 for i in range(maxit):
         print("The {}-th computation:".format(i))
 
         tspace = HuZhangFiniteElementSpace(mesh, degree)
-        vspace = LagrangeFiniteElementSpace(mesh, degree-1, spacetype='D') 
+        vspace = LagrangeFiniteElementSpace(mesh, degree-1, spacetype='D')
 
         tgdof = tspace.number_of_global_dofs()
         vgdof = vspace.number_of_global_dofs()
@@ -154,7 +149,7 @@ for i in range(maxit):
         F1[:,1] -= B1@sh
         
 
-        bdIdx = np.zeros(tgdof, dtype=np.int)
+        bdIdx = np.zeros(tgdof, dtype=np.int_)
         bdIdx[isBDdof] = 1
         Tbd = spdiags(bdIdx,0,tgdof,tgdof)
         T = spdiags(1-bdIdx,0,tgdof,tgdof)
@@ -165,15 +160,15 @@ for i in range(maxit):
 
 
         #求解
-        #FF = np.r_[F0,F1.T.reshape(-1)]
-        #AA = bmat([[M, B0.transpose(), B1.transpose()],[B0, None, None],[B1,None,None]],format='csr')
-        #x = spsolve(AA,FF)
+        FF = np.r_[F0,F1.T.reshape(-1)]
+        AA = bmat([[M, B0.transpose(), B1.transpose()],[B0, None, None],[B1,None,None]],format='csr')
+        x = spsolve(AA,FF)
 
-        B = construct.vstack([B0,B1],format='csr')
-        A = [M,B]
-        F = [F0,F1]
-        Fast_slover = LinearElasticityHZFEMFastSolve(A,F,vspace)
-        x = Fast_slover.solve()
+    #B = construct.vstack([B0,B1],format='csr')
+    #A = [M,B]
+    #F = [F0,F1]
+    #Fast_slover = LinearElasticityHZFEMFastSolve(A,F,vspace)
+    #x = Fast_slover.solve()
 
 
 

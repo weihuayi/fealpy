@@ -13,7 +13,7 @@ class DistMesher2d():
             ttol = 0.01,
             fscale = 1.2,
             dt = 0.2,
-            output=True):
+            output=False):
         """
         @brief 
 
@@ -177,7 +177,6 @@ class DistMesher2d():
             if mmove > self.ttol*self.hmin:
                 edge = self.construct_edge(node)
                 self.NT += 1
-                print("第 %05d 次三角化"%(self.NT))
 
             md = self.move(node, edge)
 
@@ -245,7 +244,6 @@ class DistMesher2d():
         cidx = cidx[isOut]
         lidx = lidx[isOut]
         if len(nidx) > 0:
-            print(node[nidx])
             node[nidx] = (node[cell[cidx, ne[lidx]]] + node[cell[cidx, pr[lidx]]])/2.0
 
 

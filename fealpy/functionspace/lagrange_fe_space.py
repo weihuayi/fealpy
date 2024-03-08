@@ -129,6 +129,76 @@ class LagrangeFESpace():
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
 
     @barycentric
+    def edge_grad_basis(self, bc, index, lidx, direction=True):
+        """
+
+        Notes
+        -----
+            bc：边上的一组重心坐标积分点
+            index: 边所在的单元编号
+            lidx: 边在该单元的局部编号
+            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+
+            计算基函数梯度在单元边上积分点的值.
+
+            这里要把边上的低维的积分点转化为高维的积分点.
+
+        TODO
+        ----
+            二维和三维统一？
+            有没有更好处理办法？
+
+        """
+        NE = len(index)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NE)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        p = self.p   # the degree of polynomial basis function
+        TD = self.TD
+        multiIndex = self.mesh.multi_index_matrix(p, TD)
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bcs.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bcs[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_dofs()
+        shape = bcs.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.mesh.grad_lambda()
+        gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[index, :, :])
+        return gphi
+
+    @barycentric
     def face_basis(self, bc, index=np.s_[:]):
         """
         @brief 计算 face 上的基函数在给定积分点处的函数值
