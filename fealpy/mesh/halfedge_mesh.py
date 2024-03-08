@@ -3471,7 +3471,7 @@ class HalfEdgeMesh2dDataStructure():
                 idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
                 cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
 
-                NN = self.number_of_nodes()
+                NN = len(self.hnode)
                 NV = self.number_of_vertices_of_cells()
                 NE = self.number_of_edges()
                 cdof = self.number_of_local_ipoints(p, iptype='cell')
