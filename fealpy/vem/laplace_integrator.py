@@ -29,6 +29,11 @@ class ConformingScalarVEMLaplaceIntegrator2d():
                 f1 = lambda x: coef*(x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) -
                     x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
                 K = list(map(f1, zip(self.D, self.PI1)))
+            elif isinstance(coef, np.ndarray):
+                f1 = lambda x: x[2]*(x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) -
+                    x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
+                K = list(map(f1, zip(self.D, self.PI1, coef)))
+
         else:
             tG = list(map(f, self.G))
             if coef is None:
@@ -38,6 +43,10 @@ class ConformingScalarVEMLaplaceIntegrator2d():
                 f1 = lambda x: coef*(x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) -
                     x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
                 K = list(map(f1, zip(self.D, self.PI1, tG)))
+            elif isinstance(coef, np.ndarray):
+                f1 = lambda x: x[3]*(x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) -
+                    x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
+                K = list(map(f1, zip(self.D, self.PI1, tG, coef)))
 
         return K
        
