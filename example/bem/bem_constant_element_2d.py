@@ -1,16 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.pde.bem_model_2d import BemModelMixedBC2d, BemModelDirichletBC2d, BemModelNeumannBC2d
+from fealpy.pde.bem_model_2d import LaplaceBemModelMixedBC2d, LaplaceBemModelDirichletBC2d, LaplaceBemModelNeumannBC2d
 from fealpy.mesh import TriangleMesh
 
 # 模型初始化，可尝试三种边界条件，默认是混合边界条件
 # 混合边界模型
-pde = BemModelMixedBC2d()
+pde = LaplaceBemModelMixedBC2d()
 # Dirichlet 边界模型
-# pde = BemModelDirichletBC2d()
+# pde = LaplaceBemModelDirichletBC2d()
 # Neumann 边界模型
-# pde = BemModelNeumannBC2d()
+# pde = LaplaceBemModelNeumannBC2d()
 
 # # 网格初始化
 box = [0, 1, 0, 1]
@@ -136,11 +136,3 @@ for k in range(maxite):
 print(f'迭代{maxite}次，结果如下：')
 print('误差：\n', errorMatrix)
 print('误差比：\n', errorMatrix[0:-1]/errorMatrix[1:])
-
-# 绘图
-# fig, axes = plt.subplots()
-#
-# mesh.add_plot(axes)
-# plt.axis('off')
-# plt.axis('equal')
-# plt.show()
