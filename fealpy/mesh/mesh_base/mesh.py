@@ -610,3 +610,76 @@ class Mesh():
         # 调用 pvpython 执行画图脚本，并传递参数
         subprocess.run(command)
         os.remove(fname)
+
+    def vtkview(self, showedge=True,
+            background_color=(0.3, 0.2, 0.1), 
+            edge_color=(0, 0, 0),
+            edge_width=1.5,
+            window_size=(800, 800)):
+        """
+        """
+        import vtk
+        import vtk.util.numpy_support as vnp
+
+        NC = self.number_of_cells()
+        GD = self.geo_dimension()
+
+        node = self.entity('node')
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity('cell')
+        cellType = self.vtk_cell_type('cell')
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+        cell = cell.astype(np.int64)
+
+        points = vtk.vtkPoints()
+        points.SetData(vnp.numpy_to_vtk(node))
+
+        cells = vtk.vtkCellArray()
+        cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
+
+        mesh =vtk.vtkUnstructuredGrid() 
+        mesh.SetPoints(points)
+        mesh.SetCells(cellType, cells)
+
+        # 创建一个映射器和 actor
+        mapper = vtk.vtkDataSetMapper()
+        mapper.SetInputData(mesh)
+
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+
+        if showedge:
+            # 创建显示边缘的管线
+            edges = vtk.vtkExtractEdges()
+            edges.SetInputData(mesh)
+
+            edgesMapper = vtk.vtkPolyDataMapper()
+            edgesMapper.SetInputConnection(edges.GetOutputPort())
+
+            edgesActor = vtk.vtkActor()
+            edgesActor.SetMapper(edgesMapper)
+            edgesActor.GetProperty().SetColor(edge_color)  # 黑色边缘
+            edgesActor.GetProperty().SetLineWidth(edge_width)  # 设置线宽
+
+
+        # 创建渲染器、渲染窗口和渲染窗口交互器
+        renderer = vtk.vtkRenderer()
+        renderWindow = vtk.vtkRenderWindow()
+        renderWindow.AddRenderer(renderer)
+        renderWindow.SetSize(window_size)
+        renderWindowInteractor = vtk.vtkRenderWindowInteractor()
+        renderWindowInteractor.SetRenderWindow(renderWindow)
+        # 添加 actor 到渲染器
+        renderer.AddActor(actor)
+        if showedge:
+            renderer.AddActor(edgesActor)
+        renderer.SetBackground(background_color)  # 背景颜色
+
+        # 开始交互
+        renderWindow.Render()
+        renderWindowInteractor.Start()
