@@ -453,7 +453,7 @@ class TriangleMesh(Mesh, Plotable):
             VTK_LINE = 3
             return VTK_LINE
 
-    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
+    def to_vtk(self, fname=None, etype='cell', index=np.s_[:]):
         """
         @brief 把网格转化为 vtk 的数据格式
         """
@@ -479,6 +479,7 @@ class TriangleMesh(Mesh, Plotable):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
 
     def is_crossed_cell(self, point, segment):
         """
@@ -1970,6 +1971,23 @@ class TriangleMesh(Mesh, Plotable):
             cell = idxMap[cell]
 
         return cls(node, cell)
+
+    @classmethod
+    def from_meshio(cls, file, show=False):
+        import meshio 
+        data = meshio.read(file)
+        node = data.points
+        cell = data.cells_dict['triangle']
+        print(data.cells_dict)
+        mesh = cls(node, cell)
+        if show:
+            import matplotlib.pyplot as plt
+            from mpl_toolkits.mplot3d import Axes3D
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            mesh.add_plot(ax)
+            plt.show()
+        return mesh 
 
     ## @ingroup MeshGenerators
     @classmethod
