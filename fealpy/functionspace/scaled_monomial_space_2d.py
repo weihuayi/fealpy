@@ -11,7 +11,7 @@ from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
 from .femdof import multi_index_matrix2d, multi_index_matrix1d
-from .lagrange_fe_space import LagrangeFiniteElementSpace
+from .lagrange_fe_space import LagrangeFESpace
 
 class SMDof2d():
     """
@@ -57,7 +57,7 @@ class SMDof2d():
         elif doftype in {'face', 'edge', 1}:
             return (p+1)
         elif doftype in {'node', 0}:
-            return 0 
+            return 0
 
     def number_of_global_dofs(self, p=None, doftype='cell'):
         ldof = self.number_of_local_dofs(p=p, doftype=doftype)
@@ -222,7 +222,7 @@ class ScaledMonomialSpace2d():
             The shape of `phi` is (..., M, ldof)
 
         """
-        p = self.p if p is None else p 
+        p = self.p if p is None else p
         h = self.cellsize
         NC = self.mesh.number_of_cells()
 
@@ -249,7 +249,7 @@ class ScaledMonomialSpace2d():
         p >= 0
         """
 
-        p = self.p if p is None else p 
+        p = self.p if p is None else p
         h = self.cellsize
 
         num = len(h) if type(index) is slice else len(index)
@@ -265,7 +265,7 @@ class ScaledMonomialSpace2d():
         idx = self.diff_index_1(p=p)
         xidx = idx['x']
         yidx = idx['y']
-        gphi[..., xidx[0], 0] = np.einsum('i, ...i->...i', xidx[1], phi) 
+        gphi[..., xidx[0], 0] = np.einsum('i, ...i->...i', xidx[1], phi)
         gphi[..., yidx[0], 1] = np.einsum('i, ...i->...i', yidx[1], phi)
 
         if scaled:
@@ -322,7 +322,7 @@ class ScaledMonomialSpace2d():
             hphi[..., idx['xx'][0], 0, 0] = np.einsum('i, ...i->...i', idx['xx'][1], phi)
             hphi[..., idx['xy'][0], 0, 1] = np.einsum('i, ...i->...i', idx['xy'][1], phi)
             hphi[..., idx['yy'][0], 1, 1] = np.einsum('i, ...i->...i', idx['yy'][1], phi)
-            hphi[..., 1, 0] = hphi[..., 0, 1] 
+            hphi[..., 1, 0] = hphi[..., 0, 1]
 
         if scaled:
             return hphi/area[index].reshape(-1, 1, 1, 1)
@@ -347,7 +347,7 @@ class ScaledMonomialSpace2d():
         return gmphi
 
     def partial_matrix(self, p=None, index=np.s_[:]):
-        p = p or self.p 
+        p = p or self.p
         mindex = multi_index_matrix2d(p)
         N = len(mindex)
         cellarea = self.mesh.entity_measure("cell")
@@ -364,7 +364,7 @@ class ScaledMonomialSpace2d():
         return Px[index], Py[index]
 
     def partial_matrix_on_edge(self, p=None):
-        p = p or self.p 
+        p = p or self.p
         I = np.arange(p)
 
         h = self.mesh.entity_measure("edge")
@@ -466,9 +466,9 @@ class ScaledMonomialSpace2d():
 
         coor = np.zeros([2*NE, 3, 2], dtype=np.float_)
         coor[:NE, :2] = node[edge]
-        coor[:NE, 2] = mid[edge2cell[:, 0]] 
+        coor[:NE, 2] = mid[edge2cell[:, 0]]
         coor[NE:, :2] = node[edge]
-        coor[NE:, 2] = mid[edge2cell[:, 1]] 
+        coor[NE:, 2] = mid[edge2cell[:, 1]]
 
         val = np.zeros([2*NE, 3])
         val[:NE] = uh(coor[:NE].swapaxes(0, 1), index=edge2cell[:, 0]).swapaxes(0 ,1)
@@ -519,7 +519,7 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
 
-    def edge_cell_mass_matrix(self, p=None, cp=None): 
+    def edge_cell_mass_matrix(self, p=None, cp=None):
         p = self.p if p is None else p
         cp = p+1 if cp is None else cp
 
@@ -539,7 +539,7 @@ class ScaledMonomialSpace2d():
         phi2 = self.basis(ps, index=edge2cell[:, 1], p=cp)
         LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
-        return LM, RM 
+        return LM, RM
 
     def cell_hessian_matrix(self, p=None):
         """
@@ -550,7 +550,7 @@ class ScaledMonomialSpace2d():
         p = self.p if p is None else p
         @cartesian
         def f(x, index):
-            hphi = self.hessian_basis(x, index=index, p=p) 
+            hphi = self.hessian_basis(x, index=index, p=p)
             return np.einsum('qclij, qcmij->qclm', hphi, hphi)
 
         A = self.integralalg.cell_integral(f, q=p+3)
@@ -574,7 +574,7 @@ class ScaledMonomialSpace2d():
         p = self.p if p is None else p
         @cartesian
         def f(x, index):
-            gmphi = self.grad_m_basis(m, x, index=index, p=p) 
+            gmphi = self.grad_m_basis(m, x, index=index, p=p)
             return np.einsum('qcli, qcmi->qclm', gmphi, gmphi)
 
         A = self.integralalg.cell_integral(f, q=p+3)
@@ -613,7 +613,7 @@ class ScaledMonomialSpace2d():
         J = I.swapaxes(-1, -2)
         gdof = self.number_of_global_dofs(p=p)
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return M 
+        return M
 
     def penalty_matrix(self, p=None, index=np.s_[:]):
         """
@@ -621,7 +621,7 @@ class ScaledMonomialSpace2d():
         -----
 
         h_e^{-1}<[u], [v]>_e
-        
+
         """
         p = p or self.p
         mesh = self.mesh
@@ -647,8 +647,8 @@ class ScaledMonomialSpace2d():
 
         cell2dof = self.cell_to_dof()
         edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
-        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape) 
-        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape) 
+        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape)
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
@@ -691,8 +691,8 @@ class ScaledMonomialSpace2d():
 
         cell2dof = self.cell_to_dof()
         edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
-        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape) 
-        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape) 
+        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape)
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
@@ -729,8 +729,8 @@ class ScaledMonomialSpace2d():
 
         cell2dof = self.cell_to_dof()
         edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
-        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape) 
-        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape) 
+        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape)
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
@@ -782,14 +782,14 @@ class ScaledMonomialSpace2d():
         -----
 
         其中 g 可以是标量函数也可以是向量函数, 当是标量函数的时候计算的是:
-        
+
         h_e^{hpower}<g, [v]>_e
 
         当是向量函数的时候计算的是:
 
         h_e^{hpower}<g_n, [v]>_e
 
-        
+
         """
         p = p or self.p
         mesh = self.mesh
@@ -873,7 +873,7 @@ class ScaledMonomialSpace2d():
             phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1], p=p)
             bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
             np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
-        return F 
+        return F
 
     def source_vector1(self, f, celltype=False, q=None):
         """
@@ -923,7 +923,7 @@ class ScaledMonomialSpace2d():
             phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
             bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
             np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
-        return F 
+        return F
 
     def coefficient_of_cell_basis_under_edge_basis(slef, p=None):
         """!
@@ -949,7 +949,7 @@ class ScaledMonomialSpace2d():
 
         points = self.mesh.bc_to_point(bcs) #(p+1, NE, 2)
         isNotOK = np.ones(NC, dtype=np.bool_)
-        start = cell2edgeloc[:-1].copy() 
+        start = cell2edgeloc[:-1].copy()
         while np.any(isNotOK):
             index = start[isNotOK]
             eidx = cell2edge[index]
@@ -972,8 +972,8 @@ class ScaledMonomialSpace2d():
         gdof = self.number_of_global_dofs()
         b = (self.basis, cell2dof, gdof)
         F = self.integralalg.serial_construct_vector(f, b, celltype=celltype,
-                q=q) 
-        return F 
+                q=q)
+        return F
 
     def matrix_H(self, p=None):
         p = self.p if p is None else p
@@ -1015,7 +1015,7 @@ class ScaledMonomialSpace2d():
         """
 
         @brief 给定一个函数 f， 把它投影到缩放单项式空间
-        @param[in] f 关于（x, y) 的函数，注意输入是笛卡尔坐标  
+        @param[in] f 关于（x, y) 的函数，注意输入是笛卡尔坐标
 
         """
 
@@ -1122,7 +1122,7 @@ class ScaledMonomialSpace2d():
 
         TODO
         ----
-        1. 实现多个函数同时恢复的情形 
+        1. 实现多个函数同时恢复的情形
         """
 
         # number of function in uh
