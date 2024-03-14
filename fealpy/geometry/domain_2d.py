@@ -6,8 +6,6 @@ from .geoalg import project
 from .implicit_curve import CircleCurve
 from .domain import Domain
 
-from fealpy import logger
-
 class RectangleDomain(Domain):
     def __init__(self, domain=[0, 1, 0, 1], hmin=0.1, hmax=None, fh=None):
         """
@@ -253,7 +251,7 @@ class BoxWithBoxHolesDomain(Domain):
         """
         """
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
-        self.fh = fh if fh is not None else super().fh
+        #self.fh = fh if fh is not None else super().fh
 
         self.box = box 
         self.boxs = boxs
@@ -282,6 +280,16 @@ class BoxWithBoxHolesDomain(Domain):
             for b in boxs:
                 d0 = ddiff(d0, drectangle(p, box))
             return d0
+
+        def fh(p):
+            d0 = 1e10 
+            for b in boxs:
+                d0 = np.minimum(d0, drectangle(p, box))
+            h = hmin + 0.05*d0
+            h[h>hmax] = hmax 
+            return h
+
+        self.fh = fh
 
         self.facets = {0:vertices, 1:fd}
 
