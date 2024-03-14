@@ -129,6 +129,14 @@ class LagrangeFESpace():
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
 
     @barycentric
+    def cell_basis_on_edge(self, bc, index, lidx, direction=True):
+        pass
+
+    @barycentric
+    def cell_grad_basis_on_edge(self, bc, index, lidx, direction=True):
+        pass
+
+    @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
         """
 

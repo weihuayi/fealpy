@@ -11,7 +11,7 @@ from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
 from .femdof import multi_index_matrix2d, multi_index_matrix1d
-from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
+from .lagrange_fe_space import LagrangeFiniteElementSpace
 
 class SMDof2d():
     """
