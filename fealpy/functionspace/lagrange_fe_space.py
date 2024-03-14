@@ -129,13 +129,12 @@ class LagrangeFESpace():
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
 
     @barycentric
-    def cell_basis_on_edge(self, bc: NDArray, index: NDArray, lidx: NDArray,
+    def cell_basis_on_edge(self, bc: NDArray, lidx: NDArray,
                            direction=True) -> NDArray[np.floating]:
         """
         @brief Return the basis value of cells on points of edges.
 
         @param bc: NDArray. Barycentric coordinates of points on edges, with shape [NE, 2].
-        @param index: NDArray. The index of cells where these edges are located, with shape [NE, ].
         @param lidx: NDArray. The local index of edges, with shape [NE, ].
         @param direction: bool. True for the default direction of the edge, False for the opposite direction.
 
@@ -146,7 +145,7 @@ class LagrangeFESpace():
         if lidx.ndim != 1:
             raise ValueError('lidx is expected to be 1-dimensional.')
 
-        NE = len(index)
+        NE = len(lidx)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[:-1] + (3, )
@@ -160,7 +159,7 @@ class LagrangeFESpace():
             bcs[idx, ..., nmap[lidx]] = bc[..., 1]
             bcs[idx, ..., pmap[lidx]] = bc[..., 0]
 
-        return self.mesh.shape_function(bcs, p=self.p)[index]
+        return self.mesh.shape_function(bcs, p=self.p)
 
     @barycentric
     def cell_grad_basis_on_edge(self, bc: NDArray, index: NDArray, lidx: NDArray,
