@@ -32,7 +32,7 @@ class LagrangeFESpace():
             mesh,
             p: int=1,
             spacetype: str='C',
-            ctype: str = 'C', 
+            ctype: str = 'C',
             doforder: str='vdims'):
         """
         @brief Initialize the Lagrange finite element space.
@@ -129,6 +129,54 @@ class LagrangeFESpace():
         return self.mesh.grad_shape_function(bc, p=self.p, index=index)
 
     @barycentric
+    def cell_basis_on_edge(self, bc: NDArray, lidx: NDArray,
+                           direction=True) -> NDArray[np.floating]:
+        """
+        @brief Return the basis value of cells on points of edges.
+
+        @param bc: NDArray. Barycentric coordinates of points on edges, with shape [NE, 2].
+        @param lidx: NDArray. The local index of edges, with shape [NE, ].
+        @param direction: bool. True for the default direction of the edge, False for the opposite direction.
+
+        @return: Basis with shape [NE, NQ, Dofs].
+        """
+        if bc.shape[-1] != 2:
+            raise ValueError('The shape of bc should be [NE, 2].')
+        if lidx.ndim != 1:
+            raise ValueError('lidx is expected to be 1-dimensional.')
+
+        NE = len(lidx)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.mesh.ftype)
+        idx = np.arange(NE)
+
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        return self.mesh.shape_function(bcs, p=self.p)
+
+    @barycentric
+    def cell_grad_basis_on_edge(self, bc: NDArray, index: NDArray, lidx: NDArray,
+                                direction=True) -> NDArray[np.floating]:
+        """
+        @brief Return the gradient of basis value of cells on points of edges.
+
+        @param bc: NDArray. Barycentric coordinates of points on edges, with shape [NE, 2].
+        @param index: NDArray. The index of cells where these edges are located, with shape [NE, ].
+        @param lidx: NDArray. The local index of edges, with shape [NE, ].
+        @param direction: bool. True for the default direction of the edge, False for the opposite direction.
+
+        @return: Gradient of basis with shape [NE, NQ, Dofs, GD].
+        """
+        return self.edge_grad_basis(bc=bc, index=index, lidx=lidx, direction=direction)
+
+    @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
         """
 
@@ -137,7 +185,7 @@ class LagrangeFESpace():
             bc：边上的一组重心坐标积分点
             index: 边所在的单元编号
             lidx: 边在该单元的局部编号
-            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致
 
             计算基函数梯度在单元边上积分点的值.
 
