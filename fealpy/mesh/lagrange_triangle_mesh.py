@@ -1,5 +1,6 @@
 import numpy as np
 
+from .lagrange_mesh import LagrangeMesh
 from .triangle_mesh import TriangleMesh
 from .mesh_base import Mesh, Plotable
 
@@ -13,7 +14,7 @@ class LagrangeTriangleMeshDataStructure():
     def number_of_cells(self):
         return self.cell.shape[0]
 
-class LagrangeTriangleMesh(Mesh): 
+class LagrangeTriangleMesh(LagrangeMesh): 
     def __init__(self, node, cell, surface=None, p=1):
 
         mesh = TriangleMesh(node, cell)
@@ -54,9 +55,6 @@ class LagrangeTriangleMesh(Mesh):
 
     def ref_cell_measure(self):
         return 0.5
-
-    def ref_face_measure(self):
-        return 1.0
  
     def integrator(self, q, etype='cell'):
         """
@@ -83,13 +81,43 @@ class LagrangeTriangleMesh(Mesh):
         """
         @brief 网格空间基函数
         """
-        pass
+        p = self.p if p is None else p
+        phi = lagrange_shape_function(bc, p)
+        return phi[..., None, :]
 
     def grad_shape_function(self):
         """
         @brief 网格空间基函数的梯度
+        计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+
+        lambda_0 = 1 - xi - eta
+        lambda_1 = xi
+        lambda_2 = eta
+
         """
-        pass
+        p = self.p if p is None else p 
+        q = p if q is None else q
+
+        TD = bc.shape[-1] - 1
+        
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = LagrangeMesh.jacobi_matrix(bcs, index=index)
+        
+        if TD == 2:
+            Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
+        else:
+            Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+        R = lagrange_grad_shape_function(bc, p) # (..., ldof, TD+1)
+        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
+
+        if variables == 'u':
+            return gphi[..., None, :, :] #(..., 1, ldof, TD)
+        elif variables == 'x':
+            G, J = LagrangeMesh.first_fundamental_form(bc, index=index, return_jacobi=True)
+            G = np.linalg.inv(G)
+            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
+            return gphi
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
         """
