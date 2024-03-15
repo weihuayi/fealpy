@@ -140,8 +140,8 @@ def zoom(x: NDArray, s: Float, d: NDArray,
                 return alpha, xc, fc, gc
 
             if sc*(alpha_1 - alpha_0) >= 0:
-                alpha_0, alpha_1 = alpha, alpha_0
-                fl = fc
+                alpha_1 = alpha_0
+            alpha_0 = alpha
 
         iter_ += 1
     return alpha, xc, fc, gc
