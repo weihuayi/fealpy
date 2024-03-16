@@ -219,3 +219,44 @@ class TriangleMesh(MeshBase):
         c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
         return jnp.array(c2p[index])
 
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        """
+        Generate a triangle mesh for a box domain using jax.numpy, optimizing both node and cell array creation.
+
+        @param box
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TriangleMesh instance
+        """
+        X, Y = jnp.mgrid[
+                box[0]:box[1]:complex(0, nx+1),
+                box[2]:box[3]:complex(0, ny+1)]
+        node = jnp.column_stack((X.ravel(), Y.ravel()))
+
+        idx = jnp.arange((nx+1) * (ny+1)).reshape(nx+1, ny+1)
+
+        # Defining cells for the two triangles within each square grid
+        cell0 = jnp.column_stack((
+            idx[1:, :-1].ravel(), 
+            idx[1:, 1:].ravel(), 
+            idx[:-1, :-1].ravel()))
+        cell1 = jnp.column_stack((idx[:-1, 1:].ravel(), idx[:-1, :-1].ravel(), idx[1:, 1:].ravel()))
+
+        # Concatenating the two sets of cells to form the complete cell array
+        cell = jnp.concatenate((cell0, cell1), axis=0)
+
+        if threshold is not None:
+            bc = jnp.sum(node[cell, :], axis=1) / 3
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = jnp.zeros(node.shape[0], dtype=jnp.bool_)
+            isValidNode = isValidNode.at[cell].set(True)
+            node = node[isValidNode]
+            idxMap = jnp.zeros(node.shape[0], dtype=jnp.int32)
+            idxMap = idxMap.at[isValidNode].set(jnp.arange(isValidNode.sum()))
+            cell = idxMap[cell.ravel()].reshape(cell.shape)
+
+        return cls(node, cell)
+

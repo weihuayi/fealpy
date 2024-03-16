@@ -6,14 +6,13 @@ from .geoalg import project
 from .implicit_curve import CircleCurve
 from .domain import Domain
 
-from fealpy import logger
-
 class RectangleDomain(Domain):
     def __init__(self, domain=[0, 1, 0, 1], hmin=0.1, hmax=None, fh=None):
         """
         """
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
-        self.fh = fh if fh is not None else super().fh
+        if fh is not None:
+            self.fh = fh
 
         self.domain = domain 
 
@@ -59,11 +58,13 @@ class RectangleDomain(Domain):
         pass
 
 class CircleDomain(Domain):
-    def __init__(self, center=[0.0, 0.0], radius=1.0, hmin=0.1, hmax=0.1, fh=huniform):
+    def __init__(self, center=[0.0, 0.0], radius=1.0, hmin=0.1, hmax=0.1,
+            fh=None):
         """
         """
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
-        self.fh = fh if fh is not None else super().fh
+        if fh is not None:
+            self.fh = fh
 
         self.curve = CircleCurve(center, radius) 
         self.fh = fh 
@@ -102,7 +103,8 @@ class LShapeDomain(Domain):
         """
         """
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
-        self.fh = fh if fh is not None else super().fh
+        if fh is not None:
+            self.fh = fh
 
         self.box = [-1.0, 1.0, -1.0, 1.0] 
         self.fh = fh
@@ -154,7 +156,8 @@ class SquareWithCircleHoleDomain(Domain):
         """
         """
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
-        self.fh = fh if fh is not None else super().fh
+        if fh is not None:
+            self.fh = fh
 
         self.box = [0, 1, 0, 1]
         vertices = np.array([
@@ -253,7 +256,6 @@ class BoxWithBoxHolesDomain(Domain):
         """
         """
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
-        self.fh = fh if fh is not None else super().fh
 
         self.box = box 
         self.boxs = boxs
@@ -280,8 +282,20 @@ class BoxWithBoxHolesDomain(Domain):
         def fd(p):
             d0 = drectangle(p, box)
             for b in boxs:
-                d0 = ddiff(d0, drectangle(p, box))
+                # d0 = ddiff(d0, drectangle(p, b)) #TODO: 为什么这样写是错的呢？
+                d1 = drectangle(p, b)
+                d0 = ddiff(d0, d1)
             return d0
+
+        def fh(p):
+            d0 = 1e10 
+            for b in boxs:
+                d0 = np.minimum(d0, drectangle(p, b))
+            h = hmin + 0.05*d0
+            h[h>hmax] = hmax 
+            return h
+
+        self.fh = fh
 
         self.facets = {0:vertices, 1:fd}
 
