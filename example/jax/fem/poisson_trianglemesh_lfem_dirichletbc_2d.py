@@ -7,7 +7,8 @@ from fealpy.pde.poisson_2d import CosCosData
 from fealpy import logger
 from fealpy.jax.mesh import TriangleMesh 
 from fealpy.jax.functionspace import LagrangeFESpace
-from fealpy.fem.diffusion_integrator import DiffusionIntegrator 
+from fealpy.jax.fem import ScalarLaplaceIntegrator
+from fealpy.jax.fem import BilinearForm
 
 
 ## 参数解析
@@ -47,9 +48,12 @@ errorType = ['$|| u - u_h||_{\\Omega,0}$',
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
 
-mesh = TriangleMesh.from_box(box = domain, nx = nx*2**i, ny = ny*2**i)
+mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
 space = LagrangeFESpace(mesh, p = p)
 
+bform = BilinearForm(space)
+L = ScalarLaplaceIntegrator()
+bform.add_domain_integrator(L)
+A = bform.assembly()
 
-print(errorMatrix)
-print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
+

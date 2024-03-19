@@ -61,6 +61,12 @@ class LagrangeFESpace():
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
+    def number_of_local_dofs(self):
+        return self.dof.number_of_local_dofs()
+
+    def number_of_global_dofs(self):
+        return self.dof.number_of_global_dofs()
+
     def cell_to_dof(self):
         return self.dof.cell2dof
 
@@ -69,11 +75,11 @@ class LagrangeFESpace():
         phi = self.mesh.shape_function(bc, p=p)
         return phi[..., None, :]
 
-    def grad_basis(self, bc, index=np.s_[:], variables='x'):
+    def grad_basis(self, bc, index=np.s_[:], variable='x'):
         """
         @brief
         """
-        return self.mesh.grad_shape_function(bc, p=self.p, index=index, variables=variables)
+        return self.mesh.grad_shape_function(bc, p=self.p, index=index, variable=variable)
 
 
     def value(self, uh, bc, index=np.s_[:]):

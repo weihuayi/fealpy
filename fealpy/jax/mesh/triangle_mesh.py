@@ -108,14 +108,14 @@ class TriangleMesh(MeshBase):
         phi = simplex_shape_function(bcs, mi, p)
         return phi # (NQ, ldof)
 
-    def grad_shape_function(self, bcs, p=1, index=jnp.s_[:], variables='x'):
+    def grad_shape_function(self, bcs, p=1, index=jnp.s_[:], variable='x'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
         R = grad_simplex_shape_function(bcs, mi, p, 1) # (NQ, ldof, TD+1) 
-        if variables == 'x':
+        if variable == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = jnp.einsum('...ij, kjm->k...im', R, Dlambda, optimize=True)
             return gphi #(NC, NQ, ldof, GD)
