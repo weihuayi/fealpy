@@ -4,7 +4,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from fealpy import logger
+from .. import logger
 
 from .mesh_kernel import *
 from .mesh_base import MeshBase
@@ -46,12 +46,14 @@ class TriangleMeshDataStructure():
         NF = i0.shape[0]
 
         i1 = np.zeros(NF, dtype=self.itype)
-        i1[j] = np.arange(3*NC, dtype=self.itype)
+        i1[j.ravel()] = np.arange(3*NC, dtype=self.itype)
 
         self.cell2edge = j.reshape(NC, 3)
         self.cell2face = self.cell2edge
         self.face2cell = jnp.vstack([i0//3, i1//3, i0%3, i1%3]).T
         self.edge2cell = self.face2cell
+
+        logger.info(f"Construct the mesh toplogy relation with {NF} edge (or face).")
 
 
 class TriangleMesh(MeshBase):
@@ -63,11 +65,16 @@ class TriangleMesh(MeshBase):
 
         assert cell.shape[-1] == 3
 
-        self.node = node
         NN = node.shape[0]
+        NC = cell.shape[0]
         GD = node.shape[1]
-        self.ds = TriangleMeshDataStructure(NN, cell)
 
+        self.itype = cell.dtype
+        self.ftype = node.dtype
+
+        logger.info(f"Initialize a {GD}D TriangleMesh instance with {NN} nodes ({node.dtype}) and {NC} cells ({cell.dtype}).")
+        self.node = node
+        self.ds = TriangleMeshDataStructure(NN, cell)
         self._edge_length = jax.jit(jax.vmap(edge_length))
 
         if GD == 2:

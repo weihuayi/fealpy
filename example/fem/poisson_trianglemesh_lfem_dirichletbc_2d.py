@@ -69,9 +69,12 @@ for i in range(maxit):
     bform.add_domain_integrator(DiffusionIntegrator(q = p+2))
     A = bform.assembly()
 
+    print(A.toarray())
+
     lform = LinearForm(space)
     lform.add_domain_integrator(ScalarSourceIntegrator(f = pde.source, q = p+2))
     F = lform.assembly()
+    print(F)
 
     bc = DirichletBC(space = space, gD = pde.dirichlet) 
     uh = space.function() 

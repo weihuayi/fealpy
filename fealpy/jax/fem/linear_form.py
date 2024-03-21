@@ -4,6 +4,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
+from .. import logger
+
 class LinearForm:
     """
 
@@ -57,6 +59,7 @@ class LinearForm:
         cell2dof = space.cell_to_dof()
         V = jnp.zeros((gdof, ), dtype=space.ftype)
         self._V = V.at[cell2dof].add(bb)
+        logger.info(f"Construct source vector with shape {V.shape}.")
         return self._V
 
     def update(self):

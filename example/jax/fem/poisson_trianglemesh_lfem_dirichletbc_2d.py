@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+# 
 import argparse
+import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
@@ -151,6 +154,7 @@ errorType = ['$|| u - u_h||_{\\Omega,0}$',
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
 
+#ipdb.set_trace()
 mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
 space = LagrangeFESpace(mesh, p = p)
 
@@ -162,4 +166,6 @@ A = bform.assembly()
 lform = LinearForm(space)
 F = ScalarSourceIntegrator(pde.source, q=3)
 lform.add_domain_integrator(F)
-b = lfrom.assembly()
+b = lform.assembly()
+print(b)
+print(A.toarray())
