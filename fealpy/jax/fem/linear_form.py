@@ -3,7 +3,6 @@ import numpy as np
 
 import jax
 import jax.numpy as jnp
-from jax.ops import index, index_add
 
 class LinearForm:
     """
@@ -57,7 +56,7 @@ class LinearForm:
 
         cell2dof = space.cell_to_dof()
         V = jnp.zeros((gdof, ), dtype=space.ftype)
-        self._V = index_add(self._V, index[cell2dof], bb)
+        self._V = V.at[cell2dof].add(bb)
         return self._V
 
     def update(self):

@@ -238,10 +238,7 @@ class TriangleMesh(MeshBase):
         idx = jnp.arange((nx+1) * (ny+1)).reshape(nx+1, ny+1)
 
         # Defining cells for the two triangles within each square grid
-        cell0 = jnp.column_stack((
-            idx[1:, :-1].ravel(), 
-            idx[1:, 1:].ravel(), 
-            idx[:-1, :-1].ravel()))
+        cell0 = jnp.column_stack((idx[1:, :-1].ravel(), idx[1:, 1:].ravel(), idx[:-1, :-1].ravel()))
         cell1 = jnp.column_stack((idx[:-1, 1:].ravel(), idx[:-1, :-1].ravel(), idx[1:, 1:].ravel()))
 
         # Concatenating the two sets of cells to form the complete cell array

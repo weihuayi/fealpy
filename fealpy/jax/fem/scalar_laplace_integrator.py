@@ -1,6 +1,5 @@
 
 import numpy as np
-from fealpy import logger
 
 import jax
 import jax.numpy as jnp
