@@ -3,7 +3,9 @@ import numpy as np
 from .lagrange_mesh import LagrangeMesh
 from .triangle_mesh import TriangleMesh
 from .mesh_base import Mesh, Plotable
-
+from .backup.core import lagrange_shape_function
+from .backup.core import lagrange_grad_shape_function
+from .backup.core import multi_index_matrix
 
 class LagrangeTriangleMeshDataStructure():
     def __init__(self, NN, cell):
@@ -30,6 +32,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.surface = surface
 
         self.node = mesh.interpolation_points(p)
+        self.multi_index_matrix = multi_index_matrix
 
         if surface is not None:
             self.node, _ = surface.project(self.node)
@@ -53,9 +56,22 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.face_shape_function = self._shape_function
         self.edge_shape_function = self._shape_function
 
+    def geo_dimension(self):
+        return self.GD
+
     def ref_cell_measure(self):
         return 0.5
  
+    def lagrange_dof(self, p, spacetype='C'):
+        if spacetype == 'C':
+            return CLagrangeTriangleDof2d(self, p)
+        elif spacetype == 'D':
+            return DLagrangeTriangleDof2d(self, p)
+    
+    def uniform_refine(self, n=1):
+        p =self.p
+        pass
+
     def integrator(self, q, etype='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式
@@ -66,6 +82,39 @@ class LagrangeTriangleMesh(LagrangeMesh):
         elif etype in {'edge', 'face', 1}:
             from ..quadrature import GaussLegendreQuadrature
             return GaussLegendreQuadrature(q)
+    
+    def cell_area(self, q=None, index=np.s_[:]):
+        """
+        @berif 计算单元的面积。
+        """
+        p = self.p
+        q = p if q is None else q
+        GD = self.geo_dimension()
+
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        if GD == 3:
+            n = np.sqrt(np.sum(n**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, n)/2.0
+        return a
+
+    def edge_length(self, q=None, index=np.s_[:]):
+        """
+        @berif 计算边的长度
+        """
+        p = self.p
+        q = p if q is None else q
+
+        qf = self.integrator(q, etype='edge')
+        bcs, ws = qf.get_quadrature_points_and_weights() 
+
+        J = self.jacobi_matrix(bcs, index=index)
+        l = np.sqrt(np.sum(J**2, axis=(-1, -2)))
+        a = np.einsum('i, ij->j', ws, l)
+        return a
+
 
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
@@ -77,7 +126,57 @@ class LagrangeTriangleMesh(LagrangeMesh):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
 
-    def shape_function(self):
+    def jacobi_TMOP(self, index = np.s_[:]):
+
+        '''
+        Notes
+        -----
+        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵
+        分解出的各个度量
+        '''
+
+        p = self.p
+        bc = multi_index_matrix[2](p)/p
+
+        J = self.jacobi_matrix(bc, index=index)# Jacobi矩阵
+        
+        Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis = -1))# 网格单元尺寸
+        
+        r = np.sqrt(np.einsum('...ij->...j', J**2))# [r1,r2]
+
+        Delta = np.einsum('ij,...j->...ij', np.eye(2), r)
+        r0 = r[:, :, 0]*r[:, :, 1]
+        Delta = np.einsum('...ijk,...i->...ijk',Delta, np.sqrt(1/r0))# 网格单元纵横比
+        
+        sphi = np.cross(J[..., 0], J[..., 1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
+        cphi = np.sum(J[..., 0]*J[..., 1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
+
+        E = np.zeros(J[...,1].shape)
+        E[...,0] = 1
+        stheta = np.cross(E,J[...,0],axis=-1)/r[...,0]
+        ctheta = np.sum(J[...,0]*E,axis=-1)/r[...,0]
+        
+        V = np.zeros(J.shape)# 网格单元方向
+        V[..., 0, 0] = ctheta
+        V[..., 1, 0] = stheta
+        V[..., 0, 1] = -stheta
+        V[..., 1, 1] = ctheta
+        
+        Q = np.zeros(J.shape)# 网格单元夹角
+        Q[..., 0, 0] = 1/np.sqrt(sphi)
+        Q[..., 1, 0] = cphi/np.sqrt(sphi)
+        Q[..., 1, 1] = sphi/np.sqrt(sphi)
+        
+        U = np.zeros(J.shape)# 网格单元尺寸和形状
+        U[...,0,0] = r[..., 0]
+        U[...,1,0] = r[..., 1]*cphi
+        U[...,1,1] = r[..., 1]*sphi
+
+        S = np.einsum('...ijk,...i->...ijk', U, 1/Lambda)# 网格单元形状
+        #V = np.dot(J, np.linalg.inv(U))# 网格单元方向
+        return J, Lambda, Q, Delta, S, U, V
+    
+    def shape_function(self, bc, p=None):
         """
         @brief 网格空间基函数
         """
@@ -85,7 +184,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         phi = lagrange_shape_function(bc, p)
         return phi[..., None, :]
 
-    def grad_shape_function(self):
+    def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
         """
         @brief 网格空间基函数的梯度
         计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
@@ -96,14 +195,8 @@ class LagrangeTriangleMesh(LagrangeMesh):
 
         """
         p = self.p if p is None else p 
-        q = p if q is None else q
-
         TD = bc.shape[-1] - 1
-        
-        qf = self.integrator(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        J = LagrangeMesh.jacobi_matrix(bcs, index=index)
-        
+         
         if TD == 2:
             Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
         else:
@@ -127,48 +220,85 @@ class LagrangeTriangleMesh(LagrangeMesh):
         @param lidx 边在该单元的局部编号
         @param direction Ture 表示边的方向和单元的逆时针方向一致，False 表示不一致
         """
-        pass
+        NC = len(cindex)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NC, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NC)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
+
+        return gphi
+
+    grad_shape_function_on_face = grad_shape_function_on_edge
+        
+
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
-        @brief 
+        @brief
         """
-        pass
+        if iptype in {'cell', 2}:
+            return (p+1)*(p+2)//2
+        elif iptype in {'face', 'edge',  1}: # 包括两个顶点
+            return p + 1
+        elif iptype in {'node', 0}:
+            return 1
+
     def number_of_global_ipoints(self, p):
-        """
-        @berif
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
 
+    def interpolation_points(self, p: int, index=np.s_[:]):
         """
-        pass
+        @brief 获取三角形网格上所有 p 次插值点
+        """
+        cell = self.entity('cell')
+        node = self.entity('node')
+        if p == 1:
+            return node
 
-    def interpolation_points(self, p:int, index=np.s_[:]):
-        """
-        @berif 获取三角形网格上所有 p 次插值点 
-        """
-        pass
+        if p > 1:
+            NN = self.number_of_nodes()
+            GD = self.geo_dimension()
+
+            gdof = self.number_of_global_ipoints(p)
+            ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoints[:NN, :] = node
+
+            NE = self.number_of_edges()
+
+            edge = self.entity('edge')
+
+            w = np.zeros((p-1, 2), dtype=np.float64)
+            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w[:, 1] = w[-1::-1, 0]
+            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, GD)
+        if p > 2:
+            TD = self.top_dimension()
+            multiIndex = self.multi_index_matrix(p, TD)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
+                    isEdgeIPoints[:,2])
+            w = multiIndex[isInCellIPoints, :]/p
+            ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell, :]).reshape(-1, GD)
+        return ipoints # (gdof, GD)
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
         @berif 
         """
         pass
-
-    def surface_unit_normal(self, index=np.s_[:]):
-        """
-        @brief 计算曲面三角形网格中每个面上的单位法线
-        """
-        assert self.geo_dimension() == 3
-        node = self.entity('node')
-        cell = self.entity('cell')
-
-        v0 = node[cell[index, 2]] - node[cell[index, 1]]
-        v1 = node[cell[index, 0]] - node[cell[index, 2]]
-        v2 = node[cell[index, 1]] - node[cell[index, 0]]
-
-        nv = np.cross(v1, v2)
-        length = np.linalg.norm(nv, axis=-1, keepdims=True)
-
-        n = nv/length
-        return n
 
     def grad_lambda(self, index=np.s_[:]):
         """
@@ -189,10 +319,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
 
     def vtk_cell_type(self, etype='cell'):
         """
-
-        Notes
-        -----
-            返回网格单元对应的 vtk类型。
+        @berif  返回网格单元对应的 vtk类型。
         """
         if etype in {'cell', 2}:
             VTK_LAGRANGE_TRIANGLE = 69
@@ -206,9 +333,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         Parameters
         ----------
 
-        Notes
-        -----
-        把网格转化为 VTK 的格式
+        @berif 把网格转化为 VTK 的格式
         """
         from .vtk_extent import vtk_cell_index, write_to_vtu
 
@@ -233,3 +358,244 @@ class LagrangeTriangleMesh(LagrangeMesh):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
+class CLagrangeTriangleDof2d():
+    """
+    @berif 拉格朗日三角形网格上的自由度管理类。
+    """
+    def __init__(self, mesh, p):
+        self.mesh = mesh
+        self.p = p
+        self.multiIndex = multi_index_matrix[2](p)
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
+
+    def is_boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        gdof = self.number_of_global_dofs()
+        edge2dof = self.edge_to_dof()
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
+        isBdDof[edge2dof[index]] = True
+        return isBdDof
+
+    @property
+    def face2dof(self):
+        return self.edge_to_dof()
+   
+    def face_to_dof(self):
+        return self.edge_to_dof()
+
+    @property
+    def edge2dof(self):
+        return self.edge_to_dof()
+
+    def edge_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分边上的自由度
+        """
+        p = self.p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+
+        if p == mesh.p:
+            return edge
+
+        NN = mesh.number_of_corner_nodes()
+        NE = mesh.number_of_edges()
+        edge2dof = np.zeros((NE, p+1), dtype=np.int)
+        edge2dof[:, [0, -1]] = edge[:, [0, -1]] # edge 可以是高次曲线
+        if p > 1:
+            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+        return edge2dof
+
+    @property
+    def cell2dof(self):
+        """
+        
+        Notes
+        -----
+            把这个方法属性化，保证程序接口兼容性
+        """
+        return self.cell_to_dof()
+
+
+    def cell_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分单元上的自由度。
+        2. 用更高效的方式来生成单元自由度数组。
+        """
+
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.entity('cell') # cell 可以是高次单元
+        if p == mesh.p:
+            return cell 
+
+        # 空间自由度和网格的自由度不一致时，重新构造单元自由度矩阵
+        NN = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        edge2cell = mesh.ds.edge_to_cell()
+        ldof = self.number_of_local_dofs()
+        cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+        edge2dof = self.edge_to_dof()
+
+        flag = edge2cell[:, 2] == 0
+        cell2dof[edge2cell[flag, 0][:, None], index[:, 0] == 0] = edge2dof[flag]
+        flag = edge2cell[:, 2] == 1
+        cell2dof[edge2cell[flag, 0][:, None], index[:, 1] == 0] = edge2dof[flag, -1::-1]
+        flag = edge2cell[:, 2] == 2
+        cell2dof[edge2cell[flag, 0][:, None], index[:, 2] == 0] = edge2dof[flag]
+
+        flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
+        cell2dof[edge2cell[flag, 1][:, None], index[:, 0] == 0] = edge2dof[flag, -1::-1]
+        flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
+        cell2dof[edge2cell[flag, 1][:, None], index[:, 1] == 0] = edge2dof[flag]
+        flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
+        cell2dof[edge2cell[flag, 1][:, None], index[:, 2] == 0] = edge2dof[flag, -1::-1]
+
+        if p > 2:
+            flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
+            cdof =  ldof - 3*p
+            cell2dof[:, flag]= NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
+
+        return cell2dof
+
+    def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+        if p == mesh.p:
+            return node
+
+        cell2dof = self.cell_to_dof()
+        GD = mesh.geo_dimension()
+        gdof = self.number_of_global_dofs()
+        ipoint = np.zeros((gdof, GD), dtype=np.float64)
+        bcs = self.multiIndex/p # 计算插值点对应的重心坐标
+        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1) 
+        return ipoint
+
+    def number_of_global_dofs(self):
+        p = self.p
+        mesh = self.mesh
+
+        if p == mesh.p:
+            return mesh.number_of_nodes()
+
+        gdof = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
+        if p > 1:
+            NE = self.mesh.number_of_edges()
+            gdof += (p-1)*NE
+
+        if p > 2:
+            ldof = self.number_of_local_dofs()
+            NC = self.mesh.number_of_cells()
+            gdof += (ldof - 3*p)*NC
+        return gdof
+
+    def number_of_local_dofs(self, doftype='cell'):
+        p = self.p
+        if doftype in {'cell', 2}:
+            return (p+1)*(p+2)//2 
+        elif doftype in {'face', 'edge',  1}:
+            return self.p + 1
+        elif doftype in {'node', 0}:
+            return 1
+
+class DLagrangeTriangleDof2d():
+    """
+    @berif 拉格朗日四边形网格上的自由度管理类。
+    """
+    def __init__(self, mesh, p):
+        self.mesh = mesh
+        self.p = p
+        self.multiIndex = multi_index_matrix[2](p)
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
+
+    @property
+    def face2dof(self):
+        return None 
+
+    def face_to_dof(self):
+        return None 
+
+    @property
+    def edge2dof(self):
+        return None 
+
+    def edge_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分边上的自由度
+        """
+        return None
+
+    @property
+    def cell2dof(self):
+        """
+        
+        Notes
+        -----
+            把这个方法属性化，保证程序接口兼容性
+        """
+        return self.cell_to_dof()
+
+
+    def cell_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分单元上的自由度。
+        2. 用更高效的方式来生成单元自由度数组。
+        """
+
+        p = self.p
+        NC = self.mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='cell')
+        cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
+        return cell2dof
+
+    def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        GD = self.mesh.geo_dimension()
+        bcs = self.multiIndex/p # 计算插值点对应的重心坐标
+        ipoint = mesh.bc_to_point(bcs).swapaxes(0, 1).reshape(-1, GD)
+        return ipoint
+
+    def number_of_global_dofs(self):
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='cell')
+        return NC*ldof
+
+    def number_of_local_dofs(self, doftype='cell'):
+        p = self.p
+        if doftype in {'cell', 2}:
+            return (p+1)*(p+2)//2
+        elif doftype in {'face', 'edge',  1}:
+            return p + 1
+        elif doftype in {'node', 0}:
+            return 1
