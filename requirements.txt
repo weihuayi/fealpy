@@ -5,6 +5,7 @@ gmsh
 matplotlib
 vtk
 pyevtk
+pypardiso
 pytest>=3.6
 pytest-cov
 bump2version

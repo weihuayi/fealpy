@@ -134,7 +134,7 @@ class MeshBase():
         node = self.entity('node')
         TD = bcs.shape[-1] - 1
         entity = self.entity(TD, index=index)
-        p = jnp.einsum('...j, ijk -> ...ik', bc, node[entity])
+        p = jnp.einsum('...j, ijk -> ...ik', bcs, node[entity])
         return p
 
     def edge_to_ipoint(self, p: int, index=np.s_[:]):
