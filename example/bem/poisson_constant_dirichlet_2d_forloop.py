@@ -1,6 +1,7 @@
 import numpy as np
 from fealpy.mesh import TriangleMesh
 from fealpy.pde.bem_model_2d import *
+from fealpy.functionspace import LagrangeFESpace
 
 
 # 构建 PDE 模型与网格
@@ -105,7 +106,10 @@ for k in range(maxite):
 
     real_solution = pde.solution(Node)  # 真解值
     h = np.max(mesh.entity_measure('cell'))
-    errorMatrix[k] = np.sqrt(np.sum((uh - real_solution) ** 2) * h)
+    space = LagrangeFESpace(mesh)
+    function_u = space.function()
+    function_u[:] = uh
+    errorMatrix[k] = mesh.error(function_u, pde.solution)
     # 加密网格
     mesh.uniform_refine(1)
 
