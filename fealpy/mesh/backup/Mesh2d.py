@@ -3,8 +3,8 @@ from types import ModuleType
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
-from ..common import ranges
-from .Mesh import Mesh
+from ...common.Tools import ranges
+from fealpy.mesh.backup.Mesh import Mesh
 
 class Mesh2d(Mesh):
     def number_of_nodes_of_cells(self):
