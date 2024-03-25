@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.pde.bem_model_2d import LaplaceBemModelMixedBC2d, LaplaceBemModelDirichletBC2d, LaplaceBemModelNeumannBC2d
 from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
 
 # 模型初始化，可尝试三种边界条件，默认是混合边界条件
 # 混合边界模型
@@ -10,7 +11,7 @@ from fealpy.mesh import TriangleMesh
 # Dirichlet 边界模型
 # pde = LaplaceBemModelDirichletBC2d()
 # Neumann 边界模型
-pde = LaplaceBemModelNeumannBC2d()
+# pde = LaplaceBemModelNeumannBC2d()
 
 # # 网格初始化
 box = [0, 1, 0, 1]
@@ -125,9 +126,10 @@ for k in range(maxite):
         Gi = np.einsum('e,e...,q,eq->...', bd_un_val, bd_face_measure, ws, np.log(1 / rij)) / 2 / np.pi
         uh[interNode_idx[i]] = Gi - Hi
 
-    real_solution = pde.solution(node)
-    h = np.max(mesh.entity_measure('cell'))
-    errorMatrix[k] = np.sqrt(np.sum((uh - real_solution) ** 2) * h)
+    space = LagrangeFESpace(mesh)
+    function_u = space.function()
+    function_u[:] = uh
+    errorMatrix[k] = mesh.error(function_u, pde.solution)
 
     mesh.uniform_refine(1)
 

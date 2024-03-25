@@ -1,6 +1,7 @@
 import numpy as np
 from fealpy.mesh import TriangleMesh
 from fealpy.pde.bem_model_2d import *
+from fealpy.functionspace import LagrangeFESpace
 
 
 pde = PoissonModelConstantDirichletBC2d()
@@ -131,11 +132,12 @@ for k in range(maxite):
     # 数值解填充
     uh[bd_node_index] = bd_val[bd_node_index]
     uh[~bd_node_flag] = u_inter
-    # 真解值
-    real_solution = pde.solution(Node)
+
     # 计算误差
-    h = np.max(mesh.entity_measure('cell'))  # 返回的是单元测度的最大值一般是体积或者大小
-    errorMatrix[k] = np.sqrt(np.sum((uh - real_solution) ** 2) * h)
+    space = LagrangeFESpace(mesh)
+    function_u = space.function()
+    function_u[:] = uh
+    errorMatrix[k] = mesh.error(function_u, pde.solution)
 
     mesh.uniform_refine(1)  # 在这里将网格进行细化成更加小的网格，即类似之前椭圆方程步长减少
 
