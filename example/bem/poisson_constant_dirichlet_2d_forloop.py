@@ -1,6 +1,7 @@
 import numpy as np
 from fealpy.mesh import TriangleMesh
 from fealpy.pde.bem_model_2d import *
+from fealpy.functionspace import LagrangeFESpace
 
 
 # 构建 PDE 模型与网格
@@ -49,9 +50,12 @@ for k in range(maxite):
     # 构建边界 Gauss 积分子，获取积分点重心坐标及其权重
     face_qf = mesh.integrator(q=2, etype='edge')  # 定义积分对象
     face_bcs, face_ws = face_qf.get_quadrature_points_and_weights()  # 返回积分点在区域内的重心坐标和权重
+    # 计算积分点笛卡尔坐标，q 为每个边界上积分点，j 为边界端点，f 为边界，d 为空间维数
+    face_ps = np.einsum('qj, fjd->fqd', face_bcs, Node[bd_face])
     # 单元 Gauss 积分子
     cell_qf = mesh.integrator(q=3, etype='cell')
     cell_bcs, cell_ws = cell_qf.get_quadrature_points_and_weights()
+    cell_ps = np.einsum('qj, ejd->eqd', cell_bcs, Node[Cell])  # 求高斯积分点
 
     x1 = Node[bd_face[:, 0]]
     x2 = Node[bd_face[:, 1]]
@@ -62,14 +66,12 @@ for k in range(maxite):
         # np.sign如果元素为正数，则返回1,如果元素为负数，则返回-1如果元素为0，则返回0
         hij = c * np.abs(
             (xi[0] - Pj[:, 0]) * (x2[:, 1] - x1[:, 1]) - (xi[1] - Pj[:, 1]) * (x2[:, 0] - x1[:, 0])) / bd_face_measure
-        # 计算积分点笛卡尔坐标，q 为每个边界上积分点，j 为边界端点，f 为边界，d 为空间维数
-        ps = np.einsum('qj, fjd->fqd', face_bcs, Node[bd_face])
-        rij = np.sqrt(np.sum((ps - xi) ** 2, axis=-1))
+
+        rij = np.sqrt(np.sum((face_ps - xi) ** 2, axis=-1))
         H[..., i, :] = np.einsum('f,f,q,fq->f', -bd_face_measure, hij, face_ws, 1 / rij ** 2) / 2 / np.pi
         G[..., i, :] = bd_face_measure / 2 / np.pi * np.einsum('q, fq ->f', face_ws, np.log(1 / rij))
 
         # 源项数值积分
-        cell_ps = np.einsum('qj, ejd->eqd', cell_bcs, Node[Cell])  # 求高斯积分点
         cell_rij = np.sqrt(np.sum((cell_ps - xi) ** 2, axis=-1))  # 求解任意两点距离
         b = pde.source(cell_ps)
         B[i] = np.einsum('e,b,eb,eb->', cell_measure, cell_ws, b, np.log(1 / cell_rij)) / np.pi / 2
@@ -92,22 +94,22 @@ for k in range(maxite):
         c = np.sign((x1[:, 0] - xi[0]) * (x2[:, 1] - xi[1]) - (x2[:, 0] - xi[0]) * (x1[:, 1] - xi[1]))
         hij = c * np.abs(
             (xi[0] - Pj[:, 0]) * (x2[:, 1] - x1[:, 1]) - (xi[1] - Pj[:, 1]) * (x2[:, 0] - x1[:, 0])) / bd_face_measure
-        ps = np.einsum('qj, ejd->eqd', face_bcs, Node[bd_face])
 
-        rij = np.sqrt(np.sum((ps - xi) ** 2, axis=-1))
+        rij = np.sqrt(np.sum((face_ps - xi) ** 2, axis=-1))
         Hi = np.einsum('f...,f,f,q,fq->...', bd_u_val, -bd_face_measure, hij, face_ws, 1 / rij ** 2) / 2 / np.pi
         Mi = np.einsum('f,f...,q,fq->...', bd_un_val, bd_face_measure, face_ws, np.log(1 / rij)) / 2 / np.pi
 
-        cell_ps = np.einsum('qj, fjd->fqd', cell_bcs, Node[Cell])  # 求高斯积分点
-        cell_rij = np.sqrt(np.sum((cell_ps - xi) ** 2, axis=-1))  # 求解任意两点距离
+        cell_rij = np.sqrt(np.sum((cell_ps - xi) ** 2, axis=-1))
         b = -2 * np.pi ** 2 * np.sin(np.pi * cell_ps[..., 0]) * np.sin(np.pi * cell_ps[..., 1])
-        # s=[(xk[0]-xi1[0])*(xi1[1]-xj1[1])-(xk[1]-xj1[1])*(xi1[0]-xk[0])]
         Bi = np.einsum('f,q,fq,fq->', cell_measure, cell_ws, b, np.log(1 / cell_rij)) / np.pi / 2
         uh[interNode_idx[i]] = Mi - Hi - Bi  # 近似解在内部节点的函数值
 
     real_solution = pde.solution(Node)  # 真解值
     h = np.max(mesh.entity_measure('cell'))
-    errorMatrix[k] = np.sqrt(np.sum((uh - real_solution) ** 2) * h)
+    space = LagrangeFESpace(mesh)
+    function_u = space.function()
+    function_u[:] = uh
+    errorMatrix[k] = mesh.error(function_u, pde.solution)
     # 加密网格
     mesh.uniform_refine(1)
 

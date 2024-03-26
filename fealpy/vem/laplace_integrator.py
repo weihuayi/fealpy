@@ -11,7 +11,7 @@ class ConformingScalarVEMLaplaceIntegrator2d():
         self.G = G
         self.D = D
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, out=None):
         p = space.p
         mesh = space.mesh
         coef = self.coef
@@ -47,8 +47,12 @@ class ConformingScalarVEMLaplaceIntegrator2d():
                 f1 = lambda x: x[3]*(x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) -
                     x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
                 K = list(map(f1, zip(self.D, self.PI1, tG, coef)))
+        if out is None:
+            return K
+        else:
+            for i in range(len(K)):
+                out[i] += K[i]
 
-        return K
        
 
 class NonConformingScalarVEMLaplaceIntegrator2d():

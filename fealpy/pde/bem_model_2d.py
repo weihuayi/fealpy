@@ -20,8 +20,7 @@ class LaplaceBemModelMixedBC2d:
         """
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros(p.shape[0])
-        val[:] = 100 * (1 + x)
+        val = 100 * (1 + x)
         return val
 
     @cartesian
@@ -88,8 +87,7 @@ class LaplaceBemModelDirichletBC2d:
         """
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros(p.shape[0])
-        val[:] = x - y
+        val = x - y
         return val
 
     @cartesian
@@ -157,8 +155,7 @@ class LaplaceBemModelNeumannBC2d:
         """
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros(p.shape[0])
-        val[:] = x - y
+        val = x - y
         return val
 
     @cartesian

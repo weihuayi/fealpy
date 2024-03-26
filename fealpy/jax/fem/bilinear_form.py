@@ -1,25 +1,27 @@
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
-import jax
+import jax 
 import jax.numpy as jnp
 
 from .. import logger
 
-class LinearForm:
+class BilinearForm:
     """
-
+    @brief 试探函数和测试函数空间相同的双线性型
     """
-    def __init__(self, space):
+    def __init__(self, space, atype=None):
         """
         @brief 
         """
         self.space = space
-        self._V = None # 需要组装的向量
         self.dintegrators = [] # 区域积分子
         self.bintegrators = [] # 边界积分子
 
-    def add_domain_integrator(self, I):
+        self._M = None # 需要组装的矩阵 
+
+    def add_domain_integrator(self, I) -> None:
         """
         @brief 增加一个或多个区域积分对象
         """
@@ -38,33 +40,24 @@ class LinearForm:
         else:
             self.bintegrators.append(I)
 
-
     def assembly(self):
         """
         @brief 数值积分组装
         """
-
         space = self.space
-        mesh = space.mesh
-
-        NC = mesh.number_of_cells()
-        gdof = space.number_of_global_dofs()
         ldof = space.number_of_local_dofs()
+        gdof = space.number_of_global_dofs()
 
-        bb = np.zeros((NC, ldof), dtype=space.ftype)
-        bb = self.dintegrators[0].assembly_cell_vector(space)
+        mesh = space.mesh
+        NC = mesh.number_of_cells()
+        CM = self.dintegrators[0].assembly_cell_matrix(space) 
         for di in self.dintegrators[1:]:
-            bb = bb + di.assembly_cell_vector(space)
+            CM = CM + di.assembly_cell_matrix(space)
 
         cell2dof = space.cell_to_dof()
-        V = jnp.zeros((gdof, ), dtype=space.ftype)
-        self._V = V.at[cell2dof].add(bb)
-        logger.info(f"Construct source vector with shape {V.shape}.")
-        return self._V
+        I = jnp.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
+        J = jnp.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
+        self._M = csr_matrix((CM.ravel(), (I.ravel(), J.ravel())), shape=(gdof, gdof))
 
-    def update(self):
-        """
-        @brief 当空间改变时，重新组装向量
-        """
-        return self.assembly()
-
+        logger.info(f"Finished construct bilinear from matrix with shape {self._M.shape}.")
+        return self._M
