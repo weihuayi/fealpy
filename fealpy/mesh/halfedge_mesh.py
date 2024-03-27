@@ -581,6 +581,25 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             bc = 0.5*(node[halfedge[index, 0]] + node[halfedge[halfedge[index, 3], 0]])
         return bc
 
+    def get_internal_point(self):
+        NC = self.number_of_cells()
+
+        node = self.entity("node")
+        halfedge = self.entity("halfedge")
+        nex = halfedge[:, 2]
+        pre = halfedge[:, 3]
+
+        v = node[halfedge[pre, 0]] - node[halfedge[:, 0]]
+        flag = np.cross(v, v[nex])>0
+
+        point = (node[halfedge[flag, 0]]+
+                 node[halfedge[nex[flag], 0]]+
+                 node[halfedge[pre[flag], 0]])/3.0
+        re = np.zeros((NC, node.shape[1]), dtype=np.float_)
+        re[halfedge[flag, 1]] = point
+        return re
+
+
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
             return self.cell_area(index=index)

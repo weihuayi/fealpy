@@ -95,12 +95,8 @@ def test_lambda():
 
 def test_from_ellipsolid_surface():
     # (-90, 90) 
-    pi = np.pi
-    radius = (4, 2, 1)
-    theta = (pi/2+pi/9, pi/2+pi/4)
-
-    mesh = TriangleMesh.from_ellipsoid_surface(10, 80, 
-            radius=(4, 2, 1), theta=(pi/2+pi/9, pi/2+pi/4))
+    mesh, U, V = TriangleMesh.from_ellipsoid_surface(10, 100, 
+            radius=(4, 2, 1), theta=(np.pi/2, np.pi/2+np.pi/3))
 
     mesh.vtkview()
 
