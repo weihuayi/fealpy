@@ -93,7 +93,23 @@ def test_lambda():
     assert val.shape == (NC, 3, 2)
 
 
+def test_from_ellipsolid_surface():
+    # (-90, 90) 
+    mesh, U, V = TriangleMesh.from_ellipsoid_surface(10, 100, 
+            radius=(4, 2, 1), theta=(np.pi/2, np.pi/2+np.pi/3))
+
+    mesh.vtkview()
+
+    if False:
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        mesh.add_plot(axes)
+        plt.show()
+
+
+
 if __name__ == "__main__":
-    TriangleMesh.show_shape_function(3, funtype='L')
-    TriangleMesh.show_grad_shape_function(3, funtype='L')
-    TriangleMesh.show_lattice(3)
+    test_from_ellipsolid_surface()
+

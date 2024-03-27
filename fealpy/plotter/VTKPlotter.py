@@ -100,7 +100,7 @@ class VTKPlotter(object):
         while True:
             if not self.queue.empty():
                 data = self.queue.get()
-                if data is not -1:
+                if data != -1:
                     if 'mesh' in data:
                         actor = meshactor(data['mesh'])
                         self.show(actors=actor)

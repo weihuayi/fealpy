@@ -2285,6 +2285,95 @@ class TriangleMesh(Mesh, Plotable):
 
         return pmesh
 
+    @classmethod
+    def from_ellipsoid_surface(cls, ntheta=10, nphi=10, 
+            radius=(1, 1, 1), 
+            theta=(np.pi/4, 3*np.pi/4)
+            ):
+        """
+        @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
+        生成相应带状区域的三角形网格
+
+        x = a \sin\theta \cos\phi
+        y = b \sin\theta \sin\phi
+        z = c \cos\theta
+
+        @param[in] ntheta \theta 方向的剖分段数
+        @param[in] nphi \phi 方向的剖分段数 
+        """
+
+        a, b, c = radius
+        NN = (ntheta+1)*nphi 
+        NC = ntheta*nphi
+
+        U, V = np.mgrid[
+                theta[0]:theta[1]:(ntheta+1)*1j,
+                0:2*np.pi:(nphi+1)*1j] 
+        U = U[:, 0:-1]
+        V = V[:, 0:-1]
+
+
+        node = np.zeros((NN, 3), dtype=np.float64)
+        X = a * np.sin(U) * np.cos(V) 
+        Y = b * np.sin(U) * np.sin(V) 
+        Z = c * np.cos(U)
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        node[:, 2] = Z.flatten()
+
+        idx = np.zeros((ntheta+1, nphi+1), np.int_)
+        idx[:, 0:-1] = np.arange(NN).reshape(ntheta+1, nphi)
+        idx[:, -1] = idx[:, 0]
+        cell = np.zeros((2*NC, 3), dtype=np.int_)
+        cell[0::2, 0] = idx[1:,0:-1].flatten(order='F')
+        cell[0::2, 1] = idx[1:,1:].flatten(order='F')
+        cell[0::2, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[1::2, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[1::2, 2] = idx[1:, 1:].flatten(order='F')
+
+        return cls(node, cell), U, V
+
+    @classmethod
+    def from_cylinder_surface(cls, nphi=10, nz=10,
+            radius=(1.0, 1.0), 
+            height=2.0
+            ):
+
+        a, b = radius
+        h = height
+        NN = nphi*(nz+1)
+        NC = nphi*nz
+
+        U, V = np.mgrid[
+                0:h:(nz+1)*1j,
+                0:2*np.pi:(nphi+1)*1j]
+        U = U[:, 0:-1]
+        V = V[:, 0:-1]
+
+
+        node = np.zeros((NN, 3), dtype=np.float64)
+        X = a * np.cos(V) 
+        Y = b * np.sin(V) 
+        Z = U 
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        node[:, 2] = Z.flatten()
+
+        idx = np.zeros((ntheta+1, nphi+1), np.int_)
+        idx[:, 0:-1] = np.arange(NN).reshape(ntheta+1, nphi)
+        idx[:, -1] = idx[:, 0]
+        cell = np.zeros((2*NC, 3), dtype=np.int_)
+        cell[0::2, 0] = idx[1:,0:-1].flatten(order='F')
+        cell[0::2, 1] = idx[1:,1:].flatten(order='F')
+        cell[0::2, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[1::2, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[1::2, 2] = idx[1:, 1:].flatten(order='F')
+
+        return cls(node, cell)
+
+
     def streamline_callculator(self, vector_field, start_cell, start_point):
         """
         @brief 给定网格上的向量场，根据初始点计算流线.
