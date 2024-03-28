@@ -1,20 +1,8 @@
 import glfw
 from OpenGL.GL import *
+from PIL import Image
 import numpy as np
-
-"""
-import logging
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler()
-formatter = logging.Formatter('[%(asctime)s][%(levelname)s] %(name)s: %(message)s', datefmt='%m-%d %H:%M:%S')
-handler.setFormatter(formatter)
-
-if not logger.handlers:
-    logger.addHandler(handler)
-    logger.propagate = False
-"""
+from ctypes import c_void_p
 
 from fealpy import logger
 
@@ -23,14 +11,13 @@ class OpenGLPlotter:
         if not glfw.init():
             raise Exception("GLFW cannot be initialized!")
 
-        self.show_edges = True  # 默认显示网格线
         self.last_mouse_pos = (width / 2, height / 2)
         self.first_mouse_use = True
 
         self.mode = 2  # 默认同时显示边和面
-        self.faceColor = np.array([0.5, 0.7, 0.9, 1.0], dtype=np.float32)  # 浅蓝色
-        self.edgeColor = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)  # 白色
-        self.bgColor = np.array([0.1, 0.2, 0.3, 1.0], dtype=np.float32)   # 深海军蓝色背景
+        self.faceColor = (0.5, 0.7, 0.9, 1.0)  # 浅蓝色
+        self.edgeColor = (1.0, 1.0, 1.0, 1.0)  # 白色
+        self.bgColor = (0.1, 0.2, 0.3, 1.0)   # 深海军蓝色背景
         
         # 设置使用OpenGL核心管线
         #glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -49,22 +36,31 @@ class OpenGLPlotter:
         # 设置视口大小
         glViewport(0, 0, width, height)
 
-        # 着色器源码
+        # 顶点着色器源码
         self.vertex_shader_source = """
-        #version 330 core
+        #version 460 core
         layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec2 aTexCoords;
         uniform mat4 transform; //变换矩阵
+
+        out vec2 TexCoords;
 
         void main()
         {
             gl_Position = transform * vec4(aPos, 1.0);
+            TexCoords = aTexCoords;
         }
         """
+
+        # 片段着色器源码
         self.fragment_shader_source = """
-        #version 330 core
-        uniform int mode;  // 0: 显示面，1: 显示边，2: 显示面和边
+        #version 460 core
+        in vec2 TexCoords;
+
+        uniform int mode;  // 0: 显示面，1: 显示边，2: 显示面和边，3：显示纹理
         uniform vec4 faceColor;
         uniform vec4 edgeColor;
+        uniform sampler2D textureSampler;
         out vec4 FragColor;
 
         void main()
@@ -74,10 +70,9 @@ class OpenGLPlotter:
             } else if (mode == 1) {
                 FragColor = edgeColor;  // 只显示边
             } else if (mode == 2) {
-                // 这个逻辑取决于您是如何组织网格数据的
-                // 例如，可以根据gl_FragCoord是否在边上来决定颜色
-                // 这里只是一个概念示例
                 FragColor = faceColor;  // 同时显示面和边
+            } else if (mode == 3) {
+                FragColor = texture(textureSampler, TexCoords); // 使用纹理
             }
         }
         """
@@ -95,7 +90,16 @@ class OpenGLPlotter:
         self.transform = np.identity(4, dtype=np.float32)
         glfw.set_scroll_callback(self.window, self.scroll_callback)
 
+        self.texture = None
+
     def load_mesh(self, nodes, cells):
+        """
+        @brief 加载网格数据，并根据提供的节点数据决定是否包含纹理坐标。
+        
+        @param nodes: 节点数组，形状可以是 (NN, 3) 或 (NN, 5)。
+                      如果是 (NN, 5)，则假设前三个值为顶点坐标，后两个值为纹理坐标。
+        @param cells: 单元格节点的索引数组。
+        """
         vertices = nodes[cells].reshape(-1, nodes.shape[1])
         self.vertex_count = len(vertices)
 
@@ -110,13 +114,40 @@ class OpenGLPlotter:
         glBindBuffer(GL_ARRAY_BUFFER, self.VBO)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
 
-        # 设置顶点属性指针
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices.itemsize * 3, ctypes.c_void_p(0))
+        # 设置顶点位置属性指针
+        stride = vertices.shape[1] * vertices.itemsize
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, c_void_p(0))
         glEnableVertexAttribArray(0)
+
+        # 如果有纹理坐标，设置纹理坐标属性指针
+        if nodes.shape[1] == 5:
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, c_void_p(3 * vertices.itemsize))
+            glEnableVertexAttribArray(1)
 
         # 解绑VBO和VAO
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
+
+    def load_texture(self, image_path):
+        # 生成纹理ID
+        texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture)
+        # 设置纹理参数
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        # 加载图片
+        image = Image.open(image_path)
+        image = image.transpose(Image.FLIP_TOP_BOTTOM) # 将图片上下翻转，因为OpenGL的纹理坐标和图片的默认坐标是反的
+        img_data = image.convert("RGBA").tobytes() # 转换图片为RGBA格式，并转换为字节
+        # 创建纹理
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        # 解绑纹理
+        glBindTexture(GL_TEXTURE_2D, 0)
+        # 存储纹理ID
+        self.texture = texture
 
     def compile_shader(self, source, shader_type):
         shader = glCreateShader(shader_type)
@@ -133,10 +164,6 @@ class OpenGLPlotter:
         shader_program = glCreateProgram()
         glAttachShader(shader_program, vertex_shader)
         glAttachShader(shader_program, fragment_shader)
-
-        # 在链接之前绑定FragColor的位置
-        # glBindFragDataLocation(shader_program, 0, "FragColor")
-
         glLinkProgram(shader_program)
         if glGetProgramiv(shader_program, GL_LINK_STATUS) != GL_TRUE:
             error = glGetProgramInfoLog(shader_program).decode('utf-8')
@@ -153,48 +180,57 @@ class OpenGLPlotter:
             
             # 清除颜色缓冲区
             glClear(GL_COLOR_BUFFER_BIT)
-            glClearColor(
-                    self.bgColor[0], 
-                    self.bgColor[1],
-                    self.bgColor[2],
-                    self.bgColor[3])
-
-            # 更新颜色和模式
-            glUniform4fv(glGetUniformLocation(self.shader_program, "faceColor"), 1, self.faceColor)
-            glUniform4fv(glGetUniformLocation(self.shader_program, "edgeColor"), 1, self.edgeColor)
-            glUniform1i(glGetUniformLocation(self.shader_program, "mode"), self.mode)
+            glClearColor(*self.bgColor)
 
             # 使用着色器程序
             glUseProgram(self.shader_program)
 
-            # 更新着色器的uniform变量以应用变换
-            # 获取uniform变量的位置，并检查它们是否有效
-            face_color_location = glGetUniformLocation(self.shader_program, "faceColor")
-            edge_color_location = glGetUniformLocation(self.shader_program, "edgeColor")
-            mode_location = glGetUniformLocation(self.shader_program, "mode")
-            transform_location = glGetUniformLocation(self.shader_program, "transform")
-
-            if face_color_location == -1 or edge_color_location == -1 or mode_location == -1 or transform_location == -1:
-                logger.error("One or more uniform locations are invalid.")
-                continue
 
             # 更新着色器的uniform变量
-            glUniform4fv(face_color_location, 1, self.faceColor)
-            glUniform4fv(edge_color_location, 1, self.edgeColor)
-            glUniform1i(mode_location, self.mode)
-            glUniformMatrix4fv(transform_location, 1, GL_FALSE, self.transform)
+            glUniform4fv(glGetUniformLocation(self.shader_program, "faceColor"), 1, self.faceColor)
+            glUniform4fv(glGetUniformLocation(self.shader_program, "edgeColor"), 1, self.edgeColor)
+            glUniform1i(glGetUniformLocation(self.shader_program, "mode"), self.mode)
+
+            # 应用变换
+            transform_location = glGetUniformLocation(self.shader_program, "transform")
+            if transform_location != -1:
+                glUniformMatrix4fv(transform_location, 1, GL_FALSE, self.transform)
+            else:
+                logger.error("Transform location is invalid.")
 
             glBindVertexArray(self.VAO)
 
-            # 根据show_edges变量决定是否绘制网格线
-            if self.show_edges:
-                # 绘制网格线的代码
+            # 绑定纹理或设置为显示边和面的模式
+            if self.texture is not None and self.mode == 3:
+                glActiveTexture(GL_TEXTURE0)
+                glBindTexture(GL_TEXTURE_2D, self.texture)
+                glUniform1i(glGetUniformLocation(self.shader_program, "textureSampler"), 0)
+            elif self.mode == 3:
+                self.mode = 2  # 如果没有加载纹理，则显示边和面
+
+            # 如果显示模式为2，则需要两遍绘制
+            if self.mode == 2:
+                # 第一遍，填充面
+                glUniform1i(glGetUniformLocation(self.shader_program, "mode"), 0)  # 设置为仅显示面
+                glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+                # 第二遍，绘制边
+                glUniform1i(glGetUniformLocation(self.shader_program, "mode"), 1)  # 设置为仅显示边
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)  # 绘制线框
                 glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)  # 恢复默认模式
-            else:
-                # 只绘制面的代码
+
+            elif self.mode == 0:
+                # 只显示面
+                glUniform1i(glGetUniformLocation(self.shader_program, "mode"), 0)
                 glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+            elif self.mode == 1:
+                # 只显示边
+                glUniform1i(glGetUniformLocation(self.shader_program, "mode"), 1)
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+                glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
             glfw.swap_buffers(self.window)
 
@@ -214,11 +250,10 @@ class OpenGLPlotter:
                 self.transform[3, 0] += translate_speed
             elif key == glfw.KEY_LEFT:  # 向左平移
                 self.transform[3, 0] -= translate_speed
-
-        if key == glfw.KEY_E and action == glfw.PRESS:
-            self.show_edges = not self.show_edges  # 切换网格线的显示状态
-
-        logger.debug("Translating: {}".format(key))
+            elif key == glfw.KEY_M:  # 假设我们使用 M 键来切换模式
+                self.mode += 1
+                if self.mode > 3:  # 超出范围后重置为 0
+                    self.mode = 0
 
     def mouse_callback(self, window, xpos, ypos):
         print(f"Mouse position: {xpos}, {ypos}")
@@ -264,15 +299,18 @@ def main():
     # 假设nodes和cells是你的网格数据
     from fealpy.mesh import TriangleMesh
 
-    mesh = TriangleMesh.from_ellipsoid_surface(10, 100, 
-            radius=(4, 2, 1), theta=(np.pi/2, np.pi/2+np.pi/3))
+    mesh, U, V = TriangleMesh.from_ellipsoid_surface(10, 100, 
+            radius=(4, 2, 1), 
+            theta=(np.pi/2, np.pi/2+np.pi/3),
+            returnuv=True)
     node = mesh.entity('node')
     cell = mesh.entity('cell')
-    nodes = np.array(node, dtype=np.float32)
+    nodes = np.hstack((node, U.reshape(-1, 1), V.reshape(-1, 1)), dtype=np.float32)
     cells = np.array(cell, dtype=np.uint32)
 
     plotter = OpenGLPlotter()
     plotter.load_mesh(nodes, cells)
+    plotter.load_texture('/home/why/we.jpg')
     plotter.run()
 
 if __name__ == "__main__":
