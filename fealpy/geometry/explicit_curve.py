@@ -46,7 +46,7 @@ class LagrangeCurve:
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1) # (NQ, ldof)
 
-        ps = np.einsum('qi, id->qd', phi, self.node)
+        ps = np.einsum('...i, id->...d', phi, self.node)
         return ps
 
 
@@ -133,7 +133,7 @@ class BSplineCurve:
             for i in range(len(xi)):
                 point[i] = self.value(xi[i])
 
-        return ps
+        return point
 
     def value(self, xi):
         """
