@@ -2332,7 +2332,7 @@ class TriangleMesh(Mesh, Plotable):
         cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
         cell[1::2, 2] = idx[1:, 1:].flatten(order='F')
 
-        return cls(node, cell), U, V
+        return cls(node, cell)
 
     @classmethod
     def from_cylinder_surface(cls, nphi=10, nz=10,
