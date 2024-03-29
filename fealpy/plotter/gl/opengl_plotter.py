@@ -35,6 +35,8 @@ class OpenGLPlotter:
             raise Exception("GLFW window cannot be created!")
         
         glfw.make_context_current(self.window)
+        # 启用深度测试
+        glEnable(GL_DEPTH_TEST)
 
         # 设置视口大小
         glViewport(0, 0, width, height)
@@ -45,12 +47,14 @@ class OpenGLPlotter:
         layout (location = 0) in vec3 aPos;
         layout (location = 1) in vec2 aTexCoords;
         uniform mat4 transform; //变换矩阵
+        //uniform mat4 projection; // 投影矩阵
 
         out vec2 TexCoords;
 
         void main()
         {
             gl_Position = transform * vec4(aPos, 1.0);
+            //gl_Position = projection * transform * vec4(aPos, 1.0);
             TexCoords = aTexCoords;
         }
         """
@@ -96,8 +100,25 @@ class OpenGLPlotter:
 
         self.texture = None
 
-        glfw.make_context_current(self.window)
         glfw.set_window_size_callback(self.window, self.window_resize_callback)
+
+        self.update_projection_matrix(width, height)
+
+    def update_projection_matrix(self, width, height):
+        """
+        """
+        aspect_ratio = width / height
+        fov = np.radians(45)  # Field of view, 45 degrees
+        near = 0.1  # Near clipping plane
+        far = 100.0  # Far clipping plane
+
+        # Create a perspective projection matrix
+        self.projection = np.zeros((4, 4), dtype=np.float32)
+        self.projection[0, 0] = 1 / (aspect_ratio * np.tan(fov / 2))
+        self.projection[1, 1] = 1 / np.tan(fov / 2)
+        self.projection[2, 2] = -(far + near) / (far - near)
+        self.projection[2, 3] = -(2 * far * near) / (far - near)
+        self.projection[3, 2] = -1
 
     def load_mesh(self, nodes, cells):
         """
@@ -200,8 +221,8 @@ class OpenGLPlotter:
         while not glfw.window_should_close(self.window):
             glfw.poll_events()
             
-            # 清除颜色缓冲区
-            glClear(GL_COLOR_BUFFER_BIT)
+            # 清除颜色缓冲区和深度缓冲区
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             glClearColor(*self.bgColor)
 
             # 使用着色器程序
@@ -219,6 +240,17 @@ class OpenGLPlotter:
                 glUniformMatrix4fv(transform_location, 1, GL_FALSE, self.transform)
             else:
                 logger.error("Transform location is invalid.")
+
+            """
+            # 应用变换
+            projection_location = glGetUniformLocation(self.shader_program,
+                    "projection")
+            if projection_location != -1:
+                glUniformMatrix4fv(projection_location, 1, GL_FALSE,
+                        self.projection)
+            else:
+                logger.error("Projection location is invalid.")
+            """
 
             glBindVertexArray(self.VAO)
 
@@ -342,6 +374,7 @@ class OpenGLPlotter:
 
     def window_resize_callback(self, window, width, height):
         glViewport(0, 0, width, height)
+        self.update_projection_matrix(width, height)
 
 def main():
     # 假设nodes和cells是你的网格数据
