@@ -8,7 +8,6 @@ class LagrangeMesh(Mesh):
         self.node = node
         self.cell = cell
 
-
     def ref_cell_measure(self):
         if self.meshtype == 'ltri':
             return 0.5
@@ -32,12 +31,13 @@ class LagrangeMesh(Mesh):
     def grad_shape_function(self, bc, p=None, index=np.s_[:]):
         pass
 
-    def jacobi_matrix(self, bc, index=np.s_[:], return_grad=False):
+    def jacobi_matrix(self, bc, p=None, index=np.s_[:], return_grad=False):
         """
         @brief 计算参考单元 u 到实际实际单元 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
+        p = self.p if p is None else p
 
         if isinstance(bc, tuple):
             TD = len(bc)
@@ -47,7 +47,7 @@ class LagrangeMesh(Mesh):
             raise ValueError(' `bc` should be a tuple or ndarray!')
 
         entity = self.entity(etype=TD)[index]
-        gphi = self.grad_shape_function(bc, index=index)
+        gphi = self.grad_shape_function(bc, p=p)
         J = np.einsum(
                 'cin, ...cim->...cnm',
                 self.node[entity, :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)
@@ -63,7 +63,7 @@ class LagrangeMesh(Mesh):
         J = self.jacobi_matrix(bc, index=index)
 
         n = np.cross(J[..., 0], J[..., 1], axis=-1)
-
+        
         if self.GD == 3:
             l = np.sqrt(np.sum(n**2, axis=-1, keepdims=True))
             n /=l
