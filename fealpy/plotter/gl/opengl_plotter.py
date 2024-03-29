@@ -6,6 +6,8 @@ from ctypes import c_void_p
 
 from fealpy import logger
 
+import ipdb
+
 class OpenGLPlotter:
     def __init__(self, width=800, height=600, title="OpenGL Application"):
         if not glfw.init():
@@ -14,6 +16,7 @@ class OpenGLPlotter:
         self.last_mouse_pos = (width / 2, height / 2)
         self.first_mouse_use = True
 
+        self.view_angle = 0 # 0 代表 X 轴，1 代表 Y 轴， 2 代表 Z 轴
         self.mode = 2  # 默认同时显示边和面
         self.faceColor = (0.5, 0.7, 0.9, 1.0)  # 浅蓝色
         self.edgeColor = (1.0, 1.0, 1.0, 1.0)  # 白色
@@ -73,6 +76,7 @@ class OpenGLPlotter:
                 FragColor = faceColor;  // 同时显示面和边
             } else if (mode == 3) {
                 FragColor = texture(textureSampler, TexCoords); // 使用纹理
+                //FragColor = vec4(TexCoords, 0.0, 1.0); // 使用纹理
             }
         }
         """
@@ -91,6 +95,9 @@ class OpenGLPlotter:
         glfw.set_scroll_callback(self.window, self.scroll_callback)
 
         self.texture = None
+
+        glfw.make_context_current(self.window)
+        glfw.set_window_size_callback(self.window, self.window_resize_callback)
 
     def load_mesh(self, nodes, cells):
         """
@@ -129,23 +136,38 @@ class OpenGLPlotter:
         glBindVertexArray(0)
 
     def load_texture(self, image_path):
+        """
+        @brief 加载纹理坐标
+        """
+        # 加载图片
+        image = Image.open(image_path)
+        image = image.transpose(Image.FLIP_TOP_BOTTOM) # 将图片上下翻转，因为OpenGL的纹理坐标和图片的默认坐标是反的
+        img_data = image.convert("RGBA").tobytes() # 转换图片为RGBA格式，并转换为字节
         # 生成纹理ID
         texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, texture)
+
         # 设置纹理参数
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        # 加载图片
-        image = Image.open(image_path)
-        image = image.transpose(Image.FLIP_TOP_BOTTOM) # 将图片上下翻转，因为OpenGL的纹理坐标和图片的默认坐标是反的
-        img_data = image.convert("RGBA").tobytes() # 转换图片为RGBA格式，并转换为字节
+
+        # Check if anisotropic filtering is available.
+        if GL_EXT_texture_filter_anisotropic:
+            # Get the maximum amount of anisotropic filtering.
+            max_aniso = glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT)
+            # Set the maximum anisotropic filtering.
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_aniso)
+
         # 创建纹理
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
         glGenerateMipmap(GL_TEXTURE_2D)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+
         # 解绑纹理
         glBindTexture(GL_TEXTURE_2D, 0)
+
         # 存储纹理ID
         self.texture = texture
 
@@ -205,8 +227,9 @@ class OpenGLPlotter:
                 glActiveTexture(GL_TEXTURE0)
                 glBindTexture(GL_TEXTURE_2D, self.texture)
                 glUniform1i(glGetUniformLocation(self.shader_program, "textureSampler"), 0)
+                glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
             elif self.mode == 3:
-                self.mode = 2  # 如果没有加载纹理，则显示边和面
+                self.mode = 0  # 如果没有加载纹理，则显示边
 
             # 如果显示模式为2，则需要两遍绘制
             if self.mode == 2:
@@ -241,6 +264,7 @@ class OpenGLPlotter:
             glfw.set_window_should_close(window, True)
 
         translate_speed = 0.1
+        scale_factor = 1.1
         if action == glfw.PRESS or action == glfw.REPEAT:
             if key == glfw.KEY_UP:  # 向上平移
                 self.transform[3, 1] += translate_speed
@@ -254,6 +278,26 @@ class OpenGLPlotter:
                 self.mode += 1
                 if self.mode > 3:  # 超出范围后重置为 0
                     self.mode = 0
+            elif key == glfw.KEY_Z:  # 放大
+                self.transform[:3, :3] *= scale_factor
+            elif key == glfw.KEY_X:  # 缩小
+                self.transform[:3, :3] /= scale_factor
+            elif key == glfw.KEY_V:
+                self.view_angle = (self.view_angle + 1) % 3  # 在0, 1, 2之间循环
+                if self.view_angle == 0:  # X轴视角
+                    self.transform = np.array([[0, 0, -1, 0],
+                                               [0, 1, 0, 0],
+                                               [1, 0, 0, 0],
+                                               [0, 0, 0, 1]], dtype=np.float32)
+                elif self.view_angle == 1:  # Y轴视角
+                    self.transform = np.array([[1, 0, 0, 0],
+                                               [0, 0, 1, 0],
+                                               [0, -1, 0, 0],
+                                               [0, 0, 0, 1]], dtype=np.float32)
+                elif self.view_angle == 2:  # Z轴视角
+                    self.transform = np.identity(4, dtype=np.float32)  # 默认视角
+
+
 
     def mouse_callback(self, window, xpos, ypos):
         print(f"Mouse position: {xpos}, {ypos}")
@@ -295,17 +339,39 @@ class OpenGLPlotter:
         self.transform[:3, :3] *= scale_factor
         logger.debug("Zooming: {}".format("In" if scale_factor > 1 else "Out"))
 
+
+    def window_resize_callback(self, window, width, height):
+        glViewport(0, 0, width, height)
+
 def main():
     # 假设nodes和cells是你的网格数据
+
+    """
+    # 定义顶点数据和UV坐标
+    nodes = np.array([
+        [-0.5, -0.5, 0.0,  0.0, 0.0],  # 左下角
+        [ 0.5, -0.5, 0.0,  1.0, 0.0],  # 右下角
+        [ 0.5,  0.5, 0.0,  1.0, 1.0],  # 右上角
+        [-0.5,  0.5, 0.0,  0.0, 1.0]   # 左上角
+    ], dtype=np.float32)
+
+    cells = np.array([
+        0, 1, 2,
+        2, 3, 0
+    ], dtype=np.uint32)
+
+    """
     from fealpy.mesh import TriangleMesh
 
-    mesh, U, V = TriangleMesh.from_ellipsoid_surface(10, 100, 
+    mesh, U, V = TriangleMesh.from_ellipsoid_surface(80, 800, 
             radius=(4, 2, 1), 
             theta=(np.pi/2, np.pi/2+np.pi/3),
             returnuv=True)
+    U = (U - np.min(U))/(np.max(U)-np.min(U))
+    V = (V - np.min(V))/(np.max(V)-np.min(V))
     node = mesh.entity('node')
     cell = mesh.entity('cell')
-    nodes = np.hstack((node, U.reshape(-1, 1), V.reshape(-1, 1)), dtype=np.float32)
+    nodes = np.hstack((node, V.reshape(-1, 1), U.reshape(-1, 1)), dtype=np.float32)
     cells = np.array(cell, dtype=np.uint32)
 
     plotter = OpenGLPlotter()
