@@ -174,13 +174,6 @@ class OpenGLPlotter:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
-        # Check if anisotropic filtering is available.
-        if GL_EXT_texture_filter_anisotropic:
-            # Get the maximum amount of anisotropic filtering.
-            max_aniso = glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT)
-            # Set the maximum anisotropic filtering.
-            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_aniso)
-
         # 创建纹理
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
         glGenerateMipmap(GL_TEXTURE_2D)
