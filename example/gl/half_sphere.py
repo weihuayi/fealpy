@@ -1,11 +1,23 @@
 import ipdb
 import numpy as np
 
+import matplotlib.pyplot as plt
+from PIL import Image
+
 from fealpy.mesh import TriangleMesh
 from fealpy.plotter.gl import OpenGLPlotter, OCAMModel 
 
 
 cmodel = OCAMModel()
+
+
+image = Image.open('/home/why/frame1_0.jpg')
+idata = np.asarray(image)
+uimage = cmodel.undistort(np.asarray(image))
+
+plt.imshow(uimage)
+plt.title("Undistorted Image")
+plt.show()
 
 
 mesh = TriangleMesh.from_unit_sphere_surface()
@@ -22,8 +34,11 @@ node = node[isValidNode]
 idxMap = np.zeros(NN, dtype=cell.dtype)
 idxMap[isValidNode] = range(isValidNode.sum())
 cell = idxMap[cell]
-ipdb.set_trace()
-uv = cmodel.world2cam(node)
+uv = cmodel.world2cam_fast(node)
+
+plt.scatter(uv[:, 0], uv[:, 1])
+plt.scatter(cmodel.xc, cmodel.yc)
+plt.show()
 
 uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
 uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
