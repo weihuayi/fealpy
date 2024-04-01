@@ -28,9 +28,9 @@ cell = idxMap[cell]
 
 uv = cmodel.sphere_to_cam(node)
 
-plt.scatter(uv[:, 0], uv[:, 1])
-plt.scatter(cmodel.xc, cmodel.yc)
-plt.show()
+#plt.scatter(uv[:, 0], uv[:, 1])
+#plt.scatter(cmodel.xc, cmodel.yc)
+#plt.show()
 
 uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
 uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))

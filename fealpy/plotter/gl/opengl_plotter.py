@@ -1,18 +1,22 @@
 import glfw
 from OpenGL.GL import *
 from PIL import Image
-import numpy as np
 from ctypes import c_void_p
 
+import numpy as np
 from fealpy import logger
 
-import ipdb
+from .kernel import calculate_rotation_matrix
+from .coordinate_axes import CoordinateAxes
+
 
 class OpenGLPlotter:
     def __init__(self, width=800, height=600, title="OpenGL Application"):
         if not glfw.init():
             raise Exception("GLFW cannot be initialized!")
 
+        self.texture = None
+        self.dragging = False
         self.last_mouse_pos = (width / 2, height / 2)
         self.first_mouse_use = True
 
@@ -21,6 +25,8 @@ class OpenGLPlotter:
         self.faceColor = (0.5, 0.7, 0.9, 1.0)  # 浅蓝色
         self.edgeColor = (1.0, 1.0, 1.0, 1.0)  # 白色
         self.bgColor = (0.1, 0.2, 0.3, 1.0)   # 深海军蓝色背景
+
+        self.transform = np.identity(4, dtype=np.float32)
         
         # 设置使用OpenGL核心管线
         #glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
@@ -94,15 +100,15 @@ class OpenGLPlotter:
 
         glfw.set_key_callback(self.window, self.key_callback)
         glfw.set_cursor_pos_callback(self.window, self.mouse_callback)
+        glfw.set_mouse_button_callback(self.window, self.mouse_button_callback)
 
-        self.transform = np.identity(4, dtype=np.float32)
         glfw.set_scroll_callback(self.window, self.scroll_callback)
-
-        self.texture = None
 
         glfw.set_window_size_callback(self.window, self.window_resize_callback)
 
         self.update_projection_matrix(width, height)
+
+        self.coordinate_axes = CoordinateAxes()
 
     def update_projection_matrix(self, width, height):
         """
@@ -280,6 +286,17 @@ class OpenGLPlotter:
                 glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
+
+
+            # 关闭深度测试，确保坐标轴总是绘制在最前面
+            glDisable(GL_DEPTH_TEST)
+
+            # 渲染坐标轴
+            self.coordinate_axes.render(self.projection, view_for_axes, np.identity(4))
+
+            # 重新启用深度测试
+            glEnable(GL_DEPTH_TEST)
+
             glfw.swap_buffers(self.window)
 
         glfw.terminate()
@@ -323,8 +340,35 @@ class OpenGLPlotter:
                     self.transform = np.identity(4, dtype=np.float32)  # 默认视角
 
 
+    def mouse_button_callback(self, window, button, action, mods):
+        """
+        """
+        if button == glfw.MOUSE_BUTTON_LEFT:
+            if action == glfw.PRESS:
+                self.dragging = True
+                self.first_mouse_use = True
+            elif action == glfw.RELEASE:
+                self.dragging = False
 
     def mouse_callback(self, window, xpos, ypos):
+        if self.dragging:
+            if self.first_mouse_use:
+                self.last_mouse_pos = (xpos, ypos)
+                self.first_mouse_use = False
+                return
+
+            xoffset = xpos - self.last_mouse_pos[0]
+            yoffset = self.last_mouse_pos[1] - ypos
+            self.last_mouse_pos = (xpos, ypos)
+
+            if xoffset == 0 and yoffset == 0:
+                return
+
+            # 计算旋转矩阵，这里仅提供概念代码，具体实现需要根据虚拟轨迹球的逻辑来完成
+            rotation_matrix = calculate_rotation_matrix(xoffset, yoffset)
+            self.transform = np.dot(rotation_matrix, self.transform)
+
+    def mouse_callback_old(self, window, xpos, ypos):
         print(f"Mouse position: {xpos}, {ypos}")
         if self.first_mouse_use:
             self.last_mouse_pos = (xpos, ypos)
