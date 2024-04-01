@@ -11,15 +11,6 @@ from fealpy.plotter.gl import OpenGLPlotter, OCAMModel
 cmodel = OCAMModel()
 
 
-image = Image.open('/home/why/frame1_0.jpg')
-idata = np.asarray(image)
-uimage = cmodel.undistort(np.asarray(image))
-
-plt.imshow(uimage)
-plt.title("Undistorted Image")
-plt.show()
-
-
 mesh = TriangleMesh.from_unit_sphere_surface()
 node = mesh.entity('node')
 cell = mesh.entity('cell')
@@ -34,7 +25,8 @@ node = node[isValidNode]
 idxMap = np.zeros(NN, dtype=cell.dtype)
 idxMap[isValidNode] = range(isValidNode.sum())
 cell = idxMap[cell]
-uv = cmodel.world2cam_fast(node)
+
+uv = cmodel.sphere_to_cam(node)
 
 plt.scatter(uv[:, 0], uv[:, 1])
 plt.scatter(cmodel.xc, cmodel.yc)

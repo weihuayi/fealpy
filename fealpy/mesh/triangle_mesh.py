@@ -2289,6 +2289,7 @@ class TriangleMesh(Mesh, Plotable):
     def from_ellipsoid_surface(cls, ntheta=10, nphi=10, 
             radius=(1, 1, 1), 
             theta=(np.pi/4, 3*np.pi/4), 
+            phi = (0, 
             returnuv=False
             ):
         """

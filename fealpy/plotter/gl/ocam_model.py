@@ -16,6 +16,32 @@ class OCAMModel:
     e: float = -0.000096
 
 
+    def sphere_to_cam(self, node, height=1080, width=1920):
+        """
+        @brief 把单位球面上的点投影到 
+        """
+        xc = self.xc
+        yc = self.yc
+
+        NN = len(node)
+        f = np.sqrt((height/2)**2 + (width/2)**2)
+        r = np.sqrt(np.sum(node**2, axis=1))
+        theta = np.arccos(node[:, 2]/r)
+        phi = np.arctan2(node[:, 1], node[:, 0])
+        phi = phi % (2 * np.pi)
+
+        uv = np.zeros((NN, 2), dtype=np.float64)
+
+        uv[:, 0] = f * theta * np.cos(phi) + xc
+        uv[:, 1] = f * theta * np.sin(phi) + yc
+
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
+
+        return uv
+
+
+
     def undistort(self, image, fc=5, width=640, height=480):
         """
         Undistort the given image using the camera model parameters.
