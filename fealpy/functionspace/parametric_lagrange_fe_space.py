@@ -80,7 +80,7 @@ class ParametricLagrangeFESpace:
         return phi 
 
     @barycentric
-    def basis(self, bc):
+    def basis(self, bc, index=np.s_[:]):
         """
 
         Notes
@@ -92,7 +92,7 @@ class ParametricLagrangeFESpace:
         
         p = self.p
         phi = self.mesh.shape_function(bc, p=p)
-        return phi 
+        return phi[..., None, :] 
 
     @barycentric
     def grad_basis(self, bc, index=np.s_[:], variables='x'):
