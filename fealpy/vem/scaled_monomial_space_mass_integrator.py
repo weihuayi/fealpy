@@ -7,10 +7,9 @@ class ScaledMonomialSpaceMassIntegrator2d:
     def __init__(self, q=3):
         self.q = q
 
-    def assembly_cell_matrix_old(self, space: ScaledMonomialSpace2d, p=None, index=np.s_[:]):
+    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, p=None, index=np.s_[:]):
         """
         @brief 组装缩放单项式空间每个单元上的质量矩阵
-               于 2024 年 3 月 11 日修改
         """
         p = space.p if p is None else p
         mesh = space.mesh
@@ -47,7 +46,7 @@ class ScaledMonomialSpaceMassIntegrator2d:
         H /= q + q.reshape(-1, 1) + 2
         return H[index]
 
-    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, p=None, index=np.s_[:]):
+    def assembly_cell_matrix_0(self, space: ScaledMonomialSpace2d, p=None, index=np.s_[:]):
         """
         @brief 组装缩放单项式空间每个单元上的质量矩阵
         """
