@@ -156,7 +156,7 @@ class BSplineCurve:
                 t1 = 0 if knot[i+k+1] == knot[i+1] else (knot[i+k+1] - xi)/(knot[i+k+1] - knot[i+1]) 
                 bval[i] = t0*bval[i] + t1*bval[i+1]
 
-        point = np.einsum('j, j...->...', bval, node)
+        point = np.einsum('j, j...->...', bval[:-1], node)
         return point
 
 
