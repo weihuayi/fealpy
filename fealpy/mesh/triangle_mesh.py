@@ -2203,7 +2203,7 @@ class TriangleMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_unit_sphere_surface(cls,refine=2):
+    def from_unit_sphere_surface(cls, refine=3):
         """
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
@@ -2288,7 +2288,8 @@ class TriangleMesh(Mesh, Plotable):
     @classmethod
     def from_ellipsoid_surface(cls, ntheta=10, nphi=10, 
             radius=(1, 1, 1), 
-            theta=(np.pi/4, 3*np.pi/4)
+            theta=(np.pi/4, 3*np.pi/4), 
+            returnuv=False
             ):
         """
         @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
@@ -2332,7 +2333,10 @@ class TriangleMesh(Mesh, Plotable):
         cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
         cell[1::2, 2] = idx[1:, 1:].flatten(order='F')
 
-        return cls(node, cell), U, V
+        if returnuv:
+            return cls(node, cell), U.flatten(), V.flatten()
+        else:
+            return cls(node, cell)
 
     @classmethod
     def from_cylinder_surface(cls, nphi=10, nz=10,

@@ -3,9 +3,6 @@ import numpy as np
 from .lagrange_mesh import LagrangeMesh
 from .triangle_mesh import TriangleMesh
 from .mesh_base import Mesh, Plotable
-from .backup.core import lagrange_shape_function
-from .backup.core import lagrange_grad_shape_function
-from .backup.core import multi_index_matrix
 
 class LagrangeTriangleMeshDataStructure():
     def __init__(self, NN, cell):
@@ -32,7 +29,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.surface = surface
 
         self.node = mesh.interpolation_points(p)
-        self.multi_index_matrix = multi_index_matrix
+        self.multi_index_matrix = mesh.multi_index_matrix
 
         if surface is not None:
             self.node, _ = surface.project(self.node)
@@ -51,7 +48,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.cell_bc_to_point = self.bc_to_point
         self.face_to_ipoint = self.edge_to_ipoint
 
-        self.shape_function = self._shape_function
+        #self.shape_function = self._shape_function
         self.cell_shape_function = self._shape_function
         self.face_shape_function = self._shape_function
         self.edge_shape_function = self._shape_function
@@ -125,69 +122,109 @@ class LagrangeTriangleMesh(LagrangeMesh):
             return 0
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
+ 
+    def lagrange_shape_function(self, bc, p, n=0):
+        """
 
-    def jacobi_TMOP(self, index = np.s_[:]):
-
-        '''
-        Notes
-        -----
-        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵
-        分解出的各个度量
-        '''
-
-        p = self.p
-        bc = multi_index_matrix[2](p)/p
-
-        J = self.jacobi_matrix(bc, index=index)# Jacobi矩阵
+        @berif 计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次
+        Lagrange 形函数关于 TD+1 个重心坐标的 n 阶导数.
         
-        Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis = -1))# 网格单元尺寸
-        
-        r = np.sqrt(np.einsum('...ij->...j', J**2))# [r1,r2]
+        注意当 n = 0 时, 返回的是函数值。
+        """
+        assert n <= p
 
-        Delta = np.einsum('ij,...j->...ij', np.eye(2), r)
-        r0 = r[:, :, 0]*r[:, :, 1]
-        Delta = np.einsum('...ijk,...i->...ijk',Delta, np.sqrt(1/r0))# 网格单元纵横比
-        
-        sphi = np.cross(J[..., 0], J[..., 1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
-        cphi = np.sum(J[..., 0]*J[..., 1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=TD) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数 
 
-        E = np.zeros(J[...,1].shape)
-        E[...,0] = 1
-        stheta = np.cross(E,J[...,0],axis=-1)/r[...,0]
-        ctheta = np.sum(J[...,0]*E,axis=-1)/r[...,0]
-        
-        V = np.zeros(J.shape)# 网格单元方向
-        V[..., 0, 0] = ctheta
-        V[..., 1, 0] = stheta
-        V[..., 0, 1] = -stheta
-        V[..., 1, 1] = ctheta
-        
-        Q = np.zeros(J.shape)# 网格单元夹角
-        Q[..., 0, 0] = 1/np.sqrt(sphi)
-        Q[..., 1, 0] = cphi/np.sqrt(sphi)
-        Q[..., 1, 1] = sphi/np.sqrt(sphi)
-        
-        U = np.zeros(J.shape)# 网格单元尺寸和形状
-        U[...,0,0] = r[..., 0]
-        U[...,1,0] = r[..., 1]*cphi
-        U[...,1,1] = r[..., 1]*sphi
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1) # (NQ, p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
 
-        S = np.einsum('...ijk,...i->...ijk', U, 1/Lambda)# 网格单元形状
-        #V = np.dot(J, np.linalg.inv(U))# 网格单元方向
-        return J, Lambda, Q, Delta, S, U, V
-    
+        if n == 0:
+            A[..., 1:, :] *= P.reshape(-1, 1)
+            idx = np.arange(TD+1)
+            R = np.prod(A[..., multiIndex, idx], axis=-1)
+            return R 
+        else:
+            T = p*bc[..., None, :] - t.reshape(-1, 1) # (NQ, p, TD+1)
+            F0 = A.copy() # (NQ, p+1, TD+1) 
+            F1 = np.zeros(A.shape, dtype=bc.dtype)
+
+            # (NQ, p, TD+1) = (NQ, p, TD+1)*(NQ, p, TD+1) + (NQ, p, TD+1)
+            for i in range(1, n+1):
+                for j in range(1, p+1):
+                    F1[..., j, :] = F1[..., j-1, :]*T[..., j-1, :] + i*p*F0[..., j-1, :]
+                F0[:] = F1
+
+            A[..., 1:, :] *= P.reshape(-1, 1)
+            F0[..., 1:, :] *= P.reshape(-1, 1)
+            
+            Q = A[..., multiIndex, range(TD+1)]
+            M = F0[..., multiIndex, range(TD+1)]
+
+            shape = bc.shape[:-1]+(ldof, TD+1) # (NQ, ldof, TD+1)
+            R = np.zeros(shape, dtype=bc.dtype)
+            for i in range(TD+1):
+                idx = list(range(TD+1))
+                idx.remove(i)
+                R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+            return R # (..., ldof, TD+1)
+
+    def lagrange_grad_shape_function(self, bc, p): 
+        """
+        @berif 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次
+        Lagrange 形函数值关于该重心坐标的梯度。
+        """
+
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=TD) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
+
+        c = np.arange(1, p+1)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=bc.dtype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+        return R # (..., ldof, TD+1)
+
     def shape_function(self, bc, p=None):
         """
         @brief 网格空间基函数
         """
         p = self.p if p is None else p
-        phi = lagrange_shape_function(bc, p)
+        phi = self.lagrange_shape_function(bc, p)
         return phi[..., None, :]
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
         """
-        @brief 网格空间基函数的梯度
-        计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+        @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
 
         lambda_0 = 1 - xi - eta
         lambda_1 = xi
@@ -195,19 +232,19 @@ class LagrangeTriangleMesh(LagrangeMesh):
 
         """
         p = self.p if p is None else p 
+        
         TD = bc.shape[-1] - 1
-         
         if TD == 2:
             Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
         else:
             Dlambda = np.array([[-1], [1]], dtype=self.ftype)
-        R = lagrange_grad_shape_function(bc, p) # (..., ldof, TD+1)
+        R = self.lagrange_grad_shape_function(bc, p=p)  # (..., ldof, TD+1)
         gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
 
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD)
         elif variables == 'x':
-            G, J = LagrangeMesh.first_fundamental_form(bc, index=index, return_jacobi=True)
+            G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
             return gphi
@@ -299,13 +336,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         @berif 
         """
         pass
-
-    def grad_lambda(self, index=np.s_[:]):
-        """
-        @berif 计算每个单元格中重心坐标的梯度
-        """
-        pass
-    
+ 
     def rot_lambda(self, index=np.s_[:]):
         """
         @berif 
@@ -366,7 +397,7 @@ class CLagrangeTriangleDof2d():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = multi_index_matrix[2](p)
+        self.multiIndex = mesh.multi_index_matrix(p, etype=2)
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
