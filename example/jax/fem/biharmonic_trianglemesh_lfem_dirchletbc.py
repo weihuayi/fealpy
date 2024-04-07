@@ -36,6 +36,7 @@ class SinSinData:
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
+        val = np.zeros(p.shape, dtype=p.dtype)
         val = jnp.column_stack((
             jnp.cos(pi*x)*jnp.sin(pi*y)/pi**3/4.0, 
             jnp.sin(pi*x)*jnp.cos(pi*y)/pi**3/4.0)) 
@@ -123,6 +124,11 @@ space = LagrangeFESpace(mesh, p = p)
 
 bform = BilinearForm(space)
 L = ScalarBiharmonicIntegrator()
+
+node = mesh.entity('node')
+dd = L.hessian(pde.solution, node)
+print('dd', dd)
+
 bform.add_domain_integrator(L)
 A = bform.assembly()
 
