@@ -154,4 +154,4 @@ class MeshBase():
             NE = len(index)
         NN = self.number_of_nodes()
         edges = self.entity('edge')[index]
-        return edge_to_ipoint(edges, index, p, NN)
+        return edge_to_ipoint(edges, index, p)
