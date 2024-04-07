@@ -84,15 +84,14 @@ class ScalarBiharmonicIntegrator:
         return A
 
     def hessian(self, f, x):
+        print('ddd:', f, f.shape, x, x.shape)
         hess = jax.jacobian(lambda x: jax.jacobian(f, argnums=0)(x), argnums=0)(x)
 #        y, jac = self.value_and_jacfwd(f, x)
 #        y, hess = self.value_and_jacfwd(jac, x)
         return hess
 
-    '''
     def value_and_jacfwd(self, f, x):
-        pushfwd = functools.partial(jax.jvp, f, (x, ))
+        pushfwd = partial(jax.jvp, f, (x, ))
         basis = jnp.eye(len(x.reshape(-1)), dtype=x.dtype).reshape(-1, *x.shape)
         y, jac = jax.vmap(pushfwd, out_axes=(None, -1))((basis, ))
         return y, jac
-    '''

@@ -126,8 +126,6 @@ bform = BilinearForm(space)
 L = ScalarBiharmonicIntegrator()
 
 node = mesh.entity('node')
-dd = L.hessian(pde.solution, node)
-print('dd', dd)
 
 bform.add_domain_integrator(L)
 A = bform.assembly()
