@@ -24,23 +24,23 @@ class ScalarBiharmonicIntegrator:
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         # 计算与单元无关的部分
-        phi = space.basis(bcs) # (NQ, ldof)
+        phi = space.basis # (NQ, ldof)
         R = self.hessian(phi, bcs) # 计算 hessian矩阵
-        M = jnp.einsum('q, qikm, qjlm->ijkl', ws, R, R) # TODO
+        M = jnp.einsum('q, qciakbm, qcjalbn->cijklmn', ws, R, R) 
         
         # 计算与单元相关的部分
         cm = mesh.entity_measure()
         glambda = mesh.grad_lambda()
 
-
         # 计算 hessian 部分的刚度矩阵
-
+        A0 = jnp.einsum('c, ckp, clq, cmp, cnq, cijklmn->cij', cm, glambda,
+                glambda, glambda, glambda, M)
 
         # 组装罚项矩阵
         NC = mesh.number_of_cells()
         NE = mesh.number_of_edges()
 
-        isEdgeDof = (mesh.multi_index_matrix(p) == 0) # TODO 这里该如何拿到边的自由度
+        isEdgeDof = (mesh.multi_index_matrix(p, 2) == 0) # TODO
         cell2edge = mesh.ds.cell_to_edge()
         cell2edgesign = mesh.ds.cell_to_edge_sign()
 
@@ -84,10 +84,9 @@ class ScalarBiharmonicIntegrator:
         return A
 
     def hessian(self, f, x):
-        print('ddd:', f, f.shape, x, x.shape)
         hess = jax.jacobian(lambda x: jax.jacobian(f, argnums=0)(x), argnums=0)(x)
 #        y, jac = self.value_and_jacfwd(f, x)
-#        y, hess = self.value_and_jacfwd(jac, x)
+#        y, hess = self.value_and_jacfwd(lambda x:jac, x)
         return hess
 
     def value_and_jacfwd(self, f, x):
