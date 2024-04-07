@@ -177,7 +177,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             cm = mesh.entity_measure('cell')
             if GD == 3:
-                hmin = model.l0**3/96
+                hmin = model.l0**3/200
             else:
                 hmin = (model.l0/8)**2
             isMarkedCell = np.logical_and(isMarkedCell, cm > hmin)
