@@ -3,6 +3,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from functools import partial
+from scipy.sparse import csr_matrix
 
 class ScalarBiharmonicIntegrator:
 
@@ -11,7 +12,7 @@ class ScalarBiharmonicIntegrator:
 
     def assembly_cell_matrix(self, space, index=jnp.s_[:]):
         """
-        @brief 计算三角形网格上的单元 Laplace 矩阵
+        @brief 计算三角形网格上的单元 hessian 矩阵
         """
 
         mesh = space.mesh
@@ -24,37 +25,65 @@ class ScalarBiharmonicIntegrator:
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         # 计算与单元无关的部分
-        phi = space.basis(bcs) # (NQ, ldof)
-        R = self.hessian(phi, bcs) # 计算 hessian矩阵
-        M = jnp.einsum('q, qikm, qjlm->ijkl', ws, R, R) # TODO
+        phi = space.basis # (NQ, ldof)
+        ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
+        R = jnp.zeros((bcs.shape[0], 1, ldof, 3, 3))
+        for i in range(bcs.shape[0]):
+            R = R.at[i].set(self.hessian(phi, bcs[i, None, :])[0, :, :, 0, :,
+                0]) # 计算 hessian矩阵
+        M = jnp.einsum('q, qcikm, qcjln->cijklmn', ws, R, R) 
         
         # 计算与单元相关的部分
         cm = mesh.entity_measure()
         glambda = mesh.grad_lambda()
 
-
         # 计算 hessian 部分的刚度矩阵
+        A = jnp.einsum('c, ckp, clq, cmp, cnq, cijklmn->cij', cm, glambda,
+                glambda, glambda, glambda, M)
+        return A
 
+    def hessian(self, f, x):
+        hess = jax.jacobian(lambda x: jax.jacobian(f, argnums=0)(x), argnums=0)(x)
+        return hess
+
+    def penalty_matrix(self, space, index=jnp.s_[:], gamma=1):
+        mesh = space.mesh
+        assert type(mesh).__name__ == "TriangleMesh"
+
+        p = space.p
+        q = self.q if self.q is not None else p+3 
 
         # 组装罚项矩阵
         NC = mesh.number_of_cells()
         NE = mesh.number_of_edges()
 
-        isEdgeDof = (mesh.multi_index_matrix(p) == 0) # TODO 这里该如何拿到边的自由度
-        cell2edge = mesh.ds.cell_to_edge()
-        cell2edgesign = mesh.ds.cell_to_edge_sign()
+        isEdgeDof = (mesh.multi_index_matrix(p, 2) == 0) # TODO
+        cell2edge = mesh.ds.cell2edge
+        NEC = mesh.ds.localEdge.shape[0]
+
+        edge2cell = mesh.ds.edge2cell
+
+        cell2edgesign = jnp.zeros((NC, NEC), dtype=np.bool_)
+        # 第 i 个单元的第 j 条边的全局边方向与在本单元中的局部方向不同
+        cell2edgesign = cell2edgesign.at[(edge2cell[:, 0], edge2cell[:, 2])].set(True)
 
         ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
-        edof = space.number_of_local_dofs('edge') # 单元边上的自由度
+        edof = space.number_of_local_dofs(doftype='edge') # 单元边上的自由度
         ndof = ldof - edof
-        edge2dof = jnp.zeros((NF, edof + 2*ndof), dtype=jnp.int)
+        edge2dof = jnp.zeros((NE, edof + 2*ndof), dtype=jnp.int64)
+        
+        qf = mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        
         NQ = len(ws)
 
         n = mesh.edge_unit_normal()
         cell2dof = space.cell_to_dof()
         # 每个积分点、每个边、每个基函数法向导数
-        val = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float)
+        val1 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
+        val2 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
         TD = mesh.top_dimension()
+
         #  循环每个边
         for i in range(TD+1):
             lidx, = jnp.nonzero( cell2edgesign[:, i]) # 单元是全局边的左边单元
@@ -63,36 +92,64 @@ class ScalarBiharmonicIntegrator:
             idx1, = jnp.nonzero(~isEdgeDof[:, i]) # 不在边上的自由度
 
             eidx = cell2edge[:, i] # 第 i 个边的全局编号
-            edge2dof[eidx[lidx, None], jnp.arange(edof,      edof+  ndof)] = cell2dof[lidx[:, None], idx1]
-            edge2dof[eidx[ridx, None], jnp.arange(edof+ndof, edof+2*ndof)] = cell2dof[ridx[:, None], idx1]
+            edge2dof = edge2dof.at[(eidx[lidx, None], jnp.arange(edof, edof+ndof))].set(cell2dof[lidx[:, None], idx1]) 
+            edge2dof = edge2dof.at[(eidx[ridx, None], jnp.arange(edof+ndof, edof+2*ndof))].set(cell2dof[ridx[:, None], idx1])
 
             # 边上的自由度按编号大小进行排序
             idx = jnp.argsort(cell2dof[:, isEdgeDof[:, i]], axis=1)
-            edge2dof[eidx, 0:edof] = cell2dof[:, isEdgeDof[:, i]][jnp.arange(NC)[:, None], idx]
+            edge2dof = edge2dof.at[(eidx, slice(0, edof))].set(cell2dof[:, isEdgeDof[:, i]][jnp.arange(NC)[:, None], idx])
 
+            
             # 边上的积分点转化为体上的积分点
             b = jnp.insert(bcs, i, 0, axis=1)
-            # (NQ, NC, cdof)
-            cval = jnp.einsum('qijm, im->qij', self.grad_basis(b), n[cell2edge[:, i]])
-            val[:, eidx[ridx, None], jnp.arange(edof+ndof, edof+2*ndof)] = +cval[:, ridx[:, None], idx1]
-            val[:, eidx[lidx, None], jnp.arange(edof,      edof+  ndof)] = -cval[:, lidx[:, None], idx1]
+            # 计算一阶法向导数 (NQ, NC, cdof)
+            cval = jnp.einsum('iqjm, im->qij', space.grad_basis(b), n[cell2edge[:, i]])
+            
+            val1 = val1.at[(slice(None), eidx[ridx], slice(edof + ndof, edof + 2 * ndof))].set(+cval[:, ridx[:, None], idx1])
+            val1 = val1.at[(slice(None), eidx[lidx], slice(edof, edof + ndof))].set(-cval[:, lidx[:, None], idx1])
+            val1 = val1.at[(slice(None), eidx[ridx], slice(0, edof))].set(+cval[:, ridx[:, None], idx0[idx[ridx, :]]])
+            val1 = val1.at[(slice(None), eidx[lidx], slice(0, edof))].set(-cval[:, lidx[:, None], idx0[idx[lidx, :]]])
+            
+            # 计算二阶法向导数
+            phi = space.basis # (NQ, ldof)
+            ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
+            R = jnp.zeros((b.shape[0], 1, ldof, 3, 3))
+            for i in range(b.shape[0]):
+                R = R.at[i].set(self.hessian(phi, b[i, None, :])[0, :, :, 0, :,
+                    0]) # 计算 hessian矩阵
+            
+            glambda = mesh.grad_lambda()
+            A = jnp.einsum('ckm, cln, qcikl->qcimn', glambda, glambda, R)
 
-            val[:, eidx[ridx, None], jnp.arange(0, edof)] += cval[:, ridx[:, None], idx0[idx[ridx, :]]]
-            val[:, eidx[lidx, None], jnp.arange(0, edof)] -= cval[:, lidx[:, None], idx0[idx[lidx, :]]]
+            cval = jnp.einsum('qcimn, cm, cn-> qci', A, n[cell2edge[:, i]],
+                n[cell2edge[:, i]])
+            cval = cval/2.0
+            
+            val2 = val2.at[(slice(None), eidx[ridx], slice(edof + ndof, edof + 2 * ndof))].set(+cval[:, ridx[:, None], idx1])
+            val2 = val2.at[(slice(None), eidx[lidx], slice(edof, edof + ndof))].set(-cval[:, lidx[:, None], idx1])
+            val2 = val2.at[(slice(None), eidx[ridx], slice(0, edof))].set(+cval[:, ridx[:, None], idx0[idx[ridx, :]]])
+            val2 = val2.at[(slice(None), eidx[lidx], slice(0, edof))].set(-cval[:, lidx[:, None], idx0[idx[lidx, :]]])
+            
 
+        edge2cell = mesh.ds.edge2cell
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
-        return A
+        h = mesh.entity_measure('edge', index=isInEdge)
+        e2d = edge2dof[isInEdge]
+        
+        # 一阶法向导数矩阵
+        P1 = jnp.einsum('q, qfi, qfj->fij', ws, val1[:, isInEdge], val1[:,
+            isInEdge])
+        P1 = P1*gamma
 
-    def hessian(self, f, x):
-        hess = jax.jacobian(lambda x: jax.jacobian(f, argnums=0)(x), argnums=0)(x)
-#        y, jac = self.value_and_jacfwd(f, x)
-#        y, hess = self.value_and_jacfwd(jac, x)
-        return hess
+        P2 = jnp.einsum('q, qfi, qfj, f->fij', ws, val1[:, isInEdge], val2[:,
+            isInEdge], h)
+        P2T = jnp.transpose(P2, axes=(0, 2, 1))
+        P = (P2+P2T)/2.0 + P1
 
-    '''
-    def value_and_jacfwd(self, f, x):
-        pushfwd = functools.partial(jax.jvp, f, (x, ))
-        basis = jnp.eye(len(x.reshape(-1)), dtype=x.dtype).reshape(-1, *x.shape)
-        y, jac = jax.vmap(pushfwd, out_axes=(None, -1))((basis, ))
-        return y, jac
-    '''
+        I = np.broadcast_to(e2d[:, :, None], shape=P.shape)
+        J = np.broadcast_to(e2d[:, None, :], shape=P.shape)
+
+        gdof = space.dof.number_of_global_dofs()
+        P = csr_matrix((P.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
+        return P

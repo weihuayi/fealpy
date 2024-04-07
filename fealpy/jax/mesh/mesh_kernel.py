@@ -53,7 +53,7 @@ def grad_simplex_shape_function(bcs, mi, p, n):
 
 # edge 
 def edge_length(points):
-    return jnp.norm(points[1] - points[0])
+    return jnp.linalg.norm(points[1] - points[0])
 
 @partial(jax.jit, static_argnums=(2, ))
 def edge_to_ipoint(edges, indices, p):
