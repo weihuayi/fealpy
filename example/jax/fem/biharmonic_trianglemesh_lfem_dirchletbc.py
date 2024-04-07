@@ -6,6 +6,7 @@ import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
+from jax.scipy.linalg import solve
 
 import jax 
 import jax.numpy as jnp
@@ -42,35 +43,11 @@ class SinSinData:
             jnp.sin(pi*x)*jnp.cos(pi*y)/pi**3/4.0)) 
         return val
 
-    '''
-    def laplace(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        return r
-    '''
-
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
         return self.solution(p)
     
-    '''
-    def laplace_dirichlet(self, p):
-        return self.laplace(p);
-
-    def laplace_neuman(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        cos = np.cos
-        sin = np.sin
-        val = np.zeros(p.shape, dtype=p.dtype)
-        val[..., 0] = 4*pi**3*(-sin(pi*y)**2 + cos(pi*y)**2)*sin(pi*x)*cos(pi*x) - 8*pi**3*sin(pi*x)*sin(pi*y)**2*cos(pi*x)
-        val[..., 1] = 4*pi**3*(-sin(pi*x)**2 + cos(pi*x)**2)*sin(pi*y)*cos(pi*y) - 8*pi**3*sin(pi*x)**2*sin(pi*y)*cos(pi*y)
-        return np.sum(val*n, axis=-1) 
-    '''
-
     def neuman(self, p, n):
         """ Neuman boundary condition
         """
@@ -86,6 +63,37 @@ class SinSinData:
     def is_boundary_dof(self, p):
         eps = 1e-14 
         return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
+
+def interpolation_points(p: int, index=np.s_[:]):
+    """
+    @brief 获取三角形网格上所有 p 次插值点
+    """
+    cell = mesh.entity('cell')
+    node = mesh.entity('node')
+
+    NN = mesh.number_of_nodes()
+    GD = mesh.geo_dimension()
+
+    gdof = mesh.number_of_global_ipoints(p)
+    ipoints = jnp.zeros((gdof, GD), dtype=jnp.float_)
+    ipoints = ipoints.at[:NN, :].set(node)
+
+
+    NE = mesh.number_of_edges()
+
+    edge = mesh.entity('edge')
+
+    w = jnp.zeros((p-1, 2), dtype=jnp.float_)
+
+    w = w.at[:, 0].set(jnp.arange(p-1, 0, -1) / p)
+
+    w = w.at[:, 1].set(w[-1::-1, 0])
+
+    ipoints = ipoints.at[NN:NN+(p-1)*NE, :].set(
+        jnp.einsum('ij, ...jm->...im', w, node[edge, :]).reshape(-1, GD)
+    )
+
+    return ipoints # (gdof, GD)
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -125,14 +133,25 @@ space = LagrangeFESpace(mesh, p = p)
 bform = BilinearForm(space)
 L = ScalarBiharmonicIntegrator()
 
-node = mesh.entity('node')
-dd = L.hessian(pde.solution, node)
-print('dd', dd)
 
 bform.add_domain_integrator(L)
-A = bform.assembly()
+A0 = bform.assembly()
+P = L.penalty_matrix(space, gamma=10)
+A = A0 + P
 
 lform = LinearForm(space)
 F = ScalarSourceIntegrator(pde.source, q=3)
 lform.add_domain_integrator(F)
 b = lform.assembly()
+
+node = mesh.entity('node')
+
+print(b)
+print(A.toarray())
+gdof = space.dof.number_of_global_dofs()
+u = jnp.zeros(gdof)
+x = pde.solution(interpolation_points(p=2))
+
+print(np.max(np.abs(A@x-b)))
+
+
