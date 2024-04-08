@@ -35,8 +35,25 @@ uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
 uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
 node = np.hstack((node, uv), dtype=np.float32)
+#node = node[cell].reshape(-1, 5)
 cell = np.array(cell, dtype=np.uint32)
 
+
+# 定义顶点数据和UV坐标
+node = np.array([
+    [-0.5, -0.5, 0.0,  0.0, 0.0],  # 左下角
+    [ 0.5, -0.5, 0.0,  1.0, 0.0],  # 右下角
+    [ 0.5,  0.5, 0.0,  1.0, 1.0],  # 右上角
+    [-0.5,  0.5, 0.0,  0.0, 1.0]   # 左上角
+], dtype=np.float32)
+
+cell = np.array([
+    0, 1, 2,
+    2, 3, 0
+], dtype=np.uint32)
+
+node = node[cell].reshape(-1, 5)
+
 plotter = OpenGLPlotter()
-plotter.add_mesh(node, cell=cell, texture_path='/home/why/frame1_0.jpg')
+plotter.add_mesh(node, cell=None, texture_path='/home/why/frame1_0.jpg')
 plotter.run()

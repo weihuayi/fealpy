@@ -34,7 +34,7 @@ class GLMesh:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.cell.nbytes, self.cell, GL_STATIC_DRAW)
 
-        # Determine how to setup vertex attributes based on the node structure
+        # 根据 node 数组的列数设置顶点的属性
         if self.node.shape[1] == 3:  # Only positions
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * self.node.itemsize, ctypes.c_void_p(0))
             glEnableVertexAttribArray(0)
@@ -115,6 +115,7 @@ class GLMesh:
         @brief 使用提供的着色器程序绘制网格。
 
         @param shader_program: 用于绘制网格的着色器程序ID。
+        @param mode: 显示模式控制
 
         该方法绑定网格的VAO和纹理（如果有），并根据是否提供了单元格索引来执行绘制命令。
         """

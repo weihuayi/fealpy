@@ -13,6 +13,9 @@ from .kernel import calculate_rotation_matrix
 
 class OpenGLPlotter:
     def __init__(self, width=800, height=600, title="OpenGL Application"):
+        """
+        @brief 
+        """
         if not glfw.init():
             raise Exception("GLFW cannot be initialized!")
 
@@ -125,6 +128,9 @@ class OpenGLPlotter:
         return shader
 
     def create_shader_program(self):
+        """
+        @brief 创建着色程序
+        """
         vertex_shader = self.compile_shader(self.vertex_shader_source, GL_VERTEX_SHADER)
         fragment_shader = self.compile_shader(self.fragment_shader_source, GL_FRAGMENT_SHADER)
         shader_program = glCreateProgram()
@@ -141,6 +147,9 @@ class OpenGLPlotter:
         return shader_program
 
     def run(self):
+        """
+        @brief 
+        """
         while not glfw.window_should_close(self.window):
             glfw.poll_events()
             
