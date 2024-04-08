@@ -67,8 +67,8 @@ class LagrangeFESpace():
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
-    def number_of_local_dofs(self):
-        return self.dof.number_of_local_dofs()
+    def number_of_local_dofs(self, doftype='cell'):
+        return self.dof.number_of_local_dofs(doftype=doftype)
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()

@@ -1,27 +1,14 @@
+import ipdb
 import numpy as np
 
+import matplotlib.pyplot as plt
+from PIL import Image
+
 from fealpy.mesh import TriangleMesh
-from fealpy.plotter.gl import OpenGLPlotter
+from fealpy.plotter.gl import OpenGLPlotter, OCAMModel
 
 
-# Given parameters
-ss = np.array([5, -576.3797, 0, 0.0007185556, -3.39907e-07, 5.242219e-10])
-xc, yc = 559.875074, 992.836922
-c, d, e = 1.000938, 0.000132, -0.000096
-width, height = 1920, 1080
-
-# Example usage with dummy 3D points (M)
-M_example = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-
-# Convert
-m_converted = world2cam(M_example, ss, xc, yc, width, height, c, d, e)
-m_converted
-
-
-#mesh, U, V = TriangleMesh.from_ellipsoid_surface(80, 800, 
-#        radius=(4, 2, 1), 
-#        theta=(np.pi/2, np.pi/2+np.pi/3),
-#        returnuv=True)
+cmodel = OCAMModel()
 
 mesh = TriangleMesh.from_unit_sphere_surface()
 node = mesh.entity('node')
@@ -38,14 +25,34 @@ idxMap = np.zeros(NN, dtype=cell.dtype)
 idxMap[isValidNode] = range(isValidNode.sum())
 cell = idxMap[cell]
 
-#U = (U - np.min(U))/(np.max(U)-np.min(U))
-#V = (V - np.min(V))/(np.max(V)-np.min(V))
-#nodes = np.hstack((node, V.reshape(-1, 1), U.reshape(-1, 1)), dtype=np.float32)
+uv = cmodel.sphere_to_cam(node)
 
-nodes = np.array(node, dtype=np.float32)
-cells = np.array(cell, dtype=np.uint32)
+#plt.scatter(uv[:, 0], uv[:, 1])
+#plt.scatter(cmodel.xc, cmodel.yc)
+#plt.show()
+
+uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
+
+node = np.hstack((node, uv), dtype=np.float32)
+#node = node[cell].reshape(-1, 5)
+cell = np.array(cell, dtype=np.uint32)
+
+
+# 定义顶点数据和UV坐标
+node = np.array([
+    [-0.5, -0.5, 0.0,  0.0, 0.0],  # 左下角
+    [ 0.5, -0.5, 0.0,  1.0, 0.0],  # 右下角
+    [ 0.5,  0.5, 0.0,  1.0, 1.0],  # 右上角
+    [-0.5,  0.5, 0.0,  0.0, 1.0]   # 左上角
+], dtype=np.float32)
+
+cell = np.array([
+    0, 1, 2,
+    2, 3, 0
+], dtype=np.uint32)
+
 
 plotter = OpenGLPlotter()
-plotter.load_mesh(nodes, cells)
-#plotter.load_texture('/home/why/we.jpg')
+plotter.add_mesh(node, cell=cell, texture_path='/home/why/frame1_0.jpg')
 plotter.run()
