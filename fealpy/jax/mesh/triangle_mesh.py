@@ -55,7 +55,6 @@ class TriangleMeshDataStructure():
 
         logger.info(f"Construct the mesh toplogy relation with {NF} edge (or face).")
 
-
 class TriangleMesh(MeshBase):
     def __init__(self, node, cell):
         """
@@ -130,6 +129,18 @@ class TriangleMesh(MeshBase):
             return R
 
     cell_grad_shape_function = grad_shape_function
+
+    def edge_unit_normal(self, index=jnp.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = jnp.array([(0,-1),(1,0)])
+        return v@w
+
+    face_unit_normal = edge_unit_normal
+    
 
     def laplace_shape_function(self, bcs, p=1, index=jnp.s_[:]):
         """
