@@ -5,6 +5,7 @@ from ctypes import c_void_p
 
 import numpy as np
 from fealpy import logger
+import ipdb
 
 from .gl_mesh import GLMesh
 from .coordinate_axes import CoordinateAxes
@@ -98,6 +99,7 @@ class OpenGLPlotter:
 
         self.update_projection_matrix(width, height)
         self.coordinate_axes = CoordinateAxes()
+        logger.info(f"Initialized the OpenGLPloter Object!" )
 
     def update_projection_matrix(self, width, height):
         """
@@ -116,6 +118,7 @@ class OpenGLPlotter:
         self.projection[3, 2] = -1
 
     def add_mesh(self, node, cell=None, texture_path=None):
+        logger.info(f"Add GLMesh with {len(node)} nodes!")
         self.meshes.append(GLMesh(node, cell=cell, texture_path=texture_path))
 
     def compile_shader(self, source, shader_type):
@@ -206,6 +209,7 @@ class OpenGLPlotter:
                 self.mode += 1
                 if self.mode > 3:  # 超出范围后重置为 0
                     self.mode = 0
+                logger.info(f"Update mode as {self.mode}")
             elif key == glfw.KEY_Z:  # 放大
                 self.transform[:3, :3] *= scale_factor
             elif key == glfw.KEY_X:  # 缩小

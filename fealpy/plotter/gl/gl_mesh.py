@@ -2,6 +2,8 @@ import numpy as np
 from PIL import Image
 from OpenGL.GL import *
 
+from fealpy import logger
+
 class GLMesh:
     def __init__(self, node, cell=None, texture_path=None):
         """
@@ -106,7 +108,11 @@ class GLMesh:
         """
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 1)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)  # 绘制线框
-        glDrawArrays(GL_TRIANGLES, 0, int(len(self.node) / (self.node.shape[1])))
+        if self.cell is not None:
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
+            glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
+        else:
+            glDrawArrays(GL_TRIANGLES, 0, int(len(self.node) / (self.node.shape[1])))
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)  # 恢复默认模式
 
 
@@ -123,13 +129,14 @@ class GLMesh:
 
         if mode == 3:
             if self.texture_id is not None: 
+                logger.info(f"Bind the texture with {self.texture_id} id!")
                 glActiveTexture(GL_TEXTURE0)
                 glBindTexture(GL_TEXTURE_2D, self.texture_id)
                 glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), 0)
             self.draw_face(shader_program)
         elif mode == 2:
+            self.draw_edge(shader_program) # 先画边，后画面
             self.draw_face(shader_program)
-            self.draw_edge(shader_program)
         elif mode == 1:
             self.draw_edge(shader_program)
         elif mode == 0:

@@ -52,8 +52,7 @@ cell = np.array([
     2, 3, 0
 ], dtype=np.uint32)
 
-node = node[cell].reshape(-1, 5)
 
 plotter = OpenGLPlotter()
-plotter.add_mesh(node, cell=None, texture_path='/home/why/frame1_0.jpg')
+plotter.add_mesh(node, cell=cell, texture_path='/home/why/frame1_0.jpg')
 plotter.run()
