@@ -14,7 +14,7 @@ class Quadtree(QuadrangleMesh):
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=self.itype)
         self.child = -np.ones((NC, 4), dtype=self.itype)
-        self.cellLocation = np.array([0,NC])
+        self.cellLocation = np.array([0,NC],dtype=np.int_)
         self.meshType = 'quadtree'
 
     def leaf_cell_index(self):
