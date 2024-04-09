@@ -154,4 +154,16 @@ class MeshBase():
             NE = len(index)
         NN = self.number_of_nodes()
         edges = self.entity('edge')[index]
-        return edge_to_ipoint(edges, index, p, NN)
+        return edge_to_ipoint(edges, index, p)
+
+    def edge_unit_tangent(self, index=jnp.s_[:], node: Optional[NDArray]=None):
+        """
+        @brief Calculate the tangent vector with unit length of each edge.\
+               See `Mesh.edge_tangent`.
+        """
+        node = self.entity('node') if node is None else node
+        edge = self.entity('edge', index=index)
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        length = jnp.sqrt(jnp.square(v).sum(axis=1))
+        return v/length.reshape(-1, 1)
+

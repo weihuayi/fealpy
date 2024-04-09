@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 def value_and_jacfwd(f, x):
-    pushfwd = functools.partial(jax.jvp, f, (x, ))
+    pushfwd = partial(jax.jvp, f, (x, ))
     basis = jnp.eye(len(x.reshape(-1)), dtype=x.dtype).reshape(-1, *x.shape)
     y, jac = jax.vmap(pushfwd, out_axes=(None, -1))((basis, ))
     return y, jac
@@ -53,14 +53,13 @@ def grad_simplex_shape_function(bcs, mi, p, n):
 
 # edge 
 def edge_length(points):
-    return jnp.norm(points[1] - points[0])
+    return jnp.linalg.norm(points[1] - points[0])
 
-@jax.jit
-def edge_to_ipoint(edges, indices, p, NN):
+@partial(jax.jit, static_argnums=(2, ))
+def edge_to_ipoint(edges, indices, p):
     return jnp.hstack([
-        edge[:, 0].reshape(-1, 1), 
-        (p-1)*indices.reshape(-1, 1) + jnp.arange(p-1),
-        edge[:, 1].reshape(-1, 1)])
+        edges[:, 0].reshape(-1, 1), (p-1)*indices.reshape(-1, 1) +
+        jnp.arange(p-1), edges[:, 1].reshape(-1, 1)])
 
 
 # triangle 
