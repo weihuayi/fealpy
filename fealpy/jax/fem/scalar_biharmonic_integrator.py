@@ -24,27 +24,19 @@ class ScalarBiharmonicIntegrator:
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        # 计算与单元无关的部分
-        phi = space.basis # (NQ, ldof)
-        ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
-        R = jnp.zeros((bcs.shape[0], 1, ldof, 3, 3))
-        for i in range(bcs.shape[0]):
-            R = R.at[i].set(self.hessian(phi, bcs[i, None, :])[0, :, :, 0, :,
-                0]) # 计算 hessian矩阵
-        M = jnp.einsum('q, qcikm, qcjln->cijklmn', ws, R, R) 
-        
+        R = space.hess_basis(bcs)
+        M = jnp.einsum('q, qikl, qjrs->ijklrs', ws, R, R) 
+
         # 计算与单元相关的部分
-        cm = mesh.entity_measure()
-        glambda = mesh.grad_lambda()
+        cm = mesh.entity_measure(index=index)
+        glambda = mesh.grad_lambda(index=index)
+
+        A = jnp.einsum('c, ckm, cln, crm, csn->cklrs', cm, glambda, glambda, glambda, glambda)
 
         # 计算 hessian 部分的刚度矩阵
-        A = jnp.einsum('c, ckp, clq, cmp, cnq, cijklmn->cij', cm, glambda,
-                glambda, glambda, glambda, M)
+        A = jnp.einsum('ijklrs, cklrs->cij', M, A)
         return A
 
-    def hessian(self, f, x):
-        hess = jax.jacobian(lambda x: jax.jacobian(f, argnums=0)(x), argnums=0)(x)
-        return hess
 
     def penalty_matrix(self, space, index=jnp.s_[:], gamma=1):
         mesh = space.mesh
@@ -79,8 +71,10 @@ class ScalarBiharmonicIntegrator:
 
         n = mesh.edge_unit_normal()
         cell2dof = space.cell_to_dof()
+
         # 每个积分点、每个边、每个基函数法向导数
         val1 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
+        # 每个积分点、每个边、每个基函数二阶法向导数
         val2 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
         TD = mesh.top_dimension()
 
@@ -125,12 +119,15 @@ class ScalarBiharmonicIntegrator:
                 n[cell2edge[:, i]])
             cval = cval/2.0
             
-            val2 = val2.at[(slice(None), eidx[ridx], slice(edof + ndof, edof + 2 * ndof))].set(+cval[:, ridx[:, None], idx1])
-            val2 = val2.at[(slice(None), eidx[lidx], slice(edof, edof + ndof))].set(-cval[:, lidx[:, None], idx1])
-            val2 = val2.at[(slice(None), eidx[ridx], slice(0, edof))].set(+cval[:, ridx[:, None], idx0[idx[ridx, :]]])
-            val2 = val2.at[(slice(None), eidx[lidx], slice(0, edof))].set(-cval[:, lidx[:, None], idx0[idx[lidx, :]]])
-            
-
+            val2 = val2.at[(slice(None), eidx[ridx], slice(edof + ndof, edof + 2
+                * ndof))].set(+cval[:, ridx[:, None], idx1]) 
+            val2 = val2.at[(slice(None), eidx[lidx], slice(edof, edof +
+                ndof))].set(+cval[:, lidx[:, None], idx1]) 
+            val2 = val2.at[(slice(None), eidx[ridx], slice(0, edof))].set(+cval[:,
+                ridx[:, None], idx0[idx[ridx, :]]]) 
+            val2 = val2.at[(slice(None), eidx[lidx], slice(0, edof))].set(
+                    +cval[:, lidx[:, None], idx0[idx[lidx, :]]])
+        
         edge2cell = mesh.ds.edge2cell
         isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 

@@ -2203,7 +2203,7 @@ class TriangleMesh(Mesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_unit_sphere_surface(cls, refine=3):
+    def from_unit_sphere_surface(cls, refine=0):
         """
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.

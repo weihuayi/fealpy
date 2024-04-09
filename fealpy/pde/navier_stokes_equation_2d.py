@@ -65,6 +65,8 @@ class Poisuille:
     def __init__(self):
         self.box = [0, 1, 0, 1]
         self.eps = 1e-8
+        self.rho = 1
+        self.mu = 1
 
     def domain(self):
         return self.box
@@ -86,7 +88,7 @@ class Poisuille:
     
     @cartesian
     def source(self, p):
-        val = np.zeros(p.shape, dtype=np.float)
+        val = np.zeros(p.shape)
         return val
 
     @cartesian

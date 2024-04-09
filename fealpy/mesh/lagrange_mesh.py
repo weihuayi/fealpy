@@ -4,15 +4,14 @@ from .mesh_base import Mesh
 from .mesh_data_structure import Mesh2dDataStructure
 
 class LagrangeMesh(Mesh):
-    def __init__(self, node, cell, manifold=None, p=1):
-        self.node = node
-        self.cell = cell
-
     def ref_cell_measure(self):
-        if self.meshtype == 'ltri':
-            return 0.5
-        else:
-            return 1.0
+        raise NotImplementedError
+    
+    def shape_function(self, bc, p=None, index=np.s_[:]):
+        raise NotImplementedError
+
+    def grad_shape_function(self, bc, p=None, index=np.s_[:]):
+        raise NotImplementedError
 
     def number_of_corner_nodes(self):
         """
@@ -24,12 +23,6 @@ class LagrangeMesh(Mesh):
         这些节点默认的编号顺序也是：角点节点，边内部节点，单元内部节点。
         """
         return self.ds.NCN
-    
-    def shape_function(self, bc, p=None, index=np.s_[:]):
-        pass
-
-    def grad_shape_function(self, bc, p=None, index=np.s_[:]):
-        pass
 
     def jacobi_matrix(self, bc, p=None, index=np.s_[:], return_grad=False):
         """
@@ -115,19 +108,26 @@ class LagrangeMesh(Mesh):
         else:
             raise ValueError(' `bc` should be a tuple or ndarray!')
 
-        pass
+    def edge_length(self, q=None, index=np.s_[:]):
+        """
+        @berif 计算边的长度
+        """
+        p = self.p
+        q = p if q is None else q
 
+        qf = self.integrator(q, etype='edge')
+        bcs, ws = qf.get_quadrature_points_and_weights() 
+
+        J = self.jacobi_matrix(bcs, index=index)
+        l = np.sqrt(np.sum(J**2, axis=(-1, -2)))
+        a = np.einsum('i, ij->j', ws, l)
+        return a
 
     def vtk_cell_type(self, etype='cell'):
         """
         @berif 返回网格单元对应的 vtk 类型。
         """
-        if etype in {'cell', 2}:
-            VTK_LAGRANGE_TRIANGLE = 69
-            return VTK_LAGRANGE_TRIANGLE 
-        elif etype in {'face', 'edge', 1}:
-            VTK_LAGRANGE_CURVE = 68
-            return VTK_LAGRANGE_CURVE
+        raise NotImplementedError
 
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
