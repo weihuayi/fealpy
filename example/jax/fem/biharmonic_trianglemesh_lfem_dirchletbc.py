@@ -5,8 +5,10 @@ import argparse
 import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, cg, lgmres
+import scipy.sparse as sp
 from jax.scipy.linalg import solve
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 import jax 
 import jax.numpy as jnp
@@ -95,6 +97,16 @@ def interpolation_points(p: int, index=np.s_[:]):
 
     return ipoints # (gdof, GD)
 
+def apply_dbc(A, f, uh, isDDof):
+    bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+    bdIdx[isDDof.reshape(-1)] = 1
+    D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+    D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+    A = D0@A@D0 + D1
+    
+    f = f.at[isDDof.reshape(-1)].set(uh[isDDof].reshape(-1))
+    return A, f
+
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -130,28 +142,53 @@ domain = pde.domain()
 mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
 space = LagrangeFESpace(mesh, p = p)
 
-bform = BilinearForm(space)
-L = ScalarBiharmonicIntegrator()
+errorType = ['$|| Ax-b ||_{\\Omega,0}$']
+errorMatrix = np.zeros((4, maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
+
+for i in range(maxit):
+
+    bform = BilinearForm(space)
+    L = ScalarBiharmonicIntegrator()
 
 
-bform.add_domain_integrator(L)
-A0 = bform.assembly()
-P = L.penalty_matrix(space, gamma=10)
-A = A0 + P
+    bform.add_domain_integrator(L)
+    A0 = bform.assembly()
+    P = L.penalty_matrix(space, gamma=100)
+    A = A0 + P
 
-lform = LinearForm(space)
-F = ScalarSourceIntegrator(pde.source, q=3)
-lform.add_domain_integrator(F)
-b = lform.assembly()
+    lform = LinearForm(space)
+    F = ScalarSourceIntegrator(pde.source, q=p+3)
+    lform.add_domain_integrator(F)
+    b = lform.assembly()
+    
+    x = pde.solution(interpolation_points(p=p))
+    
+    A, f = apply_dbc(A, b, x, pde.is_boundary_dof(interpolation_points(p=p)))
 
-node = mesh.entity('node')
+    node = mesh.entity('node')
+    print('自由度个数:', f.shape)
+    print('A的秩：', jnp.linalg.matrix_rank(A.toarray()))
+#    uh = spsolve(A, b)
+    
+    uh, tol = cg(A, b, atol=1e-15)
+#    print('真解：', uh, tol)
+#    print(b)
+#    print(A.toarray())
+    errorMatrix[0, i] = jnp.linalg.norm(uh-x)
+    errorMatrix[1, i] = jnp.linalg.norm(A@x-f)
+    errorMatrix[2, i] = jnp.linalg.norm(A0@x-f)
+    errorMatrix[3, i] = jnp.linalg.norm(P@x-f)
+    
 
-print(b)
-print(A.toarray())
-gdof = space.dof.number_of_global_dofs()
-u = jnp.zeros(gdof)
-x = pde.solution(interpolation_points(p=2))
+    if i < maxit-1:
+        nx = nx*2
+        ny = ny*2
+        mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
+        space = LagrangeFESpace(mesh, p = p)
 
-print(np.max(np.abs(A@x-b)))
 
+    print(errorMatrix[0, i])
+print(errorMatrix)
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 
