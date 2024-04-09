@@ -48,7 +48,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.cell_bc_to_point = self.bc_to_point
         self.face_to_ipoint = self.edge_to_ipoint
 
-        #self.shape_function = self._shape_function
+        self.shape_function = self._shape_function
         self.cell_shape_function = self._shape_function
         self.face_shape_function = self._shape_function
         self.edge_shape_function = self._shape_function
@@ -97,21 +97,6 @@ class LagrangeTriangleMesh(LagrangeMesh):
         a = np.einsum('i, ij->j', ws, n)/2.0
         return a
 
-    def edge_length(self, q=None, index=np.s_[:]):
-        """
-        @berif 计算边的长度
-        """
-        p = self.p
-        q = p if q is None else q
-
-        qf = self.integrator(q, etype='edge')
-        bcs, ws = qf.get_quadrature_points_and_weights() 
-
-        J = self.jacobi_matrix(bcs, index=index)
-        l = np.sqrt(np.sum(J**2, axis=(-1, -2)))
-        a = np.einsum('i, ij->j', ws, l)
-        return a
-
 
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
@@ -122,105 +107,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
             return 0
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
- 
-    def lagrange_shape_function(self, bc, p, n=0):
-        """
-
-        @berif 计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次
-        Lagrange 形函数关于 TD+1 个重心坐标的 n 阶导数.
-        
-        注意当 n = 0 时, 返回的是函数值。
-        """
-        assert n <= p
-
-        TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=TD) 
-        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数 
-
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1) # (NQ, p+1, TD+1)
-        A = np.ones(shape, dtype=bc.dtype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-
-        if n == 0:
-            A[..., 1:, :] *= P.reshape(-1, 1)
-            idx = np.arange(TD+1)
-            R = np.prod(A[..., multiIndex, idx], axis=-1)
-            return R 
-        else:
-            T = p*bc[..., None, :] - t.reshape(-1, 1) # (NQ, p, TD+1)
-            F0 = A.copy() # (NQ, p+1, TD+1) 
-            F1 = np.zeros(A.shape, dtype=bc.dtype)
-
-            # (NQ, p, TD+1) = (NQ, p, TD+1)*(NQ, p, TD+1) + (NQ, p, TD+1)
-            for i in range(1, n+1):
-                for j in range(1, p+1):
-                    F1[..., j, :] = F1[..., j-1, :]*T[..., j-1, :] + i*p*F0[..., j-1, :]
-                F0[:] = F1
-
-            A[..., 1:, :] *= P.reshape(-1, 1)
-            F0[..., 1:, :] *= P.reshape(-1, 1)
-            
-            Q = A[..., multiIndex, range(TD+1)]
-            M = F0[..., multiIndex, range(TD+1)]
-
-            shape = bc.shape[:-1]+(ldof, TD+1) # (NQ, ldof, TD+1)
-            R = np.zeros(shape, dtype=bc.dtype)
-            for i in range(TD+1):
-                idx = list(range(TD+1))
-                idx.remove(i)
-                R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-            return R # (..., ldof, TD+1)
-
-    def lagrange_grad_shape_function(self, bc, p): 
-        """
-        @berif 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次
-        Lagrange 形函数值关于该重心坐标的梯度。
-        """
-
-        TD = bc.shape[-1] - 1
-        multiIndex = self.multi_index_matrix(p, etype=TD) 
-        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
-
-        c = np.arange(1, p+1)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=bc.dtype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=bc.dtype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=bc.dtype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return R # (..., ldof, TD+1)
-
-    def shape_function(self, bc, p=None):
-        """
-        @brief 网格空间基函数
-        """
-        p = self.p if p is None else p
-        phi = self.lagrange_shape_function(bc, p)
-        return phi[..., None, :]
+    
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
         """
@@ -238,7 +125,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
             Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
         else:
             Dlambda = np.array([[-1], [1]], dtype=self.ftype)
-        R = self.lagrange_grad_shape_function(bc, p=p)  # (..., ldof, TD+1)
+        R = self._lagrange_grad_shape_function(bc, p=p)  # (..., ldof, TD+1)
         gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
 
         if variables == 'u':
@@ -248,6 +135,27 @@ class LagrangeTriangleMesh(LagrangeMesh):
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
             return gphi
+
+    def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
+        """
+
+        Notes
+        -----
+
+        etype 这个参数实际上是不需要的，为了向后兼容，所以这里先保留。
+
+        因为 bc 最后一个轴的长度就包含了这个信息。
+        """
+        p = self.p
+        node = self.node
+        TD = bc.shape[-1] - 1
+        entity = self.entity(etype=TD)[index]  
+        phi = self.shape_function(bc, p=p) # (NQ, 1, ldof)
+        print('aaa')
+        print('phi:', phi.shape)
+        #print('node[entity]:', node[entity].shape)
+        p = np.einsum('qci, cid -> qcd', phi, node[entity])
+        return p
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
         """

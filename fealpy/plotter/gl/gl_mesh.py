@@ -2,8 +2,11 @@ import numpy as np
 from PIL import Image
 from OpenGL.GL import *
 
+from fealpy import logger
+import ipdb
+
 class GLMesh:
-    def __init__(self, node, cell=None, texture_path=None):
+    def __init__(self, node, cell=None, texture_path=None, texture_unit=0):
         """
         @brief 初始化网格类，根据节点的数据格式配置顶点属性，并加载纹理（如果提供）。
 
@@ -18,6 +21,7 @@ class GLMesh:
         self.cell = cell if cell is not None else None
         self.texture_path = texture_path
         self.texture_id = None
+        self.texture_unit = texture_unit
         self.vao = glGenVertexArrays(1)
         self.vbo = glGenBuffers(1)
         self.ebo = None if self.cell is None else glGenBuffers(1)
@@ -34,7 +38,7 @@ class GLMesh:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.cell.nbytes, self.cell, GL_STATIC_DRAW)
 
-        # Determine how to setup vertex attributes based on the node structure
+        # 根据 node 数组的列数设置顶点的属性
         if self.node.shape[1] == 3:  # Only positions
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * self.node.itemsize, ctypes.c_void_p(0))
             glEnableVertexAttribArray(0)
@@ -106,7 +110,11 @@ class GLMesh:
         """
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 1)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)  # 绘制线框
-        glDrawArrays(GL_TRIANGLES, 0, int(len(self.node) / (self.node.shape[1])))
+        if self.cell is not None:
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
+            glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
+        else:
+            glDrawArrays(GL_TRIANGLES, 0, int(len(self.node) / (self.node.shape[1])))
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)  # 恢复默认模式
 
 
@@ -115,20 +123,23 @@ class GLMesh:
         @brief 使用提供的着色器程序绘制网格。
 
         @param shader_program: 用于绘制网格的着色器程序ID。
+        @param mode: 显示模式控制
 
         该方法绑定网格的VAO和纹理（如果有），并根据是否提供了单元格索引来执行绘制命令。
         """
         glBindVertexArray(self.vao)  # Bind the VAO for this mesh
 
         if mode == 3:
-            if self.texture_id is not None: 
-                glActiveTexture(GL_TEXTURE0)
+            if self.texture_id is not None and self.node.shape[1] == 5: 
+                logger.info(f"Bind the texture with texture_id {self.texture_id} and texture_unit {self.texture_unit}!")
+                glActiveTexture(GL_TEXTURE0 + self.texture_unit)
                 glBindTexture(GL_TEXTURE_2D, self.texture_id)
-                glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), 0)
+                glUniform1i(glGetUniformLocation(shader_program,
+                    "textureSampler"), self.texture_unit)
             self.draw_face(shader_program)
         elif mode == 2:
+            self.draw_edge(shader_program) # 先画边，后画面
             self.draw_face(shader_program)
-            self.draw_edge(shader_program)
         elif mode == 1:
             self.draw_edge(shader_program)
         elif mode == 0:
