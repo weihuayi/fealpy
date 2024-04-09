@@ -8,6 +8,7 @@ class VectorViscousWorkIntegrator:
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
         construct the mu * (epslion(u), epslion(v)) fem matrix
+        epsion(u) = 1/2*(\nabla u+ (\nabla u).T)
         """
 
         mesh = space[0].mesh
