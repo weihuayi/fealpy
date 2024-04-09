@@ -33,7 +33,7 @@ def _simplex_shape_function(bc, mi, p):
     phi = jnp.prod(B[mi, idx], axis=-1)
     return phi
 
-def _grad_simplex_shape_function(bc, mi, p, n):
+def _diff_simplex_shape_function(bc, mi, p, n):
     fn = _simplex_shape_function
     for i in range(n):
         fn = jax.jacfwd(fn)
@@ -45,7 +45,7 @@ def simplex_shape_function(bcs, mi, p):
     return fn(bcs, mi, p)
 
 @partial(jax.jit, static_argnums=(2, 3))
-def grad_simplex_shape_function(bcs, mi, p, n): 
+def diff_simplex_shape_function(bcs, mi, p, n): 
     return jax.vmap(
             _grad_simplex_shape_function, 
             in_axes=(0, None, None, None)

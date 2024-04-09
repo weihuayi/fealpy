@@ -76,19 +76,23 @@ class LagrangeFESpace():
     def cell_to_dof(self):
         return self.dof.cell2dof
 
-    def basis(self, bc, index=np.s_[:]):
-        p = self.p
-        phi = self.mesh.shape_function(bc, p=p)
-        return phi[..., None, :]
+    def basis(self, bc, index=jnp.s_[:], variable='u'):
+        return self.mesh.shape_function(bc, p=self.p, variable=variable)
 
-    def grad_basis(self, bc, index=np.s_[:], variable='x'):
+    def grad_basis(self, bc, index=jnp.s_[:], variable='u'):
         """
         @brief
         """
         return self.mesh.grad_shape_function(bc, p=self.p, index=index, variable=variable)
 
+    def hess_basis(self, bc, index=jnp.s_[:], variable='u'):
+        """
+        @brief
+        """
+        return self.mesh.hess_shape_function(bc, p=self.p, index=index, variable=variable)
 
-    def value(self, uh, bc, index=np.s_[:]):
+
+    def value(self, uh, bc, index=jnp.s_[:]):
         """
         @brief
         """

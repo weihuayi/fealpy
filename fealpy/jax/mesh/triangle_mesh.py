@@ -108,27 +108,51 @@ class TriangleMesh(MeshBase):
     def grad_lambda(self, index=np.s_[:]):
         return self._grad_lambda(self.node[self.ds.cell[index]])
 
-    def shape_function(self, bcs, p=1):
+    def shape_function(self, bcs, p=1, variable='u'):
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
         phi = simplex_shape_function(bcs, mi, p)
-        return phi # (NQ, ldof)
+        if variable == 'x':
+            return phi[None, ...] # (1, NQ, ldof)
+        elif variable == 'u':
+            return phi # (NQ, ldof)
+        else:
+            logger.error(f"The variable type {variable} is not correct, which should be `x` or `u`!")
 
-    def grad_shape_function(self, bcs, p=1, index=jnp.s_[:], variable='x'):
+    def grad_shape_function(self, bcs, p=1, index=jnp.s_[:], variable='u'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
-        R = grad_simplex_shape_function(bcs, mi, p, 1) # (NQ, ldof, TD+1) 
-        if variable == 'x':
+        R = diff_simplex_shape_function(bcs, mi, p, 1) # (NQ, ldof, TD+1) 
+        if variable == 'u':
+            return R
+        elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = jnp.einsum('...ij, kjm->k...im', R, Dlambda, optimize=True)
             return gphi #(NC, NQ, ldof, GD)
         else:
-            return R
+            logger.error(f"The variable type {variable} is not correct, which should be `x` or `u`!")
 
     cell_grad_shape_function = grad_shape_function
+
+    def hess_shape_function(self, bcs, p=1, index=jnp.s_[:], variable='u'):
+        """
+        @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
+        """
+        TD = bcs.shape[-1] - 1
+        mi = self.multi_index_matrix(p, TD)
+        R = diff_simplex_shape_function(bcs, mi, p, 2) # (NQ, ldof, TD+1, TD+1) 
+        if variable == 'u':
+            return R
+        elif variable == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = jnp.einsum('...ijk, cjm, ckn->c...imn', R, Dlambda, Dlambda, optimize=True)
+            return gphi #(NC, NQ, ldof, GD, GD)
+        else:
+            logger.error(f"The variable type {variable} is not correct, which should be `x` or `u`!")
+
 
     def edge_unit_normal(self, index=jnp.s_[:]):
         """
@@ -188,6 +212,31 @@ class TriangleMesh(MeshBase):
 
     def cell_quality_with_jac(self, index=jnp.s_[:]):
         return self._quality_with_jac(self.node[self.ds.cell[index]])
+
+    def interpolation_points(self, p: int, index=jnp.s_[:]):
+        """
+        @brief 获取三角形网格上所有 p 次插值点
+        """
+        GD = self.geo_dimension()
+        node = self.entity('node')
+        if p == 1:
+            return node
+        if p > 1:
+            edge = self.entity('edge')
+            w = self.multi_index_matrix(p, 1)[1:-1]/p
+            enode = jnp.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, GD)
+            ipoints = jnp.vstack((node, enode))
+        if p > 2:
+            cell = self.entity('cell')
+            mi = self.multi_index_matrix(p, 2)
+            flag = (jnp.sum(mi > 0 , axis=1) == 3)
+            w = mi[flag, :]/p
+            cnode = np.einsum('ij, kj...->ki...', w,
+                    node[cell, :]).reshape(-1, GD)
+            ipoints = jnp.vstack((ipoints, cnode))
+
+        return ipoints # (gdof, GD)
 
     def cell_to_ipoint(self, p, index=jnp.s_[:]):
         """

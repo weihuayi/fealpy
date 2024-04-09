@@ -66,36 +66,6 @@ class SinSinData:
         eps = 1e-14 
         return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
-def interpolation_points(p: int, index=np.s_[:]):
-    """
-    @brief 获取三角形网格上所有 p 次插值点
-    """
-    cell = mesh.entity('cell')
-    node = mesh.entity('node')
-
-    NN = mesh.number_of_nodes()
-    GD = mesh.geo_dimension()
-
-    gdof = mesh.number_of_global_ipoints(p)
-    ipoints = jnp.zeros((gdof, GD), dtype=jnp.float_)
-    ipoints = ipoints.at[:NN, :].set(node)
-
-
-    NE = mesh.number_of_edges()
-
-    edge = mesh.entity('edge')
-
-    w = jnp.zeros((p-1, 2), dtype=jnp.float_)
-
-    w = w.at[:, 0].set(jnp.arange(p-1, 0, -1) / p)
-
-    w = w.at[:, 1].set(w[-1::-1, 0])
-
-    ipoints = ipoints.at[NN:NN+(p-1)*NE, :].set(
-        jnp.einsum('ij, ...jm->...im', w, node[edge, :]).reshape(-1, GD)
-    )
-
-    return ipoints # (gdof, GD)
 
 def apply_dbc(A, f, uh, isDDof):
     bdIdx = np.zeros(A.shape[0], dtype=np.int_)
@@ -154,6 +124,7 @@ for i in range(maxit):
 
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
+    
     P = L.penalty_matrix(space, gamma=100)
     A = A0 + P
 

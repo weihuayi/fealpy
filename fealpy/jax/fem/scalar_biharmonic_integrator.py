@@ -24,26 +24,19 @@ class ScalarBiharmonicIntegrator:
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        # 计算与单元无关的部分
-        phi = space.basis # (NQ, ldof)
-        ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
-        R = jnp.zeros((bcs.shape[0], 1, ldof, 3, 3))
-        for i in range(bcs.shape[0]):
-            R = R.at[i].set(self.hessian(phi, bcs[i, None, :])[0, :, :, 0, :,
-                0]) # 计算 hessian矩阵(NQ, 1, ldof, 3, 3)
-        M = jnp.einsum('q, qcikm, qcjln->cijklmn', ws, R, R) 
+        R = space.hess_basis(bcs)
+        M = jnp.einsum('q, qikl, qjrs->ijklrs', ws, R, R) 
+
         # 计算与单元相关的部分
-        cm = mesh.entity_measure()
-        glambda = mesh.grad_lambda()
+        cm = mesh.entity_measure(index=index)
+        glambda = mesh.grad_lambda(index=index)
+
+        A = jnp.einsum('c, ckm, cln, crm, csn->cklrs', cm, glambda, glambda, glambda, glambda)
 
         # 计算 hessian 部分的刚度矩阵
-        A = jnp.einsum('c, ckp, clq, cmp, cnq, cijklmn->cij', cm, glambda,
-                glambda, glambda, glambda, M)
+        A = jnp.einsum('ijklrs, cklrs->cij', M, A)
         return A
 
-    def hessian(self, f, x):
-        hess = jax.jacobian(lambda x: jax.jacobian(f, argnums=0)(x), argnums=0)(x)
-        return hess
 
     def penalty_matrix(self, space, index=jnp.s_[:], gamma=1):
         mesh = space.mesh
