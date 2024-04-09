@@ -26,7 +26,7 @@ class ConformingVEMScalarSourceIntegrator2d():
         p = space.p
         q = p + 3 if q is None else q
         def u(x, index):
-            return np.einsum('ij, ijm->ijm', f(x, index), phi(x, index=index))
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
         bb = space.mesh.integral(u, q=q, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))

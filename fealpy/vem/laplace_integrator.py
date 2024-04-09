@@ -5,13 +5,12 @@ from ..functionspace import ConformingScalarVESpace2d
 from ..functionspace import NonConformingScalarVESpace2d
 
 class ConformingScalarVEMLaplaceIntegrator2d():
-    def __init__(self, PI1, G, D, c=None):
+    def __init__(self, PI1, G, c=None):
         self.coef = c
         self.PI1 = PI1
         self.G = G
-        self.D = D
 
-    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, out=None, stab=None):
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, out=None):
         p = space.p
         mesh = space.mesh
         coef = self.coef
@@ -23,33 +22,26 @@ class ConformingScalarVEMLaplaceIntegrator2d():
         if p == 1:
             tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
             if coef is None:
-                f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-                K = list(map(f1, zip(self.D, self.PI1)))
-                if stab is not None:
-                    f1 = lambda x: (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-                    stab[:] = list(map(f1, zip(self.D, self.PI1)))
+                f1 = lambda x: x[0].T@tG@x[0]
+                K = list(map(f1, zip(self.PI1)))
             elif isinstance(coef, float):
-                f1 = lambda x: coef*(x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) -
-                    x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
-                K = list(map(f1, zip(self.D, self.PI1)))
+                f1 = lambda x: coef*(x[0].T@tG@x[0])
+                K = list(map(f1, zip(self.PI1)))
             elif isinstance(coef, np.ndarray):
-                f1 = lambda x: x[2]*(x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) -
-                    x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
-                K = list(map(f1, zip(self.D, self.PI1, coef)))
+                f1 = lambda x: x[1]*(x[0].T@tG@x[0])
+                K = list(map(f1, zip(self.PI1, coef)))
 
         else:
             tG = list(map(f, self.G))
             if coef is None:
-                f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-                K = list(map(f1, zip(self.D, self.PI1, tG)))
+                f1 = lambda x: x[0].T@x[1]@x[0]
+                K = list(map(f1, zip(self.PI1, tG)))
             elif isinstance(coef, float):
-                f1 = lambda x: coef*(x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) -
-                    x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
-                K = list(map(f1, zip(self.D, self.PI1, tG)))
+                f1 = lambda x: coef*(x[0].T@x[1]@x[0])
+                K = list(map(f1, zip(self.PI1, tG)))
             elif isinstance(coef, np.ndarray):
-                f1 = lambda x: x[3]*(x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) -
-                    x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))
-                K = list(map(f1, zip(self.D, self.PI1, tG, coef)))
+                f1 = lambda x: x[2]*(x[0].T@x[1]@x[0])
+                K = list(map(f1, zip(self.PI1, tG, coef)))
         if out is None:
             return K
         else:
@@ -59,11 +51,10 @@ class ConformingScalarVEMLaplaceIntegrator2d():
        
 
 class NonConformingScalarVEMLaplaceIntegrator2d():
-    def __init__(self, PI1, G, D, c=None):
+    def __init__(self, PI1, G, c=None):
         self.coef = c
         self.PI1 = PI1
         self.G = G 
-        self.D = D
 
     def assembly_cell_matrix(self, space: NonConformingScalarVESpace2d):
         """
@@ -73,6 +64,6 @@ class NonConformingScalarVEMLaplaceIntegrator2d():
             x[0, :] = 0
             return x
         tG = list(map(f, self.G)) # 注意这里把 G 修改掉了
-        f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-        K = list(map(f1, zip(self.D, self.PI1, tG)))
+        f1 = lambda x: x[0].T@x[1]@x[0] 
+        K = list(map(f1, zip(self.PI1, tG)))
         return K

@@ -15,6 +15,7 @@ from .laplace_integrator import ConformingScalarVEMLaplaceIntegrator2d
 from .laplace_integrator import  NonConformingScalarVEMLaplaceIntegrator2d
 from .scalar_source_integrator import ConformingVEMScalarSourceIntegrator2d 
 from .scalar_source_integrator import NonConformingVEMScalarSourceIntegrator2d
+from .dof_dof_stabilization_term_integrator import DofDofStabilizationTermIntegrator2d
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
 from .estimator import PoissonCVEMEstimator
