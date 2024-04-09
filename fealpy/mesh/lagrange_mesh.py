@@ -25,11 +25,105 @@ class LagrangeMesh(Mesh):
         """
         return self.ds.NCN
     
+    def _lagrange_shape_function(self, bc, p, n=0):
+        """
+
+        @berif 计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次
+        Lagrange 形函数关于 TD+1 个重心坐标的 n 阶导数.
+        
+        注意当 n = 0 时, 返回的是函数值。
+        """
+        
+        assert n <= p
+
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=TD) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数 
+
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1) # (NQ, p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+
+        if n == 0:
+            A[..., 1:, :] *= P.reshape(-1, 1)
+            idx = np.arange(TD+1)
+            R = np.prod(A[..., multiIndex, idx], axis=-1)
+            return R 
+        else:
+            T = p*bc[..., None, :] - t.reshape(-1, 1) # (NQ, p, TD+1)
+            F0 = A.copy() # (NQ, p+1, TD+1) 
+            F1 = np.zeros(A.shape, dtype=bc.dtype)
+
+            # (NQ, p, TD+1) = (NQ, p, TD+1)*(NQ, p, TD+1) + (NQ, p, TD+1)
+            for i in range(1, n+1):
+                for j in range(1, p+1):
+                    F1[..., j, :] = F1[..., j-1, :]*T[..., j-1, :] + i*p*F0[..., j-1, :]
+                F0[:] = F1
+
+            A[..., 1:, :] *= P.reshape(-1, 1)
+            F0[..., 1:, :] *= P.reshape(-1, 1)
+            
+            Q = A[..., multiIndex, range(TD+1)]
+            M = F0[..., multiIndex, range(TD+1)]
+
+            shape = bc.shape[:-1]+(ldof, TD+1) # (NQ, ldof, TD+1)
+            R = np.zeros(shape, dtype=bc.dtype)
+            for i in range(TD+1):
+                idx = list(range(TD+1))
+                idx.remove(i)
+                R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+            return R # (..., ldof, TD+1)
+
+    def _lagrange_grad_shape_function(self, bc, p): 
+        """
+        @berif 计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次
+        Lagrange 形函数值关于该重心坐标的梯度。
+        """
+
+        TD = bc.shape[-1] - 1
+        multiIndex = self.multi_index_matrix(p, etype=TD) 
+        ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
+
+        c = np.arange(1, p+1)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=bc.dtype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=bc.dtype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+        return R # (..., ldof, TD+1)
+    
     def shape_function(self, bc, p=None, index=np.s_[:]):
-        pass
+        
+        raise NotImplementedError
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:]):
-        pass
+        
+        raise NotImplementedError
 
     def jacobi_matrix(self, bc, p=None, index=np.s_[:], return_grad=False):
         """
