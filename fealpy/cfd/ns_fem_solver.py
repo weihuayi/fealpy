@@ -12,11 +12,11 @@ from ..fem import VectorViscousWorkIntegrator, PressWorkIntegrator
 from ..fem import BilinearForm, MixedBilinearForm
 from ..fem import LinearForm
 from ..fem import VectorSourceIntegrator, ScalarSourceIntegrator
-from ..fem import VectorConvectionIntegrator
+from ..fem import VectorConvectionIntegrator, VectorEpsilonSourceIntegrator
 
 
 class NSFEMSolver:
-    def __init__(self, mesh, dt, uspace, pspace, rho=1.0, mu=1.0, q=4):
+    def __init__(self, mesh, dt, uspace, pspace, rho=1.0, mu=1.0, q=5):
         #self.model = model
         self.mesh = mesh
         self.uspace = uspace 
@@ -46,6 +46,223 @@ class NSFEMSolver:
         bform.add_domain_integrator(PressWorkIntegrator(q=q)) 
         self.AP = bform.assembly()
     
+        ##mu * (epslion(u), epslion(v))
+        bform = BilinearForm((self.uspace,)*2)
+        bform.add_domain_integrator(VectorViscousWorkIntegrator(mu=mu, q=self.q))
+        self.epS = bform.assembly() 
+    
+    # 求解中间速度u_star
+    def chorin_A_0(self, mu=None, rho=None):
+        dt = self.dt
+        if rho is None:
+            M = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            M = bform.assembly() 
+        
+        if mu is None:
+            S = self.S
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorDiffusionIntegrator(c=mu, q=self.q))
+            S = bform.assembly()
+         
+        A = M + dt*S
+        return A
+
+    def chorin_b_0(self, un, source,rho=None):
+        dt = self.dt
+        
+        if rho is None:
+            rho = self.rho
+
+        @barycentric
+        def coef(bcs, index): 
+            if callable(rho):
+                result = np.einsum('imnc, inc->imc',un.grad_value(bcs, index), un(bcs, index))
+                result = un(bcs, index) - dt*result
+                result = np.einsum('ic,ijc->ijc',rho(bcs,index),result)
+                result += dt*source(bcs, index)
+                return result
+            else:
+                result = np.einsum('imnc, inc->imc',un.grad_value(bcs, index), un(bcs, index))
+                result = un(bcs, index) - dt*result + dt*source(bcs, index)
+                return rho * result
+        
+        L = LinearForm((self.uspace,)*2)
+        L.add_domain_integrator(VectorSourceIntegrator(coef, q=self.q))
+        b = L.assembly()
+        return b
+
+    # 求压力
+    def chorin_A_1(self):
+        return self.dt*self.SP
+    
+    def chorin_b_1(self, us, rho=None):
+        
+        if rho is None:
+            rho = self.rho
+
+        @barycentric
+        def coef(bcs, index): 
+            if callable(rho):
+                result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
+                result = np.einsum('ij,ij->ij',rho(bcs,index), result)
+                return -result
+            else:
+                result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
+                return -rho * result
+        
+        L = LinearForm(self.pspace)
+        L.add_domain_integrator(ScalarSourceIntegrator(coef, self.q))
+        b = L.assembly()
+        return b
+
+    #求下一步速度
+    def chorin_A_2(self, rho=None):
+        if rho is None:
+            A = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=q))
+            A = bform.assembly()         
+        return A
+    
+    def chorin_b_2(self, us, p, rho=None):
+        dt = self.dt
+        
+        if rho is None:
+            rho = self.rho
+
+        @barycentric
+        def coef(bcs, index): 
+            if callable(rho):
+                result =  np.einsum('ij,ikj->ikj',rho(bcs,index), us(bcs,index))
+                result -= p.grad_value(bcs,index).transpose(0,2,1)
+                return result
+            else:
+                result = rho*us(bcs,index) - dt*p.grad_value(bcs,index).transpose(0,2,1)
+                return result
+        
+        L = LinearForm((self.uspace,)*2)
+        L.add_domain_integrator(VectorSourceIntegrator(coef, self.q))
+        b = L.assembly()
+        return b
+    
+    # 求解中间速度u_star
+    def ipcs_A_0(self, mu=None, rho=None):
+        dt = self.dt
+        if rho is None:
+            M = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            M = bform.assembly() 
+        
+        if mu is None:
+            S = self.epS
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorViscousWorkIntegrator(mu=mu, q=self.q))
+            S = bform.assembly()
+            self.epS = S
+         
+        A = M + dt*S
+        return A
+
+    def ipcs_b_0(self, un, p0, source,rho=None):
+        dt = self.dt
+        
+        if rho is None:
+            rho = self.rho
+
+        @barycentric
+        def coef(bcs, index): 
+            if callable(rho):
+                result = np.einsum('imnc, inc->imc',un.grad_value(bcs, index), un(bcs, index))
+                result = un(bcs, index) - dt*result
+                result = np.einsum('ic,ijc->ijc',rho(bcs,index),result)
+                result += dt*source(bcs, index)
+                return result
+            else:
+                result = un(bcs, index)
+                result -= dt * np.einsum('imnc, inc->imc',un.grad_value(bcs, index), un(bcs, index))
+                result +=  dt*source(bcs, index)
+                return rho * result
+        
+        @barycentric
+        def coefp(bcs, index): 
+            result = np.repeat(p0(bcs,index)[...,np.newaxis], 2, axis=-1)
+        
+        L = LinearForm((self.uspace,)*2)
+        L.add_domain_integrator(VectorSourceIntegrator(coef, q=self.q))
+        L.add_domain_integrator(VectorEpsilonSourceIntegrator(coefp, q=self.q))
+        b = L.assembly()
+        b -= 0.5*dt*self.epS@un.flatten() 
+        return b
+
+    # 求压力
+    def ipcs_A_1(self):
+        return self.dt*self.SP
+    
+    def ipcs_b_1(self, us, p0, rho=None):
+        
+        if rho is None:
+            rho = self.rho
+
+        @barycentric
+        def coef(bcs, index): 
+            if callable(rho):
+                result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
+                result = np.einsum('ij,ij->ij',rho(bcs,index), result)
+                return -result
+            else:
+                result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
+                return -rho * result
+        
+        L = LinearForm(self.pspace)
+        L.add_domain_integrator(ScalarSourceIntegrator(coef, self.q))
+        b = L.assembly()
+        b += self.dt*self.SP@p0 
+        return b
+    
+    #求下一步速度
+    def ipcs_A_2(self, rho=None):
+        if rho is None:
+            A = self.M
+        else:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=q))
+            A = bform.assembly()         
+        return A
+    
+    def ipcs_b_2(self, us, p1, p0, rho=None):
+        dt = self.dt
+        
+        if rho is None:
+            rho = self.rho
+
+        @barycentric
+        def coef(bcs, index): 
+            if callable(rho):
+                result0 = p1.grad_value(bcs, index) - p0.grad_value(bcs, index)
+                result =  np.einsum('ij,ikj->ikj',rho(bcs,index), us(bcs,index))
+                result -= dt * result0.transpose(0,2,1)
+                return result
+            else:
+                result = p1.grad_value(bcs, index) - p0.grad_value(bcs, index)
+                result = rho*us(bcs,index) - dt*result.transpose(0,2,1)
+                return result
+        
+        L = LinearForm((self.uspace,)*2)
+        L.add_domain_integrator(VectorSourceIntegrator(coef, self.q))
+        b = L.assembly()
+        return b
+
+
+
+
     #u \cdot u   \approx   u^n \cdot u^{n+1}
     def ossen_A(self,un, mu=None ,rho=None):
         AP = self.AP
