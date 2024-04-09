@@ -30,9 +30,8 @@ class ScalarBiharmonicIntegrator:
         R = jnp.zeros((bcs.shape[0], 1, ldof, 3, 3))
         for i in range(bcs.shape[0]):
             R = R.at[i].set(self.hessian(phi, bcs[i, None, :])[0, :, :, 0, :,
-                0]) # 计算 hessian矩阵
+                0]) # 计算 hessian矩阵(NQ, 1, ldof, 3, 3)
         M = jnp.einsum('q, qcikm, qcjln->cijklmn', ws, R, R) 
-        
         # 计算与单元相关的部分
         cm = mesh.entity_measure()
         glambda = mesh.grad_lambda()
@@ -79,8 +78,10 @@ class ScalarBiharmonicIntegrator:
 
         n = mesh.edge_unit_normal()
         cell2dof = space.cell_to_dof()
+
         # 每个积分点、每个边、每个基函数法向导数
         val1 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
+        # 每个积分点、每个边、每个基函数二阶法向导数
         val2 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
         TD = mesh.top_dimension()
 
@@ -125,12 +126,15 @@ class ScalarBiharmonicIntegrator:
                 n[cell2edge[:, i]])
             cval = cval/2.0
             
-            val2 = val2.at[(slice(None), eidx[ridx], slice(edof + ndof, edof + 2 * ndof))].set(+cval[:, ridx[:, None], idx1])
-            val2 = val2.at[(slice(None), eidx[lidx], slice(edof, edof + ndof))].set(-cval[:, lidx[:, None], idx1])
-            val2 = val2.at[(slice(None), eidx[ridx], slice(0, edof))].set(+cval[:, ridx[:, None], idx0[idx[ridx, :]]])
-            val2 = val2.at[(slice(None), eidx[lidx], slice(0, edof))].set(-cval[:, lidx[:, None], idx0[idx[lidx, :]]])
-            
-
+            val2 = val2.at[(slice(None), eidx[ridx], slice(edof + ndof, edof + 2
+                * ndof))].set(+cval[:, ridx[:, None], idx1]) 
+            val2 = val2.at[(slice(None), eidx[lidx], slice(edof, edof +
+                ndof))].set(+cval[:, lidx[:, None], idx1]) 
+            val2 = val2.at[(slice(None), eidx[ridx], slice(0, edof))].set(+cval[:,
+                ridx[:, None], idx0[idx[ridx, :]]]) 
+            val2 = val2.at[(slice(None), eidx[lidx], slice(0, edof))].set(
+                    +cval[:, lidx[:, None], idx0[idx[lidx, :]]])
+        
         edge2cell = mesh.ds.edge2cell
         isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
