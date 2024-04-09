@@ -68,8 +68,7 @@ class VectorEpsilonSourceIntegrator():
         bcs, ws = qf.get_quadrature_points_and_weights()
         NQ = len(ws)
 
-        phi = space[0].grad_basis(bcs, index=index)
-        phi = np.sum(phi,axis=-1)/GD
+        gphi = space[0].grad_basis(bcs, index=index)
 
         if callable(f):
             if hasattr(f, 'coordtype'):
@@ -85,30 +84,30 @@ class VectorEpsilonSourceIntegrator():
             val = f
         if isinstance(val, (int, float)):
             if space[0].doforder == 'sdofs':
-                bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)[:, None, :]
+                bb += val*np.einsum('q, qcid, c->cdi', ws, gphi, cellmeasure, optimize=True)
             elif space[0].doforder == 'vdims':
-                bb += val*np.einsum('q, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)[:, :, None]
+                bb += val*np.einsum('q, qcid, c->cid', ws, val, gphi, cellmeasure, optimize=True)
         elif isinstance(val, np.ndarray):
             if val.shape == (GD, ): # GD << NC
                 if space[0].doforder == 'sdofs':
-                    bb += np.einsum('q, d, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, d, qcid, c->cdi', ws, val, gphi, cellmeasure, optimize=True)
                 elif space[0].doforder == 'vdims':
-                    bb += np.einsum('q, d, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, d, qcid, c->cid', ws, val, gphi, cellmeasure, optimize=True)
             elif val.shape == (NC, GD): 
                 if space[0].doforder == 'sdofs':
-                    bb += np.einsum('q, cd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, cd, qcid, c->cdi', ws, val, gphi, cellmeasure, optimize=True)
                 elif space[0].doforder == 'vdims':
-                    bb += np.einsum('q, cd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, cd, qcid, c->cid', ws, val, gphi, cellmeasure, optimize=True)
             elif val.shape == (NQ, NC, GD):
                 if space[0].doforder == 'sdofs':
-                    bb += np.einsum('q, qcd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, qcd, qcid, c->cdi', ws, val, gphi, cellmeasure, optimize=True)
                 elif space[0].doforder == 'vdims':
-                    bb += np.einsum('q, qcd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, qcd, qcid, c->cid', ws, val, gphi, cellmeasure, optimize=True)
             elif val.shape == (NQ, GD, NC):
                 if space[0].doforder == 'sdofs':
-                    bb += np.einsum('q, qdc, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, qdc, qcid, c->cdi', ws, val, gphi, cellmeasure, optimize=True)
                 elif space[0].doforder == 'vdims':
-                    bb += np.einsum('q, qdc, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+                    bb += np.einsum('q, qdc, qcid, c->cid', ws, val, gphi, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef 的维度超出了支持范围")
         if out is None:
@@ -121,51 +120,4 @@ class VectorEpsilonSourceIntegrator():
 
         @param[in] space 
         """
-
-        space = self.space
-        f = self.f
-
-        mesh = space.mesh # 获取网格对像
-        GD = mesh.geo_dimension()
-
-        if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
-
-        NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs() 
-
-        if out is None:
-            bb = np.zeros((NC, ldof), dtype=space.ftype)
-        else:
-            bb = out
-
-        q = self.q if self.q is not None else space.p + 3 
-        qf = mesh.integrator(q, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        phi = space[0].grad_basis(bcs, index=index)
-        phi = np.sum(phi,axis=-1)/GD
-
-        if callable(f):
-            if hasattr(f, 'coordtype'):
-                if f.coordtype == 'cartesian':
-                    ps = mesh.bc_to_point(bcs, index=index)
-                    val = f(ps)
-                elif f.coordtype == 'barycentric':
-                    val = f(bcs, index=index)
-            else: # 默认是笛卡尔
-                ps = mesh.bc_to_point(bcs, index=index)
-                val = f(ps)
-        else:
-            val = f
-
-        if isinstance(val, np.ndarray):
-            if val.shape == (GD, ): # GD << NC
-                bb += np.einsum('q, d, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
-            elif val.shape == (NC, GD): 
-                bb += np.einsum('q, cd, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
-            elif val.shape == (NQ, NC, GD):
-                bb += np.einsum('q, qcd, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
-
-        if out is None:
-            return bb 
+        pass
