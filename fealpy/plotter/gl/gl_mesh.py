@@ -3,9 +3,10 @@ from PIL import Image
 from OpenGL.GL import *
 
 from fealpy import logger
+import ipdb
 
 class GLMesh:
-    def __init__(self, node, cell=None, texture_path=None):
+    def __init__(self, node, cell=None, texture_path=None, texture_unit=0):
         """
         @brief 初始化网格类，根据节点的数据格式配置顶点属性，并加载纹理（如果提供）。
 
@@ -20,6 +21,7 @@ class GLMesh:
         self.cell = cell if cell is not None else None
         self.texture_path = texture_path
         self.texture_id = None
+        self.texture_unit = texture_unit
         self.vao = glGenVertexArrays(1)
         self.vbo = glGenBuffers(1)
         self.ebo = None if self.cell is None else glGenBuffers(1)
@@ -128,11 +130,12 @@ class GLMesh:
         glBindVertexArray(self.vao)  # Bind the VAO for this mesh
 
         if mode == 3:
-            if self.texture_id is not None: 
-                logger.info(f"Bind the texture with {self.texture_id} id!")
-                glActiveTexture(GL_TEXTURE0)
+            if self.texture_id is not None and self.node.shape[1] == 5: 
+                logger.info(f"Bind the texture with texture_id {self.texture_id} and texture_unit {self.texture_unit}!")
+                glActiveTexture(GL_TEXTURE0 + self.texture_unit)
                 glBindTexture(GL_TEXTURE_2D, self.texture_id)
-                glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), 0)
+                glUniform1i(glGetUniformLocation(shader_program,
+                    "textureSampler"), self.texture_unit)
             self.draw_face(shader_program)
         elif mode == 2:
             self.draw_edge(shader_program) # 先画边，后画面

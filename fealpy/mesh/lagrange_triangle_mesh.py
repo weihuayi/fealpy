@@ -48,7 +48,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.cell_bc_to_point = self.bc_to_point
         self.face_to_ipoint = self.edge_to_ipoint
 
-        self.shape_function = self._lagrange_shape_function
+        self.shape_function = self._shape_function
         self.cell_shape_function = self._shape_function
         self.face_shape_function = self._shape_function
         self.edge_shape_function = self._shape_function
@@ -95,21 +95,6 @@ class LagrangeTriangleMesh(LagrangeMesh):
         if GD == 3:
             n = np.sqrt(np.sum(n**2, axis=-1))
         a = np.einsum('i, ij->j', ws, n)/2.0
-        return a
-
-    def edge_length(self, q=None, index=np.s_[:]):
-        """
-        @berif 计算边的长度
-        """
-        p = self.p
-        q = p if q is None else q
-
-        qf = self.integrator(q, etype='edge')
-        bcs, ws = qf.get_quadrature_points_and_weights() 
-
-        J = self.jacobi_matrix(bcs, index=index)
-        l = np.sqrt(np.sum(J**2, axis=(-1, -2)))
-        a = np.einsum('i, ij->j', ws, l)
         return a
 
 

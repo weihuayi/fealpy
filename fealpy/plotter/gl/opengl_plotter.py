@@ -24,6 +24,7 @@ class OpenGLPlotter:
         self.last_mouse_pos = (width / 2, height / 2)
         self.first_mouse_use = True
         self.meshes = []
+        self.texture_unit = 0 # 纹理单元计数器
 
         self.view_angle = 0 # 0 代表 X 轴，1 代表 Y 轴， 2 代表 Z 轴
         self.mode = 2  # 默认同时显示边和面
@@ -51,7 +52,6 @@ class OpenGLPlotter:
         layout (location = 0) in vec3 aPos;
         layout (location = 1) in vec2 aTexCoords;
         uniform mat4 transform; //变换矩阵
-        //uniform mat4 projection; // 投影矩阵
 
         out vec2 TexCoords;
 
@@ -119,7 +119,12 @@ class OpenGLPlotter:
 
     def add_mesh(self, node, cell=None, texture_path=None):
         logger.info(f"Add GLMesh with {len(node)} nodes!")
-        self.meshes.append(GLMesh(node, cell=cell, texture_path=texture_path))
+        self.meshes.append(GLMesh(node, 
+            cell=cell, 
+            texture_path=texture_path,
+            texture_unit=self.texture_unit))
+        if texture_path is not None:
+            self.texture_unit += 1
 
     def compile_shader(self, source, shader_type):
         shader = glCreateShader(shader_type)
