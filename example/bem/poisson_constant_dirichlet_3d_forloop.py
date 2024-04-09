@@ -3,6 +3,46 @@ from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
 from fealpy.pde.bem_model_3d import *
 
 
+def error_calculator(mesh, u, v, q=3, power=2):
+    qf = mesh.integrator(q, etype='cell')
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    ps = mesh.bc_to_point(bcs)
+
+    cell = mesh.entity('cell')
+    cell_node_val = u[cell]
+
+    bc0 = bcs[0].reshape(-1, 2)  # (NQ0, 2)
+    bc1 = bcs[1].reshape(-1, 2)  # (NQ1, 2)
+    bc2 = bcs[2].reshape(-1, 2)  # (NQ2, 2)
+    bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
+
+    u = np.einsum('...j, cj->...c', bc, cell_node_val)
+
+
+    if callable(v):
+        if not hasattr(v, 'coordtype'):
+            v = v(ps)
+        else:
+            if v.coordtype == 'cartesian':
+                v = v(ps)
+            elif v.coordtype == 'barycentric':
+                v = v(bcs)
+
+    if u.shape[-1] == 1:
+        u = u[..., 0]
+
+    if v.shape[-1] == 1:
+        v = v[..., 0]
+
+    cm = mesh.entity_measure('cell')
+
+    f = np.power(np.abs(u - v), power)
+
+    e = np.einsum('q, qc..., c->c...', ws, f, cm)
+    e = np.power(np.sum(e), 1 / power)
+
+    return e
+
 
 pde = PoissonModelConstantDirichletBC3d()
 nx = 5
@@ -99,10 +139,11 @@ for k in range(maxite):
         Bi = np.einsum("f,if,i,if->", v, 1 / rij1, cell_ws, b) / 4 / np.pi
         uh[interNode_idx[i]] = Mi - Hi - Bi
 
-    real_solution = pde.solution(Node)
-    h = np.max(v)
-    errorMatrix[k] = np.sqrt(np.sum((uh - real_solution) ** 2) * h)
+    # 计算误差
+    errorMatrix[k] = error_calculator(mesh, uh, pde.solution)
+
     mesh.uniform_refine(1)
+
 print(f'迭代{maxite}次，结果如下：')
 print("误差：\n", errorMatrix)
 print('误差比：\n', errorMatrix[0:-1] / errorMatrix[1:])

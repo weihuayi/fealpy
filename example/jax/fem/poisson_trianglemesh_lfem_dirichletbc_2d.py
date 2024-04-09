@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+# 
 import argparse
+import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
@@ -37,7 +40,7 @@ class CosCosData:
         x = p[..., 0]
         y = p[..., 1]
         pi = jnp.pi
-        val = jnp.cos(pi*x)*np.cos(pi*y)
+        val = jnp.cos(pi*x)*jnp.cos(pi*y)
         return val # val.shape == x.shape
 
 
@@ -48,7 +51,7 @@ class CosCosData:
         x = p[..., 0]
         y = p[..., 1]
         pi = jnp.pi
-        val = 2*pi*pi*np.cos(pi*x)*np.cos(pi*y)
+        val = 2*pi*pi*jnp.cos(pi*x)*jnp.cos(pi*y)
         return val#-self.solution(p)
 
     def gradient(self, p):
@@ -58,10 +61,9 @@ class CosCosData:
         x = p[..., 0]
         y = p[..., 1]
         pi = jnp.pi
-        val = jnp.zeros(p.shape, dtype=np.float64)
         val = jnp.column_stack((
-            -pi*np.sin(pi*x)*np.cos(pi*y), 
-            -pi*np.cos(pi*x)*np.sin(pi*y)))
+            -pi*jnp.sin(pi*x)*jnp.cos(pi*y), 
+            -pi*jnp.cos(pi*x)*jnp.sin(pi*y)))
         return val # val.shape == p.shape
 
     def flux(self, p):
@@ -151,6 +153,7 @@ errorType = ['$|| u - u_h||_{\\Omega,0}$',
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
 
+#ipdb.set_trace()
 mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
 space = LagrangeFESpace(mesh, p = p)
 
@@ -162,4 +165,6 @@ A = bform.assembly()
 lform = LinearForm(space)
 F = ScalarSourceIntegrator(pde.source, q=3)
 lform.add_domain_integrator(F)
-b = lfrom.assembly()
+b = lform.assembly()
+print(b)
+print(A.toarray())

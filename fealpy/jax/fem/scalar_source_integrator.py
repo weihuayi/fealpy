@@ -39,7 +39,7 @@ class ScalarSourceIntegrator():
 
         phi = space.basis(bcs) #TODO: 考虑非重心坐标的情形
 
-        ps = mesh.bc_to_point(bcs, index=index)
+        ps = mesh.bc_to_point(bcs)
         val = f(ps)
 
         bb = jnp.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)

@@ -2,6 +2,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
+from .. import logger
+
 class LinearMeshCFEDof():
     def __init__(self, mesh, p):
         TD = mesh.top_dimension()
@@ -58,11 +60,15 @@ class LagrangeFESpace():
         if ctype == 'C':
             self.dof = LinearMeshCFEDof(mesh, p)
 
+        logger.info(f"Initialize space with {self.dof.number_of_global_dofs()} global dofs")
+
+        self.ftype = mesh.ftype
+        self.itype = mesh.itype
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
-    def number_of_local_dofs(self):
-        return self.dof.number_of_local_dofs()
+    def number_of_local_dofs(self, doftype='cell'):
+        return self.dof.number_of_local_dofs(doftype=doftype)
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()

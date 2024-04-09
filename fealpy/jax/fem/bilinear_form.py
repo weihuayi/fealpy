@@ -5,6 +5,8 @@ from scipy.sparse import csr_matrix
 import jax 
 import jax.numpy as jnp
 
+from .. import logger
+
 class BilinearForm:
     """
     @brief 试探函数和测试函数空间相同的双线性型
@@ -55,6 +57,7 @@ class BilinearForm:
         cell2dof = space.cell_to_dof()
         I = jnp.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
         J = jnp.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
-        self._M = csr_matrix((CM.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
+        self._M = csr_matrix((CM.ravel(), (I.ravel(), J.ravel())), shape=(gdof, gdof))
 
+        logger.info(f"Finished construct bilinear from matrix with shape {self._M.shape}.")
         return self._M

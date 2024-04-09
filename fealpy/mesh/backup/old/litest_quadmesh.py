@@ -3,10 +3,10 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse import triu, tril
 
-from fealpy.mesh.Mesh2d import Mesh2d
+from fealpy.mesh.backup.Mesh2d import Mesh2d
 
 class StructureQuadMesh1(Mesh2d):
-    def __init__(self, box, hx, hy, itype=np.int32, ftype=np.float):
+    def __init__(self, box, hx, hy, itype=np.int32, ftype=np.float64):
         self.box = box
         self.nx = hx.shape[0]
         self.ny = hy.shape[0]
@@ -58,7 +58,7 @@ class StructureQuadMesh1(Mesh2d):
         cellType = self.vtk_cell_type(etype)
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=np.int), cell]
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=np.int64), cell]
         cell[:, 0] = NV
 
         return node, cell.flatten(), cellType, len(cell)

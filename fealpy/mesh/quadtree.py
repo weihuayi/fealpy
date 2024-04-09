@@ -3,7 +3,7 @@ from scipy.sparse import coo_matrix
 from .quadrangle_mesh import QuadrangleMesh
 from ..common import ranges
 from .adaptive_tools import mark
-
+from .polygon_mesh import PolygonMesh
 
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
@@ -14,6 +14,7 @@ class Quadtree(QuadrangleMesh):
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=self.itype)
         self.child = -np.ones((NC, 4), dtype=self.itype)
+        self.cellLocation = np.array([0,NC],dtype=np.int_)
         self.meshType = 'quadtree'
 
     def leaf_cell_index(self):
@@ -236,6 +237,7 @@ class Quadtree(QuadrangleMesh):
 
             parent = self.parent
             child = self.child
+            cellLocation = self.cellLocation
 
             isLeafCell = self.is_leaf_cell()
 
@@ -323,6 +325,7 @@ class Quadtree(QuadrangleMesh):
             self.node = np.concatenate((node, edgeCenter, cellCenter), axis=0)
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
+            self.cellLocation = np.append(cellLocation,cellLocation[-1]+4*NCC)
             self.ds.reinit(N + NEC + NCC, cell)
 
     def coarsen_1(self, isMarkedCell=None, options={'disp': True}):
@@ -460,6 +463,7 @@ class Quadtree(QuadrangleMesh):
 
             parent = self.parent
             child = self.child
+            cellLocation = self.cellLocation
 
             isLeafCell = self.is_leaf_cell()
 
@@ -537,6 +541,7 @@ class Quadtree(QuadrangleMesh):
             self.node = np.concatenate((node, edgeCenter, cellCenter), axis=0)
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
+            self.cellLocation = np.append(cellLocation,cellLocation[-1]+4*NCC)
             self.ds.reinit(N + NEC + NCC, cell)
 
     def adaptive_coarsen(self, estimator, data=None):
