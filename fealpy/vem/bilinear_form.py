@@ -12,6 +12,7 @@ class BilinearForm:
         self.bintegrators = [] # 边界积分子
 
         self._M = None # 需要组装的矩阵 
+        self._K = None
 
     def add_domain_integrator(self, I) -> None:
         """
@@ -61,11 +62,15 @@ class BilinearForm:
 
         """
         space = self.space
-        cell2dof = space.cell_to_dof() 
         K = self.dintegrators[0].assembly_cell_matrix(space)
         for i in range(len(self.dintegrators))[1:]:
             self.dintegrators[i].assembly_cell_matrix(space, out=K)
+        self._K = K
+        return self._assembly(K)
 
+    def _assembly(self, K):
+        space = self.space
+        cell2dof = space.cell_to_dof() 
         f2 = lambda x: np.repeat(x, x.shape[0])
         f3 = lambda x: np.tile(x, x.shape[0])
         f4 = lambda x: x.flat
@@ -75,4 +80,5 @@ class BilinearForm:
         val = np.concatenate(list(map(f4, K)))
         gdof = space.number_of_global_dofs()
         self._M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float64)
-        return self._M 
+        return self._M
+
