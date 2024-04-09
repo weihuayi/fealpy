@@ -34,6 +34,7 @@ ScalarRobinSourceIntegrator = ScalarBoundarySourceIntegrator
 from .vector_diffusion_integrator import VectorDiffusionIntegrator
 from .vector_mass_integrator import VectorMassIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
+from .vector_epsilon_source_integrator import VectorEpsilonSourceIntegrator
 from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
 # Boundary integrator for vector case
