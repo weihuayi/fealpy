@@ -1,4 +1,5 @@
 import numpy as np
+from ctypes import c_void_p
 from PIL import Image
 from OpenGL.GL import *
 
@@ -40,19 +41,19 @@ class GLMesh:
 
         # 根据 node 数组的列数设置顶点的属性
         if self.node.shape[1] == 3:  # Only positions
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * self.node.itemsize, ctypes.c_void_p(0))
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * self.node.itemsize, c_void_p(0))
             glEnableVertexAttribArray(0)
         elif self.node.shape[1] == 5:  # Positions and texture coordinates
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, ctypes.c_void_p(0))
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, c_void_p(0))
             glEnableVertexAttribArray(0)
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, ctypes.c_void_p(3 * self.node.itemsize))
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, c_void_p(3 * self.node.itemsize))
             glEnableVertexAttribArray(1)
         elif self.node.shape[1] == 6:  # Positions, texture coordinates, and normals
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, ctypes.c_void_p(0))
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(0))
             glEnableVertexAttribArray(0)
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, ctypes.c_void_p(3 * self.node.itemsize))
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(3 * self.node.itemsize))
             glEnableVertexAttribArray(1)
-            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, ctypes.c_void_p(5 * self.node.itemsize))
+            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(5 * self.node.itemsize))
             glEnableVertexAttribArray(2)
 
         # Unbind the VBO and VAO
@@ -85,10 +86,11 @@ class GLMesh:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
         # Load the image data into the texture object
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
 
         # Generate mipmaps
         glGenerateMipmap(GL_TEXTURE_2D)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
 
         # Unbind the texture
         glBindTexture(GL_TEXTURE_2D, 0)
@@ -102,7 +104,7 @@ class GLMesh:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
         else:
-            glDrawArrays(GL_TRIANGLES, 0, int(len(self.node) / (self.node.shape[1])))
+            glDrawArrays(GL_TRIANGLES, 0, len(self.node))
 
     def draw_edge(self, shader_program):
         """
@@ -114,7 +116,7 @@ class GLMesh:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
         else:
-            glDrawArrays(GL_TRIANGLES, 0, int(len(self.node) / (self.node.shape[1])))
+            glDrawArrays(GL_TRIANGLES, 0, len(self.node))
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)  # 恢复默认模式
 
 

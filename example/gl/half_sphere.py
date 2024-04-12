@@ -11,17 +11,13 @@ from fealpy.plotter.gl import OpenGLPlotter, OCAMModel
 cmodel = OCAMModel()
 
 
-mesh = TriangleMesh.from_unit_sphere_surface(refine=0)
+mesh = TriangleMesh.from_unit_sphere_surface(refine=3)
 #mesh = TriangleMesh.from_cylinder_surface()
 #mesh = TriangleMesh.from_torus_surface(2, 1, 10, 10)
 
-mesh.to_vtk(fname='test.vtu')
-
 node = mesh.entity('node')
 cell = mesh.entity('cell')
-print(node.shape, node)
-print(cell.shape,  cell)
-"""
+
 bc = mesh.entity_barycenter('cell')
 cell = cell[bc[:, 2] > 0]
 
@@ -43,12 +39,8 @@ uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
 uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
 node = np.hstack((node, uv), dtype=np.float32)
-#node = node[cell].reshape(-1, 5)
 cell = np.array(cell, dtype=np.uint32)
-"""
-
-node = np.array(node, dtype=np.float32)
-cell = np.array(cell, dtype=np.uint32)
+vertices = node[cell].reshape(-1, node.shape[1])
 
 """
 # 定义顶点数据和UV坐标
@@ -67,5 +59,6 @@ cell = np.array([
 """
 
 plotter = OpenGLPlotter()
+#plotter.add_mesh(vertices, cell=None, texture_path='/home/why/frame1_0.jpg')
 plotter.add_mesh(node, cell=cell, texture_path='/home/why/frame1_0.jpg')
 plotter.run()
