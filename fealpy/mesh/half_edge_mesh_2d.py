@@ -2273,7 +2273,11 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         NC = self.number_of_cells()
 
         node = self.entity('node')
-        cell, cellLoc = self.ds.cell_to_node()
+        if self.ds.NV is None:
+            cell, cellLoc = self.ds.cell_to_node()
+        else:
+            cell = self.ds.cell_to_node()
+            cellLoc = np.arange(NC+1)*3
 
         if node.shape[1] == 2:
             node = np.c_[node, np.zeros((len(node), 1), dtype=np.float_)]
