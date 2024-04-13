@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 #get basic parameters
 ns = 16
-udegree = 2
+udegree= 2
 pdegree = 1
 T = 10
 nt = 500
@@ -44,43 +44,42 @@ p0 = pspace.function()
 p1 = pspace.function()
 
 source = uspace.interpolate(pde.source, dim=2)
-#ubc = DirichletBC(uspace, pde.velocity, pde.is_wall_boundary) 
-#pbc = DirichletBC(pspace, pde.pressure, pde.is_p_boundary) 
-ubc = DirichletBC(uspace, pde.velocity) 
-pbc = DirichletBC(pspace, pde.pressure) 
-
+ubc = DirichletBC(uspace, pde.velocity, pde.is_wall_boundary) 
+pbc = DirichletBC(pspace, pde.pressure, pde.is_p_boundary) 
+#ubc = DirichletBC(uspace, pde.velocity) 
+#pbc = DirichletBC(pspace, pde.pressure) 
 uso = uspace.interpolate(pde.velocity,2)
 pso = pspace.interpolate(pde.pressure)
 errorMatrix = np.zeros((4,nt),dtype=np.float64)
-for i in range(0, 1):
+
+for i in range(0, 10):
     t1 = timeline.next_time_level()
     print("time=", t1)
     
-    A0 = solver.ipcs_A_0(u0)
-    b0 = solver.ipcs_b_0(u0, p0, source)
-    #print(np.sum(np.abs(A0)))
-    print(np.sum(np.abs(b0)))
+    A0 = solver.ipcs_A_0(threshold=pde.is_p_boundary)
+    b0 = solver.ipcs_b_0(u0, p0, source, threshold=pde.is_p_boundary)
     A0,b0 = ubc.apply(A0,b0)
     us[:]= spsolve(A0, b0).reshape((2,-1))
     
     A1 = solver.ipcs_A_1() 
     b1 = solver.ipcs_b_1(us, p0)
     A1,b1 = pbc.apply(A1,b1)
-    p1[:] = spsolve(A1,b1)
-    
+    p1[:] = spsolve(A1,b1) 
+
     A2 = solver.ipcs_A_2() 
     b2 = solver.ipcs_b_2(us, p1, p0)
-    A2,b2 = ubc.apply(A2,b2)
     u1[:] = spsolve(A2,b2).reshape((2,-1))
     
-
-
     u0[:] = u1
+    p0[:] = p1
     errorMatrix[0,i] = mesh.error(pde.velocity, u1)
     errorMatrix[1,i] = mesh.error(pde.pressure, p1)
     errorMatrix[2,i] = np.abs(uso-u1).max()
     errorMatrix[3,i] = np.abs(pso-p1).max()
     timeline.advance()
+    print(errorMatrix[2,i])
+    print(np.max(u1))
+
 '''
 ipoint = mesh.interpolation_points(2)
 nx = ns

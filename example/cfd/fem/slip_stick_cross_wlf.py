@@ -68,7 +68,7 @@ def is_wall_boundary(p):
 def is_slip_boundary(p):    
     x = p[..., 0]
     y = p[..., 1]
-    x_minmax_bounds = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]#[[1,4],[7,10]]#[[1,3],[4,6],[7,9]]#
+    x_minmax_bounds = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
     x_minmax_bounds2 = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
     mn, mx = np.array(x_minmax_bounds).T
     mn2 ,mx2 = np.array(x_minmax_bounds2).T
