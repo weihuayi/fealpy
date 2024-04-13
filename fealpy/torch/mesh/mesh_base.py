@@ -1,5 +1,5 @@
 
-from typing import Union, TypeVar, Generic, Dict, Sequence
+from typing import Union, TypeVar, Generic, Dict, Sequence, overload
 import torch
 
 from .quadrature import Quadrature
@@ -35,6 +35,9 @@ class MeshDataStructureBase():
 
     def geo_dimension(self) -> int:
         raise NotImplementedError
+
+    GD = property(geo_dimension)
+    TD = property(top_dimension)
 
     def construct(self) -> None:
         raise NotImplementedError
@@ -107,6 +110,9 @@ class MeshBase(Generic[_MDS_co]):
     def top_dimension(self) -> int:
         return self.ds.top_dimension()
 
+    GD = property(geo_dimension)
+    TD = property(top_dimension)
+
     def number_of_cells(self) -> int:
         return self.ds.number_of_cells()
 
@@ -131,6 +137,8 @@ class MeshBase(Generic[_MDS_co]):
 
 
 class HomoMeshBase(MeshBase[_MDS_co]):
+    @overload
+    def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor: ...
     def entity_barycenter(self, etype: Union[int, str], index: Index=_S) -> Tensor:
         r"""@brief Get the barycenter of the entity.
 
