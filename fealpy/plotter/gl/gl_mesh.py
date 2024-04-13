@@ -133,11 +133,10 @@ class GLMesh:
 
         if mode == 3:
             if self.texture_id is not None and self.node.shape[1] == 5: 
-                logger.info(f"Bind the texture with texture_id {self.texture_id} and texture_unit {self.texture_unit}!")
                 glActiveTexture(GL_TEXTURE0 + self.texture_unit)
                 glBindTexture(GL_TEXTURE_2D, self.texture_id)
-                glUniform1i(glGetUniformLocation(shader_program,
-                    "textureSampler"), self.texture_unit)
+                glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), self.texture_unit)
+                logger.info(f"Bind the texture with texture_id {self.texture_id} and texture_unit {self.texture_unit}!")
             self.draw_face(shader_program)
         elif mode == 2:
             self.draw_edge(shader_program) # 先画边，后画面
@@ -148,9 +147,9 @@ class GLMesh:
             self.draw_face(shader_program)
 
         glBindVertexArray(0)
-        if self.texture_id is not None:
-            glBindTexture(GL_TEXTURE_2D, 0)
         if self.cell is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        if self.texture_id is not None:
+            glBindTexture(GL_TEXTURE_2D, 0)
 
 
