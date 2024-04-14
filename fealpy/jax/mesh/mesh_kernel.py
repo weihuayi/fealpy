@@ -47,7 +47,7 @@ def simplex_shape_function(bcs, mi, p):
 @partial(jax.jit, static_argnums=(2, 3))
 def diff_simplex_shape_function(bcs, mi, p, n): 
     return jax.vmap(
-            _grad_simplex_shape_function, 
+            _diff_simplex_shape_function, 
             in_axes=(0, None, None, None)
             )(bcs, mi, p, n)
 
