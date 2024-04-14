@@ -1,5 +1,5 @@
 
-from typing import Union, TypeVar, Generic, Dict, Sequence, overload
+from typing import Union, TypeVar, Generic, Dict, Sequence, overload, Callable
 import torch
 
 from .quadrature import Quadrature
@@ -8,6 +8,7 @@ Tensor = torch.Tensor
 Index = Union[Tensor, int, slice]
 Entity = Union[Tensor, Sequence[Tensor]]
 _S = slice(None, None, None)
+_int_func = Callable[..., int]
 
 
 class MeshDataStructureBase():
@@ -29,18 +30,6 @@ class MeshDataStructureBase():
             self._entity_storage[etype_dim] = value
         else:
             super().__setattr__(name, value)
-
-    def top_dimension(self) -> int:
-        raise NotImplementedError
-
-    def geo_dimension(self) -> int:
-        raise NotImplementedError
-
-    GD = property(geo_dimension)
-    TD = property(top_dimension)
-
-    def construct(self) -> None:
-        raise NotImplementedError
 
     # Get the entity's top dimension from its name.
     def _entity_str2dim(self, etype: str) -> int:
@@ -65,6 +54,21 @@ class MeshDataStructureBase():
         else:
             raise ValueError(f'{etype_dim} is not a valid entity dimension.')
 
+    ### properties
+    def top_dimension(self) -> int:
+        raise NotImplementedError
+    TD = property(top_dimension)
+
+    ### counters
+    number_of_nodes: _int_func = lambda self: len(self._dim2entity(0))
+    number_of_edges: _int_func = lambda self: len(self._dim2entity(1))
+    number_of_faces: _int_func = lambda self: len(self._dim2entity(self.top_dimension() - 1))
+    number_of_cells: _int_func = lambda self: len(self._dim2entity(self.top_dimension()))
+
+    ### constructors
+    def construct(self) -> None:
+        raise NotImplementedError
+
     def entity(self, etype: Union[int, str], index: Index=_S) -> Entity:
         r"""@brief Get entities in mesh structure.
 
@@ -84,18 +88,68 @@ class MeshDataStructureBase():
     def total_edge(self) -> Entity:
         raise NotImplementedError
 
-    def number_of_nodes(self) -> int:
-        return len(self._dim2entity(0))
+    ### topology
+    def cell_to_node(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def cell_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def cell_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def cell_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def face_to_node(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def face_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def face_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def face_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def edge_to_node(self, index: Index=_S, return_indices=False) -> Tensor:
+        if return_indices:
+            pass
+        else:
+            return self.entity(1, index=index)
 
-    def number_of_edges(self) -> int:
-        return len(self._dim2entity(1))
+class HomoMeshDataStructure(MeshDataStructureBase):
+    ccw: Tensor
+    localEdge: Tensor
+    localFace: Tensor
 
-    def number_of_faces(self) -> int:
-        return len(self._dim2entity(self.top_dimension() - 1))
+    def __init__(self, num_nodes: int, cell: Tensor) -> None:
+        super().__init__()
+        self.reinit(num_nodes, cell)
 
-    def number_of_cells(self) -> int:
-        return len(self._dim2entity(self.top_dimension()))
+    def reinit(self, num_nodes: int, cell: Tensor) -> None:
+        self.num_nodes = num_nodes
+        self.cell = cell
 
+    @property
+    def itype(self):
+        return self.cell.dtype
+
+    @property
+    def device(self):
+        return self.cell.device
+
+    number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
+    number_of_nodes_of_cells = number_of_vertices_of_cells
+    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
+    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
+    number_of_vertices_of_faces: _int_func = lambda self: self.localFace.shape[-1]
+    number_of_vertices_of_edges: _int_func = lambda self: self.localEdge.shape[-1]
+
+    def total_face(self) -> Tensor:
+        NVF = self.number_of_faces_of_cells()
+        cell = self.entity(self.TD)
+        local_face = self.localFace
+        total_face = cell[..., local_face].reshape(-1, NVF)
+        return total_face
+
+    def total_edge(self) -> Tensor:
+        NVE = self.number_of_vertices_of_edges()
+        cell = self.entity(self.TD)
+        local_edge = self.localEdge
+        total_edge = cell[..., local_edge].reshape(-1, NVE)
+        return total_edge
+
+    @overload
+    def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor: ...
+    def construct(self) -> None:
+        NC = self.number_of_cells()
+        total_face = self.total_face()
 
 _MDS_co = TypeVar('_MDS_co', bound=MeshDataStructureBase, covariant=True)
 
@@ -105,7 +159,7 @@ class MeshBase(Generic[_MDS_co]):
     node: Tensor
 
     def geo_dimension(self) -> int:
-        return self.ds.geo_dimension()
+        return self.node.shape[-1]
 
     def top_dimension(self) -> int:
         return self.ds.top_dimension()
