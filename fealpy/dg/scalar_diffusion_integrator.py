@@ -10,6 +10,10 @@ ScaledMonomialSpace = ScaledMonomialSpace2d
 
 
 class ScalarDiffusionIntegrator():
+    r"""Scalar diffusion integrator
+
+        $$(\nabla v, \nabla u)_\Omega$$
+    """
     def __init__(self, c: Union[float, NDArray, None]=None, q: Optional[int]=None) -> None:
         self.coef = c
         self.q = q

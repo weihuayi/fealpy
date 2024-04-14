@@ -9,8 +9,11 @@ from ..functionspace import ScaledMonomialSpace2d, ScaledMonomialSpace3d
 ScaledMonomialSpace = ScaledMonomialSpace2d
 
 
-class ScalerSourceIntegrator():
-    r"""Scalar source integrator."""
+class ScalarSourceIntegrator():
+    r"""Scalar source integrator.
+
+        $$(v, f)_\Omega$$
+    """
     def __init__(self, source, c: Union[float, NDArray, None]=None, q: Optional[int]=None) -> None:
         self.source = source
         self.q = q
