@@ -2,6 +2,7 @@
 from typing import Union, TypeVar, Generic, Dict, Sequence, overload, Callable
 import torch
 
+from . import functional as F
 from .quadrature import Quadrature
 
 Tensor = torch.Tensor
@@ -98,10 +99,19 @@ class MeshDataStructureBase():
     def face_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
     def face_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
     def edge_to_node(self, index: Index=_S, return_indices=False) -> Tensor:
+        entity = self.entity(1, index=index)
         if return_indices:
-            pass
+            return F.homo_mesh_top_coo_indices(entity, self.number_of_nodes())
         else:
-            return self.entity(1, index=index)
+            return entity
+    def edge_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def edge_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def edge_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def node_to_node(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def node_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def node_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def node_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
+
 
 class HomoMeshDataStructure(MeshDataStructureBase):
     ccw: Tensor
