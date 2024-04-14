@@ -24,9 +24,10 @@ class ScalarInteriorPenaltyIntegrator:
         # 组装罚项矩阵
         NC = mesh.number_of_cells()
         NE = mesh.number_of_edges()
+        TD = mesh.top_dimension()
 
         isEdgeDof = (mesh.multi_index_matrix(p, 2) == 0) 
-        cell2edge = mesh.ds.cell2edge
+        cell2edge = mesh.ds.cell2edge #TODO: 增加接口
         NEC = mesh.ds.localEdge.shape[0]
 
         edge2cell = mesh.ds.edge2cell
@@ -38,7 +39,7 @@ class ScalarInteriorPenaltyIntegrator:
         ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
         edof = space.number_of_local_dofs(doftype='edge') # 单元边上的自由度
         ndof = ldof - edof
-        edge2dof = jnp.zeros((NE, edof + 2*ndof), dtype=jnp.int64)
+        face2dof = space.face_to_dof() 
         
         qf = mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -52,7 +53,6 @@ class ScalarInteriorPenaltyIntegrator:
         val1 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
         # 每个积分点、每个边、每个基函数二阶法向导数
         val2 = jnp.zeros((NQ, NE, edof + 2*ndof), dtype=jnp.float_)
-        TD = mesh.top_dimension()
         
         edge2cell = mesh.ds.edge2cell
         isBdEdge = edge2cell[:, 0] == edge2cell[:, 1] # 边界边

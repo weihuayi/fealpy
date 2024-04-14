@@ -31,11 +31,11 @@ class LinearMeshCFEDof():
         isBdDof[face2dof] = True
         return isBdDof
 
-    def face_to_dof(self, index=np.s_[:]):
-        return self.mesh.face_to_ipoint(self.p, index=index)
-
     def edge_to_dof(self, index=np.s_[:]):
         return self.mesh.edge_to_ipoint(self.p, index=index)
+
+    def face_to_dof(self, index=np.s_[:]):
+        return self.mesh.face_to_ipoint(self.p, index=index)
 
     def cell_to_dof(self, index=np.s_[:]):
         return self.mesh.cell_to_ipoint(self.p, index=index)
@@ -73,8 +73,14 @@ class LagrangeFESpace():
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
     def cell_to_dof(self):
         return self.dof.cell2dof
+
+    def face_to_dof(self):
+        return self.dof.face_to_dof()
 
     def basis(self, bc, index=jnp.s_[:], variable='u'):
         return self.mesh.shape_function(bc, p=self.p, variable=variable)
