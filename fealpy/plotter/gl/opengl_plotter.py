@@ -69,7 +69,7 @@ class OpenGLPlotter:
         #version 460 core
         in vec2 TexCoords;
 
-        uniform int mode;  // 0: 显示面，1: 显示边，2: 显示面和边，3：显示纹理
+        uniform int mode;  // 0: 显示面 1: 显示边 2: 显示面和边 3: 如果有纹理数据显示纹理
         uniform vec4 faceColor;
         uniform vec4 edgeColor;
         uniform sampler2D textureSampler;
@@ -92,6 +92,7 @@ class OpenGLPlotter:
         # 编译着色器
         self.shader_program = self.create_shader_program()
 
+        # 设置鼠标键盘回调函数
         glfw.set_key_callback(self.window, self.key_callback)
         glfw.set_cursor_pos_callback(self.window, self.mouse_callback)
         glfw.set_mouse_button_callback(self.window, self.mouse_button_callback)

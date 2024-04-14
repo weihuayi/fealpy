@@ -39,14 +39,14 @@ class LinearForm:
         else:
             return self._V.copy()
 
-    def assembly(self):
+    def assembly(self, q = None):
         """
         @brief 数值积分组装
         """
         space = self.space
-        bb = self.dintegrators[0].assembly_cell_vector(space)
+        bb = self.dintegrators[0].assembly_cell_vector(space, q=q)
         for i in range(len(self.dintegrators))[1:]:
-            bb += self.dintegrators[i].assembly_cell_vector(space)
+            bb += self.dintegrators[i].assembly_cell_vector(space, q = q)
         gdof = space.number_of_global_dofs()
         self._V = np.bincount(np.concatenate(space.dof.cell2dof), weights=bb, minlength=gdof)
         return self._V
