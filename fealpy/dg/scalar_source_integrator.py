@@ -1,5 +1,5 @@
 
-from typing import Union, Optional
+from typing import Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
@@ -9,34 +9,35 @@ from ..functionspace import ScaledMonomialSpace2d, ScaledMonomialSpace3d
 ScaledMonomialSpace = ScaledMonomialSpace2d
 
 
-class ScalarDiffusionIntegrator():
-    def __init__(self, c: Union[float, NDArray, None]=None, q: Optional[int]=None) -> None:
-        self.coef = c
+class ScalerSourceIntegrator():
+    r"""Scalar source integrator."""
+    def __init__(self, source, c: Union[float, NDArray, None]=None, q: Optional[int]=None) -> None:
+        self.source = source
         self.q = q
+        self.coef = c
 
-    def assembly_cell_matrix(self, space: ScaledMonomialSpace, out: Optional[NDArray]=None) -> NDArray:
+    def assembly_cell_vector(self, space: ScaledMonomialSpace, out=None):
         mesh: PolygonMesh = space.mesh
         coef = self.coef
         q = self.q or space.p + 1
 
         def func(x, *args):
-            gphi = space.grad_basis(x) # (NQ, NC, ldof, GD)
-            NQ, NC, _, GD = gphi.shape
+            gval = self.source(x)
+            phi = space.basis(x) # (NQ, NC, ldof)
+            NQ, NC, _ = phi.shape
 
             if coef is None:
-                return np.einsum('qcid, qcjd -> qcij', gphi, gphi)
+                return np.einsum('qc, qcj -> qcj', gval, phi)
             elif np.isscalar(coef):
-                return np.einsum('qcid, qcjd -> qcij', gphi, gphi) * coef
+                return np.einsum('qc, qcj -> qcj', gval, phi) * coef
             elif isinstance(coef, np.ndarray):
                 if coef.shape == (NC, ):
                     coef_subs = 'c'
                 elif coef.shape == (NQ, NC):
                     coef_subs = 'qc'
-                elif coef.shape == (GD, GD):
-                    coef_subs = 'ij'
                 else:
                     raise ValueError(f'coef.shape = {coef.shape} is not supported.')
-                return np.einsum(f'{coef_subs}, qcid, qcjd -> qcij', coef, gphi, gphi)
+                return np.einsum(f'{coef_subs}, qc, qcj -> qcj', coef, gval, phi)
             else:
                 raise ValueError(f'coef type {type(coef)} is not supported.')
 
