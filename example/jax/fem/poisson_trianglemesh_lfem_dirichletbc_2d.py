@@ -5,6 +5,7 @@ import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 import jax 
 import jax.numpy as jnp
@@ -115,7 +116,6 @@ class CosCosData:
         x = p[..., 0]
         return jnp.abs(x - 0.0) < 1e-12
 
-
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -162,9 +162,11 @@ L = ScalarLaplaceIntegrator()
 bform.add_domain_integrator(L)
 A = bform.assembly()
 
+x = pde.solution(mesh.interpolation_points(p=p))
 lform = LinearForm(space)
-F = ScalarSourceIntegrator(pde.source, q=3)
+F = ScalarSourceIntegrator(pde.source, q=p+3)
 lform.add_domain_integrator(F)
 b = lform.assembly()
 print(b)
 print(A.toarray())
+

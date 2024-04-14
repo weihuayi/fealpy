@@ -978,6 +978,7 @@ class TetrahedronMesh(Mesh, Plotable):
                 fval[cell] = fval0 
                 ret["nodedata"].append(fval)
         return ret
+
     def uniform_refine(self, n=1, returnim=False):
         """
         Perform uniform refinement on the tetrahedral mesh.
