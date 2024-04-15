@@ -12,6 +12,10 @@ _S = slice(None, None, None)
 _int_func = Callable[..., int]
 
 
+##################################################
+### Mesh Data Structure Base
+##################################################
+
 class MeshDataStructureBase():
     def __init__(self) -> None:
         self._entity_storage: Dict[int, Entity] = {}
@@ -90,27 +94,27 @@ class MeshDataStructureBase():
         raise NotImplementedError
 
     ### topology
-    def cell_to_node(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def cell_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def cell_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def cell_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def face_to_node(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def face_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def face_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def face_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def cell_to_node(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def cell_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def cell_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def cell_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def face_to_node(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def face_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def face_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def face_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
     def edge_to_node(self, index: Index=_S, return_indices=False) -> Tensor:
         entity = self.entity(1, index=index)
         if return_indices:
             return F.homo_mesh_top_coo_indices(entity, self.number_of_nodes())
         else:
             return entity
-    def edge_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def edge_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def edge_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def node_to_node(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def node_to_edge(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def node_to_face(self, index: Index=_S) -> Tensor: raise NotImplementedError
-    def node_to_cell(self, index: Index=_S) -> Tensor: raise NotImplementedError
+    def edge_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def edge_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def edge_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def node_to_node(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def node_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def node_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def node_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
 
 
 class HomoMeshDataStructure(MeshDataStructureBase):
@@ -163,6 +167,10 @@ class HomoMeshDataStructure(MeshDataStructureBase):
 
 _MDS_co = TypeVar('_MDS_co', bound=MeshDataStructureBase, covariant=True)
 
+
+##################################################
+### Mesh Base
+##################################################
 
 class MeshBase(Generic[_MDS_co]):
     ds: _MDS_co
