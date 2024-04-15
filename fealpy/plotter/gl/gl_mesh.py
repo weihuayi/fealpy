@@ -2,6 +2,7 @@ import numpy as np
 from ctypes import c_void_p
 from PIL import Image
 from OpenGL.GL import *
+from OpenGL.arrays import vbo
 
 from fealpy import logger
 import ipdb
@@ -23,6 +24,7 @@ class GLMesh:
         self.texture_path = texture_path
         self.texture_id = None
         self.texture_unit = texture_unit
+
         self.vao = glGenVertexArrays(1)
         self.vbo = glGenBuffers(1)
         self.ebo = None if self.cell is None else glGenBuffers(1)
@@ -35,30 +37,37 @@ class GLMesh:
         glBufferData(GL_ARRAY_BUFFER, self.node.nbytes, self.node, GL_STATIC_DRAW)
 
         # If cell data is provided, bind and set EBO
-        if self.cell is not None:
+        if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.cell.nbytes, self.cell, GL_STATIC_DRAW)
 
         # 根据 node 数组的列数设置顶点的属性
         if self.node.shape[1] == 3:  # Only positions
+            glEnableVertexAttribArray(0)
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * self.node.itemsize, c_void_p(0))
-            glEnableVertexAttribArray(0)
         elif self.node.shape[1] == 5:  # Positions and texture coordinates
+            glEnableVertexAttribArray(0)
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, c_void_p(0))
-            glEnableVertexAttribArray(0)
+
+            glEnableVertexAttribArray(1)
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, c_void_p(3 * self.node.itemsize))
-            glEnableVertexAttribArray(1)
+
         elif self.node.shape[1] == 6:  # Positions, texture coordinates, and normals
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(0))
             glEnableVertexAttribArray(0)
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(3 * self.node.itemsize))
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(0))
+
             glEnableVertexAttribArray(1)
-            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(5 * self.node.itemsize))
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(3 * self.node.itemsize))
+
             glEnableVertexAttribArray(2)
+            glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(5 * self.node.itemsize))
 
         # Unbind the VBO and VAO
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
+
+        if self.ebo is not None:
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
         # Load texture if provided
         if self.texture_path:
@@ -100,7 +109,7 @@ class GLMesh:
         @brief 画面
         """
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 0)
-        if self.cell is not None:
+        if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
         else:
@@ -112,7 +121,7 @@ class GLMesh:
         """
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 1)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)  # 绘制线框
-        if self.cell is not None:
+        if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
         else:
@@ -147,7 +156,7 @@ class GLMesh:
             self.draw_face(shader_program)
 
         glBindVertexArray(0)
-        if self.cell is not None:
+        if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
         if self.texture_id is not None:
             glBindTexture(GL_TEXTURE_2D, 0)
