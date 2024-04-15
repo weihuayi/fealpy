@@ -42,6 +42,6 @@ class ScalarSourceIntegrator():
         ps = mesh.bc_to_point(bcs)
         val = f(ps)
 
-        bb = jnp.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
+        bb = jnp.einsum('q, qc, qi, c->ci', ws, val, phi, cellmeasure, optimize=True)
         return bb 
         

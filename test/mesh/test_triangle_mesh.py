@@ -108,6 +108,41 @@ def test_from_ellipsolid_surface():
         mesh.add_plot(axes)
         plt.show()
 
+def dis(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(len(x), dtype=np.float64)
+    val[np.abs(y-0.5)<1e-5] = 1
+    return val
+
+def test_interplation_weith_HB():
+    from fealpy.functionspace import LagrangeFESpace
+
+    mesh = TriangleMesh.from_unit_square()
+    space = LagrangeFESpace(mesh, p=1)
+    u = space.function()
+
+    # 获取网格单元数
+    NC = mesh.number_of_cells()
+
+    H = np.zeros(NC, dtype=np.float64)
+
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+
+    u[:] = dis(node)
+    H = np.sum(u[:][cell], axis=-1)
+
+    cell2dof = mesh.cell_to_ipoint(p=1)
+    isMarkedCell = np.abs(np.sum(u[cell2dof], axis=-1)) > 1.5
+
+    data = {'uh': u, 'H': H}
+    option = mesh.bisect_options(disp=False, data=data)
+    mesh.bisect(isMarkedCell, options=option)
+
+    space = LagrangeFESpace(mesh, p=1)
+    Nu = option['data']['uh']
+    NH = option['data']['H']
 
 
 if __name__ == "__main__":

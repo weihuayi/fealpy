@@ -60,9 +60,8 @@ class VectorBoundarySourceIntegrator:
         NQ = len(ws)
 
         phi = space[0].face_basis(bcs, index=index) # (NQ, NF, ldof)
-
         if callable(source):
-            if ~hasattr(source, 'coordtype') or source.coordtype == 'cartesian':
+            if source.coordtype == 'cartesian':
                 n = mesh.face_unit_normal(index=index)
                 ps = mesh.bc_to_point(bcs, index=index)
                 # 在实际问题当中，法向 n  这个参数一般不需要
@@ -71,8 +70,7 @@ class VectorBoundarySourceIntegrator:
             elif source.coordtype == 'barycentric':
                 val = source(bcs, index=index)
         else:
-            val = source 
-
+            val = source
         if isinstance(val, np.ndarray):
             if val.shape == (GD, ): # 假设 GD << NC
                     bb += np.einsum('q, d, qfi, f->fid', ws, val, phi, facemeasure, optimize=True)

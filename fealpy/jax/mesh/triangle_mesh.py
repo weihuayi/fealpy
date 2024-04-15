@@ -240,16 +240,16 @@ class TriangleMesh(MeshBase):
 
     def cell_to_ipoint(self, p, index=jnp.s_[:]):
         """
-        @brief 
+        @brief  获得 p 次 Lagrange 元的插值点编号
         """
         cell = self.entity('cell')
         if p==1:
             return cell[index]
 
         mi = self.multi_index_matrix(p, 2)
-        idx0, = jnp.nonzero(mi[:, 0] == 0)
-        idx1, = jnp.nonzero(mi[:, 1] == 0)
-        idx2, = jnp.nonzero(mi[:, 2] == 0)
+        idx0, = np.nonzero(mi[:, 0] == 0)
+        idx1, = np.nonzero(mi[:, 1] == 0)
+        idx2, = np.nonzero(mi[:, 2] == 0)
 
         edge2cell = self.ds.edge2cell
         NN = self.number_of_nodes()

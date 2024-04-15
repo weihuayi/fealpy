@@ -13,7 +13,7 @@ from ..fem import BilinearForm, MixedBilinearForm
 from ..fem import LinearForm
 from ..fem import VectorSourceIntegrator, ScalarSourceIntegrator
 from ..fem import VectorConvectionIntegrator, VectorEpsilonSourceIntegrator
-
+from ..fem import VectorBoundarySourceIntegrator, FluidBoundaryFrictionIntegrator
 
 class NSFEMSolver:
     def __init__(self, mesh, dt, uspace, pspace, rho=1.0, mu=1.0, q=5):
@@ -151,9 +151,10 @@ class NSFEMSolver:
         return b
     
     # 求解中间速度u_star
-    def ipcs_A_0(self, mu=None, rho=None):
+    def ipcs_A_0(self, mu=None, rho=None, threshold=None):
         dt = self.dt
         if rho is None:
+            rho = self.rho
             M = self.M
         else:
             bform = BilinearForm((self.uspace,)*2)
@@ -167,11 +168,17 @@ class NSFEMSolver:
             bform.add_domain_integrator(VectorViscousWorkIntegrator(mu=mu, q=self.q))
             S = bform.assembly()
             self.epS = S
-         
         A = M + dt*S
+        
+        if threshold is not None:
+            bform = BilinearForm((self.uspace,)*2)
+            bform.add_boundary_integrator(FluidBoundaryFrictionIntegrator(mu=self.mu, q=self.q, threshold=threshold))
+            B = bform.assembly()
+            self.bfS = B
+            A -= dt*0.5*B
         return A
 
-    def ipcs_b_0(self, un, p0, source,rho=None):
+    def ipcs_b_0(self, un, p0, source,rho=None, threshold=None):
         dt = self.dt
         
         if rho is None:
@@ -192,14 +199,30 @@ class NSFEMSolver:
                 return rho * result
         
         @barycentric
-        def coefp(bcs, index): 
+        def coefp(bcs, index):
             result = np.repeat(p0(bcs,index)[...,np.newaxis], 2, axis=-1)
+            return dt*result
+        
+        @barycentric
+        def coefp(bcs, index):
+            result = np.repeat(p0(bcs,index)[...,np.newaxis], 2, axis=-1)
+            return dt*result
+        
+        @barycentric
+        def coefpn(ebcs, index):
+            val = p0(ebcs,index=index)
+            n = self.mesh.face_unit_normal(index=index)
+            result = np.einsum('ij,jk->ijk',val,n)
+            return -dt*result
         
         L = LinearForm((self.uspace,)*2)
         L.add_domain_integrator(VectorSourceIntegrator(coef, q=self.q))
         L.add_domain_integrator(VectorEpsilonSourceIntegrator(coefp, q=self.q))
+        if threshold is not None:
+            L.add_boundary_integrator(VectorBoundarySourceIntegrator(coefpn, q=self.q, threshold=threshold))
         b = L.assembly()
-        b -= 0.5*dt*self.epS@un.flatten() 
+        b -= dt*self.epS@un.flatten() 
+        b += 0.5*dt*self.bfS@un.flatten() 
         return b
 
     # 求压力
