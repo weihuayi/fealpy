@@ -2288,6 +2288,7 @@ class TriangleMesh(Mesh, Plotable):
     def from_ellipsoid_surface(cls, ntheta=10, nphi=10, 
             radius=(1, 1, 1), 
             theta=(np.pi/4, 3*np.pi/4), 
+            phi=None,
             returnuv=False
             ):
         """
@@ -2303,14 +2304,23 @@ class TriangleMesh(Mesh, Plotable):
         """
 
         a, b, c = radius
-        NN = (ntheta+1)*nphi 
+        if phi is None: # 默认为一封闭的带状区域
+            NN = (ntheta+1)*nphi 
+        else: # 否则为四边形区域
+            NN = (ntheta+1)*(nphi + 1)
+
         NC = ntheta*nphi
 
-        U, V = np.mgrid[
-                theta[0]:theta[1]:(ntheta+1)*1j,
-                0:2*np.pi:(nphi+1)*1j] 
-        U = U[:, 0:-1]
-        V = V[:, 0:-1]
+        if phi is None:
+            U, V = np.mgrid[
+                    theta[0]:theta[1]:(ntheta+1)*1j,
+                    0:2*np.pi:(nphi+1)*1j] 
+            U = U[:, 0:-1] # 去掉最后一列
+            V = V[:, 0:-1] # 去年最后一列
+        else:
+            U, V = np.mgrid[
+                    theta[0]:theta[1]:(ntheta+1)*1j,
+                    phi[0]:phi[1]:(nphi+1)*1j] 
 
 
         node = np.zeros((NN, 3), dtype=np.float64)
@@ -2322,8 +2332,11 @@ class TriangleMesh(Mesh, Plotable):
         node[:, 2] = Z.flatten()
 
         idx = np.zeros((ntheta+1, nphi+1), np.int_)
-        idx[:, 0:-1] = np.arange(NN).reshape(ntheta+1, nphi)
-        idx[:, -1] = idx[:, 0]
+        if phi is None:
+            idx[:, 0:-1] = np.arange(NN).reshape(ntheta+1, nphi)
+            idx[:, -1] = idx[:, 0]
+        else:
+            idx = np.arange(NN).reshape(ntheta+1, nphi+1)
         cell = np.zeros((2*NC, 3), dtype=np.int_)
         cell[0::2, 0] = idx[1:,0:-1].flatten(order='F')
         cell[0::2, 1] = idx[1:,1:].flatten(order='F')

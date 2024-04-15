@@ -59,7 +59,6 @@ cell = np.array([
 """
 
 plotter = OpenGLPlotter()
-plotter.add_mesh(vertices, cell=None, texture_path='/home/why/frame1_0.jpg')
-#ipdb.set_trace()
-#plotter.add_mesh(node, cell=cell, texture_path='/home/why/frame1_0.jpg')
+#plotter.add_mesh(vertices, cell=None, texture_path='/home/why/frame1_0.jpg')
+plotter.add_mesh(node, cell=cell, texture_path='/home/why/frame1_0.jpg')
 plotter.run()
