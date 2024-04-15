@@ -57,9 +57,10 @@ def edge_length(points):
 
 @partial(jax.jit, static_argnums=(2, ))
 def edge_to_ipoint(edges, indices, p):
+    NN = jnp.max(edges[:, ])+1
     return jnp.hstack([
         edges[:, 0].reshape(-1, 1), (p-1)*indices.reshape(-1, 1) +
-        jnp.arange(p-1), edges[:, 1].reshape(-1, 1)])
+        jnp.arange(p-1)+ NN , edges[:, 1].reshape(-1, 1)])
 
 
 # triangle 

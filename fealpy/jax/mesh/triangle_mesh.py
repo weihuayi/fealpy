@@ -250,12 +250,12 @@ class TriangleMesh(MeshBase):
         idx0, = np.nonzero(mi[:, 0] == 0)
         idx1, = np.nonzero(mi[:, 1] == 0)
         idx2, = np.nonzero(mi[:, 2] == 0)
-
+        
         edge2cell = self.ds.edge2cell
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
-
+        
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoints(p)
         c2p = np.zeros((NC, ldof), dtype=self.itype)
@@ -268,7 +268,6 @@ class TriangleMesh(MeshBase):
 
         flag = edge2cell[:, 2] == 2
         c2p[edge2cell[flag, 0][:, None], idx2] = e2p[flag]
-
 
         iflag = edge2cell[:, 0] != edge2cell[:, 1]
 

@@ -39,7 +39,7 @@ class ScalarInteriorPenaltyIntegrator:
         ldof = space.number_of_local_dofs() # 单元上所有自由度的个数
         edof = space.number_of_local_dofs(doftype='edge') # 单元边上的自由度
         ndof = ldof - edof
-        face2dof = space.face_to_dof() 
+        edge2dof = jnp.zeros((NE, edof + 2*ndof), dtype=int)
         
         qf = mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()

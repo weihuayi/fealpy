@@ -250,7 +250,7 @@ class TriangleMesh(Mesh, Plotable):
         idx0, = np.nonzero(mi[:, 0] == 0)
         idx1, = np.nonzero(mi[:, 1] == 0)
         idx2, = np.nonzero(mi[:, 2] == 0)
-
+        
         edge2cell = self.ds.edge_to_cell()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -268,7 +268,6 @@ class TriangleMesh(Mesh, Plotable):
 
         flag = edge2cell[:, 2] == 2
         c2p[edge2cell[flag, 0][:, None], idx2] = e2p[flag]
-
 
         iflag = edge2cell[:, 0] != edge2cell[:, 1]
 
