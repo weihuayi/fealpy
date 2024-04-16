@@ -19,11 +19,11 @@ dtype = [("position", "float64", (2, )),
          ("pressure", "float64")]
 
 num=10
-np.random.seed(0)
+#np.random.seed(0)
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)
 particles['position'] = random_points
-print(random_points)
+#print(random_points)
 
 domain=[0,1,0,1]
 nx = 4
@@ -38,4 +38,6 @@ plt.scatter(particles["position"][:,0], particles["position"][:,1])
 #plt.show()
 
 solver = NSFlipSolver(particles, mesh)
-solver.e(particles["position"])
+e = solver.e(particles["position"])
+solver.NGP(particles["position"],e)
+solver.bilinear(particles["position"],e)

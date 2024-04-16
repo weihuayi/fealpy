@@ -21,9 +21,39 @@ class NSFlipSolver:
         cell = self.mesh.entity('cell')
         result = position - node[i,j,:]
         result += np.column_stack((i,j))
-        print(result)
         return result
 
 
-    def NGP(position):
-        pass
+    def NGP(self,position,e):
+        i0,j0 = self.mesh.cell_location(position)
+        epsilon = e[:,0]
+        eta = e[:,1]
+        num = len(epsilon)
+        distance0 = np.zeros((num,num))
+        distance1 = np.zeros((num,num))
+        for i in range(num):
+            distance0[i] = abs(i0-epsilon[i])
+            distance1[i] = abs(j0-eta[i])
+        distance = np.stack((distance0, distance1), axis=-1)
+        print(distance[0])
+        result = np.where(np.all(distance < 0.5, axis=-1), 1, 0)
+        print(result[0])
+        return result
+
+    def bilinear(self,position,e):
+        i0,j0 = self.mesh.cell_location(position)
+        epsilon = e[:,0]
+        eta = e[:,1]
+        num = len(epsilon)
+        distance0 = np.zeros((num,num))
+        distance1 = np.zeros((num,num))
+        for i in range(num):
+            distance0[i] = abs(i0-epsilon[i])
+            distance1[i] = abs(j0-eta[i])
+        distance = np.stack((distance0, distance1), axis=-1)
+        print(distance[0])
+        result = np.where(np.all(distance <= 1, axis=-1), (1-distance0)@(1-distance1), 0)
+        print(result[0])
+        return 0
+        
+         
