@@ -1,4 +1,6 @@
 
+import numpy as np
+
 from fealpy.dg import (
     ScalarDiffusionIntegrator,
     ScalarSourceIntegrator,
@@ -18,46 +20,50 @@ P = 1
 Q = P + 2
 
 pde = CosCosData()
-mesh_tri = TriangleMesh.from_box(box=pde.domain(), nx=16, ny=16)
+mesh_tri = TriangleMesh.from_box(box=pde.domain(), nx=128, ny=128)
 mesh = PolygonMesh.from_mesh(mesh_tri)
 is_bd_face = mesh.ds.boundary_face_flag()
 space = ScaledMonomialSpace2d(mesh, p=P)
 
 gamma = P * (P+1)
-fm = mesh.entity_measure('face')
+fm = np.sqrt(mesh.entity_measure('face'))
 
 bform = BilinearForm(space)
 bform.add_domain_integrator(ScalarDiffusionIntegrator(q=Q))
-# bform.add_domain_integrator(ScalerInterfaceIntegrator(q=Q))
-# bform.add_domain_integrator(ScalerInterfaceMassIntegrator(q=Q, c=gamma/fm)) # penalty
+bform.add_boundary_integrator(ScalerInterfaceIntegrator(q=Q))
+bform.add_boundary_integrator(ScalerInterfaceMassIntegrator(q=Q, c=gamma/fm)) # penalty
 A = bform.assembly()
 
-# lform = LinearForm(space)
-# lform.add_domain_integrator(ScalarSourceIntegrator(source=pde.source, q=Q))
-# lform.add_boundary_integrator(ScalarDirichletBoundarySourceIntegrator(source=pde.dirichlet, q=Q))
-# lform.add_boundary_integrator(ScalerBoundarySourceIntegrator(source=pde.dirichlet, q=Q, c=gamma/fm[is_bd_face]))  # penalty
-# F = lform.assembly()
+lform = LinearForm(space)
+lform.add_domain_integrator(ScalarSourceIntegrator(source=pde.source, q=Q))
+lform.add_boundary_integrator(ScalarDirichletBoundarySourceIntegrator(source=pde.dirichlet, q=Q))
+lform.add_boundary_integrator(ScalerBoundarySourceIntegrator(source=pde.dirichlet, q=Q, c=gamma/fm[is_bd_face]))  # penalty
+F = lform.assembly()
+
+from matplotlib import pyplot as plt
+
+# fig = plt.figure()
+# axes = fig.add_subplot(1, 1, 1)
+# axes.imshow(A.toarray(), cmap='rainbow')
+# plt.show()
+
+uh = space.function()
+uh[:] = spsolve(A, F)
+
+err = mesh.error(pde.solution, lambda x, index: uh(x, index))
+gerr = mesh.error(pde.gradient, lambda x, index: uh.grad_value(x, index))
+
+print(err, gerr)
 
 from matplotlib import pyplot as plt
 
 fig = plt.figure()
-axes = fig.add_subplot(1, 1, 1)
-axes.imshow(A.toarray())
+axes = fig.add_subplot(1, 1, 1, projection='3d')
+cell = mesh_tri.entity('cell')
+dof = mesh_tri.entity('node', index=cell).reshape(-1, 2)
+dof_to_cell = np.arange(cell.shape[0]).repeat(cell.shape[1])
+cax = axes.plot_trisurf(
+        dof[:, 0], dof[:, 1],
+        uh(dof, index=dof_to_cell), triangles=space.cell_to_dof(), cmap='rainbow', lw=0.1)
+
 plt.show()
-
-# uh = space.function()
-# uh[:] = spsolve(A, F)
-
-# err = mesh.error(pde.solution, lambda x, index: uh(x, index))
-# gerr = mesh.error(pde.gradient, lambda x, index: uh.grad_value(x, index))
-
-# print(err, gerr)
-
-
-# from matplotlib import pyplot as plt
-
-# fig = plt.figure()
-# axes = fig.add_subplot(1, 1, 1, projection='3d')
-# mesh_tri.show_function(axes, uh)
-
-# plt.show()
