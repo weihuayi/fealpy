@@ -26,6 +26,7 @@ class ScalerInterfaceIntegrator():
         in_face_flag = face2cell[:, 0] != face2cell[:, 1]
         fn = mesh.face_unit_normal()
         fm = mesh.entity_measure('face')
+        fm_in = fm[in_face_flag]
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.face_bc_to_point(bcs) #(NQ, NF, GD)
@@ -44,14 +45,14 @@ class ScalerInterfaceIntegrator():
 
         if coef is None:
             All = -np.einsum('q, qfi, qfj, f -> fij', ws, phil, gphil, fm, optimize=True) # (NF, ldof)
-            Arr = np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphir, fm[in_face_flag], optimize=True) # (in_NF, ldof)
-            Alr = -np.einsum('q, qfi, qfj, f -> fij', ws, phil[:, in_face_flag, :], gphir, fm[in_face_flag], optimize=True)
-            Arl = np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphil[:, in_face_flag, :], fm[in_face_flag], optimize=True)
+            Arr = np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphir, fm_in, optimize=True) # (in_NF, ldof)
+            Alr = -np.einsum('q, qfi, qfj, f -> fij', ws, phil[:, in_face_flag, :], gphir, fm_in, optimize=True)
+            Arl = np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphil[:, in_face_flag, :], fm_in, optimize=True)
         elif np.isscalar(coef):
             All = np.einsum('q, qfi, qfj, f -> fij', ws, phil, gphil, fm, optimize=True) * coef # (NF, ldof)
-            Arr = -np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphir, fm[in_face_flag], optimize=True) * coef # (in_NF, ldof)
-            Alr = np.einsum('q, qfi, qfj, f -> fij', ws, phil[:, in_face_flag, :], gphir, fm[in_face_flag], optimize=True) * coef
-            Arl = -np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphil[:, in_face_flag, :], fm[in_face_flag], optimize=True) * coef
+            Arr = -np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphir, fm_in, optimize=True) * coef # (in_NF, ldof)
+            Alr = np.einsum('q, qfi, qfj, f -> fij', ws, phil[:, in_face_flag, :], gphir, fm_in, optimize=True) * coef
+            Arl = -np.einsum('q, qfi, qfj, f -> fij', ws, phir, gphil[:, in_face_flag, :], fm_in, optimize=True) * coef
         elif isinstance(coef, np.ndarray):
             if coef.shape == (NF, ):
                 coef_subs = 'f'
@@ -59,10 +60,10 @@ class ScalerInterfaceIntegrator():
                 coef_subs = 'qf'
             else:
                 raise ValueError(f'coef.shape = {coef.shape} is not supported.')
-            All = -np.einsum(f'q, {coef_subs}, qfi, qfj -> fij', ws, coef, phil, gphil, optimize=True) # (NF, ldof)
-            Arr = np.einsum(f'q, {coef_subs}, qfi, qfj -> fij', ws, coef, phir, gphir, optimize=True) # (in_NF, ldof)
-            Alr = -np.einsum(f'q, {coef_subs}, qfi, qfj -> fij', ws, coef, phil[:, in_face_flag, :], gphir, optimize=True)
-            Arl = np.einsum(f'q, {coef_subs}, qfi, qfj -> fij', ws, coef, phir, gphil[:, in_face_flag, :], optimize=True)
+            All = -np.einsum(f'q, {coef_subs}, qfi, qfj, f -> fij', ws, coef, phil, gphil, fm, optimize=True) # (NF, ldof)
+            Arr = np.einsum(f'q, {coef_subs}, qfi, qfj, f -> fij', ws, coef, phir, gphir, fm_in, optimize=True) # (in_NF, ldof)
+            Alr = -np.einsum(f'q, {coef_subs}, qfi, qfj, f -> fij', ws, coef, phil[:, in_face_flag, :], gphir, fm_in, optimize=True)
+            Arl = np.einsum(f'q, {coef_subs}, qfi, qfj, f -> fij', ws, coef, phir, gphil[:, in_face_flag, :], fm_in, optimize=True)
         else:
             raise ValueError(f'coef type {type(coef)} is not supported.')
 
