@@ -11,18 +11,18 @@ ScaledMonomialSpace = ScaledMonomialSpace2d
 
 class ScalerInterfaceMassIntegrator():
     r"""Scalar boundary source integrator."""
-    def __init__(self, q: int, coef: Union[NDArray, float, None]=None) -> None:
+    def __init__(self, c: Union[NDArray, float, None]=None, q: Optional[int]=None) -> None:
         self.q = q
-        self.coef = coef
+        self.coef = c
 
-    def assembly_face_vector(self, space: ScaledMonomialSpace, out=None):
-        q = self.q
+    def assembly_cell_matrix(self, space: ScaledMonomialSpace, out=None):
+        q = self.q or space.p + 1
         coef = self.coef
         mesh: PolygonMesh = space.mesh
-        gdof = space.number_of_global_dofs()
+        NC = mesh.number_of_cells()
+        ldof = space.number_of_local_dofs()
 
-        index = mesh.ds.boundary_face_flag()
-        face2cell = mesh.ds.face_to_cell()[index, ...]
+        face2cell = mesh.ds.face_to_cell()
         in_face_flag = face2cell[:, 0] != face2cell[:, 1]
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.quadpts, qf.weights
@@ -30,36 +30,34 @@ class ScalerInterfaceMassIntegrator():
         NQ, NF, GD = ps.shape
 
         phil = space.basis(ps, index=face2cell[:, 0]) # (NQ, NF, ldof)
-        phir = space.basis(ps, index=face2cell[in_face_flag, 1]) # (NQ, in_NF, ldof)
+        phir = space.basis(ps[:, in_face_flag, :], index=face2cell[in_face_flag, 1]) # (NQ, in_NF, ldof)
 
         if coef is None:
-            Al = np.einsum('q, qfj, qfj -> fj', ws, phil, phil, optimize=True) # (NQ, ldof)
-            Ar = np.einsum('q, qfj, qfj -> fj', ws, phir, phir, optimize=True)
+            Al = np.einsum('q, qfi, qfj -> fij', ws, phil, phil, optimize=True) # (NQ, ldof, ldof)
+            Ar = np.einsum('q, qfi, qfj -> fij', ws, phir, phir, optimize=True)
         elif np.isscalar(coef):
-            Al = np.einsum('q, qfj, qfj -> fj', ws, phil, phil, optimize=True) * coef # (NQ, ldof)
-            Ar = np.einsum('q, qfj, qfj -> fj', ws, phir, phir, optimize=True) * coef
+            Al = np.einsum('q, qfi, qfj -> fij', ws, phil, phil, optimize=True) * coef # (NQ, ldof, ldof)
+            Ar = np.einsum('q, qfi, qfj -> fij', ws, phir, phir, optimize=True) * coef
         elif isinstance(coef, np.ndarray):
             if coef.shape == (NF, ):
-                coef_subs = 'c'
+                coef_subs = 'f'
+                coef_in = coef[in_face_flag]
             elif coef.shape == (NQ, NF):
-                coef_subs = 'qc'
-            elif coef.shape == (GD, GD):
-                coef_subs = 'ij'
+                coef_subs = 'qf'
+                coef_in = coef[:, in_face_flag]
             else:
                 raise ValueError(f'coef.shape = {coef.shape} is not supported.')
-            Al = np.einsum(f'q, {coef_subs}, qfj, qfj -> fj', ws, coef, phil, phil, optimize=True) # (NQ, ldof)
-            Ar = np.einsum(f'q, {coef_subs}, qfj, qfj -> fj', ws, coef, phir, phir, optimize=True)
+            Al = np.einsum(f'q, {coef_subs}, qfi, qfj -> fij', ws, coef, phil, phil, optimize=True) # (NQ, ldof, ldof)
+            Ar = np.einsum(f'q, {coef_subs}, qfi, qfj -> fij', ws, coef_in, phir, phir, optimize=True)
         else:
             raise ValueError(f'coef type {type(coef)} is not supported.')
 
-        cell2dof = space.cell_to_dof()
-
         if out is None:
-            F = np.zeros(gdof, dtype=mesh.ftype)
-            np.add.at(F, cell2dof[face2cell[:, 0]], Al)
-            np.add.at(F, cell2dof[face2cell[in_face_flag, 1]], Ar)
-            return F
+            M = np.zeros((NC, ldof, ldof), dtype=mesh.ftype)
+            np.add.at(M, face2cell[:, 0], Al)
+            np.add.at(M, face2cell[in_face_flag, 1], Ar)
+            return M
         else:
-            np.add.at(out, cell2dof[face2cell[:, 0]], Al)
-            np.add.at(out, cell2dof[face2cell[in_face_flag, 1]], Ar)
+            np.add.at(out, face2cell[:, 0], Al)
+            np.add.at(out, face2cell[in_face_flag, 1], Ar)
             return out

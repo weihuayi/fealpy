@@ -19,14 +19,14 @@ class ScalarSourceIntegrator():
         self.q = q
         self.coef = c
 
-    def assembly_cell_vector(self, space: ScaledMonomialSpace, out=None):
+    def assembly_cell_vector(self, space: ScaledMonomialSpace, out: Optional[NDArray]=None, **kwargs):
         mesh: PolygonMesh = space.mesh
         coef = self.coef
         q = self.q or space.p + 1
 
-        def func(x, *args):
-            gval = self.source(x)
-            phi = space.basis(x) # (NQ, NC, ldof)
+        def func(x, index):
+            gval = self.source(x) # TODO:
+            phi = space.basis(x, index=index) # (NQ, NC, ldof)
             NQ, NC, _ = phi.shape
 
             if coef is None:
@@ -44,7 +44,7 @@ class ScalarSourceIntegrator():
             else:
                 raise ValueError(f'coef type {type(coef)} is not supported.')
 
-        result = mesh.integral(func, q, celltype=True) # (NC, ldof, ldof)
+        result = mesh.integral(func, q, celltype=True) # (NC, ldof)
         if out is None:
             return result
         else:

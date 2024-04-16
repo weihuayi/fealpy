@@ -23,8 +23,8 @@ class ScalarDiffusionIntegrator():
         coef = self.coef
         q = self.q or space.p + 1
 
-        def func(x, *args):
-            gphi = space.grad_basis(x) # (NQ, NC, ldof, GD)
+        def func(x, index): # (NQ, SmallTri, GD)
+            gphi = space.grad_basis(x, index=index, scaled=True) # (NQ, SmallTri, ldof, GD)
             NQ, NC, _, GD = gphi.shape
 
             if coef is None:
@@ -36,8 +36,6 @@ class ScalarDiffusionIntegrator():
                     coef_subs = 'c'
                 elif coef.shape == (NQ, NC):
                     coef_subs = 'qc'
-                elif coef.shape == (GD, GD):
-                    coef_subs = 'ij'
                 else:
                     raise ValueError(f'coef.shape = {coef.shape} is not supported.')
                 return np.einsum(f'{coef_subs}, qcid, qcjd -> qcij', coef, gphi, gphi)
