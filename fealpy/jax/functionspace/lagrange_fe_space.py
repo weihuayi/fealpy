@@ -26,7 +26,8 @@ class LinearMeshCFEDof():
                 flag = threshold(bc)
                 index = index[flag]
 
-        face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
+        edge2dof = self.edge_to_dof(index=index) # 只获取指定的面的自由度信息
+        face2dof = self.edge_to_dof(index=index) # 只获取指定的面的自由度信息
         isBdDof = np.zeros(gdof, dtype=np.bool_)
         isBdDof[face2dof] = True
         return isBdDof
@@ -35,7 +36,7 @@ class LinearMeshCFEDof():
         return self.mesh.edge_to_ipoint(self.p, index=index)
 
     def face_to_dof(self, index=np.s_[:]):
-        return self.mesh.face_to_ipoint(self.p, index=index)
+        return self.mesh.edge_to_ipoint(self.p, index=index)
 
     def cell_to_dof(self, index=np.s_[:]):
         return self.mesh.cell_to_ipoint(self.p, index=index)
