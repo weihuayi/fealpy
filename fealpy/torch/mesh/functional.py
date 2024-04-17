@@ -14,17 +14,19 @@ def homo_mesh_top_coo(entity: Tensor, num_targets: int) -> Tensor:
         indices,
         torch.ones(num, dtype=torch.bool, device=entity.device),
         size=(num_source, num_targets),
-        **kwargs
+        dtype=torch.bool, device=entity.device
     )
 
 
 def homo_mesh_top_csr(entity: Tensor, num_targets: int) -> Tensor:
-    kwargs = {'dtype': entity.dtype, 'device': entity.device}
-    crow = torch.arange(entity.size(0) + 1, **kwargs) * entity.size(1)
+    device = entity.device
+    crow = torch.arange(
+        entity.size(0) + 1, dtype=entity.dtype, device=device
+    ).mul_(entity.size(1))
     return torch.sparse_csr_tensor(
         crow,
         entity.reshape(-1),
-        torch.ones(entity.numel(), dtype=torch.bool, device=entity.device),
+        torch.ones(entity.numel(), dtype=torch.bool, device=device),
         size=(entity.size(0), num_targets),
-        **kwargs
+        dtype=torch.bool, device=device
     )
