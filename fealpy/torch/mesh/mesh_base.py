@@ -1,5 +1,7 @@
 
-from typing import Union, TypeVar, Generic, Dict, Sequence, overload, Callable
+from typing import Union, Optional, TypeVar, Generic, Dict, Sequence, overload, Callable
+
+import numpy as np
 import torch
 
 from . import functional as F
@@ -10,6 +12,7 @@ Index = Union[Tensor, int, slice]
 Entity = Union[Tensor, Sequence[Tensor]]
 _S = slice(None, None, None)
 _int_func = Callable[..., int]
+_dtype = torch.dtype
 
 
 ##################################################
@@ -94,27 +97,26 @@ class MeshDataStructureBase():
         raise NotImplementedError
 
     ### topology
-    def cell_to_node(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def cell_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def cell_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def cell_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def face_to_node(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def face_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def face_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def face_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def edge_to_node(self, index: Index=_S, return_sparse=False) -> Tensor:
+    def cell_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def cell_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def cell_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def cell_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def face_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def face_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def face_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def face_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+
+    def edge_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor:
         entity = self.entity(1, index=index)
-        if return_sparse:
-            return F.homo_mesh_top_csr(entity, self.number_of_nodes())
-        else:
-            return entity
-    def edge_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def edge_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def edge_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def node_to_node(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def node_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def node_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
-    def node_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+        return F.mesh_top_csr(entity, self.number_of_nodes(), dtype=dtype)
+
+    def edge_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def edge_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def edge_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def node_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def node_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def node_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def node_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
 
 
 class HomoMeshDataStructure(MeshDataStructureBase):
@@ -162,8 +164,7 @@ class HomoMeshDataStructure(MeshDataStructureBase):
     @overload
     def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor: ...
     def construct(self) -> None:
-        NC = self.number_of_cells()
-        total_face = self.total_face()
+        pass
 
 _MDS_co = TypeVar('_MDS_co', bound=MeshDataStructureBase, covariant=True)
 

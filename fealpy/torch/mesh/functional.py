@@ -1,9 +1,15 @@
 
+from typing import Optional
+
 import torch
 from torch import Tensor
 
+_dtype = torch.dtype
 
-def homo_mesh_top_coo(entity: Tensor, num_targets: int) -> Tensor:
+
+def homo_mesh_top_coo(entity: Tensor, num_targets: int, *,
+                      dtype: Optional[_dtype]=None) -> Tensor:
+    r"""COOrdinate format of a homogeneous mesh topology relaionship matrix."""
     kwargs = {'dtype': entity.dtype, 'device': entity.device}
     num = entity.numel()
     num_source = entity.size(0)
@@ -12,21 +18,32 @@ def homo_mesh_top_coo(entity: Tensor, num_targets: int) -> Tensor:
     indices[1, :] = entity.reshape(-1)
     return torch.sparse_coo_tensor(
         indices,
-        torch.ones(num, dtype=torch.bool, device=entity.device),
+        torch.ones(num, dtype=dtype, device=entity.device),
         size=(num_source, num_targets),
-        dtype=torch.bool, device=entity.device
+        dtype=dtype, device=entity.device
     )
 
 
-def homo_mesh_top_csr(entity: Tensor, num_targets: int) -> Tensor:
+def mesh_top_csr(entity: Tensor, num_targets: int, location: Optional[Tensor]=None, *,
+                 dtype: Optional[_dtype]=None) -> Tensor:
+    r"""CSR format of a mesh topology relaionship matrix."""
     device = entity.device
-    crow = torch.arange(
-        entity.size(0) + 1, dtype=entity.dtype, device=device
-    ).mul_(entity.size(1))
+
+    if entity.ndim == 1: # for polygon case
+        if location is None:
+            raise ValueError('location is required for 1D entity (usually for polygon mesh).')
+        crow = location
+    elif entity.ndim == 2: # for homogeneous case
+        crow = torch.arange(
+            entity.size(0) + 1, dtype=entity.dtype, device=device
+        ).mul_(entity.size(1))
+    else:
+        raise ValueError('dimension of entity must be 1 or 2.')
+
     return torch.sparse_csr_tensor(
         crow,
         entity.reshape(-1),
-        torch.ones(entity.numel(), dtype=torch.bool, device=device),
+        torch.ones(entity.numel(), dtype=dtype, device=device),
         size=(entity.size(0), num_targets),
-        dtype=torch.bool, device=device
+        dtype=dtype, device=device
     )
