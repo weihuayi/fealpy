@@ -17,9 +17,9 @@ _int_func = Callable[..., int]
 ##################################################
 
 class MeshDataStructureBase():
-    def __init__(self) -> None:
+    def __init__(self, NN: int) -> None:
         self._entity_storage: Dict[int, Entity] = {}
-        self._initialized = True
+        self.NN = NN
 
     def __getattr__(self, name: str):
         if name not in {'cell', 'face', 'edge'}:
@@ -28,9 +28,9 @@ class MeshDataStructureBase():
         return self._dim2entity(etype_dim)
 
     def __setattr__(self, name: str, value: torch.Any) -> None:
-        if not hasattr(self, '_initialized'):
-            raise RuntimeError('please call super().__init__() before setting attributes.')
         if name in ('cell', 'face', 'edge'):
+            if not hasattr(self, '_entity_storage'):
+                raise RuntimeError('please call super().__init__() before setting attributes.')
             etype_dim = self._entity_str2dim(name)
             self._entity_storage[etype_dim] = value
         else:
@@ -65,7 +65,7 @@ class MeshDataStructureBase():
     TD = property(top_dimension)
 
     ### counters
-    number_of_nodes: _int_func = lambda self: len(self._dim2entity(0))
+    number_of_nodes: _int_func = lambda self: self.NN
     number_of_edges: _int_func = lambda self: len(self._dim2entity(1))
     number_of_faces: _int_func = lambda self: len(self._dim2entity(self.top_dimension() - 1))
     number_of_cells: _int_func = lambda self: len(self._dim2entity(self.top_dimension()))
@@ -94,27 +94,27 @@ class MeshDataStructureBase():
         raise NotImplementedError
 
     ### topology
-    def cell_to_node(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def cell_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def cell_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def cell_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def face_to_node(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def face_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def face_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def face_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def edge_to_node(self, index: Index=_S, return_indices=False) -> Tensor:
+    def cell_to_node(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def cell_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def cell_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def cell_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def face_to_node(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def face_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def face_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def face_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def edge_to_node(self, index: Index=_S, return_sparse=False) -> Tensor:
         entity = self.entity(1, index=index)
-        if return_indices:
-            return F.homo_mesh_top_coo_indices(entity, self.number_of_nodes())
+        if return_sparse:
+            return F.homo_mesh_top_csr(entity, self.number_of_nodes())
         else:
             return entity
-    def edge_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def edge_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def edge_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def node_to_node(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def node_to_edge(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def node_to_face(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
-    def node_to_cell(self, index: Index=_S, return_indices=False) -> Tensor: raise NotImplementedError
+    def edge_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def edge_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def edge_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def node_to_node(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def node_to_edge(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def node_to_face(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
+    def node_to_cell(self, index: Index=_S, return_sparse=False) -> Tensor: raise NotImplementedError
 
 
 class HomoMeshDataStructure(MeshDataStructureBase):
