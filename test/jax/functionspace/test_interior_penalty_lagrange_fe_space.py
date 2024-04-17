@@ -17,11 +17,13 @@ def test_lagrange_fe_space():
     #node = jnp.array(mesh.entity('node'))
     #cell = jnp.array(mesh.entity('cell'))
     node = jnp.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], dtype=jnp.float64)
-    cell = jnp.array([[0, 2, 3], [1, 0, 3]], dtype=jnp.int64)
+    cell = jnp.array([[3, 0, 2], [0, 3, 1]], dtype=jnp.int64)
     print(node)
     print(cell)
 
     jmesh = TriangleMesh(node, cell)
+    edge = jmesh.entity('edge')
+    print(edge)
 
     space = InteriorPenaltyLagrangeFESpace2d(jmesh, p=2)
 

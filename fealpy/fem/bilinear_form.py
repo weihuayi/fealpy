@@ -91,8 +91,8 @@ class BilinearForm:
 
         """
         space = self.space
-        ldof = space.number_of_local_dofs()
-        gdof = space.number_of_global_dofs()
+        ldof = space.dof.number_of_local_dofs()
+        gdof = space.dof.number_of_global_dofs()
 
         mesh = space.mesh
         NC = mesh.number_of_cells()
@@ -100,7 +100,7 @@ class BilinearForm:
         for di in self.dintegrators:
             di.assembly_cell_matrix(space, out=CM)
 
-        cell2dof = space.cell_to_dof()
+        cell2dof = space.dof.cell_to_dof()
         I = np.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
         J = np.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
         self._M = csr_matrix((CM.flat, (I.flat, J.flat)), shape=(gdof, gdof))

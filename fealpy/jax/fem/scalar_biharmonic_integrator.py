@@ -36,6 +36,7 @@ class ScalarBiharmonicIntegrator:
         # 计算 hessian 部分的刚度矩阵
         A = jnp.einsum('ijklrs, cklrs->cij', M, A)
 
+        
         hphi = space.hess_basis(bcs, variable='x')
         A = jnp.einsum('c, q, cqlij, cqmij->clm', cm, ws, hphi, hphi)
         return A

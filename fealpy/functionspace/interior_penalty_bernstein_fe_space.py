@@ -1,18 +1,17 @@
 
 import numpy as np
-import jax
-import jax.numpy as jnp
 from itertools import product
 
-from .lagrange_fe_space import LagrangeFESpace, LinearMeshCFEDof
+from .fem_dofs import TriangleMeshCFEDof
+from .bernstein_fe_space import BernsteinFESpace 
 
-class InteriorPenaltyLagrangeDof2d(LinearMeshCFEDof):
+class InteriorPenaltyBernsteinDof2d(TriangleMeshCFEDof):
     """
-    @brief 内罚 Lagrange 元的自由度，继承于连续 Lagrange 元的自由度，添
+    @brief 内罚 Bernstein 元的自由度，继承于连续 Bernstein 元的自由度，添
            加了一条边上周围两个单元上的自由度
     """
     def __init__(self, mesh, p):
-        super(InteriorPenaltyLagrangeDof2d, self).__init__(mesh, p)
+        super(InteriorPenaltyBernsteinDof2d, self).__init__(mesh, p)
         self.iedge2celldof = self.inner_edge_to_cell_dof()
         self.bedge2celldof = self.boundary_edge_to_cell_dof()
 
@@ -35,20 +34,22 @@ class InteriorPenaltyLagrangeDof2d(LinearMeshCFEDof):
         ldof = 2*cdof - edof 
 
         # 左边单元的自由度
-        ie2cd0 = jnp.zeros([NIE, cdof-edof], dtype=self.mesh.itype) 
+        ie2cd0 = np.zeros([NIE, cdof-edof], dtype=self.mesh.itype) 
         for i in range(3):
             edgeidx = ie2c[:, 2]==i
             dofidx  = self.multiIndex[:, i] != 0
-            ie2cd0 = ie2cd0.at[edgeidx].set(c2d[ie2c[edgeidx, 0]][:, dofidx])
+            ie2cd0[edgeidx] = c2d[ie2c[edgeidx, 0]][:, dofidx]
+
         # 右边单元的自由度
-        ie2cd1 = jnp.zeros([NIE, cdof-edof], dtype=self.mesh.itype) 
+        ie2cd1 = np.zeros([NIE, cdof-edof], dtype=self.mesh.itype) 
         for i in range(3):
             edgeidx = ie2c[:, 3]==i
             dofidx  = self.multiIndex[:, i] != 0
-            ie2cd1 = ie2cd1.at[edgeidx].set(c2d[ie2c[edgeidx, 1]][:, dofidx])
+            ie2cd1[edgeidx] = c2d[ie2c[edgeidx, 1]][:, dofidx]
+
         # 边上的自由度
         ie2cd2 = e2d[isInnerEdge]
-        ie2cd  = jnp.concatenate([ie2cd0, ie2cd1, ie2cd2], axis=1)
+        ie2cd  = np.concatenate([ie2cd0, ie2cd1, ie2cd2], axis=1)
         return ie2cd
 
     def boundary_edge_to_cell_dof(self):
@@ -61,14 +62,15 @@ class InteriorPenaltyLagrangeDof2d(LinearMeshCFEDof):
         c2d = self.cell2dof
         return c2d[be2c[:, 0]]
 
-class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
+class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
     """
-    @brief 内罚 Lagrange 元，继承于 Lagrange 元，添加了 Lagrange
+    @brief 内罚 Bernstein 元，继承于 Bernstein 元，添加了 Bernstein
            基函数在边上的罚项计算
     """
     def __init__(self, mesh, p=2):
-        super(InteriorPenaltyLagrangeFESpace2d, self).__init__(mesh, p, 'C')
-        self.dof = InteriorPenaltyLagrangeDof2d(mesh, p)
+        super(InteriorPenaltyBernsteinFESpace2d, self).__init__(mesh, p, 'C')
+        self.dof = InteriorPenaltyBernsteinDof2d(mesh, p)
+        self.ftype = np.float_
 
     def grad_normal_jump_basis(self, bcs, m=1):
         """
@@ -77,8 +79,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         """
         mesh = self.mesh
         e2c  = mesh.ds.edge2cell
-        edof = self.number_of_local_dofs('edge')
-        cdof = self.number_of_local_dofs('cell')
+        edof = self.dof.number_of_local_dofs('edge')
+        cdof = self.dof.number_of_local_dofs('cell')
         ldof = 2*cdof - edof 
 
         # 内部边
@@ -89,44 +91,42 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [jnp.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
         edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
-        rval0  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
-        rval1  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
-        rval2  = jnp.zeros(shape+(NIE,      edof), dtype=self.mesh.ftype)
+        rval0  = np.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
+        rval1  = np.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
+        rval2  = np.zeros(shape+(NIE,      edof), dtype=self.mesh.ftype)
 
         # 左边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 2]==i
-            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
+            dofidx0 = np.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = np.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
-            gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('eqdi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
+            gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 0])
+            val  = np.einsum('qedi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
 
-            indices = (Ellipsis, edgeidx, slice(None))
-            rval0 = rval0.at[indices].set(val[..., dofidx0])
-            rval2 = rval2.at[indices].add(val[..., dofidx1])
+            rval0[..., edgeidx, :] = val[..., dofidx0]
+            rval2[..., edgeidx, :] = val[..., dofidx1]
 
         # 右边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 3]==i
-            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
+            dofidx0 = np.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = np.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
-            gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
-            val  = jnp.einsum('eqdi, ei->qed', gval, -en[edgeidx]) # (NQ, NIEi, cdof)
+            gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 1])
+            val  = np.einsum('qedi, ei->qed', gval, -en[edgeidx]) # (NQ, NIEi, cdof)
 
-            indices = (Ellipsis, edgeidx, slice(None))
-            rval1 = rval1.at[indices].set(val[..., dofidx0])
-            rval2 = rval2.at[indices].add(val[..., dofidx1])
-        rval = jnp.concatenate([rval0, rval1, rval2], axis=-1)
+            rval1[..., edgeidx, :] = val[..., dofidx0]
+            rval2[..., edgeidx, :] = val[..., dofidx1]
+        rval = np.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 
     def grad_normal_2_jump_basis(self, bcs):
@@ -136,8 +136,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         """
         mesh = self.mesh
         e2c  = mesh.ds.edge2cell
-        edof = self.number_of_local_dofs('edge')
-        cdof = self.number_of_local_dofs('cell')
+        edof = self.dof.number_of_local_dofs('edge')
+        cdof = self.dof.number_of_local_dofs('cell')
         ldof = 2*cdof - edof 
 
         # 内部边
@@ -148,44 +148,44 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [jnp.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
         edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
-        rval0  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
-        rval1  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
-        rval2  = jnp.zeros(shape+(NIE,      edof), dtype=self.mesh.ftype)
+        rval0  = np.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
+        rval1  = np.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
+        rval2  = np.zeros(shape+(NIE,      edof), dtype=self.mesh.ftype)
 
         # 左边单元
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 2]==i
-            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
+            dofidx0 = np.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = np.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
-            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0])
+            val  = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
-            rval0 = rval0.at[indices].set(val[..., dofidx0])
-            rval2 = rval2.at[indices].add(val[..., dofidx1])
+            rval0[indices] = val[..., dofidx0]
+            rval2[indices] = val[..., dofidx1]
 
         # 右边单元
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 3]==i
-            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
+            dofidx0 = np.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = np.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
-            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1])
+            val  = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
-            rval1 = rval1.at[indices].set(val[..., dofidx0])
-            rval2 = rval2.at[indices].add(val[..., dofidx1])
-        rval = jnp.concatenate([rval0, rval1, rval2], axis=-1)
+            rval1[indices] = val[..., dofidx0]
+            rval2[indices] = val[..., dofidx1]
+        rval = np.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 
     def boubdary_edge_grad_normal_jump_basis(self, bcs, m=1):
@@ -195,7 +195,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         """
         mesh = self.mesh
         e2c  = mesh.ds.edge2cell
-        cdof = self.number_of_local_dofs('cell')
+        cdof = self.dof.number_of_local_dofs('cell')
 
         # 边界边
         isBdEdge = mesh.ds.boundary_edge_flag()
@@ -205,21 +205,18 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [jnp.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
-        rval = jnp.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
+        rval = np.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
 
         # 左边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = be2c[:, 2]==i
 
-            gval = self.grad_basis(bcsi, index=be2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('eqdi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
-
-            indices = (Ellipsis, edgeidx, slice(None))
-            rval = rval.at[indices].set(val)
+            gval = self.grad_basis(bcsi, index=be2c[edgeidx, 0])
+            rval[..., edgeidx, :] = np.einsum('qedi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
         return rval
 
     def boubdary_edge_grad_normal_2_jump_basis(self, bcs, m=1):
@@ -229,7 +226,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         """
         mesh = self.mesh
         e2c  = mesh.ds.edge2cell
-        cdof = self.number_of_local_dofs('cell')
+        cdof = self.dof.number_of_local_dofs('cell')
 
         # 边界边
         isBdEdge = mesh.ds.boundary_edge_flag()
@@ -239,21 +236,18 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [jnp.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
-        rval = jnp.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
+        rval = np.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
 
         # 左边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = be2c[:, 2]==i
 
-            hval = self.hess_basis(bcsi, index=be2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
-
-            indices = (Ellipsis, edgeidx, slice(None))
-            rval = rval.at[indices].set(val)
+            hval = self.hess_basis(bcsi, index=be2c[edgeidx, 0])
+            rval[..., edgeidx, :] = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
         return rval
         
 
