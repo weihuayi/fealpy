@@ -65,6 +65,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         @return (NQ, NIE, ldof)
         """
         mesh = self.mesh
+        e2c  = mesh.ds.edge2cell
         edof = self.number_of_local_dofs('edge')
         cdof = self.number_of_local_dofs('cell')
         ldof = 2*cdof - edof 
@@ -77,11 +78,11 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [bcs.insert(i, 0) for i in range(3)]
+        bcss = [jnp.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
-        edof2rcdof = [slice(None, None. -1), slice(None), slice(None, None, -1)]
+        edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
         rval0  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
         rval1  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
@@ -91,29 +92,29 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 2]==i
-            dofidx0 = jnp.where(self.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
+            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
             gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('...edi, ei->...ed', gval, en) # (NQ, NIEi, cdof)
+            val  = jnp.einsum('eqdi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
-            rval0 = jax.ops.index_update(rval0, indices, val[..., dofidx0])
-            rval2 = jax.ops.index_add(rval2, indices, val[..., dofidx1])
+            rval0 = rval0.at[indices].set(val[..., dofidx0])
+            rval2 = rval2.at[indices].add(val[..., dofidx1])
 
         # 右边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 3]==i
-            dofidx0 = jnp.where(self.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
+            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
             gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
-            val  = -jnp.einsum('...edi, ei->...ed', gval, en) # (NQ, NIEi, cdof)
+            val  = -jnp.einsum('eqdi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
-            rval1 = jax.ops.index_update(rval1, indices, val[..., dofidx0])
-            rval2 = jax.ops.index_add(rval2, indices, val[..., dofidx1])
+            rval1 = rval1.at[indices].set(val[..., dofidx0])
+            rval2 = rval2.at[indices].add(val[..., dofidx1])
         rval = jnp.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 
@@ -123,6 +124,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         @return (NQ, NC, ldof)
         """
         mesh = self.mesh
+        e2c  = mesh.ds.edge2cell
         edof = self.number_of_local_dofs('edge')
         cdof = self.number_of_local_dofs('cell')
         ldof = 2*cdof - edof 
@@ -135,43 +137,43 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [bcs.insert(i, 0) for i in range(3)]
+        bcss = [jnp.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
-        edof2rcdof = [slice(None, None. -1), slice(None), slice(None, None, -1)]
+        edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
         rval0  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
         rval1  = jnp.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
         rval2  = jnp.zeros(shape+(NIE,      edof), dtype=self.mesh.ftype)
 
-        # 左边单元的基函数的法向导数跳量
+        # 左边单元
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 2]==i
-            dofidx0 = jnp.where(self.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
+            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('...edij, ei, ej->...ed', hval, en, en)/2 # (NQ, NIEi, cdof)
+            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])/2 # (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
-            rval0 = jax.ops.index_update(rval0, indices, val[..., dofidx0])
-            rval2 = jax.ops.index_add(rval2, indices, val[..., dofidx1])
+            rval0 = rval0.at[indices].set(val[..., dofidx0])
+            rval2 = rval2.at[indices].add(val[..., dofidx1])
 
-        # 右边单元的基函数的法向导数跳量
+        # 右边单元
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 3]==i
-            dofidx0 = jnp.where(self.multiIndex[:, i] != 0)[0]
-            dofidx1 = jnp.where(self.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
+            dofidx0 = jnp.where(self.dof.multiIndex[:, i] != 0)[0]
+            dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
-            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('...edij, ei, ej->...ed', hval, en, en)/2 # (NQ, NIEi, cdof)
+            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
+            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])/2 # (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
-            rval1 = jax.ops.index_update(rval1, indices, val[..., dofidx0])
-            rval2 = jax.ops.index_add(rval2, indices, val[..., dofidx1])
+            rval1 = rval1.at[indices].set(val[..., dofidx0])
+            rval2 = rval2.at[indices].add(val[..., dofidx1])
         rval = jnp.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
         

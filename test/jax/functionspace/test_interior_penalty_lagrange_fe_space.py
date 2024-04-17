@@ -13,21 +13,30 @@ jax.config.update("jax_enable_x64", True)
 
 def test_lagrange_fe_space():
 
-    mesh = Mesh.from_box(nx=1, ny=1)
-    node = jnp.array(mesh.entity('node'))
-    cell = jnp.array(mesh.entity('cell'))
+    #mesh = Mesh.from_box(nx=1, ny=1)
+    #node = jnp.array(mesh.entity('node'))
+    #cell = jnp.array(mesh.entity('cell'))
+    node = jnp.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], dtype=jnp.float64)
+    cell = jnp.array([[0, 2, 3], [1, 0, 3]], dtype=jnp.int64)
+    print(node)
+    print(cell)
 
     jmesh = TriangleMesh(node, cell)
 
-    space = InteriorPenaltyLagrangeFESpace2d(jmesh, p=1)
+    space = InteriorPenaltyLagrangeFESpace2d(jmesh, p=2)
 
     bcs = jnp.array([[0.1, 0.2, 0.7]], dtype=jnp.float64)
+    ebcs = jnp.array([[0.1, 0.9]], dtype=jnp.float64)
 
     phi = space.basis(bcs)
-    gphi = space.grad_basis(bcs)
+    gphi = space.grad_basis(bcs, variable='x')
+    jphi1 = space.grad_normal_jump_basis(ebcs)
+    jphi2 = space.grad_normal_2_jump_basis(ebcs)
 
-    print(phi)
-    print(gphi)
+    print("aaa : ", phi.shape)
+    print(gphi.shape)
+    print(jphi1)
+    print(jphi2)
 
 
 

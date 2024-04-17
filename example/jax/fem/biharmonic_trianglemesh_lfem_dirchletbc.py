@@ -15,7 +15,7 @@ import jax.numpy as jnp
 
 from fealpy import logger
 from fealpy.jax.mesh import TriangleMesh 
-from fealpy.jax.functionspace import LagrangeFESpace
+from fealpy.jax.functionspace import InteriorPenaltyLagrangeFESpace2d
 
 from fealpy.jax.fem import ScalarBiharmonicIntegrator
 from fealpy.jax.fem import ScalarInteriorPenaltyIntegrator
@@ -23,6 +23,7 @@ from fealpy.jax.fem import BilinearForm
 
 from fealpy.jax.fem import ScalarSourceIntegrator
 from fealpy.jax.fem import LinearForm
+jax.config.update("jax_enable_x64", True)
 
 class SinSinData:
 
@@ -111,11 +112,11 @@ maxit = args.maxit
 pde = SinSinData()
 domain = pde.domain()
 
-mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
-space = LagrangeFESpace(mesh, p = p)
+mesh  = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
+space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 
 errorType = ['$|| Ax-b ||_{\\Omega,0}$']
-errorMatrix = np.zeros((4, maxit), dtype=np.float64)
+errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
@@ -123,15 +124,13 @@ for i in range(maxit):
     bform = BilinearForm(space)
     L = ScalarBiharmonicIntegrator()
 
-
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
     P0 = ScalarInteriorPenaltyIntegrator(gamma=0.01)
-    P = P0.assembly_face_matrix(space)  
-    A = A0 + P
+    P  = P0.assembly_face_matrix(space)  
+    A  = A0 + P
 
-    #print(jnp.linalg.matrix_rank(P.toarray()), P.toarray().shape)
     lform = LinearForm(space)
     F = ScalarSourceIntegrator(pde.source, q=p+3)
     lform.add_domain_integrator(F)
@@ -139,39 +138,23 @@ for i in range(maxit):
     
     x = pde.solution(mesh.interpolation_points(p=p))
     
-    print('A的秩：', jnp.linalg.matrix_rank(A.toarray()))
-    print('A0的秩：', jnp.linalg.matrix_rank(A0.toarray()))
     Bd = pde.is_boundary_dof(mesh.interpolation_points(p=p))
     gd = jnp.zeros_like(x)
     gd = gd.at[Bd].set(x[Bd])
     
-    A0, f = apply_dbc(A, b, gd, pde.is_boundary_dof(mesh.interpolation_points(p=p)))
-    
     A, f = apply_dbc(A, b, gd, pde.is_boundary_dof(mesh.interpolation_points(p=p)))
 
-    node = mesh.entity('node')
-    print('自由度个数:', f.shape)
-    print('A的秩：', jnp.linalg.matrix_rank(A.toarray()))
-#    uh = spsolve(A, b)
-    print('A0的秩：', jnp.linalg.matrix_rank(A0.toarray()))
-    
-    uh0, tol = cg(A0, f, atol=1e-15)
-    print('真解：', np.sum(uh0), tol)
     uh, tol = cg(A, f, atol=1e-15)
-    print('真解：', np.sum(uh), tol)
-#    print(b)
-#    print(A.toarray())
+
     errorMatrix[0, i] = jnp.linalg.norm(uh-x)
     errorMatrix[1, i] = jnp.linalg.norm(A@x-f)
-    errorMatrix[2, i] = jnp.linalg.norm(A0@x-f)
-    errorMatrix[3, i] = jnp.linalg.norm(uh0-x)
-    
+    print(errorMatrix)
 
     if i < maxit-1:
         nx = nx*2
         ny = ny*2
         mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
-        space = LagrangeFESpace(mesh, p = p)
+        space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 
 
 print(errorMatrix)
