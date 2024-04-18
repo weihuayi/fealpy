@@ -2,6 +2,9 @@
 from .lagrange_fe_space import LagrangeFESpace
 from .bernstein_fe_space import BernsteinFESpace
 
+from .interior_penalty_bernstein_fe_space import InteriorPenaltyBernsteinFESpace2d
+
+
 from .conforming_vector_ve_space_2d import ConformingVectorVESpace2d
 from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
 

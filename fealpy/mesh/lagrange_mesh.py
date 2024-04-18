@@ -12,7 +12,7 @@ class LagrangeMesh(Mesh):
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:]):
         raise NotImplementedError
-
+    
     def number_of_corner_nodes(self):
         """
         @berif 该函数返回角点节点的个数

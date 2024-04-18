@@ -9,7 +9,6 @@
 '''  
 import numpy as np
 
-
 class NSFlipSolver:
     def __init__(self, particles, mesh):
         self.mesh = mesh
@@ -54,6 +53,23 @@ class NSFlipSolver:
         print(distance[0])
         result = np.where(np.all(distance <= 1, axis=-1), (1-distance0)@(1-distance1), 0)
         print(result[0])
-        return 0
-        
-         
+        return result
+    
+    def P2G_center(self,particles,cell_center,Vc):
+        m_p = particles["mass"]
+        e_p = particles["internal_energy"]
+        position = self.particles["position"]
+        num_p = len(position[:,0])
+        num_c = len(cell_center[:,0])
+        distance = np.zeros_like(position)
+        S_pc = np.zeros((num_p,num_c)) #求插值函数S_pc
+        for i in range(num_p):
+            distance = abs(position[i] - cell_center)
+            distance = distance[:,0] + distance[:,1]
+            min = np.min(distance)
+            S_pc[i] = np.where(distance == min,1,0)
+        rho_c = m_p@S_pc/Vc
+        I_c = (e_p@S_pc)/(rho_c*Vc)
+        print(rho_c)
+        print(I_c) #为什么有些会出现nan?
+        return rho_c,I_c

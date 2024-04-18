@@ -22,6 +22,7 @@ class ScalarDirichletBoundarySourceIntegrator():
         face2cell = mesh.ds.face_to_cell()
         bd_face_flag = face2cell[:, 0] == face2cell[:, 1]
         fn = mesh.face_unit_normal(index=bd_face_flag) # (bd_NF, GD)
+        fm = mesh.entity_measure('face', index=bd_face_flag)
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.face_bc_to_point(bcs, index=bd_face_flag) # (NQ, bd_NF, GD)
@@ -32,7 +33,7 @@ class ScalarDirichletBoundarySourceIntegrator():
             * fn[None, :, None, :],
             axis=-1
         ) # (NQ, bd_NF, ldof)
-        A = np.einsum('q, qf, qfj -> fj', ws, gval, gphi, optimize=True) # (NQ, ldof)
+        A = -np.einsum('q, qf, qfj, f -> fj', ws, gval, gphi, fm, optimize=True) # (NQ, ldof)
         cell2dof = space.cell_to_dof()
 
         if out is None:

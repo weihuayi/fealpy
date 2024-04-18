@@ -16,13 +16,16 @@ dtype = [("position", "float64", (2, )),
          ("velocity", "float64", (2, )),
          ("rho", "float64"),
          ("mass", "float64"),
-         ("pressure", "float64")]
+         ("pressure", "float64"),
+		 ("internal_energy", "float64"),]
 
 num=10
 #np.random.seed(0)
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)
 particles['position'] = random_points
+particles['mass'] = 1 #临时给的值
+particles['internal_energy'] = 1 #临时给的值
 #print(random_points)
 
 domain=[0,1,0,1]
@@ -38,6 +41,9 @@ plt.scatter(particles["position"][:,0], particles["position"][:,1])
 #plt.show()
 
 solver = NSFlipSolver(particles, mesh)
-e = solver.e(particles["position"])
-solver.NGP(particles["position"],e)
-solver.bilinear(particles["position"],e)
+#e = solver.e(particles["position"])
+#solver.NGP(particles["position"],e)
+#solver.bilinear(particles["position"],e)
+Vc = mesh.cell_area() #单元面积
+cell_center = mesh.entity_barycenter(2) #单元中心位置
+solver.P2G_center(particles,cell_center,Vc)
