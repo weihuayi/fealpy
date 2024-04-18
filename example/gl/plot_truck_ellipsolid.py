@@ -13,9 +13,9 @@ cam = np.array([
     [ 17.5/2.0,       0.0, 1.345-3.0]  # 前
     ], dtype=np.float64)
 
-mesh= TriangleMesh.from_ellipsoid_surface(20, 20, 
+mesh= TriangleMesh.from_ellipsoid_surface(80, 80, 
         radius=(17.5, 3.47, 3), 
-        theta=(np.pi/2, np.pi/2+np.pi/3),
+        theta=(np.pi/2, np.pi/2+np.pi/2.5),
         phi=(-np.pi/4, np.pi/4))
 
 node = mesh.entity('node')
