@@ -33,13 +33,13 @@ class ScalarInteriorPenaltyIntegrator:
         gn2jphi = space.grad_normal_2_jump_basis(bcs)
         
         # 一阶法向导数矩阵
-        P1 = np.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
+        P1 = np.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gnjphi, 1/em[isInnerEdge])
         P1 = P1*self.gamma
 
         P2 = np.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isInnerEdge])
         P2T = np.transpose(P2, axes=(0, 2, 1))
 
-        P = P2 + P2T + P1
+        P =P1# (P2 + P2T) + P1
         
         I = np.broadcast_to(ie2cd[:, :, None], shape=P.shape)
         J = np.broadcast_to(ie2cd[:, None, :], shape=P.shape)
@@ -51,20 +51,19 @@ class ScalarInteriorPenaltyIntegrator:
         gnjphi  = space.boubdary_edge_grad_normal_jump_basis(bcs)
         gn2jphi = space.boubdary_edge_grad_normal_2_jump_basis(bcs)
 
-        P1 = np.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
+        P1 = np.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gnjphi, 1/em[isBdEdge])
         P1 = P1*self.gamma
 
-        P2 = np.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isBdEdge])
+        P2  = np.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isBdEdge])
         P2T = np.transpose(P2, axes=(0, 2, 1))
 
-        PP = P2 + P2T + P1
+        PP = P1#(P2 + P2T) + P1
         
         I = np.broadcast_to(be2cd[:, :, None], shape=PP.shape)
         J = np.broadcast_to(be2cd[:, None, :], shape=PP.shape)
 
         gdof = space.dof.number_of_global_dofs()
         P = P+csr_matrix((PP.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
-
         return P
 
 

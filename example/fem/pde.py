@@ -121,10 +121,11 @@ class DoubleLaplacePDE():
         sin = np.sin
         pi = np.pi
         cos = np.cos
-        val = np.zeros(p.shape[:-1]+(3, ), dtype=np.float_)
-        val[..., 0] = self.uxx(x, y) 
-        val[..., 1] = self.uxy(x, y) 
-        val[..., 2] = self.uyy(x, y) 
+        val = np.zeros(p.shape[:-1]+(2, 2), dtype=np.float_)
+        val[..., 0, 0] = self.uxx(x, y) 
+        val[..., 0, 1] = self.uxy(x, y) 
+        val[..., 1, 0] = self.uxy(x, y) 
+        val[..., 1, 1] = self.uyy(x, y) 
         return val
 
     def dirichlet(self, p):

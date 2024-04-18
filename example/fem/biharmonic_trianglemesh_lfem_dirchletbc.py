@@ -149,12 +149,12 @@ for i in range(maxit):
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=0.01)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=100000.01)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
 
     lform = LinearForm(space)
-    F = ScalarSourceIntegrator(pde.source, q=p+2)
+    F = ScalarSourceIntegrator(pde.source, q=p+4)
     lform.add_domain_integrator(F)
     b = lform.assembly()
     
@@ -173,7 +173,7 @@ for i in range(maxit):
     print("AAA : ", np.max(P.data))
 
     errorMatrix[0, i] = mesh.error(uh, pde.solution)
-    errorMatrix[1, i] = np.max(A@x-f)
+    errorMatrix[1, i] = mesh.error(uh.hessian_value, pde.hessian) 
     print(errorMatrix)
 
     node = mesh.entity('node')

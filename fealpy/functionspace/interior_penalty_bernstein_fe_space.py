@@ -112,7 +112,10 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
             val  = np.einsum('qedi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
 
             rval0[..., edgeidx, :] = val[..., dofidx0]
-            rval2[..., edgeidx, :] = val[..., dofidx1]
+            rval2[..., edgeidx, :] += val[..., dofidx1]
+
+        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss[1] = bcss[1][..., [2, 1, 0]]
 
         # 右边单元的基函数的法向导数跳量
         for i in range(3):
@@ -125,7 +128,7 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
             val  = np.einsum('qedi, ei->qed', gval, -en[edgeidx]) # (NQ, NIEi, cdof)
 
             rval1[..., edgeidx, :] = val[..., dofidx0]
-            rval2[..., edgeidx, :] = val[..., dofidx1]
+            rval2[..., edgeidx, :] += val[..., dofidx1]
         rval = np.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 
@@ -170,7 +173,10 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval0[indices] = val[..., dofidx0]
-            rval2[indices] = val[..., dofidx1]
+            rval2[indices] += val[..., dofidx1]
+
+        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss[1] = bcss[1][..., [2, 1, 0]]
 
         # 右边单元
         for i in range(3):
@@ -184,7 +190,7 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval1[indices] = val[..., dofidx0]
-            rval2[indices] = val[..., dofidx1]
+            rval2[indices] += val[..., dofidx1]
         rval = np.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 

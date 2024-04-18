@@ -113,6 +113,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             rval0 = rval0.at[indices].set(val[..., dofidx0])
             rval2 = rval2.at[indices].add(val[..., dofidx1])
 
+        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss[1] = bcss[1][..., [2, 1, 0]]
         # 右边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
@@ -172,6 +174,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             rval0 = rval0.at[indices].set(val[..., dofidx0])
             rval2 = rval2.at[indices].add(val[..., dofidx1])
 
+        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss[1] = bcss[1][..., [2, 1, 0]]
         # 右边单元
         for i in range(3):
             bcsi    = bcss[i] 

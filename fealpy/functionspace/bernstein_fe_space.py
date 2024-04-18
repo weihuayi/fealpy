@@ -430,7 +430,7 @@ class BernsteinFESpace:
         """
         @note
         """
-        gdof = self.number_of_global_dofs()
+        gdof = self.dof.number_of_global_dofs()
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
@@ -459,6 +459,23 @@ class BernsteinFESpace:
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
 
+        return val
+
+    @barycentric
+    def hessian_value(self, 
+            uh: np.ndarray, 
+            bc: np.ndarray, 
+            index: Union[np.ndarray, slice]=np.s_[:]
+            ) -> np.ndarray:
+        """
+        @note
+        """
+        gdof = self.dof.number_of_global_dofs()
+        gphi = self.hess_basis(bc, index=index)
+        cell2dof = self.dof.cell_to_dof(index=index)
+        dim = len(uh.shape) - 1
+        s0 = 'abdefg'
+        val = np.einsum('...cimn, ci->...cmn', gphi, uh[cell2dof[index]])
         return val
 
     def function(self, dim=None, array=None, dtype=np.float64):
