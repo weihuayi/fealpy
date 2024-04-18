@@ -65,10 +65,56 @@ class LagrangeTriangleMesh(LagrangeMesh):
         elif spacetype == 'D':
             return DLagrangeTriangleDof2d(self, p)
     
-    def uniform_refine(self, n=1):
-        p =self.p
+
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+        """
+        @brief 一致加密网格
+        """
         pass
 
+
+    def vtk_cell_type(self, etype='cell'):
+        """
+        @berif  返回网格单元对应的 vtk类型。
+        """
+        if etype in {'cell', 2}:
+            VTK_LAGRANGE_TRIANGLE = 69
+            return VTK_LAGRANGE_TRIANGLE 
+        elif etype in {'face', 'edge', 1}:
+            VTK_LAGRANGE_CURVE = 68
+            return VTK_LAGRANGE_CURVE
+
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
+        """
+        Parameters
+        ----------
+
+        @berif 把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        idx = vtk_cell_index(self.p, cellType)
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+    
     def integrator(self, q, etype='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式
@@ -108,7 +154,6 @@ class LagrangeTriangleMesh(LagrangeMesh):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
     
-
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
         """
         @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
@@ -125,7 +170,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
             Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
         else:
             Dlambda = np.array([[-1], [1]], dtype=self.ftype)
-        R = self._lagrange_grad_shape_function(bc, p=p)  # (..., ldof, TD+1)
+        R = self._grad_shape_function(bc, p=p)  # (..., ldof, TD+1)
         gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
 
         if variables == 'u':
@@ -135,27 +180,6 @@ class LagrangeTriangleMesh(LagrangeMesh):
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
             return gphi
-
-    def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
-        """
-
-        Notes
-        -----
-
-        etype 这个参数实际上是不需要的，为了向后兼容，所以这里先保留。
-
-        因为 bc 最后一个轴的长度就包含了这个信息。
-        """
-        p = self.p
-        node = self.node
-        TD = bc.shape[-1] - 1
-        entity = self.entity(etype=TD)[index]  
-        phi = self.shape_function(bc, p=p) # (NQ, 1, ldof)
-        print('aaa')
-        print('phi:', phi.shape)
-        #print('node[entity]:', node[entity].shape)
-        p = np.einsum('qci, cid -> qcd', phi, node[entity])
-        return p
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
         """
@@ -184,6 +208,23 @@ class LagrangeTriangleMesh(LagrangeMesh):
 
     grad_shape_function_on_face = grad_shape_function_on_edge
         
+    def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
+        """
+
+        Notes
+        -----
+
+        etype 这个参数实际上是不需要的，为了向后兼容，所以这里先保留。
+
+        因为 bc 最后一个轴的长度就包含了这个信息。
+        """
+        p = self.p
+        node = self.node
+        TD = bc.shape[-1] - 1
+        entity = self.entity(etype=TD)[index]  
+        phi = self.shape_function(bc, p=p) # (NQ, 1, ldof)
+        p = np.einsum('qci, cid -> qcd', phi[...,None,:], node[entity])
+        return p
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
@@ -243,60 +284,105 @@ class LagrangeTriangleMesh(LagrangeMesh):
         """
         @berif 
         """
-        pass
+        cell = self.entity('cell')
+        if p==1:
+            return cell[index]
+
+        mi = self.multi_index_matrix(p, 2)
+        idx0, = np.nonzero(mi[:, 0] == 0)
+        idx1, = np.nonzero(mi[:, 1] == 0)
+        idx2, = np.nonzero(mi[:, 2] == 0)
+
+        edge2cell = self.ds.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        e2p = self.edge_to_ipoint(p)
+        ldof = self.number_of_local_ipoints(p)
+        c2p = np.zeros((NC, ldof), dtype=self.itype)
+
+        flag = edge2cell[:, 2] == 0
+        c2p[edge2cell[flag, 0][:, None], idx0] = e2p[flag]
+
+        flag = edge2cell[:, 2] == 1
+        c2p[edge2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+
+        flag = edge2cell[:, 2] == 2
+        c2p[edge2cell[flag, 0][:, None], idx2] = e2p[flag]
+
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+
+        flag = iflag & (edge2cell[:, 3] == 0)
+        c2p[edge2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p[edge2cell[flag, 1][:, None], idx1] = e2p[flag]
+
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p[edge2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+
+        cdof = (p-1)*(p-2)//2
+        flag = np.sum(mi > 0, axis=1) == 3
+        c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
+        return c2p[index]
  
+    def edge_frame(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上的局部标架
+        """
+        assert self.geo_dimension() == 2
+        t = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        n = t@w
+        return n, t
+
+    def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    face_normal = edge_normal
+    face_unit_normal = edge_unit_normal
+    
     def rot_lambda(self, index=np.s_[:]):
         """
         @berif 
         """
-        pass
-    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
-        """
-        @berif 一致加密三角形网格
-        """
-        pass
-
-    def vtk_cell_type(self, etype='cell'):
-        """
-        @berif  返回网格单元对应的 vtk类型。
-        """
-        if etype in {'cell', 2}:
-            VTK_LAGRANGE_TRIANGLE = 69
-            return VTK_LAGRANGE_TRIANGLE 
-        elif etype in {'face', 'edge', 1}:
-            VTK_LAGRANGE_CURVE = 68
-            return VTK_LAGRANGE_CURVE
-
-    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
-        """
-        Parameters
-        ----------
-
-        @berif 把网格转化为 VTK 的格式
-        """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
-
         node = self.entity('node')
+        cell = self.entity('cell', index=index)
+        NC = cell.shape[0]
+        v0 = node[cell[..., 2]] - node[cell[..., 1]]
+        v1 = node[cell[..., 0]] - node[cell[..., 2]]
+        v2 = node[cell[..., 1]] - node[cell[..., 0]]
         GD = self.geo_dimension()
+        nv = np.cross(v2, -v1)
+        Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
         if GD == 2:
-            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+            length = nv
+        elif GD == 3:
+            length = np.linalg.norm(nv, axis=-1)
 
-        cell = self.entity(etype)[index]
-        cellType = self.vtk_cell_type(etype)
-        idx = vtk_cell_index(self.p, cellType)
-        NV = cell.shape[-1]
+        Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+        Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+        Rlambda[:,2,:] = v2/length.reshape((-1, 1))
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
-        cell[:, 0] = NV
-
-        NC = len(cell)
-        if fname is None:
-            return node, cell.flatten(), cellType, NC 
-        else:
-            print("Writting to vtk...")
-            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
+        return Rlambda
+ 
 
 class CLagrangeTriangleDof2d():
     """
