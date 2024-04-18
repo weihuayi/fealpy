@@ -19,6 +19,9 @@ from .scalar_source_integrator import ScalarSourceIntegrator
 
 from .scalar_pgls_convection_integrator import ScalarPGLSConvectionIntegrator
 
+from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
+from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
+
 
 # Boundary integrator for scalar case
 # <kappa u, v>

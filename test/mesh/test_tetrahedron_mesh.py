@@ -121,9 +121,11 @@ def test_interplation_weith_HB():
     u0 = space.interpolate(dis)
     H = np.zeros(NC, dtype=np.float64)
     H[:] = dis(mesh.entity_barycenter("cell"))
+    mesh.celldata['H'] = H.copy()
+    mesh.to_vtk(fname = 'aaa.vtu')
 
     error0 = mesh.error(u0, dis) 
-    print('error0:', error0)
+    print('连续函数的插值误差 : ', error0)
 
     cell2dof = mesh.cell_to_ipoint(p=1)
  
@@ -138,14 +140,18 @@ def test_interplation_weith_HB():
 
     H = data["celldata"][0]
     error_H = H - dis(mesh.entity_barycenter("cell"))
+    #error_H = mesh.celldata['H'] - dis(mesh.entity_barycenter("cell"))
+    print("??? : ", H - mesh.celldata['H'])
+    print(H)
+    print(error_H)
     print(np.max(np.abs(error_H)))
 
     error_u0 = fval - dis(mesh.entity("node"))
     print(np.max(np.abs(error_u0)))
 
-
     error = mesh.error(fval, dis)
     print('error:', error)
+    mesh.to_vtk(fname='bbb.vtu')
 
 if __name__ == "__main__":
     #test_mesh_generation_by_meshpy()
