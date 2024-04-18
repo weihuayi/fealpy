@@ -149,7 +149,7 @@ for i in range(maxit):
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=100000.01)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=2.01)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
 
@@ -165,10 +165,11 @@ for i in range(maxit):
     gd[Bd] = x[Bd]
     
     A, f = apply_dbc(A, b, gd, is_boundary_dof(mesh.interpolation_points(p=p)))
+    print("FFF : ", np.max(np.abs(f)))
 
-    #uh, tol = cg(A, f, atol=1e-10)
     uh = space.function()
     uh[:] = spsolve(A, f)
+    #uh[:], tol = cg(A, f, atol=1e-15)
     print("AAA : ", np.max(A0.data))
     print("AAA : ", np.max(P.data))
 

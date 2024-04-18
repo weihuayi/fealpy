@@ -15,7 +15,7 @@ class ScalarBiharmonicIntegrator:
         mesh = space.mesh
 
         p = space.p
-        q = self.q if self.q is not None else p+3 
+        q = self.q if self.q is not None else p+4 
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()

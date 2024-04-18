@@ -155,7 +155,6 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
-        edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
         rval0  = np.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
         rval1  = np.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
@@ -169,7 +168,8 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
             dofidx1 = np.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0])
-            val  = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            val  = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx],
+                    en[edgeidx])/2# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval0[indices] = val[..., dofidx0]
@@ -177,6 +177,7 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
 
         bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
+        edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
         # 右边单元
         for i in range(3):
@@ -186,7 +187,8 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
             dofidx1 = np.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1])
-            val  = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            val  = np.einsum('qedij, ei, ej->qed', hval, en[edgeidx],
+                    en[edgeidx])/2# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval1[indices] = val[..., dofidx0]
