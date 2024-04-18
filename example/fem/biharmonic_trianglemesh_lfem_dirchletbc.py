@@ -132,7 +132,9 @@ y = sp.symbols("y")
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u)
 
-mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
+#mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5)
 space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
 
 errorType = ['$|| Ax-b ||_{\\Omega,0}$']
@@ -149,7 +151,7 @@ for i in range(maxit):
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=2.01)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=3)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
 
@@ -194,7 +196,8 @@ for i in range(maxit):
     if i < maxit-1:
         nx = nx*2
         ny = ny*2
-        mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+        #mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+        mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5/2**i)
         space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
 
 
