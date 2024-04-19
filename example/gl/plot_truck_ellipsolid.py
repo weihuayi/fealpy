@@ -13,7 +13,7 @@ cam = np.array([
     [ 17.5/2.0,       0.0, 1.345-3.0]  # 前
     ], dtype=np.float64)
 
-mesh= TriangleMesh.from_ellipsoid_surface(20, 20, 
+mesh= TriangleMesh.from_ellipsoid_surface(40, 40, 
         radius=(17.5, 3.47, 3), 
         theta=(np.pi/2, np.pi/2+np.pi/3),
         phi=(-np.pi/4, np.pi/4))
@@ -22,9 +22,19 @@ node = mesh.entity('node')
 cell = mesh.entity('cell')
 
 cmodel = OCAMModel()
+down = np.array((0, 0, -1), dtype=np.float64)
+cz = cam[-1]/np.linalg.norm(cam[-1], axis=-1)
+cy = down - np.sum(down*cz)*cz
+cy /= np.linalg.norm(cy)
+cx = np.cross(cy, cz)
+
 node0 = node - cam[-1] # 相对于相机的坐标 
-node0 /= np.linalg.norm(node0, axis=-1, keepdims=True)
-uv = cmodel.sphere_to_cam(node0)
+node1 = np.zeros_like(node0)
+node1[:, 0] = np.sum(node0*cx, axis=-1)
+node1[:, 1] = np.sum(node0*cy, axis=-1)
+node1[:, 2] = np.sum(node0*cz, axis=-1)
+node1 /= np.linalg.norm(node1, axis=-1, keepdims=True)
+uv = cmodel.sphere_to_cam(node1)
 uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
 uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
