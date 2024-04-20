@@ -1,25 +1,22 @@
 from dataclasses import dataclass, field
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 import numpy as np
-
 
 @dataclass
 class OCAMModel:
-    ss: np.ndarray = np.array([-576.3797, 0, 0.0007185556, -3.39907e-07, 5.242219e-10])
-    pol : np.ndarray = np.array([845.644875, 482.093504, -4.074978,
-        71.443521, 34.750033, 3.348958, 19.469493, 10.236789, -11.771018,
-        -10.331102, -2.154892])
-    xc: float = 559.875074
-    yc: float = 992.836922
-    c: float = 1.000938 
-    d: float = 0.000132
-    e: float = -0.000096
-    x = None # 像机在世界坐标中的位置
-    n = None # 像机在世坐标中的指向
+    location: np.ndarray
+    axes: np.ndarray 
+    center: np.ndarray 
+    height: float
+    width: float
+    ss: np.ndarray
+    pol : np.ndarray
+    affine: np.ndarray
+    fname: str
 
     def world_to_cam(self, node):
         """
-        @brief 世界坐标系到
+        @brief 世界坐标系到相机坐标系
         """
 
 
