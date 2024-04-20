@@ -96,7 +96,8 @@ data = {
     "affine" : affine,
     "fname" : fname,
     "height" : 1080,
-    "width"  : 1920
+    "width"  : 1920,
+    "vfield" : (110, 180)
 }
 
 mesh= TriangleMesh.from_section_ellipsoid()
