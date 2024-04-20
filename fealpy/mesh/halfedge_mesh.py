@@ -317,6 +317,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         halfedge = self.entity('halfedge')
         node = self.entity('node')
         cell = self.entity('cell')
+        cell = np.array(cell)
         hcell = self.ds.hcell
 
         # 计算每个单元格的测度（measure），并乘以2.0
@@ -333,7 +334,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             if self.ds.tree is None:
                 self.tree = cKDTree(node[halfedge[hcell[isNotBDCell], 0]])
             start = isNotBDCell[self.tree.query(points, k=1)[1]]
-            print("start : ::::", start[2])
 
         ## NP < NC//2 和 NP > NC//2, 出于效率的原因分成两个情况
         if NP < NC//2:
@@ -2717,7 +2717,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         phiValue = interface(node[:])
         #phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
         phiSign = np.sign(phiValue)
-        print("sign ", phiValue[:3])
 
         # 2. 找到相交的半边
         edge = self.entity('edge')

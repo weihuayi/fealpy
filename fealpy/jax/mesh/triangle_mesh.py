@@ -55,6 +55,9 @@ class TriangleMeshDataStructure():
 
         logger.info(f"Construct the mesh toplogy relation with {NF} edge (or face).")
 
+    def boundary_edge_flag(self):
+        return self.edge2cell[:, 0]==self.edge2cell[:, 1]
+
 class TriangleMesh(MeshBase):
     def __init__(self, node, cell):
         """

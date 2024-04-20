@@ -14,9 +14,16 @@ class OCAMModel:
     c: float = 1.000938 
     d: float = 0.000132
     e: float = -0.000096
+    x = None # 像机在世界坐标中的位置
+    n = None # 像机在世坐标中的指向
+
+    def world_to_cam(self, node):
+        """
+        @brief 世界坐标系到
+        """
 
 
-    def sphere_to_cam(self, node, height=1080, width=1920):
+    def cam_to_image(self, node, height=1080, width=1920):
         """
         @brief 把单位球面上的点投影到 
         """
@@ -35,6 +42,7 @@ class OCAMModel:
         uv[:, 0] = f * theta * np.cos(phi) + xc
         uv[:, 1] = f * theta * np.sin(phi) + yc
 
+        # 标准化
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
