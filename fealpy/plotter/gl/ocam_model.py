@@ -16,19 +16,20 @@ class OCAMModel:
 
     def world_to_cam(self, node):
         """
-        @brief 世界坐标系到相机坐标系
+        @brief 把世界坐标系中的点转换到相机坐标系下
         """
+        node0 = node - self.center
+        node1 = np.einsum('', node0, self.axes)
+
 
 
     def cam_to_image(self, node, height=1080, width=1920):
         """
-        @brief 把单位球面上的点投影到 
+        @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
-        xc = self.xc
-        yc = self.yc
 
         NN = len(node)
-        f = np.sqrt((height/2)**2 + (width/2)**2)
+        f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
         r = np.sqrt(np.sum(node**2, axis=1))
         theta = np.arccos(node[:, 2]/r)
         phi = np.arctan2(node[:, 1], node[:, 0])
@@ -36,8 +37,8 @@ class OCAMModel:
 
         uv = np.zeros((NN, 2), dtype=np.float64)
 
-        uv[:, 0] = f * theta * np.cos(phi) + xc
-        uv[:, 1] = f * theta * np.sin(phi) + yc
+        uv[:, 0] = f * theta * np.cos(phi) + self.center[0] 
+        uv[:, 1] = f * theta * np.sin(phi) + self.center[1] 
 
         # 标准化
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
