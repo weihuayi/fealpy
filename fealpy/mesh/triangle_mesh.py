@@ -2389,6 +2389,141 @@ class TriangleMesh(Mesh, Plotable):
 
         return cls(node, cell)
 
+    @classmethod
+    def from_section_ellipsoid(cls, size=(7, 3, 2.5), density = 0.1, top_section = np.pi/2, scale_ratio = [1, 1, 1], sinking_coefficient = 1.5):
+        """
+        构造包围一个长方体的椭球面网格，该椭球面被两个平面截取，并将底部填充
+        @param size: 长方体的长宽高
+        @param density: 网格密度
+        @param top_section: 顶部截面对应天顶角
+        @param scale_ratio: 椭球面三个半轴的缩放比例
+        @param sinking_coefficient: 相较于长方体位于椭球面中心，向下下降的系数
+        @return: 截断的椭球面网格
+        """
+        l, w, h = size
+        # 构造椭球面
+        a = 1.6178 * l * scale_ratio[0]
+        b = 1.6178 * w * scale_ratio[1]
+        c = 0.809 * h * scale_ratio[2]
+
+        theta = (top_section, np.arccos(-0.382 * h * sinking_coefficient / c))
+        phi1 = np.array([[-np.arctan(w / l), np.arctan(w / l)],
+                         [np.arctan(w / l), np.pi / 2],
+                         [np.pi / 2, np.pi - np.arctan(w / l)],
+                         [np.pi - np.arctan(w / l), np.pi + np.arctan(w / l)],
+                         [np.pi + np.arctan(w / l), 1.5 * np.pi],
+                         [1.5 * np.pi, 2 * np.pi - np.arctan(w / l)]])
+        phi2 = np.array([[-a / b * np.arctan(w / l), a / b * np.arctan(w / l)],
+                         [a / b * np.arctan(w / l), np.pi / 2],
+                         [np.pi / 2, np.pi - a / b * np.arctan(w / l)],
+                         [np.pi - a / b * np.arctan(w / l), np.pi + a / b * np.arctan(w / l)],
+                         [np.pi + a / b * np.arctan(w / l), 1.5 * np.pi],
+                         [1.5 * np.pi, 2 * np.pi - a / b * np.arctan(w / l)]])
+        nphi = int(1 / density * a / b)
+        ntheta = int(1 / density * c)
+        t = np.sqrt(c ** 2 - (0.382 * h * sinking_coefficient) ** 2) / c
+        dphi1 = np.linspace(phi1[:, 0], phi1[:, 1], nphi + 1, axis=1)
+        dphi2 = np.linspace(phi2[:, 0], phi2[:, 1], nphi + 1, axis=1)
+        rectangle_node = [[l / 2, l / 2 * np.tan(dphi1[0])],
+                          [w / 2 / np.tan(dphi1[1]), w / 2],
+                          [w / 2 / np.tan(dphi1[2]), w / 2],
+                          [-l / 2, -l / 2 * np.tan(dphi1[3])],
+                          [-w / 2 / np.tan(dphi1[4]), -w / 2],
+                          [-w / 2 / np.tan(dphi1[5]), -w / 2]]
+
+        # 根据输入长宽高自适应段数，待完善
+        nthetas = [ntheta, ntheta]
+        nphis = [nphi, nphi, nphi, nphi, nphi, nphi]
+
+        NN = (sum(nthetas) + 1) * sum(nphis)
+        node = np.zeros((NN, 3)).reshape((sum(nthetas) + 1, sum(nphis), -1))
+
+        for i in range(6):
+            NN1 = (nthetas[0] + 1) * (nphis[i] + 1)
+            NN2 = (nthetas[1] + 1) * (nphis[i] + 1)
+            line1 = np.zeros((nphi + 1, 3))
+            line2 = np.zeros((nphi + 1, 3))
+            line1[:, 0] = rectangle_node[i][0]
+            line1[:, 1] = rectangle_node[i][1]
+            line1[:, 2] = -0.382 * h * sinking_coefficient
+            line2[:, 0] = a * t * np.cos(dphi2[i])
+            line2[:, 1] = b * t * np.sin(dphi2[i])
+            line2[:, 2] = -0.382 * h * sinking_coefficient
+            node2 = np.linspace(line2, line1, ntheta + 1)
+
+            U, V = np.mgrid[
+                   theta[0]:theta[1]:(ntheta + 1) * 1j,
+                   phi2[i, 0]:phi2[i, 1]:(nphi + 1) * 1j]
+
+            node1 = np.zeros((NN1, 3), dtype=np.float64).reshape((nthetas[0] + 1, nphis[i] + 1, 3))
+            X = a * np.sin(U) * np.cos(V)
+            Y = b * np.sin(U) * np.sin(V)
+            Z = c * np.cos(U)
+            node1[..., 0] = X
+            node1[..., 1] = Y
+            node1[..., 2] = Z
+
+            node[0:nthetas[0] + 1, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node1[:, 0:-1, :]
+            node[nthetas[0] + 1:, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node2[1:, 0:-1, :]
+
+        # 处理中间区域，构造节点
+        central_node = np.zeros((nphis[1] + nphis[2] + 1, nphis[0] + 1, 3))
+        central_node[0, ...] = node[sum(nthetas), :nphis[0] + 1]
+        central_node[-1, ...] = node[sum(nthetas), sum(nphis[0:3]):sum(nphis[0:4]) + 1][::-1, ...]
+        central_node[:, -1, :] = node[sum(nthetas), sum(nphis[0:1]):sum(nphis[0:3]) + 1]
+        central_node[1:, 0, :] = node[sum(nthetas), sum(nphis[0:4]):sum(nphis[0:6]) + 1][::-1, ...]
+
+        central_node[..., 0] = np.linspace(central_node[:, 0, 0], central_node[:, -1, 0], nphis[0] + 1, axis=0).T
+        central_node[..., 1] = np.linspace(central_node[0, :, 1], central_node[-1, :, 1], nphis[1] + nphis[2] + 1,
+                                           axis=0)
+        central_node[..., 2] = -0.382 * h * sinking_coefficient
+
+        node = node.reshape((-1, 3))
+
+        idx = np.zeros((sum(nthetas) + 1, sum(nphis) + 1), np.int_)
+        idx[:, 0:-1] = np.arange(NN).reshape((sum(nthetas) + 1, sum(nphis)))
+        idx[:, -1] = idx[:, 0]
+        NC = sum(nthetas) * sum(nphis)
+        cell = np.zeros((2 * NC, 3), dtype=np.int_)
+
+        cell[0::2, 0] = idx[1:, 0:-1].flatten(order='F')
+        cell[0::2, 1] = idx[1:, 1:].flatten(order='F')
+        cell[0::2, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[1::2, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[1::2, 2] = idx[1:, 1:].flatten(order='F')
+
+        # 处理中心区域，构造单元
+        central_idx = np.zeros((nphis[1] + nphis[2] + 1, nphis[0] + 1), dtype=np.int_)
+        central_idx[0, ...] = idx[sum(nthetas), :nphis[0] + 1]
+        central_idx[-1, ...] = idx[sum(nthetas), sum(nphis[0:3]):sum(nphis[0:4]) + 1][::-1, ...]
+        central_idx[:, -1] = idx[sum(nthetas), sum(nphis[0:1]):sum(nphis[0:3]) + 1]
+        central_idx[1:, 0] = idx[sum(nthetas), sum(nphis[0:4]):sum(nphis[0:6])][::-1, ...]
+        central_idx[1:-1, 1:-1] = np.arange(NN, NN + (nphis[0] - 1) * (nphis[1] + nphis[2] - 1)).reshape(
+            (nphis[1] + nphis[2] - 1, nphis[0] - 1))
+        central_cell = np.zeros((2 * (nphis[1] + nphis[2]) * nphis[0], 3))
+        central_cell[0::2, 0] = central_idx[1:, 0:-1].flatten(order='F')
+        central_cell[0::2, 1] = central_idx[1:, 1:].flatten(order='F')
+        central_cell[0::2, 2] = central_idx[0:-1, 0:-1].flatten(order='F')
+        central_cell[1::2, 0] = central_idx[0:-1, 1:].flatten(order='F')
+        central_cell[1::2, 1] = central_idx[0:-1, 0:-1].flatten(order='F')
+        central_cell[1::2, 2] = central_idx[1:, 1:].flatten(order='F')
+
+        # 组装底面与侧面
+        node = np.concatenate((node, central_node[1:-1, 1:-1].reshape(-1, 3)), axis=0)
+        cell = np.concatenate((cell, central_cell), axis=0)
+
+        mesh = cls(node, cell)
+        # 标记单元
+        domain = np.zeros(2 * sum(nthetas) * sum(nphis), dtype=np.int_).reshape((2 * sum(nthetas), sum(nphis)))
+        for i in range(len(nphis)):
+            for j in range(len(nthetas)):
+                domain[j::2, sum(nphis[0:i]):sum(nphis[0:i + 1])] = ((i + 5) % 6 + 1) * 10 + j + 1
+        central_domain = np.zeros(2 * nphis[0] * (nphis[1] + nphis[2]), dtype=np.int_)
+        domain = np.concatenate((domain.flatten(order='F'), central_domain))
+        mesh.celldata['domain'] = domain
+
+        return mesh
 
     def streamline_callculator(self, vector_field, start_cell, start_point):
         """
