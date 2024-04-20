@@ -14,16 +14,22 @@ class OCAMModel:
     affine: np.ndarray
     fname: str
 
+    def world_to_image(self, node):
+        """
+        @brief 把世界坐标系转化为归一化的圈像坐标系
+        """
+        node = self.world_to_cam(node)
+        uv = self.cam_to_image(node)
+        return uv
+
     def world_to_cam(self, node):
         """
         @brief 把世界坐标系中的点转换到相机坐标系下
         """
-        node0 = node - self.center
-        node1 = np.einsum('', node0, self.axes)
+        node = np.einsum('ij, kj->ik', node-self.center, self.axes)
+        return node
 
-
-
-    def cam_to_image(self, node, height=1080, width=1920):
+    def cam_to_image(self, node):
         """
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
@@ -46,7 +52,29 @@ class OCAMModel:
 
         return uv
 
+    def world_to_image_fast(self, node):
+        """
+        """
+        node = self.world_to_cam(node)
+        theta = np.zeros(len(node), dtype=np.float64)
 
+        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
+        flag = (norm == 0)
+        norm[flag] = np.finfo(float).eps
+        theta = np.arctan(node[:, 2]/norm)
+
+        rho = np.polyval(self.pol, theta)
+        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
+        uv = np.zeros_like(ps)
+        c, d, e = self.affine
+        xc, yc = self.center
+        uv[:, 0] = ps[:, 0] * c + ps[:, 1] * d + xc
+        uv[:, 1] = ps[:, 0] * e + ps[:, 1]     + yc
+
+        # 标准化
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
+        return uv
 
     def undistort(self, image, fc=5, width=640, height=480):
         """
@@ -110,23 +138,6 @@ class OCAMModel:
 
 
 
-    def world2cam_fast(self, node):
-        """
-        """
-        NN = len(node)
-        theta = np.zeros(NN, dtype=np.float64)
-
-        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
-        flag = (norm == 0)
-        norm[flag] = np.finfo(float).eps
-        theta = np.arctan(node[:, 2]/norm)
-
-        rho = np.polyval(self.pol, theta)
-        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
-        uv = np.zeros_like(ps)
-        uv[:, 0] = ps[:, 0] * self.c + ps[:, 1] * self.d + self.xc
-        uv[:, 1] = ps[:, 0] * self.e + ps[:, 1]          + self.yc
-        return uv
 
     def world2cam(self, node):
         """

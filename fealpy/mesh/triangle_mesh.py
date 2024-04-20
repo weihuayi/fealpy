@@ -2390,7 +2390,13 @@ class TriangleMesh(Mesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def from_section_ellipsoid(cls, size=(7, 3, 2.5), density = 0.1, top_section = np.pi/2, scale_ratio = [1, 1, 1], sinking_coefficient = 1.5):
+    def from_section_ellipsoid(
+        cls, 
+        size=(7, 3, 2.5), 
+        density = 0.1, 
+        top_section = np.pi/2, 
+        scale_ratio = [1, 1, 1], 
+        sinking_coefficient = 1.5):
         """
         构造包围一个长方体的椭球面网格，该椭球面被两个平面截取，并将底部填充
         @param size: 长方体的长宽高
@@ -2501,7 +2507,7 @@ class TriangleMesh(Mesh, Plotable):
         central_idx[1:, 0] = idx[sum(nthetas), sum(nphis[0:4]):sum(nphis[0:6])][::-1, ...]
         central_idx[1:-1, 1:-1] = np.arange(NN, NN + (nphis[0] - 1) * (nphis[1] + nphis[2] - 1)).reshape(
             (nphis[1] + nphis[2] - 1, nphis[0] - 1))
-        central_cell = np.zeros((2 * (nphis[1] + nphis[2]) * nphis[0], 3))
+        central_cell = np.zeros((2 * (nphis[1] + nphis[2]) * nphis[0], 3), dtype=np.int_)
         central_cell[0::2, 0] = central_idx[1:, 0:-1].flatten(order='F')
         central_cell[0::2, 1] = central_idx[1:, 1:].flatten(order='F')
         central_cell[0::2, 2] = central_idx[0:-1, 0:-1].flatten(order='F')
@@ -2511,7 +2517,7 @@ class TriangleMesh(Mesh, Plotable):
 
         # 组装底面与侧面
         node = np.concatenate((node, central_node[1:-1, 1:-1].reshape(-1, 3)), axis=0)
-        cell = np.concatenate((cell, central_cell), axis=0)
+        cell = np.concatenate((cell, central_cell), axis=0, dtype=np.int_)
 
         mesh = cls(node, cell)
         # 标记单元

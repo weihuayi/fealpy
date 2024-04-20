@@ -78,12 +78,12 @@ affine = np.array([
 
 # 默认文件目录位置
 fname = [
-    '~/data/src_1.jpg',
-    '~/data/src_2.jpg',
-    '~/data/src_3.jpg',
-    '~/data/src_4.jpg',
-    '~/data/src_5.jpg',
-    '~/data/src_6.jpg',
+    '/home/why/data/src_1.jpg',
+    '/home/why/data/src_2.jpg',
+    '/home/why/data/src_3.jpg',
+    '/home/why/data/src_4.jpg',
+    '/home/why/data/src_5.jpg',
+    '/home/why/data/src_6.jpg',
     ]
 
 data = {
@@ -99,4 +99,16 @@ data = {
     "width"  : 1920
 }
 
-csys = OCAMSystem(data)
+mesh= TriangleMesh.from_section_ellipsoid()
+node = mesh.entity('node')
+cell = mesh.entity('cell')
+domain = mesh.celldata['domain']
+
+#csys = OCAMSystem(data)
+#csys.show_images()
+
+node = np.array(node, dtype=np.float32)
+vertices = node[cell].reshape(-1, node.shape[1])
+plotter = OpenGLPlotter()
+plotter.add_mesh(vertices, cell=None, texture_path=None)
+plotter.run()

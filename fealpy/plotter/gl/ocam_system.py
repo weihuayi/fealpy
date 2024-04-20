@@ -21,5 +21,29 @@ class OCAMSystem:
                 fname = data['fname'][i],
             ))
 
-        
+    def show_images(self):
+        import matplotlib.pyplot as plt
+        from PIL import Image
+        images = []
+        for cam in self.cams:
+            images.append(Image.open(cam.fname))
+
+        # 设置显示窗口
+        fig, axs = plt.subplots(3, 2, figsize=(10, 15))
+
+        # 使用索引去除空的维度，确保每个 subplot 都用图片填充
+        for i, ax in enumerate(axs.flat):
+            ax.imshow(np.asarray(images[i]))
+            ax.axis('off')  # 不显示坐标轴
+
+        plt.tight_layout()
+        plt.show()
+
+    def undistort_cv(self):
+        import cv2
+        images = []
+        for cam in self.cams:
+            h = cam.height
+            w = cam.width
+
 
