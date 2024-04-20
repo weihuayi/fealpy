@@ -2407,29 +2407,29 @@ class TriangleMesh(Mesh, Plotable):
         c = 0.809 * h * scale_ratio[2]
 
         theta = (top_section, np.arccos(-0.382 * h * sinking_coefficient / c))
-        phi1 = np.array([[-np.arctan(w / l), np.arctan(w / l)],
-                         [np.arctan(w / l), np.pi / 2],
-                         [np.pi / 2, np.pi - np.arctan(w / l)],
-                         [np.pi - np.arctan(w / l), np.pi + np.arctan(w / l)],
-                         [np.pi + np.arctan(w / l), 1.5 * np.pi],
-                         [1.5 * np.pi, 2 * np.pi - np.arctan(w / l)]])
-        phi2 = np.array([[-a / b * np.arctan(w / l), a / b * np.arctan(w / l)],
-                         [a / b * np.arctan(w / l), np.pi / 2],
-                         [np.pi / 2, np.pi - a / b * np.arctan(w / l)],
-                         [np.pi - a / b * np.arctan(w / l), np.pi + a / b * np.arctan(w / l)],
-                         [np.pi + a / b * np.arctan(w / l), 1.5 * np.pi],
-                         [1.5 * np.pi, 2 * np.pi - a / b * np.arctan(w / l)]])
+        phi1 = np.array([[np.arctan(w / l), -np.arctan(w / l)],
+                         [-np.arctan(w / l), -np.pi / 2],
+                         [-np.pi / 2, -np.pi + np.arctan(w / l)],
+                         [-np.pi + np.arctan(w / l), -np.pi - np.arctan(w / l)],
+                         [-np.pi - np.arctan(w / l), -1.5 * np.pi],
+                         [-1.5 * np.pi, -2 * np.pi + np.arctan(w / l)]])
+        phi2 = np.array([[a / b * np.arctan(w / l), -a / b * np.arctan(w / l)],
+                         [-a / b * np.arctan(w / l), -np.pi / 2],
+                         [-np.pi / 2, -np.pi + a / b * np.arctan(w / l)],
+                         [-np.pi + a / b * np.arctan(w / l), -np.pi - a / b * np.arctan(w / l)],
+                         [-np.pi - a / b * np.arctan(w / l), -1.5 * np.pi],
+                         [-1.5 * np.pi, -2 * np.pi + a / b * np.arctan(w / l)]])
         nphi = int(1 / density * a / b)
         ntheta = int(1 / density * c)
         t = np.sqrt(c ** 2 - (0.382 * h * sinking_coefficient) ** 2) / c
         dphi1 = np.linspace(phi1[:, 0], phi1[:, 1], nphi + 1, axis=1)
         dphi2 = np.linspace(phi2[:, 0], phi2[:, 1], nphi + 1, axis=1)
         rectangle_node = [[l / 2, l / 2 * np.tan(dphi1[0])],
-                          [w / 2 / np.tan(dphi1[1]), w / 2],
-                          [w / 2 / np.tan(dphi1[2]), w / 2],
+                          [-w / 2 / np.tan(dphi1[1]), -w / 2],
+                          [-w / 2 / np.tan(dphi1[2]), -w / 2],
                           [-l / 2, -l / 2 * np.tan(dphi1[3])],
-                          [-w / 2 / np.tan(dphi1[4]), -w / 2],
-                          [-w / 2 / np.tan(dphi1[5]), -w / 2]]
+                          [w / 2 / np.tan(dphi1[4]), w / 2],
+                          [w / 2 / np.tan(dphi1[5]), w / 2]]
 
         # 根据输入长宽高自适应段数，待完善
         nthetas = [ntheta, ntheta]
