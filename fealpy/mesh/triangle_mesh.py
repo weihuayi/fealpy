@@ -2396,7 +2396,8 @@ class TriangleMesh(Mesh, Plotable):
         density = 0.1, 
         top_section = np.pi/2, 
         scale_ratio = [1, 1, 1], 
-        sinking_coefficient = 1.5):
+        sinking_coefficient = 1.5,
+        return_edge = False):
         """
         构造包围一个长方体的椭球面网格，该椭球面被两个平面截取，并将底部填充
         @param size: 长方体的长宽高
@@ -2404,6 +2405,7 @@ class TriangleMesh(Mesh, Plotable):
         @param top_section: 顶部截面对应天顶角
         @param scale_ratio: 椭球面三个半轴的缩放比例
         @param sinking_coefficient: 相较于长方体位于椭球面中心，向下下降的系数
+        @param return_edge: 是否需要返回分区交界边上的点
         @return: 截断的椭球面网格
         """
         l, w, h = size
@@ -2471,6 +2473,11 @@ class TriangleMesh(Mesh, Plotable):
 
             node[0:nthetas[0] + 1, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node1[:, 0:-1, :]
             node[nthetas[0] + 1:, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node2[1:, 0:-1, :]
+        # 处理分区交界边
+        if return_edge:
+            edge_node = np.zeros((6, sum(nthetas)+1, 3))
+            for i in range(6):
+                edge_node[i, ...] = node[:, sum(nphis[0:(i+1)%6]), :]
 
         # 处理中间区域，构造节点
         central_node = np.zeros((nphis[1] + nphis[2] + 1, nphis[0] + 1, 3))
@@ -2529,7 +2536,10 @@ class TriangleMesh(Mesh, Plotable):
         domain = np.concatenate((domain.flatten(order='F'), central_domain))
         mesh.celldata['domain'] = domain
 
-        return mesh
+        if return_edge:
+            return mesh, edge_node
+        else:
+            return mesh
 
     def streamline_callculator(self, vector_field, start_cell, start_point):
         """
