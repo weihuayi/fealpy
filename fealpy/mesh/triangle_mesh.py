@@ -2524,7 +2524,7 @@ class TriangleMesh(Mesh, Plotable):
         domain = np.zeros(2 * sum(nthetas) * sum(nphis), dtype=np.int_).reshape((2 * sum(nthetas), sum(nphis)))
         for i in range(len(nphis)):
             for j in range(len(nthetas)):
-                domain[j::2, sum(nphis[0:i]):sum(nphis[0:i + 1])] = ((i + 5) % 6 + 1) * 10 + j + 1
+                domain[2*sum(nthetas[0:j]):2*sum(nthetas[0:j+1]), sum(nphis[0:i]):sum(nphis[0:i + 1])] = ((i + 5) % 6 + 1) * 10 + j + 1
         central_domain = np.zeros(2 * nphis[0] * (nphis[1] + nphis[2]), dtype=np.int_)
         domain = np.concatenate((domain.flatten(order='F'), central_domain))
         mesh.celldata['domain'] = domain
