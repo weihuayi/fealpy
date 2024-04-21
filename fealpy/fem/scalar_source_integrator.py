@@ -61,7 +61,6 @@ class ScalarSourceIntegrator():
                 val = f(ps)
         else:
             val = f
-
         if isinstance(val, (int, float)):
             bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
         else:

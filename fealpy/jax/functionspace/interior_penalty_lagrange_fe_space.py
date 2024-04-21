@@ -192,7 +192,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         rval = jnp.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 
-    def boubdary_edge_grad_normal_jump_basis(self, bcs, m=1):
+    def boundary_edge_grad_normal_jump_basis(self, bcs, m=1):
         """
         @brief 法向导数跳量计算
         @return (NQ, NIE, ldof)
@@ -226,7 +226,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             rval = rval.at[indices].set(val)
         return rval
 
-    def boubdary_edge_grad_normal_2_jump_basis(self, bcs, m=1):
+    def boundary_edge_grad_normal_2_jump_basis(self, bcs, m=1):
         """
         @brief 法向导数跳量计算
         @return (NQ, NIE, ldof)
