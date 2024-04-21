@@ -1,10 +1,10 @@
 
 from typing import Union, Optional, TypeVar, Generic, Dict, Sequence, overload, Callable
 
-import numpy as np
 import torch
 
 from . import functional as F
+from . import mesh_kernel as K
 from .quadrature import Quadrature
 
 Tensor = torch.Tensor
@@ -13,20 +13,22 @@ Entity = Union[Tensor, Sequence[Tensor]]
 _S = slice(None, None, None)
 _int_func = Callable[..., int]
 _dtype = torch.dtype
+_device = torch.device
 
 
 ##################################################
 ### Mesh Data Structure Base
 ##################################################
 
-class MeshDataStructureBase():
-    def __init__(self, NN: int) -> None:
+class MeshDataStructure():
+    def __init__(self, NN: int, TD: int) -> None:
         self._entity_storage: Dict[int, Entity] = {}
         self.NN = NN
+        self.TD = TD
 
     def __getattr__(self, name: str):
         if name not in {'cell', 'face', 'edge'}:
-            return super().__getattr__(name)
+            return
         etype_dim = self._entity_str2dim(name)
         return self._dim2entity(etype_dim)
 
@@ -38,6 +40,12 @@ class MeshDataStructureBase():
             self._entity_storage[etype_dim] = value
         else:
             super().__setattr__(name, value)
+
+    ### cuda
+    def to(self, device: Union[_device, str, None]=None, non_blocking=False):
+        for entity_tensor in self._entity_storage.values():
+            entity_tensor.to(device, non_blocking=non_blocking)
+        return self
 
     # Get the entity's top dimension from its name.
     def _entity_str2dim(self, etype: str) -> int:
@@ -63,9 +71,11 @@ class MeshDataStructureBase():
             raise ValueError(f'{etype_dim} is not a valid entity dimension.')
 
     ### properties
-    def top_dimension(self) -> int:
-        raise NotImplementedError
-    TD = property(top_dimension)
+    def top_dimension(self) -> int: return self.TD
+    @property
+    def itype(self) -> _dtype: return self.cell.dtype
+    @property
+    def device(self) -> _device: return self.cell.device
 
     ### counters
     number_of_nodes: _int_func = lambda self: self.NN
@@ -119,26 +129,14 @@ class MeshDataStructureBase():
     def node_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
 
 
-class HomoMeshDataStructure(MeshDataStructureBase):
+class HomoMeshDataStructure(MeshDataStructure):
     ccw: Tensor
     localEdge: Tensor
     localFace: Tensor
 
-    def __init__(self, num_nodes: int, cell: Tensor) -> None:
-        super().__init__()
-        self.reinit(num_nodes, cell)
-
-    def reinit(self, num_nodes: int, cell: Tensor) -> None:
-        self.num_nodes = num_nodes
+    def __init__(self, NN: int, TD: int, cell: Tensor) -> None:
+        super().__init__(NN, TD)
         self.cell = cell
-
-    @property
-    def itype(self):
-        return self.cell.dtype
-
-    @property
-    def device(self):
-        return self.cell.device
 
     number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
     number_of_nodes_of_cells = number_of_vertices_of_cells
@@ -166,38 +164,35 @@ class HomoMeshDataStructure(MeshDataStructureBase):
     def construct(self) -> None:
         pass
 
-_MDS_co = TypeVar('_MDS_co', bound=MeshDataStructureBase, covariant=True)
+_MDS_co = TypeVar('_MDS_co', bound=MeshDataStructure, covariant=True)
 
 
 ##################################################
 ### Mesh Base
 ##################################################
 
-class MeshBase(Generic[_MDS_co]):
+class Mesh(Generic[_MDS_co]):
     ds: _MDS_co
     node: Tensor
 
-    def geo_dimension(self) -> int:
-        return self.node.shape[-1]
+    def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
+        self.ds.to(device, non_blocking)
+        self.node = self.node.to(device, non_blocking)
+        return self
 
-    def top_dimension(self) -> int:
-        return self.ds.top_dimension()
-
+    @property
+    def ftype(self) -> _dtype: return self.node.dtype
+    @property
+    def device(self) -> _device: return self.node.device
+    def geo_dimension(self) -> int: return self.node.shape[-1]
+    def top_dimension(self) -> int: return self.ds.top_dimension()
     GD = property(geo_dimension)
     TD = property(top_dimension)
 
-    def number_of_cells(self) -> int:
-        return self.ds.number_of_cells()
-
-    def number_of_faces(self) -> int:
-        return self.ds.number_of_faces()
-
-    def number_of_edges(self) -> int:
-        return self.ds.number_of_edges()
-
-    def number_of_nodes(self) -> int:
-        return self.ds.number_of_nodes()
-
+    def number_of_cells(self) -> int: return self.ds.number_of_cells()
+    def number_of_faces(self) -> int: return self.ds.number_of_faces()
+    def number_of_edges(self) -> int: return self.ds.number_of_edges()
+    def number_of_nodes(self) -> int: return self.ds.number_of_nodes()
     def entity(self, etype: Union[int, str], index: Index=_S) -> Entity:
         if etype in ('node', 0):
             return self.node[index]
@@ -209,7 +204,12 @@ class MeshBase(Generic[_MDS_co]):
         raise NotImplementedError
 
 
-class HomoMeshBase(MeshBase[_MDS_co]):
+class HomoMesh(Mesh[HomoMeshDataStructure]):
+    def __init__(self, node: Tensor, cell: Tensor, TD: int) -> None:
+        super().__init__()
+        self.node = node
+        self.ds = HomoMeshDataStructure(node.size(0), TD, cell)
+
     @overload
     def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor: ...
     def entity_barycenter(self, etype: Union[int, str], index: Index=_S) -> Tensor:

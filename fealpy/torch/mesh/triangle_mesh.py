@@ -1,24 +1,22 @@
 
+from typing import Optional
+
 import numpy as np
 import torch
 from torch import Tensor
 
 from .. import logger
-from .mesh_base import MeshDataStructureBase, HomoMeshBase
+from . import functional as F
+from . import mesh_kernel as K
+from .mesh_base import HomoMeshDataStructure, HomoMesh
 
 _dtype = torch.dtype
 _device = torch.device
 
 
-class TriangleMeshDataStructure(MeshDataStructureBase):
-    TD = 2
-
+class TriangleMeshDataStructure(HomoMeshDataStructure):
     def __init__(self, NN: int, cell: Tensor):
-        self.NN = NN
-        self.cell = cell
-        self.itype = cell.dtype
-        self.device = cell.device
-
+        super().__init__(NN, 2, cell)
         # constant tensors
         kwargs = {'dtype': cell.dtype, 'device': cell.device}
         self.localEdge = torch.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
@@ -64,5 +62,9 @@ class TriangleMeshDataStructure(MeshDataStructureBase):
                     f"on device {self.device}")
 
 
-class TriangleMesh(HomoMeshBase):
-    pass
+class TriangleMesh(HomoMesh):
+
+    def shape_function(self, bc: Tensor, p: int=1, mi: Optional[Tensor]=None):
+        TD = bc.shape[-1] - 1
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        return K.simplex_shape_function(bc, p, mi)

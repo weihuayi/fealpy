@@ -1,6 +1,9 @@
 
 from typing import Optional
+from itertools import combinations_with_replacement
+from functools import reduce
 
+import numpy as np
 import torch
 from torch import Tensor
 
@@ -47,3 +50,40 @@ def mesh_top_csr(entity: Tensor, num_targets: int, location: Optional[Tensor]=No
         size=(entity.size(0), num_targets),
         dtype=dtype, device=device
     )
+
+
+def multi_index_matrix(p: int, etype: int, *, dtype=None, device=None) -> Tensor:
+    r"""Create a multi-index matrix."""
+    dtype = dtype or torch.int
+    kwargs = {'dtype': dtype, 'device': device}
+    sep = np.flip(np.array(
+        tuple(combinations_with_replacement(range(p+1), etype)),
+        dtype=np.int_
+    ), axis=0)
+    raw = np.zeros((sep.shape[0], etype+2), dtype=np.int_)
+    raw[:, -1] = p
+    raw[:, 1:-1] = sep
+    return torch.from_numpy(raw[:, 1:] - raw[:, :-1]).to(**kwargs)
+
+
+def shape_function(bc: Tensor, p: int=1, mi: Optional[Tensor]=None, *,
+                   dtype=None, device=None):
+    r"""Shape function"""
+    if p <= 0:
+        raise ValueError("p must be positive integer.")
+    if p == 1:
+        return bc
+    TD = bc.shape[-1] - 1
+    itype = torch.int
+    shape = bc.shape[:-1] + (p+1, TD+1)
+    mi = mi or multi_index_matrix(p, etype=TD, dtype=itype, device=device)
+    c = torch.arange(1, p+1, dtype=itype, device=device)
+    P = 1.0 / torch.cumprod(c, dim=0)
+    t = torch.arange(0, p, dtype=itype, device=device)
+    A = torch.ones(shape, dtype=dtype, device=device)
+    A[..., 1:, :] = p*bc.unsqueeze(-2) - t.reshape(-1, 1)
+    A = torch.cumprod(A, dim=-2).clone()
+    A[..., 1:, :].mul_(P.reshape(-1, 1))
+    idx = torch.arange(TD + 1, dtype=itype, device=device)
+    phi = torch.prod(A[..., mi, idx], dim=-1)
+    return phi
