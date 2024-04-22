@@ -1,54 +1,79 @@
 from dataclasses import dataclass, field
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 import numpy as np
-
 
 @dataclass
 class OCAMModel:
-    ss: np.ndarray = np.array([-576.3797, 0, 0.0007185556, -3.39907e-07, 5.242219e-10])
-    pol : np.ndarray = np.array([845.644875, 482.093504, -4.074978,
-        71.443521, 34.750033, 3.348958, 19.469493, 10.236789, -11.771018,
-        -10.331102, -2.154892])
-    xc: float = 559.875074
-    yc: float = 992.836922
-    c: float = 1.000938 
-    d: float = 0.000132
-    e: float = -0.000096
-    x = None # 像机在世界坐标中的位置
-    n = None # 像机在世坐标中的指向
+    location: np.ndarray
+    axes: np.ndarray 
+    center: np.ndarray 
+    height: float
+    width: float
+    ss: np.ndarray
+    pol : np.ndarray
+    affine: np.ndarray
+    fname: str
+
+    def world_to_image(self, node):
+        """
+        @brief 把世界坐标系转化为归一化的圈像坐标系
+        """
+        node = self.world_to_cam(node)
+        uv = self.cam_to_image(node)
+        return uv
 
     def world_to_cam(self, node):
         """
-        @brief 世界坐标系到
+        @brief 把世界坐标系中的点转换到相机坐标系下
+        """
+        node = np.einsum('...j, kj->...k', node-self.location, self.axes)
+        return node
+
+    def cam_to_image(self, node):
+        """
+        @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
 
-
-    def cam_to_image(self, node, height=1080, width=1920):
-        """
-        @brief 把单位球面上的点投影到 
-        """
-        xc = self.xc
-        yc = self.yc
-
-        NN = len(node)
-        f = np.sqrt((height/2)**2 + (width/2)**2)
-        r = np.sqrt(np.sum(node**2, axis=1))
-        theta = np.arccos(node[:, 2]/r)
-        phi = np.arctan2(node[:, 1], node[:, 0])
+        f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
+        r = np.sqrt(np.sum(node**2, axis=-1))
+        theta = np.arccos(node[..., 2]/r)
+        phi = np.arctan2(node[..., 1], node[:, 0])
         phi = phi % (2 * np.pi)
 
-        uv = np.zeros((NN, 2), dtype=np.float64)
+        uv = np.zeros(node.shape[:-1]+(2,), dtype=np.float64)
 
-        uv[:, 0] = f * theta * np.cos(phi) + xc
-        uv[:, 1] = f * theta * np.sin(phi) + yc
+        uv[..., 0] = f * theta * np.cos(phi) + self.center[0] 
+        uv[..., 1] = f * theta * np.sin(phi) + self.center[1] 
+
+        # 标准化
+        uv[..., 0] = (uv[..., 0] - np.min(uv[..., 0]))/(np.max(uv[..., 0])-np.min(uv[..., 0]))
+        uv[..., 1] = (uv[..., 1] - np.min(uv[..., 1]))/(np.max(uv[..., 1])-np.min(uv[..., 1]))
+
+        return uv
+
+    def world_to_image_fast(self, node):
+        """
+        """
+        node = self.world_to_cam(node)
+        theta = np.zeros(len(node), dtype=np.float64)
+
+        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
+        flag = (norm == 0)
+        norm[flag] = np.finfo(float).eps
+        theta = np.arctan(node[:, 2]/norm)
+
+        rho = np.polyval(self.pol, theta)
+        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
+        uv = np.zeros_like(ps)
+        c, d, e = self.affine
+        xc, yc = self.center
+        uv[:, 0] = ps[:, 0] * c + ps[:, 1] * d + xc
+        uv[:, 1] = ps[:, 0] * e + ps[:, 1]     + yc
 
         # 标准化
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
-
         return uv
-
-
 
     def undistort(self, image, fc=5, width=640, height=480):
         """
@@ -112,23 +137,6 @@ class OCAMModel:
 
 
 
-    def world2cam_fast(self, node):
-        """
-        """
-        NN = len(node)
-        theta = np.zeros(NN, dtype=np.float64)
-
-        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
-        flag = (norm == 0)
-        norm[flag] = np.finfo(float).eps
-        theta = np.arctan(node[:, 2]/norm)
-
-        rho = np.polyval(self.pol, theta)
-        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
-        uv = np.zeros_like(ps)
-        uv[:, 0] = ps[:, 0] * self.c + ps[:, 1] * self.d + self.xc
-        uv[:, 1] = ps[:, 0] * self.e + ps[:, 1]          + self.yc
-        return uv
 
     def world2cam(self, node):
         """

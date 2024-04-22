@@ -6,7 +6,8 @@ import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve, cg, lgmres
-import scipy.sparse as sp
+import sympy as sp
+import scipy.sparse as ssp
 from jax.scipy.linalg import solve
 from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
@@ -25,6 +26,7 @@ from fealpy.jax.fem import BilinearForm
 
 from fealpy.jax.fem import ScalarSourceIntegrator
 from fealpy.jax.fem import LinearForm
+from pde import DoubleLaplacePDE 
 jax.config.update("jax_enable_x64", True)
 
 class SinSinData_jax:
@@ -146,6 +148,10 @@ class SinSinData:
         return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 
+def is_boundary_dof(p):
+    eps = 1e-14 
+    return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
+
 def apply_dbc(A, f, uh, isDDof):
     f = f - A@uh.reshape(-1)
     bdIdx = jnp.zeros(A.shape[0], dtype=np.int_)
@@ -179,19 +185,29 @@ parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
+parser.add_argument('--gamma',
+        default=3, type=int,
+        help='默认内罚参数，默认为 3')
+
 args = parser.parse_args()
 
 p = args.degree
 nx = args.nx
 ny = args.ny
 maxit = args.maxit
+gamma = args.gamma
 
 #uuu = lambda p : (jnp.sin(jnp.pi*p[0])*jnp.sin(jnp.pi*p[1]))**1
 #pde = SinSinData(uuu)
-pde = SinSinData()
-domain = pde.domain()
+#pde = SinSinData()
+#domain = pde.domain()
 
-mesh  = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
+x = sp.symbols("x")
+y = sp.symbols("y")
+u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+pde = DoubleLaplacePDE(u)
+
+mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
 space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 
 errorType = ['$|| Ax-b ||_{\\Omega,0}$']
@@ -206,30 +222,32 @@ for i in range(maxit):
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=2.01)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
 
     lform = LinearForm(space)
-    F = ScalarSourceIntegrator(pde.source, q=p+2)
+    F = ScalarSourceIntegrator(pde.source, q=p+4)
     lform.add_domain_integrator(F)
     b = lform.assembly()
+
     
     x = pde.solution(mesh.interpolation_points(p=p))
     
-    Bd = pde.is_boundary_dof(mesh.interpolation_points(p=p))
+    Bd = is_boundary_dof(mesh.interpolation_points(p=p))
     gd = jnp.zeros_like(x)
     gd = gd.at[Bd].set(x[Bd])
     
-    A, f = apply_dbc(A, b, gd, pde.is_boundary_dof(mesh.interpolation_points(p=p)))
+    A, f = apply_dbc(A, b, gd, is_boundary_dof(mesh.interpolation_points(p=p)))
 
     #uh, tol = cg(A, f, atol=1e-10)
     uh = spsolve(A, f)
     print("AAA : ", jnp.max(A0.data))
+    print("AAA : ", jnp.max(A.data))
     print("AAA : ", jnp.max(P.data))
 
     errorMatrix[0, i] = jnp.max(jnp.abs(uh-x))
-    errorMatrix[1, i] = jnp.max(A@x-f)
+    errorMatrix[1, i] = jnp.sqrt(jnp.mean(uh-x)**2)
     print(errorMatrix)
 
     node = mesh.entity('node')
@@ -249,7 +267,7 @@ for i in range(maxit):
     if i < maxit-1:
         nx = nx*2
         ny = ny*2
-        mesh = TriangleMesh.from_box(box=domain, nx=nx, ny=ny)
+        mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
         space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 
 
