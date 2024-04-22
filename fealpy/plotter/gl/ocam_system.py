@@ -17,7 +17,7 @@ class OCAMSystem:
                 width = data['width'],
                 ss = np.array(data['ss'][i]),
                 pol = np.array(data['pol'][i]),
-                affine = data['affine'],
+                affine = data['affine'][i],
                 fname = data['fname'][i],
             ))
 
@@ -36,7 +36,7 @@ class OCAMSystem:
             ax.imshow(np.asarray(images[i]))
             ax.axis('off')  # 不显示坐标轴
 
-        plt.tight_layout()
+        #plt.tight_layout()
         plt.show()
 
     def undistort_cv(self):

@@ -9,6 +9,7 @@ from .triangle_quality import *
 from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh2dDataStructure
 
+
 class TriangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
@@ -40,7 +41,7 @@ class TriangleMesh(Mesh, Plotable):
 
         self.itype = cell.dtype
         self.ftype = node.dtype
-        self.p = 1 # 平面三角形
+        self.p = 1  # 平面三角形
 
         self.celldata = {}
         self.nodedata = {}
@@ -84,7 +85,6 @@ class TriangleMesh(Mesh, Plotable):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
 
-
     def grad_shape_function(self, bc, p=1, index=np.s_[:], variables='x'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
@@ -93,9 +93,9 @@ class TriangleMesh(Mesh, Plotable):
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = np.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
-            return gphi #(NQ, NC, ldof, GD)
+            return gphi  # (NQ, NC, ldof, GD)
         elif variables == 'u':
-            return R #(NQ, ldof, TD+1)
+            return R  # (NQ, ldof, TD+1)
 
     cell_grad_shape_function = grad_shape_function
 
@@ -112,7 +112,7 @@ class TriangleMesh(Mesh, Plotable):
         NC = len(cindex)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
-        shape = (NC, ) + bc.shape[0:-1] + (3, )
+        shape = (NC,) + bc.shape[0:-1] + (3,)
         bcs = np.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
         idx = np.arange(NC)
         if direction:
@@ -133,8 +133,8 @@ class TriangleMesh(Mesh, Plotable):
         @brief
         """
         if iptype in {'cell', 2}:
-            return (p+1)*(p+2)//2
-        elif iptype in {'face', 'edge',  1}: # 包括两个顶点
+            return (p + 1) * (p + 2) // 2
+        elif iptype in {'face', 'edge', 1}:  # 包括两个顶点
             return p + 1
         elif iptype in {'node', 0}:
             return 1
@@ -143,9 +143,9 @@ class TriangleMesh(Mesh, Plotable):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
-        return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
+        return NN + (p - 1) * NE + (p - 2) * (p - 1) // 2 * NC
 
-    def prolongation_matrix(self, p0:int, p1:int):
+    def prolongation_matrix(self, p0: int, p1: int):
         """
         @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
         """
@@ -166,17 +166,17 @@ class TriangleMesh(Mesh, Plotable):
         # 2. 网格边内部的插值点
         NE = self.number_of_edges()
         # p1 元在边上插值点对应的重心坐标
-        bcs = self.multi_index_matrix(p1, TD-1)/p1
+        bcs = self.multi_index_matrix(p1, TD - 1) / p1
         # p0 元基函数在 p1 元对应的边内部插值点处的函数值
-        phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)
+        phi = self.edge_shape_function(bcs[1:-1], p=p0)  # (ldof1 - 2, ldof0)
 
         e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
         e2p0 = self.edge_to_ipoint(p0)
-        shape = (NE, ) + phi.shape
+        shape = (NE,) + phi.shape
 
         I = np.broadcast_to(e2p1[:, :, None], shape=shape).flat
         J = np.broadcast_to(e2p0[:, None, :], shape=shape).flat
-        V = np.broadcast_to( phi[None, :, :], shape=shape).flat
+        V = np.broadcast_to(phi[None, :, :], shape=shape).flat
 
         P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
@@ -184,23 +184,22 @@ class TriangleMesh(Mesh, Plotable):
         if p1 > 2:
             NC = self.number_of_cells()
             # p1 元在单元上对应插值点的重心坐标
-            bcs = self.multi_index_matrix(p1, TD)/p1
-            flag = np.sum(bcs>0, axis=1) == 3
+            bcs = self.multi_index_matrix(p1, TD) / p1
+            flag = np.sum(bcs > 0, axis=1) == 3
             # p0 元基函数在 p1 元对应的单元内部插值点处的函数值
             phi = self.shape_function(bcs[flag, :], p=p0)
             c2p1 = self.cell_to_ipoint(p1)[:, flag]
             c2p0 = self.cell_to_ipoint(p0)
 
-            shape = (NC, ) + phi.shape
+            shape = (NC,) + phi.shape
 
             I = np.broadcast_to(c2p1[:, :, None], shape=shape).flat
             J = np.broadcast_to(c2p0[:, None, :], shape=shape).flat
-            V = np.broadcast_to( phi[None, :, :], shape=shape).flat
+            V = np.broadcast_to(phi[None, :, :], shape=shape).flat
 
             P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
         return P.tocsr()
-
 
     def interpolation_points(self, p: int, index=np.s_[:]):
         """
@@ -223,34 +222,34 @@ class TriangleMesh(Mesh, Plotable):
 
             edge = self.entity('edge')
 
-            w = np.zeros((p-1, 2), dtype=np.float64)
-            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w = np.zeros((p - 1, 2), dtype=np.float64)
+            w[:, 0] = np.arange(p - 1, 0, -1) / p
             w[:, 1] = w[-1::-1, 0]
-            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
-                    node[edge,:]).reshape(-1, GD)
+            ipoints[NN:NN + (p - 1) * NE, :] = np.einsum('ij, ...jm->...im', w,
+                                                         node[edge, :]).reshape(-1, GD)
         if p > 2:
             TD = self.top_dimension()
             multiIndex = self.multi_index_matrix(p, TD)
             isEdgeIPoints = (multiIndex == 0)
-            isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
-                    isEdgeIPoints[:,2])
-            w = multiIndex[isInCellIPoints, :]/p
-            ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    node[cell, :]).reshape(-1, GD)
-        return ipoints # (gdof, GD)
+            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
+                                isEdgeIPoints[:, 2])
+            w = multiIndex[isInCellIPoints, :] / p
+            ipoints[NN + (p - 1) * NE:, :] = np.einsum('ij, kj...->ki...', w,
+                                                       node[cell, :]).reshape(-1, GD)
+        return ipoints  # (gdof, GD)
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
         """
         """
         cell = self.entity('cell')
-        if p==1:
+        if p == 1:
             return cell[index]
 
         mi = self.multi_index_matrix(p, 2)
         idx0, = np.nonzero(mi[:, 0] == 0)
         idx1, = np.nonzero(mi[:, 1] == 0)
         idx2, = np.nonzero(mi[:, 2] == 0)
-        
+
         edge2cell = self.ds.edge_to_cell()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -280,11 +279,10 @@ class TriangleMesh(Mesh, Plotable):
         flag = iflag & (edge2cell[:, 3] == 2)
         c2p[edge2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
 
-        cdof = (p-1)*(p-2)//2
+        cdof = (p - 1) * (p - 2) // 2
         flag = np.sum(mi > 0, axis=1) == 3
-        c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
+        c2p[:, flag] = NN + NE * (p - 1) + np.arange(NC * cdof).reshape(NC, cdof)
         return c2p[index]
-
 
     def edge_frame(self, index=np.s_[:]):
         """
@@ -292,8 +290,8 @@ class TriangleMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         t = self.edge_unit_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        n = t@w
+        w = np.array([(0, -1), (1, 0)])
+        n = t @ w
         return n, t
 
     def edge_normal(self, index=np.s_[:]):
@@ -302,8 +300,8 @@ class TriangleMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
+        w = np.array([(0, -1), (1, 0)])
+        return v @ w
 
     def edge_unit_normal(self, index=np.s_[:]):
         """
@@ -311,8 +309,8 @@ class TriangleMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.edge_unit_tangent(index=index)
-        w = np.array([(0,-1),(1,0)])
-        return v@w
+        w = np.array([(0, -1), (1, 0)])
+        return v @ w
 
     face_normal = edge_normal
     face_unit_normal = edge_unit_normal
@@ -332,9 +330,8 @@ class TriangleMesh(Mesh, Plotable):
         nv = np.cross(v1, v2)
         length = np.linalg.norm(nv, axis=-1, keepdims=True)
 
-        n = nv/length
+        n = nv / length
         return n
-
 
     def grad_lambda(self, index=np.s_[:]):
         """
@@ -357,15 +354,15 @@ class TriangleMesh(Mesh, Plotable):
         if GD == 2:
             length = nv
             W = np.array([[0, 1], [-1, 0]], dtype=self.ftype)
-            Dlambda[:, 0] = v0@W/length[:, None]
-            Dlambda[:, 1] = v1@W/length[:, None]
-            Dlambda[:, 2] = v2@W/length[:, None]
+            Dlambda[:, 0] = v0 @ W / length[:, None]
+            Dlambda[:, 1] = v1 @ W / length[:, None]
+            Dlambda[:, 2] = v2 @ W / length[:, None]
         elif GD == 3:
             length = np.linalg.norm(nv, axis=-1, keepdims=True)
-            n = nv/length
-            Dlambda[:, 0] = np.cross(n, v0)/length
-            Dlambda[:, 1] = np.cross(n, v1)/length
-            Dlambda[:, 2] = np.cross(n, v2)/length
+            n = nv / length
+            Dlambda[:, 0] = np.cross(n, v0) / length
+            Dlambda[:, 1] = np.cross(n, v1) / length
+            Dlambda[:, 2] = np.cross(n, v2) / length
         return Dlambda
 
     def rot_lambda(self, index=np.s_[:]):
@@ -390,9 +387,9 @@ class TriangleMesh(Mesh, Plotable):
         elif GD == 3:
             length = np.linalg.norm(nv, axis=-1)
 
-        Rlambda[:,0,:] = v0/length.reshape((-1, 1))
-        Rlambda[:,1,:] = v1/length.reshape((-1, 1))
-        Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+        Rlambda[:, 0, :] = v0 / length.reshape((-1, 1))
+        Rlambda[:, 1, :] = v1 / length.reshape((-1, 1))
+        Rlambda[:, 2, :] = v2 / length.reshape((-1, 1))
 
         return Rlambda
 
@@ -412,13 +409,15 @@ class TriangleMesh(Mesh, Plotable):
             edge = self.entity('edge')
             cell = self.entity('cell')
             cell2edge = self.ds.cell_to_edge()
-            edge2newNode = np.arange(NN, NN+NE)
-            newNode = (node[edge[:,0],:] + node[edge[:,1],:])/2.0
+            edge2newNode = np.arange(NN, NN + NE)
+            newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
 
             if returnim:
-                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN + NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5 * np.ones(NE), (range(NN, NN + NE), edge[:, 0])), shape=(NN + NE, NN),
+                                dtype=self.ftype)
+                A += coo_matrix((0.5 * np.ones(NE), (range(NN, NN + NE), edge[:, 1])), shape=(NN + NE, NN),
+                                dtype=self.ftype)
                 nodeIMatrix.append(A.tocsr())
                 B = eye(NC, dtype=self.ftype)
                 B = bmat([[B], [B], [B], [B]])
@@ -434,15 +433,13 @@ class TriangleMesh(Mesh, Plotable):
                     levelset.project(p)
                     newNode[isInterfaceEdge] = p
 
-
             self.node = np.concatenate((node, newNode), axis=0)
             p = np.r_['-1', cell, edge2newNode[cell2edge]]
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
-            self.ds.reinit(NN+NE, cell)
+            self.ds.reinit(NN + NE, cell)
 
         if returnim:
             return nodeIMatrix, cellIMatrix
-
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
@@ -476,9 +473,8 @@ class TriangleMesh(Mesh, Plotable):
         else:
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
-
+                         nodedata=self.nodedata,
+                         celldata=self.celldata)
 
     def is_crossed_cell(self, point, segment):
         """
@@ -508,26 +504,25 @@ class TriangleMesh(Mesh, Plotable):
         location = self.location(point)
         isCrossedCell[location] = True
 
-
         # 从一个端点所在的单元出发，走到另一个端点所在的单元
-        p0 = point[segment[:, 0]] # 线段起点
-        p1 = point[segment[:, 1]] # 线段终点
+        p0 = point[segment[:, 0]]  # 线段起点
+        p1 = point[segment[:, 1]]  # 线段终点
         v = p0 - p1
 
-        start = location[segment[:, 0]] # 出发单元
-        end = location[segment[:, 1]] # 终止单元
+        start = location[segment[:, 0]]  # 出发单元
+        end = location[segment[:, 1]]  # 终止单元
 
         isNotOK = np.ones(len(segment), dtype=np.bool_)
         jdx = 3
         while isNotOK.any():
-            idx = start[isNotOK] # 当前单元
+            idx = start[isNotOK]  # 当前单元
 
             pp0 = p0[isNotOK]
             pp1 = p1[isNotOK]
             vv = v[isNotOK]
 
             a = np.zeros((len(idx), 3), dtype=self.ftype)
-            v0 = node[cell[idx, 0]] - pp1 # 所在单元的三个顶点
+            v0 = node[cell[idx, 0]] - pp1  # 所在单元的三个顶点
             v1 = node[cell[idx, 1]] - pp1
             v2 = node[cell[idx, 2]] - pp1
             a[:, 0] = np.cross(v0, vv)
@@ -539,7 +534,7 @@ class TriangleMesh(Mesh, Plotable):
             b[:, 1] = np.cross(v2, v0)
             b[:, 2] = np.cross(v0, v1)
 
-            isOK = np.sum(b >=0, axis=-1) == 3
+            isOK = np.sum(b >= 0, axis=-1) == 3
             idx0, = np.nonzero(isNotOK)
 
             for i in range(3):
@@ -550,19 +545,17 @@ class TriangleMesh(Mesh, Plotable):
             for i in range(3):
                 j = nx[i]
                 k = pr[i]
-                flag0 = (a[:, j] <= 0) & (a[:, k] >=0) & (jdx!=i)
+                flag0 = (a[:, j] <= 0) & (a[:, k] >= 0) & (jdx != i)
                 lidx[flag0] = i
 
             # 移动到下一个单元
             tmp = start[idx0[~isOK]]
             start[idx0[~isOK]] = cell2cell[idx[~isOK], lidx[~isOK]]
             isNotOK[idx0[isOK]] = False
-            _, jdx = np.where((cell2cell[start[isNotOK]].T==tmp).T)
+            _, jdx = np.where((cell2cell[start[isNotOK]].T == tmp).T)
 
             # 这些单元标记为穿过单元
             isCrossedCell[start] = True
-
-
 
         # 处理被线段穿过的网格点的连通性
 
@@ -607,14 +600,14 @@ class TriangleMesh(Mesh, Plotable):
         start[cell[:, 2]] = range(NC)
         tree = KDTree(node)
         _, loc = tree.query(points)
-        start = start[loc] # 设置一个初始单元位置
+        start = start[loc]  # 设置一个初始单元位置
 
         isNotOK = np.ones(NP, dtype=np.bool_)
         while np.any(isNotOK):
             idx = start[isNotOK]
             pp = points[isNotOK]
 
-            v0 = node[cell[idx, 0]] - pp # 所在单元的三个顶点
+            v0 = node[cell[idx, 0]] - pp  # 所在单元的三个顶点
             v1 = node[cell[idx, 1]] - pp
             v2 = node[cell[idx, 2]] - pp
 
@@ -646,25 +639,25 @@ class TriangleMesh(Mesh, Plotable):
         v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
         if GD == 2:
-            area = nv/2.0
-            x2 = np.sum(node**2, axis=1, keepdims=True)
+            area = nv / 2.0
+            x2 = np.sum(node ** 2, axis=1, keepdims=True)
             w0 = x2[cell[index, 2]] + x2[cell[index, 1]]
             w1 = x2[cell[index, 0]] + x2[cell[index, 2]]
             w2 = x2[cell[index, 1]] + x2[cell[index, 0]]
-            W = np.array([[0, -1],[1, 0]], dtype=self.ftype)
-            fe0 = w0*v0@W
-            fe1 = w1*v1@W
-            fe2 = w2*v2@W
-            c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
-            R = np.sqrt(np.sum((c-node[cell[index, 0], :])**2,axis=1))
+            W = np.array([[0, -1], [1, 0]], dtype=self.ftype)
+            fe0 = w0 * v0 @ W
+            fe1 = w1 * v1 @ W
+            fe2 = w2 * v2 @ W
+            c = 0.25 * (fe0 + fe1 + fe2) / area.reshape(-1, 1)
+            R = np.sqrt(np.sum((c - node[cell[index, 0], :]) ** 2, axis=1))
         elif GD == 3:
-            length = np.sqrt(np.sum(nv**2, axis=1))
-            n = nv/length.reshape((-1, 1))
-            l02 = np.sum(v1**2, axis=1, keepdims=True)
-            l01 = np.sum(v2**2, axis=1, keepdims=True)
-            d = 0.5*(l02*np.cross(n, v2) + l01*np.cross(-v1, n))/length.reshape(-1, 1)
+            length = np.sqrt(np.sum(nv ** 2, axis=1))
+            n = nv / length.reshape((-1, 1))
+            l02 = np.sum(v1 ** 2, axis=1, keepdims=True)
+            l01 = np.sum(v2 ** 2, axis=1, keepdims=True)
+            d = 0.5 * (l02 * np.cross(n, v2) + l01 * np.cross(-v1, n)) / length.reshape(-1, 1)
             c = node[cell[index, 0]] + d
-            R = np.sqrt(np.sum(d**2, axis=1))
+            R = np.sqrt(np.sum(d ** 2, axis=1))
 
         if returnradius:
             return c, R
@@ -677,10 +670,11 @@ class TriangleMesh(Mesh, Plotable):
         node = self.node
         localEdge = self.ds.local_edge()
         angle = np.zeros((NC, 3), dtype=self.ftype)
-        for i,(j,k) in zip(range(3),localEdge):
-            v0 = node[cell[:,j]] - node[cell[:,i]]
-            v1 = node[cell[:,k]] - node[cell[:,i]]
-            angle[:, i] = np.arccos(np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1) * np.sum(v1**2, axis=1)))
+        for i, (j, k) in zip(range(3), localEdge):
+            v0 = node[cell[:, j]] - node[cell[:, i]]
+            v1 = node[cell[:, k]] - node[cell[:, i]]
+            angle[:, i] = np.arccos(
+                np.sum(v0 * v1, axis=1) / np.sqrt(np.sum(v0 ** 2, axis=1) * np.sum(v1 ** 2, axis=1)))
         return angle
 
     def show_angle(self, axes, angle=None):
@@ -689,26 +683,26 @@ class TriangleMesh(Mesh, Plotable):
         """
         if angle is None:
             angle = self.angle()
-        hist, bins = np.histogram(angle.flatten('F')*180/np.pi, bins=50, range=(0, 180))
-        center = (bins[:-1] + bins[1:])/2
-        axes.bar(center, hist, align='center', width=180/50.0)
+        hist, bins = np.histogram(angle.flatten('F') * 180 / np.pi, bins=50, range=(0, 180))
+        center = (bins[:-1] + bins[1:]) / 2
+        axes.bar(center, hist, align='center', width=180 / 50.0)
         axes.set_xlim(0, 180)
-        mina = np.min(angle.flatten('F')*180/np.pi)
-        maxa = np.max(angle.flatten('F')*180/np.pi)
-        meana = np.mean(angle.flatten('F')*180/np.pi)
+        mina = np.min(angle.flatten('F') * 180 / np.pi)
+        maxa = np.max(angle.flatten('F') * 180 / np.pi)
+        meana = np.mean(angle.flatten('F') * 180 / np.pi)
         axes.annotate('Min angle: {:.4}'.format(mina), xy=(0.41, 0.5),
-                textcoords='axes fraction',
-                horizontalalignment='left', verticalalignment='top')
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
         axes.annotate('Max angle: {:.4}'.format(maxa), xy=(0.41, 0.45),
-                textcoords='axes fraction',
-                horizontalalignment='left', verticalalignment='top')
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
         axes.annotate('Average angle: {:.4}'.format(meana), xy=(0.41, 0.40),
-                textcoords='axes fraction',
-                horizontalalignment='left', verticalalignment='top')
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
         return mina, maxa, meana
 
-    def cell_quality(self,measure='radius_ratio'):
-        if measure=='radius_ratio':
+    def cell_quality(self, measure='radius_ratio'):
+        if measure == 'radius_ratio':
             return radius_ratio(self)
 
     def show_quality(self, axes, qtype=None, quality=None):
@@ -724,17 +718,16 @@ class TriangleMesh(Mesh, Plotable):
         center = (bins[:-1] + bins[1:]) / 2
         axes.bar(center, hist, align='center', width=0.02)
         axes.set_xlim(0, 1)
-        axes.annotate('Min quality: {:.6}'.format(minq), xy=(0,0),xytext=(0.1, 0.5),
-                textcoords='axes fraction',
-                horizontalalignment='left', verticalalignment='top')
-        axes.annotate('Max quality: {:.6}'.format(maxq), xy=(0,0),xytext=(0.1, 0.45),
-                textcoords='axes fraction',
-                horizontalalignment='left', verticalalignment='top')
-        axes.annotate('Average quality: {:.6}'.format(meanq), xy=(0,0),xytext=(0.1, 0.40),
-                textcoords='axes fraction',
-                horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Min quality: {:.6}'.format(minq), xy=(0, 0), xytext=(0.1, 0.5),
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Max quality: {:.6}'.format(maxq), xy=(0, 0), xytext=(0.1, 0.45),
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Average quality: {:.6}'.format(meanq), xy=(0, 0), xytext=(0.1, 0.40),
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
         return minq, maxq, meanq
-
 
     def edge_swap(self):
         while True:
@@ -745,7 +738,7 @@ class TriangleMesh(Mesh, Plotable):
             # Find non-Delaunay edges
             angle = self.angle()
             asum = np.sum(angle[edge2cell[:, 0:2], edge2cell[:, 2:4]], axis=1)
-            isNonDelaunayEdge = (asum > np.pi) & (edge2cell[:,0] != edge2cell[:,1])
+            isNonDelaunayEdge = (asum > np.pi) & (edge2cell[:, 0] != edge2cell[:, 1])
 
             if np.sum(isNonDelaunayEdge) == 0:
                 break
@@ -789,23 +782,23 @@ class TriangleMesh(Mesh, Plotable):
         isBdCell = self.ds.boundary_cell_flag()
         isFreeNode = ~isBdNode
 
-        cm = self.entity_measure("cell") # 单元面积
-        cb = self.entity_barycenter('cell') # 单元重心
-        cc = self.circumcenter() # 单元外心
+        cm = self.entity_measure("cell")  # 单元面积
+        cb = self.entity_barycenter('cell')  # 单元重心
+        cc = self.circumcenter()  # 单元外心
         cc[isBdCell] = cb[isBdCell]
-        cc = cm[...,None]*cc
+        cc = cm[..., None] * cc
 
-        newNode = np.zeros((NN,2),dtype=np.float64)
-        patch_area = np.zeros(NN,dtype=np.float64)
+        newNode = np.zeros((NN, 2), dtype=np.float64)
+        patch_area = np.zeros(NN, dtype=np.float64)
 
-        np.add.at(newNode,cell,np.broadcast_to(cc[:,None],(NC,3,2)))
-        np.add.at(patch_area,cell,np.broadcast_to(cm[:,None],(NC,3)))
+        np.add.at(newNode, cell, np.broadcast_to(cc[:, None], (NC, 3, 2)))
+        np.add.at(patch_area, cell, np.broadcast_to(cm[:, None], (NC, 3)))
 
         newNode[isBdNode] = node[isBdNode]
-        newNode[isFreeNode] = newNode[isFreeNode]/patch_area[...,None][isFreeNode]
+        newNode[isFreeNode] = newNode[isFreeNode] / patch_area[..., None][isFreeNode]
         self.node = newNode
-        while np.sum(cm<=0)>0:
-            self.node[isFreeNode] = (1-alpha/2)*node[isFreeNode]+alpha*newNode[isFreeNode]
+        while np.sum(cm <= 0) > 0:
+            self.node[isFreeNode] = (1 - alpha / 2) * node[isFreeNode] + alpha * newNode[isFreeNode]
         self.edge_swap()
 
     def cpt_iterate(self):
@@ -820,21 +813,21 @@ class TriangleMesh(Mesh, Plotable):
         isBdCell = self.ds.boundary_cell_flag()
         isFreeNode = ~isBdNode
 
-        cm = self.entity_measure("cell") # 单元面积
-        cb = self.entity_barycenter('cell') # 单元重心
-        cb = cm[...,None]*cb
+        cm = self.entity_measure("cell")  # 单元面积
+        cb = self.entity_barycenter('cell')  # 单元重心
+        cb = cm[..., None] * cb
 
-        newNode = np.zeros((NN,2),dtype=np.float64)
-        patch_area = np.zeros(NN,dtype=np.float64)
+        newNode = np.zeros((NN, 2), dtype=np.float64)
+        patch_area = np.zeros(NN, dtype=np.float64)
 
-        np.add.at(newNode,cell,np.broadcast_to(cb[:,None],(NC,3,2)))
-        np.add.at(patch_area,cell,np.broadcast_to(cm[:,None],(NC,3)))
+        np.add.at(newNode, cell, np.broadcast_to(cb[:, None], (NC, 3, 2)))
+        np.add.at(patch_area, cell, np.broadcast_to(cm[:, None], (NC, 3)))
 
         newNode[isBdNode] = node[isBdNode]
-        newNode[isFreeNode] = newNode[isFreeNode]/patch_area[...,None][isFreeNode]
+        newNode[isFreeNode] = newNode[isFreeNode] / patch_area[..., None][isFreeNode]
         self.node = newNode
-        while np.sum(cm<=0)>0:
-            self.node[isFreeNode] = (1-alpha/2)*node[isFreeNode]+alpha*newNode[isFreeNode]
+        while np.sum(cm <= 0) > 0:
+            self.node[isFreeNode] = (1 - alpha / 2) * node[isFreeNode] + alpha * newNode[isFreeNode]
         self.edge_swap()
 
     def uniform_bisect(self, n=1):
@@ -847,17 +840,17 @@ class TriangleMesh(Mesh, Plotable):
             IM=None,
             data=None,
             disp=True,
-            ):
+    ):
 
         options = {
-                'HB': HB,
-                'IM': IM,
-                'data': data,
-                'disp': disp
-            }
+            'HB': HB,
+            'IM': IM,
+            'data': data,
+            'disp': disp
+        }
         return options
 
-    def bisect(self, isMarkedCell=None, options={'disp':True}):
+    def bisect(self, isMarkedCell=None, options={'disp': True}):
 
         if options['disp']:
             print('Bisection begining......')
@@ -886,19 +879,19 @@ class TriangleMesh(Mesh, Plotable):
             print('The initial number of marked elements:', isMarkedCell.sum())
 
         markedCell, = np.nonzero(isMarkedCell)
-        while len(markedCell)>0:
-            isCutEdge[cell2edge[markedCell, 0]]=True
+        while len(markedCell) > 0:
+            isCutEdge[cell2edge[markedCell, 0]] = True
             refineNeighbor = cell2cell[markedCell, 0]
-            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
+            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor, 0]]]
 
         if options['disp']:
             print('The number of markedg edges: ', isCutEdge.sum())
 
         edge2newNode = np.zeros((NE,), dtype=self.itype)
-        edge2newNode[isCutEdge] = np.arange(NN, NN+isCutEdge.sum())
+        edge2newNode[isCutEdge] = np.arange(NN, NN + isCutEdge.sum())
 
         node = self.node
-        newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:])
+        newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
         self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
 
@@ -908,31 +901,31 @@ class TriangleMesh(Mesh, Plotable):
         if 'IM' in options:
             nn = len(newNode)
             IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
-                    shape=(NN+nn, NN), dtype=self.ftype)
+                            shape=(NN + nn, NN), dtype=self.ftype)
             val = np.full(nn, 0.5)
             IM += coo_matrix(
+                (
+                    val,
                     (
-                        val,
-                        (
-                            NN+np.arange(nn),
-                            edge[isCutEdge, 0]
-                        )
-                    ), shape=(NN+nn, NN), dtype=self.ftype)
+                        NN + np.arange(nn),
+                        edge[isCutEdge, 0]
+                    )
+                ), shape=(NN + nn, NN), dtype=self.ftype)
             IM += coo_matrix(
+                (
+                    val,
                     (
-                        val,
-                        (
-                            NN+np.arange(nn),
-                            edge[isCutEdge, 1]
-                        )
-                    ), shape=(NN+nn, NN), dtype=self.ftype)
+                        NN + np.arange(nn),
+                        edge[isCutEdge, 1]
+                    )
+                ), shape=(NN + nn, NN), dtype=self.ftype)
             options['IM'] = IM.tocsr()
 
         if 'HB' in options:
             options['HB'] = np.arange(NC)
 
         for k in range(2):
-            idx, = np.nonzero(edge2newNode[cell2edge0]>0)
+            idx, = np.nonzero(edge2newNode[cell2edge0] > 0)
             nc = len(idx)
             if nc == 0:
                 break
@@ -942,31 +935,31 @@ class TriangleMesh(Mesh, Plotable):
                 options['HB'] = np.concatenate((HB, HB[idx]), axis=0)
 
             L = idx
-            R = np.arange(NC, NC+nc)
+            R = np.arange(NC, NC + nc)
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
-                    if value.shape == (NC,): # 分片常数
-                        value= np.r_[value[:], value[idx]]
+                    if value.shape == (NC,):  # 分片常数
+                        value = np.r_[value[:], value[idx]]
                         options['data'][key] = value
-                    elif value.shape == (NN+k*nn, ):
+                    elif value.shape == (NN + k * nn,):
                         if k == 0:
-                            value = np.r_['0', value, np.zeros((nn, ), dtype=self.ftype)]
-                            value[NN:] = 0.5*(value[edge[isCutEdge,0]] + value[edge[isCutEdge,1]])
+                            value = np.r_['0', value, np.zeros((nn,), dtype=self.ftype)]
+                            value[NN:] = 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]])
                             options['data'][key] = value
                     else:
                         ldof = value.shape[-1]
-                        p = int((np.sqrt(1+8*ldof)-3)//2)
-                        bc = self.multi_index_matrix(p, etype=2)/p
+                        p = int((np.sqrt(1 + 8 * ldof) - 3) // 2)
+                        bc = self.multi_index_matrix(p, etype=2) / p
 
                         bcl = np.zeros_like(bc)
                         bcl[:, 0] = bc[:, 1]
-                        bcl[:, 1] = 1/2*bc[:, 0] + bc[:,2]
-                        bcl[:, 2] = 1/2*bc[:, 0]
+                        bcl[:, 1] = 1 / 2 * bc[:, 0] + bc[:, 2]
+                        bcl[:, 2] = 1 / 2 * bc[:, 0]
 
                         bcr = np.zeros_like(bc)
                         bcr[:, 0] = bc[:, 2]
-                        bcr[:, 1] = 1/2*bc[:, 0]
-                        bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
+                        bcr[:, 1] = 1 / 2 * bc[:, 0]
+                        bcr[:, 2] = 1 / 2 * bc[:, 0] + bc[:, 1]
 
                         value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
 
@@ -978,25 +971,23 @@ class TriangleMesh(Mesh, Plotable):
 
                         options['data'][key] = value
 
-
-
-            p0 = cell[idx,0]
-            p1 = cell[idx,1]
-            p2 = cell[idx,2]
+            p0 = cell[idx, 0]
+            p1 = cell[idx, 1]
+            p2 = cell[idx, 2]
             p3 = edge2newNode[cell2edge0[idx]]
-            cell = np.concatenate((cell, np.zeros((nc,3), dtype=self.itype)), axis=0)
-            cell[L,0] = p3
-            cell[L,1] = p0
-            cell[L,2] = p1
-            cell[R,0] = p3
-            cell[R,1] = p2
-            cell[R,2] = p0
+            cell = np.concatenate((cell, np.zeros((nc, 3), dtype=self.itype)), axis=0)
+            cell[L, 0] = p3
+            cell[L, 1] = p0
+            cell[L, 2] = p1
+            cell[R, 0] = p3
+            cell[R, 1] = p2
+            cell[R, 2] = p0
             if k == 0:
-                cell2edge0 = np.zeros((NC+nc,), dtype=self.itype)
-                cell2edge0[0:NC] = cell2edge[:,0]
-                cell2edge0[L] = cell2edge[idx,2]
-                cell2edge0[R] = cell2edge[idx,1]
-            NC = NC+nc
+                cell2edge0 = np.zeros((NC + nc,), dtype=self.itype)
+                cell2edge0[0:NC] = cell2edge[:, 0]
+                cell2edge0[L] = cell2edge[idx, 2]
+                cell2edge0[R] = cell2edge[idx, 1]
+            NC = NC + nc
 
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
@@ -1011,7 +1002,6 @@ class TriangleMesh(Mesh, Plotable):
         if isMarkedCell is None:
             return
 
-
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
 
@@ -1019,7 +1009,7 @@ class TriangleMesh(Mesh, Plotable):
         node = self.entity('node')
 
         valence = np.zeros(NN, dtype=self.itype)
-        np.add.at(valence, cell,1)
+        np.add.at(valence, cell, 1)
 
         valenceNew = np.zeros(NN, dtype=self.itype)
         np.add.at(valenceNew, cell[isMarkedCell][:, 0], 1)
@@ -1034,8 +1024,8 @@ class TriangleMesh(Mesh, Plotable):
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
         iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
-        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]]
-        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]]
+        nodeStar[ix & (~iy), :] = nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]]
+        nodeStar[(~ix) & iy, :] = nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]]
 
         t0 = nodeStar[:, 0]
         t1 = nodeStar[:, 1]
@@ -1060,7 +1050,7 @@ class TriangleMesh(Mesh, Plotable):
         I, J = node2cell[isBGoodNode, :].nonzero()
         nodeStar = J.reshape(-1, 2)
         idx = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 1], 1])
-        nodeStar[idx, :] = nodeStar[idx, :][:, [1,0]]
+        nodeStar[idx, :] = nodeStar[idx, :][:, [1, 0]]
 
         t4 = nodeStar[:, 0]
         t5 = nodeStar[:, 1]
@@ -1080,23 +1070,23 @@ class TriangleMesh(Mesh, Plotable):
             ridx = np.r_[t1, t3, t5]
             for key, value in options['data'].items():
                 ldof = value.shape[1]
-                p = int((np.sqrt(8*ldof+1) - 3)/2)
-                bc = self.multi_index_matrix(p=p, etype=2)/p
+                p = int((np.sqrt(8 * ldof + 1) - 3) / 2)
+                bc = self.multi_index_matrix(p=p, etype=2) / p
                 bcl = np.zeros_like(bc)
-                bcl[:, 0] = 2*bc[:, 2]
+                bcl[:, 0] = 2 * bc[:, 2]
                 bcl[:, 1] = bc[:, 0]
                 bcl[:, 2] = bc[:, 1] - bc[:, 2]
 
                 bcr = np.zeros_like(bc)
-                bcr[:, 0] = 2*bc[:, 1]
+                bcr[:, 0] = 2 * bc[:, 1]
                 bcr[:, 1] = bc[:, 2] - bc[:, 1]
                 bcr[:, 2] = bc[:, 0]
 
-                phi = self.shape_function(bcl, p=p) # (NQ, ldof)
+                phi = self.shape_function(bcl, p=p)  # (NQ, ldof)
                 value[lidx, :] = np.einsum('ci, qi->cq', value[lidx, :], phi)
 
-                phi = self.shape_function(bcr, p=p) # (NQ, ldof)
-                value[lidx, :]+= np.einsum('ci, qi->cq', value[ridx, :], phi)
+                phi = self.shape_function(bcr, p=p)  # (NQ, ldof)
+                value[lidx, :] += np.einsum('ci, qi->cq', value[ridx, :], phi)
                 value[lidx] /= 2
                 options['data'][key] = value[isKeepCell]
 
@@ -1111,7 +1101,6 @@ class TriangleMesh(Mesh, Plotable):
         cell = idxMap[cell]
 
         self.ds = TriangleMeshDataStructure(NN, cell)
-
 
     def label(self, node=None, cell=None, cellidx=None):
         """单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
@@ -1138,17 +1127,17 @@ class TriangleMesh(Mesh, Plotable):
         NC = cellidx.shape[0]
         localEdge = self.ds.localEdge
         totalEdge = cell[cellidx][:, localEdge].reshape(
-                -1, localEdge.shape[1])
+            -1, localEdge.shape[1])
         NE = totalEdge.shape[0]
         length = np.sum(
-                (node[totalEdge[:, 1]] - node[totalEdge[:, 0]])**2,
-                axis = -1)
-        length += 0.1*np.random.rand(NE)*length
+            (node[totalEdge[:, 1]] - node[totalEdge[:, 0]]) ** 2,
+            axis=-1)
+        length += 0.1 * np.random.rand(NE) * length
         cellEdgeLength = length.reshape(NC, 3)
         lidx = np.argmax(cellEdgeLength, axis=-1)
 
         flag = (lidx == 1)
-        if  sum(flag) > 0:
+        if sum(flag) > 0:
             cell[cellidx[flag], :] = cell[cellidx[flag]][:, [1, 2, 0]]
 
         flag = (lidx == 2)
@@ -1164,54 +1153,53 @@ class TriangleMesh(Mesh, Plotable):
             maxrefine=5,
             maxcoarsen=0,
             theta=1.0,
-            tol=1e-6, # 目标误差
+            tol=1e-6,  # 目标误差
             HB=None,
             imatrix=False,
             data=None,
             disp=True,
-            ):
+    ):
 
         options = {
-                'method': method,
-                'maxrefine': maxrefine,
-                'maxcoarsen': maxcoarsen,
-                'theta': theta,
-                'tol': tol,
-                'data': data,
-                'HB': HB,
-                'imatrix': imatrix,
-                'disp': disp
-            }
+            'method': method,
+            'maxrefine': maxrefine,
+            'maxcoarsen': maxcoarsen,
+            'theta': theta,
+            'tol': tol,
+            'data': data,
+            'HB': HB,
+            'imatrix': imatrix,
+            'disp': disp
+        }
         return options
-
 
     def adaptive(self, eta, options):
         theta = options['theta']
         if options['method'] == 'mean':
             options['numrefine'] = np.around(
-                    np.log2(eta/(theta*np.mean(eta)))
-                )
+                np.log2(eta / (theta * np.mean(eta)))
+            )
         elif options['method'] == 'max':
             options['numrefine'] = np.around(
-                    np.log2(eta/(theta*np.max(eta)))
-                )
+                np.log2(eta / (theta * np.max(eta)))
+            )
         elif options['method'] == 'median':
             options['numrefine'] = np.around(
-                    np.log2(eta/(theta*np.median(eta)))
-                )
+                np.log2(eta / (theta * np.median(eta)))
+            )
         elif options['method'] == 'min':
             options['numrefine'] = np.around(
-                    np.log2(eta/(theta*np.min(eta)))
-                )
+                np.log2(eta / (theta * np.min(eta)))
+            )
         elif options['method'] == 'target':
             NT = self.number_of_cells()
-            e = options['tol']/np.sqrt(NT)
+            e = options['tol'] / np.sqrt(NT)
             options['numrefine'] = np.around(
-                    np.log2(eta/(theta*e)
-                ))
+                np.log2(eta / (theta * e)
+                        ))
         else:
             raise ValueError(
-                    "I don't know anyting about method %s!".format(options['method']))
+                "I don't know anyting about method %s!".format(options['method']))
 
         flag = options['numrefine'] > options['maxrefine']
         options['numrefine'][flag] = options['maxrefine']
@@ -1253,25 +1241,25 @@ class TriangleMesh(Mesh, Plotable):
             markedCell, = np.nonzero(isMarkedCell)
 
         # allocate new memory for node and cell
-        node = np.zeros((5*NN, GD), dtype=self.ftype)
-        cell = np.zeros((3*NC, 3), dtype=self.itype)
+        node = np.zeros((5 * NN, GD), dtype=self.ftype)
+        cell = np.zeros((3 * NC, 3), dtype=self.itype)
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
-            options['numrefine'] = np.r_[options['numrefine'], np.zeros(2*NC)]
+            options['numrefine'] = np.r_[options['numrefine'], np.zeros(2 * NC)]
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
 
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
-        generation = np.zeros(NN + 2*NC, dtype=np.uint8)
+        generation = np.zeros(NN + 2 * NC, dtype=np.uint8)
 
         # 用于记录被二分的边及其中点编号
-        cutEdge = np.zeros((4*NN, 3), dtype=self.itype)
+        cutEdge = np.zeros((4 * NN, 3), dtype=self.itype)
 
         # 当前的二分边的数目
         nCut = 0
         # 非协调边的标记数组
-        nonConforming = np.ones(4*NN, dtype=np.bool_)
+        nonConforming = np.ones(4 * NN, dtype=np.bool_)
         while len(markedCell) != 0:
             # 标记最长边
             self.label(node, cell, markedCell)
@@ -1285,8 +1273,8 @@ class TriangleMesh(Mesh, Plotable):
             nMarked = len(markedCell)
             p3 = np.zeros(nMarked, dtype=self.itype)
 
-            if nCut == 0: # 如果是第一次循环
-                idx = np.arange(nMarked) # cells introduce new cut edges
+            if nCut == 0:  # 如果是第一次循环
+                idx = np.arange(nMarked)  # cells introduce new cut edges
             else:
                 # all non-conforming edges
                 ncEdge = np.nonzero(nonConforming[:nCut])
@@ -1295,9 +1283,9 @@ class TriangleMesh(Mesh, Plotable):
                 J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
                 val = np.ones(len(I), dtype=np.bool_)
                 nv2v = csr_matrix(
-                        (val, (I, J)),
-                        shape=(NN, NN))
-                i, j =  np.nonzero(nv2v[:, p1].multiply(nv2v[:, p2]))
+                    (val, (I, J)),
+                    shape=(NN, NN))
+                i, j = np.nonzero(nv2v[:, p1].multiply(nv2v[:, p2]))
                 p3[j] = i
                 idx, = np.nonzero(p3 == 0)
 
@@ -1317,11 +1305,11 @@ class TriangleMesh(Mesh, Plotable):
                 # 获得唯一的边
                 i, j = s.nonzero()
                 nNew = len(i)
-                newCutEdge = np.arange(nCut, nCut+nNew)
+                newCutEdge = np.arange(nCut, nCut + nNew)
                 cutEdge[newCutEdge, 0] = i
                 cutEdge[newCutEdge, 1] = j
-                cutEdge[newCutEdge, 2] = range(NN, NN+nNew)
-                node[NN:NN+nNew, :] = (node[i, :] + node[j, :])/2.0
+                cutEdge[newCutEdge, 2] = range(NN, NN + nNew)
+                node[NN:NN + nNew, :] = (node[i, :] + node[j, :]) / 2.0
                 nCut += nNew
                 NN += nNew
 
@@ -1330,28 +1318,28 @@ class TriangleMesh(Mesh, Plotable):
                 J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
                 val = np.ones(len(I), dtype=np.bool_)
                 nv2v = csr_matrix(
-                        (val, (I, J)),
-                        shape=(NN, NN))
-                i, j =  np.nonzero(nv2v[:, p1].multiply(nv2v[:, p2]))
+                    (val, (I, J)),
+                    shape=(NN, NN))
+                i, j = np.nonzero(nv2v[:, p1].multiply(nv2v[:, p2]))
                 p3[j] = i
 
             # 如果新点的代数仍然为 0
             idx = (generation[p3] == 0)
             cellGeneration = np.max(
-                    generation[cell[markedCell[idx]]],
-                    axis=-1)
+                generation[cell[markedCell[idx]]],
+                axis=-1)
             # 第几代点
             generation[p3[idx]] = cellGeneration + 1
             cell[markedCell, 0] = p3
             cell[markedCell, 1] = p0
             cell[markedCell, 2] = p1
-            cell[NC:NC+nMarked, 0] = p3
-            cell[NC:NC+nMarked, 1] = p2
-            cell[NC:NC+nMarked, 2] = p0
+            cell[NC:NC + nMarked, 0] = p3
+            cell[NC:NC + nMarked, 1] = p2
+            cell[NC:NC + nMarked, 2] = p0
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
                 options['numrefine'][markedCell] -= 1
-                options['numrefine'][NC:NC+nMarked] = options['numrefine'][markedCell]
+                options['numrefine'][NC:NC + nMarked] = options['numrefine'][markedCell]
 
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3
@@ -1361,8 +1349,8 @@ class TriangleMesh(Mesh, Plotable):
             isCheckNode = np.zeros(NN, dtype=np.bool_)
             isCheckNode[cutEdge[checkEdge]] = True
             isCheckCell = np.sum(
-                    isCheckNode[cell[:NC]],
-                    axis= -1) > 0
+                isCheckNode[cell[:NC]],
+                axis=-1) > 0
             # 找到所有包含检查节点的单元编号
             checkCell, = np.nonzero(isCheckCell)
             I = np.repeat(checkCell, 3)
@@ -1370,9 +1358,9 @@ class TriangleMesh(Mesh, Plotable):
             val = np.ones(len(I), dtype=np.bool_)
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             i, j = np.nonzero(
-                    cell2node[:, cutEdge[checkEdge, 0]].multiply(
-                        cell2node[:, cutEdge[checkEdge, 1]]
-                        ))
+                cell2node[:, cutEdge[checkEdge, 0]].multiply(
+                    cell2node[:, cutEdge[checkEdge, 1]]
+                ))
             markedCell = np.unique(i)
             nonConforming[checkEdge] = False
             nonConforming[checkEdge[j]] = True;
@@ -1380,13 +1368,13 @@ class TriangleMesh(Mesh, Plotable):
         if ('imatrix' in options) and (options['imatrix'] is True):
             nn = NN - NN0
             IM = coo_matrix(
+                (
+                    np.ones(NN0),
                     (
-                        np.ones(NN0),
-                        (
-                            np.arange(NN0),
-                            np.arange(NN0)
-                        )
-                    ), shape=(NN, NN), dtype=self.ftype)
+                        np.arange(NN0),
+                        np.arange(NN0)
+                    )
+                ), shape=(NN, NN), dtype=self.ftype)
             cutEdge = cutEdge[:nn]
             val = np.full((nn, 2), 0.5, dtype=self.ftype)
 
@@ -1404,7 +1392,7 @@ class TriangleMesh(Mesh, Plotable):
                 jc[j < NN0, 1] = 1.0
                 ic[i >= NN0, :] = val[i[i >= NN0] - NN0, :]
                 jc[j >= NN0, :] = val[j[j >= NN0] - NN0, :]
-                val[markedNode - NN0, :] = 0.5*(ic + jc)
+                val[markedNode - NN0, :] = 0.5 * (ic + jc)
                 cutEdge[nidx[i >= NN0], 0] = cutEdge[i[i >= NN0] - NN0, 0]
                 cutEdge[nidx[j >= NN0], 1] = cutEdge[j[j >= NN0] - NN0, 1]
                 g += 1
@@ -1412,19 +1400,18 @@ class TriangleMesh(Mesh, Plotable):
                 N = len(markedNode)
 
             IM += coo_matrix(
+                (
+                    val.flat,
                     (
-                        val.flat,
-                        (
-                            cutEdge[:, [2, 2]].flat,
-                            cutEdge[:, [0, 1]].flat
-                        )
-                    ), shape=(NN, NN0), dtype=self.ftype)
+                        cutEdge[:, [2, 2]].flat,
+                        cutEdge[:, [0, 1]].flat
+                    )
+                ), shape=(NN, NN0), dtype=self.ftype)
             options['imatrix'] = IM.tocsr()
 
         self.node = node[:NN]
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
-
 
     def jacobian_matrix(self, index=np.s_[:]):
         """
@@ -1443,7 +1430,6 @@ class TriangleMesh(Mesh, Plotable):
 
         return J
 
-
     def cell_area(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
@@ -1452,9 +1438,9 @@ class TriangleMesh(Mesh, Plotable):
         v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
         if GD == 2:
-            a = nv/2.0
+            a = nv / 2.0
         elif GD == 3:
-            a = np.sqrt(np.square(nv).sum(axis=1))/2.0
+            a = np.sqrt(np.square(nv).sum(axis=1)) / 2.0
         return a
 
     def point_to_bc(self, point):
@@ -1463,15 +1449,15 @@ class TriangleMesh(Mesh, Plotable):
         cell = self.entity('cell')
         i_cellmeasure = self.cell_area()[i_cell]
         i_cell = node[cell[i_cell]]
-        point = point[:,np.newaxis, :]
+        point = point[:, np.newaxis, :]
         v = i_cell - point
-        area0 = 0.5* np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
-        area1 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
-        area2 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
+        area0 = 0.5 * np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
+        area1 = 0.5 * np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
+        area2 = 0.5 * np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
         result = np.zeros((i_cell.shape[0], 3))
-        result[:, 0] = area0/i_cellmeasure
-        result[:, 1] = area1/i_cellmeasure
-        result[:, 2] = area2/i_cellmeasure
+        result[:, 0] = area0 / i_cellmeasure
+        result[:, 1] = area1 / i_cellmeasure
+        result[:, 2] = area2 / i_cellmeasure
         return result
 
     def mark_interface_cell(self, phi):
@@ -1535,10 +1521,9 @@ class TriangleMesh(Mesh, Plotable):
         isLinkNode = (valence > 2) & (phi != 0)
         print("isLinkNode:", isLinkNode.sum())
 
-
         # case：离散曲率
         isInteriorNode = phi < 0
-        tangle = np.zeros(NN, dtype=self.itype) # 记录界面转角
+        tangle = np.zeros(NN, dtype=self.itype)  # 记录界面转角
         isIn = isInterfaceNode & isInteriorNode & (~is360) & (~isLinkNode)
         if np.any(isIn):
             tangle[isIn] = 180 - (360 - angle[isIn]);
@@ -1552,7 +1537,6 @@ class TriangleMesh(Mesh, Plotable):
         ta = tangle[edge[isInterfaceEdge][:, 1::-1]]
         np.add.at(tangle, edge[isInterfaceEdge], ta)
 
-
         flag = np.abs(tangle) > 170
         print("转角:", flag.sum())
 
@@ -1561,15 +1545,14 @@ class TriangleMesh(Mesh, Plotable):
         isBigCurveCell = (isBigCurveNode[cell].sum(axis=1) > 0) & isInterfaceCell
 
         v = node[cell[:, 2]] - node[cell[:, 1]]
-        l = np.sqrt(np.sum(v**2, axis=1))
+        l = np.sqrt(np.sum(v ** 2, axis=1))
         if hmax is None:
             lmax = np.max(l)
-            isBigSizeCell = (l > lmax*lmax) & isInterfaceCell
+            isBigSizeCell = (l > lmax * lmax) & isInterfaceCell
         else:
             isBigSizeCell = (l > hmax) & isInterfaceCell
 
         return isBigCurveCell | isBigSizeCell
-
 
     def mark_interface_cell_with_type(self, phi, interface):
         """
@@ -1586,7 +1569,7 @@ class TriangleMesh(Mesh, Plotable):
         cell2cell = self.ds.cell_to_cell()
 
         v = node[cell[:, 2]] - node[cell[:, 1]]
-        cellType = (np.abs(v[:, 0]) > 0.0) & (np.abs(v[:, 1]) > 0.0) # TODO: 0.0-->eps
+        cellType = (np.abs(v[:, 0]) > 0.0) & (np.abs(v[:, 1]) > 0.0)  # TODO: 0.0-->eps
         isInterfaceCell = self.mark_interface_cell(phi)
 
         isMark = np.zeros(NC, dtype=np.bool_)
@@ -1595,7 +1578,7 @@ class TriangleMesh(Mesh, Plotable):
 
         n0 = cell2cell[:, 0]
         isTransitionTypeBCell = isInterfaceCell & isInterfaceCell[cell2cell[:,
-            0]] & (cell2cell[n0, 0] != range(NC)) & (~cellType)
+                                                                  0]] & (cell2cell[n0, 0] != range(NC)) & (~cellType)
 
         # Case 1:
         n1 = cell2cell[:, 1]
@@ -1607,13 +1590,13 @@ class TriangleMesh(Mesh, Plotable):
             p2 = node[cell[idx, 2]]
             p3 = node[cell[n1[idx], 0]]
 
-            m03 = (p0 + p3)/2
-            m23 = (p2 + p3)/2
-            m12 = (p1 + p2)/2
-            m0 = (m12 + p2)/2
-            m1 = (m12 + p1)/2
-            isNotTB = ((phi[cell[idx, 2]]*interface(m0) > 0.0) &
-                    (interface(m03)*interface(m23) < 0.0)) | (interface(m0)*interface(m1) < 0.0)
+            m03 = (p0 + p3) / 2
+            m23 = (p2 + p3) / 2
+            m12 = (p1 + p2) / 2
+            m0 = (m12 + p2) / 2
+            m1 = (m12 + p1) / 2
+            isNotTB = ((phi[cell[idx, 2]] * interface(m0) > 0.0) &
+                       (interface(m03) * interface(m23) < 0.0)) | (interface(m0) * interface(m1) < 0.0)
 
             isTransitionTypeBCell[idx[isNotTB]] = False
 
@@ -1626,13 +1609,13 @@ class TriangleMesh(Mesh, Plotable):
             p1 = node[cell[idx, 1]]
             p2 = node[cell[idx, 2]]
             p3 = node[cell[n2[idx], 0]]
-            m03 = (p0 + p3)/2
-            m13 = (p1 + p3)/2
-            m12 = (p1 + p2)/2
-            m0 = (m12 + p2)/2
-            m1 = (m12 + p1)/2
-            isNotTB = ((phi[cell[idx, 1]]*interface(m1) > 0.0) &
-                    (interface(m03)*interface(m13) < 0.0)) | (interface(m0)*interface(m1) < 0.0)
+            m03 = (p0 + p3) / 2
+            m13 = (p1 + p3) / 2
+            m12 = (p1 + p2) / 2
+            m0 = (m12 + p2) / 2
+            m1 = (m12 + p1) / 2
+            isNotTB = ((phi[cell[idx, 1]] * interface(m1) > 0.0) &
+                       (interface(m03) * interface(m13) < 0.0)) | (interface(m0) * interface(m1) < 0.0)
 
             isTransitionTypeBCell[idx[isNotTB]] = False
 
@@ -1643,10 +1626,10 @@ class TriangleMesh(Mesh, Plotable):
             idx, = np.nonzero(flag)
             p1 = node[cell[flag, 1]]
             p2 = node[cell[flag, 2]]
-            m12 = (p1 + p2)/2
-            m0 = (m12 + p2)/2
-            m1 = (m12 + p2)/2
-            isNotTB = interface(m0)*interface(m1) < 0.0
+            m12 = (p1 + p2) / 2
+            m0 = (m12 + p2) / 2
+            m1 = (m12 + p2) / 2
+            isNotTB = interface(m0) * interface(m1) < 0.0
             isTransitionTypeBCell[idx[isNotTB]] = False
 
         # Case 4:
@@ -1656,22 +1639,20 @@ class TriangleMesh(Mesh, Plotable):
             idx, = np.nonzero(flag)
             p1 = node[cell[idx, 1]]
             p2 = node[cell[idx, 2]]
-            m12 = (p1 + p2)/2
-            m0 = (m12 + p2)/2
-            m1 = (m12 + p1)/2
-            isNotTB = interface(m0)*interface(m1) < 0.0
+            m12 = (p1 + p2) / 2
+            m0 = (m12 + p2) / 2
+            m1 = (m12 + p1) / 2
+            isNotTB = interface(m0) * interface(m1) < 0.0
             isTransitionTypeBCell[idx[isNotTB]] = False
-
 
         isTypeBCell = isMark & (~cellType) & (~isTransitionTypeBCell)
         return isTypeBCell, cellType
-
 
     def bisect_interface_cell_with_curvature(self, interface, hmax):
         """
         """
         NN = self.number_of_nodes()
-        node= self.entity('node')
+        node = self.entity('node')
 
         phi = interface(node)
 
@@ -1679,7 +1660,7 @@ class TriangleMesh(Mesh, Plotable):
             raise ValueError('初始网格在界面围成区域的内部，需要更换一个可以覆盖界面的网格')
 
         # Step 1: 一致二分法加密网格
-        while np.all(phi>0):
+        while np.all(phi > 0):
             self.uniform_bisect()
             node = self.entity('node')
             phi = np.append(phi, interface(node[NN:]))
@@ -1697,7 +1678,6 @@ class TriangleMesh(Mesh, Plotable):
             phi = np.append(phi, interface(node[NN:]))
             NN = self.number_of_nodes()
             isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
-
 
         isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
@@ -1727,8 +1707,8 @@ class TriangleMesh(Mesh, Plotable):
         node = self.entity('node')
         cell = self.entity('cell')
         cax = axes.plot_trisurf(
-                node[:, 0], node[:, 1],
-                uh, triangles=cell, cmap=cmap, lw=0.0)
+            node[:, 0], node[:, 1],
+            uh, triangles=cell, cmap=cmap, lw=0.0)
         axes.figure.colorbar(cax, ax=axes)
         return axes
 
@@ -1745,7 +1725,7 @@ class TriangleMesh(Mesh, Plotable):
         else:
             n = 2
 
-        mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
         node = mesh.entity('node')
         ips = mesh.interpolation_points(p)
         c2p = mesh.cell_to_ipoint(p)
@@ -1772,12 +1752,10 @@ class TriangleMesh(Mesh, Plotable):
                 s = s.replace(']', ')')
                 s = s.replace(' ', ',')
                 axes.text(ips[i, 0], ips[i, 1], s,
-                        multialignment='center',
-                        fontsize=12,
-                        color='r')
+                          multialignment='center',
+                          fontsize=12,
+                          color='r')
         plt.show()
-
-
 
     @classmethod
     def show_shape_function(cls, p=1, funtype='L'):
@@ -1787,22 +1765,22 @@ class TriangleMesh(Mesh, Plotable):
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
 
-        mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
         TD = mesh.top_dimension()
         ldof = mesh.number_of_local_ipoints(p)
 
-        if p%2 == 0:
-            m = (p+2)//2
-            n = p+1
+        if p % 2 == 0:
+            m = (p + 2) // 2
+            n = p + 1
         else:
-            m = (p+1)//2
-            n = p+2
+            m = (p + 1) // 2
+            n = p + 2
 
         node = mesh.entity('node')
         ips = mesh.interpolation_points(p)
         c2p = mesh.cell_to_ipoint(p)
         ips = ips[c2p].reshape(-1, 2)
-        bcs = mesh.multi_index_matrix(10*p, TD)/10/p
+        bcs = mesh.multi_index_matrix(10 * p, TD) / 10 / p
         ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
         if funtype == 'L':
             phi = mesh.shape_function(bcs, p)
@@ -1810,22 +1788,22 @@ class TriangleMesh(Mesh, Plotable):
             phi = mesh._bernstein_shape_function(bcs, p)
         fig = plt.figure()
         for i in range(ldof):
-            axes = fig.add_subplot(m, n, i+1, projection='3d')
+            axes = fig.add_subplot(m, n, i + 1, projection='3d')
             axes.plot_trisurf(node[:, 0], node[:, 1], np.zeros(3),
-                    color='#99BBF6', alpha=0.5)
+                              color='#99BBF6', alpha=0.5)
 
             for j in range(3):
                 axes.scatter(node[j, 0], node[j, 1], 0.0, color='k')
                 axes.text(node[j, 0], node[j, 1], 0.0, f'$x_{j}$', color='k')
 
             axes.scatter(ips[i, 0], ips[i, 1], 1.0, color='r')
-            axes.text(ips[i, 0], ips[i, 1], 1+0.02, f'$p_{i}$', color='r')
+            axes.text(ips[i, 0], ips[i, 1], 1 + 0.02, f'$p_{i}$', color='r')
 
             axes.plot([ips[i, 0], ips[i, 0]], [ips[i, 1], ips[i, 1]], [0.0,
-                1.0], 'r--')
+                                                                       1.0], 'r--')
 
             axes.plot_trisurf(ps[:, 0], ps[:, 1], phi[:, i], cmap='viridis',
-                    linewidths=0)
+                              linewidths=0)
             axes.set_title(f'$\phi_{{{i}}}$')
             axes.set_xlabel('X')
             axes.set_ylabel('Y')
@@ -1849,25 +1827,25 @@ class TriangleMesh(Mesh, Plotable):
         """
         import matplotlib.pyplot as plt
 
-        mesh = cls.from_one_triangle('equ') # 返回只有一个单位等边三角形的网格
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
         TD = mesh.top_dimension()
         ldof = mesh.number_of_local_ipoints(p)
 
-        if p%2 == 0:
-            m = (p+2)//2
-            n = p+1
+        if p % 2 == 0:
+            m = (p + 2) // 2
+            n = p + 1
         else:
-            m = (p+1)//2
-            n = p+2
+            m = (p + 1) // 2
+            n = p + 2
 
         node = mesh.entity('node')
         ips = mesh.interpolation_points(p)
         c2p = mesh.cell_to_ipoint(p)
         ips = ips[c2p].reshape(-1, 2)
-        bcs = mesh.multi_index_matrix(p, TD)/p
+        bcs = mesh.multi_index_matrix(p, TD) / p
         ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
         if funtype == 'L':
-            gphi = mesh.grad_shape_function(bcs, p) #(NQ, NC, ldof, GD)
+            gphi = mesh.grad_shape_function(bcs, p)  # (NQ, NC, ldof, GD)
         elif funtype == 'B':
             R = mesh._grad_bernstein_shape_function(bcs, p)
             Dlambda = mesh.grad_lambda()
@@ -1875,14 +1853,13 @@ class TriangleMesh(Mesh, Plotable):
 
         fig = plt.figure()
         for i in range(ldof):
-            axes = fig.add_subplot(m, n, i+1)
+            axes = fig.add_subplot(m, n, i + 1)
             mesh.add_plot(axes)
             mesh.find_node(axes, node=ips, showindex=True)
             axes.quiver(ps[:, 0], ps[:, 1], gphi[:, 0, i, 0], gphi[:, 0, i, 1],
-                    units='xy')
+                        units='xy')
             axes.set_title(f'$\\nabla\\phi_{{{i}}}$')
         plt.show()
-
 
     @classmethod
     def from_obj_file(cls, fname):
@@ -1940,26 +1917,26 @@ class TriangleMesh(Mesh, Plotable):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TriangleMesh instance
         """
-        NN = (nx+1)*(ny+1)
-        NC = nx*ny
-        node = np.zeros((NN,2))
+        NN = (nx + 1) * (ny + 1)
+        NC = nx * ny
+        node = np.zeros((NN, 2))
         X, Y = np.mgrid[
-                box[0]:box[1]:(nx+1)*1j,
-                box[2]:box[3]:(ny+1)*1j]
+               box[0]:box[1]:(nx + 1) * 1j,
+               box[2]:box[3]:(ny + 1) * 1j]
         node[:, 0] = X.flat
         node[:, 1] = Y.flat
 
-        idx = np.arange(NN).reshape(nx+1, ny+1)
-        cell = np.zeros((2*NC, 3), dtype=np.int_)
-        cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
-        cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+        idx = np.arange(NN).reshape(nx + 1, ny + 1)
+        cell = np.zeros((2 * NC, 3), dtype=np.int_)
+        cell[:NC, 0] = idx[1:, 0:-1].flatten(order='F')
+        cell[:NC, 1] = idx[1:, 1:].flatten(order='F')
         cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
         cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
         cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
         cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
 
         if threshold is not None:
-            bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
+            bc = np.sum(node[cell, :], axis=1) / cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
             isValidNode = np.zeros(NN, dtype=np.bool_)
@@ -1973,7 +1950,7 @@ class TriangleMesh(Mesh, Plotable):
 
     @classmethod
     def from_meshio(cls, file, show=False):
-        import meshio 
+        import meshio
         data = meshio.read(file)
         node = data.points
         cell = data.cells_dict['triangle']
@@ -1986,16 +1963,17 @@ class TriangleMesh(Mesh, Plotable):
             ax = fig.add_subplot(111, projection='3d')
             mesh.add_plot(ax)
             plt.show()
-        return mesh 
+        return mesh
 
-    ## @ingroup MeshGenerators
+        ## @ingroup MeshGenerators
+
     @classmethod
     def from_one_triangle(cls, meshtype='iso'):
         if meshtype == 'equ':
             node = np.array([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, np.sqrt(3)/2]], dtype=np.float64)
+                [0.5, np.sqrt(3) / 2]], dtype=np.float64)
         elif meshtype == 'iso':
             node = np.array([
                 [0.0, 0.0],
@@ -2053,31 +2031,31 @@ class TriangleMesh(Mesh, Plotable):
         gmsh.model.add("UnitCircle")
 
         # 创建单位圆
-        gmsh.model.occ.addDisk(0.0,0.0,0.0,1,1,1)
+        gmsh.model.occ.addDisk(0.0, 0.0, 0.0, 1, 1, 1)
 
         # 同步几何模型
         gmsh.model.occ.synchronize()
 
         # 设置网格尺寸
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),h)
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
 
         # 生成网格
         gmsh.model.mesh.generate(2)
 
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = node_coords.reshape((-1,3))[:,:2]
+        node = node_coords.reshape((-1, 3))[:, :2]
 
         # 节点编号映射
-        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+        nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
 
         # 获取单元信息
-        cell_type = 2 # 三角形单元的类型编号为 2
-        cell_tags,cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
 
         # 节点编号映射到单元
         evid = np.array([nodetags_map[j] for j in cell_connectivity])
-        cell = evid.reshape((cell_tags.shape[-1],-1))
+        cell = evid.reshape((cell_tags.shape[-1], -1))
 
         gmsh.finalize()
 
@@ -2086,7 +2064,6 @@ class TriangleMesh(Mesh, Plotable):
         print(f"Number of cells: {cell.shape[0]}")
 
         return cls(node, cell)
-
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -2112,7 +2089,7 @@ class TriangleMesh(Mesh, Plotable):
         # 添加线段和循环
         lines = []
         for i in range(len(polygon_points)):
-            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i+1) % len(polygon_points)])
+            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i + 1) % len(polygon_points)])
             lines.append(line)
         curve_loop = gmsh.model.geo.addCurveLoop(lines)
 
@@ -2174,11 +2151,11 @@ class TriangleMesh(Mesh, Plotable):
                  array of node indices for each triangle.
         @todo 检查生成曲面单元的法向是否指向外部
         """
-        NN = nu*nv
-        NC = nu*nv
+        NN = nu * nv
+        NC = nu * nv
         node = np.zeros((NN, 3), dtype=np.float64)
 
-        U, V = np.mgrid[0:2*np.pi:nu*1j, 0:2*np.pi:nv*1j]
+        U, V = np.mgrid[0:2 * np.pi:nu * 1j, 0:2 * np.pi:nv * 1j]
         X = (R + r * np.cos(V)) * np.cos(U)
         Y = (R + r * np.cos(V)) * np.sin(U)
         Z = r * np.sin(V)
@@ -2186,13 +2163,13 @@ class TriangleMesh(Mesh, Plotable):
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
 
-        idx = np.zeros((nu+1, nv+1), np.int_)
+        idx = np.zeros((nu + 1, nv + 1), np.int_)
         idx[0:-1, 0:-1] = np.arange(NN).reshape(nu, nv)
         idx[-1, :] = idx[0, :]
         idx[:, -1] = idx[:, 0]
-        cell = np.zeros((2*NC, 3), dtype=np.int_)
-        cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
-        cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+        cell = np.zeros((2 * NC, 3), dtype=np.int_)
+        cell[:NC, 0] = idx[1:, 0:-1].flatten(order='F')
+        cell[:NC, 1] = idx[1:, 1:].flatten(order='F')
         cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
         cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
         cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
@@ -2207,27 +2184,26 @@ class TriangleMesh(Mesh, Plotable):
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
         """
-        t = (np.sqrt(5) - 1)/2
+        t = (np.sqrt(5) - 1) / 2
         node = np.array([
-            [ 0, 1, t],[ 0, 1,-t],[ 1, t, 0],[ 1,-t, 0],
-            [ 0,-1,-t],[ 0,-1, t],[ t, 0, 1],[-t, 0, 1],
-            [ t, 0,-1],[-t, 0,-1],[-1, t, 0],[-1,-t, 0]], dtype=np.float64)
+            [0, 1, t], [0, 1, -t], [1, t, 0], [1, -t, 0],
+            [0, -1, -t], [0, -1, t], [t, 0, 1], [-t, 0, 1],
+            [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=np.float64)
         cell = np.array([
-            [6, 2, 0],[3, 2, 6],[5, 3, 6],[5, 6, 7],
-            [6, 0, 7],[3, 8, 2],[2, 8, 1],[2, 1, 0],
-            [0, 1,10],[1, 9,10],[8, 9, 1],[4, 8, 3],
-            [4, 3, 5],[4, 5,11],[7,10,11],[0,10, 7],
-            [4,11, 9],[8, 4, 9],[5, 7,11],[10,9,11]], dtype=np.int_)
-        mesh = cls(node,cell)
+            [6, 2, 0], [3, 2, 6], [5, 3, 6], [5, 6, 7],
+            [6, 0, 7], [3, 8, 2], [2, 8, 1], [2, 1, 0],
+            [0, 1, 10], [1, 9, 10], [8, 9, 1], [4, 8, 3],
+            [4, 3, 5], [4, 5, 11], [7, 10, 11], [0, 10, 7],
+            [4, 11, 9], [8, 4, 9], [5, 7, 11], [10, 9, 11]], dtype=np.int_)
+        mesh = cls(node, cell)
         mesh.uniform_refine(refine)
         node = mesh.node
         cell = mesh.entity('cell')
-        d = np.sqrt(node[:,0]**2 + node[:,1]**2 + node[:,2]**2)-1
-        l = np.sqrt(np.sum(node**2,axis=1))
-        n = node/l[...,np.newaxis]
-        node = node - d[...,np.newaxis]*n
-        return cls(node,cell)
-
+        d = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2 + node[:, 2] ** 2) - 1
+        l = np.sqrt(np.sum(node ** 2, axis=1))
+        n = node / l[..., np.newaxis]
+        node = node - d[..., np.newaxis] * n
+        return cls(node, cell)
 
     @classmethod
     def from_box_with_interface(cls, interface, box, nx=10, ny=10):
@@ -2235,7 +2211,6 @@ class TriangleMesh(Mesh, Plotable):
         """
         from scipy.spatial import Delaunay
         from .uniform_mesh_2d import UniformMesh2d
-
 
     @classmethod
     def interfacemesh_generator(cls, box: Sequence[float], nx: int, ny: int, phi):
@@ -2277,20 +2252,20 @@ class TriangleMesh(Mesh, Plotable):
         pcell = np.zeros((NS * 2 + NT, 3), dtype=np.int_)
         temp = cell[~isInterfaceCell, :]
         pcell[0:NS, :] = temp[:, [1, 2, 0]]
-        pcell[NS:2*NS, :] = temp[:, [3, 0, 2]]
-        pcell[2*NS:, :] = tri
+        pcell[NS:2 * NS, :] = temp[:, [3, 0, 2]]
+        pcell[2 * NS:, :] = tri
 
         pmesh = cls(pnode, pcell)
 
         return pmesh
 
     @classmethod
-    def from_ellipsoid_surface(cls, ntheta=10, nphi=10, 
-            radius=(1, 1, 1), 
-            theta=(np.pi/4, 3*np.pi/4), 
-            phi=None,
-            returnuv=False
-            ):
+    def from_ellipsoid_surface(cls, ntheta=10, nphi=10,
+                               radius=(1, 1, 1),
+                               theta=(np.pi / 4, 3 * np.pi / 4),
+                               phi=None,
+                               returnuv=False
+                               ):
         """
         @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
         生成相应带状区域的三角形网格
@@ -2304,42 +2279,41 @@ class TriangleMesh(Mesh, Plotable):
         """
 
         a, b, c = radius
-        if phi is None: # 默认为一封闭的带状区域
-            NN = (ntheta+1)*nphi 
-        else: # 否则为四边形区域
-            NN = (ntheta+1)*(nphi + 1)
+        if phi is None:  # 默认为一封闭的带状区域
+            NN = (ntheta + 1) * nphi
+        else:  # 否则为四边形区域
+            NN = (ntheta + 1) * (nphi + 1)
 
-        NC = ntheta*nphi
+        NC = ntheta * nphi
 
         if phi is None:
             U, V = np.mgrid[
-                    theta[0]:theta[1]:(ntheta+1)*1j,
-                    0:2*np.pi:(nphi+1)*1j] 
-            U = U[:, 0:-1] # 去掉最后一列
-            V = V[:, 0:-1] # 去年最后一列
+                   theta[0]:theta[1]:(ntheta + 1) * 1j,
+                   0:2 * np.pi:(nphi + 1) * 1j]
+            U = U[:, 0:-1]  # 去掉最后一列
+            V = V[:, 0:-1]  # 去年最后一列
         else:
             U, V = np.mgrid[
-                    theta[0]:theta[1]:(ntheta+1)*1j,
-                    phi[0]:phi[1]:(nphi+1)*1j] 
-
+                   theta[0]:theta[1]:(ntheta + 1) * 1j,
+                   phi[0]:phi[1]:(nphi + 1) * 1j]
 
         node = np.zeros((NN, 3), dtype=np.float64)
-        X = a * np.sin(U) * np.cos(V) 
-        Y = b * np.sin(U) * np.sin(V) 
+        X = a * np.sin(U) * np.cos(V)
+        Y = b * np.sin(U) * np.sin(V)
         Z = c * np.cos(U)
         node[:, 0] = X.flatten()
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
 
-        idx = np.zeros((ntheta+1, nphi+1), np.int_)
+        idx = np.zeros((ntheta + 1, nphi + 1), np.int_)
         if phi is None:
-            idx[:, 0:-1] = np.arange(NN).reshape(ntheta+1, nphi)
+            idx[:, 0:-1] = np.arange(NN).reshape(ntheta + 1, nphi)
             idx[:, -1] = idx[:, 0]
         else:
-            idx = np.arange(NN).reshape(ntheta+1, nphi+1)
-        cell = np.zeros((2*NC, 3), dtype=np.int_)
-        cell[0::2, 0] = idx[1:,0:-1].flatten(order='F')
-        cell[0::2, 1] = idx[1:,1:].flatten(order='F')
+            idx = np.arange(NN).reshape(ntheta + 1, nphi + 1)
+        cell = np.zeros((2 * NC, 3), dtype=np.int_)
+        cell[0::2, 0] = idx[1:, 0:-1].flatten(order='F')
+        cell[0::2, 1] = idx[1:, 1:].flatten(order='F')
         cell[0::2, 2] = idx[0:-1, 0:-1].flatten(order='F')
         cell[1::2, 0] = idx[0:-1, 1:].flatten(order='F')
         cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
@@ -2352,36 +2326,35 @@ class TriangleMesh(Mesh, Plotable):
 
     @classmethod
     def from_cylinder_surface(cls, nphi=10, nz=10,
-            radius=(1.0, 1.0), 
-            height=2.0
-            ):
+                              radius=(1.0, 1.0),
+                              height=2.0
+                              ):
 
         a, b = radius
         h = height
-        NN = nphi*(nz+1)
-        NC = nphi*nz
+        NN = nphi * (nz + 1)
+        NC = nphi * nz
 
         U, V = np.mgrid[
-                0:h:(nz+1)*1j,
-                0:2*np.pi:(nphi+1)*1j]
+               0:h:(nz + 1) * 1j,
+               0:2 * np.pi:(nphi + 1) * 1j]
         U = U[:, 0:-1]
         V = V[:, 0:-1]
 
-
         node = np.zeros((NN, 3), dtype=np.float64)
-        X = a * np.cos(V) 
-        Y = b * np.sin(V) 
-        Z = U 
+        X = a * np.cos(V)
+        Y = b * np.sin(V)
+        Z = U
         node[:, 0] = X.flatten()
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
 
-        idx = np.zeros((ntheta+1, nphi+1), np.int_)
-        idx[:, 0:-1] = np.arange(NN).reshape(ntheta+1, nphi)
+        idx = np.zeros((ntheta + 1, nphi + 1), np.int_)
+        idx[:, 0:-1] = np.arange(NN).reshape(ntheta + 1, nphi)
         idx[:, -1] = idx[:, 0]
-        cell = np.zeros((2*NC, 3), dtype=np.int_)
-        cell[0::2, 0] = idx[1:,0:-1].flatten(order='F')
-        cell[0::2, 1] = idx[1:,1:].flatten(order='F')
+        cell = np.zeros((2 * NC, 3), dtype=np.int_)
+        cell[0::2, 0] = idx[1:, 0:-1].flatten(order='F')
+        cell[0::2, 1] = idx[1:, 1:].flatten(order='F')
         cell[0::2, 2] = idx[0:-1, 0:-1].flatten(order='F')
         cell[1::2, 0] = idx[0:-1, 1:].flatten(order='F')
         cell[1::2, 1] = idx[0:-1, 0:-1].flatten(order='F')
@@ -2391,20 +2364,20 @@ class TriangleMesh(Mesh, Plotable):
 
     @classmethod
     def from_section_ellipsoid(
-        cls, 
-        size=(7, 3, 2.5), 
-        density = 0.1, 
-        top_section = np.pi/2, 
-        scale_ratio = [1, 1, 1], 
-        sinking_coefficient = 1.5,
-        return_edge = False):
+            cls,
+            size=(17.5, 3.47, 3),
+            center_height=6,
+            scale_ratio=(1, 1, 2),
+            density=0.1,
+            top_section=np.pi / 2,
+            return_edge=False):
         """
         构造包围一个长方体的椭球面网格，该椭球面被两个平面截取，并将底部填充
         @param size: 长方体的长宽高
+        @param center_height: 椭球面球心的高度
+        @param scale_ratio: 椭球面三个半轴的缩放比例
         @param density: 网格密度
         @param top_section: 顶部截面对应天顶角
-        @param scale_ratio: 椭球面三个半轴的缩放比例
-        @param sinking_coefficient: 相较于长方体位于椭球面中心，向下下降的系数
         @param return_edge: 是否需要返回分区交界边上的点
         @return: 截断的椭球面网格
         """
@@ -2412,24 +2385,28 @@ class TriangleMesh(Mesh, Plotable):
         # 构造椭球面
         a = 1.6178 * l * scale_ratio[0]
         b = 1.6178 * w * scale_ratio[1]
-        c = 0.809 * h * scale_ratio[2]
+        c = 1.6178 * h * scale_ratio[2]
 
-        theta = (top_section, np.arccos(-0.382 * h * sinking_coefficient / c))
+        t = np.sqrt(c ** 2 - center_height ** 2) / c
+        theta = (top_section, np.arccos(-center_height / c))
         phi1 = np.array([[np.arctan(w / l), -np.arctan(w / l)],
                          [-np.arctan(w / l), -np.pi / 2],
                          [-np.pi / 2, -np.pi + np.arctan(w / l)],
                          [-np.pi + np.arctan(w / l), -np.pi - np.arctan(w / l)],
                          [-np.pi - np.arctan(w / l), -1.5 * np.pi],
                          [-1.5 * np.pi, -2 * np.pi + np.arctan(w / l)]])
-        phi2 = np.array([[a / b * np.arctan(w / l), -a / b * np.arctan(w / l)],
-                         [-a / b * np.arctan(w / l), -np.pi / 2],
-                         [-np.pi / 2, -np.pi + a / b * np.arctan(w / l)],
-                         [-np.pi + a / b * np.arctan(w / l), -np.pi - a / b * np.arctan(w / l)],
-                         [-np.pi - a / b * np.arctan(w / l), -1.5 * np.pi],
-                         [-1.5 * np.pi, -2 * np.pi + a / b * np.arctan(w / l)]])
+        temp_cof = a / b * t * 1.236
+        phi2 = np.array([[temp_cof * np.arctan(w / l), -temp_cof * np.arctan(w / l)],
+                         [-temp_cof * np.arctan(w / l), -np.pi / 2],
+                         [-np.pi / 2, -np.pi + temp_cof * np.arctan(w / l)],
+                         [-np.pi + temp_cof * np.arctan(w / l), -np.pi - temp_cof * np.arctan(w / l)],
+                         [-np.pi - temp_cof * np.arctan(w / l), -1.5 * np.pi],
+                         [-1.5 * np.pi, -2 * np.pi + temp_cof * np.arctan(w / l)]])
         nphi = int(1 / density * a / b)
         ntheta = int(1 / density * c)
-        t = np.sqrt(c ** 2 - (0.382 * h * sinking_coefficient) ** 2) / c
+
+        assert (a * t / 2 ** (1 / 2)) > (l / 2), "椭球面球心高度超出范围"
+        assert (b * t / 2 ** (1 / 2)) > w / 2, "椭球面球心高度超出范围"
         dphi1 = np.linspace(phi1[:, 0], phi1[:, 1], nphi + 1, axis=1)
         dphi2 = np.linspace(phi2[:, 0], phi2[:, 1], nphi + 1, axis=1)
         rectangle_node = [[l / 2, l / 2 * np.tan(dphi1[0])],
@@ -2448,16 +2425,15 @@ class TriangleMesh(Mesh, Plotable):
 
         for i in range(6):
             NN1 = (nthetas[0] + 1) * (nphis[i] + 1)
-            NN2 = (nthetas[1] + 1) * (nphis[i] + 1)
-            line1 = np.zeros((nphi + 1, 3))
-            line2 = np.zeros((nphi + 1, 3))
+            line1 = np.zeros((nphis[i] + 1, 3))
+            line2 = np.zeros((nphis[i] + 1, 3))
             line1[:, 0] = rectangle_node[i][0]
             line1[:, 1] = rectangle_node[i][1]
-            line1[:, 2] = -0.382 * h * sinking_coefficient
+            line1[:, 2] = -center_height
             line2[:, 0] = a * t * np.cos(dphi2[i])
             line2[:, 1] = b * t * np.sin(dphi2[i])
-            line2[:, 2] = -0.382 * h * sinking_coefficient
-            node2 = np.linspace(line2, line1, ntheta + 1)
+            line2[:, 2] = -center_height
+            node2 = np.linspace(line2, line1, nthetas[1] + 1)
 
             U, V = np.mgrid[
                    theta[0]:theta[1]:(ntheta + 1) * 1j,
@@ -2475,9 +2451,9 @@ class TriangleMesh(Mesh, Plotable):
             node[nthetas[0] + 1:, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node2[1:, 0:-1, :]
         # 处理分区交界边
         if return_edge:
-            edge_node = np.zeros((6, sum(nthetas)+1, 3))
+            edge_node = np.zeros((6, sum(nthetas) + 1, 3))
             for i in range(6):
-                edge_node[i, ...] = node[:, sum(nphis[0:(i+1)%6]), :]
+                edge_node[i, ...] = node[:, sum(nphis[0:(i + 1) % 6]), :]
 
         # 处理中间区域，构造节点
         central_node = np.zeros((nphis[1] + nphis[2] + 1, nphis[0] + 1, 3))
@@ -2489,7 +2465,7 @@ class TriangleMesh(Mesh, Plotable):
         central_node[..., 0] = np.linspace(central_node[:, 0, 0], central_node[:, -1, 0], nphis[0] + 1, axis=0).T
         central_node[..., 1] = np.linspace(central_node[0, :, 1], central_node[-1, :, 1], nphis[1] + nphis[2] + 1,
                                            axis=0)
-        central_node[..., 2] = -0.382 * h * sinking_coefficient
+        central_node[..., 2] = -center_height
 
         node = node.reshape((-1, 3))
 
@@ -2531,7 +2507,8 @@ class TriangleMesh(Mesh, Plotable):
         domain = np.zeros(2 * sum(nthetas) * sum(nphis), dtype=np.int_).reshape((2 * sum(nthetas), sum(nphis)))
         for i in range(len(nphis)):
             for j in range(len(nthetas)):
-                domain[2*sum(nthetas[0:j]):2*sum(nthetas[0:j+1]), sum(nphis[0:i]):sum(nphis[0:i + 1])] = ((i + 5) % 6 + 1) * 10 + j + 1
+                domain[2 * sum(nthetas[0:j]):2 * sum(nthetas[0:j + 1]), sum(nphis[0:i]):sum(nphis[0:i + 1])] = ((
+                                                                                                                            i + 5) % 6 + 1) * 10 + j + 1
         central_domain = np.zeros(2 * nphis[0] * (nphis[1] + nphis[2]), dtype=np.int_)
         domain = np.concatenate((domain.flatten(order='F'), central_domain))
         mesh.celldata['domain'] = domain
@@ -2639,22 +2616,21 @@ class TriangleMeshWithInfinityNode:
 
         node = mesh.node
         self.node = np.append(node, [[np.nan, np.nan]], axis=0)
-        self.ds = TriangleMeshDataStructure(NN+1, newCell)
+        self.ds = TriangleMeshDataStructure(NN + 1, newCell)
 
         if bc:
             self.center = np.append(mesh.entity_barycenter('cell'),
-                    0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+                                    0.5 * (node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
         else:
             self.center = np.append(mesh.circumcenter(),
-                    0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+                                    0.5 * (node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
 
         self.meshtype = 'tri'
-
 
     def is_infinity_cell(self):
         N = self.ds.number_of_nodes()
         cell = self.ds.cell
-        return cell[:, 0] == N-1
+        return cell[:, 0] == N - 1
 
     def is_boundary_edge(self):
         NE = self.ds.number_of_edges()
@@ -2695,9 +2671,8 @@ class TriangleMeshWithInfinityNode:
 
         PNC = len(NV)
         pcell = np.zeros(NV.sum(), dtype=self.itype)
-        pcellLocation = np.zeros(PNC+1, dtype=self.itype)
+        pcellLocation = np.zeros(PNC + 1, dtype=self.itype)
         pcellLocation[1:] = np.cumsum(NV)
-
 
         isBdEdge = self.is_boundary_edge()
         NC = self.ds.number_of_cells() - isBdEdge.sum()

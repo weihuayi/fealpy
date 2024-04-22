@@ -86,6 +86,14 @@ fname = [
     '/home/why/data/src_6.jpg',
     ]
 
+fname = [
+    '/home/why/data/camera_models/chessboard_1/frame1_0.jpg',
+    '/home/why/data/camera_models/chessboard_2/frame2_0.jpg',
+    '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
+    '/home/why/data/camera_models/chessboard_4/frame4_0.jpg',
+    '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
+    '/home/why/data/camera_models/chessboard_6/frame6_0.jpg',
+    ]
 data = {
     "nc" : 6,
     "location" : location,
@@ -100,16 +108,43 @@ data = {
     "vfield" : (110, 180)
 }
 
-mesh= TriangleMesh.from_section_ellipsoid()
+
+a = 3.0*17.5/2.0
+b = 3.0*3.47/2.0
+c = 3.0*3.0/2.0
+mesh= TriangleMesh.from_ellipsoid_surface(20, 20, 
+        radius=(a, b, c), 
+        theta=(np.pi/2, np.pi/2+np.pi/2.5))
+
+#mesh= TriangleMesh.from_section_ellipsoid()
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.add_plot(axes)
+axes.scatter(location[:, 0], location[:, 1], location[:, 2], color='k')
+for l, v in zip(location, cx):
+    axes.quiver(l[0], l[1], l[2], v[0], v[1], v[2],length=1, normalize=True, color='r')
+for l, v in zip(location, cy):
+    axes.quiver(l[0], l[1], l[2], v[0], v[1], v[2],length=1, normalize=True, color='g')
+for l, v in zip(location, cz):
+    axes.quiver(l[0], l[1], l[2], v[0], v[1], v[2],length=1, normalize=True, color='b')
+axes.axis(True)
+plt.show()
+
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 domain = mesh.celldata['domain']
+cell = cell[(domain == 11) | (domain == 12)]
+node = node[cell].reshape(-1, node.shape[-1])
 
-#csys = OCAMSystem(data)
-#csys.show_images()
+csys = OCAMSystem(data)
+csys.show_images()
 
-node = np.array(node, dtype=np.float32)
-vertices = node[cell].reshape(-1, node.shape[1])
+uv = csys.cams[0].world_to_image(node)
+
+node = np.concatenate((node, uv), axis=-1, dtype=np.float32)
 plotter = OpenGLPlotter()
-plotter.add_mesh(vertices, cell=None, texture_path=None)
+plotter.add_mesh(node, cell=None, texture_path=csys.cams[0].fname)
 plotter.run()
