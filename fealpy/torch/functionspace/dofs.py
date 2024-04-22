@@ -1,4 +1,6 @@
 
+__all__ = ['LinearMeshCFEDof']
+
 from typing import Union, Generic, TypeVar
 
 import torch
@@ -43,7 +45,7 @@ class LinearMeshCFEDof(Generic[_MT]):
         return self.mesh.edge_to_ipoint(self.p, index=index)
 
     def face_to_dof(self, index: Index=_S):
-        return self.mesh.edge_to_ipoint(self.p, index=index)
+        return self.mesh.face_to_ipoint(self.p, index=index)
 
     def cell_to_dof(self, index: Index=_S):
         return self.mesh.cell_to_ipoint(self.p, index=index)
@@ -51,8 +53,8 @@ class LinearMeshCFEDof(Generic[_MT]):
     def interpolation_points(self, index: Index=_S):
         return self.mesh.interpolation_points(self.p, index=index)
 
-    def number_of_global_dofs(self):
+    def number_of_global_dofs(self) -> int:
         return self.mesh.number_of_global_ipoints(self.p)
 
-    def number_of_local_dofs(self, doftype='cell'):
+    def number_of_local_dofs(self, doftype='cell') -> int:
         return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)

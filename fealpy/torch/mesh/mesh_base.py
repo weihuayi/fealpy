@@ -1,5 +1,8 @@
 
-from typing import Union, Optional, TypeVar, Generic, Dict, Sequence, overload, Callable
+from typing import (
+    Union, Optional, TypeVar, Generic, Dict, Sequence, overload, Callable,
+    Literal, Any
+)
 
 import torch
 
@@ -9,11 +12,13 @@ from .quadrature import Quadrature
 
 Tensor = torch.Tensor
 Index = Union[Tensor, int, slice]
-Entity = Union[Tensor, Sequence[Tensor]]
-_S = slice(None, None, None)
+EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
 _int_func = Callable[..., int]
 _dtype = torch.dtype
 _device = torch.device
+
+_S = slice(None, None, None)
+_default = object()
 
 
 ##################################################
@@ -21,19 +26,22 @@ _device = torch.device
 ##################################################
 
 class MeshDataStructure():
+    _STORAGE_ATTR = ['cell', 'face', 'edge', 'cell_location','face_location']
     def __init__(self, NN: int, TD: int) -> None:
-        self._entity_storage: Dict[int, Entity] = {}
+        self._entity_storage: Dict[int, Tensor] = {}
         self.NN = NN
         self.TD = TD
 
+    @overload
+    def __getattr__(self, name: EntityName) -> Tensor: ...
     def __getattr__(self, name: str):
-        if name not in {'cell', 'face', 'edge'}:
-            return
+        if name not in self._STORAGE_ATTR:
+            return self.__dict__[name]
         etype_dim = self._entity_str2dim(name)
         return self._dim2entity(etype_dim)
 
     def __setattr__(self, name: str, value: torch.Any) -> None:
-        if name in ('cell', 'face', 'edge'):
+        if name in self._STORAGE_ATTR:
             if not hasattr(self, '_entity_storage'):
                 raise RuntimeError('please call super().__init__() before setting attributes.')
             etype_dim = self._entity_str2dim(name)
@@ -51,24 +59,34 @@ class MeshDataStructure():
     def _entity_str2dim(self, etype: str) -> int:
         if etype == 'cell':
             return self.top_dimension()
+        elif etype == 'cell_location':
+            return -self.top_dimension()
         elif etype == 'face':
             TD = self.top_dimension()
             if TD <= 1:
-                raise ValueError('the mesh has no face.')
+                raise ValueError('the mesh has no face entity.')
             return TD - 1
+        elif etype == 'face_location':
+            TD = self.top_dimension()
+            if TD <= 1:
+                raise ValueError('the mesh has no face location.')
+            return -TD + 1
         elif etype == 'edge':
             return 1
         elif etype == 'node':
-            raise ValueError('the node is not in mesh structure.')
+            raise ValueError('The node entity is not available in mesh data structure. '
+                             'Please fetch it from the mesh object.')
         else:
-            raise ValueError(f'{etype} is not a valid entity type.')
+            raise KeyError(f'{etype} is not a valid entity attribute.')
 
     # Get the entity from its toppology dimension.
-    def _dim2entity(self, etype_dim: int, index: Index=_S) -> Entity:
+    def _dim2entity(self, etype_dim: int, index: Index=_S, *, default=_default) -> Tensor:
         if etype_dim in self._entity_storage:
             return self._entity_storage[etype_dim][index]
         else:
-            raise ValueError(f'{etype_dim} is not a valid entity dimension.')
+            if default is not _default:
+                return default
+            raise ValueError(f'{etype_dim} is not a valid entity attribute index.')
 
     ### properties
     def top_dimension(self) -> int: return self.TD
@@ -87,11 +105,13 @@ class MeshDataStructure():
     def construct(self) -> None:
         raise NotImplementedError
 
-    def entity(self, etype: Union[int, str], index: Index=_S) -> Entity:
+    def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor:
         r"""@brief Get entities in mesh structure.
 
         @param etype: int or str. The topology dimension of the entity, or name
         'cell' | 'face' | 'edge'. Note that 'node' is not in mesh structure.
+        For polygon meshes, the names 'cell_location' | 'face_location' may also be
+        available, and the `index` argument is applied on the flattened entity tensor.
         @param index: int, slice ot Tensor. The index of the entity.
 
         @return: Tensor or Sequence[Tensor].
@@ -100,14 +120,24 @@ class MeshDataStructure():
             etype = self._entity_str2dim(etype)
         return self._dim2entity(etype, index)
 
-    def total_face(self) -> Entity:
+    def total_face(self) -> Tensor:
         raise NotImplementedError
 
-    def total_edge(self) -> Entity:
+    def total_edge(self) -> Tensor:
         raise NotImplementedError
 
     ### topology
-    def cell_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
+    def cell_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor:
+        TD = self.top_dimension()
+        cell = self.entity(TD)
+        if cell.ndim == 1: # for polygon meshes
+            cell_location = self.entity(-TD)
+            return F.mesh_top_csr(cell, self.number_of_nodes(), cell_location, dtype=dtype)[index]
+        elif cell.ndim == 2: # for homogeneous meshes
+            return F.mesh_top_csr(cell[index], self.number_of_nodes(), dtype=dtype)
+        else:
+            raise RuntimeError(f'cell entity tensor should be 1D or 2D.')
+
     def cell_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
     def cell_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
     def cell_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
@@ -117,8 +147,8 @@ class MeshDataStructure():
     def face_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
 
     def edge_to_node(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor:
-        entity = self.entity(1, index=index)
-        return F.mesh_top_csr(entity, self.number_of_nodes(), dtype=dtype)
+        edge = self.entity(1, index=index)
+        return F.mesh_top_csr(edge, self.number_of_nodes(), dtype=dtype)
 
     def edge_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
     def edge_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None) -> Tensor: raise NotImplementedError
@@ -164,15 +194,13 @@ class HomoMeshDataStructure(MeshDataStructure):
     def construct(self) -> None:
         pass
 
-_MDS_co = TypeVar('_MDS_co', bound=MeshDataStructure, covariant=True)
-
 
 ##################################################
 ### Mesh Base
 ##################################################
 
-class Mesh(Generic[_MDS_co]):
-    ds: _MDS_co
+class Mesh():
+    ds: MeshDataStructure
     node: Tensor
 
     def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
@@ -193,7 +221,7 @@ class Mesh(Generic[_MDS_co]):
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
     def number_of_nodes(self) -> int: return self.ds.number_of_nodes()
-    def entity(self, etype: Union[int, str], index: Index=_S) -> Entity:
+    def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor:
         if etype in ('node', 0):
             return self.node[index]
         else:
