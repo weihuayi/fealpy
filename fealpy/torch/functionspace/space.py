@@ -1,17 +1,14 @@
 
-from typing import Union, Generic, TypeVar
+from typing import Union
 from abc import ABCMeta, abstractmethod
 
 from torch import Tensor
 
-from ..mesh.mesh_base import Mesh
-
-_MT = TypeVar('_MT', bound=Mesh)
 Index = Union[int, slice, Tensor]
 _S = slice(None)
 
 
-class FunctionSpace(Generic[_MT], metaclass=ABCMeta):
+class FunctionSpace(metaclass=ABCMeta):
 
     ### basis
     @abstractmethod

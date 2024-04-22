@@ -231,6 +231,18 @@ class Mesh():
         r"""@brief Get the quadrature points and weights."""
         raise NotImplementedError
 
+    def shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+                       mi: Optional[Tensor]=None) -> Tensor:
+        raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
+
+    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+                            mi: Optional[Tensor]=None) -> Tensor:
+        raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
+
+    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+                            mi: Optional[Tensor]=None) -> Tensor:
+        raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
+
 
 class HomoMesh(Mesh[HomoMeshDataStructure]):
     def __init__(self, node: Tensor, cell: Tensor, TD: int) -> None:

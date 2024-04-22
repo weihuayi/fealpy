@@ -20,7 +20,6 @@ class LinearMeshCFEDof(Generic[_MT]):
         self.mesh = mesh
         self.p = p
         self.multiIndex = mesh.multi_index_matrix(p, TD)
-        self.cell2dof = self.cell_to_dof()
 
     def is_boundary_dof(self, threshold=None):
         TD = self.mesh.top_dimension()

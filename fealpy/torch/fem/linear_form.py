@@ -80,4 +80,5 @@ class LinearForm(Generic[_FS]):
         V.coalesce()
         self._V = V
         logger.info(f"Construct source vector with shape {V.shape}.")
+
         return V
