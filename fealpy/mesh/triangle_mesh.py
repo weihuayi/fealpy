@@ -2366,8 +2366,8 @@ class TriangleMesh(Mesh, Plotable):
     def from_section_ellipsoid(
             cls,
             size=(17.5, 3.47, 3),
-            center_height=2.5,
-            scale_ratio=(1, 1, 1),
+            center_height=6,
+            scale_ratio=(1, 1, 2),
             density=0.1,
             top_section=np.pi / 2,
             return_edge=False):
@@ -2429,10 +2429,10 @@ class TriangleMesh(Mesh, Plotable):
             line2 = np.zeros((nphis[i] + 1, 3))
             line1[:, 0] = rectangle_node[i][0]
             line1[:, 1] = rectangle_node[i][1]
-            line1[:, 2] = 0
+            line1[:, 2] = -center_height
             line2[:, 0] = a * t * np.cos(dphi2[i])
             line2[:, 1] = b * t * np.sin(dphi2[i])
-            line2[:, 2] = 0
+            line2[:, 2] = -center_height
             node2 = np.linspace(line2, line1, nthetas[1] + 1)
 
             U, V = np.mgrid[
@@ -2445,7 +2445,7 @@ class TriangleMesh(Mesh, Plotable):
             Z = c * np.cos(U)
             node1[..., 0] = X
             node1[..., 1] = Y
-            node1[..., 2] = Z + center_height
+            node1[..., 2] = Z
 
             node[0:nthetas[0] + 1, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node1[:, 0:-1, :]
             node[nthetas[0] + 1:, sum(nphis[0:i]):(sum(nphis[0:i]) + nphis[i]), :] = node2[1:, 0:-1, :]
@@ -2465,7 +2465,7 @@ class TriangleMesh(Mesh, Plotable):
         central_node[..., 0] = np.linspace(central_node[:, 0, 0], central_node[:, -1, 0], nphis[0] + 1, axis=0).T
         central_node[..., 1] = np.linspace(central_node[0, :, 1], central_node[-1, :, 1], nphis[1] + nphis[2] + 1,
                                            axis=0)
-        central_node[..., 2] = 0
+        central_node[..., 2] = -center_height
 
         node = node.reshape((-1, 3))
 
