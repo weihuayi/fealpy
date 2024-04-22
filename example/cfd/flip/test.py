@@ -20,6 +20,23 @@ dtype = [("position", "float64", (2, )),
 		 ("internal_energy", "float64"),]
 
 num=10
+np.random.seed(0)
+random_points = np.random.rand(num, 2)
+particles = np.zeros(num, dtype=dtype)
+particles['position'] = random_points
+particles['mass'] = 1 #临时给的值
+particles['internal_energy'] = 1 #临时给的值
+domain=[0,1,0,1]
+nx = 4
+ny = 4
+hx = (domain[1] - domain[0])/nx
+hy = (domain[3] - domain[2])/ny
+mesh = UniformMesh2d([0,nx,0,ny],h=(hx,hy),origin=(0,0))
+print(mesh.cell_barycenter())
+solver = NSFlipSolver(particles, mesh)
+print(solver.bilinear(particles['position']).shape)
+'''
+num=10
 #np.random.seed(0)
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)
@@ -47,3 +64,4 @@ solver = NSFlipSolver(particles, mesh)
 Vc = mesh.cell_area() #单元面积
 cell_center = mesh.entity_barycenter(2) #单元中心位置
 solver.P2G_center(particles,cell_center,Vc)
+'''

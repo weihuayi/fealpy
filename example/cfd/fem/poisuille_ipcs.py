@@ -77,8 +77,8 @@ for i in range(0, 10):
     errorMatrix[2,i] = np.abs(uso-u1).max()
     errorMatrix[3,i] = np.abs(pso-p1).max()
     timeline.advance()
-    print(errorMatrix[2,i])
-    print(np.max(u1))
+    print("max u:",errorMatrix[2,i])
+    print("error:",np.max(u1))
 
 '''
 ipoint = mesh.interpolation_points(2)

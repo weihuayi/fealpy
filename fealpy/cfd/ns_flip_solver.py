@@ -39,8 +39,9 @@ class NSFlipSolver:
         print(result[0])
         return result
 
-    def bilinear(self,position,e):
+    def bilinear(self,position):
         i0,j0 = self.mesh.cell_location(position)
+        e = self.e(position)
         epsilon = e[:,0]
         eta = e[:,1]
         num = len(epsilon)
@@ -55,10 +56,12 @@ class NSFlipSolver:
         print(result[0])
         return result
     
-    def P2G_center(self,particles,cell_center,Vc):
+    def P2G_center(self, particles):
         m_p = particles["mass"]
         e_p = particles["internal_energy"]
         position = self.particles["position"]
+        cell_center = self.mesh.cell_center()
+        Vc = self.mesh.cell_area()
         num_p = len(position[:,0])
         num_c = len(cell_center[:,0])
         distance = np.zeros_like(position)
