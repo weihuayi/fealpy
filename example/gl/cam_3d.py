@@ -92,7 +92,7 @@ fname = [
     '/home/why/data/camera_models/chessboard_2/frame2_0.jpg',
     '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
     '/home/why/data/camera_models/chessboard_4/frame4_0.jpg',
-    '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
+    '/home/why/data/camera_models/chessboard_5/frame5_0.jpg',
     '/home/why/data/camera_models/chessboard_6/frame6_0.jpg',
     ]
 """
@@ -141,7 +141,14 @@ plt.show()
 csys = OCAMSystem(data)
 csys.show_images()
 
-mesh= TriangleMesh.from_section_ellipsoid()
+mesh= TriangleMesh.from_section_ellipsoid(
+            size=(17.5, 3.47, 3),
+            center_height=h,
+            scale_ratio=(2, 2, 2),
+            density=0.1,
+            top_section=np.pi / 2,
+            return_edge=False)
+
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 domain = mesh.celldata['domain']
