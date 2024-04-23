@@ -14,7 +14,6 @@ class LevelSet:
         self._nely = nely
         self._domain = domain
 
-
     def reinit(self, struc):
         """
         根据给定的结构重置化水平集函数
