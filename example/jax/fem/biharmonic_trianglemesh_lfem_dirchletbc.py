@@ -186,7 +186,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--gamma',
-        default=3, type=int,
+        default=5, type=int,
         help='默认内罚参数，默认为 3')
 
 args = parser.parse_args()
@@ -210,7 +210,7 @@ pde = DoubleLaplacePDE(u)
 mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
 space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 
-errorType = ['$|| Ax-b ||_{\\Omega,0}$']
+errorType = ['$|| Ax-b ||_{\\Omega,\infty}$', '$|| Ax-b ||_{\\Omega,0}$']
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
 
@@ -274,3 +274,15 @@ for i in range(maxit):
 print(errorMatrix)
 print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 
+def compute_order(errors, maxit):
+    orders = np.zeros((2, maxit-1), dtype=np.float64) 
+    for i in range(maxit-1):
+        if np.any(errors[:, i] == 0) or np.any(errors[:, i+1] == 0):
+            orders[:, i] = 0
+        else:
+            orders[:, i] = np.log(errors[:, i] / errors[:, i+1]) / np.log(2)
+    return orders
+
+#order = np.zeros((2, maxit-1), dtype=np.float64) 
+order = compute_order(errorMatrix, maxit)
+print(order)
