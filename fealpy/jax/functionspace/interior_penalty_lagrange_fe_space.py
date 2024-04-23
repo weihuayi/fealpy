@@ -168,7 +168,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
+                    en[edgeidx])/2.0# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval0 = rval0.at[indices].set(val[..., dofidx0])
@@ -184,7 +185,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
+                    en[edgeidx])/2.0# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval1 = rval1.at[indices].set(val[..., dofidx0])
