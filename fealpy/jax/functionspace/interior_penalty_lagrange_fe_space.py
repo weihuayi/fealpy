@@ -168,7 +168,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
+                    en[edgeidx])/2.0# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval0 = rval0.at[indices].set(val[..., dofidx0])
@@ -184,7 +185,8 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             dofidx1 = jnp.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
-            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            val  = jnp.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
+                    en[edgeidx])/2.0# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval1 = rval1.at[indices].set(val[..., dofidx0])
@@ -192,7 +194,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
         rval = jnp.concatenate([rval0, rval1, rval2], axis=-1)
         return rval
 
-    def boubdary_edge_grad_normal_jump_basis(self, bcs, m=1):
+    def boundary_edge_grad_normal_jump_basis(self, bcs, m=1):
         """
         @brief 法向导数跳量计算
         @return (NQ, NIE, ldof)
@@ -226,7 +228,7 @@ class InteriorPenaltyLagrangeFESpace2d(LagrangeFESpace):
             rval = rval.at[indices].set(val)
         return rval
 
-    def boubdary_edge_grad_normal_2_jump_basis(self, bcs, m=1):
+    def boundary_edge_grad_normal_2_jump_basis(self, bcs, m=1):
         """
         @brief 法向导数跳量计算
         @return (NQ, NIE, ldof)

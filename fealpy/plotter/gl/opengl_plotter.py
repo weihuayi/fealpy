@@ -42,7 +42,8 @@ class OpenGLPlotter:
         glfw.make_context_current(self.window)
         # 启用深度测试
         glEnable(GL_DEPTH_TEST)
-        #glDisable(GL_CULL_FACE)
+        #glEnable(GL_CULL_FACE);
+        #glFrontFace(GL_CCW);
 
         # 设置视口大小
         glViewport(0, 0, width, height)

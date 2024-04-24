@@ -31,7 +31,7 @@ class ScalarInteriorPenaltyIntegrator:
         qf = mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
         
-        gnjphi  = space.grad_normal_jump_basis(bcs)
+        gnjphi  = -space.grad_normal_jump_basis(bcs)
         gn2jphi = space.grad_normal_2_jump_basis(bcs)
         
         # 一阶法向导数矩阵
@@ -41,8 +41,8 @@ class ScalarInteriorPenaltyIntegrator:
         P2 = jnp.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isInnerEdge])
         P2T = jnp.transpose(P2, axes=(0, 2, 1))
 
-        P = P2 + P2T + P1
-        
+        P = (P2 + P2T) + P1
+         
         I = jnp.broadcast_to(ie2cd[:, :, None], shape=P.shape)
         J = jnp.broadcast_to(ie2cd[:, None, :], shape=P.shape)
 
@@ -50,8 +50,8 @@ class ScalarInteriorPenaltyIntegrator:
         P = csr_matrix((P.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
 
         # 边界的积分
-        gnjphi  = space.boubdary_edge_grad_normal_jump_basis(bcs)
-        gn2jphi = space.boubdary_edge_grad_normal_2_jump_basis(bcs)
+        gnjphi  = -space.boundary_edge_grad_normal_jump_basis(bcs)
+        gn2jphi = space.boundary_edge_grad_normal_2_jump_basis(bcs)
 
         P1 = jnp.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
         P1 = P1*self.gamma
@@ -59,7 +59,7 @@ class ScalarInteriorPenaltyIntegrator:
         P2 = jnp.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isBdEdge])
         P2T = jnp.transpose(P2, axes=(0, 2, 1))
 
-        PP = P2 + P2T + P1
+        PP = (P2 + P2T) + P1
         
         I = jnp.broadcast_to(be2cd[:, :, None], shape=PP.shape)
         J = jnp.broadcast_to(be2cd[:, None, :], shape=PP.shape)

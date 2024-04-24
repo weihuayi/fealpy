@@ -109,16 +109,20 @@ parser.add_argument('--degree',
         help='Bernstein 有限元空间的次数, 默认为 2 次.')
 
 parser.add_argument('--nx',
-        default=1, type=int,
+        default=4, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--ny',
-        default=1, type=int,
+        default=4, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
+
+parser.add_argument('--gamma',
+        default=5, type=int,
+        help='默认内罚参数，默认为3')
 
 args = parser.parse_args()
 
@@ -126,22 +130,23 @@ p = args.degree
 nx = args.nx
 ny = args.ny
 maxit = args.maxit
+gamma = args.gamma
 
 x = sp.symbols("x")
 y = sp.symbols("y")
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u)
 
-vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
-#mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
-mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5)
+#vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
+mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+#mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5)
 space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
 
 errorType = ['$|| Ax-b ||_{\\Omega,0}$']
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
-print(mesh.entity('cell'))
-print(mesh.entity('edge'))
+#print(mesh.entity('cell'))
+#print(mesh.entity('edge'))
 
 for i in range(maxit):
 
@@ -151,10 +156,10 @@ for i in range(maxit):
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=3)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
-
+    
     lform = LinearForm(space)
     F = ScalarSourceIntegrator(pde.source, q=p+4)
     lform.add_domain_integrator(F)
@@ -167,15 +172,16 @@ for i in range(maxit):
     gd[Bd] = x[Bd]
     
     A, f = apply_dbc(A, b, gd, is_boundary_dof(mesh.interpolation_points(p=p)))
-    print("FFF : ", np.max(np.abs(f)))
 
     uh = space.function()
     uh[:] = spsolve(A, f)
     #uh[:], tol = cg(A, f, atol=1e-15)
-    print("AAA : ", np.max(A0.data))
+    print("AAAA : ", np.max(A0.data))
+    print("AAA : ", np.max(A.data))
     print("AAA : ", np.max(P.data))
 
-    errorMatrix[0, i] = mesh.error(uh, pde.solution)
+    errorMatrix[0, i] = np.max(np.abs(uh-x))
+#    errorMatrix[0, i] = mesh.error(uh, pde.solution)
     errorMatrix[1, i] = mesh.error(uh.hessian_value, pde.hessian) 
     print(errorMatrix)
 
@@ -196,8 +202,8 @@ for i in range(maxit):
     if i < maxit-1:
         nx = nx*2
         ny = ny*2
-        #mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
-        mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5/2**i)
+        mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+        #mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5/2**i)
         space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
 
 

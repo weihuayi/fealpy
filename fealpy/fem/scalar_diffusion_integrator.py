@@ -45,6 +45,7 @@ class ScalarDiffusionIntegrator:
 
         if coef is None:
             D += np.einsum('q, qcid, qcjd, c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
+            print("D:", D.shape, "\n", D)
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
@@ -69,6 +70,83 @@ class ScalarDiffusionIntegrator:
                     D += np.einsum('q, cdn, qcin, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
                 elif coef.shape == (NQ, NC, GD, GD):
                     D += np.einsum('q, qcdn, qcin, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                else:
+                    raise ValueError(f"coef with shape {coef.shape}! Now we just support shape: (NC, ), (NQ, NC), (GD, GD), (NC, GD, GD) or NQ, NC, GD, GD)")
+            else:
+                raise ValueError("coef 不支持该类型")
+
+        if out is None:
+            return D
+
+    def assembly_cell_matrix_quickly(self, space, index=np.s_[:], cellmeasure=None, out=None):
+        """
+        @note 没有参考单元的组装方式
+        """
+        p = space.p
+        q = self.q if self.q is not None else p+1
+
+        coef = self.coef
+        mesh = space.mesh
+        GD = mesh.geo_dimension()
+
+        if cellmeasure is None:
+            if mesh.meshtype == 'UniformMesh2d':
+                NC = mesh.number_of_cells()
+                cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
+            else:
+                cellmeasure = mesh.entity_measure('cell', index=index)
+
+        NC = len(cellmeasure)
+        ldof = space.number_of_local_dofs() 
+        if out is None:
+            D = np.zeros((NC, ldof, ldof), dtype=space.ftype)
+        else:
+            D = out
+
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        NQ = len(ws)
+
+        phi0 = mesh.grad_shape_function(bc=bcs, p=p, index=index, variables='u') # (NQ, ldof, TD+1)
+        phi1 = phi0
+
+        glambda = mesh.grad_lambda() # (NC, ldof, GD)
+        M = np.einsum('q, qik, qjl -> ijkl', ws, phi1, phi1) # (ldof, ldof, TD+1, TD+1)
+
+        if coef is None:
+            #D += np.einsum('q, qcid, qcjd, c -> cij', ws, phi0, phi1, cellmeasure, optimize=True)
+            D += np.einsum('ijkl, ckm, clm, c -> cij', M, glambda, glambda, cellmeasure, optimize=True)
+            print("D:", D.shape, "\n", D)
+        else:
+            if callable(coef):
+                if hasattr(coef, 'coordtype'):
+                    if coef.coordtype == 'cartesian':
+                        ps = mesh.bc_to_point(bcs, index=index)
+                        coef = coef(ps)
+                    elif coef.coordtype == 'barycentric':
+                        coef = coef(bcs, index=index)
+                else:
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    coef = coef(ps)
+            if np.isscalar(coef):
+                #D += coef*np.einsum('q, qcid, qcjd, c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
+                D += coef*np.einsum('qcij, cid, cjd, c -> cij', M, glambda, glambda, cellmeasure, optimize=True)
+            elif isinstance(coef, np.ndarray):
+                if coef.shape == (NC, ):
+                    #D += np.einsum('q, c, qcid, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('c, qcij, cid, cjd, c -> cij', coef, M, glambda, glambda, cellmeasure, optimize=True)
+                elif coef.shape == (NQ, NC):
+                    #D += np.einsum('q, qc, qcid, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('qc, qcij, cid, cjd, c -> cij', coef, M, glambda, glambda, cellmeasure, optimize=True)
+                elif coef.shape == (GD, GD):
+                    #D += np.einsum('q, dn, qcin, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('dn, qcij, cin, cjd, c -> cij', coef, M, glambda, glambda, cellmeasure, optimize=True)
+                elif coef.shape == (NC, GD, GD):
+                    #D += np.einsum('q, cdn, qcin, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('cdn, qcij, cin, cjd, c -> cij', coef, M, glambda, glambda, cellmeasure, optimize=True)
+                elif coef.shape == (NQ, NC, GD, GD):
+                    #D += np.einsum('q, qcdn, qcin, qcjd, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                    D += np.einsum('qcdn, qcij, cin, cjd, c -> cij', coef, M, glambda, glambda, cellmeasure, optimize=True)
                 else:
                     raise ValueError(f"coef with shape {coef.shape}! Now we just support shape: (NC, ), (NQ, NC), (GD, GD), (NC, GD, GD) or NQ, NC, GD, GD)")
             else:

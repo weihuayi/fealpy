@@ -50,6 +50,31 @@ class NSFEMSolver:
         bform = BilinearForm((self.uspace,)*2)
         bform.add_domain_integrator(VectorViscousWorkIntegrator(mu=mu, q=self.q))
         self.epS = bform.assembly() 
+
+        self._solver = {
+            "chorin": self.chorin, 
+            "newton": self.newton,
+            "ipcs": self.ipcs}
+
+        self.solver = self._solver['']
+
+    def options(self):
+        """
+        @brief 解法器控制参数
+        """
+        pass
+
+    def run(self):
+        pass
+
+    def chorin(self):
+        pass
+
+    def netwon(self):
+        pass
+
+    def ipcs(self):
+        pass
     
     # 求解中间速度u_star
     def chorin_A_0(self, mu=None, rho=None):

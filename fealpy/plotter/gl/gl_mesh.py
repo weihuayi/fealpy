@@ -81,7 +81,8 @@ class GLMesh:
         """
         # Load the image with Pillow
         image = Image.open(self.texture_path)
-        image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image for OpenGL
+        #image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image for OpenGL
+        image = image.transpose(Image.FLIP_LEFT_RIGHT)  # Flip the image for OpenGL
         img_data = image.convert("RGBA").tobytes()  # Convert the image to RGBA format
 
         # Generate a texture ID and bind it
