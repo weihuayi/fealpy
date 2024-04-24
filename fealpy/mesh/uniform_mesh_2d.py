@@ -311,7 +311,7 @@ class UniformMesh2d(Mesh, Plotable):
 
     def to_vtk(self, filename, celldata=None, nodedata=None):
         """
-        @brief 节点和单元按列排序
+        @brief: Converts the mesh data to a VTK structured grid format and writes to a VTS file
         """
         import vtk
         from vtk.util.numpy_support import numpy_to_vtk
