@@ -144,7 +144,7 @@ csys.show_images()
 mesh= TriangleMesh.from_section_ellipsoid(
             size=(17.5, 3.47, 3),
             center_height=h,
-            scale_ratio=(2, 2, 2),
+            scale_ratio=(1.618, 1.618, 1.618),
             density=0.1,
             top_section=np.pi / 2,
             return_edge=False)
@@ -164,4 +164,10 @@ for i in range(6):
     plotter.add_mesh(no, cell=None, texture_path=csys.cams[i].fname)
     i0 += 10
     i1 += 10
+
+# 卡车区域的贴图
+ce = cell[domain == 0]
+no = np.array(node[ce].reshape(-1, node.shape[-1]), dtype=np.float32)
+
+plotter.add_mesh(no, cell=None, texture_path=None)
 plotter.run()
