@@ -1,5 +1,6 @@
 import numpy as np
 from .ocam_model import OCAMModel
+from fealpy.mesh import TriangleMesh
 
 class OCAMSystem:
     def __init__(self, data):
@@ -38,6 +39,20 @@ class OCAMSystem:
 
         #plt.tight_layout()
         plt.show()
+
+    def sphere_mesh(self):
+        mesh = TriangleMesh.from_unit_sphere_surface(refine=3)
+
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        bc = mesh.entity_barycenter('cell')
+        cell = cell[bc[:, 2] > 0]
+
+        vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float32)
+        for cam in self.cams:
+            uv = cam.cam_to_image(vertices)
+
 
     def undistort_cv(self):
         import cv2
