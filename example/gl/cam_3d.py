@@ -86,14 +86,16 @@ fname = [
     '/home/why/data/src_6.jpg',
     ]
 
+"""
 fname = [
     '/home/why/data/camera_models/chessboard_1/frame1_0.jpg',
     '/home/why/data/camera_models/chessboard_2/frame2_0.jpg',
     '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
     '/home/why/data/camera_models/chessboard_4/frame4_0.jpg',
-    '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
+    '/home/why/data/camera_models/chessboard_5/frame5_0.jpg',
     '/home/why/data/camera_models/chessboard_6/frame6_0.jpg',
     ]
+"""
 data = {
     "nc" : 6,
     "location" : location,
@@ -108,16 +110,17 @@ data = {
     "vfield" : (110, 180)
 }
 
-
+"""
 a = 3.0*17.5/2.0
 b = 3.0*3.47/2.0
 c = 3.0*3.0/2.0
 mesh= TriangleMesh.from_ellipsoid_surface(20, 20, 
         radius=(a, b, c), 
         theta=(np.pi/2, np.pi/2+np.pi/2.5))
+"""
 
-#mesh= TriangleMesh.from_section_ellipsoid()
 
+"""
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
@@ -132,19 +135,39 @@ for l, v in zip(location, cz):
     axes.quiver(l[0], l[1], l[2], v[0], v[1], v[2],length=1, normalize=True, color='b')
 axes.axis(True)
 plt.show()
+"""
 
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-domain = mesh.celldata['domain']
-cell = cell[(domain == 11) | (domain == 12)]
-node = node[cell].reshape(-1, node.shape[-1])
 
 csys = OCAMSystem(data)
 csys.show_images()
 
-uv = csys.cams[0].world_to_image(node)
+mesh= TriangleMesh.from_section_ellipsoid(
+            size=(17.5, 3.47, 3),
+            center_height=h,
+            scale_ratio=(1.618, 1.618, 1.618),
+            density=0.1,
+            top_section=np.pi / 2,
+            return_edge=False)
 
-node = np.concatenate((node, uv), axis=-1, dtype=np.float32)
+node = mesh.entity('node')
+cell = mesh.entity('cell')
+domain = mesh.celldata['domain']
+
 plotter = OpenGLPlotter()
-plotter.add_mesh(node, cell=None, texture_path=csys.cams[0].fname)
+
+i0, i1 = 11, 12
+for i in range(6):
+    ce = cell[(domain == i0) | (domain == i1)]
+    no = node[ce].reshape(-1, node.shape[-1])
+    uv = csys.cams[i].world_to_image(no)
+    no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
+    plotter.add_mesh(no, cell=None, texture_path=csys.cams[i].fname)
+    i0 += 10
+    i1 += 10
+
+# 卡车区域的贴图
+ce = cell[domain == 0]
+no = np.array(node[ce].reshape(-1, node.shape[-1]), dtype=np.float32)
+
+plotter.add_mesh(no, cell=None, texture_path=None)
 plotter.run()

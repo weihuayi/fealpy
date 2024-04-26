@@ -2367,7 +2367,7 @@ class TriangleMesh(Mesh, Plotable):
             cls,
             size=(17.5, 3.47, 3),
             center_height=6,
-            scale_ratio=(1, 1, 2),
+            scale_ratio=(1, 1, 1),
             density=0.1,
             top_section=np.pi / 2,
             return_edge=False):
@@ -2383,9 +2383,9 @@ class TriangleMesh(Mesh, Plotable):
         """
         l, w, h = size
         # 构造椭球面
-        a = 1.6178 * l * scale_ratio[0]
-        b = 1.6178 * w * scale_ratio[1]
-        c = 1.6178 * h * scale_ratio[2]
+        a = l * scale_ratio[0]
+        b = w * scale_ratio[1]
+        c = h * scale_ratio[2]
 
         t = np.sqrt(c ** 2 - center_height ** 2) / c
         theta = (top_section, np.arccos(-center_height / c))
