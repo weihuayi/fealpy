@@ -213,8 +213,11 @@ space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 errorType = ['$|| Ax-b ||_{\\Omega,\infty}$', '$|| Ax-b ||_{\\Omega,0}$']
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
+h = np.zeros(maxit, dtype=np.float64)
 
 for i in range(maxit):
+    h[i] = np.sqrt(np.max(mesh.cell_area())
+
 
     bform = BilinearForm(space)
     L = ScalarBiharmonicIntegrator()
@@ -274,13 +277,14 @@ for i in range(maxit):
 print(errorMatrix)
 print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 
-def compute_order(errors, maxit):
+def compute_order(errors, maxit, h):
     orders = np.zeros((2, maxit-1), dtype=np.float64) 
     for i in range(maxit-1):
         if np.any(errors[:, i] == 0) or np.any(errors[:, i+1] == 0):
             orders[:, i] = 0
         else:
-            orders[:, i] = np.log(errors[:, i] / errors[:, i+1]) / np.log(2)
+            orders[:, i] = np.log(errors[:, i] / errors[:, i+1]) /
+            np.log(h[i]/h[i+1])
     return orders
 
 #order = np.zeros((2, maxit-1), dtype=np.float64) 
