@@ -34,7 +34,8 @@ class OCAMModel:
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
 
-        f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
+        f = np.sqrt((self.height/2)**2 + (self.width/2)**2) # TODO: 正确的 f
+        f = 844
         r = np.sqrt(np.sum(node**2, axis=-1))
         theta = np.arccos(node[..., 2]/r)
         phi = np.arctan2(node[..., 1], node[:, 0])
