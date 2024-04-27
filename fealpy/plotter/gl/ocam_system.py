@@ -55,10 +55,10 @@ class OCAMSystem:
         for cam in self.cams:
             print(cam.axes)
             print(cam.location)
-            no = np.einsum('ik, jk->ij', vertices, cam.axes) + cam.location
+            no = np.einsum('ik, kj->ij', vertices, cam.axes) + cam.location
             uv = cam.cam_to_image(vertices)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
-            plotter.add_mesh(no, cell=None, texture_path=None)
+            plotter.add_mesh(no, cell=None, texture_path=cam.fname, flip=cam.flip)
 
     def ellipsoid_mesh(self, plotter):
         """
