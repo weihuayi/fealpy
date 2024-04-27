@@ -19,7 +19,7 @@ dtype = [("position", "float64", (2, )),
          ("pressure", "float64"),
 		 ("internal_energy", "float64"),]
 
-num=10
+num=10000
 np.random.seed(0)
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)

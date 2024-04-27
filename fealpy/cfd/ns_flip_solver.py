@@ -76,7 +76,7 @@ class NSFlipSolver:
         for i in range(num_p):
             S_pc[i,index[i]] = 1
         rho_c = m_p@S_pc/Vc
-        I_c = (e_p@S_pc)/(rho_c*Vc) #会除以很多0,这里改怎么避免？
+        I_c = (e_p@S_pc)/(rho_c*Vc) #粒子足够多就不会等于0,不能加入条件语句，因为某一单元的Vc等于0,就得找在该单元的粒子，再使其ep等于0
         return rho_c, I_c
 
     def P2G_vertex(self,particles):
@@ -86,5 +86,6 @@ class NSFlipSolver:
         vertex = self.mesh.node.reshape(num_v,2)
         S_pv = self.bilinear(particles["position"],vertex)
         M_v = m_p@S_pv
-        #U_v = m_p*v_p/M_v ?
-        return M_v
+        m_p = m_p[:,np.newaxis]
+        U_v = ((m_p*v_p).T@S_pv/M_v).T #需要确认写法
+        return M_v, U_v
