@@ -86,6 +86,10 @@ fname = [
     '/home/why/data/src_6.jpg',
     ]
 
+flip = [
+    'TB', 'TB', 'LR', 'TB', 'TB', 'LR'
+]
+
 """
 fname = [
     '/home/why/data/camera_models/chessboard_1/frame1_0.jpg',
@@ -107,7 +111,8 @@ data = {
     "fname" : fname,
     "height" : 1080,
     "width"  : 1920,
-    "vfield" : (110, 180)
+    "vfield" : (110, 180),
+    'flip' : flip
 }
 
 """
@@ -141,33 +146,7 @@ plt.show()
 csys = OCAMSystem(data)
 csys.show_images()
 
-mesh= TriangleMesh.from_section_ellipsoid(
-            size=(17.5, 3.47, 3),
-            center_height=h,
-            scale_ratio=(1.618, 1.618, 1.618),
-            density=0.1,
-            top_section=np.pi / 2,
-            return_edge=False)
-
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-domain = mesh.celldata['domain']
-
 plotter = OpenGLPlotter()
-
-i0, i1 = 11, 12
-for i in range(6):
-    ce = cell[(domain == i0) | (domain == i1)]
-    no = node[ce].reshape(-1, node.shape[-1])
-    uv = csys.cams[i].world_to_image(no)
-    no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
-    plotter.add_mesh(no, cell=None, texture_path=csys.cams[i].fname)
-    i0 += 10
-    i1 += 10
-
-# 卡车区域的贴图
-ce = cell[domain == 0]
-no = np.array(node[ce].reshape(-1, node.shape[-1]), dtype=np.float32)
-
-plotter.add_mesh(no, cell=None, texture_path=None)
+csys.ellipsoid_mesh(plotter)
+csys.sphere_mesh(plotter)
 plotter.run()

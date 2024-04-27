@@ -13,6 +13,7 @@ class OCAMModel:
     pol : np.ndarray
     affine: np.ndarray
     fname: str
+    flip: str
 
     def world_to_image(self, node):
         """
@@ -35,7 +36,6 @@ class OCAMModel:
         """
 
         f = np.sqrt((self.height/2)**2 + (self.width/2)**2) # TODO: 正确的 f
-        f = 844
         r = np.sqrt(np.sum(node**2, axis=-1))
         theta = np.arccos(node[..., 2]/r)
         phi = np.arctan2(node[..., 1], node[:, 0])

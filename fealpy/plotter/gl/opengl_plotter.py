@@ -120,12 +120,12 @@ class OpenGLPlotter:
         self.projection[2, 3] = -(2 * far * near) / (far - near)
         self.projection[3, 2] = -1
 
-    def add_mesh(self, node, cell=None, texture_path=None):
+    def add_mesh(self, node, cell=None, texture_path=None, flip='LR'):
         logger.info(f"Add GLMesh with {len(node)} nodes!")
         self.meshes.append(GLMesh(node, 
             cell=cell, 
             texture_path=texture_path,
-            texture_unit=self.texture_unit))
+            texture_unit=self.texture_unit, flip=flip))
         if texture_path is not None:
             self.texture_unit += 1
 

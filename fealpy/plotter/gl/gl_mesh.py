@@ -8,7 +8,7 @@ from fealpy import logger
 import ipdb
 
 class GLMesh:
-    def __init__(self, node, cell=None, texture_path=None, texture_unit=0):
+    def __init__(self, node, cell=None, texture_path=None, texture_unit=0, flip='LR'):
         """
         @brief 初始化网格类，根据节点的数据格式配置顶点属性，并加载纹理（如果提供）。
 
@@ -19,6 +19,7 @@ class GLMesh:
         @param cell: 单元格的索引数组，用于绘制网格。如果为None，则使用顶点数组直接绘制。
         @param texture_path: 纹理图片的路径。如果为None，则不加载纹理。
         """
+        self.flip = flip
         self.node = node 
         self.cell = cell if cell is not None else None
         self.texture_path = texture_path
@@ -81,8 +82,10 @@ class GLMesh:
         """
         # Load the image with Pillow
         image = Image.open(self.texture_path)
-        #image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image for OpenGL
-        image = image.transpose(Image.FLIP_LEFT_RIGHT)  # Flip the image for OpenGL
+        if self.flip == 'TB':
+            image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image for OpenGL
+        elif self.flip == 'LR':
+            image = image.transpose(Image.FLIP_LEFT_RIGHT)  # Flip the image for OpenGL
         img_data = image.convert("RGBA").tobytes()  # Convert the image to RGBA format
 
         # Generate a texture ID and bind it
