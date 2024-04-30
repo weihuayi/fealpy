@@ -216,8 +216,7 @@ NDof = np.zeros(maxit, dtype=np.int_)
 h = np.zeros(maxit, dtype=np.float64)
 
 for i in range(maxit):
-    h[i] = np.sqrt(np.max(mesh.cell_area())
-
+    h[i] = np.sqrt(np.max(mesh.cell_area()))
 
     bform = BilinearForm(space)
     L = ScalarBiharmonicIntegrator()
@@ -274,8 +273,8 @@ for i in range(maxit):
         space = InteriorPenaltyLagrangeFESpace2d(mesh, p = p)
 
 
-print(errorMatrix)
-print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
+print('error:', errorMatrix)
+print('derror:', errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 
 def compute_order(errors, maxit, h):
     orders = np.zeros((2, maxit-1), dtype=np.float64) 
@@ -283,10 +282,9 @@ def compute_order(errors, maxit, h):
         if np.any(errors[:, i] == 0) or np.any(errors[:, i+1] == 0):
             orders[:, i] = 0
         else:
-            orders[:, i] = np.log(errors[:, i] / errors[:, i+1]) /
-            np.log(h[i]/h[i+1])
+            orders[:, i] = np.log(errors[:, i] / errors[:, i+1]) / np.log(h[i]/h[i+1])
     return orders
 
 #order = np.zeros((2, maxit-1), dtype=np.float64) 
-order = compute_order(errorMatrix, maxit)
-print(order)
+order = compute_order(errorMatrix, maxit, h)
+print('order:', order)

@@ -98,6 +98,28 @@ def apply_dbc(A, f, uh, isDDof):
     f[isDDof.reshape(-1)] = uh[isDDof].reshape(-1)
     return A, f
 
+def point_g_h_value(uh, nidx):
+    cell = mesh.entity('cell')
+    NC = cell.shape[0]
+    cidx = np.where(np.any(cell == nidx, axis=1))[0]
+    k = np.argmax(cell[cidx] == nidx, axis=1)
+
+    bc = np.identity(3)
+    guh = uh.grad_value(bc)
+    huh = uh.hessian_value(bc)
+
+    gx0 = np.mean(guh[k, cidx, :], axis=0)
+    hx0 = np.mean(huh[k, cidx, :], axis=0)
+    return gx0, hx0
+
+def find_nodes(nodes):
+    x_min, x_max = 0.25, 0.75
+    y_min, y_max = 0.25, 0.75
+    condition = (nodes[:, 0] >= x_min) & (nodes[:, 0] <= x_max) & (nodes[:, 1] >= y_min) & (nodes[:, 1] <= y_max)
+    node0 = nodes[condition]
+    return node0
+
+
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -143,12 +165,25 @@ mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
 space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
 
 errorType = ['$|| Ax-b ||_{\\Omega,0}$']
-errorMatrix = np.zeros((2, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.int_)
-#print(mesh.entity('cell'))
-#print(mesh.entity('edge'))
+errorMatrix = np.zeros((3, maxit), dtype=np.float64)
+error = np.zeros((2, maxit), dtype=np.float64)
+Rerror = np.zeros((1, maxit), dtype=np.float64)
 
+NDof = np.zeros(maxit, dtype=np.int_)
+
+node = mesh.entity('node')
+node0 = find_nodes(node)
+
+GD = mesh.geo_dimension()
+Rhu = np.zeros((maxit, len(node0), GD, GD), dtype=np.float_)
+
+gx0 = np.zeros((len(node0), GD), dtype=np.float_)
+hx0 = np.zeros((len(node0), GD, GD), dtype=np.float_)
+print('ddddd:', len(node0))
+
+h = np.zeros(maxit, dtype=np.float64)
 for i in range(maxit):
+    h[i] = np.sqrt(np.max(mesh.cell_area()))
 
     bform = BilinearForm(space)
     L = ScalarBiharmonicIntegrator()
@@ -180,24 +215,48 @@ for i in range(maxit):
     print("AAA : ", np.max(A.data))
     print("AAA : ", np.max(P.data))
 
-    errorMatrix[0, i] = np.max(np.abs(uh-x))
-#    errorMatrix[0, i] = mesh.error(uh, pde.solution)
-    errorMatrix[1, i] = mesh.error(uh.hessian_value, pde.hessian) 
+#    errorMatrix[0, i] = np.max(np.abs(uh-x))
+    errorMatrix[0, i] = mesh.error(uh, pde.solution)
+    errorMatrix[1, i] = mesh.error(uh.grad_value, pde.gradient) 
+    errorMatrix[2, i] = mesh.error(uh.hessian_value, pde.hessian) 
     print(errorMatrix)
-
+    
+    # 计算某点处的误差情况
     node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    cell = np.array(cell)
+    nidx = np.where(np.isin(node[:, 0], node0[:, 0]) & np.isin(node[:, 1], node0[:, 1]))[0]
+    
+    x = pde.solution(node[nidx])
+    gx = pde.gradient(node[nidx])
+    hx = pde.hessian(node[nidx])
+     
+    for j in range(len(node0)):
+        gx0[j], hx0[j] = point_g_h_value(uh, nidx[j])
+    
+    error[0, i] = np.max(np.abs(gx0-gx))
+    error[1, i] = np.max(np.abs(hx0-hx))
+    
+    if p > 2:
+        k = 2**p/2.0
+        Rhu[i] -= hx0/(k-1)
+        if i > 0:
+            Rhu[i-1] += k*hx0/(k-1)
+            Rerror[0, i-1] = np.max(np.abs(Rhu[i-1]-hx))
+    else:
+        Rerror[0, i] = error[1, i]
+    
+#    node = mesh.entity('node')
+#    cell = mesh.entity('cell')
+#    cell = np.array(cell)
 
-    NN = len(node)
-    node0 = np.array(node)
-    node0 = np.c_[node0, x[:NN, None]]
-    node1 = np.array(node)
-    node1 = np.c_[node1, uh[:NN, None]]
-    meshv0 = TriangleMesh(node0, cell)
-    meshv1 = TriangleMesh(node1, cell)
-    meshv0.to_vtk(fname='aaa.vtu')
-    meshv1.to_vtk(fname='bbb.vtu')
+#    NN = len(node)
+#    node0 = np.array(node)
+#    node0 = np.c_[node0, x[:NN, None]]
+#    node1 = np.array(node)
+#    node1 = np.c_[node1, uh[:NN, None]]
+#    meshv0 = TriangleMesh(node0, cell)
+#    meshv1 = TriangleMesh(node1, cell)
+#    meshv0.to_vtk(fname='aaa.vtu')
+#    meshv1.to_vtk(fname='bbb.vtu')
 
     if i < maxit-1:
         nx = nx*2
@@ -205,8 +264,30 @@ for i in range(maxit):
         mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
         #mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5/2**i)
         space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
+        
 
+print('error:', errorMatrix)
+print('d_error:', errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 
-print(errorMatrix)
-print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
+def compute_order(errors, h):
+    orders = np.zeros_like(errors)
+    for i in range(orders.shape[-1]-1):
+        if np.any(errors[:, i] == 0) or np.any(errors[:, i+1] == 0):
+            orders[:, i+1] = 0
+        else:
+            orders[:, i+1] = np.log(errors[:, i] / errors[:, i+1]) / np.log(h[i]/h[i+1])
+    return orders
+
+#order = np.zeros((2, maxit-1), dtype=np.float64) 
+order = compute_order(errorMatrix, h)
+print('order:', order)
+
+print('x0_error:', error)
+x0order = compute_order(error, h)
+print('x0order:', x0order)
+    
+print('x0_error:', Rerror)
+Rx0order = compute_order(Rerror, h)
+print('Rx0order:', Rx0order)
+    
 
