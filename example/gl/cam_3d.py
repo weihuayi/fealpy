@@ -87,7 +87,7 @@ fname = [
     ]
 
 flip = [
-    'LR', 'LR', 'LR', 'LR', 'LR', 'LR'
+    'TB', 'TB', 'LR', 'TB', 'TB', 'LR'
 ]
 
 """

@@ -265,6 +265,7 @@ class OpenGLPlotter:
             # 计算旋转矩阵，这里仅提供概念代码，具体实现需要根据虚拟轨迹球的逻辑来完成
             rotation_matrix = calculate_rotation_matrix(xoffset, yoffset)
             self.transform = np.dot(rotation_matrix, self.transform)
+            print(self.transform)
 
     def mouse_callback_old(self, window, xpos, ypos):
         print(f"Mouse position: {xpos}, {ypos}")
@@ -310,43 +311,3 @@ class OpenGLPlotter:
     def window_resize_callback(self, window, width, height):
         glViewport(0, 0, width, height)
         self.update_projection_matrix(width, height)
-
-def main():
-    # 假设nodes和cells是你的网格数据
-
-    """
-    # 定义顶点数据和UV坐标
-    nodes = np.array([
-        [-0.5, -0.5, 0.0,  0.0, 0.0],  # 左下角
-        [ 0.5, -0.5, 0.0,  1.0, 0.0],  # 右下角
-        [ 0.5,  0.5, 0.0,  1.0, 1.0],  # 右上角
-        [-0.5,  0.5, 0.0,  0.0, 1.0]   # 左上角
-    ], dtype=np.float32)
-
-    cells = np.array([
-        0, 1, 2,
-        2, 3, 0
-    ], dtype=np.uint32)
-
-    """
-    from fealpy.mesh import TriangleMesh
-
-    mesh, U, V = TriangleMesh.from_ellipsoid_surface(80, 800, 
-            radius=(4, 2, 1), 
-            theta=(np.pi/2, np.pi/2+np.pi/3),
-            returnuv=True)
-    U = (U - np.min(U))/(np.max(U)-np.min(U))
-    V = (V - np.min(V))/(np.max(V)-np.min(V))
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    nodes = np.hstack((node, V.reshape(-1, 1), U.reshape(-1, 1)), dtype=np.float32)
-    cells = np.array(cell, dtype=np.uint32)
-
-    plotter = OpenGLPlotter()
-    plotter.load_mesh(nodes, cells)
-    plotter.load_texture('/home/why/we.jpg')
-    plotter.run()
-
-if __name__ == "__main__":
-    main()
-

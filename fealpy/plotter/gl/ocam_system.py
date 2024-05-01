@@ -56,6 +56,7 @@ class OCAMSystem:
         for i, cam in enumerate(self.cams):
             # 相机坐标系下的坐标转换为世界坐标系的坐标
             no = np.einsum('ik, kj->ij', vertices, cam.axes) + cam.location
+            no[:, 1] *= -1.0
             uv = cam.cam_to_image(vertices)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
             plotter.add_mesh(no, cell=None, texture_path=cam.fname, flip=cam.flip)
@@ -76,18 +77,21 @@ class OCAMSystem:
         cell = mesh.entity('cell')
         domain = mesh.celldata['domain']
 
+        """ 
         cd = domain.copy()
         cd[(domain == 11) | (domain == 12)] = domain[(domain == 51) | (domain == 52)]
         cd[(domain == 21) | (domain == 22)] = domain[(domain == 41) | (domain == 42)]
         cd[(domain == 41) | (domain == 42)] = domain[(domain == 21) | (domain == 22)]
         cd[(domain == 51) | (domain == 52)] = domain[(domain == 11) | (domain == 12)]
         domain = cd
+        """
 
 
         i0, i1 = 11, 12
         for i, cam in enumerate(self.cams):
             ce = cell[(domain == i0) | (domain == i1)]
             no = node[ce].reshape(-1, node.shape[-1])
+            no[:, 1] *= -1.0
             print(i, cam.fname)
             uv = cam.world_to_image(no)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
