@@ -9,7 +9,7 @@ from fealpy.plotter.gl import OpenGLPlotter, OCAMModel, OCAMSystem
 h = 3.0 # 世界坐标原点到地面的高度
 location = np.array([ # 相机在世界坐标系中的位置
     [ 8.35/2.0, -3.47/2.0, 1.515], # 右前
-    [-8.25/2.0, -3.47/2.0, 1.505], # 右后
+    [-8.35/2.0, -3.47/2.0, 1.505], # 右后
     [-17.5/2.0,       0.0, 1.295], # 后
     [-8.35/2.0,  3.47/2.0, 1.495], # 左后
     [ 8.35/2.0,  3.47/2.0, 1.495], # 左前
@@ -86,14 +86,20 @@ fname = [
     '/home/why/data/src_6.jpg',
     ]
 
+flip = [
+    'LR', 'LR', 'LR', 'LR', 'LR', 'LR'
+]
+
+"""
 fname = [
     '/home/why/data/camera_models/chessboard_1/frame1_0.jpg',
     '/home/why/data/camera_models/chessboard_2/frame2_0.jpg',
     '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
     '/home/why/data/camera_models/chessboard_4/frame4_0.jpg',
-    '/home/why/data/camera_models/chessboard_3/frame3_0.jpg',
+    '/home/why/data/camera_models/chessboard_5/frame5_0.jpg',
     '/home/why/data/camera_models/chessboard_6/frame6_0.jpg',
     ]
+"""
 data = {
     "nc" : 6,
     "location" : location,
@@ -105,19 +111,21 @@ data = {
     "fname" : fname,
     "height" : 1080,
     "width"  : 1920,
-    "vfield" : (110, 180)
+    "vfield" : (110, 180),
+    'flip' : flip
 }
 
-
+"""
 a = 3.0*17.5/2.0
 b = 3.0*3.47/2.0
 c = 3.0*3.0/2.0
 mesh= TriangleMesh.from_ellipsoid_surface(20, 20, 
         radius=(a, b, c), 
         theta=(np.pi/2, np.pi/2+np.pi/2.5))
+"""
 
-#mesh= TriangleMesh.from_section_ellipsoid()
 
+"""
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
@@ -132,19 +140,13 @@ for l, v in zip(location, cz):
     axes.quiver(l[0], l[1], l[2], v[0], v[1], v[2],length=1, normalize=True, color='b')
 axes.axis(True)
 plt.show()
+"""
 
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-domain = mesh.celldata['domain']
-cell = cell[(domain == 11) | (domain == 12)]
-node = node[cell].reshape(-1, node.shape[-1])
 
 csys = OCAMSystem(data)
 csys.show_images()
 
-uv = csys.cams[0].world_to_image(node)
-
-node = np.concatenate((node, uv), axis=-1, dtype=np.float32)
 plotter = OpenGLPlotter()
-plotter.add_mesh(node, cell=None, texture_path=csys.cams[0].fname)
+csys.ellipsoid_mesh(plotter)
+csys.sphere_mesh(plotter)
 plotter.run()

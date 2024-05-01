@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Callable, Any, Tuple
 import numpy as np
+import cv2
+import glob
 
 @dataclass
 class OCAMModel:
@@ -13,15 +15,12 @@ class OCAMModel:
     pol : np.ndarray
     affine: np.ndarray
     fname: str
-    hd: float 
-    wd: float
-    hs: float 
-    ws: float
+    flip: str
+    chessboardpath: str
 
     def __post_init__(self):
-        self.mapx = np.zeros((hd, wd), dtype=np.float32)
-        self.mapy = np.zeros((hd, wd), dtype=np.float32)
-        self.fish2Map()
+        self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+
 
     def world_to_image(self, node):
         """
@@ -35,7 +34,9 @@ class OCAMModel:
         """
         @brief 把世界坐标系中的点转换到相机坐标系下
         """
-        node = np.einsum('...j, kj->...k', node-self.location, self.axes)
+        print(self.location)
+        print(self.axes)
+        node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
     def cam_to_image(self, node):
@@ -43,25 +44,27 @@ class OCAMModel:
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
 
+        NN = len(node)
         f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
-        r = np.sqrt(np.sum(node**2, axis=-1))
-        theta = np.arccos(node[..., 2]/r)
-        phi = np.arctan2(node[..., 1], node[:, 0])
+        r = np.sqrt(np.sum(node**2, axis=1))
+        theta = np.arccos(node[:, 2]/r)
+        phi = np.arctan2(node[:, 1], node[:, 0])
         phi = phi % (2 * np.pi)
 
-        uv = np.zeros(node.shape[:-1]+(2,), dtype=np.float64)
+        uv = np.zeros((NN, 2), dtype=np.float64)
 
-        uv[..., 0] = f * theta * np.cos(phi) + self.center[0] 
-        uv[..., 1] = f * theta * np.sin(phi) + self.center[1] 
+        uv[:, 0] = f * theta * np.cos(phi) + self.center[0] 
+        uv[:, 1] = f * theta * np.sin(phi) + self.center[1] 
 
         # 标准化
-        uv[..., 0] = (uv[..., 0] - np.min(uv[..., 0]))/(np.max(uv[..., 0])-np.min(uv[..., 0]))
-        uv[..., 1] = (uv[..., 1] - np.min(uv[..., 1]))/(np.max(uv[..., 1])-np.min(uv[..., 1]))
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
         return uv
 
     def world_to_image_fast(self, node):
         """
+        @brief 利用 matlab 工具箱 中的算法来处理
         """
         node = self.world_to_cam(node)
         theta = np.zeros(len(node), dtype=np.float64)
@@ -181,60 +184,87 @@ class OCAMModel:
         ps = node[:, 0:2]/l.reshape(-1, 1)*rho.reshape(-1, 1)
         return ps 
 
-    def fish2Eqts(self, x_dest, y_dest, w_rad):
-        """
-        @brief 鱼眼图像到矩形区域的映射函数 
-        """
-        phi = x_dest / w_rad
-        theta = -y_dest / w_rad + np.pi / 2
+    def get_K_and_D(self, checkerboard, imgsPath):
+        CHECKERBOARD = checkerboard
+        subpix_criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_CHECK_COND+cv2.fisheye.CALIB_FIX_SKEW
+        objp = np.zeros((1, CHECKERBOARD[0]*CHECKERBOARD[1], 3), np.float32)
+        objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
+        _img_shape = None
+        objpoints = []
+        imgpoints = []
+        images = glob.glob(imgsPath + '/*.jpg')
+        for fname in images:
+            img = cv2.imread(fname)
+            if _img_shape == None:
+                _img_shape = img.shape[:2]
+            else:
+                assert _img_shape == img.shape[:2], "All images must share the same size."
 
-        flag = theta < 0
-        theta[flag] = -theta[flag]
-        phi[flag] += np.pi
+            gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            ret, corners = cv2.findChessboardCorners(gray, checkerboard,
+                flags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
 
-        flag = theta > np.pi
-        theta[flag] = 2*np.pi - theta[flag]
-        phi[flag] += np.pi
+            #ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD,cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE)
+            if ret == True:
+                objpoints.append(objp)
+                cv2.cornerSubPix(gray,corners,(3,3),(-1,-1),subpix_criteria)
+                imgpoints.append(corners)
+        N_OK = len(objpoints)
+        K = np.zeros((3, 3))
+        D = np.zeros((4, 1))
+        rvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+        tvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+        rms, _, _, _, _ = cv2.fisheye.calibrate(
+            objpoints,
+            imgpoints,
+            gray.shape[::-1],
+            K,
+            D,
+            rvecs,
+            tvecs,
+            calibration_flags,
+            (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
+        )
+        DIM = _img_shape[::-1]
+        print("Found " + str(N_OK) + " valid images for calibration")
+        print("DIM=" + str(_img_shape[::-1]))
+        print("K  =np.array(" + str(K.tolist()) + ")")
+        print("D  =np.array(" + str(D.tolist()) + ")")
+        return DIM, K, D
 
-        s = np.sin(theta)
-        v0 = s * np.sin(phi)
-        v1 = np.cos(theta)
-        r = np.sqrt(v1 * v1 + v0 * v0)
-        theta = w_rad * np.arctan2(r, s * np.cos(phi))
 
-        x_src = theta * v0 / r
-        y_src = theta * v1 / r
+    def undistort_chess(self, imgname, scale=0.6):
+        img = cv2.imread(imgname)
+        K, D, DIM = self.K, self.D, self.DIM
+        dim1 = img.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
+        assert dim1[0]/dim1[1] == DIM[0]/DIM[1] #Image to undistort needs to have same aspect ratio as the ones used in calibration
+        if dim1[0]!=DIM[0]:
+            img = cv2.resize(img,DIM,interpolation=cv2.INTER_AREA)
+        Knew = K.copy()
+        if scale: #change fov
+            Knew[(0,1), (0,1)] = scale * Knew[(0,1), (0,1)]
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), Knew, DIM, cv2.CV_16SC2)
+        undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        return undistorted_img
 
-        return x_src, y_src
+    def perspective(self, img):
+        # 定义原始图像中的四个角点坐标
+        original_points = np.array([[430.479, 233.444],
+                                    [1072.281, 238.995],
+                                    [1096.582, 38.359],
+                                    [252.12, 23.290]], dtype=np.float32)[::-1]
+        # 定义目标图像中对应的四个角点坐标
+        target_points = np.array([[430.479, 233.444],
+                                  [1072.281, 233.444],
+                                  [1080.281, 38.359],
+                                  [350.479, 38.359]], dtype=np.float32)[::-1]
 
-    def fish2Map(self):
-        """
-        @brief 获取鱼眼图像到矩形区域的映射矩阵 
-        """
-        w_rad = self.ws2*8 / np.pi
-        w2 = self.wd//2 + 0.5
-        h2 = self.hd//2 + 0.5
-        ws2 = self.ws//2 + 0.5
-        hs2 = self.hs//2 + 0.5
+        # 计算透视变换矩阵
+        M = cv2.getPerspectiveTransform(original_points, target_points)
 
-        y_d = np.tile(np.arange(self.hd) - h2, (self.wd, 1)).T
-        x_d = np.tile(np.arange(self.wd) - w2, (self.hd, 1))
-        x_s, y_s = self.fish2Eqts(x_d, y_d, w_rad)
-        self.map_x[:] = x_s + ws2
-        self.map_y[:] = y_s + hs2
-
-    def unwarp(self, src):
-        dst = cv2.remap(src, self.map_x, self.map_y, 
-                        interpolation=cv2.INTER_LINEAR, 
-                        borderMode=cv2.BORDER_CONSTANT, 
-                        borderValue=(0, 0, 0))
-        # 定义边缘厚度
-        k = 50
-        # 获取图像尺寸
-        height, width = dst.shape[:2]
-        # 裁剪图像边缘
-        dst = dst[80:height-k*3, k:width-k]
-        return dst
-
+        # 进行透视矫正
+        result = cv2.warpPerspective(img, M, (1920, 1080))
+        return result
 
 

@@ -42,7 +42,8 @@ class OpenGLPlotter:
         glfw.make_context_current(self.window)
         # 启用深度测试
         glEnable(GL_DEPTH_TEST)
-        #glDisable(GL_CULL_FACE)
+        #glEnable(GL_CULL_FACE);
+        #glFrontFace(GL_CCW);
 
         # 设置视口大小
         glViewport(0, 0, width, height)
@@ -119,12 +120,12 @@ class OpenGLPlotter:
         self.projection[2, 3] = -(2 * far * near) / (far - near)
         self.projection[3, 2] = -1
 
-    def add_mesh(self, node, cell=None, texture_path=None):
+    def add_mesh(self, node, cell=None, texture_path=None, flip='LR'):
         logger.info(f"Add GLMesh with {len(node)} nodes!")
         self.meshes.append(GLMesh(node, 
             cell=cell, 
             texture_path=texture_path,
-            texture_unit=self.texture_unit))
+            texture_unit=self.texture_unit, flip=flip))
         if texture_path is not None:
             self.texture_unit += 1
 

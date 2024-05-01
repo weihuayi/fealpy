@@ -121,7 +121,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--gamma',
-        default=3, type=int,
+        default=5, type=int,
         help='默认内罚参数，默认为3')
 
 args = parser.parse_args()
