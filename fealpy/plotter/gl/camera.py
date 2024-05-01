@@ -5,7 +5,8 @@ class Camera:
     def __init__(self, 
             pos=(0.0, 0.0, 3.0), 
             front=(0.0, 0.0, -1.0),
-            up=(0.0, 1.0, 0.0)):
+            up=(0.0, 1.0, 0.0)
+            wd = 1920, hd = 1080, ws = 1500, hs = 1500):
         self.camera_pos = glm.vec3(pos[0], pos[1], pos[2])
         self.camera_front = glm.vec3(front[0], front[1], front[2])
         self.camera_up = glm.vec3(up[0], up[1], up[2])

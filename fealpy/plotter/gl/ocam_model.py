@@ -13,6 +13,15 @@ class OCAMModel:
     pol : np.ndarray
     affine: np.ndarray
     fname: str
+    hd: float 
+    wd: float
+    hs: float 
+    ws: float
+
+    def __post_init__(self):
+        self.mapx = np.zeros((hd, wd), dtype=np.float32)
+        self.mapy = np.zeros((hd, wd), dtype=np.float32)
+        self.fish2Map()
 
     def world_to_image(self, node):
         """
@@ -171,5 +180,61 @@ class OCAMModel:
 
         ps = node[:, 0:2]/l.reshape(-1, 1)*rho.reshape(-1, 1)
         return ps 
+
+    def fish2Eqts(self, x_dest, y_dest, w_rad):
+        """
+        @brief 鱼眼图像到矩形区域的映射函数 
+        """
+        phi = x_dest / w_rad
+        theta = -y_dest / w_rad + np.pi / 2
+
+        flag = theta < 0
+        theta[flag] = -theta[flag]
+        phi[flag] += np.pi
+
+        flag = theta > np.pi
+        theta[flag] = 2*np.pi - theta[flag]
+        phi[flag] += np.pi
+
+        s = np.sin(theta)
+        v0 = s * np.sin(phi)
+        v1 = np.cos(theta)
+        r = np.sqrt(v1 * v1 + v0 * v0)
+        theta = w_rad * np.arctan2(r, s * np.cos(phi))
+
+        x_src = theta * v0 / r
+        y_src = theta * v1 / r
+
+        return x_src, y_src
+
+    def fish2Map(self):
+        """
+        @brief 获取鱼眼图像到矩形区域的映射矩阵 
+        """
+        w_rad = self.ws2*8 / np.pi
+        w2 = self.wd//2 + 0.5
+        h2 = self.hd//2 + 0.5
+        ws2 = self.ws//2 + 0.5
+        hs2 = self.hs//2 + 0.5
+
+        y_d = np.tile(np.arange(self.hd) - h2, (self.wd, 1)).T
+        x_d = np.tile(np.arange(self.wd) - w2, (self.hd, 1))
+        x_s, y_s = self.fish2Eqts(x_d, y_d, w_rad)
+        self.map_x[:] = x_s + ws2
+        self.map_y[:] = y_s + hs2
+
+    def unwarp(self, src):
+        dst = cv2.remap(src, self.map_x, self.map_y, 
+                        interpolation=cv2.INTER_LINEAR, 
+                        borderMode=cv2.BORDER_CONSTANT, 
+                        borderValue=(0, 0, 0))
+        # 定义边缘厚度
+        k = 50
+        # 获取图像尺寸
+        height, width = dst.shape[:2]
+        # 裁剪图像边缘
+        dst = dst[80:height-k*3, k:width-k]
+        return dst
+
 
 
