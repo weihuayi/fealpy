@@ -1,7 +1,7 @@
 
 from typing import (
-    Union, Optional, TypeVar, Generic, Dict, Sequence, overload, Callable,
-    Literal, Any
+    Union, Optional, Dict, Sequence, overload, Callable,
+    Literal
 )
 
 import torch
@@ -217,6 +217,9 @@ class Mesh():
     GD = property(geo_dimension)
     TD = property(top_dimension)
 
+    def multi_index_matrix(self, p: int, etype: int) -> Tensor:
+        return F.multi_index_matrix(p, etype, dtype=self.ds.itype, device=self.device)
+
     def number_of_cells(self) -> int: return self.ds.number_of_cells()
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
@@ -232,24 +235,19 @@ class Mesh():
         raise NotImplementedError
 
     def shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
-                       mi: Optional[Tensor]=None) -> Tensor:
+                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
     def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
-                            mi: Optional[Tensor]=None) -> Tensor:
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
     def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
-                            mi: Optional[Tensor]=None) -> Tensor:
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
 
-class HomoMesh(Mesh[HomoMeshDataStructure]):
-    def __init__(self, node: Tensor, cell: Tensor, TD: int) -> None:
-        super().__init__()
-        self.node = node
-        self.ds = HomoMeshDataStructure(node.size(0), TD, cell)
-
+class HomoMesh(Mesh):
     @overload
     def entity(self, etype: Union[int, str], index: Index=_S) -> Tensor: ...
     def entity_barycenter(self, etype: Union[int, str], index: Index=_S) -> Tensor:
@@ -286,3 +284,22 @@ class HomoMesh(Mesh[HomoMeshDataStructure]):
             string = ", ".join([desp1[i]+desp2[i] for i in range(TD)])
             string += " -> " + desp1[:TD] + desp2[:TD]
             return torch.einsum(string, *bcs).reshape(-1, entity.size(-1))
+
+    ### ipoints
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        r"""@brief Get the relationship between edges and integration points."""
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        edges = self.ds.edge[index]
+        indices = torch.arange(NE)[index]
+        return torch.stack([
+            edges[:, 0].reshape(-1, 1),
+            (p-1) * indices.reshape(-1, 1) + torch.range(p-1) + NN,
+            edges[:, 1].reshape(-1, 1),
+        ], dim=-1)
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        ...
+
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        ...
