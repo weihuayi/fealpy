@@ -84,15 +84,18 @@ class TriangleMesh(HomoMesh):
                         "cell_area and grad_lambda are not available. "
                         "Any operation involving them will fail.")
 
+    # TODO: finish this
     def cell_to_ipoint(self, p: int, index: Index=None) -> Tensor:
         cell = self.ds.cell
         if p == 1:
             return cell[index]
 
         mi = self.multi_index_matrix(p, 2)
-        idx0, = torch.nonzero(mi[:, 0] == 0)
-        idx1, = torch.nonzero(mi[:, 1] == 0)
-        idx2, = torch.nonzero(mi[:, 2] == 0)
+        idx0, = torch.nonzero(mi[:, 0] == 0, as_tuple=True)
+        idx1, = torch.nonzero(mi[:, 1] == 0, as_tuple=True)
+        idx2, = torch.nonzero(mi[:, 2] == 0, as_tuple=True)
+        itype = self.ds.itype
+        device = self.device
 
         face2cell = self.ds.face_to_cell()
         NN = self.number_of_nodes()
@@ -101,6 +104,33 @@ class TriangleMesh(HomoMesh):
 
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoint()
+        c2p = torch.zeros((NC, ldof), dtype=itype, device=device)
+
+        flag = face2cell[:, 2] == 0
+        c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
+
+        flag = face2cell[:, 2] == 1
+        c2p[face2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+
+        flag = face2cell[:, 2] == 2
+        c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
+
+        iflag = face2cell[:, 0] != face2cell[:, 1]
+
+        flag = iflag & (face2cell[:, 3] == 0)
+        c2p[face2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+
+        flag = iflag & (face2cell[:, 3] == 1)
+        c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
+
+        flag = iflag & (face2cell[:, 3] == 2)
+        c2p[face2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+
+        cdof = (p-1)*(p-2)//2
+        flag = torch.sum(mi > 0, axis=1) == 3
+        c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, dtype=itype, device=device).reshape(NC, cdof)
+        return c2p[index]
+
 
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.node[self.ds.cell[index]])
