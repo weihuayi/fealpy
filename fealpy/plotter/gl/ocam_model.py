@@ -13,7 +13,6 @@ class OCAMModel:
     pol : np.ndarray
     affine: np.ndarray
     fname: str
-    flip: str
 
     def world_to_image(self, node):
         """
@@ -27,7 +26,7 @@ class OCAMModel:
         """
         @brief 把世界坐标系中的点转换到相机坐标系下
         """
-        node = np.einsum('...j, kj->...k', node-self.location, self.axes)
+        node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
     def cam_to_image(self, node):
@@ -35,25 +34,27 @@ class OCAMModel:
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
 
-        f = np.sqrt((self.height/2)**2 + (self.width/2)**2) # TODO: 正确的 f
-        r = np.sqrt(np.sum(node**2, axis=-1))
-        theta = np.arccos(node[..., 2]/r)
-        phi = np.arctan2(node[..., 1], node[:, 0])
+        NN = len(node)
+        f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
+        r = np.sqrt(np.sum(node**2, axis=1))
+        theta = np.arccos(node[:, 2]/r)
+        phi = np.arctan2(node[:, 1], node[:, 0])
         phi = phi % (2 * np.pi)
 
-        uv = np.zeros(node.shape[:-1]+(2,), dtype=np.float64)
+        uv = np.zeros((NN, 2), dtype=np.float64)
 
-        uv[..., 0] = f * theta * np.cos(phi) + self.center[0] 
-        uv[..., 1] = f * theta * np.sin(phi) + self.center[1] 
+        uv[:, 0] = f * theta * np.cos(phi) + self.center[0] 
+        uv[:, 1] = f * theta * np.sin(phi) + self.center[1] 
 
         # 标准化
-        uv[..., 0] = (uv[..., 0] - np.min(uv[..., 0]))/(np.max(uv[..., 0])-np.min(uv[..., 0]))
-        uv[..., 1] = (uv[..., 1] - np.min(uv[..., 1]))/(np.max(uv[..., 1])-np.min(uv[..., 1]))
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
         return uv
 
     def world_to_image_fast(self, node):
         """
+        @brief 利用 matlab 工具箱 中的算法来处理
         """
         node = self.world_to_cam(node)
         theta = np.zeros(len(node), dtype=np.float64)

@@ -50,15 +50,16 @@ class OCAMSystem:
         cell = mesh.entity('cell')
         bc = mesh.entity_barycenter('cell')
         cell = cell[bc[:, 2] > 0]
+        # 相机坐标系下的点
         vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
 
-        for cam in self.cams:
-            print(cam.axes)
-            print(cam.location)
+        for i, cam in enumerate(self.cams):
+            # 相机坐标系下的坐标转换为世界坐标系的坐标
             no = np.einsum('ik, kj->ij', vertices, cam.axes) + cam.location
             uv = cam.cam_to_image(vertices)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
             plotter.add_mesh(no, cell=None, texture_path=cam.fname, flip=cam.flip)
+            print(i, ":", cam.fname)
 
     def ellipsoid_mesh(self, plotter):
         """
@@ -85,12 +86,13 @@ class OCAMSystem:
 
 
         i0, i1 = 11, 12
-        for cam in self.cams:
+        for i, cam in enumerate(self.cams):
             ce = cell[(domain == i0) | (domain == i1)]
             no = node[ce].reshape(-1, node.shape[-1])
             uv = cam.world_to_image(no)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
             plotter.add_mesh(no, cell=None, texture_path=cam.fname, flip=cam.flip)
+            print(i, cam.fname)
             i0 += 10
             i1 += 10
 
