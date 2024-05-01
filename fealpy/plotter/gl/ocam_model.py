@@ -13,6 +13,7 @@ class OCAMModel:
     pol : np.ndarray
     affine: np.ndarray
     fname: str
+    flip: str
 
     def world_to_image(self, node):
         """
@@ -26,6 +27,8 @@ class OCAMModel:
         """
         @brief 把世界坐标系中的点转换到相机坐标系下
         """
+        print(self.location)
+        print(self.axes)
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 

@@ -59,7 +59,6 @@ class OCAMSystem:
             uv = cam.cam_to_image(vertices)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
             plotter.add_mesh(no, cell=None, texture_path=cam.fname, flip=cam.flip)
-            print(i, ":", cam.fname)
 
     def ellipsoid_mesh(self, plotter):
         """
@@ -89,10 +88,10 @@ class OCAMSystem:
         for i, cam in enumerate(self.cams):
             ce = cell[(domain == i0) | (domain == i1)]
             no = node[ce].reshape(-1, node.shape[-1])
+            print(i, cam.fname)
             uv = cam.world_to_image(no)
             no = np.concatenate((no, uv), axis=-1, dtype=np.float32)
             plotter.add_mesh(no, cell=None, texture_path=cam.fname, flip=cam.flip)
-            print(i, cam.fname)
             i0 += 10
             i1 += 10
 
@@ -101,6 +100,22 @@ class OCAMSystem:
         no = np.array(node[ce].reshape(-1, node.shape[-1]), dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=None)
 
+    def ellipsoid_mesh_1(self, plotter):
+        mesh= TriangleMesh.from_section_ellipsoid(
+            size=(17.5, 3.47, 3),
+            center_height=3,
+            scale_ratio=(1.618, 1.618, 1.618),
+            density=0.1,
+            top_section=np.pi / 2,
+            return_edge=False)
+
+        mesh = TriangleMesh.from_ellipsoid_surface(ntheta=80, nphi=80,
+                               radius=(1.618*17.5, 1.618*3.47, 1.618*3.0),
+                               theta=(np.pi / 4, 3 * np.pi / 4),
+                               )
+
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
 
     def undistort_cv(self):
         import cv2
