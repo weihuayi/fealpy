@@ -144,7 +144,10 @@ class OCAMSystem:
         #添加球面网格
         plotter.add_mesh(snode, cell=None, texture_path=self.cams[icam].fname)
 
-    def test_half_sphere_domain(self, plotter, r=1.0, icam=-1):
+    def test_half_sphere_surface(self, plotter, r=1.0, icam=-1):
+        """
+        @brief 在单位半球(z > 0)上的三角形网格上进行帖图
+        """
         mesh = TriangleMesh.from_unit_sphere_surface(refine=4)
         node = r*mesh.entity('node')
         cell = mesh.entity('cell')
@@ -157,6 +160,21 @@ class OCAMSystem:
         no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return uv
+    
+    def test_half_sphere_surface_with_cutting(self, plotter, theta=np.pi*35/180, h=0.1, icam=-1, ptype='O'):
+        """
+        """
+        mesh = TriangleMesh.from_half_sphere_surface_with_cutting(theta=theta, h=h)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        # 相机坐标系下的点
+        vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
+
+        uv = self.cams[icam].cam_to_image(vertices, ptype=ptype)
+        no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
+        plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
+        return mesh, uv
 
     def undistort_cv(self):
         import cv2

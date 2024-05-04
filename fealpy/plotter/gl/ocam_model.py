@@ -37,13 +37,26 @@ class OCAMModel:
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
-    def cam_to_image(self, node):
+    def cam_to_image(self, node, ptype='O'):
         """
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
 
         NN = len(node)
-        f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
+
+        fx = self.K[0, 0] 
+        fy = self.K[1, 1]
+        u0 = self.K[0, 2]
+        v0 = self.K[1, 2]
+
+        w = self.width
+        h = self.height
+        f = np.sqrt((h/2)**2 + (w/2)**2)
+        fx = f
+        fy = f
+        u0 = self.center[0]
+        v0 = self.center[1]
+
         r = np.sqrt(np.sum(node**2, axis=1))
         theta = np.arccos(node[:, 2]/r)
         phi = np.arctan2(node[:, 1], node[:, 0])
@@ -51,8 +64,23 @@ class OCAMModel:
 
         uv = np.zeros((NN, 2), dtype=np.float64)
 
-        uv[:, 0] = f * theta * np.cos(phi) + self.center[0] 
-        uv[:, 1] = f * theta * np.sin(phi) + self.center[1] 
+        if ptype == 'L': # 等距投影
+            uv[:, 0] = fx * theta * np.cos(phi) + u0 
+            uv[:, 1] = fy * theta * np.sin(phi) + v0 
+        elif ptype == 'O': # 正交投影
+            uv[:, 0] = fx * np.sin(theta) * np.cos(phi) + u0 
+            uv[:, 1] = fy * np.sin(theta) * np.sin(phi) + v0 
+        elif ptype == 'A': # 等积投影
+            uv[:, 0] = 2 * fx * np.sin(theta/2) * np.cos(phi) + u0 
+            uv[:, 1] = 2 * fy * np.sin(theta/2) * np.sin(phi) + v0 
+        elif ptype == 'S': # 体视投影, Stereographic Projection
+            uv[:, 0] = 2 * fx * np.tan(theta/2) * np.cos(phi) + u0 
+            uv[:, 1] = 2 * fy * np.tan(theta/2) * np.sin(phi) + v0 
+        else:
+            raise ValueError(f"投影类型{ptype}错误!")
+
+
+
 
         # 标准化
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))

@@ -2519,7 +2519,7 @@ class TriangleMesh(Mesh, Plotable):
             return mesh
     
     @classmethod
-    def from_sphere_surface_cutting(cls,theta=np.pi/3,h=0.3):
+    def from_half_sphere_surface_with_cutting(cls, theta=np.pi/3, h=0.3):
         import gmsh
         theta = np.pi/2-theta
         gmsh.initialize()
