@@ -2517,6 +2517,38 @@ class TriangleMesh(Mesh, Plotable):
             return mesh, edge_node
         else:
             return mesh
+    
+    @classmethod
+    def from_sphere_surface_cutting(cls,theta=np.pi/3,h=0.3):
+        import gmsh
+        theta = np.pi/2-theta
+        gmsh.initialize()
+        gmsh.model.occ.addSphere(0,0,0,1.0,tag=1,angle1=-theta,angle2=theta,angle3=np.pi)
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),h)
+        gmsh.model.mesh.generate(2)
+
+        ntags, vxyz, _ = gmsh.model.mesh.getNodes()
+        node = vxyz.reshape((-1,3))
+        vmap = dict({j:i for i,j in enumerate(ntags)})
+        tets_tags,evtags = gmsh.model.mesh.getElementsByType(2)
+        evid = np.array([vmap[j] for j in evtags])
+        cell = evid.reshape((tets_tags.shape[-1],-1))
+        gmsh.finalize()
+
+        W1 = np.array([[1,0,0],[0,0,-1],[0,1,0]])
+        W2 = np.array([[-1,0,0],[0,1,0],[0,0,-1]])
+        node = node@W1@W2
+
+        mesh1 = cls(node,cell)
+        bc = mesh1.entity_barycenter("cell")
+
+        remove_flag = np.zeros(mesh1.number_of_cells(),dtype=np.bool_)
+        remove_flag[bc[:,2]<1e-6]=True
+        remove_flag[bc[:,1]>(np.sin(theta)-1e-6)]=True
+        remove_flag[bc[:,1]<(-np.sin(theta)+1e-6)]=True
+        cell = cell[~remove_flag]
+        return cls(node,cell)
 
     def streamline_callculator(self, vector_field, start_cell, start_point):
         """
