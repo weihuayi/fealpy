@@ -11,6 +11,12 @@ from fealpy.plotter.gl import OpenGLPlotter, OCAMSystem
 csys = OCAMSystem.from_data()
 plotter = OpenGLPlotter()
 
-csys.test_1(plotter, z=20)
+#csys.test_plain_domain(plotter, z=20)
+uv = csys.test_half_sphere_domain(plotter)
+
+
+plt.scatter(uv[:, 0], uv[:, 1])
+plt.show()
+
 plotter.run()
 

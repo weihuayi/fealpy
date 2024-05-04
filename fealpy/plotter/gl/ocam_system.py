@@ -117,7 +117,7 @@ class OCAMSystem:
         no = np.array(node[ce].reshape(-1, node.shape[-1]), dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=None)
 
-    def test_1(self, plotter, z=10):
+    def test_plain_domain(self, plotter, z=10, icam=-1):
         """
         @brief 测试半球外一平面网格
         """
@@ -129,20 +129,34 @@ class OCAMSystem:
         node[:, -1] = z
         cell = mesh.entity('cell')
 
-        #投影到球面上，半径为 0.5 z
+        #投影到球面上
         snode = node / np.sqrt(np.sum(node**2, axis=-1, keepdims=True))
         snode = snode[cell].reshape(-1, node.shape[-1])
-        uv = self.cams[0].cam_to_image(snode)
+
+        uv = self.cams[icam].cam_to_image(snode)
         pnode = node[cell].reshape(-1, node.shape[-1])
         pnode = np.concatenate((pnode, uv), axis=-1, dtype=np.float32)
         snode = np.concatenate((snode, uv), axis=-1, dtype=np.float32)
 
         #添加平面网格
-        plotter.add_mesh(pnode, cell=None, texture_path=self.cams[0].fname)
+        plotter.add_mesh(pnode, cell=None, texture_path=self.cams[icam].fname)
 
         #添加球面网格
-        plotter.add_mesh(snode, cell=None, texture_path=self.cams[0].fname)
+        plotter.add_mesh(snode, cell=None, texture_path=self.cams[icam].fname)
 
+    def test_half_sphere_domain(self, plotter, r=1.0, icam=-1):
+        mesh = TriangleMesh.from_unit_sphere_surface(refine=4)
+        node = r*mesh.entity('node')
+        cell = mesh.entity('cell')
+        bc = mesh.entity_barycenter('cell')
+        cell = cell[bc[:, 2] > 0]
+        # 相机坐标系下的点
+        vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
+
+        uv = self.cams[icam].cam_to_image(vertices)
+        no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
+        plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
+        return uv
 
     def undistort_cv(self):
         import cv2

@@ -265,7 +265,6 @@ class OpenGLPlotter:
             # 计算旋转矩阵，这里仅提供概念代码，具体实现需要根据虚拟轨迹球的逻辑来完成
             rotation_matrix = calculate_rotation_matrix(xoffset, yoffset)
             self.transform = np.dot(rotation_matrix, self.transform)
-            print(self.transform)
 
     def mouse_callback_old(self, window, xpos, ypos):
         print(f"Mouse position: {xpos}, {ypos}")
