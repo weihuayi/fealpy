@@ -1,12 +1,69 @@
+import numpy as np
+from functools import partial
 import jax
 import jax.numpy as jnp
 
 def value_and_jacfwd(f, x):
-    pushfwd = functools.partial(jax.jvp, f, (x, ))
+    pushfwd = partial(jax.jvp, f, (x, ))
     basis = jnp.eye(len(x.reshape(-1)), dtype=x.dtype).reshape(-1, *x.shape)
     y, jac = jax.vmap(pushfwd, out_axes=(None, -1))((basis, ))
     return y, jac
 
+# simplex 
+def _simplex_shape_function(bc, mi, p):
+    """
+    @brief 给定一组重心坐标点 `bc`, 计算单纯形单元上 `p` 次 Lagrange
+    基函数在这一组重心坐标点处的函数值
+
+    @param[in] bc : (TD+1, )
+    @param[in] p : 基函数的次数，为正整数
+    @param[in] mi : p 次的多重指标矩阵
+
+    @return phi : 形状为 (NQ, ldof)
+    """
+    TD = bc.shape[-1] - 1
+    c = jnp.arange(1, p+1)
+    P = 1.0/jnp.cumprod(c)
+    t = jnp.arange(0, p)
+    A = p*bc - jnp.arange(0, p).reshape(-1, 1)
+    A = P.reshape(-1, 1)*jnp.cumprod(A, axis=-2) # (p, TD+1)
+    B = jnp.ones((p+1, TD+1), dtype=A.dtype)
+    B = B.at[1:, :].set(A)
+    idx = jnp.arange(TD+1)
+    phi = jnp.prod(B[mi, idx], axis=-1)
+    return phi
+
+def _diff_simplex_shape_function(bc, mi, p, n):
+    fn = _simplex_shape_function
+    for i in range(n):
+        fn = jax.jacfwd(fn)
+    return fn(bc, mi, p)
+
+@partial(jax.jit, static_argnums=(2, ))
+def simplex_shape_function(bcs, mi, p):
+    fn = jax.vmap(_simplex_shape_function, in_axes=(0, None, None))
+    return fn(bcs, mi, p)
+
+@partial(jax.jit, static_argnums=(2, 3))
+def diff_simplex_shape_function(bcs, mi, p, n): 
+    return jax.vmap(
+            _diff_simplex_shape_function, 
+            in_axes=(0, None, None, None)
+            )(bcs, mi, p, n)
+
+# edge 
+def edge_length(points):
+    return jnp.linalg.norm(points[1] - points[0])
+
+@partial(jax.jit, static_argnums=(2, ))
+def edge_to_ipoint(edges, indices, p):
+    NN = jnp.max(edges[:, ])+1
+    return jnp.hstack([
+        edges[:, 0].reshape(-1, 1), (p-1)*indices.reshape(-1, 1) +
+        jnp.arange(p-1)+ NN , edges[:, 1].reshape(-1, 1)])
+
+
+# triangle 
 def tri_area_2d(points):
     """
     @brief 给定一个单元的三个顶点的坐标，计算三角形的面积
@@ -86,3 +143,6 @@ def tri_grad_lambda_3d(points):
     n2 = jnp.cross(n, v2)
     Dlambda = jnp.array([n0, n1, n2], dtype=jnp.float64)/length
     return Dlambda 
+
+
+# tetrahedron

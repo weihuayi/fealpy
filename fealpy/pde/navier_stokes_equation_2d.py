@@ -64,7 +64,9 @@ class Poisuille:
     """
     def __init__(self):
         self.box = [0, 1, 0, 1]
-        self.eps = 1e-8
+        self.eps = 1e-10
+        self.rho = 1
+        self.mu = 1
 
     def domain(self):
         return self.box
@@ -86,7 +88,7 @@ class Poisuille:
     
     @cartesian
     def source(self, p):
-        val = np.zeros(p.shape, dtype=np.float)
+        val = np.zeros(p.shape)
         return val
 
     @cartesian
@@ -95,7 +97,7 @@ class Poisuille:
       
     @cartesian
     def is_wall_boundary(self, p):
-        return (np.abs(p[..., 1]) < self.eps) | (np.abs(p[..., 1] - 1.0) < self.eps)
+        return (np.abs(p[..., 1]-0.0) < self.eps) | (np.abs(p[..., 1] - 1.0) < self.eps)
 
     @cartesian
     def dirichlet(self, p):

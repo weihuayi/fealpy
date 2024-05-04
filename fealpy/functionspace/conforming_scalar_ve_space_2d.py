@@ -169,14 +169,14 @@ class ConformingScalarVESpace2d():
             p = self.p
             ipoint = self.dof.interpolation_points()
             uI = self.function()
-            uI[:NN+(p-1)*NE] = u(ipoint)
+            uI[:NN+(p-1)*NE] = u(ipoint[:NN+(p-1)*NE])
             if p > 1:
                 phi = self.smspace.basis
                 def f(x, index):
                     return np.einsum(
                             'ij, ij...->ij...',
                             u(x), phi(x, index=index, p=p-2))
-                bb = self.integralalg.integral(f, celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
+                bb = self.mesh.integral(f, celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
                 uI[NN+(p-1)*NE:] = bb.reshape(-1)
             return uI
         else:

@@ -1,8 +1,13 @@
+from .. import logger
+
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres, 
         LinearOperator, spsolve_triangular)
-from pypardiso import spsolve
+try:
+    from pypardiso import spsolve
+except ImportError:
+    logger.error("Can't import spsolve from pypardiso! Please install it by `pip install -U pypardiso`.")
 
 from .amg_coarsen import ruge_stuben_chen_coarsen 
 from .amg_interpolation import two_points_interpolation
@@ -105,8 +110,9 @@ class GAMGSolver():
                 break
 
         # 计算最粗矩阵最大和最小特征值
-        emax, _ = eigs(self.A[-1], 1, which='LM')
-        emin, _ = eigs(self.A[-1], 1, which='SM')
+        A = self.A[-1].toarray()
+        emax, _ = eigs(A, 1, which='LM')
+        emin, _ = eigs(A, 1, which='SM')
 
         # 计算条件数的估计值
         condest = abs(emax[0] / emin[0])

@@ -1,13 +1,18 @@
 import platform
 
+from .. import logger
 from .solve import solve, active_set_solver
 from .gamg_solver import GAMGSolver
-from .cupy_solver import CupySolver
+
+try:
+    from .cupy_solver import CupySolver
+except ImportError:
+    logger.info("Can't import CupySolver! If you want to use, please install it and try again.")
 
 try:
     from .matlab_solver import MatlabSolver
 except ImportError:
-    print('I do not find matlab installed on this system!, so you can not use it')
+    logger.info("Can't import MatlabSolver! If you want to use it, please install it and try again")
 
 #try:
 #    from .petsc_solver import PETScSolver

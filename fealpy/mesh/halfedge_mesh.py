@@ -164,7 +164,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         halfedge = self.ds.halfedge
         v0 = node[halfedge[halfedge[:, 2], 0]] - node[halfedge[:, 0]]
         v1 = node[halfedge[halfedge[:, 3], 0]] - node[halfedge[:, 0]]
-
         angle = np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1)*np.sum(v1**2, axis=1))
         self.halfedgedata['level'][(angle < -0.98)] = 1 
 
@@ -318,6 +317,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         halfedge = self.entity('halfedge')
         node = self.entity('node')
         cell = self.entity('cell')
+        cell = np.array(cell)
         hcell = self.ds.hcell
 
         # 计算每个单元格的测度（measure），并乘以2.0
@@ -334,7 +334,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             if self.ds.tree is None:
                 self.tree = cKDTree(node[halfedge[hcell[isNotBDCell], 0]])
             start = isNotBDCell[self.tree.query(points, k=1)[1]]
-            print("start : ::::", start[2])
 
         ## NP < NC//2 和 NP > NC//2, 出于效率的原因分成两个情况
         if NP < NC//2:
@@ -582,6 +581,25 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             bc = 0.5*(node[halfedge[index, 0]] + node[halfedge[halfedge[index, 3], 0]])
         return bc
 
+    def get_internal_point(self):
+        NC = self.number_of_cells()
+
+        node = self.entity("node")
+        halfedge = self.entity("halfedge")
+        nex = halfedge[:, 2]
+        pre = halfedge[:, 3]
+
+        v = node[halfedge[pre, 0]] - node[halfedge[:, 0]]
+        flag = np.cross(v, v[nex])>0
+
+        point = (node[halfedge[flag, 0]]+
+                 node[halfedge[nex[flag], 0]]+
+                 node[halfedge[pre[flag], 0]])/3.0
+        re = np.zeros((NC, node.shape[1]), dtype=np.float_)
+        re[halfedge[flag, 1]] = point
+        return re
+
+
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
             return self.cell_area(index=index)
@@ -743,21 +761,14 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         c[index] /=3*a[index, None]
         return c[index]
 
-    def edge_normal(self, index=np.s_[:], node=None):
+    def edge_normal(self, index=np.s_[:]):
         """
-        @brief Calculate the tangent vector of each edge.
-
-        @param index: int, NDArray or slice.
-        @param node: NDArray, optional. Use the nodes of the mesh if not provided.
-
-        @return: An array with shape (NE, GD).
+        @brief 计算二维网格中每条边上单位法线
         """
-        node = self.entity('node') if node is None else node
-        edge = self.entity('edge', index)
-        v = node[edge[:, 1], :] - node[edge[:, 0], :]
-        v = v[..., [1, 0]]
-        v[..., 0] *= -1
-        return v
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
 
     def edge_unit_normal(self, index=np.s_[:], node=None):
         """
@@ -2706,7 +2717,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         phiValue = interface(node[:])
         #phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
         phiSign = np.sign(phiValue)
-        print("sign ", phiValue[:3])
 
         # 2. 找到相交的半边
         edge = self.entity('edge')
@@ -3479,7 +3489,7 @@ class HalfEdgeMesh2dDataStructure():
                 idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
                 cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
 
-                NN = self.number_of_nodes()
+                NN = len(self.hnode)
                 NV = self.number_of_vertices_of_cells()
                 NE = self.number_of_edges()
                 cdof = self.number_of_local_ipoints(p, iptype='cell')

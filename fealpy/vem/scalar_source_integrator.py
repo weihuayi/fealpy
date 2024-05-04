@@ -3,12 +3,13 @@ from numpy.typing import NDArray
 from typing import TypedDict, Callable, Tuple, Union
 
 class ConformingVEMScalarSourceIntegrator2d():
-    def __init__(self, f: Union[Callable, int, float, NDArray], PI0):
+    def __init__(self, f: Union[Callable, int, float, NDArray], PI0, c=None):
         """
         @brief
 
         @param[in] f 
         """
+        self.coef = 1 if c is None else c
         self.f = f
         self.vector = None
         self.PI0 = PI0
@@ -23,12 +24,13 @@ class ConformingVEMScalarSourceIntegrator2d():
         f = self.f
         phi = space.smspace.basis
         p = space.p
+        q = p + 3 if q is None else q
         def u(x, index):
             return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
-        bb = space.mesh.integral(u, q=p+3, celltype=True)
+        bb = space.mesh.integral(u, q=q, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
-        return bb
+        return self.coef*bb
 
 class NonConformingVEMScalarSourceIntegrator2d():
     def __init__(self, f: Union[Callable, int, float, NDArray], PI0):

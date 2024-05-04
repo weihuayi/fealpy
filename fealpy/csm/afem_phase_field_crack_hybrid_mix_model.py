@@ -1,8 +1,5 @@
 import numpy as np
 import time
-#import cupy as cp
-#import cupyx.scipy.sparse.linalg as cpx
-#from cupyx.scipy.sparse.linalg import LinearOperator as CuPyLinearOperator
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -88,7 +85,6 @@ class AFEMPhaseFieldCrackHybridMixModel():
             gd = self.energy_degradation_function(d)
             ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
                 model.mu, c=gd))
-           
             if atype == 'fast':
                 # 无数值积分矩阵组装
                 A0 = ubform.fast_assembly()
@@ -117,9 +113,10 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 du.flat[:],_ = lgmres(A0, R0, atol=1e-18)
             elif solve == 'cg':
                 du.flat[:],_ = cg(A0, R0, atol=1e-18)
-            elif solve == 'GPU':
+            elif solve == 'gpu':
                 from ..solver.cupy_solver import CupySolver
-                du.flat[:] = CupySolver.cg_solver(A0, b0, atol=1e-18)
+                Solver = CupySolver()
+                du.flat[:] = Solver.cg_solver(A0, R0, atol=1e-18)
             else:
                 print("We don't have this solver yet")
 
@@ -142,7 +139,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 A1 = dbform.fast_assembly()
             else:
                 A1 = dbform.assembly()
-
+            
             # 线性积分子
             lform = LinearForm(space)
             lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
@@ -160,11 +157,10 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 dd,_ = lgmres(A1, R1, atol=1e-20)
             elif solve == 'cg':
                 dd,_ = cg(A1, R1, atol=1e-20)
-            elif solve == 'GPU':
-                dd = CupySolver.gmres_solver(A1, b1, atol=1e-20)
+            elif solve == 'gpu':
+                dd = Solver.gmres_solver(A1, R1, atol=1e-20)
             else:
                 print("We don't have this solver yet")
-
             d[:] += dd
             
             self.stored_energy = self.get_stored_energy(phip, d)
@@ -179,15 +175,19 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 
             isMarkedCell = mark(eta, theta = theta) # TODO：
 
-            cm = mesh.entity_measure('cell') 
-            isMarkedCell = np.logical_and(isMarkedCell, np.sqrt(cm) > model.l0/8)
-            
+            cm = mesh.entity_measure('cell')
+            if GD == 3:
+                hmin = model.l0**3/200
+            else:
+                hmin = (model.l0/8)**2
+            isMarkedCell = np.logical_and(isMarkedCell, cm > hmin)
             if np.any(isMarkedCell):
                 if GD == 2:
                     if refine == 'nvp':
                         self.bisect_refine_2d(isMarkedCell)
                     elif refine == 'rg':
-                        self.redgreen_refine_2d(isMarkedCell)
+                        if refine == 'nvp':
+                            self.redgreen_refine_2d(isMarkedCell)
                 elif GD == 3:
                         self.bisect_refine_3d(isMarkedCell)
                 else:

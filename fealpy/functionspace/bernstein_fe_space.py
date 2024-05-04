@@ -97,8 +97,8 @@ class BernsteinFESpace:
 
         # B : (NQ, p+1, TD+1) 
         # B[:, multiIndex, np.arange(TD+1).reshape(1, -1)]: (NQ, ldof, TD+1)
-        phi = P[0, -1, 0]*np.prod(B[:, multiIndex, np.arange(TD+1).reshape(1, -1)], 
-                axis=-1)
+        phi = P[0, -1, 0]*np.prod(B[:, multiIndex, 
+            np.arange(TD+1).reshape(1, -1)], axis=-1)
         return phi[..., None, :] 
 
     @barycentric
@@ -156,7 +156,7 @@ class BernsteinFESpace:
 
         Dlambda = self.mesh.grad_lambda()
         gphi = P[0, -1, 0]*np.einsum("qlm, cmd->qcld", R, Dlambda, optimize=True)
-        return gphi
+        return gphi[:, index]
 
     def partial_matrix_dense(self):
         """
@@ -292,7 +292,7 @@ class BernsteinFESpace:
                 gmphi[q, ..., i] = (M@phi[q]).reshape(NC, -1)
         return gmphi
 
-    def grad_m_basis(self, bcs, m):
+    def grad_m_basis(self, bcs, m, index=np.s_[:]):
         """
         @brief m=3时导数排列顺序: [xxx, yxx, yxy, yyy]
                导数按顺序每个对应一个 A_d^m 的多重指标，对应 alpha 的导数有
@@ -300,6 +300,9 @@ class BernsteinFESpace:
         """
         p = self.p
         p0 = p-m
+        if p0<0:
+            return np.zeros([1, 1, 1, 1], dtype=np.float_)
+
         phi = self.basis(bcs, p=p0)
         NQ = bcs.shape[0]
 
@@ -343,8 +346,19 @@ class BernsteinFESpace:
             c = (factorial(m)**2)*comb(p, m)/np.prod(factorial(beta)) # 数
             Bi[:, idx] = c*phi[:, num] #(NQ, ldof)
             midxp_0 += beta[None, :]
-        gmphi = np.einsum('iql, icn->qcln', B, symLambdaBeta, optimize=True)
+        gmphi = np.einsum('iql, icn->qcln', B, symLambdaBeta[:, index], optimize=True)
         return gmphi
+
+    def hess_basis(self, bcs, index=np.s_[:]):
+        g2phi = self.grad_m_basis(bcs, 2, index=index)
+        TD = self.mesh.top_dimension()
+        shape = g2phi.shape[:-1] + (TD, TD)
+        hval  = np.zeros(shape, dtype=np.float_)
+        hval[..., 0, 0] = g2phi[..., 0]
+        hval[..., 0, 1] = g2phi[..., 1]
+        hval[..., 1, 0] = g2phi[..., 1]
+        hval[..., 1, 1] = g2phi[..., 2]
+        return hval
 
     def lagrange_to_bernstein(self, p = 1, TD = 1):
         '''
@@ -382,7 +396,7 @@ class BernsteinFESpace:
         coordinates `bc` for each mesh cell. It computes the function values at these coordinates
         and returns the results as a numpy.ndarray.
         """
-        gdof = self.number_of_global_dofs()
+        gdof = self.dof.number_of_global_dofs()
         phi = self.basis(bc, index=index) # (NQ, NC, ldof)
         cell2dof = self.dof.cell_to_dof(index=index)
 
@@ -416,7 +430,7 @@ class BernsteinFESpace:
         """
         @note
         """
-        gdof = self.number_of_global_dofs()
+        gdof = self.dof.number_of_global_dofs()
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
@@ -445,6 +459,23 @@ class BernsteinFESpace:
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
 
+        return val
+
+    @barycentric
+    def hessian_value(self, 
+            uh: np.ndarray, 
+            bc: np.ndarray, 
+            index: Union[np.ndarray, slice]=np.s_[:]
+            ) -> np.ndarray:
+        """
+        @note
+        """
+        gdof = self.dof.number_of_global_dofs()
+        gphi = self.hess_basis(bc, index=index)
+        cell2dof = self.dof.cell_to_dof(index=index)
+        dim = len(uh.shape) - 1
+        s0 = 'abdefg'
+        val = np.einsum('...cimn, ci->...cmn', gphi, uh[cell2dof[index]])
         return val
 
     def function(self, dim=None, array=None, dtype=np.float64):

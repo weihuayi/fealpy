@@ -46,7 +46,7 @@ class LagrangeCurve:
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1) # (NQ, ldof)
 
-        ps = np.einsum('qi, id->qd', phi, self.node)
+        ps = np.einsum('...i, id->...d', phi, self.node)
         return ps
 
 
@@ -97,7 +97,7 @@ class BSplineCurve:
         assert np.all(knot[0:p+1] == 0)
         assert np.all(knot[-p-1:] == 1)
         
-        self.ftype = node.dtype
+        self.dtype = node.dtype
         self.n = n 
         self.p = p
         self.knot = knot
@@ -133,7 +133,7 @@ class BSplineCurve:
             for i in range(len(xi)):
                 point[i] = self.value(xi[i])
 
-        return ps
+        return point
 
     def value(self, xi):
         """
@@ -142,35 +142,42 @@ class BSplineCurve:
 
         knot = self.knot
         node = self.node
-        bval = np.zeros(self.n+1, dtype=self.ftype)
+        bval = np.zeros(self.n+1, dtype=self.dtype)
 
         # 初始化
-        for i in range(self.n):
-            if (xi >= self.knot[i]) & (xi < self.knot[i+1]):
-                bval[i] = 1
-                break
+        if xi == 1.0:
+            bval[-2] = 1
+        else:
+            for i in range(self.n):
+                if (xi >= knot[i]) & (xi < knot[i+1]):
+                    bval[i] = 1
+                    break
 
-        for k in range(1, self.p):
+
+        for k in range(1, self.p+1):
             for i in range(self.n):
                 t0 = 0 if knot[i+k] == knot[i] else (xi - knot[i])/(knot[i+k] - knot[i])
                 t1 = 0 if knot[i+k+1] == knot[i+1] else (knot[i+k+1] - xi)/(knot[i+k+1] - knot[i+1]) 
                 bval[i] = t0*bval[i] + t1*bval[i+1]
 
-        point = np.einsum('j, j...->...', bval, node)
+        point = np.einsum('j, j...->...', bval[:-1], node)
         return point
 
 
     def basis(self, xi):
         knot = self.knot
-        bval = np.zeros((len(xi), self.n+1), dtype=self.ftype)
+        bval = np.zeros((len(xi), self.n+1), dtype=self.dtype)
 
 
         # 初始化
         for j in range(len(xi)):
-            for i in range(self.n):
-                if (xi[j] >= self.knot[i]) & (xi[j] < self.knot[i+1]):
-                    bval[j, i] = 1
-                    break
+            if xi[j] == 1.0:
+                bval[j, -2] = 1
+            else:
+                for i in range(self.n):
+                    if (xi[j] >= self.knot[i]) & (xi[j] < self.knot[i+1]):
+                        bval[j, i] = 1
+                        break
 
         for j in range(len(xi)):
             for k in range(1, self.p+1):

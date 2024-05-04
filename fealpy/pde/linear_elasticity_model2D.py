@@ -149,8 +149,8 @@ class GenLinearElasticitymodel2D():
         node = np.array([
             (0, 0),
             (1, 0),
-            (2, 1)], dtype=np.float)
-        cell = np.array([[0,1,2]],dtype=np.int)
+            (2, 1)], dtype=np.float_)
+        cell = np.array([[0,1,2]],dtype=np.int_)
         mesh = TriangleMesh(node, cell)
 
         mesh.uniform_refine(n)
@@ -183,7 +183,7 @@ class GenLinearElasticitymodel2D():
     def dirichlet(self, p, n=None, t=None):
         displacement = self.displacement(p) #(NQ,NEbd,gdim)
         shape = p.shape
-        val = np.zeros(shape,dtype=np.float)
+        val = np.zeros(shape,dtype=np.float_)
         if len(shape) >=3:
             bd_type_idx = self.is_dirichlet_boundary(np.mean(p,axis=0))
         else:
@@ -206,7 +206,7 @@ class GenLinearElasticitymodel2D():
         stress = self.stress(p) #(NEbd,ldof,gdim,gdim)
         stress_n = np.einsum('...ij,...j->...i',stress,n) #(NEbd,ldof,2)
         shape = p.shape
-        val = np.zeros(shape,dtype=np.float)
+        val = np.zeros(shape,dtype=np.float_)
 
         if len(shape) >= 3:
             bd_type_idx = self.is_neumann_boundary(np.mean(p,axis=1))

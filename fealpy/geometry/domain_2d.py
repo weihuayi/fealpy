@@ -4,12 +4,16 @@ from .sizing_function import huniform
 from .signed_distance_function import dmin, dcircle, drectangle, ddiff
 from .geoalg import project
 from .implicit_curve import CircleCurve
+from .domain import Domain
 
-class RectangleDomain:
-    def __init__(self, domain=[0, 1, 0, 1], fh=huniform):
+class RectangleDomain(Domain):
+    def __init__(self, domain=[0, 1, 0, 1], hmin=0.1, hmax=None, fh=None):
         """
         """
-        self.fh = fh
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+        if fh is not None:
+            self.fh = fh
+
         self.domain = domain 
 
         mx = (domain[1] - domain[0])/10
@@ -53,10 +57,15 @@ class RectangleDomain:
     def meshing_facet_1d(self, hmin, fh=None):
         pass
 
-class CircleDomain:
-    def __init__(self, center=[0.0, 0.0], radius=1.0, fh=huniform):
+class CircleDomain(Domain):
+    def __init__(self, center=[0.0, 0.0], radius=1.0, hmin=0.1, hmax=0.1,
+            fh=None):
         """
         """
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+        if fh is not None:
+            self.fh = fh
+
         self.curve = CircleCurve(center, radius) 
         self.fh = fh 
         m = radius + radius/10
@@ -89,10 +98,14 @@ class CircleDomain:
     def meshing_facet_1d(self, hmin, fh=None):
         pass
 
-class LShapeDomain:
-    def __init__(self, fh=huniform):
+class LShapeDomain(Domain):
+    def __init__(self, hmin=0.1, hmax=0.1, fh=None):
         """
         """
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+        if fh is not None:
+            self.fh = fh
+
         self.box = [-1.0, 1.0, -1.0, 1.0] 
         self.fh = fh
         vertices = np.array([
@@ -138,11 +151,14 @@ class LShapeDomain:
     def meshing_facet_1d(self, hmin, fh=None):
         pass
 
-class SquareWithCircleHoleDomain:
-    def __init__(self, fh=huniform):
+class SquareWithCircleHoleDomain(Domain):
+    def __init__(self, hmin=0.1, hmax=0.1, fh=None):
         """
         """
-        self.fh = fh
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+        if fh is not None:
+            self.fh = fh
+
         self.box = [0, 1, 0, 1]
         vertices = np.array([
             (0.0, 0.0), 
@@ -178,11 +194,13 @@ class SquareWithCircleHoleDomain:
     def meshing_facet_1d(self, hmin, fh=None):
         pass
 
-class BoxWithCircleHolesDomain:
-    def __init__(self, box=[0, 1, 0, 1], circles=[(0.5, 0.5, 0.2)], fh=huniform):
+class BoxWithCircleHolesDomain(Domain):
+    def __init__(self, box=[0, 1, 0, 1], circles=[(0.5, 0.5, 0.2)], hmin=0.003,
+            hmax=0.01):
         """
         """
-        self.fh = fh
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+
         self.box = box 
         vertices = np.array([
             (box[0], box[2]), 
@@ -198,8 +216,17 @@ class BoxWithCircleHolesDomain:
             d0 = drectangle(p, box)
             for circle in self.circles:
                 d0 = ddiff(d0, circle(p))
-
             return d0
+
+        def fh(p):
+            d0 = 1e10 
+            for circle in self.circles:
+                d0 = np.minimum(d0, circle(p))
+            h = hmin + 0.05*d0
+            h[h>hmax] = hmax 
+            return h
+
+        self.fh = fh
         self.facets = {0:vertices, 1:fd}
 
     def __call__(self, p):
@@ -223,11 +250,13 @@ class BoxWithCircleHolesDomain:
     def meshing_facet_1d(self, hmin, fh=None):
         pass
 
-class BoxWithBoxHolesDomain:
-    def __init__(self, box=[-2, 2, -2, 2], boxs=[(-1, 1, -1, 1)], fh=huniform):
+class BoxWithBoxHolesDomain(Domain):
+    def __init__(self, box=[-2, 2, -2, 2], boxs=[(-1, 1, -1, 1)], hmin=0.1,
+            hmax=0.1, fh=None):
         """
         """
-        self.fh = fh
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+
         self.box = box 
         self.boxs = boxs
 
@@ -253,8 +282,20 @@ class BoxWithBoxHolesDomain:
         def fd(p):
             d0 = drectangle(p, box)
             for b in boxs:
-                d0 = ddiff(d0, drectangle(p, box))
+                # d0 = ddiff(d0, drectangle(p, b)) #TODO: 为什么这样写是错的呢？
+                d1 = drectangle(p, b)
+                d0 = ddiff(d0, d1)
             return d0
+
+        def fh(p):
+            d0 = 1e10 
+            for b in boxs:
+                d0 = np.minimum(d0, drectangle(p, b))
+            h = hmin + 0.05*d0
+            h[h>hmax] = hmax 
+            return h
+
+        self.fh = fh
 
         self.facets = {0:vertices, 1:fd}
 

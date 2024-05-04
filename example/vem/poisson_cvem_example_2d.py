@@ -20,6 +20,7 @@ from fealpy.vem import ConformingScalarVEMH1Projector2d
 from fealpy.vem import ConformingScalarVEML2Projector2d 
 from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
 from fealpy.vem import ConformingVEMScalarSourceIntegrator2d
+from fealpy.vem import DofDofStabilizationTermIntegrator2d
 
 # 双线性型
 from fealpy.vem import BilinearForm
@@ -68,7 +69,7 @@ errorType = ['$\Vert u - \Pi u_h\Vert_{\Omega,0}$',
              '$\Vert\\nabla u - \Pi \\nabla u_h\Vert_{\Omega, 0}$'
              ]
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.int_)
+NDof = np.zeros(maxit, dtype=np.float_)
 
 for i in range(maxit):
     mesh = PolygonMesh.from_box(domain, nx=nx, ny=ny)
@@ -89,9 +90,11 @@ for i in range(maxit):
     PI1 = h1.assembly_cell_matrix(space)
     G = h1.G
 
-    li = ConformingScalarVEMLaplaceIntegrator2d(PI1, G, D)
+    li = ConformingScalarVEMLaplaceIntegrator2d(PI1, G)
+    stab = DofDofStabilizationTermIntegrator2d(PI1, D)
     bform = BilinearForm(space)
     bform.add_domain_integrator(li)
+    bform.add_domain_integrator(stab)
     A = bform.assembly()
 
     #组装右端 F

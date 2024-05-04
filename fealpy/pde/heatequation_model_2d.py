@@ -169,6 +169,15 @@ class SinSinExpData:
         pi = np.pi
         u = np.sin(2*pi*x)*np.sin(2*pi*y)*np.exp(-t)
         return u
+
+    def gradient(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        gu = np.zeros_like(p)
+        gu[..., 0] = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)*np.exp(-t)
+        gu[..., 1] = 2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)*np.exp(-t)
+        return gu
     
     def diffusion_coefficient(self, p):
         return self.diffusionCoefficient
@@ -213,7 +222,7 @@ class SinCosExpData:
         INPUT:
             p: array object, N*2 
         """
-        return 0.0
+        return np.zeros(p.shape[:-1], dtype=np.float_)
 
     def dirichlet(self, p, t):
         """ Dilichlet boundary condition
@@ -224,6 +233,15 @@ class SinCosExpData:
         """ Neuman boundary condition
         """
         return 0.0
+
+    def gradient(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        gu = np.zeros_like(p)
+        gu[..., 0] =  2*pi*np.cos(2*pi*x)*np.cos(2*pi*y)*np.exp(-t)
+        gu[..., 1] = -2*pi*np.sin(2*pi*x)*np.sin(2*pi*y)*np.exp(-t)
+        return gu
 
     def is_dirichlet_boundary(self, p):
         eps = 1e-14 

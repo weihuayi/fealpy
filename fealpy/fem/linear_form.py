@@ -76,14 +76,14 @@ class LinearForm:
             cellmeasure = mesh.entity_measure()
 
         NC = mesh.number_of_cells()
-        gdof = space.number_of_global_dofs()
-        ldof = space.number_of_local_dofs()
+        gdof = space.dof.number_of_global_dofs()
+        ldof = space.dof.number_of_local_dofs()
 
         bb = np.zeros((NC, ldof), dtype=space.ftype)
         for di in self.dintegrators:
             di.assembly_cell_vector(space, cellmeasure=cellmeasure, out=bb)
 
-        cell2dof = space.cell_to_dof()
+        cell2dof = space.dof.cell_to_dof()
         self._V = np.zeros((gdof, ), dtype=space.ftype)
         np.add.at(self._V, cell2dof, bb)
 

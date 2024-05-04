@@ -19,6 +19,9 @@ from .scalar_source_integrator import ScalarSourceIntegrator
 
 from .scalar_pgls_convection_integrator import ScalarPGLSConvectionIntegrator
 
+from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
+from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
+
 
 # Boundary integrator for scalar case
 # <kappa u, v>
@@ -34,6 +37,7 @@ ScalarRobinSourceIntegrator = ScalarBoundarySourceIntegrator
 from .vector_diffusion_integrator import VectorDiffusionIntegrator
 from .vector_mass_integrator import VectorMassIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
+from .vector_epsilon_source_integrator import VectorEpsilonSourceIntegrator
 from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
 # Boundary integrator for vector case
@@ -58,4 +62,4 @@ from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
 from .dirichlet_bc import DirichletBC
 from .recovery_alg import recovery_alg, LinearRecoveryAlg
-
+from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegrator

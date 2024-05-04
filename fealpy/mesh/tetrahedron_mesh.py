@@ -778,7 +778,7 @@ class TetrahedronMesh(Mesh, Plotable):
         cell[:NC] = self.entity('cell')
 
         for key in self.celldata:
-            data = np.zeros(4*NC, dtype=self.itype)
+            data = np.zeros(4*NC, dtype=self.ftype)
             data[:NC] = self.celldata[key]
             self.celldata[key] = data.copy()
 
@@ -978,6 +978,7 @@ class TetrahedronMesh(Mesh, Plotable):
                 fval[cell] = fval0 
                 ret["nodedata"].append(fval)
         return ret
+
     def uniform_refine(self, n=1, returnim=False):
         """
         Perform uniform refinement on the tetrahedral mesh.

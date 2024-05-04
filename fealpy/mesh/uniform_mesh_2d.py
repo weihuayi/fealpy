@@ -301,13 +301,68 @@ class UniformMesh2d(Mesh, Plotable):
         ny = self.ds.ny
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
-
+        
         x = np.linspace(box[0], box[1], nx + 1)
         y = np.linspace(box[2], box[3], ny + 1)
         z = np.zeros(1)
         gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
         return filename
+
+    def to_vtk(self, filename, celldata=None, nodedata=None):
+        """
+        @brief: Converts the mesh data to a VTK structured grid format and writes to a VTS file
+        """
+        import vtk
+        from vtk.util.numpy_support import numpy_to_vtk
+
+        # 网格参数
+        nx, ny = self.ds.nx, self.ds.ny
+        h = self.h
+        origin = self.origin
+
+        # 创建坐标点
+        x = np.linspace(origin[0], origin[0] + nx * h[0], nx + 1)
+        y = np.linspace(origin[1], origin[1] + ny * h[1], ny + 1)
+        z = np.zeros(1)
+
+        # 按 y,x 顺序重新组织坐标数组
+        yx_x = np.repeat(x, ny + 1)
+        yx_y = np.tile(y, nx + 1)
+        yx_z = np.zeros_like(yx_x)
+
+        # 创建 VTK 网格对象
+        rectGrid = vtk.vtkStructuredGrid()
+        rectGrid.SetDimensions(ny + 1, nx + 1, 1)
+
+        # 创建点
+        points = vtk.vtkPoints()
+        for i in range(len(yx_x)):
+            points.InsertNextPoint(yx_x[i], yx_y[i], yx_z[i])
+        rectGrid.SetPoints(points)
+
+        # 添加节点数据
+        if nodedata is not None:
+            for name, data in nodedata.items():
+                data_array = numpy_to_vtk(data, deep=True)
+                data_array.SetName(name)
+                rectGrid.GetPointData().AddArray(data_array)
+
+        # 添加单元格数据
+        if celldata is not None:
+            for name, data in celldata.items():
+                data_array = numpy_to_vtk(data, deep=True)
+                data_array.SetName(name)
+                rectGrid.GetCellData().AddArray(data_array)
+
+        # 写入 VTK 文件
+        writer = vtk.vtkXMLStructuredGridWriter()
+        writer.SetInputData(rectGrid)
+        writer.SetFileName(filename)
+        writer.Write()
+
+        return filename
+
 
     ## @ingroup FDMInterface
     @property
@@ -676,6 +731,7 @@ class UniformMesh2d(Mesh, Plotable):
         D0 = spdiags(1 - bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0 @ A @ D0 + D1
+
         return A, f
 
     ## @ingroup FDMInterface

@@ -38,7 +38,7 @@ class ScalarSourceIntegrator():
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs() 
+        ldof = space.dof.number_of_local_dofs() 
         if out is None:
             bb = np.zeros((NC, ldof), dtype=space.ftype)
         else:
@@ -61,7 +61,6 @@ class ScalarSourceIntegrator():
                 val = f(ps)
         else:
             val = f
-
         if isinstance(val, (int, float)):
             bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
         else:

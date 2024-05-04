@@ -709,17 +709,27 @@ class UniformMesh3d(Mesh, Plotable):
         """
         node = self.entity('node')
         if isinstance(bc, tuple):
-            assert len(bc) == 3
-            cell = self.entity('cell')[index]
+            assert len(bc) in [2, 3]
+            if len(bc) == 3:
+                cell = self.entity('cell')[index]
 
-            bc0 = bc[0].reshape(-1, 2)  # (NQ0, 2)
-            bc1 = bc[1].reshape(-1, 2)  # (NQ1, 2)
-            bc2 = bc[2].reshape(-1, 2)  # (NQ2, 2)
-            bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
+                bc0 = bc[0].reshape(-1, 2)  # (NQ0, 2)
+                bc1 = bc[1].reshape(-1, 2)  # (NQ1, 2)
+                bc2 = bc[2].reshape(-1, 2)  # (NQ2, 2)
+                bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
 
-            p = np.einsum('...j, cjk->...ck', bc, node[cell[:]])  # (NQ, NC, 3)
-            if p.shape[0] == 1:  # 如果只有一个积分点
-                p = p.reshape(-1, 3)
+                p = np.einsum('...j, cjk->...ck', bc, node[cell[:]])  # (NQ, NC, 3)
+                if p.shape[0] == 1:  # 如果只有一个积分点
+                    p = p.reshape(-1, 3)
+            else:
+                face = self.entity('face')[index]
+                bc0 = bc[0].reshape(-1, 2)
+                bc1 = bc[1].reshape(-1, 2)
+                bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4)
+
+                p = np.einsum('...j, fjk->...fk', bc, node[face[:]])
+                if p.shape[0] == 1:  # 如果只有一个积分点
+                    p = p.reshape(-1, 3)
         else:
             edge = self.entity('edge')[index]
             p = np.einsum('...j, ejk->...ek', bc, node[edge])  # (NQ, NE, 3)
@@ -780,11 +790,40 @@ class UniformMesh3d(Mesh, Plotable):
             raise ValueError(f'the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
-    def entity_measure(self, etype):
+    def entity_measure(self, etype='cell', index=np.s_[:]):
         """
         @brief
         """
-        pass
+        node = self.entity('node')
+        if etype in {'cell', 3}:
+            cell = self.entity('cell')[index]
+            v0 = node[cell[:, 1]] - node[cell[:, 0]]
+            v1 = node[cell[:, 2]] - node[cell[:, 0]]
+            v2 = node[cell[:, 4]] - node[cell[:, 0]]
+            return np.sum(v2*np.cross(v1, v0), axis=1)
+        elif etype in {'face', 2}:
+            norm = self.face_normal(index)
+            return np.sqrt(np.square(norm).sum(axis=1))
+        elif etype in {'edge', 1}:
+            edge = self.entity('edge')[index]
+            node0 = node[edge[:, 0]]
+            node1 = node[edge[:, 1]]
+            length = np.sqrt(np.sum(node1-node0).sum(axis=1))
+        else:
+            raise ValueError(f'the entity type `{etype}` is not correct!')
+
+    def face_normal(self, index=np.s_[:]):
+        node = self.entity('node')
+        face = self.ds.face[index]
+        v0 = node[face[:, 1]] - node[face[:, 0]]
+        v2 = node[face[:, 3]] - node[face[:, 0]]
+        norm = np.cross(v2, v0)
+        return norm
+
+    def face_unit_normal(self, index=np.s_[:]):
+        norm = self.face_normal(index)
+        length = np.sqrt(np.square(norm).sum(axis=1))
+        return norm/length.reshape(-1, 1)
 
     ## @ingroup FEMInterface
     def shape_function(self, bc, p=1):
