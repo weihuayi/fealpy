@@ -709,5 +709,147 @@ class HexahedronMesh(Mesh, Plotable):
         @return HexahedronMesh instance
         """
         return cls.from_box(box=[0, 1, 0, 1, 0, 1], nx=nx, ny=ny, nz=nz, threshold=threshold)
+    
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_fuel_rod_gmsh(cls,R1,R2,L,w,h,l,p):
+        """
+        Generate a hexahedron mesh for a fuel-rod region by gmsh
+
+        @param R1 The radius of semicircles
+        @param R2 The radius of quarter circles
+        @param L The length of straight segments
+        @param w The thickness of caldding
+        @param h Parameter controlling mesh density
+        @param l The length of the fuel-rod
+        @param p The pitch of the fuel-rod
+        @return HexahedronMesh instance
+        """
+        import gmsh
+        import math
+        gmsh.initialize()
+        gmsh.model.add("fuel_rod_3D")
+
+        # 内部单元大小
+        Lc1 = h
+        # 包壳单元大小
+        Lc2 = h/2.5
+
+        factory = gmsh.model.geo
+        # 外圈点
+        factory.addPoint( -R1 -R2 -L, 0 , 0 , Lc2 , 1 )#圆心1
+        factory.addPoint( -R1 -R2 -L, -R1 , 0 , Lc2 , 2)
+        factory.addPoint( -R1 -R2 , -R1 , 0 , Lc2 , 3)
+        factory.addPoint( -R1 -R2 , -R1 -R2 , 0 , Lc2 , 4)#圆心2
+        factory.addPoint( -R1 , -R1 -R2 , 0 , Lc2 , 5)
+        factory.addPoint( -R1 , -R1 -R2 -L , 0 , Lc2 , 6)
+        factory.addPoint( 0 , -R1 -R2 -L , 0 , Lc2 , 7)#圆心3
+        factory.addPoint( R1 , -R1 -R2 -L , 0 , Lc2 , 8)
+        factory.addPoint( R1 , -R1 -R2 , 0 , Lc2 , 9)
+        factory.addPoint( R1 +R2 , -R1 -R2 , 0, Lc2 , 10)#圆心4
+        factory.addPoint( R1 +R2 , -R1 , 0 , Lc2 , 11) 
+        factory.addPoint( R1 +R2 +L , -R1 , 0 , Lc2 , 12)
+        factory.addPoint( R1 +R2 +L , 0 , 0 , Lc2 , 13)#圆心5
+        factory.addPoint( R1 +R2 +L , R1 , 0 , Lc2 , 14)
+        factory.addPoint( R1 +R2 , R1 , 0 , Lc2 , 15)
+        factory.addPoint( R1 +R2 , R1 +R2 , 0 , Lc2 , 16)#圆心6
+        factory.addPoint( R1 , R1 +R2 , 0 , Lc2 , 17)
+        factory.addPoint( R1 , R1 +R2 +L , 0 , Lc2 , 18)
+        factory.addPoint( 0 , R1 +R2 +L , 0 , Lc2 , 19)#圆心7
+        factory.addPoint( -R1 , R1 +R2 +L , 0 , Lc2 , 20)
+        factory.addPoint( -R1 , R1 +R2 , 0 , Lc2 , 21)
+        factory.addPoint( -R1 -R2 , R1 +R2 , 0 , Lc2 , 22)#圆心8
+        factory.addPoint( -R1 -R2 , R1 , 0 , Lc2 , 23)
+        factory.addPoint( -R1 -R2 -L , R1 , 0 , Lc2 , 24)
+
+        # 外圈线
+        line_list_out = []
+        for i in range(8):
+            if i == 0:
+                factory.addCircleArc(24 , 3*i+1 , 3*i+2, 2*i+1)
+                factory.addLine( 3*i+2 , 3*i+3 , 2*(i+1) )
+            else:
+                factory.addCircleArc(3*i , 3*i+1 , 3*i+2 , 2*i+1)
+                factory.addLine( 3*i+2 , 3*i+3 , 2*(i+1) )
+            # 填充线环中的线
+            line_list_out.append(2*i+1)
+            line_list_out.append(2*(i+1))
+        # 生成外圈线环
+        factory.addCurveLoop(line_list_out,17)
+
+        # 内圈点
+        factory.addPoint( -R1 -R2 -L, -R1 +w , 0 , Lc1 , 25)
+        factory.addPoint( -R1 -R2 , -R1 +w , 0 , Lc1 , 26)
+        factory.addPoint( -R1 +w , -R1 -R2 , 0 , Lc1 , 27)
+        factory.addPoint( -R1 +w , -R1 -R2 -L , 0 , Lc1 , 28)
+        factory.addPoint( R1 -w , -R1 -R2 -L , 0 , Lc1 , 29)
+        factory.addPoint( R1 -w , -R1 -R2 , 0 , Lc1 , 30)
+        factory.addPoint( R1 +R2 , -R1 +w , 0 , Lc1 , 31) 
+        factory.addPoint( R1 +R2 +L , -R1 +w , 0 , Lc1 , 32)
+        factory.addPoint( R1 +R2 +L , R1 -w , 0 , Lc1 , 33)
+        factory.addPoint( R1 +R2 , R1 -w , 0 , Lc1 , 34)
+        factory.addPoint( R1 -w , R1 +R2 , 0 , Lc1 , 35)
+        factory.addPoint( R1 -w , R1 +R2 +L , 0 , Lc1 , 36)
+        factory.addPoint( -R1 +w , R1 +R2 +L , 0 , Lc1 , 37)
+        factory.addPoint( -R1 +w , R1 +R2 , 0 , Lc1 , 38)
+        factory.addPoint( -R1 -R2 , R1 -w, 0 , Lc1 , 39)
+        factory.addPoint( -R1 -R2 -L , R1 -w, 0 , Lc1 , 40)
+
+        # 内圈线
+        line_list_in = []
+        for j in range(8):
+            if j == 0:
+                factory.addCircleArc(40 , 3*j+1 , 25+2*j , 18+2*j)
+                factory.addLine(25+2*j , 26+2*j , 19+2*j)
+            else:
+                factory.addCircleArc(24+2*j , 3*j+1 , 25+2*j, 18+2*j)
+                factory.addLine(25+2*j , 26+2*j , 19+2*j)
+            line_list_in.append(18+2*j)
+            line_list_in.append(19+2*j)
+        # 生成内圈线环  
+        factory.addCurveLoop(line_list_in,34)
+
+        # 内圈面
+        factory.addPlaneSurface([34],35)
+        # 包壳截面
+        factory.addPlaneSurface([17, 34],36)
+
+        factory.synchronize()
+
+        N = math.ceil((2*l)/p)
+        angle = ((2*l)/p* math.pi) / N
+        nsection = math.ceil(l/(N*h))
+        for i in range(N):
+            if i == 0:
+                ov1 = factory.twist([(2,35)],0,0,0,0,0,l/N,0,0,1,angle,[nsection],[],True)
+                ov2 = factory.twist([(2,36)],0,0,0,0,0,l/N,0,0,1,angle,[nsection],[],True)
+            else:
+                ov1 = factory.twist([(2,ov1[0][1])],0,0,0,0,0,l/N,0,0,1,angle,[nsection],[],True)
+                ov2 = factory.twist([(2,ov2[0][1])],0,0,0,0,0,l/N,0,0,1,angle,[nsection],[],True)
+
+        factory.synchronize()
+        gmsh.option.setNumber("Mesh.Algorithm", 8)
+        gmsh.option.setNumber("Mesh.RecombineAll", 1)
+        # 生成网格
+        gmsh.model.mesh.generate(3)
+        #gmsh.fltk.run()
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)
+
+        #节点的编号映射
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+
+        # 获取四面体单元信息
+        Hexahedron_type = 5  
+        Hexahedron_tags, Hexahedron_connectivity = gmsh.model.mesh.getElementsByType(Hexahedron_type)
+        evid = np.array([nodetags_map[j] for j in Hexahedron_connectivity])
+        cell = evid.reshape((Hexahedron_tags.shape[-1],-1))
+
+        gmsh.finalize()
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        return cls(node,cell)
 
 HexahedronMesh.set_ploter('3d')
