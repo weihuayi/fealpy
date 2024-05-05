@@ -12,6 +12,7 @@ from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 from fealpy import logger
 from fealpy.mesh import TriangleMesh 
+from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 from fealpy.functionspace import InteriorPenaltyBernsteinFESpace2d
 
 from fealpy.fem import ScalarBiharmonicIntegrator
@@ -98,7 +99,7 @@ def apply_dbc(A, f, uh, isDDof):
     f[isDDof.reshape(-1)] = uh[isDDof].reshape(-1)
     return A, f
 
-def point_g_h_value(uh, nidx):
+def node_g_h_value(uh, nidx):
     cell = mesh.entity('cell')
     NC = cell.shape[0]
     cidx = np.where(np.any(cell == nidx, axis=1))[0]
@@ -174,12 +175,15 @@ NDof = np.zeros(maxit, dtype=np.int_)
 node = mesh.entity('node')
 node0 = find_nodes(node)
 
-GD = mesh.geo_dimension()
-Rhu = np.zeros((maxit, len(node0), GD, GD), dtype=np.float_)
+# 插值点
+points = mesh.interpolation_points(p=p)
+points0 = find_nodes(points)
 
-gx0 = np.zeros((len(node0), GD), dtype=np.float_)
-hx0 = np.zeros((len(node0), GD, GD), dtype=np.float_)
-print('ddddd:', len(node0))
+GD = mesh.geo_dimension()
+Rhu = np.zeros((maxit, len(points), GD, GD), dtype=np.float_)
+
+gx0 = np.zeros((len(points0), GD), dtype=np.float_)
+hx0 = np.zeros((len(points0), GD, GD), dtype=np.float_)
 
 h = np.zeros(maxit, dtype=np.float64)
 for i in range(maxit):
@@ -211,9 +215,9 @@ for i in range(maxit):
     uh = space.function()
     uh[:] = spsolve(A, f)
     #uh[:], tol = cg(A, f, atol=1e-15)
-    print("AAAA : ", np.max(A0.data))
-    print("AAA : ", np.max(A.data))
-    print("AAA : ", np.max(P.data))
+    #print("AAAA : ", np.max(A0.data))
+    #print("AAA : ", np.max(A.data))
+    #print("AAA : ", np.max(P.data))
 
 #    errorMatrix[0, i] = np.max(np.abs(uh-x))
     errorMatrix[0, i] = mesh.error(uh, pde.solution)
@@ -223,14 +227,38 @@ for i in range(maxit):
     
     # 计算某点处的误差情况
     node = mesh.entity('node')
-    nidx = np.where(np.isin(node[:, 0], node0[:, 0]) & np.isin(node[:, 1], node0[:, 1]))[0]
+    points = mesh.interpolation_points(p=p)
+    mesh0 = HalfEdgeMesh2d.from_mesh(mesh, NV=3)
+#    nidx = np.where(np.isin(node[:, 0], node0[:, 0]) & np.isin(node[:, 1], node0[:, 1]))[0]
     
-    x = pde.solution(node[nidx])
-    gx = pde.gradient(node[nidx])
-    hx = pde.hessian(node[nidx])
+    print(points0.shape)
+    scell, pbc = mesh0.find_point_in_triangle_mesh(points0)
+    print('dddd:', scell.shape, pbc)
+
+    x = pde.solution(points0)
+    gx = pde.gradient(points0)
+    hx = pde.hessian(points0)
      
-    for j in range(len(node0)):
-        gx0[j], hx0[j] = point_g_h_value(uh, nidx[j])
+    for j in range(len(points0)):
+        if np.all(pbc[j, :] >1e-5):
+            guh[j] = uh.grad_value(pbc[j])
+            huh[j] = uh.hessian_value(pbc[j])
+            print('ddddddd:', j)
+        elif np.sum(pbc[j, :] >1e-10) == 1:
+            nidx = np.where(np.isin(points[:, 0], points0[j, 0]) &
+                    np.isin(points[:, 1], points0[j, 1]))[0]
+            gx0[j], hx0[j] = node_g_h_value(uh, nidx)
+        elif np.sum(pbc[j, :] > 1e-10) == 2:
+            e2c = mesh0.ds.edge_to_cell()
+            if pbc[j, 0] < 1e-10:
+                if (scell[j] == e2c[:, 0]):
+                    pass
+            print('scell:, ', scell[j])
+            print('cbc:', j, pbc[j])
+            print(e2c)
+            ee2c = mesh.ds.edge_to_cell()
+            print(ee2c)
+
     
     error[0, i] = np.max(np.abs(gx0-gx))
     error[1, i] = np.max(np.abs(hx0-hx))
@@ -286,7 +314,7 @@ print('x0_error:', error)
 x0order = compute_order(error, h)
 print('x0order:', x0order)
     
-print('x0_error:', Rerror)
+print('Rx0_error:', Rerror)
 Rx0order = compute_order(Rerror, h)
 print('Rx0order:', Rx0order)
     
