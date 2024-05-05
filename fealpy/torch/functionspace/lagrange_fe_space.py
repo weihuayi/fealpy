@@ -45,23 +45,22 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def face_to_dof(self):
         return self.dof.face_to_dof()
 
-    def basis(self, bc, index: Index=_S, variable='u'):
-        return self.mesh.shape_function(bc, self.p, index=index)
+    def basis(self, bc: Tensor, index: Index=_S, variable='u'):
+        return self.mesh.shape_function(bc, self.p, index=index, variable=variable)
 
-    def grad_basis(self, bc, index: Index=_S, variable='u'):
+    def grad_basis(self, bc: Tensor, index: Index=_S, variable='u'):
         """
         @brief
         """
-        return self.mesh.grad_shape_function(bc, self.p, index=index)
+        return self.mesh.grad_shape_function(bc, self.p, index=index, variable=variable)
 
-    def hess_basis(self, bc, index: Index=_S, variable='u'):
+    def hess_basis(self, bc: Tensor, index: Index=_S, variable='u'):
         """
         @brief
         """
-        return self.mesh.hess_shape_function(bc, self.p, index=index)
+        return self.mesh.hess_shape_function(bc, self.p, index=index, variable=variable)
 
-
-    def value(self, uh, bc, index: Index=_S):
+    def value(self, uh: Tensor, bc: Tensor, index: Index=_S):
         """
         @brief
         """

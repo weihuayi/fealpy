@@ -274,7 +274,7 @@ class LaplaceDataGenerator2d():
             yield nval[bd_node_flag]
 
     def save(self, sigma_idx: int, path: str, gn_names: Iterable[str], *,
-             dtype=float32):
+             dtype=float32, **kwargs: NDArray):
         """
         @brief Generate GD & GN data and save as `.npz` file.
 
@@ -289,4 +289,6 @@ class LaplaceDataGenerator2d():
         for name, gd, gn in zip(gn_names, self.gd(), self.gn()):
             data = np.stack([gd, gn], axis=0, dtype=dtype)
             data_dict[name] = data
+        for k, v in kwargs.items():
+            data_dict[k] = v
         np.savez(path + f"{sigma_idx}.npz", **data_dict)

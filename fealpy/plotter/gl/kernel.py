@@ -13,7 +13,7 @@ def calculate_rotation_matrix(xoffset, yoffset, sensitivity=0.005):
         return np.identity(4)
 
     # 归一化旋转轴
-    axis = np.array([-yoffset, xoffset, 0.0])
+    axis = np.array([xoffset, yoffset, 0.0])
     axis = axis / np.linalg.norm(axis)
 
     # 使用四元数计算旋转矩阵

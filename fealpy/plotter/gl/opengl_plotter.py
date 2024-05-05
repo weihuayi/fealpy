@@ -120,12 +120,12 @@ class OpenGLPlotter:
         self.projection[2, 3] = -(2 * far * near) / (far - near)
         self.projection[3, 2] = -1
 
-    def add_mesh(self, node, cell=None, texture_path=None):
+    def add_mesh(self, node, cell=None, texture_path=None, flip='LR'):
         logger.info(f"Add GLMesh with {len(node)} nodes!")
         self.meshes.append(GLMesh(node, 
             cell=cell, 
             texture_path=texture_path,
-            texture_unit=self.texture_unit))
+            texture_unit=self.texture_unit, flip=flip))
         if texture_path is not None:
             self.texture_unit += 1
 
@@ -310,43 +310,3 @@ class OpenGLPlotter:
     def window_resize_callback(self, window, width, height):
         glViewport(0, 0, width, height)
         self.update_projection_matrix(width, height)
-
-def main():
-    # 假设nodes和cells是你的网格数据
-
-    """
-    # 定义顶点数据和UV坐标
-    nodes = np.array([
-        [-0.5, -0.5, 0.0,  0.0, 0.0],  # 左下角
-        [ 0.5, -0.5, 0.0,  1.0, 0.0],  # 右下角
-        [ 0.5,  0.5, 0.0,  1.0, 1.0],  # 右上角
-        [-0.5,  0.5, 0.0,  0.0, 1.0]   # 左上角
-    ], dtype=np.float32)
-
-    cells = np.array([
-        0, 1, 2,
-        2, 3, 0
-    ], dtype=np.uint32)
-
-    """
-    from fealpy.mesh import TriangleMesh
-
-    mesh, U, V = TriangleMesh.from_ellipsoid_surface(80, 800, 
-            radius=(4, 2, 1), 
-            theta=(np.pi/2, np.pi/2+np.pi/3),
-            returnuv=True)
-    U = (U - np.min(U))/(np.max(U)-np.min(U))
-    V = (V - np.min(V))/(np.max(V)-np.min(V))
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    nodes = np.hstack((node, V.reshape(-1, 1), U.reshape(-1, 1)), dtype=np.float32)
-    cells = np.array(cell, dtype=np.uint32)
-
-    plotter = OpenGLPlotter()
-    plotter.load_mesh(nodes, cells)
-    plotter.load_texture('/home/why/we.jpg')
-    plotter.run()
-
-if __name__ == "__main__":
-    main()
-

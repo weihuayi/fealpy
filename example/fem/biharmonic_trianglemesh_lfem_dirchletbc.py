@@ -155,12 +155,14 @@ ny = args.ny
 maxit = args.maxit
 gamma = args.gamma
 
+print("P : ", p)
+
 x = sp.symbols("x")
 y = sp.symbols("y")
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**2
 pde = DoubleLaplacePDE(u)
 
-#vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
+vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
 mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
 #mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5)
 space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)

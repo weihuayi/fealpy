@@ -4,17 +4,17 @@ from functools import partial
 
 import numpy as np
 import torch
-from torch import Tensor
+from torch import Tensor, vmap
+from torch.func import jacfwd, jacrev
 
 # simplex
 # @torch.jit.script
 def _simplex_shape_function(bc: Tensor, p: int, mi: Tensor):
     """
-    @brief 给定一组重心坐标点 `bc`, 计算单纯形单元上 `p` 次 Lagrange
-    基函数在这一组重心坐标点处的函数值
+    @brief `p`-order shape function values on these barycentry points.
 
     @param bc: Tensor(TD+1, )
-    @param p: 基函数的次数，为正整数
+    @param p: order of the shape function
     @param mi: p-order multi-index matrix
 
     @return phi: Tensor(ldof, )
@@ -36,5 +36,21 @@ def _simplex_shape_function(bc: Tensor, p: int, mi: Tensor):
 
 
 def simplex_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
-    fn = torch.vmap(partial(_simplex_shape_function, p=p, mi=mi))
+    fn = vmap(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    )
+    return fn(bcs)
+
+
+def simplex_grad_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(jacfwd(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    ))
+    return fn(bcs)
+
+
+def simplex_hess_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(jacrev(jacfwd(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    )))
     return fn(bcs)
