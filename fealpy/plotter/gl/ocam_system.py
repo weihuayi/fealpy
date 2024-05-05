@@ -159,7 +159,7 @@ class OCAMSystem:
         uv = self.cams[icam].cam_to_image(vertices)
         no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
-        return uv
+        return mesh, uv
     
     def test_half_sphere_surface_with_cutting(self, plotter, theta=np.pi*35/180, h=0.1, icam=-1, ptype='O'):
         """
@@ -168,10 +168,21 @@ class OCAMSystem:
         node = mesh.entity('node')
         cell = mesh.entity('cell')
 
+
         # 相机坐标系下的点
         vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
-
         uv = self.cams[icam].cam_to_image(vertices, ptype=ptype)
+
+
+        """
+        r = np.sin(theta) # 圆柱面半径
+        phi = np.arctan2(node[:, 0], node[:, 2])
+        phi = phi % (2 * np.pi)
+        node[:, 2] = r * np.cos(phi)
+        node[:, 0] = r * np.sin(phi)
+        vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
+        """
+
         no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv

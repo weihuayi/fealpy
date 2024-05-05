@@ -1,9 +1,7 @@
 import cv2
-import cv2
 import numpy as np
 
-import cv2
-import numpy as np
+import ipdb
 
 class FisheyeStitcher:
     def __init__(self, width, height, fovd, enb_light_compen, enb_refine_align, map_path):
@@ -45,30 +43,15 @@ class FisheyeStitcher:
         # 初始化地图和遮罩
         self.fish_to_map()
         self.create_mask()
-
-    def fish_to_eqt(self, x_dest, y_dest, w_rad):
-        phi = x_dest / w_rad
-        theta = -y_dest / w_rad + np.pi / 2
-
-        if theta < 0:
-            theta = -theta
-            phi += np.pi
-        if theta > np.pi:
-            theta = np.pi - (theta - np.pi)
-            phi += np.pi
-
-        s = np.sin(theta)
-        v0 = s * np.sin(phi)
-        v1 = np.cos(theta)
-        r = np.sqrt(v0 ** 2 + v1 ** 2)
-        theta = w_rad * np.arctan2(r, s * np.cos(phi))
-
-        x_src = theta * v0 / r
-        y_src = theta * v1 / r
-
-        return x_src, y_src
+        self.create_blend_mask()
+        self.gen_scale_map()
+        # 读取刚性 MLS 插值网格
+        self.read_mls_grids()
 
     def fish_to_map(self):
+        """
+        @brief 
+        """
         # 创建鱼眼到球面投影的映射表
         w_rad = self.wd / (2.0 * np.pi)
         w2 = self.wd // 2
@@ -85,9 +68,13 @@ class FisheyeStitcher:
         phi = x_d / w_rad
         theta = -y_d / w_rad + np.pi / 2
 
-        theta[theta < 0] *= -1
-        phi[theta > np.pi] += np.pi
-        theta[theta > np.pi] = np.pi - (theta[theta > np.pi] - np.pi)
+        flag = theta < 0
+        theta[flag] *= -1
+        phi[flag] += np.pi
+
+        flag = theta > np.pi
+        theta[flag] = 2*np.pi - theta[flag]
+        phi[flag] += np.pi
 
         s = np.sin(theta)
         v0 = s * np.sin(phi)
@@ -102,6 +89,7 @@ class FisheyeStitcher:
         self.map_y = y_src.astype(np.float32)
 
     def create_mask(self):
+
         # 创建圆形遮罩以裁剪图像数据
         ws2 = self.ws // 2
         hs2 = self.hs // 2
@@ -119,6 +107,118 @@ class FisheyeStitcher:
 
         self.cir_mask = cir_mask
         self.inner_cir_mask = inner_cir_mask
+
+    def create_blend_mask(self):
+        """
+        创建用于图像混合的遮罩。
+        更新成员 `m_blend_post` 和 `m_binary_mask`。
+        """
+        ws2 = self.ws // 2
+        hs2 = self.hs // 2
+
+        # 使用内部遮罩创建环形遮罩
+        cir_mask_inv = cv2.bitwise_not(self.inner_cir_mask)
+        ring_mask = cv2.bitwise_and(self.cir_mask, cir_mask_inv)
+
+        # 将环形遮罩展开为等矩形投影
+        ring_mask_unwarped = cv2.remap(ring_mask, self.map_x, self.map_y, cv2.INTER_LINEAR)
+
+        # 剪切展开后的遮罩
+        mask = ring_mask_unwarped[:, ws2 - hs2:ws2 + hs2].astype(np.uint8)
+
+        h, w = mask.shape
+        first_zero_col = 120  # 根据 C++ 代码中的固定值
+        first_zero_row = 45   # 根据 C++ 代码中的固定值
+
+        # 使用 NumPy 来找到每行第一个零值的位置
+        # 将目标区域限制在 [first_zero_col-10, w//2+10]
+        cols = np.arange(first_zero_col - 10, w // 2 + 10)
+        blend_post = np.zeros(h, dtype=np.int32)
+
+        # 对每一行执行 NumPy 逻辑操作
+        for r in range(h):
+            if r > h - first_zero_row:
+                blend_post[r] = 0
+            else:
+                row_vals = mask[r, cols]
+                zero_indices = np.where(row_vals == 0)[0]
+                if zero_indices.size > 0:
+                    blend_post[r] = cols[zero_indices[0]] - 15
+                else:
+                    blend_post[r] = 0
+
+        # 更新类属性
+        self.m_blend_post = blend_post.tolist()
+        self.m_binary_mask = mask
+
+    def gen_scale_map(self):
+        """
+        生成用于光衰减补偿的标度图 `m_scale_map`。
+        """
+        h = self.hs
+        w = self.ws
+        ws2 = self.ws // 2
+        hs2 = self.hs // 2
+
+        # 生成反向的光衰减轮廓 R_pf
+        x_coor = np.arange(ws2, dtype=np.float32)
+        r_pf = (
+            self.p1_ * np.power(x_coor, 5.0) +
+            self.p2_ * np.power(x_coor, 4.0) +
+            self.p3_ * np.power(x_coor, 3.0) +
+            self.p4_ * np.power(x_coor, 2.0) +
+            self.p5_ * x_coor +
+            self.p6_
+        )
+
+        # 元素取倒数
+        r_pf = 1.0 / r_pf
+
+        # 创建 IV 象限标度图
+        scale_map_quad_4 = np.zeros((hs2, ws2), dtype=np.float32)
+        da = r_pf[-1]
+        for x in range(ws2):
+            for y in range(hs2):
+                r = np.floor(np.sqrt(x**2 + y**2))
+                if r >= ws2 - 1:
+                    scale_map_quad_4[y, x] = da
+                else:
+                    a = r_pf[int(r)]
+                    b = r_pf[min(int(r) + 1, ws2 - 1)]
+                    scale_map_quad_4[y, x] = (a + b) / 2.0
+
+        # 生成其他象限的标度图并合并
+        scale_map_quad_1 = np.flipud(scale_map_quad_4)
+        scale_map_quad_3 = np.fliplr(scale_map_quad_4)
+        scale_map_quad_2 = np.fliplr(scale_map_quad_1)
+
+        quad_21 = np.hstack((scale_map_quad_2, scale_map_quad_1))
+        quad_34 = np.hstack((scale_map_quad_3, scale_map_quad_4))
+
+        # 将四个象限组合成完整的标度图
+        self.m_scale_map = np.vstack((quad_21, quad_34))
+
+    def read_mls_grids(self):
+        """
+        从文件中读取刚性 MLS 插值网格并更新 `mls_map_x` 和 `mls_map_y`。
+        """
+        # 打开 MLS 文件
+        fs = cv2.FileStorage(self.map_path, cv2.FILE_STORAGE_READ)
+        if not fs.isOpened():
+            raise ValueError(f"Cannot open map file: {self.map_path}")
+
+        # 读取 `Xd` 和 `Yd` 的值
+        mls_map_x = fs.getNode("Xd").mat()
+        mls_map_y = fs.getNode("Yd").mat()
+        fs.release()
+
+        # 确保读取数据的类型正确
+        if mls_map_x is None or mls_map_y is None:
+            raise ValueError(f"Missing Xd or Yd data in file: {self.map_path}")
+
+        # 更新类属性
+        self.mls_map_x = mls_map_x
+        self.mls_map_y = mls_map_y
 
     @staticmethod
     def extract_frame_from_video(video_path, frame_number=0):
@@ -146,67 +246,11 @@ class FisheyeStitcher:
 
         return frame
 
-# 示例使用
-# stitcher = FisheyeStitcher(3840, 1920, 195.0, True, True, 'path_to_mls_map')
 
-# 示例使用
-# stitcher = FisheyeStitcher(1920, 1980, 195.0, True, True, 'path_to_mls_map')
-# extracted_frame = FisheyeStitcher.extract_frame_from_video('/home/why/data/input_video.mp4', 10)
-# if extracted_frame is not None:
-#    cv2.imshow('Extracted Frame', extracted_frame)
-#    cv2.waitKey(0)
-#    cv2.destroyAllWindows()
-
-def test_fish_to_eqt():
-    """
-    测试 `fish_to_eqt` 方法是否正确转换单个点坐标。
-    """
-    stitcher = FisheyeStitcher(3840, 1920, 195.0, True, True, 'path_to_mls_map')
-    # 期望的目标坐标
-    x_dest, y_dest = 100, 50
-    w_rad = stitcher.wd / (2.0 * np.pi)
-
-    # 获取转换后的坐标
-    x_src, y_src = stitcher.fish_to_eqt(x_dest, y_dest, w_rad)
-
-    # 打印结果供手动校验
-    print(f'fish_to_eqt: x_src = {x_src}, y_src = {y_src}')
+if __name__ == "__main__":
+    video_path = '/home/why/data/input_video.mp4'
+    mls_map_path = '/home/why/data/grid_xd_yd_3840x1920.yml.gz'
+    ipdb.set_trace()
+    stitcher = FisheyeStitcher(3840, 1920, 195.0, True, True, mls_map_path)
 
 
-def test_fish_to_map():
-    """
-    测试 `fish_to_map` 方法的映射结果是否合理。
-    """
-    stitcher = FisheyeStitcher(3840, 1920, 195.0, True, True, 'path_to_mls_map')
-    # 生成投影映射表
-    stitcher.fish_to_map()
-
-    # 检查映射表的大小和数据类型
-    assert stitcher.map_x.shape == (stitcher.hd, stitcher.wd)
-    assert stitcher.map_y.shape == (stitcher.hd, stitcher.wd)
-    assert stitcher.map_x.dtype == np.float32
-    assert stitcher.map_y.dtype == np.float32
-
-    print(f'fish_to_map: map_x and map_y are correctly sized and typed.')
-
-
-def test_create_mask():
-    """
-    测试 `create_mask` 方法生成的遮罩是否符合预期。
-    """
-    stitcher = FisheyeStitcher(3840, 1920, 195.0, True, True, 'path_to_mls_map')
-    stitcher.create_mask()
-
-    # 检查遮罩的大小和数据类型
-    assert stitcher.cir_mask.shape == (stitcher.hs, stitcher.ws)
-    assert stitcher.inner_cir_mask.shape == (stitcher.hs, stitcher.ws)
-    assert stitcher.cir_mask.dtype == np.uint8
-    assert stitcher.inner_cir_mask.dtype == np.uint8
-
-    print(f'create_mask: cir_mask and inner_cir_mask are correctly sized and typed.')
-
-
-# 运行测试
-test_fish_to_eqt()
-test_fish_to_map()
-test_create_mask()

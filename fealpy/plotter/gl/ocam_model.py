@@ -80,12 +80,37 @@ class OCAMModel:
             raise ValueError(f"投影类型{ptype}错误!")
 
 
-
-
         # 标准化
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
+        #uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/self.width
+        #uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/self.height
+
+        return uv
+
+    def cam_to_image_fast(self, node):
+        """
+        @brief 利用 matlab 工具箱 中的算法来处理
+        """
+        theta = np.zeros(len(node), dtype=np.float64)
+
+        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
+        flag = (norm == 0)
+        norm[flag] = np.finfo(float).eps
+        theta = np.arctan(node[:, 2]/norm)
+
+        rho = np.polyval(self.pol, theta)
+        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
+        uv = np.zeros_like(ps)
+        c, d, e = self.affine
+        xc, yc = self.center
+        uv[:, 0] = ps[:, 0] * c + ps[:, 1] * d + xc
+        uv[:, 1] = ps[:, 0] * e + ps[:, 1]     + yc
+
+        # 标准化
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
 
     def world_to_image_fast(self, node):
@@ -112,6 +137,51 @@ class OCAMModel:
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
+
+    def equirectangular_projection(self, fovd=195):
+        """
+        @brief 使用等矩形投影将鱼眼图像转换为平面图像。
+        @return: 转换后的平面图像
+        """
+        # 读取输入鱼眼图像
+        src_img = cv2.imread(self.fname)
+        hs, ws = src_img.shape[:2]
+        u0, v0 = ws // 2, hs // 2
+
+        # 计算目标图像尺寸
+        wd = int(ws * 360/fovd)
+        hd = hs
+        u1, v1 = wd // 2, hd // 2
+
+        # 使用数组化计算
+        y_indices, x_indices = np.indices((hd, wd))
+        xd = x_indices - u1 
+        yd = y_indices - v1 
+
+        # 使用矢量化运算
+        phi = 2 * np.pi * xd / wd
+        theta = -2 * np.pi * yd / wd + np.pi / 2
+
+        flag = theta < 0
+        phi[flag] += np.pi
+        theta[flag] *= -1
+
+        flag = theta > np.pi
+        phi[flag] += np.pi
+        theta[flag] = 2*np.pi - theta[flag]
+
+        x = np.sin(theta) * np.cos(phi)
+        y = np.sin(theta) * np.sin(phi)
+        z = np.cos(theta)
+        r = np.sqrt(y ** 2 + z ** 2)
+        f = wd * np.arctan2(r, x)/ 2.0 / np.pi
+
+        map_x = np.array(f * y / r + u0, dtype=np.float32)
+        map_y = np.array(f * z / r + v0, dtype=np.float32) 
+
+        # 使用映射表将鱼眼图像转换为等矩形投影图像
+        dst_img = cv2.remap(src_img, map_x, map_y, cv2.INTER_LINEAR)
+        return dst_img
 
     def undistort(self, image, fc=5, width=640, height=480):
         """
