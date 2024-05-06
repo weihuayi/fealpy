@@ -17,7 +17,7 @@ class OCAMModel:
     fname: str
     flip: str
     chessboardpath: str
-    iceneter: tuple
+    icenter: tuple
     radius : float
 
     def __post_init__(self):
