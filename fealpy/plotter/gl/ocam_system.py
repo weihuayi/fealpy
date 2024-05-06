@@ -22,7 +22,9 @@ class OCAMSystem:
                 affine = data['affine'][i],
                 fname = data['fname'][i],
                 flip = data['flip'][i],
-                chessboardpath=data['chessboardpath'][i]
+                chessboardpath=data['chessboardpath'][i],
+                icenter=data['icenter'][i],
+                radius=data['raidus'][i]
             ))
 
     def undistort_cv(self):
@@ -273,12 +275,12 @@ class OCAMSystem:
 
         # 默认文件目录位置
         fname = [
-            '/home/why/data/src_1.jpg',
-            '/home/why/data/src_2.jpg',
-            '/home/why/data/src_3.jpg',
-            '/home/why/data/src_4.jpg',
-            '/home/why/data/src_5.jpg',
-            '/home/why/data/src_6.jpg',
+            '~/data/src_1.jpg',
+            '~/data/src_2.jpg',
+            '~/data/src_3.jpg',
+            '~/data/src_4.jpg',
+            '~/data/src_5.jpg',
+            '~/data/src_6.jpg',
             ]
 
         flip = [
@@ -286,12 +288,12 @@ class OCAMSystem:
         ]
 
         chessboardpath = [
-            '/home/why/data/camera_models/chessboard_2',
-            '/home/why/data/camera_models/chessboard_1',
-            '/home/why/data/camera_models/chessboard_3',
-            '/home/why/data/camera_models/chessboard_4',
-            '/home/why/data/camera_models/chessboard_5',
-            '/home/why/data/camera_models/chessboard_6',
+            '~/data/camera_models/chessboard_2',
+            '~/data/camera_models/chessboard_1',
+            '~/data/camera_models/chessboard_3',
+            '~/data/camera_models/chessboard_4',
+            '~/data/camera_models/chessboard_5',
+            '~/data/camera_models/chessboard_6',
             ]
 
         data = {
@@ -307,7 +309,9 @@ class OCAMSystem:
             "width" : 1920,
             "height" : 1080,
             "vfield" : (110, 180),
-            'flip' : flip
+            'flip' : flip,
+            'icenter': np.zeros((6, 2)),
+            'radius' : np.zeros(6)
         }
 
         return cls(data)

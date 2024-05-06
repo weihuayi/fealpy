@@ -17,9 +17,18 @@ class OCAMModel:
     fname: str
     flip: str
     chessboardpath: str
+    iceneter: tuple
+    radius : float
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+
+
+    def __call__(self, u):
+        pass
+
+    def meshing(self):
+        pass
 
 
     def world_to_image(self, node):
