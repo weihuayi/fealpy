@@ -285,7 +285,7 @@ class OCAMSystem:
             ]
 
         flip = [
-            'LR', 'LR', 'LR', 'LR', 'LR', 'LR'
+            None, None, None, None, None, None 
         ]
 
         chessboardpath = [
