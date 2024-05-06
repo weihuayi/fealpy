@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import cv2
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
@@ -24,7 +25,7 @@ class OCAMSystem:
                 flip = data['flip'][i],
                 chessboardpath=data['chessboardpath'][i],
                 icenter=data['icenter'][i],
-                radius=data['raidus'][i]
+                radius=data['radius'][i]
             ))
 
     def undistort_cv(self):
@@ -275,12 +276,12 @@ class OCAMSystem:
 
         # 默认文件目录位置
         fname = [
-            '~/data/src_1.jpg',
-            '~/data/src_2.jpg',
-            '~/data/src_3.jpg',
-            '~/data/src_4.jpg',
-            '~/data/src_5.jpg',
-            '~/data/src_6.jpg',
+            os.path.expanduser('~/data/src_1.jpg'),
+            os.path.expanduser('~/data/src_2.jpg'),
+            os.path.expanduser('~/data/src_3.jpg'),
+            os.path.expanduser('~/data/src_4.jpg'),
+            os.path.expanduser('~/data/src_5.jpg'),
+            os.path.expanduser('~/data/src_6.jpg'),
             ]
 
         flip = [
@@ -288,12 +289,12 @@ class OCAMSystem:
         ]
 
         chessboardpath = [
-            '~/data/camera_models/chessboard_2',
-            '~/data/camera_models/chessboard_1',
-            '~/data/camera_models/chessboard_3',
-            '~/data/camera_models/chessboard_4',
-            '~/data/camera_models/chessboard_5',
-            '~/data/camera_models/chessboard_6',
+            os.path.expanduser('~/data/camera_models/chessboard_2'),
+            os.path.expanduser('~/data/camera_models/chessboard_1'),
+            os.path.expanduser('~/data/camera_models/chessboard_3'),
+            os.path.expanduser('~/data/camera_models/chessboard_4'),
+            os.path.expanduser('~/data/camera_models/chessboard_5'),
+            os.path.expanduser('~/data/camera_models/chessboard_6'),
             ]
 
         data = {
