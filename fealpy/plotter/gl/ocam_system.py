@@ -297,6 +297,17 @@ class OCAMSystem:
             os.path.expanduser('~/data/camera_models/chessboard_6'),
             ]
 
+        icenter = np.array([
+            [553.866, 992.559],
+            [566.843, 986.667],
+            [544.920, 978.480],
+            [520.528, 985.73],
+            [528.981, 961.628],
+            [538.6615, 940.2435],
+            ], dtype=np.float64)
+
+        radius = np.array([877.5,882.056,886.9275,884.204,883.616,884.5365],dtype=np.float64)
+        
         data = {
             "nc" : 6,
             "location" : location,
@@ -311,8 +322,8 @@ class OCAMSystem:
             "height" : 1080,
             "vfield" : (110, 180),
             'flip' : flip,
-            'icenter': np.zeros((6, 2)),
-            'radius' : np.zeros(6)
+            'icenter': icenter,
+            'radius' : radius
         }
 
         return cls(data)
