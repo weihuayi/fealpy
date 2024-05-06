@@ -25,7 +25,53 @@ class OCAMModel:
 
 
     def __call__(self, u):
-        pass
+        icenter = self.icenter
+        r = self.radius
+        d = np.zeros(u.shape[0])
+        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        flag1 = np.zeros(u.shape[0],dtype=np.bool_)
+        flag1[u[...,1]<y1]=True
+        flag1[u[...,1]>y2]=True
+        u1 = u[flag1]
+        u2 = u[~flag1]
+        
+        d1 = np.sqrt(np.sum((u1-icenter)**2,axis=-1))-r
+        
+        v1 = np.array([-icenter[...,0],y2-icenter[...,1]])
+        v2 = np.array([-icenter[...,0],y1-icenter[...,1]])
+        v3 = np.array([1080-icenter[...,0],y1-icenter[...,1]])
+        v4 = np.array([1080-icenter[...,0],y2-icenter[...,1]])
+        v = u2-icenter
+        
+        c1 = np.cross(v1,v)
+        c2 = np.cross(v,v2)
+        c3 = np.cross(v3,v)
+        c4 = np.cross(v,v4)
+        flag2 = np.zeros(u2.shape[0],dtype=np.int_)
+        flag2[c1>0 and c2>0] = 1
+        flag2[c3>0 and c4>0] = 2
+        d2 = -u2[flag2==1,0] 
+        d3 = u2[flag2==2,0]-1080
+        
+        u3 = u2[flag2==0]
+        flag3 = u3[...,0]<icenter[...,0]
+        d4 = np.zeros((len(u3[flag3]),2),dtype=np.float64)
+        d4[:,0] = -u3[flag3,0]
+        d4[:,1] = np.sqrt(np.sum((u3[flag3]-icenter)**2,axis=-1))-r
+        d4 = np.min(d4,axis=1)
+
+        d5 = np.zeros((len(u3[~flag3]),2),dtype=np.float64)
+        d5[:,0] = u3[flag3,0]-1080
+        d5[:,1] = np.sqrt(np.sum((u3[~flag3]-icenter)**2,axis=-1))-r
+        d5 = np.min(d5,axis=1)
+        
+        d[~flag1][flag2==0][flag3]=d4 
+        d[~flag1][flag2==0][~flag3]=d5
+        d[~flag1][flag2==1] = d2
+        d[~flag1][flag2==2] = d3
+        d[flag1] = d1
+        return d
 
     def meshing(self):
         pass
