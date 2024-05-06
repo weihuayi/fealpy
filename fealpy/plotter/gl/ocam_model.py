@@ -85,14 +85,59 @@ class OCAMModel:
     def signed_dist_function(self, u):
         return self(u)
 
-    def meshing(self):
-        domain=OCAMDomain(icenter=self.icenter,radius=self.radius)
-        hmin=100
+    def gmeshing(self):
+        import gmsh
+        from fealpy.mesh import TriangleMesh
+        icenter = self.icenter
+        r = self.radius
+        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        gmsh.initialize()
+
+        gmsh.model.geo.addPoint(icenter[...,0],icenter[...,1],0,tag=1)
+        gmsh.model.geo.addPoint(0,y1,0,tag=2)
+        gmsh.model.geo.addPoint(0,y2,0,tag=3)
+        gmsh.model.geo.addPoint(1080,y1,0,tag=4)
+        gmsh.model.geo.addPoint(1080,y2,0,tag=5)
+
+        gmsh.model.geo.addCircleArc(2,1,4,tag=1)
+        gmsh.model.geo.addLine(4,5,tag=2)
+        gmsh.model.geo.addCircleArc(5,1,3,tag=3)
+        gmsh.model.geo.addLine(3,2,tag=4)
+
+        gmsh.model.geo.addCurveLoop([1,2,3,4],1)
+        gmsh.model.geo.addPlaneSurface([1],1)
+
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.field.add("Distance",1)
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[1,3])
+        gmsh.model.mesh.field.setNumber(1,"Sampling",100)
+        lc = 50
+        gmsh.model.mesh.field.add("Threshold", 2)
+        gmsh.model.mesh.field.setNumber(2, "InField", 1)
+        gmsh.model.mesh.field.setNumber(2, "SizeMin", lc)
+        gmsh.model.mesh.field.setNumber(2, "SizeMax", 3*lc)
+        gmsh.model.mesh.field.setNumber(2, "DistMin", 200)
+        gmsh.model.mesh.field.setNumber(2, "DistMax", 800)
+
+        gmsh.model.mesh.field.setAsBackgroundMesh(2)
+        gmsh.model.mesh.generate(2)
+        ntags, vxyz, _ = gmsh.model.mesh.getNodes()
+        node = vxyz.reshape((-1,3))
+        node = node[:,:2]
+        vmap = dict({j:i for i,j in enumerate(ntags)})
+        tris_tags,evtags = gmsh.model.mesh.getElementsByType(2)
+        evid = np.array([vmap[j] for j in evtags])
+        cell = evid.reshape((tris_tags.shape[-1],-1))
+        gmsh.finalize()
+        return TriangleMesh(node,cell)
+
+    def distmeshing(self,fh=None):
+        domain=OCAMDomain(icenter=self.icenter,radius=self.radius,fh=fh)
+        hmin=50
         mesher=DistMesher2d(domain,hmin)
         mesh = mesher.meshing(maxit=100)
         return mesh
-        
-
 
     def world_to_image(self, node):
         """
@@ -317,9 +362,6 @@ class OCAMModel:
         
         return r, g, b
 
-
-
-
     def world2cam(self, node):
         """
         """
@@ -434,11 +476,21 @@ class OCAMModel:
         return result
 
 class OCAMDomain(Domain):
-    def __init__(self,icenter,radius,hmin=100,hmax=100,fh=None):
+    def __init__(self,icenter,radius,hmin=10,hmax=20,fh=None):
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
         if fh is not None:
             self.fh = fh
-    def __call__(self,p):
+        self.box = [0,1180,0,2020]
+        self.icenter=icenter
+        self.radius=radius
+        vertices = np.array([
+            (0,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
+            (0,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
+            (1080,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
+            (1080,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0]))])
+        curves = np.array([[0,1],[2,3]])
+        self.facets = {0:vertices,1:curves}
+    def __call__(self,u):
         icenter = self.icenter
         r = self.radius
         d = np.zeros(u.shape[0])
@@ -499,5 +551,7 @@ class OCAMDomain(Domain):
 
     def sizing_function(self,p):
         return self.fh(p,self)
+    def facet(self,dim):
+        return self.facets[0]
     
 
