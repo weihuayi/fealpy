@@ -4,11 +4,15 @@ from abc import ABCMeta, abstractmethod
 
 from torch import Tensor
 
+from ..mesh import Mesh
+
 Index = Union[int, slice, Tensor]
 _S = slice(None)
 
 
 class FunctionSpace(metaclass=ABCMeta):
+    r"""THe base class of function spaces"""
+    mesh: Mesh
 
     ### basis
     @abstractmethod

@@ -1,5 +1,5 @@
 
-from typing import Union, Generic, TypeVar
+from typing import Union, Generic, TypeVar, Callable
 
 from torch import Tensor
 
@@ -44,3 +44,5 @@ __all__ = [
     'DomainSourceIntegrator',
     'BoundarySourceIntegrator'
 ]
+
+CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
