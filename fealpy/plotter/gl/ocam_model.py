@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Callable, Any, Tuple
 import numpy as np
+import cv2
+import glob
 
 @dataclass
 class OCAMModel:
@@ -13,6 +15,12 @@ class OCAMModel:
     pol : np.ndarray
     affine: np.ndarray
     fname: str
+    flip: str
+    chessboardpath: str
+
+    def __post_init__(self):
+        self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+
 
     def world_to_image(self, node):
         """
@@ -26,33 +34,88 @@ class OCAMModel:
         """
         @brief 把世界坐标系中的点转换到相机坐标系下
         """
-        node = np.einsum('...j, kj->...k', node-self.location, self.axes)
+        node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
-    def cam_to_image(self, node):
+    def cam_to_image(self, node, ptype='O'):
         """
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
 
-        f = np.sqrt((self.height/2)**2 + (self.width/2)**2)
-        r = np.sqrt(np.sum(node**2, axis=-1))
-        theta = np.arccos(node[..., 2]/r)
-        phi = np.arctan2(node[..., 1], node[:, 0])
+        NN = len(node)
+
+        fx = self.K[0, 0] 
+        fy = self.K[1, 1]
+        u0 = self.K[0, 2]
+        v0 = self.K[1, 2]
+
+        w = self.width
+        h = self.height
+        f = np.sqrt((h/2)**2 + (w/2)**2)
+        fx = f
+        fy = f
+        u0 = self.center[0]
+        v0 = self.center[1]
+
+        r = np.sqrt(np.sum(node**2, axis=1))
+        theta = np.arccos(node[:, 2]/r)
+        phi = np.arctan2(node[:, 1], node[:, 0])
         phi = phi % (2 * np.pi)
 
-        uv = np.zeros(node.shape[:-1]+(2,), dtype=np.float64)
+        uv = np.zeros((NN, 2), dtype=np.float64)
 
-        uv[..., 0] = f * theta * np.cos(phi) + self.center[0] 
-        uv[..., 1] = f * theta * np.sin(phi) + self.center[1] 
+        if ptype == 'L': # 等距投影
+            uv[:, 0] = fx * theta * np.cos(phi) + u0 
+            uv[:, 1] = fy * theta * np.sin(phi) + v0 
+        elif ptype == 'O': # 正交投影
+            uv[:, 0] = fx * np.sin(theta) * np.cos(phi) + u0 
+            uv[:, 1] = fy * np.sin(theta) * np.sin(phi) + v0 
+        elif ptype == 'A': # 等积投影
+            uv[:, 0] = 2 * fx * np.sin(theta/2) * np.cos(phi) + u0 
+            uv[:, 1] = 2 * fy * np.sin(theta/2) * np.sin(phi) + v0 
+        elif ptype == 'S': # 体视投影, Stereographic Projection
+            uv[:, 0] = 2 * fx * np.tan(theta/2) * np.cos(phi) + u0 
+            uv[:, 1] = 2 * fy * np.tan(theta/2) * np.sin(phi) + v0 
+        else:
+            raise ValueError(f"投影类型{ptype}错误!")
+
 
         # 标准化
-        uv[..., 0] = (uv[..., 0] - np.min(uv[..., 0]))/(np.max(uv[..., 0])-np.min(uv[..., 0]))
-        uv[..., 1] = (uv[..., 1] - np.min(uv[..., 1]))/(np.max(uv[..., 1])-np.min(uv[..., 1]))
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
+        #uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/self.width
+        #uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/self.height
+
+        return uv
+
+    def cam_to_image_fast(self, node):
+        """
+        @brief 利用 matlab 工具箱 中的算法来处理
+        """
+        theta = np.zeros(len(node), dtype=np.float64)
+
+        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
+        flag = (norm == 0)
+        norm[flag] = np.finfo(float).eps
+        theta = np.arctan(node[:, 2]/norm)
+
+        rho = np.polyval(self.pol, theta)
+        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
+        uv = np.zeros_like(ps)
+        c, d, e = self.affine
+        xc, yc = self.center
+        uv[:, 0] = ps[:, 0] * c + ps[:, 1] * d + xc
+        uv[:, 1] = ps[:, 0] * e + ps[:, 1]     + yc
+
+        # 标准化
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
 
     def world_to_image_fast(self, node):
         """
+        @brief 利用 matlab 工具箱 中的算法来处理
         """
         node = self.world_to_cam(node)
         theta = np.zeros(len(node), dtype=np.float64)
@@ -74,6 +137,51 @@ class OCAMModel:
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
+
+    def equirectangular_projection(self, fovd=195):
+        """
+        @brief 使用等矩形投影将鱼眼图像转换为平面图像。
+        @return: 转换后的平面图像
+        """
+        # 读取输入鱼眼图像
+        src_img = cv2.imread(self.fname)
+        hs, ws = src_img.shape[:2]
+        u0, v0 = ws // 2, hs // 2
+
+        # 计算目标图像尺寸
+        wd = int(ws * 360/fovd)
+        hd = hs
+        u1, v1 = wd // 2, hd // 2
+
+        # 使用数组化计算
+        y_indices, x_indices = np.indices((hd, wd))
+        xd = x_indices - u1 
+        yd = y_indices - v1 
+
+        # 使用矢量化运算
+        phi = 2 * np.pi * xd / wd
+        theta = -2 * np.pi * yd / wd + np.pi / 2
+
+        flag = theta < 0
+        phi[flag] += np.pi
+        theta[flag] *= -1
+
+        flag = theta > np.pi
+        phi[flag] += np.pi
+        theta[flag] = 2*np.pi - theta[flag]
+
+        x = np.sin(theta) * np.cos(phi)
+        y = np.sin(theta) * np.sin(phi)
+        z = np.cos(theta)
+        r = np.sqrt(y ** 2 + z ** 2)
+        f = wd * np.arctan2(r, x)/ 2.0 / np.pi
+
+        map_x = np.array(f * y / r + u0, dtype=np.float32)
+        map_y = np.array(f * z / r + v0, dtype=np.float32) 
+
+        # 使用映射表将鱼眼图像转换为等矩形投影图像
+        dst_img = cv2.remap(src_img, map_x, map_y, cv2.INTER_LINEAR)
+        return dst_img
 
     def undistort(self, image, fc=5, width=640, height=480):
         """
@@ -171,5 +279,84 @@ class OCAMModel:
 
         ps = node[:, 0:2]/l.reshape(-1, 1)*rho.reshape(-1, 1)
         return ps 
+
+    def get_K_and_D(self, checkerboard, imgsPath):
+        CHECKERBOARD = checkerboard
+        subpix_criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_CHECK_COND+cv2.fisheye.CALIB_FIX_SKEW
+        objp = np.zeros((1, CHECKERBOARD[0]*CHECKERBOARD[1], 3), np.float32)
+        objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
+        _img_shape = None
+        objpoints = []
+        imgpoints = []
+        images = glob.glob(imgsPath + '/*.jpg')
+        for fname in images:
+            img = cv2.imread(fname)
+            if _img_shape == None:
+                _img_shape = img.shape[:2]
+            else:
+                assert _img_shape == img.shape[:2], "All images must share the same size."
+
+            gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            ret, corners = cv2.findChessboardCorners(gray, checkerboard,
+                flags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
+
+            #ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD,cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE)
+            if ret == True:
+                objpoints.append(objp)
+                cv2.cornerSubPix(gray,corners,(3,3),(-1,-1),subpix_criteria)
+                imgpoints.append(corners)
+        N_OK = len(objpoints)
+        K = np.zeros((3, 3))
+        D = np.zeros((4, 1))
+        rvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+        tvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+        rms, _, _, _, _ = cv2.fisheye.calibrate(
+            objpoints,
+            imgpoints,
+            gray.shape[::-1],
+            K,
+            D,
+            rvecs,
+            tvecs,
+            calibration_flags,
+            (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
+        )
+        DIM = _img_shape[::-1]
+        return DIM, K, D
+
+
+    def undistort_chess(self, imgname, scale=0.6):
+        img = cv2.imread(imgname)
+        K, D, DIM = self.K, self.D, self.DIM
+        dim1 = img.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
+        assert dim1[0]/dim1[1] == DIM[0]/DIM[1] #Image to undistort needs to have same aspect ratio as the ones used in calibration
+        if dim1[0]!=DIM[0]:
+            img = cv2.resize(img,DIM,interpolation=cv2.INTER_AREA)
+        Knew = K.copy()
+        if scale: #change fov
+            Knew[(0,1), (0,1)] = scale * Knew[(0,1), (0,1)]
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), Knew, DIM, cv2.CV_16SC2)
+        undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        return undistorted_img
+
+    def perspective(self, img):
+        # 定义原始图像中的四个角点坐标
+        original_points = np.array([[430.479, 233.444],
+                                    [1072.281, 238.995],
+                                    [1096.582, 38.359],
+                                    [252.12, 23.290]], dtype=np.float32)[::-1]
+        # 定义目标图像中对应的四个角点坐标
+        target_points = np.array([[430.479, 233.444],
+                                  [1072.281, 233.444],
+                                  [1080.281, 38.359],
+                                  [350.479, 38.359]], dtype=np.float32)[::-1]
+
+        # 计算透视变换矩阵
+        M = cv2.getPerspectiveTransform(original_points, target_points)
+
+        # 进行透视矫正
+        result = cv2.warpPerspective(img, M, (1920, 1080))
+        return result
 
 

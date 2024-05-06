@@ -2130,7 +2130,154 @@ class TriangleMesh(Mesh, Plotable):
         cell = idxMap[cell]
 
         return cls(node, cell)
+    
+    ## @ingroup MeshGenerators
+    @classmethod 
+    def from_fuel_rod_gmsh(cls,R1,R2,L,w,h,meshtype='normal'):
+        """
+        Generate a trangle mesh for a fuel-rod region by gmsh
 
+        @param R1 The radius of semicircles
+        @param R2 The radius of quarter circles
+        @param L The length of straight segments
+        @param w The thickness of caldding
+        @param h Parameter controlling mesh density
+        @param meshtype Choose whether to add mesh refinement at the boundary
+        @return TriangleMesh instance
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("fuel_rod_2D")
+
+        # 内部单元大小
+        Lc1 = h
+        # 包壳单元大小
+        Lc2 = h/2.5
+
+        factory = gmsh.model.geo
+        # 外圈点
+        factory.addPoint( -R1 -R2 -L, 0 , 0 , Lc2 , 1 )#圆心1
+        factory.addPoint( -R1 -R2 -L, -R1 , 0 , Lc2 , 2)
+        factory.addPoint( -R1 -R2 , -R1 , 0 , Lc2 , 3)
+        factory.addPoint( -R1 -R2 , -R1 -R2 , 0 , Lc2 , 4)#圆心2
+        factory.addPoint( -R1 , -R1 -R2 , 0 , Lc2 , 5)
+        factory.addPoint( -R1 , -R1 -R2 -L , 0 , Lc2 , 6)
+        factory.addPoint( 0 , -R1 -R2 -L , 0 , Lc2 , 7)#圆心3
+        factory.addPoint( R1 , -R1 -R2 -L , 0 , Lc2 , 8)
+        factory.addPoint( R1 , -R1 -R2 , 0 , Lc2 , 9)
+        factory.addPoint( R1 +R2 , -R1 -R2 , 0, Lc2 , 10)#圆心4
+        factory.addPoint( R1 +R2 , -R1 , 0 , Lc2 , 11) 
+        factory.addPoint( R1 +R2 +L , -R1 , 0 , Lc2 , 12)
+        factory.addPoint( R1 +R2 +L , 0 , 0 , Lc2 , 13)#圆心5
+        factory.addPoint( R1 +R2 +L , R1 , 0 , Lc2 , 14)
+        factory.addPoint( R1 +R2 , R1 , 0 , Lc2 , 15)
+        factory.addPoint( R1 +R2 , R1 +R2 , 0 , Lc2 , 16)#圆心6
+        factory.addPoint( R1 , R1 +R2 , 0 , Lc2 , 17)
+        factory.addPoint( R1 , R1 +R2 +L , 0 , Lc2 , 18)
+        factory.addPoint( 0 , R1 +R2 +L , 0 , Lc2 , 19)#圆心7
+        factory.addPoint( -R1 , R1 +R2 +L , 0 , Lc2 , 20)
+        factory.addPoint( -R1 , R1 +R2 , 0 , Lc2 , 21)
+        factory.addPoint( -R1 -R2 , R1 +R2 , 0 , Lc2 , 22)#圆心8
+        factory.addPoint( -R1 -R2 , R1 , 0 , Lc2 , 23)
+        factory.addPoint( -R1 -R2 -L , R1 , 0 , Lc2 , 24)
+
+        # 外圈线
+        line_list_out = []
+        for i in range(8):
+            if i == 0:
+                factory.addCircleArc(24 , 3*i+1 , 3*i+2, 2*i+1)
+                factory.addLine( 3*i+2 , 3*i+3 , 2*(i+1) )
+            else:
+                factory.addCircleArc(3*i , 3*i+1 , 3*i+2 , 2*i+1)
+                factory.addLine( 3*i+2 , 3*i+3 , 2*(i+1) )
+            # 填充线环中的线
+            line_list_out.append(2*i+1)
+            line_list_out.append(2*(i+1))
+        # 生成外圈线环
+        factory.addCurveLoop(line_list_out,17)
+
+        # 内圈点
+        factory.addPoint( -R1 -R2 -L, -R1 +w , 0 , Lc1 , 25)
+        factory.addPoint( -R1 -R2 , -R1 +w , 0 , Lc1 , 26)
+        factory.addPoint( -R1 +w , -R1 -R2 , 0 , Lc1 , 27)
+        factory.addPoint( -R1 +w , -R1 -R2 -L , 0 , Lc1 , 28)
+        factory.addPoint( R1 -w , -R1 -R2 -L , 0 , Lc1 , 29)
+        factory.addPoint( R1 -w , -R1 -R2 , 0 , Lc1 , 30)
+        factory.addPoint( R1 +R2 , -R1 +w , 0 , Lc1 , 31) 
+        factory.addPoint( R1 +R2 +L , -R1 +w , 0 , Lc1 , 32)
+        factory.addPoint( R1 +R2 +L , R1 -w , 0 , Lc1 , 33)
+        factory.addPoint( R1 +R2 , R1 -w , 0 , Lc1 , 34)
+        factory.addPoint( R1 -w , R1 +R2 , 0 , Lc1 , 35)
+        factory.addPoint( R1 -w , R1 +R2 +L , 0 , Lc1 , 36)
+        factory.addPoint( -R1 +w , R1 +R2 +L , 0 , Lc1 , 37)
+        factory.addPoint( -R1 +w , R1 +R2 , 0 , Lc1 , 38)
+        factory.addPoint( -R1 -R2 , R1 -w, 0 , Lc1 , 39)
+        factory.addPoint( -R1 -R2 -L , R1 -w, 0 , Lc1 , 40)
+
+        # 内圈线
+        line_list_in = []
+        for j in range(8):
+            if j == 0:
+                factory.addCircleArc(40 , 3*j+1 , 25+2*j , 18+2*j)
+                factory.addLine(25+2*j , 26+2*j , 19+2*j)
+            else:
+                factory.addCircleArc(24+2*j , 3*j+1 , 25+2*j, 18+2*j)
+                factory.addLine(25+2*j , 26+2*j , 19+2*j)
+            line_list_in.append(18+2*j)
+            line_list_in.append(19+2*j)
+        # 生成内圈线环  
+        factory.addCurveLoop(line_list_in,34)
+
+        # 内圈面
+        factory.addPlaneSurface([34],35)
+        # 包壳截面
+        factory.addPlaneSurface([17, 34],36)
+
+        factory.synchronize()
+
+        if meshtype == 'refine':
+            gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+            gmmf = gmsh.model.mesh.field
+            gmmf.add("Distance",1)
+            gmmf.setNumbers(1, "CurvesList",line_list_in)
+            gmmf.setNumber(1,"Sampling",1000)
+            gmmf.add("Threshold",2)
+            gmmf.setNumber(2, "InField", 1)
+            gmmf.setNumber(2, "SizeMin", Lc1/5)
+            gmmf.setNumber(2, "SizeMax", Lc1)
+            gmmf.setNumber(2, "DistMin", w)
+            gmmf.setNumber(2, "DistMax", 2*w)
+            gmmf.setAsBackgroundMesh(2)
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)[:, 0:2].copy()
+
+        # 获取三角形单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+        cell = np.array(cell_connectivity, dtype=np.int_).reshape(-1, 3) - 1
+
+
+        gmsh.finalize()
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        NN = len(node)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+
+        return cls(node,cell)
+    
     ## @ingroup MeshGenerators
     @classmethod
     def from_torus_surface(cls, R, r, nu, nv):
@@ -2367,7 +2514,7 @@ class TriangleMesh(Mesh, Plotable):
             cls,
             size=(17.5, 3.47, 3),
             center_height=6,
-            scale_ratio=(1, 1, 2),
+            scale_ratio=(1, 1, 1),
             density=0.1,
             top_section=np.pi / 2,
             return_edge=False):
@@ -2383,9 +2530,9 @@ class TriangleMesh(Mesh, Plotable):
         """
         l, w, h = size
         # 构造椭球面
-        a = 1.6178 * l * scale_ratio[0]
-        b = 1.6178 * w * scale_ratio[1]
-        c = 1.6178 * h * scale_ratio[2]
+        a = l * scale_ratio[0]
+        b = w * scale_ratio[1]
+        c = h * scale_ratio[2]
 
         t = np.sqrt(c ** 2 - center_height ** 2) / c
         theta = (top_section, np.arccos(-center_height / c))
@@ -2517,6 +2664,38 @@ class TriangleMesh(Mesh, Plotable):
             return mesh, edge_node
         else:
             return mesh
+    
+    @classmethod
+    def from_half_sphere_surface_with_cutting(cls, theta=np.pi/3, h=0.3):
+        import gmsh
+        theta = np.pi/2-theta
+        gmsh.initialize()
+        gmsh.model.occ.addSphere(0,0,0,1.0,tag=1,angle1=-theta,angle2=theta,angle3=np.pi)
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),h)
+        gmsh.model.mesh.generate(2)
+
+        ntags, vxyz, _ = gmsh.model.mesh.getNodes()
+        node = vxyz.reshape((-1,3))
+        vmap = dict({j:i for i,j in enumerate(ntags)})
+        tets_tags,evtags = gmsh.model.mesh.getElementsByType(2)
+        evid = np.array([vmap[j] for j in evtags])
+        cell = evid.reshape((tets_tags.shape[-1],-1))
+        gmsh.finalize()
+
+        W1 = np.array([[1,0,0],[0,0,-1],[0,1,0]])
+        W2 = np.array([[-1,0,0],[0,1,0],[0,0,-1]])
+        node = node@W1@W2
+
+        mesh1 = cls(node,cell)
+        bc = mesh1.entity_barycenter("cell")
+
+        remove_flag = np.zeros(mesh1.number_of_cells(),dtype=np.bool_)
+        remove_flag[bc[:,2]<1e-6]=True
+        remove_flag[bc[:,1]>(np.sin(theta)-1e-6)]=True
+        remove_flag[bc[:,1]<(-np.sin(theta)+1e-6)]=True
+        cell = cell[~remove_flag]
+        return cls(node,cell)
 
     def streamline_callculator(self, vector_field, start_cell, start_point):
         """

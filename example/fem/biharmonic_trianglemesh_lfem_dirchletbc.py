@@ -121,7 +121,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--gamma',
-        default=3, type=int,
+        default=5, type=int,
         help='默认内罚参数，默认为3')
 
 args = parser.parse_args()
@@ -132,12 +132,14 @@ ny = args.ny
 maxit = args.maxit
 gamma = args.gamma
 
+print("P : ", p)
+
 x = sp.symbols("x")
 y = sp.symbols("y")
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**2
 pde = DoubleLaplacePDE(u)
 
-#vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
+vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
 mesh  = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
 #mesh  = TriangleMesh.from_polygon_gmsh(vertice, 0.5)
 space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
@@ -149,6 +151,8 @@ NDof = np.zeros(maxit, dtype=np.int_)
 #print(mesh.entity('edge'))
 
 for i in range(maxit):
+    print(1/nx)
+    print(space.dof.number_of_local_dofs())
 
     bform = BilinearForm(space)
     L = ScalarBiharmonicIntegrator()
@@ -180,8 +184,8 @@ for i in range(maxit):
     print("AAA : ", np.max(A.data))
     print("AAA : ", np.max(P.data))
 
-    errorMatrix[0, i] = np.max(np.abs(uh-x))
-#    errorMatrix[0, i] = mesh.error(uh, pde.solution)
+    
+    errorMatrix[0, i] = mesh.error(uh, pde.solution)
     errorMatrix[1, i] = mesh.error(uh.hessian_value, pde.hessian) 
     print(errorMatrix)
 
