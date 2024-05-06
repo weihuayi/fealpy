@@ -104,6 +104,7 @@ class OCAMModel:
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
 
+        """
         w = self.width
         h = self.height
         f = np.sqrt((h/2)**2 + (w/2)**2)
@@ -111,6 +112,7 @@ class OCAMModel:
         fy = f
         u0 = self.center[0]
         v0 = self.center[1]
+        """
 
         r = np.sqrt(np.sum(node**2, axis=1))
         theta = np.arccos(node[:, 2]/r)
