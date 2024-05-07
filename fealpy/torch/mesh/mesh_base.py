@@ -1,4 +1,5 @@
 
+from math import comb
 from typing import (
     Union, Optional, Dict, Sequence, overload, Callable,
     Literal, TypeVar
@@ -271,6 +272,24 @@ class Mesh():
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
     def number_of_nodes(self) -> int: return self.ds.number_of_nodes()
+    def number_of_local_ipoints(self, p: int, iptype: Union[str, int]='cell'):
+        if iptype in ('node', 0):
+            return 1
+        if isinstance(iptype, str):
+            iptype = entity_str2dim(self.ds, iptype)
+        if iptype < 0:
+            raise ValueError("Unsupported iptype.")
+        return comb(p + iptype, iptype)
+
+    def number_of_global_ipoints(self, p: int) -> int:
+        coef = 1
+        count = self.entity(0).size(0)
+
+        for i in range(1, self.TD + 1):
+            coef *= (p-i) // i
+            count += coef * self.entity(i).size(0)
+        return count
+
     def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
@@ -280,14 +299,14 @@ class Mesh():
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
-        else:
-            node = self.node
-            if isinstance(etype, str):
-                etype = entity_str2dim(self.ds, etype)
-            etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
-            summary = etn@self.node
-            count = etn@torch.ones((node.size(0), 1), dtype=node.dtype)
-            return summary.div_(count)
+
+        node = self.node
+        if isinstance(etype, str):
+            etype = entity_str2dim(self.ds, etype)
+        etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
+        summary = etn@self.node
+        count = etn@torch.ones((node.size(0), 1), dtype=node.dtype)
+        return summary.div_(count)
 
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
         r"""@brief Get the quadrature points and weights."""
@@ -343,20 +362,24 @@ class HomoMesh(Mesh):
             return torch.einsum(string, *bcs).reshape(-1, entity.size(-1))
 
     ### ipoints
+    def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
+
     def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         r"""@brief Get the relationship between edges and integration points."""
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.ds.edge[index]
-        indices = torch.arange(NE)[index]
-        return torch.stack([
+        kwargs = {'dtype': edges.dtype, 'device': self.device}
+        indices = torch.arange(NE, **kwargs)[index]
+        return torch.cat([
             edges[:, 0].reshape(-1, 1),
-            (p-1) * indices.reshape(-1, 1) + torch.range(p-1) + NN,
+            (p-1) * indices.reshape(-1, 1) + torch.arange(p-1, **kwargs) + NN,
             edges[:, 1].reshape(-1, 1),
         ], dim=-1)
 
     def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        ...
+        raise NotImplementedError
 
     def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        ...
+        raise NotImplementedError

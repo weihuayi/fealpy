@@ -29,11 +29,8 @@ class FunctionSpace(metaclass=ABCMeta):
     def grad(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
 
     # counters
-    @abstractmethod
     def number_of_global_dofs(self) -> int: raise NotImplementedError
-    @abstractmethod
     def number_of_local_dofs(self, doftype='cell') -> int: raise NotImplementedError
 
     # relationships
-    @abstractmethod
     def cell_to_dof(self) -> Tensor: raise NotImplementedError

@@ -84,8 +84,45 @@ class TriangleMesh(HomoMesh):
                         "cell_area and grad_lambda are not available. "
                         "Any operation involving them will fail.")
 
-    # TODO: finish this
-    def cell_to_ipoint(self, p: int, index: Index=None) -> Tensor:
+    def interpolation_points(self, p: int, index=np.s_[:]):
+        """
+        @brief Fetch all p-order interpolation points on a triangle mesh.
+        """
+        node = self.entity('node')
+        if p == 1:
+            return node
+        if p <= 0:
+            raise ValueError("p must be a integer larger than 0.")
+
+        cell = self.entity('cell')
+        ipoint_list = []
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+
+        GD = self.geo_dimension()
+        ipoint_list.append(node) # ipoints[:NN, :]
+
+        edge = self.entity('edge')
+        w = torch.zeros((p - 1, 2), **kwargs)
+        w[:, 0] = torch.arange(p - 1, 0, -1, **kwargs).div_(p)
+        w[:, 1] = w[:, 0].flip(0)
+        ipoints_from_edge = torch.einsum('ij, ...jm->...im', w,
+                                         node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]
+        ipoint_list.append(ipoints_from_edge)
+
+        if p >= 3:
+            TD = self.top_dimension()
+            multiIndex = self.multi_index_matrix(p, TD)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
+                                isEdgeIPoints[:, 2])
+            w = multiIndex[isInCellIPoints, :].div_(p)
+            ipoints_from_cell = torch.einsum('ij, kj...->ki...', w,
+                                          node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
+            ipoint_list.append(ipoints_from_cell)
+
+        return torch.cat(ipoint_list, dim=0)  # (gdof, GD)
+
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         cell = self.ds.cell
         if p == 1:
             return cell[index]
@@ -94,8 +131,7 @@ class TriangleMesh(HomoMesh):
         idx0, = torch.nonzero(mi[:, 0] == 0, as_tuple=True)
         idx1, = torch.nonzero(mi[:, 1] == 0, as_tuple=True)
         idx2, = torch.nonzero(mi[:, 2] == 0, as_tuple=True)
-        itype = self.ds.itype
-        device = self.device
+        kwargs = {'dtype': self.ds.itype, 'device': self.device}
 
         face2cell = self.ds.face_to_cell()
         NN = self.number_of_nodes()
@@ -103,14 +139,15 @@ class TriangleMesh(HomoMesh):
         NC = self.number_of_cells()
 
         e2p = self.edge_to_ipoint(p)
-        ldof = self.number_of_local_ipoint()
-        c2p = torch.zeros((NC, ldof), dtype=itype, device=device)
+        ldof = self.number_of_local_ipoints(p, 'cell')
+        c2p = torch.zeros((NC, ldof), **kwargs)
+        print(c2p.shape)
 
         flag = face2cell[:, 2] == 0
         c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
 
         flag = face2cell[:, 2] == 1
-        c2p[face2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+        c2p[face2cell[flag, 0][:, None], idx1.flip(0)] = e2p[flag]
 
         flag = face2cell[:, 2] == 2
         c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
@@ -118,19 +155,18 @@ class TriangleMesh(HomoMesh):
         iflag = face2cell[:, 0] != face2cell[:, 1]
 
         flag = iflag & (face2cell[:, 3] == 0)
-        c2p[face2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+        c2p[face2cell[flag, 1][:, None], idx0.flip(0)] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 1)
         c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 2)
-        c2p[face2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+        c2p[face2cell[flag, 1][:, None], idx2.flip(0)] = e2p[flag]
 
         cdof = (p-1)*(p-2)//2
         flag = torch.sum(mi > 0, axis=1) == 3
-        c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, dtype=itype, device=device).reshape(NC, cdof)
+        c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         return c2p[index]
-
 
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.node[self.ds.cell[index]])
