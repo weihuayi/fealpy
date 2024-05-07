@@ -1,76 +1,56 @@
 import numpy as np
 
-class Quaternion():
+class Quaternion:
     def __init__(self, arr):
-        self.data = arr
+        self.data = np.array(arr, dtype=float)
 
     def norm(self):
-        return np.linalg.norm(self.data) 
+        """计算四元数的模（长度）。"""
+        return np.linalg.norm(self.data)
 
-    def normlize(self):
-        self.data = self.data/self.norm()
+    def normalize(self):
+        """将四元数归一化为单位四元数。"""
+        norm = self.norm()
+        if norm != 0:
+            self.data /= norm
 
     def __xor__(self, other):
-        """
-        操作符 ^ 重载
-        """
-        return self.data@other.data
+        """重载异或运算符用于计算点积。"""
+        return np.dot(self.data, other.data)
 
-    def __itruediv(self, m):
+    def __itruediv__(self, m):
+        """重载 /= 运算符。"""
         self.data /= m
         return self
 
     def __mul__(self, other):
-        q0 = self.data[:-1]
-        q1 = other.data[:-1]
-        w0 = self.data[-1]
-        w1 = other.data[-1]
-
-        w = w0*w1 - q0@q1
-        q = w0*q1+w1*q0+np.cross(q0, q1)
-        re = Quaternion(np.append(q, w))
-        return re 
+        """重载 * 运算符用于四元数乘法。"""
+        w0, x0, y0, z0 = self.data
+        w1, x1, y1, z1 = other.data
+        w = w0 * w1 - x0 * x1 - y0 * y1 - z0 * z1
+        x = w0 * x1 + x0 * w1 + y0 * z1 - z0 * y1
+        y = w0 * y1 - x0 * z1 + y0 * w1 + z0 * x1
+        z = w0 * z1 + x0 * y1 - y0 * x1 + z0 * w1
+        return Quaternion([w, x, y, z])
 
     def convert_to_opengl_matrix(self):
-        """
-        q 是一个长度为 4 的数组, 代表一个四元数 q[0]i + q[1]j + q[2]k + q[3], 
-        将 q 转换为一个旋转矩阵 m, m 是一个长度为 16 的数组代表一个 4*4 的矩阵.
-        """
-        m = np.zeros(16, dtype=np.float_)
+        """将单位四元数转换为OpenGL旋转矩阵。"""
         q = self.data
-        l = q@q;
-        s = 2.0 / l;
-        xs = q[0]*s;
-        ys = q[1]*s;
-        zs = q[2]*s;
-        
-        wx = q[3]*xs;
-        wy = q[3]*ys;
-        wz = q[3]*zs;
-        
-        xx = q[0]*xs;
-        xy = q[0]*ys;
-        xz = q[0]*zs;
-        
-        yy = q[1]*ys;
-        yz = q[1]*zs;
-        zz = q[2]*zs;
+        n = np.dot(q, q)
+        if n < np.finfo(float).eps:
+            return np.identity(4, dtype=float)
 
-        m[0*4+0] = 1.0 - (yy + zz);
-        m[1*4+0] = xy - wz;
-        m[2*4+0] = xz + wy;
-        m[0*4+1] = xy + wz;
-        m[1*4+1] = 1.0 - (xx + zz);
-        m[2*4+1] = yz - wx;
-        m[0*4+2] = xz - wy;
-        m[1*4+2] = yz + wx;
-        m[2*4+2] = 1.0 - (xx + yy);
-        
-        m[0*4+3] = 0.0;
-        m[1*4+3] = 0.0;
-        m[2*4+3] = 0.0;
-        m[3*4+0] = m[3*4+1] = m[3*4+2] = 0.0;
-        m[3*4+3] = 1.0;
-        return m
+        q *= 2.0 / n
+        x, y, z, w = q
+        xx, yy, zz = x*x, y*y, z*z
+        xy, xz, yz = x*y, x*z, y*z
+        wx, wy, wz = w*x, w*y, w*z
 
+        matrix = np.array([
+            [1.0-yy-zz, xy+wz, xz-wy, 0.0],
+            [xy-wz, 1.0-xx-zz, yz+wx, 0.0],
+            [xz+wy, yz-wx, 1.0-xx-yy, 0.0],
+            [0.0, 0.0, 0.0, 1.0]
+        ], dtype=float)
 
+        return matrix.flatten()

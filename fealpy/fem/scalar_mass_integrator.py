@@ -31,7 +31,7 @@ class ScalarMassIntegrator:
                 cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs()  
+        ldof = space.number_of_local_dofs()
 
         if out is None:
             M = np.zeros((NC, ldof, ldof), dtype=space.ftype)
@@ -68,8 +68,55 @@ class ScalarMassIntegrator:
 
         if out is None:
             return M
+
+    def assembly_cell_matrix_quickly(self, space, index=np.s_[:], cellmeasure=None,
+            out=None):
+        """
+        @note 没有参考单元的组装方式
+        """
+
+        q = self.q if self.q is not None else space.p+1
+        coef = self.coef
         
-    
+        mesh = space.mesh
+ 
+        if cellmeasure is None:
+            if mesh.meshtype == 'UniformMesh2d':
+                 NC = mesh.number_of_cells()
+                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
+            else:
+                cellmeasure = mesh.entity_measure('cell', index=index)
+
+        NC = len(cellmeasure)
+        ldof = space.number_of_local_dofs()
+
+        if out is None:
+            M = np.zeros((NC, ldof, ldof), dtype=space.ftype)
+        else:
+            M = out
+
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        phi0 = mesh.shape_function(bc=bcs, p=space.p) # (NQ, ldof)
+        P = np.einsum('q, qi, qj -> ij', ws, phi0, phi0) # (ldof, ldof)
+
+        if coef is None:
+            M += np.einsum('ij, c -> cij', P, cellmeasure, optimize=True)
+        else:
+            if callable(coef):
+                raise ValueError("coef 不支持该类型")
+
+            if np.isscalar(coef):
+                M += coef*np.einsum('ij, c -> cij', P, cellmeasure, optimize=True)
+            elif isinstance(coef, np.ndarray):
+                raise ValueError("coef 不支持该类型")
+            else:
+                raise ValueError("coef is not correct!")
+
+        if out is None:
+            return M
+
     def assembly_cell_matrix_fast(self, space,
             trialspace=None, testspace=None, coefspace=None,
             index=np.s_[:], cellmeasure=None, out=None):
