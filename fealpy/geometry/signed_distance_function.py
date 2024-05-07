@@ -48,11 +48,12 @@ def dmin(*args):
     d = np.array(args)
     return np.min(d, axis=0)
 
-
 def dmax(*args):
     d = np.array(args)
     return np.max(d, axis=0)
 
+def dintersection(d0,d1):
+    return np.maximum(d0,d1)
 
 def dcuboid(p, domain=[0, 1, 0, 1, 0, 1]):
     """
