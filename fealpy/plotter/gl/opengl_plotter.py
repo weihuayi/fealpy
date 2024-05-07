@@ -255,6 +255,7 @@ class OpenGLPlotter:
                 self.first_mouse_use = False
                 return
 
+            # TODO
             yoffset = xpos - self.last_mouse_pos[0]
             xoffset = self.last_mouse_pos[1] - ypos
             self.last_mouse_pos = (xpos, ypos)
