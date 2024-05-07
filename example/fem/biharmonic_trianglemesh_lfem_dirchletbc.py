@@ -252,14 +252,15 @@ for i in range(maxit):
             gx0[j], hx0[j] = node_g_h_value(uh, nidx)
         elif np.sum(pbc[j, :] > 1e-10) == 2:
             e2c = mesh0.ds.edge_to_cell()
+            e2cidx = np.where(scell[j] == e2c[:, :2])
             if pbc[j, 0] < 1e-10:
-                if (scell[j] == e2c[:, 0]):
-                    pass
+#                if (scell[j] == e2c[:, 0]):
+#                    pass
             print('scell:, ', scell[j])
             print('cbc:', j, pbc[j])
-            print(e2c)
-            ee2c = mesh.ds.edge_to_cell()
-            print(ee2c)
+            print('e2c:', e2c, 'end')
+#            ee2c = mesh.ds.edge_to_cell()
+#            print(ee2c)
 
     
     error[0, i] = np.max(np.abs(gx0-gx))
