@@ -3185,6 +3185,9 @@ class HalfEdgeMesh2dDataStructure():
         return edge2node*edge2node.tranpose()
 
     def edge_to_cell(self):
+        """
+        @brief 计算每条边对应的两个单元和边在单元中的局部编号
+        """
         NE = self.NE
         NC = self.NC
         NHE = self.NHE

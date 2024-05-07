@@ -200,11 +200,13 @@ class OCAMModel:
 
 
         # 标准化
-        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
-        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
+        #uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        #uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
         #uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/self.width
         #uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/self.height
+        uv[:, 0] = uv[:, 0]/self.width
+        uv[:, 1] = uv[:, 1]/self.height
 
         return uv
 
