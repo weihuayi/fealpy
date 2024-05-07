@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import cv2
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
@@ -22,7 +23,9 @@ class OCAMSystem:
                 affine = data['affine'][i],
                 fname = data['fname'][i],
                 flip = data['flip'][i],
-                chessboardpath=data['chessboardpath'][i]
+                chessboardpath=data['chessboardpath'][i],
+                icenter=data['icenter'][i],
+                radius=data['radius'][i]
             ))
 
     def undistort_cv(self):
@@ -159,7 +162,7 @@ class OCAMSystem:
         uv = self.cams[icam].cam_to_image(vertices)
         no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
-        return uv
+        return mesh, uv
     
     def test_half_sphere_surface_with_cutting(self, plotter, theta=np.pi*35/180, h=0.1, icam=-1, ptype='O'):
         """
@@ -168,10 +171,21 @@ class OCAMSystem:
         node = mesh.entity('node')
         cell = mesh.entity('cell')
 
+
         # 相机坐标系下的点
         vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
-
         uv = self.cams[icam].cam_to_image(vertices, ptype=ptype)
+
+
+        """
+        r = np.sin(theta) # 圆柱面半径
+        phi = np.arctan2(node[:, 0], node[:, 2])
+        phi = phi % (2 * np.pi)
+        node[:, 2] = r * np.cos(phi)
+        node[:, 0] = r * np.sin(phi)
+        vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
+        """
+
         no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
@@ -262,27 +276,38 @@ class OCAMSystem:
 
         # 默认文件目录位置
         fname = [
-            '/home/why/data/src_1.jpg',
-            '/home/why/data/src_2.jpg',
-            '/home/why/data/src_3.jpg',
-            '/home/why/data/src_4.jpg',
-            '/home/why/data/src_5.jpg',
-            '/home/why/data/src_6.jpg',
+            os.path.expanduser('~/data/src_1.jpg'),
+            os.path.expanduser('~/data/src_2.jpg'),
+            os.path.expanduser('~/data/src_3.jpg'),
+            os.path.expanduser('~/data/src_4.jpg'),
+            os.path.expanduser('~/data/src_5.jpg'),
+            os.path.expanduser('~/data/src_6.jpg'),
             ]
 
         flip = [
-            'LR', 'LR', 'LR', 'LR', 'LR', 'LR'
+            None, None, None, None, None, None 
         ]
 
         chessboardpath = [
-            '/home/why/data/camera_models/chessboard_2',
-            '/home/why/data/camera_models/chessboard_1',
-            '/home/why/data/camera_models/chessboard_3',
-            '/home/why/data/camera_models/chessboard_4',
-            '/home/why/data/camera_models/chessboard_5',
-            '/home/why/data/camera_models/chessboard_6',
+            os.path.expanduser('~/data/camera_models/chessboard_2'),
+            os.path.expanduser('~/data/camera_models/chessboard_1'),
+            os.path.expanduser('~/data/camera_models/chessboard_3'),
+            os.path.expanduser('~/data/camera_models/chessboard_4'),
+            os.path.expanduser('~/data/camera_models/chessboard_5'),
+            os.path.expanduser('~/data/camera_models/chessboard_6'),
             ]
 
+        icenter = np.array([
+            [553.866, 992.559],
+            [566.843, 986.667],
+            [544.920, 978.480],
+            [520.528, 985.73],
+            [528.981, 961.628],
+            [538.6615, 940.2435],
+            ], dtype=np.float64)
+
+        radius = np.array([877.5,882.056,886.9275,884.204,883.616,884.5365],dtype=np.float64)
+        
         data = {
             "nc" : 6,
             "location" : location,
@@ -296,7 +321,9 @@ class OCAMSystem:
             "width" : 1920,
             "height" : 1080,
             "vfield" : (110, 180),
-            'flip' : flip
+            'flip' : flip,
+            'icenter': icenter,
+            'radius' : radius
         }
 
         return cls(data)

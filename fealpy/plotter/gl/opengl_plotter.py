@@ -59,7 +59,7 @@ class OpenGLPlotter:
 
         void main()
         {
-            gl_Position = transform * vec4(aPos, 1.0);
+            gl_Position = transform * vec4(aPos.x, -aPos.y, aPos.z, 1.0);
             //gl_Position = projection * transform * vec4(aPos, 1.0);
             TexCoords = aTexCoords;
         }

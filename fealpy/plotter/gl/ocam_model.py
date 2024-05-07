@@ -3,6 +3,8 @@ from typing import Callable, Any, Tuple
 import numpy as np
 import cv2
 import glob
+from fealpy.mesh import DistMesher2d
+from ...geometry.domain import Domain
 
 @dataclass
 class OCAMModel:
@@ -17,10 +19,125 @@ class OCAMModel:
     fname: str
     flip: str
     chessboardpath: str
+    icenter: tuple
+    radius : float
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
 
+    def __call__(self, u):
+        icenter = self.icenter
+        r = self.radius
+        d = np.zeros(u.shape[0])
+        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        flag1 = np.zeros(u.shape[0],dtype=np.bool_)
+        flag1[u[...,1]<y1]=True
+        flag1[u[...,1]>y2]=True
+        u1 = u[flag1]
+        u2 = u[~flag1]
+        
+        d1 = np.sqrt(np.sum((u1-icenter)**2,axis=-1))-r
+        
+        v1 = np.array([-icenter[...,0],y2-icenter[...,1]])
+        v2 = np.array([-icenter[...,0],y1-icenter[...,1]])
+        v3 = np.array([1080-icenter[...,0],y1-icenter[...,1]])
+        v4 = np.array([1080-icenter[...,0],y2-icenter[...,1]])
+        v = u2-icenter
+        
+        c1 = np.cross(v1,v)
+        c2 = np.cross(v,v2)
+        a1 = c1>0
+        a2 = c2>0
+        c3 = np.cross(v3,v)
+        c4 = np.cross(v,v4)
+        a3 = c3>0
+        a4 = c4>0
+        flag2 = np.zeros(u2.shape[0],dtype=np.int_)
+        flag2[a1 & a2] = 1
+        flag2[a3 & a4] = 2
+        d2 = -u2[flag2==1,0] 
+        d3 = u2[flag2==2,0]-1080
+        
+        u3 = u2[flag2==0]
+        flag3 = u3[...,0]<icenter[...,0]
+        d4 = np.zeros((len(u3[flag3]),2),dtype=np.float64)
+        d4[:,0] = -u3[flag3,0]
+        d4[:,1] = np.sqrt(np.sum((u3[flag3]-icenter)**2,axis=-1))-r
+        d4 = np.min(d4,axis=1)
+
+        d5 = np.zeros((len(u3[~flag3]),2),dtype=np.float64)
+        d5[:,0] = u3[~flag3,0]-1080
+        d5[:,1] = np.sqrt(np.sum((u3[~flag3]-icenter)**2,axis=-1))-r
+        d5 = np.min(d5,axis=1)
+        
+        d[flag1]=d1
+        dd = d[~flag1]
+        dd[flag2==1]=d2
+        dd[flag2==2]=d3
+        ddd=dd[flag2==0]
+        ddd[flag3]=d4
+        ddd[~flag3]=d5
+        dd[flag2==0]=ddd
+        d[~flag1]=dd
+        return d
+
+    def signed_dist_function(self, u):
+        return self(u)
+
+    def gmeshing(self):
+        import gmsh
+        from fealpy.mesh import TriangleMesh
+        icenter = self.icenter
+        r = self.radius
+        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        gmsh.initialize()
+
+        gmsh.model.geo.addPoint(icenter[...,0],icenter[...,1],0,tag=1)
+        gmsh.model.geo.addPoint(0,y1,0,tag=2)
+        gmsh.model.geo.addPoint(0,y2,0,tag=3)
+        gmsh.model.geo.addPoint(1080,y1,0,tag=4)
+        gmsh.model.geo.addPoint(1080,y2,0,tag=5)
+
+        gmsh.model.geo.addCircleArc(2,1,4,tag=1)
+        gmsh.model.geo.addLine(4,5,tag=2)
+        gmsh.model.geo.addCircleArc(5,1,3,tag=3)
+        gmsh.model.geo.addLine(3,2,tag=4)
+
+        gmsh.model.geo.addCurveLoop([1,2,3,4],1)
+        gmsh.model.geo.addPlaneSurface([1],1)
+
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.field.add("Distance",1)
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[1,3])
+        gmsh.model.mesh.field.setNumber(1,"Sampling",100)
+        lc = 50
+        gmsh.model.mesh.field.add("Threshold", 2)
+        gmsh.model.mesh.field.setNumber(2, "InField", 1)
+        gmsh.model.mesh.field.setNumber(2, "SizeMin", lc)
+        gmsh.model.mesh.field.setNumber(2, "SizeMax", 3*lc)
+        gmsh.model.mesh.field.setNumber(2, "DistMin", 200)
+        gmsh.model.mesh.field.setNumber(2, "DistMax", 800)
+
+        gmsh.model.mesh.field.setAsBackgroundMesh(2)
+        gmsh.model.mesh.generate(2)
+        ntags, vxyz, _ = gmsh.model.mesh.getNodes()
+        node = vxyz.reshape((-1,3))
+        node = node[:,:2]
+        vmap = dict({j:i for i,j in enumerate(ntags)})
+        tris_tags,evtags = gmsh.model.mesh.getElementsByType(2)
+        evid = np.array([vmap[j] for j in evtags])
+        cell = evid.reshape((tris_tags.shape[-1],-1))
+        gmsh.finalize()
+        return TriangleMesh(node,cell)
+
+    def distmeshing(self,fh=None):
+        domain=OCAMDomain(icenter=self.icenter,radius=self.radius,fh=fh)
+        hmin=50
+        mesher=DistMesher2d(domain,hmin)
+        mesh = mesher.meshing(maxit=100)
+        return mesh
 
     def world_to_image(self, node):
         """
@@ -49,6 +166,7 @@ class OCAMModel:
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
 
+        """
         w = self.width
         h = self.height
         f = np.sqrt((h/2)**2 + (w/2)**2)
@@ -56,6 +174,7 @@ class OCAMModel:
         fy = f
         u0 = self.center[0]
         v0 = self.center[1]
+        """
 
         r = np.sqrt(np.sum(node**2, axis=1))
         theta = np.arccos(node[:, 2]/r)
@@ -80,12 +199,37 @@ class OCAMModel:
             raise ValueError(f"投影类型{ptype}错误!")
 
 
-
-
         # 标准化
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
 
+        #uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/self.width
+        #uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/self.height
+
+        return uv
+
+    def cam_to_image_fast(self, node):
+        """
+        @brief 利用 matlab 工具箱 中的算法来处理
+        """
+        theta = np.zeros(len(node), dtype=np.float64)
+
+        norm = np.sqrt(node[:, 0]**2 + node[:, 1]**2)
+        flag = (norm == 0)
+        norm[flag] = np.finfo(float).eps
+        theta = np.arctan(node[:, 2]/norm)
+
+        rho = np.polyval(self.pol, theta)
+        ps = node[:, 0:2]/norm[:, None]*rho[:, None]
+        uv = np.zeros_like(ps)
+        c, d, e = self.affine
+        xc, yc = self.center
+        uv[:, 0] = ps[:, 0] * c + ps[:, 1] * d + xc
+        uv[:, 1] = ps[:, 0] * e + ps[:, 1]     + yc
+
+        # 标准化
+        uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
+        uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
 
     def world_to_image_fast(self, node):
@@ -112,6 +256,51 @@ class OCAMModel:
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
+
+    def equirectangular_projection(self, fovd=195):
+        """
+        @brief 使用等矩形投影将鱼眼图像转换为平面图像。
+        @return: 转换后的平面图像
+        """
+        # 读取输入鱼眼图像
+        src_img = cv2.imread(self.fname)
+        hs, ws = src_img.shape[:2]
+        u0, v0 = ws // 2, hs // 2
+
+        # 计算目标图像尺寸
+        wd = int(ws * 360/fovd)
+        hd = hs
+        u1, v1 = wd // 2, hd // 2
+
+        # 使用数组化计算
+        y_indices, x_indices = np.indices((hd, wd))
+        xd = x_indices - u1 
+        yd = y_indices - v1 
+
+        # 使用矢量化运算
+        phi = 2 * np.pi * xd / wd
+        theta = -2 * np.pi * yd / wd + np.pi / 2
+
+        flag = theta < 0
+        phi[flag] += np.pi
+        theta[flag] *= -1
+
+        flag = theta > np.pi
+        phi[flag] += np.pi
+        theta[flag] = 2*np.pi - theta[flag]
+
+        x = np.sin(theta) * np.cos(phi)
+        y = np.sin(theta) * np.sin(phi)
+        z = np.cos(theta)
+        r = np.sqrt(y ** 2 + z ** 2)
+        f = wd * np.arctan2(r, x)/ 2.0 / np.pi
+
+        map_x = np.array(f * y / r + u0, dtype=np.float32)
+        map_y = np.array(f * z / r + v0, dtype=np.float32) 
+
+        # 使用映射表将鱼眼图像转换为等矩形投影图像
+        dst_img = cv2.remap(src_img, map_x, map_y, cv2.INTER_LINEAR)
+        return dst_img
 
     def undistort(self, image, fc=5, width=640, height=480):
         """
@@ -172,9 +361,6 @@ class OCAMModel:
         b = img[points[:, 0], points[:, 1], 2]
         
         return r, g, b
-
-
-
 
     def world2cam(self, node):
         """
@@ -289,4 +475,83 @@ class OCAMModel:
         result = cv2.warpPerspective(img, M, (1920, 1080))
         return result
 
+class OCAMDomain(Domain):
+    def __init__(self,icenter,radius,hmin=10,hmax=20,fh=None):
+        super().__init__(hmin=hmin, hmax=hmax, GD=2)
+        if fh is not None:
+            self.fh = fh
+        self.box = [0,1180,0,2020]
+        self.icenter=icenter
+        self.radius=radius
+        vertices = np.array([
+            (0,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
+            (0,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
+            (1080,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
+            (1080,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0]))])
+        curves = np.array([[0,1],[2,3]])
+        self.facets = {0:vertices,1:curves}
+    def __call__(self,u):
+        icenter = self.icenter
+        r = self.radius
+        d = np.zeros(u.shape[0])
+        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        flag1 = np.zeros(u.shape[0],dtype=np.bool_)
+        flag1[u[...,1]<y1]=True
+        flag1[u[...,1]>y2]=True
+        u1 = u[flag1]
+        u2 = u[~flag1]
+        
+        d1 = np.sqrt(np.sum((u1-icenter)**2,axis=-1))-r
+        
+        v1 = np.array([-icenter[...,0],y2-icenter[...,1]])
+        v2 = np.array([-icenter[...,0],y1-icenter[...,1]])
+        v3 = np.array([1080-icenter[...,0],y1-icenter[...,1]])
+        v4 = np.array([1080-icenter[...,0],y2-icenter[...,1]])
+        v = u2-icenter
+        
+        c1 = np.cross(v1,v)
+        c2 = np.cross(v,v2)
+        a1 = c1>0
+        a2 = c2>0
+        c3 = np.cross(v3,v)
+        c4 = np.cross(v,v4)
+        a3 = c3>0
+        a4 = c4>0
+        flag2 = np.zeros(u2.shape[0],dtype=np.int_)
+        flag2[a1 & a2] = 1
+        flag2[a3 & a4] = 2
+        d2 = -u2[flag2==1,0] 
+        d3 = u2[flag2==2,0]-1080
+        
+        u3 = u2[flag2==0]
+        flag3 = u3[...,0]<icenter[...,0]
+        d4 = np.zeros((len(u3[flag3]),2),dtype=np.float64)
+        d4[:,0] = -u3[flag3,0]
+        d4[:,1] = np.sqrt(np.sum((u3[flag3]-icenter)**2,axis=-1))-r
+        d4 = np.min(d4,axis=1)
+
+        d5 = np.zeros((len(u3[~flag3]),2),dtype=np.float64)
+        d5[:,0] = u3[~flag3,0]-1080
+        d5[:,1] = np.sqrt(np.sum((u3[~flag3]-icenter)**2,axis=-1))-r
+        d5 = np.min(d5,axis=1)
+        
+        d[flag1]=d1
+        dd = d[~flag1]
+        dd[flag2==1]=d2
+        dd[flag2==2]=d3
+        ddd=dd[flag2==0]
+        ddd[flag3]=d4
+        ddd[~flag3]=d5
+        dd[flag2==0]=ddd
+        d[~flag1]=dd
+        return d
+    def signed_dist_function(self,u):
+        return self(u)
+
+    def sizing_function(self,p):
+        return self.fh(p,self)
+    def facet(self,dim):
+        return self.facets[0]
+    
 

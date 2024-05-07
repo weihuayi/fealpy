@@ -3260,7 +3260,7 @@ class HalfEdgeMesh2dDataStructure():
         else:
             raise ValueError('The property NV should be None, 3 or 4! But the NV is {}'.format(self.NV))
 
-        flag = edge2cell[:, 1] < 0 
+        flag = edge2cell[:, -1] < 0 
         edge2cell[flag, 1] = edge2cell[flag, 0]
         edge2cell[flag, 3] = edge2cell[flag, 2]
         return edge2cell
