@@ -33,12 +33,12 @@ class TriangleMeshDataStructure(HomoMeshDataStructure):
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
 
+        self.construct()
+
     def total_face(self):
         return self.cell[..., self.localFace].reshape(-1, 2)
 
-    # TODO: this is not correct. So, face2cell is unavailable.
     def construct(self) -> None:
-        kwargs = {'dtype': self.itype, 'device': self.device}
         NC = self.cell.shape[0]
         NFC = self.cell.shape[1]
 
@@ -52,8 +52,8 @@ class TriangleMeshDataStructure(HomoMeshDataStructure):
         self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
         NF = i0_np.shape[0]
 
-        i1_np = np.zeros(NF, **kwargs)
-        i1_np[j_np] = np.arange(NFC*NC, **kwargs)
+        i1_np = np.zeros(NF, dtype=i0_np.dtype)
+        i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
 
         self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
         self.cell2face = self.cell2edge
