@@ -5,7 +5,7 @@ import cv2
 import glob
 from fealpy.mesh import DistMesher2d
 from ...geometry.domain import Domain
-
+from fealpy.geometry import dintersection,drectangle,dcircle
 @dataclass
 class OCAMModel:
     location: np.ndarray
@@ -28,59 +28,7 @@ class OCAMModel:
     def __call__(self, u):
         icenter = self.icenter
         r = self.radius
-        d = np.zeros(u.shape[0])
-        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
-        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
-        flag1 = np.zeros(u.shape[0],dtype=np.bool_)
-        flag1[u[...,1]<y1]=True
-        flag1[u[...,1]>y2]=True
-        u1 = u[flag1]
-        u2 = u[~flag1]
-        
-        d1 = np.sqrt(np.sum((u1-icenter)**2,axis=-1))-r
-        
-        v1 = np.array([-icenter[...,0],y2-icenter[...,1]])
-        v2 = np.array([-icenter[...,0],y1-icenter[...,1]])
-        v3 = np.array([1080-icenter[...,0],y1-icenter[...,1]])
-        v4 = np.array([1080-icenter[...,0],y2-icenter[...,1]])
-        v = u2-icenter
-        
-        c1 = np.cross(v1,v)
-        c2 = np.cross(v,v2)
-        a1 = c1>0
-        a2 = c2>0
-        c3 = np.cross(v3,v)
-        c4 = np.cross(v,v4)
-        a3 = c3>0
-        a4 = c4>0
-        flag2 = np.zeros(u2.shape[0],dtype=np.int_)
-        flag2[a1 & a2] = 1
-        flag2[a3 & a4] = 2
-        d2 = -u2[flag2==1,0] 
-        d3 = u2[flag2==2,0]-1080
-        
-        u3 = u2[flag2==0]
-        flag3 = u3[...,0]<icenter[...,0]
-        d4 = np.zeros((len(u3[flag3]),2),dtype=np.float64)
-        d4[:,0] = -u3[flag3,0]
-        d4[:,1] = np.sqrt(np.sum((u3[flag3]-icenter)**2,axis=-1))-r
-        d4 = np.min(d4,axis=1)
-
-        d5 = np.zeros((len(u3[~flag3]),2),dtype=np.float64)
-        d5[:,0] = u3[~flag3,0]-1080
-        d5[:,1] = np.sqrt(np.sum((u3[~flag3]-icenter)**2,axis=-1))-r
-        d5 = np.min(d5,axis=1)
-        
-        d[flag1]=d1
-        dd = d[~flag1]
-        dd[flag2==1]=d2
-        dd[flag2==2]=d3
-        ddd=dd[flag2==0]
-        ddd[flag3]=d4
-        ddd[~flag3]=d5
-        dd[flag2==0]=ddd
-        d[~flag1]=dd
-        return d
+        return dintersection(drectangle(u,[0,1080,0,1920]),dcircle(u,cxy=icenter,r=r))
 
     def signed_dist_function(self, u):
         return self(u)
@@ -490,62 +438,12 @@ class OCAMDomain(Domain):
             (1080,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0]))])
         curves = np.array([[0,1],[2,3]])
         self.facets = {0:vertices,1:curves}
+
     def __call__(self,u):
         icenter = self.icenter
         r = self.radius
-        d = np.zeros(u.shape[0])
-        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
-        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
-        flag1 = np.zeros(u.shape[0],dtype=np.bool_)
-        flag1[u[...,1]<y1]=True
-        flag1[u[...,1]>y2]=True
-        u1 = u[flag1]
-        u2 = u[~flag1]
-        
-        d1 = np.sqrt(np.sum((u1-icenter)**2,axis=-1))-r
-        
-        v1 = np.array([-icenter[...,0],y2-icenter[...,1]])
-        v2 = np.array([-icenter[...,0],y1-icenter[...,1]])
-        v3 = np.array([1080-icenter[...,0],y1-icenter[...,1]])
-        v4 = np.array([1080-icenter[...,0],y2-icenter[...,1]])
-        v = u2-icenter
-        
-        c1 = np.cross(v1,v)
-        c2 = np.cross(v,v2)
-        a1 = c1>0
-        a2 = c2>0
-        c3 = np.cross(v3,v)
-        c4 = np.cross(v,v4)
-        a3 = c3>0
-        a4 = c4>0
-        flag2 = np.zeros(u2.shape[0],dtype=np.int_)
-        flag2[a1 & a2] = 1
-        flag2[a3 & a4] = 2
-        d2 = -u2[flag2==1,0] 
-        d3 = u2[flag2==2,0]-1080
-        
-        u3 = u2[flag2==0]
-        flag3 = u3[...,0]<icenter[...,0]
-        d4 = np.zeros((len(u3[flag3]),2),dtype=np.float64)
-        d4[:,0] = -u3[flag3,0]
-        d4[:,1] = np.sqrt(np.sum((u3[flag3]-icenter)**2,axis=-1))-r
-        d4 = np.min(d4,axis=1)
+        return dintersection(drectangle(u,[0,1080,0,1920]),dcircle(u,cxy=icenter,r=r))
 
-        d5 = np.zeros((len(u3[~flag3]),2),dtype=np.float64)
-        d5[:,0] = u3[~flag3,0]-1080
-        d5[:,1] = np.sqrt(np.sum((u3[~flag3]-icenter)**2,axis=-1))-r
-        d5 = np.min(d5,axis=1)
-        
-        d[flag1]=d1
-        dd = d[~flag1]
-        dd[flag2==1]=d2
-        dd[flag2==2]=d3
-        ddd=dd[flag2==0]
-        ddd[flag3]=d4
-        ddd[~flag3]=d5
-        dd[flag2==0]=ddd
-        d[~flag1]=dd
-        return d
     def signed_dist_function(self,u):
         return self(u)
 
