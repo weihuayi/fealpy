@@ -21,6 +21,7 @@ class OCAMModel:
     chessboardpath: str
     icenter: tuple
     radius : float
+    sign_field: np.ndarray
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
@@ -57,9 +58,9 @@ class OCAMModel:
         gmsh.model.geo.addPlaneSurface([1],1)
 
         gmsh.model.geo.synchronize()
-        '''
+        
         gmsh.model.mesh.field.add("Distance",1)
-        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[1,3])
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
         gmsh.model.mesh.field.setNumber(1,"Sampling",100)
         lc = 50
         gmsh.model.mesh.field.add("Threshold", 2)
@@ -70,9 +71,9 @@ class OCAMModel:
         gmsh.model.mesh.field.setNumber(2, "DistMax", 800)
 
         gmsh.model.mesh.field.setAsBackgroundMesh(2)
-        '''
+        
         gmsh.model.mesh.generate(2)
-        gmsh.fltk().run()
+        #gmsh.fltk().run()
         ntags, vxyz, _ = gmsh.model.mesh.getNodes()
         node = vxyz.reshape((-1,3))
         node = node[:,:2]
