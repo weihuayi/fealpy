@@ -22,9 +22,17 @@ class OCAMModel:
     icenter: tuple
     radius : float
     sign_field: np.ndarray
+    camere_points: list
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        cps_all = []
+        for i in range(4):
+            cps = self.camere_points[i]
+            cps_all.append([])
+            for j in range(len(cps)):
+                cps_all[i].append(self.world_to_image(cps[j]))
+        self.camere_points = cps_all
 
     def __call__(self, u):
         icenter = self.icenter
