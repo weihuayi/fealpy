@@ -7,6 +7,7 @@ from fealpy.mesh import TriangleMesh
 class OCAMSystem:
     def __init__(self, data):
         self.cams = []
+        cps = self.get_split_point()
         for i in range(data['nc']):
             axes = np.zeros((3, 3), dtype=np.float64)
             axes[0, :] = data['axes'][0][i]
@@ -26,7 +27,8 @@ class OCAMSystem:
                 chessboardpath=data['chessboardpath'][i],
                 icenter=data['icenter'][i],
                 radius=data['radius'][i],
-                sign_field=data['sign_field'][i]
+                sign_field=data['sign_field'][i],
+                camere_points = cps[i]
             ))
 
     def undistort_cv(self):
@@ -320,6 +322,7 @@ class OCAMSystem:
             camere_points[i].append(total_vects[(2 * i + 3) % 12])
 
         gmsh.finalize()
+        return camere_points
 
     def undistort_cv(self):
         import cv2
