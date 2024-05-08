@@ -120,6 +120,35 @@ def find_nodes(nodes):
     node0 = nodes[condition]
     return node0
 
+def edge_points_g_h_value(e2c, eindex, c0, bc0, uh):
+    i0 = np.where((scell[j] == e2c[:, 0]) & (e2c[:, 2] == eindex))
+    i1 = np.where((scell[j] == e2c[:, 1]) & (e2c[:, 3] == eindex))
+    if np.any(i0):
+        c1 = e2c[i0, 1]
+        e = e2c[i0, 3][0][0]
+    elif np.any(i1):
+        c1 = e2c[i1, 0]
+        e = e2c[i1, 2][0][0]
+    else:
+        print('error!')
+    ebc = np.concatenate((bc0[:eindex], bc0[eindex+1:]))
+    if (eindex == 0) | (eindex == 2):
+        ebc[0], ebc[1] = ebc[1], ebc[0]
+    if e == 1:
+        ebc[0], ebc[1] = ebc[1], ebc[0]
+    bc1 = np.insert(ebc, e, 0)
+    
+    bc = np.zeros((2, 3), dtype=np.float_)
+    bc[0] = bc0
+    bc[1] = bc1
+
+    guh = uh.grad_value(bc)
+    huh = uh.hessian_value(bc)
+
+    gx0 = (guh[0, c0, :]+guh[1, c1, :])*0.5
+    hx0 = (huh[0, c0, :]+huh[1, c1, :])*0.5
+    return gx0, hx0
+
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -155,8 +184,6 @@ ny = args.ny
 maxit = args.maxit
 gamma = args.gamma
 
-print("P : ", p)
-
 x = sp.symbols("x")
 y = sp.symbols("y")
 u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**2
@@ -182,27 +209,30 @@ points = mesh.interpolation_points(p=p)
 points0 = find_nodes(points)
 
 GD = mesh.geo_dimension()
-Rhu = np.zeros((maxit, len(points), GD, GD), dtype=np.float_)
+Rhu = np.zeros((maxit, len(node0), GD, GD), dtype=np.float_)
+gx0 = np.zeros((len(node0), GD), dtype=np.float_)
+hx0 = np.zeros((len(node0), GD, GD), dtype=np.float_)
 
-gx0 = np.zeros((len(points0), GD), dtype=np.float_)
-hx0 = np.zeros((len(points0), GD, GD), dtype=np.float_)
+#Rhu = np.zeros((maxit, len(points0), GD, GD), dtype=np.float_)
+#gx0 = np.zeros((len(points0), GD), dtype=np.float_)
+#hx0 = np.zeros((len(points0), GD, GD), dtype=np.float_)
 
 h = np.zeros(maxit, dtype=np.float64)
 for i in range(maxit):
     h[i] = np.sqrt(np.max(mesh.cell_area()))
 
     bform = BilinearForm(space)
-    L = ScalarBiharmonicIntegrator()
+    L = ScalarBiharmonicIntegrator(q=11)
 
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma, q=11)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
     
     lform = LinearForm(space)
-    F = ScalarSourceIntegrator(pde.source, q=p+4)
+    F = ScalarSourceIntegrator(pde.source, q=11)
     lform.add_domain_integrator(F)
     b = lform.assembly()
     
@@ -229,40 +259,46 @@ for i in range(maxit):
     
     # 计算某点处的误差情况
     node = mesh.entity('node')
+    nidx = np.where(np.isin(node[:, 0], node0[:, 0]) & np.isin(node[:, 1], node0[:, 1]))[0]
+    
+    x = pde.solution(node[nidx])
+    gx = pde.gradient(node[nidx])
+    hx = pde.hessian(node[nidx])
+    
+    for j in range(len(node0)):
+        gx0[j], hx0[j] = node_g_h_value(uh, nidx[j])
+
+    '''
+    # 计算所有选中插值点的误差情况
     points = mesh.interpolation_points(p=p)
     mesh0 = HalfEdgeMesh2d.from_mesh(mesh, NV=3)
-#    nidx = np.where(np.isin(node[:, 0], node0[:, 0]) & np.isin(node[:, 1], node0[:, 1]))[0]
     
-    print(points0.shape)
     scell, pbc = mesh0.find_point_in_triangle_mesh(points0)
-    print('dddd:', scell.shape, pbc)
 
     x = pde.solution(points0)
     gx = pde.gradient(points0)
     hx = pde.hessian(points0)
+    
+    e2c = mesh0.ds.edge_to_cell()
      
     for j in range(len(points0)):
-        if np.all(pbc[j, :] >1e-5):
-            guh[j] = uh.grad_value(pbc[j])
-            huh[j] = uh.hessian_value(pbc[j])
-            print('ddddddd:', j)
+        if np.all(pbc[j, :] > 1e-10):
+            # 点在单元内部
+            gx0[j] = uh.grad_value(pbc[j].reshape(1, -1))[0, scell[j], :]
+            hx0[j] = uh.hessian_value(pbc[j].reshape(1, -1))[0, scell[j], :]
         elif np.sum(pbc[j, :] >1e-10) == 1:
+            # 点为节点
             nidx = np.where(np.isin(points[:, 0], points0[j, 0]) &
                     np.isin(points[:, 1], points0[j, 1]))[0]
             gx0[j], hx0[j] = node_g_h_value(uh, nidx)
-        elif np.sum(pbc[j, :] > 1e-10) == 2:
-            e2c = mesh0.ds.edge_to_cell()
-            e2cidx = np.where(scell[j] == e2c[:, :2])
-            if pbc[j, 0] < 1e-10:
-#                if (scell[j] == e2c[:, 0]):
-#                    pass
-            print('scell:, ', scell[j])
-            print('cbc:', j, pbc[j])
-            print('e2c:', e2c, 'end')
-#            ee2c = mesh.ds.edge_to_cell()
-#            print(ee2c)
+        elif np.sum(pbc[j, :] >1e-10) == 2:
+            # 点在边上
+            eidx = np.where(np.abs(pbc[j, :]) < 1e-10)[0][0]
+            gx0[j], hx0[j] = edge_points_g_h_value(e2c, eidx, scell[j], pbc[j, :], uh) 
+        else:
+            print('error!!!!!!')
+    '''
 
-    
     error[0, i] = np.max(np.abs(gx0-gx))
     error[1, i] = np.max(np.abs(hx0-hx))
     
