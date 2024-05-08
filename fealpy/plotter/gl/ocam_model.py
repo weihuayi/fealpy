@@ -39,10 +39,12 @@ class OCAMModel:
         from fealpy.mesh import TriangleMesh
         icenter = self.icenter
         r = self.radius
+        sign_field=self.sign_field
         x1 = np.sqrt(r*r-icenter[...,1]*icenter[...,1])
         x2 = np.sqrt(r*r-(1080-icenter[...,1])**2)
         gmsh.initialize()
 
+        # 边界区域
         gmsh.model.geo.addPoint(icenter[...,0],icenter[...,1],0,tag=1)
         gmsh.model.geo.addPoint(icenter[...,0]-x1,0,0,tag=2)
         gmsh.model.geo.addPoint(icenter[...,0]+x1,0,0,tag=3)
@@ -55,7 +57,55 @@ class OCAMModel:
         gmsh.model.geo.addCircleArc(5,1,2,tag=4)
 
         gmsh.model.geo.addCurveLoop([1,2,3,4],1)
-        gmsh.model.geo.addPlaneSurface([1],1)
+        
+        # 标志场区域
+        for i in range(24):
+            gmsh.model.geo.addPoint(sign_field[i,0],sign_field[i,1],0,tag=6+i)
+
+        gmsh.model.geo.addLine(6,7,tag=5)
+        gmsh.model.geo.addLine(7,8,tag=6)
+        gmsh.model.geo.addLine(8,9,tag=7)
+        gmsh.model.geo.addLine(9,6,tag=8)
+        gmsh.model.geo.addCurveLoop([5,6,7,8],2)
+
+        gmsh.model.geo.addLine(10,11,tag=9)
+        gmsh.model.geo.addLine(11,12,tag=10)
+        gmsh.model.geo.addLine(12,13,tag=11)
+        gmsh.model.geo.addLine(13,10,tag=12)
+        gmsh.model.geo.addCurveLoop([9,10,11,12],3)
+
+        gmsh.model.geo.addLine(14,15,tag=13)
+        gmsh.model.geo.addLine(15,16,tag=14)
+        gmsh.model.geo.addLine(16,17,tag=15)
+        gmsh.model.geo.addLine(17,14,tag=16)
+        gmsh.model.geo.addCurveLoop([13,14,15,16],4)
+
+        gmsh.model.geo.addLine(18,19,tag=17)
+        gmsh.model.geo.addLine(19,20,tag=18)
+        gmsh.model.geo.addLine(20,21,tag=19)
+        gmsh.model.geo.addLine(21,18,tag=20)
+        gmsh.model.geo.addCurveLoop([17,18,19,20],5)
+
+        gmsh.model.geo.addLine(22,23,tag=21)
+        gmsh.model.geo.addLine(23,24,tag=22)
+        gmsh.model.geo.addLine(24,25,tag=23)
+        gmsh.model.geo.addLine(25,22,tag=24)
+        gmsh.model.geo.addCurveLoop([21,22,23,24],6)
+
+        gmsh.model.geo.addLine(26,27,tag=25)
+        gmsh.model.geo.addLine(27,28,tag=26)
+        gmsh.model.geo.addLine(28,29,tag=27)
+        gmsh.model.geo.addLine(29,26,tag=28)
+        gmsh.model.geo.addCurveLoop([25,26,27,28],7)
+        
+        # 生成面
+        gmsh.model.geo.addPlaneSurface([1,2,5],1)
+        gmsh.model.geo.addPlaneSurface([2,3],2)
+        gmsh.model.geo.addPlaneSurface([3,4],3)
+        gmsh.model.geo.addPlaneSurface([4],4)
+        gmsh.model.geo.addPlaneSurface([5,6],5)
+        gmsh.model.geo.addPlaneSurface([6,7],6)
+        gmsh.model.geo.addPlaneSurface([7],7)
 
         gmsh.model.geo.synchronize()
         
@@ -73,7 +123,7 @@ class OCAMModel:
         gmsh.model.mesh.field.setAsBackgroundMesh(2)
         
         gmsh.model.mesh.generate(2)
-        #gmsh.fltk().run()
+        gmsh.fltk().run()
         ntags, vxyz, _ = gmsh.model.mesh.getNodes()
         node = vxyz.reshape((-1,3))
         node = node[:,:2]
