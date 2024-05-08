@@ -21,6 +21,7 @@ class OCAMModel:
     chessboardpath: str
     icenter: tuple
     radius : float
+    sign_field: np.ndarray
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
@@ -28,7 +29,7 @@ class OCAMModel:
     def __call__(self, u):
         icenter = self.icenter
         r = self.radius
-        return dintersection(drectangle(u,[0,1080,0,1920]),dcircle(u,cxy=icenter,r=r))
+        return dintersection(drectangle(u,[0,1920,0,1080]),dcircle(u,cxy=icenter,r=r))
 
     def signed_dist_function(self, u):
         return self(u)
@@ -38,27 +39,28 @@ class OCAMModel:
         from fealpy.mesh import TriangleMesh
         icenter = self.icenter
         r = self.radius
-        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
-        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        x1 = np.sqrt(r*r-icenter[...,1]*icenter[...,1])
+        x2 = np.sqrt(r*r-(1080-icenter[...,1])**2)
         gmsh.initialize()
 
         gmsh.model.geo.addPoint(icenter[...,0],icenter[...,1],0,tag=1)
-        gmsh.model.geo.addPoint(0,y1,0,tag=2)
-        gmsh.model.geo.addPoint(0,y2,0,tag=3)
-        gmsh.model.geo.addPoint(1080,y1,0,tag=4)
-        gmsh.model.geo.addPoint(1080,y2,0,tag=5)
-
-        gmsh.model.geo.addCircleArc(2,1,4,tag=1)
-        gmsh.model.geo.addLine(4,5,tag=2)
-        gmsh.model.geo.addCircleArc(5,1,3,tag=3)
-        gmsh.model.geo.addLine(3,2,tag=4)
+        gmsh.model.geo.addPoint(icenter[...,0]-x1,0,0,tag=2)
+        gmsh.model.geo.addPoint(icenter[...,0]+x1,0,0,tag=3)
+        gmsh.model.geo.addPoint(icenter[...,0]+x2,1080,0,tag=4)
+        gmsh.model.geo.addPoint(icenter[...,0]-x2,1080,0,tag=5)
+ 
+        gmsh.model.geo.addLine(2,3,tag=1)
+        gmsh.model.geo.addCircleArc(3,1,4,tag=2)
+        gmsh.model.geo.addLine(4,5,tag=3)
+        gmsh.model.geo.addCircleArc(5,1,2,tag=4)
 
         gmsh.model.geo.addCurveLoop([1,2,3,4],1)
         gmsh.model.geo.addPlaneSurface([1],1)
 
         gmsh.model.geo.synchronize()
+        
         gmsh.model.mesh.field.add("Distance",1)
-        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[1,3])
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
         gmsh.model.mesh.field.setNumber(1,"Sampling",100)
         lc = 50
         gmsh.model.mesh.field.add("Threshold", 2)
@@ -69,7 +71,9 @@ class OCAMModel:
         gmsh.model.mesh.field.setNumber(2, "DistMax", 800)
 
         gmsh.model.mesh.field.setAsBackgroundMesh(2)
+        
         gmsh.model.mesh.generate(2)
+        #gmsh.fltk().run()
         ntags, vxyz, _ = gmsh.model.mesh.getNodes()
         node = vxyz.reshape((-1,3))
         node = node[:,:2]
@@ -80,7 +84,7 @@ class OCAMModel:
         gmsh.finalize()
         return TriangleMesh(node,cell)
 
-    def distmeshing(self,fh=None):
+    def distmeshing(self,hmin=50,fh=None):
         domain=OCAMDomain(icenter=self.icenter,radius=self.radius,fh=fh)
         hmin=50
         mesher=DistMesher2d(domain,hmin)
@@ -430,21 +434,21 @@ class OCAMDomain(Domain):
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
         if fh is not None:
             self.fh = fh
-        self.box = [0,1180,0,2020]
+        self.box = [0,2020,0,1180]
         self.icenter=icenter
         self.radius=radius
         vertices = np.array([
-            (0,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
-            (0,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
-            (1080,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
-            (1080,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0]))])
+            (icenter[...,0]-np.sqrt(radius*radius-icenter[...,1]*icenter[...,1]),0),
+            (icenter[...,0]+np.sqrt(radius*radius-icenter[...,1]*icenter[...,1]),0),
+            (icenter[...,0]-np.sqrt(radius*radius-(1080-icenter[...,1])*(1080-icenter[...,1])),1080),
+            (icenter[...,0]+np.sqrt(radius*radius-(1080-icenter[...,1])*(1080-icenter[...,1])),1080)])
         curves = np.array([[0,1],[2,3]])
         self.facets = {0:vertices,1:curves}
 
     def __call__(self,u):
         icenter = self.icenter
         r = self.radius
-        return dintersection(drectangle(u,[0,1080,0,1920]),dcircle(u,cxy=icenter,r=r))
+        return dintersection(drectangle(u,[0,1920,0,1080]),dcircle(u,cxy=icenter,r=r))
 
     def signed_dist_function(self,u):
         return self(u)
