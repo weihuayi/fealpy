@@ -415,9 +415,9 @@ class UniformMesh1d(Mesh, Plotable):
 
         # Assemble convection term
         cc = c / (2 * h)
-        val_c = np.broadcast_to(cc[:-1], (NN - 1,))
-        A += csr_matrix((val_c, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A -= csr_matrix((val_c, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        val_c = np.broadcast_to(cc, (NN - 1,))
+        A -= csr_matrix((val_c, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val_c, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         # Assemble reaction term
         A += diags([r], [0], shape=(NN, NN), format='csr')
