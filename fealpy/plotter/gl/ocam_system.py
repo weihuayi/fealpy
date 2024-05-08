@@ -191,6 +191,136 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
+    def get_split_point(self,
+                        size=(17.5, 3.47, 3),
+                        scale_ratio=(1.618, 1.618, 1.618),
+                        h=0.05,
+                        center_height=3,
+                        v=0.5,
+                        theta1=np.pi / 6,
+                        theta2=np.pi / 4 * 0):
+        '''
+        获取分割线
+        @param size: 小车长宽高
+        @param scale_ratio: 三个主轴的伸缩比例
+        @param h: 节点密度
+        @param center_height: 椭球面球心的高度
+        @param v: 两侧摄像头分割线相对位置
+        @param theta1: 主分割线偏转角
+        @param theta2: 两侧分割线
+        @return: 分割线上点的笛卡尔坐标
+        '''
+        import gmsh
+        pi = np.pi
+        gmsh.initialize()
+        l, w, h = size
+
+        # 构造椭球面
+        a = l * scale_ratio[0]
+        b = w * scale_ratio[1]
+        c = h * scale_ratio[2]
+
+        bottom = center_height / c
+
+        # 构造单位球面
+        r = 1.0
+        ball = gmsh.model.occ.addSphere(0, 0, 0, r, 1, -pi / 2, 0)
+
+        # 底面截取
+        box = gmsh.model.occ.addBox(-1, -1, -1, 2, 2, 1 - bottom)
+        half_ball = gmsh.model.occ.cut([(3, ball)], [(3, box)])[0]
+
+        # 底部矩形附着
+        rec = gmsh.model.occ.addRectangle(-0.5 / scale_ratio[0], -0.5 / scale_ratio[1], -bottom, 1 / scale_ratio[0],
+                                          1 / scale_ratio[1])
+
+        # 分割线对应的固定点
+        fixed_point1 = [0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point2 = [0.5 * r * v / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point3 = [-0.5 * r * v / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point4 = [-0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point5 = [-0.5 * r / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point6 = [-0.5 * r * v / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point7 = [0.5 * r * v / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point8 = [0.5 * r / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+
+        def get_plane(fixed_point, phi):
+            p1 = gmsh.model.occ.addPoint(fixed_point[0], fixed_point[1], fixed_point[2])
+            p2 = gmsh.model.occ.addPoint(fixed_point[0] + r * np.cos(phi), fixed_point[1] + r * np.sin(phi),
+                                         fixed_point[2])
+            p3 = gmsh.model.occ.addPoint(fixed_point[0] + r * np.cos(phi), fixed_point[1] + r * np.sin(phi),
+                                         fixed_point[2] + 1.5 * r)
+            p4 = gmsh.model.occ.addPoint(fixed_point[0], fixed_point[1], fixed_point[2] + 1.5 * r)
+            line1 = gmsh.model.occ.addLine(p1, p2)
+            line2 = gmsh.model.occ.addLine(p2, p3)
+            line3 = gmsh.model.occ.addLine(p3, p4)
+            line4 = gmsh.model.occ.addLine(p4, p1)
+            curve = gmsh.model.occ.addCurveLoop([line1, line2, line3, line4])
+            plane = gmsh.model.occ.addPlaneSurface([curve])
+
+            return plane
+
+        # 分割平面
+        plane1 = get_plane(fixed_point1, -theta1)
+        plane2 = get_plane(fixed_point1, -pi / 2 + theta1)
+        plane3 = get_plane(fixed_point2, -pi / 2 - theta2)
+        plane4 = get_plane(fixed_point3, -pi / 2 + theta2)
+        plane5 = get_plane(fixed_point4, -pi / 2 - theta1)
+        plane6 = get_plane(fixed_point4, -pi + theta1)
+        plane7 = get_plane(fixed_point5, pi - theta1)
+        plane8 = get_plane(fixed_point5, pi / 2 + theta1)
+        plane9 = get_plane(fixed_point6, pi / 2 - theta2)
+        plane10 = get_plane(fixed_point7, pi / 2 + theta2)
+        plane11 = get_plane(fixed_point8, pi / 2 - theta1)
+        plane12 = get_plane(fixed_point8, theta1)
+
+        ov = gmsh.model.occ.fragment(half_ball, [(2, rec)])[0]
+
+        # 分割面与主体求交，得到分割线
+        intersection = gmsh.model.occ.intersect(ov,
+                                                [(2, plane1), (2, plane2), (2, plane3), (2, plane4), (2, plane5),
+                                                 (2, plane6),
+                                                 (2, plane7), (2, plane8), (2, plane9), (2, plane10), (2, plane11),
+                                                 (2, plane12)])
+
+        gmsh.model.occ.synchronize()
+        # 调整网格密度
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+        gmsh.model.mesh.generate(2)
+
+        # 获取分割线节点
+        total_vects = []
+        start_surface_tag = 5
+        for i in range(12):
+            surface_tag = start_surface_tag + i
+            curves = gmsh.model.getBoundary([(2, surface_tag)], combined=False, oriented=True)[1:3]
+            curve_vects = []
+            for curve in curves:
+                tag = abs(curve[1])
+                node_pre = gmsh.model.mesh.getNodes(1, tag, includeBoundary=True)[1].reshape(-1, 3)
+                nodes = np.zeros_like(node_pre)
+                nodes[0, :] = node_pre[-2, :]
+                nodes[-1, :] = node_pre[-1, :]
+                nodes[1:-1, :] = node_pre[0:-2, :]
+                # 由球面映射到椭球面
+                nodes[:, 0] *= a
+                nodes[:, 1] *= b
+                nodes[:, 2] *= c
+                curve_vects.append(nodes)
+            total_vects.append(curve_vects)
+
+        # 显示
+        # gmsh.fltk.run()
+        camere_points = []
+        for i in range(6):
+            camere_points.append([])
+            camere_points[i].append(total_vects[(2 * i) % 12])
+            camere_points[i].append(total_vects[(2 * i + 1) % 12])
+            camere_points[i].append(total_vects[(2 * i + 2) % 12])
+            camere_points[i].append(total_vects[(2 * i + 3) % 12])
+
+        gmsh.finalize()
+
     def undistort_cv(self):
         import cv2
         images = []
