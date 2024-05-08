@@ -27,8 +27,8 @@ class OCAMSystem:
                 chessboardpath=data['chessboardpath'][i],
                 icenter=data['icenter'][i],
                 radius=data['radius'][i],
-                sign_field=data['sign_field'][i],
-                camere_points = cps[i]
+                mark_board=data['mark_board'][i],
+                camera_points = cps[i]
             ))
 
     def undistort_cv(self):
@@ -287,7 +287,7 @@ class OCAMSystem:
 
         gmsh.model.occ.synchronize()
         # 调整网格密度
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+        #gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
         gmsh.model.mesh.generate(2)
 
         # 获取分割线节点
@@ -312,17 +312,16 @@ class OCAMSystem:
             total_vects.append(curve_vects)
 
         # 显示
-        # gmsh.fltk.run()
-        camere_points = []
+        #gmsh.fltk.run()
+        camera_points = []
         for i in range(6):
-            camere_points.append([])
-            camere_points[i].append(total_vects[(2 * i) % 12])
-            camere_points[i].append(total_vects[(2 * i + 1) % 12])
-            camere_points[i].append(total_vects[(2 * i + 2) % 12])
-            camere_points[i].append(total_vects[(2 * i + 3) % 12])
-
+            camera_points.append([])
+            camera_points[i].append(total_vects[(2 * i) % 12])
+            camera_points[i].append(total_vects[(2 * i + 1) % 12])
+            camera_points[i].append(total_vects[(2 * i + 2) % 12])
+            camera_points[i].append(total_vects[(2 * i + 3) % 12])
         gmsh.finalize()
-        return camere_points
+        return camera_points
 
     def undistort_cv(self):
         import cv2
@@ -441,7 +440,7 @@ class OCAMSystem:
             ], dtype=np.float64)
 
         radius = np.array([877.5,882.056,886.9275,884.204,883.616,884.5365],dtype=np.float64)
-        sign_field=np.array(
+        mark_board = np.array(
         [[(240.946,702.130),(265.611,726.620),(326.989,605.794),(291.346,599.545),
          (248.493,694.023),(268.282,711.997),(314.241,614.862),(288.833,609.140),
          (265.521,668.427),(275.295,673.864),(291.393,641.555),(280.467,638.472),
@@ -475,12 +474,12 @@ class OCAMSystem:
          [(266.546,761.228),(368.820,838.300),(471.901,599.210),(350.959,587.009),
          (282.813,752.674),(364.447,809.124),(447.787,614.515),(352.791,602.933),
          (323.830,712.295),(356.378,726.475),(383.816,661.568),(349.424,653.671),
-         (1460.643,835.675),(1581.636,748.868),(1462.596,566.232),(1344.212,587.207),
+         (1460.643,835.675),(1581.636,748.868),(1483.032,566.232),(1344.212,587.207),
          (1468.790,802.020),(1562.534,736.320),(1480.875,583.683),(1372.462,602.471),
          (1480.763,713.575),(1514.355,696.954),(1483.021,638.530),(1446.418,650.523)]
          ],dtype=np.float64)
 
-        sign_field[...,1] = 1080-sign_field[...,1] 
+        mark_board[...,1] = 1080-mark_board[...,1] 
         data = {
             "nc" : 6,
             "location" : location,
@@ -497,7 +496,7 @@ class OCAMSystem:
             'flip' : flip,
             'icenter': icenter,
             'radius' : radius,
-            'sign_field': sign_field
+            'mark_board': mark_board
         }
 
         return cls(data)
