@@ -1,6 +1,8 @@
 import numpy as np
 import os
 import cv2
+import matplotlib.pyplot as plt
+
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
 
@@ -237,7 +239,6 @@ class OCAMSystem:
                                           1 / scale_ratio[1])
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.generate(2)
-        gmsh.fltk.run()
 
         # 分割线对应的固定点
         fixed_point1 = [0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]

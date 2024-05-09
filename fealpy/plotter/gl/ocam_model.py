@@ -1,11 +1,15 @@
 from dataclasses import dataclass, field
 from typing import Callable, Any, Tuple
+
 import numpy as np
 import cv2
 import glob
+import matplotlib.pyplot as plt
+
 from fealpy.mesh import DistMesher2d
 from ...geometry.domain import Domain
 from fealpy.geometry import dintersection,drectangle,dcircle
+
 @dataclass
 class OCAMModel:
     location: np.ndarray
@@ -34,8 +38,10 @@ class OCAMModel:
                 val = self.world_to_image(cps[j])
                 val *= np.array([[self.width, self.height]])
                 val[:, 1] = self.height-val[:, 1]
+                val = val[self.signed_dist_function(val)<0] # 去掉不在区域内的点
                 cps_all[i].append(val)
         self.camera_points = cps_all
+        self.imagemesh = self.gmeshing()
 
     def __call__(self, u):
         icenter = self.icenter
@@ -207,7 +213,7 @@ class OCAMModel:
 
         
         gmsh.model.geo.synchronize()
-        gmsh.fltk().run()
+        #gmsh.fltk().run()
         #gmsh.option.setNumber("Mesh.Algorithm",6) 
         gmsh.model.mesh.field.add("Distance",1)
         gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
@@ -245,7 +251,7 @@ class OCAMModel:
         
         
         gmsh.model.mesh.generate(2)
-        gmsh.fltk().run()
+        #gmsh.fltk().run()
 
         ntags, vxyz, _ = gmsh.model.mesh.getNodes()
         node = vxyz.reshape((-1,3))
@@ -569,6 +575,30 @@ class OCAMModel:
         DIM = _img_shape[::-1]
         return DIM, K, D
 
+    def show_camera_image_and_mesh(self, imgname=None, outname=None):
+        from PIL import Image
+        mesh = self.imagemesh
+        mesh.add_plot(plt, alpha=0.2)
+        if imgname is None:
+            imgname = self.fname
+        img = cv2.imread(imgname)
+        plt.imshow(img, extent=[0, 1920, 0, 1080])
+
+        # 递归获取所有的 numpy 数组
+        def get_numpy_arrays(data):
+            numpy_arrays = []
+            for item in data:
+                if isinstance(item, np.ndarray):
+                    numpy_arrays.append(item)
+                elif isinstance(item, list):
+                    numpy_arrays.extend(get_numpy_arrays(item))  # 递归调用
+            return numpy_arrays
+        points = get_numpy_arrays(self.camera_points)
+        for i in range(len(points)):
+            plt.plot(points[i][:, 0], points[i][:, 1], 'r')
+        if outname is not None:
+            plt.savefig(outname)
+        plt.show()
 
     def undistort_chess(self, imgname, scale=0.6):
         img = cv2.imread(imgname)
