@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 csys = OCAMSystem.from_data()
 for i in range(6):
     model = csys.cams[i]
+    model.show_camera_image_mesh()
+    #mesh = model.gmeshing()
 
-    mesh = model.gmeshing()
     #fig, axes = plt.subplots()
     #mesh.add_plot(axes)
     #plt.show()
