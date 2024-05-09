@@ -21,14 +21,23 @@ class OCAMModel:
     chessboardpath: str
     icenter: tuple
     radius : float
+    mark_board: np.ndarray
+    camera_points: list
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        cps_all = []
+        for i in range(4):
+            cps = self.camera_points[i]
+            cps_all.append([])
+            for j in range(len(cps)):
+                cps_all[i].append(self.world_to_image(cps[j]))
+        self.camera_points = cps_all
 
     def __call__(self, u):
         icenter = self.icenter
         r = self.radius
-        return dintersection(drectangle(u,[0,1080,0,1920]),dcircle(u,cxy=icenter,r=r))
+        return dintersection(drectangle(u,[0,1920,0,1080]),dcircle(u,cxy=icenter,r=r))
 
     def signed_dist_function(self, u):
         return self(u)
@@ -38,38 +47,198 @@ class OCAMModel:
         from fealpy.mesh import TriangleMesh
         icenter = self.icenter
         r = self.radius
-        y1 = icenter[...,1]-np.sqrt(r*r-icenter[...,0]*icenter[...,0])
-        y2 = icenter[...,1]+np.sqrt(r*r-icenter[...,0]*icenter[...,0])
+        mark_board=self.mark_board        
+        camera_points = self.camera_points
+        #print(camera_points)
+        for i in range(len(camera_points)):
+            camera_points[i][0][...,0] = camera_points[i][0][...,0]*self.width
+            camera_points[i][0][...,1] = camera_points[i][0][...,1]*self.height
+            camera_points[i][1][...,0] = camera_points[i][1][...,0]*self.width
+            camera_points[i][1][...,1] = camera_points[i][1][...,1]*self.height
+
+        x1 = np.sqrt(r*r-icenter[...,1]*icenter[...,1])
+        x2 = np.sqrt(r*r-(1080-icenter[...,1])**2)
         gmsh.initialize()
 
+        # 边界区域
         gmsh.model.geo.addPoint(icenter[...,0],icenter[...,1],0,tag=1)
-        gmsh.model.geo.addPoint(0,y1,0,tag=2)
-        gmsh.model.geo.addPoint(0,y2,0,tag=3)
-        gmsh.model.geo.addPoint(1080,y1,0,tag=4)
-        gmsh.model.geo.addPoint(1080,y2,0,tag=5)
-
-        gmsh.model.geo.addCircleArc(2,1,4,tag=1)
-        gmsh.model.geo.addLine(4,5,tag=2)
-        gmsh.model.geo.addCircleArc(5,1,3,tag=3)
-        gmsh.model.geo.addLine(3,2,tag=4)
+        gmsh.model.geo.addPoint(icenter[...,0]-x1,0,0,tag=2)
+        gmsh.model.geo.addPoint(icenter[...,0]+x1,0,0,tag=3)
+        gmsh.model.geo.addPoint(icenter[...,0]+x2,1080,0,tag=4)
+        gmsh.model.geo.addPoint(icenter[...,0]-x2,1080,0,tag=5)
+ 
+        gmsh.model.geo.addLine(2,3,tag=1)
+        gmsh.model.geo.addCircleArc(3,1,4,tag=2)
+        gmsh.model.geo.addLine(4,5,tag=3)
+        gmsh.model.geo.addCircleArc(5,1,2,tag=4)
 
         gmsh.model.geo.addCurveLoop([1,2,3,4],1)
-        gmsh.model.geo.addPlaneSurface([1],1)
+        
+        
+        # 标记板区域
+        for i in range(24):
+            gmsh.model.geo.addPoint(mark_board[i,0],mark_board[i,1],0,tag=6+i)
 
+        gmsh.model.geo.addLine(6,7,tag=5)
+        gmsh.model.geo.addLine(7,8,tag=6)
+        gmsh.model.geo.addLine(8,9,tag=7)
+        gmsh.model.geo.addLine(9,6,tag=8)
+        gmsh.model.geo.addCurveLoop([5,6,7,8],2)
+
+        gmsh.model.geo.addLine(10,11,tag=9)
+        gmsh.model.geo.addLine(11,12,tag=10)
+        gmsh.model.geo.addLine(12,13,tag=11)
+        gmsh.model.geo.addLine(13,10,tag=12)
+        gmsh.model.geo.addCurveLoop([9,10,11,12],3)
+
+        gmsh.model.geo.addLine(14,15,tag=13)
+        gmsh.model.geo.addLine(15,16,tag=14)
+        gmsh.model.geo.addLine(16,17,tag=15)
+        gmsh.model.geo.addLine(17,14,tag=16)
+        gmsh.model.geo.addCurveLoop([13,14,15,16],4)
+
+        gmsh.model.geo.addLine(18,19,tag=17)
+        gmsh.model.geo.addLine(19,20,tag=18)
+        gmsh.model.geo.addLine(20,21,tag=19)
+        gmsh.model.geo.addLine(21,18,tag=20)
+        gmsh.model.geo.addCurveLoop([17,18,19,20],5)
+
+        gmsh.model.geo.addLine(22,23,tag=21)
+        gmsh.model.geo.addLine(23,24,tag=22)
+        gmsh.model.geo.addLine(24,25,tag=23)
+        gmsh.model.geo.addLine(25,22,tag=24)
+        gmsh.model.geo.addCurveLoop([21,22,23,24],6)
+
+        gmsh.model.geo.addLine(26,27,tag=25)
+        gmsh.model.geo.addLine(27,28,tag=26)
+        gmsh.model.geo.addLine(28,29,tag=27)
+        gmsh.model.geo.addLine(29,26,tag=28)
+        gmsh.model.geo.addCurveLoop([25,26,27,28],7)
+        
+        # 分割线
+        t0 = False # 判断点是否是同一点
+        t1 = False
+        if np.sum((camera_points[0][0][0]-camera_points[1][0][0])**2)<1e-3:
+            t0=True
+        if np.sum((camera_points[2][0][0]-camera_points[3][0][0])**2)<1e-3:
+            t1=True
+
+        # 左侧分割线
+        camera_points_tag1 = []
+        for j in range(camera_points[0][0].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[0][0][j,0],camera_points[0][0][j,1],0)
+            camera_points_tag1.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag1,29)
+        camera_points_tag2 = camera_points_tag1[-1:]
+        for j in range(1,camera_points[0][1].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[0][1][j,0],camera_points[0][1][j,1],0)
+            camera_points_tag2.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag2,30)
+
+        if t0 == 1:
+            camera_points_tag1=camera_points_tag1[:1]
+        else: 
+            p=gmsh.model.geo.addPoint(camera_points[1][0][0,0],camera_points[1][0][0,1],0)
+            camera_points_tag1 = [p]
+        for j in range(1,camera_points[1][0].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[1][0][j,0],camera_points[1][0][j,1],0)
+            camera_points_tag1.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag1,31)
+        camera_points_tag2 = camera_points_tag1[-1:]
+        for j in range(1,camera_points[1][1].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[1][1][j,0],camera_points[1][1][j,1],0)
+            camera_points_tag2.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag2,32)
+        if t0 is False:
+            gmsh.model.geo.addCurveLoop([29,30,-30,-29])
+            gmsh.model.geo.addCurveLoop([31,32,-32,-31])
+        else:
+            gmsh.model.geo.addCurveLoop([-30,-29,31,32,-32,-31,29,30])
+        
+        # 右侧分割线
+        camera_points_tag1 = []
+        for j in range(camera_points[2][0].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[2][0][j,0],camera_points[2][0][j,1],0)
+            camera_points_tag1.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag1,33)
+        camera_points_tag2 = camera_points_tag1[-1:]
+        for j in range(1,camera_points[2][1].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[2][1][j,0],camera_points[2][1][j,1],0)
+            camera_points_tag2.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag2,34)
+
+        if t1 == 1:
+            camera_points_tag1=camera_points_tag1[:1]
+        else: 
+            p=gmsh.model.geo.addPoint(camera_points[3][0][0,0],camera_points[3][0][0,1],0)
+            camera_points_tag1 = [p]
+        for j in range(1,camera_points[3][0].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[3][0][j,0],camera_points[3][0][j,1],0)
+            camera_points_tag1.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag1,35)
+        camera_points_tag2 = camera_points_tag1[-1:]
+        for j in range(1,camera_points[3][1].shape[0]):
+            p=gmsh.model.geo.addPoint(camera_points[3][1][j,0],camera_points[3][1][j,1],0)
+            camera_points_tag2.append(p)
+        gmsh.model.geo.addSpline(camera_points_tag2,36)
+        if t1 is False:
+            gmsh.model.geo.addCurveLoop([33,34,-34,-33])
+            gmsh.model.geo.addCurveLoop([35,36,-36,-35])
+        else:
+            gmsh.model.geo.addCurveLoop([-34,-33,35,36,-36,-35,33,34])
+   
+        # 生成面
+        if t0+t1==2:
+            gmsh.model.geo.addPlaneSurface([1,2,5,8,9],1)
+        else:
+            gmsh.model.geo.addPlaneSurface([1,2,5,8,9,10],1)
+        gmsh.model.geo.addPlaneSurface([2,3],2)
+        gmsh.model.geo.addPlaneSurface([3,4],3)
+        gmsh.model.geo.addPlaneSurface([4],4)
+        gmsh.model.geo.addPlaneSurface([5,6],5)
+        gmsh.model.geo.addPlaneSurface([6,7],6)
+        gmsh.model.geo.addPlaneSurface([7],7)
+        
         gmsh.model.geo.synchronize()
+        #gmsh.option.setNumber("Mesh.Algorithm",6) 
         gmsh.model.mesh.field.add("Distance",1)
-        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[1,3])
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
         gmsh.model.mesh.field.setNumber(1,"Sampling",100)
-        lc = 50
+        lc1 = 50
         gmsh.model.mesh.field.add("Threshold", 2)
         gmsh.model.mesh.field.setNumber(2, "InField", 1)
-        gmsh.model.mesh.field.setNumber(2, "SizeMin", lc)
-        gmsh.model.mesh.field.setNumber(2, "SizeMax", 3*lc)
+        gmsh.model.mesh.field.setNumber(2, "SizeMin", lc1)
+        gmsh.model.mesh.field.setNumber(2, "SizeMax", 3*lc1)
         gmsh.model.mesh.field.setNumber(2, "DistMin", 200)
         gmsh.model.mesh.field.setNumber(2, "DistMax", 800)
-
-        gmsh.model.mesh.field.setAsBackgroundMesh(2)
+         
+        gmsh.model.mesh.field.add("Distance",3)
+        if t0==1:
+            gmsh.model.mesh.field.setNumbers(3,"CurvesList",[29,30,31,32])
+            lc2 = 15
+        if t1==1:
+            gmsh.model.mesh.field.setNumbers(3,"CurvesList",[33,34,35,36])
+            lc2 = 15
+        if t0+t1==2:
+            gmsh.model.mesh.field.setNumbers(3,"CurvesList",[29,30,31,32,33,34,35,36])
+            lc2 = 30
+        gmsh.model.mesh.field.setNumber(3,"Sampling",100)
+        gmsh.model.mesh.field.add("Threshold", 4)
+        gmsh.model.mesh.field.setNumber(4, "InField", 3)
+        gmsh.model.mesh.field.setNumber(4, "SizeMin", lc2)
+        gmsh.model.mesh.field.setNumber(4, "SizeMax", 3*lc1)
+        gmsh.model.mesh.field.setNumber(4, "DistMin", 20)
+        gmsh.model.mesh.field.setNumber(4, "DistMax", 150)
+        
+        gmsh.model.mesh.field.add("Min",5)
+        gmsh.model.mesh.field.setNumbers(5, "FieldsList", [2,4])
+        
+        gmsh.model.mesh.field.setAsBackgroundMesh(5)
+        
+        
         gmsh.model.mesh.generate(2)
+        #gmsh.fltk().run()
+
         ntags, vxyz, _ = gmsh.model.mesh.getNodes()
         node = vxyz.reshape((-1,3))
         node = node[:,:2]
@@ -77,10 +246,11 @@ class OCAMModel:
         tris_tags,evtags = gmsh.model.mesh.getElementsByType(2)
         evid = np.array([vmap[j] for j in evtags])
         cell = evid.reshape((tris_tags.shape[-1],-1))
+        
         gmsh.finalize()
         return TriangleMesh(node,cell)
-
-    def distmeshing(self,fh=None):
+        
+    def distmeshing(self,hmin=50,fh=None):
         domain=OCAMDomain(icenter=self.icenter,radius=self.radius,fh=fh)
         hmin=50
         mesher=DistMesher2d(domain,hmin)
@@ -430,21 +600,21 @@ class OCAMDomain(Domain):
         super().__init__(hmin=hmin, hmax=hmax, GD=2)
         if fh is not None:
             self.fh = fh
-        self.box = [0,1180,0,2020]
+        self.box = [0,2020,0,1180]
         self.icenter=icenter
         self.radius=radius
         vertices = np.array([
-            (0,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
-            (0,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
-            (1080,icenter[...,1]-np.sqrt(radius*radius-icenter[...,0]*icenter[...,0])),
-            (1080,icenter[...,1]+np.sqrt(radius*radius-icenter[...,0]*icenter[...,0]))])
+            (icenter[...,0]-np.sqrt(radius*radius-icenter[...,1]*icenter[...,1]),0),
+            (icenter[...,0]+np.sqrt(radius*radius-icenter[...,1]*icenter[...,1]),0),
+            (icenter[...,0]-np.sqrt(radius*radius-(1080-icenter[...,1])*(1080-icenter[...,1])),1080),
+            (icenter[...,0]+np.sqrt(radius*radius-(1080-icenter[...,1])*(1080-icenter[...,1])),1080)])
         curves = np.array([[0,1],[2,3]])
         self.facets = {0:vertices,1:curves}
 
     def __call__(self,u):
         icenter = self.icenter
         r = self.radius
-        return dintersection(drectangle(u,[0,1080,0,1920]),dcircle(u,cxy=icenter,r=r))
+        return dintersection(drectangle(u,[0,1920,0,1080]),dcircle(u,cxy=icenter,r=r))
 
     def signed_dist_function(self,u):
         return self(u)

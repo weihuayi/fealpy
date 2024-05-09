@@ -7,6 +7,7 @@ from fealpy.mesh import TriangleMesh
 class OCAMSystem:
     def __init__(self, data):
         self.cams = []
+        cps = self.get_split_point()
         for i in range(data['nc']):
             axes = np.zeros((3, 3), dtype=np.float64)
             axes[0, :] = data['axes'][0][i]
@@ -25,7 +26,9 @@ class OCAMSystem:
                 flip = data['flip'][i],
                 chessboardpath=data['chessboardpath'][i],
                 icenter=data['icenter'][i],
-                radius=data['radius'][i]
+                radius=data['radius'][i],
+                mark_board=data['mark_board'][i],
+                camera_points = cps[i]
             ))
 
     def undistort_cv(self):
@@ -190,6 +193,136 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
+    def get_split_point(self,
+                        size=(17.5, 3.47, 3),
+                        scale_ratio=(1.618, 1.618, 1.618),
+                        h=0.05,
+                        center_height=3,
+                        v=0.5,
+                        theta1=np.pi / 6,
+                        theta2=np.pi / 4 * 0):
+        '''
+        获取分割线
+        @param size: 小车长宽高
+        @param scale_ratio: 三个主轴的伸缩比例
+        @param h: 节点密度
+        @param center_height: 椭球面球心的高度
+        @param v: 两侧摄像头分割线相对位置
+        @param theta1: 主分割线偏转角
+        @param theta2: 两侧分割线
+        @return: 分割线上点的笛卡尔坐标
+        '''
+        import gmsh
+        pi = np.pi
+        gmsh.initialize()
+        l, w, h = size
+
+        # 构造椭球面
+        a = l * scale_ratio[0]
+        b = w * scale_ratio[1]
+        c = h * scale_ratio[2]
+
+        bottom = center_height / c
+
+        # 构造单位球面
+        r = 1.0
+        ball = gmsh.model.occ.addSphere(0, 0, 0, r, 1, -pi / 2, 0)
+
+        # 底面截取
+        box = gmsh.model.occ.addBox(-1, -1, -1, 2, 2, 1 - bottom)
+        half_ball = gmsh.model.occ.cut([(3, ball)], [(3, box)])[0]
+
+        # 底部矩形附着
+        rec = gmsh.model.occ.addRectangle(-0.5 / scale_ratio[0], -0.5 / scale_ratio[1], -bottom, 1 / scale_ratio[0],
+                                          1 / scale_ratio[1])
+
+        # 分割线对应的固定点
+        fixed_point1 = [0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point2 = [0.5 * r * v / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point3 = [-0.5 * r * v / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point4 = [-0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point5 = [-0.5 * r / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point6 = [-0.5 * r * v / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point7 = [0.5 * r * v / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+        fixed_point8 = [0.5 * r / scale_ratio[0], 0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
+
+        def get_plane(fixed_point, phi):
+            p1 = gmsh.model.occ.addPoint(fixed_point[0], fixed_point[1], fixed_point[2])
+            p2 = gmsh.model.occ.addPoint(fixed_point[0] + r * np.cos(phi), fixed_point[1] + r * np.sin(phi),
+                                         fixed_point[2])
+            p3 = gmsh.model.occ.addPoint(fixed_point[0] + r * np.cos(phi), fixed_point[1] + r * np.sin(phi),
+                                         fixed_point[2] + 1.5 * r)
+            p4 = gmsh.model.occ.addPoint(fixed_point[0], fixed_point[1], fixed_point[2] + 1.5 * r)
+            line1 = gmsh.model.occ.addLine(p1, p2)
+            line2 = gmsh.model.occ.addLine(p2, p3)
+            line3 = gmsh.model.occ.addLine(p3, p4)
+            line4 = gmsh.model.occ.addLine(p4, p1)
+            curve = gmsh.model.occ.addCurveLoop([line1, line2, line3, line4])
+            plane = gmsh.model.occ.addPlaneSurface([curve])
+
+            return plane
+
+        # 分割平面
+        plane1 = get_plane(fixed_point1, -theta1)
+        plane2 = get_plane(fixed_point1, -pi / 2 + theta1)
+        plane3 = get_plane(fixed_point2, -pi / 2 - theta2)
+        plane4 = get_plane(fixed_point3, -pi / 2 + theta2)
+        plane5 = get_plane(fixed_point4, -pi / 2 - theta1)
+        plane6 = get_plane(fixed_point4, -pi + theta1)
+        plane7 = get_plane(fixed_point5, pi - theta1)
+        plane8 = get_plane(fixed_point5, pi / 2 + theta1)
+        plane9 = get_plane(fixed_point6, pi / 2 - theta2)
+        plane10 = get_plane(fixed_point7, pi / 2 + theta2)
+        plane11 = get_plane(fixed_point8, pi / 2 - theta1)
+        plane12 = get_plane(fixed_point8, theta1)
+
+        ov = gmsh.model.occ.fragment(half_ball, [(2, rec)])[0]
+
+        # 分割面与主体求交，得到分割线
+        intersection = gmsh.model.occ.intersect(ov,
+                                                [(2, plane1), (2, plane2), (2, plane3), (2, plane4), (2, plane5),
+                                                 (2, plane6),
+                                                 (2, plane7), (2, plane8), (2, plane9), (2, plane10), (2, plane11),
+                                                 (2, plane12)])
+
+        gmsh.model.occ.synchronize()
+        # 调整网格密度
+        #gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+        gmsh.model.mesh.generate(2)
+
+        # 获取分割线节点
+        total_vects = []
+        start_surface_tag = 5
+        for i in range(12):
+            surface_tag = start_surface_tag + i
+            curves = gmsh.model.getBoundary([(2, surface_tag)], combined=False, oriented=True)[1:3]
+            curve_vects = []
+            for curve in curves:
+                tag = abs(curve[1])
+                node_pre = gmsh.model.mesh.getNodes(1, tag, includeBoundary=True)[1].reshape(-1, 3)
+                nodes = np.zeros_like(node_pre)
+                nodes[0, :] = node_pre[-2, :]
+                nodes[-1, :] = node_pre[-1, :]
+                nodes[1:-1, :] = node_pre[0:-2, :]
+                # 由球面映射到椭球面
+                nodes[:, 0] *= a
+                nodes[:, 1] *= b
+                nodes[:, 2] *= c
+                curve_vects.append(nodes)
+            total_vects.append(curve_vects)
+
+        # 显示
+        #gmsh.fltk.run()
+        camera_points = []
+        for i in range(6):
+            camera_points.append([])
+            camera_points[i].append(total_vects[(2 * i) % 12])
+            camera_points[i].append(total_vects[(2 * i + 1) % 12])
+            camera_points[i].append(total_vects[(2 * i + 2) % 12])
+            camera_points[i].append(total_vects[(2 * i + 3) % 12])
+        gmsh.finalize()
+        return camera_points
+
     def undistort_cv(self):
         import cv2
         images = []
@@ -298,16 +431,55 @@ class OCAMSystem:
             ]
 
         icenter = np.array([
-            [553.866, 992.559],
-            [566.843, 986.667],
-            [544.920, 978.480],
-            [520.528, 985.73],
-            [528.981, 961.628],
-            [538.6615, 940.2435],
+            [992.559,526.134],
+            [986.667,513.157],
+            [978.480,535.08],
+            [985.73,559.472],
+            [961.628,551.019],
+            [940.2435,541.3385],
             ], dtype=np.float64)
 
         radius = np.array([877.5,882.056,886.9275,884.204,883.616,884.5365],dtype=np.float64)
-        
+        mark_board = np.array(
+        [[(240.946,702.130),(265.611,726.620),(326.989,605.794),(291.346,599.545),
+         (248.493,694.023),(268.282,711.997),(314.241,614.862),(288.833,609.140),
+         (265.521,668.427),(275.295,673.864),(291.393,641.555),(280.467,638.472),
+         (1673.001,772.285),(1711.515,733.990),(1654.236,612.171),(1600.493,622.823),
+         (1671.702,754.323),(1702.732,725.841),(1654.219,624.930),(1616.665,634.889),
+         (1666.478,705.236),(1680.064,697.104),(1661.974,660.024),(1647.485,665.864)],
+         [(268.593,717.706),(308.979,755.603),(384.439,608.193),(329.074,598.007),
+         (279.318,709.072),(309.456,737.338),(369.147,619.301),(329.805,611.696),
+         (301.373,681.322),(315.767,690.052,),(339.370,650.618),(320.949,644.135),
+         (1704.463,768.055),(1732.520,732.221),(1681.072,626.701),(1646.601,638.913),
+         (1703.475,749.778),(1722.529,726.180),(1682.977,638.310),(1657.391,648.564),
+         (1696.748,710.659),(1706.177,701.772),(1690.590,669.869),(1680.413,675.212)],
+         [(336.722,761.334),(459.065,843.159),(561.643,572.304),(421.546,567.267),
+         (356.073,747.818),(451.158,806.274),(534.843,593.878),(428.283,584.402),
+         (400.842,700.596),(436.129,717.193),(467.284,647.240),(427.526,638.794),
+         (1532.010,805.481),(1654.638,732.667),(1560.331,543.526),(1423.584,549.188),
+         (1540.329,771.869),(1635.315,721.673),(1557.946,560.666),(1450.886,568.042),
+         (1552.074,688.311),(1588.403,675.260),(1557.017,613.734),(1522.558,621.695)],
+         [(233.503,674.422),(259.214,702.625),(316.859,578.079),(279.466,569.207),
+         (243.090,665.626),(260.053,685.466),(305.689,587.776),(281.988,581.209),
+         (258.467,642.556),(268.377,648.475),(284.372,614.911),(272.615,611.244),
+         (1666.714,711.499),(1703.773,672.993),(1643.246,554.714),(1594.974,564.733),
+         (1665.166,695.445),(1695.455,665.853),(1643.087,566.604),(1606.476,577.471),
+         (1658.640,646.255),(1670.754,637.334),(1652.185,600.063),(1637.795,607.301)],
+         [(260.645,674.616),(302.728,708.959),(378.877,560.912),(320.521,553.519),
+         (270.127,666.156),(303.906,692.382),(364.535,571.969),(321.852,565.919),
+         (295.149,637.813),(309.516,644.059),(331.469,605.169),(312.906,599.970),
+         (1690.343,688.457),(1716.687,664.436),(1665.597,557.933),(1629.563,564.493),
+         (1688.991,673.511),(1708.099,655.327),(1667.512,571.222),(1642.266,576.273),
+         (1681.099,637.213),(1691.977,630.243),(1675.108,598.143),(1663.869,602.714)],
+         [(266.546,761.228),(368.820,838.300),(471.901,599.210),(350.959,587.009),
+         (282.813,752.674),(364.447,809.124),(447.787,614.515),(352.791,602.933),
+         (323.830,712.295),(356.378,726.475),(383.816,661.568),(349.424,653.671),
+         (1460.643,835.675),(1581.636,748.868),(1483.032,566.232),(1344.212,587.207),
+         (1468.790,802.020),(1562.534,736.320),(1480.875,583.683),(1372.462,602.471),
+         (1480.763,713.575),(1514.355,696.954),(1483.021,638.530),(1446.418,650.523)]
+         ],dtype=np.float64)
+
+        mark_board[...,1] = 1080-mark_board[...,1] 
         data = {
             "nc" : 6,
             "location" : location,
@@ -323,7 +495,8 @@ class OCAMSystem:
             "vfield" : (110, 180),
             'flip' : flip,
             'icenter': icenter,
-            'radius' : radius
+            'radius' : radius,
+            'mark_board': mark_board
         }
 
         return cls(data)
