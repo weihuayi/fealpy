@@ -199,8 +199,8 @@ class OCAMSystem:
                         densty=0.05,
                         center_height=3,
                         v=0.5,
-                        theta1=np.pi / 6,
-                        theta2=np.pi / 4 * 0):
+                        theta1= 0,
+                        theta2= 0):
         '''
         获取分割线
         @param size: 小车长宽高
@@ -235,6 +235,9 @@ class OCAMSystem:
         # 底部矩形附着
         rec = gmsh.model.occ.addRectangle(-0.5 / scale_ratio[0], -0.5 / scale_ratio[1], -bottom, 1 / scale_ratio[0],
                                           1 / scale_ratio[1])
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.generate(2)
+        gmsh.fltk.run()
 
         # 分割线对应的固定点
         fixed_point1 = [0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
