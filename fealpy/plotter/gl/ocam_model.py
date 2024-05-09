@@ -213,7 +213,7 @@ class OCAMModel:
 
         
         gmsh.model.geo.synchronize()
-        gmsh.fltk().run()
+        #gmsh.fltk().run()
         #gmsh.option.setNumber("Mesh.Algorithm",6) 
         gmsh.model.mesh.field.add("Distance",1)
         gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
@@ -575,14 +575,29 @@ class OCAMModel:
         DIM = _img_shape[::-1]
         return DIM, K, D
 
-    def show_camera_image_mesh(self, imgname=None):
+    def show_camera_image_and_mesh(self, imgname=None, outname=None):
         from PIL import Image
         mesh = self.imagemesh
-        mesh.add_plot(plt, alpha=0.5)
+        mesh.add_plot(plt, alpha=0.2)
         if imgname is None:
             imgname = self.fname
         img = cv2.imread(imgname)
         plt.imshow(img, extent=[0, 1920, 0, 1080])
+
+        # 递归获取所有的 numpy 数组
+        def get_numpy_arrays(data):
+            numpy_arrays = []
+            for item in data:
+                if isinstance(item, np.ndarray):
+                    numpy_arrays.append(item)
+                elif isinstance(item, list):
+                    numpy_arrays.extend(get_numpy_arrays(item))  # 递归调用
+            return numpy_arrays
+        points = get_numpy_arrays(self.camera_points)
+        for i in range(len(points)):
+            plt.plot(points[i][:, 0], points[i][:, 1], 'r')
+        if outname is not None:
+            plt.savefig(outname)
         plt.show()
 
     def undistort_chess(self, imgname, scale=0.6):

@@ -201,7 +201,7 @@ class OCAMSystem:
                         densty=0.05,
                         center_height=3,
                         v=0.5,
-                        theta1= np.pi/24,
+                        theta1= 0,
                         theta2= 0):
         '''
         获取分割线
