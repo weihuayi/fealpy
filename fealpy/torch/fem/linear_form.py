@@ -77,8 +77,7 @@ class LinearForm(Generic[_FS]):
         for bi in self.bintegrators:
             V = V + bi.assembly_face_vector(space)
 
-        V.coalesce()
-        self._V = V
+        self._V = V.coalesce()
         logger.info(f"Construct source vector with shape {V.shape}.")
 
-        return V
+        return self._V

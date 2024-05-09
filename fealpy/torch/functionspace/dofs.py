@@ -36,7 +36,7 @@ class LinearMeshCFEDof(Generic[_MT]):
                 index = index[flag]
 
         face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
-        isBdDof = torch.zeros(gdof, dtype=torch.bool)
+        isBdDof = torch.zeros(gdof, dtype=torch.bool, device=self.mesh.device)
         isBdDof[face2dof] = True
         return isBdDof
 
@@ -49,7 +49,7 @@ class LinearMeshCFEDof(Generic[_MT]):
     def cell_to_dof(self, index: Index=_S):
         return self.mesh.cell_to_ipoint(self.p, index=index)
 
-    def interpolation_points(self, index: Index=_S):
+    def interpolation_points(self, index: Index=_S) -> Tensor:
         return self.mesh.interpolation_points(self.p, index=index)
 
     def number_of_global_dofs(self) -> int:
