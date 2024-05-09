@@ -198,7 +198,7 @@ class OCAMSystem:
     def get_split_point(self,
                         size=(17.5, 3.47, 3),
                         scale_ratio=(1.618, 1.618, 1.618),
-                        h=0.05,
+                        densty=0.05,
                         center_height=3,
                         v=0.5,
                         theta1= np.pi/24,
@@ -207,7 +207,7 @@ class OCAMSystem:
         获取分割线
         @param size: 小车长宽高
         @param scale_ratio: 三个主轴的伸缩比例
-        @param h: 节点密度
+        @param densty: 节点密度
         @param center_height: 椭球面球心的高度
         @param v: 两侧摄像头分割线相对位置
         @param theta1: 主分割线偏转角
@@ -291,7 +291,7 @@ class OCAMSystem:
 
         gmsh.model.occ.synchronize()
         # 调整网格密度
-        #gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), densty)
         gmsh.model.mesh.generate(2)
 
         # 获取分割线节点
