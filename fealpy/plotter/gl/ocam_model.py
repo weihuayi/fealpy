@@ -31,7 +31,10 @@ class OCAMModel:
             cps = self.camera_points[i]
             cps_all.append([])
             for j in range(len(cps)):
-                cps_all[i].append(self.world_to_image(cps[j]))
+                val = self.world_to_image(cps[j])
+                val *= np.array([[self.width, self.height]])
+                val[:, 1] = self.height-val[:, 1]
+                cps_all[i].append(val)
         self.camera_points = cps_all
 
     def __call__(self, u):
@@ -50,14 +53,9 @@ class OCAMModel:
         mark_board=self.mark_board        
         camera_points = self.camera_points
         #print(camera_points)
-        for i in range(len(camera_points)):
-            camera_points[i][0][...,0] = camera_points[i][0][...,0]*self.width
-            camera_points[i][0][...,1] = camera_points[i][0][...,1]*self.height
-            camera_points[i][1][...,0] = camera_points[i][1][...,0]*self.width
-            camera_points[i][1][...,1] = camera_points[i][1][...,1]*self.height
 
         x1 = np.sqrt(r*r-icenter[...,1]*icenter[...,1])
-        x2 = np.sqrt(r*r-(1080-icenter[...,1])**2)
+        x2 = np.sqrt(r*r-(self.height-icenter[...,1])**2)
         gmsh.initialize()
 
         # 边界区域
@@ -76,44 +74,44 @@ class OCAMModel:
         
         
         # 标记板区域
-        for i in range(24):
-            gmsh.model.geo.addPoint(mark_board[i,0],mark_board[i,1],0,tag=6+i)
+        #for i in range(24):
+        #    gmsh.model.geo.addPoint(mark_board[i,0],mark_board[i,1],0,tag=6+i)
 
-        gmsh.model.geo.addLine(6,7,tag=5)
-        gmsh.model.geo.addLine(7,8,tag=6)
-        gmsh.model.geo.addLine(8,9,tag=7)
-        gmsh.model.geo.addLine(9,6,tag=8)
-        gmsh.model.geo.addCurveLoop([5,6,7,8],2)
+        #gmsh.model.geo.addLine(6,7,tag=5)
+        #gmsh.model.geo.addLine(7,8,tag=6)
+        #gmsh.model.geo.addLine(8,9,tag=7)
+        #gmsh.model.geo.addLine(9,6,tag=8)
+        #gmsh.model.geo.addCurveLoop([5,6,7,8],2)
 
-        gmsh.model.geo.addLine(10,11,tag=9)
-        gmsh.model.geo.addLine(11,12,tag=10)
-        gmsh.model.geo.addLine(12,13,tag=11)
-        gmsh.model.geo.addLine(13,10,tag=12)
-        gmsh.model.geo.addCurveLoop([9,10,11,12],3)
+        #gmsh.model.geo.addLine(10,11,tag=9)
+        #gmsh.model.geo.addLine(11,12,tag=10)
+        #gmsh.model.geo.addLine(12,13,tag=11)
+        #gmsh.model.geo.addLine(13,10,tag=12)
+        #gmsh.model.geo.addCurveLoop([9,10,11,12],3)
 
-        gmsh.model.geo.addLine(14,15,tag=13)
-        gmsh.model.geo.addLine(15,16,tag=14)
-        gmsh.model.geo.addLine(16,17,tag=15)
-        gmsh.model.geo.addLine(17,14,tag=16)
-        gmsh.model.geo.addCurveLoop([13,14,15,16],4)
+        #gmsh.model.geo.addLine(14,15,tag=13)
+        #gmsh.model.geo.addLine(15,16,tag=14)
+        #gmsh.model.geo.addLine(16,17,tag=15)
+        #gmsh.model.geo.addLine(17,14,tag=16)
+        #gmsh.model.geo.addCurveLoop([13,14,15,16],4)
 
-        gmsh.model.geo.addLine(18,19,tag=17)
-        gmsh.model.geo.addLine(19,20,tag=18)
-        gmsh.model.geo.addLine(20,21,tag=19)
-        gmsh.model.geo.addLine(21,18,tag=20)
-        gmsh.model.geo.addCurveLoop([17,18,19,20],5)
+        #gmsh.model.geo.addLine(18,19,tag=17)
+        #gmsh.model.geo.addLine(19,20,tag=18)
+        #gmsh.model.geo.addLine(20,21,tag=19)
+        #gmsh.model.geo.addLine(21,18,tag=20)
+        #gmsh.model.geo.addCurveLoop([17,18,19,20],5)
 
-        gmsh.model.geo.addLine(22,23,tag=21)
-        gmsh.model.geo.addLine(23,24,tag=22)
-        gmsh.model.geo.addLine(24,25,tag=23)
-        gmsh.model.geo.addLine(25,22,tag=24)
-        gmsh.model.geo.addCurveLoop([21,22,23,24],6)
+        #gmsh.model.geo.addLine(22,23,tag=21)
+        #gmsh.model.geo.addLine(23,24,tag=22)
+        #gmsh.model.geo.addLine(24,25,tag=23)
+        #gmsh.model.geo.addLine(25,22,tag=24)
+        #gmsh.model.geo.addCurveLoop([21,22,23,24],6)
 
-        gmsh.model.geo.addLine(26,27,tag=25)
-        gmsh.model.geo.addLine(27,28,tag=26)
-        gmsh.model.geo.addLine(28,29,tag=27)
-        gmsh.model.geo.addLine(29,26,tag=28)
-        gmsh.model.geo.addCurveLoop([25,26,27,28],7)
+        #gmsh.model.geo.addLine(26,27,tag=25)
+        #gmsh.model.geo.addLine(27,28,tag=26)
+        #gmsh.model.geo.addLine(28,29,tag=27)
+        #gmsh.model.geo.addLine(29,26,tag=28)
+        #gmsh.model.geo.addCurveLoop([25,26,27,28],7)
         
         # 分割线
         t0 = False # 判断点是否是同一点
@@ -188,6 +186,7 @@ class OCAMModel:
             gmsh.model.geo.addCurveLoop([-34,-33,35,36,-36,-35,33,34])
    
         # 生成面
+        """
         if t0+t1==2:
             gmsh.model.geo.addPlaneSurface([1,2,5,8,9],1)
         else:
@@ -198,8 +197,17 @@ class OCAMModel:
         gmsh.model.geo.addPlaneSurface([5,6],5)
         gmsh.model.geo.addPlaneSurface([6,7],6)
         gmsh.model.geo.addPlaneSurface([7],7)
+        """
+
+        # 如果有标记板就把这一段删掉, 上面的取消注释
+        if t0+t1==2:
+            gmsh.model.geo.addPlaneSurface([1, 2, 3],1)
+        else:
+            gmsh.model.geo.addPlaneSurface([1, 2, 3, 4],1)
+
         
         gmsh.model.geo.synchronize()
+        gmsh.fltk().run()
         #gmsh.option.setNumber("Mesh.Algorithm",6) 
         gmsh.model.mesh.field.add("Distance",1)
         gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
@@ -237,7 +245,7 @@ class OCAMModel:
         
         
         gmsh.model.mesh.generate(2)
-        #gmsh.fltk().run()
+        gmsh.fltk().run()
 
         ntags, vxyz, _ = gmsh.model.mesh.getNodes()
         node = vxyz.reshape((-1,3))
@@ -272,7 +280,7 @@ class OCAMModel:
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
-    def cam_to_image(self, node, ptype='O'):
+    def cam_to_image(self, node, ptype='L'):
         """
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
