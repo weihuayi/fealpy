@@ -1,4 +1,6 @@
 
+from typing import Optional
+
 import torch
 from torch import Tensor
 
@@ -9,7 +11,7 @@ from .integrator import DomainIntegrator, _FS, _S, Index, CoefLike
 
 class ScalarDiffusionIntegrator(DomainIntegrator[_FS]):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, c: CoefLike, q: int=3) -> None:
+    def __init__(self, c: Optional[CoefLike]=None, q: int=3) -> None:
         self.coef = c
         self.q = q
 
@@ -29,7 +31,7 @@ class ScalarDiffusionIntegrator(DomainIntegrator[_FS]):
         bcs, ws = qf.get_quadrature_points_and_weights()
         NQ = ws.size(0)
 
-        gphi = space.grad_basis(bcs, index)
+        gphi = space.grad_basis(bcs, index, variable='x')
 
         if coef is None:
             return torch.einsum('q, qci..., qcj..., c -> cij', ws, gphi, gphi, cm)

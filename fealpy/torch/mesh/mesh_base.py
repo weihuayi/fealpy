@@ -69,8 +69,7 @@ def entity_str2dim(ds, etype: str) -> int:
     elif etype == 'edge':
         return 1
     elif etype == 'node':
-        raise ValueError('The node entity is not available in mesh data structure. '
-                            'Please fetch it from the mesh object.')
+        return 0
     else:
         raise KeyError(f'{etype} is not a valid entity attribute.')
 
@@ -88,7 +87,8 @@ def entity_dim2tensor(ds, etype_dim: int, index=None, *, default=_default):
     else:
         if default is not _default:
             return default
-        raise ValueError(f'{etype_dim} is not a valid entity attribute index.')
+        raise ValueError(f'{etype_dim} is not a valid entity attribute index '
+                         f"in {ds.__class__.__name__}.")
 
 
 def entity_dim2node(ds, etype_dim: int, index=None, dtype=None) -> Tensor:
@@ -272,24 +272,6 @@ class Mesh():
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
     def number_of_nodes(self) -> int: return self.ds.number_of_nodes()
-    def number_of_local_ipoints(self, p: int, iptype: Union[str, int]='cell'):
-        if iptype in ('node', 0):
-            return 1
-        if isinstance(iptype, str):
-            iptype = entity_str2dim(self.ds, iptype)
-        if iptype < 0:
-            raise ValueError("Unsupported iptype.")
-        return comb(p + iptype, iptype)
-
-    def number_of_global_ipoints(self, p: int) -> int:
-        coef = 1
-        count = self.entity(0).size(0)
-
-        for i in range(1, self.TD + 1):
-            coef *= (p-i) // i
-            count += coef * self.entity(i).size(0)
-        return count
-
     def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
@@ -297,6 +279,14 @@ class Mesh():
             return self.ds.entity(etype, index)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+        r"""@brief Get the barycenter of the entity.
+
+        @param etype: int or str. The topology dimension of the entity, or name
+        'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
+        @param index: int, slice ot Tensor. The index of the entity.
+
+        @return: Tensor.
+        """
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
 
@@ -304,9 +294,7 @@ class Mesh():
         if isinstance(etype, str):
             etype = entity_str2dim(self.ds, etype)
         etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
-        summary = etn@self.node
-        count = etn@torch.ones((node.size(0), 1), dtype=node.dtype)
-        return summary.div_(count)
+        return F.entity_barycenter(etn, node)
 
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
         r"""@brief Get the quadrature points and weights."""
@@ -327,39 +315,21 @@ class Mesh():
 
 class HomoMesh(Mesh):
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
-        r"""@brief Get the barycenter of the entity.
-
-        @param etype: int or str. The topology dimension of the entity, or name
-        'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
-        @param index: int, slice ot Tensor. The index of the entity.
-
-        @return: Tensor.
-        """
         node = self.entity('node')
         if etype in ('node', 0):
             return node if index is None else node[index]
-        else:
-            entity: Tensor = self.ds.entity(etype, index)
-            return torch.mean(node[entity, :], dim=1)
+        entity = self.ds.entity(etype, index)
+        return F.homo_entity_barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]], index=_S) -> Tensor:
+    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]], etype='cell', index=_S) -> Tensor:
         r"""@brief Convert barycenter coordinate points to cartesian coordinate points
             on mesh entities.
         """
         node = self.entity('node')
-        if isinstance(bcs, Tensor): # for edge, interval, triangle and tetrahedron
-            TD = bcs.size(-1)
-            entity: Tensor = self.ds.entity(TD, index)
-            return torch.einsum('ijk, ...j -> ...ik', node[entity, :], bcs)
-
-        else: # for quadrangle and hexahedron
-            TD = len(bcs)
-            entity: Tensor = self.ds.entity(TD, index)
-            desp1 = 'mnopq'
-            desp2 = 'abcde'
-            string = ", ".join([desp1[i]+desp2[i] for i in range(TD)])
-            string += " -> " + desp1[:TD] + desp2[:TD]
-            return torch.einsum(string, *bcs).reshape(-1, entity.size(-1))
+        entity = self.ds.entity(etype, index)
+        # TODO: finish this
+        ccw = getattr(self.ds, 'ccw', None)
+        return F.bc_to_points(bcs, node, entity, ccw)
 
     ### ipoints
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:

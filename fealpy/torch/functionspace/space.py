@@ -16,11 +16,11 @@ class FunctionSpace(metaclass=ABCMeta):
 
     ### basis
     @abstractmethod
-    def basis(self, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
+    def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
     @abstractmethod
-    def grad_basis(self, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
+    def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
     @abstractmethod
-    def hess_basis(self, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
+    def hess_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
 
     # values
     @abstractmethod

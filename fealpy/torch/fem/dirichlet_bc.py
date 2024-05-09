@@ -37,6 +37,11 @@ class DirichletBC():
     def apply_for_other_space(self, A: Tensor, f: Tensor, uh: Tensor) -> Tuple[Tensor, Tensor]:
         """
         @brief 处理基是向量函数的向量函数空间或标量函数空间的 Dirichlet 边界条件
+
+        Args:
+            A: Coefficient matrix Tensor in the COO format.
+            f: Right-hand-side vector.
+            uh: Solution vector.
         """
         space = self.space
         gD = self.gD

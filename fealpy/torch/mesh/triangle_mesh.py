@@ -6,11 +6,12 @@ import torch
 from torch import Tensor
 
 from fealpy.torch.mesh.mesh_base import _S
+from fealpy.torch.mesh.quadrature import Quadrature
 
 from .. import logger
 from . import functional as F
 from . import mesh_kernel as K
-from .mesh_base import HomoMeshDataStructure, HomoMesh
+from .mesh_base import HomoMeshDataStructure, HomoMesh, entity_str2dim
 
 Index = Union[Tensor, int, slice]
 _dtype = torch.dtype
@@ -84,6 +85,44 @@ class TriangleMesh(HomoMesh):
                         "cell_area and grad_lambda are not available. "
                         "Any operation involving them will fail.")
 
+    def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+        node = self.node
+        if isinstance(etype, str):
+            etype = entity_str2dim(self.ds, etype)
+        if etype == 0:
+            return node if index is None else node[index]
+        elif etype == 1:
+            edge = self.entity(1, index)
+            return F.edge_length(node[edge])
+        elif etype == 2:
+            cell = self.entity(2, index)
+            return self._cell_area(node[cell])
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+    def integrator(self, q: int, etype: Union[int, str]='cell',
+                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+        from .quadrature import TriangleQuadrature
+        if isinstance(etype, str):
+            etype = entity_str2dim(self.ds, etype)
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+        if etype == 2:
+            quad = TriangleQuadrature(**kwargs)
+        elif etype == 1:
+            raise NotImplementedError
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+        quad._latest_order = q
+        return quad
+
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
+        if isinstance(iptype, str):
+            iptype = entity_str2dim(self.ds, iptype)
+        return F.simplex_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p: int):
+        return F.simplex_gdof(p, self)
+
     def interpolation_points(self, p: int, index=np.s_[:]):
         """
         @brief Fetch all p-order interpolation points on a triangle mesh.
@@ -141,7 +180,6 @@ class TriangleMesh(HomoMesh):
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoints(p, 'cell')
         c2p = torch.zeros((NC, ldof), **kwargs)
-        print(c2p.shape)
 
         flag = face2cell[:, 2] == 0
         c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
@@ -179,7 +217,7 @@ class TriangleMesh(HomoMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(0)
+            return phi.unsqueeze_(1)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -188,13 +226,13 @@ class TriangleMesh(HomoMesh):
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
-        R = K.simplex_grad_shape_function(bc, p, mi)
+        R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = torch.einsum('...ij, kjm -> k...im', Dlambda, R)
-            # NOTE: the subscript 'k': cell, 'i': dof, 'j': bc, 'm': dimension, '...': batch
+            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
+            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "

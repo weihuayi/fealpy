@@ -8,3 +8,6 @@ from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 
 ### Domain Linear Forms
 from .scalar_source_integrator import ScalarSourceIntegrator
+
+### Dirichlet BC
+from .dirichlet_bc import DirichletBC
