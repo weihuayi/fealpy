@@ -87,5 +87,8 @@ class NSFlipSolver:
         S_pv = self.bilinear(particles["position"],vertex)
         M_v = m_p@S_pv
         m_p = m_p[:,np.newaxis]
-        U_v = ((m_p*v_p).T@S_pv/M_v).T #需要确认写法
+        U_v = ((m_p*v_p).T@S_pv/M_v).T 
         return M_v, U_v
+
+    def pressure(self,rho_c,I_c,R,Cv):
+        return (rho_c*R*I_c)/Cv

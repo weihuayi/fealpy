@@ -12,6 +12,11 @@ from fealpy.cfd import NSFlipSolver
 from fealpy.mesh import UniformMesh2d
 import matplotlib.pyplot as plt
 
+R = 8.314 #普适气体常数
+Cv = 4186 #比热容 
+mu = 1 #剪切粘度
+lam = -(2/3)*mu #体积粘度
+
 dtype = [("position", "float64", (2, )), 
          ("velocity", "float64", (2, )),
          ("rho", "float64"),
@@ -19,7 +24,7 @@ dtype = [("position", "float64", (2, )),
          ("pressure", "float64"),
 		 ("internal_energy", "float64"),]
 
-num=10000
+num=10
 np.random.seed(0)
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)
@@ -29,6 +34,7 @@ particles['internal_energy'] = 1 #临时给的值
 particles['velocity'] = np.array([0.0, 1.0]) #临时给的值
 #print(random_points)
 
+nt = 100
 domain=[0,1,0,1]
 nx = 4
 ny = 4
@@ -47,6 +53,11 @@ vertex = mesh.node.reshape(num_v,2)
 #e = solver.e(particles["position"])
 #solver.coordinate(particles["position"])
 #solver.NGP(particles["position"],vertex)
-#solver.bilinear(particles["position"],vertex)
-#solver.P2G_cell(particles)
-solver.P2G_vertex(particles)
+Sv = solver.bilinear(particles["position"],vertex)
+grad_Sv = Sv.todense() #形状有疑问？
+solver.P2G_cell(particles)
+rho_c ,I_c =  solver.P2G_cell(particles)
+#solver.P2G_vertex(particles)
+p = solver.pressure(rho_c,I_c,R,Cv)
+Q = np.matmul(-(lam+2*mu)*grad_Sv.T,particles['velocity'])
+phi = np.einsum('ij,ik->ijk', mu*grad_Sv, particles['velocity'])
