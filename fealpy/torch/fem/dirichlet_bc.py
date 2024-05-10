@@ -2,7 +2,6 @@
 
 from typing import Optional, Tuple, Callable, Union
 
-import numpy as np
 import torch
 from torch import Tensor
 
@@ -20,11 +19,16 @@ class DirichletBC():
 
     def apply(self, A: Tensor, f: Tensor, uh: Optional[Tensor]=None) -> Tuple[Tensor, Tensor]:
         """
-        @brief Process Dirichlet boundary condition.
+        @brief Process Dirichlet boundary condition. This is out-of-place for
+        A and f, while in-place for uh.
 
         @param[in] A: coefficient matrix
         @param[in] f: right-hand-size vector
         @param[in] uh: solution vector
+
+        Returns:
+            A: coefficient matrix
+            f: right-hand-size vector
         """
         gdof = self.space.number_of_global_dofs()
         GD = int(A.shape[0]//gdof)
@@ -75,7 +79,7 @@ class DirichletBC():
         A = torch.sparse_coo_tensor(indices, new_values, A.size())
         A = A.coalesce()
 
-        bdIdx = torch.zeros_like(f)
+        bdIdx = torch.zeros_like(f, requires_grad=False)
         bdIdx[isDDof.reshape(-1)] = 1
         f = f * (1-bdIdx) + uh.reshape(-1) * bdIdx
 
