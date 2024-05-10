@@ -195,14 +195,13 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
-    def get_split_point(self,
-                        size=(17.5, 3.47, 3),
+    def get_split_point(size=(17.5, 3.47, 3),
                         scale_ratio=(1.618, 1.618, 1.618),
                         densty=0.05,
                         center_height=3,
                         v=0.5,
-                        theta1= 0,
-                        theta2= 0):
+                        theta1=0,
+                        theta2=0):
         '''
         获取分割线
         @param size: 小车长宽高
@@ -237,8 +236,9 @@ class OCAMSystem:
         # 底部矩形附着
         rec = gmsh.model.occ.addRectangle(-0.5 / scale_ratio[0], -0.5 / scale_ratio[1], -bottom, 1 / scale_ratio[0],
                                           1 / scale_ratio[1])
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(2)
+        # gmsh.model.occ.synchronize()
+        # gmsh.model.mesh.generate(2)
+        # gmsh.fltk.run()
 
         # 分割线对应的固定点
         fixed_point1 = [0.5 * r / scale_ratio[0], -0.5 * r / scale_ratio[1], -bottom - 0.5 * r]
@@ -287,7 +287,7 @@ class OCAMSystem:
                                                 [(2, plane1), (2, plane2), (2, plane3), (2, plane4), (2, plane5),
                                                  (2, plane6),
                                                  (2, plane7), (2, plane8), (2, plane9), (2, plane10), (2, plane11),
-                                                 (2, plane12)])
+                                                 (2, plane12)], removeObject=False)
 
         gmsh.model.occ.synchronize()
         # 调整网格密度
@@ -316,15 +316,109 @@ class OCAMSystem:
             total_vects.append(curve_vects)
 
         # 显示
-        #gmsh.fltk.run()
+        # gmsh.fltk.run()
         camera_points = []
         for i in range(6):
             camera_points.append([])
-            camera_points[i].append(total_vects[(2 * i) % 12])
-            camera_points[i].append(total_vects[(2 * i + 1) % 12])
-            camera_points[i].append(total_vects[(2 * i + 2) % 12])
-            camera_points[i].append(total_vects[(2 * i + 3) % 12])
+            camera_points[i].append(total_vects[(2 * i) % 12][0])
+            camera_points[i].append(total_vects[(2 * i) % 12][1])
+            camera_points[i].append(total_vects[(2 * i + 1) % 12][0])
+            camera_points[i].append(total_vects[(2 * i + 1) % 12][1])
+            camera_points[i].append(total_vects[(2 * i + 2) % 12][0])
+            camera_points[i].append(total_vects[(2 * i + 2) % 12][1])
+            camera_points[i].append(total_vects[(2 * i + 3) % 12][0])
+            camera_points[i].append(total_vects[(2 * i + 3) % 12][1])
         gmsh.finalize()
+
+        # 构建横向分割线
+        intersection_points_list = np.zeros((12, 3, 3))
+        for i in range(12):
+            intersection_points_list[i, 0] = total_vects[i][1][-1]
+            intersection_points_list[i, 1] = total_vects[i][1][0]
+            intersection_points_list[i, 2] = total_vects[i][0][0]
+        # 恢复到单位球面
+        intersection_points_list[..., 0] /= a
+        intersection_points_list[..., 1] /= b
+        intersection_points_list[..., 2] /= c
+        # 拟合横向分割线
+        gmsh.initialize()
+        intersection_line_tag = []
+        intersection_line_tag.append([])
+        intersection_line_tag.append([])
+        intersection_line_tag.append([])
+        # 分割线 1、2
+        o1 = gmsh.model.occ.addPoint(0, 0, 0)
+        o2 = gmsh.model.occ.addPoint(0, 0, -bottom)
+        for i in range(12):
+            p11 = intersection_points_list[i, 0]
+            p12 = intersection_points_list[(i + 1) % 12, 0]
+            p21 = intersection_points_list[i, 1]
+            p22 = intersection_points_list[(i + 1) % 12, 1]
+            p11_tag = gmsh.model.occ.addPoint(p11[0], p11[1], p11[2])
+            p12_tag = gmsh.model.occ.addPoint(p12[0], p12[1], p12[2])
+            p21_tag = gmsh.model.occ.addPoint(p21[0], p21[1], p21[2])
+            p22_tag = gmsh.model.occ.addPoint(p22[0], p22[1], p22[2])
+            int_tag1 = gmsh.model.occ.addCircleArc(p11_tag, o1, p12_tag)
+            intersection_line_tag[0].append(int_tag1)
+            int_tag2 = gmsh.model.occ.addCircleArc(p21_tag, o2, p22_tag)
+            intersection_line_tag[1].append(int_tag2)
+        # 分割线 3
+        for i in range(8):
+            if i in [0, 1, 2]:
+                j = i + 1
+            if i == 3:
+                j = i + 2
+            if i in [4, 5, 6]:
+                j = i + 3
+            if i == 7:
+                j = i + 4
+            p1 = intersection_points_list[j, 2]
+            p2 = intersection_points_list[(j + 1) % 12, 2]
+            p1_tag = gmsh.model.occ.addPoint(p1[0], p1[1], p1[2])
+            p2_tag = gmsh.model.occ.addPoint(p2[0], p2[1], p2[2])
+            int_tag = gmsh.model.occ.addLine(p1_tag, p2_tag)
+            intersection_line_tag[2].append(int_tag)
+
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), densty)
+        gmsh.model.mesh.generate(1)
+
+        horizontal_split_points = []
+        for i in range(len(intersection_line_tag)):
+            horizontal_split_points.append([])
+            for j in range(len(intersection_line_tag[i])):
+                node_pre = gmsh.model.mesh.getNodes(1, intersection_line_tag[i][j], includeBoundary=True)[1].reshape(-1,
+                                                                                                                     3)
+                nodes = np.zeros_like(node_pre)
+                nodes[0, :] = node_pre[-2, :]
+                nodes[-1, :] = node_pre[-1, :]
+                nodes[1:-1, :] = node_pre[0:-2, :]
+                # 由球面映射到椭球面
+                nodes[:, 0] *= a
+                nodes[:, 1] *= b
+                nodes[:, 2] *= c
+                horizontal_split_points[i].append(nodes)
+
+        gmsh.finalize()
+        # 装配相机分割线
+        for i in range(6):
+            for j in range(3):
+                camera_points[i].append(horizontal_split_points[0][(2 * i + j) % 12])
+                camera_points[i].append(horizontal_split_points[1][(2 * i + j) % 12])
+            if i in [0, 1, 3, 4]:
+                if i in [0, 1]:
+                    j = i
+                else:
+                    j = i + 1
+                camera_points[i].append(horizontal_split_points[2][j])
+                camera_points[i].append(horizontal_split_points[2][j + 1])
+            else:
+                if i == 2:
+                    j = i + 1
+                else:
+                    j = i + 2
+                camera_points[i].append(horizontal_split_points[2][j])
+
         return camera_points
 
     def undistort_cv(self):
