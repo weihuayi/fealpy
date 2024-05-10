@@ -40,22 +40,44 @@ class DirichletBC():
 
         Args:
             A: Coefficient matrix Tensor in the COO format.
-            f: Right-hand-side vector.
+            f: Right-hand-side dense vector.
             uh: Solution vector.
         """
+        # Make sure that A is in the COO format and f is dense.
+        if not A.layout == torch.sparse_coo:
+            raise ValueError('The layout of A must be torch.sparse_coo.')
+        if not A.is_coalesced():
+            raise RuntimeError('The A must be coalesced.')
+        if f.is_sparse:
+            raise ValueError('The layout of f must be torch.dense.')
+
         space = self.space
         gD = self.gD
         isDDof = space.is_boundary_dof(threshold=self.threshold)
-        isDDof = space.interpolate(gD, uh, dof_idx=isDDof) # isDDof.shape == uh.shape
-        f = f - A@uh.reshape(-1) # 注意这里不修改外界 f 的值
+        space.interpolate(gD, uh, index=isDDof) # isDDof.shape == uh.shape
+        f = f - torch.sparse.mm(A, uh.reshape(-1, 1)).reshape(-1)
 
-        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+        # NOTE: Code in the numpy version:
+        # ```
+        # bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+        # bdIdx[isDDof.reshape(-1)] = 1
+        # D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        # D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        # A = D0@A@D0 + D1
+        # ```
+
+        new_values = torch.zeros_like(A.values(), requires_grad=False)
+        indices = A.indices()
+        IDX = isDDof[indices[0, :]] & (indices[1, :] == indices[0, :])
+        new_values[IDX] = 1.0
+        IDX = ~(isDDof[indices[0, :]] | isDDof[indices[1, :]])
+        new_values[IDX] = A.values()[IDX]
+        A = torch.sparse_coo_tensor(indices, new_values, A.size())
+        A = A.coalesce()
+
+        bdIdx = torch.zeros_like(f)
         bdIdx[isDDof.reshape(-1)] = 1
-        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        A = D0@A@D0 + D1
-
-        f[isDDof.reshape(-1)] = uh[isDDof].reshape(-1)
+        f = f * (1-bdIdx) + uh.reshape(-1) * bdIdx
 
         return A, f
 

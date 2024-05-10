@@ -206,6 +206,9 @@ class TriangleMesh(HomoMesh):
         c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         return c2p[index]
 
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        return self.edge_to_ipoint(p, index)
+
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.node[self.ds.cell[index]])
 
