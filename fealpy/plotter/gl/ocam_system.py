@@ -195,9 +195,10 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
-    def get_split_point(size=(17.5, 3.47, 3),
+    def get_split_point(self,
+                        size=(17.5, 3.47, 3),
                         scale_ratio=(1.618, 1.618, 1.618),
-                        densty=0.05,
+                        densty=0.02,
                         center_height=3,
                         v=0.5,
                         theta1=0,
