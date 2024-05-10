@@ -195,9 +195,10 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
-    def get_split_point(size=(17.5, 3.47, 3),
+    def get_split_point(self,
+                        size=(17.5, 3.47, 3),
                         scale_ratio=(1.618, 1.618, 1.618),
-                        densty=0.05,
+                        densty=0.02,
                         center_height=3,
                         v=0.5,
                         theta1=0,
@@ -536,6 +537,8 @@ class OCAMSystem:
             [961.628,551.019],
             [940.2435,541.3385],
             ], dtype=np.float64)
+        icenter[:, 1] *= -1
+        icenter[:, 1] += 1080
 
         radius = np.array([877.5,882.056,886.9275,884.204,883.616,884.5365],dtype=np.float64)
         mark_board = np.array(

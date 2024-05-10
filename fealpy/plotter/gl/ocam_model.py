@@ -31,17 +31,14 @@ class OCAMModel:
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
         cps_all = []
-        for i in range(4):
-            cps = self.camera_points[i]
-            cps_all.append([])
-            for j in range(len(cps)):
-                val = self.world_to_image(cps[j])
-                val *= np.array([[self.width, self.height]])
-                val[:, 1] = self.height-val[:, 1]
-                val = val[self.signed_dist_function(val)<0] # 去掉不在区域内的点
-                cps_all[i].append(val)
+        for cps in self.camera_points:
+            val = self.world_to_image(cps)
+            val *= np.array([[self.width, self.height]])
+            val = val[self.signed_dist_function(val)<0] # 去掉不在区域内的点
+            val[:, 1] = self.height-val[:, 1]
+            cps_all.append(val)
         self.camera_points = cps_all
-        self.imagemesh = self.gmeshing()
+        self.imagemesh = self.gmshing_new()
 
     def __call__(self, u):
         icenter = self.icenter
@@ -51,7 +48,59 @@ class OCAMModel:
     def signed_dist_function(self, u):
         return self(u)
 
-    def gmeshing(self):
+    def gmshing_new(self):
+        import gmsh
+        from fealpy.mesh import TriangleMesh
+
+        gmsh.initialize()
+        occ = gmsh.model.occ
+        gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 20)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
+
+        # 获得分割线
+        cps = self.camera_points
+        lines = []
+        for cp in cps:
+            curves = [] 
+            for p in cp:
+                curves.append(occ.addPoint(p[0], p[1], 0))
+            lines.append(occ.addSpline(curves))
+
+        # 生成区域
+        rec  = occ.addRectangle(0, 0, 0, 1920, 1080)
+        circ = occ.addDisk(self.icenter[0], self.height-self.icenter[1], 0, self.radius, self.radius)
+
+        ## 保留 rec 和 circ 的交集
+        dom = occ.intersect([(2, rec)], [(2, circ)])[0]
+
+        ## 分割线和区域的交集
+        occ.fragment([(1, l) for l in lines], dom)
+
+        occ.synchronize()
+
+        ## 生成网格
+        gmsh.model.mesh.generate(2)
+
+        #gmsh.fltk.run()
+
+        # 转化为 fealpy 的网格
+        node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)[:, :2]
+        NN = node.shape[0]
+
+        ## 节点编号到标签的映射
+        nid2tag = gmsh.model.mesh.get_nodes()[0]
+        tag2nid = np.zeros(NN*2, dtype = np.int_)
+        tag2nid[nid2tag] = np.arange(NN)
+
+        ## 单元
+        cell = gmsh.model.mesh.get_elements(2, -1)[2][0]
+        cell = tag2nid[cell].reshape(-1, 3)
+
+        gmsh.finalize()
+        return TriangleMesh(node, cell)
+
+    def gmshing(self):
         import gmsh
         from fealpy.mesh import TriangleMesh
         icenter = self.icenter
@@ -314,6 +363,7 @@ class OCAMModel:
         phi = phi % (2 * np.pi)
 
         uv = np.zeros((NN, 2), dtype=np.float64)
+        print("fx, fy, radius", fx, fy, self.radius)
 
         if ptype == 'L': # 等距投影
             uv[:, 0] = fx * theta * np.cos(phi) + u0 
@@ -584,16 +634,7 @@ class OCAMModel:
         img = cv2.imread(imgname)
         plt.imshow(img, extent=[0, 1920, 0, 1080])
 
-        # 递归获取所有的 numpy 数组
-        def get_numpy_arrays(data):
-            numpy_arrays = []
-            for item in data:
-                if isinstance(item, np.ndarray):
-                    numpy_arrays.append(item)
-                elif isinstance(item, list):
-                    numpy_arrays.extend(get_numpy_arrays(item))  # 递归调用
-            return numpy_arrays
-        points = get_numpy_arrays(self.camera_points)
+        points = self.camera_points
         for i in range(len(points)):
             plt.plot(points[i][:, 0], points[i][:, 1], 'r')
         if outname is not None:
