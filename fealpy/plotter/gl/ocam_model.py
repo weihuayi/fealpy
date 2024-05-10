@@ -399,7 +399,21 @@ class OCAMModel:
         
         NN = len(uv)
         node = np.zeros((NN,3),dtype=np.float64)
-        u0
+        node[:,0] = uv[:,0]-u0
+        node[:,1] = uv[:,1]-v0
+        
+        phi = np.arctan(fx*node[:,1],(fy*node[:,0]))
+        phi = phi%(2*np.pi)
+        if ptype == 'L':
+            theta = node[:,0]/(fx*np.cos(phi))
+        if ptype == 'O':
+            stheta = node[:,0]/(fx*np.cos(phi))
+            theta = np.arcsin(stheta)
+
+        node[:,0] = np.sin(theta)*np.cos(phi)
+        node[:,1] = np.sin(theta)*np.sin(phi)
+        node[:,2] = np.cos(theta)
+        return node
         
     def equirectangular_projection(self, fovd=195):
         """
