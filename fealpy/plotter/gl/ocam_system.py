@@ -442,6 +442,8 @@ class OCAMSystem:
             [961.628,551.019],
             [940.2435,541.3385],
             ], dtype=np.float64)
+        icenter[:, 1] *= -1
+        icenter[:, 1] += 1080
 
         radius = np.array([877.5,882.056,886.9275,884.204,883.616,884.5365],dtype=np.float64)
         mark_board = np.array(

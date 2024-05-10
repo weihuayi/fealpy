@@ -41,7 +41,7 @@ class OCAMModel:
                 val = val[self.signed_dist_function(val)<0] # 去掉不在区域内的点
                 cps_all[i].append(val)
         self.camera_points = cps_all
-        self.imagemesh = self.gmeshing()
+        #self.imagemesh = self.gmshing()
 
     def __call__(self, u):
         icenter = self.icenter
@@ -51,7 +51,60 @@ class OCAMModel:
     def signed_dist_function(self, u):
         return self(u)
 
-    def gmeshing(self):
+    def gmshing_new(self):
+        import gmsh
+        from fealpy.mesh import TriangleMesh
+
+
+        print("asdasdasd")
+        gmsh.initialize()
+        gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
+        occ = gmsh.model.occ
+
+        # 递归获取所有的 numpy 数组
+        def get_numpy_arrays(data):
+            numpy_arrays = []
+            for item in data:
+                if isinstance(item, np.ndarray):
+                    numpy_arrays.append(item)
+                elif isinstance(item, list):
+                    numpy_arrays.extend(get_numpy_arrays(item))  # 递归调用
+            return numpy_arrays
+
+        def create_quadrilateral(p1, p2, p3, p4, output_filename):
+            # 定义四边形面
+            line1 = occ.addLine(p1, p2)
+            line2 = occ.addLine(p2, p3)
+            line3 = occ.addLine(p3, p4)
+            line4 = occ.addLine(p4, p1)
+            loop = occ.addCurveLoop([line1, line2, line3, line4])
+            return loop
+
+        cps = get_numpy_arrays(self.camera_points)
+
+        lines = []
+        for cp in cps:
+            curves = [] 
+            for p in cp:
+                curves.append(occ.addPoint(p[0], p[1], 0))
+            lines.append(occ.addSpline(curves))
+
+        rec  = occ.addRectangle(0, 0, 0, 1920, 1080)
+        circ = occ.addDisk(self.icenter[0], self.height-self.icenter[1], 0, self.radius, self.radius)
+        # 保留 rec 和 circ 的交集
+        dom = occ.intersect([(2, rec)], [(2, circ)], )[0]
+        occ.fragment([(1, l) for l in lines], dom)
+
+        occ.synchronize()
+        gmsh.model.mesh.generate(2)
+        gmsh.fltk.run()
+        gmsh.finalize()
+        
+
+
+
+
+    def gmshing(self):
         import gmsh
         from fealpy.mesh import TriangleMesh
         icenter = self.icenter
