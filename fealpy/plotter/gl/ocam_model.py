@@ -440,7 +440,30 @@ class OCAMModel:
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
+    
+    def image_to_camera_surface(self, uv,ptype='L'):
+        NN = len(uv)
 
+        fx = self.K[0, 0] 
+        fy = self.K[1, 1]
+        u0 = self.K[0, 2]
+        v0 = self.K[1, 2]
+        node = np.zeros((NN,3),dtype=np.float64)
+        node[:,0] = uv[:,0]-u0
+        node[:,1] = uv[:,1]-v0
+
+        phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
+        phi[phi<0] = phi[phi<0]+np.pi
+        rho = node[:,0]/(fx*np.cos(phi))
+
+        if ptype=='L':
+            theta=rho
+
+        node[:,0] = np.sin(theta)*np.cos(phi)
+        node[:,1] = np.sin(theta)*np.sin(phi)
+        node[:,2] = np.cos(theta)
+        return node
+        
     def equirectangular_projection(self, fovd=195):
         """
         @brief 使用等矩形投影将鱼眼图像转换为平面图像。
