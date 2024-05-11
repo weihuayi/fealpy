@@ -98,6 +98,7 @@ class OCAMSystem:
             mesh = self.cams[i].imagemesh
             node = mesh.entity('node')
             mesh.to_vtk(fname = 'image_mesh_'+str(i)+'.vtu')
+            node = self.cams[i].mesh_to_image(node)
             node = self.cams[i].image_to_camera_sphere(node)
             mesh.node = node
             mesh.to_vtk(fname = 'sphere_mesh_'+str(i)+'.vtu')
@@ -107,8 +108,6 @@ class OCAMSystem:
             inode[outflag] = self.cams[i].sphere_project_to_implict_surface(node[outflag], f2)
 
             mesh.node = inode
-            print('asdasdasd : ', np.max(np.abs(inode)))
-            print('asdasdasd : ', np.max(np.abs(inode)))
             mesh.to_vtk(fname = 'screen_mesh_'+str(i)+'.vtu')
 
     def sphere_mesh(self, plotter):

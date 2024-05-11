@@ -55,8 +55,8 @@ class OCAMModel:
         gmsh.initialize()
         occ = gmsh.model.occ
         gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 50)  # 最大网格尺寸
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 20)    # 最小网格尺寸
+        #gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
+        #gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
 
         # 获得分割线
         cps = self.camera_points
@@ -79,10 +79,17 @@ class OCAMModel:
 
         occ.synchronize()
 
+        # 定义网格尺寸场函数
+        def f(dim, tag, x, y, z, lc): 
+            m = self.mesh_to_image(np.array([[x, y]]))
+            l = np.linalg.norm(m[0]-self.icenter)
+            return 40*(self.radius-l)/self.radius + 2
+        gmsh.model.mesh.setSizeCallback(f)
+
         ## 生成网格
         gmsh.model.mesh.generate(2)
-
         #gmsh.fltk.run()
+
 
         # 转化为 fealpy 的网格
         node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)[:, :2]
@@ -335,6 +342,10 @@ class OCAMModel:
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
+    def mesh_to_image(self, node):
+        node[:, 1] = self.height - node[:, 1]
+        return node
+
     def cam_to_image(self, node, ptype='L'):
         """
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
@@ -464,7 +475,11 @@ class OCAMModel:
         #phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
         phi = np.arctan2(fx*node[:,1], (fy*node[:,0]))
         phi[phi<0] = phi[phi<0]+np.pi
-        rho = node[:,0]/(fx*np.cos(phi))
+
+        idx = np.abs(fx*np.cos(phi))>1e-13
+        rho = np.zeros_like(phi)
+        rho[idx] = node[idx,0]/(fx*np.cos(phi[idx]))
+        rho[~idx] = node[~idx, 1]/(fy*np.sin(phi[~idx]))
 
         if ptype=='L':
             theta=rho
@@ -480,10 +495,9 @@ class OCAMModel:
         """
         from scipy.optimize import fsolve
         ret = np.zeros_like(nodes)
-        print(ret.shape)
         for i, node in enumerate(nodes):
             g = lambda t : Fun(self.location + t*(node-self.location))
-            t = fsolve(g, 100)
+            t = fsolve(g, 1000)
             ret[i] = self.location + t*(node-self.location)
         return ret
         
