@@ -9,9 +9,9 @@ from fealpy.mesh import TriangleMesh
 class OCAMSystem:
     def __init__(self, data):
 
-        self.size=(17.5, 3.47, 3) # 小车长宽高
-        self.center_height=3      # 椭球面球心的高度
-        self.scale_ratio=(1.618, 1.618, 1.618) # 三个主轴的伸缩比例
+        self.size=data['size'] # 椭球面的长宽高
+        self.center_height = data['center_height'] # 椭球面的中心高度
+        self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
         
         self.cams = []
         cps = self.get_split_point()
@@ -46,11 +46,15 @@ class OCAMSystem:
         a *= self.scale_ratio[0]
         b *= self.scale_ratio[1]
         c *= self.scale_ratio[2]
-        def f0(x, y, z):
+        def f0(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
             return x**2/a**2 + y**2/b**2 + z**2/c**2 - 1.0
 
         z0 = self.center_height
-        def f1(x, y, z):
+        def f1(p):
+            z = p[..., 2]
             return z + z0
         return f0, f1
 
@@ -93,14 +97,19 @@ class OCAMSystem:
         for i in range(6):
             mesh = self.cams[i].imagemesh
             node = mesh.entity('node')
+            mesh.to_vtk(fname = 'image_mesh_'+str(i)+'.vtu')
             node = self.cams[i].image_to_camera_sphere(node)
+            mesh.node = node
+            mesh.to_vtk(fname = 'sphere_mesh_'+str(i)+'.vtu')
 
             inode = self.cams[i].sphere_project_to_implict_surface(node, f1)
             outflag = inode[:, 2] <-z0
             inode[outflag] = self.cams[i].sphere_project_to_implict_surface(node[outflag], f2)
 
-            mesh.ds.node = inode
-            mesh.to_vtk(fname = 'screen_mesh_'+str(i)+'.vtk')
+            mesh.node = inode
+            print('asdasdasd : ', np.max(np.abs(inode)))
+            print('asdasdasd : ', np.max(np.abs(inode)))
+            mesh.to_vtk(fname = 'screen_mesh_'+str(i)+'.vtu')
 
     def sphere_mesh(self, plotter):
         """
@@ -471,7 +480,7 @@ class OCAMSystem:
 
         @param[in] h : 世界坐标原点到地面的高度
         """
-        h = self.center_height
+        h = 3
         location = np.array([ # 相机在世界坐标系中的位置
             [ 8.35/2.0, -3.47/2.0, 1.515], # 右前
             [-8.35/2.0, -3.47/2.0, 1.505], # 右后
@@ -632,7 +641,10 @@ class OCAMSystem:
             'flip' : flip,
             'icenter': icenter,
             'radius' : radius,
-            'mark_board': mark_board
+            'mark_board': mark_board,
+            'center_height' : h,
+            'size' : (17.5, 3.47, 3), # 小车长宽高
+            'scale_ratio' : (1.618, 1.618, 1.618) # 三个主轴的伸缩比例
         }
 
         return cls(data)

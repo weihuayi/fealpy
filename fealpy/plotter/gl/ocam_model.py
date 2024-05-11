@@ -55,8 +55,8 @@ class OCAMModel:
         gmsh.initialize()
         occ = gmsh.model.occ
         gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 20)  # 最大网格尺寸
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 20)    # 最小网格尺寸
 
         # 获得分割线
         cps = self.camera_points
@@ -461,7 +461,8 @@ class OCAMModel:
         node[:,0] = uv[:,0]-u0
         node[:,1] = uv[:,1]-v0
 
-        phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
+        #phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
+        phi = np.arctan2(fx*node[:,1], (fy*node[:,0]))
         phi[phi<0] = phi[phi<0]+np.pi
         rho = node[:,0]/(fx*np.cos(phi))
 
@@ -479,9 +480,10 @@ class OCAMModel:
         """
         from scipy.optimize import fsolve
         ret = np.zeros_like(nodes)
+        print(ret.shape)
         for i, node in enumerate(nodes):
-            g = lambda t : Fun(self.locatio + t*(node-self.location))
-            t = fsolve(g, 0)
+            g = lambda t : Fun(self.location + t*(node-self.location))
+            t = fsolve(g, 100)
             ret[i] = self.location + t*(node-self.location)
         return ret
         
