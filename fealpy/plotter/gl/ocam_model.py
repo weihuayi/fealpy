@@ -55,7 +55,7 @@ class OCAMModel:
         gmsh.initialize()
         occ = gmsh.model.occ
         gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 50)  # 最大网格尺寸
         gmsh.option.setNumber("Mesh.MeshSizeMin", 20)    # 最小网格尺寸
 
         # 获得分割线
