@@ -8,6 +8,11 @@ from fealpy.mesh import TriangleMesh
 
 class OCAMSystem:
     def __init__(self, data):
+
+        self.size=data['size'] # 椭球面的长宽高
+        self.center_height = data['center_height'] # 椭球面的中心高度
+        self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
+        
         self.cams = []
         cps = self.get_split_point()
         for i in range(data['nc']):
@@ -32,6 +37,26 @@ class OCAMSystem:
                 mark_board=data['mark_board'][i],
                 camera_points = cps[i]
             ))
+
+    def get_implict_surface_function(self):
+        """
+        @brief 获取隐式表面函数
+        """
+        a, b, c = self.size
+        a *= self.scale_ratio[0]
+        b *= self.scale_ratio[1]
+        c *= self.scale_ratio[2]
+        def f0(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+            return x**2/a**2 + y**2/b**2 + z**2/c**2 - 1.0
+
+        z0 = self.center_height
+        def f1(p):
+            z = p[..., 2]
+            return z + z0
+        return f0, f1
 
     def undistort_cv(self):
         for i, cam in enumerate(self.cams):
@@ -66,6 +91,26 @@ class OCAMSystem:
         #plt.tight_layout()
         plt.show()
 
+    def show_screen_mesh(self):
+        z0 = self.center_height
+        f1, f2 = self.get_implict_surface_function()
+        for i in range(6):
+            mesh = self.cams[i].imagemesh
+            node = mesh.entity('node')
+            mesh.to_vtk(fname = 'image_mesh_'+str(i)+'.vtu')
+            node = self.cams[i].image_to_camera_sphere(node)
+            mesh.node = node
+            mesh.to_vtk(fname = 'sphere_mesh_'+str(i)+'.vtu')
+
+            inode = self.cams[i].sphere_project_to_implict_surface(node, f1)
+            outflag = inode[:, 2] <-z0
+            inode[outflag] = self.cams[i].sphere_project_to_implict_surface(node[outflag], f2)
+
+            mesh.node = inode
+            print('asdasdasd : ', np.max(np.abs(inode)))
+            print('asdasdasd : ', np.max(np.abs(inode)))
+            mesh.to_vtk(fname = 'screen_mesh_'+str(i)+'.vtu')
+
     def sphere_mesh(self, plotter):
         """
         @brief 在世界坐标系的相机位置处生成半球网格
@@ -90,9 +135,9 @@ class OCAMSystem:
         @brief 把椭球面环视网格加入 plotter
         """
         mesh= TriangleMesh.from_section_ellipsoid(
-            size=(17.5, 3.47, 3),
-            center_height=3,
-            scale_ratio=(1.618, 1.618, 1.618),
+            size=self.size,
+            center_height=self.center_height,
+            scale_ratio=self.scale_ratio,
             density=0.1,
             top_section=np.pi / 2,
             return_edge=False)
@@ -196,24 +241,22 @@ class OCAMSystem:
         return mesh, uv
 
     def get_split_point(self,
-                        size=(17.5, 3.47, 3),
-                        scale_ratio=(1.618, 1.618, 1.618),
                         densty=0.02,
-                        center_height=3,
                         v=0.5,
                         theta1=0,
                         theta2=0):
         '''
         获取分割线
-        @param size: 小车长宽高
-        @param scale_ratio: 三个主轴的伸缩比例
         @param densty: 节点密度
-        @param center_height: 椭球面球心的高度
         @param v: 两侧摄像头分割线相对位置
         @param theta1: 主分割线偏转角
         @param theta2: 两侧分割线
         @return: 分割线上点的笛卡尔坐标
         '''
+        size = self.size
+        scale_ratio = self.scale_ratio
+        center_height = self.center_height
+
         import gmsh
         pi = np.pi
         gmsh.initialize()
@@ -431,12 +474,13 @@ class OCAMSystem:
 
 
     @classmethod
-    def from_data(cls, h=3.0):
+    def from_data(cls):
         """
         @brief 测试数据
 
         @param[in] h : 世界坐标原点到地面的高度
         """
+        h = 3
         location = np.array([ # 相机在世界坐标系中的位置
             [ 8.35/2.0, -3.47/2.0, 1.515], # 右前
             [-8.35/2.0, -3.47/2.0, 1.505], # 右后
@@ -597,7 +641,10 @@ class OCAMSystem:
             'flip' : flip,
             'icenter': icenter,
             'radius' : radius,
-            'mark_board': mark_board
+            'mark_board': mark_board,
+            'center_height' : h,
+            'size' : (17.5, 3.47, 3), # 小车长宽高
+            'scale_ratio' : (1.618, 1.618, 1.618) # 三个主轴的伸缩比例
         }
 
         return cls(data)

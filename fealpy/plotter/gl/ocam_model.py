@@ -55,8 +55,8 @@ class OCAMModel:
         gmsh.initialize()
         occ = gmsh.model.occ
         gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 20)  # 最大网格尺寸
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 20)    # 最小网格尺寸
 
         # 获得分割线
         cps = self.camera_points
@@ -440,8 +440,17 @@ class OCAMModel:
         uv[:, 0] = (uv[:, 0] - np.min(uv[:, 0]))/(np.max(uv[:, 0])-np.min(uv[:, 0]))
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
+
+    def camera_to_world(self, node):
+        """
+        @brief 把相机坐标系中的点转换到世界坐标系下
+        """
+        A = np.linalg.inv(self.axes.T)
+        node = np.einsum('ij, jk->ik', node, A)
+        node += self.location
+        return node
     
-    def image_to_camera_surface(self, uv,ptype='L'):
+    def image_to_camera_sphere(self, uv,ptype='L'):
         NN = len(uv)
 
         fx = self.K[0, 0] 
@@ -452,7 +461,8 @@ class OCAMModel:
         node[:,0] = uv[:,0]-u0
         node[:,1] = uv[:,1]-v0
 
-        phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
+        #phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
+        phi = np.arctan2(fx*node[:,1], (fy*node[:,0]))
         phi[phi<0] = phi[phi<0]+np.pi
         rho = node[:,0]/(fx*np.cos(phi))
 
@@ -462,7 +472,20 @@ class OCAMModel:
         node[:,0] = np.sin(theta)*np.cos(phi)
         node[:,1] = np.sin(theta)*np.sin(phi)
         node[:,2] = np.cos(theta)
-        return node
+        return self.camera_to_world(node)
+
+    def sphere_project_to_implict_surface(self, nodes, Fun): 
+        """
+        @brief 将球面上的点投影到隐式曲面上
+        """
+        from scipy.optimize import fsolve
+        ret = np.zeros_like(nodes)
+        print(ret.shape)
+        for i, node in enumerate(nodes):
+            g = lambda t : Fun(self.location + t*(node-self.location))
+            t = fsolve(g, 100)
+            ret[i] = self.location + t*(node-self.location)
+        return ret
         
     def equirectangular_projection(self, fovd=195):
         """
