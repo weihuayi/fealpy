@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
+import pickle
 
 class OCAMSystem:
     def __init__(self, data):
@@ -14,7 +15,19 @@ class OCAMSystem:
         self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
         
         self.cams = []
-        cps = self.get_split_point()
+        self.get_ground_mesh()
+
+        # 判断是否存在 cps.pkl 文件
+        fname = os.path.expanduser("~/data/cps.pkl")
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                cps = pickle.load(f)
+        else:
+            cps = self.get_split_point()
+            # 保存 cps:
+            with open(fname, 'wb') as f:
+                pickle.dump(cps, f)
+        
         for i in range(data['nc']):
             axes = np.zeros((3, 3), dtype=np.float64)
             axes[0, :] = data['axes'][0][i]
@@ -58,6 +71,49 @@ class OCAMSystem:
             return z + z0
         return f0, f1
 
+    def get_ground_mesh(self, theta = 0):
+        import gmsh
+        gmsh.initialize()
+        l, w, h = self.size
+        a = l * self.scale_ratio[0]
+        b = w * self.scale_ratio[1]
+        c = h * self.scale_ratio[2]
+        z0 = -self.center_height
+
+        a *= np.sqrt(1-z0**2/c**2)
+        b *= np.sqrt(1-z0**2/c**2)
+
+        # 构造椭圆面
+        ellipsoid = gmsh.model.occ.addDisk(0, 0, z0, a, b)
+        box = gmsh.model.occ.addRectangle(-l/2, -w/2, z0, l, w)
+        ground = gmsh.model.occ.cut([(2, ellipsoid)], [(2, box)])[0]
+
+        v = 10*np.array([[-np.cos(theta), -np.sin(theta)], 
+                      [np.cos(theta), -np.sin(theta)], 
+                      [np.cos(theta), np.sin(theta)], 
+                      [-np.cos(theta), np.sin(theta)]])
+        point = np.array([[-l/2, -w/2], [l/2, -w/2], [l/2, w/2], [-l/2, w/2]],
+                         dtype=np.float64) + v
+        print(point)
+        ps = [2, 3, 4, 5]
+        l = []
+        for i in range(4):
+            pp = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
+            print(pp)
+            l.append(gmsh.model.occ.addLine(ps[i], pp))
+        gmsh.model.occ.fragment([(1, ll) for ll in l], ground)
+
+
+        gmsh.model.occ.synchronize()
+        gmsh.fltk.run()
+
+        gmsh.model.mesh.generate(2)
+        gmsh.fltk.run()
+        gmsh.finalize()
+
+
+
+
     def undistort_cv(self):
         for i, cam in enumerate(self.cams):
             outname = cam.fname[:-4]
@@ -91,14 +147,26 @@ class OCAMSystem:
         #plt.tight_layout()
         plt.show()
 
-    def show_screen_mesh(self):
+    def show_screen_mesh(self, plotter, idx):
         z0 = self.center_height
         f1, f2 = self.get_implict_surface_function()
         for i in range(6):
+            if i != idx:
+                continue
+
+            print('ASDASDASDASD : ', i)
             mesh = self.cams[i].imagemesh
             node = mesh.entity('node')
             mesh.to_vtk(fname = 'image_mesh_'+str(i)+'.vtu')
+
             node = self.cams[i].mesh_to_image(node)
+
+            uv = np.zeros_like(node)
+            uv[:, 0] = node[:, 0]/self.cams[i].width
+            if i==1:
+                uv[:, 0] = (node[:, 0]-40)/self.cams[i].width
+            uv[:, 1] = node[:, 1]/self.cams[i].height
+
             node = self.cams[i].image_to_camera_sphere(node)
             mesh.node = node
             mesh.to_vtk(fname = 'sphere_mesh_'+str(i)+'.vtu')
@@ -109,6 +177,16 @@ class OCAMSystem:
 
             mesh.node = inode
             mesh.to_vtk(fname = 'screen_mesh_'+str(i)+'.vtu')
+
+            # 相机坐标系下的点
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
+            uv       = np.array(uv[cell].reshape(-1, 2), dtype=np.float64)
+
+            no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
+            print(self.cams[i].fname)
+            plotter.add_mesh(no, cell=None, texture_path=self.cams[i].fname)
 
     def sphere_mesh(self, plotter):
         """
@@ -564,8 +642,8 @@ class OCAMSystem:
         ]
 
         chessboardpath = [
-            os.path.expanduser('~/data/camera_models/chessboard_2'),
             os.path.expanduser('~/data/camera_models/chessboard_1'),
+            os.path.expanduser('~/data/camera_models/chessboard_2'),
             os.path.expanduser('~/data/camera_models/chessboard_3'),
             os.path.expanduser('~/data/camera_models/chessboard_4'),
             os.path.expanduser('~/data/camera_models/chessboard_5'),
@@ -643,7 +721,7 @@ class OCAMSystem:
             'mark_board': mark_board,
             'center_height' : h,
             'size' : (17.5, 3.47, 3), # 小车长宽高
-            'scale_ratio' : (1.618, 1.618, 1.618) # 三个主轴的伸缩比例
+            'scale_ratio' : (1.618, 3.618, 1.618) # 三个主轴的伸缩比例
         }
 
         return cls(data)
