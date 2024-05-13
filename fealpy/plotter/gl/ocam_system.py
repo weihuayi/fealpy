@@ -94,12 +94,10 @@ class OCAMSystem:
                       [-np.cos(theta), np.sin(theta)]])
         point = np.array([[-l/2, -w/2], [l/2, -w/2], [l/2, w/2], [-l/2, w/2]],
                          dtype=np.float64) + v
-        print(point)
         ps = [2, 3, 4, 5]
         l = []
         for i in range(4):
             pp = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
-            print(pp)
             l.append(gmsh.model.occ.addLine(ps[i], pp))
         gmsh.model.occ.fragment([(1, ll) for ll in l], ground)
 
