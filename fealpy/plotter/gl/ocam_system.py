@@ -16,7 +16,16 @@ class OCAMSystem:
         self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
         
         self.cams = []
-        self.get_ground_mesh()
+
+        fname = os.path.expanduser("~/data/groundmesh.pkl")
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.groundmesh = pickle.load(f)
+        else:
+            self.groundmesh = self.get_ground_mesh()
+            # 保存 cps:
+            with open(fname, 'wb') as f:
+                pickle.dump(self.groundmesh, f)
 
         # 判断是否存在 cps.pkl 文件
         fname = os.path.expanduser("~/data/cps.pkl")
@@ -88,7 +97,6 @@ class OCAMSystem:
             curve = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
             return gmsh.model.occ.addPlaneSurface([curve])
 
-
         l, w, h = self.size
         a = l * self.scale_ratio[0]
         b = w * self.scale_ratio[1]
@@ -129,7 +137,7 @@ class OCAMSystem:
         gmsh.model.occ.cut(ground, [(2, plane) for plane in planes])
 
         gmsh.model.occ.synchronize()
-        #gmsh.fltk.run()
+        gmsh.fltk.run()
 
         node = gmsh.model.mesh.getNodes()
 
@@ -145,7 +153,7 @@ class OCAMSystem:
             return mesh
 
         # 转化为 fealpy 的网格
-        node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)[:, :2]
+        node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)
         NN = node.shape[0]
 
         ## 节点编号到标签的映射
@@ -154,9 +162,9 @@ class OCAMSystem:
         tag2nid[nid2tag] = np.arange(NN)
 
         partmesh = []
-        dimtag = gmsh.model.occ.getEntities(2)
-        for dim, tag in dimtag:
-            cell = gmsh.model.mesh.get_elements(2, tag)[2][0]
+        idx = [3, 5, 6, 4, 2, 1]
+        for i in idx:
+            cell = gmsh.model.mesh.get_elements(2, i)[2][0]
             cell = tag2nid[cell].reshape(-1, 3)
             partmesh.append(creat_part_mesh(node, cell))
 
@@ -170,6 +178,18 @@ class OCAMSystem:
             result = cam.undistort_chess(cam.fname)
             result = cam.perspective(result)
             cv2.imwrite(outname+'_c.jpg', result)
+
+    def show_ground_mesh(self, plotter):
+        for i, mesh in enumerate(self.groundmesh):
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            vertices = np.array(node[cell].reshape(-1, 3), dtype=np.float64)
+            uv = self.cams[i].world_to_image(vertices)
+            uv[:, 0] = 1-uv[:, 0]
+            no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
+
+            plotter.add_mesh(no, cell=None, texture_path = self.cams[i].fname)
+
 
     def show_parameters(self):
         for i, cam in enumerate(self.cams):
@@ -683,6 +703,15 @@ class OCAMSystem:
             os.path.expanduser('~/data/src_4.jpg'),
             os.path.expanduser('~/data/src_5.jpg'),
             os.path.expanduser('~/data/src_6.jpg'),
+            ]
+
+        fname = [
+            os.path.expanduser('~/data/camera_inputs/src_1.jpg'),
+            os.path.expanduser('~/data/camera_inputs/src_2.jpg'),
+            os.path.expanduser('~/data/camera_inputs/src_3.jpg'),
+            os.path.expanduser('~/data/camera_inputs/src_4.jpg'),
+            os.path.expanduser('~/data/camera_inputs/src_5.jpg'),
+            os.path.expanduser('~/data/camera_inputs/src_6.jpg'),
             ]
 
         flip = [
