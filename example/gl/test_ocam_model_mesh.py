@@ -13,7 +13,7 @@ csys.show_screen_mesh(plotter, 4)
 plotter.run()
 for i in range(6):
     model = csys.cams[i]
-    #model.show_camera_image_and_mesh(outname='cam%d.png' % i)
+    model.show_camera_image_and_mesh(outname='cam%d.png' % i)
     #mesh = model.gmshing_new()
 
     #fig, axes = plt.subplots()

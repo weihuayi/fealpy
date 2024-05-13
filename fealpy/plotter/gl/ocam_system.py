@@ -1,4 +1,5 @@
 import numpy as np
+import gmsh
 import os
 import cv2
 import matplotlib.pyplot as plt
@@ -71,9 +72,23 @@ class OCAMSystem:
             return z + z0
         return f0, f1
 
-    def get_ground_mesh(self, theta = 0):
-        import gmsh
+    def get_ground_mesh(self, theta = np.pi/6):
         gmsh.initialize()
+
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 0.2)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 0.1)    # 最小网格尺寸
+
+        def add_rectangle(p0, p1, p2, p3):
+            # 添加线
+            l1 = gmsh.model.occ.addLine(p0, p1)
+            l2 = gmsh.model.occ.addLine(p1, p2)
+            l3 = gmsh.model.occ.addLine(p2, p3)
+            l4 = gmsh.model.occ.addLine(p3, p0)
+            # 添加 loop
+            curve = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+            return gmsh.model.occ.addPlaneSurface([curve])
+
+
         l, w, h = self.size
         a = l * self.scale_ratio[0]
         b = w * self.scale_ratio[1]
@@ -88,31 +103,65 @@ class OCAMSystem:
         box = gmsh.model.occ.addRectangle(-l/2, -w/2, z0, l, w)
         ground = gmsh.model.occ.cut([(2, ellipsoid)], [(2, box)])[0]
 
-        v = 10*np.array([[-np.cos(theta), -np.sin(theta)], 
+        v = 30*np.array([[-np.cos(theta), -np.sin(theta)], 
                       [np.cos(theta), -np.sin(theta)], 
                       [np.cos(theta), np.sin(theta)], 
                       [-np.cos(theta), np.sin(theta)]])
         point = np.array([[-l/2, -w/2], [l/2, -w/2], [l/2, w/2], [-l/2, w/2]],
-                         dtype=np.float64) + v
-        print(point)
+                         dtype=np.float64)
         ps = [2, 3, 4, 5]
-        l = []
+        planes  = []
         for i in range(4):
-            pp = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
-            print(pp)
-            l.append(gmsh.model.occ.addLine(ps[i], pp))
-        gmsh.model.occ.fragment([(1, ll) for ll in l], ground)
+            pp1 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], z0)
+            pp2 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], 1.0)
+            pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 1.0)
+            planes.append(add_rectangle(ps[i], pp1, pp2, pp3))
 
+        point = np.array([[0, -w/2], [0, w/2]], dtype=np.float64)
+        v = 30*np.array([[0, -1], [0, 1]], dtype=np.float64)
+        for i in range(2):
+            pp0 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
+            pp1 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], z0)
+            pp2 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], 1.0)
+            pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 1.0)
+            planes.append(add_rectangle(pp0, pp1, pp2, pp3))
+
+        gmsh.model.occ.cut(ground, [(2, plane) for plane in planes])
 
         gmsh.model.occ.synchronize()
-        gmsh.fltk.run()
+        #gmsh.fltk.run()
+
+        node = gmsh.model.mesh.getNodes()
 
         gmsh.model.mesh.generate(2)
-        gmsh.fltk.run()
+
+        def creat_part_mesh(node, cell):
+            idx = np.unique(cell)
+            nidxmap = np.zeros(node.shape[0], dtype = np.int_)
+            nidxmap[idx] = np.arange(idx.shape[0])
+            cell = nidxmap[cell]
+
+            mesh = TriangleMesh(node[idx], cell)
+            return mesh
+
+        # 转化为 fealpy 的网格
+        node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)[:, :2]
+        NN = node.shape[0]
+
+        ## 节点编号到标签的映射
+        nid2tag = gmsh.model.mesh.get_nodes()[0]
+        tag2nid = np.zeros(NN*2, dtype = np.int_)
+        tag2nid[nid2tag] = np.arange(NN)
+
+        partmesh = []
+        dimtag = gmsh.model.occ.getEntities(2)
+        for dim, tag in dimtag:
+            cell = gmsh.model.mesh.get_elements(2, tag)[2][0]
+            cell = tag2nid[cell].reshape(-1, 3)
+            partmesh.append(creat_part_mesh(node, cell))
+
         gmsh.finalize()
-
-
-
+        return partmesh
 
     def undistort_cv(self):
         for i, cam in enumerate(self.cams):
@@ -154,7 +203,6 @@ class OCAMSystem:
             if i != idx:
                 continue
 
-            print('ASDASDASDASD : ', i)
             mesh = self.cams[i].imagemesh
             node = mesh.entity('node')
             mesh.to_vtk(fname = 'image_mesh_'+str(i)+'.vtu')
