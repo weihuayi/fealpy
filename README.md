@@ -40,7 +40,7 @@ pip install -e .
 
 If you want to install optional dependencies, such as `pypardiso`, `pyamg`, `meshpy` and so on, you can do so by specifying the [optional] extra:
 ```
-pip install -e .[dev, optional]
+pip install -e .[optional]
 ```
 
 To install both development and optional dependencies, use:
