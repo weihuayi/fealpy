@@ -3,6 +3,8 @@ from typing import Callable, Any, Tuple
 
 import numpy as np
 import cv2
+import os
+import pickle
 import glob
 import matplotlib.pyplot as plt
 
@@ -38,7 +40,18 @@ class OCAMModel:
             val[:, 1] = self.height-val[:, 1]
             cps_all.append(val)
         self.camera_points = cps_all
-        self.imagemesh = self.gmshing_new()
+
+        # 判断是否存在网格文件
+        fname = os.path.expanduser("~/data/ocam_mesh_{}_{}.pkl".format(self.icenter, self.radius))
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.imagemesh = pickle.load(f)
+        else:
+            self.imagemesh = self.gmshing_new()
+            # 保存 cps:
+            with open(fname, 'wb') as f:
+                pickle.dump(self.imagemesh, f)
+
 
     def __call__(self, u):
         icenter = self.icenter
@@ -83,7 +96,8 @@ class OCAMModel:
         def f(dim, tag, x, y, z, lc): 
             m = self.mesh_to_image(np.array([[x, y]]))
             l = np.linalg.norm(m[0]-self.icenter)
-            return 40*(self.radius-l)/self.radius + 2
+            #return 40*(self.radius-l)/self.radius + 2
+            return 80*(self.radius-l)/self.radius + 4
         gmsh.model.mesh.setSizeCallback(f)
 
         ## 生成网格
@@ -374,7 +388,6 @@ class OCAMModel:
         phi = phi % (2 * np.pi)
 
         uv = np.zeros((NN, 2), dtype=np.float64)
-        print("fx, fy, radius", fx, fy, self.radius)
 
         if ptype == 'L': # 等距投影
             uv[:, 0] = fx * theta * np.cos(phi) + u0 
