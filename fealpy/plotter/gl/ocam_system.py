@@ -33,11 +33,12 @@ class OCAMSystem:
             with open(fname, 'rb') as f:
                 cps = pickle.load(f)
         else:
-            cps = self.get_split_point()
+            cps = self.get_split_point0()
             # 保存 cps:
             with open(fname, 'wb') as f:
                 pickle.dump(cps, f)
         
+        print(cps)
         for i in range(data['nc']):
             axes = np.zeros((3, 3), dtype=np.float64)
             axes[0, :] = data['axes'][0][i]
@@ -385,6 +386,102 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
+    def get_split_point0(self, densty=0.02, v=0.5, theta0=np.pi/6, theta1=0, scheme=0):
+        size = self.size
+        scale_ratio = self.scale_ratio
+        center_height = self.center_height
+
+        import gmsh
+        gmsh.initialize()
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 0.02)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 0.01)    # 最小网格尺寸
+
+        def add_rectangle(p0, p1, p2, p3):
+            # 添加线
+            l1 = gmsh.model.occ.addLine(p0, p1)
+            l2 = gmsh.model.occ.addLine(p1, p2)
+            l3 = gmsh.model.occ.addLine(p2, p3)
+            l4 = gmsh.model.occ.addLine(p3, p0)
+            # 添加 loop
+            curve = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+            return gmsh.model.occ.addPlaneSurface([curve])
+
+
+        # 构造椭球面
+        l, w, h = size
+        a = l * scale_ratio[0]
+        b = w * scale_ratio[1]
+        c = h * scale_ratio[2]
+
+        phi = np.arcsin(-center_height / c)
+
+        # 构造单位球面
+        r = 1.0
+        ball = gmsh.model.occ.addSphere(0, 0, 0, 1, 1, phi, 0)
+        gmsh.model.occ.dilate([(3, ball)],0, 0, 0, a, b, c)
+        gmsh.model.occ.remove([(3, ball), (2, 2)])
+
+        # 车辆区域
+        vehicle = gmsh.model.occ.addRectangle(-l/2, -w/2, -center_height, l, w)
+        gmsh.model.occ.cut([(2, 3)], [(2, vehicle)])
+
+        # 分割线对应的固定点
+        planes  = []
+        vpoint = np.array([[-l/2, -w/2], [l/2, -w/2], 
+                                 [l/2, w/2], [-l/2, w/2]], dtype=np.float64)
+        z0 = -center_height
+
+        if scheme == 0: # 第一种方案
+            v = 30*np.array([[-np.cos(theta0), -np.sin(theta0)], 
+                          [np.cos(theta0), -np.sin(theta0)], 
+                          [np.cos(theta0), np.sin(theta0)], 
+                          [-np.cos(theta0), np.sin(theta0)]])
+            ps = [3, 4, 5, 6]
+            for i in range(4):
+                pp1 = gmsh.model.occ.addPoint(vpoint[i, 0]+v[i, 0], vpoint[i, 1]+v[i, 1], z0)
+                pp2 = gmsh.model.occ.addPoint(vpoint[i, 0]+v[i, 0], vpoint[i, 1]+v[i, 1], 0)
+                pp3 = gmsh.model.occ.addPoint(vpoint[i, 0], vpoint[i, 1], 0)
+                planes.append(add_rectangle(ps[i], pp1, pp2, pp3))
+
+            mpoint = np.array([[0, -w/2], [0, w/2]], dtype=np.float64)
+            v = 30*np.array([[0, -1], [0, 1]], dtype=np.float64)
+            for i in range(2):
+                pp0 = gmsh.model.occ.addPoint(mpoint[i, 0], mpoint[i, 1], z0)
+                pp1 = gmsh.model.occ.addPoint(mpoint[i, 0]+v[i, 0], mpoint[i, 1]+v[i, 1], z0)
+                pp2 = gmsh.model.occ.addPoint(mpoint[i, 0]+v[i, 0], mpoint[i, 1]+v[i, 1], 1.0)
+                pp3 = gmsh.model.occ.addPoint(mpoint[i, 0], mpoint[i, 1], 1.0)
+                planes.append(add_rectangle(pp0, pp1, pp2, pp3))
+
+        frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
+        for i in range(len(frag[1]))[2:]:
+            gmsh.model.occ.remove(frag[1][i], recursive=True)
+
+        dimtags = gmsh.model.occ.getEntities(2)
+        gmsh.model.occ.remove(dimtags)
+        gmsh.model.occ.remove([(1, 1)])
+
+        gmsh.model.occ.synchronize()
+        gmsh.fltk.run()
+
+        gmsh.model.mesh.generate(1)
+
+        lines = []
+        if scheme == 0:
+            parttag = [[28, 11, 12, 22, 27, 3, 12], 
+                       [32, 17, 19, 31, 27, 18, 12],
+                       [33, 21, 20, 30, 31, 15, 18],
+                       [29, 16, 14, 26, 30, 9, 15],
+                       [25, 10, 8, 24, 26, 6, 9],
+                       [23, 7, 5, 2, 4, 24, 22, 6, 3]]
+            for tags in parttag:
+                l = []
+                for tag in tags:
+                    node = gmsh.model.mesh.getNodes(1, tag)[1].reshape(-1, 3)
+                    l.append(node)
+                lines.append(l)
+        gmsh.finalize()
+        return lines
+
     def get_split_point(self,
                         densty=0.02,
                         v=0.5,
@@ -705,14 +802,14 @@ class OCAMSystem:
             os.path.expanduser('~/data/src_6.jpg'),
             ]
 
-        fname = [
-            os.path.expanduser('~/data/camera_inputs/src_1.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_2.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_3.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_4.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_5.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_6.jpg'),
-            ]
+        #fname = [
+        #    os.path.expanduser('~/data/camera_inputs/src_1.jpg'),
+        #    os.path.expanduser('~/data/camera_inputs/src_2.jpg'),
+        #    os.path.expanduser('~/data/camera_inputs/src_3.jpg'),
+        #    os.path.expanduser('~/data/camera_inputs/src_4.jpg'),
+        #    os.path.expanduser('~/data/camera_inputs/src_5.jpg'),
+        #    os.path.expanduser('~/data/camera_inputs/src_6.jpg'),
+        #    ]
 
         flip = [
             None, None, None, None, None, None 
