@@ -1444,21 +1444,23 @@ class TriangleMesh(Mesh, Plotable):
         return a
 
     def point_to_bc(self, point):
-        i_cell = self.location(point)
+        """
+        @brief 找到定点 point 所在的单元，并计算其重心坐标 
+        """
+        index = self.location(point)
         node = self.node
         cell = self.entity('cell')
-        i_cellmeasure = self.cell_area()[i_cell]
-        i_cell = node[cell[i_cell]]
+        cm = self.cell_area()[index]
         point = point[:, np.newaxis, :]
-        v = i_cell - point
-        area0 = 0.5 * np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
-        area1 = 0.5 * np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
-        area2 = 0.5 * np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
-        result = np.zeros((i_cell.shape[0], 3))
-        result[:, 0] = area0 / i_cellmeasure
-        result[:, 1] = area1 / i_cellmeasure
-        result[:, 2] = area2 / i_cellmeasure
-        return result
+        v = node[cell[index]] - point
+        a0 = 0.5 * np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
+        a1 = 0.5 * np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
+        a2 = 0.5 * np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
+        result = np.zeros((index.shape[0], 3))
+        result[:, 0] = a0 / cm
+        result[:, 1] = a1 / cm
+        result[:, 2] = a2 / cm
+        return index, result
 
     def mark_interface_cell(self, phi):
         """
