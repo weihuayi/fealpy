@@ -45,7 +45,7 @@ pip install -e .[optional]
 
 To install both development and optional dependencies, use:
 ```bash
-pip install -e .[dev, optional]
+pip install -e .[dev,optional]
 ```
 To verify that FEALPy is installed correctly, you can run the following command:
 
@@ -57,7 +57,6 @@ To update your FEALPy installation to the latest version from the source reposit
 ```bash
 cd fealpy
 git pull origin main
-pip install -e .
 ```
 
 To uninstall FEALPy, just run the following command:
