@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 from fealpy.mesh import QuadrangleMesh
 from fealpy.fvm import ScalarDiffusionIntegrator
-
+from fealpy.tools.show import showmultirate
+from fealpy.tools.show import show_error_table
 
 def solution(p):
     x = p[..., 0]
@@ -32,28 +33,44 @@ def is_dirichlet_boundary(p):
     y = p[..., 1]
     return (np.abs(y-1)<eps)|(np.abs(x-1)<eps)|(np.abs(x)<eps)|(np.abs(y)<eps)
 
-
-nx = 20
-ny = 20
+ns = 4
 domain = [0,1,0,1]
-mesh = QuadrangleMesh.from_box(box=domain,nx=nx,ny=nx)
-h = (domain[1]-domain[0])/nx
+mesh = QuadrangleMesh.from_box(box=domain,nx=ns,ny=ns)
+maxit=6
+#errorType = ['$max( u - u_h)$',]
+errorType = ['$||( u - u_h)||_{l2}$',]
+errorMatrix = np.zeros((1, maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
 
-DI = ScalarDiffusionIntegrator(mesh)
+for i in range(maxit):
+    print("The {}-th computation:".format(i))
+    NDof[i] = mesh.number_of_nodes()
+    DI = ScalarDiffusionIntegrator(mesh)
 
-DM,Db = DI.cell_center_matrix(dirichlet, is_dirichlet_boundary)
+    DM,Db = DI.cell_center_matrix(dirichlet, is_dirichlet_boundary)
 
-bb = mesh.integral(source, celltype=True)
-uh = spsolve(DM, bb+Db)
+    bb = mesh.integral(source, celltype=True)
+    uh = spsolve(DM, bb+Db)
 
+    ipoint = mesh.entity_barycenter('cell')
+    u = solution(ipoint)
+    
+    e = u - uh 
+    h = (domain[1]-domain[0])/ns
+    #errorMatrix[0,i] = np.max(np.abs(e))
+    errorMatrix[0,i] = np.sqrt(np.sum(h*h*e**2))
+    if i < maxit-1:
+        ns *= 2
+        mesh = QuadrangleMesh.from_box(box=domain,nx=ns,ny=ns)
+    #print('emax', np.max(np.abs(u-uh)))
+    #print('eL2', np.sqrt(np.sum(h*h*e**2)))
 
-
-ipoint = mesh.entity_barycenter('cell')
-u = solution(ipoint)
-e = u - uh
-print('emax', np.max(np.abs(u-uh)))
-print('eL2', np.sqrt(np.sum(h*h*e**2)))
-
+showmultirate(plt, 3, NDof, errorMatrix,  errorType, propsize=20)
+show_error_table(NDof, errorType, errorMatrix)
+plt.xlabel("Number of dofs")
+plt.ylabel("l2 Error")
+plt.show()
+'''
 fig = plt.figure()
 ax1 = fig.add_subplot(111,projection='3d')
 ipoint = mesh.entity_barycenter('cell')
@@ -64,5 +81,5 @@ Y = yy.reshape(ny, ny)
 Z = uh.reshape(nx, ny)
 ax1.plot_surface(X, Y, Z, cmap='rainbow')
 plt.show()
-
+'''
 
