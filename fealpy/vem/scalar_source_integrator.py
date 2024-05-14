@@ -1,3 +1,6 @@
+
+import inspect
+
 import numpy as np
 from numpy.typing import NDArray
 from typing import TypedDict, Callable, Tuple, Union
@@ -22,11 +25,16 @@ class ConformingVEMScalarSourceIntegrator2d():
 
         """
         f = self.f
+        N = len(inspect.signature(f).parameters)
         phi = space.smspace.basis
         p = space.p
         q = p + 3 if q is None else q
-        def u(x, index):
-            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
+        if N==1:
+            def u(x, index):
+                return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
+        else:
+            def u(x, index):
+                return np.einsum('ij, ijm->ijm', f(x, index), phi(x, index=index))
         bb = space.mesh.integral(u, q=q, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))

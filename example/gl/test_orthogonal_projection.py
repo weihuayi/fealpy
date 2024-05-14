@@ -1,4 +1,3 @@
-
 import ipdb
 import numpy as np
 import cv2
@@ -11,11 +10,10 @@ from fealpy.mesh import TriangleMesh
 from fealpy.plotter.gl import OpenGLPlotter, OCAMSystem 
 
 csys = OCAMSystem.from_data()
+n = np.array([[0, 0, 1], [0, 0, 10]])
+ss = csys.cams[0].cam_to_image(n)
 
-#img = csys.cams[0].equirectangular_projection(fovd=180)
-#cv2.imshow('Equirectangular Projection', img)
-#cv2.waitKey(0)
-#cv2.destroyAllWindows()
+img = csys.cams[0].equirectangular_projection(fovd=180)
 
 plotter = OpenGLPlotter()
 
@@ -29,4 +27,6 @@ mesh.add_plot(axes, aspect='auto')
 #plt.scatter(uv[:, 0], uv[:, 1])
 plt.show()
 plotter.run()
+
+
 
