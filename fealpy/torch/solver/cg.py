@@ -10,7 +10,7 @@ from .. import logger
 
 
 def sparse_cg(A: Tensor, b: Tensor, x0: Optional[Tensor]=None,
-              atol: float=1e-12, rtol: float=1e-8, maxiter: Optional[int]=1000) -> Tensor:
+              atol: float=1e-12, rtol: float=1e-8, maxiter: Optional[int]=10000) -> Tensor:
     r"""Solve a linear system Ax = b using the Conjugate Gradient (CG) method.
 
     Args:
@@ -20,7 +20,7 @@ def sparse_cg(A: Tensor, b: Tensor, x0: Optional[Tensor]=None,
         Must have the same shape as b when reshaped appropriately.
         atol (float, optional): Absolute tolerance for convergence. Default is 1e-12.
         rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
-        maxiter (int, optional): Maximum number of iterations allowed. Default is 1000.
+        maxiter (int, optional): Maximum number of iterations allowed. Default is 10000.
         If not provided, the method will continue until convergence based on the given tolerances.
 
     Returns:
@@ -116,6 +116,8 @@ class SparseCG(Function):
         x = output
         ctx.save_for_backward(A, x)
 
+    # NOTE: This backward function is not implemented yet.
+    # Now only the shape is correct to test the autograd, while values do not make sense.
     @staticmethod
     def backward(ctx, grad_output: Tensor):
         A, x = ctx.saved_tensors

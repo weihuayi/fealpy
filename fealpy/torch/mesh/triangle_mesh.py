@@ -154,7 +154,7 @@ class TriangleMesh(HomoMesh):
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
                                 isEdgeIPoints[:, 2])
-            w = multiIndex[isInCellIPoints, :].div_(p)
+            w = multiIndex[isInCellIPoints, :].to(self.ftype).div_(p)
             ipoints_from_cell = torch.einsum('ij, kj...->ki...', w,
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
             ipoint_list.append(ipoints_from_cell)

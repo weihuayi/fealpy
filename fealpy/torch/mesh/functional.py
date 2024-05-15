@@ -117,7 +117,7 @@ def simplex_gdof(p: int, mesh) -> int:
     count = mesh.node.size(0)
 
     for i in range(1, mesh.TD + 1):
-        coef *= (p-i) // i
+        coef = (coef * (p-i)) // i
         count += coef * mesh.entity(i).size(0)
     return count
 
