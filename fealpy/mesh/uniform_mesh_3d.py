@@ -601,25 +601,25 @@ class UniformMesh3d(Mesh, Plotable):
         cz = 1 / (hz ** 2)
 
         NN = self.number_of_nodes()
-        k = np.arange(NN).reshape(n0, n1, n2)
+        K = np.arange(NN).reshape(n0, n1, n2)
 
         A = diags([2 * (cx + cy + cz)], [0], shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(-cx, (NN - n1 * n2,))
-        I = k[1:, :, :].flat
-        J = k[0:-1, :, :].flat
+        I = K[1:, :, :].flat
+        J = K[0:-1, :, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         val = np.broadcast_to(-cy, (NN - n0 * n2,))
-        I = k[:, 1:, :].flat
-        J = k[:, 0:-1, :].flat
+        I = K[:, 1:, :].flat
+        J = K[:, 0:-1, :].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         val = np.broadcast_to(-cz, (NN - n0 * n1,))
-        I = k[:, :, 1:].flat
-        J = k[:, :, 0:-1].flat
+        I = K[:, :, 1:].flat
+        J = K[:, :, 0:-1].flat
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
