@@ -33,12 +33,13 @@ class OCAMSystem:
             with open(fname, 'rb') as f:
                 cps = pickle.load(f)
         else:
-            cps = self.get_split_point0()
+            #cps = self.get_split_point0(scheme=0)
+            cps = self.get_split_point()
             # 保存 cps:
             with open(fname, 'wb') as f:
                 pickle.dump(cps, f)
+        self.camera_points = cps
         
-        print(cps)
         for i in range(data['nc']):
             axes = np.zeros((3, 3), dtype=np.float64)
             axes[0, :] = data['axes'][0][i]
@@ -191,7 +192,22 @@ class OCAMSystem:
 
             plotter.add_mesh(no, cell=None, texture_path = self.cams[i].fname)
 
-
+    def show_split_lines(self):
+        """
+        @brief 显示分割线
+        """
+        # 三维的分割线的绘制
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        axes.set_box_aspect([30,10,1.5])
+        for i in range(6):
+            if i != 3:
+                continue
+            points = self.camera_points[i]
+            for point in points:
+                axes.plot(point[:, 0], point[:, 1], point[:, 2])
+        plt.show()
+            
     def show_parameters(self):
         for i, cam in enumerate(self.cams):
             print(i, "-th camara:")
@@ -386,7 +402,8 @@ class OCAMSystem:
         plotter.add_mesh(no, cell=None, texture_path=self.cams[icam].fname)
         return mesh, uv
 
-    def get_split_point0(self, densty=0.02, v=0.5, theta0=np.pi/6, theta1=0, scheme=0):
+    def get_split_point0(self, densty=0.02, v=0.5, theta0=np.pi/6, theta1=0, 
+                         scheme=1):
         size = self.size
         scale_ratio = self.scale_ratio
         center_height = self.center_height
@@ -430,27 +447,39 @@ class OCAMSystem:
         vpoint = np.array([[-l/2, -w/2], [l/2, -w/2], 
                                  [l/2, w/2], [-l/2, w/2]], dtype=np.float64)
         z0 = -center_height
+        # 角点分界线 1
+        v = 30*np.array([[-np.cos(theta0), -np.sin(theta0)], 
+                      [np.cos(theta0), -np.sin(theta0)], 
+                      [np.cos(theta0), np.sin(theta0)], 
+                      [-np.cos(theta0), np.sin(theta0)]])
+        ps = [3, 4, 5, 6]
+        for i in range(4):
+            pp1 = gmsh.model.occ.addPoint(vpoint[i, 0]+v[i, 0], vpoint[i, 1]+v[i, 1], z0)
+            pp2 = gmsh.model.occ.addPoint(vpoint[i, 0]+v[i, 0], vpoint[i, 1]+v[i, 1], 0)
+            pp3 = gmsh.model.occ.addPoint(vpoint[i, 0], vpoint[i, 1], 0)
+            planes.append(add_rectangle(ps[i], pp1, pp2, pp3))
 
-        if scheme == 0: # 第一种方案
-            v = 30*np.array([[-np.cos(theta0), -np.sin(theta0)], 
-                          [np.cos(theta0), -np.sin(theta0)], 
-                          [np.cos(theta0), np.sin(theta0)], 
-                          [-np.cos(theta0), np.sin(theta0)]])
-            ps = [3, 4, 5, 6]
+        if scheme == 1:
+            # 角点分界线 2 
+            v = 30*np.array([[-np.sin(theta0), -np.cos(theta0)], 
+                          [np.sin(theta0), -np.cos(theta0)], 
+                          [np.sin(theta0), np.cos(theta0)], 
+                          [-np.sin(theta0), np.cos(theta0)]])
             for i in range(4):
                 pp1 = gmsh.model.occ.addPoint(vpoint[i, 0]+v[i, 0], vpoint[i, 1]+v[i, 1], z0)
                 pp2 = gmsh.model.occ.addPoint(vpoint[i, 0]+v[i, 0], vpoint[i, 1]+v[i, 1], 0)
                 pp3 = gmsh.model.occ.addPoint(vpoint[i, 0], vpoint[i, 1], 0)
                 planes.append(add_rectangle(ps[i], pp1, pp2, pp3))
 
-            mpoint = np.array([[0, -w/2], [0, w/2]], dtype=np.float64)
-            v = 30*np.array([[0, -1], [0, 1]], dtype=np.float64)
-            for i in range(2):
-                pp0 = gmsh.model.occ.addPoint(mpoint[i, 0], mpoint[i, 1], z0)
-                pp1 = gmsh.model.occ.addPoint(mpoint[i, 0]+v[i, 0], mpoint[i, 1]+v[i, 1], z0)
-                pp2 = gmsh.model.occ.addPoint(mpoint[i, 0]+v[i, 0], mpoint[i, 1]+v[i, 1], 1.0)
-                pp3 = gmsh.model.occ.addPoint(mpoint[i, 0], mpoint[i, 1], 1.0)
-                planes.append(add_rectangle(pp0, pp1, pp2, pp3))
+        # 中点分界线
+        mpoint = np.array([[0, -w/2], [0, w/2]], dtype=np.float64)
+        v = 30*np.array([[0, -1], [0, 1]], dtype=np.float64)
+        for i in range(2):
+            pp0 = gmsh.model.occ.addPoint(mpoint[i, 0], mpoint[i, 1], z0)
+            pp1 = gmsh.model.occ.addPoint(mpoint[i, 0]+v[i, 0], mpoint[i, 1]+v[i, 1], z0)
+            pp2 = gmsh.model.occ.addPoint(mpoint[i, 0]+v[i, 0], mpoint[i, 1]+v[i, 1], 1.0)
+            pp3 = gmsh.model.occ.addPoint(mpoint[i, 0], mpoint[i, 1], 1.0)
+            planes.append(add_rectangle(pp0, pp1, pp2, pp3))
 
         frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
         for i in range(len(frag[1]))[2:]:
@@ -461,24 +490,32 @@ class OCAMSystem:
         gmsh.model.occ.remove([(1, 1)])
 
         gmsh.model.occ.synchronize()
-        gmsh.fltk.run()
+        #gmsh.fltk.run()
 
         gmsh.model.mesh.generate(1)
 
         lines = []
         if scheme == 0:
-            parttag = [[28, 11, 12, 22, 27, 3, 12], 
+            parttag = [[28, 11, 13, 22, 27, 3, 12], 
                        [32, 17, 19, 31, 27, 18, 12],
                        [33, 21, 20, 30, 31, 15, 18],
                        [29, 16, 14, 26, 30, 9, 15],
                        [25, 10, 8, 24, 26, 6, 9],
                        [23, 7, 5, 2, 4, 24, 22, 6, 3]]
-            for tags in parttag:
-                l = []
-                for tag in tags:
-                    node = gmsh.model.mesh.getNodes(1, tag)[1].reshape(-1, 3)
-                    l.append(node)
-                lines.append(l)
+        elif scheme == 1:
+            parttag = [[41, 38, 34, 18, 12 ,3, 42, 17, 19, 11, 13],
+                       [49, 45, 41, 30, 24, 18, 46, 23, 25, 29, 31],
+                       [44, 47, 49, 45, 21, 27, 30, 24, 28, 26, 48, 33, 32, 29, 31],
+                       [40, 44, 47, 15, 21, 27, 43, 22, 20, 28, 26],
+                       [36, 37, 40, 6, 9, 15, 39, 16, 14, 10, 8],
+                       [38, 34, 36, 37, 12, 3, 6, 9, 11, 13, 35, 2, 7, 4, 5, 10, 8]]
+
+        for tags in parttag:
+            l = []
+            for tag in tags:
+                node = gmsh.model.mesh.getNodes(1, tag)[1].reshape(-1, 3)
+                l.append(node)
+            lines.append(l)
         gmsh.finalize()
         return lines
 
