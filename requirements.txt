@@ -1,5 +1,6 @@
 numpy
 scipy
+sympy
 matplotlib
 gmsh
 vtk
