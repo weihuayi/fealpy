@@ -77,6 +77,7 @@ class SparseCG(Function):
         r = b - mm(A, x0)      # (dof, batch)
         p = r                  # (dof, batch)
         n_iter = 0
+        b_norm = b.norm()
 
         # iterate
         while True:
@@ -95,7 +96,7 @@ class SparseCG(Function):
                             "stopped by absolute tolerance.")
                 break
 
-            if r_norm_new / b.norm() < rtol:
+            if r_norm_new / b_norm < rtol:
                 logger.info(f"SparseCG: converged in {n_iter} iterations, "
                             "stopped by relative tolerance.")
                 break
