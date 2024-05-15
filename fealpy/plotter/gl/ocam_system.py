@@ -217,13 +217,10 @@ class OCAMSystem:
         #plt.tight_layout()
         plt.show()
 
-    def show_screen_mesh(self, plotter, idx):
+    def show_screen_mesh(self, plotter):
         z0 = self.center_height
         f1, f2 = self.get_implict_surface_function()
         for i in range(6):
-            if i != idx:
-                continue
-
             mesh = self.cams[i].imagemesh
             node = mesh.entity('node')
             mesh.to_vtk(fname = 'image_mesh_'+str(i)+'.vtu')

@@ -9,8 +9,8 @@ from fealpy.plotter.gl import OpenGLPlotter, OCAMSystem
 csys = OCAMSystem.from_data()
 plotter = OpenGLPlotter()
 
-#csys.show_screen_mesh(plotter)
-csys.show_ground_mesh(plotter)
+csys.show_screen_mesh(plotter)
+#csys.show_ground_mesh(plotter)
 plotter.run()
 for i in range(6):
     model = csys.cams[i]
