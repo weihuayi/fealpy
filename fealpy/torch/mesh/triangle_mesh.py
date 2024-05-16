@@ -6,11 +6,12 @@ import torch
 from torch import Tensor
 
 from fealpy.torch.mesh.mesh_base import _S
+from fealpy.torch.mesh.quadrature import Quadrature
 
 from .. import logger
 from . import functional as F
 from . import mesh_kernel as K
-from .mesh_base import HomoMeshDataStructure, HomoMesh
+from .mesh_base import HomoMeshDataStructure, HomoMesh, entity_str2dim
 
 Index = Union[Tensor, int, slice]
 _dtype = torch.dtype
@@ -33,12 +34,12 @@ class TriangleMeshDataStructure(HomoMeshDataStructure):
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
 
+        self.construct()
+
     def total_face(self):
         return self.cell[..., self.localFace].reshape(-1, 2)
 
-    # TODO: this is not correct. So, face2cell is unavailable.
     def construct(self) -> None:
-        kwargs = {'dtype': self.itype, 'device': self.device}
         NC = self.cell.shape[0]
         NFC = self.cell.shape[1]
 
@@ -52,8 +53,8 @@ class TriangleMeshDataStructure(HomoMeshDataStructure):
         self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
         NF = i0_np.shape[0]
 
-        i1_np = np.zeros(NF, **kwargs)
-        i1_np[j_np] = np.arange(NFC*NC, **kwargs)
+        i1_np = np.zeros(NF, dtype=i0_np.dtype)
+        i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
 
         self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
         self.cell2face = self.cell2edge
@@ -84,8 +85,83 @@ class TriangleMesh(HomoMesh):
                         "cell_area and grad_lambda are not available. "
                         "Any operation involving them will fail.")
 
-    # TODO: finish this
-    def cell_to_ipoint(self, p: int, index: Index=None) -> Tensor:
+    def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+        node = self.node
+        if isinstance(etype, str):
+            etype = entity_str2dim(self.ds, etype)
+        if etype == 0:
+            return node if index is None else node[index]
+        elif etype == 1:
+            edge = self.entity(1, index)
+            return F.edge_length(node[edge])
+        elif etype == 2:
+            cell = self.entity(2, index)
+            return self._cell_area(node[cell])
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+    def integrator(self, q: int, etype: Union[int, str]='cell',
+                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+        from .quadrature import TriangleQuadrature
+        if isinstance(etype, str):
+            etype = entity_str2dim(self.ds, etype)
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+        if etype == 2:
+            quad = TriangleQuadrature(**kwargs)
+        elif etype == 1:
+            raise NotImplementedError
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+        quad._latest_order = q
+        return quad
+
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
+        if isinstance(iptype, str):
+            iptype = entity_str2dim(self.ds, iptype)
+        return F.simplex_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p: int):
+        return F.simplex_gdof(p, self)
+
+    def interpolation_points(self, p: int, index=np.s_[:]):
+        """
+        @brief Fetch all p-order interpolation points on a triangle mesh.
+        """
+        node = self.entity('node')
+        if p == 1:
+            return node
+        if p <= 0:
+            raise ValueError("p must be a integer larger than 0.")
+
+        cell = self.entity('cell')
+        ipoint_list = []
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+
+        GD = self.geo_dimension()
+        ipoint_list.append(node) # ipoints[:NN, :]
+
+        edge = self.entity('edge')
+        w = torch.zeros((p - 1, 2), **kwargs)
+        w[:, 0] = torch.arange(p - 1, 0, -1, **kwargs).div_(p)
+        w[:, 1] = w[:, 0].flip(0)
+        ipoints_from_edge = torch.einsum('ij, ...jm->...im', w,
+                                         node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]
+        ipoint_list.append(ipoints_from_edge)
+
+        if p >= 3:
+            TD = self.top_dimension()
+            multiIndex = self.multi_index_matrix(p, TD)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
+                                isEdgeIPoints[:, 2])
+            w = multiIndex[isInCellIPoints, :].to(self.ftype).div_(p)
+            ipoints_from_cell = torch.einsum('ij, kj...->ki...', w,
+                                          node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
+            ipoint_list.append(ipoints_from_cell)
+
+        return torch.cat(ipoint_list, dim=0)  # (gdof, GD)
+
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         cell = self.ds.cell
         if p == 1:
             return cell[index]
@@ -94,8 +170,7 @@ class TriangleMesh(HomoMesh):
         idx0, = torch.nonzero(mi[:, 0] == 0, as_tuple=True)
         idx1, = torch.nonzero(mi[:, 1] == 0, as_tuple=True)
         idx2, = torch.nonzero(mi[:, 2] == 0, as_tuple=True)
-        itype = self.ds.itype
-        device = self.device
+        kwargs = {'dtype': self.ds.itype, 'device': self.device}
 
         face2cell = self.ds.face_to_cell()
         NN = self.number_of_nodes()
@@ -103,14 +178,14 @@ class TriangleMesh(HomoMesh):
         NC = self.number_of_cells()
 
         e2p = self.edge_to_ipoint(p)
-        ldof = self.number_of_local_ipoint()
-        c2p = torch.zeros((NC, ldof), dtype=itype, device=device)
+        ldof = self.number_of_local_ipoints(p, 'cell')
+        c2p = torch.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
         c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
 
         flag = face2cell[:, 2] == 1
-        c2p[face2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+        c2p[face2cell[flag, 0][:, None], idx1.flip(0)] = e2p[flag]
 
         flag = face2cell[:, 2] == 2
         c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
@@ -118,19 +193,21 @@ class TriangleMesh(HomoMesh):
         iflag = face2cell[:, 0] != face2cell[:, 1]
 
         flag = iflag & (face2cell[:, 3] == 0)
-        c2p[face2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+        c2p[face2cell[flag, 1][:, None], idx0.flip(0)] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 1)
         c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 2)
-        c2p[face2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+        c2p[face2cell[flag, 1][:, None], idx2.flip(0)] = e2p[flag]
 
         cdof = (p-1)*(p-2)//2
         flag = torch.sum(mi > 0, axis=1) == 3
-        c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, dtype=itype, device=device).reshape(NC, cdof)
+        c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         return c2p[index]
 
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        return self.edge_to_ipoint(p, index)
 
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.node[self.ds.cell[index]])
@@ -143,7 +220,7 @@ class TriangleMesh(HomoMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(0)
+            return phi.unsqueeze_(1)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -152,13 +229,13 @@ class TriangleMesh(HomoMesh):
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
-        R = K.simplex_grad_shape_function(bc, p, mi)
+        R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = torch.einsum('...ij, kjm -> k...im', Dlambda, R)
-            # NOTE: the subscript 'k': cell, 'i': dof, 'j': bc, 'm': dimension, '...': batch
+            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
+            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "

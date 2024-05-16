@@ -75,8 +75,7 @@ class BilinearForm(Generic[_FS]):
         for bi in self.bintegrators:
             M = M + bi.assembly_face_matrix(space)
 
-        M.coalesce()
-        self._M = M
-        logger.info(f"Finished construct bilinear from matrix with shape {self._M.shape}.")
+        self._M = M.coalesce()
+        logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
 
-        return M
+        return self._M

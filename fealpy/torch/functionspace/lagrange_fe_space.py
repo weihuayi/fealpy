@@ -1,5 +1,5 @@
 
-from typing import Union, TypeVar, Generic
+from typing import Union, TypeVar, Generic, Callable
 
 import torch
 from torch import Tensor
@@ -45,6 +45,39 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def face_to_dof(self):
         return self.dof.face_to_dof()
 
+    def is_boundary_dof(self, threshold=None):
+        if self.ctype == 'C':
+            return self.dof.is_boundary_dof(threshold)
+        else:
+            raise RuntimeError("boundary dof is not supported by discontinuous spaces.")
+
+    def interpolate(self, gD: Union[Callable[..., Tensor], Tensor],
+                    uh: Tensor,
+                    index: Index=_S):
+        ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
+        GD = self.mesh.geo_dimension()
+
+        if callable(gD):
+            gD = gD(ipoints[index])
+
+        if (len(uh.shape) == 1) or (self.doforder == 'vdims'):
+            if len(uh.shape) == 1 and gD.shape[-1] == 1:
+                gD = gD.squeeze(-1)
+            uh[index] = gD
+
+        elif self.doforder == 'sdofs':
+            if isinstance(gD, (int, float)):
+                uh[..., index] = gD
+            elif isinstance(gD, Tensor):
+                if gD.shape == (GD, ):
+                    uh[..., index] = gD[:, None]
+                else:
+                    uh[..., index] = gD.T
+            else:
+                raise ValueError("Unsupported type for gD. Must be a callable, int, float, or Tensor.")
+
+        return uh
+
     def basis(self, bc: Tensor, index: Index=_S, variable='u'):
         return self.mesh.shape_function(bc, self.p, index=index, variable=variable)
 
@@ -64,4 +97,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         @brief
         """
+        pass
+
+    def grad(self, uh: Tensor, bc: Tensor, index: Index=_S):
         pass
