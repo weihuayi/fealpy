@@ -78,6 +78,6 @@ class LinearForm(Generic[_FS]):
             V = V + bi.assembly_face_vector(space)
 
         self._V = V.coalesce()
-        logger.info(f"Construct source vector with shape {V.shape}.")
+        logger.info(f"Linear form vector constructed, with shape {list(V.shape)}.")
 
         return self._V
