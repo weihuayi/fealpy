@@ -184,6 +184,8 @@ ny = args.ny
 maxit = args.maxit
 gamma = args.gamma
 
+q = 11
+
 x = sp.symbols("x")
 y = sp.symbols("y")
 u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**2
@@ -222,17 +224,17 @@ for i in range(maxit):
     h[i] = np.sqrt(np.max(mesh.cell_area()))
 
     bform = BilinearForm(space)
-    L = ScalarBiharmonicIntegrator(q=11)
+    L = ScalarBiharmonicIntegrator(q=q)
 
     bform.add_domain_integrator(L)
     A0 = bform.assembly()
     
-    P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma, q=11)
+    P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma, q=q)
     P  = P0.assembly_face_matrix(space)  
     A  = A0 + P
     
     lform = LinearForm(space)
-    F = ScalarSourceIntegrator(pde.source, q=11)
+    F = ScalarSourceIntegrator(pde.source, q=q)
     lform.add_domain_integrator(F)
     b = lform.assembly()
     
@@ -302,6 +304,9 @@ for i in range(maxit):
     error[0, i] = np.max(np.abs(gx0-gx))
     error[1, i] = np.max(np.abs(hx0-hx))
     
+    
+    '''
+    # 计算R^k的误差
     if p > 2:
         k = 2**p/2.0
         Rhu[i] -= hx0/(k-1)
@@ -310,7 +315,7 @@ for i in range(maxit):
             Rerror[0, i-1] = np.max(np.abs(Rhu[i-1]-hx))
     else:
         Rerror[0, i] = error[1, i]
-    
+    '''
 #    node = mesh.entity('node')
 #    cell = mesh.entity('cell')
 #    cell = np.array(cell)
