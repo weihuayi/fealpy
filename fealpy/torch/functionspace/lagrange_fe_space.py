@@ -55,7 +55,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
                     uh: Tensor,
                     index: Index=_S):
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-        GD = self.geo_dimension()
+        GD = self.mesh.geo_dimension()
 
         if callable(gD):
             gD = gD(ipoints[index])
