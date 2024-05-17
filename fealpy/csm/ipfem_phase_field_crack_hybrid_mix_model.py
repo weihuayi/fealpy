@@ -21,9 +21,9 @@ from scipy.sparse.linalg import spsolve, lgmres, cg
 from scipy.sparse import csr_matrix, coo_matrix
 
 
-class AFEMPhaseFieldCrackHybridMixModel():
+class IPFEMPhaseFieldCrackHybridMixModel():
     """
-    @brief 线性自适应有限元相场方法混合模型求解裂纹传播问题
+    @brief 内罚有限元相场方法混合模型求解裂纹传播问题
     """
     def __init__(self, model, mesh, p=1, p0=2, gamma=5):
         """
@@ -47,7 +47,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
         self.ipspace = InteriorPenaltyBernsteinFESpace2d(mesh, p = p0)
 
         self.uh = self.space.function(dim=self.GD) # 位移场
-        self.d = self.space.function() # 相场
+        self.d = self.dspace.function() # 相场
         self.H = np.zeros(NC) # 最大历史应变场
         self.D0 = self.linear_tangent_matrix()
         
@@ -139,35 +139,36 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             # 相场模型计算
             ipbform = BilinearForm(ipspace)
-            ipbform.add_domain_integrator(ScalarBiharmonicIntegrator(q=q))
-            A = dbform.assembly()
+            ipbform.add_domain_integrator(ScalarBiharmonicIntegrator())
+            A = ipbform.assembly()
             
-            P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma, q=4)
-            P  = P0.assembly_face_matrix(space)  
-            A  = G_c*l0**3/16*(A + P)
+            P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma)
+            P  = P0.assembly_face_matrix(ipspace)  
+            A  = model.Gc*model.l0**3/16*(A + P)
 
-            dbfrom = BilineaForm(space)
-            dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
-                q=4))
-            dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0/2.0, q=4))
+            dbform = BilinearForm(dspace)
+            dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0))
+            dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0/2.0))
+            A1 = dbform.assembly()
 
+            '''
             start2 = time.time()
             if atype == 'fast':
                 # 无数值积分矩阵组装
                 A1 = dbform.fast_assembly()
             else:
                 A1 = dbform.assembly()
-           
+            '''
             A1 += A
 
             # 线性积分子
-            lform = LinearForm(space)
+            lform = LinearForm(dspace)
             lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
             R1 = lform.assembly()
             R1 -= A1@d[:]
 
             if dirichlet_phase:
-                dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
+                dbc = DirichletBC(dspace, 0, threshold=model.is_boundary_phase)
                 A1, R1 = dbc.apply(A1, R1)
 
             # 选择合适的解法器
