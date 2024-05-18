@@ -486,7 +486,6 @@ class Mesh():
                     f = f(ps)
                 elif f.coordtype == 'barycentric':
                     f = f(bcs)
-
         cm = self.entity_measure('cell')
 
         if isinstance(f, (int, float)): #  u 为标量常函数

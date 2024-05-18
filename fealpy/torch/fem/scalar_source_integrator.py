@@ -32,9 +32,8 @@ class ScalarSourceIntegrator(DomainSourceIntegrator):
         NQ = ws.size(0)
 
         phi = space.basis(bcs, index=index, variable='x')
-        print(phi.shape)
         val = process_coef_func(f, bcs, mesh, index)
-        print(val.shape)
+
         if is_scalar(val):
             return val * torch.einsum('q, qci, c -> ci', ws, phi, cm)
         else:
