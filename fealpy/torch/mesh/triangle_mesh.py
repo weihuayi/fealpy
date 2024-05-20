@@ -154,7 +154,7 @@ class TriangleMesh(HomoMesh):
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
                                 isEdgeIPoints[:, 2])
-            w = multiIndex[isInCellIPoints, :].div_(p)
+            w = multiIndex[isInCellIPoints, :].to(self.ftype).div_(p)
             ipoints_from_cell = torch.einsum('ij, kj...->ki...', w,
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
             ipoint_list.append(ipoints_from_cell)
@@ -205,6 +205,9 @@ class TriangleMesh(HomoMesh):
         flag = torch.sum(mi > 0, axis=1) == 3
         c2p[:, flag] = NN + NE*(p-1) + torch.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         return c2p[index]
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        return self.edge_to_ipoint(p, index)
 
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.node[self.ds.cell[index]])

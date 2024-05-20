@@ -117,7 +117,7 @@ def simplex_gdof(p: int, mesh) -> int:
     count = mesh.node.size(0)
 
     for i in range(1, mesh.TD + 1):
-        coef *= (p-i) // i
+        coef = (coef * (p-i)) // i
         count += coef * mesh.entity(i).size(0)
     return count
 
@@ -137,7 +137,7 @@ def simplex_measure(points: Tensor):
         raise RuntimeError("The geometric dimension of points must be NVC-1"
                            "to form a simplex.")
     edges = points[..., 1:, :] - points[..., :-1, :]
-    return det(edges).div_(factorial(TD))
+    return det(edges).div(factorial(TD))
 
 
 # Quadrangle Mesh & Hexahedron Mesh

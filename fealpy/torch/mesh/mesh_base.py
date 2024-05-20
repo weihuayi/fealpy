@@ -208,6 +208,10 @@ class MeshDataStructure():
         else:
             return face2cell[index]
 
+    ### boundary
+    def boundary_face_flag(self): return self.face2cell[:, 0] == self.face2cell[:, 1]
+    def boundary_face_index(self): return torch.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+
 
 class HomoMeshDataStructure(MeshDataStructure):
     ccw: Tensor
