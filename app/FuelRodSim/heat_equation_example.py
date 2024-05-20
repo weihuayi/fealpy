@@ -7,6 +7,78 @@ from fealpy.fem import DiffusionIntegrator, BilinearForm, ScalarMassIntegrator, 
 from fealpy.fem.dirichlet_bc import DirichletBC
 import matplotlib.pyplot as plt
 
+
+class Parabolic2dData:
+    def domain(self):
+        return [0, 1, 0, 1]
+
+    def duration(self):
+        return [0, 0.1]
+    
+    
+    def solution(self,p,t):
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.sin(pi*x)*np.sin(pi*y)*np.exp(-2*pi*t) 
+    
+    def init_solution(self, p):
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.sin(pi*x)*np.sin(pi*y)
+        
+    
+    def source(self, p, t):
+        """
+        @brief 方程右端项 
+
+        @param[in] p numpy.ndarray, 空间点
+        @param[in] t float, 时间点 
+
+        @return 方程右端函数值
+        """
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.zeros(x.shape)
+
+     
+    def dirichlet(self, p,t):
+        
+        return self.solution(p,t)
+    
+class Parabolic3dData:
+    def domain(self):
+        return [0, 1, 0, 1, 0, 1]
+
+    def duration(self):
+        return [0, 1]
+
+    def source(self,p,t):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        return np.zeros_like(x)
+
+    def solution(self, p, t):
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        return np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z) * np.exp(-3 * pi * t)
+    
+    def init_solution(self, p):
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        return np.sin(pi*x)*np.sin(pi*y)*np.sin(pi * z) 
+
+    def dirichlet(self, p, t):
+        
+        return self.solution(p, t)
+    
 class FuelRod3dData:
     def domain(self):
         return [0, 1, 0, 1, 0, 1]
@@ -20,8 +92,21 @@ class FuelRod3dData:
     def dirichlet(self, p, t):
         return np.array([500])
     
+class FuelRod2dData:
+    def domain(self):
+        return [0, 1, 0, 1]
+
+    def duration(self):
+        return [0, 1]
+
+    def source(self,p,t):
+        return 0
+
+    def dirichlet(self, p, t):
+        return np.array([500])
+
 class HeatEquationSolver:
-    def __init__(self, mesh: TriangleMesh, pde: FuelRod3dData, nt, bdnidx, p0, alpha_caldding=4e-4, alpha_inner=8e-4, layered=True, ficdx=None ,cacidx=None,output: str = './result', filename: str = 'temp'):
+    def __init__(self, mesh: TriangleMesh, pde: Parabolic2dData, nt, bdnidx, p0, alpha_caldding=4e-4, alpha_inner=8e-4, layered=True, ficdx=None ,cacidx=None,output: str = './result', filename: str = 'temp'):
         """
         Args:
             mesh (TriangleMesh): 三角形网格
@@ -177,3 +262,107 @@ class HeatEquationSolver:
             plt.show()
 
 
+
+# 使用示例:二维的燃料棒slover
+if __name__ == "__main__":
+    mm = 1e-03
+    #包壳厚度
+    w = 0.15 * mm
+    #半圆半径
+    R1 = 0.5 * mm
+    #四分之一圆半径
+    R2 = 1.0 * mm
+    #连接处直线段
+    L = 0.575 * mm
+    #内部单元大小
+    h = 0.5 * mm
+    #棒长
+    l = 20 * mm
+    #螺距
+    p = 40 * mm
+
+from app.FuelRodSim.fuel_rod_mesher import FuelRodMesher 
+mesher = FuelRodMesher(R1,R2,L,w,h,meshtype='segmented',modeltype='2D')
+mesh = mesher.get_mesh
+ficdx,cacidx = mesher.get_2D_fcidx_cacidx()
+cnidx,bdnidx = mesher.get_2D_cnidx_bdnidx()
+pde = FuelRod3dData()
+FuelRodsolver = HeatEquationSolver(mesh, pde,640, bdnidx,300,ficdx=ficdx,cacidx=cacidx,output='./result_fuelrod2Dtest')
+FuelRodsolver.solve()
+
+
+"""
+# 使用示例:三维的燃料棒slover
+if __name__ == "__main__":
+    mm = 1e-03
+    #包壳厚度
+    w = 0.15 * mm
+    #半圆半径
+    R1 = 0.5 * mm
+    #四分之一圆半径
+    R2 = 1.0 * mm
+    #连接处直线段
+    L = 0.575 * mm
+    #内部单元大小
+    h = 0.5 * mm
+    #棒长
+    l = 20 * mm
+    #螺距
+    p = 40 * mm
+
+from app.FuelRodSim.fuel_rod_mesher import FuelRodMesher 
+mesher = FuelRodMesher(R1,R2,L,w,h,l,p,meshtype='segmented',modeltype='3D')
+mesh = mesher.get_mesh
+ficdx,cacidx = mesher.get_3D_fcidx_cacidx()
+cnidx,bdnidx = mesher.get_3D_cnidx_bdnidx()
+pde = FuelRod3dData()
+FuelRodsolver = HeatEquationSolver(mesh, pde,64, bdnidx,300,ficdx=ficdx,cacidx=cacidx,output='./result_fuelrod3Dtest')
+FuelRodsolver.solve()
+"""
+
+"""
+#使用示例，三维箱子热传导
+if __name__ == "__main__":
+    nx = 20
+    ny = 20
+    nz = 20
+from fealpy.mesh import TetrahedronMesh
+mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1],nx,ny,nz)
+node = mesh.node
+isBdNode = mesh.ds.boundary_node_flag()
+pde = FuelRod3dData()
+Boxslover = HeatEquationSolver(mesh,pde,120,isBdNode,300,alpha_caldding=0.08,layered=False,output='./rusult_boxtest')
+Boxslover.solve()
+"""
+
+"""
+# 二维带真解的测试案例
+pde=Parabolic2dData()
+nx = 20
+ny = 20
+mesh = TriangleMesh.from_box([0, 1, 0, 1], nx,ny)
+node = mesh.node
+print(node.shape)
+isBdNode = mesh.ds.boundary_node_flag()
+p0=pde.init_solution(node) #准备一个初值
+Box2dslover = HeatEquationSolver(mesh,pde,160,isBdNode,p0=p0,alpha_caldding=1,layered=False,output='./rusult_box2dtesttest')
+Box2dslover.solve()
+Box2dslover.plot_exact_solution() # 绘制真解
+Box2dslover.plot_error()
+"""
+
+"""
+# 三维带真解的测试
+pde=Parabolic3dData()
+nx = 5
+ny = 5
+nz = 5
+mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx, ny, nz)
+node = mesh.node
+isBdNode = mesh.ds.boundary_node_flag()
+p0=pde.init_solution(node) #准备一个初值
+Box3DSolver = HeatEquationSolver(mesh, pde, 160, isBdNode, p0=p0, alpha_caldding=1, layered=False, output='./result_box3dtest')
+Box3DSolver.solve()
+Box3DSolver.plot_exact_solution()
+Box3DSolver.plot_error()
+"""
