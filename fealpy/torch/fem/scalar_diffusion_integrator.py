@@ -4,12 +4,13 @@ from typing import Optional
 from torch import Tensor
 
 from ..mesh import HomoMesh
+from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import DomainIntegrator, _FS, _S, Index, CoefLike
+from .integrator import DomainIntegrator, _S, Index, CoefLike
 
 
-class ScalarDiffusionIntegrator(DomainIntegrator[_FS]):
+class ScalarDiffusionIntegrator(DomainIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
     def __init__(self, c: Optional[CoefLike]=None, q: int=3, *,
                  batched: bool=False) -> None:

@@ -4,9 +4,10 @@ from typing import Optional
 from torch import Tensor
 
 from ..mesh import HomoMesh
+from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral
-from .integrator import DomainSourceIntegrator, _FS, _S, Index, CoefLike
+from .integrator import DomainSourceIntegrator, _S, Index, CoefLike
 
 
 class ScalarSourceIntegrator(DomainSourceIntegrator):

@@ -2,9 +2,8 @@
 from typing import Union
 from abc import ABCMeta, abstractmethod
 
+import torch
 from torch import Tensor
-
-from ..mesh import Mesh
 
 Index = Union[int, slice, Tensor]
 _S = slice(None)
@@ -12,7 +11,9 @@ _S = slice(None)
 
 class FunctionSpace(metaclass=ABCMeta):
     r"""THe base class of function spaces"""
-    mesh: Mesh
+    device: torch.device
+    ftype: torch.dtype
+    itype: torch.dtype
 
     ### basis
     @abstractmethod

@@ -27,6 +27,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         self.ftype = mesh.ftype
         self.itype = mesh.ds.itype
+        self.device = mesh.device
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
