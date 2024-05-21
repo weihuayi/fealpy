@@ -12,7 +12,9 @@ _S = slice(None)
 
 class Integrator(Generic[_FS]):
     r"""@brief The base class for integrators on function spaces."""
-    pass
+    def assembly(self, space: _FS, index: Index=_S) -> Tensor:
+        r"""Assembly the matrix or vector."""
+        raise NotImplementedError
 
 
 class DomainIntegrator(Integrator[_FS]):
