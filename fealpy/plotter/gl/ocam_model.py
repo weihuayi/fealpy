@@ -3,6 +3,8 @@ from typing import Callable, Any, Tuple
 
 import numpy as np
 import cv2
+import os
+import pickle
 import glob
 import matplotlib.pyplot as plt
 
@@ -30,6 +32,9 @@ class OCAMModel:
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        print(self.icenter, self.radius)
+        self.icenter, self.radius = self.get_center_and_radius(self.fname)
+        print(self.icenter, self.radius)
         cps_all = []
         for cps in self.camera_points:
             val = self.world_to_image(cps)
@@ -38,7 +43,18 @@ class OCAMModel:
             val[:, 1] = self.height-val[:, 1]
             cps_all.append(val)
         self.camera_points = cps_all
-        self.imagemesh = self.gmshing_new()
+
+        # 判断是否存在网格文件
+        fname = os.path.expanduser("~/data/ocam_mesh_{}_{}.pkl".format(self.icenter, self.radius))
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.imagemesh = pickle.load(f)
+        else:
+            self.imagemesh = self.gmshing_new()
+            # 保存 cps:
+            with open(fname, 'wb') as f:
+                pickle.dump(self.imagemesh, f)
+
 
     def __call__(self, u):
         icenter = self.icenter
@@ -83,7 +99,8 @@ class OCAMModel:
         def f(dim, tag, x, y, z, lc): 
             m = self.mesh_to_image(np.array([[x, y]]))
             l = np.linalg.norm(m[0]-self.icenter)
-            return 40*(self.radius-l)/self.radius + 2
+            #return 40*(self.radius-l)/self.radius + 2
+            return 80*(self.radius-l)/self.radius + 4
         gmsh.model.mesh.setSizeCallback(f)
 
         ## 生成网格
@@ -374,7 +391,6 @@ class OCAMModel:
         phi = phi % (2 * np.pi)
 
         uv = np.zeros((NN, 2), dtype=np.float64)
-        print("fx, fy, radius", fx, fy, self.radius)
 
         if ptype == 'L': # 等距投影
             uv[:, 0] = fx * theta * np.cos(phi) + u0 
@@ -733,6 +749,45 @@ class OCAMModel:
         # 进行透视矫正
         result = cv2.warpPerspective(img, M, (1920, 1080))
         return result
+
+    def get_center_and_radius(self, image_path):
+        # 读取图像
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        image0 = cv2.imread(image_path)
+        if image is None:
+            print("Error: Unable to load image.")
+            return None, None
+
+        # 对图像进行阈值处理，保留非黑色区域
+        _, thresholded = cv2.threshold(image, 70, 255, cv2.THRESH_BINARY)
+
+        # 找到非黑色区域的轮廓
+        contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 寻找最大轮廓
+        max_contour = max(contours, key=cv2.contourArea)
+
+        # 使用最小外接圆找到中心和半径
+        center, radius = cv2.minEnclosingCircle(max_contour)
+
+        # 绘制最小外接圆
+        #circle_image = image0
+        #cv2.circle(circle_image, center, radius, (0, 255, 0), 2)  # 绘制圆
+        #cv2.circle(circle_image, center, 5, (0, 0, 255), -1)  # 绘制中心点
+
+        # 绘制最大轮廓
+        #contour_image = np.zeros_like(image)
+        #cv2.drawContours(contour_image, [max_contour], 0, (255, 255, 255), 2)
+        #print(f"Center: {center}, Radius: {radius}")
+
+        ## 显示结果
+        #plt.figure(figsize=(8, 6))
+        #plt.imshow(circle_image)
+        #plt.title('Fisheye Center and Radius')
+        #plt.axis('off')
+        #plt.show()
+        return center, radius
+
 
 class OCAMDomain(Domain):
     def __init__(self,icenter,radius,hmin=10,hmax=20,fh=None):
