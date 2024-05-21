@@ -1203,7 +1203,7 @@ class UniformMesh2d(Mesh, Plotable):
             raise ValueError('the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
-    def entity_measure(self, etype, index=np.s_[:]):
+    def entity_measure(self, etype=2, index=np.s_[:]):
         """
         @brief
         """

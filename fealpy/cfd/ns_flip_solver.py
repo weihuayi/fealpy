@@ -30,9 +30,18 @@ class NSFlipSolver:
         result =  i * nx + j 
         return result
 
+<<<<<<< HEAD
+    def bilinear(self,position):
+        i0,j0 = self.mesh.cell_location(position)
+        e = self.e(position)
+||||||| 57d1018e
+    def bilinear(self,position,e):
+        i0,j0 = self.mesh.cell_location(position)
+=======
     def NGP(self,position,vertex):
         i0,j0 = self.mesh.cell_location(vertex)
         e = self.e(position)
+>>>>>>> upstream/master
         epsilon = e[:,0]
         eta = e[:,1]
         num_p = len(e)
@@ -64,19 +73,54 @@ class NSFlipSolver:
         result = csr_matrix(result)
         return result
     
+<<<<<<< HEAD
+    def P2G_center(self, particles):
+        m_p = particles["mass"]
+        e_p = particles["internal_energy"]
+||||||| 57d1018e
+    def P2G_center(self,particles,cell_center,Vc):
+        m_p = particles["mass"]
+        e_p = particles["internal_energy"]
+=======
     def P2G_cell(self, particles):
         m_p = particles["mass"] #粒子质量
         e_p = particles["internal_energy"] #粒子内能
         Vc = self.mesh.cell_area() #单元面积
+>>>>>>> upstream/master
         position = self.particles["position"]
+<<<<<<< HEAD
+        cell_center = self.mesh.cell_center()
+        Vc = self.mesh.cell_area()
+        num_p = len(position[:,0])
+        num_c = len(cell_center[:,0])
+        distance = np.zeros_like(position)
+        S_pc = np.zeros((num_p,num_c)) #求插值函数S_pc
+||||||| 57d1018e
+        num_p = len(position[:,0])
+        num_c = len(cell_center[:,0])
+        distance = np.zeros_like(position)
+        S_pc = np.zeros((num_p,num_c)) #求插值函数S_pc
+=======
         index = self.coordinate(particles["position"])
         num_p = len(position)
         num_c = self.mesh.ds.nx * self.mesh.ds.ny
         S_pc = diags([0], [0], shape=(num_p, num_c), format='csr')
+>>>>>>> upstream/master
         for i in range(num_p):
             S_pc[i,index[i]] = 1
         rho_c = m_p@S_pc/Vc
-        I_c = (e_p@S_pc)/(rho_c*Vc) #粒子足够多就不会等于0,不能加入条件语句，因为某一单元的Vc等于0,就得找在该单元的粒子，再使其ep等于0
+<<<<<<< HEAD
+        I_c = (e_p@S_pc)/(rho_c*Vc)
+        print(rho_c)
+        print(I_c) #为什么有些会出现nan?
+        return rho_c,I_c
+||||||| 57d1018e
+        I_c = (e_p@S_pc)/(rho_c*Vc)
+        print(rho_c)
+        print(I_c) #为什么有些会出现nan?
+        return rho_c,I_c
+=======
+        I_c = (e_p@S_pc)/(rho_c*Vc) #会除以很多0,这里改怎么避免？
         return rho_c, I_c
 
     def P2G_vertex(self,particles):
@@ -86,6 +130,6 @@ class NSFlipSolver:
         vertex = self.mesh.node.reshape(num_v,2)
         S_pv = self.bilinear(particles["position"],vertex)
         M_v = m_p@S_pv
-        m_p = m_p[:,np.newaxis]
-        U_v = ((m_p*v_p).T@S_pv/M_v).T #需要确认写法
-        return M_v, U_v
+        #U_v = m_p*v_p/M_v ?
+        return M_v
+>>>>>>> upstream/master
