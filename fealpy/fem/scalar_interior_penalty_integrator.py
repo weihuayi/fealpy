@@ -41,6 +41,8 @@ class ScalarInteriorPenaltyIntegrator:
 
         P = (P2 + P2T) + P1
         
+        NC = mesh.number_of_cells()
+        
         I = np.broadcast_to(ie2cd[:, :, None], shape=P.shape)
         J = np.broadcast_to(ie2cd[:, None, :], shape=P.shape)
 
