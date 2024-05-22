@@ -27,7 +27,7 @@ def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
 
     Returns:
         Tensor[C, I]: The result of the integration.
-        If `batched == True`, the shape of the result is (B, C, I).
+        If `batched == True`, the shape of the result is (C, I, B).
     """
     if coef is None:
         return einsum('q, c, qci -> ci', weights, measure, input)
@@ -38,7 +38,7 @@ def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
     if is_scalar(coef):
         return einsum('q, c, qci -> ci', weights, measure, input) * coef
     elif is_tensor(coef):
-        out_subs = 'bci' if batched else 'ci'
+        out_subs = 'cib' if batched else 'ci'
         subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
         return einsum(f'q, c, qci, {subs} -> {out_subs}', weights, measure, input, coef)
     else:
@@ -62,7 +62,7 @@ def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: 
 
     Returns:
         Tensor[C, I, J]: The result of the integration.
-        If `batched == True`, the shape of the output is (B, C, I, J).
+        If `batched == True`, the shape of the output is (C, I, J, B).
     """
     if coef is None:
         return einsum('q, c, qci..., qcj... -> cij', weights, measure, input1, input2)
@@ -73,7 +73,7 @@ def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: 
     if is_scalar(coef):
         return einsum('q, c, qci..., qcj... -> cij', weights, measure, input1, input2) * coef
     elif is_tensor(coef):
-        out_subs = 'bcij' if batched else 'cij'
+        out_subs = 'cijb' if batched else 'cij'
         subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
         return einsum(f'q, c, qci..., qcj..., {subs} -> {out_subs}', weights, measure, input1, input2, coef)
     else:

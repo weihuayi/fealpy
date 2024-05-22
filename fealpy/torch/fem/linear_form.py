@@ -6,7 +6,8 @@ from torch import Tensor
 
 from .. import logger
 from ..functionspace.space import FunctionSpace
-from .form import IntegratorHandler, Form
+from .integrator import Integrator
+from .form import Form
 
 
 _FS = TypeVar('_FS', bound=FunctionSpace)
@@ -16,8 +17,8 @@ class LinearForm(Form[_FS]):
     r"""@brief"""
     def __init__(self, space: _FS, retain_ints: bool=False, batch_size: int=0):
         self.space = space
-        self.dintegrators: List[IntegratorHandler] = []
-        self.bintegrators: List[IntegratorHandler] = []
+        self.dintegrators: List[Integrator] = []
+        self.bintegrators: List[Integrator] = []
         self._M: Optional[Tensor] = None
         self.retain_ints = retain_ints
         self.batch_size = batch_size
@@ -37,7 +38,7 @@ class LinearForm(Form[_FS]):
 
             for i in range(len(self.dintegrators)):
                 di = self.dintegrators[i]
-                cell_vec = cell_vec + di.assembly_cell_vector(space)
+                cell_vec = cell_vec + di.assembly(space)
 
                 if not self.retain_ints:
                     di.clear()
@@ -53,7 +54,7 @@ class LinearForm(Form[_FS]):
 
         for i in range(len(self.bintegrators)):
             bi = self.bintegrators[i]
-            V = V + bi.assembly_face_vector(space)
+            V = V + bi.assembly(space)
 
             if not self.retain_ints:
                 bi.clear()
@@ -79,7 +80,7 @@ class LinearForm(Form[_FS]):
 
             for i in range(len(self.dintegrators)):
                 di = self.dintegrators[i]
-                new_vec = di.assembly_cell_vector(space)
+                new_vec = di.assembly(space)
 
                 if new_vec.ndim == 2:
                     new_vec = new_vec.unsqueeze(-1).expand(local_vec_shape)
@@ -101,7 +102,7 @@ class LinearForm(Form[_FS]):
 
         for i in range(len(self.bintegrators)):
             bi = self.bintegrators[i]
-            new_vec = bi.assembly_face_vector(space)
+            new_vec = bi.assembly(space)
             values = new_vec.values()
 
             if values.ndim == 1:

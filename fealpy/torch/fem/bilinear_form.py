@@ -6,7 +6,8 @@ from torch import Tensor
 
 from .. import logger
 from ..functionspace.space import FunctionSpace
-from .form import IntegratorHandler, Form
+from .integrator import Integrator
+from .form import Form
 
 
 _FS = TypeVar('_FS', bound=FunctionSpace)
@@ -16,8 +17,8 @@ class BilinearForm(Form[_FS]):
     r"""@brief"""
     def __init__(self, space: _FS, retain_ints: bool=False, batch_size: int=0):
         self.space = space
-        self.dintegrators: List[IntegratorHandler] = []
-        self.bintegrators: List[IntegratorHandler] = []
+        self.dintegrators: List[Integrator] = []
+        self.bintegrators: List[Integrator] = []
         self._M: Optional[Tensor] = None
         self.retain_ints = retain_ints
         self.batch_size = batch_size
@@ -37,7 +38,7 @@ class BilinearForm(Form[_FS]):
 
             for i in range(len(self.dintegrators)):
                 di = self.dintegrators[i]
-                cell_mat = cell_mat + di.assembly_cell_matrix(space)
+                cell_mat = cell_mat + di.assembly(space)
                 if not self.retain_ints:
                     di.clear()
 
@@ -55,7 +56,7 @@ class BilinearForm(Form[_FS]):
 
         for i in range(len(self.bintegrators)):
             bi = self.bintegrators[i]
-            M = M + bi.assembly_face_matrix(space)
+            M = M + bi.assembly(space)
             if not self.retain_ints:
                 bi.clear()
 
@@ -81,7 +82,7 @@ class BilinearForm(Form[_FS]):
 
             for i in range(len(self.dintegrators)):
                 di = self.dintegrators[i]
-                new_mat = di.assembly_cell_matrix(space)
+                new_mat = di.assembly(space)
 
                 if new_mat.ndim == 3: # If the matrix does not have batch dimension
                     new_mat = new_mat.unsqueeze(-1).expand(local_mat_shape)
@@ -106,7 +107,7 @@ class BilinearForm(Form[_FS]):
 
         for i in range(len(self.bintegrators)):
             bi = self.bintegrators[i]
-            new_mat = bi.assembly_face_matrix(space)
+            new_mat = bi.assembly(space)
             value = new_mat.values()
 
             if value.ndim == 1:
