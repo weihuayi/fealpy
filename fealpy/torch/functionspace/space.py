@@ -1,11 +1,12 @@
 
-from typing import Union
+from typing import Union, Callable, Optional
 from abc import ABCMeta, abstractmethod
 
 import torch
 from torch import Tensor
 
 Index = Union[int, slice, Tensor]
+Number = Union[int, float]
 _S = slice(None)
 
 
@@ -35,3 +36,8 @@ class FunctionSpace(metaclass=ABCMeta):
 
     # relationships
     def cell_to_dof(self) -> Tensor: raise NotImplementedError
+
+    # interpolation
+    def interpolate(self, source: Union[Callable[..., Tensor], Tensor, Number],
+                    uh: Tensor, dim: Optional[int]=None, index: Index=_S) -> Tensor:
+        raise NotImplementedError
