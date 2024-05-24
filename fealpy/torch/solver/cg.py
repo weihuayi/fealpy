@@ -9,7 +9,8 @@ from torch.autograd import Function
 from .. import logger
 
 
-def sparse_cg(A: Tensor, b: Tensor, x0: Optional[Tensor]=None,
+def sparse_cg(A: Tensor, b: Tensor, x0: Optional[Tensor]=None, *,
+              batch_first: bool=False,
               atol: float=1e-12, rtol: float=1e-8, maxiter: Optional[int]=10000) -> Tensor:
     r"""Solve a linear system Ax = b using the Conjugate Gradient (CG) method.
 

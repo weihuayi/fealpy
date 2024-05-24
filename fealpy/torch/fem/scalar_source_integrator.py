@@ -1,21 +1,24 @@
 
-from typing import Callable, Union
+from typing import Optional
 
-import torch
 from torch import Tensor
 
 from ..mesh import HomoMesh
-from ..utils import process_coef_func, is_scalar
-from .integrator import DomainSourceIntegrator, _FS, _S, Index
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import linear_integral
+from .integrator import DomainSourceIntegrator, _S, Index, CoefLike
 
 
 class ScalarSourceIntegrator(DomainSourceIntegrator):
-    def __init__(self, source: Union[Callable, int, float, Tensor], q: int=3):
-        r""""""
+    r"""The domain source integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
+                 batched: bool=False):
         self.f = source
         self.q = q
+        self.batched = batched
 
-    def assembly_cell_vector(self, space: _FS, index: Index=_S):
+    def assembly_cell_vector(self, space: _FS, index: Index=_S) -> Tensor:
         f = self.f
         q = self.q
         mesh = getattr(space, 'mesh', None)
@@ -26,20 +29,9 @@ class ScalarSourceIntegrator(DomainSourceIntegrator):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
-        NC = cm.size(0)
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        NQ = ws.size(0)
-
         phi = space.basis(bcs, index=index, variable='x')
         val = process_coef_func(f, bcs, mesh, index)
 
-        if is_scalar(val):
-            return val * torch.einsum('q, qci, c -> ci', ws, phi, cm)
-        else:
-            if val.shape == (NC, ):
-                return torch.einsum('q, c, qci, c -> ci', ws, val, phi, cm)
-            elif val.shape == (NQ, NC):
-                return torch.einsum('q, qc, qci, c -> ci', ws, val, phi, cm)
-            else:
-                raise RuntimeError(f'source value shape {val.shape} is not supported.')
+        return linear_integral(phi, ws, cm, val, batched=self.batched)

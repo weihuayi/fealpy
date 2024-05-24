@@ -400,7 +400,10 @@ class PMLPDEModel2d:
         origin = p.shape[:-1]
         p = p.reshape(-1, 2)
         x = p[..., 0]
-        flag = self.levelset(p)< 0. # (NC, )
+        if np.all(np.isin(self.levelset(p), [True, False])):
+            flag = self.levelset(p)
+        else:
+            flag = self.levelset(p)< 0. # (NC, )
         n = np.empty((x.shape[-1], ), dtype=np.complex128)
         n[flag] = self.refractive_index[1]
         n[~flag] = self.refractive_index[0]
