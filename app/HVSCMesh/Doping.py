@@ -84,6 +84,5 @@ def TotalDoping(node):
     p_emitter_length = 6.1/base
     distance_to_baseline = H_total - y;
     Na += peak_p_emitter*Gaussian(distance_to_baseline/p_emitter_length);
-    return Nd-Na
-
+    return (Nd-Na)/1e20
 
