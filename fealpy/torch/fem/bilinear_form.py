@@ -60,10 +60,7 @@ class BilinearForm(Form[_FS]):
             if not self.retain_ints:
                 bi.clear()
 
-        self._M = M.coalesce()
-        logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
-
-        return self._M
+        return M
 
     def _batch_assembly(self) -> Tensor:
         space = self.space
@@ -121,16 +118,18 @@ class BilinearForm(Form[_FS]):
             if not self.retain_ints:
                 bi.clear()
 
-        self._M = M.coalesce()
+        return M
+
+    def assembly(self, coalesce=True) -> Tensor:
+        r"""Assembly the bilinear form matrix. Returns COO Tensor of shape (gdof, gdof)."""
+        if self.batch_size == 0:
+            M = self._single_assembly()
+        elif self.batch_size > 0:
+            M = self._batch_assembly()
+        else:
+            raise ValueError("batch_size must be a non-negative integer.")
+
+        self._M = M.coalesce() if coalesce else M
         logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
 
         return self._M
-
-    def assembly(self) -> Tensor:
-        r"""Assembly the bilinear form matrix. Returns COO Tensor of shape (gdof, gdof)."""
-        if self.batch_size == 0:
-            return self._single_assembly()
-        elif self.batch_size > 0:
-            return self._batch_assembly()
-        else:
-            raise ValueError("batch_size must be a non-negative integer.")

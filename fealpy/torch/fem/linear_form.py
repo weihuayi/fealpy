@@ -59,10 +59,7 @@ class LinearForm(Form[_FS]):
             if not self.retain_ints:
                 bi.clear()
 
-        self._V = V.coalesce()
-        logger.info(f"Linear form vector constructed, with shape {list(V.shape)}.")
-
-        return self._V
+        return V
 
     def _batch_assembly(self) -> Tensor:
         space = self.space
@@ -116,16 +113,21 @@ class LinearForm(Form[_FS]):
             if not self.retain_ints:
                 bi.clear()
 
-        self._V = V.coalesce()
-        logger.info(f"Linear form vector constructed, with shape {list(V.shape)}.")
+        return V
 
-        return self._V
-
-    def assembly(self) -> Tensor:
-        r"""Assembly the linear form vector. Returns COO Tensor of shape (gdof,)."""
+    def assembly(self, coalesce=True, return_dense=True) -> Tensor:
+        r"""@brief Assembly the linear form vector. Returns COO Tensor of shape (gdof,)
+        if `return_sparse==False`, otherwise returns dense Tensor."""
         if self.batch_size == 0:
-            return self._single_assembly()
+            V = self._single_assembly()
         elif self.batch_size > 0:
-            return self._batch_assembly()
+            V = self._batch_assembly()
         else:
             raise ValueError("batch_size must be a non-negative integer.")
+
+        self._V = V.coalesce() if coalesce else V
+        logger.info(f"Linear form vector constructed, with shape {list(V.shape)}.")
+
+        if return_dense:
+            return self._V.to_dense()
+        return self._V
