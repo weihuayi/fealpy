@@ -57,6 +57,9 @@ class Form(Generic[_FS]):
         INTS = self.integrators[group]
         ct = INTS[0](self.space)
 
+        if not retain_ints:
+            INTS[0].clear()
+
         for int_ in INTS[1:]:
             new_ct = int_(self.space)
             fdim = min(ct.ndim, new_ct.ndim)
@@ -65,9 +68,9 @@ class Form(Generic[_FS]):
                                    f"has an incompatible shape {tuple(new_ct.shape)} "
                                    f"with the previous {tuple(ct.shape)} in the group '{group}'.")
             if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct.unsqueeze_(-1)
+                ct = new_ct + ct.unsqueeze(-1)
             elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct.unsqueeze_(-1)
+                ct = ct + new_ct.unsqueeze(-1)
             else:
                 ct = ct + new_ct
             if not retain_ints:

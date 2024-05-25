@@ -43,22 +43,22 @@ class Integrator(metaclass=ABCMeta):
 
 
 class CellOperatorIntegrator(Integrator):
-    def assembly(self, space: _FunctionSpace, index: Index=_S) -> Tensor:
+    def assembly(self, space: _FunctionSpace) -> Tensor:
         raise NotImplementedError
 
 
 class FaceOperatorIntegrator(Integrator):
-    def assembly(self, space: _FunctionSpace, index: Index=_S) -> Tensor:
+    def assembly(self, space: _FunctionSpace) -> Tensor:
         raise NotImplementedError
 
 
 class CellSourceIntegrator(Integrator):
-    def assembly(self, space: _FunctionSpace, index: Index=_S) -> Tensor:
+    def assembly(self, space: _FunctionSpace) -> Tensor:
         raise NotImplementedError
 
 
 class FaceSourceIntegrator(Integrator):
-    def assembly(self, space: _FunctionSpace, index: Index=_S) -> Tensor:
+    def assembly(self, space: _FunctionSpace) -> Tensor:
         raise NotImplementedError
 
 
