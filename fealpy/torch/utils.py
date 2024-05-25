@@ -4,7 +4,7 @@ from typing import Optional, Union, Callable
 
 from torch import Tensor
 
-from .mesh import HomoMesh
+from .mesh import HomoMesh, Mesh
 
 Number = Union[builtins.int, builtins.float]
 CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
@@ -74,3 +74,14 @@ def get_coef_subscripts(shape: Tensor, nq: int, nc: int, batched: bool):
                                f"({nq}) or ({nc}), but got {tuple(shape)}.")
 
     return subs
+
+
+def process_threshold(threshold: Union[Tensor, slice, Callable[[Tensor], Tensor]],
+                      index: Tensor, mesh: Mesh, etype: str):
+    if callable(threshold):
+        bc = mesh.entity_barycenter(etype, index=index)
+        return index[threshold(bc)]
+    else:
+        raise ValueError("threshold must be callable, slice, indices Tensor, "
+                            "or boolean Tensor, "
+                            f"but got {type(threshold)}")
