@@ -48,9 +48,8 @@ class BilinearForm(Form[_FS]):
             size=global_mat_shape
         )
 
-        for group, INTS in self.integrators.items():
-            e2dof = INTS[0].to_global_dof(space)
-            group_tensor = self.assembly_group(group, retain_ints)
+        for group in self.integrators.keys():
+            group_tensor, e2dof = self.assembly_group(group, retain_ints)
             I = torch.broadcast_to(e2dof[:, :, None], size=group_tensor.shape)
             J = torch.broadcast_to(e2dof[:, None, :], size=group_tensor.shape)
             indices = torch.stack([I.ravel(), J.ravel()], dim=0)
@@ -70,11 +69,10 @@ class BilinearForm(Form[_FS]):
             size=global_mat_shape
         )
 
-        for group, INTS in self.integrators.items():
-            e2dof = INTS[0].to_global_dof(space)
+        for group in self.integrators.keys():
+            group_tensor, e2dof = self.assembly_group(group, retain_ints)
             NC = e2dof.size(0)
             local_mat_shape = (NC, ldof, ldof, batch_size)
-            group_tensor = self.assembly_group(group, retain_ints)
 
             if group_tensor.ndim == 3:
                 group_tensor = group_tensor.unsqueeze_(-1).expand(local_mat_shape)

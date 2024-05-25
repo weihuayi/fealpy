@@ -48,9 +48,8 @@ class LinearForm(Form[_FS]):
             size=global_mat_shape
         )
 
-        for group, INTS in self.integrators.items():
-            e2dof = INTS[0].to_global_dof(space)
-            group_tensor = self.assembly_group(group, retain_ints)
+        for group in self.integrators.keys():
+            group_tensor, e2dof = self.assembly_group(group, retain_ints)
             indices = e2dof.ravel()
             M += torch.sparse_coo_tensor(indices, group_tensor.ravel(), size=global_mat_shape)
 
@@ -68,11 +67,10 @@ class LinearForm(Form[_FS]):
             size=global_mat_shape
         )
 
-        for group, INTS in self.integrators.items():
-            e2dof = INTS[0].to_global_dof(space)
+        for group in self.integrators.keys():
+            group_tensor, e2dof = self.assembly_group(group, retain_ints)
             NC = e2dof.size(0)
             local_mat_shape = (NC, ldof, batch_size)
-            group_tensor = self.assembly_group(group, retain_ints)
 
             if group_tensor.ndim == 2:
                 group_tensor = group_tensor.unsqueeze_(-1).expand(local_mat_shape)

@@ -14,7 +14,7 @@ _FS = TypeVar('_FS', bound=FunctionSpace)
 class Form(Generic[_FS]):
     space: _FS
     integrators: Dict[str, Tuple[_I, ...]]
-    memory: Dict[str, Tensor]
+    memory: Dict[str, Tuple[Tensor, Tensor]]
     batch_size: int
 
     def __len__(self) -> int:
@@ -56,6 +56,7 @@ class Form(Generic[_FS]):
 
         INTS = self.integrators[group]
         ct = INTS[0](self.space)
+        etg = INTS[0].to_global_dof(self.space)
 
         if not retain_ints:
             INTS[0].clear()
@@ -77,6 +78,6 @@ class Form(Generic[_FS]):
                 int_.clear()
 
         if retain_ints:
-            self.memory[group] = ct
+            self.memory[group] = (ct, etg)
 
-        return ct
+        return ct, etg
