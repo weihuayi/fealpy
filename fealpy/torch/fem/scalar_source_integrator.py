@@ -7,20 +7,26 @@ from ..mesh import HomoMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral
-from .integrator import DomainSourceIntegrator, _S, Index, CoefLike
+from .integrator import CellSourceIntegrator, _S, Index, CoefLike
 
 
-class ScalarSourceIntegrator(DomainSourceIntegrator):
+class ScalarSourceIntegrator(CellSourceIntegrator):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
     def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
-                 batched: bool=False):
+                 index: Index=_S,
+                 batched: bool=False) -> None:
+        super().__init__(index=index)
         self.f = source
         self.q = q
         self.batched = batched
 
-    def assembly_cell_vector(self, space: _FS, index: Index=_S) -> Tensor:
+    def to_global_dof(self, space: _FS) -> Tensor:
+        return space.cell_to_dof()[self.index]
+
+    def assembly(self, space: _FS) -> Tensor:
         f = self.f
         q = self.q
+        index = self.index
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomoMesh):
