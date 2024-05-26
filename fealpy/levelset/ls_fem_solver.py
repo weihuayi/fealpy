@@ -129,9 +129,10 @@ class LSFEMSolver(LSSolver):
         b = M @ phi0 - (dt/2) * C @ phi0
 
         # Solve the linear system to find the updated level set function.
-        phi0[:] = self.mumps_solve_system(A, b)
+        #phi0[:] = self.mumps_solve_system(A, b)
+        result = self.mumps_solve_system(A, b)
 
-        return phi0
+        return result
 
 
     def solve_measure(self, phi0, dt, u=None, tol=1e-8):
