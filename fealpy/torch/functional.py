@@ -22,7 +22,7 @@ def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
         measure (Tensor[C,]): The measure of the quadrature points.
         coef (Number, Tensor, optional): The coefficient of the integration. Defaults to None.
         Must be int, float, Tensor, or callable returning Tensor with shape (Q,), (C,) or (Q, C).
-        If `batched == True`, the shape of the coef should be (B, Q, C) or (B, C).
+        If `batched == True`, the shape of the coef should be (Q, C, B) or (C, B).
         batched (bool, optional): Whether the coef are batched. Defaults to False.
 
     Returns:
@@ -57,7 +57,7 @@ def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: 
         measure (Tensor[C,]): The measure of the quadrature points.
         coef (Number, Tensor, optional): The coefficient of the integration. Defaults to None.
         Must be int, float, Tensor, or callable returning Tensor with shape (Q,), (C,) or (Q, C).
-        If `batched == True`, the shape of the coef should be (B, Q, C) or (B, C).
+        If `batched == True`, the shape of the coef should be (Q, C, B) or (C, B).
         batched (bool, optional): Whether the coef are batched. Defaults to False.
 
     Returns:

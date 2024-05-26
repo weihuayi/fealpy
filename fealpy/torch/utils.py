@@ -76,12 +76,11 @@ def get_coef_subscripts(shape: Tensor, nq: int, nc: int, batched: bool):
     return subs
 
 
-def process_threshold(threshold: Union[Tensor, slice, Callable[[Tensor], Tensor]],
+def process_threshold(threshold: Callable[[Tensor], Tensor],
                       index: Tensor, mesh: Mesh, etype: str):
     if callable(threshold):
         bc = mesh.entity_barycenter(etype, index=index)
         return index[threshold(bc)]
     else:
-        raise ValueError("threshold must be callable, slice, indices Tensor, "
-                            "or boolean Tensor, "
-                            f"but got {type(threshold)}")
+        raise ValueError("threshold must be callable, "
+                         f"but got {type(threshold)}")
