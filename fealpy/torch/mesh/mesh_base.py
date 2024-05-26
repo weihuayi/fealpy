@@ -342,7 +342,8 @@ class HomoMesh(Mesh):
         node = self.entity('node')
         entity = self.ds.entity(etype, index)
         # TODO: finish this
-        ccw = getattr(self.ds, 'ccw', None)
+        # ccw = getattr(self.ds, 'ccw', None)
+        ccw = None
         return F.bc_to_points(bcs, node, entity, ccw)
 
     ### ipoints

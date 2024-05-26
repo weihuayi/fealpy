@@ -40,6 +40,6 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
-        coef = process_coef_func(coef, mesh=mesh, index=index)
+        coef = process_coef_func(coef, mesh=mesh, etype='cell', index=index)
 
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)

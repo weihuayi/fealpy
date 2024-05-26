@@ -31,11 +31,6 @@ class LinearForm(Form[_FS]):
             raise ValueError("Output of operator integrators should be 3D "
                              "(or 4D with batch in the last dimension), "
                              f"but got shape {tuple(local_tensor.shape)}.")
-        ldof = self.space.number_of_local_dofs()
-        if local_tensor.shape[1:2] != (ldof,):
-            raise ValueError(f"Size of operator integrator outputs on the 1 and 2 "
-                             f"dimension should equal to the number of local dofs ({ldof}), "
-                             f"but got shape {tuple(local_tensor.shape)}.")
 
     def _single_assembly(self, retain_ints: bool) -> Tensor:
         space = self.space
