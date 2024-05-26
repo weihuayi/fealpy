@@ -7,20 +7,28 @@ from ..mesh import HomoMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import DomainIntegrator, _S, Index, CoefLike
+from .integrator import CellOperatorIntegrator, _S, Index, CoefLike
 
 
-class ScalarDiffusionIntegrator(DomainIntegrator):
+class ScalarDiffusionIntegrator(CellOperatorIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
     def __init__(self, c: Optional[CoefLike]=None, q: int=3, *,
-                 batched: bool=False) -> None:
+                 index: Index=_S,
+                 batched: bool=False,
+                 method: Optional[str]=None) -> None:
+        method = 'assembly' if (method is None) else method
+        super().__init__(index=index, method=method)
         self.coef = c
         self.q = q
         self.batched = batched
 
-    def assembly_cell_matrix(self, space: _FS, index: Index=_S) -> Tensor:
+    def to_global_dof(self, space: _FS) -> Tensor:
+        return space.cell_to_dof()[self.index]
+
+    def assembly(self, space: _FS) -> Tensor:
         coef = self.coef
         q = self.q
+        index = self.index
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomoMesh):

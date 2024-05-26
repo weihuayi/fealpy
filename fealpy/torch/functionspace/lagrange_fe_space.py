@@ -104,7 +104,30 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         @brief
         """
-        pass
+        phi = self.basis(bc, index=index)
+        cell2dof = self.dof.cell_to_dof(index)
+
+        dim = len(uh.shape) - 1
+        s0 = 'abdefg'
+        doforder = 'vdims' if not hasattr(self, 'doforder') else self.doforder
+
+        if doforder == 'sdofs':
+            # phi.shape == (NQ, NC, ldof)
+            # uh.shape == (..., gdof)
+            # uh[..., cell2dof].shape == (..., NC, ldof)
+            # val.shape == (NQ, ..., NC)
+            s1 = f"...ci, {s0[:dim]}ci->...{s0[:dim]}c"
+            val = torch.einsum(s1, phi, uh[..., cell2dof])
+        elif doforder == 'vdims':
+            # phi.shape == (NQ, NC, ldof)
+            # uh.shape == (gdof, ...)
+            # uh[cell2dof, ...].shape == (NC, ldof, ...)
+            # val.shape == (NQ, NC, ...)
+            s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"
+            val = torch.einsum(s1, phi, uh[cell2dof, ...])
+        else:
+            raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
+        return val
 
     def grad(self, uh: Tensor, bc: Tensor, index: Index=_S):
         pass

@@ -1,10 +1,11 @@
 
-from typing import Sequence, overload, List, Generic, TypeVar
+from typing import Sequence, overload, List, Generic, TypeVar, Dict, Tuple, Optional
 
 from torch import Tensor
 
 from .integrator import Integrator as _I
 from ..functionspace.space import FunctionSpace
+from ..import logger
 
 
 _FS = TypeVar('_FS', bound=FunctionSpace)
@@ -12,51 +13,71 @@ _FS = TypeVar('_FS', bound=FunctionSpace)
 
 class Form(Generic[_FS]):
     space: _FS
-    dintegrators: List[_I]
-    bintegrators: List[_I]
+    integrators: Dict[str, Tuple[_I, ...]]
+    memory: Dict[str, Tuple[Tensor, Tensor]]
+    batch_size: int
+
+    def __len__(self) -> int:
+        return len(self.integrators)
 
     @overload
-    def add_domain_integrator(self, I: _I) -> _I: ...
+    def add_integrator(self, I: _I, *, group: str=...) -> _I: ...
     @overload
-    def add_domain_integrator(self, I: Sequence[_I]) -> List[_I]: ...
+    def add_integrator(self, I: Sequence[_I], *, group: str=...) -> List[_I]: ...
     @overload
-    def add_domain_integrator(self, *I: _I) -> List[_I]: ...
-    def add_domain_integrator(self, *I):
+    def add_integrator(self, *I: _I, group: str=...) -> List[_I]: ...
+    def add_integrator(self, *I, group=None):
+        if len(I) == 0:
+            logger.info("add_integrator() is called with no arguments.")
+            return None
+
         if len(I) == 1:
-            I = I[0]
-            if isinstance(I, Sequence):
-                self.dintegrators.extend(I)
-            else:
-                self.dintegrators.append(I)
-        elif len(I) >= 2:
-            self.dintegrators.extend(I)
+            if isinstance(I[0], Sequence):
+                I = tuple(I[0])
+        group = f'_group_{len(self)}' if group is None else group
+
+        if group in self.integrators:
+            self.integrators[group] += I
+            self.clear_memory(group)
         else:
-            raise RuntimeError("add_domain_integrator() is called with no arguments.")
+            self.integrators[group] = I
 
         return I
 
-    @overload
-    def add_boundary_integrator(self, I: _I) -> _I: ...
-    @overload
-    def add_boundary_integrator(self, I: Sequence[_I]) -> List[_I]: ...
-    @overload
-    def add_boundary_integrator(self, *I: _I) -> List[_I]: ...
-    def add_boundary_integrator(self, *I):
-        if len(I) == 1:
-            I = I[0]
-            if isinstance(I, Sequence):
-                self.bintegrators.extend(I)
-            else:
-                self.bintegrators.append(I)
-        elif len(I) >= 2:
-            self.bintegrators.extend(I)
+    def clear_memory(self, group: Optional[str]=None) -> None:
+        if group is None:
+            self.memory.clear()
         else:
-            raise RuntimeError("add_boundary_integrator() is called with no arguments.")
+            self.memory.pop(group, None)
 
-        return I
+    def assembly_group(self, group: str, retain_ints: bool=False):
+        if group in self.memory:
+            return self.memory[group]
 
-    def number_of_domain_integrators(self) -> int:
-        return len(self.dintegrators)
+        INTS = self.integrators[group]
+        ct = INTS[0](self.space)
+        etg = INTS[0].to_global_dof(self.space)
 
-    def number_of_boundary_integrators(self) -> int:
-        return len(self.bintegrators)
+        if not retain_ints:
+            INTS[0].clear()
+
+        for int_ in INTS[1:]:
+            new_ct = int_(self.space)
+            fdim = min(ct.ndim, new_ct.ndim)
+            if ct.shape[:fdim] != new_ct.shape[:fdim]:
+                raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "
+                                   f"has an incompatible shape {tuple(new_ct.shape)} "
+                                   f"with the previous {tuple(ct.shape)} in the group '{group}'.")
+            if new_ct.ndim > ct.ndim:
+                ct = new_ct + ct.unsqueeze(-1)
+            elif new_ct.ndim < ct.ndim:
+                ct = ct + new_ct.unsqueeze(-1)
+            else:
+                ct = ct + new_ct
+            if not retain_ints:
+                int_.clear()
+
+        if retain_ints:
+            self.memory[group] = (ct, etg)
+
+        return ct, etg
