@@ -405,8 +405,7 @@ class NSFEMSolver:
         A1 = 27.396
         A2_wave = 51.6
         tau = 182680
-        n = 0.574
-        lam = 0.173 
+        n = 0.574 
         
         deformnation = u.grad_value(bcs)
         deformnation = 0.5*(deformnation + deformnation.transpose(0,2,1,3))
