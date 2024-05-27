@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Optional, Callable
 
 from torch import Tensor
 
@@ -13,9 +13,9 @@ from .integrator import FaceSourceIntegrator, _S, Index, CoefLike
 class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
     r"""The boundary source integrator for function spaces based on homogeneous meshes."""
     def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
-                 index: Index=_S,
+                 threshold: Optional[Callable[[Tensor], Tensor]]=None,
                  batched: bool=False) -> None:
-        super().__init__(index=index)
+        super().__init__()
         self.f = source
         self.q = q
         self.batched = batched

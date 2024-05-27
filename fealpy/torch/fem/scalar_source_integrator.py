@@ -15,9 +15,10 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
     def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
-        super().__init__(index=index)
+        super().__init__()
         self.f = source
         self.q = q
+        self.index = index
         self.batched = batched
 
     def to_global_dof(self, space: _FS) -> Tensor:

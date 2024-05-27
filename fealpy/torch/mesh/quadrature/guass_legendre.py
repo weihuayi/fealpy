@@ -265,4 +265,7 @@ class GaussLegendreQuadrature(Quadrature):
         else:
             raise NotImplementedError('quadrature order higher than 20 is not supported now.')
 
-        return A
+        A = A.div_(2)
+        return torch.stack([(0.5 + A[:, 0]),
+                            (0.5 - A[:, 0]),
+                            A[:, 1]], dim=-1)

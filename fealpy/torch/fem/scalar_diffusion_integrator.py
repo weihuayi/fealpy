@@ -17,9 +17,10 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
-        super().__init__(index=index, method=method)
+        super().__init__(method=method)
         self.coef = c
         self.q = q
+        self.index = index
         self.batched = batched
 
     def to_global_dof(self, space: _FS) -> Tensor:
