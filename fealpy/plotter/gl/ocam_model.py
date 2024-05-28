@@ -797,12 +797,8 @@ class OCAMModel:
         """
         @brief 调和映射
         """
-        from fealpy.functionspace import LagrangeFiniteElementSpace
-        from fealpy.fem import BilinearForm, LinearForm
-        from fealpy.fem import VectorDiffusionIntegrator
 
-        mesh = self.imagemesh
-        space = LagrangeFiniteElementSpace(mesh, p=1)
+
 
 
 
