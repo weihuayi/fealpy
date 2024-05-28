@@ -29,7 +29,7 @@ def neumann(points: Tensor):
     kwargs = {'dtype': points.dtype, "device": points.device}
     theta = torch.arctan2(y-0.5, x-0.5)
     freq = torch.arange(1, 11, **kwargs)
-    return cos(tensordot(theta, freq, dims=0))
+    return cos(tensordot(freq, theta, dims=0))
 
 
 tmr = timer()
@@ -58,12 +58,12 @@ tmr.send('forms')
 A = bform.assembly()
 F = lform.assembly()
 
-uh = torch.zeros((space.number_of_global_dofs(), 10), dtype=torch.float64, device=device)
+uh = torch.zeros((10, space.number_of_global_dofs()), dtype=torch.float64, device=device)
 tmr.send('assembly')
 
 
 A = A.to_sparse_csr()
-uh = sparse_cg(A, F, uh, maxiter=1000)
+uh = sparse_cg(A, F, uh, maxiter=1000, batch_first=True)
 uh = uh.detach()
 value = space.value(uh, torch.tensor([[1/3, 1/3, 1/3]], device=device, dtype=torch.float64)).squeeze(0)
 value = value.cpu().numpy()
@@ -78,6 +78,6 @@ fig.suptitle('Parallel solving Poisson equation on 2D Triangle mesh')
 
 for i in range(10):
     axes = fig.add_subplot(3, 4, i+1)
-    mesh_numpy.add_plot(axes, cellcolor=value[:, i], cmap='jet', linewidths=0, showaxis=True)
+    mesh_numpy.add_plot(axes, cellcolor=value[i, :], cmap='jet', linewidths=0, showaxis=True)
 
 plt.show()

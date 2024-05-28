@@ -15,7 +15,7 @@ from fealpy.torch.fem import (
 )
 from fealpy.torch.solver import sparse_cg
 
-from torch import cos, pi
+from torch import cos, pi, tensordot
 
 from fealpy.ml import timer
 from matplotlib import pyplot as plt
@@ -29,9 +29,9 @@ def source(points: Tensor):
     kwargs = {'dtype': points.dtype, "device": points.device}
     coef = torch.linspace(pi/2, 5*pi, 10).to(**kwargs)
     return torch.einsum(
-        "b, ...b -> ...b",
+        "b, b... -> b...",
         2*coef**2,
-        cos(torch.tensordot(x, coef, dims=0)) * cos(torch.tensordot(y, coef, dims=0))
+        cos(tensordot(coef, x, dims=0)) * cos(tensordot(coef, y, dims=0))
     )
 
 
@@ -40,7 +40,7 @@ def solution(points: Tensor):
     y = points[..., 1]
     kwargs = {'dtype': points.dtype, "device": points.device}
     coef = torch.linspace(pi/2, 5*pi, 10).to(**kwargs)
-    return cos(torch.tensordot(x, coef, dims=0)) * cos(torch.tensordot(y, coef, dims=0))
+    return cos(tensordot(coef, x, dims=0)) * cos(tensordot(coef, y, dims=0))
 
 
 tmr = timer()
@@ -69,14 +69,14 @@ tmr.send('forms')
 A = bform.assembly()
 F = lform.assembly()
 
-uh = torch.zeros((space.number_of_global_dofs(), 10), dtype=torch.float64, device=device)
+uh = torch.zeros((10, space.number_of_global_dofs()), dtype=torch.float64, device=device)
 tmr.send('assembly')
 
 A, F = DirichletBC(space, solution).apply(A, F, uh)
 tmr.send('dirichlet')
 
 A = A.to_sparse_csr()
-uh = sparse_cg(A, F, uh, maxiter=5000)
+uh = sparse_cg(A, F, uh, maxiter=5000, batch_first=True)
 uh = uh.detach()
 value = space.value(uh, torch.tensor([[1/3, 1/3, 1/3]], device=device, dtype=torch.float64)).squeeze(0)
 value = value.cpu().numpy()
@@ -91,6 +91,6 @@ fig.suptitle('Parallel solving Poisson equation on 2D Triangle mesh')
 
 for i in range(10):
     axes = fig.add_subplot(3, 4, i+1)
-    mesh_numpy.add_plot(axes, cellcolor=value[:, i], cmap='jet', linewidths=0, showaxis=True)
+    mesh_numpy.add_plot(axes, cellcolor=value[i, :], cmap='jet', linewidths=0, showaxis=True)
 
 plt.show()

@@ -55,16 +55,16 @@ def is_tensor(input: Union[int, float, Tensor]) -> bool:
 
 def get_coef_subscripts(shape: Tensor, nq: int, nc: int, batched: bool):
     if batched:
-        coef_shape = shape[:-1]
+        coef_shape = shape[1:]
         if coef_shape == (nq, nc):
-            subs = "qcb"
+            subs = "bqc"
         elif coef_shape == (nq, ):
-            subs = "qb"
+            subs = "bq"
         elif coef_shape == (nc, ):
-            subs = "cb"
+            subs = "bc"
         else:
-            raise RuntimeError(f"The shape of the coef should be ({nq}, {nc}, Batch), "
-                               f"({nq}, Batch) or ({nc}, Batch), but got {tuple(shape)}.")
+            raise RuntimeError(f"The shape of the coef should be (Batch, {nq}, {nc}), "
+                               f"(Batch, {nq}) or (Batch, {nc}), but got {tuple(shape)}.")
 
     else:
         coef_shape = shape

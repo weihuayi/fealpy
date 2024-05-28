@@ -69,9 +69,9 @@ class Form(Generic[_FS]):
                                    f"has an incompatible shape {tuple(new_ct.shape)} "
                                    f"with the previous {tuple(ct.shape)} in the group '{group}'.")
             if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct.unsqueeze(-1)
+                ct = new_ct + ct.unsqueeze(0)
             elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct.unsqueeze(-1)
+                ct = ct + new_ct.unsqueeze(0)
             else:
                 ct = ct + new_ct
             if not retain_ints:
