@@ -29,12 +29,11 @@ class OCAMModel:
     radius : float
     mark_board: np.ndarray
     camera_points: list
+    viewpoint : tuple
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
-        print(self.icenter, self.radius)
         self.icenter, self.radius = self.get_center_and_radius(self.fname)
-        print(self.icenter, self.radius)
         cps_all = []
         for cps in self.camera_points:
             val = self.world_to_image(cps)
@@ -712,7 +711,13 @@ class OCAMModel:
 
         points = self.camera_points
         for i in range(len(points)):
+            # 绘制线
             plt.plot(points[i][:, 0], points[i][:, 1], 'r')
+            # 标记是第i条线, 字体大小为30
+            j = len(points[i]) // 2
+            plt.text(points[i][j, 0], points[i][j, 1], str(i), color='r',
+                     fontsize=30)
+
         if outname is not None:
             plt.savefig(outname)
         plt.show()
@@ -787,6 +792,15 @@ class OCAMModel:
         #plt.axis('off')
         #plt.show()
         return center, radius
+
+    def harmonic_map(self):
+        """
+        @brief 调和映射
+        """
+
+
+
+
 
 
 class OCAMDomain(Domain):
