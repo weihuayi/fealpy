@@ -12,6 +12,11 @@ from fealpy.cfd import NSFlipSolver
 from fealpy.mesh import UniformMesh2d
 import matplotlib.pyplot as plt
 
+R = 8.314 #普适气体常数
+Cv = 4186 #比热容 
+mu = 1 #剪切粘度
+lam = -(2/3)*mu #体积粘度
+
 dtype = [("position", "float64", (2, )), 
          ("velocity", "float64", (2, )),
          ("rho", "float64"),
@@ -20,7 +25,6 @@ dtype = [("position", "float64", (2, )),
 		 ("internal_energy", "float64"),]
 
 num=10
-<<<<<<< HEAD
 np.random.seed(0)
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)
@@ -39,11 +43,6 @@ print(solver.bilinear(particles['position']).shape)
 '''
 num=10
 #np.random.seed(0)
-||||||| 57d1018e
-#np.random.seed(0)
-=======
-np.random.seed(0)
->>>>>>> upstream/master
 random_points = np.random.rand(num, 2)
 particles = np.zeros(num, dtype=dtype)
 particles['position'] = random_points
@@ -68,23 +67,16 @@ solver = NSFlipSolver(particles, mesh)
 num_v = (mesh.ds.nx + 1)*(mesh.ds.ny + 1)
 vertex = mesh.node.reshape(num_v,2)
 #e = solver.e(particles["position"])
-<<<<<<< HEAD
 #solver.NGP(particles["position"],e)
 #solver.bilinear(particles["position"],e)
 Vc = mesh.cell_area() #单元面积
 cell_center = mesh.entity_barycenter(2) #单元中心位置
 solver.P2G_center(particles,cell_center,Vc)
 '''
-||||||| 57d1018e
 #solver.NGP(particles["position"],e)
 #solver.bilinear(particles["position"],e)
-Vc = mesh.cell_area() #单元面积
-cell_center = mesh.entity_barycenter(2) #单元中心位置
-solver.P2G_center(particles,cell_center,Vc)
-=======
 #solver.coordinate(particles["position"])
 #solver.NGP(particles["position"],vertex)
 #solver.bilinear(particles["position"],vertex)
 #solver.P2G_cell(particles)
 solver.P2G_vertex(particles)
->>>>>>> upstream/master
