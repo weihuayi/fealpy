@@ -60,6 +60,9 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
         self.itype = halfedge.dtype
         self.ftype = node.dtype
+        
+        self.meshtype = 'tri'
+        self.type = "TRI"
 
         self.node = DynamicArray(node, dtype = node.dtype)
         self.ds = HalfEdgeMesh2dDataStructure(halfedge, NN = node.shape[0], NC=NC, NV=NV)
@@ -454,6 +457,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             R = self._grad_shape_function(bc, p)
             if variables == 'x':
                 Dlambda = self.grad_lambda(index=index)
+                print(R.shape, Dlambda.shape)
                 gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
                 return gphi #(NQ, NC, ldof, GD)
             elif variables == 'u':
@@ -2650,7 +2654,8 @@ class HalfEdgeMesh2d(Mesh, Plotable):
     def grad_lambda(self, index=np.s_[:]):
         node = self.entity('node')
         cell = self.entity('cell')
-        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        NC = self.number_of_cells() if np.array_equal(index, np.s_[:]) else len(index)
+        #NC = self.number_of_cells() if index == np.s_[:] else len(index)
         v0 = node[cell[index, 2]] - node[cell[index, 1]]
         v1 = node[cell[index, 0]] - node[cell[index, 2]]
         v2 = node[cell[index, 1]] - node[cell[index, 0]]

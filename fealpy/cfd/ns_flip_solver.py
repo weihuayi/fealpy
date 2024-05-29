@@ -30,8 +30,8 @@ class NSFlipSolver:
         result =  i * nx + j 
         return result
 
-    def NGP(self,position,vertex):
-        i0,j0 = self.mesh.cell_location(vertex)
+    def bilinear(self,position):
+        i0,j0 = self.mesh.cell_location(position)
         e = self.e(position)
         epsilon = e[:,0]
         eta = e[:,1]
@@ -64,20 +64,23 @@ class NSFlipSolver:
         result = csr_matrix(result)
         return result
     
-    def P2G_cell(self, particles):
-        m_p = particles["mass"] #粒子质量
-        e_p = particles["internal_energy"] #粒子内能
-        Vc = self.mesh.cell_area() #单元面积
+    def P2G_center(self, particles):
+        m_p = particles["mass"]
+        e_p = particles["internal_energy"]
         position = self.particles["position"]
-        index = self.coordinate(particles["position"])
-        num_p = len(position)
-        num_c = self.mesh.ds.nx * self.mesh.ds.ny
-        S_pc = diags([0], [0], shape=(num_p, num_c), format='csr')
+        cell_center = self.mesh.cell_center()
+        Vc = self.mesh.cell_area()
+        num_p = len(position[:,0])
+        num_c = len(cell_center[:,0])
+        distance = np.zeros_like(position)
+        S_pc = np.zeros((num_p,num_c)) #求插值函数S_pc
         for i in range(num_p):
             S_pc[i,index[i]] = 1
         rho_c = m_p@S_pc/Vc
-        I_c = (e_p@S_pc)/(rho_c*Vc) #粒子足够多就不会等于0,不能加入条件语句，因为某一单元的Vc等于0,就得找在该单元的粒子，再使其ep等于0
-        return rho_c, I_c
+        I_c = (e_p@S_pc)/(rho_c*Vc)
+        print(rho_c)
+        print(I_c) #为什么有些会出现nan?
+        return rho_c,I_c
 
     def P2G_vertex(self,particles):
         m_p = particles["mass"] #粒子质量
@@ -92,3 +95,4 @@ class NSFlipSolver:
 
     def pressure(self,rho_c,I_c,R,Cv):
         return (rho_c*R*I_c)/Cv
+

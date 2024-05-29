@@ -1,11 +1,7 @@
-numpy>=1.21
+numpy
 scipy
-numba
-gmsh
+sympy
 matplotlib
+gmsh
 vtk
 pyevtk
-pypardiso
-pytest>=3.6
-pytest-cov
-bump2version

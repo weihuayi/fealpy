@@ -31,10 +31,26 @@ particles = np.zeros(num, dtype=dtype)
 particles['position'] = random_points
 particles['mass'] = 1 #临时给的值
 particles['internal_energy'] = 1 #临时给的值
+domain=[0,1,0,1]
+nx = 4
+ny = 4
+hx = (domain[1] - domain[0])/nx
+hy = (domain[3] - domain[2])/ny
+mesh = UniformMesh2d([0,nx,0,ny],h=(hx,hy),origin=(0,0))
+print(mesh.cell_barycenter())
+solver = NSFlipSolver(particles, mesh)
+print(solver.bilinear(particles['position']).shape)
+'''
+num=10
+#np.random.seed(0)
+random_points = np.random.rand(num, 2)
+particles = np.zeros(num, dtype=dtype)
+particles['position'] = random_points
+particles['mass'] = 1 #临时给的值
+particles['internal_energy'] = 1 #临时给的值
 particles['velocity'] = np.array([0.0, 1.0]) #临时给的值
 #print(random_points)
 
-nt = 100
 domain=[0,1,0,1]
 nx = 4
 ny = 4
@@ -51,13 +67,16 @@ solver = NSFlipSolver(particles, mesh)
 num_v = (mesh.ds.nx + 1)*(mesh.ds.ny + 1)
 vertex = mesh.node.reshape(num_v,2)
 #e = solver.e(particles["position"])
+#solver.NGP(particles["position"],e)
+#solver.bilinear(particles["position"],e)
+Vc = mesh.cell_area() #单元面积
+cell_center = mesh.entity_barycenter(2) #单元中心位置
+solver.P2G_center(particles,cell_center,Vc)
+'''
+#solver.NGP(particles["position"],e)
+#solver.bilinear(particles["position"],e)
 #solver.coordinate(particles["position"])
 #solver.NGP(particles["position"],vertex)
-Sv = solver.bilinear(particles["position"],vertex)
-grad_Sv = Sv.todense() #形状有疑问？
-solver.P2G_cell(particles)
-rho_c ,I_c =  solver.P2G_cell(particles)
-#solver.P2G_vertex(particles)
-p = solver.pressure(rho_c,I_c,R,Cv)
-Q = np.matmul(-(lam+2*mu)*grad_Sv.T,particles['velocity'])
-phi = np.einsum('ij,ik->ijk', mu*grad_Sv, particles['velocity'])
+#solver.bilinear(particles["position"],vertex)
+#solver.P2G_cell(particles)
+solver.P2G_vertex(particles)

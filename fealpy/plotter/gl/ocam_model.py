@@ -1,11 +1,17 @@
 from dataclasses import dataclass, field
 from typing import Callable, Any, Tuple
+
 import numpy as np
 import cv2
+import os
+import pickle
 import glob
+import matplotlib.pyplot as plt
+
 from fealpy.mesh import DistMesher2d
 from ...geometry.domain import Domain
 from fealpy.geometry import dintersection,drectangle,dcircle
+
 @dataclass
 class OCAMModel:
     location: np.ndarray
@@ -26,13 +32,29 @@ class OCAMModel:
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        print(self.icenter, self.radius)
+        self.icenter, self.radius = self.get_center_and_radius(self.fname)
+        print(self.icenter, self.radius)
         cps_all = []
-        for i in range(4):
-            cps = self.camera_points[i]
-            cps_all.append([])
-            for j in range(len(cps)):
-                cps_all[i].append(self.world_to_image(cps[j]))
+        for cps in self.camera_points:
+            val = self.world_to_image(cps)
+            val *= np.array([[self.width, self.height]])
+            val = val[self.signed_dist_function(val)<0] # 去掉不在区域内的点
+            val[:, 1] = self.height-val[:, 1]
+            cps_all.append(val)
         self.camera_points = cps_all
+
+        # 判断是否存在网格文件
+        fname = os.path.expanduser("~/data/ocam_mesh_{}_{}.pkl".format(self.icenter, self.radius))
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.imagemesh = pickle.load(f)
+        else:
+            self.imagemesh = self.gmshing_new()
+            # 保存 cps:
+            with open(fname, 'wb') as f:
+                pickle.dump(self.imagemesh, f)
+
 
     def __call__(self, u):
         icenter = self.icenter
@@ -42,7 +64,67 @@ class OCAMModel:
     def signed_dist_function(self, u):
         return self(u)
 
-    def gmeshing(self):
+    def gmshing_new(self):
+        import gmsh
+        from fealpy.mesh import TriangleMesh
+
+        gmsh.initialize()
+        occ = gmsh.model.occ
+        gmsh.option.setNumber("Geometry.Tolerance", 1e-6)  # 设置容差值
+        #gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
+        #gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
+
+        # 获得分割线
+        cps = self.camera_points
+        lines = []
+        for cp in cps:
+            curves = [] 
+            for p in cp:
+                curves.append(occ.addPoint(p[0], p[1], 0))
+            lines.append(occ.addSpline(curves))
+
+        # 生成区域
+        rec  = occ.addRectangle(0, 0, 0, 1920, 1080)
+        circ = occ.addDisk(self.icenter[0], self.height-self.icenter[1], 0, self.radius, self.radius)
+
+        ## 保留 rec 和 circ 的交集
+        dom = occ.intersect([(2, rec)], [(2, circ)])[0]
+
+        ## 分割线和区域的交集
+        occ.fragment([(1, l) for l in lines], dom)
+
+        occ.synchronize()
+
+        # 定义网格尺寸场函数
+        def f(dim, tag, x, y, z, lc): 
+            m = self.mesh_to_image(np.array([[x, y]]))
+            l = np.linalg.norm(m[0]-self.icenter)
+            #return 40*(self.radius-l)/self.radius + 2
+            return 80*(self.radius-l)/self.radius + 4
+        gmsh.model.mesh.setSizeCallback(f)
+
+        ## 生成网格
+        gmsh.model.mesh.generate(2)
+        #gmsh.fltk.run()
+
+
+        # 转化为 fealpy 的网格
+        node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)[:, :2]
+        NN = node.shape[0]
+
+        ## 节点编号到标签的映射
+        nid2tag = gmsh.model.mesh.get_nodes()[0]
+        tag2nid = np.zeros(NN*2, dtype = np.int_)
+        tag2nid[nid2tag] = np.arange(NN)
+
+        ## 单元
+        cell = gmsh.model.mesh.get_elements(2, -1)[2][0]
+        cell = tag2nid[cell].reshape(-1, 3)
+
+        gmsh.finalize()
+        return TriangleMesh(node, cell)
+
+    def gmshing(self):
         import gmsh
         from fealpy.mesh import TriangleMesh
         icenter = self.icenter
@@ -50,14 +132,9 @@ class OCAMModel:
         mark_board=self.mark_board        
         camera_points = self.camera_points
         #print(camera_points)
-        for i in range(len(camera_points)):
-            camera_points[i][0][...,0] = camera_points[i][0][...,0]*self.width
-            camera_points[i][0][...,1] = camera_points[i][0][...,1]*self.height
-            camera_points[i][1][...,0] = camera_points[i][1][...,0]*self.width
-            camera_points[i][1][...,1] = camera_points[i][1][...,1]*self.height
 
         x1 = np.sqrt(r*r-icenter[...,1]*icenter[...,1])
-        x2 = np.sqrt(r*r-(1080-icenter[...,1])**2)
+        x2 = np.sqrt(r*r-(self.height-icenter[...,1])**2)
         gmsh.initialize()
 
         # 边界区域
@@ -76,44 +153,44 @@ class OCAMModel:
         
         
         # 标记板区域
-        for i in range(24):
-            gmsh.model.geo.addPoint(mark_board[i,0],mark_board[i,1],0,tag=6+i)
+        #for i in range(24):
+        #    gmsh.model.geo.addPoint(mark_board[i,0],mark_board[i,1],0,tag=6+i)
 
-        gmsh.model.geo.addLine(6,7,tag=5)
-        gmsh.model.geo.addLine(7,8,tag=6)
-        gmsh.model.geo.addLine(8,9,tag=7)
-        gmsh.model.geo.addLine(9,6,tag=8)
-        gmsh.model.geo.addCurveLoop([5,6,7,8],2)
+        #gmsh.model.geo.addLine(6,7,tag=5)
+        #gmsh.model.geo.addLine(7,8,tag=6)
+        #gmsh.model.geo.addLine(8,9,tag=7)
+        #gmsh.model.geo.addLine(9,6,tag=8)
+        #gmsh.model.geo.addCurveLoop([5,6,7,8],2)
 
-        gmsh.model.geo.addLine(10,11,tag=9)
-        gmsh.model.geo.addLine(11,12,tag=10)
-        gmsh.model.geo.addLine(12,13,tag=11)
-        gmsh.model.geo.addLine(13,10,tag=12)
-        gmsh.model.geo.addCurveLoop([9,10,11,12],3)
+        #gmsh.model.geo.addLine(10,11,tag=9)
+        #gmsh.model.geo.addLine(11,12,tag=10)
+        #gmsh.model.geo.addLine(12,13,tag=11)
+        #gmsh.model.geo.addLine(13,10,tag=12)
+        #gmsh.model.geo.addCurveLoop([9,10,11,12],3)
 
-        gmsh.model.geo.addLine(14,15,tag=13)
-        gmsh.model.geo.addLine(15,16,tag=14)
-        gmsh.model.geo.addLine(16,17,tag=15)
-        gmsh.model.geo.addLine(17,14,tag=16)
-        gmsh.model.geo.addCurveLoop([13,14,15,16],4)
+        #gmsh.model.geo.addLine(14,15,tag=13)
+        #gmsh.model.geo.addLine(15,16,tag=14)
+        #gmsh.model.geo.addLine(16,17,tag=15)
+        #gmsh.model.geo.addLine(17,14,tag=16)
+        #gmsh.model.geo.addCurveLoop([13,14,15,16],4)
 
-        gmsh.model.geo.addLine(18,19,tag=17)
-        gmsh.model.geo.addLine(19,20,tag=18)
-        gmsh.model.geo.addLine(20,21,tag=19)
-        gmsh.model.geo.addLine(21,18,tag=20)
-        gmsh.model.geo.addCurveLoop([17,18,19,20],5)
+        #gmsh.model.geo.addLine(18,19,tag=17)
+        #gmsh.model.geo.addLine(19,20,tag=18)
+        #gmsh.model.geo.addLine(20,21,tag=19)
+        #gmsh.model.geo.addLine(21,18,tag=20)
+        #gmsh.model.geo.addCurveLoop([17,18,19,20],5)
 
-        gmsh.model.geo.addLine(22,23,tag=21)
-        gmsh.model.geo.addLine(23,24,tag=22)
-        gmsh.model.geo.addLine(24,25,tag=23)
-        gmsh.model.geo.addLine(25,22,tag=24)
-        gmsh.model.geo.addCurveLoop([21,22,23,24],6)
+        #gmsh.model.geo.addLine(22,23,tag=21)
+        #gmsh.model.geo.addLine(23,24,tag=22)
+        #gmsh.model.geo.addLine(24,25,tag=23)
+        #gmsh.model.geo.addLine(25,22,tag=24)
+        #gmsh.model.geo.addCurveLoop([21,22,23,24],6)
 
-        gmsh.model.geo.addLine(26,27,tag=25)
-        gmsh.model.geo.addLine(27,28,tag=26)
-        gmsh.model.geo.addLine(28,29,tag=27)
-        gmsh.model.geo.addLine(29,26,tag=28)
-        gmsh.model.geo.addCurveLoop([25,26,27,28],7)
+        #gmsh.model.geo.addLine(26,27,tag=25)
+        #gmsh.model.geo.addLine(27,28,tag=26)
+        #gmsh.model.geo.addLine(28,29,tag=27)
+        #gmsh.model.geo.addLine(29,26,tag=28)
+        #gmsh.model.geo.addCurveLoop([25,26,27,28],7)
         
         # 分割线
         t0 = False # 判断点是否是同一点
@@ -188,6 +265,7 @@ class OCAMModel:
             gmsh.model.geo.addCurveLoop([-34,-33,35,36,-36,-35,33,34])
    
         # 生成面
+        """
         if t0+t1==2:
             gmsh.model.geo.addPlaneSurface([1,2,5,8,9],1)
         else:
@@ -198,8 +276,17 @@ class OCAMModel:
         gmsh.model.geo.addPlaneSurface([5,6],5)
         gmsh.model.geo.addPlaneSurface([6,7],6)
         gmsh.model.geo.addPlaneSurface([7],7)
+        """
+
+        # 如果有标记板就把这一段删掉, 上面的取消注释
+        if t0+t1==2:
+            gmsh.model.geo.addPlaneSurface([1, 2, 3],1)
+        else:
+            gmsh.model.geo.addPlaneSurface([1, 2, 3, 4],1)
+
         
         gmsh.model.geo.synchronize()
+        #gmsh.fltk().run()
         #gmsh.option.setNumber("Mesh.Algorithm",6) 
         gmsh.model.mesh.field.add("Distance",1)
         gmsh.model.mesh.field.setNumbers(1,"CurvesList",[2,4])
@@ -272,7 +359,11 @@ class OCAMModel:
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
-    def cam_to_image(self, node, ptype='O'):
+    def mesh_to_image(self, node):
+        node[:, 1] = self.height - node[:, 1]
+        return node
+
+    def cam_to_image(self, node, ptype='L'):
         """
         @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
         """
@@ -377,6 +468,55 @@ class OCAMModel:
         uv[:, 1] = (uv[:, 1] - np.min(uv[:, 1]))/(np.max(uv[:, 1])-np.min(uv[:, 1]))
         return uv
 
+    def camera_to_world(self, node):
+        """
+        @brief 把相机坐标系中的点转换到世界坐标系下
+        """
+        A = np.linalg.inv(self.axes.T)
+        node = np.einsum('ij, jk->ik', node, A)
+        node += self.location
+        return node
+    
+    def image_to_camera_sphere(self, uv,ptype='L'):
+        NN = len(uv)
+
+        fx = self.K[0, 0] 
+        fy = self.K[1, 1]
+        u0 = self.K[0, 2]
+        v0 = self.K[1, 2]
+        node = np.zeros((NN,3),dtype=np.float64)
+        node[:,0] = uv[:,0]-u0
+        node[:,1] = uv[:,1]-v0
+
+        #phi = np.arctan(fx*node[:,1]/(fy*node[:,0]))
+        phi = np.arctan2(fx*node[:,1], (fy*node[:,0]))
+        phi[phi<0] = phi[phi<0]+np.pi
+
+        idx = np.abs(fx*np.cos(phi))>1e-13
+        rho = np.zeros_like(phi)
+        rho[idx] = node[idx,0]/(fx*np.cos(phi[idx]))
+        rho[~idx] = node[~idx, 1]/(fy*np.sin(phi[~idx]))
+
+        if ptype=='L':
+            theta=rho
+
+        node[:,0] = np.sin(theta)*np.cos(phi)
+        node[:,1] = np.sin(theta)*np.sin(phi)
+        node[:,2] = np.cos(theta)
+        return self.camera_to_world(node)
+
+    def sphere_project_to_implict_surface(self, nodes, Fun): 
+        """
+        @brief 将球面上的点投影到隐式曲面上
+        """
+        from scipy.optimize import fsolve
+        ret = np.zeros_like(nodes)
+        for i, node in enumerate(nodes):
+            g = lambda t : Fun(self.location + t*(node-self.location))
+            t = fsolve(g, 1000)
+            ret[i] = self.location + t*(node-self.location)
+        return ret
+        
     def equirectangular_projection(self, fovd=195):
         """
         @brief 使用等矩形投影将鱼眼图像转换为平面图像。
@@ -561,6 +701,21 @@ class OCAMModel:
         DIM = _img_shape[::-1]
         return DIM, K, D
 
+    def show_camera_image_and_mesh(self, imgname=None, outname=None):
+        from PIL import Image
+        mesh = self.imagemesh
+        mesh.add_plot(plt, alpha=0.2)
+        if imgname is None:
+            imgname = self.fname
+        img = cv2.imread(imgname)
+        plt.imshow(img, extent=[0, 1920, 0, 1080])
+
+        points = self.camera_points
+        for i in range(len(points)):
+            plt.plot(points[i][:, 0], points[i][:, 1], 'r')
+        if outname is not None:
+            plt.savefig(outname)
+        plt.show()
 
     def undistort_chess(self, imgname, scale=0.6):
         img = cv2.imread(imgname)
@@ -594,6 +749,45 @@ class OCAMModel:
         # 进行透视矫正
         result = cv2.warpPerspective(img, M, (1920, 1080))
         return result
+
+    def get_center_and_radius(self, image_path):
+        # 读取图像
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        image0 = cv2.imread(image_path)
+        if image is None:
+            print("Error: Unable to load image.")
+            return None, None
+
+        # 对图像进行阈值处理，保留非黑色区域
+        _, thresholded = cv2.threshold(image, 70, 255, cv2.THRESH_BINARY)
+
+        # 找到非黑色区域的轮廓
+        contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 寻找最大轮廓
+        max_contour = max(contours, key=cv2.contourArea)
+
+        # 使用最小外接圆找到中心和半径
+        center, radius = cv2.minEnclosingCircle(max_contour)
+
+        # 绘制最小外接圆
+        #circle_image = image0
+        #cv2.circle(circle_image, center, radius, (0, 255, 0), 2)  # 绘制圆
+        #cv2.circle(circle_image, center, 5, (0, 0, 255), -1)  # 绘制中心点
+
+        # 绘制最大轮廓
+        #contour_image = np.zeros_like(image)
+        #cv2.drawContours(contour_image, [max_contour], 0, (255, 255, 255), 2)
+        #print(f"Center: {center}, Radius: {radius}")
+
+        ## 显示结果
+        #plt.figure(figsize=(8, 6))
+        #plt.imshow(circle_image)
+        #plt.title('Fisheye Center and Radius')
+        #plt.axis('off')
+        #plt.show()
+        return center, radius
+
 
 class OCAMDomain(Domain):
     def __init__(self,icenter,radius,hmin=10,hmax=20,fh=None):
