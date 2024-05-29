@@ -14,7 +14,7 @@ from .scalar_source_integrator import ScalarSourceIntegrator
 
 
 ### Face Source
-
+from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC

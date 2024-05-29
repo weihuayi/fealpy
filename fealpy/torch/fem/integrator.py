@@ -16,8 +16,7 @@ class Integrator(metaclass=ABCMeta):
     _value: Optional[Tensor]
     _assembly: str
 
-    def __init__(self, index: Index=_S, method='assembly') -> None:
-        self.index = index
+    def __init__(self, method='assembly') -> None:
         self._assembly = method
 
     def __call__(self, space: _FunctionSpace) -> Tensor:

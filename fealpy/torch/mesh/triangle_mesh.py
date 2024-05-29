@@ -103,13 +103,15 @@ class TriangleMesh(HomoMesh):
     def integrator(self, q: int, etype: Union[int, str]='cell',
                    qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import TriangleQuadrature
+        from .quadrature import GaussLegendreQuadrature
+
         if isinstance(etype, str):
             etype = entity_str2dim(self.ds, etype)
         kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 2:
             quad = TriangleQuadrature(**kwargs)
         elif etype == 1:
-            raise NotImplementedError
+            quad = GaussLegendreQuadrature(**kwargs)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         quad._latest_order = q

@@ -4,17 +4,20 @@ from typing import Optional, Tuple, Callable, Union
 
 import torch
 from torch import Tensor
+from torch.sparse import mm
 
 from ..functionspace.space import FunctionSpace
 
 
 class DirichletBC():
+    """@brief"""
     def __init__(self, space: FunctionSpace, gD: Union[Callable[..., Tensor], Tensor],
-                 threshold: Optional[Callable] = None):
-        r""""""
+                 threshold: Optional[Callable]=None,
+                 batch_first: bool=True):
         self.space = space
         self.gD = gD
         self.threshold = threshold
+        self.batch_first = batch_first
         self.bctype = 'Dirichlet'
 
     def apply(self, A: Tensor, f: Tensor, uh: Tensor) -> Tuple[Tensor, Tensor]:
@@ -29,9 +32,6 @@ class DirichletBC():
         @Returns:
             A: coefficient matrix
             f: right-hand-size vector
-
-        @Note:
-        The f and uh accepts batched data in the last dimension.
         """
         return self.apply_for_other_space(A, f, uh)
 
@@ -49,12 +49,17 @@ class DirichletBC():
         space = self.space
         gD = self.gD
         isDDof = space.is_boundary_dof(threshold=self.threshold) # on the same device as space
-        space.interpolate(gD, uh, dim=0, index=isDDof) # isDDof.shape == uh.shape
+        DIM = -1 if self.batch_first else 0
+        space.interpolate(gD, uh, dim=DIM, index=isDDof) # isDDof.shape == uh.shape
+
+        if self.batch_first:
+            uh = uh.transpose(0, 1)
+            f = f.transpose(0, 1)
 
         if uh.ndim == 1:
-            f = f - torch.sparse.mm(A, uh.unsqueeze(-1)).squeeze(-1)
+            f = f - mm(A, uh.unsqueeze(-1)).squeeze(-1)
         elif uh.ndim == 2:
-            f = f - torch.sparse.mm(A, uh)
+            f = f - mm(A, uh)
         else:
             raise ValueError('The dimension of uh must be 1 or 2.')
 
@@ -81,6 +86,9 @@ class DirichletBC():
         if uh.ndim == 2:
             bdIdx = bdIdx.unsqueeze_(1)
         f = f * ~bdIdx + uh * bdIdx
+
+        if self.batch_first:
+            f = f.transpose(0, 1)
 
         return A, f
 

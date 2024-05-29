@@ -15,18 +15,23 @@ def process_coef_func(
     coef: Optional[CoefLike],
     bcs: Optional[Tensor]=None,
     mesh: Optional[HomoMesh]=None,
+    etype: Optional[Union[int, str]]=None,
     index: Optional[Tensor]=None
 ):
     r"""Fetch the result Tensor if `coef` is a function."""
     if callable(coef):
         if index is None:
             raise RuntimeError('The index should be provided for coef functions.')
+        if bcs is None:
+            raise RuntimeError('The bcs should be provided for coef functions.')
+        if etype is None:
+            raise RuntimeError('The etype should be provided for coef functions.')
         if getattr(coef, 'coordtype', 'cartesian') == 'cartesian':
             if (mesh is None) or (not isinstance(mesh, HomoMesh)):
                 raise RuntimeError('The mesh should be provided for cartesian coef functions.'
                                    'Note that only homogeneous meshes are supported here.')
 
-            ps = mesh.bc_to_point(bcs, index=index)
+            ps = mesh.bc_to_point(bcs, etype=etype, index=index)
             coef_val = coef(ps)
         else:
             coef_val = coef(bcs, index=index)
@@ -50,16 +55,16 @@ def is_tensor(input: Union[int, float, Tensor]) -> bool:
 
 def get_coef_subscripts(shape: Tensor, nq: int, nc: int, batched: bool):
     if batched:
-        coef_shape = shape[:-1]
+        coef_shape = shape[1:]
         if coef_shape == (nq, nc):
-            subs = "qcb"
+            subs = "bqc"
         elif coef_shape == (nq, ):
-            subs = "qb"
+            subs = "bq"
         elif coef_shape == (nc, ):
-            subs = "cb"
+            subs = "bc"
         else:
-            raise RuntimeError(f"The shape of the coef should be ({nq}, {nc}, Batch), "
-                               f"({nq}, Batch) or ({nc}, Batch), but got {tuple(shape)}.")
+            raise RuntimeError(f"The shape of the coef should be (Batch, {nq}, {nc}), "
+                               f"(Batch, {nq}) or (Batch, {nc}), but got {tuple(shape)}.")
 
     else:
         coef_shape = shape

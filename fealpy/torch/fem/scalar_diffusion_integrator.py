@@ -17,9 +17,10 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
-        super().__init__(index=index, method=method)
+        super().__init__(method=method)
         self.coef = c
         self.q = q
+        self.index = index
         self.batched = batched
 
     def to_global_dof(self, space: _FS) -> Tensor:
@@ -40,6 +41,6 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
-        coef = process_coef_func(coef, mesh=mesh, index=index)
+        coef = process_coef_func(coef, mesh=mesh, etype='cell', index=index)
 
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)

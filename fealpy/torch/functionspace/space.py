@@ -36,6 +36,7 @@ class FunctionSpace(metaclass=ABCMeta):
 
     # relationships
     def cell_to_dof(self) -> Tensor: raise NotImplementedError
+    def face_to_dof(self) -> Tensor: raise NotImplementedError
 
     # interpolation
     def interpolate(self, source: Union[Callable[..., Tensor], Tensor, Number],

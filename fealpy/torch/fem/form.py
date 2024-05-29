@@ -17,6 +17,13 @@ class Form(Generic[_FS]):
     memory: Dict[str, Tuple[Tensor, Tensor]]
     batch_size: int
 
+    def __init__(self, space: _FS, batch_size: int=0):
+        self.space = space
+        self.integrators = {}
+        self.memory = {}
+        self._M: Optional[Tensor] = None
+        self.batch_size = batch_size
+
     def __len__(self) -> int:
         return len(self.integrators)
 
@@ -50,7 +57,7 @@ class Form(Generic[_FS]):
         else:
             self.memory.pop(group, None)
 
-    def assembly_group(self, group: str, retain_ints: bool=False):
+    def _assembly_group(self, group: str, retain_ints: bool=False):
         if group in self.memory:
             return self.memory[group]
 
@@ -69,9 +76,9 @@ class Form(Generic[_FS]):
                                    f"has an incompatible shape {tuple(new_ct.shape)} "
                                    f"with the previous {tuple(ct.shape)} in the group '{group}'.")
             if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct.unsqueeze(-1)
+                ct = new_ct + ct.unsqueeze(0)
             elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct.unsqueeze(-1)
+                ct = ct + new_ct.unsqueeze(0)
             else:
                 ct = ct + new_ct
             if not retain_ints:
