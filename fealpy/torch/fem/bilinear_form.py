@@ -13,14 +13,6 @@ _FS = TypeVar('_FS', bound=FunctionSpace)
 
 
 class BilinearForm(Form[_FS]):
-    """@brief"""
-    def __init__(self, space: _FS, batch_size: int=0):
-        self.space = space
-        self.integrators = {}
-        self.memory = {}
-        self._M: Optional[Tensor] = None
-        self.batch_size = batch_size
-
     def check_local_shape(self, entity_to_global: Tensor, local_tensor: Tensor):
         if entity_to_global.ndim != 2:
             raise ValueError("entity-to-global relationship should be a 2D tensor, "
@@ -65,7 +57,7 @@ class BilinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self.assembly_group(group, retain_ints)
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
             NC = e2dof.size(0)
             local_mat_shape = (batch_size, NC, ldof, ldof)
 
@@ -99,3 +91,15 @@ class BilinearForm(Form[_FS]):
         logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
 
         return self._M
+
+    def mult(self, x: Tensor, out: Optional[Tensor]=None) -> Tensor:
+        """Maxtrix vector multiplication.
+
+        Args:
+            x (Tensor): Vector, accepts batch on the first dimension.
+            out (Tensor, optional): Output vector. Defaults to None.
+
+        Returns:
+            Tensor: self @ x
+        """
+        raise NotImplementedError

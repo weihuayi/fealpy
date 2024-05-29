@@ -13,14 +13,6 @@ _FS = TypeVar('_FS', bound=FunctionSpace)
 
 
 class LinearForm(Form[_FS]):
-    """@brief"""
-    def __init__(self, space: _FS, batch_size: int=0):
-        self.space = space
-        self.integrators = {}
-        self.memory = {}
-        self._M: Optional[Tensor] = None
-        self.batch_size = batch_size
-
     def check_local_shape(self, entity_to_global: Tensor, local_tensor: Tensor):
         if entity_to_global.ndim != 2:
             raise ValueError("entity-to-global relationship should be a 2D tensor, "
@@ -44,7 +36,7 @@ class LinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self.assembly_group(group, retain_ints)
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
             indices = e2dof.ravel()
             M += torch.sparse_coo_tensor(indices, group_tensor.ravel(), size=global_mat_shape)
 
