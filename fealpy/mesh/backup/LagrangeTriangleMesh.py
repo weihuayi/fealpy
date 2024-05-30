@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..quadrature import TriangleQuadrature, GaussLegendreQuadrature
+from ...quadrature import TriangleQuadrature, GaussLegendreQuadrature
 
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
@@ -26,7 +26,6 @@ class LinearTriangleMeshDataStructure(LinearMeshDataStructure):
         self.cell = cell
         self.itype = cell.dtype
         self.construct_edge()
-
 
 class LagrangeTriangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None, boundary=None):
@@ -112,7 +111,7 @@ class LagrangeTriangleMesh(Mesh2d):
         -----
         把网格转化为 VTK 的格式
         """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
+        from ..vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()
@@ -590,7 +589,7 @@ class CLagrangeTriangleDof2d():
 
         NN = mesh.number_of_corner_nodes()
         NE = mesh.number_of_edges()
-        edge2dof = np.zeros((NE, p+1), dtype=np.int)
+        edge2dof = np.zeros((NE, p+1), dtype=np.int_)
         edge2dof[:, [0, -1]] = edge[:, [0, -1]] # edge 可以是高次曲线
         if p > 1:
             edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
@@ -632,6 +631,7 @@ class CLagrangeTriangleDof2d():
         cell2dof = np.zeros((NC, ldof), dtype=np.int_)
         edge2dof = self.edge_to_dof()
 
+        index = self.multiIndex
         flag = edge2cell[:, 2] == 0
         cell2dof[edge2cell[flag, 0][:, None], index[:, 0] == 0] = edge2dof[flag]
         flag = edge2cell[:, 2] == 1
