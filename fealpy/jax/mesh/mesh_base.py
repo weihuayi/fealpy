@@ -1,7 +1,10 @@
 
 import numpy as np
 
-from typing import Any, Callable, Optional, List, Union
+from typing import (
+    Literal, Callable, Optional, List, Union, TypeVar,
+    overload, Dict, Any
+)
 from numpy.typing import NDArray
 
 import jax
@@ -9,11 +12,186 @@ import jax.numpy as jnp
 
 from .mesh_kernel import edge_to_ipoint
 
+Array = jax.Array
+Index = Union[Array, int, slice]
+EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
+_int_func = Callable[..., int]
+_dtype = jnp.dtype
+_device = jax.Device
+
+_S = slice(None, None, None)
+_T = TypeVar('_T')
+_default = object()
+
+
+##################################################
+### Utils
+##################################################
+
+def entity_str2dim(ds, etype: str) -> int:
+    if etype == 'cell':
+        return ds.top_dimension()
+    elif etype == 'cell_location':
+        return -ds.top_dimension()
+    elif etype == 'face':
+        TD = ds.top_dimension()
+        if TD <= 1:
+            raise ValueError('the mesh has no face entity.')
+        return TD - 1
+    elif etype == 'face_location':
+        TD = ds.top_dimension()
+        if TD <= 1:
+            raise ValueError('the mesh has no face location.')
+        return -TD + 1
+    elif etype == 'edge':
+        return 1
+    elif etype == 'node':
+        return 0
+    else:
+        raise KeyError(f'{etype} is not a valid entity attribute.')
+
+
+def entity_dim2array(ds, etype_dim: int, index=None, *, default=_default):
+    r"""Get entity tensor by its top dimension."""
+    if etype_dim in ds._entity_storage:
+        et = ds._entity_storage[etype_dim]
+        if index is None:
+            return et
+        else:
+            if et.ndim == 1:
+                raise RuntimeError("index is not supported for flattened entity.")
+            return et[index]
+    else:
+        if default is not _default:
+            return default
+        raise ValueError(f'{etype_dim} is not a valid entity attribute index '
+                         f"in {ds.__class__.__name__}.")
+
+
+##################################################
+### Mesh Data Structure Base
+#################################################
+
+class MeshDataStructure():
+    _STORAGE_ATTR = ['cell', 'face', 'edge', 'cell_location','face_location']
+    def __init__(self, NN: int, TD: int) -> None:
+        self._entity_storage: Dict[int, Array] = {}
+        self.NN = NN
+        self.TD = TD
+
+    @overload
+    def __getattr__(self, name: EntityName) -> Array: ...
+    def __getattr__(self, name: str):
+        if name not in self._STORAGE_ATTR:
+            return self.__dict__[name]
+        etype_dim = entity_str2dim(self, name)
+        return entity_dim2array(self, etype_dim)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in self._STORAGE_ATTR:
+            if not hasattr(self, '_entity_storage'):
+                raise RuntimeError('please call super().__init__() before setting attributes.')
+            etype_dim = entity_str2dim(self, name)
+            self._entity_storage[etype_dim] = value
+        else:
+            super().__setattr__(name, value)
+
+    ### cuda
+    def to(self, device: Optional[_device]=None):
+        for entity_tensor in self._entity_storage.values():
+            jax.device_put(entity_tensor, device)
+        return self
+
+    ### properties
+    def top_dimension(self) -> int: return self.TD
+    @property
+    def itype(self) -> _dtype: return self.cell.dtype
+
+    ### counters
+    number_of_nodes: _int_func = lambda self: self.NN
+    number_of_edges: _int_func = lambda self: len(entity_dim2array(self, 1))
+    number_of_faces: _int_func = lambda self: len(entity_dim2array(self, self.top_dimension() - 1))
+    number_of_cells: _int_func = lambda self: len(entity_dim2array(self, self.top_dimension()))
+
+    ### constructors
+    def construct(self) -> None:
+        raise NotImplementedError
+
+    @overload
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Array: ...
+    @overload
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default: _T) -> Union[Array, _T]: ...
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default=_default):
+        r"""@brief Get entities in mesh structure.
+
+        @param etype: int or str. The topology dimension of the entity, or name
+        'cell' | 'face' | 'edge'. Note that 'node' is not in mesh structure.
+        For polygon meshes, the names 'cell_location' | 'face_location' may also be
+        available, and the `index` argument is applied on the flattened entity array.
+        @param index: int, slice or Array. The index of the entity.
+
+        @return: Array or Sequence[Array].
+        """
+        if isinstance(etype, str):
+            etype = entity_str2dim(self, etype)
+        return entity_dim2array(self, etype, index, default=default)
+
+    def total_face(self) -> Array:
+        raise NotImplementedError
+
+    def total_edge(self) -> Array:
+        raise NotImplementedError
+
+    ### boundary
+    def boundary_face_flag(self): return self.face2cell[:, 0] == self.face2cell[:, 1]
+    def boundary_face_index(self): return jnp.nonzero(self.boundary_face_flag())[0]
+
+
+class HomoMeshDataStructure(MeshDataStructure):
+    ccw: Array
+    localEdge: Array
+    localFace: Array
+
+    def __init__(self, NN: int, TD: int, cell: Array) -> None:
+        super().__init__(NN, TD)
+        self.cell = cell
+
+    number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
+    number_of_nodes_of_cells = number_of_vertices_of_cells
+    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
+    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
+    number_of_vertices_of_faces: _int_func = lambda self: self.localFace.shape[-1]
+    number_of_vertices_of_edges: _int_func = lambda self: self.localEdge.shape[-1]
+
+    def total_face(self) -> Array:
+        NVF = self.number_of_faces_of_cells()
+        cell = self.entity(self.TD)
+        local_face = self.localFace
+        total_face = cell[..., local_face].reshape(-1, NVF)
+        return total_face
+
+    def total_edge(self) -> Array:
+        NVE = self.number_of_vertices_of_edges()
+        cell = self.entity(self.TD)
+        local_edge = self.localEdge
+        total_edge = cell[..., local_edge].reshape(-1, NVE)
+        return total_edge
+
+    def construct(self) -> None:
+        raise NotImplementedError
+
+
+##################################################
+### Mesh Base
+##################################################
+
 class MeshBase():
     """
     @brief The base class for mesh.
-
     """
+    ds: MeshDataStructure
+    node: Array
+
     def geo_dimension(self) -> int:
         """
         @brief Get geometry dimension of the mesh.
