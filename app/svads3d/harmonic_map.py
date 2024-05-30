@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import csr_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve
+from dataclasses import dataclass
 
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -33,7 +34,7 @@ def sphere_harmonic_map(data : HarmonicMapData):
     dval = data.dval
 
     NN = mesh.number_of_nodes()
-    GD = mesh.geo_dimension()
+    GD = dval.shape[1]
     gdof = NN*GD 
 
     space = LagrangeFiniteElementSpace(mesh, p=1)
@@ -54,9 +55,9 @@ def sphere_harmonic_map(data : HarmonicMapData):
     T = csr_matrix((d, (I, np.where(idof)[0])), shape=(N, gdof))
 
     f = np.zeros(gdof, dtype=np.float64)
-    f[~idof] = dval.fllaten
-    f = (T@S@f)[idof]
-    S = T@S@T 
+    f[~idof] = dval.flatten()
+    f = (T@S@f)
+    S = T@S@T.T
 
     ## 1.2 解方程
     uh = spsolve(S, f)
@@ -64,14 +65,14 @@ def sphere_harmonic_map(data : HarmonicMapData):
     ## 1.3 归一化
     vh = uh.reshape(-1, GD)
     uh = vh/np.linalg.norm(vh, axis=1, keepdims=True)
-    uh = uh.flat
+    uh = uh.reshape(-1)
 
     # 2. 迭代求解
     I = np.tile(np.arange(N//GD), (GD, 1)).T.flatten()
     J = np.arange(N)
     while True:
         ## 2.1 计算 C 并组装矩阵
-        C = csr_matrix((uh, (I, J)), shape=(NN, gdof))
+        C = csr_matrix((uh, (I, J)), shape=(N//GD, N))
         A = bmat([[S, C.T], [C, None]], format='csr') 
 
         ## 2.2 计算右端 b
@@ -80,20 +81,21 @@ def sphere_harmonic_map(data : HarmonicMapData):
 
         ## 2.3 解方程
         x = spsolve(A, b)
-        uh = x[:N]
+        wh = x[:N]
 
         ## 2.4 归一化
-        vh = uh.reshape(-1, GD)
+        vh = uh.reshape(-1, GD) + wh.reshape(-1, GD)
         uh1 = vh/np.linalg.norm(vh, axis=1, keepdims=True)
-        if np.linalg.norm(uh1-uh) < 1e-8:
-            uh = uh1.flat
+        print(np.linalg.norm(uh1.flat - uh))
+        if np.linalg.norm(uh1.flat - uh) < 1e-8:
+            uh = uh1.reshape(-1)
             break
-        uh = uh1.flat
+        uh = uh1.reshape(-1)
 
-    fun = space.function()
+    fun = np.zeros((NN*GD))
     fun[idof] = uh
     fun[~idof] = dval.flat
-    return fun
+    return fun.reshape(-1, GD)
 
 
 
