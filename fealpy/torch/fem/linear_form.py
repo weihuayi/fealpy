@@ -55,7 +55,7 @@ class LinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self.assembly_group(group, retain_ints)
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
             NC = e2dof.size(0)
             local_mat_shape = (batch_size, NC, ldof)
 

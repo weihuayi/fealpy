@@ -36,7 +36,7 @@ class BilinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self.assembly_group(group, retain_ints)
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
             I = torch.broadcast_to(e2dof[:, :, None], size=group_tensor.shape)
             J = torch.broadcast_to(e2dof[:, None, :], size=group_tensor.shape)
             indices = torch.stack([I.ravel(), J.ravel()], dim=0)
