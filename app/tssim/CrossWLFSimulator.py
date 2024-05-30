@@ -155,15 +155,6 @@ class CrossSolver():
         return result
         
 
-
-
-
-    '''
-    计算ns方程
-    '''
-    def NS():
-        pass
-    
     
     '''
     计算温度方程

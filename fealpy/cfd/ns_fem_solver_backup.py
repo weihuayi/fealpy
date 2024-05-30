@@ -176,7 +176,7 @@ class NSFEMSolver:
         return b
     
     # 求解中间速度u_star
-    def ipcs_A_0(self, mu=None, rho=None, threshold=None, Re=1):
+    def ipcs_A_0(self, mu=None, rho=None, threshold=None):
         dt = self.dt
         if rho is None:
             rho = self.rho
@@ -193,14 +193,14 @@ class NSFEMSolver:
             bform.add_domain_integrator(VectorViscousWorkIntegrator(mu=mu, q=self.q))
             S = bform.assembly()
             self.epS = S
-        A = M + (1/Re)*dt*S
+        A = M + dt*S
         
         if threshold is not None:
             bform = BilinearForm((self.uspace,)*2)
             bform.add_boundary_integrator(FluidBoundaryFrictionIntegrator(mu=self.mu, q=self.q, threshold=threshold))
             B = bform.assembly()
             self.bfS = B
-            A -= (1/Re)*dt*0.5*B
+            A -= dt*0.5*B
         return A
 
     def ipcs_b_0(self, un, p0, source,rho=None, threshold=None):
