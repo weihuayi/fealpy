@@ -15,8 +15,6 @@ class KernelFunctionBase():
     def grad_value(self, r):
         return grad(self.value)(r)
 
-
-
 class QuinticKernel(KernelFunctionBase): 
 
     def __init__(self,h,dim=3):
