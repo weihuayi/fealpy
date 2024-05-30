@@ -70,6 +70,7 @@ def sphere_harmonic_map(data : HarmonicMapData):
     # 2. 迭代求解
     I = np.tile(np.arange(N//GD), (GD, 1)).T.flatten()
     J = np.arange(N)
+    E = (S@uh).dot(uh)
     while True:
         ## 2.1 计算 C 并组装矩阵
         C = csr_matrix((uh, (I, J)), shape=(N//GD, N))
@@ -85,12 +86,11 @@ def sphere_harmonic_map(data : HarmonicMapData):
 
         ## 2.4 归一化
         vh = uh.reshape(-1, GD) + wh.reshape(-1, GD)
-        uh1 = vh/np.linalg.norm(vh, axis=1, keepdims=True)
-        print(np.linalg.norm(uh1.flat - uh))
-        if np.linalg.norm(uh1.flat - uh) < 1e-8:
-            uh = uh1.reshape(-1)
+        uh = (vh/np.linalg.norm(vh, axis=1, keepdims=True)).reshape(-1)
+        E0 = (S@uh).dot(uh)
+        if np.linalg.norm(E - E0) < 1e-8:
             break
-        uh = uh1.reshape(-1)
+        E = E0
 
     fun = np.zeros((NN*GD))
     fun[idof] = uh
