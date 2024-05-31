@@ -306,6 +306,16 @@ class Mesh():
 
     def shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        """@brief Shape function value on the given bc points, in shape (..., ldof).
+
+        @param bc: The bc points, in shape (..., NVC).
+        @param p: The order of the shape function.
+        @param index: The index of the cell.
+        @param variable: The variable name.
+        @param mi: The multi-index matrix.
+
+        @returns: The shape function value, in shape (..., ldof).
+        """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
     def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
@@ -332,7 +342,8 @@ class HomoMesh(Mesh):
         node = self.entity('node')
         entity = self.ds.entity(etype, index)
         # TODO: finish this
-        ccw = getattr(self.ds, 'ccw', None)
+        # ccw = getattr(self.ds, 'ccw', None)
+        ccw = None
         return F.bc_to_points(bcs, node, entity, ccw)
 
     ### ipoints

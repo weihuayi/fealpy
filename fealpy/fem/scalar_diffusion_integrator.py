@@ -45,7 +45,6 @@ class ScalarDiffusionIntegrator:
 
         if coef is None:
             D += np.einsum('q, qcid, qcjd, c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
-            print("D:", D.shape, "\n", D)
         else:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):

@@ -14,6 +14,7 @@ class OCAMSystem:
         self.size=data['size'] # 椭球面的长宽高
         self.center_height = data['center_height'] # 椭球面的中心高度
         self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
+        self.viewpoint = data['viewpoint'] # 视点
         
         self.cams = []
 
@@ -60,7 +61,8 @@ class OCAMSystem:
                 icenter=data['icenter'][i],
                 radius=data['radius'][i],
                 mark_board=data['mark_board'][i],
-                camera_points = cps[i]
+                camera_points = cps[i],
+                viewpoint = self.viewpoint
             ))
 
     def get_implict_surface_function(self):
@@ -949,9 +951,12 @@ class OCAMSystem:
             'mark_board': mark_board,
             'center_height' : h,
             'size' : (17.5, 3.47, 3), # 小车长宽高
-            'scale_ratio' : (1.618, 3.618, 1.618) # 三个主轴的伸缩比例
+            'scale_ratio' : (1.618, 3.618, 1.618), # 三个主轴的伸缩比例
+            'viewpoint' : (0, 0, 0), # 视点
         }
 
         return cls(data)
+
+
 
 

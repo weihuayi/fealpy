@@ -2,8 +2,8 @@ import numpy as np
 
 from types import ModuleType
 from .Mesh import Mesh
-from ..quadrature import GaussLegendreQuadrature
-from ..quadrature import ZeroDimensionQuadrature
+from ...quadrature import GaussLegendreQuadrature
+from ...quadrature import ZeroDimensionQuadrature
 
 ## @defgroup GeneralInterface
 class Mesh1d(Mesh):

@@ -1,23 +1,35 @@
 
 from typing import Optional
 
-import torch
 from torch import Tensor
 
 from ..mesh import HomoMesh
-from ..utils import process_coef_func, is_scalar
-from .integrator import DomainIntegrator, _FS, _S, Index, CoefLike
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import bilinear_integral
+from .integrator import CellOperatorIntegrator, _S, Index, CoefLike
 
 
-class ScalarDiffusionIntegrator(DomainIntegrator[_FS]):
+class ScalarDiffusionIntegrator(CellOperatorIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, c: Optional[CoefLike]=None, q: int=3) -> None:
+    def __init__(self, c: Optional[CoefLike]=None, q: int=3, *,
+                 index: Index=_S,
+                 batched: bool=False,
+                 method: Optional[str]=None) -> None:
+        method = 'assembly' if (method is None) else method
+        super().__init__(method=method)
         self.coef = c
         self.q = q
+        self.index = index
+        self.batched = batched
 
-    def assembly_cell_matrix(self, space: _FS, index: Index=_S) -> Tensor:
+    def to_global_dof(self, space: _FS) -> Tensor:
+        return space.cell_to_dof()[self.index]
+
+    def assembly(self, space: _FS) -> Tensor:
         coef = self.coef
         q = self.q
+        index = self.index
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomoMesh):
@@ -25,24 +37,10 @@ class ScalarDiffusionIntegrator(DomainIntegrator[_FS]):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        cm = mesh.entity_measure('cell', index)
-        NC = cm.size(0)
+        cm = mesh.entity_measure('cell', index=index)
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        NQ = ws.size(0)
+        gphi = space.grad_basis(bcs, index=index, variable='x')
+        coef = process_coef_func(coef, mesh=mesh, etype='cell', index=index)
 
-        gphi = space.grad_basis(bcs, index, variable='x')
-
-        if coef is None:
-            return torch.einsum('q, qci..., qcj..., c -> cij', ws, gphi, gphi, cm)
-        else:
-            coef = process_coef_func(coef, mesh=mesh, index=index)
-            if is_scalar(coef):
-                return torch.einsum('q, qci..., qcj..., c -> cij', ws, gphi, gphi, cm) * coef
-            else:
-                if coef.shape == (NC, ):
-                    return torch.einsum('q, qci..., qcj..., c -> cij', ws, gphi, gphi, cm*coef)
-                elif coef.shape == (NQ, NC):
-                    return torch.einsum('q, qci..., qcj..., c, qc -> cij', ws, gphi, gphi, cm, coef)
-                else:
-                    RuntimeError(f'coef shape {coef.shape} is not supported.')
+        return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)

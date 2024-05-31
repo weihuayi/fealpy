@@ -3,9 +3,9 @@ import warnings
 from scipy.sparse import coo_matrix, csr_matrix, bmat, eye
 from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
-from ..quadrature import TriangleQuadrature
-from ..quadrature import GaussLegendreQuadrature
-from .triangle_quality import *
+from ...quadrature import TriangleQuadrature
+from ...quadrature import GaussLegendreQuadrature
+from ..triangle_quality import *
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 

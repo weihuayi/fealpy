@@ -302,9 +302,11 @@ class LagrangeFESpace():
         """
         gdof = self.number_of_global_dofs()
         phi = self.basis(bc, index=index) # (NQ, NC, ldof)
-        #cell2dof = self.dof.cell_to_dof(index=index)
-        TD = bc.shape[-1] - 1
-        cell2dof = self.dof.entity_to_dof(etype=TD, index=index)
+        if isinstance(bc, tuple):
+            cell2dof = self.dof.cell_to_dof(index=index)
+        else:
+            TD = bc.shape[-1] - 1
+            cell2dof = self.dof.entity_to_dof(etype=TD, index=index)
 
         dim = len(uh.shape) - 1
         s0 = 'abdefg'

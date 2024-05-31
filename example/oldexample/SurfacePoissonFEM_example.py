@@ -17,6 +17,7 @@ from fealpy.tools.show import showmultirate, show_error_table
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import bmat
 
+import ipdb
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -52,9 +53,10 @@ mtype = args.mtype
 nrefine = args.nrefine
 maxit = args.maxit
 
+#ipdb.set_trace()
 pde = PDE()
 surface = pde.domain()
-mesh = pde.init_mesh(meshtype=mtype, p=mdegree) # p 次的拉格朗日四边形网格
+mesh = pde.init_mesh(meshtype=mtype, p=mdegree) # p 次的拉格朗日三角形网格
 
 mesh.uniform_refine(n=nrefine)
 
@@ -72,7 +74,7 @@ m = 4
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
-    space = ParametricLagrangeFiniteElementSpace(mesh, p=sdegree)
+    space = ParametricLagrangeFESpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
 
     uI = space.interpolation(pde.solution)

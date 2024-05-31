@@ -1,5 +1,5 @@
 
-from typing import Union, TypeVar, Generic, Callable
+from typing import Union, TypeVar, Generic, Callable, Optional
 
 import torch
 from torch import Tensor
@@ -11,6 +11,7 @@ from .dofs import LinearMeshCFEDof
 
 _MT = TypeVar('_MT', bound=Mesh)
 Index = Union[int, slice, Tensor]
+Number = Union[int, float]
 _S = slice(None)
 
 
@@ -27,6 +28,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         self.ftype = mesh.ftype
         self.itype = mesh.ds.itype
+        self.device = mesh.device
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
@@ -51,30 +53,35 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         else:
             raise RuntimeError("boundary dof is not supported by discontinuous spaces.")
 
-    def interpolate(self, gD: Union[Callable[..., Tensor], Tensor],
-                    uh: Tensor,
-                    index: Index=_S):
-        ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-        GD = self.mesh.geo_dimension()
+    def interpolate(self, source: Union[Callable[..., Tensor], Tensor, Number],
+                    uh: Tensor, dim: Optional[int]=None, index: Index=_S) -> Tensor:
+        """@brief Interpolate the given Tensor or function `source` to the dofs.
 
-        if callable(gD):
-            gD = gD(ipoints[index])
+        @params source: The source to be interpolated.
+        @params uh: The output Tensor.
+        @params dim: The dimension of the dofs in the uh and source.
+        This arg will be set to -1 if the `doforder` of space is 'sdofs' when not given,\
+        otherwise 0.
+        @params index: The index of the dofs to be interpolated.
 
-        if (len(uh.shape) == 1) or (self.doforder == 'vdims'):
-            if len(uh.shape) == 1 and gD.shape[-1] == 1:
-                gD = gD.squeeze(-1)
-            uh[index] = gD
+        @return: The interpolated Tensor `uh`.
+        """
+        if callable(source):
+            ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
+            source = source(ipoints[index])
 
-        elif self.doforder == 'sdofs':
-            if isinstance(gD, (int, float)):
-                uh[..., index] = gD
-            elif isinstance(gD, Tensor):
-                if gD.shape == (GD, ):
-                    uh[..., index] = gD[:, None]
-                else:
-                    uh[..., index] = gD.T
-            else:
-                raise ValueError("Unsupported type for gD. Must be a callable, int, float, or Tensor.")
+        if uh.ndim == 1:
+            if isinstance(source, Tensor) and source.shape[-1] == 1:
+                source = source.squeeze(-1)
+            uh[index] = source
+            return uh
+
+        if dim is None:
+            dim = -1 if (getattr(self, 'doforder', None) == 'sdofs') else 0
+
+        slicing = [slice(None)] * uh.ndim
+        slicing[dim] = index
+        uh[slicing] = source
 
         return uh
 
@@ -97,7 +104,34 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         @brief
         """
-        pass
+        phi = self.basis(bc, index=index)
+        cell2dof = self.dof.cell_to_dof(index)
+
+        dim = len(uh.shape) - 1
+        s0 = 'abdefg'
+        doforder = 'batched' if not hasattr(self, 'doforder') else self.doforder
+
+        if doforder == 'sdofs':
+            # phi.shape == (NQ, NC, ldof)
+            # uh.shape == (..., gdof)
+            # uh[..., cell2dof].shape == (..., NC, ldof)
+            # val.shape == (NQ, ..., NC)
+            s1 = f"...ci, {s0[:dim]}ci->...{s0[:dim]}c"
+            val = torch.einsum(s1, phi, uh[..., cell2dof])
+        elif doforder == 'vdims':
+            # phi.shape == (NQ, NC, ldof)
+            # uh.shape == (gdof, ...)
+            # uh[cell2dof, ...].shape == (NC, ldof, ...)
+            # val.shape == (NQ, NC, ...)
+            s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"
+            val = torch.einsum(s1, phi, uh[cell2dof, ...])
+        elif doforder == 'batched':
+            # Here 'batched' case is added.
+            s1 = f"...ci, {s0[:dim]}ci -> {s0[:dim]}...c"
+            val = torch.einsum(s1, phi, uh[..., cell2dof])
+        else:
+            raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
+        return val
 
     def grad(self, uh: Tensor, bc: Tensor, index: Index=_S):
         pass
