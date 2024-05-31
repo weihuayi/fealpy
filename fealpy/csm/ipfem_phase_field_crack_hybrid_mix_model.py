@@ -282,8 +282,10 @@ class IPFEMPhaseFieldCrackHybridMixModel():
 
         node = mesh0.entity(etype='node')
         cell = mesh0.entity(etype='cell')
-
-        mesh = TriangleMesh(node, cell)
+        cell0 = np.zeros_like(cell,dtype=np.int_)
+        cell0[:]=cell[:]
+        print(node.shape, cell.shape)
+        mesh = TriangleMesh(node, cell0)
         self.mesh = mesh
        
         # 更新加密后的空间
