@@ -8,6 +8,9 @@ class KernelFunctionBase():
     def __init__(self, h: float):
         self.h_derivative = 1.0/h
 
+    def __call__(self, r):
+        return self.value(r)
+
     @abstractmethod
     def value(self, r):
         pass
