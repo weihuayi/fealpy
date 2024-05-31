@@ -1,24 +1,42 @@
 import numpy as np
+from sympy import *
 
-class Parabolic2dData:
+class Parabolic2dData: 
+    def __init__(self,u, x, y, t, D=[0, 1, 0, 1], T=[0, 1]):
+        self._domain = D 
+        self._duration = T 
+        self.u = lambdify([x,y,t], sympify(u))
+        self.f = lambdify([x,y,t],diff(u,t,1)-diff(u,x,2)-diff(u,y,2))
+        
     def domain(self):
-        return [0, 1, 0, 1]
+        return self._domain
 
     def duration(self):
-        return [0, 0.1]
-    
-    
-    def solution(self,p,t):
-        pi = np.pi
+        return self._duration 
+
+    def solution(self, p, t):
         x = p[..., 0]
         y = p[..., 1]
-        return np.sin(pi*x)*np.sin(pi*y)*np.exp(-2*pi*t) 
-    
+        return self.u(x,y,t) 
+
     def init_solution(self, p):
-        pi = np.pi
         x = p[..., 0]
         y = p[..., 1]
-        return np.sin(pi*x)*np.sin(pi*y)
+        return self.u(x,y,self._duration[0])
+        
+    def source(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        return self.f(x,y,t)
+    
+    def gradient(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        pass
+       # return self.dudx(p,t)
+    
+    def dirichlet(self, p, t):
+        return self.solution(p, t)
         
     
     def source(self, p, t):
@@ -41,31 +59,35 @@ class Parabolic2dData:
         return self.solution(p,t)
     
 class Parabolic3dData:
+    def __init__(self,u, x, y, z, t, D=[0, 1, 0, 1, 0, 1], T=[0, 1]):
+        self._domain = D 
+        self._duration = T 
+        self.u = lambdify([x,y,z,t], sympify(u))
+        self.f = lambdify([x,y,z,t],diff(u,t,1)-diff(u,x,2)-diff(u,y,2)-diff(u,z,2))
+    
     def domain(self):
-        return [0, 1, 0, 1, 0, 1]
+        return self._domain
 
     def duration(self):
-        return [0, 1]
+        return self._duration
 
     def source(self,p,t):
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return np.zeros_like(x)
+        return self.f(x,y,z,t)
 
     def solution(self, p, t):
-        pi = np.pi
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return np.sin(pi * x) * np.sin(pi * y) * np.sin(pi * z) * np.exp(-3 * pi * t)
+        return self.u(x,y,z,t) 
     
     def init_solution(self, p):
-        pi = np.pi
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return np.sin(pi*x)*np.sin(pi*y)*np.sin(pi * z) 
+        return self.u(x,y,z,self._duration[0])
 
     def dirichlet(self, p, t):
         
