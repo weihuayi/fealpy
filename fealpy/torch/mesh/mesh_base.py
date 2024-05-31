@@ -281,7 +281,7 @@ class Mesh():
     def multi_index_matrix(self, p: int, etype: int) -> Tensor:
         return F.multi_index_matrix(p, etype, dtype=self.ds.itype, device=self.device)
 
-    def count(self) -> int: return self.ds.count()
+    def count(self, etype: Union[int, str]) -> int: return self.ds.count(etype)
     def number_of_cells(self) -> int: return self.ds.number_of_cells()
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
