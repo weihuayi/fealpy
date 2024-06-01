@@ -56,7 +56,7 @@ class NSFEMSolver:
             "netwon": self.netwon,
             "ipcs": self.ipcs}
 
-        self.solver = self._solver['']
+        #self.solver = self._solver['']
 
     def options(self):
         """
@@ -203,12 +203,15 @@ class NSFEMSolver:
             A -= (1/Re)*dt*0.5*B
         return A
 
-    def ipcs_b_0(self, un, p0, source,rho=None, threshold=None):
+    def ipcs_b_0(self, un, p0, source, Re=1, rho=None, threshold=None):
         dt = self.dt
         
         if rho is None:
             rho = self.rho
-
+            
+        '''
+        (\rho(u^n - dt * u^n \cdot \nabla u^n) , v)
+        '''
         @barycentric
         def coef(bcs, index): 
             if callable(rho):
@@ -222,32 +225,33 @@ class NSFEMSolver:
                 result -= dt * np.einsum('imnc, inc->imc',un.grad_value(bcs, index), un(bcs, index))
                 result +=  dt*source(bcs, index)
                 return rho * result
-        
+        '''
+        (p^n I, \nabla b)
+        '''
         @barycentric
         def coefp(bcs, index):
             result = np.repeat(p0(bcs,index)[...,np.newaxis], 2, axis=-1)
             return dt*result
-        
-        @barycentric
-        def coefp(bcs, index):
-            result = np.repeat(p0(bcs,index)[...,np.newaxis], 2, axis=-1)
-            return dt*result
-        
-        @barycentric
-        def coefpn(ebcs, index):
-            val = p0(ebcs,index=index)
-            n = self.mesh.face_unit_normal(index=index)
-            result = np.einsum('ij,jk->ijk',val,n)
-            return -dt*result
         
         L = LinearForm((self.uspace,)*2)
         L.add_domain_integrator(VectorSourceIntegrator(coef, q=self.q))
         L.add_domain_integrator(VectorEpsilonSourceIntegrator(coefp, q=self.q))
+        
         if threshold is not None:
+            '''
+            <p^n \cdot n, v>
+            '''
+            @barycentric
+            def coefpn(ebcs, index):
+                val = p0(ebcs,index=index)
+                n = self.mesh.face_unit_normal(index=index)
+                result = np.einsum('ij,jk->ijk',val,n)
+                return -dt*result
             L.add_boundary_integrator(VectorBoundarySourceIntegrator(coefpn, q=self.q, threshold=threshold))
+        
         b = L.assembly()
-        b -= dt*self.epS@un.flatten() 
-        b += 0.5*dt*self.bfS@un.flatten() 
+        b -= (1/Re)*dt*self.epS@un.flatten() 
+        b += (1/Re)*0.5*dt*self.bfS@un.flatten() 
         return b
 
     # 求压力

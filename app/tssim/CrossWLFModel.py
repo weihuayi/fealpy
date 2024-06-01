@@ -54,3 +54,4 @@ class CrossWLF:
         y = p[...,1]
         val =  -x
         return val
+    
