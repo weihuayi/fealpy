@@ -13,7 +13,6 @@ from torch import Tensor, tensordot, rand
 import numpy as np
 import yaml
 from tqdm import tqdm
-# from viztracer import VizTracer
 
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch import logger
@@ -61,7 +60,7 @@ def neumann(points: Tensor):
     kwargs = {'dtype': points.dtype, "device": points.device}
     theta = torch.arctan2(y, x)
     freq = torch.tensor(FREQ, **kwargs)
-    return torch.sin(tensordot(freq, theta, dims=0))
+    return torch.cos(tensordot(freq, theta, dims=0))
 
 
 def main(sigma_iterable: Sequence[int], seed=0, index=0):
@@ -92,6 +91,8 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
             rads=rads.cpu().numpy()
         )
 
+    return
+
 
 def estimate_space_occupied(n_float: int, n_bool: int, n_samples: int, dtype: str):
     if dtype == torch.float32:
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     import os
 
     process_num = config['process_num']
-    space_occ = estimate_space_occupied(EXT * 8 * len(FREQ),
+    space_occ = estimate_space_occupied(EXT * 4 * len(FREQ),
                                         (EXT+1)**2,
                                         config['tail'] - config['head'],
                                         DTYPE)
@@ -157,11 +158,6 @@ if __name__ == "__main__":
 
     PART = 4
     TM = int(time())
-    # tracer = VizTracer()
-    # tracer.start()
-    # main(NUM, 999, 0)
-    # tracer.stop()
-    # tracer.save(f'{output_folder}/{TM}.json')
 
     pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
     pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))

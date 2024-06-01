@@ -120,7 +120,7 @@ class EITDataGenerator():
 
         return gn
 
-    def run(self) -> Tensor:
+    def run(self, return_full=False) -> Tensor:
         """_summary_
 
         Returns:
@@ -132,4 +132,6 @@ class EITDataGenerator():
         if self.unsqueezed:
             uh = uh.squeeze(0)
 
+        if return_full:
+            return uh
         return uh[..., self._bd_dof.cpu()]
