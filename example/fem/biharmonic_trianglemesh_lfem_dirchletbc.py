@@ -169,7 +169,7 @@ parser.add_argument('--ny',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=4, type=int,
+        default=6, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--gamma',
@@ -305,7 +305,6 @@ for i in range(maxit):
     error[1, i] = np.max(np.abs(hx0-hx))
     
     
-    '''
     # 计算R^k的误差
     if p > 2:
         k = 2**p/2.0
@@ -315,7 +314,6 @@ for i in range(maxit):
             Rerror[0, i-1] = np.max(np.abs(Rhu[i-1]-hx))
     else:
         Rerror[0, i] = error[1, i]
-    '''
 #    node = mesh.entity('node')
 #    cell = mesh.entity('cell')
 #    cell = np.array(cell)
@@ -347,7 +345,7 @@ def compute_order(errors, h):
         if np.any(errors[:, i] == 0) or np.any(errors[:, i+1] == 0):
             orders[:, i+1] = 0
         else:
-            orders[:, i+1] = np.log(errors[:, i] / errors[:, i+1]) / np.log(h[i]/h[i+1])
+            orders[:, i+1] = np.log2(errors[:, i] / errors[:, i+1]) / np.log2(h[i]/h[i+1])
     return orders
 
 #order = np.zeros((2, maxit-1), dtype=np.float64) 

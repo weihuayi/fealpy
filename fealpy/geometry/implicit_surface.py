@@ -131,11 +131,12 @@ class SphereSurface():
                 return node, cell
             else:
                 if p is None:
-                    from fealpy.mesh import TriangleMesh
+                    from fealpy.mesh.backup import TriangleMesh
                     return TriangleMesh(node, cell) 
                 else:
-                    from fealpy.mesh import LagrangeTriangleMesh
+                    from fealpy.mesh.backup import LagrangeTriangleMesh
                     return LagrangeTriangleMesh(node, cell, p=p, surface=self) 
+
         elif meshtype == 'quad':
             node = np.array([
                 (-1, -1, -1),
@@ -161,7 +162,7 @@ class SphereSurface():
                     from fealpy.mesh import QuadrangleMesh 
                     return QuadrangleMesh(node, cell) 
                 else:
-                    from fealpy.mesh import LagrangeQuadrangleMesh 
+                    from fealpy.mesh.backup import LagrangeQuadrangleMesh 
                     return LagrangeQuadrangleMesh(node, cell, p=p, surface=self) 
 
 

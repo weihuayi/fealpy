@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import copy
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -60,13 +61,13 @@ class AFEMPhaseFieldCrackHybridMixModel():
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
 
-        mesh = self.mesh
-        space = self.space
-        model = self.model
         GD = self.GD
         D0 = self.D0
         k = 0
         while k < maxit:
+            mesh = self.mesh
+            space = self.space
+            model = self.model
             print('k:', k)
             uh = self.uh
             d = self.d
@@ -186,8 +187,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
                     if refine == 'nvp':
                         self.bisect_refine_2d(isMarkedCell)
                     elif refine == 'rg':
-                        if refine == 'nvp':
-                            self.redgreen_refine_2d(isMarkedCell)
+                        self.redgreen_refine_2d(isMarkedCell)
                 elif GD == 3:
                         self.bisect_refine_3d(isMarkedCell)
                 else:
