@@ -15,6 +15,7 @@ from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 ScalarLaplaceIntegrator = ScalarDiffusionIntegrator 
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
+from .nonlinear_scalar_mass_integrator import NonlinearScalarMassIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 
 from .scalar_pgls_convection_integrator import ScalarPGLSConvectionIntegrator
@@ -28,6 +29,7 @@ from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
 from .scalar_robin_boundary_integrator import ScalarRobinBoundaryIntegrator
 # <g, v>
 from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator
+from .scalar_interface_integrator import ScalarInterfaceIntegrator
 # <g_N, v>
 ScalarNeumannSourceIntegrator = ScalarBoundarySourceIntegrator
 # <g_R, v>
