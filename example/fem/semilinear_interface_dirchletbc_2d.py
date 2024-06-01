@@ -13,6 +13,8 @@ from fealpy.functionspace import LagrangeFESpace
 #区域积分子
 from fealpy.fem import ScalarDiffusionIntegrator, NonlinearScalarMassIntegrator
 from fealpy.fem import ScalarSourceIntegrator
+
+#界面积分子
 from fealpy.fem import ScalarInterfaceIntegrator 
 
 #双线性形
