@@ -457,7 +457,6 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             R = self._grad_shape_function(bc, p)
             if variables == 'x':
                 Dlambda = self.grad_lambda(index=index)
-                print(R.shape, Dlambda.shape)
                 gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
                 return gphi #(NQ, NC, ldof, GD)
             elif variables == 'u':
