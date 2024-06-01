@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import copy
 
 from ..functionspace import LagrangeFESpace, InteriorPenaltyBernsteinFESpace2d
 from ..fem import BilinearForm, LinearForm
@@ -16,6 +17,8 @@ from ..fem import LinearElasticityOperatorIntegrator
 from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
+from ..mesh.halfedge_mesh import HalfEdgeMesh2d
+from ..mesh import TriangleMesh
 
 from scipy.sparse.linalg import spsolve, lgmres, cg
 from scipy.sparse import csr_matrix, coo_matrix
@@ -53,7 +56,7 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         
         disp = model.is_boundary_disp()
 
-#        self.recovery = LinearRecoveryAlg()
+        self.recovery = LinearRecoveryAlg()
 
     def newton_raphson(self, 
             disp, 
@@ -67,16 +70,16 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
 
-        mesh = self.mesh
-        space = self.space
-        dspace = self.dspace
-        ipspace = self.ipspace
         model = self.model
         GD = self.GD
         D0 = self.D0
         gamma = self.gamma
         k = 0
         while k < maxit:
+            mesh = self.mesh
+            space = self.space
+            dspace = self.dspace
+            ipspace = self.ipspace
             print('k:', k)
             uh = self.uh
             d = self.d
@@ -191,6 +194,28 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             self.d = d
             self.H = H
 
+            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
+            eta = self.recovery.recovery_estimate(self.d)
+                
+            isMarkedCell = mark(eta, theta = theta) # TODO：
+
+            cm = mesh.entity_measure('cell')
+            if GD == 3:
+                hmin = model.l0**3/200
+            else:
+                hmin = (model.l0/8)**2
+            isMarkedCell = np.logical_and(isMarkedCell, cm > hmin)
+            if np.any(isMarkedCell):
+                if GD == 2:
+                    if refine == 'nvp':
+                        self.bisect_refine_2d(isMarkedCell)
+                    elif refine == 'rg':
+                        self.redgreen_refine_2d(isMarkedCell)
+                elif GD == 3:
+                        self.bisect_refine_3d(isMarkedCell)
+                else:
+                    print("GD is not 2 or 3, it is incorrect")
+            
             
             # 计算残量误差
             if k == 0:
@@ -206,6 +231,80 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             if error < 1e-5:
                 break
             k += 1
+    
+    def bisect_refine_2d(self, isMarkedCell):
+        """
+        @brief 二分法加密策略
+        """
+        dcell2dof = self.dspace.cell_to_dof()
+        data = {'uh0':self.uh[:, 0], 'uh1':self.uh[:, 1], 'd':self.d[dcell2dof],
+                'H':self.H}
+        option = self.mesh.bisect_options(data=data, disp=False)
+        self.mesh.bisect(isMarkedCell, options=option)
+        print('mesh refine')      
+       
+        # 更新加密后的空间
+        self.space = LagrangeFESpace(self.mesh, p=self.p)
+        self.dspace = LagrangeFESpace(self.mesh, p=self.p0)
+        self.ipspace = InteriorPenaltyBernsteinFESpace2d(self.mesh, p = self.p0)
+
+        NC = self.mesh.number_of_cells()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.dspace.function()
+        self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
+        
+        dcell2dof = self.dspace.cell_to_dof()
+        self.uh[:, 0] = option['data']['uh0']
+        self.uh[:, 1] = option['data']['uh1']
+        self.d[dcell2dof.reshape(-1)] = option['data']['d'].reshape(-1)
+        self.H = option['data']['H']
+   
+    def redgreen_refine_2d(self, isMarkedCell):
+        """
+        @brief 红绿加密策略
+        """
+        mesh0 = HalfEdgeMesh2d.from_mesh(self.mesh, NV=3) 
+
+        mesh0.celldata['H'] = self.H
+        mesho = copy.deepcopy(mesh0)
+        spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
+        dspaceo = LagrangeFESpace(mesho, p=self.p0)
+
+        uh0 = spaceo.function()
+        uh1 = spaceo.function()
+        d0 = dspaceo.function()
+        uh0[:] = self.uh[:, 0]
+        uh1[:] = self.uh[:, 1]
+        d0[:] = self.d[:]
+
+        mesh0.refine_triangle_rg(isMarkedCell)
+        print('mesh refine')
+
+        node = mesh0.entity(etype='node')
+        cell = mesh0.entity(etype='cell')
+        cell0 = np.zeros_like(cell,dtype=np.int_)
+        cell0[:]=cell[:]
+        print(node.shape, cell.shape)
+        mesh = TriangleMesh(node, cell0)
+        self.mesh = mesh
+       
+        # 更新加密后的空间
+        self.space = LagrangeFESpace(self.mesh, p=1, doforder='vdims')
+        self.dspace = LagrangeFESpace(self.mesh, p=self.p0)
+        self.ipspace = InteriorPenaltyBernsteinFESpace2d(self.mesh, p = self.p0)
+
+        NC = self.mesh.number_of_cells()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.dspace.function()
+        self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
+        
+        self.uh[:, 0] = self.space.interpolation_fe_function(uh0)
+        self.uh[:, 1] = self.space.interpolation_fe_function(uh1)
+        
+        self.d[:] = self.dspace.interpolation_fe_function(d0)
+        
+        self.mesh.interpolation_cell_data(mesho, datakey=['H'])
+        print('interpolation cell data:', NC)      
         
     def energy_degradation_function(self, d):
         eps = 1e-10

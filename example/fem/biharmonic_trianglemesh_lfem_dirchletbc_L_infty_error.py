@@ -14,7 +14,10 @@ from fealpy import logger
 from fealpy.mesh import TriangleMesh 
 from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d
 from fealpy.functionspace import InteriorPenaltyBernsteinFESpace2d
+from fealpy.functionspace import LagrangeFESpace
 
+from fealpy.fem import ScalarMassIntegrator
+from fealpy.fem import ScalarSourceIntegrator         # (f, v)
 from fealpy.fem import ScalarBiharmonicIntegrator
 from fealpy.fem import ScalarInteriorPenaltyIntegrator
 from fealpy.fem import BilinearForm
@@ -125,11 +128,13 @@ def grad_max_error(uh, pde, nidx):
     @brief: 计算 nidx 的节点上梯度值的最大值误差
     """
     node = mesh.entity('node')
-    print(nidx)
+#    print(nidx)
     
     x = pde.solution(node[nidx])
     gx = pde.gradient(node[nidx])
     hx = pde.hessian(node[nidx])
+    gx0 = np.zeros((len(nidx), GD), dtype=np.float_)
+    hx0 = np.zeros((len(nidx), GD, GD), dtype=np.float_)
     
     for j in range(len(nidx)):
         gx0[j], hx0[j] = node_g_h_value(uh, nidx[j])
@@ -137,6 +142,21 @@ def grad_max_error(uh, pde, nidx):
     error0 = np.max(np.abs(gx0-gx))
     error1 = np.max(np.abs(hx0-hx))
     return error0, error1 
+
+# 计算两点之间的欧几里得距离
+def distance(point1, point2):
+    return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+
+# 找到半径为 d 的区域内的所有点
+def points_in_radius(node, center, d):
+    Bindices = []
+    Bpoints = []
+    for m, n in enumerate(node):
+        if distance(n, center) <= d:
+            Bindices.append(m)
+            Bpoints.append(n)
+    return Bindices, Bpoints
+
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -157,7 +177,7 @@ parser.add_argument('--ny',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=4, type=int,
+        default=6, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--gamma',
@@ -188,16 +208,17 @@ errorType = ['$|| Ax-b ||_{\\Omega,0}$']
 errorMatrix = np.zeros((3, maxit), dtype=np.float64)
 error = np.zeros((2, maxit), dtype=np.float64)
 Rerror = np.zeros((1, maxit), dtype=np.float64)
+ratio = np.zeros(maxit, dtype=np.float64)
 
 NDof = np.zeros(maxit, dtype=np.int_)
 
 node = mesh.entity('node')
-nidx   = find_nodes(node)
+#nidx = find_nodes(node)
 
 GD = mesh.geo_dimension()
-Rhu = np.zeros((maxit, len(nidx), GD, GD), dtype=np.float_)
-gx0 = np.zeros((len(nidx), GD), dtype=np.float_)
-hx0 = np.zeros((len(nidx), GD, GD), dtype=np.float_)
+#Rhu = np.zeros((maxit, len(nidx), GD, GD), dtype=np.float_)
+#gx0 = np.zeros((len(nidx), GD), dtype=np.float_)
+#hx0 = np.zeros((len(nidx), GD, GD), dtype=np.float_)
 
 h = np.zeros(maxit, dtype=np.float64)
 for i in range(maxit):
@@ -235,21 +256,55 @@ for i in range(maxit):
     print(errorMatrix)
     
     # 计算某点处的误差情况
-    error[:, i] = grad_max_error(uh, pde, nidx)
+    error[:, i] = grad_max_error(uh, pde, np.arange(node.shape[0]))
     print(error)
+    
+    lspace = LagrangeFESpace(mesh, p=p)
 
-    def f(V):
+    lbform = BilinearForm(lspace)
+    lbform.add_domain_integrator(ScalarMassIntegrator(q=p+2)) 
+    M = bform.assembly()
+
+    llform = LinearForm(lspace)
+    # (f, v)
+    si = ScalarSourceIntegrator(uh, q=p+2)
+    llform.add_domain_integrator(si)
+    F = lform.assembly()
+    Lx = lspace.function()
+
+    Lx[:] = spsolve(M, F)
+
+    # 找到每个点在半径 d 内的节点
+    for a in range(1, 5):
+        d = 3 * a * h[i]
+        Lerror1 = np.linalg.norm(Lx)/d**2
+        if d > 0.8:
+            break
+        node0 = np.array((0.5, 0.5))
+        Bidx, Bnode = points_in_radius(node, node0, d)
+
+        def f(V):
+            uI = space.function()
+            uI[:] = V
+            gerror = grad_max_error(uI, pde, Bidx)[0]
+#            print('error:', gerror)
+            return gerror
+
+        gdof = space.dof.number_of_global_dofs()
         uI = space.function()
-        uI[:] = V
-        error = grad_max_error(uI, pde, nidx)[0]
-        print('error:', error)
-        return error
+        uI[:] = minimize(f, uh[:]).x
+        Berror = np.max(uI)
+        print('Berror', Berror)
+        if a == 1:
+            ratio[i] = error[0,
+                    i]/(Berror+Lerror1)/np.sqrt(np.abs(np.log(h[i])))**3
+        else:
+            ratio[i] = max(ratio[i], error[0, i]/(Berror+Lerror1)/np.sqrt(np.abs(np.log(h[i])))**3)
 
-    gdof = space.dof.number_of_global_dofs()
-    uI = space.function()
-    uI[:] = minimize(f, uh[:]).x
-    def ff(x):
-        return x**2
+#    def ff(x):
+#        return x**2
+
+    print(ratio)
 
     if i < maxit-1:
         nx = nx*2
@@ -257,7 +312,7 @@ for i in range(maxit):
         mesh.uniform_refine()
         space = InteriorPenaltyBernsteinFESpace2d(mesh, p = p)
         
-
+print(ratio)
 print('error:', errorMatrix)
 print('d_error:', errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 

@@ -17,6 +17,8 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 from fealpy.decorator import barycentric, cartesian
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
+from scipy.sparse.linalg import spsolve
 
 ns = 10
 T = 10
@@ -35,13 +37,33 @@ LSSolver = LSFEMSolver(phispace)
 NSSolver = NSFEMSolver(mesh, dt ,uspace, pspace) 
 inletdof = uspace.is_boundary_dof(pde.is_inlet_boundary)
 walldof = uspace.is_boundary_dof(pde.is_wall_boundary)
+
 phi0 = phispace.interpolate(pde.init_surface)
 phi1 = phispace.function()
 u0 = uspace.function(dim=2)
+us = uspace.function(dim=2)
+u1 = uspace.function(dim=2)
 u0[0,inletdof] = 5
 p0 = pspace.function()
 T0 = Tspace.function()
 T0[walldof] = 525
+
+
+#ipcs_0的边界处理
+ubdof = uspace.is_boundary_dof(pde.is_wall_boundary) \
+        | uspace.is_boundary_dof(pde.is_left_boundary)
+u_inlet_bdof = uspace.is_boundary_dof(pde.is_inlet_boundary)
+is_u_bdof = np.hstack([ubdof, ubdof])
+ugdof = 2*uspace.number_of_global_dofs()
+uxx = uspace.function(dim=2)
+uxx[0,:][u_inlet_bdof] = 5
+bdIdx = np.zeros(ugdof, dtype=np.int_)
+bdIdx[is_u_bdof] = 1
+uD0 = spdiags(1-bdIdx, 0, ugdof, ugdof)
+uD1 = spdiags(bdIdx, 0, ugdof, ugdof)
+#ipcs_1的边界处理
+pbc = DirichletBC(pspace, pde.pressure, pde.is_p_boundary) 
+
 
 for i in range(1):
     phi1[:] = LSSolver.mumps_solve(5, phi0, dt, u0)
@@ -63,9 +85,26 @@ for i in range(1):
     delta = solver.delta_epsion(phi1)
     kappa = solver.kappa(phi1)
     
-    #ipcs
-    A0 = NSSolver.ipcs_A_0(mu=eta, rho=rho, threshold=pde.is_outflow_boundary)
-    b0 = NSSolver.ipcs_b_0(un=u0, p0=p0, source=1, rho=rho, threshold=pde.is_outflow_boundary)
+    #ipcs_0
+    @barycentric
+    def source(bcs, index=None):
+        result = 1/pde.WE*kappa(bcs)*delta(bcs)
+        result = np.einsum('ij,ijk->ijk', result, phi1.grad_value(bcs))
+        return result.transpose(0,2,1)
+
+
+    A0 = NSSolver.ipcs_A_0(mu=eta, rho=rho, threshold=pde.is_outflow_boundary, Re=Re)
+    b0 = NSSolver.ipcs_b_0(un=u0, p0=p0, source=source, Re=Re, rho=rho, threshold=pde.is_outflow_boundary)
+    b0 = b0 - A0@uxx.flatten()     
+    A0 = uD0@A0@uD0 + uD1
+    b0[is_u_bdof] = uxx.flatten()[is_u_bdof]
+    us[:] = spsolve(A0, b0).reshape(2,-1)
+    
+    #ipcs_1
+    A1 = NSSolver.ipcs_A_1()
+    b1 = NSSolver.ipcs_b_1(us, p0, rho)
+    
+
 
 '''
 fname = 'test' + 'test_.vtu'
