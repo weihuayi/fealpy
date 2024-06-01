@@ -26,7 +26,11 @@ class OptimizeParameter:
         align_point[4, 0] =  rear.mark_board[12:]
         align_point[4, 1] = lrear.mark_board[:12]
         align_point[5, 0] = lrear.mark_board[12:]
+        align_point[5, 1] = lfront.mark_board[:12]
 
+        self.models = [[lfront, front], [front, rfront], [rfront, rrear], 
+                       [rrear, rear], [rear, lrear], [lrear, lfront]]
+        self.align_point = align_point
 
 
 
@@ -35,11 +39,33 @@ class OptimizeParameter:
         @brief The object function to be optimized.
         @param x The parameters to be optimized.
         """
+        ocam_systerm = self.ocam_systerm
+        models = self.models
+        align_point = self.align_point
 
+        ## 要对齐的点在屏幕上的坐标
+        align_point_screen = np.zeros([6, 2, 12, 2], dtype=np.float_)
+
+        f1, f2 = ocam_systerm.get_implict_surface_function()
+
+        ## 简化for loop
+        import itertools
+
+        for i, j in itertools.product(range(6), range(2)):
+            mod = models[i][j]
+            spoint = mod.image_to_camera_sphere(align_point[i, j])
+            inode = mod.sphere_project_to_implict_surface(spoint, f1)
+
+            outflag = inode[:, 2] <-z0
+            inode[outflag] = mod.sphere_project_to_implict_surface(spoint[outflag], f2)
+            align_point_screen[i, j] = inode
+        error = np.sum((align_point_screen[:, 0] - align_point_screen[:, 1])**2)
+        return error
 
 
     def optimize(self):
         """
         @brief Optimize the parameters of the camera model.
         """
+        pass
 
