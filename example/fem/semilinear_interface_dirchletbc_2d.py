@@ -13,8 +13,6 @@ from fealpy.functionspace import LagrangeFESpace
 #区域积分子
 from fealpy.fem import ScalarDiffusionIntegrator, NonlinearScalarMassIntegrator
 from fealpy.fem import ScalarSourceIntegrator
-
-#界面积分子
 from fealpy.fem import ScalarInterfaceIntegrator 
 
 #双线性形
@@ -92,18 +90,16 @@ class LineInterfaceData():
     def gradient(self, p):
 
         flag = self.subdomain(p)
-        #u0x = pi*cos(pi*x)*sin(pi*y)
-        #u1y = pi*sin(pi*x)*cos(pi*y)
-        #u0x = -pi*cos(pi*x)*sin(pi*y)
-        #u1y = -pi*sin(pi*x)*cos(pi*y)
         pi = np.pi
         grad = np.zeros(p.shape, dtype = np.float64)
-        x = p[..., flag[0], 0]
-        y = p[..., flag[0], 1]
-        grad[..., flag[0], 0] = pi*np.cos(pi*x)*np.sin(pi*y)
-        grad[..., flag[0], 1] = pi*np.sin(pi*x)*np.cos(pi*y)
-        grad[..., flag[1], 0] = -pi*np.cos(pi*x)*np.sin(pi*y)
-        grad[..., flag[1], 1] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        x = p[...,flag[0], 0]
+        y = p[...,flag[0], 1]
+        grad[flag[0], 0] = pi*np.cos(pi*x)*np.sin(pi*y)
+        grad[flag[0], 1] = pi*np.sin(pi*x)*np.cos(pi*y)
+        x = p[...,flag[1], 0]
+        y = p[...,flag[1], 1]
+        grad[flag[1], 0] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        grad[flag[1], 1] = -pi*np.sin(pi*x)*np.cos(pi*y)
         return grad
 
     #源项
