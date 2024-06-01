@@ -7,7 +7,7 @@ from ..mesh import HomoMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral, integral
-from .integrator import FaceSourceIntegrator, _S, Index, CoefLike
+from .integrator import FaceSourceIntegrator, enable_cache, CoefLike
 
 # TODO: Support the threshold, process the index
 class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
@@ -22,12 +22,13 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
         self.zero_integral = zero_integral
         self.batched = batched
 
+    @enable_cache
     def to_global_dof(self, space: _FS) -> Tensor:
         index = space.mesh.ds.boundary_face_index()
         return space.face_to_dof()[index]
 
-    def assembly(self, space: _FS) -> Tensor:
-        f = self.f
+    @enable_cache
+    def fetch(self, space: _FS):
         q = self.q
         mesh = getattr(space, 'mesh', None)
 
@@ -41,6 +42,13 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
         qf = mesh.integrator(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index, variable='x')
+
+        return bcs, ws, phi, fm, index
+
+    def assembly(self, space: _FS) -> Tensor:
+        f = self.f
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, fm, index = self.fetch(space)
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='face', index=index) # TODO: support normal derivative
 
         if self.zero_integral:

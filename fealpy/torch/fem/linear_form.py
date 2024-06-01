@@ -28,7 +28,7 @@ class LinearForm(Form[_FS]):
         space = self.space
         device = space.device
         gdof = space.number_of_global_dofs()
-        global_mat_shape = (gdof, gdof)
+        global_mat_shape = (gdof,)
         M = torch.sparse_coo_tensor(
             torch.empty((1, 0), dtype=space.itype, device=device),
             torch.empty((0,), dtype=space.ftype, device=device),
@@ -37,7 +37,7 @@ class LinearForm(Form[_FS]):
 
         for group in self.integrators.keys():
             group_tensor, e2dof = self._assembly_group(group, retain_ints)
-            indices = e2dof.ravel()
+            indices = e2dof.view(1, -1)
             M += torch.sparse_coo_tensor(indices, group_tensor.ravel(), size=global_mat_shape)
 
         return M

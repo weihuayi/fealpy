@@ -13,6 +13,7 @@ from torch import Tensor, tensordot, rand
 import numpy as np
 import yaml
 from tqdm import tqdm
+# from viztracer import VizTracer
 
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch import logger
@@ -66,6 +67,10 @@ def neumann(points: Tensor):
 def main(sigma_iterable: Sequence[int], seed=0, index=0):
     torch.manual_seed(seed)
     mesh = TriangleMesh.from_box((-1, 1, -1, 1), EXT, EXT, ftype=DTYPE, device=DEVICE)
+    generator = EITDataGenerator(mesh=mesh)
+    gn = generator.set_boundary(neumann, batched=True)
+    if index == 0: # Save gn only on the first task
+        np.save(os.path.join(output_folder, 'gn.npy'), gn.cpu().numpy())
 
     for sigma_idx in tqdm(sigma_iterable,
                           desc=f"task{index}",
@@ -77,16 +82,14 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
         rads = rand(NUM_CIR, **kwargs) * (b-0.1) + 0.1 # (NCir, )
         ls_fn = lambda p: levelset(p, ctrs, rads)
 
-        generator = EITDataGenerator(
-            mesh=mesh,
-            sigma_vals=SIGMA,
-            levelset=ls_fn
-        )
-        gd, gn = generator.run(neumann, batched=True)
-        data = torch.stack([gd, gn], dim=1) # (Batch, 2, bd_bof)
-        torch.save(
-            dict(data=data, label=generator.label()),
-            os.path.join(output_folder, f'{sigma_idx}.pt')
+        label = generator.set_levelset(SIGMA, ls_fn)
+        gd = generator.run()
+        np.savez(
+            os.path.join(output_folder, f'gd_{sigma_idx}.npz'),
+            gd=gd.numpy(),
+            label=label.cpu().numpy(),
+            ctrs=ctrs.cpu().numpy(),
+            rads=rads.cpu().numpy()
         )
 
 
@@ -143,10 +146,10 @@ if __name__ == "__main__":
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # from multiprocessing import Pool
+    from multiprocessing import Pool
     from fealpy.ml import timer
 
-    # pool = Pool(process_num)
+    pool = Pool(process_num)
     tmr = timer()
     tmr.send(None)
 
@@ -154,15 +157,19 @@ if __name__ == "__main__":
 
     PART = 4
     TM = int(time())
-    main(NUM, 999, 0)
+    # tracer = VizTracer()
+    # tracer.start()
+    # main(NUM, 999, 0)
+    # tracer.stop()
+    # tracer.save(f'{output_folder}/{TM}.json')
 
-    # pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
-    # pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
-    # pool.apply_async(main, (NUM[2::PART], 122 + TM, 2))
-    # pool.apply_async(main, (NUM[3::PART], 222 + TM, 3))
+    pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
+    pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
+    pool.apply_async(main, (NUM[2::PART], 122 + TM, 2))
+    pool.apply_async(main, (NUM[3::PART], 222 + TM, 3))
 
-    # pool.close()
-    # pool.join()
+    pool.close()
+    pool.join()
 
     tmr.send('stop')
 
