@@ -52,6 +52,12 @@ class Form(Generic[_FS]):
         return I
 
     def clear_memory(self, group: Optional[str]=None) -> None:
+        """Clear the cache of the form, including global output and group output.
+
+        Args:
+            group (Optional[str], optional): The name of integrator group to clear
+            the result from. Defaults to None. Clear all cache if `None`.
+        """
         if group is None:
             self.memory.clear()
         else:
@@ -64,9 +70,6 @@ class Form(Generic[_FS]):
         INTS = self.integrators[group]
         ct = INTS[0](self.space)
         etg = INTS[0].to_global_dof(self.space)
-
-        if not retain_ints:
-            INTS[0].clear()
 
         for int_ in INTS[1:]:
             new_ct = int_(self.space)
@@ -81,8 +84,6 @@ class Form(Generic[_FS]):
                 ct = ct + new_ct.unsqueeze(0)
             else:
                 ct = ct + new_ct
-            if not retain_ints:
-                int_.clear()
 
         if retain_ints:
             self.memory[group] = (ct, etg)

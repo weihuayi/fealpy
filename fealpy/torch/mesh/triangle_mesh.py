@@ -1,5 +1,5 @@
 
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 import numpy as np
 import torch
@@ -242,3 +242,53 @@ class TriangleMesh(HomoMesh):
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
+
+    @classmethod
+    def from_box(cls, box: List[int]=[0, 1, 0, 1], nx=10, ny=10, threshold=None, *,
+                 itype: Optional[_dtype]=torch.int,
+                 ftype: Optional[_dtype]=torch.float64,
+                 device: Union[_device, str, None]=None,
+                 require_grad: bool=False):
+        """@brief Generate a triangle mesh for a box domain .
+
+        @param box:
+        @param nx: Number of divisions along the x-axis (default: 10)
+        @param ny: Number of divisions along the y-axis (default: 10)
+        @param threshold: Optional function to filter cells based on their barycenter coordinates (default: None)
+
+        @returns: TriangleMesh instance
+        """
+        fkwargs = {'dtype': ftype, 'device': device}
+        ikwargs = {'dtype': itype, 'device': device}
+        NN = (nx + 1) * (ny + 1)
+        NC = nx * ny
+        X, Y = torch.meshgrid(
+            torch.linspace(box[0], box[1], nx + 1, **fkwargs),
+            torch.linspace(box[2], box[3], ny + 1, **fkwargs),
+            indexing='ij'
+        )
+        node = torch.stack([X.ravel(), Y.ravel()], dim=-1)
+
+        idx = torch.arange(NN, **ikwargs).reshape(nx + 1, ny + 1)
+        cell = torch.zeros((2 * NC, 3), **ikwargs)
+        cell[:NC, 0] = idx[1:, 0:-1].T.flatten()
+        cell[:NC, 1] = idx[1:, 1:].T.flatten()
+        cell[:NC, 2] = idx[0:-1, 0:-1].T.flatten()
+        cell[NC:, 0] = idx[0:-1, 1:].T.flatten()
+        cell[NC:, 1] = idx[0:-1, 0:-1].T.flatten()
+        cell[NC:, 2] = idx[1:, 1:].T.flatten()
+
+        if threshold is not None:
+            bc = torch.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = torch.zeros(NN, dtype=torch.bool)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = torch.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+            cell = idxMap[cell]
+
+        node.requires_grad_(require_grad)
+
+        return cls(node, cell)
