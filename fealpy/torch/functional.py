@@ -11,6 +11,20 @@ Number = Union[builtins.int, builtins.float]
 CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
 
 
+def integral(value: Tensor, weights: Tensor, measure: Tensor) -> Tensor:
+    """Numerical integration.
+
+    Args:
+        value (Tensor[..., Q, C]): The values on the quadrature points to be integrated.
+        weights (Tensor): The weights of the quadrature points.
+        measure (Tensor): The measure of the quadrature points.
+
+    Returns:
+        Tensor[...]: The result of the integration.
+    """
+    return einsum(f'q, c, ...qc -> ...', weights, measure, value)
+
+
 def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
                     coef: Union[Number, Tensor, None]=None,
                     batched: bool=False) -> Tensor:
@@ -42,7 +56,7 @@ def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
         subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
         return einsum(f'q, c, qci, {subs} -> {out_subs}', weights, measure, input, coef)
     else:
-        raise TypeError(f"coef should be int, float, Tensor or callable, but got {type(coef)}.")
+        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
 
 
 def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: Tensor,
@@ -77,4 +91,4 @@ def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: 
         subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
         return einsum(f'q, c, qci..., qcj..., {subs} -> {out_subs}', weights, measure, input1, input2, coef)
     else:
-        raise TypeError(f"coef should be int, float, Tensor or callable, but got {type(coef)}.")
+        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")

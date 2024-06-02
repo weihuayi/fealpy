@@ -1,5 +1,4 @@
 
-from math import comb
 from typing import (
     Union, Optional, Dict, Sequence, overload, Callable,
     Literal, TypeVar
@@ -140,10 +139,20 @@ class MeshDataStructure():
     def device(self) -> _device: return self.cell.device
 
     ### counters
-    number_of_nodes: _int_func = lambda self: self.NN
-    number_of_edges: _int_func = lambda self: len(entity_dim2tensor(self, 1))
-    number_of_faces: _int_func = lambda self: len(entity_dim2tensor(self, self.top_dimension() - 1))
-    number_of_cells: _int_func = lambda self: len(entity_dim2tensor(self, self.top_dimension()))
+    def count(self, etype: Union[int, str]) -> int:
+        """@brief Return the number of entities of the given type."""
+        if etype in ('node', 0):
+            return self.NN
+        if isinstance(etype, str):
+            edim = entity_str2dim(self, etype)
+        if -edim in self._entity_storage: # for polygon mesh
+            return self._entity_storage[-edim].size(0) - 1
+        return entity_dim2tensor(self, edim).size(0) # for homogeneous mesh
+
+    def number_of_nodes(self): return self.NN
+    def number_of_edges(self): return self.count('edge')
+    def number_of_faces(self): return self.count('face')
+    def number_of_cells(self): return self.count('cell')
 
     ### constructors
     def construct(self) -> None:
@@ -272,6 +281,7 @@ class Mesh():
     def multi_index_matrix(self, p: int, etype: int) -> Tensor:
         return F.multi_index_matrix(p, etype, dtype=self.ds.itype, device=self.device)
 
+    def count(self, etype: Union[int, str]) -> int: return self.ds.count(etype)
     def number_of_cells(self) -> int: return self.ds.number_of_cells()
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()

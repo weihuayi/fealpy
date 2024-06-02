@@ -20,7 +20,7 @@ from fealpy.ml import timer
 from matplotlib import pyplot as plt
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-NX, NY = 32, 32
+NX, NY = 64, 64
 
 
 def neumann(points: Tensor):
@@ -29,7 +29,7 @@ def neumann(points: Tensor):
     kwargs = {'dtype': points.dtype, "device": points.device}
     theta = torch.arctan2(y-0.5, x-0.5)
     freq = torch.arange(1, 11, **kwargs)
-    return cos(tensordot(freq, theta, dims=0))
+    return torch.sin(tensordot(freq, theta, dims=0))
 
 
 tmr = timer()
@@ -52,7 +52,7 @@ bform = BilinearForm(space)
 bform.add_integrator(ScalarDiffusionIntegrator())
 
 lform = LinearForm(space, batch_size=10)
-lform.add_integrator(ScalarBoundarySourceIntegrator(neumann, batched=True))
+lform.add_integrator(ScalarBoundarySourceIntegrator(neumann, zero_integral=True, batched=True))
 tmr.send('forms')
 
 A = bform.assembly()
