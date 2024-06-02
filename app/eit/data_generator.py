@@ -40,8 +40,9 @@ class EITDataGenerator():
         self._di = ScalarDiffusionIntegrator(None)
 
         # prepare for the unique condition in the neumann case
+        bd_dof = space.is_boundary_dof().nonzero().ravel()
         gdof = space.number_of_global_dofs()
-        zeros = torch.zeros((gdof, ), **kwargs)
+        zeros = torch.zeros_like(bd_dof, **kwargs)
         lform_c = LinearForm(space)
         lform_c.add_integrator(ScalarBoundarySourceIntegrator(1.))
         cdata = lform_c.assembly(return_dense=False)
@@ -150,4 +151,4 @@ class EITDataGenerator():
 
         # NOTE: interpolation points on nodes are arranged firstly,
         # therefore the value on the boundary nodes can be fetched like this:
-        return uh[..., self._bd_node_index]
+        return uh[..., self._bd_node_index.cpu()]
