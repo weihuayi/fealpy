@@ -56,11 +56,19 @@ class FluidBoundaryFrictionIntegrator:
         egphi = space[0].edge_grad_basis(ebcs, edge2cell[:,0], edge2cell[:,2])
         n = mesh.face_unit_normal(index=index)
         
-        pgx0 = np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,0],n[:,0],emeasure)
-        pgy1 = np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,1],n[:,1],emeasure)
-        pgx1 = np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,0],n[:,1],emeasure)
-        pgy0 = np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,1],n[:,0],emeasure)  
-        
+        if callable(mu):
+            pgx0 = np.einsum('ij,i,ijk,jim,j,j->jkm',mu(ebcs,index), ews,ephi,egphi[...,0],n[:,0],emeasure)
+            pgy1 = np.einsum('ij,i,ijk,jim,j,j->jkm',mu(ebcs,index), ews,ephi,egphi[...,1],n[:,1],emeasure)
+            pgx1 = np.einsum('ij,i,ijk,jim,j,j->jkm',mu(ebcs,index), ews,ephi,egphi[...,0],n[:,1],emeasure)
+            pgy0 = np.einsum('ij,i,ijk,jim,j,j->jkm',mu(ebcs,index), ews,ephi,egphi[...,1],n[:,0],emeasure)  
+           
+        else:
+            pgx0 = mu*np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,0],n[:,0],emeasure)
+            pgy1 = mu*np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,1],n[:,1],emeasure)
+            pgx1 = mu*np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,0],n[:,1],emeasure)
+            pgy0 = mu*np.einsum('i,ijk,jim,j,j->jkm',ews,ephi,egphi[...,1],n[:,0],emeasure)  
+           
+
         J1 = np.broadcast_to(face2dof[:,:,None],shape =pgx0.shape) 
         tag = edge2cell[:,0]
         I1 = np.broadcast_to(cell2dof[tag][:,None,:],shape = pgx0.shape)
@@ -78,7 +86,7 @@ class FluidBoundaryFrictionIntegrator:
             result[1::2,:] = result[row//2:,:] 
             r =  result
         if out is None:
-            return mu*r
+            return r
         else:
-            out += mu*r
+            out += r
 
