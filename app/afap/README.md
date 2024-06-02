@@ -1,3 +1,16 @@
 # AFAP: Advanced Fracture Analysis Platform
 
-我想开发一个材料断裂失效模拟的开源软件，我们会完全基于 Python 语言开发，计算后端可以切换 Numpy、JAX、PyTorch 、TensorFlow 等提供多维数组切换功能的计算平台，除了实现传统的算法、还想引入人工智能的技术，发展更高效模拟技术。请给我提供几个英文名字的建议，有全称，有缩写，并给出你的建议理由 。
+## Introduction
+
+Welcome to the Advanced Fracture Analysis Platform (AFAP), an open-source software package designed for the simulation of material fracture and failure. AFAP is entirely based on Python and offers a flexible computational backend that can switch between Numpy, JAX, PyTorch, and TensorFlow. This enables efficient multi-dimensional array processing and leverages both traditional algorithms and advanced AI techniques for high-performance simulations.
+
+## Features
+- **Multi-Backend Support**: Seamlessly switch between Numpy, JAX, PyTorch, and TensorFlow for computation.
+- **Traditional Algorithms**: Implement classical fracture mechanics algorithms.
+- **AI Techniques**: Incorporate artificial intelligence methods to enhance simulation efficiency.
+- **Open-Source**: Fully open-source, encouraging collaboration and contributions from the community.
+
+
+## Contact
+
+For any questions, feel free to reach out to us at [tiantian@smart.xtu.edu.cn] or open an issue on GitHub.

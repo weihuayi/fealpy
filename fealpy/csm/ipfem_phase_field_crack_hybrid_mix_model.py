@@ -322,17 +322,20 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         self.dspace = LagrangeFESpace(self.mesh, p=self.p0)
         self.ipspace = InteriorPenaltyBernsteinFESpace2d(self.mesh, p = self.p0)
 
+        space0 = LagrangeFESpace(mesh0, p=1, doforder='vdims')
+        dspace0 = LagrangeFESpace(mesh0, p=self.p0)
+
         NC = self.mesh.number_of_cells()
-        self.uh = self.space.function(dim=self.GD)
-        self.d = self.dspace.function()
+        self.uh = space0.function(dim=self.GD)
+        self.d = dspace0.function()
         self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
         
-        self.uh[:, 0] = self.space.interpolation_fe_function(uh0)
-        self.uh[:, 1] = self.space.interpolation_fe_function(uh1)
+        self.uh[:, 0] = space0.interpolation_fe_function(uh0)
+        self.uh[:, 1] = space0.interpolation_fe_function(uh1)
         
-        self.d[:] = self.dspace.interpolation_fe_function(d0)
+        self.d[:] = dspace0.interpolation_fe_function(d0)
         
-        self.mesh.interpolation_cell_data(mesho, datakey=['H'])
+        mesh0.interpolation_cell_data(mesho, datakey=['H'])
         print('interpolation cell data:', NC)      
         
     def energy_degradation_function(self, d):
