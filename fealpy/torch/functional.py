@@ -12,20 +12,20 @@ CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
 
 
 def integral(value: Tensor, weights: Tensor, measure: Tensor, *,
-             cell_type=False) -> Tensor:
+             entity_type=False) -> Tensor:
     """Numerical integration.
 
     Args:
         value (Tensor[..., Q, C]): The values on the quadrature points to be integrated.
         weights (Tensor[Q,]): The weights of the quadrature points.
         measure (Tensor[C,]): The measure of the quadrature points.
-        cell_type (bool): Whether to return integration in each cell. Defaults to False.
+        entity_type (bool): Whether to return integration in each entity. Defaults to False.
 
     Returns:
         Tensor[...]: The result of the integration. The shape will be [..., C]\
-        if cell_type is True, otherwise [...].
+        if entity_type is True, otherwise [...].
     """
-    subs = '...c' if cell_type else '...'
+    subs = '...c' if entity_type else '...'
     return einsum(f'q, c, ...qc -> {subs}', weights, measure, value)
 
 
