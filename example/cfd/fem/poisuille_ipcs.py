@@ -22,7 +22,7 @@ ns = 16
 udegree= 2
 pdegree = 1
 T = 10
-nt = 500
+nt = 1000
 pde = Poisuille()
 rho = pde.rho
 mu = pde.mu
@@ -60,7 +60,8 @@ for i in range(0, 10):
     b0 = solver.ipcs_b_0(u0, p0, source, threshold=pde.is_p_boundary)
     A0,b0 = ubc.apply(A0,b0)
     us[:]= spsolve(A0, b0).reshape((2,-1))
-    
+    print(np.sum(np.abs(us)))
+
     A1 = solver.ipcs_A_1() 
     b1 = solver.ipcs_b_1(us, p0)
     A1,b1 = pbc.apply(A1,b1)
@@ -77,8 +78,8 @@ for i in range(0, 10):
     errorMatrix[2,i] = np.abs(uso-u1).max()
     errorMatrix[3,i] = np.abs(pso-p1).max()
     timeline.advance()
-    print("max u:",errorMatrix[2,i])
-    print("error:",np.max(u1))
+    #print("max u:",errorMatrix[0,i])
+    print("max u:",np.max(u1))
 
 '''
 ipoint = mesh.interpolation_points(2)

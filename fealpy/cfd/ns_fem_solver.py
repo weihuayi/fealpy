@@ -16,11 +16,12 @@ from ..fem import VectorConvectionIntegrator, VectorEpsilonSourceIntegrator
 from ..fem import VectorBoundarySourceIntegrator, FluidBoundaryFrictionIntegrator
 
 class NSFEMSolver:
-    def __init__(self, mesh, dt, uspace, pspace, rho=1.0, mu=1.0, q=5):
+    def __init__(self, mesh, dt, uspace, pspace, Tspace=None, rho=1.0, mu=1.0, q=5):
         #self.model = model
         self.mesh = mesh
         self.uspace = uspace 
         self.pspace = pspace
+        self.Tspace = Tspace
         self.rho = rho
         self.mu = mu
         self.q = q
@@ -180,7 +181,7 @@ class NSFEMSolver:
         dt = self.dt
         if rho is None:
             rho = self.rho
-            M = self.M
+            M = rho*self.M
         else:
             bform = BilinearForm((self.uspace,)*2)
             bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
@@ -197,7 +198,7 @@ class NSFEMSolver:
         
         if threshold is not None:
             bform = BilinearForm((self.uspace,)*2)
-            bform.add_boundary_integrator(FluidBoundaryFrictionIntegrator(mu=self.mu, q=self.q, threshold=threshold))
+            bform.add_boundary_integrator(FluidBoundaryFrictionIntegrator(mu=mu, q=self.q, threshold=threshold))
             B = bform.assembly()
             self.bfS = B
             A -= (1/Re)*dt*0.5*B
@@ -267,7 +268,7 @@ class NSFEMSolver:
         def coef(bcs, index): 
             if callable(rho):
                 result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
-                result = np.einsum('ij,ij->ij',rho(bcs,index), result)
+                #result = np.einsum('ij,ij->ij',rho(bcs,index), result)
                 return -result
             else:
                 result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
@@ -285,7 +286,8 @@ class NSFEMSolver:
             A = self.M
         else:
             bform = BilinearForm((self.uspace,)*2)
-            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=q))
+            #bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            bform.add_domain_integrator(VectorMassIntegrator(q=self.q))
             A = bform.assembly()         
         return A
     
@@ -299,7 +301,8 @@ class NSFEMSolver:
         def coef(bcs, index): 
             if callable(rho):
                 result0 = p1.grad_value(bcs, index) - p0.grad_value(bcs, index)
-                result =  np.einsum('ij,ikj->ikj',rho(bcs,index), us(bcs,index))
+                #result =  np.einsum('ij,ikj->ikj',rho(bcs,index), us(bcs,index))
+                result =  us(bcs,index)
                 result -= dt * result0.transpose(0,2,1)
                 return result
             else:
@@ -311,8 +314,45 @@ class NSFEMSolver:
         L.add_domain_integrator(VectorSourceIntegrator(coef, self.q))
         b = L.assembly()
         return b
+    
+    def temperature_A(self, u, C, rho, lam, pe):
+            bform = BilinearForm(self.Tspace)
+            dt = self.dt
 
+            @barycentric
+            def coef(bcs, index): 
+                return pe*rho(bcs,index) * C(bcs,index)
+            
+            @barycentric
+            def coef1(bcs, index):
+                result = np.einsum('ikj,ij->ikj',u(bcs,index),coef(bcs,index))
+                return dt*result
+            
+            @barycentric
+            def coef2(bcs, index):
+                return dt*lam(bcs,index)
+            bform.add_domain_integrator(ScalarMassIntegrator(c=coef, q=self.q))
+            bform.add_domain_integrator(ScalarConvectionIntegrator(c=coef1, q=self.q))
+            bform.add_domain_integrator(ScalarDiffusionIntegrator(c=coef2, q=self.q))
+            A = bform.assembly()         
+                
+    def temperature_b(self, Tn, u, p, eta, br, pe, rho, c):
+            dt = self.dt
 
+            @barycentric
+            def coef(bcs, index): 
+                gradu = u.grad_value(bcs,index)
+                D = 0.5*(gradu + gradu.transpose(0,2,1,3))
+                D = np.einsum('ij, imnj->imnj',eta(bcs,index), D)
+                D[:,0,0,:] -= p(bcs,index)
+                D[:,1,1,:] -= p(bcs,index)
+                result = br*np.einsum('imnj,imnj->ij',D, gradu)
+                result = pe*c(bcs,index)*rho(bcs,index)*Tn(bcs,index) + dt*result
+                return result
+            L = LinearForm(self.Tspace)
+            L.add_domain_integrator(ScalarSourceIntegrator(coef, self.q))
+            b = L.assembly()
+            return b
 
 
     #u \cdot u   \approx   u^n \cdot u^{n+1}
