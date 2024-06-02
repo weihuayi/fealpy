@@ -11,18 +11,22 @@ Number = Union[builtins.int, builtins.float]
 CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
 
 
-def integral(value: Tensor, weights: Tensor, measure: Tensor) -> Tensor:
+def integral(value: Tensor, weights: Tensor, measure: Tensor, *,
+             cell_type=False) -> Tensor:
     """Numerical integration.
 
     Args:
         value (Tensor[..., Q, C]): The values on the quadrature points to be integrated.
-        weights (Tensor): The weights of the quadrature points.
-        measure (Tensor): The measure of the quadrature points.
+        weights (Tensor[Q,]): The weights of the quadrature points.
+        measure (Tensor[C,]): The measure of the quadrature points.
+        cell_type (bool): Whether to return integration in each cell. Defaults to False.
 
     Returns:
-        Tensor[...]: The result of the integration.
+        Tensor[...]: The result of the integration. The shape will be [..., C]\
+        if cell_type is True, otherwise [...].
     """
-    return einsum(f'q, c, ...qc -> ...', weights, measure, value)
+    subs = '...c' if cell_type else '...'
+    return einsum(f'q, c, ...qc -> {subs}', weights, measure, value)
 
 
 def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,

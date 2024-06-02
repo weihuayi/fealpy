@@ -24,17 +24,24 @@ class EITDataGenerator():
         Args:
             mesh (Mesh): _description_
         """
+        # setup function space
         kwargs = dict(dtype=mesh.ftype, device=mesh.device)
-        space = LagrangeFESpace(mesh, p=1)
-        ips = space.interpolation_points() # (Q, C, 2)
-
+        space = LagrangeFESpace(mesh, p=1) # Linear FE space
         self.space = space
-        self.ips = ips
+
+        # fetch boundary nodes to output gd and gn
+        bd_node_index = mesh.ds.boundary_node_index()
+        bd_node = mesh.entity('node', index=bd_node_index) # (Q, C, 2)
+        self.bd_node = bd_node
+        self._bd_node_index = bd_node_index
+
+        # fetch integrators
         self._bsi = ScalarBoundarySourceIntegrator(None, zero_integral=True, batched=True)
         self._di = ScalarDiffusionIntegrator(None)
-        self._bd_dof = torch.nonzero(space.is_boundary_dof(), as_tuple=True)[0]
+
+        # prepare for the unique condition in the neumann case
         gdof = space.number_of_global_dofs()
-        zeros = torch.zeros_like(self._bd_dof, **kwargs)
+        zeros = torch.zeros((gdof, ), **kwargs)
         lform_c = LinearForm(space)
         lform_c.add_integrator(ScalarBoundarySourceIntegrator(1.))
         cdata = lform_c.assembly(return_dense=False)
@@ -56,7 +63,7 @@ class EITDataGenerator():
 
     def set_levelset(self, sigma_vals: Tuple[float, float],
                      levelset: Callable[[Tensor], Tensor]) -> Tensor:
-        """Set the levelset function.
+        """Set inclusion distribution.
 
         Args:
             sigma_vals (Tuple[float, float]): Sigma value of inclusion and background.
@@ -76,7 +83,7 @@ class EITDataGenerator():
 
         bform = BilinearForm(space)
         self._di.coef = _coef_func
-        self._di.clear(space_level=False)
+        self._di.clear(result_only=True)
         bform.add_integrator(self._di)
         self._A = bform.assembly()
         A_n = cat([cat([self._A, self.c], dim=1),
@@ -91,21 +98,24 @@ class EITDataGenerator():
 
     def set_boundary(self, gn_source: Union[Callable[[Tensor], Tensor], Tensor],
                      batched=True) -> Tensor:
-        """_summary_
+        """Set boundary current density.
 
         Args:
             gn_source (Union[Callable[[Tensor], Tensor], Tensor]): _description_
             batched (bool, optional): _description_. Defaults to True.
 
         Returns:
-            Tensor: gn Tensor.
+            Tensor: current density on boundary nodes.
         """
-        gn = gn_source(self.ips[self._bd_dof])
+        # NOTE: current density values on boundary nodes are needed instead of
+        # boundary faces, because we measure the current by the electric node
+        # in the real world.
+        gn = gn_source(self.bd_node)
         batch_size = gn.size(0) if batched else 0
         lform = LinearForm(self.space, batch_size=batch_size)
         self._bsi.f = gn_source
         self._bsi.batched = batched
-        self._bsi.clear(space_level=False)
+        self._bsi.clear(result_only=True)
         lform.add_integrator(self._bsi)
         b_ = lform.assembly()
         self.unsqueezed = False
@@ -121,10 +131,13 @@ class EITDataGenerator():
         return gn
 
     def run(self, return_full=False) -> Tensor:
-        """_summary_
+        """Generate voltage on boundary nodes.
+
+        Args:
+            return_full (bool, optional): Whether return full uh. Defaults to False.
 
         Returns:
-            Tensor: gd Tensor on CPU.
+            Tensor: gd Tensor on **CPU**.
         """
         uh = spsolve(self._A_n_np, self.b_.T).T
         uh = torch.from_numpy(uh) # cpu
@@ -134,4 +147,7 @@ class EITDataGenerator():
 
         if return_full:
             return uh
-        return uh[..., self._bd_dof.cpu()]
+
+        # NOTE: interpolation points on nodes are arranged firstly,
+        # therefore the value on the boundary nodes can be fetched like this:
+        return uh[..., self._bd_node_index]
