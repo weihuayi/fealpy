@@ -8,13 +8,16 @@ from torch.sparse import mm
 
 from ..functionspace.space import FunctionSpace
 
+CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
+
 
 class DirichletBC():
     """Dirichlet boundary condition."""
-    def __init__(self, space: FunctionSpace, gD: Union[Callable[..., Tensor], Tensor],
+    def __init__(self, space: FunctionSpace,
+                 gd: Optional[CoefLike]=None,
                  *, threshold: Optional[Callable]=None, left: bool=True):
         self.space = space
-        self.gD = gD
+        self.gd = gd
         self.threshold = threshold
         self.left = left
         self.bctype = 'Dirichlet'
@@ -79,19 +82,25 @@ class DirichletBC():
                 raise ValueError('The vector size must match the gdof of the space.')
         return vector
 
-    def apply(self, A: Tensor, f: Tensor, uh: Tensor, *, check=True) -> Tuple[Tensor, Tensor]:
+    def apply(self, A: Tensor, f: Tensor, uh: Optional[Tensor]=None,
+              gd: Optional[CoefLike]=None, *,
+              check=True) -> Tuple[Tensor, Tensor]:
         """Apply Dirichlet boundary conditions.
 
         Args:
             A (Tensor): _description_
             f (Tensor): _description_
-            uh (Tensor): _description_
+            uh (Tensor, optional): The solution uh Tensor. Boundary interpolation\
+                will be done on `uh` if given, which is an **in-place** operation.\
+                Defaults to None.
+            gd (CoefLike, optional): The Dirichlet boundary condition.\
+                Use the default gd passed in the __init__ if `None`. Default to None.
             check (bool, optional): _description_. Defaults to True.
 
         Returns:
-            Tuple[Tensor, Tensor]: _description_
+            Tuple[Tensor, Tensor]: New adjusted `A` and `f`.
         """
-        f = self.apply_vector(f, A, uh, check=check)
+        f = self.apply_vector(f, A, uh, gd, check=check)
         A = self.apply_matrix(A, check=check)
         return A, f
 
@@ -129,26 +138,35 @@ class DirichletBC():
         return A
 
     def apply_vector(self, vector: Tensor, matrix: Tensor, uh: Optional[Tensor],
-                     *, check=True) -> Tensor:
+                     gd: Optional[CoefLike]=None, *, check=True) -> Tensor:
         """Appy Dirichlet boundary contition to right-hand-size vector only.
 
         Args:
             vector (Tensor): The original right-hand-size vector.
             matrix (Tensor): The original COO sparse matrix.
-            uh (Optional[Tensor]): The solution uh Tensor. Defuault to None.
+            uh (Optional[Tensor]): The solution uh Tensor. Defuault to None.\
+                See `DirichletBC.apply()` for more details.
+            gd (Optional[CoefLike]): The Dirichlet boundary condition.\
+                Use the default gd passed in the __init__ if `None`. Default to None.
             check (bool, optional): Whether to check the vector. Defaults to True.
+
+        Raises:
+            RuntimeError: If gd is `None` and no default gd exists.
 
         Returns:
             Tensor: New adjusted right-hand-size vector.
         """
         A = matrix
         f = self.check_vector(vector) if check else vector
+        gd = self.gd if gd is None else gd
+        if gd is None:
+            raise RuntimeError("The boundary condition is None.")
         bd_idx = self.boundary_dof_index
         DIM = -1 if self.left else 0
 
         if uh is None:
             uh = torch.zeros_like(f)
-        self.space.interpolate(self.gD, uh, dim=DIM, index=bd_idx) # isDDof.shape == uh.shape
+        self.space.interpolate(gd, uh, dim=DIM, index=bd_idx) # isDDof.shape == uh.shape
 
         if uh.ndim == 1:
             f = f - mm(A, uh.unsqueeze(-1)).squeeze(-1)

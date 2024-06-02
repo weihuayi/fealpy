@@ -62,15 +62,13 @@ tmr.send('forms')
 
 A = bform.assembly()
 F = lform.assembly()
-
-uh = torch.zeros((10, space.number_of_global_dofs()), dtype=torch.float64, device=device)
 tmr.send('assembly')
 
-A, F = DirichletBC(space, solution).apply(A, F, uh)
+A, F = DirichletBC(space).apply(A, F, gd=solution)
 tmr.send('dirichlet')
 
 A = A.to_sparse_csr()
-uh = sparse_cg(A, F, uh, maxiter=5000, batch_first=True)
+uh = sparse_cg(A, F, maxiter=5000, batch_first=True)
 uh = uh.detach()
 value = space.value(uh, torch.tensor([[1/3, 1/3, 1/3]], device=device, dtype=torch.float64)).squeeze(0)
 value = value.cpu().numpy()
