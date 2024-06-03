@@ -33,6 +33,11 @@ class OCAMModel:
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        fname = os.path.expanduser("~/data/DIM_K_D_{}_{}.pkl".format(self.icenter, self.radius))
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.DIM, self.K, self.D = pickle.load(f)
+
         self.icenter, self.radius = self.get_center_and_radius(self.fname)
         cps_all = []
         for cps in self.camera_points:
@@ -54,6 +59,11 @@ class OCAMModel:
             with open(fname, 'wb') as f:
                 pickle.dump(self.imagemesh, f)
 
+    def set_location(self, location):
+        self.location = location
+
+    def set_axes(self, axes):
+        self.axes = axes
 
     def __call__(self, u):
         icenter = self.icenter
@@ -483,6 +493,8 @@ class OCAMModel:
         fy = self.K[1, 1]
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
+        print(u0, v0)
+        print(np.max(uv, axis=0))
         node = np.zeros((NN,3),dtype=np.float64)
         node[:,0] = uv[:,0]-u0
         node[:,1] = uv[:,1]-v0

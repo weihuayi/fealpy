@@ -65,6 +65,24 @@ class OCAMSystem:
                 viewpoint = self.viewpoint
             ))
 
+    def set_parameters(self, data):
+        """
+        @brief 设置参数
+        """
+        loc = data[:6]
+        cz  = data[6:12]
+        cx  = data[12:18]
+        cy  = np.cross(cz, cx)
+
+        for i in range(6):
+            axes = np.zeros((3, 3), dtype=np.float64)
+            axes[0, :] = cx[i]
+            axes[1, :] = cy[i]
+            axes[2, :] = cz[i]
+
+            self.cams[i].set_location(loc[i])
+            self.cams[i].set_axes(axes)
+
     def get_implict_surface_function(self):
         """
         @brief 获取隐式表面函数
