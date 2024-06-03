@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+from ...quadrature import GaussLegendreQuadrature, TensorProductQuadrature
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 from .core import multi_index_matrix

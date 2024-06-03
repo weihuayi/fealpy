@@ -8,14 +8,15 @@ class KernelFunctionBase():
     def __init__(self, h: float):
         self.h_derivative = 1.0/h
 
+    def __call__(self, r):
+        return self.value(r)
+
     @abstractmethod
     def value(self, r):
         pass
 
     def grad_value(self, r):
         return grad(self.value)(r)
-
-
 
 class QuinticKernel(KernelFunctionBase): 
 
@@ -103,4 +104,4 @@ class WendlandC2Kernel(KernelFunctionBase):
             q = r * self.h_derivative
             q0 = jnp.maximum(0.0,1.0-0.5*q)
             q1 = 2.0 * q + 1.0
-            return self.alpha * (q1**4 * q2)
+            return self.alpha * (q0**4 * q1)
