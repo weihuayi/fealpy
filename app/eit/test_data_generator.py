@@ -1,8 +1,11 @@
-"""An example generating a single data for EIT."""
+"""An example generating a single data for EIT.
+
+This can only test if the generator can solve the PDE, but can not test if
+the gd and gn saved are correct.
+"""
 
 import torch
 from torch import Tensor, tensordot, rand
-import numpy as np
 from matplotlib import pyplot as plt
 
 from fealpy.torch.mesh import TriangleMesh
