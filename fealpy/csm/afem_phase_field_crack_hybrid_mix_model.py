@@ -64,6 +64,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
         tmr = self.tmr
+        next(tmr)
         GD = self.GD
         D0 = self.D0
         k = 0
@@ -82,7 +83,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             du = np.zeros_like(uh)
             
-            next(tmr)
+            tmr.send('init')
 
             # 求解位移
             vspace = (GD*(space, ))
