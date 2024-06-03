@@ -30,6 +30,8 @@ class OCAMModel:
     mark_board: np.ndarray
     camera_points: list
     viewpoint : tuple
+    data_path: str
+    name: str
 
     def __post_init__(self):
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
@@ -49,7 +51,7 @@ class OCAMModel:
         self.camera_points = cps_all
 
         # 判断是否存在网格文件
-        fname = os.path.expanduser("~/data/ocam_mesh_{}_{}.pkl".format(self.icenter, self.radius))
+        fname = os.path.expanduser(self.data_path+"ocam_mesh_{}.pkl".format(self.name))
         if os.path.exists(fname):
             with open(fname, 'rb') as f:
                 self.imagemesh = pickle.load(f)

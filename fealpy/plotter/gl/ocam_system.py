@@ -15,10 +15,11 @@ class OCAMSystem:
         self.center_height = data['center_height'] # 椭球面的中心高度
         self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
         self.viewpoint = data['viewpoint'] # 视点
+        self.data_path = data['data_path']
         
         self.cams = []
 
-        fname = os.path.expanduser("~/data/groundmesh.pkl")
+        fname = os.path.expanduser(self.data_path+"groundmesh.pkl")
         if os.path.exists(fname):
             with open(fname, 'rb') as f:
                 self.groundmesh = pickle.load(f)
@@ -29,7 +30,7 @@ class OCAMSystem:
                 pickle.dump(self.groundmesh, f)
 
         # 判断是否存在 cps.pkl 文件
-        fname = os.path.expanduser("~/data/cps.pkl")
+        fname = os.path.expanduser(self.data_path+"cps.pkl")
         if os.path.exists(fname):
             with open(fname, 'rb') as f:
                 cps = pickle.load(f)
@@ -62,7 +63,9 @@ class OCAMSystem:
                 radius=data['radius'][i],
                 mark_board=data['mark_board'][i],
                 camera_points = cps[i],
-                viewpoint = self.viewpoint
+                viewpoint = self.viewpoint,
+                data_path = data['data_path'],
+                name = "cam{}".format(i),
             ))
 
     def set_parameters(self, data):
@@ -789,7 +792,7 @@ class OCAMSystem:
 
 
     @classmethod
-    def from_data(cls):
+    def from_data(cls, data_path: str='~'):
         """
         @brief 测试数据
 
@@ -867,21 +870,21 @@ class OCAMSystem:
 
         # 默认文件目录位置
         fname = [
-            os.path.expanduser('~/data/src_1.jpg'),
-            os.path.expanduser('~/data/src_2.jpg'),
-            os.path.expanduser('~/data/src_3.jpg'),
-            os.path.expanduser('~/data/src_4.jpg'),
-            os.path.expanduser('~/data/src_5.jpg'),
-            os.path.expanduser('~/data/src_6.jpg'),
+            os.path.expanduser(data_path+'src_1.jpg'),
+            os.path.expanduser(data_path+'src_2.jpg'),
+            os.path.expanduser(data_path+'src_3.jpg'),
+            os.path.expanduser(data_path+'src_4.jpg'),
+            os.path.expanduser(data_path+'src_5.jpg'),
+            os.path.expanduser(data_path+'src_6.jpg'),
             ]
 
         fname = [
-            os.path.expanduser('~/data/camera_inputs/src_1.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_2.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_3.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_4.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_5.jpg'),
-            os.path.expanduser('~/data/camera_inputs/src_6.jpg'),
+            os.path.expanduser(data_path+'camera_inputs/src_1.jpg'),
+            os.path.expanduser(data_path+'camera_inputs/src_2.jpg'),
+            os.path.expanduser(data_path+'camera_inputs/src_3.jpg'),
+            os.path.expanduser(data_path+'camera_inputs/src_4.jpg'),
+            os.path.expanduser(data_path+'camera_inputs/src_5.jpg'),
+            os.path.expanduser(data_path+'camera_inputs/src_6.jpg'),
             ]
 
         flip = [
@@ -889,12 +892,12 @@ class OCAMSystem:
         ]
 
         chessboardpath = [
-            os.path.expanduser('~/data/camera_models/chessboard_1'),
-            os.path.expanduser('~/data/camera_models/chessboard_2'),
-            os.path.expanduser('~/data/camera_models/chessboard_3'),
-            os.path.expanduser('~/data/camera_models/chessboard_4'),
-            os.path.expanduser('~/data/camera_models/chessboard_5'),
-            os.path.expanduser('~/data/camera_models/chessboard_6'),
+            os.path.expanduser(data_path+'camera_models/chessboard_1'),
+            os.path.expanduser(data_path+'camera_models/chessboard_2'),
+            os.path.expanduser(data_path+'camera_models/chessboard_3'),
+            os.path.expanduser(data_path+'camera_models/chessboard_4'),
+            os.path.expanduser(data_path+'camera_models/chessboard_5'),
+            os.path.expanduser(data_path+'camera_models/chessboard_6'),
             ]
 
         icenter = np.array([
@@ -971,6 +974,7 @@ class OCAMSystem:
             'size' : (17.5, 3.47, 3), # 小车长宽高
             'scale_ratio' : (1.618, 3.618, 1.618), # 三个主轴的伸缩比例
             'viewpoint' : (0, 0, 0), # 视点
+            'data_path': data_path,
         }
 
         return cls(data)

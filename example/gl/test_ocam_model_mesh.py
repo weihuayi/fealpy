@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import TriangleMesh
 from fealpy.plotter.gl import OpenGLPlotter, OCAMSystem 
 
-csys = OCAMSystem.from_data()
+csys = OCAMSystem.from_data('D:/data/')
 #plotter = OpenGLPlotter()
 #csys.show_split_lines()
 
