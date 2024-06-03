@@ -60,7 +60,6 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         self.recovery = LinearRecoveryAlg()
         
         self.tmr = timer()
-
     def newton_raphson(self, 
             disp, 
             dirichlet_phase=False, 
@@ -73,6 +72,7 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
         tmr = self.tmr
+        next(tmr)
         model = self.model
         GD = self.GD
         D0 = self.D0
@@ -88,8 +88,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             d = self.d
             H = self.H
 
-            next(tmr)
-            
+            tmr.send('init')
+
             node = mesh.entity('node')
             isDDof = model.is_disp_boundary(node)
             uh[isDDof] = disp
