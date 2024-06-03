@@ -218,8 +218,47 @@ class MeshDataStructure():
             return face2cell[index]
 
     ### boundary
-    def boundary_face_flag(self): return self.face2cell[:, 0] == self.face2cell[:, 1]
-    def boundary_face_index(self): return torch.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+    def boundary_node_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary nodes.
+
+        Returns:
+            Tensor: boundary node flag.
+        """
+        NN = self.number_of_nodes()
+        bd_face_flag = self.boundary_face_flag()
+        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        bd_face2node = self.entity('face', index=bd_face_flag)
+        bd_node_flag = torch.zeros((NN,), **kwargs)
+        bd_node_flag[bd_face2node.ravel()] = True
+        return bd_node_flag
+
+    def boundary_face_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary faces.
+
+        Returns:
+            Tensor: boundary face flag.
+        """
+        return self.face2cell[:, 0] == self.face2cell[:, 1]
+
+    def boundary_cell_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary cells.
+
+        Returns:
+            Tensor: boundary cell flag.
+        """
+        NC = self.number_of_cells()
+        bd_face_flag = self.boundary_face_flag()
+        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        bd_face2cell = self.face2cell[bd_face_flag, 0]
+        bd_cell_flag = torch.zeros((NC,), **kwargs)
+        bd_cell_flag[bd_face2cell.ravel()] = True
+        return bd_cell_flag
+
+    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    # TODO: finish this:
+    # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
+    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
+    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
 
 
 class HomoMeshDataStructure(MeshDataStructure):
