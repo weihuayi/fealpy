@@ -210,9 +210,7 @@ class HomoMeshDataStructure(MeshDataStructure):
 ##################################################
 
 class Mesh():
-    """
-    @brief The base class for mesh.
-    """
+    """The base class for mesh."""
     ds: MeshDataStructure
     node: Array
 
@@ -285,9 +283,8 @@ class Mesh():
         raise NotImplementedError
 
     def edge_unit_tangent(self, index=jnp.s_[:], node: Optional[NDArray]=None):
-        """
-        @brief Calculate the tangent vector with unit length of each edge.\
-               See `Mesh.edge_tangent`.
+        """Calculate the tangent vector with unit length of each edge.\
+        See `Mesh.edge_tangent`.
         """
         node = self.entity('node') if node is None else node
         edge = self.entity('edge', index=index)
@@ -321,10 +318,11 @@ class HomoMesh(Mesh):
         on mesh entities.
 
         Args:
-        bc (Array): Barycenter coordinate points array, with shape (NQ, NVC), where\
-                   NVC is the number of nodes in each entity.
-        etype (str | int): Specify the type of entities on which the coordinates be converted.
-        index (Array | int | slice): Index to slice entities.
+            bc (Array): Barycenter coordinate points array, with shape (NQ, NVC), where\
+                NVC is the number of nodes in each entity.
+            etype (str | int): Specify the type of entities on which the coordinates\
+                be converted.
+            index (Array | int | slice): Index to slice entities.
 
         Note:
             To get the correct result, the order of bc must match the order of nodes\
