@@ -38,7 +38,8 @@ def sparse_cg(A: Tensor, b: Tensor, x0: Optional[Tensor]=None, *,
     """
     assert isinstance(A, Tensor), "A must be a torch.Tensor"
     assert isinstance(b, Tensor), "b must be a torch.Tensor"
-    assert isinstance(x0, Tensor), "x0 must be a torch.Tensor"
+    if x0 is not None:
+        assert isinstance(x0, Tensor), "x0 must be a torch.Tensor if not None"
     unsqueezed = False
 
     if not (A.is_sparse_csr or A.is_sparse):
@@ -82,8 +83,10 @@ class SparseCG(Function):
     @staticmethod
     def forward(A, b, x0, atol, rtol, maxiter):
         # initialize
-        x = x0                 # (dof, batch)
-        r = b - mm(A, x0)      # (dof, batch)
+        A = A.detach()
+        b = b.detach()
+        x = x0.detach()        # (dof, batch)
+        r = b - mm(A, x)       # (dof, batch)
         p = r                  # (dof, batch)
         n_iter = 0
         b_norm = b.norm()
@@ -152,5 +155,6 @@ class SparseCG(Function):
         if ctx.needs_input_grad[1]:
             weights = grad_output.mean(dim=-1, keepdim=True)
             grad_b = mm(inv_A, weights)
+            grad_b = torch.broadcast_to(grad_b, x.shape)
 
         return grad_A, grad_b, None, None, None, None

@@ -1806,7 +1806,10 @@ class TriangleMesh(Mesh, Plotable):
 
             axes.plot_trisurf(ps[:, 0], ps[:, 1], phi[:, i], cmap='viridis',
                               linewidths=0)
-            axes.set_title(f'$\phi_{{{i}}}$')
+            if p == 1:
+                axes.set_title(f'$\phi_{{{i}}}=\lambda_{{{i}}}$')
+            else:
+                axes.set_title(f'$\phi_{{{i}}}$')
             axes.set_xlabel('X')
             axes.set_ylabel('Y')
             axes.set_zlabel('Z')
