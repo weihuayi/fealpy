@@ -48,17 +48,17 @@ class Integrator(metaclass=ABCMeta):
         and the global dofs."""
         raise NotImplementedError
 
-    def clear(self, space_level=True) -> None:
+    def clear(self, result_only=True) -> None:
         """Clear the cache of the integrators.
 
         Args:
-            space_level (bool, optional): Whether to clear cache for space,
-            such as basis, entity measure and bc points. Defaults to False.
-            If `False`, only clear the cache of the integral result.
+            result_only (bool, optional): Whether to only clear the cached result.
+            Other cache may be basis, entity measures, bc points... Defaults to True.
+            If `False`, anything cached will be cleared.
         """
         self._value = None
 
-        if space_level:
+        if not result_only:
             if hasattr(self, '_cache'):
                 self._cache.clear()
 

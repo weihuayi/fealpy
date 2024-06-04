@@ -1,42 +1,229 @@
 
 import numpy as np
 
-from typing import Any, Callable, Optional, List, Union
+from typing import (
+    Literal, Callable, Optional, Union, TypeVar,
+    overload, Dict, Any
+)
 from numpy.typing import NDArray
 
 import jax
 import jax.numpy as jnp
 
-from .mesh_kernel import edge_to_ipoint
+from . import functional as F
+from . import mesh_kernel as K
+from .quadrature import Quadrature
 
-class MeshBase():
-    """
-    @brief The base class for mesh.
+Array = jax.Array
+Index = Union[Array, int, slice]
+EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
+_int_func = Callable[..., int]
+_dtype = jnp.dtype
+_device = jax.Device
 
-    """
-    def geo_dimension(self) -> int:
+_S = slice(None, None, None)
+_T = TypeVar('_T')
+_default = object()
+
+
+##################################################
+### Utils
+##################################################
+
+def entity_str2dim(ds, etype: str) -> int:
+    if etype == 'cell':
+        return ds.top_dimension()
+    elif etype == 'cell_location':
+        return -ds.top_dimension()
+    elif etype == 'face':
+        TD = ds.top_dimension()
+        if TD <= 1:
+            raise ValueError('the mesh has no face entity.')
+        return TD - 1
+    elif etype == 'face_location':
+        TD = ds.top_dimension()
+        if TD <= 1:
+            raise ValueError('the mesh has no face location.')
+        return -TD + 1
+    elif etype == 'edge':
+        return 1
+    elif etype == 'node':
+        return 0
+    else:
+        raise KeyError(f'{etype} is not a valid entity attribute.')
+
+
+def entity_dim2array(ds, etype_dim: int, index=None, *, default=_default):
+    r"""Get entity tensor by its top dimension."""
+    if etype_dim in ds._entity_storage:
+        et = ds._entity_storage[etype_dim]
+        if index is None:
+            return et
+        else:
+            if et.ndim == 1:
+                raise RuntimeError("index is not supported for flattened entity.")
+            return et[index]
+    else:
+        if default is not _default:
+            return default
+        raise ValueError(f'{etype_dim} is not a valid entity attribute index '
+                         f"in {ds.__class__.__name__}.")
+
+
+##################################################
+### Mesh Data Structure Base
+##################################################
+
+class MeshDataStructure():
+    _STORAGE_ATTR = ['cell', 'face', 'edge', 'cell_location','face_location']
+    def __init__(self, NN: int, TD: int) -> None:
+        self._entity_storage: Dict[int, Array] = {}
+        self.NN = NN
+        self.TD = TD
+
+    @overload
+    def __getattr__(self, name: EntityName) -> Array: ...
+    def __getattr__(self, name: str):
+        if name not in self._STORAGE_ATTR:
+            return self.__dict__[name]
+        etype_dim = entity_str2dim(self, name)
+        return entity_dim2array(self, etype_dim)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in self._STORAGE_ATTR:
+            if not hasattr(self, '_entity_storage'):
+                raise RuntimeError('please call super().__init__() before setting attributes.')
+            etype_dim = entity_str2dim(self, name)
+            self._entity_storage[etype_dim] = value
+        else:
+            super().__setattr__(name, value)
+
+    ### cuda
+    def to(self, device: Optional[_device]=None):
+        for entity_tensor in self._entity_storage.values():
+            jax.device_put(entity_tensor, device)
+        return self
+
+    ### properties
+    def top_dimension(self) -> int: return self.TD
+    @property
+    def itype(self) -> _dtype: return self.cell.dtype
+
+    ### counters
+    def count(self, etype: Union[int, str]) -> int:
+        """_summary_
+
+        Args:
+            etype (Union[int, str]): _description_
+
+        Returns:
+            int: _description_
         """
-        @brief Get geometry dimension of the mesh.
+        if etype in ('node', 0):
+            return self.NN
+        if isinstance(etype, str):
+            edim = entity_str2dim(self, etype)
+        if -edim in self._entity_storage: # for polygon mesh
+            return self._entity_storage[-edim].shape[0] - 1
+        return entity_dim2array(self, edim).shape[0] # for homogeneous mesh
+
+    def number_of_nodes(self): return self.NN
+    def number_of_edges(self): return self.count('edge')
+    def number_of_faces(self): return self.count('face')
+    def number_of_cells(self): return self.count('cell')
+
+    ### constructors
+    def construct(self) -> None:
+        raise NotImplementedError
+
+    @overload
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Array: ...
+    @overload
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default: _T) -> Union[Array, _T]: ...
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default=_default):
+        """Get entities in mesh structure.
+
+        Args:
+            etype (int or str): The topology dimension of the entity, or name\
+            'cell' | 'face' | 'edge'. Note that 'node' is not in mesh structure.\
+            For polygon meshes, the names 'cell_location' | 'face_location' may also be\
+            available, and the `index` argument is applied on the flattened entity array.
+            index (int, slice or Array): The index of the entity.
+
+        Returns:
+            Array or Sequence[Array].
         """
-        return self.node.shape[-1]
+        if isinstance(etype, str):
+            etype = entity_str2dim(self, etype)
+        return entity_dim2array(self, etype, index, default=default)
 
-    def top_dimension(self) -> int:
-        """
-        @brief Get topology dimension of the mesh.
-        """
-        return self.ds.TD
+    def total_face(self) -> Array:
+        raise NotImplementedError
 
-    def number_of_nodes(self) -> int:
-        return len(self.node)
+    def total_edge(self) -> Array:
+        raise NotImplementedError
 
-    def number_of_faces(self) -> int:
-        return len(self.ds.face)
+    ### topology
+    # TODO: add more methods here
 
-    def number_of_edges(self) -> int:
-        return len(self.ds.edge)
+    ### boundary
+    def boundary_face_flag(self): return self.face2cell[:, 0] == self.face2cell[:, 1]
+    def boundary_face_index(self): return jnp.nonzero(self.boundary_face_flag())[0]
 
-    def number_of_cells(self) -> int:
-        return len(self.ds.cell)
+
+class HomoMeshDataStructure(MeshDataStructure):
+    ccw: Array
+    localEdge: Array
+    localFace: Array
+
+    def __init__(self, NN: int, TD: int, cell: Array) -> None:
+        super().__init__(NN, TD)
+        self.cell = cell
+
+    number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
+    number_of_nodes_of_cells = number_of_vertices_of_cells
+    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
+    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
+    number_of_vertices_of_faces: _int_func = lambda self: self.localFace.shape[-1]
+    number_of_vertices_of_edges: _int_func = lambda self: self.localEdge.shape[-1]
+
+    def total_face(self) -> Array:
+        NVF = self.number_of_faces_of_cells()
+        cell = self.entity(self.TD)
+        local_face = self.localFace
+        total_face = cell[..., local_face].reshape(-1, NVF)
+        return total_face
+
+    def total_edge(self) -> Array:
+        NVE = self.number_of_vertices_of_edges()
+        cell = self.entity(self.TD)
+        local_edge = self.localEdge
+        total_edge = cell[..., local_edge].reshape(-1, NVE)
+        return total_edge
+
+    def construct(self) -> None:
+        raise NotImplementedError
+
+
+##################################################
+### Mesh Base
+##################################################
+
+class Mesh():
+    """The base class for mesh."""
+    ds: MeshDataStructure
+    node: Array
+
+    def geo_dimension(self) -> int: return self.node.shape[-1]
+    def top_dimension(self) -> int: return self.ds.top_dimension()
+    GD = property(geo_dimension)
+    TD = property(top_dimension)
+
+    def count(self, etype: Union[int, str]) -> int: return self.ds.count(etype)
+    def number_of_cells(self) -> int: return self.ds.number_of_cells()
+    def number_of_faces(self) -> int: return self.ds.number_of_faces()
+    def number_of_edges(self) -> int: return self.ds.number_of_edges()
+    def number_of_nodes(self) -> int: return self.ds.number_of_nodes()
 
     @staticmethod
     def multi_index_matrix(p: int, etype: int):
@@ -76,70 +263,92 @@ class MeshBase():
             multiIndex[:, 1] = p - multiIndex[:, 0]
             return jnp.array(multiIndex)
 
-    def entity(self, etype: Union[int, str], index=np.s_[:]):
-        """
-        @brief Get entities.
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Array:
+        if etype in ('node', 0):
+            return self.node if index is None else self.node[index]
+        else:
+            return self.ds.entity(etype, index)
 
-        @param etype: Type of entities. Accept dimension or name.
-        @param index: Index for entities.
+    def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
+        """Get the quadrature points and weights.
 
-        @return: A tensor representing the entities in this mesh.
-        """
-        TD = self.top_dimension()
-        GD = self.geo_dimension()
-        if etype in {'cell', TD}:
-            return self.ds.cell[index]
-        elif etype in {'edge', 1}:
-            return self.ds.edge[index]
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, GD)[index]
-        elif etype in {'face', TD-1}: # Try 'face' in the last
-            return self.ds.face[index]
-        raise ValueError(f"Invalid etype '{etype}'.")
+        Args:
+            q (int): index of the quadrature formula.
+            etype (int | str): The type of the entity.
+            qtype (str): quadrature type.
 
-    def entity_barycenter(self, etype: Union[int, str], index=jnp.s_[:]):
+        Returns:
+            Quadrature.
         """
-        @brief Calculate barycenters of entities.
+        raise NotImplementedError
+
+    def edge_unit_tangent(self, index=jnp.s_[:], node: Optional[NDArray]=None):
+        """Calculate the tangent vector with unit length of each edge.\
+        See `Mesh.edge_tangent`.
+        """
+        node = self.entity('node') if node is None else node
+        edge = self.entity('edge', index=index)
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        length = jnp.sqrt(jnp.square(v).sum(axis=1))
+        return v/length.reshape(-1, 1)
+
+    def shape_function(self, bc: Array, p: int=1, *, index: Array,
+                       variable: str='u', mi: Optional[Array]=None) -> Array:
+        raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
+
+    def grad_shape_function(self, bc: Array, p: int=1, *, index: Array,
+                            variable: str='u', mi: Optional[Array]=None) -> Array:
+        raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
+
+    def hess_shape_function(self, bc: Array, p: int=1, *, index: Array,
+                            variable: str='u', mi: Optional[Array]=None) -> Array:
+        raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
+
+
+class HomoMesh(Mesh):
+    def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Array:
+        node = self.entity('node')
+        if etype in ('node', 0):
+            return node if index is None else node[index]
+        entity = self.ds.entity(etype, index)
+        return F.homo_entity_barycenter(entity, node)
+
+    def bc_to_point(self, bcs: Array, etype='cell', index=jnp.s_[:]) -> Array:
+        """Convert barycenter coordinate points to cartesian coordinate points\
+        on mesh entities.
+
+        Args:
+            bc (Array): Barycenter coordinate points array, with shape (NQ, NVC), where\
+                NVC is the number of nodes in each entity.
+            etype (str | int): Specify the type of entities on which the coordinates\
+                be converted.
+            index (Array | int | slice): Index to slice entities.
+
+        Note:
+            To get the correct result, the order of bc must match the order of nodes\
+        in the entity.
+
+        Returns:
+            Cartesian coordinate points array, with shape (NQ, GD).
         """
         node = self.entity('node')
-        TD = self.ds.TD
-        if etype in {'cell', TD}:
-            cell = self.ds.cell
-            return jnp.sum(node[cell[index], :], axis=1) / cell.shape[1]
-        elif etype in {'edge', 1}:
-            edge = self.ds.edge
-            return jnp.sum(node[edge[index], :], axis=1) / edge.shape[1]
-        elif etype in {'node', 0}:
-            return node[index]
-        elif etype in {'face', TD-1}: # Try 'face' in the last
-            face = self.ds.face
-            return jnp.sum(node[face[index], :], axis=1) / face.shape[1]
-        raise ValueError(f"Invalid entity type '{etype}'.")
-
-    def bc_to_point(self, bcs, index=jnp.s_[:]):
-        """
-        @brief Convert barycenter coordinate points to cartesian coordinate points\
-               on mesh entities.
-
-        @param bc: Barycenter coordinate points array, with shape (NQ, NVC), where\
-                   NVC is the number of nodes in each entity.
-        @param etype: Specify the type of entities on which the coordinates be converted.
-        @param index: Index to slice entities.
-
-        @note: To get the correct result, the order of bc must match the order of nodes\
-               in the entity.
-
-        @return: Cartesian coordinate points array, with shape (NQ, GD).
-        """
-        node = self.entity('node')
-        TD = bcs.shape[-1] - 1
-        entity = self.entity(TD, index=index)
+        entity = self.ds.entity(etype, index=index)
         p = jnp.einsum('...j, ijk -> ...ik', bcs, node[entity])
         return p
 
-    def edge_to_ipoint(self, p: int, index=np.s_[:]):
-        """
-        @brief 获取网格边与插值点的对应关系
+    ### ipoints
+    def interpolation_points(self, p: int, index: Index=_S) -> Array:
+        raise NotImplementedError
+
+    def edge_to_ipoint(self, p: int, index=_S) -> Array:
+        """Fetch the relationship between edges and interpolation points.
+
+        Args:
+            p (int): The interpolation order.
+            index (Array | int | slice): The index of edges.
+
+        Return:
+            Array: An indices array.
         """
         if isinstance(index, slice) and index == slice(None):
             NE = self.number_of_edges()
@@ -152,18 +361,12 @@ class MeshBase():
             NE = len(index)
         else:
             NE = len(index)
-        NN = self.number_of_nodes()
+
         edges = self.entity('edge')[index]
-        return edge_to_ipoint(edges, index, p)
+        return K.edge_to_ipoint(edges, index, p)
 
-    def edge_unit_tangent(self, index=jnp.s_[:], node: Optional[NDArray]=None):
-        """
-        @brief Calculate the tangent vector with unit length of each edge.\
-               See `Mesh.edge_tangent`.
-        """
-        node = self.entity('node') if node is None else node
-        edge = self.entity('edge', index=index)
-        v = node[edge[:, 1], :] - node[edge[:, 0], :]
-        length = jnp.sqrt(jnp.square(v).sum(axis=1))
-        return v/length.reshape(-1, 1)
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Array:
+        raise NotImplementedError
 
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Array:
+        raise NotImplementedError
