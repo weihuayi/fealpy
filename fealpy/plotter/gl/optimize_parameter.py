@@ -1,12 +1,13 @@
 
 import itertools
 import numpy as np
+from .ocam_system import OCAMSystem
 
 class OptimizeParameter:
     """
     @brief Optimize the parameters of the camera model.
     """
-    def __init__(self, ocam_systerm):
+    def __init__(self, ocam_systerm : OCAMSystem) -> None:
         self.ocam_systerm = ocam_systerm
         lfront = ocam_systerm.cams[4]
         lrear = ocam_systerm.cams[3]
@@ -55,14 +56,12 @@ class OptimizeParameter:
         for i, j in itertools.product(range(6), range(2)):
             mod = models[i][j]
             spoint = mod.mesh_to_image(align_point[i, j])
-            print(spoint)
             spoint = align_point[i, j]
             spoint = mod.image_to_camera_sphere(spoint)
             inode = mod.sphere_project_to_implict_surface(spoint, f1)
-            print(inode)
 
             outflag = inode[:, 2] <-z0
-            inode[outflag] = mod.sphere_project_to_implict_surface(spoint[outflag], f2)
+            #inode[outflag] = mod.sphere_project_to_implict_surface(spoint[outflag], f2)
             align_point_screen[i, j] = inode
         #print(align_point)
         #print(align_point_screen)
@@ -80,9 +79,7 @@ class OptimizeParameter:
             init_x[i+6]  = self.ocam_systerm.cams[i].axes[0]
             init_x[i+12] = self.ocam_systerm.cams[i].axes[1]
 
-        #init_x += 0.1
         error = self.object_function(init_x)
-        print(error)
 
 
 
