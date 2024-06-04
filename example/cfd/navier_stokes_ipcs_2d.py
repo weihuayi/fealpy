@@ -1,9 +1,18 @@
 import numpy as np
-from  mumps import DMumpsContext
+# 判断有没有 mumps
+try:
+    from  mumps import DMumpsContext
+    has_mumps = True
+except ImportError:
+    print("No module named 'mumps'")
+    has_mumps = False
+
 import scipy 
 
 import matplotlib.pyplot as plt
 import matplotlib
+
+from scipy.sparse.linalg import spsolve
 
 from fealpy.decorator import cartesian,barycentric
 
@@ -112,9 +121,20 @@ Vbform2 = BilinearForm(2*(uspace,))
 Vbform2.add_domain_integrator(VectorMassIntegrator(c=1))
 C = Vbform2.assembly()
 
-ctx = DMumpsContext()
-ctx.set_silent()
 errorMatrix = np.zeros((2,nt),dtype=np.float64)
+
+if has_mumps:
+    def Solve(A, b):
+        ctx = DMumpsContext()
+        ctx.set_silent()
+        ctx.set_centralized_sparse(A)
+        ctx.set_rhs(b)
+        ctx.run(job=6)
+        ctx.destroy()
+        return b
+else:
+    def Solve(A, b):
+        return spsolve(A, b)
 
 for i in range(2): 
     # 下一个的时间层 t1
@@ -139,11 +159,7 @@ for i in range(2):
     b1 = fb1 - fb2 + fb4 - mu*fb3
     AA, b1 = ubc.apply(A, b1)
 
-    ctx.set_centralized_sparse(AA)
-    x = b1.copy()
-    ctx.set_rhs(x)
-    ctx.run(job=6)
-    us.flat[:] = x
+    us.flat[:] = Solve(AA, b1.copy())
 
     #组装第二个方程的右端向量
      
@@ -159,11 +175,7 @@ for i in range(2):
     b22 = B@p0
     b2 = b21+b22
     
-    ctx.set_centralized_sparse(B)
-    x = b2.copy()
-    ctx.set_rhs(x)
-    ctx.run(job=6)
-    p1[:] = x[:]
+    p1[:] = Solve(B, b2.copy())
 
     #组装第三个方程的右端向量
     @barycentric
@@ -179,12 +191,7 @@ for i in range(2):
     tb1 = C@us.flatten(order='C')
     b3 = tb1 - tb2
     
-    ctx.set_centralized_sparse(C)
-    x = b3.copy()
-    ctx.set_rhs(x)
-    ctx.run(job=6)
-    
-    u1.flat[:] = x[:]
+    u1.flat[:] = Solve(C, b3.copy())
 
     co1 = usolution(mesh.node)
     NN = mesh.number_of_nodes()
@@ -201,7 +208,6 @@ for i in range(2):
 # 画图
 '''
 print(errorMatrix[0,:])
-ctx.destroy()
 fig1 = plt.figure()
 node = mesh.node
 x = tuple(node[:,0])
