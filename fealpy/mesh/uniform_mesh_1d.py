@@ -922,7 +922,7 @@ class UniformMesh1d(Mesh, Plotable):
         J = k[0:-1]
 
         val = np.broadcast_to(-r, (NN-1, ))
-        A = self.matrix_operator(0,-val,-val,I,J,NN)
+        A = self.matrix_operator(0,-val,val,I,J,NN)
        
         return A
 
