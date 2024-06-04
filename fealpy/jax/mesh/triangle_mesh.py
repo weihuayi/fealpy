@@ -1,3 +1,4 @@
+
 from typing import Any, Callable, Optional, List, Union
 
 import numpy as np
@@ -6,11 +7,14 @@ import jax.numpy as jnp
 
 from .. import logger
 
-from .mesh_kernel import *
-from .mesh_base import MeshBase
+from . import functional as F
+from . import mesh_kernel as K
+from .mesh_base import HomoMesh, HomoMeshDataStructure, entity_str2dim
+
+Array = jax.Array
 
 
-class TriangleMeshDataStructure():
+class TriangleMeshDataStructure(HomoMeshDataStructure):
     localEdge = jnp.array([(1, 2), (2, 0), (0, 1)])
     localFace = jnp.array([(1, 2), (2, 0), (0, 1)])
     ccw = jnp.array([0, 1, 2])
@@ -20,11 +24,8 @@ class TriangleMeshDataStructure():
         (1, 2, 0),
         (2, 0, 1)])
 
-    def __init__(self, NN, cell):
-        self.NN = NN
-        self.cell = cell
-        self.TD = 2
-        self.itype = cell.dtype
+    def __init__(self, NN: int, cell: Array):
+        super().__init__(NN, 2, cell)
         self.construct()
 
     def total_face(self):
@@ -34,7 +35,7 @@ class TriangleMeshDataStructure():
         NC = self.cell.shape[0]
         NFC = self.cell.shape[1]
 
-        totalFace = self.total_face() 
+        totalFace = self.total_face()
         _, i0, j = jnp.unique(
             jnp.sort(totalFace, axis=1),
             return_index=True,
@@ -55,16 +56,15 @@ class TriangleMeshDataStructure():
 
         logger.info(f"Construct the mesh toplogy relation with {NF} edge (or face).")
 
-    def boundary_edge_flag(self):
-        return self.edge2cell[:, 0]==self.edge2cell[:, 1]
+    def boundary_edge_flag(self): return self.boundary_face_flag()
+    def boundary_edge_index(self): return self.boundary_face_index()
 
-class TriangleMesh(MeshBase):
-    def __init__(self, node, cell):
+
+class TriangleMesh(HomoMesh):
+    def __init__(self, node: Array, cell: Array):
         """
         @brief TriangleMesh 对象的初始化函数
-
         """
-
         assert cell.shape[-1] == 3
 
         NN = node.shape[0]
@@ -77,44 +77,52 @@ class TriangleMesh(MeshBase):
         logger.info(f"Initialize a {GD}D TriangleMesh instance with {NN} nodes ({node.dtype}) and {NC} cells ({cell.dtype}).")
         self.node = node
         self.ds = TriangleMeshDataStructure(NN, cell)
-        self._edge_length = jax.jit(jax.vmap(edge_length))
+        self._edge_length = jax.jit(jax.vmap(K.edge_length))
 
         if GD == 2:
-            self._cell_area = jax.jit(jax.vmap(tri_area_2d))
-            self._cell_area_with_jac = jax.jit(jax.vmap(tri_area_2d_with_jac))
-            self._grad_lambda = jax.jit(jax.vmap(tri_grad_lambda_2d))
+            self._cell_area = jax.jit(jax.vmap(K.tri_area_2d))
+            self._cell_area_with_jac = jax.jit(jax.vmap(K.tri_area_2d_with_jac))
+            self._grad_lambda = jax.jit(jax.vmap(K.tri_grad_lambda_2d))
         elif GD == 3:
-            self._cell_area = jax.jit(jax.vmap(tri_area_3d))
-            self._cell_area_with_jac = jax.jit(jax.vmap(tri_area_3d_with_jac))
-            self._grad_lambda = jax.jit(jax.vmap(tri_grad_lambda_3d))
+            self._cell_area = jax.jit(jax.vmap(K.tri_area_3d))
+            self._cell_area_with_jac = jax.jit(jax.vmap(K.tri_area_3d_with_jac))
+            self._grad_lambda = jax.jit(jax.vmap(K.tri_grad_lambda_3d))
 
-        self._quality = jax.jit(jax.vmap(tri_quality_radius_ratio))
-        self._quality_with_jac = jax.jit(jax.vmap(tri_quality_radius_ratio_with_jac))
+        self._quality = jax.jit(jax.vmap(K.tri_quality_radius_ratio))
+        self._quality_with_jac = jax.jit(jax.vmap(K.tri_quality_radius_ratio_with_jac))
 
-    def number_of_local_ipoints(self, p, iptype='cell'):
+    def number_of_local_ipoints(self, p: int, iptype: Union[str, int]='cell') -> int:
+        """Count the local interpolation points.
+
+        Args:
+            p (int): The order of the interpolation points.
+            iptype (str | int, optional): The interpolation type. Defaults to 'cell'.
+
+        Returns:
+            int: The number of local interpolation points, denoted by 'ldof'.
         """
-        @brief
+        if isinstance(iptype, str):
+            iptype = entity_str2dim(self.ds, iptype)
+        return F.simplex_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p: int) -> int:
+        """Count the global interpolation points.
+
+        Args:
+            p (int): The order of the interpolation points.
+
+        Returns:
+            int: The number of global interpolation points, denoted by 'gdof'.
         """
-        if iptype in {'cell', 2}:
-            return (p+1)*(p+2)//2
-        elif iptype in {'face', 'edge',  1}: # 包括两个顶点
-            return p + 1
-        elif iptype in {'node', 0}:
-            return 1
+        return F.simplex_gdof(p, self)
 
-    def number_of_global_ipoints(self, p):
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
-
-    def grad_lambda(self, index=np.s_[:]):
+    def grad_lambda(self, index=np.s_[:]) -> Array:
         return self._grad_lambda(self.node[self.ds.cell[index]])
 
-    def shape_function(self, bcs, p=1, variable='u'):
+    def shape_function(self, bcs: Array, p: int=1, variable='u') -> Array:
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
-        phi = simplex_shape_function(bcs, mi, p)
+        phi = K.simplex_shape_function(bcs, mi, p)
         if variable == 'x':
             return phi[None, ...] # (1, NQ, ldof)
         elif variable == 'u':
@@ -122,13 +130,13 @@ class TriangleMesh(MeshBase):
         else:
             logger.error(f"The variable type {variable} is not correct, which should be `x` or `u`!")
 
-    def grad_shape_function(self, bcs, p=1, index=jnp.s_[:], variable='u'):
+    def grad_shape_function(self, bcs: Array, p: int=1, index=jnp.s_[:], variable='u'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
-        R = diff_simplex_shape_function(bcs, mi, p, 1) # (NQ, ldof, TD+1) 
+        R = K.diff_simplex_shape_function(bcs, mi, p, 1) # (NQ, ldof, TD+1)
         if variable == 'u':
             return R
         elif variable == 'x':
@@ -140,13 +148,13 @@ class TriangleMesh(MeshBase):
 
     cell_grad_shape_function = grad_shape_function
 
-    def hess_shape_function(self, bcs, p=1, index=jnp.s_[:], variable='u'):
+    def hess_shape_function(self, bcs: Array, p: int=1, index=jnp.s_[:], variable='u'):
         """
         @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
         """
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
-        R = diff_simplex_shape_function(bcs, mi, p, 2) # (NQ, ldof, TD+1, TD+1) 
+        R = K.diff_simplex_shape_function(bcs, mi, p, 2) # (NQ, ldof, TD+1, TD+1)
         if variable == 'u':
             return R
         elif variable == 'x':
@@ -167,31 +175,32 @@ class TriangleMesh(MeshBase):
         return v@w
 
     face_unit_normal = edge_unit_normal
-    
 
-    def laplace_shape_function(self, bcs, p=1, index=jnp.s_[:]):
+    def laplace_shape_function(self, bcs: Array, p: int=1, index=jnp.s_[:]) -> Array:
         """
         @brief 计算 p 次 Lagrange 基函数的拉普拉斯
         """
         TD = bcs.shape[-1] - 1
         mi = self.multi_index_matrix(p, TD)
-        R = grad_simplex_shape_function(bcs, mi, p, 2) 
+        R = K.grad_simplex_shape_function(bcs, mi, p, 2)
         Dlambda = self.grad_lambda(index=index)
         lphi = jnp.einsum('cjm, ...ijk, ckm->k...i', Dlambda, R, Dlambda, optimize=True)
         return lphi #(NC, NQ, ldof, GD)
 
-    def integrator(self, q, etype='cell'):
-        """
-        @brief 获取不同维度网格实体上的积分公式
-        """
+    def integrator(self, q: int, etype='cell', qtype: str='legendre'):
         if etype in {'cell', 2}:
-            from .triangle_quadrature import TriangleQuadrature
-            return TriangleQuadrature(q)
+            from .quadrature import TriangleQuadrature
+            quad = TriangleQuadrature(dtype=self.ftype)
         elif etype in {'edge', 'face', 1}:
-            from .gauss_legendre_quadrature import GaussLegendreQuadrature
-            return GaussLegendreQuadrature(q)
+            from .quadrature import GaussLegendreQuadrature
+            quad = GaussLegendreQuadrature(dtype=self.ftype)
+        else:
+            raise ValueError(f"No quadrature provided for entity type '{etype}'.")
 
-    def entity_measure(self, etype=2, index=np.s_[:]):
+        quad._latest_order = q
+        return quad
+
+    def entity_measure(self, etype: Union[int, str]='cell', index=np.s_[:]) -> Array:
         if etype in {'cell', 2}:
             return self.cell_area(index=index)
         elif etype in {'edge', 'face', 1}:
@@ -201,14 +210,14 @@ class TriangleMesh(MeshBase):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
 
-    def cell_area(self, index=jnp.s_[:]):
-        return self._cell_area(self.node[self.ds.cell[index]]) 
+    def cell_area(self, index=jnp.s_[:]) -> Array:
+        return self._cell_area(self.node[self.ds.cell[index]])
 
-    def edge_length(self, index=jnp.s_[:]):
-        return self._edge_length(self.node[self.ds.edge[index]]) 
+    def edge_length(self, index=jnp.s_[:]) -> Array:
+        return self._edge_length(self.node[self.ds.edge[index]])
 
     def cell_area_with_jac(self, index=jnp.s_[:]):
-        return self._cell_area_with_jac(self.node[self.ds.cell[index]]) 
+        return self._cell_area_with_jac(self.node[self.ds.cell[index]])
 
     def cell_quality(self, index=jnp.s_[:]):
         return  self._quality(self.node[self.ds.cell[index]])
@@ -216,7 +225,7 @@ class TriangleMesh(MeshBase):
     def cell_quality_with_jac(self, index=jnp.s_[:]):
         return self._quality_with_jac(self.node[self.ds.cell[index]])
 
-    def interpolation_points(self, p: int, index=jnp.s_[:]):
+    def interpolation_points(self, p: int, index=jnp.s_[:]) -> Array:
         """
         @brief 获取三角形网格上所有 p 次插值点
         """
@@ -241,7 +250,7 @@ class TriangleMesh(MeshBase):
 
         return ipoints # (gdof, GD)
 
-    def cell_to_ipoint(self, p, index=jnp.s_[:]):
+    def cell_to_ipoint(self, p: int, index=jnp.s_[:]) -> Array:
         """
         @brief  获得 p 次 Lagrange 元的插值点编号
         """
@@ -253,12 +262,12 @@ class TriangleMesh(MeshBase):
         idx0, = np.nonzero(mi[:, 0] == 0)
         idx1, = np.nonzero(mi[:, 1] == 0)
         idx2, = np.nonzero(mi[:, 2] == 0)
-        
+
         edge2cell = self.ds.edge2cell
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
-        
+
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoints(p)
         c2p = np.zeros((NC, ldof), dtype=self.itype)
@@ -325,4 +334,3 @@ class TriangleMesh(MeshBase):
             cell = idxMap[cell.ravel()].reshape(cell.shape)
 
         return cls(node, cell)
-
