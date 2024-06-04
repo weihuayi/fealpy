@@ -20,7 +20,7 @@ from fealpy.ml import timer
 from matplotlib import pyplot as plt
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-NX, NY = 32, 32
+NX, NY = 64, 64
 
 
 def neumann(points: Tensor):
@@ -29,20 +29,15 @@ def neumann(points: Tensor):
     kwargs = {'dtype': points.dtype, "device": points.device}
     theta = torch.arctan2(y-0.5, x-0.5)
     freq = torch.arange(1, 11, **kwargs)
-    return cos(tensordot(freq, theta, dims=0))
+    return torch.sin(tensordot(freq, theta, dims=0))
 
 
 tmr = timer()
 
 mesh_numpy = TMD.from_box(nx=NX, ny=NY)
-cell = mesh_numpy.ds.cell
-node = mesh_numpy.node
 next(tmr)
-mesh = TriangleMesh(
-    torch.from_numpy(node).to(device),
-    torch.from_numpy(cell).to(device),
-)
-NC = cell.shape[0]
+mesh = TriangleMesh.from_box(nx=NX, ny=NY, device=device)
+NC = mesh.number_of_cells()
 
 
 space = LagrangeFESpace(mesh, p=1)
@@ -52,7 +47,7 @@ bform = BilinearForm(space)
 bform.add_integrator(ScalarDiffusionIntegrator())
 
 lform = LinearForm(space, batch_size=10)
-lform.add_integrator(ScalarBoundarySourceIntegrator(neumann, batched=True))
+lform.add_integrator(ScalarBoundarySourceIntegrator(neumann, zero_integral=True, batched=True))
 tmr.send('forms')
 
 A = bform.assembly()
@@ -67,8 +62,6 @@ uh = sparse_cg(A, F, uh, maxiter=1000, batch_first=True)
 uh = uh.detach()
 value = space.value(uh, torch.tensor([[1/3, 1/3, 1/3]], device=device, dtype=torch.float64)).squeeze(0)
 value = value.cpu().numpy()
-print(value.shape)
-# uh = uh.cpu().numpy()
 tmr.send('solve(cg)')
 tmr.send('stop')
 

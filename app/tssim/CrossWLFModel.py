@@ -55,3 +55,11 @@ class CrossWLF:
         val =  -x
         return val
     
+    @cartesian
+    def boundary_pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = x
+        val[:] = 0
+        return val
+    

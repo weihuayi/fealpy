@@ -11,6 +11,24 @@ Number = Union[builtins.int, builtins.float]
 CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
 
 
+def integral(value: Tensor, weights: Tensor, measure: Tensor, *,
+             entity_type=False) -> Tensor:
+    """Numerical integration.
+
+    Args:
+        value (Tensor[..., Q, C]): The values on the quadrature points to be integrated.
+        weights (Tensor[Q,]): The weights of the quadrature points.
+        measure (Tensor[C,]): The measure of the quadrature points.
+        entity_type (bool): Whether to return integration in each entity. Defaults to False.
+
+    Returns:
+        Tensor[...]: The result of the integration. The shape will be [..., C]\
+        if entity_type is True, otherwise [...].
+    """
+    subs = '...c' if entity_type else '...'
+    return einsum(f'q, c, ...qc -> {subs}', weights, measure, value)
+
+
 def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
                     coef: Union[Number, Tensor, None]=None,
                     batched: bool=False) -> Tensor:
@@ -42,7 +60,7 @@ def linear_integral(input: Tensor, weights: Tensor, measure: Tensor,
         subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
         return einsum(f'q, c, qci, {subs} -> {out_subs}', weights, measure, input, coef)
     else:
-        raise TypeError(f"coef should be int, float, Tensor or callable, but got {type(coef)}.")
+        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
 
 
 def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: Tensor,
@@ -77,4 +95,4 @@ def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: 
         subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
         return einsum(f'q, c, qci..., qcj..., {subs} -> {out_subs}', weights, measure, input1, input2, coef)
     else:
-        raise TypeError(f"coef should be int, float, Tensor or callable, but got {type(coef)}.")
+        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")

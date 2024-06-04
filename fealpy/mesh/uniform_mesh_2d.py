@@ -787,8 +787,6 @@ class UniformMesh2d(Mesh, Plotable):
         """
         rx = tau / self.h[0] ** 2
         ry = tau / self.h[1] ** 2
-        if rx + ry > 1.5:
-            raise ValueError(f"The sum rx + ry: {rx + ry} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
         n0 = self.nx + 1

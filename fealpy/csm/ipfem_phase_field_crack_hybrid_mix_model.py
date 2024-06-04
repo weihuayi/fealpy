@@ -23,6 +23,7 @@ from ..mesh import TriangleMesh
 from scipy.sparse.linalg import spsolve, lgmres, cg
 from scipy.sparse import csr_matrix, coo_matrix
 
+from ..ml import timer
 
 class IPFEMPhaseFieldCrackHybridMixModel():
     """
@@ -57,7 +58,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         disp = model.is_boundary_disp()
 
         self.recovery = LinearRecoveryAlg()
-
+        
+        self.tmr = timer()
     def newton_raphson(self, 
             disp, 
             dirichlet_phase=False, 
@@ -69,7 +71,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
-
+        tmr = self.tmr
+        next(tmr)
         model = self.model
         GD = self.GD
         D0 = self.D0
@@ -84,20 +87,25 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             uh = self.uh
             d = self.d
             H = self.H
-            
+
+            tmr.send('init')
+
             node = mesh.entity('node')
             isDDof = model.is_disp_boundary(node)
             uh[isDDof] = disp
 
             du = np.zeros_like(uh)
-            
+             
             # 求解位移
             vspace = (GD*(space, ))
             ubform = BilinearForm(GD*(space, ))
-            
+            tmr.send('mesh_and_space')            
+
             gd = self.energy_degradation_function(d)
             ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
                 model.mu, c=gd))
+            tmr.send('uforms')
+
             if atype == 'fast':
                 # 无数值积分矩阵组装
                 A0 = ubform.fast_assembly()
@@ -111,14 +119,16 @@ class IPFEMPhaseFieldCrackHybridMixModel():
 #            A0 = ubform.assembly()
 
             R0 = -A0@uh.flat[:]
-            
+            tmr.send('uassembly') 
+
             self.force = np.sum(-R0[isDDof.flat])
             
             ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
 
             A0, R0 = ubc.apply(A0, R0) 
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
-            
+            tmr.send('udirichlet')
+
             # 选择合适的解法器
             if solve == 'spsolve':
                 du.flat[:] = spsolve(A0, R0)
@@ -132,6 +142,7 @@ class IPFEMPhaseFieldCrackHybridMixModel():
                 du.flat[:] = Solver.cg_solver(A0, R0, atol=1e-18)
             else:
                 print("We don't have this solver yet")
+            tmr.send('usolve')
 
             uh[:] += du
             
@@ -139,6 +150,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             strain = self.strain(uh)
             phip, _ = self.strain_energy_density_decomposition(strain)
             H[:] = np.fmax(H, phip)
+
+            tmr.send('H_strain')
 
             # 相场模型计算
             ipbform = BilinearForm(ipspace)
@@ -148,11 +161,15 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             P0 = ScalarInteriorPenaltyIntegrator(gamma=gamma)
             P  = P0.assembly_face_matrix(ipspace)  
             A  = model.Gc*model.l0**3/16*(A + P)
+            
+            tmr.send('ipMartix')
 
             dbform = BilinearForm(dspace)
             dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0))
             dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0/2.0))
             A1 = dbform.assembly()
+            tmr.send('dlMatrix')
+
 
             '''
             start2 = time.time()
@@ -169,10 +186,14 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
             R1 = lform.assembly()
             R1 -= A1@d[:]
+            
+            tmr.send('dlvector')
 
             if dirichlet_phase:
                 dbc = DirichletBC(dspace, 0, threshold=model.is_boundary_phase)
                 A1, R1 = dbc.apply(A1, R1)
+            
+            tmr.send('d_dirichlet')
 
             # 选择合适的解法器
             if solve == 'spsolve':
@@ -186,10 +207,14 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             else:
                 print("We don't have this solver yet")
             d[:] += dd
-            
+           
+            tmr.send('dsolve')
+
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
             
+            tmr.send('energy')
+
             self.uh = uh
             self.d = d
             self.H = H
@@ -198,6 +223,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             eta = self.recovery.recovery_estimate(self.d)
                 
             isMarkedCell = mark(eta, theta = theta) # TODO：
+            
+            tmr.send('Markcell')
 
             cm = mesh.entity_measure('cell')
             if GD == 3:
@@ -216,7 +243,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
                 else:
                     print("GD is not 2 or 3, it is incorrect")
             
-            
+            tmr.send('refine')
+
             # 计算残量误差
             if k == 0:
                 er0 = np.linalg.norm(R0)
@@ -231,6 +259,7 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             if error < 1e-5:
                 break
             k += 1
+            tmr.send('stop')
     
     def bisect_refine_2d(self, isMarkedCell):
         """
@@ -284,8 +313,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         cell = mesh0.entity(etype='cell')
         cell0 = np.zeros_like(cell,dtype=np.int_)
         cell0[:]=cell[:]
-        print(node.shape, cell.shape)
-        mesh = TriangleMesh(node, cell0)
+        print(type(node), cell.shape)
+        mesh = TriangleMesh(node[:], cell[:])
         self.mesh = mesh
        
         # 更新加密后的空间
@@ -293,17 +322,20 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         self.dspace = LagrangeFESpace(self.mesh, p=self.p0)
         self.ipspace = InteriorPenaltyBernsteinFESpace2d(self.mesh, p = self.p0)
 
+        space0 = LagrangeFESpace(mesh0, p=1, doforder='vdims')
+        dspace0 = LagrangeFESpace(mesh0, p=self.p0)
+
         NC = self.mesh.number_of_cells()
-        self.uh = self.space.function(dim=self.GD)
-        self.d = self.dspace.function()
+        self.uh = space0.function(dim=self.GD)
+        self.d = dspace0.function()
         self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
         
-        self.uh[:, 0] = self.space.interpolation_fe_function(uh0)
-        self.uh[:, 1] = self.space.interpolation_fe_function(uh1)
+        self.uh[:, 0] = space0.interpolation_fe_function(uh0)
+        self.uh[:, 1] = space0.interpolation_fe_function(uh1)
         
-        self.d[:] = self.dspace.interpolation_fe_function(d0)
+        self.d[:] = dspace0.interpolation_fe_function(d0)
         
-        self.mesh.interpolation_cell_data(mesho, datakey=['H'])
+        mesh0.interpolation_cell_data(mesho, datakey=['H'])
         print('interpolation cell data:', NC)      
         
     def energy_degradation_function(self, d):

@@ -75,8 +75,8 @@ class CrossSolver():
     '''
     def delta_epsion(self, phi, epsilon=None): 
         if epsilon is None:
-            #epsilon = np.max(self.mesh.entity_measure('edge'))
-            epsilon = np.min(self.mesh.entity_measure('edge'))/2
+            epsilon = np.max(self.mesh.entity_measure('edge'))
+            #epsilon = np.min(self.mesh.entity_measure('edge'))/2
         result = self.phispace.function()
         tag = (phi>-epsilon) & (phi<epsilon)
         result[tag] = 0.5*(1 + np.cos(np.pi*phi[tag]/epsilon))/epsilon

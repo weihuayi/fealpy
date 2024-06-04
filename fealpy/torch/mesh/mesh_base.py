@@ -1,5 +1,4 @@
 
-from math import comb
 from typing import (
     Union, Optional, Dict, Sequence, overload, Callable,
     Literal, TypeVar
@@ -140,10 +139,20 @@ class MeshDataStructure():
     def device(self) -> _device: return self.cell.device
 
     ### counters
-    number_of_nodes: _int_func = lambda self: self.NN
-    number_of_edges: _int_func = lambda self: len(entity_dim2tensor(self, 1))
-    number_of_faces: _int_func = lambda self: len(entity_dim2tensor(self, self.top_dimension() - 1))
-    number_of_cells: _int_func = lambda self: len(entity_dim2tensor(self, self.top_dimension()))
+    def count(self, etype: Union[int, str]) -> int:
+        """@brief Return the number of entities of the given type."""
+        if etype in ('node', 0):
+            return self.NN
+        if isinstance(etype, str):
+            edim = entity_str2dim(self, etype)
+        if -edim in self._entity_storage: # for polygon mesh
+            return self._entity_storage[-edim].size(0) - 1
+        return entity_dim2tensor(self, edim).size(0) # for homogeneous mesh
+
+    def number_of_nodes(self): return self.NN
+    def number_of_edges(self): return self.count('edge')
+    def number_of_faces(self): return self.count('face')
+    def number_of_cells(self): return self.count('cell')
 
     ### constructors
     def construct(self) -> None:
@@ -209,8 +218,47 @@ class MeshDataStructure():
             return face2cell[index]
 
     ### boundary
-    def boundary_face_flag(self): return self.face2cell[:, 0] == self.face2cell[:, 1]
-    def boundary_face_index(self): return torch.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+    def boundary_node_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary nodes.
+
+        Returns:
+            Tensor: boundary node flag.
+        """
+        NN = self.number_of_nodes()
+        bd_face_flag = self.boundary_face_flag()
+        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        bd_face2node = self.entity('face', index=bd_face_flag)
+        bd_node_flag = torch.zeros((NN,), **kwargs)
+        bd_node_flag[bd_face2node.ravel()] = True
+        return bd_node_flag
+
+    def boundary_face_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary faces.
+
+        Returns:
+            Tensor: boundary face flag.
+        """
+        return self.face2cell[:, 0] == self.face2cell[:, 1]
+
+    def boundary_cell_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary cells.
+
+        Returns:
+            Tensor: boundary cell flag.
+        """
+        NC = self.number_of_cells()
+        bd_face_flag = self.boundary_face_flag()
+        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        bd_face2cell = self.face2cell[bd_face_flag, 0]
+        bd_cell_flag = torch.zeros((NC,), **kwargs)
+        bd_cell_flag[bd_face2cell.ravel()] = True
+        return bd_cell_flag
+
+    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    # TODO: finish this:
+    # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
+    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
+    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
 
 
 class HomoMeshDataStructure(MeshDataStructure):
@@ -272,6 +320,7 @@ class Mesh():
     def multi_index_matrix(self, p: int, etype: int) -> Tensor:
         return F.multi_index_matrix(p, etype, dtype=self.ds.itype, device=self.device)
 
+    def count(self, etype: Union[int, str]) -> int: return self.ds.count(etype)
     def number_of_cells(self) -> int: return self.ds.number_of_cells()
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
