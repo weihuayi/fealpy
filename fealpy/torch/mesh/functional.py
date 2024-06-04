@@ -56,12 +56,32 @@ def edge_length(points: Tensor, out=None) -> Tensor:
     r"""Edge length.
 
     Args:
-        points: Tensor(..., 2, GD).
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
+        out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
-        Tensor(...,).
+        Tensor: Length of edges, shaped [...].
     """
     return norm(points[..., 0, :] - points[..., 1, :], dim=-1, out=out)
+
+
+def edge_normal(points: Tensor, unit: bool=False, out=None) -> Tensor:
+    """Edge normal for 2D meshes.
+
+    Args:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
+        unit (bool, optional): Whether to normalize the normal. Defaults to False.
+        out (Tensor, optional): The output tensor. Defaults to None.
+
+    Returns:
+        Tensor: Normal of edges, shaped [..., GD].
+    """
+    if points.shape[-1] != 2:
+        raise ValueError("Only 2D meshes are supported.")
+    edges = points[..., 1, :] - points[..., 0, :]
+    if unit:
+        edges = edges.div_(norm(edges, dim=-1, keepdim=True))
+    return torch.cat([edges[..., 1], -edges[..., 0]], dim=-1, out=out)
 
 
 def entity_barycenter(etn: Tensor, node: Tensor) -> Tensor:

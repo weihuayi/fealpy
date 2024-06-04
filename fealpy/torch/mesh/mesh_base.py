@@ -352,6 +352,39 @@ class Mesh():
         etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
         return F.entity_barycenter(etn, node)
 
+    def edge_length(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the length of the edges.
+
+        Args:
+            index (int | slice | Tensor, optional): Index of edges.
+            out (Tensor, optional): The output tensor. Defaults to None.
+
+        Returns:
+            Tensor: Length of edges, shaped [NE,].
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_length(self.node[edge], out=out)
+
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
+        """Calculate the normal of the edges.
+
+        Args:
+            index (int | slice | Tensor, optional): Index of edges.
+            unit (bool, optional): _description_. Defaults to False.
+            out (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            Tensor: _description_
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_normal(self.node[edge], unit=unit, out=out)
+
+    def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the unit normal of the edges.
+        Equivalent to `edge_normal(index=index, unit=True)`.
+        """
+        return self.edge_normal(index=index, unit=True, out=out)
+
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
         """Get the quadrature points and weights."""
         raise NotImplementedError
