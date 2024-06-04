@@ -1,6 +1,6 @@
 
 from abc import ABCMeta, abstractmethod
-from typing import Union, Callable, Optional, Any
+from typing import Union, Callable, Optional, Any, TypeVar
 
 from torch import Tensor
 
@@ -9,9 +9,10 @@ from ..functionspace.space import FunctionSpace as _FS
 Index = Union[int, slice, Tensor]
 _S = slice(None)
 CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
+_Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
 
-def enable_cache(meth: Callable[[Any, _FS], Tensor]) -> Callable[[Any, _FS], Tensor]:
+def enable_cache(meth: _Meth) -> _Meth:
     def wrapper(self, space: _FS) -> Tensor:
         if getattr(self, '_cache', None) is None:
             self._cache = {}
