@@ -61,10 +61,7 @@ class OptimizeParameter:
             inode = mod.sphere_project_to_implict_surface(spoint, f1)
 
             outflag = inode[:, 2] <-z0
-            #inode[outflag] = mod.sphere_project_to_implict_surface(spoint[outflag], f2)
             align_point_screen[i, j] = inode
-        #print(align_point)
-        #print(align_point_screen)
         error = np.sum((align_point_screen[:, 0] - align_point_screen[:, 1])**2)
         return error
 
