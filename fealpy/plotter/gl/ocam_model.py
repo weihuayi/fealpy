@@ -34,7 +34,15 @@ class OCAMModel:
     name: str
 
     def __post_init__(self):
-        self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        fname = os.path.expanduser(self.data_path+"DIM_K_D_{}.pkl".format(self.name))
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.DIM, self.K, self.D = pickle.load(f)
+        else:
+            self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+            with open(fname, 'wb') as f:
+                pickle.dump((self.DIM, self.K, self.D), f)
+
         self.icenter, self.radius = self.get_center_and_radius(self.fname)
         cps_all = []
         for cps in self.camera_points:
@@ -56,6 +64,11 @@ class OCAMModel:
             with open(fname, 'wb') as f:
                 pickle.dump(self.imagemesh, f)
 
+    def set_location(self, location):
+        self.location = location
+
+    def set_axes(self, axes):
+        self.axes = axes
 
     def __call__(self, u):
         icenter = self.icenter
@@ -75,6 +88,13 @@ class OCAMModel:
         #gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
         #gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
 
+        def add_rectangle(p0, p1, p2, p3):
+            l0 = occ.addLine(p0, p1)
+            l1 = occ.addLine(p1, p2)
+            l2 = occ.addLine(p2, p3)
+            l3 = occ.addLine(p3, p0)
+            return l0, l1, l2, l3
+
         # 获得分割线
         cps = self.camera_points
         lines = []
@@ -83,6 +103,16 @@ class OCAMModel:
             for p in cp:
                 curves.append(occ.addPoint(p[0], p[1], 0))
             lines.append(occ.addSpline(curves))
+
+        # 获取标记板
+        mb = self.mark_board
+        for i in range(6):
+            p0 = occ.addPoint(mb[4*i+0, 0], mb[4*i+0, 1], 0.0)
+            p1 = occ.addPoint(mb[4*i+1, 0], mb[4*i+1, 1], 0.0)
+            p2 = occ.addPoint(mb[4*i+2, 0], mb[4*i+2, 1], 0.0)
+            p3 = occ.addPoint(mb[4*i+3, 0], mb[4*i+3, 1], 0.0)
+            ret = add_rectangle(p0, p1, p2, p3)
+            [lines.append(r) for r in ret]
 
         # 生成区域
         rec  = occ.addRectangle(0, 0, 0, 1920, 1080)
@@ -493,7 +523,7 @@ class OCAMModel:
         phi = np.arctan2(fx*node[:,1], (fy*node[:,0]))
         phi[phi<0] = phi[phi<0]+np.pi
 
-        idx = np.abs(fx*np.cos(phi))>1e-13
+        idx = np.abs(fx*np.cos(phi))>1e-10
         rho = np.zeros_like(phi)
         rho[idx] = node[idx,0]/(fx*np.cos(phi[idx]))
         rho[~idx] = node[~idx, 1]/(fy*np.sin(phi[~idx]))

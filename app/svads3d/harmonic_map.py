@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 
-from fealpy.fem import BilinearForm, LinearForm, DirichletBC
+from fealpy.fem import BilinearForm
 from fealpy.fem import VectorDiffusionIntegrator
 
 @dataclass

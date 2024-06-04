@@ -68,6 +68,24 @@ class OCAMSystem:
                 name = "cam{}".format(i),
             ))
 
+    def set_parameters(self, data):
+        """
+        @brief 设置参数
+        """
+        loc = data[:6]
+        cx  = data[6:12]
+        cy  = data[12:18]
+        cz  = np.cross(cx, cy)
+
+        for i in range(6):
+            axes = np.zeros((3, 3), dtype=np.float64)
+            axes[0, :] = cx[i]
+            axes[1, :] = cy[i]
+            axes[2, :] = cz[i]
+
+            self.cams[i].set_location(loc[i])
+            self.cams[i].set_axes(axes)
+
     def get_implict_surface_function(self):
         """
         @brief 获取隐式表面函数
@@ -271,7 +289,7 @@ class OCAMSystem:
             #if i==1:
             #    uv[:, 0] = (node[:, 0]-40)/self.cams[i].width
             uv[:, 1] = node[:, 1]/self.cams[i].height
-            uv[:, 0] = 1-uv[:, 0]
+            #uv[:, 0] = 1-uv[:, 0]
 
             node = self.cams[i].image_to_camera_sphere(node)
             mesh.node = node
@@ -291,7 +309,6 @@ class OCAMSystem:
             uv       = np.array(uv[cell].reshape(-1, 2), dtype=np.float64)
 
             no = np.concatenate((vertices, uv), axis=-1, dtype=np.float32)
-            print(self.cams[i].fname)
             plotter.add_mesh(no, cell=None, texture_path=self.cams[i].fname)
 
     def sphere_mesh(self, plotter):
@@ -960,7 +977,4 @@ class OCAMSystem:
         }
 
         return cls(data)
-
-
-
 

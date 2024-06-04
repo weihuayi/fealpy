@@ -2,7 +2,7 @@ import platform
 
 from .. import logger
 from .solve import solve, active_set_solver
-from .gamg_solver import GAMGSolver
+#from .gamg_solver import GAMGSolver
 
 try:
     from .cupy_solver import CupySolver
