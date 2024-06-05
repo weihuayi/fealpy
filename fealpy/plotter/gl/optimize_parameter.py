@@ -55,13 +55,9 @@ class OptimizeParameter:
         z0 = -osysterm.center_height
         for i, j in itertools.product(range(6), range(2)):
             mod = models[i][j]
-            spoint = mod.mesh_to_image(align_point[i, j])
-            spoint = align_point[i, j]
-            spoint = mod.image_to_camera_sphere(spoint)
-            inode = mod.sphere_project_to_implict_surface(spoint, f1)
+            align_point_screen[i, j] = mod.mesh_to_ground(align_point[i, j], z0)
 
-            outflag = inode[:, 2] <-z0
-            align_point_screen[i, j] = inode
+        print(np.concatenate([align_point_screen[:, 0], align_point_screen[:, 1]], axis=-1))
         error = np.sum((align_point_screen[:, 0] - align_point_screen[:, 1])**2)
         return error
 
@@ -77,6 +73,7 @@ class OptimizeParameter:
             init_x[i+12] = self.ocam_systerm.cams[i].axes[1]
 
         error = self.object_function(init_x)
+        print(error)
 
 
 
