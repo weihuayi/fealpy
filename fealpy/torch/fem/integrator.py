@@ -7,7 +7,6 @@ from torch import Tensor
 from ..functionspace.space import FunctionSpace as _FS
 
 Index = Union[int, slice, Tensor]
-_S = slice(None)
 CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
 _Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
@@ -64,28 +63,58 @@ class Integrator(metaclass=ABCMeta):
                 self._cache.clear()
 
 
+class OperatorIntegrator(Integrator):
+    coef: Optional[CoefLike]
+
+    def assembly(self, space: _FS) -> Tensor:
+        raise NotImplementedError
+
+    def set_coef(self, coef: Optional[CoefLike]=None, /) -> None:
+        """Set a new coefficient of the equation to the integrator.
+
+        Args:
+            coef (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
+        """
+        self.coef = coef
+        self.clear()
+
+
+class SourceIntegrator(Integrator):
+    source: Optional[CoefLike]
+
+    def assembly(self, space: _FS) -> Tensor:
+        raise NotImplementedError
+
+    def set_source(self, source: Optional[CoefLike]=None, /) -> None:
+        """Set a new source term of the equation to the integrator.
+
+        Args:
+            source (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
+        """
+        self.source = source
+        self.clear()
+
+
+# These Integrator classes are for type checking
+
 class CellOperatorIntegrator(Integrator):
-    def assembly(self, space: _FS) -> Tensor:
-        raise NotImplementedError
-
-
-class FaceOperatorIntegrator(Integrator):
-    def assembly(self, space: _FS) -> Tensor:
-        raise NotImplementedError
-
+    pass
 
 class CellSourceIntegrator(Integrator):
-    def assembly(self, space: _FS) -> Tensor:
-        raise NotImplementedError
+    pass
 
+class FaceOperatorIntegrator(Integrator):
+    pass
 
 class FaceSourceIntegrator(Integrator):
-    def assembly(self, space: _FS) -> Tensor:
-        raise NotImplementedError
+    pass
 
 
 __all__ = [
     'Integrator',
+    'OperatorIntegrator',
+    'SourceIntegrator',
+
     'CellOperatorIntegrator',
     'FaceOperatorIntegrator',
     'CellSourceIntegrator',

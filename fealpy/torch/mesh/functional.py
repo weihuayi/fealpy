@@ -81,7 +81,7 @@ def edge_normal(points: Tensor, unit: bool=False, out=None) -> Tensor:
     edges = points[..., 1, :] - points[..., 0, :]
     if unit:
         edges = edges.div_(norm(edges, dim=-1, keepdim=True))
-    return torch.cat([edges[..., 1], -edges[..., 0]], dim=-1, out=out)
+    return torch.stack([edges[..., 1], -edges[..., 0]], dim=-1, out=out)
 
 
 def entity_barycenter(etn: Tensor, node: Tensor) -> Tensor:
