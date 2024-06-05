@@ -825,10 +825,22 @@ class OCAMModel:
         #plt.show()
         return center, radius
 
+    def mesh_to_ground(self, points, ground_location = -3.0):
+        """
+        @brief 将图像上的点投影到地面
+        @param points: 图像上的点 (...， 2) 的数组
+        """
+        f2 = lambda x : x[..., 2] - ground_location
+        points = self.mesh_to_image(points)
+        points = self.image_to_camera_sphere(points)
+        retp = self.sphere_project_to_implict_surface(points, f2)
+        return retp
+
     def harmonic_map(self):
         """
         @brief 调和映射
         """
+        pass
 
 
 
