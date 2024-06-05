@@ -56,6 +56,9 @@ class BernsteinFESpace:
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
     @barycentric
     def basis(self, bc, index=np.s_[:], p=None):
         """
@@ -494,3 +497,41 @@ class BernsteinFESpace:
         elif self.doforder == 'vdims':
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=dtype)
+
+    def interpolate(self, u, dim=None, dtype=None):
+        """
+        @brief Interpolates a function `u` in the finite element space.
+        """
+        assert callable(u)
+
+        if not hasattr(u, 'coordtype'):
+            ips = self.interpolation_points()
+            uI = u(ips)
+        else:
+            if u.coordtype == 'cartesian':
+                ips = self.interpolation_points()
+                uI = u(ips)
+            elif u.coordtype == 'barycentric':
+                TD = self.TD
+                p = self.p
+                bcs = self.mesh.multi_index_matrix(p, TD)/p
+                uI = u(bcs)
+
+        l2b = self.bernstein_to_lagrange(self.p, self.TD)
+        c2d = self.dof.cell2dof
+        uI[c2d] = np.einsum('ij, cj->ci', l2b, uI[c2d])
+        return self.function(dim=dim, array=uI, dtype=uI.dtype)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
