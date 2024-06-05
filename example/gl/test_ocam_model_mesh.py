@@ -4,7 +4,7 @@ from fealpy.plotter.gl import OCAMSystem
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import TriangleMesh
-from fealpy.plotter.gl import OpenGLPlotter, OCAMSystem 
+from fealpy.plotter.gl import OpenGLPlotter, OCAMSystem
 
 csys = OCAMSystem.from_data('~/data/')
 plotter = OpenGLPlotter()
