@@ -71,6 +71,7 @@ class OperatorIntegrator(Integrator):
 
     def set_coef(self, coef: Optional[CoefLike]=None, /) -> None:
         """Set a new coefficient of the equation to the integrator.
+        This will clear the cached result.
 
         Args:
             coef (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
@@ -87,6 +88,7 @@ class SourceIntegrator(Integrator):
 
     def set_source(self, source: Optional[CoefLike]=None, /) -> None:
         """Set a new source term of the equation to the integrator.
+        This will clear the cached result.
 
         Args:
             source (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
@@ -97,16 +99,16 @@ class SourceIntegrator(Integrator):
 
 # These Integrator classes are for type checking
 
-class CellOperatorIntegrator(Integrator):
+class CellOperatorIntegrator(OperatorIntegrator):
     pass
 
-class CellSourceIntegrator(Integrator):
+class CellSourceIntegrator(SourceIntegrator):
     pass
 
-class FaceOperatorIntegrator(Integrator):
+class FaceOperatorIntegrator(OperatorIntegrator):
     pass
 
-class FaceSourceIntegrator(Integrator):
+class FaceSourceIntegrator(SourceIntegrator):
     pass
 
 
