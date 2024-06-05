@@ -372,7 +372,12 @@ class UniformMesh1d(Mesh, Plotable):
             de = e[1:] - e[0:-1]
             e1 = np.sqrt(np.sum(de ** 2) / h + e0 ** 2)
             return e1
-
+    def matrix_operator(self,diag,val_1,val_2,I,J,NN):
+        A = diags([diag],[0],shape=(NN,NN),dtype=self.ftype)
+        A += csr_matrix((val_1, (I, J)), shape=(NN,NN), dtype=self.ftype)
+        A += csr_matrix((val_2, (J, I)), shape=(NN,NN), dtype=self.ftype)
+        
+        return A
     ## @ingroup FDMInterface
     def elliptic_operator(self, d=1, c=None, r=None):
         """
@@ -387,14 +392,14 @@ class UniformMesh1d(Mesh, Plotable):
 
         h = self.h
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
         node = self.node
 
         if callable(d):
             d = d(node)
         
         if c is None:
-            c = np.zeros(NN)
+            c = np.zeros(NN-1)
         elif callable(c):
             c = c(node)
         
@@ -403,24 +408,21 @@ class UniformMesh1d(Mesh, Plotable):
         elif callable(r):
             r = r(node)
 
+        I = k[1:]
+        J = k[:-1]
+
         # Assemble diffusion term
         cx = d / (h ** 2)
-        A = diags([2 * cx], [0], shape=(NN, NN), format='csr')
-
         val = np.broadcast_to(-cx, (NN - 1,))
-        I = K[1:]
-        J = K[:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
+        A = self.matrix_operator(2*cx,val,val,I,J,NN)
+        
         # Assemble convection term
         cc = c / (2 * h)
         val_c = np.broadcast_to(cc, (NN - 1,))
-        A -= csr_matrix((val_c, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val_c, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        # Assemble reaction term
-        A += diags([r], [0], shape=(NN, NN), format='csr')
+        A += self.matrix_operator(r,-val_c,val_c,I,J,NN)
+
 
         return A
 
@@ -434,15 +436,14 @@ class UniformMesh1d(Mesh, Plotable):
         h = self.h
         cx = 1/(h**2)
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([2*cx], [0], shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
 
         val = np.broadcast_to(-cx, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(2*cx,val,val,I,J,NN)
+
         return A
 
 
@@ -456,22 +457,17 @@ class UniformMesh1d(Mesh, Plotable):
         h = self.h
         cx = 5 / (self.h ** 2)
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([-2 * cx], [0], shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
 
         val = np.broadcast_to(cx, (NN-1,))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(-2*cx,val,val,I,J,NN)
 
         cy = 1 / (2 * h)
         val2 = np.broadcast_to(cy, (NN-1,))
-        A += csr_matrix((-val2, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val2, (J, I)), shape=(NN, NN), dtype=self.ftype)
-
-        A += diags([0.001], [0], shape=(NN, NN), format='csr')
+        A += self.matrix_operator(0.001,-val2,val2,I,J,NN)
 
         return A
 
@@ -565,6 +561,10 @@ class UniformMesh1d(Mesh, Plotable):
         else:
             index = self.ds.boundary_node_flag()
 
+        # uh[index]  = gN(node[index])
+
+        # f -= A@uh
+        # f[index] = uh[index]
         f[index] = gN(node[index])
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
@@ -629,15 +629,14 @@ class UniformMesh1d(Mesh, Plotable):
             raise ValueError(f"The r: {r} should be smaller than 0.5")
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([1 - 2 * r], 0, shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
 
         val = np.broadcast_to(r, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(1-2*r,val,val,I,J,NN)
+
         return A
 
     def parabolic_operator_backward(self, tau):
@@ -649,15 +648,15 @@ class UniformMesh1d(Mesh, Plotable):
         r = tau/self.h**2 
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([1+2*r], 0, shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1] 
 
         val = np.broadcast_to(-r, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(1+2*r,val,val,I,J,NN)
+
+
         return A
 
     def parabolic_operator_crank_nicholson(self, tau):
@@ -669,19 +668,17 @@ class UniformMesh1d(Mesh, Plotable):
         r = tau/self.h**2 
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([1 + r], 0, shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
+
         val = np.broadcast_to(-r/2, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(1+r,val,val,I,J,NN)
 
-        B = diags([1 - r], 0, shape=(NN, NN), format='csr')
         val = np.broadcast_to(r/2, (NN-1, ))
-        B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        B = self.matrix_operator(1-r,val,val,I,J,NN)
+
         return A, B
 
 
@@ -698,16 +695,13 @@ class UniformMesh1d(Mesh, Plotable):
         r = a * tau / self.h 
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([2 - 2*r**2], 0, shape=(NN, NN), format='csr')
-
-        I = K[1:]
-        J = K[0:-1]
+        I = k[1:]
+        J = k[0:-1]
 
         val = np.broadcast_to(r**2, (NN-1, ))
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(2-2*r**2,val,val,I,J,NN)
 
 
         return A
@@ -727,26 +721,19 @@ class UniformMesh1d(Mesh, Plotable):
         r = a * tau / self.h 
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A0 = diags([1 + 2 * r**2 * theta], 0, shape=(NN, NN), format='csr')
-        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], 0, shape=(NN, NN), format='csr')
-        A2 = diags([- 1 - 2 * r**2 * theta], 0, shape=(NN, NN), format='csr')
-
-        I = K[1:]
-        J = K[0:-1]
-
+        I = k[1:]
+        J = k[0:-1]
+        
         val = np.broadcast_to(- r**2 * theta, (NN-1, ))
-        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-
+        A0 = self.matrix_operator(1 + 2 * r**2 * theta,val,val,I,J,NN)
+        
         val = np.broadcast_to(r**2 * (1 - 2 * theta), (NN-1, ))
-        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A1 = self.matrix_operator(2 - 2 * r**2 * (1 - 2 * theta),val,val,I,J,NN)
 
         val = np.broadcast_to(r**2 * theta, (NN-1, ))
-        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A2 = self.matrix_operator(- 1 - 2 * r**2 * theta,val,val,I,J,NN)
 
         return A0, A1, A2
 
@@ -765,26 +752,19 @@ class UniformMesh1d(Mesh, Plotable):
         r = a * tau / self.h 
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
-        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
-        A2 = diags([- 1 - 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
-
-        I = K[1:]
-        J = K[0:-1]
+        I = k[1:]
+        J = k[0:-1]
 
         val = np.broadcast_to(- r**2 * theta, (NN-1, ))
-        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A0 = self.matrix_operator(1 + 2 * r**2 * theta,val,val,I,J,NN)
 
         val = np.broadcast_to(r**2 * (1 - 2 * theta), (NN-1, ))
-        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A1 = self.matrix_operator(2 - 2 * r**2 * (1 - 2 * theta),val,val,I,J,NN)        
 
         val = np.broadcast_to(r**2 * theta, (NN-1, ))
-        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A2 = self.matrix_operator(- 1 - 2 * r**2 * theta,val,val,I,J,NN)         
 
         return A0, A1, A2
 
@@ -800,26 +780,21 @@ class UniformMesh1d(Mesh, Plotable):
             raise ValueError(f"The r: {r} should be smaller than 1.0")
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
+        I = k[1:]
+        J = k[0:-1]
+        
         if a > 0:
-            A = diags([1 - r], 0, shape=(NN, NN), format='csr')
-
-            I = K[1:]
-            J = K[0:-1]
-
-            val = np.broadcast_to(r, (NN-1, ))
-            A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+            val_0 = np.broadcast_to(r, (NN-1, ))
+            val_1 = np.broadcast_to(0, (NN-1, ))
+            A = self.matrix_operator(1-r,val_0,val_1,I,J,NN)
 
             return A
         else:
-            B = diags([1 + r], 0, shape=(NN, NN), format='csr')
-
-            I = K[1:]
-            J = K[0:-1]
-
-            val = np.broadcast_to(-r, (NN-1, ))
-            B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+            val_0 = np.broadcast_to(-r, (NN-1, ))
+            val_1 = np.broadcast_to(r, (NN-1, ))
+            B = self.matrix_operator(1+r,val_0,val_1,I,J,NN)
 
             return B
 
@@ -834,15 +809,15 @@ class UniformMesh1d(Mesh, Plotable):
         r = a*tau/self.h
         
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([1], 0, shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
+
         val0 = np.broadcast_to(-r/2, (NN-1, ))
         val1 = np.broadcast_to(r/2, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(1,val1,val0,I,J,NN)
+
         return A
 
 
@@ -856,16 +831,14 @@ class UniformMesh1d(Mesh, Plotable):
             raise ValueError(f"The r: {r} should be smaller than 1.0")
     
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
     
-        A = diags([1-r], 0, shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]  
+
         val0 = np.broadcast_to(0, (NN-1, ))
         val1 = np.broadcast_to(r, (NN-1, ))
-
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(1-r,val1,val0,I,J,NN)
 
         return A
 
@@ -880,17 +853,15 @@ class UniformMesh1d(Mesh, Plotable):
             raise ValueError(f"The r: {r} should be smaller than 1.0")
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([0], 0, shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
 
         val0 = np.broadcast_to(1/2*(1 - r), (NN-1, ))
         val1 = np.broadcast_to(1/2*(1 + r), (NN-1, ))
 
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(0,val1,val0,I,J,NN)
     
         return A
 
@@ -902,26 +873,21 @@ class UniformMesh1d(Mesh, Plotable):
         r = a*tau/self.h
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
+        I = k[1:]
+        J = k[0:-1]
+        
         if a > 0:
-            A = diags([1 + r], [0], shape=(NN, NN), format='csr')
             val0 = np.broadcast_to(0, (NN-1, ))
             val1 = np.broadcast_to(-r, (NN-1, ))
-            I = K[1:]
-            J = K[0:-1]
-            A += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
-            A += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+            A = self.matrix_operator(1+r,val0,val1,I,J,NN)
 
             return A
         else:
-            B = diags([1 - r], [0], shape=(NN, NN), format='csr')
             val0 = np.broadcast_to(r, (NN-1, ))
             val1 = np.broadcast_to(0, (NN-1, ))
-            I = K[1:]
-            J = K[0:-1]
-            B += csr_matrix((val0, (I, J)), shape=(NN, NN), dtype=self.ftype)
-            B += csr_matrix((val1, (J, I)), shape=(NN, NN), dtype=self.ftype)
+            B = self.matrix_operator(1-r,val0,val1,I,J,NN)
 
             return B
 
@@ -932,17 +898,15 @@ class UniformMesh1d(Mesh, Plotable):
         r = a*tau/self.h
     
         NN = self.number_of_nodes()
-        K = np.arange(NN)
-    
-        A = diags([1], [0], shape=(NN, NN), format='csr')
-        val = np.broadcast_to(r/2, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
-    
-        return A
+        k = np.arange(NN)
 
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(r/2, (NN-1, ))
+        A = self.matrix_operator(1,val,-val,I,J,NN)
+
+        return A
     def hyperbolic_operator_leap_frog(self, a, tau):
         """
         @brief 蛙跳格式
@@ -953,14 +917,12 @@ class UniformMesh1d(Mesh, Plotable):
             raise ValueError(f"The r: {r} should be smaller than 1.0")
     
         NN = self.number_of_nodes()
-        K = np.arange(NN)
-    
-        A = diags([0], [0], shape=(NN, NN), format='csr')
+        k = np.arange(NN)
+        I = k[1:]
+        J = k[0:-1]
+
         val = np.broadcast_to(-r, (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val, (I, -J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (-J, I)), shape=(NN, NN), dtype=self.ftype)
+        A = self.matrix_operator(0,-val,val,I,J,NN)
        
         return A
 
@@ -974,15 +936,14 @@ class UniformMesh1d(Mesh, Plotable):
             raise ValueError(f"The r: {r} should be smaller than 1.0")
 
         NN = self.number_of_nodes()
-        K = np.arange(NN)
+        k = np.arange(NN)
 
-        A = diags([1 - r**2], [0], shape=(NN, NN), format='csr')
+        I = k[1:]
+        J = k[0:-1]
+
         val0 = np.broadcast_to(-r/2 + r**2/2, (NN-1, ))
         val1 = np.broadcast_to(r/2 + r**2/2 , (NN-1, ))
-        I = K[1:]
-        J = K[0:-1]
-        A += csr_matrix((val0, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val1, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A=self.matrix_operator(1 - r**2,val1,val0,I,J,NN)
     
         return A
 
