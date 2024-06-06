@@ -24,7 +24,7 @@ class OCAMSystem:
             with open(fname, 'rb') as f:
                 self.groundmesh = pickle.load(f)
         else:
-            self.groundmesh = self.get_ground_mesh()
+            self.groundmesh = self.get_ground_mesh(only_ground=False)
             # 保存 cps:
             with open(fname, 'wb') as f:
                 pickle.dump(self.groundmesh, f)

@@ -33,10 +33,6 @@ def test_interpolation_fe_function(p):
     order = np.log2(error[:, :-1]/error[:, 1:])
     assert(np.all(np.abs(order[0, -2:]-p-1)<0.2))
     assert(np.all(np.abs(order[1, -2:]-p)<0.2))
-    print(order)
-
-if __name__ == '__main__':
-    test_interpolation_fe_function(3)
 
 
 
