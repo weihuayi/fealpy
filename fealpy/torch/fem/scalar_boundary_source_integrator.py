@@ -17,7 +17,7 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
                  zero_integral: bool=False,
                  batched: bool=False) -> None:
         super().__init__()
-        self.f = source
+        self.source = source
         self.q = q
         self.zero_integral = zero_integral
         self.batched = batched
@@ -46,7 +46,7 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
         return bcs, ws, phi, fm, index
 
     def assembly(self, space: _FS) -> Tensor:
-        f = self.f
+        f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, fm, index = self.fetch(space)
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='face', index=index) # TODO: support normal derivative
@@ -56,5 +56,26 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
                 raise RuntimeError("The zero_integral option is only supported when the source is a tensor.")
             val_int = integral(val, ws, fm/fm.sum())
             val = val - val_int.reshape((-1,) + (1,) * (val.ndim - 1))
+            self._source_int = val_int
+
+        self._source_val = val
 
         return linear_integral(phi, ws, fm, val, batched=self.batched)
+
+    def get_source_val(self):
+        """Get the latest source value
+        (after the zero-integration if `zero_integral` is True).
+
+        Returns:
+            Tensor: Source value, shaped [Batch, Q, F_bd].
+        """
+        return self._source_val
+
+    def get_source_int(self) -> Tensor:
+        """Get the latest source integration on the boundary.
+        This is available only when `zero_integral` is True.
+
+        Returns:
+            Tensor: Integration value of each sample, shaped [Batch,].
+        """
+        return self._source_int

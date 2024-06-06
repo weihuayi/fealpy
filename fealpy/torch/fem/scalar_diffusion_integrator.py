@@ -12,13 +12,13 @@ from .integrator import CellOperatorIntegrator, _S, Index, CoefLike, enable_cach
 
 class ScalarDiffusionIntegrator(CellOperatorIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, c: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
-        self.coef = c
+        self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
@@ -55,7 +55,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
     def fast_assembly(self, space: _FS) -> Tensor:
         """
         限制：常系数、单纯形网格
-        TODO: 加入 assert 
+        TODO: 加入 assert
         """
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.fetch(space, variable='u')
