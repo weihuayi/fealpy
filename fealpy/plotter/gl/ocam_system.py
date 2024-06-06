@@ -4,9 +4,24 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 
+from dataclasses import dataclass, field
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
 import pickle
+
+@dataclass
+class GroundMarkPoint:
+    """
+    @brief 地面标记点
+    @param points0: 点在相机 cam0 的图像中的坐标
+    @param points1: 点在相机 cam1 的图像中的坐标
+    @param points2: 点的真实坐标
+    """
+    cam0:    int
+    cam1:    int
+    points0: np.ndarray
+    points1: np.ndarray
+    points2: np.ndarray
 
 class OCAMSystem:
     def __init__(self, data):
@@ -19,17 +34,7 @@ class OCAMSystem:
         
         self.cams = []
 
-        fname = os.path.expanduser(self.data_path+"groundmesh.pkl")
-        if os.path.exists(fname):
-            with open(fname, 'rb') as f:
-                self.groundmesh = pickle.load(f)
-        else:
-            self.groundmesh = self.get_ground_mesh(only_ground=False)
-            # 保存 cps:
-            with open(fname, 'wb') as f:
-                pickle.dump(self.groundmesh, f)
-
-        # 判断是否存在 cps.pkl 文件
+        # 判断是否已经生成了splite point 文件
         fname = os.path.expanduser(self.data_path+"cps.pkl")
         if os.path.exists(fname):
             with open(fname, 'rb') as f:
@@ -67,6 +72,35 @@ class OCAMSystem:
                 data_path = data['data_path'],
                 name = "cam{}".format(i),
             ))
+        self.gmp = self.ground_mark_board()
+
+        # 判断是否已经生成了 groundmesh 文件
+        fname = os.path.expanduser(self.data_path+"groundmesh.pkl")
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.groundmesh = pickle.load(f)
+        else:
+            self.groundmesh = self.get_ground_mesh(only_ground=False)
+            # 保存 cps:
+            with open(fname, 'wb') as f:
+                pickle.dump(self.groundmesh, f)
+
+
+    # 获取特征点
+    def ground_mark_board(self):
+        """
+        @brief 获取地面标记点
+        """
+        gmp = []
+        for i in range(6):
+            ri = (i+1)%6 # 右边相邻相机
+            ps0 = self.cams[i].mark_board[12:]
+            ps1 = self.cams[ri].mark_board[:12]
+            ps2 = 0.5*self.cams[i].mesh_to_ground(ps0, -self.center_height)
+            ps2+= 0.5*self.cams[ri].mesh_to_ground(ps1, -self.center_height)
+            for j in range(len(ps0)):
+                gmp.append(GroundMarkPoint(i, ri, ps0[j], ps1[j], ps2[j]))
+        return gmp
 
     def set_parameters(self, data):
         """
@@ -165,6 +199,11 @@ class OCAMSystem:
             pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
             planes.append(add_rectangle(pp0, pp1, pp2, pp3))
 
+        # 地面特征点
+        gmp = self.gmp
+        gmps = [gmsh.model.occ.addPoint(p.points2[0], p.points2[1], p.points2[2]) for p in gmp]
+        gmsh.model.occ.fragment(ground, [(0, p) for p in gmps])
+
         frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
         for i in range(len(frag[1]))[2:]:
             gmsh.model.occ.remove(frag[1][i], recursive=True)
@@ -197,6 +236,9 @@ class OCAMSystem:
         tag2nid = np.zeros(NN*2, dtype = np.int_)
         tag2nid[nid2tag] = np.arange(NN)
 
+        ## 获取地面特征点在网格中的编号
+        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, gmpsi)[0] for gmpsi in gmps])
+
         partmesh = []
         if only_ground:
             idxs = [[10], [12], [13], [11], [9], [8]]
@@ -208,7 +250,29 @@ class OCAMSystem:
                 cell0 = gmsh.model.mesh.get_elements(2, j)[2][0]
                 cell0 = tag2nid[cell0].reshape(-1, 3)
                 cell = np.concatenate((cell, cell0), axis=0)
+
+            # 获取第 i 块网格的屏幕边界特征点
+            didx_s = []
+            dval_s = []
+            geoedge = gmsh.model.getBoundary([(2, j) for j in idx])
+            for ge in geoedge:
+                didx_s.append(gmsh.model.mesh.get_nodes(1, ge[0])[0])
+                dval_s.append(node[didx_s[-1]])
+                
+
+            # 获取第 i 块网格的地面特征点
+            didx_g = []
+            dgmpidx = []
+            ismeshi = np.zeros(NN, dtype = np.bool_)
+            ismeshi[cell] = True
+            flag = ismeshi[gmpidx]
+            for i in range(len(flag)):
+                if flag[i]:
+                    didx_g.append(gmpidx[i])
+                    dgmpidx.append(i)
+
             partmesh.append(creat_part_mesh(node, cell))
+
 
         gmsh.finalize()
         return partmesh
