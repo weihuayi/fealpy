@@ -2,15 +2,6 @@ import jax
 import jax.numpy as jnp
 from jax import jit, value_and_grad
 from utilfuncs import Mesher
- 
-def test_projectionFilter(rho, beta, c0, isOn):
-    if isOn:
-        v1 = jnp.tanh(c0 * beta)
-        nm = v1 + jnp.tanh(beta * (rho - c0))
-        dnm = v1 + jnp.tanh(beta * (1. - c0))
-        return nm / dnm
-    else:
-        return rho
 
 class ComplianceMinimizer:
     def __init__(self, 
