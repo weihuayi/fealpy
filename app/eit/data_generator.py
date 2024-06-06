@@ -83,8 +83,7 @@ class EITDataGenerator():
         space = self.space
 
         bform = BilinearForm(space)
-        self._di.coef = _coef_func
-        self._di.clear(result_only=True)
+        self._di.set_coef(_coef_func)
         bform.add_integrator(self._di)
         self._A = bform.assembly()
         A_n = cat([cat([self._A, self.c], dim=1),
@@ -114,9 +113,8 @@ class EITDataGenerator():
         gn = gn_source(self.bd_node)
         batch_size = gn.size(0) if batched else 0
         lform = LinearForm(self.space, batch_size=batch_size)
-        self._bsi.f = gn_source
+        self._bsi.set_source(gn_source)
         self._bsi.batched = batched
-        self._bsi.clear(result_only=True)
         lform.add_integrator(self._bsi)
         b_ = lform.assembly()
         self.unsqueezed = False

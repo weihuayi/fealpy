@@ -140,7 +140,7 @@ class MeshDataStructure():
 
     ### counters
     def count(self, etype: Union[int, str]) -> int:
-        """@brief Return the number of entities of the given type."""
+        """Return the number of entities of the given type."""
         if etype in ('node', 0):
             return self.NN
         if isinstance(etype, str):
@@ -163,15 +163,19 @@ class MeshDataStructure():
     @overload
     def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default: _T) -> Union[Tensor, _T]: ...
     def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default=_default):
-        r"""@brief Get entities in mesh structure.
+        """Get entities in mesh structure.
 
-        @param etype: int or str. The topology dimension of the entity, or name
-        'cell' | 'face' | 'edge'. Note that 'node' is not in mesh structure.
-        For polygon meshes, the names 'cell_location' | 'face_location' may also be
-        available, and the `index` argument is applied on the flattened entity tensor.
-        @param index: int, slice ot Tensor. The index of the entity.
+        Args:
+            index (int | slice | Tensor): The index of the entity.
+            etype (int | str): The topology dimension of the entity, or name
+            'cell' | 'face' | 'edge'. Note that 'node' is not available in data structure.
+            For polygon meshes, the names 'cell_location' | 'face_location' may also be
+            available, and the `index` argument is applied on the flattened entity tensor.
+            index (int | slice | Tensor): The index of the entity.
+            default (Any): The default value if the entity is not found.
 
-        @return: Tensor or Sequence[Tensor].
+        Returns:
+            Tensor: Entity or the default value.
         """
         if isinstance(etype, str):
             etype = entity_str2dim(self, etype)
@@ -291,9 +295,6 @@ class HomoMeshDataStructure(MeshDataStructure):
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
-    def construct(self) -> None:
-        raise NotImplementedError
-
 
 ##################################################
 ### Mesh Base
@@ -332,13 +333,15 @@ class Mesh():
             return self.ds.entity(etype, index)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
-        r"""@brief Get the barycenter of the entity.
+        """Get the barycenter of the entity.
 
-        @param etype: int or str. The topology dimension of the entity, or name
-        'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
-        @param index: int, slice ot Tensor. The index of the entity.
+        Args:
+            etype (int | str): The topology dimension of the entity, or name
+            'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
+            index (int | slice | Tensor): The index of the entity.
 
-        @return: Tensor.
+        Returns:
+            Tensor: A 2-d tensor containing barycenters of the entity.
         """
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
@@ -349,29 +352,65 @@ class Mesh():
         etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
         return F.entity_barycenter(etn, node)
 
+    def edge_length(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the length of the edges.
+
+        Args:
+            index (int | slice | Tensor, optional): Index of edges.
+            out (Tensor, optional): The output tensor. Defaults to None.
+
+        Returns:
+            Tensor: Length of edges, shaped [NE,].
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_length(self.node[edge], out=out)
+
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
+        """Calculate the normal of the edges.
+
+        Args:
+            index (int | slice | Tensor, optional): Index of edges.
+            unit (bool, optional): _description_. Defaults to False.
+            out (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            Tensor: _description_
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_normal(self.node[edge], unit=unit, out=out)
+
+    def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the unit normal of the edges.
+        Equivalent to `edge_normal(index=index, unit=True)`.
+        """
+        return self.edge_normal(index=index, unit=True, out=out)
+
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
-        r"""@brief Get the quadrature points and weights."""
+        """Get the quadrature points and weights."""
         raise NotImplementedError
 
-    def shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        """@brief Shape function value on the given bc points, in shape (..., ldof).
+        """Shape function value on the given bc points, in shape (..., ldof).
 
-        @param bc: The bc points, in shape (..., NVC).
-        @param p: The order of the shape function.
-        @param index: The index of the cell.
-        @param variable: The variable name.
-        @param mi: The multi-index matrix.
+        Args:
+            bc (Tensor): The bc points, in shape (..., NVC).
+            p (int, optional): The order of the shape function. Defaults to 1.
+            index (int | slice | Tensor, optional): The index of the cell.
+            variable (str, optional): The variable name. Defaults to 'u'.
+            mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
-        @returns: The shape function value, in shape (..., ldof).
+        Returns:
+            Tensor: The shape function value with shape (..., ldof). The shape will\
+            be (..., 1, ldof) if `variable == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
-    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
-    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
@@ -384,9 +423,10 @@ class HomoMesh(Mesh):
         entity = self.ds.entity(etype, index)
         return F.homo_entity_barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]], etype='cell', index=_S) -> Tensor:
-        r"""@brief Convert barycenter coordinate points to cartesian coordinate points
-            on mesh entities.
+    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]],
+                    etype: Union[int, str]='cell', index: Index=_S) -> Tensor:
+        """Convert barycenter coordinate points to cartesian coordinate points
+        on mesh entities.
         """
         node = self.entity('node')
         entity = self.ds.entity(etype, index)
@@ -400,7 +440,7 @@ class HomoMesh(Mesh):
         raise NotImplementedError
 
     def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        r"""@brief Get the relationship between edges and integration points."""
+        """Get the relationship between edges and integration points."""
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.ds.edge[index]

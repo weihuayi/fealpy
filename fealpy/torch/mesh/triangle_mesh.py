@@ -68,6 +68,7 @@ class TriangleMeshDataStructure(HomoMeshDataStructure):
 
 
 class TriangleMesh(HomoMesh):
+    ds: TriangleMeshDataStructure
     def __init__(self, node: Tensor, cell: Tensor) -> None:
         self.node = node
         self.ds = TriangleMeshDataStructure(node.shape[0], cell)

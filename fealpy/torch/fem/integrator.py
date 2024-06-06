@@ -1,17 +1,17 @@
 
 from abc import ABCMeta, abstractmethod
-from typing import Union, Callable, Optional, Any
+from typing import Union, Callable, Optional, Any, TypeVar
 
 from torch import Tensor
 
 from ..functionspace.space import FunctionSpace as _FS
 
 Index = Union[int, slice, Tensor]
-_S = slice(None)
 CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
+_Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
 
-def enable_cache(meth: Callable[[Any, _FS], Tensor]) -> Callable[[Any, _FS], Tensor]:
+def enable_cache(meth: _Meth) -> _Meth:
     def wrapper(self, space: _FS) -> Tensor:
         if getattr(self, '_cache', None) is None:
             self._cache = {}
@@ -63,28 +63,60 @@ class Integrator(metaclass=ABCMeta):
                 self._cache.clear()
 
 
-class CellOperatorIntegrator(Integrator):
+class OperatorIntegrator(Integrator):
+    coef: Optional[CoefLike]
+
     def assembly(self, space: _FS) -> Tensor:
         raise NotImplementedError
 
+    def set_coef(self, coef: Optional[CoefLike]=None, /) -> None:
+        """Set a new coefficient of the equation to the integrator.
+        This will clear the cached result.
 
-class FaceOperatorIntegrator(Integrator):
+        Args:
+            coef (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
+        """
+        self.coef = coef
+        self.clear()
+
+
+class SourceIntegrator(Integrator):
+    source: Optional[CoefLike]
+
     def assembly(self, space: _FS) -> Tensor:
         raise NotImplementedError
 
+    def set_source(self, source: Optional[CoefLike]=None, /) -> None:
+        """Set a new source term of the equation to the integrator.
+        This will clear the cached result.
 
-class CellSourceIntegrator(Integrator):
-    def assembly(self, space: _FS) -> Tensor:
-        raise NotImplementedError
+        Args:
+            source (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
+        """
+        self.source = source
+        self.clear()
 
 
-class FaceSourceIntegrator(Integrator):
-    def assembly(self, space: _FS) -> Tensor:
-        raise NotImplementedError
+# These Integrator classes are for type checking
+
+class CellOperatorIntegrator(OperatorIntegrator):
+    pass
+
+class CellSourceIntegrator(SourceIntegrator):
+    pass
+
+class FaceOperatorIntegrator(OperatorIntegrator):
+    pass
+
+class FaceSourceIntegrator(SourceIntegrator):
+    pass
 
 
 __all__ = [
     'Integrator',
+    'OperatorIntegrator',
+    'SourceIntegrator',
+
     'CellOperatorIntegrator',
     'FaceOperatorIntegrator',
     'CellSourceIntegrator',
