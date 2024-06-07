@@ -3,7 +3,7 @@ from typing import Optional, Callable
 
 from torch import Tensor
 
-from ..mesh import HomoMesh
+from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral, integral
@@ -32,7 +32,7 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
         q = self.q
         mesh = getattr(space, 'mesh', None)
 
-        if not isinstance(mesh, HomoMesh):
+        if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The ScalarBoundarySourceIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")

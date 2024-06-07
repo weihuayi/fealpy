@@ -7,6 +7,7 @@ from torch import Tensor
 from ..functionspace.space import FunctionSpace as _FS
 
 Index = Union[int, slice, Tensor]
+_S = slice(None)
 CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
 _Meth = TypeVar('_Meth', bound=Callable[..., Any])
 

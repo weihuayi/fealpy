@@ -2,6 +2,7 @@
 import itertools
 import numpy as np
 from .ocam_system import OCAMSystem
+from fealpy.iopt import COA
 
 class OptimizeParameter:
     """
@@ -45,7 +46,8 @@ class OptimizeParameter:
         models = self.models
         align_point = self.align_point
 
-        osysterm.set_parameters(x)
+        #osysterm.set_parameters(x)
+        osysterm.set_parameters(x.reshape(18,3))
 
         ## 要对齐的点在屏幕上的坐标
         align_point_screen = np.zeros([6, 2, 12, 3], dtype=np.float_)
@@ -57,7 +59,7 @@ class OptimizeParameter:
             mod = models[i][j]
             align_point_screen[i, j] = mod.mesh_to_ground(align_point[i, j], z0)
 
-        print(np.concatenate([align_point_screen[:, 0], align_point_screen[:, 1]], axis=-1))
+        #print(np.concatenate([align_point_screen[:, 0], align_point_screen[:, 1]], axis=-1))
         error = np.sum((align_point_screen[:, 0] - align_point_screen[:, 1])**2)
         return error
 
@@ -71,8 +73,21 @@ class OptimizeParameter:
             init_x[i]    = self.ocam_systerm.cams[i].location
             init_x[i+6]  = self.ocam_systerm.cams[i].axes[0]
             init_x[i+12] = self.ocam_systerm.cams[i].axes[1]
+        init_x = init_x.flatten()
 
-        error = self.object_function(init_x)
+        #设置参数
+        ub = init_x + 1
+        lb = init_x - 1
+        N = 100
+        dim = 18 * 3
+        Max_iter = 2000
+
+        opt_alg = COA(N, dim, ub, lb, Max_iter, self.object_function, init_x)
+        error, best_position, _ = opt_alg.cal()
+        #print('The best-obtained solution by COA is : ' , best_position)
+        #print('The best optimal value of the objective funciton found by COA is : ' , error)
+        #error = self.object_function(init_x)
+
         print(error)
 
 
