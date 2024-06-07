@@ -10,8 +10,7 @@ from fealpy.torch.mesh.quadrature import Quadrature
 
 from .. import logger
 from . import functional as F
-from . import mesh_kernel as K
-from .mesh_base import HomoMeshDataStructure, HomoMesh, entity_str2dim
+from .mesh_base import MeshDS, SimplexMesh, entity_str2dim
 
 Index = Union[Tensor, int, slice]
 _dtype = torch.dtype
@@ -20,11 +19,12 @@ _device = torch.device
 _S = slice(None)
 
 
-class TriangleMeshDataStructure(HomoMeshDataStructure):
+class TriangleMeshDataStructure(MeshDS):
     def __init__(self, NN: int, cell: Tensor):
-        super().__init__(NN, 2, cell)
+        super().__init__(NN, 2)
         # constant tensors
         kwargs = {'dtype': cell.dtype, 'device': cell.device}
+        self.cell = cell
         self.localEdge = torch.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
         self.localFace = torch.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
         self.ccw = torch.tensor([0, 1, 2], **kwargs)
@@ -39,35 +39,8 @@ class TriangleMeshDataStructure(HomoMeshDataStructure):
     def total_face(self):
         return self.cell[..., self.localFace].reshape(-1, 2)
 
-    def construct(self) -> None:
-        NC = self.cell.shape[0]
-        NFC = self.cell.shape[1]
 
-        totalFace = self.total_face()
-        _, i0_np, j_np = np.unique(
-            torch.sort(totalFace, dim=1)[0].cpu().numpy(),
-            return_index=True,
-            return_inverse=True,
-            axis=0
-        )
-        self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
-        NF = i0_np.shape[0]
-
-        i1_np = np.zeros(NF, dtype=i0_np.dtype)
-        i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
-
-        self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
-        self.cell2face = self.cell2edge
-
-        face2cell_np = np.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
-        self.face2cell = torch.from_numpy(face2cell_np).to(self.device)
-        self.edge2cell = self.face2cell
-
-        logger.info(f"Mesh toplogy relation constructed, with {NF} edge (or face), "
-                    f"on device {self.device}")
-
-
-class TriangleMesh(HomoMesh):
+class TriangleMesh(SimplexMesh):
     ds: TriangleMeshDataStructure
     def __init__(self, node: Tensor, cell: Tensor) -> None:
         self.node = node
@@ -86,6 +59,7 @@ class TriangleMesh(HomoMesh):
                         "cell_area and grad_lambda are not available. "
                         "Any operation involving them will fail.")
 
+    # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         node = self.node
         if isinstance(etype, str):
@@ -101,6 +75,7 @@ class TriangleMesh(HomoMesh):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
+    # integrator
     def integrator(self, q: int, etype: Union[int, str]='cell',
                    qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import TriangleQuadrature
@@ -118,6 +93,7 @@ class TriangleMesh(HomoMesh):
         quad._latest_order = q
         return quad
 
+    # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
             iptype = entity_str2dim(self.ds, iptype)
@@ -126,17 +102,14 @@ class TriangleMesh(HomoMesh):
     def number_of_global_ipoints(self, p: int):
         return F.simplex_gdof(p, self)
 
-    def interpolation_points(self, p: int, index=np.s_[:]):
-        """
-        @brief Fetch all p-order interpolation points on a triangle mesh.
-        """
+    def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
+        """Fetch all p-order interpolation points on the triangle mesh."""
         node = self.entity('node')
         if p == 1:
             return node
         if p <= 0:
             raise ValueError("p must be a integer larger than 0.")
 
-        cell = self.entity('cell')
         ipoint_list = []
         kwargs = {'dtype': self.ftype, 'device': self.device}
 
@@ -153,6 +126,7 @@ class TriangleMesh(HomoMesh):
 
         if p >= 3:
             TD = self.top_dimension()
+            cell = self.entity('cell')
             multiIndex = self.multi_index_matrix(p, TD)
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
@@ -212,38 +186,11 @@ class TriangleMesh(HomoMesh):
     def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         return self.edge_to_ipoint(p, index)
 
+    # shape function
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.node[self.ds.cell[index]])
 
-    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
-        phi = K.simplex_shape_function(bc, p, mi)
-        if variable == 'u':
-            return phi
-        elif variable == 'x':
-            return phi.unsqueeze_(1)
-        else:
-            raise ValueError("Variable type is expected to be 'u' or 'x', "
-                             f"but got '{variable}'.")
-
-    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
-        R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
-        if variable == 'u':
-            return R
-        elif variable == 'x':
-            Dlambda = self.grad_lambda(index=index)
-            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
-            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
-            return gphi
-        else:
-            raise ValueError("Variable type is expected to be 'u' or 'x', "
-                             f"but got '{variable}'.")
-
+    # constructor
     @classmethod
     def from_box(cls, box: List[int]=[0, 1, 0, 1], nx=10, ny=10, threshold=None, *,
                  itype: Optional[_dtype]=torch.int,

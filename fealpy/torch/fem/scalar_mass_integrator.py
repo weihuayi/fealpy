@@ -6,17 +6,16 @@ from torch import Tensor
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import linear_integral
-from .integrator import CellSourceIntegrator, _S, Index, CoefLike, enable_cache
+from ..functional import bilinear_integral
+from .integrator import CellOperatorIntegrator, _S, Index, CoefLike, enable_cache
 
 
-class ScalarSourceIntegrator(CellSourceIntegrator):
-    r"""The domain source integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
+class ScalarMassIntegrator(CellOperatorIntegrator):
+    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()
-        self.source = source
+        self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
@@ -32,7 +31,7 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
+            raise RuntimeError("The ScalarMassIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -40,13 +39,12 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index, variable='x')
-
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> Tensor:
-        f = self.source
+        coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
 
-        return linear_integral(phi, ws, cm, val, batched=self.batched)
+        return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)

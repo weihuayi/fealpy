@@ -6,6 +6,7 @@ from .linear_form import LinearForm
 
 ### Cell Operator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
+from .scalar_mass_integrator import ScalarMassIntegrator
 
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
