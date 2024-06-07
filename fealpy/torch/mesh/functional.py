@@ -121,8 +121,8 @@ def homo_entity_barycenter(entity: Tensor, node: Tensor):
     return torch.mean(node[entity, :], dim=1)
 
 
-# Triangle Mesh & Tetrahedron Mesh
-# ================================
+# Interval Mesh & Triangle Mesh & Tetrahedron Mesh
+# ================================================
 
 def simplex_ldof(p: int, iptype: int) -> int:
     r"""Number of local DoFs of a simplex."""
@@ -168,6 +168,23 @@ def simplex_measure(points: Tensor):
 ### Final Mesh
 ##################################################
 
+# Interval Mesh
+# =============
+
+def int_grad_lambda(points: Tensor):
+    """grad_lambda function for the interval mesh.
+
+    Args:
+        points (Tensor[..., 2, GD]): _description_
+
+    Returns:
+        Tensor: grad lambda tensor shaped [..., 2, GD].
+    """
+    v = points[..., 1, :] - points[..., 0, :] # (NC, GD)
+    h2 = torch.sum(v**2, dim=-1, keepdim=True)
+    v = v.div(h2)
+    return torch.stack([-v, v], dim=-2)
+
 # Triangle Mesh
 # =============
 
@@ -177,7 +194,7 @@ def tri_area_3d(points: Tensor, out: Optional[Tensor]=None):
 
 
 def tri_grad_lambda_2d(points: Tensor):
-    r"""
+    """grad_lambda function for the triangle mesh in 2D.
     Args:
         points: Tensor(..., 3, 2).
 

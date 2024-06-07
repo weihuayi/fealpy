@@ -4,7 +4,7 @@ from typing import Optional, Union, Callable
 
 from torch import Tensor
 
-from .mesh import HomoMesh, Mesh
+from .mesh import HomogeneousMesh, Mesh
 
 Number = Union[builtins.int, builtins.float]
 CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
@@ -14,7 +14,7 @@ Index = Union[slice, Tensor, int]
 def process_coef_func(
     coef: Optional[CoefLike],
     bcs: Optional[Tensor]=None,
-    mesh: Optional[HomoMesh]=None,
+    mesh: Optional[HomogeneousMesh]=None,
     etype: Optional[Union[int, str]]=None,
     index: Optional[Tensor]=None
 ):
@@ -27,7 +27,7 @@ def process_coef_func(
         if etype is None:
             raise RuntimeError('The etype should be provided for coef functions.')
         if getattr(coef, 'coordtype', 'cartesian') == 'cartesian':
-            if (mesh is None) or (not isinstance(mesh, HomoMesh)):
+            if (mesh is None) or (not isinstance(mesh, HomogeneousMesh)):
                 raise RuntimeError('The mesh should be provided for cartesian coef functions.'
                                    'Note that only homogeneous meshes are supported here.')
 
