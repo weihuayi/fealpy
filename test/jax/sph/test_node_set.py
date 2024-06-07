@@ -1,6 +1,8 @@
 import jax.numpy as jnp
 from jax import random
 from fealpy.jax.sph.node_set import NodeSet
+from fealpy.jax.sph.kernel_function import QuinticKernel
+import matplotlib.pyplot as plt
 
 def test_neighbors():
     box_size = 10.0  
@@ -36,6 +38,53 @@ def test_add_node_data():
     assert jnp.array_equal(node_set.nodedata['pressure'], pressure_data), "Pressure data mismatch"
     print("all tests passed.")
 
+def test_interpolate():
+    #参数设置
+    box_size = 10.0  
+    cutoff = 1.5 
+    key = random.PRNGKey(0)
+    num_particles = 10
+    positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
+    node_set = NodeSet(positions)
+    #测试函数
+    u = node_set.node[:,0]*node_set.node[:,1] 
+    kernel = QuinticKernel(h=cutoff,dim=2)
+    neighbor = node_set.neighbors(box_size, cutoff)
+    a = node_set.interpolate(u,kernel,neighbor,cutoff)
+    print(a[0])
+    print(a[1])
+
+def test_from_tgv_domain():
+    node_set = NodeSet.from_tgv_domain()
+    fig, ax = plt.subplots()
+    node_set.add_plot(ax, color='red', markersize=50)
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.title('NodeSet from TGV Domain')
+    plt.show()
+
+def test_from_ringshaped_channel_domain():
+    node_set = NodeSet.from_ringshaped_channel_domain()
+    fig, ax = plt.subplots()
+    node_set.add_plot(ax, color='red', markersize=50)
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.title('NodeSet from ring shaped channel Domain')
+    plt.show()
+
+def test_dam_break_domain():
+    node_set = NodeSet.from_dam_break_domain()
+    fig, ax = plt.subplots()
+    node_set.add_plot(ax, color='red', markersize=50)
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.title('NodeSet from dam break Domain')
+    plt.show()
+
 if __name__ == "__main__":
-    test_neighbors()
-    test_add_node_data()
+    #test_neighbors()
+    #test_add_node_data()
+    #test_interpolate()
+    #test_from_tgv_domain()
+    #test_from_ringshaped_channel_domain()
+    test_dam_break_domain()
