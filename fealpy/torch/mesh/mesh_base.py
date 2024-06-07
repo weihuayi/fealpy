@@ -4,9 +4,12 @@ from typing import (
     Literal, TypeVar
 )
 
+import numpy as np
 import torch
 
+from .. import logger
 from . import functional as F
+from . import mesh_kernel as K
 from .quadrature import Quadrature
 
 Tensor = torch.Tensor
@@ -57,13 +60,13 @@ def entity_str2dim(ds, etype: str) -> int:
         return -ds.top_dimension()
     elif etype == 'face':
         TD = ds.top_dimension()
-        if TD <= 1:
-            raise ValueError('the mesh has no face entity.')
+        # if TD <= 1:
+        #     raise ValueError('the mesh has no face entity.')
         return TD - 1
     elif etype == 'face_location':
         TD = ds.top_dimension()
-        if TD <= 1:
-            raise ValueError('the mesh has no face location.')
+        # if TD <= 1:
+        #     raise ValueError('the mesh has no face location.')
         return -TD + 1
     elif etype == 'edge':
         return 1
@@ -101,7 +104,7 @@ def entity_dim2node(ds, etype_dim: int, index=None, dtype=None) -> Tensor:
 ### Mesh Data Structure Base
 ##################################################
 
-class MeshDataStructure():
+class MeshDS():
     _STORAGE_ATTR = ['cell', 'face', 'edge', 'cell_location','face_location']
     def __init__(self, NN: int, TD: int) -> None:
         self._entity_storage: Dict[int, Tensor] = {}
@@ -129,6 +132,10 @@ class MeshDataStructure():
     def to(self, device: Union[_device, str, None]=None, non_blocking=False):
         for entity_tensor in self._entity_storage.values():
             entity_tensor.to(device, non_blocking=non_blocking)
+        for attr in self.__dict__:
+            value = self.__dict__[attr]
+            if isinstance(value, torch.Tensor):
+                self.__dict__[attr] = value.to(device, non_blocking=non_blocking)
         return self
 
     ### properties
@@ -153,10 +160,6 @@ class MeshDataStructure():
     def number_of_edges(self): return self.count('edge')
     def number_of_faces(self): return self.count('face')
     def number_of_cells(self): return self.count('cell')
-
-    ### constructors
-    def construct(self) -> None:
-        raise NotImplementedError
 
     @overload
     def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor: ...
@@ -265,14 +268,18 @@ class MeshDataStructure():
     def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
 
 
-class HomoMeshDataStructure(MeshDataStructure):
+    ### Homogeneous Mesh ###
+    def is_homogeneous(self) -> bool:
+        """Return True if the mesh is homogeneous.
+
+        Returns:
+            bool: Homogeneous indicator.
+        """
+        return self.cell.ndim == 2
+
     ccw: Tensor
     localEdge: Tensor
     localFace: Tensor
-
-    def __init__(self, NN: int, TD: int, cell: Tensor) -> None:
-        super().__init__(NN, TD)
-        self.cell = cell
 
     number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
     number_of_nodes_of_cells = number_of_vertices_of_cells
@@ -295,13 +302,59 @@ class HomoMeshDataStructure(MeshDataStructure):
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
+    def construct(self):
+        if not self.is_homogeneous():
+            raise RuntimeError('Can not construct for a non-homogeneous mesh.')
+
+        NC = self.cell.shape[0]
+        NFC = self.cell.shape[1]
+
+        totalFace = self.total_face()
+        _, i0_np, j_np = np.unique(
+            torch.sort(totalFace, dim=1)[0].cpu().numpy(),
+            return_index=True,
+            return_inverse=True,
+            axis=0
+        )
+        self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
+        NF = i0_np.shape[0]
+
+        i1_np = np.zeros(NF, dtype=i0_np.dtype)
+        i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
+
+        self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
+        self.cell2face = self.cell2edge
+
+        face2cell_np = np.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
+        self.face2cell = torch.from_numpy(face2cell_np).to(self.device)
+        self.edge2cell = self.face2cell
+
+        if self.TD == 3:
+            NEC = self.number_of_edges_of_cells()
+
+            total_edge = self.total_edge()
+            _, i2, j = np.unique(
+                torch.sort(total_edge, dim=1)[0].cpu().numpy(),
+                return_index=True,
+                return_inverse=True,
+                axis=0
+            )
+            self.edge = total_edge[i2, :]
+            self.cell2edge = torch.from_numpy(j).to(self.device).reshape(NC, NEC)
+
+        elif self.TD == 2:
+            self.edge2cell = self.face2cell
+
+        logger.info(f"Mesh toplogy relation constructed, with {NF} edge (or face), "
+                    f"on device {self.device}")
+
 
 ##################################################
 ### Mesh Base
 ##################################################
 
 class Mesh():
-    ds: MeshDataStructure
+    ds: MeshDS
     node: Tensor
 
     def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
@@ -415,7 +468,8 @@ class Mesh():
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
 
-class HomoMesh(Mesh):
+class HomogeneousMesh(Mesh):
+    # entity
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         node = self.entity('node')
         if etype in ('node', 0):
@@ -439,6 +493,12 @@ class HomoMesh(Mesh):
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
+
     def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         """Get the relationship between edges and integration points."""
         NN = self.number_of_nodes()
@@ -452,8 +512,46 @@ class HomoMesh(Mesh):
             edges[:, 1].reshape(-1, 1),
         ], dim=-1)
 
-    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+
+class SimplexMesh(HomogeneousMesh):
+    # ipoints
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
+        if isinstance(iptype, str):
+            iptype = entity_str2dim(self.ds, iptype)
+        return F.simplex_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p: int):
+        return F.simplex_gdof(p, self)
+
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
-    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        raise NotImplementedError
+    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        TD = bc.shape[-1] - 1
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        phi = K.simplex_shape_function(bc, p, mi)
+        if variable == 'u':
+            return phi
+        elif variable == 'x':
+            return phi.unsqueeze_(1)
+        else:
+            raise ValueError("Variable type is expected to be 'u' or 'x', "
+                             f"but got '{variable}'.")
+
+    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        TD = bc.shape[-1] - 1
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
+        if variable == 'u':
+            return R
+        elif variable == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
+            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
+            return gphi
+        else:
+            raise ValueError("Variable type is expected to be 'u' or 'x', "
+                             f"but got '{variable}'.")

@@ -16,7 +16,7 @@ from fealpy.torch.solver import sparse_cg
 
 from torch import cos, pi, tensordot
 
-from fealpy.ml import timer
+from fealpy.utils import timer
 from matplotlib import pyplot as plt
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')

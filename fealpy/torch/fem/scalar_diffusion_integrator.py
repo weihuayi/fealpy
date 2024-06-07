@@ -3,7 +3,7 @@ from typing import Optional
 
 from torch import Tensor
 
-from ..mesh import HomoMesh
+from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
@@ -33,7 +33,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         index = self.index
         mesh = getattr(space, 'mesh', None)
 
-        if not isinstance(mesh, HomoMesh):
+        if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The ScalarDiffusionIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
