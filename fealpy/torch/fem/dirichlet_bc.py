@@ -137,7 +137,7 @@ class DirichletBC():
 
         return A
 
-    def apply_vector(self, vector: Tensor, matrix: Tensor, uh: Optional[Tensor],
+    def apply_vector(self, vector: Tensor, matrix: Tensor, uh: Optional[Tensor]=None,
                      gd: Optional[CoefLike]=None, *, check=True) -> Tensor:
         """Appy Dirichlet boundary contition to right-hand-size vector only.
 
