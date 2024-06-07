@@ -1,9 +1,9 @@
 
 import jax.numpy as jnp
+from jax_md import space, partition
+from jax import jit, vmap
 from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
-from jax import random
-from jax_md import space, partition
 
 class NodeSet():
 
@@ -62,9 +62,41 @@ class NodeSet():
                     neighbors_dict[i]['distances'].append(distance)
 
         return neighbors_dict
+
+    def interpolate(self, u, kernel, neighbor, h):
+        """
+        参数:
+        - u: 函数值
+        - kernel: 核函数
+        - neighbor: 邻近索引
+        - h: 光滑长度
+        返回:
+        - kernel_function: 核函数插值后的值
+        - kernel_grad : 核函数梯度插值后的值
+        """
+        kernel_function = []
+        kernel_grad = []
+        for i, value in neighbor.items():
+            rho = len(value['indices'])
+            m = jnp.pi * h**2
+            if rho == 0:
+                kernel_function.append(0)
+                kernel_grad.append(0)
+            else:
+                idx = [item.item() for item in value['indices']]
+                dist = jnp.array([item.item() for item in value['distances']])
+                w = kernel.value(dist)
+                k = jnp.dot((m/rho)*u[jnp.array(idx)],w)
+                kernel_function.append(k)
+          
+                reduce = self.node[1,:] - self.node[idx,:]
+                dw = vmap(kernel.grad_value)(dist)[:,jnp.newaxis]*reduce
+                dk = jnp.dot((m/rho)*u[jnp.array(idx)],dw)
+                kernel_grad.append(dk)
+        return kernel_function, kernel_grad
     
     @classmethod
-    def from_tgv_domain(cls, dx=0.2, dy=0.2):
+    def from_tgv_domain(cls, dx=0.02, dy=0.02):
         result = jnp.mgrid[0:1+dx:dx, 0:1+dy:dy].reshape(2, -1).T
         return cls(result)
 
