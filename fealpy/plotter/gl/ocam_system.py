@@ -237,45 +237,48 @@ class OCAMSystem:
         tag2nid[nid2tag] = np.arange(NN)
 
         ## 获取地面特征点在网格中的编号
-        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, gmpsi)[0] for gmpsi in gmps])
+        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, g)[0] for g in gmps])
 
+        ## 网格分块
+        didx = [] # 狄利克雷边界条件的节点编号
+        dval = [] # 狄利克雷边界条件的节点值
         partmesh = []
         if only_ground:
             idxs = [[10], [12], [13], [11], [9], [8]]
         else:
             idxs = [[10, 4], [12, 6], [13, 7], [11, 5], [9, 3], [8, 1, 2]]
-        for idx in idxs:
-            cell = np.zeros([0, 3], dtype = np.int_)
+        for i, idx in enumerate(idxs):
+            # 获取第 i 块网格的单元
+            cell = []
             for j in idx:
-                cell0 = gmsh.model.mesh.get_elements(2, j)[2][0]
-                cell0 = tag2nid[cell0].reshape(-1, 3)
-                cell = np.concatenate((cell, cell0), axis=0)
+                cell0 = gmsh.model.mesh.get_elements(2, j)[2][0].reshape(-1, 3)
+                cell.append(tag2nid[cell0])
+            cell = np.concatenate(cell, axis=0)
+
+            f0 = lambda x : self.cams[i].project_to_cam_sphere(x)
+            f1 = lambda x : self.cams[i].image_to_camera_sphere(x)
 
             # 获取第 i 块网格的屏幕边界特征点
-            didx_s = []
-            dval_s = []
             geoedge = gmsh.model.getBoundary([(2, j) for j in idx])
-            for ge in geoedge:
-                didx_s.append(gmsh.model.mesh.get_nodes(1, ge[0])[0])
-                dval_s.append(node[didx_s[-1]])
-                
+            didx_s = [gmsh.model.mesh.get_nodes(1, ge[0])[0] for ge in geoedge]
+            dval_s = [f0(node[didx]) for didx in didx_s]
 
             # 获取第 i 块网格的地面特征点
-            didx_g = []
-            dgmpidx = []
             ismeshi = np.zeros(NN, dtype = np.bool_)
-            ismeshi[cell] = True
-            flag = ismeshi[gmpidx]
-            for i in range(len(flag)):
-                if flag[i]:
-                    didx_g.append(gmpidx[i])
-                    dgmpidx.append(i)
+            ismeshi[cell] = True # 第 i 块网格中的点
 
+            flag = ismeshi[gmpidx]
+            didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
+            dval_g = [f1(g.points0) if g.cam0 == i else f1(g.points1) for j, g in enumerate(gmps) if flag[j]]
+
+            didx.append(didx_s + didx_g)
+            dval.append(dval_s + dval_g)
             partmesh.append(creat_part_mesh(node, cell))
 
-
+        didx = np.concatenate(didx, axis=0)
+        dval = np.concatenate(dval, axis=0)
         gmsh.finalize()
-        return partmesh
+        return partmesh, didx, dval 
 
     def undistort_cv(self):
         for i, cam in enumerate(self.cams):

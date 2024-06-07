@@ -390,6 +390,15 @@ class OCAMModel:
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
+    def project_to_cam_sphere(self, node):
+        """
+        @brief 将球面上的点投影到相机单位球面上
+        """
+        node = node-self.location
+        r = np.sqrt(np.sum(node**2, axis=1))
+        node /= r[:, None]
+        return node
+
     def mesh_to_image(self, node):
         node[:, 1] = self.height - node[:, 1]
         return node
