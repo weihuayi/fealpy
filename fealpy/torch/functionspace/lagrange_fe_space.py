@@ -129,14 +129,14 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         if doforder == 'sdofs':
             # phi.shape == (NQ, NC, ldof)
-            # uh.shape == (..., gdof)
+            # uh.shape == (..., GD, gdof)
             # uh[..., cell2dof].shape == (..., NC, ldof)
             # val.shape == (NQ, ..., NC)
             s1 = f"...ci, {s0[:dim]}ci->...{s0[:dim]}c"
             val = torch.einsum(s1, phi, uh[..., cell2dof])
         elif doforder == 'vdims':
             # phi.shape == (NQ, NC, ldof)
-            # uh.shape == (gdof, ...)
+            # uh.shape == (gdof, GD)
             # uh[cell2dof, ...].shape == (NC, ldof, ...)
             # val.shape == (NQ, NC, ...)
             s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"
