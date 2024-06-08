@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
 import pickle
+from app.svads3d.harmonic_map import *
 
 @dataclass
 class GroundMarkPoint:
@@ -271,12 +272,10 @@ class OCAMSystem:
             didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
             dval_g = [f1(g.points0) if g.cam0 == i else f1(g.points1) for j, g in enumerate(gmps) if flag[j]]
 
-            didx.append(didx_s + didx_g)
-            dval.append(dval_s + dval_g)
+            didx.append(np.concatenate((didx_s, didx_g), axis=0))
+            dval.append(np.concatenate((dval_s, dval_g), axis=0))
             partmesh.append(creat_part_mesh(node, cell))
 
-        didx = np.concatenate(didx, axis=0)
-        dval = np.concatenate(dval, axis=0)
         gmsh.finalize()
         return partmesh, didx, dval 
 
@@ -850,6 +849,50 @@ class OCAMSystem:
 
         return camera_points
 
+    def screen_to_viewpoint(self, points):
+        """
+        @brief 将屏幕上的点映射到视点单位球
+        """
+        vp = self.viewpoint
+        v = points-vp[None, :]
+        v /= np.linalg.norm(v, axis=-1, keepdims=True)
+        return v+vp[None, :]
+
+    def screen_to_image(self):
+        """
+        @brief 从视点到相机球面坐标
+        """
+        uv = []
+        for i, cam in enumerate(self.cams):
+            mesh   = self.partmesh[i]
+            node_s = mesh.entity('node').copy()
+            node   = screen_to_viewpoint(node_s)
+            mesh.node = node
+
+            data = HarmonicMapData(mesh, self.didx[i], self.dval[i])
+            node = sphere_harmonic_map(data).reshape(-1, 3)
+            uv.append(cam.cam_to_image(node))
+            mesh.node = node_s
+        return uv
+
+    def show_ground_mesh_with_view_point(self, plotter):
+        """
+        @brief 显示地面网格和视点
+        """
+        mesh = TriangleMesh.from_box([-10, 10, -10, 10], nx=100, ny=100)
+        node = np.zeros((mesh.number_of_nodes(), 3), dtype=np.float64)
+        node[:, 0:2] = mesh.entity('node')
+        cell = mesh.entity('cell')
+        # 投影到单位球面
+        node = screen_to_viewpoint(node)
+        uv = self.screen_to_image()
+        for i, cam in enumerate(self.cams):
+            mesh = self.partmesh[i]
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            no = np.concatenate((node[cell].reshape(-1, 3), uv[i][cell].reshape(-1, 3)), axis=-1, dtype=np.float32)
+            plotter.add_mesh(no, cell=None, texture_path=cam.fname)
+
     def undistort_cv(self):
         import cv2
         images = []
@@ -1022,26 +1065,26 @@ class OCAMSystem:
         mark_board[...,1] = 1080-mark_board[...,1] 
         data = {
             "nc" : 6,
-            "location" : location,
-            "axes" : (cx, cy, cz),
-            "center" : center,
-            "ss" : ss,
-            "pol" : pol,
-            "affine" : affine,
-            "fname" : fname,
-            "chessboardpath": chessboardpath,
-            "width" : 1920,
-            "height" : 1080,
-            "vfield" : (110, 180),
-            'flip' : flip,
-            'icenter': icenter,
-            'radius' : radius,
-            'mark_board': mark_board,
-            'center_height' : h,
+            "location" : location, # 相机位置
+            "axes" : (cx, cy, cz), # 相机坐标系旋转矩阵
+            "center" : center,     # 相机中心
+            "ss" : ss,             # 鱼眼相机映射的多项式系数
+            "pol" : pol,           # 鱼眼相机逆映射多项式系数
+            "affine" : affine,     # 仿射变换系数
+            "fname" : fname,       # 图片文件名
+            "chessboardpath": chessboardpath, # 棋盘格文件名
+            "width" : 1920,        # 图片宽度
+            "height" : 1080,       # 图片高度
+            "vfield" : (110, 180), # 水平视场角，垂直视场角
+            'flip' : flip,         # 是否翻转
+            'icenter': icenter,    # 图片中心
+            'radius' : radius,     # 图片半径
+            'mark_board': mark_board, # 地面标记的点
+            'center_height' : h,      # 世界坐标原点到地面的高度
             'size' : (17.5, 3.47, 3), # 小车长宽高
             'scale_ratio' : (1.618, 3.618, 1.618), # 三个主轴的伸缩比例
-            'viewpoint' : (0, 0, 0), # 视点
-            'data_path': data_path,
+            'viewpoint' : (0, 0, 0),  # 视点
+            'data_path': data_path,   # 数据文件路径
         }
 
         return cls(data)

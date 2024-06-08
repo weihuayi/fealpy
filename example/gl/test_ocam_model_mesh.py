@@ -10,12 +10,13 @@ csys = OCAMSystem.from_data('~/data/')
 plotter = OpenGLPlotter()
 #csys.show_split_lines()
 
-csys.show_screen_mesh(plotter)
+#csys.show_screen_mesh(plotter)
 #csys.show_ground_mesh(plotter)
+csys.show_ground_mesh_with_view_point(plotter)
 plotter.run()
-for i in range(6):
-    model = csys.cams[i]
-    model.show_camera_image_and_mesh(outname='cam%d.png' % i)
+#for i in range(6):
+#    model = csys.cams[i]
+#    model.show_camera_image_and_mesh(outname='cam%d.png' % i)
     #mesh = model.gmshing_new()
 
     #fig, axes = plt.subplots()
