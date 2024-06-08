@@ -2,17 +2,17 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 
-class LinearForm:
+class InternalOperator:
     """
 
     """
-
     def __init__(self, space):
         """
         @brief
         """
         self.space = space
-        self._V = None  # 需要组装的矩阵
+        self._H = None
+        self._G = None
         self.integrators = []  # 区域积分子
 
 
