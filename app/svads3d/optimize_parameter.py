@@ -1,7 +1,7 @@
 
 import itertools
 import numpy as np
-from .ocam_system import OCAMSystem
+from fealpy.plotter.gl.ocam_system import OCAMSystem
 from fealpy.iopt import COA
 
 class OptimizeParameter:
