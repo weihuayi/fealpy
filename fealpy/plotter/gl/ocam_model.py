@@ -885,5 +885,45 @@ class OCAMDomain(Domain):
         return self.fh(p,self)
     def facet(self,dim):
         return self.facets[0]
+    import numpy as np
+
+def rotation_matrix_from_euler_angles(theta, gamma, beta):
+    """
+    Compute the rotation matrix from Euler angles.
+
+    Parameters:
+    theta (float): Rotation angle around the x-axis in radians.
+    gamma (float): Rotation angle around the y-axis in radians.
+    beta (float): Rotation angle around the z-axis in radians.
+
+    Returns:
+    np.ndarray: The resulting rotation matrix.
+    """
+    # Rotation matrix around x-axis
+    R_x = np.array([
+        [1, 0, 0],
+        [0, np.cos(theta), -np.sin(theta)],
+        [0, np.sin(theta), np.cos(theta)]
+    ])
+
+    # Rotation matrix around y-axis
+    R_y = np.array([
+        [np.cos(gamma), 0, np.sin(gamma)],
+        [0, 1, 0],
+        [-np.sin(gamma), 0, np.cos(gamma)]
+    ])
+
+    # Rotation matrix around z-axis
+    R_z = np.array([
+        [np.cos(beta), -np.sin(beta), 0],
+        [np.sin(beta), np.cos(beta), 0],
+        [0, 0, 1]
+    ])
+
+    # Combined rotation matrix
+    R = R_z @ R_y @ R_x
+    return R
+
+
     
 
