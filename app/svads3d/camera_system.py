@@ -13,11 +13,11 @@ class CameraSystem():
         mesh : 相机系统上的网格。
     """
     location: np.ndarray = None
-    cameras: list[Camera] = None
-    screen: Screen = None
+    cameras = None
+    screen = None
     mesh = None
 
-    def __init__(self, location: np.ndarray, cameras: list[Camera]):
+    def __init__(self, location: np.ndarray, cameras):
         """
         初始化相机系统对象。
         @param location: 相机系统的空间位置。

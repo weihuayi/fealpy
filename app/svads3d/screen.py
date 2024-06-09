@@ -13,14 +13,14 @@ class Screen:
         domain (list[array]): 分割线围成分区。
         mesh : 屏幕上生成的网格。
     """
-    camear_system: CameraSystem = None
+    camear_system = None
     data: dict = None
     feature_point: Union[np.ndarray, list[np.ndarray]] = None
     split_line: Union[np.ndarray, list[np.ndarray]] = None
     domain: Union[np.ndarray, list[np.ndarray]] = None
     mesh = None
 
-    def __init__(self, camear_system: CameraSystem, data: dict):
+    def __init__(self, camear_system, data: dict):
         """
         @brief: 屏幕初始化。
                 1. 从相机系统获取地面特征点
@@ -45,7 +45,7 @@ class Screen:
         pass
 
 
-    def partition(self, partition_type :PartitionType):
+    def partition(self, partition_type):
         """
         将屏幕区域分区，并通过分区的分割线构造特征点与特征线，可选择 PartitionType 中提供的分区方案。
         @param partition_type: 分区方案。
@@ -56,7 +56,7 @@ class Screen:
         self.domain = None
         pass
 
-    def meshing(self, meshing_type:MeshingType):
+    def meshing(self, meshing_type):
         """
         在屏幕上生成网格，可选择 MeshingType 中提供的网格化方案。
         @param meshing_type: 网格化方案。
