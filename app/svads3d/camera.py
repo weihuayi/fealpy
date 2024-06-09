@@ -3,47 +3,41 @@ from typing import Union
 import os
 import cv2
 import glob
+from scipy.optimize import fsolve
 
 
 class Camera():
     """
     相机对象，记录相机的位置与朝向，是构造相机系统的基础。
-    Attributes:
-        picture (Picture): 相机对应的图像。
-        location (array): 相机的空间位置（世界坐标）。
-        direction (array): 相机的朝向（角度）。
-        camear_system (CameraSystem): 相机所处的相机系统。
-        mesh: 相机上的网格。
     """
-    picture = None
-    location: np.ndarray = None
-    axes: np.ndarray = None
-    camear_system = None
+    def __init__(self, picture, data_path, chessboard_dir, location, eular_angle):
+    eular_angle: np.ndarray = None
+    camear_system: CameraSystem = None
     mesh = None
-
-    def __init__(self, picture, data_path, chessboard_dir, location, axes):
         """
         @brief 构造函数。
             1. 获取图片到自身的特征点（地面特征点）
 
         @param picture: 相机对应的图像。
+        @param data_path: 相机的数据路径。
+        @param chessboard_dir: 棋盘格图片的路径。
         @param location: 相机的空间位置（世界坐标）。
-        @param axes: 相机的朝向（角度）。
+        @param eular_angle: 相机的欧拉角。
         """
         self.picture = picture
         self.picture.camera = self
         self.data_path = data_path
         self.chessboard_dir = chessboard_dir
         self.location = np.array(location)
-        self.axes = np.array(axes)
+
+        self.eular_angle = eular_angle
+        self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
 
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), data_path + chessboard_dir)
 
         self.ground_feature_points = self.camera_to_world(picture.to_camera(picture.mark_board.reshape((-1,2)), 'L')).reshape((2,-1,3))
         self.feature_points = self.camera_to_world(picture.to_camera(picture.feature_point, 'L'))
         self.screen_feature_points = None
-
-
 
     def set_screen_frature_points(self, feature_point):
         """
@@ -55,6 +49,31 @@ class Camera():
             self.feature_point.extend(feature_point)
         else:
             self.feature_point.append(feature_point)
+
+    def get_rot_matrix(self, theta, gamma, beta) -> np.ndarray:
+        """
+        @brief 从欧拉角计算旋转矩阵。
+        @param theta: 绕x轴的旋转角度。
+        @param gamma: 绕y轴的旋转角度。
+        @param beta: 绕z轴的旋转角度。
+        @return: 旋转矩阵。
+        """
+        # 绕 x 轴的旋转矩阵
+        R_x = np.array([[1, 0, 0],
+                        [0, np.cos(theta), -np.sin(theta)],
+                        [0, np.sin(theta), np.cos(theta)]])
+
+        # 绕 y 轴的旋转矩阵
+        R_y = np.array([[np.cos(gamma), 0, np.sin(gamma)],
+                        [0, 1, 0],
+                        [-np.sin(gamma), 0, np.cos(gamma)]])
+
+        # 绕 z 轴的旋转矩阵
+        R_z = np.array([[np.cos(beta), -np.sin(beta), 0],
+                        [np.sin(beta), np.cos(beta), 0],
+                        [0, 0, 1]])
+        R = R_z @ R_y @ R_x
+        return R
 
     def to_camera_system(self, *args):
         """
@@ -81,11 +100,25 @@ class Camera():
 
     def projecte_to_self(self, point):
         """
-        @brief 将点投影到相机球上。
-        @param point: 点
+        将点投影到相机球面上。
+        @param points: 要投影的点。
+        @return: 投影后的点。
+        """
+        v = points - self.location
+        v = v/np.linalg.norm(v, axis=-1, keepdims=True)
+        return v + self.location
+
+
+    def to_screen(self, points):
+        """
+        将相机球面上的点投影到屏幕上。
+        @param args: 相机球面上的点。
         @return:
         """
-        pass
+        screen = self.system.screen
+        ret = screen.projecte_to_self(points, self.location, 1.0)
+        return ret
+
 
 
     def camera_to_world(self, node):

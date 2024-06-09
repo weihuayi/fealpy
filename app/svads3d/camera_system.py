@@ -25,24 +25,21 @@ class CameraSystem():
         """
         self.location = location
         self.cameras = cameras
+        self.viewpoint = np.array(viewpoint)
         for camera in self.cameras:
             camera.camear_system = self
 
-    def to_screen(self, *args):
+    def to_screen(self, points):
         """
-
-        @param args:
-        @return:
+        将相机系统的点映射到屏幕上。
+        @param points: 相机系统的点。
+        @return: 映射后的屏幕上的点。
         """
-        assert self.screen is not None, "相机系统所属的屏幕未初始化。"
-        if type(args[0]) in [list[np.ndarray], np.ndarray]:
-            pass
-        else:
-            pass
+        return screen.sphere_to_self(points, self.viewpoint, 1.0)
 
     def to_camera(self, mesh, didx, dval):
         """
-        调和映射，将当前相机系统的点或网格映射到相机上。
+        调和映射，将当前相机系统的网格映射到相机上。
         @param mesh: 网格
         @param didx: 网格狄利克雷点索引
         @param dval: 网格狄利克雷点值
@@ -52,16 +49,15 @@ class CameraSystem():
         node = shpere_harmonic_map(data).reshape(-1, 3)
         return node
 
-    def projecte_to_self(self, *args):
+    def projecte_to_view_point(self, points):
         """
-        将当前相机系统的点或网格投影到自身。
-        @param args: 相机系统的点或网格。
-        @return:
+        将点投影到视点上。
+        @param points: 要投影的点。
+        @return: 投影后的点。
         """
-        if type(args[0]) in [list[np.ndarray], np.ndarray]:
-            pass
-        else:
-            pass
+        v = points - self.viewpoint
+        v = v / np.linalg.norm(v, axis=-1, keepdims=True)
+        return v + self.viewpoint
 
     def assemble(self):
         """
