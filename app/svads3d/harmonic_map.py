@@ -78,6 +78,7 @@ def sphere_harmonic_map(data : HarmonicMapData):
     E = compute_energy(uh)
     print("init energy: ", E)
 
+    k = 0
     # 2. 迭代求解
     I = np.tile(np.arange(N//GD), (GD, 1)).T.flatten()
     J = np.arange(N)
@@ -99,8 +100,9 @@ def sphere_harmonic_map(data : HarmonicMapData):
         uh = (vh/np.linalg.norm(vh, axis=1, keepdims=True)).reshape(-1)
         E0 = compute_energy(uh)
         print("energy: ", E0)
-        if np.linalg.norm(E - E0) < 1e-2:
+        if (np.linalg.norm(E - E0) < 1e-2)|(k>100):
             break
+        k += 1
         E = E0
     return extend_fun(uh).reshape(-1, GD)
 
