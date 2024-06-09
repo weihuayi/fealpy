@@ -21,10 +21,29 @@ class Screen:
     mesh = None
 
     def __init__(self, camear_system: CameraSystem, data: dict):
+        """
+        @brief: 屏幕初始化。
+                1. 从相机系统获取地面特征点
+                2. 优化相机参数
+                3. 分区
+                4. 网格化 (计算自身的特征点)
+                5. 构建相机的框架特征点 (用于调和映射的边界条件)
+                6. 计算 uv
+        @param feature_point: 屏幕上的特征点，用于网格生成以及计算视点到相机系统的映射。
+        """
         self.camear_system = camear_system
         self.camear_system.screen = self
         self.data = data
         pass
+
+    def optimize(self, *args):
+        """
+        相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
+        @param args:
+        @return:
+        """
+        pass
+
 
     def partition(self, partition_type :PartitionType):
         """
@@ -56,6 +75,14 @@ class Screen:
         else:
             pass
 
+    def compute_uv(self, *args):
+        """
+        计算屏幕上网格点在相机系统中的uv坐标。
+        @param args: 屏幕上的点。
+        @return:
+        """
+        pass
+
     def display(self, *args):
         """
         显示图像。
@@ -63,3 +90,13 @@ class Screen:
         @return:
         """
         pass
+
+    def projecte_to_self(self, *args):
+        """
+        将相机系统上的点投影到屏幕上。
+        @param args: 相机系统上的点。
+        @return:
+        """
+        pass
+
+
