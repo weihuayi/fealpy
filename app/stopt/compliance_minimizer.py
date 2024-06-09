@@ -4,11 +4,12 @@ from jax import jit, value_and_grad
 from utilfuncs import Mesher
 
 class ComplianceMinimizer:
-    def __init__(self, 
-                 mesh = None, 
-                 bc = None, 
-                 material = None, 
-                 globalvolCons = None, 
+    def __init__(self,
+                 mesh = None,
+                 bc = None,
+                 material = None,
+                 globalvolCons = None,
+                 optimizationParams = None,
                  projection = None):
         
         # 默认网格参数
@@ -28,7 +29,11 @@ class ComplianceMinimizer:
         if globalvolCons is None:
             globalvolCons = {'isOn': True, 'vf': 0.5}
         
-        # 默认投影参数
+        # 默认优化器参数
+        if optimizationParams is None:
+            optimizationParams = {'maxIters': 200, 'minIters': 100, 'relTol': 0.05}
+
+        # 默认投影滤波器参数
         if projection is None:
             projection = {'isOn': True, 'beta': 4, 'c0': 0.5}
         
@@ -75,12 +80,17 @@ class ComplianceMinimizer:
         # 设置全局体积约束
         self.globalVolumeConstraint = globalvolCons
         
-        # 自动微分计算柔顺度和约束
-        self.objectiveHandle = jit(value_and_grad(self.computeCompliance))
+        # 自动微分计算柔顺度及其灵敏度
+        self.objectiveHandle = value_and_grad(self.computeCompliance)
+        
+        # 自动微分计算约束值及其灵敏度
         self.consHandle = self.computeConstraints
         self.numConstraints = 1
         
-        # 设置投影参数
+        # 设置优化器参数
+        self.optimizationParams = optimizationParams
+
+        # 设置投影滤波器参数
         self.projection = projection
 
     def computeCompliance(self, rho):
@@ -116,7 +126,7 @@ class ComplianceMinimizer:
         
         @jit
         # 直接法求解线性方程组
-        def solveKuf(K): 
+        def solveKuf(K):
             u_free = jax.scipy.linalg.solve(K[self.bc['free'],:][:,self.bc['free']], \
                                         self.bc['force'][self.bc['free']], check_finite=False)
             u = jnp.zeros((self.mesh['ndof']))
@@ -130,8 +140,37 @@ class ComplianceMinimizer:
         J = jnp.dot(self.bc['force'].T, u)[0]
 
         return J
-
+    
     def computeConstraints(self, rho, epoch):
-        # 将具体实现填充在这里
-        pass
+
+        @jit
+        # 计算体积约束
+        def computeGlobalVolumeConstraint(rho):
+            g = jnp.mean(rho) / self.globalVolumeConstraint['vf'] - 1.
+            return g
+        
+        # 体积约束的值及其灵敏度
+        c, gradc = value_and_grad(computeGlobalVolumeConstraint)(rho)
+        c, gradc = c.reshape((1, 1)), gradc.reshape((1, -1))
+
+        return c, gradc
+
+    def mmaOptimize(self, optimizationParams, ft):
+        
+        rho = jnp.ones((self.mesh['nelx'] * self.mesh['nely']))
+        loop = 0
+        change = 1.
+
+        while( (change > optimizationParams['relTol']) \
+            and (loop < optimizationParams['maxIters']) \
+            or (loop < optimizationParams['minIters']) ):
+
+            loop = loop + 1
+
+            J, dJ = self.objectiveHandle(rho)
+
+            vc, dvc = self.consHandle(rho, loop)
+
+    
+
 
