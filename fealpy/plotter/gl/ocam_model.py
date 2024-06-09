@@ -397,7 +397,7 @@ class OCAMModel:
         node = node-self.location
         r = np.sqrt(np.sum(node**2, axis=1))
         node /= r[:, None]
-        return node
+        return node + self.location
 
     def mesh_to_image(self, node):
         node[:, 1] = self.height - node[:, 1]
@@ -525,6 +525,7 @@ class OCAMModel:
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
         node = np.zeros((NN,3),dtype=np.float64)
+
         node[:,0] = uv[:,0]-u0
         node[:,1] = uv[:,1]-v0
 

@@ -30,7 +30,7 @@ class OCAMSystem:
         self.size=data['size'] # 椭球面的长宽高
         self.center_height = data['center_height'] # 椭球面的中心高度
         self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
-        self.viewpoint = data['viewpoint'] # 视点
+        self.viewpoint = np.array(data['viewpoint']) # 视点
         self.data_path = data['data_path']
         
         self.cams = []
@@ -77,14 +77,15 @@ class OCAMSystem:
 
         # 判断是否已经生成了 groundmesh 文件
         fname = os.path.expanduser(self.data_path+"groundmesh.pkl")
-        if os.path.exists(fname):
-            with open(fname, 'rb') as f:
-                self.groundmesh = pickle.load(f)
-        else:
-            self.groundmesh = self.get_ground_mesh(only_ground=False)
-            # 保存 cps:
-            with open(fname, 'wb') as f:
-                pickle.dump(self.groundmesh, f)
+        self.groundmesh, self.didx, self.dval = self.get_ground_mesh(only_ground=False)
+        #if os.path.exists(fname):
+        #    with open(fname, 'rb') as f:
+        #        self.groundmesh, self.didx, self.dval = pickle.load(f) 
+        #else:
+        #    self.groundmesh, self.didx, self.dval = self.get_ground_mesh(only_ground=False)
+        #    # 保存 cps:
+        #    with open(fname, 'wb') as f:
+        #        pickle.dump((self.groundmesh, self.didx, self.dval), f)
 
 
     # 获取特征点
@@ -226,7 +227,7 @@ class OCAMSystem:
             cell = nidxmap[cell]
 
             mesh = TriangleMesh(node[idx], cell)
-            return mesh
+            return mesh, nidxmap
 
         # 转化为 fealpy 的网格
         node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)
@@ -256,13 +257,18 @@ class OCAMSystem:
                 cell.append(tag2nid[cell0])
             cell = np.concatenate(cell, axis=0)
 
-            f0 = lambda x : self.cams[i].project_to_cam_sphere(x)
-            f1 = lambda x : self.cams[i].image_to_camera_sphere(x)
+            f0 = lambda x : self.cams[i].project_to_cam_sphere(x)-self.cams[i].location
+            f1 = lambda x : self.cams[i].image_to_camera_sphere(x)-self.cams[i].location
 
             # 获取第 i 块网格的屏幕边界特征点
-            geoedge = gmsh.model.getBoundary([(2, j) for j in idx])
-            didx_s = [gmsh.model.mesh.get_nodes(1, ge[0])[0] for ge in geoedge]
-            dval_s = [f0(node[didx]) for didx in didx_s]
+            geoedge = []
+            for j in idx:
+                geoedge += gmsh.model.getBoundary([(2, j)])
+            geoedge = np.unique([abs(ge[1]) for ge in geoedge])
+
+            lists = [gmsh.model.mesh.get_nodes(1, ge) for ge in geoedge]
+            didx_s = [tag2nid[ge[0]] for ge in lists]
+            dval_s = [f0(ge[1].reshape(-1, 3)) for ge in lists]
 
             # 获取第 i 块网格的地面特征点
             ismeshi = np.zeros(NN, dtype = np.bool_)
@@ -270,11 +276,20 @@ class OCAMSystem:
 
             flag = ismeshi[gmpidx]
             didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
-            dval_g = [f1(g.points0) if g.cam0 == i else f1(g.points1) for j, g in enumerate(gmps) if flag[j]]
+            dval_g = [f1(g.points0[None, :]) if g.cam0 == i else
+                      f1(g.points1[None, :]) for j, g in enumerate(gmp) if flag[j]]
 
-            didx.append(np.concatenate((didx_s, didx_g), axis=0))
-            dval.append(np.concatenate((dval_s, dval_g), axis=0))
-            partmesh.append(creat_part_mesh(node, cell))
+            pmesh, nidxmap = creat_part_mesh(node, cell)
+            partmesh.append(pmesh)
+            didx_i = nidxmap[np.concatenate(didx_s+didx_g, dtype=np.int_)]
+            dval_i = np.concatenate(dval_s+dval_g, axis=0)
+            didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
+            dval_i = np.concatenate(dval_s, axis=0)
+
+            didx_i, uniqueidx = np.unique(didx_i, return_index=True)
+            dval_i = dval_i[uniqueidx]
+            didx.append(didx_i)
+            dval.append(dval_i)
 
         gmsh.finalize()
         return partmesh, didx, dval 
@@ -311,6 +326,22 @@ class OCAMSystem:
             if i != 3:
                 continue
             points = self.camera_points[i]
+            for point in points:
+                axes.plot(point[:, 0], point[:, 1], point[:, 2])
+        plt.show()
+
+    def show_sphere_lines(self):
+        """
+        @brief 显示分割线
+        """
+        # 三维的分割线的绘制
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        axes.set_box_aspect([30,10,1.5])
+        for i in range(6):
+            if i != 3:
+                continue
+            points = self.dval
             for point in points:
                 axes.plot(point[:, 0], point[:, 1], point[:, 2])
         plt.show()
@@ -864,14 +895,18 @@ class OCAMSystem:
         """
         uv = []
         for i, cam in enumerate(self.cams):
-            mesh   = self.partmesh[i]
+            mesh   = self.groundmesh[i]
             node_s = mesh.entity('node').copy()
-            node   = screen_to_viewpoint(node_s)
+            node   = self.screen_to_viewpoint(node_s)
             mesh.node = node
 
             data = HarmonicMapData(mesh, self.didx[i], self.dval[i])
             node = sphere_harmonic_map(data).reshape(-1, 3)
-            uv.append(cam.cam_to_image(node))
+            node += cam.location
+            uvi = cam.world_to_image(node)
+            uvi[:, 0] = 1-uvi[:, 0]
+
+            uv.append(uvi)
             mesh.node = node_s
         return uv
 
@@ -884,13 +919,12 @@ class OCAMSystem:
         node[:, 0:2] = mesh.entity('node')
         cell = mesh.entity('cell')
         # 投影到单位球面
-        node = screen_to_viewpoint(node)
         uv = self.screen_to_image()
         for i, cam in enumerate(self.cams):
-            mesh = self.partmesh[i]
+            mesh = self.groundmesh[i]
             node = mesh.entity('node')
             cell = mesh.entity('cell')
-            no = np.concatenate((node[cell].reshape(-1, 3), uv[i][cell].reshape(-1, 3)), axis=-1, dtype=np.float32)
+            no = np.concatenate((node[cell].reshape(-1, 3), uv[i][cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
             plotter.add_mesh(no, cell=None, texture_path=cam.fname)
 
     def undistort_cv(self):
