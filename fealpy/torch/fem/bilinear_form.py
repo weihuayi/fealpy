@@ -73,12 +73,15 @@ class BilinearForm(Form[_FS]):
         return M
 
     def assembly(self, coalesce=True, retain_ints: bool=False) -> Tensor:
-        """@brief Assembly the bilinear form matrix.
+        """Assembly the bilinear form matrix.
 
-        @param coalesce: Whether to coalesce the sparse tensor.
-        @param retain_ints: Whether to retain the integrator cache.
+        Args:
+            coalesce (bool, optional): Whether to coalesce the sparse tensor.
+            retain_ints (bool, optional): Whether to retain the integrator cache.
 
-        @returns: Tensor[gdof, gdof]. Batch is placed in the LAST dimension if `batch_size > 0`
+        Returns:
+            Tensor[gdof, gdof]. Batch is placed in the LAST dimension as
+            Hybrid COO Tensor format.
         """
         if self.batch_size == 0:
             M = self._single_assembly(retain_ints)
