@@ -32,22 +32,22 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
-    def number_of_local_dofs(self, doftype='cell'):
+    def number_of_local_dofs(self, doftype='cell') -> int:
         return self.dof.number_of_local_dofs(doftype=doftype)
 
-    def number_of_global_dofs(self):
+    def number_of_global_dofs(self) -> int:
         return self.dof.number_of_global_dofs()
 
-    def interpolation_points(self):
+    def interpolation_points(self) -> Tensor:
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self):
+    def cell_to_dof(self) -> Tensor:
         return self.dof.cell_to_dof()
 
-    def face_to_dof(self):
+    def face_to_dof(self) -> Tensor:
         return self.dof.face_to_dof()
 
-    def is_boundary_dof(self, threshold=None):
+    def is_boundary_dof(self, threshold=None) -> Tensor:
         if self.ctype == 'C':
             return self.dof.is_boundary_dof(threshold)
         else:
@@ -101,8 +101,24 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variable=variable)
 
     def value(self, uh: Tensor, bc: Tensor, index: Index=_S):
-        """
-        @brief
+        """Calculate the value of the finite element function.
+
+        Args:
+            uh (Tensor): Dofs of the function, shaped (..., gdof) for 'sdofs' and
+            'batched', (gdof, ...) for 'vdims'.
+            bc (Tensor): Input points in barycentric coordinates, shaped (NQ, NVC).
+            index (Index, optional): _description_.
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            Tensor: Function value. Its shape varies according to the `doforder` of space.
+            - Returns a Tensor of shape (NQ, ..., NC) if `doforder` is 'sdofs'.
+            - Returns a Tensor of shape (NQ, NC, ...) if `doforder` is 'vdims'.
+            - Returns a Tensor of shape (..., NQ, NC) if `doforder` is 'batched'.
+
+            Defaults to 'batched' if the space does not have `doforder` attribute.
         """
         phi = self.basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index)
@@ -113,14 +129,14 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         if doforder == 'sdofs':
             # phi.shape == (NQ, NC, ldof)
-            # uh.shape == (..., gdof)
+            # uh.shape == (..., GD, gdof)
             # uh[..., cell2dof].shape == (..., NC, ldof)
             # val.shape == (NQ, ..., NC)
             s1 = f"...ci, {s0[:dim]}ci->...{s0[:dim]}c"
             val = torch.einsum(s1, phi, uh[..., cell2dof])
         elif doforder == 'vdims':
             # phi.shape == (NQ, NC, ldof)
-            # uh.shape == (gdof, ...)
+            # uh.shape == (gdof, GD)
             # uh[cell2dof, ...].shape == (NC, ldof, ...)
             # val.shape == (NQ, NC, ...)
             s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"

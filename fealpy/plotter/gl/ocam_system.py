@@ -4,9 +4,25 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 
+from dataclasses import dataclass, field
 from .ocam_model import OCAMModel
 from fealpy.mesh import TriangleMesh
 import pickle
+from app.svads3d.harmonic_map import *
+
+@dataclass
+class GroundMarkPoint:
+    """
+    @brief 地面标记点
+    @param points0: 点在相机 cam0 的图像中的坐标
+    @param points1: 点在相机 cam1 的图像中的坐标
+    @param points2: 点的真实坐标
+    """
+    cam0:    int
+    cam1:    int
+    points0: np.ndarray
+    points1: np.ndarray
+    points2: np.ndarray
 
 class OCAMSystem:
     def __init__(self, data):
@@ -14,22 +30,12 @@ class OCAMSystem:
         self.size=data['size'] # 椭球面的长宽高
         self.center_height = data['center_height'] # 椭球面的中心高度
         self.scale_ratio = data['scale_ratio'] # 椭球面的缩放比例
-        self.viewpoint = data['viewpoint'] # 视点
+        self.viewpoint = np.array(data['viewpoint']) # 视点
         self.data_path = data['data_path']
         
         self.cams = []
 
-        fname = os.path.expanduser(self.data_path+"groundmesh.pkl")
-        if os.path.exists(fname):
-            with open(fname, 'rb') as f:
-                self.groundmesh = pickle.load(f)
-        else:
-            self.groundmesh = self.get_ground_mesh(only_ground=False)
-            # 保存 cps:
-            with open(fname, 'wb') as f:
-                pickle.dump(self.groundmesh, f)
-
-        # 判断是否存在 cps.pkl 文件
+        # 判断是否已经生成了splite point 文件
         fname = os.path.expanduser(self.data_path+"cps.pkl")
         if os.path.exists(fname):
             with open(fname, 'rb') as f:
@@ -67,6 +73,36 @@ class OCAMSystem:
                 data_path = data['data_path'],
                 name = "cam{}".format(i),
             ))
+        self.gmp = self.ground_mark_board()
+
+        # 判断是否已经生成了 groundmesh 文件
+        fname = os.path.expanduser(self.data_path+"groundmesh.pkl")
+        self.groundmesh, self.didx, self.dval = self.get_ground_mesh(only_ground=False)
+        #if os.path.exists(fname):
+        #    with open(fname, 'rb') as f:
+        #        self.groundmesh, self.didx, self.dval = pickle.load(f) 
+        #else:
+        #    self.groundmesh, self.didx, self.dval = self.get_ground_mesh(only_ground=False)
+        #    # 保存 cps:
+        #    with open(fname, 'wb') as f:
+        #        pickle.dump((self.groundmesh, self.didx, self.dval), f)
+
+
+    # 获取特征点
+    def ground_mark_board(self):
+        """
+        @brief 获取地面标记点
+        """
+        gmp = []
+        for i in range(6):
+            ri = (i+1)%6 # 右边相邻相机
+            ps0 = self.cams[i].mark_board[12:]
+            ps1 = self.cams[ri].mark_board[:12]
+            ps2 = 0.5*self.cams[i].mesh_to_ground(ps0, -self.center_height)
+            ps2+= 0.5*self.cams[ri].mesh_to_ground(ps1, -self.center_height)
+            for j in range(len(ps0)):
+                gmp.append(GroundMarkPoint(i, ri, ps0[j], ps1[j], ps2[j]))
+        return gmp
 
     def set_parameters(self, data):
         """
@@ -165,6 +201,11 @@ class OCAMSystem:
             pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
             planes.append(add_rectangle(pp0, pp1, pp2, pp3))
 
+        # 地面特征点
+        gmp = self.gmp
+        gmps = [gmsh.model.occ.addPoint(p.points2[0], p.points2[1], p.points2[2]) for p in gmp]
+        gmsh.model.occ.fragment(ground, [(0, p) for p in gmps])
+
         frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
         for i in range(len(frag[1]))[2:]:
             gmsh.model.occ.remove(frag[1][i], recursive=True)
@@ -186,7 +227,7 @@ class OCAMSystem:
             cell = nidxmap[cell]
 
             mesh = TriangleMesh(node[idx], cell)
-            return mesh
+            return mesh, nidxmap
 
         # 转化为 fealpy 的网格
         node = gmsh.model.mesh.get_nodes()[1].reshape(-1, 3)
@@ -197,21 +238,61 @@ class OCAMSystem:
         tag2nid = np.zeros(NN*2, dtype = np.int_)
         tag2nid[nid2tag] = np.arange(NN)
 
+        ## 获取地面特征点在网格中的编号
+        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, g)[0] for g in gmps])
+
+        ## 网格分块
+        didx = [] # 狄利克雷边界条件的节点编号
+        dval = [] # 狄利克雷边界条件的节点值
         partmesh = []
         if only_ground:
             idxs = [[10], [12], [13], [11], [9], [8]]
         else:
             idxs = [[10, 4], [12, 6], [13, 7], [11, 5], [9, 3], [8, 1, 2]]
-        for idx in idxs:
-            cell = np.zeros([0, 3], dtype = np.int_)
+        for i, idx in enumerate(idxs):
+            # 获取第 i 块网格的单元
+            cell = []
             for j in idx:
-                cell0 = gmsh.model.mesh.get_elements(2, j)[2][0]
-                cell0 = tag2nid[cell0].reshape(-1, 3)
-                cell = np.concatenate((cell, cell0), axis=0)
-            partmesh.append(creat_part_mesh(node, cell))
+                cell0 = gmsh.model.mesh.get_elements(2, j)[2][0].reshape(-1, 3)
+                cell.append(tag2nid[cell0])
+            cell = np.concatenate(cell, axis=0)
+
+            f0 = lambda x : self.cams[i].project_to_cam_sphere(x)-self.cams[i].location
+            f1 = lambda x : self.cams[i].image_to_camera_sphere(x)-self.cams[i].location
+
+            # 获取第 i 块网格的屏幕边界特征点
+            geoedge = []
+            for j in idx:
+                geoedge += gmsh.model.getBoundary([(2, j)])
+            geoedge = np.unique([abs(ge[1]) for ge in geoedge])
+
+            lists = [gmsh.model.mesh.get_nodes(1, ge) for ge in geoedge]
+            didx_s = [tag2nid[ge[0]] for ge in lists]
+            dval_s = [f0(ge[1].reshape(-1, 3)) for ge in lists]
+
+            # 获取第 i 块网格的地面特征点
+            ismeshi = np.zeros(NN, dtype = np.bool_)
+            ismeshi[cell] = True # 第 i 块网格中的点
+
+            flag = ismeshi[gmpidx]
+            didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
+            dval_g = [f1(g.points0[None, :]) if g.cam0 == i else
+                      f1(g.points1[None, :]) for j, g in enumerate(gmp) if flag[j]]
+
+            pmesh, nidxmap = creat_part_mesh(node, cell)
+            partmesh.append(pmesh)
+            didx_i = nidxmap[np.concatenate(didx_s+didx_g, dtype=np.int_)]
+            dval_i = np.concatenate(dval_s+dval_g, axis=0)
+            didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
+            dval_i = np.concatenate(dval_s, axis=0)
+
+            didx_i, uniqueidx = np.unique(didx_i, return_index=True)
+            dval_i = dval_i[uniqueidx]
+            didx.append(didx_i)
+            dval.append(dval_i)
 
         gmsh.finalize()
-        return partmesh
+        return partmesh, didx, dval 
 
     def undistort_cv(self):
         for i, cam in enumerate(self.cams):
@@ -245,6 +326,22 @@ class OCAMSystem:
             if i != 3:
                 continue
             points = self.camera_points[i]
+            for point in points:
+                axes.plot(point[:, 0], point[:, 1], point[:, 2])
+        plt.show()
+
+    def show_sphere_lines(self):
+        """
+        @brief 显示分割线
+        """
+        # 三维的分割线的绘制
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        axes.set_box_aspect([30,10,1.5])
+        for i in range(6):
+            if i != 3:
+                continue
+            points = self.dval
             for point in points:
                 axes.plot(point[:, 0], point[:, 1], point[:, 2])
         plt.show()
@@ -783,6 +880,53 @@ class OCAMSystem:
 
         return camera_points
 
+    def screen_to_viewpoint(self, points):
+        """
+        @brief 将屏幕上的点映射到视点单位球
+        """
+        vp = self.viewpoint
+        v = points-vp[None, :]
+        v /= np.linalg.norm(v, axis=-1, keepdims=True)
+        return v+vp[None, :]
+
+    def screen_to_image(self):
+        """
+        @brief 从视点到相机球面坐标
+        """
+        uv = []
+        for i, cam in enumerate(self.cams):
+            mesh   = self.groundmesh[i]
+            node_s = mesh.entity('node').copy()
+            node   = self.screen_to_viewpoint(node_s)
+            mesh.node = node
+
+            data = HarmonicMapData(mesh, self.didx[i], self.dval[i])
+            node = sphere_harmonic_map(data).reshape(-1, 3)
+            node += cam.location
+            uvi = cam.world_to_image(node)
+            uvi[:, 0] = 1-uvi[:, 0]
+
+            uv.append(uvi)
+            mesh.node = node_s
+        return uv
+
+    def show_ground_mesh_with_view_point(self, plotter):
+        """
+        @brief 显示地面网格和视点
+        """
+        mesh = TriangleMesh.from_box([-10, 10, -10, 10], nx=100, ny=100)
+        node = np.zeros((mesh.number_of_nodes(), 3), dtype=np.float64)
+        node[:, 0:2] = mesh.entity('node')
+        cell = mesh.entity('cell')
+        # 投影到单位球面
+        uv = self.screen_to_image()
+        for i, cam in enumerate(self.cams):
+            mesh = self.groundmesh[i]
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            no = np.concatenate((node[cell].reshape(-1, 3), uv[i][cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
+            plotter.add_mesh(no, cell=None, texture_path=cam.fname)
+
     def undistort_cv(self):
         import cv2
         images = []
@@ -955,26 +1099,26 @@ class OCAMSystem:
         mark_board[...,1] = 1080-mark_board[...,1] 
         data = {
             "nc" : 6,
-            "location" : location,
-            "axes" : (cx, cy, cz),
-            "center" : center,
-            "ss" : ss,
-            "pol" : pol,
-            "affine" : affine,
-            "fname" : fname,
-            "chessboardpath": chessboardpath,
-            "width" : 1920,
-            "height" : 1080,
-            "vfield" : (110, 180),
-            'flip' : flip,
-            'icenter': icenter,
-            'radius' : radius,
-            'mark_board': mark_board,
-            'center_height' : h,
+            "location" : location, # 相机位置
+            "axes" : (cx, cy, cz), # 相机坐标系旋转矩阵
+            "center" : center,     # 相机中心
+            "ss" : ss,             # 鱼眼相机映射的多项式系数
+            "pol" : pol,           # 鱼眼相机逆映射多项式系数
+            "affine" : affine,     # 仿射变换系数
+            "fname" : fname,       # 图片文件名
+            "chessboardpath": chessboardpath, # 棋盘格文件名
+            "width" : 1920,        # 图片宽度
+            "height" : 1080,       # 图片高度
+            "vfield" : (110, 180), # 水平视场角，垂直视场角
+            'flip' : flip,         # 是否翻转
+            'icenter': icenter,    # 图片中心
+            'radius' : radius,     # 图片半径
+            'mark_board': mark_board, # 地面标记的点
+            'center_height' : h,      # 世界坐标原点到地面的高度
             'size' : (17.5, 3.47, 3), # 小车长宽高
             'scale_ratio' : (1.618, 3.618, 1.618), # 三个主轴的伸缩比例
-            'viewpoint' : (0, 0, 0), # 视点
-            'data_path': data_path,
+            'viewpoint' : (0, 0, 0),  # 视点
+            'data_path': data_path,   # 数据文件路径
         }
 
         return cls(data)

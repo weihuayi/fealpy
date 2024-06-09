@@ -10,5 +10,9 @@ data:
   dtype: 'float64'
   device: 'cuda:0'
 
+fem:
+  p: 1
+  q: 3
+
 process_num: 4
 output_folder: 'D://data/gdgn_cir3_e64_64_c8_validate/'

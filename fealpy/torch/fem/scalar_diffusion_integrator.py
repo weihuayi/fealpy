@@ -1,9 +1,10 @@
 
 from typing import Optional
 
+import torch
 from torch import Tensor
 
-from ..mesh import HomoMesh
+from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
@@ -28,12 +29,12 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         return space.cell_to_dof()[self.index]
 
     @enable_cache
-    def fetch(self, space: _FS, variable: str='x') -> Tensor:
+    def fetch(self, space: _FS) -> Tensor:
         q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
 
-        if not isinstance(mesh, HomoMesh):
+        if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The ScalarDiffusionIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
@@ -41,7 +42,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         cm = mesh.entity_measure('cell', index=index)
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable=variable)
+        gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index
 
     def assembly(self, space: _FS) -> Tensor:
@@ -57,9 +58,16 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         限制：常系数、单纯形网格
         TODO: 加入 assert
         """
+        q = self.q
+        index = self.index
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, gphi, cm, index = self.fetch(space, variable='u')
-        M = jnp.enisum('q, qik, qjl->ijkl', ws, gphi, gphi)
+
+        cm = mesh.entity_measure('cell', index=index)
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi = space.grad_basis(bcs, index=index, variable='u')
+
         glambda = mesh.grad_lambda()
-        A = jnp.enisum('ijkl, ckm, clm->cij', M, glambda, glambda, cm)
+        M = torch.einsum('q, qik, qjl->ijkl', ws, gphi, gphi)
+        A = torch.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
         return A

@@ -75,7 +75,7 @@ class DirichletBC():
         if vector.ndim not in (1, 2):
             raise ValueError('The vector must be 1-D or 2-D.')
         if self.left:
-            if vector.shape[1] != self.gdof:
+            if vector.shape[-1] != self.gdof:
                 raise ValueError('The vector size must match the gdof of the space.')
         else:
             if vector.shape[0] != self.gdof:

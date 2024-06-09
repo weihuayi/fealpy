@@ -1,11 +1,10 @@
 from typing import Tuple
-
-from .mesh_base import MeshBase
+from .mesh_base import HomoMesh
 
 import jax.numpy as jnp
 
 
-class UniformMesh2d(MeshBase):
+class UniformMesh2d(HomoMesh):
 
     def __init__(self):
         """
@@ -13,8 +12,10 @@ class UniformMesh2d(MeshBase):
                 in both x and y directions.
         """
 
-        def __init__(self, extent: Tuple[int, int, int, int], h: Tuple[float, float] = (1.0, 1.0),
-                           origin: Tuple[float, float] = (0.0, 0.0), itype: type = jnp.int32,
+        def __init__(self, extent: Tuple[int, int, int, int], \
+                           h: Tuple[float, float] = (1.0, 1.0), \
+                           origin: Tuple[float, float] = (0.0, 0.0), \
+                           itype: type = jnp.int32,
                            ftype: type = jnp.float64):
             """
             @brief: Initialize the 2D uniform mesh.
@@ -52,3 +53,13 @@ class UniformMesh2d(MeshBase):
             @return: The area of a single cell (all cells have the same area)
             """
             return self.h[0] * self.h[1]
+
+        def gradient(self, f, order=1):
+            """
+            @brief 求网格函数 f 的梯度
+            """
+            hx = self.h[0]
+            hy = self.h[1]
+            fx, fy = jnp.gradient(f, hx, hy, edge_order=order)
+
+            return fx, fy

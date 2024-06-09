@@ -1,9 +1,9 @@
 
 import jax.numpy as jnp
-from scipy.spatial import cKDTree 
+from jax_md import space, partition
+from jax import jit, vmap
 from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
-import matplotlib.pyplot as plt
 
 class NodeSet():
 
@@ -11,7 +11,6 @@ class NodeSet():
         self.NN = node.shape[0]
         self.node = node
         self.nodedata = {}
-        self.tree = cKDTree(node)
         self.is_boundary = jnp.zeros(self.number_of_node(), dtype=bool)
 
     def number_of_node(self):
@@ -29,18 +28,73 @@ class NodeSet():
                               for names, dtypes in zip(name, dtype)})
 
     def set_node_data(self, name, val):
-        self.nodedata[name][:] = val
+        self.nodedata[name] = self.nodedata[name].at[:].set(val)
 
     def add_plot(self, axes, color='k', markersize=20):
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
-    
-    def neighbors(self, h, points=None):
-        if points is None:
-            return self.tree.query_ball_point(self.node, h)
-        else:
-            return self.tree.query_ball_point(points, h)
 
+    def neighbors(self, box_size, cutoff):
+        """
+        参数:
+        - box_size: 模拟盒子的大小
+        - cutoff: 邻近搜索的截断距离
+        返回:
+        - neighbors_dict: 一个字典，包含每个粒子的邻近粒子索引和距离
+        """
+        # 定义邻近列表的参数
+        displacement, shift = space.periodic(box_size)
+        neighbor_fn = partition.neighbor_list(displacement, box_size, cutoff)
+        # 初始化邻近列表，用于分配内存
+        nbrs = neighbor_fn.allocate(self.node)
+        # 更新邻近列表
+        nbrs = neighbor_fn.update(self.node, nbrs)
+        neighbors_dict = {}
+        # 遍历每个粒子，获取邻近粒子的索引和距离
+        for i in range(self.node.shape[0]):
+            neighbors = nbrs.idx[i, nbrs.idx[i] < self.node.shape[0]]  # 获取粒子 i 的邻近粒子索引
+            neighbors_dict[i] = {'indices': [], 'distances': []}
+            for j in neighbors:
+                if i != j:  # 不计算自身粒子
+                    r_ij = displacement(self.node[i], self.node[j])
+                    distance = jnp.linalg.norm(r_ij)
+                    neighbors_dict[i]['indices'].append(j)
+                    neighbors_dict[i]['distances'].append(distance)
+
+        return neighbors_dict
+
+    def interpolate(self, u, kernel, neighbor, h):
+        """
+        参数:
+        - u: 函数值
+        - kernel: 核函数
+        - neighbor: 邻近索引
+        - h: 光滑长度
+        返回:
+        - kernel_function: 核函数插值后的值
+        - kernel_grad : 核函数梯度插值后的值
+        """
+        kernel_function = []
+        kernel_grad = []
+        for i, value in neighbor.items():
+            rho = len(value['indices'])
+            m = jnp.pi * h**2
+            if rho == 0:
+                kernel_function.append(0)
+                kernel_grad.append(0)
+            else:
+                idx = [item.item() for item in value['indices']]
+                dist = jnp.array([item.item() for item in value['distances']])
+                w = kernel.value(dist)
+                k = jnp.dot((m/rho)*u[jnp.array(idx)],w)
+                kernel_function.append(k)
+          
+                reduce = self.node[1,:] - self.node[idx,:]
+                dw = vmap(kernel.grad_value)(dist)[:,jnp.newaxis]*reduce
+                dk = jnp.dot((m/rho)*u[jnp.array(idx)],dw)
+                kernel_grad.append(dk)
+        return kernel_function, kernel_grad
+    
     @classmethod
     def from_tgv_domain(cls, dx=0.02, dy=0.02):
         result = jnp.mgrid[0:1+dx:dx, 0:1+dy:dy].reshape(2, -1).T
@@ -112,12 +166,3 @@ class NodeSet():
         result = cls(node)
         result.is_boundary = result.is_boundary.at[pp.shape[0]:].set(True)
         return result
-
-#node_set = NodeSet.from_tgv_domain()
-#node_set = NodeSet.from_ringshaped_channel_domain()
-#node_set = from_dam_break_domain()
-'''
-fig, ax = plt.subplots()
-node_set.add_plot(ax)
-plt.show()
-'''
