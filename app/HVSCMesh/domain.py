@@ -24,7 +24,7 @@ class Rectangle_BJT_Domain(Domain):
             (domain[1], domain[3]),
             (domain[0], domain[3]),
             ], dtype=np.float64)
-
+        
         curves = np.array([
             (0, 1),
             (1, 2),
@@ -74,14 +74,18 @@ class RB_IGCT_Domain(Domain):
             (0.0,1500.0)
             ], dtype=np.float64)
 
+        circenter = np.array([(110.0,0.0)],dtype=np.float64)
+        
         lines = np.array([
             (0, 1),
             (2, 3),
             (3, 4),
             (4, 5),
             (5, 0)], dtype=np.float64)
-        circleArc = np.array([(2,3)],dtype=np.float64)
-        self.facets = {0:vertices, 1:lines, 2:circleArc}
+
+        circleArc = np.array([(1,2)],dtype=np.float64)
+
+        self.facets = {0:vertices, 1:lines, 2:circleArc, 10:circenter}
 
     def __call__(self, p):
         """
