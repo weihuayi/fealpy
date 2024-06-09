@@ -3,6 +3,44 @@ import jax.numpy as jnp
 from jax import jit, value_and_grad
 from utilfuncs import Mesher
 
+@jit
+# 投影滤波器
+def projectionFilter(projection, rho):
+    if(projection['isOn']):
+        v1 = jnp.tanh(projection['c0'] * projection['beta'])
+        nm = v1 + jnp.tanh(projection['beta'] * (rho - projection['c0']))
+        dnm = v1 + jnp.tanh(projection['beta'] * (1. - projection['c0']))
+        return nm/dnm
+    else:
+        return rho
+    
+@jit
+# SIMP 材料插值模型
+def materialModel(material, rho):
+    E = material['Emin'] + \
+        (material['Emax'] - material['Emin']) * \
+        (rho + 0.01) ** material['penal']
+    return E
+
+@jit
+# 组装全局刚度矩阵
+def assembleK(mesh, K0, E, idx):
+    K_asm = jnp.zeros((mesh['ndof'], mesh['ndof']))
+    K_elem = (K0.flatten()[jnp.newaxis]).T
+
+    K_elem = (K_elem * E).T.flatten()
+    K_asm = K_asm.at[(idx)].add(K_elem)
+    return K_asm
+
+@jit
+# 直接法求解线性方程组
+def solveKuf(bc, K, mesh):
+    u_free = jax.scipy.linalg.solve(K[bc['free'],:][:, bc['free']], \
+                                    bc['force'][bc['free']], check_finite=False)
+    u = jnp.zeros((mesh['ndof']))
+    u = u.at[bc['free']].set(u_free.reshape(-1))
+    return u
+
 class ComplianceMinimizer:
     def __init__(self,
                  mesh = None,
@@ -93,50 +131,24 @@ class ComplianceMinimizer:
         # 设置投影滤波器参数
         self.projection = projection
 
+    def projectionFilter(self, rho):
+        return projectionFilter(self.projection, rho)
+    
+    def materialModel(self, rho):
+        return materialModel(self.material, rho)
+    
+    def assembleK(self, E):
+        return assembleK(self.mesh, self.K0, E, self.idx)
+    
+    def solveKuf(self, K):
+        return solveKuf(self.bc, K, self.mesh)   
+
     def computeCompliance(self, rho):
-
-        @jit
-        # 投影滤波器
-        def projectionFilter(rho):
-            if(self.projection['isOn']):
-                v1 = jnp.tanh(self.projection['c0'] * self.projection['beta'])
-                nm = v1 + jnp.tanh(self.projection['beta'] * (rho - self.projection['c0']))
-                dnm = v1 + jnp.tanh(self.projection['beta'] * (1. - self.projection['c0']))
-                return nm/dnm
-            else:
-                return rho
-
-        @jit
-        # SIMP 材料插值模型
-        def materialModel(rho):
-            E = self.material['Emin'] + \
-                (self.material['Emax'] - self.material['Emin']) * \
-                (rho + 0.01) ** self.material['penal']
-            return E
         
-        @jit
-        # 组装全局刚度矩阵
-        def assembleK(E):
-            K_asm = jnp.zeros((self.mesh['ndof'], self.mesh['ndof']))
-            K_elem = (self.K0.flatten()[jnp.newaxis]).T
-
-            K_elem = (K_elem*E).T.flatten()
-            K_asm = K_asm.at[(self.idx)].add(K_elem)
-            return K_asm
-        
-        @jit
-        # 直接法求解线性方程组
-        def solveKuf(K):
-            u_free = jax.scipy.linalg.solve(K[self.bc['free'],:][:,self.bc['free']], \
-                                        self.bc['force'][self.bc['free']], check_finite=False)
-            u = jnp.zeros((self.mesh['ndof']))
-            u = u.at[self.bc['free']].set(u_free.reshape(-1))
-            return u
-        
-        rho = projectionFilter(rho)
-        E = materialModel(rho)
-        K = assembleK(E)
-        u = solveKuf(K)
+        rho = self.projectionFilter(rho)
+        E = self.materialModel(rho)
+        K = self.assembleK(E)
+        u = self.solveKuf(K)
         J = jnp.dot(self.bc['force'].T, u)[0]
 
         return J
