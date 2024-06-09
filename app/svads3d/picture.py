@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from typing import Union
+from .camera import Camera
 
 
 class Picture():
@@ -24,6 +25,8 @@ class Picture():
     def __init__(self, data: dict):
         """
         初始化图片信息，处理特征点等特征信息。
+        1. 读取图片
+        2. 处理特征点
         @param data: 相关数据，包括图片信息。
         """
         self.data = data

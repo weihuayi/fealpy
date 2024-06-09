@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Union
+from .harmonic_map import HarmonicMapData, shpere_harmonic_map
 
 
 class CameraSystem():
@@ -17,19 +18,15 @@ class CameraSystem():
     mesh = None
 
     def __init__(self, location: np.ndarray, cameras: list[Camera]):
+        """
+        初始化相机系统对象。
+        @param location: 相机系统的空间位置。
+        @param cameras: 构成相机系统的相机列表。
+        """
         self.location = location
         self.cameras = cameras
         for camera in self.cameras:
             camera.camear_system = self
-        pass
-
-    def optimize(self, *args):
-        """
-        相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
-        @param args:
-        @return:
-        """
-        pass
 
     def to_screen(self, *args):
         """
@@ -43,9 +40,21 @@ class CameraSystem():
         else:
             pass
 
-    def to_camera(self, *args):
+    def to_camera(self, mesh, didx, dval):
         """
         调和映射，将当前相机系统的点或网格映射到相机上。
+        @param mesh: 网格
+        @param didx: 网格狄利克雷点索引
+        @param dval: 网格狄利克雷点值
+        @return: 映射后的网格点
+        """
+        data = HarmonicMapData(mesh, didx, dval)
+        node = shpere_harmonic_map(data).reshape(-1, 3)
+        return node
+
+    def projecte_to_self(self, *args):
+        """
+        将当前相机系统的点或网格投影到自身。
         @param args: 相机系统的点或网格。
         @return:
         """
