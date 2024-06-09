@@ -1,5 +1,5 @@
 """
-此脚本用于生成数据集，每个样本包含多个 gD & gN 数据通道和标签。
+此脚本用于生成电阻抗成像数据集。
 求解区域为 [-1, 1], [-1, 1]。
 """
 
@@ -16,8 +16,8 @@ from tqdm import tqdm
 
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch import logger
+from fealpy.cem import EITDataGenerator
 
-from data_generator import EITDataGenerator
 
 logger.setLevel('WARNING')
 parser = argparse.ArgumentParser()
@@ -46,6 +46,13 @@ NUM_CIR = config['data'].get('num_cir', 3)
 FREQ = config['data']['freq']
 DTYPE = getattr(torch, config['data']['dtype'])
 DEVICE = config['data'].get('device', None)
+
+if 'fem' in config:
+    P = config['fem'].get('p', 1)
+    Q = config['fem'].get('q', P + 2)
+else:
+    P, Q = 1, 3
+
 output_folder = config['output_folder']
 kwargs = {"dtype": DTYPE, "device": DEVICE}
 os.path.join(output_folder, "")
@@ -66,8 +73,9 @@ def neumann(points: Tensor):
 def main(sigma_iterable: Sequence[int], seed=0, index=0):
     torch.manual_seed(seed)
     mesh = TriangleMesh.from_box((-1, 1, -1, 1), EXT, EXT, ftype=DTYPE, device=DEVICE)
-    generator = EITDataGenerator(mesh=mesh)
-    gn = generator.set_boundary(neumann, batched=True)
+    generator = EITDataGenerator(mesh=mesh, p=P, q=Q)
+    gn = generator.set_boundary(neumann, batch_size=len(FREQ))
+
     if index == 0: # Save gn only on the first task
         np.save(os.path.join(output_folder, 'gn.npy'), gn.cpu().numpy())
 
@@ -83,6 +91,7 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
 
         label = generator.set_levelset(SIGMA, ls_fn)
         gd = generator.run()
+
         np.savez(
             os.path.join(output_folder, f'gd_{sigma_idx}.npz'),
             gd=gd.numpy(),
@@ -125,7 +134,7 @@ if __name__ == "__main__":
     print("Start generating data...")
     print(f"using {process_num} processes")
     print("Config:")
-    print(f"    mesh: {EXT}x{EXT}")
+    print(f"    mesh: {EXT}x{EXT}, order: {P}, integral: {Q}")
     print(f"    sigma(inclusion): {SIGMA[0]}")
     print(f"    sigma(background): {SIGMA[1]}")
     print(f"    number of circles: {NUM_CIR}")
@@ -158,6 +167,7 @@ if __name__ == "__main__":
 
     PART = 4
     TM = int(time())
+    # main(NUM, 999, 0)
 
     pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
     pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
