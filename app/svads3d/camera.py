@@ -19,15 +19,33 @@ class Camera():
     mesh = None
 
     def __init__(self, picture: Picture, location: np.ndarray, direction: np.ndarray):
+        """
+        @brief 构造函数。
+            1. 获取图片到自身的特征点（地面特征点）
+
+        @param picture: 相机对应的图像。
+        @param location: 相机的空间位置（世界坐标）。
+        @param direction: 相机的朝向（角度）。
+        """
         self.picture = picture
         self.picture.camera = self
         self.location = location
         self.direction = direction
+
+        self.ground_feature_points = None
+        self.screen_feature_points = None
+
+    def set_screen_frature_points(self, *args):
+        """
+        @brief 设置相机的屏幕特征点。
+        @param args: 屏幕特征点。
+        @return:
+        """
         pass
 
     def to_camera_system(self, *args):
         """
-        调和映射，将相机上的点或网格映射到相机系统（视点）。
+        @brief 调和映射，将相机上的点或网格映射到相机系统（视点）。
         @param args: 相机上的点或网格。
         @return:
         """
@@ -39,7 +57,7 @@ class Camera():
 
     def to_picture(self, *args):
         """
-        将相机上的点或网格映射到图像上。
+        @brief 将相机上的点或网格映射到图像上。
         @param args: 相机上的点或网格
         @return:
         """
@@ -47,4 +65,12 @@ class Camera():
             pass
         else:
             pass
+
+    def projecte_to_self(self, point):
+        """
+        @brief 将点投影到相机球上。
+        @param point: 点
+        @return:
+        """
+        pass
 

@@ -46,7 +46,6 @@ class OptimizeParameter:
         models = self.models
         align_point = self.align_point
 
-        #osysterm.set_parameters(x)
         osysterm.set_parameters(x.reshape(18,3))
 
         ## 要对齐的点在屏幕上的坐标
