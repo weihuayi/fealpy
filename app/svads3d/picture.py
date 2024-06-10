@@ -31,7 +31,7 @@ class Picture():
         @param data: 相关数据，包括图片信息。
         """
         self.data_path = data_path
-        self.fname = data_path+fname
+        self.fname = data_path+"camera_inputs/"+fname
         # 读取图像
         image = cv2.imread(self.fname, cv2.IMREAD_GRAYSCALE)
         if image is None:

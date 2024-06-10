@@ -138,6 +138,20 @@ class Camera():
         return uv
 
 
+    def set_parameters(self, location, eular_angle):
+        """
+        @brief 设置相机的位置与朝向。
+        @param location: 相机的位置。
+        @param eular_angle: 相机的欧拉角。
+        @return:
+        """
+        self.location = np.array(location)
+        self.eular_angle = eular_angle
+        self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
+
+        self.ground_feature_points = self.picture_to_self(self.picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
+        self.feature_points = self.picture_to_self(self.picture.feature_point)
+
 
     def projecte_to_self(self, points):
         """
