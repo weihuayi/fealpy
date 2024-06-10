@@ -1,5 +1,6 @@
 import numpy as np
 import gmsh
+from fealpy.mesh import TriangleMesh
 from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
@@ -135,7 +136,7 @@ class Screen:
         self.domain = None
         pass
 
-    def meshing(self, theta = np.pi/6, only_ground=True):#(self, meshing_type:MeshingType):
+    def meshing(self, theta = np.pi/6, only_ground=False):#(self, meshing_type:MeshingType):
         """
         在屏幕上生成网格，可选择 MeshingType 中提供的网格化方案。
         @param meshing_type: 网格化方案。
@@ -258,7 +259,7 @@ class Screen:
 
             cam = camerasys.cameras[i]
             f0 = lambda x : cam.projecte_to_self(x)-cam.location
-            f1 = lambda x : cam.picture_to_self(x)-cam.location
+            f1 = lambda x : x-cam.location
 
             # 获取第 i 块网格的屏幕边界特征点
             geoedge = []
@@ -271,10 +272,7 @@ class Screen:
             dval_s = [f0(ge[1].reshape(-1, 3)) for ge in lists]
 
             # 获取第 i 块网格的地面特征点
-            ismeshi = np.zeros(NN, dtype = np.bool_)
-            ismeshi[cell] = True # 第 i 块网格中的点
-
-            flag = ismeshi[gmpidx]
+            flag = [(g.cam0 == i) | (g.cam1 == i) for g in gmp]
             didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
             dval_g = [f1(g.points0[None, :]) if g.cam0 == i else
                       f1(g.points1[None, :]) for j, g in enumerate(gmp) if flag[j]]
@@ -314,17 +312,19 @@ class Screen:
             node_s = mesh.entity('node').copy()
             node   = self.to_view_point(node_s)
             mesh.node = node
-            mesh.to_vtk(fname='view_mesh_'+str(i)+'.vtk')
+            mesh.to_vtk(fname='view_mesh_'+str(i)+'.vtu')
 
             data = HarmonicMapData(mesh, self.didxs[i], self.dvals[i])
             node = sphere_harmonic_map(data).reshape(-1, 3)
             node += cam.location
+            mesh.node = node
+            mesh.to_vtk(fname='sphere_mesh_'+str(i)+'.vtu')
             uvi = cam.to_picture(node, normalizd=True)
             uvi[:, 0] = 1-uvi[:, 0]
 
             uv.append(uvi)
             mesh.node = node_s
-            mesh.to_vtk(fname='screen_mesh_'+str(i)+'.vtk')
+            mesh.to_vtk(fname='screen_mesh_'+str(i)+'.vtu')
         return uv
 
     def sphere_to_self(self, points, center, radius):

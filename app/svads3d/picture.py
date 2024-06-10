@@ -38,10 +38,13 @@ class Picture():
             raise FileNotFoundError
         else:
             self.image = image
+        self.height, self.width = self.image.shape
         self.mark_board = np.array(mark_board).reshape((2, -1, 2))
+        #self.mark_board[..., 1] = self.height - self.mark_board[..., 1] 
+        #self.mark_board[..., 0] = self.width - self.mark_board[..., 0]
+
         self.feature_point = mark_board
         self.center, self.radius = self.get_center_and_radius()
-        self.height, self.width = self.image.shape
 
 
     def add_feature_point(self, feature_point: Union[list[np.ndarray], np.ndarray, list]):

@@ -6,7 +6,7 @@ from picture import Picture
 from camera import Camera
 from camera_system import CameraSystem
 from screen import Screen
-from opengl_plotter import OpenGLPlotter
+from fealpy.plotter.gl import OpenGLPlotter
 
 
 
