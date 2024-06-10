@@ -87,16 +87,63 @@ class Camera():
         else:
             raise NotImplemented
 
+    def world_to_cam(self, node):
+        """
+        @brief 把世界坐标系中的点转换到相机坐标系下
+        """
+        node = np.einsum('ij, kj->ik', node - self.location, self.axes)
+        return node
+    def cam_to_image(self, node, ptype='L'):
+        """
+        @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
+        """
+        NN = len(node)
+
+        fx = self.K[0, 0]
+        fy = self.K[1, 1]
+        u0 = self.K[0, 2]
+        v0 = self.K[1, 2]
+
+        r = np.sqrt(np.sum(node**2, axis=1))
+        theta = np.arccos(node[:, 2]/r)
+        phi = np.arctan2(node[:, 1], node[:, 0])
+        phi = phi % (2 * np.pi)
+
+        uv = np.zeros((NN, 2), dtype=np.float64)
+
+        if ptype == 'L': # 等距投影
+            uv[:, 0] = fx * theta * np.cos(phi) + u0
+            uv[:, 1] = fy * theta * np.sin(phi) + v0
+        elif ptype == 'O': # 正交投影
+            uv[:, 0] = fx * np.sin(theta) * np.cos(phi) + u0
+            uv[:, 1] = fy * np.sin(theta) * np.sin(phi) + v0
+        elif ptype == 'A': # 等积投影
+            uv[:, 0] = 2 * fx * np.sin(theta/2) * np.cos(phi) + u0
+            uv[:, 1] = 2 * fy * np.sin(theta/2) * np.sin(phi) + v0
+        elif ptype == 'S': # 体视投影, Stereographic Projection
+            uv[:, 0] = 2 * fx * np.tan(theta/2) * np.cos(phi) + u0
+            uv[:, 1] = 2 * fy * np.tan(theta/2) * np.sin(phi) + v0
+        else:
+            raise ValueError(f"投影类型{ptype}错误!")
+
+        # 标准化
+        uv[:, 0] = uv[:, 0]/self.width
+        uv[:, 1] = uv[:, 1]/self.height
+
+        return uv
     def to_picture(self, *args):
         """
         @brief 将相机上的点或网格映射到图像上。
         @param args: 相机上的点或网格
         @return:
         """
-        if type(args[0]) in [list[np.ndarray], np.ndarray]:
-            pass
+        if type(args[0]) in [list[np.ndarray], np.ndarray, list]:
+            node = args[0]
+            node = self.world_to_cam(node)
+            uv = self.cam_to_image(node)
+            return uv
         else:
-            pass
+            raise NotImplemented
 
     def projecte_to_self(self, point):
         """
@@ -107,8 +154,6 @@ class Camera():
         v = points - self.location
         v = v/np.linalg.norm(v, axis=-1, keepdims=True)
         return v + self.location
-
-
     def to_screen(self, points):
         """
         将相机球面上的点投影到屏幕上。
@@ -118,8 +163,6 @@ class Camera():
         screen = self.system.screen
         ret = screen.projecte_to_self(points, self.location, 1.0)
         return ret
-
-
 
     def camera_to_world(self, node):
         """
