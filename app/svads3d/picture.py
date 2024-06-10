@@ -31,14 +31,18 @@ class Picture():
         @param data: 相关数据，包括图片信息。
         """
         self.data_path = data_path
-        self.fname = fname
+        self.fname = data_path+"camera_inputs/"+fname
         # 读取图像
-        image = cv2.imread(self.data_path + self.fname, cv2.IMREAD_GRAYSCALE)
+        image = cv2.imread(self.fname, cv2.IMREAD_GRAYSCALE)
         if image is None:
             raise FileNotFoundError
         else:
             self.image = image
+        self.height, self.width = self.image.shape
         self.mark_board = np.array(mark_board).reshape((2, -1, 2))
+        #self.mark_board[..., 1] = self.height - self.mark_board[..., 1] 
+        #self.mark_board[..., 0] = self.width - self.mark_board[..., 0]
+
         self.feature_point = mark_board
         self.center, self.radius = self.get_center_and_radius()
 
@@ -101,6 +105,12 @@ class Picture():
             return node
         else:
             raise NotImplemented
+
+    def normalizd_coordinate(self, points):
+        uv = np.zeros_like(points)
+        uv[:, 0] = points[:, 0]/self.width
+        uv[:, 1] = points[:, 1]/self.height
+        return uv
 
     def get_center_and_radius(self):
         image = self.image

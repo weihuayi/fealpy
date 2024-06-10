@@ -1,8 +1,10 @@
 import numpy as np
 import gmsh
+from fealpy.mesh import TriangleMesh
 from typing import Union
 from camera_system import CameraSystem
-from .harmonic_map import HarmonicMapData, sphere_harmonic_map
+from scipy.optimize import fsolve
+from harmonic_map import * 
 
 @dataclass
 class GroundMarkPoint:
@@ -22,21 +24,21 @@ class Screen:
     """
     屏幕对象，用于分区，显示，
     Attributes:
-        camear_system (CameraSystem): 屏幕对应的相机系统。
+        camera_system (CameraSystem): 屏幕对应的相机系统。
         data (dict): 屏幕初始化信息，包括屏幕的长宽高、三个主轴长度、缩放比等数据。
         feature_point (list[array]): 特征点坐标。
         split_line (list[array]): 特征点连成的特征线（分割线）。
         domain (list[array]): 分割线围成分区。
         mesh : 屏幕上生成的网格。
     """
-    camear_system = None
+    camera_system = None
     data: dict = None
     feature_point: Union[np.ndarray, list[np.ndarray]] = None
     split_line: Union[np.ndarray, list[np.ndarray]] = None
     domain: Union[np.ndarray, list[np.ndarray]] = None
     mesh = None
 
-    def __init__(self, camear_system, data: dict):
+    def __init__(self, camera_system, carsize, scale_ratio, center_height):
         """
         @brief: 屏幕初始化。
                 1. 从相机系统获取地面特征点
@@ -47,14 +49,13 @@ class Screen:
                 6. 计算 uv
         @param feature_point: 屏幕上的特征点，用于网格生成以及计算视点到相机系统的映射。
         """
-        self.carsize = None
-        self.scale_ratio = None
-        self.center_height = None
-        self.size = (self.carsize[i]*self.scale_ratio[i] for i in range(3))
+        self.carsize = carsize
+        self.scale_ratio = scale_ratio  
+        self.center_height = center_height
+        self.axis_length = np.array([self.carsize[i]*self.scale_ratio[i] for i in range(3)])
 
-        self.camear_system = camear_system
-        self.camear_system.screen = self
-        self.data = data
+        self.camera_system = camera_system
+        self.camera_system.screen = self
 
         self.gmp = self.ground_mark_board()
         self.meshs, self.didxs, self.dvals = self.meshing()
@@ -65,13 +66,13 @@ class Screen:
         @brief 获取地面标记点
         """
         gmp = []
-        camsys = self.camear_system
+        camsys = self.camera_system
         for i in range(6):
             ri = (i+1)%6 # 右边相邻相机
-            ps0 = camsys.cams[ i].mark_board[1]
-            ps1 = camsys.cams[ri].mark_board[0]
-            ps2 = 0.5*camsys.cams[ i].to_screen(ps0, -camsys.center_height)
-            ps2+= 0.5*camsys.cams[ri].to_screen(ps1, -camsys.center_height)
+            ps0 = camsys.cameras[ i].ground_feature_points[1]
+            ps1 = camsys.cameras[ri].ground_feature_points[0]
+            ps2 = 0.5*camsys.cameras[ i].to_screen(ps0)
+            ps2+= 0.5*camsys.cameras[ri].to_screen(ps1)
             for j in range(len(ps0)):
                 gmp.append(GroundMarkPoint(i, ri, ps0[j], ps1[j], ps2[j]))
         return gmp
@@ -79,40 +80,45 @@ class Screen:
     def optimize(self):
         """
         相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
-        @param args:
-        @return:
         """
-        gmp = self.gmp
-        align_point = np.array([[g.points0, g.points1] for g in gmp])
-        def object_function(self, x):
+        def object_function(x):
             """
             @brief The object function to be optimized.
             @param x The parameters to be optimized.
             """
-            osysterm = self.ocam_systerm
-            models = self.models
-            align_point = self.align_point
-
-            osysterm.set_parameters(x.reshape(18,3))
+            systerm = self.camera_system
+            gmp = self.gmp
+            systerm.set_parameters(x)
 
             ## 要对齐的点在屏幕上的坐标
-            align_point_screen = np.zeros([6, 2, 12, 3], dtype=np.float_)
+            NGMP = len(gmp)
+            gmp_screen = np.zeros([NGMP, 2, 3], dtype=np.float_)
+            for i, g in enumerate(gmp): 
+                cam0 = g.cam0
+                point0 = g.points0
+                gmp_screen[i, 0] = systerm.cameras[cam0].to_screen(point0)
+                cam1 = g.cam1
+                point1 = g.points1
+                gmp_screen[i, 1] = systerm.cameras[cam1].to_screen(point1)
 
-            f1, f2 = osysterm.get_implict_surface_function()
-
-            z0 = -osysterm.center_height
-            for i, j in itertools.product(range(6), range(2)):
-                mod = models[i][j]
-                align_point_screen[i, j] = mod.mesh_to_ground(align_point[i, j], z0)
-
-            error = np.sum((align_point_screen[:, 0] - align_point_screen[:, 1])**2)
+            error = np.sum((gmp_screen[:, 0] - gmp_screen[:, 1])**2)
             return error
+
+        # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
+        init_x = np.zeros((6, 2, 3), dtype=np.float_)
+        for i in range(6):
+            init_x[i, 0] = self.camera_system.cameras[i].location
+            init_x[i, 1] = self.camera_system.cameras[i].eular_angle
+
+        init_x += 0.0000001
+        val = object_function(init_x)
+        print(val)
 
     def get_implict_function(self):
         """
         @brief 获取表示自身的隐式函数
         """
-        a, b, c = self.size
+        a, b, c = self.axis_length
         z0      = self.center_height
         def f0(p):
             x = p[..., 0]
@@ -135,7 +141,7 @@ class Screen:
         self.domain = None
         pass
 
-    def meshing(self, theta = np.pi/6, only_ground=True):#(self, meshing_type:MeshingType):
+    def meshing(self, theta = np.pi/6, only_ground=False):#(self, meshing_type:MeshingType):
         """
         在屏幕上生成网格，可选择 MeshingType 中提供的网格化方案。
         @param meshing_type: 网格化方案。
@@ -146,7 +152,7 @@ class Screen:
         gmsh.option.setNumber("Mesh.MeshSizeMax", 1)  # 最大网格尺寸
         gmsh.option.setNumber("Mesh.MeshSizeMin", 0.5)    # 最小网格尺寸
 
-        camsys = self.camear_system
+        camerasys = self.camera_system
 
         def add_rectangle(p0, p1, p2, p3):
             """
@@ -162,7 +168,8 @@ class Screen:
             return gmsh.model.occ.addPlaneSurface([curve])
 
         # 构造椭球面
-        a, b, c = self.size
+        l, w, h = self.carsize
+        a, b, c = self.axis_length
         z0 = -self.center_height
         phi = np.arcsin(z0 / c)
 
@@ -237,7 +244,8 @@ class Screen:
         tag2nid[nid2tag] = np.arange(NN)
 
         ## 获取地面特征点在网格中的编号
-        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, g)[0] for g in gmps])
+        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, g)[0] for g in
+                           gmps]).reshape(-1)
 
         ## 网格分块
         didx = [] # 狄利克雷边界条件的节点编号
@@ -255,8 +263,9 @@ class Screen:
                 cell.append(tag2nid[cell0])
             cell = np.concatenate(cell, axis=0)
 
-            f0 = lambda x : camsys.cams[i].project_to_cam_sphere(x)-camsys.cams[i].location
-            f1 = lambda x : camsys.cams[i].image_to_camera_sphere(x)-camsys.cams[i].location
+            cam = camerasys.cameras[i]
+            f0 = lambda x : cam.projecte_to_self(x)-cam.location
+            f1 = lambda x : x-cam.location
 
             # 获取第 i 块网格的屏幕边界特征点
             geoedge = []
@@ -273,16 +282,23 @@ class Screen:
             ismeshi[cell] = True # 第 i 块网格中的点
 
             flag = ismeshi[gmpidx]
-            didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
+            flag0 = np.array([(g.cam0 == i) | (g.cam1 == i) for g in gmp])
+            flag = flag & flag0
+
+            didx_g = [[gmpidx[j]] for j in range(len(flag)) if flag[j]]
             dval_g = [f1(g.points0[None, :]) if g.cam0 == i else
                       f1(g.points1[None, :]) for j, g in enumerate(gmp) if flag[j]]
+
+            if i==0:
+                print()
+                print(dval_g)
 
             pmesh, nidxmap = creat_part_mesh(node, cell)
             partmesh.append(pmesh)
             didx_i = nidxmap[np.concatenate(didx_s+didx_g, dtype=np.int_)]
             dval_i = np.concatenate(dval_s+dval_g, axis=0)
-            didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
-            dval_i = np.concatenate(dval_s, axis=0)
+            #didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
+            #dval_i = np.concatenate(dval_s, axis=0)
 
             didx_i, uniqueidx = np.unique(didx_i, return_index=True)
             dval_i = dval_i[uniqueidx]
@@ -298,7 +314,7 @@ class Screen:
         @param points: 屏幕上的点。
         @return: 映射到相机系统的点。
         """
-        return self.camear_system.projecte_to_view_point(points)
+        return self.camera_system.projecte_to_view_point(points)
 
     def compute_uv(self):
         """
@@ -307,20 +323,24 @@ class Screen:
         @return:
         """
         uv = []
-        for i, cam in enumerate(self.camear_system.cams):
+        for i, cam in enumerate(self.camera_system.cameras):
             mesh   = self.meshs[i]
             node_s = mesh.entity('node').copy()
-            node   = self.screen_to_viewpoint(node_s)
+            node   = self.to_view_point(node_s)
             mesh.node = node
+            mesh.to_vtk(fname='view_mesh_'+str(i)+'.vtu')
 
-            data = HarmonicMapData(mesh, self.didx[i], self.dval[i])
+            data = HarmonicMapData(mesh, self.didxs[i], self.dvals[i])
             node = sphere_harmonic_map(data).reshape(-1, 3)
             node += cam.location
-            uvi = cam.to_picture(node)
+            mesh.node = node
+            mesh.to_vtk(fname='sphere_mesh_'+str(i)+'.vtu')
+            uvi = cam.to_picture(node, normalizd=True)
             uvi[:, 0] = 1-uvi[:, 0]
 
             uv.append(uvi)
             mesh.node = node_s
+            mesh.to_vtk(fname='screen_mesh_'+str(i)+'.vtu')
         return uv
 
     def sphere_to_self(self, points, center, radius):
@@ -331,9 +351,10 @@ class Screen:
         @param radius: 半径。
         @return: 投影到屏幕上的点。
         """
+        if len(points.shape)==1:
+            points = points[None, :]
         f0, f1 = self.get_implict_function()
-        ret = np.zeros_like(nodes)
-
+        ret = np.zeros_like(points)
         def sphere_to_implict_function(p, c, r, fun):
             g = lambda t : fun(c + t*(p-c))
             t = fsolve(g, 1000)
@@ -342,7 +363,7 @@ class Screen:
 
         g0 = lambda p : sphere_to_implict_function(p, center, radius, f0)
         g1 = lambda p : sphere_to_implict_function(p, center, radius, f1)
-        for i, node in enumerate(nodes):
+        for i, node in enumerate(points):
             val = g0(node)
             if val[2] < -self.center_height:
                 val = g1(node)
@@ -355,9 +376,11 @@ class Screen:
         @param plotter: 绘图器。
         """
         uvs = self.uvs
-        for uv, mesh, cam in zip(uvs, meshs, cams):
+        meshs = self.meshs
+        cameras = self.camera_system.cameras
+        for uv, mesh, cam in zip(uvs, meshs, cameras):
             node = mesh.entity('node')
             cell = mesh.entity('cell')
             no = np.concatenate((node[cell].reshape(-1, 3), uv[cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
-            plotter.add_mesh(no, cell=None, texture_path=cam.fname)
+            plotter.add_mesh(no, cell=None, texture_path=cam.picture.fname)
 

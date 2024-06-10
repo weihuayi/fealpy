@@ -11,9 +11,6 @@ class Camera():
     相机对象，记录相机的位置与朝向，是构造相机系统的基础。
     """
     def __init__(self, picture, data_path, chessboard_dir, location, eular_angle):
-    eular_angle: np.ndarray = None
-    camear_system: CameraSystem = None
-    mesh = None
         """
         @brief 构造函数。
             1. 获取图片到自身的特征点（地面特征点）
@@ -35,9 +32,10 @@ class Camera():
 
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), data_path + chessboard_dir)
 
-        self.ground_feature_points = self.camera_to_world(picture.to_camera(picture.mark_board.reshape((-1,2)), 'L')).reshape((2,-1,3))
-        self.feature_points = self.camera_to_world(picture.to_camera(picture.feature_point, 'L'))
+        self.ground_feature_points = self.picture_to_self(picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
+        self.feature_points = self.picture_to_self(picture.feature_point)
         self.screen_feature_points = None
+        self.camera_system = None
 
     def set_screen_frature_points(self, feature_point):
         """
@@ -87,22 +85,30 @@ class Camera():
         else:
             raise NotImplemented
 
-    def world_to_cam(self, node):
+    def to_picture(self, points, normalizd=False, maptype="L"):
         """
-        @brief 把世界坐标系中的点转换到相机坐标系下
+        @brief 将相机上的点或网格映射到图像上。
+        @param args: 相机上的点或网格
+        @return:
         """
-        node = np.einsum('ij, kj->ik', node - self.location, self.axes)
-        return node
-    def cam_to_image(self, node, ptype='L'):
-        """
-        @brief 把相机坐标系中的点投影到归一化的图像 uv 坐标系
-        """
+        node = self.world_to_camera(points)
+
         NN = len(node)
 
         fx = self.K[0, 0]
         fy = self.K[1, 1]
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
+
+        """
+        w = self.width
+        h = self.height
+        f = np.sqrt((h/2)**2 + (w/2)**2)
+        fx = f
+        fy = f
+        u0 = self.center[0]
+        v0 = self.center[1]
+        """
 
         r = np.sqrt(np.sum(node**2, axis=1))
         theta = np.arccos(node[:, 2]/r)
@@ -111,41 +117,43 @@ class Camera():
 
         uv = np.zeros((NN, 2), dtype=np.float64)
 
-        if ptype == 'L': # 等距投影
+        if maptype == 'L': # 等距投影
             uv[:, 0] = fx * theta * np.cos(phi) + u0
             uv[:, 1] = fy * theta * np.sin(phi) + v0
-        elif ptype == 'O': # 正交投影
+        elif maptype == 'O': # 正交投影
             uv[:, 0] = fx * np.sin(theta) * np.cos(phi) + u0
             uv[:, 1] = fy * np.sin(theta) * np.sin(phi) + v0
-        elif ptype == 'A': # 等积投影
+        elif maptype == 'A': # 等积投影
             uv[:, 0] = 2 * fx * np.sin(theta/2) * np.cos(phi) + u0
             uv[:, 1] = 2 * fy * np.sin(theta/2) * np.sin(phi) + v0
-        elif ptype == 'S': # 体视投影, Stereographic Projection
+        elif maptype == 'S': # 体视投影, Stereographic Projection
             uv[:, 0] = 2 * fx * np.tan(theta/2) * np.cos(phi) + u0
             uv[:, 1] = 2 * fy * np.tan(theta/2) * np.sin(phi) + v0
         else:
             raise ValueError(f"投影类型{ptype}错误!")
 
         # 标准化
-        uv[:, 0] = uv[:, 0]/self.width
-        uv[:, 1] = uv[:, 1]/self.height
-
+        if normalizd:
+            uv = self.picture.normalizd_coordinate(uv)
         return uv
-    def to_picture(self, *args):
+
+
+    def set_parameters(self, location, eular_angle):
         """
-        @brief 将相机上的点或网格映射到图像上。
-        @param args: 相机上的点或网格
+        @brief 设置相机的位置与朝向。
+        @param location: 相机的位置。
+        @param eular_angle: 相机的欧拉角。
         @return:
         """
-        if type(args[0]) in [list[np.ndarray], np.ndarray, list]:
-            node = args[0]
-            node = self.world_to_cam(node)
-            uv = self.cam_to_image(node)
-            return uv
-        else:
-            raise NotImplemented
+        self.location = np.array(location)
+        self.eular_angle = eular_angle
+        self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
 
-    def projecte_to_self(self, point):
+        self.ground_feature_points = self.picture_to_self(self.picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
+        self.feature_points = self.picture_to_self(self.picture.feature_point)
+
+
+    def projecte_to_self(self, points):
         """
         将点投影到相机球面上。
         @param points: 要投影的点。
@@ -154,15 +162,29 @@ class Camera():
         v = points - self.location
         v = v/np.linalg.norm(v, axis=-1, keepdims=True)
         return v + self.location
+
+    def picture_to_self(self, point):
+        """
+        """
+        p = self.picture.to_camera(point, "L")
+        return self.camera_to_world(p)
+
     def to_screen(self, points):
         """
         将相机球面上的点投影到屏幕上。
         @param args: 相机球面上的点。
         @return:
         """
-        screen = self.system.screen
-        ret = screen.projecte_to_self(points, self.location, 1.0)
+        screen = self.camera_system.screen
+        ret = screen.sphere_to_self(points, self.location, 1.0)
         return ret
+
+    def world_to_camera(self, points):
+        """
+        @brief 把世界坐标系中的点转换到相机坐标系下
+        """
+        node = np.einsum('ij, kj->ik', points-self.location, self.axes)
+        return node
 
     def camera_to_world(self, node):
         """
