@@ -6,7 +6,7 @@ from picture import Picture
 from camera import Camera
 from camera_system import CameraSystem
 from screen import Screen
-from opengl_plotter import OpenGLPlotter
+from fealpy.plotter.gl import OpenGLPlotter
 
 
 
@@ -22,6 +22,7 @@ if __name__ == '__main__':
                zip(pictures, data['chessboard_dir'], data['locations'], data['eular_angle'])]
     camear_sys = CameraSystem(cameras, data['view_point'])
     screen = Screen(camear_sys, data["car_size"], data["scale_factor"], data["center_height"])
+    screen.optimize()
 
     plotter = OpenGLPlotter()
 

@@ -17,6 +17,16 @@ class CameraSystem():
     screen = None
     mesh = None
 
+    def set_parameters(self, parameters):
+        """
+        设置相机系统的参数。
+        @param parameters: 相机系统的参数。
+        """
+        for i in range(6):
+            loc = parameters[i, 0]
+            ang = parameters[i, 1]
+            self.cameras[i].set_parameters(loc, ang)
+
     def __init__(self, cameras, viewpoint):
         """
         初始化相机系统对象。

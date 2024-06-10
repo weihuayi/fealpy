@@ -32,8 +32,8 @@ class Camera():
 
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), data_path + chessboard_dir)
 
-        self.ground_feature_points = self.camera_to_world(picture.to_camera(picture.mark_board.reshape((-1,2)), 'L')).reshape((2,-1,3))
-        self.feature_points = self.camera_to_world(picture.to_camera(picture.feature_point, 'L'))
+        self.ground_feature_points = self.picture_to_self(picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
+        self.feature_points = self.picture_to_self(picture.feature_point)
         self.screen_feature_points = None
         self.camera_system = None
 
@@ -84,13 +84,6 @@ class Camera():
             pass
         else:
             raise NotImplemented
-
-    def world_to_camera(self, points):
-        """
-        @brief 把世界坐标系中的点转换到相机坐标系下
-        """
-        node = np.einsum('ij, kj->ik', points-self.location, self.axes)
-        return node
 
     def to_picture(self, points, normalizd=False, maptype="L"):
         """
@@ -145,6 +138,20 @@ class Camera():
         return uv
 
 
+    def set_parameters(self, location, eular_angle):
+        """
+        @brief 设置相机的位置与朝向。
+        @param location: 相机的位置。
+        @param eular_angle: 相机的欧拉角。
+        @return:
+        """
+        self.location = np.array(location)
+        self.eular_angle = eular_angle
+        self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
+
+        self.ground_feature_points = self.picture_to_self(self.picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
+        self.feature_points = self.picture_to_self(self.picture.feature_point)
+
 
     def projecte_to_self(self, points):
         """
@@ -171,6 +178,13 @@ class Camera():
         screen = self.camera_system.screen
         ret = screen.sphere_to_self(points, self.location, 1.0)
         return ret
+
+    def world_to_camera(self, points):
+        """
+        @brief 把世界坐标系中的点转换到相机坐标系下
+        """
+        node = np.einsum('ij, kj->ik', points-self.location, self.axes)
+        return node
 
     def camera_to_world(self, node):
         """

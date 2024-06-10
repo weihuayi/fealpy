@@ -42,8 +42,8 @@ plotter = OpenGLPlotter()
 
 #csys.show_screen_mesh(plotter)
 #csys.show_ground_mesh(plotter)
-#csys.show_ground_mesh_with_view_point(plotter)
-#plotter.run()
+csys.show_ground_mesh_with_view_point(plotter)
+plotter.run()
 #csys.show_sphere_lines()
 for i in range(6):
     model = csys.cams[i]
