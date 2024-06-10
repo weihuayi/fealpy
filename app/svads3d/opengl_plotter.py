@@ -7,9 +7,9 @@ import numpy as np
 from fealpy import logger
 import ipdb
 
-from .gl_mesh import GLMesh
-from .coordinate_axes import CoordinateAxes
-from .kernel import calculate_rotation_matrix
+from gl_mesh import GLMesh
+from coordinate_axes import CoordinateAxes
+from kernel import calculate_rotation_matrix
 
 
 class OpenGLPlotter:
