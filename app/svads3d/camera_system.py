@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Union
-from .harmonic_map import HarmonicMapData, shpere_harmonic_map
+from harmonic_map import * 
 
 
 class CameraSystem():
@@ -17,17 +17,17 @@ class CameraSystem():
     screen = None
     mesh = None
 
-    def __init__(self, location: np.ndarray, cameras):
+    def __init__(self, cameras, viewpoint):
         """
         初始化相机系统对象。
-        @param location: 相机系统的空间位置。
         @param cameras: 构成相机系统的相机列表。
+        @param viewpoint: 相机系统的视点。
         """
-        self.location = location
         self.cameras = cameras
         self.viewpoint = np.array(viewpoint)
         for camera in self.cameras:
-            camera.camear_system = self
+            camera.camera_system = self
+        self.screen = None
 
     def to_screen(self, points):
         """
