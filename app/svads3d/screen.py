@@ -5,6 +5,8 @@ from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
+from fealpy.iopt import COA
+
 
 @dataclass
 class GroundMarkPoint:
@@ -88,6 +90,7 @@ class Screen:
             """
             systerm = self.camera_system
             gmp = self.gmp
+            x = x.reshape((6, 2, 3))
             systerm.set_parameters(x)
 
             ## 要对齐的点在屏幕上的坐标
@@ -109,10 +112,18 @@ class Screen:
         for i in range(6):
             init_x[i, 0] = self.camera_system.cameras[i].location
             init_x[i, 1] = self.camera_system.cameras[i].eular_angle
+        init_x = init_x.flatten()
 
-        init_x += 0.0000001
-        val = object_function(init_x)
-        print(val)
+        #参数设置
+        N = 100
+        dim = 6 * 6
+        ub = init_x + 1
+        lb = init_x - 1
+        Max_iter = 1000
+
+        opt_alg = COA(N, dim, ub, lb, Max_iter, object_function, init_x)
+        bestfitness,best_position,_ = opt_alg.cal()
+        print(bestfitness)
 
     def get_implict_function(self):
         """
