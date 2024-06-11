@@ -1,5 +1,5 @@
 
-from typing import Union, Callable, Optional, Any, TypeVar, Dict
+from typing import Union, Callable, Optional, Any, TypeVar, Dict, Tuple, Dict
 
 from torch import Tensor
 
@@ -12,7 +12,7 @@ _Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
 
 class IntegratorMeta(type):
-    def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any):
+    def __init__(self, name: str, bases: Tuple[type, ...], dict: Dict[str, Any], /, **kwds: Any):
         for meth_name, meth in dict.items():
             if callable(meth):
                 if hasattr(meth, '__call_name__'):
