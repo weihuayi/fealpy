@@ -25,14 +25,14 @@ class Rectangle_BJT_Domain(Domain):
             (domain[0], domain[3]),
             ], dtype=np.float64)
         
-        curves = np.array([
+        lines = np.array([
             (0, 1),
             (1, 2),
             (2, 3),
             (3, 0),
             ], dtype=np.float64)
 
-        self.facets = {0:vertices, 1:curves}
+        self.facets = {0:vertices, 1:lines}
 
     def __call__(self, p):
         """
