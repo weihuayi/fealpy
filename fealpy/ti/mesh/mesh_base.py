@@ -64,20 +64,6 @@ class MeshDS():
     @overload
     def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default: _T) -> Union[Template, _T]: ...
     def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default=_default):
-        """Get entities in mesh structure.
-
-        Args:
-            index (int | slice | Tensor): The index of the entity.
-            etype (int | str): The topology dimension of the entity, or name
-            'cell' | 'face' | 'edge'. Note that 'node' is not available in data structure.
-            For polygon meshes, the names 'cell_location' | 'face_location' may also be
-            available, and the `index` argument is applied on the flattened entity tensor.
-            index (int | slice | Tensor): The index of the entity.
-            default (Any): The default value if the entity is not found.
-
-        Returns:
-            Template: Entity or the default value.
-        """
         if isinstance(etype, str):
             etype = entity_str2dim(self, etype)
         return entity_dim2field(self, etype, index, default=default)
@@ -87,3 +73,11 @@ class MeshDS():
 
     def total_edge(self) -> Tensor:
         raise NotImplementedError
+
+    def is_homogeneous(self) -> bool:
+        """Return True if the mesh is homogeneous.
+
+        Returns:
+            bool: Homogeneous indiator.
+        """
+        return len(self.cell.shape) == 2

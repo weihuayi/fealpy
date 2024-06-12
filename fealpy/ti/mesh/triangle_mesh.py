@@ -6,7 +6,7 @@ import taichi as ti
 from .. import logger
 from .. import to_taichi_field
 
-from .mesh_base import MeshDS
+from .quadrature import TriangleQuadrature, 
 
 @ti.data_oriented
 class TriangleMeshDataStructure(MeshDS):
@@ -56,6 +56,15 @@ class TriangleMesh():
 
     def geo_dimension(self):
         return self.node.shape[1]
+
+    def quadrature_formula(self, index: int, etype='cell'):
+        if etype in ('cell', 2):
+            return TriangleQuadrature(index)
+        elif etype in ('face', 'edge', 1):
+
+
+    integrator = quadrature_formula
+            
 
     def view(self, name='Window Title', res=(640, 360), fps_limit=200, pos = (150, 150)): 
         GD = self.geo_dimension()
