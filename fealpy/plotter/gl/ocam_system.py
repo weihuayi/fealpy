@@ -239,7 +239,7 @@ class OCAMSystem:
         tag2nid[nid2tag] = np.arange(NN)
 
         ## 获取地面特征点在网格中的编号
-        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, g)[0] for g in gmps])
+        gmpidx = np.array([gmsh.model.mesh.get_nodes(0, g)[0] for g in gmps]).reshape(-1)
 
         ## 网格分块
         didx = [] # 狄利克雷边界条件的节点编号
@@ -275,7 +275,10 @@ class OCAMSystem:
             ismeshi[cell] = True # 第 i 块网格中的点
 
             flag = ismeshi[gmpidx]
-            didx_g = [gmpidx[j] for j in range(len(flag)) if flag[j]]
+            flag0 = np.array([(g.cam0 == i) | (g.cam1 == i) for g in gmp])
+            flag = flag & flag0
+
+            didx_g = [[gmpidx[j]] for j in range(len(flag)) if flag[j]]
             dval_g = [f1(g.points0[None, :]) if g.cam0 == i else
                       f1(g.points1[None, :]) for j, g in enumerate(gmp) if flag[j]]
 
