@@ -1,12 +1,16 @@
 from typing import Union
+
 import numpy as np
 import taichi as ti
 
-from ..utils import to_taichi_field
+from .. import logger
+from .. import to_taichi_field
+
+from .mesh_base import MeshDS
 
 @ti.data_oriented
-class TriangleMeshDataStructure:
-    def __init__(self, NN, cell):
+class TriangleMeshDataStructure(MeshDS):
+    def __init__(self, NN: int, cell: ti.template()):
         # 使用 NumPy 数组初始化字段
         self.NN = NN
         self.cell = cell
