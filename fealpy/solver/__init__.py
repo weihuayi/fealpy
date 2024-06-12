@@ -2,7 +2,7 @@ import platform
 
 from .. import logger
 from .solve import solve, active_set_solver
-from .gamg_solver import GAMGSolver
+#from .gamg_solver import GAMGSolver
 
 try:
     from .cupy_solver import CupySolver
@@ -25,3 +25,5 @@ from .fast_solver import LinearElasticityLFEMFastSolver
 from .fast_solver import LevelSetFEMFastSolver 
 
 from .LinearElasticityRLFEMFastSolver import LinearElasticityRLFEMFastSolver
+
+from .gamg_solver import GAMGSolver

@@ -28,7 +28,7 @@ class LinearForm(Form[_FS]):
         space = self.space
         device = space.device
         gdof = space.number_of_global_dofs()
-        global_mat_shape = (gdof, gdof)
+        global_mat_shape = (gdof,)
         M = torch.sparse_coo_tensor(
             torch.empty((1, 0), dtype=space.itype, device=device),
             torch.empty((0,), dtype=space.ftype, device=device),
@@ -37,7 +37,7 @@ class LinearForm(Form[_FS]):
 
         for group in self.integrators.keys():
             group_tensor, e2dof = self._assembly_group(group, retain_ints)
-            indices = e2dof.ravel()
+            indices = e2dof.reshape(1, -1)
             M += torch.sparse_coo_tensor(indices, group_tensor.ravel(), size=global_mat_shape)
 
         return M
@@ -55,27 +55,30 @@ class LinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self.assembly_group(group, retain_ints)
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
             NC = e2dof.size(0)
             local_mat_shape = (batch_size, NC, ldof)
 
             if group_tensor.ndim == 2:
                 group_tensor = group_tensor.unsqueeze(0).expand(local_mat_shape)
 
-            indices = e2dof.ravel().unsqueeze(0)
+            indices = e2dof.reshape(1, -1)
             group_tensor = group_tensor.reshape(batch_size, -1).transpose(0, 1)
             M += torch.sparse_coo_tensor(indices, group_tensor, size=global_mat_shape)
 
         return M
 
     def assembly(self, coalesce=True, retain_ints: bool=False, return_dense=True) -> Tensor:
-        """@brief Assembly the linear form vector.
+        """Assembly the linear form vector.
 
-        @param coalesce: Whether to coalesce the sparse tensor.
-        @param retain_ints: Whether to retain the integrator cache.
-        @param return_dense: Whether to return dense tensor.
+        Args:
+            coalesce (bool, optional): Whether to coalesce the sparse tensor.
+            retain_ints (bool, optional): Whether to retain the integrator cache.
+            return_dense (bool, optional): Whether to return dense tensor.
 
-        @returns: Tensor[gdof,]. Batch is placed in the LAST dimension if `batch_size > 0`.
+        Returns:
+            Tensor[gdof,]. Batch is placed in the FIRST dimension for dense tensor,
+            and in the LAST dimension for sparse tensor (Hybrid COO Tensor).
         """
         if self.batch_size == 0:
             V = self._single_assembly(retain_ints)

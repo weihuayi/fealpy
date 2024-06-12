@@ -1,5 +1,5 @@
 import numpy as np
-import time
+import copy
 
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
@@ -17,6 +17,8 @@ from ..mesh.adaptive_tools import mark
 from scipy.sparse.linalg import spsolve, lgmres, cg
 from scipy.sparse import csr_matrix, coo_matrix
 
+
+from ..ml import timer
 
 class AFEMPhaseFieldCrackHybridMixModel():
     """
@@ -48,6 +50,8 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
         self.recovery = LinearRecoveryAlg()
 
+        self.tmr = timer()
+
     def newton_raphson(self, 
             disp, 
             dirichlet_phase=False, 
@@ -59,14 +63,15 @@ class AFEMPhaseFieldCrackHybridMixModel():
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
-
-        mesh = self.mesh
-        space = self.space
-        model = self.model
+        tmr = self.tmr
+        next(tmr)
         GD = self.GD
         D0 = self.D0
         k = 0
         while k < maxit:
+            mesh = self.mesh
+            space = self.space
+            model = self.model
             print('k:', k)
             uh = self.uh
             d = self.d
@@ -78,18 +83,26 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             du = np.zeros_like(uh)
             
+            tmr.send('init')
+
             # 求解位移
             vspace = (GD*(space, ))
             ubform = BilinearForm(GD*(space, ))
             
+            tmr.send('mesh_and_space')            
+
             gd = self.energy_degradation_function(d)
             ubform.add_domain_integrator(LinearElasticityOperatorIntegrator(model.lam,
                 model.mu, c=gd))
+
+            tmr.send('ufrom') 
+
             if atype == 'fast':
                 # 无数值积分矩阵组装
                 A0 = ubform.fast_assembly()
             else:
                 A0 = ubform.assembly()
+            
 
             # 使用切算子计算来组装单元刚度矩阵，暂时仅能计算二维
 #            D = self.dsigma_depsilon(d, D0)
@@ -99,12 +112,16 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             R0 = -A0@uh.flat[:]
             
+            tmr.send('uassbemly')
+            
             self.force = np.sum(-R0[isDDof.flat])
             
             ubc = DirichletBC(vspace, 0, threshold=model.is_dirchlet_boundary)
 
             A0, R0 = ubc.apply(A0, R0) 
             A0, R0 = ubc.apply(A0, R0, dflag=isDDof)
+            
+            tmr.send('udirichlet')
             
             # 选择合适的解法器
             if solve == 'spsolve':
@@ -122,33 +139,43 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
             uh[:] += du
             
+            tmr.send('usolve')
+            
             # 更新应变和最大历史应变场参数
             strain = self.strain(uh)
             phip, _ = self.strain_energy_density_decomposition(strain)
             H[:] = np.fmax(H, phip)
+            
+            tmr.send('H_strain')
 
             # 相场模型计算
             dbform = BilinearForm(space)
             dbform.add_domain_integrator(ScalarDiffusionIntegrator(c=model.Gc*model.l0,
                 q=4))
             dbform.add_domain_integrator(ScalarMassIntegrator(c=2*H+model.Gc/model.l0, q=4))
+            
+            tmr.send('dfrom')
 
-            start2 = time.time()
             if atype == 'fast':
                 # 无数值积分矩阵组装
                 A1 = dbform.fast_assembly()
             else:
                 A1 = dbform.assembly()
-            
+           
+            tmr.send('dassembly')
+
             # 线性积分子
             lform = LinearForm(space)
             lform.add_domain_integrator(ScalarSourceIntegrator(2*H, q=4))
             R1 = lform.assembly()
             R1 -= A1@d[:]
+            
+            tmr.send('dvector')
 
             if dirichlet_phase:
                 dbc = DirichletBC(space, 0, threshold=model.is_boundary_phase)
                 A1, R1 = dbc.apply(A1, R1)
+            tmr.send('d_dirichlet')
 
             # 选择合适的解法器
             if solve == 'spsolve':
@@ -163,9 +190,13 @@ class AFEMPhaseFieldCrackHybridMixModel():
                 print("We don't have this solver yet")
             d[:] += dd
             
+            tmr.send('dsolve')
+
             self.stored_energy = self.get_stored_energy(phip, d)
             self.dissipated_energy = self.get_dissipated_energy(d)
-            
+           
+            tmr.send('energy')
+
             self.uh = uh
             self.d = d
             self.H = H
@@ -174,7 +205,9 @@ class AFEMPhaseFieldCrackHybridMixModel():
             eta = self.recovery.recovery_estimate(self.d)
                 
             isMarkedCell = mark(eta, theta = theta) # TODO：
-
+            
+            tmr.send('Markcell')
+            
             cm = mesh.entity_measure('cell')
             if GD == 3:
                 hmin = model.l0**3/200
@@ -186,12 +219,13 @@ class AFEMPhaseFieldCrackHybridMixModel():
                     if refine == 'nvp':
                         self.bisect_refine_2d(isMarkedCell)
                     elif refine == 'rg':
-                        if refine == 'nvp':
-                            self.redgreen_refine_2d(isMarkedCell)
+                        self.redgreen_refine_2d(isMarkedCell)
                 elif GD == 3:
                         self.bisect_refine_3d(isMarkedCell)
                 else:
                     print("GD is not 2 or 3, it is incorrect")
+                        
+            tmr.send('refine')
             
             # 计算残量误差
             if k == 0:
@@ -207,7 +241,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
             if error < 1e-5:
                 break
             k += 1
-        
+            tmr.send('stop')        
 
     def bisect_refine_3d(self, isMarkedCell):
         """

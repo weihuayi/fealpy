@@ -5,6 +5,8 @@ from torch import Tensor
 CONTEXT = 'torch'
 
 from fealpy.mesh import TriangleMesh as TMD
+from fealpy.utils import timer
+
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch.functionspace import LagrangeFESpace
 from fealpy.torch.fem import (
@@ -17,7 +19,6 @@ from fealpy.torch.solver import sparse_cg
 
 from torch import cos, pi, tensordot
 
-from fealpy.ml import timer
 from matplotlib import pyplot as plt
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -46,15 +47,9 @@ def solution(points: Tensor):
 tmr = timer()
 
 mesh_numpy = TMD.from_box(nx=NX, ny=NY)
-cell = mesh_numpy.ds.cell
-node = mesh_numpy.node
 next(tmr)
-mesh = TriangleMesh(
-    torch.from_numpy(node).to(device),
-    torch.from_numpy(cell).to(device),
-)
-NC = cell.shape[0]
-
+mesh = TriangleMesh.from_box(nx=NX, ny=NY, device=device)
+NC = mesh.number_of_cells()
 
 space = LagrangeFESpace(mesh, p=3)
 tmr.send('mesh_and_space')
@@ -68,20 +63,16 @@ tmr.send('forms')
 
 A = bform.assembly()
 F = lform.assembly()
-
-uh = torch.zeros((10, space.number_of_global_dofs()), dtype=torch.float64, device=device)
 tmr.send('assembly')
 
-A, F = DirichletBC(space, solution).apply(A, F, uh)
+A, F = DirichletBC(space).apply(A, F, gd=solution)
 tmr.send('dirichlet')
 
 A = A.to_sparse_csr()
-uh = sparse_cg(A, F, uh, maxiter=5000, batch_first=True)
+uh = sparse_cg(A, F, maxiter=5000, batch_first=True)
 uh = uh.detach()
 value = space.value(uh, torch.tensor([[1/3, 1/3, 1/3]], device=device, dtype=torch.float64)).squeeze(0)
 value = value.cpu().numpy()
-print(value.shape)
-# uh = uh.cpu().numpy()
 tmr.send('solve(cg)')
 tmr.send('stop')
 

@@ -30,9 +30,19 @@ class OCAMModel:
     mark_board: np.ndarray
     camera_points: list
     viewpoint : tuple
+    data_path: str
+    name: str
 
     def __post_init__(self):
-        self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+        fname = os.path.expanduser(self.data_path+"DIM_K_D_{}.pkl".format(self.name))
+        if os.path.exists(fname):
+            with open(fname, 'rb') as f:
+                self.DIM, self.K, self.D = pickle.load(f)
+        else:
+            self.DIM, self.K, self.D = self.get_K_and_D((4, 6), self.chessboardpath)
+            with open(fname, 'wb') as f:
+                pickle.dump((self.DIM, self.K, self.D), f)
+
         self.icenter, self.radius = self.get_center_and_radius(self.fname)
         cps_all = []
         for cps in self.camera_points:
@@ -44,7 +54,7 @@ class OCAMModel:
         self.camera_points = cps_all
 
         # 判断是否存在网格文件
-        fname = os.path.expanduser("~/data/ocam_mesh_{}_{}.pkl".format(self.icenter, self.radius))
+        fname = os.path.expanduser(self.data_path+"ocam_mesh_{}.pkl".format(self.name))
         if os.path.exists(fname):
             with open(fname, 'rb') as f:
                 self.imagemesh = pickle.load(f)
@@ -54,6 +64,11 @@ class OCAMModel:
             with open(fname, 'wb') as f:
                 pickle.dump(self.imagemesh, f)
 
+    def set_location(self, location):
+        self.location = location
+
+    def set_axes(self, axes):
+        self.axes = axes
 
     def __call__(self, u):
         icenter = self.icenter
@@ -73,6 +88,13 @@ class OCAMModel:
         #gmsh.option.setNumber("Mesh.MeshSizeMax", 40)  # 最大网格尺寸
         #gmsh.option.setNumber("Mesh.MeshSizeMin", 10)    # 最小网格尺寸
 
+        def add_rectangle(p0, p1, p2, p3):
+            l0 = occ.addLine(p0, p1)
+            l1 = occ.addLine(p1, p2)
+            l2 = occ.addLine(p2, p3)
+            l3 = occ.addLine(p3, p0)
+            return l0, l1, l2, l3
+
         # 获得分割线
         cps = self.camera_points
         lines = []
@@ -81,6 +103,16 @@ class OCAMModel:
             for p in cp:
                 curves.append(occ.addPoint(p[0], p[1], 0))
             lines.append(occ.addSpline(curves))
+
+        # 获取标记板
+        mb = self.mark_board
+        for i in range(6):
+            p0 = occ.addPoint(mb[4*i+0, 0], mb[4*i+0, 1], 0.0)
+            p1 = occ.addPoint(mb[4*i+1, 0], mb[4*i+1, 1], 0.0)
+            p2 = occ.addPoint(mb[4*i+2, 0], mb[4*i+2, 1], 0.0)
+            p3 = occ.addPoint(mb[4*i+3, 0], mb[4*i+3, 1], 0.0)
+            ret = add_rectangle(p0, p1, p2, p3)
+            [lines.append(r) for r in ret]
 
         # 生成区域
         rec  = occ.addRectangle(0, 0, 0, 1920, 1080)
@@ -358,6 +390,15 @@ class OCAMModel:
         node = np.einsum('ij, kj->ik', node-self.location, self.axes)
         return node
 
+    def project_to_cam_sphere(self, node):
+        """
+        @brief 将球面上的点投影到相机单位球面上
+        """
+        node = node-self.location
+        r = np.sqrt(np.sum(node**2, axis=1))
+        node /= r[:, None]
+        return node + self.location
+
     def mesh_to_image(self, node):
         node[:, 1] = self.height - node[:, 1]
         return node
@@ -484,6 +525,7 @@ class OCAMModel:
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
         node = np.zeros((NN,3),dtype=np.float64)
+
         node[:,0] = uv[:,0]-u0
         node[:,1] = uv[:,1]-v0
 
@@ -491,7 +533,7 @@ class OCAMModel:
         phi = np.arctan2(fx*node[:,1], (fy*node[:,0]))
         phi[phi<0] = phi[phi<0]+np.pi
 
-        idx = np.abs(fx*np.cos(phi))>1e-13
+        idx = np.abs(fx*np.cos(phi))>1e-10
         rho = np.zeros_like(phi)
         rho[idx] = node[idx,0]/(fx*np.cos(phi[idx]))
         rho[~idx] = node[~idx, 1]/(fy*np.sin(phi[~idx]))
@@ -793,10 +835,22 @@ class OCAMModel:
         #plt.show()
         return center, radius
 
+    def mesh_to_ground(self, points, ground_location = -3.0):
+        """
+        @brief 将图像上的点投影到地面
+        @param points: 图像上的点 (...， 2) 的数组
+        """
+        f2 = lambda x : x[..., 2] - ground_location
+        points = self.mesh_to_image(points)
+        points = self.image_to_camera_sphere(points)
+        retp = self.sphere_project_to_implict_surface(points, f2)
+        return retp
+
     def harmonic_map(self):
         """
         @brief 调和映射
         """
+        pass
 
 
 
@@ -831,5 +885,45 @@ class OCAMDomain(Domain):
         return self.fh(p,self)
     def facet(self,dim):
         return self.facets[0]
+    import numpy as np
+
+def rotation_matrix_from_euler_angles(theta, gamma, beta):
+    """
+    Compute the rotation matrix from Euler angles.
+
+    Parameters:
+    theta (float): Rotation angle around the x-axis in radians.
+    gamma (float): Rotation angle around the y-axis in radians.
+    beta (float): Rotation angle around the z-axis in radians.
+
+    Returns:
+    np.ndarray: The resulting rotation matrix.
+    """
+    # Rotation matrix around x-axis
+    R_x = np.array([
+        [1, 0, 0],
+        [0, np.cos(theta), -np.sin(theta)],
+        [0, np.sin(theta), np.cos(theta)]
+    ])
+
+    # Rotation matrix around y-axis
+    R_y = np.array([
+        [np.cos(gamma), 0, np.sin(gamma)],
+        [0, 1, 0],
+        [-np.sin(gamma), 0, np.cos(gamma)]
+    ])
+
+    # Rotation matrix around z-axis
+    R_z = np.array([
+        [np.cos(beta), -np.sin(beta), 0],
+        [np.sin(beta), np.cos(beta), 0],
+        [0, 0, 1]
+    ])
+
+    # Combined rotation matrix
+    R = R_z @ R_y @ R_x
+    return R
+
+
     
 

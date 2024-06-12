@@ -56,12 +56,32 @@ def edge_length(points: Tensor, out=None) -> Tensor:
     r"""Edge length.
 
     Args:
-        points: Tensor(..., 2, GD).
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
+        out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
-        Tensor(...,).
+        Tensor: Length of edges, shaped [...].
     """
     return norm(points[..., 0, :] - points[..., 1, :], dim=-1, out=out)
+
+
+def edge_normal(points: Tensor, unit: bool=False, out=None) -> Tensor:
+    """Edge normal for 2D meshes.
+
+    Args:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
+        unit (bool, optional): Whether to normalize the normal. Defaults to False.
+        out (Tensor, optional): The output tensor. Defaults to None.
+
+    Returns:
+        Tensor: Normal of edges, shaped [..., GD].
+    """
+    if points.shape[-1] != 2:
+        raise ValueError("Only 2D meshes are supported.")
+    edges = points[..., 1, :] - points[..., 0, :]
+    if unit:
+        edges = edges.div_(norm(edges, dim=-1, keepdim=True))
+    return torch.stack([edges[..., 1], -edges[..., 0]], dim=-1, out=out)
 
 
 def entity_barycenter(etn: Tensor, node: Tensor) -> Tensor:
@@ -101,8 +121,8 @@ def homo_entity_barycenter(entity: Tensor, node: Tensor):
     return torch.mean(node[entity, :], dim=1)
 
 
-# Triangle Mesh & Tetrahedron Mesh
-# ================================
+# Interval Mesh & Triangle Mesh & Tetrahedron Mesh
+# ================================================
 
 def simplex_ldof(p: int, iptype: int) -> int:
     r"""Number of local DoFs of a simplex."""
@@ -148,6 +168,23 @@ def simplex_measure(points: Tensor):
 ### Final Mesh
 ##################################################
 
+# Interval Mesh
+# =============
+
+def int_grad_lambda(points: Tensor):
+    """grad_lambda function for the interval mesh.
+
+    Args:
+        points (Tensor[..., 2, GD]): _description_
+
+    Returns:
+        Tensor: grad lambda tensor shaped [..., 2, GD].
+    """
+    v = points[..., 1, :] - points[..., 0, :] # (NC, GD)
+    h2 = torch.sum(v**2, dim=-1, keepdim=True)
+    v = v.div(h2)
+    return torch.stack([-v, v], dim=-2)
+
 # Triangle Mesh
 # =============
 
@@ -157,7 +194,7 @@ def tri_area_3d(points: Tensor, out: Optional[Tensor]=None):
 
 
 def tri_grad_lambda_2d(points: Tensor):
-    r"""
+    """grad_lambda function for the triangle mesh in 2D.
     Args:
         points: Tensor(..., 3, 2).
 

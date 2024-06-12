@@ -1,13 +1,15 @@
 
-from math import comb
 from typing import (
     Union, Optional, Dict, Sequence, overload, Callable,
     Literal, TypeVar
 )
 
+import numpy as np
 import torch
 
+from .. import logger
 from . import functional as F
+from . import mesh_kernel as K
 from .quadrature import Quadrature
 
 Tensor = torch.Tensor
@@ -58,13 +60,13 @@ def entity_str2dim(ds, etype: str) -> int:
         return -ds.top_dimension()
     elif etype == 'face':
         TD = ds.top_dimension()
-        if TD <= 1:
-            raise ValueError('the mesh has no face entity.')
+        # if TD <= 1:
+        #     raise ValueError('the mesh has no face entity.')
         return TD - 1
     elif etype == 'face_location':
         TD = ds.top_dimension()
-        if TD <= 1:
-            raise ValueError('the mesh has no face location.')
+        # if TD <= 1:
+        #     raise ValueError('the mesh has no face location.')
         return -TD + 1
     elif etype == 'edge':
         return 1
@@ -102,7 +104,7 @@ def entity_dim2node(ds, etype_dim: int, index=None, dtype=None) -> Tensor:
 ### Mesh Data Structure Base
 ##################################################
 
-class MeshDataStructure():
+class MeshDS():
     _STORAGE_ATTR = ['cell', 'face', 'edge', 'cell_location','face_location']
     def __init__(self, NN: int, TD: int) -> None:
         self._entity_storage: Dict[int, Tensor] = {}
@@ -130,6 +132,10 @@ class MeshDataStructure():
     def to(self, device: Union[_device, str, None]=None, non_blocking=False):
         for entity_tensor in self._entity_storage.values():
             entity_tensor.to(device, non_blocking=non_blocking)
+        for attr in self.__dict__:
+            value = self.__dict__[attr]
+            if isinstance(value, torch.Tensor):
+                self.__dict__[attr] = value.to(device, non_blocking=non_blocking)
         return self
 
     ### properties
@@ -140,29 +146,39 @@ class MeshDataStructure():
     def device(self) -> _device: return self.cell.device
 
     ### counters
-    number_of_nodes: _int_func = lambda self: self.NN
-    number_of_edges: _int_func = lambda self: len(entity_dim2tensor(self, 1))
-    number_of_faces: _int_func = lambda self: len(entity_dim2tensor(self, self.top_dimension() - 1))
-    number_of_cells: _int_func = lambda self: len(entity_dim2tensor(self, self.top_dimension()))
+    def count(self, etype: Union[int, str]) -> int:
+        """Return the number of entities of the given type."""
+        if etype in ('node', 0):
+            return self.NN
+        if isinstance(etype, str):
+            edim = entity_str2dim(self, etype)
+        if -edim in self._entity_storage: # for polygon mesh
+            return self._entity_storage[-edim].size(0) - 1
+        return entity_dim2tensor(self, edim).size(0) # for homogeneous mesh
 
-    ### constructors
-    def construct(self) -> None:
-        raise NotImplementedError
+    def number_of_nodes(self): return self.NN
+    def number_of_edges(self): return self.count('edge')
+    def number_of_faces(self): return self.count('face')
+    def number_of_cells(self): return self.count('cell')
 
     @overload
     def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor: ...
     @overload
     def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default: _T) -> Union[Tensor, _T]: ...
     def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default=_default):
-        r"""@brief Get entities in mesh structure.
+        """Get entities in mesh structure.
 
-        @param etype: int or str. The topology dimension of the entity, or name
-        'cell' | 'face' | 'edge'. Note that 'node' is not in mesh structure.
-        For polygon meshes, the names 'cell_location' | 'face_location' may also be
-        available, and the `index` argument is applied on the flattened entity tensor.
-        @param index: int, slice ot Tensor. The index of the entity.
+        Args:
+            index (int | slice | Tensor): The index of the entity.
+            etype (int | str): The topology dimension of the entity, or name
+            'cell' | 'face' | 'edge'. Note that 'node' is not available in data structure.
+            For polygon meshes, the names 'cell_location' | 'face_location' may also be
+            available, and the `index` argument is applied on the flattened entity tensor.
+            index (int | slice | Tensor): The index of the entity.
+            default (Any): The default value if the entity is not found.
 
-        @return: Tensor or Sequence[Tensor].
+        Returns:
+            Tensor: Entity or the default value.
         """
         if isinstance(etype, str):
             etype = entity_str2dim(self, etype)
@@ -209,18 +225,61 @@ class MeshDataStructure():
             return face2cell[index]
 
     ### boundary
-    def boundary_face_flag(self): return self.face2cell[:, 0] == self.face2cell[:, 1]
-    def boundary_face_index(self): return torch.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+    def boundary_node_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary nodes.
+
+        Returns:
+            Tensor: boundary node flag.
+        """
+        NN = self.number_of_nodes()
+        bd_face_flag = self.boundary_face_flag()
+        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        bd_face2node = self.entity('face', index=bd_face_flag)
+        bd_node_flag = torch.zeros((NN,), **kwargs)
+        bd_node_flag[bd_face2node.ravel()] = True
+        return bd_node_flag
+
+    def boundary_face_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary faces.
+
+        Returns:
+            Tensor: boundary face flag.
+        """
+        return self.face2cell[:, 0] == self.face2cell[:, 1]
+
+    def boundary_cell_flag(self) -> Tensor:
+        """Return a boolean tensor indicating the boundary cells.
+
+        Returns:
+            Tensor: boundary cell flag.
+        """
+        NC = self.number_of_cells()
+        bd_face_flag = self.boundary_face_flag()
+        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        bd_face2cell = self.face2cell[bd_face_flag, 0]
+        bd_cell_flag = torch.zeros((NC,), **kwargs)
+        bd_cell_flag[bd_face2cell.ravel()] = True
+        return bd_cell_flag
+
+    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    # TODO: finish this:
+    # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
+    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
+    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
 
 
-class HomoMeshDataStructure(MeshDataStructure):
+    ### Homogeneous Mesh ###
+    def is_homogeneous(self) -> bool:
+        """Return True if the mesh is homogeneous.
+
+        Returns:
+            bool: Homogeneous indicator.
+        """
+        return self.cell.ndim == 2
+
     ccw: Tensor
     localEdge: Tensor
     localFace: Tensor
-
-    def __init__(self, NN: int, TD: int, cell: Tensor) -> None:
-        super().__init__(NN, TD)
-        self.cell = cell
 
     number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
     number_of_nodes_of_cells = number_of_vertices_of_cells
@@ -243,8 +302,51 @@ class HomoMeshDataStructure(MeshDataStructure):
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
-    def construct(self) -> None:
-        raise NotImplementedError
+    def construct(self):
+        if not self.is_homogeneous():
+            raise RuntimeError('Can not construct for a non-homogeneous mesh.')
+
+        NC = self.cell.shape[0]
+        NFC = self.cell.shape[1]
+
+        totalFace = self.total_face()
+        _, i0_np, j_np = np.unique(
+            torch.sort(totalFace, dim=1)[0].cpu().numpy(),
+            return_index=True,
+            return_inverse=True,
+            axis=0
+        )
+        self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
+        NF = i0_np.shape[0]
+
+        i1_np = np.zeros(NF, dtype=i0_np.dtype)
+        i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
+
+        self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
+        self.cell2face = self.cell2edge
+
+        face2cell_np = np.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
+        self.face2cell = torch.from_numpy(face2cell_np).to(self.device)
+        self.edge2cell = self.face2cell
+
+        if self.TD == 3:
+            NEC = self.number_of_edges_of_cells()
+
+            total_edge = self.total_edge()
+            _, i2, j = np.unique(
+                torch.sort(total_edge, dim=1)[0].cpu().numpy(),
+                return_index=True,
+                return_inverse=True,
+                axis=0
+            )
+            self.edge = total_edge[i2, :]
+            self.cell2edge = torch.from_numpy(j).to(self.device).reshape(NC, NEC)
+
+        elif self.TD == 2:
+            self.edge2cell = self.face2cell
+
+        logger.info(f"Mesh toplogy relation constructed, with {NF} edge (or face), "
+                    f"on device {self.device}")
 
 
 ##################################################
@@ -252,7 +354,7 @@ class HomoMeshDataStructure(MeshDataStructure):
 ##################################################
 
 class Mesh():
-    ds: MeshDataStructure
+    ds: MeshDS
     node: Tensor
 
     def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
@@ -272,6 +374,7 @@ class Mesh():
     def multi_index_matrix(self, p: int, etype: int) -> Tensor:
         return F.multi_index_matrix(p, etype, dtype=self.ds.itype, device=self.device)
 
+    def count(self, etype: Union[int, str]) -> int: return self.ds.count(etype)
     def number_of_cells(self) -> int: return self.ds.number_of_cells()
     def number_of_faces(self) -> int: return self.ds.number_of_faces()
     def number_of_edges(self) -> int: return self.ds.number_of_edges()
@@ -283,13 +386,15 @@ class Mesh():
             return self.ds.entity(etype, index)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
-        r"""@brief Get the barycenter of the entity.
+        """Get the barycenter of the entity.
 
-        @param etype: int or str. The topology dimension of the entity, or name
-        'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
-        @param index: int, slice ot Tensor. The index of the entity.
+        Args:
+            etype (int | str): The topology dimension of the entity, or name
+            'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
+            index (int | slice | Tensor): The index of the entity.
 
-        @return: Tensor.
+        Returns:
+            Tensor: A 2-d tensor containing barycenters of the entity.
         """
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
@@ -300,34 +405,71 @@ class Mesh():
         etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
         return F.entity_barycenter(etn, node)
 
+    def edge_length(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the length of the edges.
+
+        Args:
+            index (int | slice | Tensor, optional): Index of edges.
+            out (Tensor, optional): The output tensor. Defaults to None.
+
+        Returns:
+            Tensor: Length of edges, shaped [NE,].
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_length(self.node[edge], out=out)
+
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
+        """Calculate the normal of the edges.
+
+        Args:
+            index (int | slice | Tensor, optional): Index of edges.
+            unit (bool, optional): _description_. Defaults to False.
+            out (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            Tensor: _description_
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_normal(self.node[edge], unit=unit, out=out)
+
+    def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the unit normal of the edges.
+        Equivalent to `edge_normal(index=index, unit=True)`.
+        """
+        return self.edge_normal(index=index, unit=True, out=out)
+
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
-        r"""@brief Get the quadrature points and weights."""
+        """Get the quadrature points and weights."""
         raise NotImplementedError
 
-    def shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        """@brief Shape function value on the given bc points, in shape (..., ldof).
+        """Shape function value on the given bc points, in shape (..., ldof).
 
-        @param bc: The bc points, in shape (..., NVC).
-        @param p: The order of the shape function.
-        @param index: The index of the cell.
-        @param variable: The variable name.
-        @param mi: The multi-index matrix.
+        Args:
+            bc (Tensor): The bc points, in shape (..., NVC).
+            p (int, optional): The order of the shape function. Defaults to 1.
+            index (int | slice | Tensor, optional): The index of the cell.
+            variable (str, optional): The variable name. Defaults to 'u'.
+            mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
-        @returns: The shape function value, in shape (..., ldof).
+        Returns:
+            Tensor: The shape function value with shape (..., ldof). The shape will\
+            be (..., 1, ldof) if `variable == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
-    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
-    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Tensor,
+    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
 
-class HomoMesh(Mesh):
+class HomogeneousMesh(Mesh):
+    # entity
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         node = self.entity('node')
         if etype in ('node', 0):
@@ -335,9 +477,10 @@ class HomoMesh(Mesh):
         entity = self.ds.entity(etype, index)
         return F.homo_entity_barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]], etype='cell', index=_S) -> Tensor:
-        r"""@brief Convert barycenter coordinate points to cartesian coordinate points
-            on mesh entities.
+    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]],
+                    etype: Union[int, str]='cell', index: Index=_S) -> Tensor:
+        """Convert barycenter coordinate points to cartesian coordinate points
+        on mesh entities.
         """
         node = self.entity('node')
         entity = self.ds.entity(etype, index)
@@ -350,8 +493,14 @@ class HomoMesh(Mesh):
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
+
     def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        r"""@brief Get the relationship between edges and integration points."""
+        """Get the relationship between edges and integration points."""
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.ds.edge[index]
@@ -363,8 +512,46 @@ class HomoMesh(Mesh):
             edges[:, 1].reshape(-1, 1),
         ], dim=-1)
 
-    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+
+class SimplexMesh(HomogeneousMesh):
+    # ipoints
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
+        if isinstance(iptype, str):
+            iptype = entity_str2dim(self.ds, iptype)
+        return F.simplex_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p: int):
+        return F.simplex_gdof(p, self)
+
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
-    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        raise NotImplementedError
+    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        TD = bc.shape[-1] - 1
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        phi = K.simplex_shape_function(bc, p, mi)
+        if variable == 'u':
+            return phi
+        elif variable == 'x':
+            return phi.unsqueeze_(1)
+        else:
+            raise ValueError("Variable type is expected to be 'u' or 'x', "
+                             f"but got '{variable}'.")
+
+    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        TD = bc.shape[-1] - 1
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
+        if variable == 'u':
+            return R
+        elif variable == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
+            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
+            return gphi
+        else:
+            raise ValueError("Variable type is expected to be 'u' or 'x', "
+                             f"but got '{variable}'.")

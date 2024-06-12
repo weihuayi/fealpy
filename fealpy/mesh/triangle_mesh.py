@@ -1715,6 +1715,12 @@ class TriangleMesh(Mesh, Plotable):
         return axes
 
     @classmethod
+    def show_multi_index(cls, p=1):
+        """
+        """
+        pass
+
+    @classmethod
     def show_lattice(cls, p=1, showmultiindex=False):
         """
         @brief 展示三角形上的单纯形格点
@@ -1806,7 +1812,10 @@ class TriangleMesh(Mesh, Plotable):
 
             axes.plot_trisurf(ps[:, 0], ps[:, 1], phi[:, i], cmap='viridis',
                               linewidths=0)
-            axes.set_title(f'$\phi_{{{i}}}$')
+            if p == 1:
+                axes.set_title(f'$\phi_{{{i}}}=\lambda_{{{i}}}$')
+            else:
+                axes.set_title(f'$\phi_{{{i}}}$')
             axes.set_xlabel('X')
             axes.set_ylabel('Y')
             axes.set_zlabel('Z')
