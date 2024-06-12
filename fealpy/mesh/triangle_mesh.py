@@ -1715,6 +1715,12 @@ class TriangleMesh(Mesh, Plotable):
         return axes
 
     @classmethod
+    def show_multi_index(cls, p=1):
+        """
+        """
+        pass
+
+    @classmethod
     def show_lattice(cls, p=1, showmultiindex=False):
         """
         @brief 展示三角形上的单纯形格点

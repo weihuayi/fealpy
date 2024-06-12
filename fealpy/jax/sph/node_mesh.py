@@ -2,26 +2,35 @@
 import jax.numpy as jnp
 from jax_md import space, partition
 from jax import jit, vmap
-from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
 
-class NodeSet():
+class NodeMeshDataStructure():
+    def __init__(self, NN):
+        self.NN = NN
 
-    def __init__(self, node):
-        self.NN = node.shape[0]
+    def construct(self, node, box=None):
+        self.neighbor = None
+        self.neighborLocation = None
+
+class NodeMesh():
+
+    def __init__(self, node, box=None):
         self.node = node
-        self.nodedata = {}
-        self.is_boundary = jnp.zeros(self.number_of_node(), dtype=bool)
+
+        self.ds = NodeSetDataStructure(NN)
+        self.ds.construct(node, box=box)
+
+        self.nodedata = {} # the data defined on node
+        self.meshdata = {}
 
     def number_of_node(self):
-        return self.NN 
+        return self.ds.NN 
     
-    def dimension(self):
+    def geo_dimension(self):
+        return self.node.shape[1]
+
+    def top_dimension(self):
         return self.node.shape[1]
        
-    def is_boundary_node(self):
-        return self.is_boundary
-
     def add_node_data(self, name, dtype=jnp.float64):
         NN = self.NN
         self.nodedata.update({names: jnp.zeros(NN, dtypes) 
