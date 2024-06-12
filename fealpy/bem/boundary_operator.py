@@ -3,7 +3,7 @@ from scipy.sparse import csr_matrix
 from fealpy.mesh import IntervalMesh, TriangleMesh, QuadrangleMesh
 from fealpy.pde.bem_model_2d import PoissonModelConstantDirichletBC2d
 from fealpy.functionspace import LagrangeFESpace
-from potential_integrator import PotentialIntegrator
+from potential_grad_potential_integrator import PotentialGradPotentialIntegrator
 from grad_potential_integrator import GradPotentialIntegrator
 from scalar_source_integrator import ScalarSourceIntegrator
 from matplotlib import pyplot as plt
@@ -129,11 +129,11 @@ if __name__ == '__main__':
     ny = 5
     # 定义网格对象
     mesh = TriangleMesh.from_box(box, nx, ny)
-    p = 1
+    p = 2
     space = LagrangeFESpace(mesh, p=p)
 
     bd_operator = BoundaryOperator(space)
-    bd_operator.add_boundary_integrator(PotentialIntegrator(q=p+2))
+    bd_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=p + 1))
     bd_operator.add_boundary_integrator(GradPotentialIntegrator(q=p+2))
     bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=p+2))
 
