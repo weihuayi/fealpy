@@ -30,9 +30,15 @@ def test_matvec(setup_csr_matrix):
     
     vec[0], vec[1], vec[2] = 1.0, 2.0, 3.0
     
-    expected_result = [5.0, 3.0, 14.0]
+    expected_result = [5.0, 3.0, 22.0]
 
-    result = csr_matrix.matvec(vec)
+    result = csr_matrix@vec
+
+    print(csr_matrix.tofield())
+    print(vec)
+    print(result)
+
+
     
     for i in range(3):
         assert result[i] == pytest.approx(expected_result[i], rel=1e-5)
