@@ -31,4 +31,4 @@ from .FirstNedelecFiniteElementSpace3d import FirstNedelecFiniteElementSpace3d
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
 
 # nodeset
-from .node_set_kernel_function_space import NodeSetKernelSpace
+#from .node_set_kernel_function_space import NodeSetKernelSpace
