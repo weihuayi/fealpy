@@ -38,6 +38,7 @@ class BoundaryOperator:
         cell = aux_idx1[bd_face]
         self.bd_mesh = self.Boundary_Mesh[type(mesh).__name__](new_node, cell)
         self.bd_space = LagrangeFESpace(self.bd_mesh, p=space.p)
+        self.space.bd_space = self.bd_space
 
 
     def add_domain_integrator(self, I):
@@ -78,38 +79,30 @@ class BoundaryOperator:
 
     def assembly_for_sspace_and_vspace_with_vector_basis(self):
         # ===================================================
-        bd_mesh = self.bd_mesh
         bd_space = self.bd_space
 
-        bd_ldof = bd_space.dof.number_of_local_dofs()
         bd_gdof = bd_space.dof.number_of_global_dofs()
 
-        bd_NC = bd_mesh.number_of_cells()
-        bd_CM = np.zeros((bd_NC, bd_ldof, bd_ldof), dtype=bd_space.ftype)
+        Hij, Gij = self.bintegrators[0].assembly_face_matrix(bd_space)
 
-        self._H, self._G = self.bintegrators[0].assembly_face_matrix(bd_space)
+        face2dof = bd_space.dof.cell_to_dof()
+        I = np.broadcast_to(np.arange(bd_gdof, dtype=np.int64)[:, None, None], shape=Hij.shape)
+        J = np.broadcast_to(face2dof[None, ...], shape=Hij.shape)
 
+        # 整体矩阵的初始化与组装
+        self._H = np.zeros((bd_gdof, bd_gdof))
+        np.add.at(self._H, (I, J), Hij)
+        np.fill_diagonal(self._H, 0.5)
+        self._G = np.zeros((bd_gdof, bd_gdof))
+        np.add.at(self._G, (I, J), Gij)
         # ===================================================
         cell_space = self.space
-        cell_ldof = cell_space.dof.number_of_local_dofs()
         cell_gdof = cell_space.dof.number_of_global_dofs()
 
-        cell_mesh = cell_space.mesh
-        cell_NC = cell_mesh.number_of_cells()
-        cell_CM = np.zeros((cell_NC, cell_ldof, cell_ldof), dtype=cell_space.ftype)
+        f = self.dintegrators[0].assembly_cell_vector(cell_space, bd_space)
+        self._f = f
 
-
-
-
-        cell2dof = cell_space.dof.cell_to_dof()
-        I = np.broadcast_to(cell2dof[:, :, None], shape=cell_CM.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], shape=cell_CM.shape)
-        self._M = csr_matrix((cell_CM.flat, (I.flat, J.flat)), shape=(cell_gdof, cell_gdof))
-
-        for bi in self.bintegrators:
-            self._M += bi.assembly_face_matrix(cell_space)
-
-        return self._M
+        return self._H, self._G, self._f
 
     def assembly_for_vspace_with_scalar_basis(self):
 
@@ -123,19 +116,32 @@ class BoundaryOperator:
 
 
 if __name__ == '__main__':
+    from fealpy.bem.boundary_condition import DirichletBC
+    from fealpy.bem.internal_operator import InternalOperator
     pde = PoissonModelConstantDirichletBC2d()
     box = pde.domain()
     nx = 5
     ny = 5
     # 定义网格对象
     mesh = TriangleMesh.from_box(box, nx, ny)
-    p = 2
+    p = 1
     space = LagrangeFESpace(mesh, p=p)
 
     bd_operator = BoundaryOperator(space)
     bd_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=p + 1))
-    bd_operator.add_boundary_integrator(GradPotentialIntegrator(q=p+2))
     bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=p+2))
 
-    bd_operator.assembly()
+    H, G, F = bd_operator.assembly()
+    bc = DirichletBC(space=space.bd_space, gD=pde.dirichlet)
+    G, F = bc.apply(H, G, F)
+    xi = space.bd_space.xi
+    u = pde.dirichlet(xi)
+    q = np.linalg.solve(G, F)
+
+    inter_operator = InternalOperator(space)
+    inter_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=p + 1))
+    inter_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=p + 2))
+    inter_operator.assembly()
+
+    print(-1)
 
