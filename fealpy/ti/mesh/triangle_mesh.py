@@ -1,12 +1,16 @@
 from typing import Union
+
 import numpy as np
 import taichi as ti
 
-from ..utils import to_taichi_field
+from .. import logger
+from .. import to_taichi_field
+
+from .quadrature import TriangleQuadrature, 
 
 @ti.data_oriented
-class TriangleMeshDataStructure:
-    def __init__(self, NN, cell):
+class TriangleMeshDataStructure(MeshDS):
+    def __init__(self, NN: int, cell: ti.template()):
         # 使用 NumPy 数组初始化字段
         self.NN = NN
         self.cell = cell
@@ -52,6 +56,15 @@ class TriangleMesh():
 
     def geo_dimension(self):
         return self.node.shape[1]
+
+    def quadrature_formula(self, index: int, etype='cell'):
+        if etype in ('cell', 2):
+            return TriangleQuadrature(index)
+        elif etype in ('face', 'edge', 1):
+
+
+    integrator = quadrature_formula
+            
 
     def view(self, name='Window Title', res=(640, 360), fps_limit=200, pos = (150, 150)): 
         GD = self.geo_dimension()

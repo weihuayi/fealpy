@@ -1,5 +1,5 @@
-import taichi as ti
 import numpy as np
+import taichi as ti
 import re
 
 def einsum(equation, *operands):

@@ -1,6 +1,12 @@
 from typing import Union
+
 import numpy as np
 import taichi as ti
+
+from ti.types import template as Template 
+from ti.types import ndarray as NDArray
+
+Index = Union[Template, NDArray]
 
 dtype_map = {
     np.dtype(np.float32): ti.f32,
@@ -18,22 +24,22 @@ def numpy_to_taichi_dtype(np_dtype):
     else:
         raise ValueError(f"Unsupported dtype: {np_dtype}")
 
-def to_taichi_ndarray(arr: Union[np.ndarray, ti.types.ndarray]):
+def to_taichi_ndarray(arr: Union[np.ndarray, NDArray]):
     if isinstance(arr, np.ndarray):
         tarr = ti.ndarray(dtype=dtype_map[arr.dtype], shape=arr.shape)
         tarr.from_numpy(arr)
         return tarr
-    elif isinstance(arr, ti.types.ndarray):
+    elif isinstance(arr, NDArray):
         return arr
     else:
         raise ValueError(f"Unsupported array: {arr.dtype}")
 
-def to_taichi_field(arr: Union[np.ndarray, ti.types.template]):
+def to_taichi_field(arr: Union[np.ndarray, Template]):
     if isinstance(arr, np.ndarray):
         tarr = ti.field(dtype=dtype_map[arr.dtype], shape=arr.shape)
         tarr.from_numpy(arr)
         return tarr
-    elif isinstance(arr, ti.types.template):
+    elif isinstance(arr, Template):
         return arr
     else:
         raise ValueError(f"Unsupported array: {arr.dtype}")
