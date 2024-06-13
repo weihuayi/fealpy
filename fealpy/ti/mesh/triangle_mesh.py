@@ -6,7 +6,7 @@ import taichi as ti
 from .. import logger
 from .. import to_taichi_field
 
-from .quadrature import TriangleQuadrature, 
+from .quadrature import TriangleQuadrature 
 
 @ti.data_oriented
 class TriangleMeshDataStructure(MeshDS):
