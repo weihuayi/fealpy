@@ -59,10 +59,10 @@ class IntervalMesh(SimplexMesh):
             etype = entity_str2dim(self.ds, etype)
         kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 1:
-            quad = GaussLegendreQuadrature(**kwargs)
+            quad = GaussLegendreQuadrature(q, **kwargs)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-        quad._latest_order = q
+
         return quad
 
     # ipoints
