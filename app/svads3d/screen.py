@@ -6,6 +6,8 @@ from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
 from fealpy.iopt import COA
+from meshing_type import MeshingType
+from partition_type import PartitionType
 
 
 @dataclass
@@ -40,7 +42,8 @@ class Screen:
     domain: Union[np.ndarray, list[np.ndarray]] = None
     mesh = None
 
-    def __init__(self, camera_system, carsize, scale_ratio, center_height):
+    def __init__(self, camera_system, carsize, scale_ratio, center_height,
+                 ptype=PartitionType.NONE, mtype=MeshingType.TRIANGLE):
         """
         @brief: 屏幕初始化。
                 1. 从相机系统获取地面特征点
@@ -60,7 +63,11 @@ class Screen:
         self.camera_system.screen = self
 
         self.gmp = self.ground_mark_board()
-        self.meshs, self.didxs, self.dvals = self.meshing()
+        # 判断分区类型和网格化类型
+        if (ptype == PartitionType.NONE)&(mtype == MeshingType.TRIANGLE):
+            self.meshs, self.didxs, self.dvals = self.meshing()
+        else: # 没有实现
+            ValueError("Not implemented!")
         self.uvs = self.compute_uv()
 
     def ground_mark_board(self):
@@ -83,18 +90,19 @@ class Screen:
         """
         相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
         """
+        systerm = self.camera_system
+        gmp = self.gmp
+        NGMP = len(gmp)
         def object_function(x):
             """
             @brief The object function to be optimized.
             @param x The parameters to be optimized.
             """
-            systerm = self.camera_system
-            gmp = self.gmp
+            print(x)
             x = x.reshape((6, 2, 3))
             systerm.set_parameters(x)
 
             ## 要对齐的点在屏幕上的坐标
-            NGMP = len(gmp)
             gmp_screen = np.zeros([NGMP, 2, 3], dtype=np.float_)
             for i, g in enumerate(gmp): 
                 cam0 = g.cam0
@@ -117,8 +125,8 @@ class Screen:
         #参数设置
         N = 100
         dim = 6 * 6
-        ub = init_x + 1
-        lb = init_x - 1
+        ub = init_x + 0.1
+        lb = init_x - 0.1
         Max_iter = 1000
 
         opt_alg = COA(N, dim, ub, lb, Max_iter, object_function, init_x)
