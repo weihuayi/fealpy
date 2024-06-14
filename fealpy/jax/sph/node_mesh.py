@@ -1,23 +1,27 @@
 
+import jax
 import jax.numpy as jnp
 from jax_md import space, partition
 from jax import jit, vmap
+from scipy.sparse import csr_matrix
 
 class NodeMeshDataStructure():
     def __init__(self, NN):
         self.NN = NN
 
+    '''
     def construct(self, node, box=None):
         self.neighbor = None
         self.neighborLocation = None
+    '''
 
 class NodeMesh():
 
     def __init__(self, node, box=None):
         self.node = node
 
-        self.ds = NodeSetDataStructure(NN)
-        self.ds.construct(node, box=box)
+        #self.ds = NodeSetDataStructure(NN)
+        #self.ds.construct(node, box=box)
 
         self.nodedata = {} # the data defined on node
         self.meshdata = {}
@@ -70,8 +74,28 @@ class NodeMesh():
                     neighbors_dict[i]['indices'].append(j)
                     neighbors_dict[i]['distances'].append(distance)
 
-        return neighbors_dict
+        return nbrs
 
+    def neighbor(self, box_size, h):
+        position = self.node
+        num = position.shape[0]
+        @jit
+        def distance(p1, p2):
+            delta = jnp.abs(p1-p2)
+            delta = jnp.where(delta > box_size * 0.5, box_size - delta, delta)  # 周期边界条件
+            return jnp.sqrt(jnp.sum(delta**2))
+        @jit
+        def neighbor_row(i,position):
+            def element(j):
+                dist = distance(position[i], position[j])
+                return jnp.where(dist <= h, dist, 0)
+            return jax.vmap(element)(jnp.arange(num))
+        nbrs = jax.vmap(lambda i: neighbor_row(i, position))(jnp.arange(num))
+        row, col = jnp.nonzero(nbrs)
+        data = nbrs[row,col]
+        csr = csr_matrix((data, (row, col)),shape=nbrs.shape)
+        return csr
+    
     def interpolate(self, u, kernel, neighbor, h):
         """
         参数:
