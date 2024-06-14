@@ -6,7 +6,9 @@ class ScalarDiffusionIntegrator:
     """
     @note (c \\grad u, \\grad v)
     """    
-    def __init__(self, c=None, q=None):
+    def __init__(self, uh=None, uh_func=None, c=None, q=None):
+        self.uh = uh
+        self.uh_func = uh_func
         self.coef = c
         self.q = q
         self.type = "BL0"
@@ -76,6 +78,62 @@ class ScalarDiffusionIntegrator:
 
         if out is None:
             return D
+
+    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
+        """
+        @brief 组装单元向量
+
+        @param[in] space 一个标量的函数空间
+
+        """
+        coef = self.coef
+        p = space.p
+        q = self.q
+        uh = self.uh
+
+        q = p+3 if q is None else q
+
+        mesh = space.mesh
+        if cellmeasure is None:
+            cellmeasure = mesh.entity_measure('cell', index=index)
+
+        NC = len(cellmeasure)
+        ldof = space.dof.number_of_local_dofs() 
+        if out is None:
+            bb = np.zeros((NC, ldof), dtype=space.ftype)
+        else:
+            bb = out
+
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        phi = space.grad_basis(bcs, index=index) #TODO: 考虑非重心坐标的情形
+
+        if callable(coef):
+            if hasattr(coef, 'coordtype'):
+                if coef.coordtype == 'barycentric':
+                    coef = coef(bcs, index=index)
+                elif coef.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    coef = coef(ps)
+            else: # 默认是笛卡尔
+                ps = mesh.bc_to_point(bcs, index=index)
+                coef = coef(ps)
+        else:
+            coef = coef
+        val = uh.grad_value(bcs)
+        if isinstance(val, (int, float)):
+            bb += coef*np.einsum('q, qcd, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
+        else:
+            if coef.shape == (NC, ): 
+                bb += np.einsum('q, c, qcd, qcid, c->ci', ws, coef, val, phi, cellmeasure, optimize=True)
+            else:
+                if coef.shape[-1] == 1:
+                    coef = coef[..., 0]
+                bb += np.einsum('q, qc, qcd, qcid, c->ci', ws, coef, val, phi, cellmeasure, optimize=True)
+        if out is None:
+            return bb 
+        
 
     def assembly_cell_matrix_quickly(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """
@@ -177,14 +235,14 @@ class ScalarDiffusionIntegrator:
                  cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
             else:
                  cellmeasure = mesh.entity_measure('cell', index=index)
-        
+
         NC = len(cellmeasure)
 
         if out is None:
             D = np.zeros((NC, TSFldof, TAFldof), dtype=trialspace.ftype)
         else:
             D = out
-        
+
         glambda = mesh.grad_lambda()
         if coef is None:
             #print("data[dataindex]:", data[dataindex].shape, "\n", data[dataindex])
