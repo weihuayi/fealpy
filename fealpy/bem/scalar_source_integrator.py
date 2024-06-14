@@ -6,6 +6,7 @@ from typing import TypedDict, Callable, Tuple, Union
 
 class ScalarSourceIntegrator():
 
+
     def __init__(self, f: Union[Callable, int, float, NDArray], q=None):
         """
         @brief
@@ -17,67 +18,61 @@ class ScalarSourceIntegrator():
         self.vector = None
 
     def assembly_cell_vector(self,
-                             cal_space,
-                             dof_space,
-                             cellmeasure=None,
-                             out=None):
-        """
-        @brief 组装单元向量
-
-        @param[in] space 一个标量的函数空间
-
-        """
-        if cal_space == dof_space:
-            index = ~dof_space.is_boundary_dof()
-        else:
-            index = np.s_[:]
+                             bd_space,
+                             xi=None):
+        space = bd_space
         f = self.f
-        p = dof_space.p
+        p = space.p
         q = self.q
         q = p + 3 if q is None else q
-        GD = dof_space.GD
-        TD = dof_space.TD
+        GD = space.GD
+        TD = space.TD
 
-        cal_mesh = cal_space.mesh
-        if cellmeasure is None:
-            cellmeasure = cal_mesh.entity_measure('cell', index=index)
+        mesh = space.mesh
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
 
-        qf = cal_mesh.integrator(q, 'cell')
+        domain_mesh = space.domain_mesh
+        cell_measure = domain_mesh.entity_measure('cell')
+
+        # 获取计算节点坐标
+        # (bd_gdof, dim) or (len(xi), dim)
+        if xi is None:
+            if  not hasattr(space, 'xi'):
+                cell2dof = space.dof.cell_to_dof()
+                if space.p == 0:
+                    gdof = cell.shape[0]
+                    mul_idx = 0.5 * np.ones((1, cell.shape[-1]))
+                    cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx)
+                else:
+                    gdof = space.number_of_global_dofs()
+                    mul_idx = mesh.multi_index_matrix(space.p, TD)
+                    cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx / space.p)
+                xi = np.zeros((gdof, GD))
+                xi[cell2dof] = cell_point
+                space.xi = xi
+            else:
+                xi = space.xi
+
+        # 获取积分权重并计算积分点坐标
+        qf = domain_mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-
         if callable(f):
             if hasattr(f, 'coordtype'):
                 if f.coordtype == 'barycentric':
-                    val = f(bcs, index=index)
+                    val = f(bcs)
                 elif f.coordtype == 'cartesian':
-                    ps = cal_mesh.bc_to_point(bcs, index=index)
+                    ps = domain_mesh.bc_to_point(bcs)
                     val = f(ps)
             else:  # 默认是笛卡尔
-                ps = cal_mesh.bc_to_point(bcs, index=index)
+                ps = domain_mesh.bc_to_point(bcs)
                 val = f(ps)
         else:
             val = f
 
-        # 获取自由度对应的节点坐标
-        cell2dof = dof_space.dof.cell_to_dof()
-        dof_mesh = dof_space.mesh
-        dof_node = dof_mesh.entity('node')
-        dof_cell = dof_mesh.entity('cell')
-        if dof_space.p == 0:
-            gdof = cell.shape[0]
-            mul_idx = 0.5 * np.ones((1, dof_cell.shape[-1]))
-            cell_point = np.einsum('cid,oi->cod', dof_node[dof_cell], mul_idx)
-        else:
-            gdof = dof_space.number_of_global_dofs()
-            mul_idx = dof_mesh.multi_index_matrix(dof_space.p, TD)
-            cell_point = np.einsum('cid,oi->cod', dof_node[dof_cell], mul_idx / dof_space.p)
-        xi = np.zeros((gdof, GD))
-        xi[cell2dof] = cell_point
-        xi = xi[index]
-        dof_space.xi = xi
 
-        cell_r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
-        f = np.einsum('c,q,nqc,qc->n', cellmeasure, ws, np.log(1 / cell_r), val, optimize=True) / (2**(GD-1) * np.pi)
+        r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
+        f = np.einsum('c,q,nqc,qc->n', cell_measure, ws, np.log(1 / r), val, optimize=True) / (2**(GD-1) * np.pi)
 
         return f
 

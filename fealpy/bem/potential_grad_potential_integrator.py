@@ -11,68 +11,48 @@ class PotentialGradPotentialIntegrator:
         self.coef = c
         self.q = q
 
-    def assembly_face_matrix(self, bd_space:fealpy.functionspace.LagrangeFESpace, space:fealpy.functionspace.LagrangeFESpace=None):
-        """
-        @note 没有参考单元的组装方式
-        """
-        coef = self.coef
-        q = self.q
-        if not isinstance(bd_space, tuple):
-            space0 = bd_space
-        else:
-            GD = len(bd_space)
-            space0 = bd_space[0]
+    def assembly_face_matrix(self, bd_space, xi:np.ndarray=None):
+        space = bd_space
+        mesh = space.mesh
 
-        if space is None:
-            space1 = space0
-            index = np.s_[:]
-        else:
-            space1 = space
-            index = ~space1.is_boundary_dof()
-
-
-        bd_mesh = space0.mesh
-        bd_node = bd_mesh.entity('node')
-        bd_cell = bd_mesh.entity('cell')
-        bd_cell_measure = bd_mesh.entity_measure('cell')
-        NC = bd_cell.shape[0]
-
-        GD = space1.GD
-        TD = space1.TD
-        ldof = space1.number_of_local_dofs()
-
-        mesh = space1.mesh
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         cell_measure = mesh.entity_measure('cell')
 
-        # 获取整体边界网格节点坐标
-        # bd_gdof * dim
+        q = self.q
+        NC = cell.shape[0]
+        GD = space.GD
+        TD = space.TD
+        ldof = space.number_of_local_dofs()
 
-        cell2dof = space1.dof.cell_to_dof()
-        if space1.p == 0:
-            gdof = cell.shape[0]
-            mul_idx = 0.5*np.ones((1, cell.shape[-1]))
-            cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx)
-        else:
-            gdof = space1.number_of_global_dofs()
-            mul_idx = mesh.multi_index_matrix(space1.p, TD)
-            cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx / space1.p)
-        xi = np.zeros((gdof, GD))
-        xi[cell2dof] = cell_point
-        xi = xi[index]
-        space1.xi = xi
-        # 每个面的两个节点
-        x1 = bd_node[bd_cell[:, 0]]  # bd_NF * dim
-        x2 = bd_node[bd_cell[:, 1]]
-        x_f = bd_mesh.entity_barycenter('cell')
+        # 获取计算节点坐标
+        # (bd_gdof, dim) or (len(xi), dim)
+        if xi is None:
+            if  not hasattr(space, 'xi'):
+                cell2dof = space.dof.cell_to_dof()
+                if space.p == 0:
+                    gdof = cell.shape[0]
+                    mul_idx = 0.5 * np.ones((1, cell.shape[-1]))
+                    cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx)
+                else:
+                    gdof = space.number_of_global_dofs()
+                    mul_idx = mesh.multi_index_matrix(space.p, TD)
+                    cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx / space.p)
+                xi = np.zeros((gdof, GD))
+                xi[cell2dof] = cell_point
+                space.xi = xi
+            else:
+                xi = space.xi
 
-        qf = bd_mesh.integrator(q, 'cell')
+        # 获取每个边界面上任意一点坐标（此处使用单元重心）
+        x_f = mesh.entity_barycenter('cell')
+        # 获取积分权重并计算积分点坐标
+        qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        # xi = node
-        ps = np.einsum('qj, ejd->qed', bcs, bd_node[bd_cell], optimize=True)
-
-        phi = space0.basis(bcs)  # (NQ, NC, ldof, ...)
+        ps = mesh.bc_to_point(bcs)
+        # ps = np.einsum('qj, ejd->qed', bcs, node[cell], optimize=True)
+        # 计算积分点对应的（局部）基函数值
+        phi = space.basis(bcs)  # (NQ, NC, ldof, ...)
         # 相关数据计算
         # bd_gdof * bd_NF
         # c = np.sign((x1[np.newaxis, :, 0] - xi[..., np.newaxis, 0]) * (
@@ -84,22 +64,19 @@ class PotentialGradPotentialIntegrator:
         #                        xi[..., np.newaxis, 1] - x1[np.newaxis, :, 1]) * (
         #                        x2[np.newaxis, :, 0] - x1[np.newaxis, :, 0])) / bd_cell_measure[np.newaxis, :]
 
-        # NF
-        n = bd_mesh.cell_normal()
+        # 计算计算节点到边界面的有向距离
+        n = mesh.cell_normal()
         h = np.einsum('fd, nfd -> nf', n, x_f[np.newaxis, ...] - xi[..., np.newaxis, :]) / np.linalg.norm(n, axis=-1)
 
+        # 计算计算节点到积分点的距离（无符号）
         # bd_gdof * NQ * bd_NF
         r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
 
         # 单元自由度矩阵计算
-        Hij = np.einsum('f, nf, q, qfi, nqf -> nfi', bd_cell_measure, h, ws, phi, 1 / r ** 2, optimize=True) / (
+        H = np.einsum('f, nf, q, qfi, nqf -> nfi', cell_measure, h, ws, phi, 1 / r ** 2, optimize=True) / (
                     -2**(GD-1) * np.pi)
-        Gij = np.einsum('f, q, qfi, nqf -> nfi', bd_cell_measure, ws, phi, np.log(1 / r), optimize=True) / (2**(GD-1) * np.pi)
+        G = np.einsum('f, q, qfi, nqf -> nfi', cell_measure, ws, phi, np.log(1 / r), optimize=True) / (2**(GD-1) * np.pi)
 
-        H = np.zeros((gdof, NC, GD))
-        G = np.zeros((gdof, NC, GD))
-        H[index, ...] = Hij
-        G[index, ...] = Gij
         return H, G
 
 

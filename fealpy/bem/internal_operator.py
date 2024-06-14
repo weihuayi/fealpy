@@ -10,8 +10,6 @@ class InternalOperator:
         self._G = None
         self.dintegrators = []  # 区域积分子
         self.bintegrators = []  # 边界积分子
-        # 构造边界网格与空间
-        self.bd_space = self.space.bd_space
 
 
     def add_domain_integrator(self, I):
@@ -52,29 +50,28 @@ class InternalOperator:
 
     def assembly_for_sspace_and_vspace_with_vector_basis(self):
         # ===================================================
-        bd_space = self.bd_space
+        space = self.space
+        if space.p == 0:
+            gdof = space.mesh.number_of_cells()
+        else:
+            gdof = space.dof.number_of_global_dofs()
+        domain_mesh = space.domain_mesh
+        xi = domain_mesh.entity('node')[~domain_mesh.ds.boundary_node_flag()]
 
-        gdof = self.space.number_of_global_dofs()
+        Hij, Gij = self.bintegrators[0].assembly_face_matrix(space, xi)
 
-        Hij, Gij = self.bintegrators[0].assembly_face_matrix(bd_space, self.space)
-
-        face2dof = self.space.bd_space.cell_to_dof()
-        I = np.broadcast_to(np.arange(gdof, dtype=np.int64)[:, None, None], shape=Hij.shape)
+        face2dof = space.cell_to_dof()
+        I = np.broadcast_to(np.arange(len(xi), dtype=np.int64)[:, None, None], shape=Hij.shape)
         J = np.broadcast_to(face2dof[None, ...], shape=Hij.shape)
 
         # 整体矩阵的初始化与组装
-        index = self.space.is_boundary_dof()
-        self._H = np.zeros((gdof, gdof))
-        np.add.at(self._H[index, index], (I, J), Hij)
-        np.fill_diagonal(self._H, 0.5)
-        self._G = np.zeros((gdof, gdof))
-        np.add.at(self._G[index, index], (I, J), Gij)
+        self._H = np.zeros((len(xi), gdof))
+        np.add.at(self._H, (I, J), Hij)
+        self._G = np.zeros((len(xi), gdof))
+        np.add.at(self._G, (I, J), Gij)
         # ===================================================
-        cell_space = self.space
-        cell_gdof = cell_space.dof.number_of_global_dofs()
-
-        f = self.dintegrators[0].assembly_cell_vector(cell_space, cell_space)
-        self._f[index] = f
+        f = self.dintegrators[0].assembly_cell_vector(space, xi)
+        self._f = f
 
         return self._H, self._G, self._f
 
