@@ -1,7 +1,6 @@
 import taichi as ti
 from typing import Union, Tuple
 
-from ..utils import numpy_to_taichi_dtype
 
 @ti.data_oriented
 class CSRMatrix:
@@ -89,6 +88,7 @@ class CSRMatrix:
         CSRMatrix
             The resulting CSRMatrix instance.
         """
+        from ..utils import numpy_to_taichi_dtype
         if dtype is None:
             dtype = numpy_to_taichi_dtype(scipy_csr.data.dtype)
 

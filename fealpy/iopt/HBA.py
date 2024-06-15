@@ -170,7 +170,7 @@ if __name__ == "__main__":
     Lb = -100  
     Ub = 100  
     N = 30  
-  
+
     # 调用HBA函数进行优化  
     xmin, fmin, CNVG = HBA(sumqu, dim, Lb, Ub, T, N)  
     # print(CNVG)  
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     plt.ylabel('Best fitness obtained so far')  
     plt.legend(['HBA'])  
     plt.show()  
-  
+
     # 显示最佳位置和适应度得分  
     print(f"The best location= {xmin}")  
     print(f"The best fitness score = {fmin}")
