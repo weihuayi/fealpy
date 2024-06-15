@@ -6,18 +6,9 @@ from typing import (
 import numpy as np
 import taichi as ti
 
-from ti.types import template as Template 
-from ti.types import ndarray as NDArray
+from ..sparse import CSRMatrix
 
-EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
-_int_func = Callable[..., int]
-_T = TypeVar('_T') # 用创建通用类型变量
-_default = object()
 
-def mesh_top_csr(entity: Template, num_targets: int, location: Optional[Template]=None, *,
-                 dtype=None) -> Template:
-    r"""CSR format of a mesh topology relaionship matrix."""
-    pass
 
 def entity_str2dim(ds, etype: str) -> int:
     if etype == 'cell':

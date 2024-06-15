@@ -2,7 +2,7 @@ import taichi as ti
 import pytest
 from fealpy.ti.sparse import CSRMatrix
 
-ti.init(arch='cuda')
+ti.init(arch=ti.cuda)
 
 def setup_csr_matrix():
     data = ti.field(dtype=ti.f64, shape=(5,))
