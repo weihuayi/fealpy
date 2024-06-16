@@ -26,4 +26,4 @@ from .fast_solver import LevelSetFEMFastSolver
 
 from .LinearElasticityRLFEMFastSolver import LinearElasticityRLFEMFastSolver
 
-from .gamg_solver import GAMGSolver
+#from .gamg_solver import GAMGSolver
