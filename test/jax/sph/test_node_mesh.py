@@ -68,9 +68,10 @@ def test_interpolate():
     print(a[1])
 
 def test_from_tgv_domain():
-    node_set = NodeMesh.from_tgv_domain()
+    node_fluid, node_dummy = NodeMesh.from_tgv_domain()
     fig, ax = plt.subplots()
-    node_set.add_plot(ax, color='red', markersize=50)
+    node_fluid.add_plot(ax, color='red', markersize=25)
+    node_dummy.add_plot(ax,color='blue', markersize=25)
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.title('NodeSet from TGV Domain')
@@ -96,9 +97,9 @@ def test_dam_break_domain():
 
 if __name__ == "__main__":
     #test_neighbor()
-    test_neighbors()
+    #test_neighbors()
     #test_add_node_data()
     #test_interpolate()
-    #test_from_tgv_domain()
+    test_from_tgv_domain()
     #test_from_ringshaped_channel_domain()
     #test_dam_break_domain()
