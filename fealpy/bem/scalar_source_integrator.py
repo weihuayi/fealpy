@@ -6,6 +6,7 @@ from typing import TypedDict, Callable, Tuple, Union
 
 class ScalarSourceIntegrator():
 
+
     def __init__(self, f: Union[Callable, int, float, NDArray], q=None):
         """
         @brief
@@ -17,59 +18,63 @@ class ScalarSourceIntegrator():
         self.vector = None
 
     def assembly_cell_vector(self,
-                             space,
-                             index=np.s_[:],
-                             cellmeasure=None,
-                             out=None):
-        """
-        @brief 组装单元向量
-
-        @param[in] space 一个标量的函数空间
-
-        """
+                             bd_space,
+                             xi=None):
+        space = bd_space
         f = self.f
         p = space.p
         q = self.q
-
         q = p + 3 if q is None else q
+        GD = space.GD
+        TD = space.TD
 
         mesh = space.mesh
-        if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
 
-        NC = len(cellmeasure)
-        ldof = space.dof.number_of_local_dofs()
-        if out is None:
-            bb = np.zeros((NC, ldof), dtype=space.ftype)
-        else:
-            bb = out
+        domain_mesh = space.domain_mesh
+        cell_measure = domain_mesh.entity_measure('cell')
 
-        qf = mesh.integrator(q, 'cell')
+        # 获取计算节点坐标
+        # (bd_gdof, dim) or (len(xi), dim)
+        if xi is None:
+            if  not hasattr(space, 'xi'):
+                cell2dof = space.dof.cell_to_dof()
+                if space.p == 0:
+                    gdof = cell.shape[0]
+                    mul_idx = 0.5 * np.ones((1, cell.shape[-1]))
+                    cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx)
+                else:
+                    gdof = space.number_of_global_dofs()
+                    mul_idx = mesh.multi_index_matrix(space.p, TD)
+                    cell_point = np.einsum('cid,oi->cod', node[cell], mul_idx / space.p)
+                xi = np.zeros((gdof, GD))
+                xi[cell2dof] = cell_point
+                space.xi = xi
+            else:
+                xi = space.xi
+
+        # 获取积分权重并计算积分点坐标
+        qf = domain_mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-
-        phi = space.basis(bcs, index=index)  # TODO: 考虑非重心坐标的情形
-
         if callable(f):
             if hasattr(f, 'coordtype'):
                 if f.coordtype == 'barycentric':
-                    val = f(bcs, index=index)
+                    val = f(bcs)
                 elif f.coordtype == 'cartesian':
-                    ps = mesh.bc_to_point(bcs, index=index)
+                    ps = domain_mesh.bc_to_point(bcs)
                     val = f(ps)
             else:  # 默认是笛卡尔
-                ps = mesh.bc_to_point(bcs, index=index)
+                ps = domain_mesh.bc_to_point(bcs)
                 val = f(ps)
         else:
             val = f
-        if isinstance(val, (int, float)):
-            bb += val * np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
-        else:
-            if val.shape == (NC,):
-                bb += np.einsum('q, c, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
-            else:
-                if val.shape[-1] == 1:
-                    val = val[..., 0]
-                bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
-        if out is None:
-            return bb
+
+
+        r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
+        f = np.einsum('c,q,nqc,qc->n', cell_measure, ws, np.log(1 / r), val, optimize=True) / (2**(GD-1) * np.pi)
+
+        return f
+
+
 
