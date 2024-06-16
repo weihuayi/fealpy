@@ -1,12 +1,39 @@
+from typing import Union, Optional
+
+import numpy as np
 import taichi as ti
 
-def zeros(shape, dtype=ti.f32):
+# dtype map from numpy to taichi
+dtype_map = {
+    np.dtype(np.float32): ti.f32,
+    np.dtype(np.float64): ti.f64,
+    np.dtype(np.int32): ti.i32,
+    np.dtype(np.int64): ti.i64,
+    np.dtype(np.uint32): ti.u32,
+    np.dtype(np.uint64): ti.u64,
+}
+
+def from_numpy(a: np.ndarray):
+    """
+    Create a Taichi field from a numpy.ndarray object.
+
+    Parameters:
+        a (np.ndarray): a numpy.ndarray
+    """
+    if isinstance(a, np.ndarray):
+        tarr = ti.field(dtype=dtype_map[a.dtype], shape=a.shape)
+        tarr.from_numpy(a)
+        return tarr
+    else:
+        return a
+
+def zeros(shape, dtype=ti.i32):
     """
     Create a Taichi field filled with zeros.
 
     Parameters:
         shape (tuple): Shape of the field.
-        dtype (taichi.DataType): Data type of the field. Default is ti.f32.
+        dtype (taichi.DataType): Data type of the field. Default is ti.i32.
 
     Returns:
         field: Taichi field filled with zeros.
@@ -15,13 +42,13 @@ def zeros(shape, dtype=ti.f32):
     field.fill(0)
     return field
 
-def ones(shape, dtype=ti.f32):
+def ones(shape, dtype=ti.i32):
     """
     Create a Taichi field filled with ones.
 
     Parameters:
         shape (tuple): Shape of the field.
-        dtype (taichi.DataType): Data type of the field. Default is ti.f32.
+        dtype (taichi.DataType): Data type of the field. Default is ti.i32.
 
     Returns:
         field: Taichi field filled with ones.
@@ -33,7 +60,7 @@ def ones(shape, dtype=ti.f32):
 def arange(start: Union[int, float], 
            stop: Optional[Union[int, float]] = None, 
            step: Union[int, float] = 1, 
-           dtype=ti.f32, *, like=None):
+           dtype=ti.i32):
     """
     Create a Taichi field with evenly spaced values within a given interval.
 
@@ -41,8 +68,7 @@ def arange(start: Union[int, float],
         start (int or float): Start of the interval.
         stop (int or float, optional): End of the interval. If not provided, start is treated as 0 and start is used as stop.
         step (int or float, optional): Spacing between values. Default is 1.
-        dtype (taichi.DataType): Data type of the field. Default is ti.f32.
-        like: Ignored, for NumPy compatibility.
+        dtype (taichi.DataType): Data type of the field. Default is ti.i32.
 
     Returns:
         field: Taichi field with evenly spaced values.
@@ -60,3 +86,4 @@ def arange(start: Union[int, float],
 
     fill_arange()
     return field
+

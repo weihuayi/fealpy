@@ -3,12 +3,11 @@ from typing import (
     Literal, TypeVar
 )
 
-import numpy as np
 import taichi as ti
-import re
 
+Field = TypeVar('Field')
 
-def sort(a, axis: Optional[int]=-1, kind: str='quichsort', order=None):
+def sort(a: Field, axis: Optional[int]=-1, kind: str='quichsort', order=None):
     """
     Return a sorted copy of an array.
 
