@@ -9,13 +9,13 @@ This module provide many fem model
 from .bilinear_form import BilinearForm
 from .mixed_bilinear_form import MixedBilinearForm
 from .linear_form import LinearForm
+from .nonlinear_form import NonlinearForm
 
 # Domain integrator for scalar case
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 ScalarLaplaceIntegrator = ScalarDiffusionIntegrator 
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
-from .nonlinear_scalar_mass_integrator import NonlinearScalarMassIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 
 from .scalar_pgls_convection_integrator import ScalarPGLSConvectionIntegrator
