@@ -74,7 +74,7 @@ uh = uh.detach()
 value = space.value(uh, torch.tensor([[1/3, 1/3, 1/3]], device=device, dtype=torch.float64)).squeeze(0)
 value = value.cpu().numpy()
 tmr.send('solve(cg)')
-tmr.send('stop')
+next(tmr)
 
 fig = plt.figure(figsize=(12, 9))
 fig.tight_layout()

@@ -251,7 +251,7 @@ class IntervalMesh(Mesh, Plotable):
         return line
 
     @classmethod
-    def from_interval_domain(cls, domain, nx=10):
+    def from_interval_domain(cls, interval=[0, 1], nx=10):
         node = np.linspace(domain[0], domain[1], nx+1, dtype=np.float64)
         cell = np.zeros((nx, 2), dtype=np.int_)
         cell[:, 0] = np.arange(0, nx)

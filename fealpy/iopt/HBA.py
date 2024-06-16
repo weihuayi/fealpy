@@ -164,26 +164,26 @@ def f1(x):
 
 
 
+if __name__ == "__main__": 
+    dim = 30  
+    T = 1000 
+    Lb = -100  
+    Ub = 100  
+    N = 30  
 
-dim = 30  
-T = 1000 
-Lb = -100  
-Ub = 100  
-N = 30  
-  
-# 调用HBA函数进行优化  
-xmin, fmin, CNVG = HBA(sumqu, dim, Lb, Ub, T, N)  
-# print(CNVG)  
-# 绘制收敛曲线  
-plt.figure()  
-plt.semilogy(CNVG, 'r')  
-plt.xlim([0, T])  
-plt.title('Convergence curve')  
-plt.xlabel('Iteration')  
-plt.ylabel('Best fitness obtained so far')  
-plt.legend(['HBA'])  
-plt.show()  
-  
-# 显示最佳位置和适应度得分  
-print(f"The best location= {xmin}")  
-print(f"The best fitness score = {fmin}")
+    # 调用HBA函数进行优化  
+    xmin, fmin, CNVG = HBA(sumqu, dim, Lb, Ub, T, N)  
+    # print(CNVG)  
+    # 绘制收敛曲线  
+    plt.figure()  
+    plt.semilogy(CNVG, 'r')  
+    plt.xlim([0, T])  
+    plt.title('Convergence curve')  
+    plt.xlabel('Iteration')  
+    plt.ylabel('Best fitness obtained so far')  
+    plt.legend(['HBA'])  
+    plt.show()  
+
+    # 显示最佳位置和适应度得分  
+    print(f"The best location= {xmin}")  
+    print(f"The best fitness score = {fmin}")

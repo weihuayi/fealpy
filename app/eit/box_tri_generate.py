@@ -57,8 +57,9 @@ output_folder = config['output_folder']
 kwargs = {"dtype": DTYPE, "device": DEVICE}
 os.path.join(output_folder, "")
 
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
+os.makedirs(output_folder, exist_ok=True)
+os.makedirs(os.path.join(output_folder, f'gd'), exist_ok=True)
+os.makedirs(os.path.join(output_folder, f'inclusion'), exist_ok=True)
 
 
 def neumann(points: Tensor):
@@ -92,9 +93,12 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
         label = generator.set_levelset(SIGMA, ls_fn)
         gd = generator.run()
 
+        np.save(
+            os.path.join(output_folder, f'gd/{sigma_idx}.npy'),
+            gd.numpy()
+        )
         np.savez(
-            os.path.join(output_folder, f'gd_{sigma_idx}.npz'),
-            gd=gd.numpy(),
+            os.path.join(output_folder, f'inclusion/{sigma_idx}.npz'),
             label=label.cpu().numpy(),
             ctrs=ctrs.cpu().numpy(),
             rads=rads.cpu().numpy()

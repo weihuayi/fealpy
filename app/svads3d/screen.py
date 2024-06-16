@@ -5,6 +5,10 @@ from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
+from fealpy.iopt import COA
+from meshing_type import MeshingType
+from partition_type import PartitionType
+
 
 @dataclass
 class GroundMarkPoint:
@@ -38,7 +42,8 @@ class Screen:
     domain: Union[np.ndarray, list[np.ndarray]] = None
     mesh = None
 
-    def __init__(self, camera_system, carsize, scale_ratio, center_height):
+    def __init__(self, camera_system, carsize, scale_ratio, center_height,
+                 ptype=PartitionType.NONE, mtype=MeshingType.TRIANGLE):
         """
         @brief: 屏幕初始化。
                 1. 从相机系统获取地面特征点
@@ -57,9 +62,15 @@ class Screen:
         self.camera_system = camera_system
         self.camera_system.screen = self
 
+        #self.optimize()
         self.gmp = self.ground_mark_board()
-        self.meshs, self.didxs, self.dvals = self.meshing()
+        # 判断分区类型和网格化类型
+        if (ptype == PartitionType.NONE)&(mtype == MeshingType.TRIANGLE):
+            self.meshs, self.didxs, self.dvals = self.meshing()
+        else: # 没有实现
+            ValueError("Not implemented!")
         self.uvs = self.compute_uv()
+        #self.uvs = self.compute_uv_0()
 
     def ground_mark_board(self):
         """
@@ -81,17 +92,21 @@ class Screen:
         """
         相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
         """
+        systerm = self.camera_system
+        self.i=0
         def object_function(x):
             """
             @brief The object function to be optimized.
             @param x The parameters to be optimized.
             """
-            systerm = self.camera_system
-            gmp = self.gmp
+            self.i+=1
+            print("Optimization iteration: ", self.i)
+            gmp = self.ground_mark_board()
+            NGMP = len(gmp)
+            x = x.reshape((6, 2, 3))
             systerm.set_parameters(x)
 
             ## 要对齐的点在屏幕上的坐标
-            NGMP = len(gmp)
             gmp_screen = np.zeros([NGMP, 2, 3], dtype=np.float_)
             for i, g in enumerate(gmp): 
                 cam0 = g.cam0
@@ -102,6 +117,7 @@ class Screen:
                 gmp_screen[i, 1] = systerm.cameras[cam1].to_screen(point1)
 
             error = np.sum((gmp_screen[:, 0] - gmp_screen[:, 1])**2)
+            print("Error: ", error)
             return error
 
         # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
@@ -109,10 +125,19 @@ class Screen:
         for i in range(6):
             init_x[i, 0] = self.camera_system.cameras[i].location
             init_x[i, 1] = self.camera_system.cameras[i].eular_angle
+        init_x = init_x.flatten()
 
-        init_x += 0.0000001
-        val = object_function(init_x)
-        print(val)
+        #参数设置
+        N = 100
+        dim = 6 * 6
+        ub = init_x + 0.1
+        lb = init_x - 0.1
+        Max_iter = 50
+
+        opt_alg = COA(N, dim, ub, lb, Max_iter, object_function, init_x)
+        bestfitness,best_position,_ = opt_alg.cal()
+        print(bestfitness)
+        print(best_position)
 
     def get_implict_function(self):
         """
@@ -297,8 +322,8 @@ class Screen:
             partmesh.append(pmesh)
             didx_i = nidxmap[np.concatenate(didx_s+didx_g, dtype=np.int_)]
             dval_i = np.concatenate(dval_s+dval_g, axis=0)
-            #didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
-            #dval_i = np.concatenate(dval_s, axis=0)
+            didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
+            dval_i = np.concatenate(dval_s, axis=0)
 
             didx_i, uniqueidx = np.unique(didx_i, return_index=True)
             dval_i = dval_i[uniqueidx]
@@ -369,6 +394,20 @@ class Screen:
                 val = g1(node)
             ret[i] = val
         return ret
+
+    def compute_uv_0(self):
+        """
+        @brief 计算屏幕上网格点在相机系统中的uv坐标(无调和映射)。
+        """
+        uv = []
+        for mesh, cam in zip(self.meshs, self.camera_system.cameras):
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            uvi = cam.projecte_to_self(node)
+            uvi = cam.to_picture(uvi, normalizd=True)
+            uvi[:, 0] = 1-uvi[:, 0]
+            uv.append(uvi)
+        return uv
 
     def display(self, plotter):
         """

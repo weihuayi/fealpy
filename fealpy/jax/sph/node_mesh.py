@@ -1,27 +1,40 @@
 
+import jax
 import jax.numpy as jnp
 from jax_md import space, partition
 from jax import jit, vmap
-from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
+from scipy.sparse import csr_matrix
 
-class NodeSet():
+class NodeMeshDataStructure():
+    def __init__(self, NN):
+        self.NN = NN
 
-    def __init__(self, node):
-        self.NN = node.shape[0]
+    '''
+    def construct(self, node, box=None):
+        self.neighbor = None
+        self.neighborLocation = None
+    '''
+
+class NodeMesh():
+
+    def __init__(self, node, box=None):
         self.node = node
-        self.nodedata = {}
-        self.is_boundary = jnp.zeros(self.number_of_node(), dtype=bool)
+
+        #self.ds = NodeSetDataStructure(NN)
+        #self.ds.construct(node, box=box)
+
+        self.nodedata = {} # the data defined on node
+        self.meshdata = {}
 
     def number_of_node(self):
-        return self.NN 
+        return self.ds.NN 
     
-    def dimension(self):
+    def geo_dimension(self):
+        return self.node.shape[1]
+
+    def top_dimension(self):
         return self.node.shape[1]
        
-    def is_boundary_node(self):
-        return self.is_boundary
-
     def add_node_data(self, name, dtype=jnp.float64):
         NN = self.NN
         self.nodedata.update({names: jnp.zeros(NN, dtypes) 
@@ -61,8 +74,28 @@ class NodeSet():
                     neighbors_dict[i]['indices'].append(j)
                     neighbors_dict[i]['distances'].append(distance)
 
-        return neighbors_dict
+        return nbrs
 
+    def neighbor(self, box_size, h):
+        position = self.node
+        num = position.shape[0]
+        @jit
+        def distance(p1, p2):
+            delta = jnp.abs(p1-p2)
+            delta = jnp.where(delta > box_size * 0.5, box_size - delta, delta)  # 周期边界条件
+            return jnp.sqrt(jnp.sum(delta**2))
+        @jit
+        def neighbor_row(i,position):
+            def element(j):
+                dist = distance(position[i], position[j])
+                return jnp.where(dist <= h, dist, 0)
+            return jax.vmap(element)(jnp.arange(num))
+        nbrs = jax.vmap(lambda i: neighbor_row(i, position))(jnp.arange(num))
+        row, col = jnp.nonzero(nbrs)
+        data = nbrs[row,col]
+        csr = csr_matrix((data, (row, col)),shape=nbrs.shape)
+        return csr
+    
     def interpolate(self, u, kernel, neighbor, h):
         """
         参数:

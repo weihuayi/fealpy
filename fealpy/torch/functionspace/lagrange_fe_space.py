@@ -149,5 +149,5 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
         return val
 
-    def grad(self, uh: Tensor, bc: Tensor, index: Index=_S):
+    def grad_value(self, uh: Tensor, bc: Tensor, index: Index=_S):
         pass

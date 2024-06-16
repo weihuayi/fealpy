@@ -10,29 +10,29 @@ _device = torch.device
 
 class Quadrature():
     r"""Base class for quadrature generators."""
-    def __init__(self, in_memory: bool=True,
+    def __init__(self, index: Optional[int]=None, in_memory: bool=True,
                  dtype: Optional[_dtype]=None,
                  device: Union[_device, str, None]=None) -> None:
         self._cache: Optional[Dict[int, Tensor]] = {} if in_memory else None
-        self._latest_order = -1
+        self._latest_index = index
         self.dtype = dtype
         self.device = device
 
     def __len__(self) -> int:
         return self.number_of_quadrature_points()
 
-    def _get_latest_order(self, order: Optional[int]=None) -> int:
-        if order is not None:
-            if (not isinstance(order, int)) or (order <= 0):
-                raise ValueError("The order must be a positive integer.")
-            self._latest_order = order
-            return order
-        if self._latest_order == -1:
-            raise ValueError("The order has not been specified yet.")
-        return self._latest_order
+    def _get_latest_index(self, index: Optional[int]=None) -> int:
+        if index is not None:
+            if (not isinstance(index, int)) or (index <= 0):
+                raise ValueError("The index must be a positive integer.")
+            self._latest_index = index
+            return index
+        if self._latest_index == -1:
+            raise ValueError("The index has not been specified yet.")
+        return self._latest_index
 
-    def __getitem__(self, order: int) -> Tensor:
-        return self.get(order)
+    def __getitem__(self, index: int) -> Tensor:
+        return self.get(index)
 
     def __getattr__(self, name: str):
         if name not in {'quadpts', 'weights'}:
@@ -43,36 +43,36 @@ class Quadrature():
             else:
                 return self.get_quadrature_points_and_weights()[1]
 
-    def get(self, order: int, *, refresh: bool=False) -> Tensor:
-        self._latest_order = order
+    def get(self, index: int, *, refresh: bool=False) -> Tensor:
+        self._latest_index = index
         if self._cache is not None:
-            if (order in self._cache) and (not refresh):
-                return self._cache[order]
+            if (index in self._cache) and (not refresh):
+                return self._cache[index]
             else:
-                result = self.make(order)
-                self._cache[order] = result
+                result = self.make(index)
+                self._cache[index] = result
                 return result
         else:
-            return self.make(order)
+            return self.make(index)
 
     def clear(self) -> None:
         self._cache.clear()
 
-    def make(self, order: int) -> Tensor:
+    def make(self, index: int) -> Tensor:
         raise NotImplementedError
 
-    def number_of_quadrature_points(self, order: Optional[int]=None) -> int:
-        if order is None:
-            order = self._get_latest_order(order)
-        qw = self.get(order)
+    def number_of_quadrature_points(self, index: Optional[int]=None) -> int:
+        if index is None:
+            index = self._get_latest_index(index)
+        qw = self.get(index)
         return qw.shape[0]
 
-    def get_quadrature_points_and_weights(self, order: Optional[int]=None) -> Tensor:
-        if order is None:
-            order = self._get_latest_order(order)
-        return self[order][:, :-1], self[order][:, -1]
+    def get_quadrature_points_and_weights(self, index: Optional[int]=None) -> Tensor:
+        if index is None:
+            index = self._get_latest_index(index)
+        return self[index][:, :-1], self[index][:, -1]
 
-    def get_quadrature_point_and_weight(self, i: int, order: Optional[int]=None) -> Tensor:
-        if order is None:
-            order = self._get_latest_order(order)
-        return self[order][i, :-1], self[order][i, -1]
+    def get_quadrature_point_and_weight(self, i: int, index: Optional[int]=None) -> Tensor:
+        if index is None:
+            index = self._get_latest_index(index)
+        return self[index][i, :-1], self[index][i, -1]
