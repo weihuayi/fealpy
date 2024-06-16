@@ -7,9 +7,10 @@ class ScalarMassIntegrator:
     @note (c u, v)
     """    
 
-    def __init__(self, uh=None, uh_func=None, c=None, q=None):
+    def __init__(self, uh=None, uh_func=None, grad_uh_func=None, c=None, q=None):
         self.uh = uh
         self.uh_func = uh_func
+        self.grad_uh_func = grad_uh_func
         self.coef = c
         self.q = q
         self.type = 'BL3'
@@ -23,7 +24,7 @@ class ScalarMassIntegrator:
         q = self.q if self.q is not None else space.p+1
         coef = self.coef
         uh = self.uh
-        uh_func = self.uh_func
+        grad_uh_func = self.grad_uh_func
 
         mesh = space.mesh
 
@@ -59,8 +60,8 @@ class ScalarMassIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
-            if uh_func is not None:
-                coef = coef * uh_func(uh(bcs))
+            if grad_uh_func is not None:
+                coef = coef * grad_uh_func(uh(bcs))
             if np.isscalar(coef):
                 M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
@@ -117,7 +118,7 @@ class ScalarMassIntegrator:
                 coef = coef(ps)
         else:
             coef = coef
-        val = coef * uh_func(uh(bcs))
+        val = -coef * uh_func(uh(bcs))
 
         if isinstance(val, (int, float)):
             bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
