@@ -1,7 +1,6 @@
 
 from typing import (
-    Union, Optional, Dict, Sequence, overload, Callable,
-    Literal, TypeVar
+    Union, Optional, Dict, Sequence, overload, Callable, Literal
 )
 
 import numpy as np
@@ -20,8 +19,6 @@ _dtype = torch.dtype
 _device = torch.device
 
 _S = slice(None, None, None)
-_T = TypeVar('_T')
-_default = object()
 
 
 ##################################################
@@ -53,77 +50,78 @@ def mesh_top_csr(entity: Tensor, num_targets: int, location: Optional[Tensor]=No
     )
 
 
-def entity_str2dim(ds, etype: str) -> int:
-    if etype == 'cell':
-        return ds.top_dimension()
-    elif etype == 'cell_location':
-        return -ds.top_dimension()
-    elif etype == 'face':
-        TD = ds.top_dimension()
-        # if TD <= 1:
-        #     raise ValueError('the mesh has no face entity.')
+def estr2dim(mesh, estr: str) -> int:
+    if estr == 'cell':
+        return mesh.top_dimension()
+    elif estr == 'face':
+        TD = mesh.top_dimension()
         return TD - 1
-    elif etype == 'face_location':
-        TD = ds.top_dimension()
-        # if TD <= 1:
-        #     raise ValueError('the mesh has no face location.')
-        return -TD + 1
-    elif etype == 'edge':
+    elif estr == 'edge':
         return 1
-    elif etype == 'node':
+    elif estr == 'node':
         return 0
     else:
-        raise KeyError(f'{etype} is not a valid entity attribute.')
+        raise KeyError(f'{estr} is not a valid entity name in FEALPy.')
 
 
-def entity_dim2tensor(ds, etype_dim: int, index=None, *, default=_default):
-    r"""Get entity tensor by its top dimension."""
-    if etype_dim in ds._entity_storage:
-        et = ds._entity_storage[etype_dim]
+def edim2entity(dict_: Dict, edim: int, index=None):
+    r"""Get entity tensor by its top dimension. Returns None if not found."""
+    if edim in dict_:
+        et = dict_[edim]
         if index is None:
             return et
-        else:
+        else: # TODO: finish this
             if et.ndim == 1:
                 raise RuntimeError("index is not supported for flattened entity.")
             return et[index]
     else:
-        if default is not _default:
-            return default
-        raise ValueError(f'{etype_dim} is not a valid entity attribute index '
-                         f"in {ds.__class__.__name__}.")
+        logger.info(f'entity {edim} is not found and a NoneType is returned.')
+        return None
 
 
-def entity_dim2node(ds, etype_dim: int, index=None, dtype=None) -> Tensor:
+def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
     r"""Get the <entiry>_to_node sparse matrix by entity's top dimension."""
-    entity = entity_dim2tensor(ds, etype_dim, index)
-    location = entity_dim2tensor(ds, -etype_dim, default=None)
-    return mesh_top_csr(entity, ds.number_of_nodes(), location, dtype=dtype)
+    entity = edim2entity(mesh.storage(), etype_dim, index)
+    location = getattr(entity, 'location', None)
+    NN = mesh.count('node')
+    if NN <= 0:
+        raise RuntimeError('No valid node is found in the mesh.')
+    return mesh_top_csr(entity, NN, location, dtype=dtype)
 
 
 ##################################################
 ### Mesh Data Structure Base
 ##################################################
+# NOTE: MeshDS provides a storage for mesh entities and all topological methods.
 
 class MeshDS():
-    _STORAGE_ATTR = ['cell', 'face', 'edge', 'cell_location','face_location']
-    def __init__(self, NN: int, TD: int) -> None:
+    _STORAGE_ATTR = ['cell', 'face', 'edge', 'node']
+    cell: Tensor
+    face: Tensor
+    edge: Tensor
+    node: Tensor
+    face2cell: Tensor
+    cell2edge: Tensor
+    localEdge: Tensor # only for homogeneous mesh
+    localFace: Tensor # only for homogeneous mesh
+
+    def __init__(self, TD: int) -> None:
         self._entity_storage: Dict[int, Tensor] = {}
-        self.NN = NN
         self.TD = TD
 
     @overload
     def __getattr__(self, name: EntityName) -> Tensor: ...
     def __getattr__(self, name: str):
         if name not in self._STORAGE_ATTR:
-            return self.__dict__[name]
-        etype_dim = entity_str2dim(self, name)
-        return entity_dim2tensor(self, etype_dim)
+            return object.__getattribute__(self, name)
+        etype_dim = estr2dim(self, name)
+        return edim2entity(self.storage(), etype_dim)
 
     def __setattr__(self, name: str, value: torch.Any) -> None:
         if name in self._STORAGE_ATTR:
             if not hasattr(self, '_entity_storage'):
                 raise RuntimeError('please call super().__init__() before setting attributes.')
-            etype_dim = entity_str2dim(self, name)
+            etype_dim = estr2dim(self, name)
             self._entity_storage[etype_dim] = value
         else:
             super().__setattr__(name, value)
@@ -144,63 +142,74 @@ class MeshDS():
     def itype(self) -> _dtype: return self.cell.dtype
     @property
     def device(self) -> _device: return self.cell.device
+    def storage(self) -> Dict[int, Tensor]:
+        return self._entity_storage
 
     ### counters
     def count(self, etype: Union[int, str]) -> int:
         """Return the number of entities of the given type."""
-        if etype in ('node', 0):
-            return self.NN
         if isinstance(etype, str):
-            edim = entity_str2dim(self, etype)
-        if -edim in self._entity_storage: # for polygon mesh
-            return self._entity_storage[-edim].size(0) - 1
-        return entity_dim2tensor(self, edim).size(0) # for homogeneous mesh
+            edim = estr2dim(self, etype)
+        entity = edim2entity(self.storage(), edim)
 
-    def number_of_nodes(self): return self.NN
+        if entity is None:
+            logger.info(f'count: entity {etype} is not found and 0 is returned.')
+            return 0
+
+        if hasattr(entity, 'location'):
+            return entity.location.size(0) - 1
+        else:
+            return entity.size(0)
+
+    def number_of_nodes(self): return self.count('node')
     def number_of_edges(self): return self.count('edge')
     def number_of_faces(self): return self.count('face')
     def number_of_cells(self): return self.count('cell')
 
-    @overload
-    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor: ...
-    @overload
-    def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default: _T) -> Union[Tensor, _T]: ...
-    def entity(self, etype: Union[int, str], index: Optional[Index]=None, *, default=_default):
+    def _nv_entity(self, etype: Union[int, str]) -> Tensor:
+        entity = self.entity(etype)
+        if hasattr(entity, 'location'):
+            loc = entity.location
+            return loc[1:] - loc[:-1]
+        else:
+            return torch.tensor((entity.shape[-1],), dtype=self.itype, device=self.device)
+
+    def number_of_vertices_of_cells(self): return self._nv_entity('cell')
+    def number_of_vertices_of_faces(self): return self._nv_entity('face')
+    def number_of_vertices_of_edges(self): return self._nv_entity('edge')
+    number_of_nodes_of_cells = number_of_vertices_of_cells
+    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
+    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
+
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         """Get entities in mesh structure.
 
-        Args:
+        Parameters:
             index (int | slice | Tensor): The index of the entity.
-            etype (int | str): The topology dimension of the entity, or name
-            'cell' | 'face' | 'edge'. Note that 'node' is not available in data structure.
-            For polygon meshes, the names 'cell_location' | 'face_location' may also be
-            available, and the `index` argument is applied on the flattened entity tensor.
+
+            etype (int | str): The topological dimension of the entity, or name
+            'cell' | 'face' | 'edge' | 'node'.
+
             index (int | slice | Tensor): The index of the entity.
-            default (Any): The default value if the entity is not found.
 
         Returns:
-            Tensor: Entity or the default value.
+            Tensor: Entity or the default value. Returns None if not found.
         """
         if isinstance(etype, str):
-            etype = entity_str2dim(self, etype)
-        return entity_dim2tensor(self, etype, index, default=default)
-
-    def total_face(self) -> Tensor:
-        raise NotImplementedError
-
-    def total_edge(self) -> Tensor:
-        raise NotImplementedError
+            etype = estr2dim(self, etype)
+        return edim2entity(self.storage(), etype, index)
 
     ### topology
     def cell_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
         etype = self.top_dimension()
-        return entity_dim2node(self, etype, index, dtype=dtype)
+        return edim2node(self, etype, index, dtype=dtype)
 
     def face_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
         etype = self.top_dimension() - 1
-        return entity_dim2node(self, etype, index, dtype=dtype)
+        return edim2node(self, etype, index, dtype=dtype)
 
     def edge_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
-        return entity_dim2node(self, 1, index, dtype)
+        return edim2node(self, 1, index, dtype)
 
     def cell_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None,
                      return_sparse=False) -> Tensor:
@@ -209,7 +218,7 @@ class MeshDS():
                                'has been constructed.')
         cell2edge = self.cell2edge[index]
         if return_sparse:
-            return mesh_top_csr(cell2edge[index, :2], self.number_of_edges(), dtype=dtype)
+            return mesh_top_csr(cell2edge[index], self.number_of_edges(), dtype=dtype)
         else:
             return cell2edge[index]
 
@@ -267,38 +276,29 @@ class MeshDS():
     def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
     def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
 
-
     ### Homogeneous Mesh ###
-    def is_homogeneous(self) -> bool:
-        """Return True if the mesh is homogeneous.
+    def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
+        """Return True if the mesh entity is homogeneous.
 
         Returns:
             bool: Homogeneous indicator.
         """
-        return self.cell.ndim == 2
-
-    ccw: Tensor
-    localEdge: Tensor
-    localFace: Tensor
-
-    number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
-    number_of_nodes_of_cells = number_of_vertices_of_cells
-    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
-    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
-    number_of_vertices_of_faces: _int_func = lambda self: self.localFace.shape[-1]
-    number_of_vertices_of_edges: _int_func = lambda self: self.localEdge.shape[-1]
+        entity = self.entity(etype)
+        if entity is None:
+            raise RuntimeError(f'{etype} is not found.')
+        return entity.ndim == 2
 
     def total_face(self) -> Tensor:
-        NVF = self.number_of_faces_of_cells()
         cell = self.entity(self.TD)
         local_face = self.localFace
+        NVF = local_face.shape[-1]
         total_face = cell[..., local_face].reshape(-1, NVF)
         return total_face
 
     def total_edge(self) -> Tensor:
-        NVE = self.number_of_vertices_of_edges()
         cell = self.entity(self.TD)
         local_edge = self.localEdge
+        NVE = local_edge.shape[-1]
         total_edge = cell[..., local_edge].reshape(-1, NVE)
         return total_edge
 
@@ -345,7 +345,7 @@ class MeshDS():
         elif self.TD == 2:
             self.edge2cell = self.face2cell
 
-        logger.info(f"Mesh toplogy relation constructed, with {NF} edge (or face), "
+        logger.info(f"Mesh toplogy relation constructed, with {NF} faces, "
                     f"on device {self.device}")
 
 
@@ -353,37 +353,26 @@ class MeshDS():
 ### Mesh Base
 ##################################################
 
-class Mesh():
-    ds: MeshDS
-    node: Tensor
-
-    def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
-        self.ds.to(device, non_blocking)
-        self.node = self.node.to(device, non_blocking)
-        return self
-
+class Mesh(MeshDS):
     @property
-    def ftype(self) -> _dtype: return self.node.dtype
-    @property
-    def device(self) -> _device: return self.node.device
-    def geo_dimension(self) -> int: return self.node.shape[-1]
-    def top_dimension(self) -> int: return self.ds.top_dimension()
+    def ftype(self) -> _dtype:
+        node = self.entity(0)
+        if node is None:
+            raise RuntimeError('Can not get the float type as the node '
+                               'has not been assigned.')
+        return node.dtype
+
+    def geo_dimension(self) -> int:
+        node = self.entity(0)
+        if node is None:
+            raise RuntimeError('Can not get the geometrical dimension as the node '
+                               'has not been assigned.')
+        return node.shape[-1]
+
     GD = property(geo_dimension)
-    TD = property(top_dimension)
 
     def multi_index_matrix(self, p: int, etype: int) -> Tensor:
-        return F.multi_index_matrix(p, etype, dtype=self.ds.itype, device=self.device)
-
-    def count(self, etype: Union[int, str]) -> int: return self.ds.count(etype)
-    def number_of_cells(self) -> int: return self.ds.number_of_cells()
-    def number_of_faces(self) -> int: return self.ds.number_of_faces()
-    def number_of_edges(self) -> int: return self.ds.number_of_edges()
-    def number_of_nodes(self) -> int: return self.ds.number_of_nodes()
-    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
-        if etype in ('node', 0):
-            return self.node if index is None else self.node[index]
-        else:
-            return self.ds.entity(etype, index)
+        return F.multi_index_matrix(p, etype, dtype=self.itype, device=self.device)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         """Get the barycenter of the entity.
@@ -401,8 +390,8 @@ class Mesh():
 
         node = self.node
         if isinstance(etype, str):
-            etype = entity_str2dim(self.ds, etype)
-        etn = entity_dim2node(self.ds, etype, index, dtype=node.dtype)
+            etype = estr2dim(self, etype)
+        etn = edim2node(self, etype, index, dtype=node.dtype)
         return F.entity_barycenter(etn, node)
 
     def edge_length(self, index: Index=_S, out=None) -> Tensor:
@@ -474,7 +463,7 @@ class HomogeneousMesh(Mesh):
         node = self.entity('node')
         if etype in ('node', 0):
             return node if index is None else node[index]
-        entity = self.ds.entity(etype, index)
+        entity = self.entity(etype, index)
         return F.homo_entity_barycenter(entity, node)
 
     def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]],
@@ -483,11 +472,9 @@ class HomogeneousMesh(Mesh):
         on mesh entities.
         """
         node = self.entity('node')
-        entity = self.ds.entity(etype, index)
-        # TODO: finish this
-        # ccw = getattr(self.ds, 'ccw', None)
-        ccw = None
-        return F.bc_to_points(bcs, node, entity, ccw)
+        entity = self.entity(etype, index)
+        order = getattr(entity, 'bc_order', None)
+        return F.bc_to_points(bcs, node, entity, order)
 
     ### ipoints
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
@@ -503,7 +490,7 @@ class HomogeneousMesh(Mesh):
         """Get the relationship between edges and integration points."""
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
-        edges = self.ds.edge[index]
+        edges = self.edge[index]
         kwargs = {'dtype': edges.dtype, 'device': self.device}
         indices = torch.arange(NE, **kwargs)[index]
         return torch.cat([
@@ -517,7 +504,7 @@ class SimplexMesh(HomogeneousMesh):
     # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
-            iptype = entity_str2dim(self.ds, iptype)
+            iptype = estr2dim(self, iptype)
         return F.simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
@@ -530,7 +517,7 @@ class SimplexMesh(HomogeneousMesh):
     def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
         phi = K.simplex_shape_function(bc, p, mi)
         if variable == 'u':
             return phi
@@ -543,7 +530,7 @@ class SimplexMesh(HomogeneousMesh):
     def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.ds.itype, device=self.device)
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
         R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R
