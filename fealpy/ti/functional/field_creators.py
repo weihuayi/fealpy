@@ -76,7 +76,8 @@ def arange(start: Union[int, float],
     if stop is None:
         start, stop = 0, start
 
-    num_elements = int((stop - start) / step)
+    d = stop - start
+    num_elements = d//step + d%step 
     field = ti.field(dtype, shape=(num_elements,))
 
     @ti.kernel

@@ -58,5 +58,6 @@ def test_arange():
     np.testing.assert_array_equal(ti_field.to_numpy(), expected)
 
 if __name__ == "__main__":
+    test_arange()
     pytest.main([__file__])
 
