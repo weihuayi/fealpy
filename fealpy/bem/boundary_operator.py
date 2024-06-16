@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.sparse import csr_matrix
-from fealpy.mesh import IntervalMesh, TriangleMesh, QuadrangleMesh
+from fealpy.mesh import IntervalMesh, TriangleMesh, QuadrangleMesh, UniformMesh3d
 from fealpy.pde.bem_model_2d import PoissonModelConstantDirichletBC2d
+from fealpy.pde.bem_model_3d import *
 from fealpy.functionspace import LagrangeFESpace
 from potential_grad_potential_integrator import PotentialGradPotentialIntegrator
 from grad_potential_integrator import GradPotentialIntegrator
@@ -15,7 +16,7 @@ def boundary_mesh_build(mesh):
         "UniformMesh2d": IntervalMesh,
         "TetrahedronMesh": TriangleMesh,
         "HexahedronMesh": QuadrangleMesh,
-        "UniformMesh23d": QuadrangleMesh,
+        "UniformMesh3d": QuadrangleMesh,
     }
     node = mesh.entity('node')
     old_bd_node_idx = mesh.ds.boundary_node_index()
@@ -131,6 +132,10 @@ class BoundaryOperator:
         np.fill_diagonal(self._H, 0.5)
         self._G = np.zeros((gdof, gdof))
         np.add.at(self._G, (I, J), Gij)
+        bd_face_measure = space.mesh.entity_measure('cell')
+        # TODO: 修复系数矩阵对角线问题
+        np.fill_diagonal(self._G, (bd_face_measure * (np.log(2 / bd_face_measure) + 1) / np.pi / 2))
+        t = self._G
         # ===================================================
         f = self.dintegrators[0].assembly_cell_vector(space)
         self._f = f
@@ -157,8 +162,17 @@ if __name__ == '__main__':
     ny = 5
     # 定义网格对象
     mesh = TriangleMesh.from_box(box, nx, ny)
+    # pde = PoissonModelConstantDirichletBC3d()
+    # nx = 5
+    # ny = 5
+    # nz = 5
+    #
+    # hx = (1 - 0) / nx
+    # hy = (1 - 0) / ny
+    # hz = (1 - 0) / nz
+    # mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
     # 构造边界网格与空间
-    p = 1
+    p = 0
     maxite = 4
     errorMatrix = np.zeros(maxite)
 
@@ -168,8 +182,8 @@ if __name__ == '__main__':
         space.domain_mesh = mesh
 
         bd_operator = BoundaryOperator(space)
-        bd_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=p+1))
-        bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=p+1))
+        bd_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=2))
+        bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
 
         H, G, F = bd_operator.assembly()
         bc = DirichletBC(space=space, gD=pde.dirichlet)
@@ -179,8 +193,8 @@ if __name__ == '__main__':
         q = np.linalg.solve(G, F)
 
         inter_operator = InternalOperator(space)
-        inter_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=p+1))
-        inter_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=p+1))
+        inter_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=2))
+        inter_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
         inter_H, inter_G, inter_F = inter_operator.assembly()
         u_inter = inter_G@q - inter_H@u + inter_F
 
