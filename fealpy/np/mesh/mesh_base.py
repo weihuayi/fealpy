@@ -4,11 +4,12 @@ from typing import (
 )
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.sparse import csr_matrix
 
 from .. import logger
 
-from .utils import EntityName, Tensor, Index, _T, _S, _int_func, _dtype
+from .utils import EntityName, Index, _T, _S, _int_func, _dtype
 from .utils import estr2dim, edim2entity, edim2node, mesh_top_csr, arr_to_csr
 from . import functional as F
 from .quadrature import Quadrature
@@ -16,21 +17,21 @@ from .quadrature import Quadrature
 
 class MeshDS():
     _STORAGE_ATTR = ['cell', 'face', 'edge', 'node']
-    cell: Tensor
-    face: Tensor
-    edge: Tensor
-    node: Tensor
-    face2cell: Tensor
-    cell2edge: Tensor
-    localEdge: Tensor # only for homogeneous mesh
-    localFace: Tensor # only for homogeneous mesh
+    cell: NDArray
+    face: NDArray
+    edge: NDArray
+    node: NDArray
+    face2cell: NDArray
+    cell2edge: NDArray
+    localEdge: NDArray # only for homogeneous mesh
+    localFace: NDArray # only for homogeneous mesh
 
     def __init__(self, TD: int) -> None:
-        self._entity_storage: Dict[int, Tensor] = {}
+        self._entity_storage: Dict[int, NDArray] = {}
         self.TD = TD
 
     @overload
-    def __getattr__(self, name: EntityName) -> Tensor: ...
+    def __getattr__(self, name: EntityName) -> NDArray: ...
     def __getattr__(self, name: str):
         if name not in self._STORAGE_ATTR:
             return object.__getattribute__(self, name)
@@ -51,7 +52,7 @@ class MeshDS():
     @property
     def itype(self) -> _dtype: return self.cell.dtype
     @property
-    def storage(self) -> Dict[int, Tensor]:
+    def storage(self) -> Dict[int, NDArray]:
         return self._entity_storage
 
     ### counters
@@ -75,7 +76,7 @@ class MeshDS():
     def number_of_faces(self): return self.count('face')
     def number_of_cells(self): return self.count('cell')
 
-    def _nv_entity(self, etype: Union[int, str]) -> Tensor:
+    def _nv_entity(self, etype: Union[int, str]) -> NDArray:
         entity = self.entity(etype)
         if hasattr(entity, 'location'):
             loc = entity.location
@@ -90,38 +91,38 @@ class MeshDS():
     number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
     number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
 
-    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+    def entity(self, etype: Union[int, str], index: Optional[Index]=None) -> NDArray:
         """Get entities in mesh structure.
 
         Parameters:
-            index (int | slice | Tensor): The index of the entity.
+            index (int | slice | NDArray): The index of the entity.
 
             etype (int | str): The topological dimension of the entity, or name
             'cell' | 'face' | 'edge' | 'node'.
 
-            index (int | slice | Tensor): The index of the entity.
+            index (int | slice | NDArray): The index of the entity.
 
         Returns:
-            Tensor: Entity or the default value. Returns None if not found.
+            NDArray: Entity or the default value. Returns None if not found.
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
         return edim2entity(self.storage, etype, index)
 
     ### topology
-    def cell_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
+    def cell_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> NDArray:
         etype = self.top_dimension()
         return edim2node(self, etype, index, dtype=dtype)
 
-    def face_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
+    def face_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> NDArray:
         etype = self.top_dimension() - 1
         return edim2node(self, etype, index, dtype=dtype)
 
-    def edge_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
+    def edge_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> NDArray:
         return edim2node(self, 1, index, dtype)
 
     def cell_to_edge(self, index: Index=_S, *, dtype: Optional[_dtype]=None,
-                     return_sparse=False) -> Tensor:
+                     return_sparse=False) -> NDArray:
         if not hasattr(self, 'cell2edge'):
             raise RuntimeError('Please call construct() first or make sure the cell2edge'
                                'has been constructed.')
@@ -132,7 +133,7 @@ class MeshDS():
             return cell2edge[index]
 
     def face_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None,
-                     return_sparse=False) -> Tensor:
+                     return_sparse=False) -> NDArray:
         if not hasattr(self, 'face2cell'):
             raise RuntimeError('Please call construct() first or make sure the face2cell'
                                'has been constructed.')
@@ -143,11 +144,11 @@ class MeshDS():
             return face2cell[index]
 
     ### boundary
-    def boundary_node_flag(self) -> Tensor:
-        """Return a boolean tensor indicating the boundary nodes.
+    def boundary_node_flag(self) -> NDArray:
+        """Return a boolean NDArray indicating the boundary nodes.
 
         Returns:
-            Tensor: boundary node flag.
+            NDArray: boundary node flag.
         """
         NN = self.number_of_nodes()
         bd_face_flag = self.boundary_face_flag()
@@ -157,19 +158,19 @@ class MeshDS():
         bd_node_flag[bd_face2node.ravel()] = True
         return bd_node_flag
 
-    def boundary_face_flag(self) -> Tensor:
-        """Return a boolean tensor indicating the boundary faces.
+    def boundary_face_flag(self) -> NDArray:
+        """Return a boolean NDArray indicating the boundary faces.
 
         Returns:
-            Tensor: boundary face flag.
+            NDArray: boundary face flag.
         """
         return self.face2cell[:, 0] == self.face2cell[:, 1]
 
-    def boundary_cell_flag(self) -> Tensor:
-        """Return a boolean tensor indicating the boundary cells.
+    def boundary_cell_flag(self) -> NDArray:
+        """Return a boolean NDArray indicating the boundary cells.
 
         Returns:
-            Tensor: boundary cell flag.
+            NDArray: boundary cell flag.
         """
         NC = self.number_of_cells()
         bd_face_flag = self.boundary_face_flag()
@@ -197,14 +198,14 @@ class MeshDS():
             raise RuntimeError(f'{etype} is not found.')
         return entity.ndim == 2
 
-    def total_face(self) -> Tensor:
+    def total_face(self) -> NDArray:
         cell = self.entity(self.TD)
         local_face = self.localFace
         NVF = local_face.shape[-1]
         total_face = cell[..., local_face].reshape(-1, NVF)
         return total_face
 
-    def total_edge(self) -> Tensor:
+    def total_edge(self) -> NDArray:
         cell = self.entity(self.TD)
         local_edge = self.localEdge
         NVE = local_edge.shape[-1]
@@ -280,19 +281,19 @@ class Mesh(MeshDS):
 
     GD = property(geo_dimension)
 
-    def multi_index_matrix(self, p: int, etype: int) -> Tensor:
+    def multi_index_matrix(self, p: int, etype: int) -> NDArray:
         return F.multi_index_matrix(p, etype, dtype=self.itype)
 
-    def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+    def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> NDArray:
         """Get the barycenter of the entity.
 
         Args:
             etype (int | str): The topology dimension of the entity, or name
             'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
-            index (int | slice | Tensor): The index of the entity.
+            index (int | slice | NDArray): The index of the entity.
 
         Returns:
-            Tensor: A 2-d tensor containing barycenters of the entity.
+            NDArray: A 2-d NDArray containing barycenters of the entity.
         """
         if etype in ('node', 0):
             return self.node if index is None else self.node[index]
@@ -303,34 +304,34 @@ class Mesh(MeshDS):
         etn = edim2node(self, etype, index, dtype=node.dtype)
         return F.entity_barycenter(etn, node)
 
-    def edge_length(self, index: Index=_S, out=None) -> Tensor:
+    def edge_length(self, index: Index=_S, out=None) -> NDArray:
         """Calculate the length of the edges.
 
         Args:
-            index (int | slice | Tensor, optional): Index of edges.
-            out (Tensor, optional): The output tensor. Defaults to None.
+            index (int | slice | NDArray, optional): Index of edges.
+            out (NDArray, optional): The output NDArray. Defaults to None.
 
         Returns:
-            Tensor: Length of edges, shaped [NE,].
+            NDArray: Length of edges, shaped [NE,].
         """
         edge = self.entity(1, index=index)
         return F.edge_length(self.node[edge], out=out)
 
-    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> NDArray:
         """Calculate the normal of the edges.
 
         Args:
-            index (int | slice | Tensor, optional): Index of edges.
+            index (int | slice | NDArray, optional): Index of edges.
             unit (bool, optional): _description_. Defaults to False.
-            out (Tensor, optional): _description_. Defaults to None.
+            out (NDArray, optional): _description_. Defaults to None.
 
         Returns:
-            Tensor: _description_
+            NDArray: _description_
         """
         edge = self.entity(1, index=index)
         return F.edge_normal(self.node[edge], unit=unit, out=out)
 
-    def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
+    def edge_unit_normal(self, index: Index=_S, out=None) -> NDArray:
         """Calculate the unit normal of the edges.
         Equivalent to `edge_normal(index=index, unit=True)`.
         """
@@ -340,43 +341,43 @@ class Mesh(MeshDS):
         """Get the quadrature points and weights."""
         raise NotImplementedError
 
-    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+    def shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
+                       variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         """Shape function value on the given bc points, in shape (..., ldof).
 
         Args:
-            bc (Tensor): The bc points, in shape (..., NVC).
+            bc (NDArray): The bc points, in shape (..., NVC).
             p (int, optional): The order of the shape function. Defaults to 1.
-            index (int | slice | Tensor, optional): The index of the cell.
+            index (int | slice | NDArray, optional): The index of the cell.
             variable (str, optional): The variable name. Defaults to 'u'.
-            mi (Tensor, optional): The multi-index matrix. Defaults to None.
+            mi (NDArray, optional): The multi-index matrix. Defaults to None.
 
         Returns:
-            Tensor: The shape function value with shape (..., ldof). The shape will\
+            NDArray: The shape function value with shape (..., ldof). The shape will\
             be (..., 1, ldof) if `variable == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
-    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+    def grad_shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
-    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+    def hess_shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
 
 class HomogeneousMesh(Mesh):
     # entity
-    def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+    def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> NDArray:
         node = self.entity('node')
         if etype in ('node', 0):
             return node if index is None else node[index]
         entity = self.entity(etype, index)
         return F.homo_entity_barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[Tensor, Sequence[Tensor]],
-                    etype: Union[int, str]='cell', index: Index=_S) -> Tensor:
+    def bc_to_point(self, bcs: Union[NDArray, Sequence[NDArray]],
+                    etype: Union[int, str]='cell', index: Index=_S) -> NDArray:
         """Convert barycenter coordinate points to cartesian coordinate points
         on mesh entities.
         """
@@ -386,16 +387,16 @@ class HomogeneousMesh(Mesh):
         return F.bc_to_points(bcs, node, entity, order)
 
     ### ipoints
-    def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
+    def interpolation_points(self, p: int, index: Index=_S) -> NDArray:
         raise NotImplementedError
 
-    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> NDArray:
         raise NotImplementedError
 
-    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+    def face_to_ipoint(self, p: int, index: Index=_S) -> NDArray:
         raise NotImplementedError
 
-    def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> NDArray:
         """Get the relationship between edges and integration points."""
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -420,11 +421,11 @@ class SimplexMesh(HomogeneousMesh):
         return F.simplex_gdof(p, self)
 
     # shape function
-    def grad_lambda(self, index: Index=_S) -> Tensor:
+    def grad_lambda(self, index: Index=_S) -> NDArray:
         raise NotImplementedError
 
-    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+    def shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
+                       variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
         phi = F.simplex_shape_function(bc, p, mi)
@@ -436,8 +437,8 @@ class SimplexMesh(HomogeneousMesh):
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
 
-    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+    def grad_shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
         R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)

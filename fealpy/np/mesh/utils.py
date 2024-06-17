@@ -10,17 +10,16 @@ from scipy.sparse import csr_matrix
 from .. import logger
 
 
-Tensor = NDArray
 EntityName = Literal['cell', 'face', 'edge', 'node']
-Index = Union[Tensor, int, slice]
+Index = Union[NDArray, int, slice]
 _int_func = Callable[..., int]
 _dtype = np.dtype
 
 _S = slice(None, None, None)
 _T = TypeVar('_T')
 
-def mesh_top_csr(entity: Tensor, num_targets: int, location: Optional[Tensor]=None, *,
-                 dtype: Optional[_dtype]=None) -> Tensor:
+def mesh_top_csr(entity: NDArray, num_targets: int, location: Optional[NDArray]=None, *,
+                 dtype: Optional[_dtype]=None) -> NDArray:
     r"""CSR format of a mesh topology relaionship matrix."""
 
     if entity.ndim == 1: # for polygon case
@@ -115,7 +114,7 @@ def edim2entity(dict_: Dict, edim: int, index=None):
 #         print(f'Entity {edim} is not found and None is returned.')  # Replacing logger with print for simplicity
 #         return None
     
-def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
+def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> NDArray:
     r"""Get the <entiry>_to_node sparse matrix by entity's top dimension."""
     entity = edim2entity(mesh.storage(), etype_dim, index)
     location = getattr(entity, 'location', None)

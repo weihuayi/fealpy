@@ -26,9 +26,9 @@ NX, NY = 64, 64
 PI = np.pi
 
 mesh = TriangleMesh.from_box(nx=NX, ny=NY)
-mesh_ = tri.from_box(nx=NX, ny=NY)
+# mesh_ = tri.from_box(nx=NX, ny=NY)
 node = mesh.entity('node')
-node_ = mesh_.entity('node')
-print(node_.shape)
+# node_ = mesh_.entity('node')
+print(node.shape)
 
 
