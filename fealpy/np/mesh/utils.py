@@ -7,14 +7,40 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix
 
+from .. import logger
 
+
+Tensor = NDArray
 EntityName = Literal['cell', 'face', 'edge', 'node']
-Entity = np.ndarray 
-Index = Union[np.ndarray, int, slice]
-
+Index = Union[Tensor, int, slice]
 _int_func = Callable[..., int]
+_dtype = np.dtype
+
 _S = slice(None, None, None)
 _T = TypeVar('_T')
+
+def mesh_top_csr(entity: Tensor, num_targets: int, location: Optional[Tensor]=None, *,
+                 dtype: Optional[_dtype]=None) -> Tensor:
+    r"""CSR format of a mesh topology relaionship matrix."""
+
+    if entity.ndim == 1: # for polygon case
+        if location is None:
+            raise ValueError('location is required for 1D entity (usually for polygon mesh).')
+        crow = location
+    elif entity.ndim == 2: # for homogeneous case
+        crow = np.arange(
+            entity.size(0) + 1, dtype=entity.dtype
+        ).mul_(entity.size(1))
+    else:
+        raise ValueError('dimension of entity must be 1 or 2.')
+
+    return csr_matrix(
+        crow,
+        entity.reshape(-1),
+        np.ones(entity.numel(), dtype=dtype),
+        size=(entity.size(0), num_targets),
+        dtype=dtype
+    )
 
 def estr2dim(ds, estr: str) -> int:
     """
@@ -45,6 +71,58 @@ def estr2dim(ds, estr: str) -> int:
         return 0
     else:
         raise KeyError(f'{estr} is not a valid entity attribute.')
+    
+def edim2entity(dict_: Dict, edim: int, index=None):
+    r"""Get entity tensor by its top dimension. Returns None if not found."""
+    if edim in dict_:
+        et = dict_[edim]
+        if index is None:
+            return et
+        else: # TODO: finish this
+            if et.ndim == 1:
+                raise RuntimeError("index is not supported for flattened entity.")
+            return et[index]
+    else:
+        logger.info(f'entity {edim} is not found and a NoneType is returned.')
+        return None
+    
+# import numpy as np
+
+# def edim2entity(dict_: dict, edim: int, index=None):
+#     """
+#     Get entity array by its top dimension. Returns None if not found.
+    
+#     Parameters:
+#     - dict_: Dictionary mapping dimensions to entity arrays.
+#     - edim: Integer representing the topological dimension of the entity.
+#     - index: Optional index or indices to extract from the entity array. If not provided, returns the full array.
+    
+#     Returns:
+#     - Entity array or a subset of it based on the provided index, or None if the entity is not found.
+#     """
+#     if edim in dict_:
+#         et = dict_[edim]
+#         if index is None:
+#             return et
+#         else:
+#             if et.ndim == 1:
+#                 raise RuntimeError("index is not supported for flattened entity.")
+#             # Ensure index is a tuple for multi-dimensional indexing, even if it's a single index
+#             if not isinstance(index, tuple):
+#                 index = (index,)
+#             return et[tuple(index)]
+#     else:
+#         print(f'Entity {edim} is not found and None is returned.')  # Replacing logger with print for simplicity
+#         return None
+    
+def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
+    r"""Get the <entiry>_to_node sparse matrix by entity's top dimension."""
+    entity = edim2entity(mesh.storage(), etype_dim, index)
+    location = getattr(entity, 'location', None)
+    NN = mesh.count('node')
+    if NN <= 0:
+        raise RuntimeError('No valid node is found in the mesh.')
+    return mesh_top_csr(entity, NN, location, dtype=dtype)
 
 def ranges(nv, start = 0):
     shifts = np.cumsum(nv)
