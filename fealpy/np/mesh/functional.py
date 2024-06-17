@@ -201,12 +201,12 @@ def tri_grad_lambda_2d(points):
     e0 = points[..., 2, :] - points[..., 1, :]
     e1 = points[..., 0, :] - points[..., 2, :]
     e2 = points[..., 1, :] - points[..., 0, :]
-    nv = e0[:, 0] * e1[:, 1] - e0[:, 1] * e1[:, 0]  # Determinant for 2D case, equivalent to np.linalg.det for 2x2 matrix
-    e0 = -e0
-    e1 = -e1
-    e2 = -e2
+    nv = det(np.stack([e0, e1], axis=-2)) # Determinant for 2D case, equivalent to np.linalg.det for 2x2 matrix
+    e0 = np.flip(e0, axis=-1)
+    e1 = np.flip(e1, axis=-1)
+    e2 = np.flip(e2, axis=-1)
     result = np.stack([e0, e1, e2], axis=-2)
-    result[..., 0, :] *= -1
+    result[..., 0] *= -1
     return result / np.expand_dims(nv, axis=(-1, -2))
 
 def tri_grad_lambda_3d(points):
