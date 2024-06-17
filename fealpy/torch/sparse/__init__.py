@@ -1,2 +1,2 @@
 
-from coo_tensor import COOTensor
+from .coo_tensor import COOTensor
