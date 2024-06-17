@@ -36,7 +36,7 @@ class MeshDS():
         if name not in self._STORAGE_ATTR:
             return object.__getattribute__(self, name)
         etype_dim = estr2dim(self, name)
-        return edim2entity(self.storage, etype_dim)
+        return edim2entity(self.storage(), etype_dim)
 
     def __setattr__(self, name: str, value: np.any) -> None:
         if name in self._STORAGE_ATTR:
@@ -51,7 +51,6 @@ class MeshDS():
     def top_dimension(self) -> int: return self.TD
     @property
     def itype(self) -> _dtype: return self.cell.dtype
-    @property
     def storage(self) -> Dict[int, NDArray]:
         return self._entity_storage
 
@@ -107,7 +106,7 @@ class MeshDS():
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        return edim2entity(self.storage, etype, index)
+        return edim2entity(self.storage(), etype, index)
 
     ### topology
     def cell_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> NDArray:
