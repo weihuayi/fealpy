@@ -9,20 +9,38 @@ from fealpy.iopt import COA
 from meshing_type import MeshingType
 from partition_type import PartitionType
 
+# 重叠区域网格
+@dataclass
+class OverlapMesh:
+    """
+    @brief 重叠区域网格
+    @param mesh: 网格
+    @param cam0: 相机0
+    @param cam1: 相机1
+    @param uv0: 网格点在相机 0 的图像中的 uv 坐标
+    @param uv1: 网格点在相机 1 的图像中的 uv 坐标
+    @param tag: "ground" or "ellipsoid", 用于区分地面和椭球面
+    """
+    mesh : list[TriangleMesh] = None
+    cam0 : int = None
+    cam1 : int = None
+    uv0  : np.ndarray = None
+    uv1  : np.ndarray = None
+    tag  : str = None  
 
 @dataclass
-class GroundMarkPoint:
+class NonOverlapMesh:
     """
-    @brief 地面标记点
-    @param points0: 点在相机 cam0 的图像中的坐标
-    @param points1: 点在相机 cam1 的图像中的坐标
-    @param points2: 点的真实坐标
+    @brief 非重叠区域网格
+    @param mesh: 网格
+    @param cam: 相机
+    @param uv: 网格点在相机的图像中的 uv 坐标
+    @param tag: "ground" or "ellipsoid", 用于区分地面和椭球面
     """
-    cam0:    int
-    cam1:    int
-    points0: np.ndarray
-    points1: np.ndarray
-    points2: np.ndarray
+    mesh : list[TriangleMesh] = None
+    cam  : int = None
+    uv   : np.ndarray = None
+    tag  : str = None
 
 class Screen:
     """
@@ -62,19 +80,16 @@ class Screen:
         self.camera_system = camera_system
         self.camera_system.screen = self
 
-        self.groundmesh = {"overlap": [], "nonoverlap": []}
-        self.ellipsoidmesh = {"overlap": [], "nonoverlap": []}
+        self.overlapmesh = [] 
+        self.nonoverlapmesh = [] 
 
         #self.optimize()
-        self.gmp = self.ground_mark_board()
         # 判断分区类型和网格化类型
         if (ptype == PartitionType.NONE)&(mtype == MeshingType.TRIANGLE):
             self.meshs, self.didxs, self.dvals = self.meshing()
         else: # 没有实现
             ValueError("Not implemented!")
-        self.uvs = None
         self.uvs = self.compute_uv()
-        #self.uvs = self.compute_uv_0()
 
     def ground_mark_board(self):
         """
@@ -159,16 +174,66 @@ class Screen:
             return z + z0
         return f0, f1
 
-    def partition(self, partition_type):
+    def partition(self):
         """
         将屏幕区域分区，并通过分区的分割线构造特征点与特征线，可选择 PartitionType 中提供的分区方案。
-        @param partition_type: 分区方案。
-        @return:
         """
-        self.feature_point = None
-        self.split_line = None
-        self.domain = None
-        pass
+        def add_rectangle(p0, p1, p2, p3):
+            """
+            @brief 添加矩形
+            """
+            # 添加线
+            l1 = gmsh.model.occ.addLine(p0, p1)
+            l2 = gmsh.model.occ.addLine(p1, p2)
+            l3 = gmsh.model.occ.addLine(p2, p3)
+            l4 = gmsh.model.occ.addLine(p3, p0)
+            # 添加 loop
+            curve = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+            s = gmsh.model.occ.addPlaneSurface([curve])
+
+        ground = {}
+        eillposid = {}
+
+        # 无重叠分区
+        if self.partition_type == PartitionType.NONE:
+            v = 30*np.array([[-np.cos(theta), -np.sin(theta)], 
+                          [np.cos(theta), -np.sin(theta)], 
+                          [np.cos(theta), np.sin(theta)], 
+                          [-np.cos(theta), np.sin(theta)]])
+            point = np.array([[-l/2, -w/2], [l/2, -w/2], [l/2, w/2], [-l/2, w/2]],
+                             dtype=np.float64)
+            ps = [3, 4, 5, 6]
+            planes  = []
+            for i in range(4):
+                pp1 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], z0)
+                pp2 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], 0.0)
+                pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
+                planes.append(add_rectangle(ps[i], pp1, pp2, pp3))
+
+            point = np.array([[0, -w/2], [0, w/2]], dtype=np.float64)
+            v = 30*np.array([[0, -1], [0, 1]], dtype=np.float64)
+            for i in range(2):
+                pp0 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
+                pp1 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], z0)
+                pp2 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], 0.0)
+                pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
+                planes.append(add_rectangle(pp0, pp1, pp2, pp3))
+
+            # 将屏幕分区
+            frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
+            for i in range(len(frag[1]))[2:]:
+                gmsh.model.occ.remove(frag[1][i], recursive=True)
+
+        # 重叠分区1
+        elif self.partition_type == PartitionType.OVERLAP1:
+            pass
+        # 重叠分区2
+        elif self.partition_type == PartitionType.OVERLAP2:
+            pass
+        else:
+            ValueError("Not implemented!")
+
+        return ground, eillposid
 
     def meshing(self, theta = np.pi/6, only_ground=False):#(self, meshing_type:MeshingType):
         """
@@ -183,18 +248,6 @@ class Screen:
 
         camerasys = self.camera_system
 
-        def add_rectangle(p0, p1, p2, p3):
-            """
-            @brief 添加矩形
-            """
-            # 添加线
-            l1 = gmsh.model.occ.addLine(p0, p1)
-            l2 = gmsh.model.occ.addLine(p1, p2)
-            l3 = gmsh.model.occ.addLine(p2, p3)
-            l4 = gmsh.model.occ.addLine(p3, p0)
-            # 添加 loop
-            curve = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
-            return gmsh.model.occ.addPlaneSurface([curve])
 
         # 构造椭球面
         l, w, h = self.carsize
@@ -208,44 +261,17 @@ class Screen:
         gmsh.model.occ.dilate([(3, ball)],0, 0, 0, a, b, c)
         gmsh.model.occ.remove([(3, ball), (2, 2)])
 
-        # 车辆区域
+        ## 车辆区域
         vehicle = gmsh.model.occ.addRectangle(-l/2, -w/2, z0, l, w)
-        ground = gmsh.model.occ.cut([(2, 1), (2, 3)], [(2, vehicle)])[0]
 
-        v = 30*np.array([[-np.cos(theta), -np.sin(theta)], 
-                      [np.cos(theta), -np.sin(theta)], 
-                      [np.cos(theta), np.sin(theta)], 
-                      [-np.cos(theta), np.sin(theta)]])
-        point = np.array([[-l/2, -w/2], [l/2, -w/2], [l/2, w/2], [-l/2, w/2]],
-                         dtype=np.float64)
-        ps = [3, 4, 5, 6]
-        planes  = []
-        for i in range(4):
-            pp1 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], z0)
-            pp2 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], 0.0)
-            pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
-            planes.append(add_rectangle(ps[i], pp1, pp2, pp3))
+        ## 生成屏幕
+        screen = gmsh.model.occ.cut([(2, 1), (2, 3)], [(2, vehicle)])[0]
 
-        point = np.array([[0, -w/2], [0, w/2]], dtype=np.float64)
-        v = 30*np.array([[0, -1], [0, 1]], dtype=np.float64)
-        for i in range(2):
-            pp0 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
-            pp1 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], z0)
-            pp2 = gmsh.model.occ.addPoint(point[i, 0]+v[i, 0], point[i, 1]+v[i, 1], 0.0)
-            pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
-            planes.append(add_rectangle(pp0, pp1, pp2, pp3))
-
-        frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
-        for i in range(len(frag[1]))[2:]:
-            gmsh.model.occ.remove(frag[1][i], recursive=True)
-
-        if only_ground:
-            gmsh.model.occ.remove([(2, i+1) for i in range(7)], recursive=True)
+        # 分区
+        ground, eillposid = self.partition()
 
         gmsh.model.occ.synchronize()
         gmsh.fltk.run()
-
-        node = gmsh.model.mesh.getNodes()
 
         gmsh.model.mesh.generate(2)
 
