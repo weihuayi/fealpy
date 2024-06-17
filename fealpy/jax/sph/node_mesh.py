@@ -129,9 +129,14 @@ class NodeMesh():
         return kernel_function, kernel_grad
     
     @classmethod
-    def from_tgv_domain(cls, dx=0.02, dy=0.02):
-        result = jnp.mgrid[0:1+dx:dx, 0:1+dy:dy].reshape(2, -1).T
-        return cls(result)
+    def from_tgv_domain(cls, dx=0.2, dy=0.2):
+        dummy_d = jnp.mgrid[-3*dx:1+3.99*dx:dx, -3*dy:0:(3*dy)/3].reshape(2, -1).T
+        dummy_u = jnp.mgrid[-3*dx:1+3.99*dx:dx, 1+dy:1+3.99*dy:(3*dy)/3].reshape(2, -1).T
+        dummy_l = jnp.mgrid[-2.99*dx:0:(3*dx)/3, 0:1+dy:dy].reshape(2, -1).T
+        dummy_r = jnp.mgrid[1+dx:1+3.99*dx:(3*dx)/3, 0:1+dy:dy].reshape(2, -1).T
+        dummy = jnp.vstack((dummy_d, dummy_u, dummy_l, dummy_r))
+        fluid = jnp.mgrid[0:1+dx:dx, 0:1+dy:dy].reshape(2, -1).T
+        return cls(fluid), cls(dummy)
 
     @classmethod
     def from_ringshaped_channel_domain(cls, dx=0.02, dy=0.02):

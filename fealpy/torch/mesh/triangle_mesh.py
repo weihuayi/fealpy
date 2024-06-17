@@ -10,7 +10,7 @@ from fealpy.torch.mesh.quadrature import Quadrature
 
 from .. import logger
 from . import functional as F
-from .mesh_base import MeshDS, SimplexMesh, entity_str2dim
+from .mesh_base import SimplexMesh, estr2dim
 
 Index = Union[Tensor, int, slice]
 _dtype = torch.dtype
@@ -19,9 +19,9 @@ _device = torch.device
 _S = slice(None)
 
 
-class TriangleMeshDataStructure(MeshDS):
-    def __init__(self, NN: int, cell: Tensor):
-        super().__init__(NN, 2)
+class TriangleMesh(SimplexMesh):
+    def __init__(self, node: Tensor, cell: Tensor) -> None:
+        super().__init__(TD=2)
         # constant tensors
         kwargs = {'dtype': cell.dtype, 'device': cell.device}
         self.cell = cell
@@ -36,16 +36,7 @@ class TriangleMeshDataStructure(MeshDS):
 
         self.construct()
 
-    def total_face(self):
-        return self.cell[..., self.localFace].reshape(-1, 2)
-
-
-class TriangleMesh(SimplexMesh):
-    ds: TriangleMeshDataStructure
-    def __init__(self, node: Tensor, cell: Tensor) -> None:
         self.node = node
-        self.ds = TriangleMeshDataStructure(node.shape[0], cell)
-
         GD = node.size(-1)
 
         if GD == 2:
@@ -63,9 +54,9 @@ class TriangleMesh(SimplexMesh):
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         node = self.node
         if isinstance(etype, str):
-            etype = entity_str2dim(self.ds, etype)
+            etype = estr2dim(self, etype)
         if etype == 0:
-            return node if index is None else node[index]
+            return torch.tensor([0,], dtype=self.ftype, device=self.device)
         elif etype == 1:
             edge = self.entity(1, index)
             return F.edge_length(node[edge])
@@ -82,7 +73,7 @@ class TriangleMesh(SimplexMesh):
         from .quadrature import GaussLegendreQuadrature
 
         if isinstance(etype, str):
-            etype = entity_str2dim(self.ds, etype)
+            etype = estr2dim(self, etype)
         kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 2:
             quad = TriangleQuadrature(q, **kwargs)
@@ -96,7 +87,7 @@ class TriangleMesh(SimplexMesh):
     # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
-            iptype = entity_str2dim(self.ds, iptype)
+            iptype = estr2dim(self, iptype)
         return F.simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
@@ -139,7 +130,7 @@ class TriangleMesh(SimplexMesh):
         return torch.cat(ipoint_list, dim=0)  # (gdof, GD)
 
     def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        cell = self.ds.cell
+        cell = self.cell
         if p == 1:
             return cell[index]
 
@@ -147,9 +138,9 @@ class TriangleMesh(SimplexMesh):
         idx0, = torch.nonzero(mi[:, 0] == 0, as_tuple=True)
         idx1, = torch.nonzero(mi[:, 1] == 0, as_tuple=True)
         idx2, = torch.nonzero(mi[:, 2] == 0, as_tuple=True)
-        kwargs = {'dtype': self.ds.itype, 'device': self.device}
+        kwargs = {'dtype': self.itype, 'device': self.device}
 
-        face2cell = self.ds.face_to_cell()
+        face2cell = self.face_to_cell()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
@@ -188,7 +179,7 @@ class TriangleMesh(SimplexMesh):
 
     # shape function
     def grad_lambda(self, index: Index=_S):
-        return self._grad_lambda(self.node[self.ds.cell[index]])
+        return self._grad_lambda(self.node[self.cell[index]])
 
     # constructor
     @classmethod
@@ -197,14 +188,19 @@ class TriangleMesh(SimplexMesh):
                  ftype: Optional[_dtype]=torch.float64,
                  device: Union[_device, str, None]=None,
                  require_grad: bool=False):
-        """@brief Generate a triangle mesh for a box domain .
+        """Generate a uniform triangle mesh for a box domain .
 
-        @param box:
-        @param nx: Number of divisions along the x-axis (default: 10)
-        @param ny: Number of divisions along the y-axis (default: 10)
-        @param threshold: Optional function to filter cells based on their barycenter coordinates (default: None)
+        Parameters:
+            box (List[int]):
 
-        @returns: TriangleMesh instance
+            nx (int): Number of divisions along the x-axis (default: 10)
+
+            ny (int): Number of divisions along the y-axis (default: 10)
+
+            threshold: Optional function to filter cells based on their barycenter coordinates (default: None)
+
+        Returns:
+            TriangleMesh: Triangle mesh instance.
         """
         fkwargs = {'dtype': ftype, 'device': device}
         ikwargs = {'dtype': itype, 'device': device}
