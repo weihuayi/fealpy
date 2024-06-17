@@ -1,0 +1,3 @@
+
+class IntervalMesh():
+    pass
