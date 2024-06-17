@@ -348,3 +348,10 @@ class Mesh(MeshDS):
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
+
+class HomogeneousMesh(Mesh):
+    pass
+
+
+class SimplexMesh(HomogeneousMesh):
+    pass
