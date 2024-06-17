@@ -47,34 +47,30 @@ class NodeMesh():
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
 
-    def neighbors(self, box_size, cutoff):
+    def neighbors(self, box_size, h):
         """
         参数:
         - box_size: 模拟盒子的大小
-        - cutoff: 邻近搜索的截断距离
+        - h: 平滑长度
         返回:
-        - neighbors_dict: 一个字典，包含每个粒子的邻近粒子索引和距离
+        - index: 每个粒子的邻近粒子索引
+        - indptr: 每行邻近索引的计数
         """
         # 定义邻近列表的参数
         displacement, shift = space.periodic(box_size)
-        neighbor_fn = partition.neighbor_list(displacement, box_size, cutoff)
+        neighbor_fn = partition.neighbor_list(displacement, box_size, h)
         # 初始化邻近列表，用于分配内存
         nbrs = neighbor_fn.allocate(self.node)
         # 更新邻近列表
         nbrs = neighbor_fn.update(self.node, nbrs)
-        neighbors_dict = {}
-        # 遍历每个粒子，获取邻近粒子的索引和距离
-        for i in range(self.node.shape[0]):
-            neighbors = nbrs.idx[i, nbrs.idx[i] < self.node.shape[0]]  # 获取粒子 i 的邻近粒子索引
-            neighbors_dict[i] = {'indices': [], 'distances': []}
-            for j in neighbors:
-                if i != j:  # 不计算自身粒子
-                    r_ij = displacement(self.node[i], self.node[j])
-                    distance = jnp.linalg.norm(r_ij)
-                    neighbors_dict[i]['indices'].append(j)
-                    neighbors_dict[i]['distances'].append(distance)
-
-        return nbrs
+        neighbor = nbrs.idx
+        num = self.node.shape[0]
+        index = jax.vmap(lambda idx, row: jnp.hstack([row, jnp.array([idx])]))(jnp.arange(neighbor.shape[0]), neighbor)
+        row_len = jnp.sum(index != num,axis=1)
+        indptr = jax.lax.scan(lambda carry, x: (carry + x, carry + x), 0, row_len)[1]
+        indptr = jnp.concatenate((jnp.array([0]), indptr))
+        index = index[index != num]
+        return index, indptr
 
     def neighbor(self, box_size, h):
         position = self.node

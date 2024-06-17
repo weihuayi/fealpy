@@ -19,19 +19,13 @@ def test_neighbors():
     box_size = 1.0  
     cutoff = 0.2
     key = random.PRNGKey(0)
-    num_particles = 10
+    num_particles = 50
     positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
     node_mesh = NodeMesh(positions)
-    
     # 计算邻近列表
-    neighbors_dict = node_mesh.neighbors(box_size, cutoff)
-    print(neighbors_dict)
-    '''
-    for i, data in neighbors_dict.items():
-        print(f"Particle {i} neighbors: {data['indices']}")
-        for j, distance in zip(data['indices'], data['distances']):
-            print(f"  Distance between particle {i} and {j}: {distance}")
-    '''
+    index, indptr = node_mesh.neighbors(box_size, cutoff)
+    print(index)
+    print(indptr)
     
 def test_add_node_data():
     #创建初始粒子
@@ -97,9 +91,9 @@ def test_dam_break_domain():
 
 if __name__ == "__main__":
     #test_neighbor()
-    #test_neighbors()
+    test_neighbors()
     #test_add_node_data()
     #test_interpolate()
-    test_from_tgv_domain()
+    #test_from_tgv_domain()
     #test_from_ringshaped_channel_domain()
     #test_dam_break_domain()
