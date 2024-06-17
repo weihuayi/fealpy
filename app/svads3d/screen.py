@@ -62,6 +62,9 @@ class Screen:
         self.camera_system = camera_system
         self.camera_system.screen = self
 
+        self.groundmesh = {"overlap": [], "nonoverlap": []}
+        self.ellipsoidmesh = {"overlap": [], "nonoverlap": []}
+
         #self.optimize()
         self.gmp = self.ground_mark_board()
         # 判断分区类型和网格化类型
@@ -69,6 +72,7 @@ class Screen:
             self.meshs, self.didxs, self.dvals = self.meshing()
         else: # 没有实现
             ValueError("Not implemented!")
+        self.uvs = None
         self.uvs = self.compute_uv()
         #self.uvs = self.compute_uv_0()
 
@@ -231,11 +235,6 @@ class Screen:
             pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
             planes.append(add_rectangle(pp0, pp1, pp2, pp3))
 
-        # 地面特征点
-        gmp = self.gmp
-        gmps = [gmsh.model.occ.addPoint(p.points2[0], p.points2[1], p.points2[2]) for p in gmp]
-        gmsh.model.occ.fragment(ground, [(0, p) for p in gmps])
-
         frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
         for i in range(len(frag[1]))[2:]:
             gmsh.model.occ.remove(frag[1][i], recursive=True)
@@ -244,7 +243,7 @@ class Screen:
             gmsh.model.occ.remove([(2, i+1) for i in range(7)], recursive=True)
 
         gmsh.model.occ.synchronize()
-        #gmsh.fltk.run()
+        gmsh.fltk.run()
 
         node = gmsh.model.mesh.getNodes()
 
@@ -302,26 +301,8 @@ class Screen:
             didx_s = [tag2nid[ge[0]] for ge in lists]
             dval_s = [f0(ge[1].reshape(-1, 3)) for ge in lists]
 
-            # 获取第 i 块网格的地面特征点
-            ismeshi = np.zeros(NN, dtype = np.bool_)
-            ismeshi[cell] = True # 第 i 块网格中的点
-
-            flag = ismeshi[gmpidx]
-            flag0 = np.array([(g.cam0 == i) | (g.cam1 == i) for g in gmp])
-            flag = flag & flag0
-
-            didx_g = [[gmpidx[j]] for j in range(len(flag)) if flag[j]]
-            dval_g = [f1(g.points0[None, :]) if g.cam0 == i else
-                      f1(g.points1[None, :]) for j, g in enumerate(gmp) if flag[j]]
-
-            if i==0:
-                print()
-                print(dval_g)
-
             pmesh, nidxmap = creat_part_mesh(node, cell)
             partmesh.append(pmesh)
-            didx_i = nidxmap[np.concatenate(didx_s+didx_g, dtype=np.int_)]
-            dval_i = np.concatenate(dval_s+dval_g, axis=0)
             didx_i = nidxmap[np.concatenate(didx_s, dtype=np.int_)]
             dval_i = np.concatenate(dval_s, axis=0)
 
@@ -382,16 +363,16 @@ class Screen:
         ret = np.zeros_like(points)
         def sphere_to_implict_function(p, c, r, fun):
             g = lambda t : fun(c + t*(p-c))
-            t = fsolve(g, 1000)
+            t = fsolve(g, 100)
             val = c + t*(p-c)
             return val
 
         g0 = lambda p : sphere_to_implict_function(p, center, radius, f0)
         g1 = lambda p : sphere_to_implict_function(p, center, radius, f1)
         for i, node in enumerate(points):
-            val = g0(node)
-            if val[2] < -self.center_height:
-                val = g1(node)
+            val = g1(node)
+            if f0(val) > 0:
+                val = g0(node)
             ret[i] = val
         return ret
 
