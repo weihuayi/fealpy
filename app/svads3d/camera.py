@@ -40,7 +40,7 @@ class Camera():
     def set_screen_frature_points(self, feature_point):
         """
         @brief 设置相机的屏幕特征点。
-        @param args: 屏幕特征点。
+        @param feature_point: 屏幕特征点。
         @return:
         """
         if isinstance(feature_point, list):

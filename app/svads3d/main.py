@@ -20,7 +20,7 @@ if __name__ == '__main__':
     data_path = '/home/cbtxs/data/'
 
     mtype = MeshingType.TRIANGLE
-    ptype = PartitionType.NONE
+    ptype = PartitionType("nonoverlap", np.pi/6)
 
     pictures = [Picture(data_path, picture, mb) for picture, mb in zip(data['pictures'], data["mark_board"])]
     cameras = [Camera(pic, data_path, chessboard_dir, loc, axes) 
