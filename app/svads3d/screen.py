@@ -272,10 +272,142 @@ class Screen:
 
         # 重叠分区1
         elif self.partition_type == "overlap1":
-            pass
+            theta1 = parameters[0]
+            theta2 = parameters[1]
+            v1 = 30 * np.array([[-np.cos(theta1), -np.sin(theta1)],
+                                [np.cos(theta1), -np.sin(theta1)],
+                                [np.cos(theta1), np.sin(theta1)],
+                                [-np.cos(theta1), np.sin(theta1)]])
+            v2 = 30 * np.array([[-np.cos(theta2), -np.sin(theta2)],
+                                [np.cos(theta2), -np.sin(theta2)],
+                                [np.cos(theta2), np.sin(theta2)],
+                                [-np.cos(theta2), np.sin(theta2)]])
+            point = np.array([[-l / 2, -w / 2], [l / 2, -w / 2], [l / 2, w / 2], [-l / 2, w / 2]],
+                             dtype=np.float64)
+
+            ps = [3, 4, 5, 6]
+            planes = []
+            for i in range(4):
+                pp11 = gmsh.model.occ.addPoint(point[i, 0] + v1[i, 0], point[i, 1] + v1[i, 1], z0)
+                pp12 = gmsh.model.occ.addPoint(point[i, 0] + v1[i, 0], point[i, 1] + v1[i, 1], 0.0)
+                pp13 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
+                planes.append(add_rectangle(ps[i], pp11, pp12, pp13))
+
+                pp21 = gmsh.model.occ.addPoint(point[i, 0] + v2[i, 0], point[i, 1] + v2[i, 1], z0)
+                pp22 = gmsh.model.occ.addPoint(point[i, 0] + v2[i, 0], point[i, 1] + v2[i, 1], 0.0)
+                planes.append(add_rectangle(ps[i], pp21, pp22, pp13))
+
+            point = np.array([[0, -w / 2], [0, w / 2]], dtype=np.float64)
+            v = 30 * np.array([[0, -1], [0, 1]], dtype=np.float64)
+            for i in range(len(point)):
+                pp0 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
+                pp1 = gmsh.model.occ.addPoint(point[i, 0] + v[i, 0], point[i, 1] + v[i, 1], z0)
+                pp2 = gmsh.model.occ.addPoint(point[i, 0] + v[i, 0], point[i, 1] + v[i, 1], 0.0)
+                pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
+                planes.append(add_rectangle(pp0, pp1, pp2, pp3))
+
+            # 将屏幕分区
+            frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
+            for i in range(len(frag[1]))[2:]:
+                gmsh.model.occ.remove(frag[1][i], recursive=True)
+
+            ground = [[[14], [5, 0]],
+                      [[16], [0]],
+                      [[18], [1]],
+                      [[21], [1, 2]],
+                      [[20], [2]],
+                      [[19], [2, 3]],
+                      [[17], [3]],
+                      [[15], [4]],
+                      [[13], [4, 5]],
+                      [[12], [5]]]
+
+            eillposid = [[[4], [5, 0]],
+                         [[6], [0]],
+                         [[8], [1]],
+                         [[10], [1, 2]],
+                         [[11], [2]],
+                         [[9], [2, 3]],
+                         [[7], [3]],
+                         [[5], [4]],
+                         [[3], [4, 5]],
+                         [[2, 1], [5]]]
+            return ground, eillposid
         # 重叠分区2
         elif self.partition_type == "overlap2":
-            pass
+            theta1 = parameters[0]
+            theta2 = parameters[1]
+            theta3 = parameters[2]
+            t = parameters[3]
+            v1 = 30 * np.array([[-np.cos(theta1), -np.sin(theta1)],
+                                [np.cos(theta1), -np.sin(theta1)],
+                                [np.cos(theta1), np.sin(theta1)],
+                                [-np.cos(theta1), np.sin(theta1)]])
+            v2 = 30 * np.array([[-np.cos(theta2), -np.sin(theta2)],
+                                [np.cos(theta2), -np.sin(theta2)],
+                                [np.cos(theta2), np.sin(theta2)],
+                                [-np.cos(theta2), np.sin(theta2)]])
+            point = np.array([[-l / 2, -w / 2], [l / 2, -w / 2], [l / 2, w / 2], [-l / 2, w / 2]],
+                             dtype=np.float64)
+
+            ps = [3, 4, 5, 6]
+            planes = []
+            for i in range(4):
+                pp11 = gmsh.model.occ.addPoint(point[i, 0] + v1[i, 0], point[i, 1] + v1[i, 1], z0)
+                pp12 = gmsh.model.occ.addPoint(point[i, 0] + v1[i, 0], point[i, 1] + v1[i, 1], 0.0)
+                pp13 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
+                planes.append(add_rectangle(ps[i], pp11, pp12, pp13))
+
+                pp21 = gmsh.model.occ.addPoint(point[i, 0] + v2[i, 0], point[i, 1] + v2[i, 1], z0)
+                pp22 = gmsh.model.occ.addPoint(point[i, 0] + v2[i, 0], point[i, 1] + v2[i, 1], 0.0)
+                planes.append(add_rectangle(ps[i], pp21, pp22, pp13))
+
+            point = np.array([[t * l / 2, -w / 2],
+                              [-t * l / 2, -w / 2],
+                              [-t * l / 2, w / 2],
+                              [t * l / 2, w / 2]], dtype=np.float64)
+            v = 30 * np.array([[np.cos(theta3), -np.sin(theta3)],
+                               [-np.cos(theta3), -np.sin(theta3)],
+                               [-np.cos(theta3), np.sin(theta3)],
+                               [np.cos(theta3), np.sin(theta3)]], dtype=np.float64)
+            for i in range(len(point)):
+                pp0 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], z0)
+                pp1 = gmsh.model.occ.addPoint(point[i, 0] + v[i, 0], point[i, 1] + v[i, 1], z0)
+                pp2 = gmsh.model.occ.addPoint(point[i, 0] + v[i, 0], point[i, 1] + v[i, 1], 0.0)
+                pp3 = gmsh.model.occ.addPoint(point[i, 0], point[i, 1], 0.0)
+                planes.append(add_rectangle(pp0, pp1, pp2, pp3))
+
+            # 将屏幕分区
+            frag = gmsh.model.occ.fragment([(2, 1), (2, 3)], [(2, plane) for plane in planes])
+            for i in range(len(frag[1]))[2:]:
+                gmsh.model.occ.remove(frag[1][i], recursive=True)
+
+            ground = [[[16], [5, 0]],
+                      [[18], [0]],
+                      [[20], [0, 1]],
+                      [[22], [1]],
+                      [[25], [1, 2]],
+                      [[24], [2]],
+                      [[23], [2, 3]],
+                      [[21], [3]],
+                      [[19], [3, 4]],
+                      [[17], [4]],
+                      [[15], [4, 5]],
+                      [[14], [5]]]
+
+            eillposid = [[[4], [5, 0]],
+                         [[6], [0]],
+                         [[8], [0, 1]],
+                         [[10], [1]],
+                         [[12], [1, 2]],
+                         [[13], [2]],
+                         [[11], [2, 3]],
+                         [[9], [3]],
+                         [[7], [3, 4]],
+                         [[5], [4]],
+                         [[3], [4, 5]],
+                         [[2, 1], [5]]]
+            return ground, eillposid
         else:
             ValueError("Not implemented!")
 
@@ -355,6 +487,7 @@ class Screen:
         # 分区并生成网格
         ground, eillposid = self.partition()
         gmsh.model.occ.synchronize()
+        gmsh.fltk.run()
         gmsh.model.mesh.generate(2)
 
         ## 获取节点

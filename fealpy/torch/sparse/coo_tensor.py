@@ -1,20 +1,24 @@
 
-from typing import Optional, Union, overload
+from typing import Optional, Union, overload, List
 
 import torch
 
 
 _Size = torch.Size
+_dtype = torch.dtype
 _device = torch.device
 Tensor = torch.Tensor
+Number = Union[int, float]
 
 
 class COOTensor():
     def __init__(self, indices: Tensor, values: Optional[Tensor],
                  spshape: Optional[_Size]=None, *,
+                 dtype: Optional[_dtype]=None,
+                 device: Union[str, _device, None]=None,
                  is_coalesced: Optional[bool]=None):
         """
-        Initialize COO format sparse tensor
+        Initialize COO format sparse tensor.
 
         Parameters:
             indices (Tensor): indices of non-zero elements, shaped (D, N).
@@ -23,6 +27,17 @@ class COOTensor():
             values (Tensor | None): non-zero elements, shaped (..., N).
             spshape (Size | None): shape in the sparse dimensions.
         """
+        if device is not None:
+            indices = indices.to(device)
+            if values is not None:
+                values = values.to(device)
+        else:
+            if values is not None and values.device != indices.device:
+                raise ValueError("values and indices must be on the same device")
+
+        if values is not None and dtype is not None:
+            values = values.to(dtype=dtype)
+
         self.indices = indices
         self.values = values
         self.is_coalesced = is_coalesced
@@ -118,7 +133,7 @@ class COOTensor():
         else:
             return self.values.clone()
 
-    def to_dense(self):
+    def to_dense(self) -> Tensor:
         """Convert the COO tensor to a dense tensor and return as a new object."""
         kwargs = {'dtype': self.dtype, 'device': self.device}
         dense_tensor = torch.zeros(self.shape, **kwargs)
@@ -132,12 +147,12 @@ class COOTensor():
 
         return dense_tensor
 
-    def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
+    def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False) -> Tensor:
         """Return a new COOTensor object with the same indices and values on the
         specified device."""
         pass
 
-    def coalesce(self, accumulate: bool=True):
+    def coalesce(self, accumulate: bool=True) -> Tensor:
         """Merge duplicate indices and return as a new COOTensor object.
 
         Parameters:
@@ -176,3 +191,23 @@ class COOTensor():
             return COOTensor(
                 unique_indices, new_values, self.sparse_shape, is_coalesced=True
             )
+
+    @overload
+    def add(self, other: Union[Number, 'COOTensor'], alpha: float=1.0) -> 'COOTensor': ...
+    @overload
+    def add(self, other: Tensor, alpha: float=1.0) -> Tensor: ...
+    def add(self, other: Union[Number, 'COOTensor', Tensor], alpha: float=1.0) -> Union['COOTensor', Tensor]:
+        pass
+
+    @overload
+    def mul(self, other: Union[Number, 'COOTensor']) -> 'COOTensor': ...
+    @overload
+    def mul(self, other: Tensor) -> Tensor: ...
+    def mul(self, other: Union[Number, 'COOTensor', Tensor]) -> Union['COOTensor', Tensor]:
+        pass
+
+    def div(self, other: Union[Number, Tensor]) -> 'COOTensor':
+        pass
+
+    def inner(self, other: Tensor, dims: List[int]) -> 'COOTensor':
+        pass
