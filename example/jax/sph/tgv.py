@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 jax.config.update("jax_enable_x64", True)
 
 EPS = jnp.finfo(float).eps
-dx = 0.2
+dx = 0.02
 dy = 0.2
 m = dx * dy #质量
 h = dx #平滑长度
@@ -17,16 +17,18 @@ gamma = 1
 p0 = c0**2*rho0/gamma #参考压力
 nu = 1 #运动粘度
 g = jnp.array([0.0, 0.0])
+T = 5
+dt = 0.0004
 
 fluid_node_set, dummy_node_set = NodeMesh.from_tgv_domain(dx, dy)
 
 # 初始化数组
 position = jnp.vstack((fluid_node_set.node, dummy_node_set.node))
 NN = position.shape[0]
-momentum_velocity = jnp.zeros((NN, 2), dtype=jnp.float64)
-transport_velocity = jnp.zeros((NN, 2), dtype=jnp.float64)
+mv = jnp.zeros((NN, 2), dtype=jnp.float64)
+tv = jnp.zeros((NN, 2), dtype=jnp.float64)
 mass = jnp.ones(NN, dtype=jnp.float64) * m
-rho = jnp.zeros(NN, dtype=jnp.float64)
+rho = jnp.ones(NN, dtype=jnp.float64) * rho0
 volume = jnp.zeros(NN, dtype=jnp.float64)
 pressure = jnp.zeros(NN, dtype=jnp.float64)
 external_force = jnp.zeros((NN, 2), dtype=jnp.float64) * g
@@ -38,8 +40,9 @@ x = position[:,0]
 y = position[:,1]
 u0 = -jnp.cos(2 * jnp.pi * x) * jnp.sin(2 * jnp.pi * y)
 v0 = jnp.sin(2 * jnp.pi * x) * jnp.cos(2 * jnp.pi *y)
-momentum_velocity = momentum_velocity.at[:,0].set(u0)
-momentum_velocity = momentum_velocity.at[:,1].set(v0)
+mv = mv.at[:,0].set(u0)
+mv = mv.at[:,1].set(v0)
+tv = mv
 
 #设置粒子标签
 isFd = isFd.at[:fluid_node_set.node.shape[0]].set(True)
@@ -53,20 +56,24 @@ plt.legend()
 plt.title('Particle Tag')
 plt.show()
 '''
-
 #放入元组中存储
-state = (
-    position,
-    momentum_velocity,
-    transport_velocity,
-    mass,
-    rho,
-    volume,
-    pressure,
-    external_force,
-    isFd,
-    isDd
-)
+mesh.nodedate =
+{
+    "position": position,
+    "tag": isFd,
+    "mv": mv,
+    "tv": tv,
+    "drhodt": drhodt,
+    "dudt": jnp.zeros_like(mv),
+    "dvdt": jnp.zeros_like(mv),
+    "rho": rho,
+    "p": p,
+    "mass": mass,
+    "eta": eta,
+}
+
+
+
 
 '''
 for i in state:
