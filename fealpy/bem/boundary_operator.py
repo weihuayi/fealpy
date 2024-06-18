@@ -18,9 +18,12 @@ def boundary_mesh_build(mesh):
         "HexahedronMesh": QuadrangleMesh,
         "UniformMesh3d": QuadrangleMesh,
     }
+    if type(mesh).__name__ == "UniformMesh3d":
+        bd_face = mesh.ds.boundary_face()[:, [0, 2, 3, 1]]
+    else:
+        bd_face = mesh.ds.boundary_face()
     node = mesh.entity('node')
     old_bd_node_idx = mesh.ds.boundary_node_index()
-    bd_face = mesh.ds.boundary_face()
     new_node = node[old_bd_node_idx]
     aux_idx1 = np.zeros(len(node), dtype=np.int_)
     aux_idx2 = np.arange(len(old_bd_node_idx), dtype=np.int_)
@@ -133,9 +136,9 @@ class BoundaryOperator:
         self._G = np.zeros((gdof, gdof))
         np.add.at(self._G, (I, J), Gij)
         bd_face_measure = space.mesh.entity_measure('cell')
-        # TODO: 修复系数矩阵对角线问题
-        np.fill_diagonal(self._G, (bd_face_measure * (np.log(2 / bd_face_measure) + 1) / np.pi / 2))
-        t = self._G
+        # TODO: 补充高次与高维情况下，对奇异积分的处理
+        if space.GD == 2:
+            np.fill_diagonal(self._G, (bd_face_measure * (np.log(2 / bd_face_measure) + 1) / np.pi / 2))
         # ===================================================
         f = self.dintegrators[0].assembly_cell_vector(space)
         self._f = f
@@ -156,28 +159,30 @@ class BoundaryOperator:
 if __name__ == '__main__':
     from fealpy.bem.boundary_condition import DirichletBC
     from fealpy.bem.internal_operator import InternalOperator
-    pde = PoissonModelConstantDirichletBC2d()
-    box = pde.domain()
-    nx = 5
-    ny = 5
-    # 定义网格对象
-    mesh = TriangleMesh.from_box(box, nx, ny)
-    # pde = PoissonModelConstantDirichletBC3d()
+    # pde = PoissonModelConstantDirichletBC2d()
+    # box = pde.domain()
     # nx = 5
     # ny = 5
-    # nz = 5
-    #
-    # hx = (1 - 0) / nx
-    # hy = (1 - 0) / ny
-    # hz = (1 - 0) / nz
-    # mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
+    # # 定义网格对象
+    # mesh = TriangleMesh.from_box(box, nx, ny)
+    pde = PoissonModelConstantDirichletBC3d()
+    nx = 5
+    ny = 5
+    nz = 5
+
+    hx = (1 - 0) / nx
+    hy = (1 - 0) / ny
+    hz = (1 - 0) / nz
+    mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
+    # mesh.to_vtk_file(filename='ori_quad.vtu')
     # 构造边界网格与空间
-    p = 0
-    maxite = 4
+    p = 1
+    maxite = 1
     errorMatrix = np.zeros(maxite)
 
     for k in range(maxite):
         bd_mesh = boundary_mesh_build(mesh)
+        # bd_mesh.to_vtk(fname='test_quad.vtu')
         space = LagrangeFESpace(bd_mesh, p=p)
         space.domain_mesh = mesh
 

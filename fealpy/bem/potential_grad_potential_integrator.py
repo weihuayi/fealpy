@@ -54,16 +54,6 @@ class PotentialGradPotentialIntegrator:
         # 计算积分点对应的（局部）基函数值
         phi = space.basis(bcs)  # (NQ, NC, ldof, ...)
         # 相关数据计算
-        # bd_gdof * bd_NF
-        # c = np.sign((x1[np.newaxis, :, 0] - xi[..., np.newaxis, 0]) * (
-        #         x2[np.newaxis, :, 1] - xi[..., np.newaxis, 1]) - (
-        #                     x2[np.newaxis, :, 0] - xi[..., np.newaxis, 0]) * (
-        #                     x1[np.newaxis, :, 1] - xi[..., np.newaxis, 1]))
-        # h = c * np.abs((xi[..., np.newaxis, 0] - x1[np.newaxis, :, 0]) * (
-        #         x2[np.newaxis, :, 1] - x1[np.newaxis, :, 1]) - (
-        #                        xi[..., np.newaxis, 1] - x1[np.newaxis, :, 1]) * (
-        #                        x2[np.newaxis, :, 0] - x1[np.newaxis, :, 0])) / bd_cell_measure[np.newaxis, :]
-
         # 计算计算节点到边界面的有向距离
         n = mesh.cell_normal()
         h = np.einsum('fd, nfd -> nf', n, x_f[np.newaxis, ...] - xi[..., np.newaxis, :]) / np.linalg.norm(n, axis=-1)
@@ -73,9 +63,17 @@ class PotentialGradPotentialIntegrator:
         r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
 
         # 单元自由度矩阵计算
-        H = np.einsum('f, nf, q, qfi, nqf -> nfi', cell_measure, h, ws, phi, 1 / r ** 2, optimize=True) / (
-                    -2**(GD-1) * np.pi)
-        G = np.einsum('f, q, qfi, nqf -> nfi', cell_measure, ws, phi, np.log(1 / r), optimize=True) / (2**(GD-1) * np.pi)
+        if GD == 2:
+            H = np.einsum('f, nf, q, qfi, nqf -> nfi', cell_measure, h, ws, phi, 1 / r ** 2, optimize=True) / (
+                        -2 * np.pi)
+            G = np.einsum('f, q, qfi, nqf -> nfi', cell_measure, ws, phi, np.log(1 / r), optimize=True) / (2 * np.pi)
+        elif GD == 3:
+            H = np.einsum('f, nf, q, qfi, nqf -> nfi', cell_measure, h, ws, phi, 1 / r ** 3, optimize=True) / (
+                    -4 * np.pi)
+            G = np.einsum('f, q, qfi, nqf -> nfi', cell_measure, ws, phi, 1 / r, optimize=True) / (
+                        4 * np.pi)
+        else:
+            raise ValueError("GD must be 2 or 3.")
 
         return H, G
 
