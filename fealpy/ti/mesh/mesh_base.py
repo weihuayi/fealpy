@@ -58,7 +58,7 @@ class MeshDS():
     def count(self, etype: Union[int, str]) -> int:
         """Return the number of entities of the given type."""
         edim = estr2dim(self, etype) if isinstance(etype, str) else etype
-        entity = edim2entity(self, edim)
+        entity = self.entity(edim) 
         if hasattr(entity, 'location'):
             return entity.location.shape[0] - 1
         else:
@@ -84,8 +84,8 @@ class MeshDS():
             1. deal with index
         """
         edim = estr2dim(self, etype) if isinstance(etype, str) else etype
-        if edim in ds._entity_storage:
-            entity = ds._entity_storage[edim]
+        if edim in self._entity_storage:
+            entity = self._entity_storage[edim]
             if (index is None) or (index == _S) :
                 return entity
             else:
@@ -164,6 +164,7 @@ class MeshDS():
                     entity[i*4 + j] = entity[i, j]
                 for i in range(NF+1):
                     location[i] = i*2
+
             process_entity()
             return mesh_top_csr(face2cell, (NF, NC))
         else:
@@ -187,11 +188,13 @@ class MeshDS():
         return bd_face_flag
 
     number_of_vertices_of_cells: _int_func = lambda self: self.cell.shape[-1]
-    number_of_nodes_of_cells = number_of_vertices_of_cells
-    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
-    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
     number_of_vertices_of_faces: _int_func = lambda self: self.localFace.shape[-1]
     number_of_vertices_of_edges: _int_func = lambda self: self.localEdge.shape[-1]
+    number_of_nodes_of_cells = number_of_vertices_of_cells
+    number_of_nodes_of_faces = number_of_vertices_of_faces
+    number_of_nodes_of_edges = number_of_vertices_of_edges
+    number_of_edges_of_cells: _int_func = lambda self: self.localEdge.shape[0]
+    number_of_faces_of_cells: _int_func = lambda self: self.localFace.shape[0]
 
     def total_face(self) -> Field:
         """
