@@ -61,7 +61,7 @@ class TriangleMesh():
         if etype in ('cell', 2):
             return TriangleQuadrature(index)
         elif etype in ('face', 'edge', 1):
-
+            return None
 
     integrator = quadrature_formula
             

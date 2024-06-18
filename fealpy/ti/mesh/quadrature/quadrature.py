@@ -1,19 +1,13 @@
-from typing import Dict, Optional, Union, Tuple
+from typing import Tuple, TypeVar 
 
-import taichi as ti 
-
-from ti.types import template as Template 
-
+Field = TypeVar('Field')
 
 class Quadrature():
     r"""Base class for quadrature generators."""
     def number_of_quadrature_points(self) -> int:
         return self.NQ
 
-    def get_quadrature_points_and_weights(self) -> Template:
-        return self.quadpts, self.weights 
-
-    def get_quadrature_points_and_weights(self) -> Tuple[Template, Template]:
+    def get_quadrature_points_and_weights(self) -> Tuple[Field, Field]:
         return self.quadpts, self.weights 
 
     def get_quadrature_precision(self) -> int:

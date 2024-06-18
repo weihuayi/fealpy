@@ -1,7 +1,7 @@
 import numpy as np
 import torch as ti
 
-from .... import to_taichi_field
+from ... import from_numpy 
 
 from .quadrature import Quadrature
 
@@ -339,6 +339,6 @@ class TriangleQuadrature(Quadrature):
         else:
             raise NotImplementedError('quadrature index higher than 11 is not supported now.')
 
-        self.quadpts = to_taichi_field(A[:, 0:-1])
-        self.weights = to_taichi_field(A[:, -1])
+        self.quadpts = from_numpy(A[:, 0:-1])
+        self.weights = from_numpy(A[:, -1])
         self.NQ =  A.shape[0]

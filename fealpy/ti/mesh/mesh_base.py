@@ -16,6 +16,15 @@ from . import functional as F
 @ti.data_oriented
 class MeshDS():
     _STORAGE_ATTR = ['cell', 'face', 'edge', 'node']
+    cell: Entity 
+    face: Entity
+    edge: Entity 
+    node: Entity 
+    face2cell: Field 
+    cell2edge: Field 
+    localEdge: Field # only for homogeneous mesh
+    localFace: Field # only for homogeneous mesh
+
     def __init__(self, NN: int, TD: int) -> None: 
         self._entity_storage: Dict[int, _T] = {}
         self.NN = NN
@@ -61,13 +70,16 @@ class MeshDS():
     def number_of_cells(self): return self.count('cell')
 
     def entity(self, etype: Union[int, str], index: Optional[Index]=None):
-        """Get entities in mesh structure.
+        """
+        Get entities in mesh structure.
 
         Parameters:
             etype (int | str): The topology dimension of the entity, or name
             index (int | slice | Field): The index of the entity.
+
         Returns:
             Entity: Entity or the default value.
+
         TODO:
             1. deal with index
         """
@@ -182,21 +194,25 @@ class MeshDS():
     number_of_vertices_of_edges: _int_func = lambda self: self.localEdge.shape[-1]
 
     def total_face(self) -> Field:
-        NVF = self.number_of_vertices_of_faces()
+        """
+        """
+        NC = self.count('cell')
+        NVF = self.number_of_nodes_of_faces()
+        NFC = self.number_of_faces_of_cells()
         cell = self.entity(self.TD)
         local_face = self.localFace
-        total_face = cell[..., local_face].reshape(-1, NVF)
-
-        total_face = ti.field(self.itype, shape=(3*NC, 
-        @ti.kernel
-        def 
+        total_face = ti.field(self.itype, shape=(NFC*NC, NVF))   
         return total_face
 
-    def total_edge(self) -> Tensor:
-        NVE = self.number_of_vertices_of_edges()
+    def total_edge(self) -> Field:
+        """
+        """
+        NC = self.count('cell')
+        NVE = self.number_of_nodes_of_edges()
+        NEC = self.number_of_edges_of_cells()
         cell = self.entity(self.TD)
         local_edge = self.localEdge
-        total_edge = cell[..., local_edge].reshape(-1, NVE)
+        total_edge = ti.field(self.itype, shape=(NEC*NC, NVE))   
         return total_edge
 
     def construct(self):
