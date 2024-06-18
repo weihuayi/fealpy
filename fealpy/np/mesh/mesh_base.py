@@ -66,9 +66,9 @@ class MeshDS():
             return 0
 
         if hasattr(entity, 'location'):
-            return entity.location.size(0) - 1
+            return entity.location.shape[0] - 1
         else:
-            return entity.size(0)
+            return entity.shape[0]
 
     def number_of_nodes(self): return self.count('node')
     def number_of_edges(self): return self.count('edge')
@@ -179,11 +179,11 @@ class MeshDS():
         bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
-    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    def boundary_node_index(self): return self.boundary_node_flag().nonzero()[0]
     # TODO: finish this:
     # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
-    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
-    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
+    def boundary_face_index(self): return self.boundary_face_flag().nonzero()[0]
+    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero()[0]
 
     ### Homogeneous Mesh ###
     def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
@@ -400,13 +400,12 @@ class HomogeneousMesh(Mesh):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.edge[index]
-        kwargs = {'dtype': edges.dtype}
-        indices = np.arange(NE, **kwargs)[index]
-        return np.cat([
+        indices = np.arange(NE, dtype=edges.dtype)[index]
+        return np.concatenate([
             edges[:, 0].reshape(-1, 1),
-            (p-1) * indices.reshape(-1, 1) + np.arange(p-1, **kwargs) + NN,
+            (p-1) * indices.reshape(-1, 1) + np.arange(p-1, dtype=edges.dtype) + NN,
             edges[:, 1].reshape(-1, 1),
-        ], dim=-1)
+        ], axis=-1)
 
 
 class SimplexMesh(HomogeneousMesh):

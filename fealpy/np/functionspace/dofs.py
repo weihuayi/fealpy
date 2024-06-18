@@ -24,7 +24,7 @@ class LinearMeshCFEDof(Generic[_MT]):
     def is_boundary_dof(self, threshold=None):
         TD = self.mesh.top_dimension()
         gdof = self.number_of_global_dofs()
-        if isinstance(threshold, NDArray):
+        if isinstance(threshold, np.ndarray):
             index = threshold
             if (index.dtype == np.bool_) and (len(index) == gdof):
                 return index

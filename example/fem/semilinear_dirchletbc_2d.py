@@ -4,10 +4,12 @@ from scipy.sparse.linalg import spsolve
 from fealpy.tools import showmultirate
 
 #三角形网格
-from fealpy.mesh import TriangleMesh
+# from fealpy.mesh import TriangleMesh
+from fealpy.np.mesh import TriangleMesh
 
 # 拉格朗日有限元空间
-from fealpy.functionspace import LagrangeFESpace
+# from fealpy.functionspace import LagrangeFESpace
+from fealpy.np.functionspace import LagrangeFESpace
 
 #区域积分子
 from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
@@ -125,6 +127,7 @@ for i in range(maxit):
     u0 = space.function()
     du = space.function()
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
+    # isDDof = space.is_boundary_dof(pde.dirichlet, u0)
     isIDof = ~isDDof
 
     D = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient, q=p+2)
