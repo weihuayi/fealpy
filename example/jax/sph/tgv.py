@@ -57,8 +57,7 @@ plt.title('Particle Tag')
 plt.show()
 '''
 #放入元组中存储
-mesh.nodedate =
-{
+mesh.nodedate = {
     "position": position,
     "tag": isFd,
     "mv": mv,

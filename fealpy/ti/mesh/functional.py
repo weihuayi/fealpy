@@ -1,5 +1,5 @@
 from typing import (
-    Union, Optional, Dict, Sequence, overload, Callable,
+    Union, Optional, Dict, Tuple, Sequence, overload, Callable,
     Literal, TypeVar
 )
 
@@ -12,12 +12,12 @@ from ..sparse import CSRMatrix
 
 from .utils import Entity
 
-def mesh_top_csr(entity: Entity, shape: Tuple(int, int), copy=False) -> CSRMatrix:
+def mesh_top_csr(entity: Entity, shape: Tuple[int, int], copy=False) -> CSRMatrix:
     if entity.ndim == 1:
         if ~hasattr(entity, 'location'):
              raise ValueError('entity.location is required for 1D entity (usually for polygon mesh).')
-         indices = entity
-         indptr = entity.location
+        indices = entity
+        indptr = entity.location
     elif entity.ndim == 2: # for homogeneous case
         M = entity.shape[0]
         N = entity.shape[1]
