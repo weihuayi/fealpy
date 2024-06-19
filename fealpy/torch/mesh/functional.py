@@ -1,62 +1,47 @@
 
 from typing import Optional, Sequence, Union
 from itertools import combinations_with_replacement
-from functools import reduce
+from functools import reduce, partial
 from math import factorial, comb
 
 import numpy as np
 import torch
-from torch import Tensor, norm, det, cross
+from torch import Tensor, vmap, norm, det, cross
+from torch.func import jacfwd, jacrev
 
 
 ##################################################
 ### Mesh
 ##################################################
 
-def multi_index_matrix(p: int, etype: int, *, dtype=None, device=None) -> Tensor:
-    r"""Create a multi-index matrix."""
+def multi_index_matrix(p: int, dim: int, *, dtype=None, device=None) -> Tensor:
+    """Create a multi-index matrix.
+
+    Parameters:
+        p (int): order.
+        dim (int): dimension.
+
+    Returns:
+        Tensor: multi-index matrix.
+    """
     dtype = dtype or torch.int
     kwargs = {'dtype': dtype, 'device': device}
     sep = np.flip(np.array(
-        tuple(combinations_with_replacement(range(p+1), etype)),
+        tuple(combinations_with_replacement(range(p+1), dim)),
         dtype=np.int_
     ), axis=0)
-    raw = np.zeros((sep.shape[0], etype+2), dtype=np.int_)
+    raw = np.zeros((sep.shape[0], dim+2), dtype=np.int_)
     raw[:, -1] = p
     raw[:, 1:-1] = sep
     return torch.from_numpy(raw[:, 1:] - raw[:, :-1]).to(**kwargs)
 
 
-def shape_function(bc: Tensor, p: int=1, mi: Optional[Tensor]=None, *,
-                   dtype=None, device=None) -> Tensor:
-    r"""Shape function"""
-    if p <= 0:
-        raise ValueError("p must be a positive integer.")
-    if p == 1:
-        return bc
-    TD = bc.shape[-1] - 1
-    itype = torch.int
-    dtype = dtype or bc.dtype
-    shape = bc.shape[:-1] + (p+1, TD+1)
-    mi = mi or multi_index_matrix(p, etype=TD, dtype=itype, device=device)
-    c = torch.arange(1, p+1, dtype=itype, device=device)
-    P = 1.0 / torch.cumprod(c, dim=0)
-    t = torch.arange(0, p, dtype=itype, device=device)
-    A = torch.ones(shape, dtype=dtype, device=device)
-    torch.sub(p*bc.unsqueeze(-2), t.reshape(-1, 1), out=A[..., 1:, :])
-    A = torch.cumprod(A, dim=-2).clone()
-    A[..., 1:, :].mul_(P.reshape(-1, 1))
-    idx = torch.arange(TD + 1, dtype=itype, device=device)
-    phi = torch.prod(A[..., mi, idx], dim=-1)
-    return phi
-
-
 ### Leangth of edges
 def edge_length(points: Tensor, out=None) -> Tensor:
-    r"""Edge length.
+    """Edge length.
 
-    Args:
-        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
         out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
@@ -68,9 +53,9 @@ def edge_length(points: Tensor, out=None) -> Tensor:
 def edge_normal(points: Tensor, unit: bool=False, out=None) -> Tensor:
     """Edge normal for 2D meshes.
 
-    Args:
-        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
-        unit (bool, optional): Whether to normalize the normal. Defaults to False.
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        unit (bool, optional): Whether to normalize the normal. Defaults to False.\n
         out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
@@ -94,7 +79,7 @@ def entity_barycenter(etn: Tensor, node: Tensor) -> Tensor:
 ### Homogeneous Mesh
 ##################################################
 
-def bc_tensor(bcs: Sequence[Tensor]):
+def bc_tensor(bcs: Sequence[Tensor]) -> Tensor:
     num = len(bcs)
     NVC = reduce(lambda x, y: x * y.shape[-1], bcs, 1)
     desp1 = 'mnopq'
@@ -116,13 +101,13 @@ def bc_to_points(bcs: Union[Tensor, Sequence[Tensor]], node: Tensor,
     return torch.einsum('ijk, ...j -> ...ik', points, bcs)
 
 
-def homo_entity_barycenter(entity: Tensor, node: Tensor):
+def homo_entity_barycenter(entity: Tensor, node: Tensor) -> Tensor:
     r"""Entity barycenter in homogeneous meshes."""
     return torch.mean(node[entity, :], dim=1)
 
 
-# Interval Mesh & Triangle Mesh & Tetrahedron Mesh
-# ================================================
+# Interval & Triangle & Tetrahedron
+# =================================
 
 def simplex_ldof(p: int, iptype: int) -> int:
     r"""Number of local DoFs of a simplex."""
@@ -142,15 +127,16 @@ def simplex_gdof(p: int, mesh) -> int:
     return count
 
 
-def simplex_measure(points: Tensor):
+def simplex_measure(points: Tensor) -> Tensor:
     r"""Entity measurement of a simplex.
 
-    Args:
-        points: Tensor(..., NVC, GD).
-        out: Tensor(...,), optional.
+    Parameters:
+        points (Tensor[..., NVC, GD]):
+
+        out (Tensor[...,], optional):
 
     Returns:
-        Tensor(...,).
+        Tensor[...,].
     """
     TD = points.size(-2) - 1
     if TD != points.size(-1):
@@ -160,8 +146,56 @@ def simplex_measure(points: Tensor):
     return det(edges).div(factorial(TD))
 
 
-# Quadrangle Mesh & Hexahedron Mesh
-# =================================
+def _simplex_shape_function(bc: Tensor, p: int, mi: Tensor) -> Tensor:
+    """`p`-order shape function values on these barycentry points.
+
+    Parameters:
+        bc (Tensor[TD+1, ]):
+        p (inr): order of the shape function.
+        mi (Tensor): p-order multi-index matrix.
+
+    Returns:
+        Tensor[ldof, ]: phi.
+    """
+    TD = bc.shape[-1] - 1
+    itype = torch.int
+    device = bc.device
+    shape = (1, TD+1)
+    c = torch.arange(1, p+1, dtype=itype, device=device)
+    P = 1.0 / torch.cumprod(c, dim=0)
+    t = torch.arange(0, p, dtype=itype, device=device)
+    Ap = p*bc.unsqueeze(-2) - t.reshape(-1, 1)
+    Ap = torch.cumprod(Ap, dim=-2).clone()
+    Ap = Ap.mul(P.reshape(-1, 1))
+    A = torch.cat([torch.ones(shape, dtype=bc.dtype, device=device), Ap], dim=-2)
+    idx = torch.arange(TD + 1, dtype=itype, device=device)
+    phi = torch.prod(A[mi, idx], dim=-1)
+    return phi
+
+
+def simplex_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    )
+    return fn(bcs)
+
+
+def simplex_grad_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(jacfwd(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    ))
+    return fn(bcs)
+
+
+def simplex_hess_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(jacrev(jacfwd(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    )))
+    return fn(bcs)
+
+
+# Quadrangle & Hexahedron
+# =======================
 
 
 ##################################################
@@ -171,7 +205,7 @@ def simplex_measure(points: Tensor):
 # Interval Mesh
 # =============
 
-def int_grad_lambda(points: Tensor):
+def int_grad_lambda(points: Tensor) -> Tensor:
     """grad_lambda function for the interval mesh.
 
     Args:
@@ -188,18 +222,19 @@ def int_grad_lambda(points: Tensor):
 # Triangle Mesh
 # =============
 
-def tri_area_3d(points: Tensor, out: Optional[Tensor]=None):
+def tri_area_3d(points: Tensor, out: Optional[Tensor]=None) -> Tensor:
     return cross(points[..., 1, :] - points[..., 0, :],
-                 points[..., 2, :] - points[..., 0, :], dim=-1, out=out)
+                 points[..., 2, :] - points[..., 0, :], dim=-1, out=out) / 2.0
 
 
-def tri_grad_lambda_2d(points: Tensor):
+def tri_grad_lambda_2d(points: Tensor) -> Tensor:
     """grad_lambda function for the triangle mesh in 2D.
-    Args:
-        points: Tensor(..., 3, 2).
+
+    Parameters:
+        points (Tensor[..., 3, 2]):
 
     Returns:
-        Tensor(..., 3, 2).
+        Tensor[..., 3, 2]:
     """
     e0 = points[..., 2, :] - points[..., 1, :]
     e1 = points[..., 0, :] - points[..., 2, :]
@@ -212,13 +247,13 @@ def tri_grad_lambda_2d(points: Tensor):
     result[..., 0].mul_(-1)
     return result.div_(nv[..., None, None])
 
-def tri_grad_lambda_3d(points: Tensor):
-    r"""
-    Args:
-        points: Tensor(..., 3, 3).
+def tri_grad_lambda_3d(points: Tensor) -> Tensor:
+    """
+    Parameters:
+        points (Tensor[..., 3, 3]):
 
     Returns:
-        Tensor(..., 3, 3).
+        Tensor[..., 3, 3]:
     """
     e0 = points[..., 2, :] - points[..., 1, :] # (..., 3)
     e1 = points[..., 0, :] - points[..., 2, :]

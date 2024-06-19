@@ -3,6 +3,8 @@ from typing import Optional, Union, overload, List
 
 import torch
 
+from .utils import _dense_ndim, _dense_shape
+
 
 _Size = torch.Size
 _device = torch.device
@@ -28,6 +30,60 @@ class CSRTensor():
         if spshape is None:
             nrow = crow.size(0) - 1
             ncol = col.max().item() + 1
-            self._spshape = torch.Size((nrow, ncol))
+            self._spshape = _Size((nrow, ncol))
         else:
-            self._spshape = torch.Size(spshape)
+            self._spshape = _Size(spshape)
+
+    def __repr__(self) -> str:
+        return f"CSRTensor(crow={self.crow}, col={self.col}, "\
+               + f"values={self.values}, shape={self.shape})"
+
+    @overload
+    def size(self) -> _Size: ...
+    @overload
+    def size(self, dim: int) -> int: ...
+    def size(self, dim: Optional[int]=None):
+        if dim is None:
+            return self.shape
+        else:
+            return self.shape[dim]
+
+    @property
+    def device(self): return self.crow.device
+    @property
+    def dtype(self):
+        if self.values is None:
+            return self.crow.dtype
+        else:
+            return self.values.dtype
+
+    @property
+    def shape(self): return _Size(self.dense_shape + self.sparse_shape)
+    @property
+    def dense_shape(self): return _dense_shape(self.values)
+    @property
+    def sparse_shape(self): return self._spshape
+
+    @property
+    def ndim(self): return self.dense_ndim + self.sparse_ndim
+    @property
+    def dense_ndim(self): return _dense_ndim(self.values)
+    @property
+    def sparse_ndim(self): return 2
+    @property
+    def nnz(self): return self.col.shape[1]
+
+    def to_dense(self) -> Tensor:
+        """Convert the CSRTensor to a dense tensor and return as a new object."""
+        kwargs = {'dtype': self.dtype, 'device': self.device}
+        dense_tensor = torch.zeros(self.shape, **kwargs)
+
+        for i in range(1, self.crow.shape[0]):
+            start = self.crow[i - 1]
+            end = self.crow[i]
+            dense_tensor[..., i - 1, self.col[start:end]] = self.values[..., start:end]
+
+        return dense_tensor
+
+    def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
+        pass
