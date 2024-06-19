@@ -427,7 +427,16 @@ class Mesh(MeshDS):
         return self.edge_normal(index=index, unit=True, out=out)
 
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
-        """Get the quadrature points and weights."""
+        """Get the quadrature points and weights.
+
+        Parameters:
+            q (int): The index of the quadrature points.
+            etype (int | str, optional): The topology dimension of the entity to\
+            generate the quadrature points on. Defaults to 'cell'.
+
+        Returns:
+            Quadrature: Object for quadrature points and weights.
+        """
         raise NotImplementedError
 
     def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
