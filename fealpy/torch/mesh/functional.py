@@ -1,12 +1,13 @@
 
 from typing import Optional, Sequence, Union
 from itertools import combinations_with_replacement
-from functools import reduce
+from functools import reduce, partial
 from math import factorial, comb
 
 import numpy as np
 import torch
-from torch import Tensor, norm, det, cross
+from torch import Tensor, vmap, norm, det, cross
+from torch.func import jacfwd, jacrev
 
 
 ##################################################
@@ -25,30 +26,6 @@ def multi_index_matrix(p: int, etype: int, *, dtype=None, device=None) -> Tensor
     raw[:, -1] = p
     raw[:, 1:-1] = sep
     return torch.from_numpy(raw[:, 1:] - raw[:, :-1]).to(**kwargs)
-
-
-def shape_function(bc: Tensor, p: int=1, mi: Optional[Tensor]=None, *,
-                   dtype=None, device=None) -> Tensor:
-    r"""Shape function"""
-    if p <= 0:
-        raise ValueError("p must be a positive integer.")
-    if p == 1:
-        return bc
-    TD = bc.shape[-1] - 1
-    itype = torch.int
-    dtype = dtype or bc.dtype
-    shape = bc.shape[:-1] + (p+1, TD+1)
-    mi = mi or multi_index_matrix(p, etype=TD, dtype=itype, device=device)
-    c = torch.arange(1, p+1, dtype=itype, device=device)
-    P = 1.0 / torch.cumprod(c, dim=0)
-    t = torch.arange(0, p, dtype=itype, device=device)
-    A = torch.ones(shape, dtype=dtype, device=device)
-    torch.sub(p*bc.unsqueeze(-2), t.reshape(-1, 1), out=A[..., 1:, :])
-    A = torch.cumprod(A, dim=-2).clone()
-    A[..., 1:, :].mul_(P.reshape(-1, 1))
-    idx = torch.arange(TD + 1, dtype=itype, device=device)
-    phi = torch.prod(A[..., mi, idx], dim=-1)
-    return phi
 
 
 ### Leangth of edges
@@ -121,8 +98,8 @@ def homo_entity_barycenter(entity: Tensor, node: Tensor):
     return torch.mean(node[entity, :], dim=1)
 
 
-# Interval Mesh & Triangle Mesh & Tetrahedron Mesh
-# ================================================
+# Interval & Triangle & Tetrahedron
+# =================================
 
 def simplex_ldof(p: int, iptype: int) -> int:
     r"""Number of local DoFs of a simplex."""
@@ -145,12 +122,13 @@ def simplex_gdof(p: int, mesh) -> int:
 def simplex_measure(points: Tensor):
     r"""Entity measurement of a simplex.
 
-    Args:
-        points: Tensor(..., NVC, GD).
-        out: Tensor(...,), optional.
+    Parameters:
+        points (Tensor[..., NVC, GD]):
+
+        out (Tensor[...,], optional):
 
     Returns:
-        Tensor(...,).
+        Tensor[...,].
     """
     TD = points.size(-2) - 1
     if TD != points.size(-1):
@@ -160,8 +138,56 @@ def simplex_measure(points: Tensor):
     return det(edges).div(factorial(TD))
 
 
-# Quadrangle Mesh & Hexahedron Mesh
-# =================================
+def _simplex_shape_function(bc: Tensor, p: int, mi: Tensor):
+    """`p`-order shape function values on these barycentry points.
+
+    Parameters:
+        bc (Tensor[TD+1, ]):
+        p (inr): order of the shape function.
+        mi (Tensor): p-order multi-index matrix.
+
+    Returns:
+        Tensor[ldof, ]: phi.
+    """
+    TD = bc.shape[-1] - 1
+    itype = torch.int
+    device = bc.device
+    shape = (1, TD+1)
+    c = torch.arange(1, p+1, dtype=itype, device=device)
+    P = 1.0 / torch.cumprod(c, dim=0)
+    t = torch.arange(0, p, dtype=itype, device=device)
+    Ap = p*bc.unsqueeze(-2) - t.reshape(-1, 1)
+    Ap = torch.cumprod(Ap, dim=-2).clone()
+    Ap = Ap.mul(P.reshape(-1, 1))
+    A = torch.cat([torch.ones(shape, dtype=bc.dtype, device=device), Ap], dim=-2)
+    idx = torch.arange(TD + 1, dtype=itype, device=device)
+    phi = torch.prod(A[mi, idx], dim=-1)
+    return phi
+
+
+def simplex_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    )
+    return fn(bcs)
+
+
+def simplex_grad_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(jacfwd(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    ))
+    return fn(bcs)
+
+
+def simplex_hess_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
+    fn = vmap(jacrev(jacfwd(
+        partial(_simplex_shape_function, p=p, mi=mi)
+    )))
+    return fn(bcs)
+
+
+# Quadrangle & Hexahedron
+# =======================
 
 
 ##################################################
@@ -190,7 +216,7 @@ def int_grad_lambda(points: Tensor):
 
 def tri_area_3d(points: Tensor, out: Optional[Tensor]=None):
     return cross(points[..., 1, :] - points[..., 0, :],
-                 points[..., 2, :] - points[..., 0, :], dim=-1, out=out)
+                 points[..., 2, :] - points[..., 0, :], dim=-1, out=out) / 2.0
 
 
 def tri_grad_lambda_2d(points: Tensor):

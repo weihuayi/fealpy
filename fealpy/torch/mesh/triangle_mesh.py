@@ -1,7 +1,6 @@
 
 from typing import Optional, Union, List
 
-import numpy as np
 import torch
 from torch import Tensor
 
@@ -85,14 +84,6 @@ class TriangleMesh(SimplexMesh):
         return quad
 
     # ipoints
-    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
-        if isinstance(iptype, str):
-            iptype = estr2dim(self, iptype)
-        return F.simplex_ldof(p, iptype)
-
-    def number_of_global_ipoints(self, p: int):
-        return F.simplex_gdof(p, self)
-
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         """Fetch all p-order interpolation points on the triangle mesh."""
         node = self.entity('node')
