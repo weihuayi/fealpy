@@ -14,15 +14,23 @@ from torch.func import jacfwd, jacrev
 ### Mesh
 ##################################################
 
-def multi_index_matrix(p: int, etype: int, *, dtype=None, device=None) -> Tensor:
-    r"""Create a multi-index matrix."""
+def multi_index_matrix(p: int, dim: int, *, dtype=None, device=None) -> Tensor:
+    """Create a multi-index matrix.
+
+    Parameters:
+        p (int): order.
+        dim (int): dimension.
+
+    Returns:
+        Tensor: multi-index matrix.
+    """
     dtype = dtype or torch.int
     kwargs = {'dtype': dtype, 'device': device}
     sep = np.flip(np.array(
-        tuple(combinations_with_replacement(range(p+1), etype)),
+        tuple(combinations_with_replacement(range(p+1), dim)),
         dtype=np.int_
     ), axis=0)
-    raw = np.zeros((sep.shape[0], etype+2), dtype=np.int_)
+    raw = np.zeros((sep.shape[0], dim+2), dtype=np.int_)
     raw[:, -1] = p
     raw[:, 1:-1] = sep
     return torch.from_numpy(raw[:, 1:] - raw[:, :-1]).to(**kwargs)
@@ -30,10 +38,10 @@ def multi_index_matrix(p: int, etype: int, *, dtype=None, device=None) -> Tensor
 
 ### Leangth of edges
 def edge_length(points: Tensor, out=None) -> Tensor:
-    r"""Edge length.
+    """Edge length.
 
-    Args:
-        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
         out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
@@ -45,9 +53,9 @@ def edge_length(points: Tensor, out=None) -> Tensor:
 def edge_normal(points: Tensor, unit: bool=False, out=None) -> Tensor:
     """Edge normal for 2D meshes.
 
-    Args:
-        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].
-        unit (bool, optional): Whether to normalize the normal. Defaults to False.
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        unit (bool, optional): Whether to normalize the normal. Defaults to False.\n
         out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
@@ -71,7 +79,7 @@ def entity_barycenter(etn: Tensor, node: Tensor) -> Tensor:
 ### Homogeneous Mesh
 ##################################################
 
-def bc_tensor(bcs: Sequence[Tensor]):
+def bc_tensor(bcs: Sequence[Tensor]) -> Tensor:
     num = len(bcs)
     NVC = reduce(lambda x, y: x * y.shape[-1], bcs, 1)
     desp1 = 'mnopq'
@@ -93,7 +101,7 @@ def bc_to_points(bcs: Union[Tensor, Sequence[Tensor]], node: Tensor,
     return torch.einsum('ijk, ...j -> ...ik', points, bcs)
 
 
-def homo_entity_barycenter(entity: Tensor, node: Tensor):
+def homo_entity_barycenter(entity: Tensor, node: Tensor) -> Tensor:
     r"""Entity barycenter in homogeneous meshes."""
     return torch.mean(node[entity, :], dim=1)
 
@@ -119,7 +127,7 @@ def simplex_gdof(p: int, mesh) -> int:
     return count
 
 
-def simplex_measure(points: Tensor):
+def simplex_measure(points: Tensor) -> Tensor:
     r"""Entity measurement of a simplex.
 
     Parameters:
@@ -138,7 +146,7 @@ def simplex_measure(points: Tensor):
     return det(edges).div(factorial(TD))
 
 
-def _simplex_shape_function(bc: Tensor, p: int, mi: Tensor):
+def _simplex_shape_function(bc: Tensor, p: int, mi: Tensor) -> Tensor:
     """`p`-order shape function values on these barycentry points.
 
     Parameters:
@@ -197,7 +205,7 @@ def simplex_hess_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
 # Interval Mesh
 # =============
 
-def int_grad_lambda(points: Tensor):
+def int_grad_lambda(points: Tensor) -> Tensor:
     """grad_lambda function for the interval mesh.
 
     Args:
@@ -214,18 +222,19 @@ def int_grad_lambda(points: Tensor):
 # Triangle Mesh
 # =============
 
-def tri_area_3d(points: Tensor, out: Optional[Tensor]=None):
+def tri_area_3d(points: Tensor, out: Optional[Tensor]=None) -> Tensor:
     return cross(points[..., 1, :] - points[..., 0, :],
                  points[..., 2, :] - points[..., 0, :], dim=-1, out=out) / 2.0
 
 
-def tri_grad_lambda_2d(points: Tensor):
+def tri_grad_lambda_2d(points: Tensor) -> Tensor:
     """grad_lambda function for the triangle mesh in 2D.
-    Args:
-        points: Tensor(..., 3, 2).
+
+    Parameters:
+        points (Tensor[..., 3, 2]):
 
     Returns:
-        Tensor(..., 3, 2).
+        Tensor[..., 3, 2]:
     """
     e0 = points[..., 2, :] - points[..., 1, :]
     e1 = points[..., 0, :] - points[..., 2, :]
@@ -238,13 +247,13 @@ def tri_grad_lambda_2d(points: Tensor):
     result[..., 0].mul_(-1)
     return result.div_(nv[..., None, None])
 
-def tri_grad_lambda_3d(points: Tensor):
-    r"""
-    Args:
-        points: Tensor(..., 3, 3).
+def tri_grad_lambda_3d(points: Tensor) -> Tensor:
+    """
+    Parameters:
+        points (Tensor[..., 3, 3]):
 
     Returns:
-        Tensor(..., 3, 3).
+        Tensor[..., 3, 3]:
     """
     e0 = points[..., 2, :] - points[..., 1, :] # (..., 3)
     e1 = points[..., 0, :] - points[..., 2, :]
