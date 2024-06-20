@@ -8,17 +8,20 @@ jax.config.update("jax_enable_x64", True)
 EPS = jnp.finfo(float).eps
 dx = 0.02
 dy = 0.2
-m = dx * dy #质量
+volume = dx * dy #质量
 h = dx #平滑长度
 Vmax = 1 #预期最大速度
 c0 =10 * Vmax #声速
 rho0 = 1 #参考密度
+mass = volume*rho0
 gamma = 1
 p0 = c0**2*rho0/gamma #参考压力
 nu = 1 #运动粘度
 g = jnp.array([0.0, 0.0])
 T = 5
 dt = 0.0004
+nt = int(T/dt)
+EPS = jnp.finfo(float).eps
 
 fluid_node_set, dummy_node_set = NodeMesh.from_tgv_domain(dx, dy)
 
@@ -27,13 +30,13 @@ position = jnp.vstack((fluid_node_set.node, dummy_node_set.node))
 NN = position.shape[0]
 mv = jnp.zeros((NN, 2), dtype=jnp.float64)
 tv = jnp.zeros((NN, 2), dtype=jnp.float64)
-mass = jnp.ones(NN, dtype=jnp.float64) * m
+mass = jnp.ones(NN, dtype=jnp.float64) * mass
 rho = jnp.ones(NN, dtype=jnp.float64) * rho0
-volume = jnp.zeros(NN, dtype=jnp.float64)
 pressure = jnp.zeros(NN, dtype=jnp.float64)
 external_force = jnp.zeros((NN, 2), dtype=jnp.float64) * g
 isFd = jnp.zeros(NN, dtype=bool)
 isDd = jnp.zeros(NN, dtype=bool)
+#TODO#eos
 
 #计算初始速度
 x = position[:,0]
