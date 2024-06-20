@@ -4,22 +4,24 @@ import numpy as np
 import taichi as ti
 
 from .. import logger
-from .. import numpy as tnp  # the numpy interface in taichi 
+from .. import numpy as tnp  # the numpy-like interface in taichi 
 
 from .utils import EntityName, Entity
 from .quadrature import TriangleQuadrature 
-from .mesh_base import MeshDS
+from .mesh_base import SimplexMesh 
 
 @ti.data_oriented
-class TriangleMesh(MeshDS):
+class TriangleMesh(SimplexMesh):
     def __init__(self, node: Entity, cell: Entity):
-        super().__init__(node.shape[0], 2)
+
+        TD = 2 # the topology dimension
+        super().__init__(node.shape[0], TD)
         self.node = node 
         self.cell = cell
-        self.localEdge = tnp.array([(1, 2), (2, 0), (0, 1)], dtype=ti.i8)
-        self.localFace = tnp.array([(1, 2), (2, 0), (0, 1)], dtype=ti.i8)
-        self.ccw = tnp.array([0, 1, 2], dtype=ti.i8)
-        self.localCell = tnp.array([
+        self.localEdge = tnp.field([(1, 2), (2, 0), (0, 1)], dtype=ti.i8)
+        self.localFace = tnp.field([(1, 2), (2, 0), (0, 1)], dtype=ti.i8)
+        self.ccw = tnp.field([0, 1, 2], dtype=ti.i8)
+        self.localCell = tnp.field([
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], dtype=ti.i8)

@@ -3,6 +3,8 @@ from typing import (
     Literal, TypeVar
 )
 
+from math import factorial, comb
+
 import numpy as np
 import taichi as ti
 
@@ -341,10 +343,10 @@ class Mesh(MeshDS):
         Parameters:
             etype (int | str): The topology dimension of the entity, or name
                 'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
-            index (int | slice | Tensor): The index of the entity.
+            index (int | slice | Field): The index of the entity.
 
         Returns:
-            Tensor: A 2-d tensor containing barycenters of the entity.
+            Field: A 2-d scalar field containing barycenters of the entity.
         """
 
         assert index is None, "Up to now, we just support the case index==None"
@@ -355,75 +357,39 @@ class Mesh(MeshDS):
         entity = self.entity(etype)
         return F.entity_barycenter(entity, node)
 
-    def edge_length(self, index: Index=_S, out=None) -> Tensor:
-        """Calculate the length of the edges.
 
-        Parameters:
-            index (int | slice | Tensor, optional): Index of edges.
-            out (Tensor, optional): The output tensor. Defaults to None.
-
-        Returns:
-            Tensor[NE,]: Length of edges, shaped [NE,].
-        """
-        edge = self.entity(1, index=index)
-        return F.edge_length(self.node[edge], out=out)
-
-    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
-        """Calculate the normal of the edges.
-
-        Parameters:
-            index (int | slice | Tensor, optional): Index of edges.\n
-            unit (bool, optional): _description_. Defaults to False.\n
-            out (Tensor, optional): _description_. Defaults to None.
-
-        Returns:
-            Tensor[NE, GD]: _description_
-        """
-        edge = self.entity(1, index=index)
-        return F.edge_normal(self.node[edge], unit=unit, out=out)
-
-    def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
-        """Calculate the unit normal of the edges.
-        Equivalent to `edge_normal(index=index, unit=True)`.
-        """
-        return self.edge_normal(index=index, unit=True, out=out)
-
-    def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
-        """Get the quadrature points and weights.
-
-        Parameters:
-            q (int): The index of the quadrature points.
-            etype (int | str, optional): The topology dimension of the entity to\
-            generate the quadrature points on. Defaults to 'cell'.
-
-        Returns:
-            Quadrature: Object for quadrature points and weights.
-        """
+class HomogeneousMesh(Mesh):
+    def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
-    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        """Shape function value on the given bc points, in shape (..., ldof).
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
 
-        Parameters:
-            bc (Tensor): The bc points, in shape (..., NVC).\n
-            p (int, optional): The order of the shape function. Defaults to 1.\n
-            index (int | slice | Tensor, optional): The index of the cell.\n
-            variable (str, optional): The variable name. Defaults to 'u'.\n
-            mi (Tensor, optional): The multi-index matrix. Defaults to None.
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        raise NotImplementedError
 
-        Returns:
-            Tensor: The shape function value with shape (..., ldof). The shape will\
-            be (..., 1, ldof) if `variable == 'x'`.
-        """
-        raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
+class SimplexMesh(HomogeneousMesh):
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
+        if isinstance(iptype, str):
+            dim = estr2dim(self, iptype)
+        return F.simplex_ldof(p, dim)
 
-    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
+    def number_of_global_ipoints(self, p: int):
+        return F.simplex_gdof(p, self)
 
-    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> Tensor:
+        raise NotImplementedError
 
-
+    def shape_function(self, bc: Field, p: int=1, *, 
+                       variable: str='u', mi: Optional[Field]=None) -> Field:
+        TD = bc.shape[-1] - 1
+        mi = mi or F.multi_index_matrix(p, TD)
+        phi = F.simplex_shape_function(bc, p, mi)
+        if variable == 'u':
+            return phi
+        elif variable == 'x':
+            return phi.unsqueeze_(1)
+        else:
+            raise ValueError("Variable type is expected to be 'u' or 'x', "
+                             f"but got '{variable}'.")
