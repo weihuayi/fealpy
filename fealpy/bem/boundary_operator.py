@@ -4,8 +4,7 @@ from fealpy.mesh import IntervalMesh, TriangleMesh, QuadrangleMesh, UniformMesh3
 from fealpy.pde.bem_model_2d import PoissonModelConstantDirichletBC2d
 from fealpy.pde.bem_model_3d import *
 from fealpy.functionspace import LagrangeFESpace
-from potential_grad_potential_integrator import PotentialGradPotentialIntegrator
-from grad_potential_integrator import GradPotentialIntegrator
+from potential_flux_integrator import PotentialFluxIntegrator
 from scalar_source_integrator import ScalarSourceIntegrator
 from matplotlib import pyplot as plt
 
@@ -18,9 +17,12 @@ def boundary_mesh_build(mesh):
         "HexahedronMesh": QuadrangleMesh,
         "UniformMesh3d": QuadrangleMesh,
     }
+    if type(mesh).__name__ == "UniformMesh3d":
+        bd_face = mesh.ds.boundary_face()[:, [0, 2, 3, 1]]
+    else:
+        bd_face = mesh.ds.boundary_face()
     node = mesh.entity('node')
     old_bd_node_idx = mesh.ds.boundary_node_index()
-    bd_face = mesh.ds.boundary_face()
     new_node = node[old_bd_node_idx]
     aux_idx1 = np.zeros(len(node), dtype=np.int_)
     aux_idx2 = np.arange(len(old_bd_node_idx), dtype=np.int_)
@@ -38,10 +40,15 @@ def error_calculator(mesh, u, v, q=3, power=2):
 
     cell = mesh.entity('cell')
     cell_node_val = u[cell]
+    if type(mesh).__name__ == "UniformMesh3d":
+        bc0 = bcs[0].reshape(-1, 2)  # (NQ0, 2)
+        bc1 = bcs[1].reshape(-1, 2)  # (NQ1, 2)
+        bc2 = bcs[2].reshape(-1, 2)  # (NQ2, 2)
+        bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
 
-    u = np.einsum('...j, cj->...c', bcs, cell_node_val)
-
-
+        u = np.einsum('...j, cj->...c', bc, cell_node_val)
+    else:
+        u = np.einsum('...j, cj->...c', bcs, cell_node_val)
     if callable(v):
         if not hasattr(v, 'coordtype'):
             v = v(ps)
@@ -133,9 +140,9 @@ class BoundaryOperator:
         self._G = np.zeros((gdof, gdof))
         np.add.at(self._G, (I, J), Gij)
         bd_face_measure = space.mesh.entity_measure('cell')
-        # TODO: 修复系数矩阵对角线问题
-        np.fill_diagonal(self._G, (bd_face_measure * (np.log(2 / bd_face_measure) + 1) / np.pi / 2))
-        t = self._G
+        # TODO: 补充高次与高维情况下，对奇异积分的处理
+        if space.GD == 2:
+            np.fill_diagonal(self._G, (bd_face_measure * (np.log(2 / bd_face_measure) + 1) / np.pi / 2))
         # ===================================================
         f = self.dintegrators[0].assembly_cell_vector(space)
         self._f = f
@@ -156,6 +163,7 @@ class BoundaryOperator:
 if __name__ == '__main__':
     from fealpy.bem.boundary_condition import DirichletBC
     from fealpy.bem.internal_operator import InternalOperator
+    from fealpy.tools.show import showmultirate
     pde = PoissonModelConstantDirichletBC2d()
     box = pde.domain()
     nx = 5
@@ -163,26 +171,29 @@ if __name__ == '__main__':
     # 定义网格对象
     mesh = TriangleMesh.from_box(box, nx, ny)
     # pde = PoissonModelConstantDirichletBC3d()
-    # nx = 5
-    # ny = 5
-    # nz = 5
+    # nx = 3
+    # ny = 3
+    # nz = 3
     #
     # hx = (1 - 0) / nx
     # hy = (1 - 0) / ny
     # hz = (1 - 0) / nz
     # mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
+    # mesh.to_vtk_file(filename='ori_quad.vtu')
     # 构造边界网格与空间
     p = 0
-    maxite = 4
+    maxite = 3
     errorMatrix = np.zeros(maxite)
+    N = np.zeros(maxite)
 
     for k in range(maxite):
         bd_mesh = boundary_mesh_build(mesh)
+        # bd_mesh.to_vtk(fname='test_quad.vtu')
         space = LagrangeFESpace(bd_mesh, p=p)
         space.domain_mesh = mesh
 
         bd_operator = BoundaryOperator(space)
-        bd_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=2))
+        bd_operator.add_boundary_integrator(PotentialFluxIntegrator(q=2))
         bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
 
         H, G, F = bd_operator.assembly()
@@ -193,7 +204,7 @@ if __name__ == '__main__':
         q = np.linalg.solve(G, F)
 
         inter_operator = InternalOperator(space)
-        inter_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=2))
+        inter_operator.add_boundary_integrator(PotentialFluxIntegrator(q=2))
         inter_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
         inter_H, inter_G, inter_F = inter_operator.assembly()
         u_inter = inter_G@q - inter_H@u + inter_F
@@ -204,12 +215,20 @@ if __name__ == '__main__':
 
         errorMatrix[k] = error_calculator(mesh, result_u, pde.solution)
 
+        v = mesh.entity_measure('cell')
+        h = np.max(v)
+        N[k] = np.power(h, 1 / mesh.geo_dimension())
+
         if k < maxite:
             mesh.uniform_refine(1)
 
     print(f'迭代{maxite}次，结果如下：')
     print("误差：\n", errorMatrix)
     print('误差比：\n', errorMatrix[0:-1] / errorMatrix[1:])
+
+    fig = plt.figure()
+    axes = showmultirate(plt, 0, N[None, ...], errorMatrix[None, ...], labellist=[['l2']])
+    plt.show()
 
 
 

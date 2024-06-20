@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-
+from scipy.spatial.distance import cdist
 from typing import TypedDict, Callable, Tuple, Union
 
 
@@ -34,6 +34,7 @@ class ScalarSourceIntegrator():
 
         domain_mesh = space.domain_mesh
         cell_measure = domain_mesh.entity_measure('cell')
+        NC = len(cell_measure)
 
         # 获取计算节点坐标
         # (bd_gdof, dim) or (len(xi), dim)
@@ -70,9 +71,18 @@ class ScalarSourceIntegrator():
         else:
             val = f
 
-
-        r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
-        f = np.einsum('c,q,nqc,qc->n', cell_measure, ws, np.log(1 / r), val, optimize=True) / (2**(GD-1) * np.pi)
+        num_of_xi = len(xi)
+        # r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
+        t = ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]
+        r = np.linalg.norm(t, axis=-1)
+        # ps = np.broadcast_to(ps[np.newaxis, ...], (num_of_xi, len(ws), NC, GD)).reshape((-1, GD))
+        # xi = np.broadcast_to(xi[:, np.newaxis, np.newaxis, ...], (num_of_xi, len(ws), NC, GD)).reshape((-1, GD))
+        # r = cdist(ps, xi).reshape((num_of_xi, len(ws), NC))
+        if GD == 2:
+            f = np.einsum('c,q,nqc,qc->n', cell_measure, ws, np.log(1 / r), val, optimize=True) / (2**(GD-1) * np.pi)
+        elif GD == 3:
+            f = np.einsum('c,q,nqc,qc->n', cell_measure, ws, 1 / r, val, optimize=True) / (
+                        2 ** (GD - 1) * np.pi)
 
         return f
 
