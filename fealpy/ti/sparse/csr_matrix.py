@@ -4,45 +4,7 @@ from typing import Union, Tuple
 
 @ti.data_oriented
 class CSRMatrix:
-    """
-    A data class representing a Compressed Sparse Row (CSR) matrix using Taichi.
-
-    Attributes
-    ----------
-    data : Union[Template, None]
-        The non-zero values of the CSR matrix. Notice that `data` can be None.
-    indices : Template
-        The column indices of the corresponding elements in `data`.
-    indptr : Template
-        The index pointers to the start of each row in `data`.
-    shape : tuple of int
-        The shape of the matrix (rows, columns).
-    dtype : data-type
-        The data type of the matrix elements.
-    itype : index-type
-        The data type of the matrix indices.
-    """
     def __init__(self, arg1, shape: Tuple[int, int], dtype=None, itype=None, copy=False):
-        """
-        Initializes the CSRMatrix with given data, indices, and indptr.
-
-        Parameters
-        ----------
-        arg1 : 
-            A tuple containing the data, indices, and indptr of the CSR matrix.
-            Notice that the data can be None.
-        shape : tuple of int
-            The shape of the matrix (rows, columns).
-        dtype : data-type, optional
-            The desired data-type for the matrix (default is ti.f64).
-        copy : bool, optional
-            If True, the data is copied (default is False).
-
-        Raises
-        ------
-        ValueError
-            If `arg1` does not contain exactly three elements.
-        """
         if len(arg1) == 3:
             self.data, self.indices, self.indptr = arg1
             self.shape = shape

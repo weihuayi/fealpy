@@ -359,13 +359,13 @@ class Mesh(MeshDS):
 
 
 class HomogeneousMesh(Mesh):
-    def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
+    def interpolation_points(self, p: int, index: Index=_S) -> Field:
         raise NotImplementedError
 
-    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Field:
         raise NotImplementedError
 
-    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Field:
         raise NotImplementedError
 
 class SimplexMesh(HomogeneousMesh):
@@ -377,8 +377,7 @@ class SimplexMesh(HomogeneousMesh):
     def number_of_global_ipoints(self, p: int):
         return F.simplex_gdof(p, self)
 
-    # shape function
-    def grad_lambda(self, index: Index=_S) -> Tensor:
+    def grad_lambda(self, index: Index=_S) -> Field:
         raise NotImplementedError
 
     def shape_function(self, bc: Field, p: int=1, *, 

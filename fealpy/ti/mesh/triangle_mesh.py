@@ -7,7 +7,7 @@ from .. import logger
 from .. import numpy as tnp  # the numpy-like interface in taichi 
 
 from .utils import EntityName, Entity
-from .quadrature import TriangleQuadrature 
+from .quadrature import TriangleQuadrature, GaussLegendreQuadrature
 from .mesh_base import SimplexMesh 
 
 @ti.data_oriented
@@ -37,7 +37,7 @@ class TriangleMesh(SimplexMesh):
         if etype in ('cell', 2):
             return TriangleQuadrature(index)
         elif etype in ('face', 'edge', 1):
-            return None
+            return GaussLegendreQuadrature(index) 
 
     integrator = quadrature_formula
             
