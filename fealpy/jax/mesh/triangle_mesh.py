@@ -8,75 +8,32 @@ import jax.numpy as jnp
 from .. import logger
 
 from . import functional as F
-from . import mesh_kernel as K
-from .mesh_base import HomoMesh, HomoMeshDataStructure, entity_str2dim
-
-Array = jax.Array
+from .utils import Array
+from .mesh_base import SimplexMesh 
 
 
-class TriangleMeshDataStructure(HomoMeshDataStructure):
-    localEdge = jnp.array([(1, 2), (2, 0), (0, 1)])
-    localFace = jnp.array([(1, 2), (2, 0), (0, 1)])
-    ccw = jnp.array([0, 1, 2])
-
-    localCell = np.array([
-        (0, 1, 2),
-        (1, 2, 0),
-        (2, 0, 1)])
-
-    def __init__(self, NN: int, cell: Array):
-        super().__init__(NN, 2, cell)
-        self.construct()
-
-    def total_face(self):
-        return self.cell[..., self.localFace].reshape(-1, 2)
-
-    def construct(self) -> None:
-        NC = self.cell.shape[0]
-        NFC = self.cell.shape[1]
-
-        totalFace = self.total_face()
-        _, i0, j = jnp.unique(
-            jnp.sort(totalFace, axis=1),
-            return_index=True,
-            return_inverse=True,
-            axis=0
-        )
-        self.face = totalFace[i0, :]
-        self.edge = self.face
-        NF = i0.shape[0]
-
-        i1 = np.zeros(NF, dtype=self.itype)
-        i1[j.ravel()] = np.arange(3*NC, dtype=self.itype)
-
-        self.cell2edge = j.reshape(NC, 3)
-        self.cell2face = self.cell2edge
-        self.face2cell = jnp.vstack([i0//3, i1//3, i0%3, i1%3]).T
-        self.edge2cell = self.face2cell
-
-        logger.info(f"Construct the mesh toplogy relation with {NF} edge (or face).")
-
-    def boundary_edge_flag(self): return self.boundary_face_flag()
-    def boundary_edge_index(self): return self.boundary_face_index()
-
-
-class TriangleMesh(HomoMesh):
+class TriangleMesh(SimplexMesh):
     def __init__(self, node: Array, cell: Array):
         """
         @brief TriangleMesh 对象的初始化函数
         """
-        assert cell.shape[-1] == 3
-
+        self.node = node
         NN = node.shape[0]
-        NC = cell.shape[0]
-        GD = node.shape[1]
+        TD = 2
+        super().__init__(NN, TD)
 
-        self.itype = cell.dtype
-        self.ftype = node.dtype
+        self.localEdge = jnp.array([(1, 2), (2, 0), (0, 1)])
+        self.localFace = jnp.array([(1, 2), (2, 0), (0, 1)])
+        self.ccw = jnp.array([0, 1, 2])
+
+        self.localCell = np.array([
+            (0, 1, 2),
+            (1, 2, 0),
+            (2, 0, 1)])
+
 
         logger.info(f"Initialize a {GD}D TriangleMesh instance with {NN} nodes ({node.dtype}) and {NC} cells ({cell.dtype}).")
-        self.node = node
-        self.ds = TriangleMeshDataStructure(NN, cell)
+
         self._edge_length = jax.jit(jax.vmap(K.edge_length))
 
         if GD == 2:

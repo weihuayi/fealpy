@@ -29,7 +29,7 @@ def from_numpy(a: np.ndarray):
     else:
         return a
 
-def field(input_array: Any, dtype = None) -> ti.field:
+def field(input_array: Any, dtype = None) -> Field:
     """
     Create a Taichi field from a given array-like input.
 
@@ -47,6 +47,8 @@ def field(input_array: Any, dtype = None) -> ti.field:
     dtype = dtype or dtype_map[input_array.dtype]
     ti_field = ti.field(dtype=dtype, shape=shape)
     return ti_field
+
+array = field
 
 
 def zeros(shape, dtype=ti.i32):
