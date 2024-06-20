@@ -52,7 +52,6 @@ def linear_integral(input: NDArray, weights: NDArray, measure: NDArray,
 
     NQ = weights.shape[0]
     NC = measure.shape[0]
-
     if is_scalar(coef):
         return np.einsum('q, c, qci -> ci', weights, measure, input) * coef
     elif is_tensor(coef):
@@ -82,16 +81,16 @@ def bilinear_integral(input1: NDArray, input2: NDArray, weights: NDArray, measur
         If `batched == True`, the shape of the output is (B, C, I, J).
     """
     if coef is None:
-        return np.einsum('q, c, qci..., qcj... -> cij', weights, measure, input1, input2)
+        return np.einsum('q, c, qcid, qcjd -> cij', weights, measure, input1, input2)
 
     NQ = weights.shape[0]
     NC = measure.shape[0]
 
     if is_scalar(coef):
-        return np.einsum('q, c, qci..., qcj... -> cij', weights, measure, input1, input2) * coef
+        return np.einsum('q, c, qcid, qcjd -> cij', weights, measure, input1, input2) * coef
     elif is_tensor(coef):
         out_subs = 'cij'
         subs = get_coef_subscripts(coef.shape, NQ, NC)
-        return np.einsum(f'q, c, qci..., qcj..., {subs} -> {out_subs}', weights, measure, input1, input2, coef)
+        return np.einsum(f'q, c, qcid, qcjd, {subs} -> {out_subs}', weights, measure, input1, input2, coef)
     else:
         raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")

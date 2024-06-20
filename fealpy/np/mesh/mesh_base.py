@@ -430,7 +430,7 @@ class SimplexMesh(HomogeneousMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(1)
+            return  np.expand_dims(phi, axis=1)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -438,7 +438,7 @@ class SimplexMesh(HomogeneousMesh):
     def grad_shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
         R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R

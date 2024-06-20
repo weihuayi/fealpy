@@ -134,9 +134,9 @@ class TriangleMesh(SimplexMesh):
             return cell[index]
 
         mi = self.multi_index_matrix(p, 2)
-        idx0, = np.nonzero(mi[:, 0] == 0, as_tuple=True)
-        idx1, = np.nonzero(mi[:, 1] == 0, as_tuple=True)
-        idx2, = np.nonzero(mi[:, 2] == 0, as_tuple=True)
+        idx0, = np.nonzero(mi[:, 0] == 0)
+        idx1, = np.nonzero(mi[:, 1] == 0)
+        idx2, = np.nonzero(mi[:, 2] == 0)
         kwargs = {'dtype': self.itype}
 
         face2cell = self.face_to_cell()
