@@ -8,6 +8,7 @@ import taichi as ti
 
 from .. import logger
 from ..sparse import CSRMatrix
+from .. import numpy as tnp
 
 from .utils import EntityName, Entity, Field, Index, _S, _int_func
 from .utils import estr2dim
@@ -57,8 +58,7 @@ class MeshDS():
     ### counters
     def count(self, etype: Union[int, str]) -> int:
         """Return the number of entities of the given type."""
-        edim = estr2dim(self, etype) if isinstance(etype, str) else etype
-        entity = self.entity(edim) 
+        entity = self.entity(etype) 
         if hasattr(entity, 'location'):
             return entity.location.shape[0] - 1
         else:
@@ -198,68 +198,232 @@ class MeshDS():
 
     def total_face(self) -> Field:
         """
+        Generate the total faces for every cells 
+
+        Notes:
+            tface = cell[:, lface].reshape(-1, NVF)
         """
+        TD = self.TD
         NC = self.count('cell')
-        NVF = self.number_of_nodes_of_faces()
+        NNF = self.number_of_nodes_of_faces()
         NFC = self.number_of_faces_of_cells()
-        cell = self.entity(self.TD)
-        local_face = self.localFace
-        total_face = ti.field(self.itype, shape=(NFC*NC, NVF))   
-        return total_face
+        cell = self.entity(TD)
+        lface = self.localFace
+        tface = ti.field(self.itype, shape=(NFC*NC, NNF))   
+
+        @ti.kernel
+        def set_total_face():
+            """
+            Kernel function to set the total faces.
+            """
+            for i in range(NC):  # Iterate over each cell
+                for j in range(NFC):  # Iterate over each face in the cell
+                    for k in range(NVF):  # Iterate over each vertex in the face
+                        tface[i * NFC + j, k] = cell[i, lface[j, k]]  # Set total face value
+
+        set_total_face()  # Call the kernel function to set total faces
+        return tface
 
     def total_edge(self) -> Field:
         """
+        Generate the total edges fro every cells 
         """
+        TD = self.TD
         NC = self.count('cell')
-        NVE = self.number_of_nodes_of_edges()
+        NNE = self.number_of_nodes_of_edges()
         NEC = self.number_of_edges_of_cells()
-        cell = self.entity(self.TD)
-        local_edge = self.localEdge
-        total_edge = ti.field(self.itype, shape=(NEC*NC, NVE))   
-        return total_edge
+        cell = self.entity(TD)
+        ledge = self.localEdge
+        tedge = ti.field(self.itype, shape=(NEC*NC, NNE))   
+
+        @ti.kernel
+        def set_total_edge():
+            """
+            Kernel function to set the total faces.
+            """
+            for i in range(NC):  
+                for j in range(NEC):
+                    for k in range(NNE):
+                        tface[i * NFC + j, k] = cell[i, ledge[j, k]]
+        return tedge
 
     def construct(self):
+        """
+        Consruct the adjacency relationship
+
+        Notes:
+            Here we use numpy, and will update it to taichi in future.
+        """
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
-        NC = self.cell.shape[0]
-        NFC = self.cell.shape[1]
+        NC = self.count('cell')
+        NNF = self.number_of_nodes_of_faces()
+        NFC = self.number_of_faces_of_cells()
 
-        totalFace = self.total_face()
-        _, i0_np, j_np = np.unique(
-            torch.sort(totalFace, dim=1)[0].cpu().numpy(),
+        cell = self.entity('cell').to_numpy()
+        lface = self.localFace.to_numpy()
+        tface = cell[:, lface].reshape(-1, NNF)
+        _, i0, j = np.unique(
+            np.sort(tface, axis=1),
             return_index=True,
             return_inverse=True,
             axis=0
         )
-        self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
-        NF = i0_np.shape[0]
+        NF = i0.shape[0]
+        face = tface[i0, :]
 
-        i1_np = np.zeros(NF, dtype=i0_np.dtype)
-        i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
+        face2cell = np.zeros((NF, 4), dtype=self.itype)
+        i1 = np.zeros(NF, dtype=self.itype)
+        i1[j] = np.arange(NFC*NC, dtype=self.itype)
 
-        self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
-        self.cell2face = self.cell2edge
+        face2cell[:, 0] = i0 // NFC
+        face2cell[:, 1] = i1 // NFC
+        face2cell[:, 2] = i0 % NFC
+        face2cell[:, 3] = i1 % NFC
 
-        face2cell_np = np.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
-        self.face2cell = torch.from_numpy(face2cell_np).to(self.device)
-        self.edge2cell = self.face2cell
+        cell2face = j.reshape(-1, NFC)
+
+        self.face = tnp.from_numpy(face)
+        self.face2cell = tnp.from_numpy(face2cell)
+        self.cell2face = tnp.from_numpy(cell2face)
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
-
-            total_edge = self.total_edge()
+            NNE = self.number_of_nodes_of_edges()
+            ledge = self.localEdge.to_numpy()
+            tedge = cell[:, ledge].reshape(-1, NNE) 
             _, i2, j = np.unique(
-                torch.sort(total_edge, dim=1)[0].cpu().numpy(),
+                np.sort(tedge, axis=1),
                 return_index=True,
                 return_inverse=True,
                 axis=0
             )
-            self.edge = total_edge[i2, :]
-            self.cell2edge = torch.from_numpy(j).to(self.device).reshape(NC, NEC)
+            edge = tedge[i2, :]
+            cell2edge = np.reshape(j, (NC, NEC))
+            self.edge = tnp.from_numpy(edge)
+            self.cell2edge = tnp.from_numpy(cell2edge)
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell
 
-        logger.info(f"Mesh toplogy relation constructed, with {NF} edge (or face), "
-                    f"on device {self.device}")
+        logger.info(f"Mesh toplogy relation constructed, with {NF} edge (or face), ")
+
+
+##################################################
+### Mesh
+##################################################
+
+class Mesh(MeshDS):
+    @property
+    def ftype(self) -> _dtype:
+        node = self.entity(0)
+        if node is None:
+            raise RuntimeError('Can not get the float type as the node '
+                               'has not been assigned.')
+        return node.dtype
+
+    def geo_dimension(self) -> int:
+        node = self.entity(0)
+        if node is None:
+            raise RuntimeError('Can not get the geometrical dimension as the node '
+                               'has not been assigned.')
+        return node.shape[-1]
+
+    GD = property(geo_dimension)
+
+    def multi_index_matrix(self, p: int, edim: int) -> Field:
+        return F.multi_index_matrix(p, edim)
+
+    def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Field:
+        """Get the barycenter of the entity.
+
+        Parameters:
+            etype (int | str): The topology dimension of the entity, or name
+                'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
+            index (int | slice | Tensor): The index of the entity.
+
+        Returns:
+            Tensor: A 2-d tensor containing barycenters of the entity.
+        """
+
+        assert index is None, "Up to now, we just support the case index==None"
+
+        if etype in ('node', 0):
+            return self.node
+        node = self.entity(0)
+        entity = self.entity(etype)
+        return F.entity_barycenter(entity, node)
+
+    def edge_length(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the length of the edges.
+
+        Parameters:
+            index (int | slice | Tensor, optional): Index of edges.
+            out (Tensor, optional): The output tensor. Defaults to None.
+
+        Returns:
+            Tensor[NE,]: Length of edges, shaped [NE,].
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_length(self.node[edge], out=out)
+
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
+        """Calculate the normal of the edges.
+
+        Parameters:
+            index (int | slice | Tensor, optional): Index of edges.\n
+            unit (bool, optional): _description_. Defaults to False.\n
+            out (Tensor, optional): _description_. Defaults to None.
+
+        Returns:
+            Tensor[NE, GD]: _description_
+        """
+        edge = self.entity(1, index=index)
+        return F.edge_normal(self.node[edge], unit=unit, out=out)
+
+    def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
+        """Calculate the unit normal of the edges.
+        Equivalent to `edge_normal(index=index, unit=True)`.
+        """
+        return self.edge_normal(index=index, unit=True, out=out)
+
+    def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
+        """Get the quadrature points and weights.
+
+        Parameters:
+            q (int): The index of the quadrature points.
+            etype (int | str, optional): The topology dimension of the entity to\
+            generate the quadrature points on. Defaults to 'cell'.
+
+        Returns:
+            Quadrature: Object for quadrature points and weights.
+        """
+        raise NotImplementedError
+
+    def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        """Shape function value on the given bc points, in shape (..., ldof).
+
+        Parameters:
+            bc (Tensor): The bc points, in shape (..., NVC).\n
+            p (int, optional): The order of the shape function. Defaults to 1.\n
+            index (int | slice | Tensor, optional): The index of the cell.\n
+            variable (str, optional): The variable name. Defaults to 'u'.\n
+            mi (Tensor, optional): The multi-index matrix. Defaults to None.
+
+        Returns:
+            Tensor: The shape function value with shape (..., ldof). The shape will\
+            be (..., 1, ldof) if `variable == 'x'`.
+        """
+        raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
+
+    def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
+
+    def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
+
+
