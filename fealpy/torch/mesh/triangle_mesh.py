@@ -1,7 +1,6 @@
 
 from typing import Optional, Union, List
 
-import numpy as np
 import torch
 from torch import Tensor
 
@@ -85,14 +84,6 @@ class TriangleMesh(SimplexMesh):
         return quad
 
     # ipoints
-    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
-        if isinstance(iptype, str):
-            iptype = estr2dim(self, iptype)
-        return F.simplex_ldof(p, iptype)
-
-    def number_of_global_ipoints(self, p: int):
-        return F.simplex_gdof(p, self)
-
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         """Fetch all p-order interpolation points on the triangle mesh."""
         node = self.entity('node')
@@ -188,16 +179,14 @@ class TriangleMesh(SimplexMesh):
                  ftype: Optional[_dtype]=torch.float64,
                  device: Union[_device, str, None]=None,
                  require_grad: bool=False):
-        """Generate a uniform triangle mesh for a box domain .
+        """Generate a uniform triangle mesh for a box domain.
 
         Parameters:
-            box (List[int]):
-
-            nx (int): Number of divisions along the x-axis (default: 10)
-
-            ny (int): Number of divisions along the y-axis (default: 10)
-
-            threshold: Optional function to filter cells based on their barycenter coordinates (default: None)
+            box (List[int]): 4 integers, the left, right, bottom, top of the box.\n
+            nx (int, optional): Number of divisions along the x-axis, defaults to 10.\n
+            ny (int, optional): Number of divisions along the y-axis, defaults to 10.\n
+            threshold (Callable | None, optional): Optional function to filter cells.
+                Based on their barycenter coordinates, defaults to None.
 
         Returns:
             TriangleMesh: Triangle mesh instance.

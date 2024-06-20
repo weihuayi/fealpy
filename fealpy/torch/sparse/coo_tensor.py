@@ -3,6 +3,8 @@ from typing import Optional, Union, overload, List
 
 import torch
 
+from .utils import _dense_ndim, _dense_shape
+
 
 _Size = torch.Size
 _dtype = torch.dtype
@@ -97,26 +99,16 @@ class COOTensor():
             return self.values.dtype
 
     @property
-    def shape(self):
-        if self.values is None:
-            return self._spshape
-        else:
-            return torch.Size(self.values.shape[:-1] + self._spshape)
-
+    def shape(self): return _Size(self.dense_shape + self.sparse_shape)
     @property
-    def dense_shape(self): return self.values.shape[:-1]
+    def dense_shape(self): return _dense_shape(self.values)
     @property
     def sparse_shape(self): return self._spshape
 
     @property
-    def ndim(self):
-        if self.values is None:
-            return self.sparse_ndim
-        else:
-            return self.dense_ndim + self.sparse_ndim
-
+    def ndim(self): return self.dense_ndim + self.sparse_ndim
     @property
-    def dense_ndim(self): return self.values.ndim - 1
+    def dense_ndim(self): return _dense_ndim(self.values)
     @property
     def sparse_ndim(self): return self.indices.shape[0]
     @property

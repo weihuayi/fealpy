@@ -6,15 +6,6 @@ from fealpy.jax.sph.partition import *
 from fealpy.jax.sph.kernel_function import QuinticKernel
 from jax_md.partition import space
 import matplotlib.pyplot as plt
-def test_neighbor():
-    box_size = 1.0
-    h = 0.2
-    key = random.PRNGKey(0)
-    num_particles = 100
-    positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
-    node_mesh = NodeMesh(positions)
-    idx = node_mesh.neighbor(box_size,h)
-    print(idx)
 
 def test_neighbors():
     box_size = 1.0  
@@ -85,10 +76,10 @@ def test_interpolate():
     print(a[1])
 
 def test_from_tgv_domain():
-    node_fluid, node_dummy = NodeMesh.from_tgv_domain()
+    box_size = jnp.array([1.0,1.0])
+    node = NodeMesh.from_tgv_domain(box_size)
     fig, ax = plt.subplots()
-    node_fluid.add_plot(ax, color='red', markersize=25)
-    node_dummy.add_plot(ax,color='blue', markersize=25)
+    node.add_plot(ax, color='red', markersize=25)
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.title('NodeSet from TGV Domain')
@@ -114,10 +105,10 @@ def test_dam_break_domain():
 
 if __name__ == "__main__":
     #test_neighbor()
-    test_neighbors()
-    test_neighbors_jax()
+    #test_neighbors()
+    #test_neighbors_jax()
     #test_add_node_data()
     #test_interpolate()
-    #test_from_tgv_domain()
+    test_from_tgv_domain()
     #test_from_ringshaped_channel_domain()
     #test_dam_break_domain()
