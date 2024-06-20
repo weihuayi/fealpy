@@ -242,6 +242,8 @@ class TriangleMesh(Mesh, Plotable):
         """
         """
         cell = self.entity('cell')
+        if p == 0:
+            return np.arange(len(cell)).reshape((-1, 1))[index]
         if p == 1:
             return cell[index]
 

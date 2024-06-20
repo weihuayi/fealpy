@@ -41,10 +41,15 @@ def error_calculator(mesh, u, v, q=3, power=2):
 
     cell = mesh.entity('cell')
     cell_node_val = u[cell]
+    if type(mesh).__name__ == "UniformMesh3d":
+        bc0 = bcs[0].reshape(-1, 2)  # (NQ0, 2)
+        bc1 = bcs[1].reshape(-1, 2)  # (NQ1, 2)
+        bc2 = bcs[2].reshape(-1, 2)  # (NQ2, 2)
+        bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
 
-    u = np.einsum('...j, cj->...c', bcs, cell_node_val)
-
-
+        u = np.einsum('...j, cj->...c', bc, cell_node_val)
+    else:
+        u = np.einsum('...j, cj->...c', bcs, cell_node_val)
     if callable(v):
         if not hasattr(v, 'coordtype'):
             v = v(ps)
@@ -159,26 +164,28 @@ class BoundaryOperator:
 if __name__ == '__main__':
     from fealpy.bem.boundary_condition import DirichletBC
     from fealpy.bem.internal_operator import InternalOperator
-    # pde = PoissonModelConstantDirichletBC2d()
-    # box = pde.domain()
-    # nx = 5
-    # ny = 5
-    # # 定义网格对象
-    # mesh = TriangleMesh.from_box(box, nx, ny)
-    pde = PoissonModelConstantDirichletBC3d()
+    from fealpy.tools.show import showmultirate
+    pde = PoissonModelConstantDirichletBC2d()
+    box = pde.domain()
     nx = 5
     ny = 5
-    nz = 5
-
-    hx = (1 - 0) / nx
-    hy = (1 - 0) / ny
-    hz = (1 - 0) / nz
-    mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
+    # 定义网格对象
+    mesh = TriangleMesh.from_box(box, nx, ny)
+    # pde = PoissonModelConstantDirichletBC3d()
+    # nx = 3
+    # ny = 3
+    # nz = 3
+    #
+    # hx = (1 - 0) / nx
+    # hy = (1 - 0) / ny
+    # hz = (1 - 0) / nz
+    # mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
     # mesh.to_vtk_file(filename='ori_quad.vtu')
     # 构造边界网格与空间
     p = 1
-    maxite = 1
+    maxite = 3
     errorMatrix = np.zeros(maxite)
+    N = np.zeros(maxite)
 
     for k in range(maxite):
         bd_mesh = boundary_mesh_build(mesh)
@@ -209,12 +216,20 @@ if __name__ == '__main__':
 
         errorMatrix[k] = error_calculator(mesh, result_u, pde.solution)
 
+        v = mesh.entity_measure('cell')
+        h = np.max(v)
+        N[k] = np.power(h, 1 / mesh.geo_dimension())
+
         if k < maxite:
             mesh.uniform_refine(1)
 
     print(f'迭代{maxite}次，结果如下：')
     print("误差：\n", errorMatrix)
     print('误差比：\n', errorMatrix[0:-1] / errorMatrix[1:])
+
+    fig = plt.figure()
+    axes = showmultirate(plt, 0, N[None, ...], errorMatrix[None, ...], labellist=[['l2']])
+    plt.show()
 
 
 
