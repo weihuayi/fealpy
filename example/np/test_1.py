@@ -1,28 +1,25 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.sparse.linalg import spsolve
-from fealpy.tools import showmultirate
 
-#三角形网格
-# from fealpy.mesh import TriangleMesh
-from fealpy.np.mesh import TriangleMesh
+CONTEXT = 'numpy'
 
-# 拉格朗日有限元空间
-# from fealpy.functionspace import LagrangeFESpace
-from fealpy.np.functionspace import LagrangeFESpace
-
-#区域积分子
-from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
-from fealpy.fem import ScalarSourceIntegrator
-
-from fealpy.fem import NonlinearForm
-
-import numpy as np
+from fealpy.mesh import TriangleMesh as TMD
+from fealpy.utils import timer
 from fealpy.decorator import cartesian
+
+from fealpy.np.mesh import TriangleMesh
+from fealpy.torch.mesh import TriangleMesh as tri
+from fealpy.np.functionspace import LagrangeFESpace
+from fealpy.np.fem import (
+    BilinearForm, LinearForm,
+    ScalarDiffusionIntegrator,
+    ScalarSourceIntegrator,
+    DirichletBC
+)
+from scipy.sparse.linalg import spsolve
+
+from matplotlib import pyplot as plt
+
 from typing import Sequence
-
-
-PI = np.pi
 
 class NonlinearData():
     def __init__(self, domain:Sequence[float]):
@@ -105,11 +102,11 @@ def nonlinear_gradient_func(u):
     return val
 
 
+NX, NY = 64, 64
+PI = np.pi
 domain = [0, 1, 0, 2]
-nx = 4
-ny = 4
 pde = NonlinearData(domain)
-mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
+mesh = TriangleMesh.from_box(nx=NX, ny=NY)
 
 p = 1
 maxit = 6
@@ -117,6 +114,7 @@ tol = 1e-8
 NDof = np.zeros(maxit, dtype=np.int_)
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 errorType = ['$|| u - u_h||_{\Omega, 0}$', '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']
+
 
 #非线性迭代
 for i in range(maxit):
@@ -127,7 +125,6 @@ for i in range(maxit):
     u0 = space.function()
     du = space.function()
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
-    # isDDof = space.is_boundary_dof(pde.dirichlet, u0)
     isIDof = ~isDDof
 
     D = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient, q=p+2)
@@ -147,25 +144,4 @@ for i in range(maxit):
         if err < tol:
             break
 
-    uI = space.interpolate(pde.solution)
-    errorMatrix[0, i] = mesh.error(pde.solution, u0, q=p+2)
-    errorMatrix[1, i] = mesh.error(pde.gradient, u0.grad_value, q=p+2)
-    if i < maxit-1:
-        mesh.uniform_refine()
 
-#收敛阶    
-print(errorMatrix)
-print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
-showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20)   
-
-#可视化
-bc = np.array([1/3, 1/3, 1/3])
-uI = space.interpolate(pde.solution)
-uI = uI(bc)
-uh = u0(bc)
-
-fig, axes = plt.subplots(1, 2)
-mesh.add_plot(axes[0], cellcolor=uI, linewidths=0)
-mesh.add_plot(axes[1], cellcolor=uh, linewidths=0) 
-
-plt.show()

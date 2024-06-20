@@ -10,24 +10,31 @@ from fealpy.np.mesh.utils import *
 from fealpy.np.mesh.functional import *
 
 
-mesh = Mesh.from_box(nx=2, ny=2)
+def test_simplex_shape_function():
 
-def test_multi_index_matrix():
-
-    TD = mesh.top_dimension()
+    q = 3
     p = 2
 
-    multiIndex = multi_index_matrix(p, TD)
+    mesh = Mesh.from_box(nx=2, ny=2)
+    qf = mesh.integrator(q)
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    #ipdb.set_trace()
+    phi0 = mesh.shape_function(bcs, p)
+    gphi0 = mesh.grad_shape_function(bcs, p)
 
-    assert(multiIndex == )
+    TD = mesh.top_dimension()
+    mi = mesh.multi_index_matrix(p, TD)
+    phi = simplex_shape_function(bcs, p, mi)
+    gphi = simplex_grad_shape_function(bcs, p, mi)
 
-def test_simplex_shape_function():
-    pass
+    err0 = np.abs(phi0 - phi)
+    assert(np.max(err0 < 1e-12))
 
-def test_grad_simplex_shape_sunction():
-    pass
+    print(gphi0.shape)
+    print(gphi.shape)
+    print(TD)
+    #err1 = np.abs(gphi0 - gphi)
+    #assert(np.max(err1 < 1e-12))
 
 if __name__ == "__main__":
-    test_multi_index_matrix()
     test_simplex_shape_function()
-    test_grad_simplex_shape_sunction()
