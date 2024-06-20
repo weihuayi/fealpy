@@ -2,7 +2,7 @@ import fealpy.functionspace
 import numpy as np
 
 
-class PotentialGradPotentialIntegrator:
+class PotentialFluxIntegrator:
     """
     @note (c \\grad u, \\grad v)
     """

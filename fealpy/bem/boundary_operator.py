@@ -4,8 +4,7 @@ from fealpy.mesh import IntervalMesh, TriangleMesh, QuadrangleMesh, UniformMesh3
 from fealpy.pde.bem_model_2d import PoissonModelConstantDirichletBC2d
 from fealpy.pde.bem_model_3d import *
 from fealpy.functionspace import LagrangeFESpace
-from potential_grad_potential_integrator import PotentialGradPotentialIntegrator
-from grad_potential_integrator import GradPotentialIntegrator
+from potential_flux_integrator import PotentialFluxIntegrator
 from scalar_source_integrator import ScalarSourceIntegrator
 from matplotlib import pyplot as plt
 
@@ -182,7 +181,7 @@ if __name__ == '__main__':
     # mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))  #
     # mesh.to_vtk_file(filename='ori_quad.vtu')
     # 构造边界网格与空间
-    p = 1
+    p = 0
     maxite = 3
     errorMatrix = np.zeros(maxite)
     N = np.zeros(maxite)
@@ -194,7 +193,7 @@ if __name__ == '__main__':
         space.domain_mesh = mesh
 
         bd_operator = BoundaryOperator(space)
-        bd_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=2))
+        bd_operator.add_boundary_integrator(PotentialFluxIntegrator(q=2))
         bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
 
         H, G, F = bd_operator.assembly()
@@ -205,7 +204,7 @@ if __name__ == '__main__':
         q = np.linalg.solve(G, F)
 
         inter_operator = InternalOperator(space)
-        inter_operator.add_boundary_integrator(PotentialGradPotentialIntegrator(q=2))
+        inter_operator.add_boundary_integrator(PotentialFluxIntegrator(q=2))
         inter_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
         inter_H, inter_G, inter_F = inter_operator.assembly()
         u_inter = inter_G@q - inter_H@u + inter_F

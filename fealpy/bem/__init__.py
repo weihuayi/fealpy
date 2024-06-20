@@ -1,6 +1,5 @@
 from ..mesh import IntervalMesh, TriangleMesh, QuadrangleMesh
 from boundary_operator import BoundaryOperator
 from internal_operator import InternalOperator
-from potential_grad_potential_integrator import PotentialGradPotentialIntegrator
-from grad_potential_integrator import GradPotentialIntegrator
+from potential_flux_integrator import PotentialFluxIntegrator
 from scalar_source_integrator import ScalarSourceIntegrator
