@@ -8,7 +8,6 @@ import torch
 
 from .. import logger
 from . import functional as F
-from . import mesh_kernel as K
 from .quadrature import Quadrature
 
 Tensor = torch.Tensor
@@ -377,9 +376,9 @@ class Mesh(MeshDS):
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         """Get the barycenter of the entity.
 
-        Args:
+        Parameters:
             etype (int | str): The topology dimension of the entity, or name
-            'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
+                'cell' | 'face' | 'edge' | 'node'. Returns sliced node if 'node'.
             index (int | slice | Tensor): The index of the entity.
 
         Returns:
@@ -397,12 +396,12 @@ class Mesh(MeshDS):
     def edge_length(self, index: Index=_S, out=None) -> Tensor:
         """Calculate the length of the edges.
 
-        Args:
+        Parameters:
             index (int | slice | Tensor, optional): Index of edges.
             out (Tensor, optional): The output tensor. Defaults to None.
 
         Returns:
-            Tensor: Length of edges, shaped [NE,].
+            Tensor[NE,]: Length of edges, shaped [NE,].
         """
         edge = self.entity(1, index=index)
         return F.edge_length(self.node[edge], out=out)
@@ -410,13 +409,13 @@ class Mesh(MeshDS):
     def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
         """Calculate the normal of the edges.
 
-        Args:
-            index (int | slice | Tensor, optional): Index of edges.
-            unit (bool, optional): _description_. Defaults to False.
+        Parameters:
+            index (int | slice | Tensor, optional): Index of edges.\n
+            unit (bool, optional): _description_. Defaults to False.\n
             out (Tensor, optional): _description_. Defaults to None.
 
         Returns:
-            Tensor: _description_
+            Tensor[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
         return F.edge_normal(self.node[edge], unit=unit, out=out)
@@ -428,18 +427,27 @@ class Mesh(MeshDS):
         return self.edge_normal(index=index, unit=True, out=out)
 
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
-        """Get the quadrature points and weights."""
+        """Get the quadrature points and weights.
+
+        Parameters:
+            q (int): The index of the quadrature points.
+            etype (int | str, optional): The topology dimension of the entity to\
+            generate the quadrature points on. Defaults to 'cell'.
+
+        Returns:
+            Quadrature: Object for quadrature points and weights.
+        """
         raise NotImplementedError
 
     def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         """Shape function value on the given bc points, in shape (..., ldof).
 
-        Args:
-            bc (Tensor): The bc points, in shape (..., NVC).
-            p (int, optional): The order of the shape function. Defaults to 1.
-            index (int | slice | Tensor, optional): The index of the cell.
-            variable (str, optional): The variable name. Defaults to 'u'.
+        Parameters:
+            bc (Tensor): The bc points, in shape (..., NVC).\n
+            p (int, optional): The order of the shape function. Defaults to 1.\n
+            index (int | slice | Tensor, optional): The index of the cell.\n
+            variable (str, optional): The variable name. Defaults to 'u'.\n
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
@@ -518,7 +526,7 @@ class SimplexMesh(HomogeneousMesh):
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
-        phi = K.simplex_shape_function(bc, p, mi)
+        phi = F.simplex_shape_function(bc, p, mi)
         if variable == 'u':
             return phi
         elif variable == 'x':
@@ -531,7 +539,7 @@ class SimplexMesh(HomogeneousMesh):
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
-        R = K.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
+        R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':

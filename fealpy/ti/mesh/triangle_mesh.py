@@ -4,7 +4,7 @@ import numpy as np
 import taichi as ti
 
 from .. import logger
-from .. import numpy as np 
+from .. import numpy as tnp  # the numpy interface in taichi 
 
 from .utils import EntityName, Entity
 from .quadrature import TriangleQuadrature 
@@ -58,8 +58,8 @@ class TriangleMesh(MeshDS):
 
     @classmethod
     def from_numpy_mesh(cls, mesh): 
-        node = to_taichi_field(mesh.entity('node'))
-        cell = to_taichi_field(mesh.entity('cell'))
+        node = tnp.array(mesh.entity('node'))
+        cell = tnp.array(mesh.entity('cell'))
         return cls(node, cell)
 
 
