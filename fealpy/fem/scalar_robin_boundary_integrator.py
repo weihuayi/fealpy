@@ -56,6 +56,7 @@ class ScalarRobinBoundaryIntegrator:
         n = mesh.face_unit_normal(index=index) 
 
         FM = kappa*np.einsum('q, qci, qcj, c->cij', ws, phi, phi, measure, optimize=True)
+        print(FM.shape)
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
