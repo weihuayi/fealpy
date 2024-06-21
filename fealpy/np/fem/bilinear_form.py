@@ -4,7 +4,7 @@ from typing import TypeVar, Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix
 
 from .. import logger
 from ..functionspace.space import FunctionSpace
@@ -42,9 +42,9 @@ class BilinearForm(Form[_FS]):
             return self.assembly_for_vspace_with_scalar_basis()
         else:
             # 标量函数空间或基是向量函数的向量函数空间
-            return self.assembly_for_sspace_and_vspace_with_vector_basis()
+            return self.assembly_for_sspace_and_vspace_with_vector_basis(retain_ints=False)
     
-    def assembly_for_sspace_and_vspace_with_vector_basis(self, retain_ints: bool) -> coo_matrix:
+    def assembly_for_sspace_and_vspace_with_vector_basis(self, retain_ints: bool) -> csr_matrix:
         space = self.space
         gdof = space.number_of_global_dofs()
         global_mat_shape = (gdof, gdof)
@@ -52,11 +52,12 @@ class BilinearForm(Form[_FS]):
         M = csr_matrix(global_mat_shape)
 
         for group in self.integrators.keys():
-            group_matrix, e2dof = self._assembly_group(group, retain_ints)
-            I, J = np.meshgrid(e2dof, e2dof, indexing='ij')
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
+            I = np.broadcast_to(e2dof[:, :, None], shape=group_tensor.shape)
+            J = np.broadcast_to(e2dof[:, None, :], shape=group_tensor.shape)
             I = I.ravel()
             J = J.ravel()
-            data = group_matrix.ravel()
+            data = group_tensor.ravel()
             M += csr_matrix((data, (I, J)), shape=global_mat_shape)
         self._M = M
 

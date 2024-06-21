@@ -42,42 +42,29 @@ def process_coef_func(
 
 
 def is_scalar(input: Union[int, float, NDArray]) -> bool:
-    if isinstance(input, NDArray):
-        return input.numel() == 1
+    if isinstance(input, np.ndarray):
+        return input.size == 1
     else:
         return isinstance(input, (int, float))
 
 
 def is_tensor(input: Union[int, float, NDArray]) -> bool:
-    if isinstance(input, NDArray):
-        return input.numel() >= 2
+    if isinstance(input, np.ndarray):
+        return input.size >= 2
     return False
 
 
-def get_coef_subscripts(shape: NDArray, nq: int, nc: int, batched: bool):
-    if batched:
-        coef_shape = shape[1:]
-        if coef_shape == (nq, nc):
-            subs = "bqc"
-        elif coef_shape == (nq, ):
-            subs = "bq"
-        elif coef_shape == (nc, ):
-            subs = "bc"
-        else:
-            raise RuntimeError(f"The shape of the coef should be (Batch, {nq}, {nc}), "
-                               f"(Batch, {nq}) or (Batch, {nc}), but got {tuple(shape)}.")
-
+def get_coef_subscripts(shape: NDArray, nq: int, nc: int):
+    coef_shape = shape
+    if coef_shape == (nq, nc):
+        subs = "qc"
+    elif coef_shape == (nq, ):
+        subs = "q"
+    elif coef_shape == (nc, ):
+        subs = "c"
     else:
-        coef_shape = shape
-        if coef_shape == (nq, nc):
-            subs = "qc"
-        elif coef_shape == (nq, ):
-            subs = "q"
-        elif coef_shape == (nc, ):
-            subs = "c"
-        else:
-            raise RuntimeError(f"The shape of the coef should be ({nq}, {nc}), "
-                               f"({nq}) or ({nc}), but got {tuple(shape)}.")
+        raise RuntimeError(f"The shape of the coef should be ({nq}, {nc}), "
+                        f"({nq}) or ({nc}), but got {tuple(shape)}.")
 
     return subs
 
