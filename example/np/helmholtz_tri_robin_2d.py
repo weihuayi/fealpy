@@ -84,6 +84,7 @@ n = 64
 mesh = TriangleMesh.from_box(domain, nx=n, ny=n)
 mesh.node.astype(complex)
 space = LagrangeFESpace(mesh, p=p)
+space.ftype = np.complex128
 
 b = BilinearForm(space)
 b.add_integrator([D, M])
@@ -98,10 +99,4 @@ F = l.assembly()
 uh = space.function(dtype=np.complex128)
 uh[:] = spsolve(A, F)
 
-uI = space.interpolate(pde.solution)
 
-bc = np.array([1/3, 1/3, 1/3])
-ps = mesh.bc_to_point(bc)
-u = pde.solution(ps)
-uI = uI(bc)
-uh = uh(bc)
