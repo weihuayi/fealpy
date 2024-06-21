@@ -32,7 +32,7 @@ def process_coef_func(
                 raise RuntimeError('The mesh should be provided for cartesian coef functions.'
                                    'Note that only homogeneous meshes are supported here.')
 
-            n = mesh.face_unit_normal(index=index)
+            n = mesh.edge_unit_normal(index=index)
             ps = mesh.bc_to_point(bcs, etype=etype, index=index)
             coef_val = coef(ps)
         else:

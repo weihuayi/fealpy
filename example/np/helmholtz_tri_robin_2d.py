@@ -77,7 +77,7 @@ M = ScalarMassIntegrator(-k**2)
 R = ScalarRobinBoundaryIntegrator(kappa)
 f = ScalarSourceIntegrator(pde.source)
 
-Vr = ScalarRobinSourceIntegrator(pde.robin())
+Vr = ScalarRobinSourceIntegrator(pde.robin)
 
 
 n = 64

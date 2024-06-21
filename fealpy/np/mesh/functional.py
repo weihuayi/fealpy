@@ -124,14 +124,23 @@ def edge_length(points: NDArray, out=None) -> NDArray:
     """
     return np.linalg.norm(points[..., 0, :] - points[..., 1, :], axis=-1)
 
-def edge_normal(edge: NDArray, node: NDArray, 
-        normalize: bool=False) -> NDArray:
-    v = node[edge[:, 1]] - node[edge[:, 0]]
-    #TODO: 旋转
-    if normalize:
-        l = np.linalg.norm(v, axis=-1)
-        return v/l[:, None]
-    return v
+def edge_normal(points: NDArray, unit: bool=False, out=None) -> NDArray:
+    """Edge normal for 2D meshes.
+
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        unit (bool, optional): Whether to normalize the normal. Defaults to False.\n
+        out (Tensor, optional): The output tensor. Defaults to None.
+
+    Returns:
+        Tensor: Normal of edges, shaped [..., GD].
+    """
+    if points.shape[-1] != 2:
+        raise ValueError("Only 2D meshes are supported.")
+    edges = points[..., 1, :] - points[..., 0, :]
+    if unit:
+        edges /= np.linalg.norm(edges, axis=-1, keepdims=True)
+    return np.stack([edges[..., 1], -edges[..., 0]], axis=-1)
 
 def edge_tangent(edge: NDArray, node: NDArray, 
         normalize: bool=False) -> NDArray:
