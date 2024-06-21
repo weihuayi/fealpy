@@ -110,7 +110,7 @@ def homo_entity_barycenter(entity: Tensor, node: Tensor) -> Tensor:
 # =================================
 
 def simplex_ldof(p: int, iptype: int) -> int:
-    r"""Number of local DoFs of a simplex."""
+    r"""Number of local DoFs of a simplex shape."""
     if iptype == 0:
         return 1
     return comb(p + iptype, iptype)
@@ -196,6 +196,21 @@ def simplex_hess_shape_function(bcs: Tensor, p: int, mi: Tensor) -> Tensor:
 
 # Quadrangle & Hexahedron
 # =======================
+
+def tensor_ldof(p: int, iptype: int) -> int:
+    r"""Number of local DoFs of a tensor shape."""
+    return (p + 1) ** iptype
+
+
+def tensor_gdof(p: int, mesh) -> int:
+    r"""Number of global DoFs of a mesh with tensor cells."""
+    coef = 1
+    count = mesh.node.size(0)
+
+    for i in range(1, mesh.TD + 1):
+        coef = coef * (p-i)
+        count += coef * mesh.entity(i).size(0)
+    return count
 
 
 ##################################################
