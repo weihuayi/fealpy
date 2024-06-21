@@ -32,6 +32,7 @@ def process_coef_func(
                 raise RuntimeError('The mesh should be provided for cartesian coef functions.'
                                    'Note that only homogeneous meshes are supported here.')
 
+            n = mesh.face_unit_normal(index=index)
             ps = mesh.bc_to_point(bcs, etype=etype, index=index)
             coef_val = coef(ps)
         else:
@@ -41,14 +42,14 @@ def process_coef_func(
     return coef_val
 
 
-def is_scalar(input: Union[int, float, NDArray]) -> bool:
+def is_scalar(input: Union[int, float,complex, NDArray]) -> bool:
     if isinstance(input, np.ndarray):
         return input.size == 1
     else:
-        return isinstance(input, (int, float))
+        return isinstance(input, (int, float, complex))
 
 
-def is_tensor(input: Union[int, float, NDArray]) -> bool:
+def is_tensor(input: Union[int, float,complex, NDArray]) -> bool:
     if isinstance(input, np.ndarray):
         return input.size >= 2
     return False
