@@ -1,4 +1,5 @@
-from typing import Union, Optional
+from typing import Union, Optional, Sequence
+from functools import reduce
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,7 +8,7 @@ from numpy.linalg import det
 from .utils import estr2dim
 from math import factorial, comb
 
-def multi_index_matrix(p: int, TD: int) -> NDArray:
+def multi_index_matrix(p: int, TD: int, dtype=np.int_) -> NDArray:
     """
     Create a multi-index matrix. 
 
@@ -20,7 +21,7 @@ def multi_index_matrix(p: int, TD: int) -> NDArray:
         idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
         idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
         idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
-        multiIndex = np.zeros((ldof, 4), dtype=np.int_)
+        multiIndex = np.zeros((ldof, 4), dtype=dtype)
         multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
         multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
         multiIndex[1:, 1] = idx0 - idx2
@@ -30,14 +31,14 @@ def multi_index_matrix(p: int, TD: int) -> NDArray:
         ldof = (p+1)*(p+2)//2
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+        multiIndex = np.zeros((ldof, 3), dtype=dtype)
         multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
         multiIndex[:,1] = idx0 - multiIndex[:,2]
         multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
         return multiIndex
     elif TD == 1:
         ldof = p+1
-        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+        multiIndex = np.zeros((ldof, 2), dtype=dtype)
         multiIndex[:, 0] = np.arange(p, -1, -1)
         multiIndex[:, 1] = p - multiIndex[:, 0]
         return multiIndex
@@ -135,6 +136,36 @@ def edge_tangent(edge: NDArray, node: NDArray,
 def entity_barycenter(entity: NDArray, node: NDArray) -> NDArray:
     raise NotImplementedError
 
+##################################################
+### Homogeneous Mesh
+##################################################
+
+def bc_tensor(bcs: Sequence[NDArray]) -> NDArray:
+    num = len(bcs)
+    NVC = reduce(lambda x, y: x * y.shape[-1], bcs, 1)
+    desp1 = 'mnopq'
+    desp2 = 'abcde'
+    string = ", ".join([desp1[i]+desp2[i] for i in range(num)])
+    string += " -> " + desp1[:num] + desp2[:num]
+    return np.einsum(string, *bcs).reshape(-1, NVC)
+
+
+def bc_to_points(bcs: Union[NDArray, Sequence[NDArray]], node: NDArray,
+                 entity: NDArray, order: Optional[NDArray]) -> NDArray:
+    r"""Barycentric coordinates to cartesian coordinates in homogeneous meshes."""
+    if order is not None:
+        entity = entity[:, order]
+    points = node[entity, :]
+
+    if not isinstance(bcs, np.ndarray):
+        bcs = bc_tensor(bcs)
+    return np.einsum('ijk, ...j -> ...ik', points, bcs)
+
+
+def homo_entity_barycenter(entity: NDArray, node: NDArray) -> NDArray:
+    r"""Entity barycenter in homogeneous meshes."""
+    return np.mean(node[entity, :], axis=1)
+
 
 # Interval Mesh & Triangle Mesh & Tetrahedron Mesh
 # ================================================
@@ -153,11 +184,11 @@ def simplex_gdof(p: int, mesh) -> int:
     Number of global DoFs of a mesh with simplex cells.
     """
     coef = 1
-    count = mesh.node.size(0)
+    count = mesh.node.shape[0]
 
     for i in range(1, mesh.TD + 1):
         coef = (coef * (p-i)) // i
-        count += coef * mesh.entity(i).size(0)
+        count += coef * mesh.entity(i).shape[0]
     return count
 
 
@@ -172,12 +203,12 @@ def simplex_measure(points: NDArray):
     Returns:
         Tensor(...,).
     """
-    TD = points.size(-2) - 1
-    if TD != points.size(-1):
+    TD = points.shape[-2] - 1
+    if TD != points.shape[-1]:
         raise RuntimeError("The geometric dimension of points must be NVC-1"
                            "to form a simplex.")
     edges = points[..., 1:, :] - points[..., :-1, :]
-    return det(edges).div(factorial(TD))
+    return det(edges)/(factorial(TD))
 
 
 # Triangle Mesh
@@ -216,12 +247,12 @@ def tri_grad_lambda_2d(points):
     e0 = points[..., 2, :] - points[..., 1, :]
     e1 = points[..., 0, :] - points[..., 2, :]
     e2 = points[..., 1, :] - points[..., 0, :]
-    nv = e0[:, 0] * e1[:, 1] - e0[:, 1] * e1[:, 0]  # Determinant for 2D case, equivalent to np.linalg.det for 2x2 matrix
-    e0 = -e0
-    e1 = -e1
-    e2 = -e2
+    nv = det(np.stack([e0, e1], axis=-2)) # Determinant for 2D case, equivalent to np.linalg.det for 2x2 matrix
+    e0 = np.flip(e0, axis=-1)
+    e1 = np.flip(e1, axis=-1)
+    e2 = np.flip(e2, axis=-1)
     result = np.stack([e0, e1, e2], axis=-2)
-    result[..., 0, :] *= -1
+    result[..., 0] *= -1
     return result / np.expand_dims(nv, axis=(-1, -2))
 
 def tri_grad_lambda_3d(points):

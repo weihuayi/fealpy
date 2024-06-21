@@ -3,7 +3,7 @@ import taiti as ti
 
 from .quadrature import Quadrature
 
-from .... import to_taichi_field
+from ... import numpy as tnp 
 
 # http://keisan.casio.com/exec/system/1280624821
 
@@ -268,6 +268,8 @@ class GaussLegendreQuadrature(Quadrature):
             raise NotImplementedError('quadrature index higher than 20 is not supported now.')
 
         A /= 2.0
-        self.weights = to_taichi_field(A[:, 1].copy())
+        self.weights = tnp.field(A[:, 1].copy())
         A[:, 0] += 0.5
-        self.quadpts = to_taichi_field(A[:, 0]
+        self.quadpts = tnp.field([0.5 + A[:, 0], 0.5 - A[:, 0]])
+        self.NQ = self.weights.shape[0]
+        self.order = self.NQ

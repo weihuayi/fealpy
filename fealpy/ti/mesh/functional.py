@@ -3,13 +3,15 @@ from typing import (
     Literal, TypeVar
 )
 
+from math import factorial, comb
+
 import numpy as np
 import taichi as ti
 
 
 from .. import logger
-from ..sparse import CSRMatrix
 from .. import numpy as tnp
+from ..sparse import CSRMatrix
 
 from .utils import Entity, Field
 
@@ -72,11 +74,12 @@ def multi_index_matrix(p: int, edim: int) -> Field:
         multiIndex[:, 1] = p - multiIndex[:, 0]
         return multiIndex
 
-    return tnp.from_numpy(multiIndex)
+    return tnp.field(multiIndex)
 
 
 def entity_barycenter(entity: Entity, node: Entity):
-
+    """
+    """
     N = entity.shape[0]
     n = entity.shape[1]
     GD = node.shape[1]
@@ -87,7 +90,23 @@ def entity_barycenter(entity: Entity, node: Entity):
     @ti.kernel
     def compute_barycenter():
         for i in range(N):
-            for j in range(n):
-                for d in range(GD):
-                    bc[i, d] += 
+            for d in range(GD):
+                for j in range(n):
+                    bc[i, d] += node[entity[i, j], d] 
+                bc[i, d] /= n  
+    compute_barycenter()
+    return bc
 
+def simplex_ldof(p: int, dim: int) -> int:
+    if dim == 0:
+        return 1
+    return comb(p + dim, dim)
+
+def simplex_gdof(p: int, mesh) -> int:
+    coef = 1
+    count = mesh.node.shape[0]
+    for i in range(1, mesh.TD+1):
+        coef = (coef * (p - i)) //i
+        count += coef * mesh.entity(i).shape[0]
+
+    return count

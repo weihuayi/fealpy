@@ -20,12 +20,14 @@ class OverlapGroundMesh:
     @param cam1: 相机1
     @param uv0: 网格点在相机 0 的图像中的 uv 坐标
     @param uv1: 网格点在相机 1 的图像中的 uv 坐标
+    @param w:   网格点上的图像在相机 0 中的权重
     """
     mesh : list[TriangleMesh] = None
     cam0 : int = None
     cam1 : int = None
     uv0  : np.ndarray = None
     uv1  : np.ndarray = None
+    w    : np.ndarray = None
 
 @dataclass
 class OverlapEllipsoidMesh:
@@ -40,6 +42,7 @@ class OverlapEllipsoidMesh:
     @param dval1: 相机 1 狄利克雷边界条件的节点值
     @param uv0: 网格点在相机 0 的图像中的 uv 坐标
     @param uv1: 网格点在相机 1 的图像中的 uv 坐标
+    @param w:   网格点上的图像在相机 0 中的权重
     """
     mesh : list[TriangleMesh] = None
     cam0 : int = None
@@ -50,6 +53,7 @@ class OverlapEllipsoidMesh:
     dval1: np.ndarray = None
     uv0  : np.ndarray = None
     uv1  : np.ndarray = None
+    w    : np.ndarray = None
 
 @dataclass
 class NonOverlapGroundMesh:
@@ -113,73 +117,66 @@ class Screen:
         self.eillposid_overlapmesh = []
         self.eillposid_nonoverlapmesh = []
 
-        # 判断分区类型和网格化类型
+        # self.optimize()
         self.meshing()
         self.compute_uv()
 
-    def ground_mark_board(self):
+    def get_feature_point(self):
         """
         @brief 获取地面标记点
         """
         gmp = []
         camsys = self.camera_system
-        for i in range(6):
-            ri = (i+1)%6 # 右边相邻相机
-            ps0 = camsys.cameras[ i].ground_feature_points[1]
-            ps1 = camsys.cameras[ri].ground_feature_points[0]
-            ps2 = 0.5*camsys.cameras[ i].to_screen(ps0)
-            ps2+= 0.5*camsys.cameras[ri].to_screen(ps1)
-            for j in range(len(ps0)):
-                gmp.append(GroundMarkPoint(i, ri, ps0[j], ps1[j], ps2[j]))
         return gmp
 
     def optimize(self):
         """
         相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
         """
-        systerm = self.camera_system
-        self.i=0
+        camsys = self.camera_system
+        #self.i=0
         def object_function(x):
             """
             @brief The object function to be optimized.
             @param x The parameters to be optimized.
             """
-            self.i+=1
-            print("Optimization iteration: ", self.i)
-            gmp = self.ground_mark_board()
-            NGMP = len(gmp)
-            x = x.reshape((6, 2, 3))
-            systerm.set_parameters(x)
+            #self.i+=1
+            #print("Optimization iteration: ", self.i)
+            x = x.reshape(6, -1)
+            camsys.set_parameters(x)
 
-            ## 要对齐的点在屏幕上的坐标
-            gmp_screen = np.zeros([NGMP, 2, 3], dtype=np.float_)
-            for i, g in enumerate(gmp): 
-                cam0 = g.cam0
-                point0 = g.points0
-                gmp_screen[i, 0] = systerm.cameras[cam0].to_screen(point0)
-                cam1 = g.cam1
-                point1 = g.points1
-                gmp_screen[i, 1] = systerm.cameras[cam1].to_screen(point1)
-
-            error = np.sum((gmp_screen[:, 0] - gmp_screen[:, 1])**2)
+            error = 0
+            for i in range(6):
+                ps0 = camsys.cameras[i].feature_points["ground"]
+                ps1 = camsys.cameras[i].feature_points["camera_sphere"]
+                ps2 = camsys.cameras[i].to_screen(ps1)
+                error += np.sum((ps0 - ps2[:, :-1])**2)
             print("Error: ", error)
             return error
 
         # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
-        init_x = np.zeros((6, 2, 3), dtype=np.float_)
+        init_x = np.zeros((6, 10), dtype=np.float_)
         for i in range(6):
-            init_x[i, 0] = self.camera_system.cameras[i].location
-            init_x[i, 1] = self.camera_system.cameras[i].eular_angle
-        init_x = init_x.flatten()
+            init_x[i, :3] = camsys.cameras[i].location
+            init_x[i, 3:6] = camsys.cameras[i].eular_angle
+            init_x[i, 6:] = np.array([1.0, 0.000001, 0.000001, 0.000001])
+        print("init error : ", object_function(init_x))
 
         #参数设置
         N = 100
-        dim = 6 * 6
-        ub = init_x + 0.1
-        lb = init_x - 0.1
-        Max_iter = 50
+        dim = 6*10
+        ub = init_x.copy()
+        ub[:, 0:3] += 0.1
+        ub[:, 3:6] += 0.01
+        ub[:, 6:]  += 0.1
+        lb = init_x.copy()
+        lb[:, 0:3] -= 0.1
+        lb[:, 3:6] -= 0.01
+        lb[:, 6]  -= 0.1
+        Max_iter = 10
 
-        opt_alg = COA(N, dim, ub, lb, Max_iter, object_function, init_x)
+        opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
+                      object_function, init_x.flatten())
         bestfitness,best_position,_ = opt_alg.cal()
         print(bestfitness)
         print(best_position)
@@ -311,26 +308,26 @@ class Screen:
             for i in range(len(frag[1]))[2:]:
                 gmsh.model.occ.remove(frag[1][i], recursive=True)
 
-            ground = [[[14], [5, 0]],
+            ground = [[[14], [5, 0, 34, 38]],
                       [[16], [0]],
                       [[18], [1]],
-                      [[21], [1, 2]],
+                      [[21], [1, 2, 45, 49]],
                       [[20], [2]],
-                      [[19], [2, 3]],
+                      [[19], [2, 3, 47, 44]],
                       [[17], [3]],
                       [[15], [4]],
-                      [[13], [4, 5]],
+                      [[13], [4, 5, 37, 36]],
                       [[12], [5]]]
 
-            eillposid = [[[4], [5, 0]],
+            eillposid = [[[4], [5, 0, 3, 12]],
                          [[6], [0]],
                          [[8], [1]],
-                         [[10], [1, 2]],
+                         [[10], [1, 2, 24, 30]],
                          [[11], [2]],
-                         [[9], [2, 3]],
+                         [[9], [2, 3, 27, 21]],
                          [[7], [3]],
                          [[5], [4]],
-                         [[3], [4, 5]],
+                         [[3], [4, 5, 9, 6]],
                          [[2, 1], [5]]]
             return ground, eillposid
         # 重叠分区2
@@ -382,30 +379,30 @@ class Screen:
             for i in range(len(frag[1]))[2:]:
                 gmsh.model.occ.remove(frag[1][i], recursive=True)
 
-            ground = [[[16], [5, 0]],
+            ground = [[[16], [5, 0, 40, 44]],
                       [[18], [0]],
-                      [[20], [0, 1]],
+                      [[20], [0, 1, 47, 51]],
                       [[22], [1]],
-                      [[25], [1, 2]],
+                      [[25], [1, 2, 55, 59]],
                       [[24], [2]],
-                      [[23], [2, 3]],
+                      [[23], [2, 3, 57, 54]],
                       [[21], [3]],
-                      [[19], [3, 4]],
+                      [[19], [3, 4, 50, 46]],
                       [[17], [4]],
-                      [[15], [4, 5]],
+                      [[15], [4, 5, 43, 42]],
                       [[14], [5]]]
 
-            eillposid = [[[4], [5, 0]],
+            eillposid = [[[4], [5, 0, 3, 12]],
                          [[6], [0]],
-                         [[8], [0, 1]],
+                         [[8], [0, 1, 18, 24]],
                          [[10], [1]],
-                         [[12], [1, 2]],
+                         [[12], [1, 2, 30, 36]],
                          [[13], [2]],
-                         [[11], [2, 3]],
+                         [[11], [2, 3, 33, 27]],
                          [[9], [3]],
-                         [[7], [3, 4]],
+                         [[7], [3, 4, 21, 15]],
                          [[5], [4]],
-                         [[3], [4, 5]],
+                         [[3], [4, 5, 9, 6]],
                          [[2, 1], [5]]]
             return ground, eillposid
         else:
@@ -455,13 +452,24 @@ class Screen:
         elif is_eillposid & (not overlap):
             pmesh.didx, pmesh.dval = self._get_didx_dval(pmesh.mesh, cams[0], surfaces, tag2nid, nidxmap)
 
-    def meshing(self, theta = np.pi/6, only_ground=False):#(self, meshing_type:MeshingType):
+    def _get_weight(self, node, l0, l1):
+        """
+        @brief 根据一个点到两个曲线的距离比例计算权重
+        """
+        p0 = gmsh.model.get_closest_point(1, l0, node)
+        p1 = gmsh.model.get_closest_point(1, l1, node)
+        l0 = np.linalg.norm(p0-node)
+        l1 = np.linalg.norm(p1-node)
+        return l0/(l0+l1)
+
+    def meshing(self):
         """
         在屏幕上生成网格，可选择 MeshingType 中提供的网格化方案。
         @param meshing_type: 网格化方案。
         @return:
         """
         gmsh.initialize()
+
 
         gmsh.option.setNumber("Mesh.MeshSizeMax", 1)  # 最大网格尺寸
         gmsh.option.setNumber("Mesh.MeshSizeMin", 0.5)    # 最小网格尺寸
@@ -487,7 +495,7 @@ class Screen:
         # 分区并生成网格
         ground, eillposid = self.partition()
         gmsh.model.occ.synchronize()
-        gmsh.fltk.run()
+        #gmsh.fltk.run()
         gmsh.model.mesh.generate(2)
 
         ## 获取节点
@@ -521,6 +529,7 @@ class Screen:
                 pmesh = OverlapEllipsoidMesh()
                 pmesh.cam0, pmesh.cam1 = cam
                 self._partmeshing(surfaces, node, tag2nid, cam, pmesh, overlap=True, is_eillposid=True)
+                gmsh.model.get_closest_point()
                 self.eillposid_overlapmesh.append(pmesh)
             else:
                 pmesh = NonOverlapEllipsoidMesh()
@@ -600,7 +609,7 @@ class Screen:
         # 计算重叠椭球区域网格的uv坐标
         for mesh in self.eillposid_overlapmesh:
             mesh.uv0 = self._compute_uv_of_eillposid(mesh.mesh, mesh.cam0, mesh.didx0, mesh.dval0)
-            mesh.uv1 = self._compute_uv_of_eillposid(mesh,mesh, mesh.cam1, mesh.didx1, mesh.dval1)
+            mesh.uv1 = self._compute_uv_of_eillposid(mesh.mesh, mesh.cam1, mesh.didx1, mesh.dval1)
 
         # 计算非重叠椭球区域网格的uv坐标
         for mesh in self.eillposid_nonoverlapmesh:

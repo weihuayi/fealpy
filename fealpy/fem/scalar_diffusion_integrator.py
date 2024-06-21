@@ -75,7 +75,7 @@ class ScalarDiffusionIntegrator:
                     raise ValueError(f"coef with shape {coef.shape}! Now we just support shape: (NC, ), (NQ, NC), (GD, GD), (NC, GD, GD) or NQ, NC, GD, GD)")
             else:
                 raise ValueError("coef 不支持该类型")
-
+        # print(D.ravel())
         if out is None:
             return D
 

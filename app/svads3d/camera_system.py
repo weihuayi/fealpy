@@ -23,9 +23,10 @@ class CameraSystem():
         @param parameters: 相机系统的参数。
         """
         for i in range(6):
-            loc = parameters[i, 0]
-            ang = parameters[i, 1]
-            self.cameras[i].set_parameters(loc, ang)
+            loc = parameters[i, :3]
+            ang = parameters[i, 3:6]
+            coe = parameters[i, 6:]
+            self.cameras[i].set_parameters(loc, ang, coe)
 
     def __init__(self, cameras, viewpoint):
         """

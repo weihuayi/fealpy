@@ -1,2 +1,2 @@
 
-from .triangle import TriangleQuadrature
+from .triangle_quadrature import TriangleQuadrature
