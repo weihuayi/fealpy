@@ -469,6 +469,18 @@ class Mesh():
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
 
+    def cell_normal(self, index=np.s_[:], node: Optional[NDArray]=None):
+        """
+        @brief 计算网格单元的外法线方向，适用于三维空间中单元拓扑维数为 2 的情况，
+        比如三维空间中的三角形或四边形网格.
+        """
+        node = self.entity('node') if node is None else node
+        cell = self.entity('cell', index=index)
+        v1 = node[cell[:, 1]] - node[cell[:, 0]]
+        v2 = node[cell[:, 2]] - node[cell[:, 1]]
+        normal = np.cross(v1, v2)
+        return normal
+
     def integral(self, f, q=3, celltype=False):
         """
         @brief 在网格中数值积分一个函数
