@@ -19,3 +19,12 @@ def _dense_ndim(values: Optional[Tensor]):
         return 0
     else:
         return values.ndim - 1
+
+
+def shape_to_strides(shape: _Size, item_size: int):
+    strides = [item_size, ]
+
+    for i in range(len(shape) - 1):
+        strides.append(strides[-1] * shape[-i])
+
+    return tuple(reversed(strides))

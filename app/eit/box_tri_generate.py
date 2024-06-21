@@ -161,26 +161,27 @@ if __name__ == "__main__":
         os.makedirs(output_folder)
 
     from multiprocessing import Pool
-    from fealpy.ml import timer
+    from fealpy.utils import timer
 
     pool = Pool(process_num)
     tmr = timer()
-    tmr.send(None)
+    next(tmr)
 
     NUM = tuple(range(config['head'], config['tail']))
 
     PART = 4
-    TM = int(time())
+    seed = config.get('seed', int(time()))
     # main(NUM, 999, 0)
 
-    pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
-    pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
-    pool.apply_async(main, (NUM[2::PART], 122 + TM, 2))
-    pool.apply_async(main, (NUM[3::PART], 222 + TM, 3))
+    pool.apply_async(main, (NUM[0::PART], 621 + seed, 0))
+    pool.apply_async(main, (NUM[1::PART], 928 + seed, 1))
+    pool.apply_async(main, (NUM[2::PART], 122 + seed, 2))
+    pool.apply_async(main, (NUM[3::PART], 222 + seed, 3))
 
     pool.close()
     pool.join()
 
     tmr.send('stop')
+    next(tmr)
 
     print("Done.")
