@@ -15,7 +15,7 @@ We also hope FEALPy can accelerate the creation and testing of next-gen
 intelligent CAE apps, paving the way for advanced algorithms in industrial
 applications.
 
-FEALPy's development goal is to become the next generation intelligent CAE
+So FEALPy's development goal is to become the next generation intelligent CAE
 simulation computing engine.
 
 The word "FEAL" is an archaic or poetic term in English, meaning faithful or
