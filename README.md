@@ -1,15 +1,20 @@
-# FEALPy: Finite Element Analysis Library in Python
-
-[![Join the chat at https://gitter.im/weihuayi/fealpy](https://badges.gitter.im/weihuayi/fealpy.svg)](https://gitter.im/weihuayi/fealpy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+# FEALPy: Next-Generation Intelligent CAE Simulation Engine
 ![Python package](https://github.com/weihuayi/fealpy/workflows/Python%20package/badge.svg)
 ![Upload Python Package](https://github.com/weihuayi/fealpy/workflows/Upload%20Python%20Package/badge.svg)
 
 ![](./FEALPY.png)
 
-We want to develop an efficient and easy to use finite element software
-package to support our teach and research work. 
+The finite element algorithm is just the starting point for FEALPy, but its goal
+is the sea of stars.
 
-We still have lot work to do. 
+FEALPy is an open-source library for intelligent CAE (Computer-Aided
+Engineering) simulation algorithms. It supports the integration of fundamental
+CAE simulation algorithms with artificial intelligence, aiding in basic research
+and talent development. Additionally, it facilitates the rapid development and
+verification of next-generation intelligent CAE application prototypes, laying a
+solid foundation for the transition of algorithms into industrial simulation
+applications. 
+
 
 # Installation
 
@@ -38,7 +43,8 @@ cd fealpy
 pip install -e .
 ```
 
-If you want to install optional dependencies, such as `pypardiso`, `pyamg`, `meshpy` and so on, you can do so by specifying the [optional] extra:
+If you want to install optional dependencies, such as `pypardiso`, `pyamg`,
+`meshpy` and so on, you can do so by specifying the [optional] extra:
 ```
 pip install -e .[optional]
 ```
