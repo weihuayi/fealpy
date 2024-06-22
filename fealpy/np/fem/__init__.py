@@ -13,10 +13,11 @@ from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 
 ### Face Operator
-
+from .scalar_robin_boundary_integrator import ScalarRobinBoundaryIntegrator
 
 ### Face Source
 from .scalar_boundary_source_integrator import ScalarBoundarySourceIntegrator
+ScalarRobinSourceIntegrator = ScalarBoundarySourceIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC

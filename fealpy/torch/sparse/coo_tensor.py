@@ -27,7 +27,7 @@ class COOTensor():
                 Where D is the number of sparse dimension, and N is the number
                 of non-zeros (nnz).
             values (Tensor | None): non-zero elements, shaped (..., N).
-            spshape (Size | None): shape in the sparse dimensions.
+            spshape (Size | None, optional): shape in the sparse dimensions.
         """
         if device is not None:
             indices = indices.to(device)
@@ -68,7 +68,7 @@ class COOTensor():
 
             # The last dim of values must match the last dim of indices.
             if values.shape[-1] != indices.shape[1]:
-                raise ValueError(f"values must have the same length as indices ({indices.shape[1]}) "
+                raise ValueError(f"values must have the same size as indices ({indices.shape[1]}) "
                                  "in the last dimension (number of non-zero elements), "
                                  f"but got {values.shape[-1]}")
         elif values is None:
@@ -127,6 +127,9 @@ class COOTensor():
 
     def to_dense(self) -> Tensor:
         """Convert the COO tensor to a dense tensor and return as a new object."""
+        if not self.is_coalesced:
+            raise ValueError("indices must be coalesced before calling to_dense()")
+
         kwargs = {'dtype': self.dtype, 'device': self.device}
         dense_tensor = torch.zeros(self.shape, **kwargs)
         slicing = [self.indices[i] for i in range(self.sparse_ndim)]
@@ -144,7 +147,7 @@ class COOTensor():
         specified device."""
         pass
 
-    def coalesce(self, accumulate: bool=True) -> Tensor:
+    def coalesce(self, accumulate: bool=True) -> 'COOTensor':
         """Merge duplicate indices and return as a new COOTensor object.
 
         Parameters:
@@ -162,7 +165,7 @@ class COOTensor():
 
         if self.values is not None:
             dense_ndim = self.dense_ndim
-            value_shape = self.dense_shape + (unique_indices.size(0), )
+            value_shape = self.dense_shape + (unique_indices.size(-1), )
             new_values = torch.zeros(value_shape, **kwargs)
             inverse_indices = inverse_indices[(None,) * dense_ndim + (slice(None),)]
             inverse_indices = inverse_indices.broadcast_to(self.values.shape)
@@ -175,7 +178,7 @@ class COOTensor():
         else:
             if accumulate:
                 ones = torch.ones((self.nnz, ), **kwargs)
-                new_values = torch.zeros((unique_indices.size(0), ), **kwargs)
+                new_values = torch.zeros((unique_indices.size(-1), ), **kwargs)
                 new_values.scatter_add_(-1, inverse_indices, ones)
             else:
                 new_values = None

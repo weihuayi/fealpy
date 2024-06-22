@@ -426,7 +426,7 @@ class SimplexMesh(HomogeneousMesh):
                        variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
-        phi = F.simplex_shape_function(bc, p, mi)
+        phi = F.simplex_shape_function(bc, p, mi, dtype=self.ftype)
         if variable == 'u':
             return phi
         elif variable == 'x':
@@ -439,7 +439,7 @@ class SimplexMesh(HomogeneousMesh):
                             variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
-        R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
+        R = F.simplex_grad_shape_function(bc, p, mi, dtype=self.ftype) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':

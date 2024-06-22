@@ -23,7 +23,6 @@ nu = 1 #运动粘度
 T = 5 #终止时间
 dt = 0.0004 #时间间隔
 t_num = int(T / dt)
-dim = 2 #维数
 box_size = jnp.array([1.0,1.0]) #模拟区域
 
 mesh = NodeMesh.from_tgv_domain(box_size, dx)
@@ -32,9 +31,9 @@ position = mesh.node
 NN = position.shape[0]
 mv = jnp.zeros((NN, 2), dtype=jnp.float64)
 tv = jnp.zeros((NN, 2), dtype=jnp.float64)
-volume = jnp.ones(NN, dtype=jnp.float64) * h**dim
+volume = jnp.ones(NN, dtype=jnp.float64) * dx*dy
 rho = jnp.ones(NN, dtype=jnp.float64) * rho0
-mass = jnp.ones(NN, dtype=jnp.float64) * h**dim * rho0
+mass = jnp.ones(NN, dtype=jnp.float64) * dx*dy * rho0
 eta = jnp.ones(NN, dtype=jnp.float64) * eta0
 external_force = jnp.zeros_like(position)
 displacement, shift = space.periodic(side=box_size)
@@ -65,15 +64,6 @@ mv = mv.at[:,0].set(u0)
 mv = mv.at[:,1].set(v0)
 tv = mv
 
-'''
-fig, ax = plt.subplots()
-mesh.add_plot(ax, color='red', markersize=25)
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.title('NodeSet from TGV Domain')
-plt.show()
-'''
-
 #初始化 nodedate 字典
 mesh.nodedate = {
     "position": position,
@@ -90,4 +80,30 @@ mesh.nodedate = {
 }
 
 kernel = QuinticKernel(h=h,dim=2)
+
+for i in range(t_num):
+    '''
+    solver
+    '''
+
+    mesh.nodedata['mv'] += dt*mesh.nodedata["dmvdt"]
+    mesh.nodedata['tv'] = mesh.nodedata['mv'] + 0.5*dt*mesh.nodata['mv']
+
+
+    mesh.nodedata["position"] = shift_fn(mesh.nodedata["position"], 1.0 * dt * mesh.nodedata["tv"])
+    
+    '''
+    更新neighbor
+    '''
+    '''
+    forward
+    '''
+    '''
+    不需要边界处理
+    '''
+
+
+
+
+
 

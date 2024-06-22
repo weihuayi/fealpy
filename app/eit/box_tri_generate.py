@@ -73,6 +73,7 @@ def neumann(points: Tensor):
 
 def main(sigma_iterable: Sequence[int], seed=0, index=0):
     torch.manual_seed(seed)
+    np.random.seed(seed)
     mesh = TriangleMesh.from_box((-1, 1, -1, 1), EXT, EXT, ftype=DTYPE, device=DEVICE)
     generator = EITDataGenerator(mesh=mesh, p=P, q=Q)
     gn = generator.set_boundary(neumann, batch_size=len(FREQ))
@@ -85,9 +86,16 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
                           dynamic_ncols=True,
                           unit='sample',
                           position=index):
-        ctrs = rand(NUM_CIR, 2, **kwargs) * 1.6 - 0.8 # (NCir, GD)
-        b, _ = torch.min(0.9-torch.abs(ctrs), axis=-1) # (NCir, )
-        rads = rand(NUM_CIR, **kwargs) * (b-0.1) + 0.1 # (NCir, )
+        # ctrs = rand(NUM_CIR, 2, **kwargs) * 1.6 - 0.8 # (NCir, GD)
+        # b, _ = torch.min(0.9-torch.abs(ctrs), axis=-1) # (NCir, )
+        # rads = rand(NUM_CIR, **kwargs) * (b-0.1) + 0.1 # (NCir, )
+
+        ctrs = np.random.rand(NUM_CIR, 2) * 1.6 - 0.8 # (NCir, GD)
+        b = np.min(0.9-np.abs(ctrs), axis=-1) # (NCir, )
+        rads = np.random.rand(NUM_CIR) * (b-0.1) + 0.1 # (NCir, )
+        ctrs = torch.from_numpy(ctrs).to(**kwargs)
+        rads = torch.from_numpy(rads).to(**kwargs)
+
         ls_fn = lambda p: levelset(p, ctrs, rads)
 
         label = generator.set_levelset(SIGMA, ls_fn)
@@ -161,26 +169,27 @@ if __name__ == "__main__":
         os.makedirs(output_folder)
 
     from multiprocessing import Pool
-    from fealpy.ml import timer
+    from fealpy.utils import timer
 
     pool = Pool(process_num)
     tmr = timer()
-    tmr.send(None)
+    next(tmr)
 
     NUM = tuple(range(config['head'], config['tail']))
 
     PART = 4
-    TM = int(time())
+    seed = config.get('seed', int(time()))
     # main(NUM, 999, 0)
 
-    pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
-    pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
-    pool.apply_async(main, (NUM[2::PART], 122 + TM, 2))
-    pool.apply_async(main, (NUM[3::PART], 222 + TM, 3))
+    pool.apply_async(main, (NUM[0::PART], 621 + seed, 0))
+    pool.apply_async(main, (NUM[1::PART], 928 + seed, 1))
+    pool.apply_async(main, (NUM[2::PART], 122 + seed, 2))
+    pool.apply_async(main, (NUM[3::PART], 222 + seed, 3))
 
     pool.close()
     pool.join()
 
     tmr.send('stop')
+    next(tmr)
 
     print("Done.")
