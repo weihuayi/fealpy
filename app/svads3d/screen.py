@@ -456,10 +456,12 @@ class Screen:
         """
         @brief 根据一个点到两个曲线的距离比例计算权重
         """
-        p0 = gmsh.model.get_closest_point(1, l0, node)
-        p1 = gmsh.model.get_closest_point(1, l1, node)
+        p0 = gmsh.model.get_closest_point(1, l0, node)[0]
+        p1 = gmsh.model.get_closest_point(1, l1, node)[0]
         l0 = np.linalg.norm(p0-node)
         l1 = np.linalg.norm(p1-node)
+        if l0+l1<1e-14:
+            return 0.5
         return l0/(l0+l1)
 
     def meshing(self):
@@ -511,11 +513,12 @@ class Screen:
         ## 地面区域网格
         for i, val in enumerate(ground):
             surfaces, cam = val
-            if len(cam)==2: # 重叠区域 
+            if len(cam)==4: # 重叠区域 
                 pmesh = OverlapGroundMesh()
-                pmesh.cam0, pmesh.cam1 = cam
+                pmesh.cam0, pmesh.cam1 = cam[0], cam[1]
                 self._partmeshing(surfaces, node, tag2nid, cam, pmesh, overlap=True)
                 self.ground_overlapmesh.append(pmesh)
+                pmesh.w = np.array([self._get_weight(node, cam[2], cam[3]) for node in pmesh.mesh.entity('node')], dtype=np.float_)
             else:
                 pmesh = NonOverlapGroundMesh()
                 pmesh.cam = cam[0]
@@ -525,12 +528,12 @@ class Screen:
         ## 椭球区域网格
         for i, val in enumerate(eillposid):
             surfaces, cam = val
-            if len(cam)==2:
+            if len(cam)==4:
                 pmesh = OverlapEllipsoidMesh()
-                pmesh.cam0, pmesh.cam1 = cam
+                pmesh.cam0, pmesh.cam1 = cam[0], cam[1]
                 self._partmeshing(surfaces, node, tag2nid, cam, pmesh, overlap=True, is_eillposid=True)
-                gmsh.model.get_closest_point()
                 self.eillposid_overlapmesh.append(pmesh)
+                pmesh.w = np.array([self._get_weight(node, cam[2], cam[3]) for node in pmesh.mesh.entity('node')], dtype=np.float_)
             else:
                 pmesh = NonOverlapEllipsoidMesh()
                 pmesh.cam = cam[0]
@@ -624,11 +627,25 @@ class Screen:
         for mesh in self.ground_nonoverlapmesh:
             mesh.uv = self._compute_uv_of_ground(mesh.mesh, mesh.cam)
 
-    def _display_mesh(self, plotter, mesh, cam, uv):
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-        no = np.concatenate((node[cell].reshape(-1, 3), uv[cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
-        plotter.add_mesh(no, cell=None, texture_path=cam.picture.fname)
+    def _display_mesh(self, plotter, pmesh):
+        cam = self.camera_system.cameras[pmesh.cam]
+        node = pmesh.mesh.entity('node')
+        cell = pmesh.mesh.entity('cell')
+        no = np.concatenate((node[cell].reshape(-1, 3), pmesh.uv[cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
+        plotter.add_mesh(no, cell=None, texture_paths=[cam.picture.fname])
+
+    def _display_overlap_mesh(self, plotter, mesh):
+        cam0 = self.camera_system.cameras[mesh.cam0]
+        cam1 = self.camera_system.cameras[mesh.cam1]
+        cell = mesh.mesh.entity('cell')
+        node = mesh.mesh.entity('node')[cell].reshape(-1, 3)
+        uv0 = mesh.uv0[cell].reshape(-1, 2)
+        uv1 = mesh.uv1[cell].reshape(-1, 2)
+        w   = mesh.w[cell].reshape(-1, 1)
+        has_inf = np.any(np.isinf(w))
+
+        no = np.concatenate((node, uv0, uv1, w), axis=-1, dtype=np.float32)
+        plotter.add_mesh(no, cell=None, texture_paths=[cam0.picture.fname, cam1.picture.fname])
 
     def display(self, plotter):
         """
@@ -638,20 +655,18 @@ class Screen:
         cameras = self.camera_system.cameras
         # 非重叠地面区域网格
         for mesh in self.ground_nonoverlapmesh:
-            self._display_mesh(plotter, mesh.mesh, cameras[mesh.cam], mesh.uv)
+            self._display_mesh(plotter, mesh)
 
         # 非重叠椭球区域网格
         for mesh in self.eillposid_nonoverlapmesh:
-            self._display_mesh(plotter, mesh.mesh, cameras[mesh.cam], mesh.uv)
+            self._display_mesh(plotter, mesh)
 
         # 重叠地面区域网格
         for mesh in self.ground_overlapmesh:
-            self._display_mesh(plotter, mesh.mesh, cameras[mesh.cam0], mesh.uv0)
-            self._display_mesh(plotter, mesh.mesh, cameras[mesh.cam1], mesh.uv1)
+            self._display_overlap_mesh(plotter, mesh)
 
         # 重叠椭球区域网格
         for mesh in self.eillposid_overlapmesh:
-            self._display_mesh(plotter, mesh.mesh, cameras[mesh.cam0], mesh.uv0)
-            self._display_mesh(plotter, mesh.mesh, cameras[mesh.cam1], mesh.uv1)
+            self._display_overlap_mesh(plotter, mesh)
 
 
