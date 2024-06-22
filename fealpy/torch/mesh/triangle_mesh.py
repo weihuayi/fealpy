@@ -58,10 +58,10 @@ class TriangleMesh(SimplexMesh):
             return torch.tensor([0,], dtype=self.ftype, device=self.device)
         elif etype == 1:
             edge = self.entity(1, index)
-            return F.edge_length(node[edge])
+            return F.edge_length(edge, node)
         elif etype == 2:
             cell = self.entity(2, index)
-            return self._cell_area(node[cell])
+            return self._cell_area(cell, node)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
@@ -170,7 +170,7 @@ class TriangleMesh(SimplexMesh):
 
     # shape function
     def grad_lambda(self, index: Index=_S):
-        return self._grad_lambda(self.node[self.cell[index]])
+        return self._grad_lambda(self.cell[index], self.node)
 
     # constructor
     @classmethod

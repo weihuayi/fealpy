@@ -37,30 +37,34 @@ def multi_index_matrix(p: int, dim: int, *, dtype=None, device=None) -> Tensor:
 
 
 ### Leangth of edges
-def edge_length(points: Tensor, out=None) -> Tensor:
+def edge_length(edge: Tensor, node: Tensor, out=None) -> Tensor:
     """Edge length.
 
     Parameters:
-        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        edge (Tensor): Indices of nodes on the two ends of edges, shaped [..., 2].\n
+        node (Tensor): Coordinates of nodes, shaped [N, GD].\n
         out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
         Tensor: Length of edges, shaped [...].
     """
+    points = node[edge, :]
     return norm(points[..., 0, :] - points[..., 1, :], dim=-1, out=out)
 
 
-def edge_normal(points: Tensor, unit: bool=False, out=None) -> Tensor:
+def edge_normal(edge: Tensor, node: Tensor, unit: bool=False, out=None) -> Tensor:
     """Edge normal for 2D meshes.
 
     Parameters:
-        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        edge (Tensor): Indices of nodes on the two ends of edges, shaped [..., 2].\n
+        node (Tensor): Coordinates of nodes, shaped [N, GD].\n
         unit (bool, optional): Whether to normalize the normal. Defaults to False.\n
         out (Tensor, optional): The output tensor. Defaults to None.
 
     Returns:
         Tensor: Normal of edges, shaped [..., GD].
     """
+    points = node[edge, :]
     if points.shape[-1] != 2:
         raise ValueError("Only 2D meshes are supported.")
     edges = points[..., 1, :] - points[..., 0, :]
@@ -137,17 +141,17 @@ def simplex_gdof(p: int, mesh) -> int:
     return count
 
 
-def simplex_measure(points: Tensor) -> Tensor:
-    r"""Entity measurement of a simplex.
+def simplex_measure(simplex: Tensor, node: Tensor) -> Tensor:
+    """Entity measurement of a simplex.
 
     Parameters:
-        points (Tensor[..., NVC, GD]):
-
-        out (Tensor[...,], optional):
+        simplex (Tensor[..., NVC]): Indices of vertices of the simplex.\n
+        node (Tensor[N, GD]): Node coordinates.
 
     Returns:
         Tensor[...,].
     """
+    points = node[simplex, :]
     TD = points.size(-2) - 1
     if TD != points.size(-1):
         raise RuntimeError("The geometric dimension of points must be NVC-1"
@@ -230,15 +234,17 @@ def tensor_gdof(p: int, mesh) -> int:
 # Interval Mesh
 # =============
 
-def int_grad_lambda(points: Tensor) -> Tensor:
-    """grad_lambda function for the interval mesh.
+def int_grad_lambda(line: Tensor, node: Tensor) -> Tensor:
+    """grad_lambda function on lines.
 
     Args:
-        points (Tensor[..., 2, GD]): _description_
+        line (Tensor[..., 2]): Indices of vertices of lines.\n
+        node (Tensor[N, GD]): Node coordinates.
 
     Returns:
         Tensor: grad lambda tensor shaped [..., 2, GD].
     """
+    points = node[line, :]
     v = points[..., 1, :] - points[..., 0, :] # (NC, GD)
     h2 = torch.sum(v**2, dim=-1, keepdim=True)
     v = v.div(h2)
@@ -247,20 +253,23 @@ def int_grad_lambda(points: Tensor) -> Tensor:
 # Triangle Mesh
 # =============
 
-def tri_area_3d(points: Tensor, out: Optional[Tensor]=None) -> Tensor:
+def tri_area_3d(tri: Tensor, node: Tensor, out: Optional[Tensor]=None) -> Tensor:
+    points = node[tri, :]
     return cross(points[..., 1, :] - points[..., 0, :],
                  points[..., 2, :] - points[..., 0, :], dim=-1, out=out) / 2.0
 
 
-def tri_grad_lambda_2d(points: Tensor) -> Tensor:
+def tri_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
     """grad_lambda function for the triangle mesh in 2D.
 
     Parameters:
-        points (Tensor[..., 3, 2]):
+        tri (Tensor[..., 3]): Indices of vertices of triangles.\n
+        node (Tensor[N, 2]): Node coordinates.
 
     Returns:
         Tensor[..., 3, 2]:
     """
+    points = node[tri, :]
     e0 = points[..., 2, :] - points[..., 1, :]
     e1 = points[..., 0, :] - points[..., 2, :]
     e2 = points[..., 1, :] - points[..., 0, :]
@@ -272,14 +281,16 @@ def tri_grad_lambda_2d(points: Tensor) -> Tensor:
     result[..., 0].mul_(-1)
     return result.div_(nv[..., None, None])
 
-def tri_grad_lambda_3d(points: Tensor) -> Tensor:
+def tri_grad_lambda_3d(tri: Tensor, node: Tensor) -> Tensor:
     """
     Parameters:
-        points (Tensor[..., 3, 3]):
+        points (Tensor[..., 3]): Indices of vertices of triangles.\n
+        node (Tensor[N, 3]): Node coordinates.
 
     Returns:
         Tensor[..., 3, 3]:
     """
+    points = node[tri, :]
     e0 = points[..., 2, :] - points[..., 1, :] # (..., 3)
     e1 = points[..., 0, :] - points[..., 2, :]
     e2 = points[..., 1, :] - points[..., 0, :]

@@ -402,7 +402,7 @@ class Mesh(MeshDS):
             Tensor[NE,]: Length of edges, shaped [NE,].
         """
         edge = self.entity(1, index=index)
-        return F.edge_length(self.node[edge], out=out)
+        return F.edge_length(edge, self.node, out=out)
 
     def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
         """Calculate the normal of the edges.
@@ -416,7 +416,7 @@ class Mesh(MeshDS):
             Tensor[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return F.edge_normal(self.node[edge], unit=unit, out=out)
+        return F.edge_normal(edge, self.node, unit=unit, out=out)
 
     def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
         """Calculate the unit normal of the edges.
@@ -476,7 +476,7 @@ class Mesh(MeshDS):
 
     def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
-        """Shape function value on the given bc points, in shape (..., ldof, bc).
+        """Gradient of shape function on the given bc points, in shape (..., ldof, bc).
 
         Parameters:
             bc (Tensor): The bc points, in shape (NQ, bc).\n
@@ -619,3 +619,15 @@ class StructuredMesh(HomogeneousMesh):
             self._entity_storage[etype_dim] = entity
 
             return entity
+
+    def _node(self):
+        raise NotImplementedError
+
+    def _edge(self):
+        raise NotImplementedError
+
+    def _face(self):
+        raise NotImplementedError
+
+    def _cell(self):
+        raise NotImplementedError
