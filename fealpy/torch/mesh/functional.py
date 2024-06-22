@@ -91,14 +91,24 @@ def bc_tensor(bcs: Sequence[Tensor]) -> Tensor:
 
 def bc_to_points(bcs: Union[Tensor, Sequence[Tensor]], node: Tensor,
                  entity: Tensor, order: Optional[Tensor]) -> Tensor:
-    r"""Barycentric coordinates to cartesian coordinates in homogeneous meshes."""
+    """Barycentric coordinates to cartesian coordinates in homogeneous meshes.
+
+    Parameters:
+        bcs (Tensor | Sequence[Tensor]): Barycentric coordinates, shaped (..., bc).\n
+        node (Tensor): Node coordinates.\n
+        entity (Tensor): Entity indices.\n
+        order (Tensor | None): Order of entities. Defaults to None.
+
+    Returns:
+        Tensor[NC, ..., GD]: Cartesian coordinates.
+    """
     if order is not None:
         entity = entity[:, order]
     points = node[entity, :]
 
     if not isinstance(bcs, Tensor):
         bcs = bc_tensor(bcs)
-    return torch.einsum('ijk, ...j -> ...ik', points, bcs)
+    return torch.einsum('ijk, ...j -> i...k', points, bcs)
 
 
 def homo_entity_barycenter(entity: Tensor, node: Tensor) -> Tensor:

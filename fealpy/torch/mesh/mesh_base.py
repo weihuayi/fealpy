@@ -462,20 +462,33 @@ class Mesh(MeshDS):
         """Shape function value on the given bc points, in shape (..., ldof).
 
         Parameters:
-            bc (Tensor): The bc points, in shape (..., NVC).\n
+            bc (Tensor): The bc points, in shape (NQ, bc).\n
             p (int, optional): The order of the shape function. Defaults to 1.\n
             index (int | slice | Tensor, optional): The index of the cell.\n
             variable (str, optional): The variable name. Defaults to 'u'.\n
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
-            Tensor: The shape function value with shape (..., ldof). The shape will\
-            be (..., 1, ldof) if `variable == 'x'`.
+            Tensor: The shape function value with shape (NQ, ldof). The shape will\
+            be (1, NQ, ldof) if `variable == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
     def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        """Shape function value on the given bc points, in shape (..., ldof, bc).
+
+        Parameters:
+            bc (Tensor): The bc points, in shape (NQ, bc).\n
+            p (int, optional): The order of the shape function. Defaults to 1.\n
+            index (int | slice | Tensor, optional): The index of the cell.\n
+            variable (str, optional): The variable name. Defaults to 'u'.\n
+            mi (Tensor, optional): The multi-index matrix. Defaults to None.
+
+        Returns:
+            Tensor: The shape function value with shape (NQ, ldof, bc). The shape will\
+            be (NC, NQ, ldof, GD) if `variable == 'x'`.
+        """
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
     def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
@@ -535,7 +548,7 @@ class SimplexMesh(HomogeneousMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(1)
+            return phi.unsqueeze_(0)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -549,8 +562,8 @@ class SimplexMesh(HomogeneousMesh):
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
-            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
+            gphi = torch.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
+            # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
