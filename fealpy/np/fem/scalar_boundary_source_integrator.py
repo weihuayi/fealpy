@@ -48,7 +48,8 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, fm, index = self.fetch(space)
-        val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='face', index=index) # TODO: support normal derivative
+        n = mesh.edge_unit_normal(index=index)
+        val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='face', index=index, n=n) # TODO: support normal derivative
 
         if self.zero_integral:
             if not isinstance(val, NDArray):

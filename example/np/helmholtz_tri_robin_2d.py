@@ -1,102 +1,72 @@
 
-import argparse
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.sparse.linalg import spsolve
+
+CONTEXT = 'numpy'
 
 from fealpy.pde.helmholtz_2d import HelmholtzData2d
 
-#三角形网格
+from fealpy.mesh import TriangleMesh as TMD
+from fealpy.utils import timer
+
 from fealpy.np.mesh import TriangleMesh
-
-# 拉格朗日有限元空间
 from fealpy.np.functionspace import LagrangeFESpace
+from fealpy.np.fem import (
+    BilinearForm, LinearForm,
+    ScalarMassIntegrator,
+    ScalarDiffusionIntegrator,
+    ScalarSourceIntegrator,
+    ScalarRobinSourceIntegrator,
+    ScalarRobinBoundaryIntegrator
+)
 
-#区域积分子
-from fealpy.np.fem import ScalarDiffusionIntegrator      # (A\nabla u, \nabla v)
-from fealpy.np.fem import ScalarMassIntegrator           # (r*u, v)
-from fealpy.np.fem import ScalarSourceIntegrator         # (f, v)
+from scipy.sparse.linalg import spsolve
 
-#边界积分子
-from fealpy.np.fem import ScalarRobinSourceIntegrator    # <g_R, v>
-from fealpy.np.fem import ScalarRobinBoundaryIntegrator  # <kappa*u, v>
+from matplotlib import pyplot as plt 
 
-#双线性形
-from fealpy.np.fem import BilinearForm
 
-#线性形
-from fealpy.np.fem import LinearForm
-
-## 参数解析
-parser = argparse.ArgumentParser(description=
-        """
-        TriangleMesh 上任意次有限元方法求解二维 Helmholtz 方程 
-        """)
-
-parser.add_argument('--degree',
-        default=1, type=int,
-        help='Lagrange 有限元空间的次数, 默认为 1 次.')
-
-parser.add_argument('--wavenum', 
-        default=1, type=int,
-        help='模型的波数, 默认为 1.')
-
-parser.add_argument('--cip', nargs=2,
-        default=[0, 0], type=float,
-        help=' CIP-FEM 的系数, 默认取值 0, 即标准有限元方法.')
-
-parser.add_argument('--ns',
-        default=20, type=int,
-        help='初始网格 x 和 y 方向剖分段数, 默认 20 段.')
-
-parser.add_argument('--maxit',
-        default=4, type=int,
-        help='默认网格加密求解的次数, 默认加密求解 4 次')
-
-args = parser.parse_args()
-k = args.wavenum
+k = 1
 kappa = k * 1j
-c = complex(args.cip[0], args.cip[1])
-ns = args.ns
-maxit = args.maxit
-p=1
-
 pde = HelmholtzData2d(k=k) 
 domain = pde.domain()
+NX, NY = 64, 64
 
-errorType = ['$|| u - u_I||_{\Omega,0}$',
-             '$|| \\nabla u - \\nabla u_I||_{\Omega, 0}$',
-             '$|| u - u_h||_{\Omega,0}$',
-             '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$',
-             ]
+tmr = timer()
 
-errorMatrix = np.zeros((4, maxit), dtype=np.float64)
+mesh_plot = TMD.from_box(nx=NX, ny=NY)
+next(tmr)
 
-D = ScalarDiffusionIntegrator()
-M = ScalarMassIntegrator(-k**2)
-R = ScalarRobinBoundaryIntegrator(kappa)
-f = ScalarSourceIntegrator(pde.source)
+mesh = TriangleMesh.from_box(domain, nx=NX, ny=NY)
 
-Vr = ScalarRobinSourceIntegrator(pde.robin)
-
-
-n = 64
-mesh = TriangleMesh.from_box(domain, nx=n, ny=n)
-mesh.node.astype(complex)
-space = LagrangeFESpace(mesh, p=p)
+space = LagrangeFESpace(mesh, p=1)
 space.ftype = np.complex128
+tmr.send('mesh_and_space')
 
 b = BilinearForm(space)
-b.add_integrator([D, M])
-b.add_integrator(R)
+b.add_integrator([ScalarDiffusionIntegrator(), 
+                  ScalarMassIntegrator(-k**2)])
+b.add_integrator(ScalarRobinBoundaryIntegrator(kappa))
 
 l = LinearForm(space)
-l.add_integrator([f, Vr])
+l.add_integrator(ScalarSourceIntegrator(pde.source))
+l.add_integrator(ScalarRobinSourceIntegrator(pde.robin))
+tmr.send('forms')
 
 A = b.assembly() 
 F = l.assembly()
+tmr.send('assembly')
 
 uh = space.function(dtype=np.complex128)
 uh[:] = spsolve(A, F)
+value = space.value(uh, np.array([[1/3, 1/3, 1/3]], dtype=np.float64))
+tmr.send('spsolve')
+next(tmr)
 
+fig = plt.figure(figsize=(12, 9))
+fig.tight_layout()
+fig.suptitle('Solving Helmholtz equation on 2D Triangle mesh')
 
+axes = fig.add_subplot(1, 2, 1)
+mesh_plot.add_plot(axes, cellcolor=np.real(value), cmap='jet', linewidths=0, showaxis=True)
+axes = fig.add_subplot(1, 2, 2)
+mesh_plot.add_plot(axes, cellcolor=np.imag(value), cmap='jet', linewidths=0, showaxis=True)
+plt.show()
