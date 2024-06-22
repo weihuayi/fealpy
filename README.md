@@ -1,4 +1,4 @@
-# FEALPy: Next-Generation Intelligent CAE Simulation Engine
+# FEALPy:Finite Element Analysis Library in Python 
 ![Python package](https://github.com/weihuayi/fealpy/workflows/Python%20package/badge.svg)
 ![Upload Python Package](https://github.com/weihuayi/fealpy/workflows/Upload%20Python%20Package/badge.svg)
 
@@ -12,8 +12,11 @@ algorithms, integrating CAE fundamentals with AI to support advanced algorithm
 research and the cultivation of versatile talent.
 
 We also hope FEALPy can accelerate the creation and testing of next-gen
-intelligent CAE prototypes, paving the way for advanced algorithms in industrial
+intelligent CAE apps, paving the way for advanced algorithms in industrial
 applications.
+
+FEALPy's development goal is to become the next generation intelligent CAE
+simulation computing engine.
 
 The word "FEAL" is an archaic or poetic term in English, meaning faithful or
 loyal. Though not commonly used in modern English, it carries strong
