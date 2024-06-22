@@ -46,9 +46,9 @@ class IntervalMesh(SimplexMesh):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    # integrator
-    def integrator(self, q: int, etype: Union[int, str]='cell',
-                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+    # quadrature
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import GaussLegendreQuadrature
 
         if isinstance(etype, str):
