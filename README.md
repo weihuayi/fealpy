@@ -4,17 +4,29 @@
 
 ![](./FEALPY.png)
 
-The finite element algorithm is just the starting point for FEALPy, but its goal
-is the sea of stars.
+While beginning with the finite element algorithm, FEALPy's sights are set on
+exploring vast horizons.
 
-FEALPy is an open-source library for intelligent CAE (Computer-Aided
-Engineering) simulation algorithms. It supports the integration of fundamental
-CAE simulation algorithms with artificial intelligence, aiding in basic research
-and talent development. Additionally, it facilitates the rapid development and
-verification of next-generation intelligent CAE application prototypes, laying a
-solid foundation for the transition of algorithms into industrial simulation
-applications. 
+We hope FEALPy will be an open-source library for intelligent CAE simulation
+algorithms, integrating CAE fundamentals with AI to support advanced algorithm
+research and the cultivation of versatile talent.
 
+We also hope FEALPy can accelerate the creation and testing of next-gen
+intelligent CAE prototypes, paving the way for advanced algorithms in industrial
+applications.
+
+The word "FEAL" is an archaic or poetic term in English, meaning faithful or
+loyal. Though not commonly used in modern English, it carries strong
+connotations of unwavering dedication and reliability.
+
+The name "FEALPy" embodies this essence of loyalty and faithfulness. It
+signifies the software's commitment to being a dependable and trustworthy tool
+in the field of intelligent CAE simulation. Just as "FEAL" suggests
+steadfastness, FEALPy aims to provide consistent, reliable support for
+researchers, engineers, and developers in their pursuit of innovative solutions
+and advancements in CAE simulations. The name reflects the software's mission to
+be a loyal companion in the journey toward groundbreaking discoveries and
+industrial applications.
 
 # Installation
 
