@@ -43,7 +43,7 @@ def multi_index_matrix(p: int, TD: int, dtype=np.int_) -> NDArray:
         multiIndex[:, 1] = p - multiIndex[:, 0]
         return multiIndex
 
-def simplex_shape_function(bc: NDArray, p: int =1, mi: NDArray=None):
+def simplex_shape_function(bc: NDArray, p: int =1, mi: NDArray=None, dtype=np.int_):
     """
     Create simple shape function.
 
@@ -63,7 +63,7 @@ def simplex_shape_function(bc: NDArray, p: int =1, mi: NDArray=None):
     P = 1.0/np.multiply.accumulate(c)
     t = np.arange(0, p)
     shape = bc.shape[:-1]+(p+1, TD+1)
-    A = np.ones(shape, dtype=bc.dtype)
+    A = np.ones(shape, dtype=dtype)
     A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
     np.cumprod(A, axis=-2, out=A)
     A[..., 1:, :] *= P.reshape(-1, 1)
@@ -72,7 +72,7 @@ def simplex_shape_function(bc: NDArray, p: int =1, mi: NDArray=None):
     return phi
 
 
-def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None) -> NDArray:
+def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None, dtype=np.int_) -> NDArray:
     """
     Create simple grad shape function.
 
@@ -87,13 +87,13 @@ def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None) -> NDA
 
     t = np.arange(0, p)
     shape = bc.shape[:-1]+(p+1, TD+1)
-    A = np.ones(shape, dtype=bc.dtype)
+    A = np.ones(shape, dtype=dtype)
     A[..., 1:, :] = p*bc[..., None, :] - t.reshape(-1, 1)
 
     FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
     FF[..., range(p), range(p)] = p
     np.cumprod(FF, axis=-2, out=FF)
-    F = np.zeros(shape, dtype=bc.dtype)
+    F = np.zeros(shape, dtype=dtype)
     F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
     F[..., 1:, :] *= P.reshape(-1, 1)
 
@@ -104,7 +104,7 @@ def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None) -> NDA
     M = F[..., mi, range(TD+1)]
 
     shape = bc.shape[:-1]+(ldof, TD+1)
-    R = np.zeros(shape, dtype=bc.dtype)
+    R = np.zeros(shape, dtype=dtype)
     for i in range(TD+1):
         idx = list(range(TD+1))
         idx.remove(i)
@@ -112,18 +112,35 @@ def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None) -> NDA
     return R # (..., ldof, TD+1)
 
 ### Length of edges
-def edge_length(edge: NDArray, node: NDArray) -> NDArray:
-    v = node[edge[:, 1]] - node[edge[:, 0]]
-    return np.linalg.norm(points, axis=-1)
+def edge_length(points: NDArray, out=None) -> NDArray:
+    """Edge length.
 
-def edge_normal(edge: NDArray, node: NDArray, 
-        normalize: bool=False) -> NDArray:
-    v = node[edge[:, 1]] - node[edge[:, 0]]
-    #TODO: 旋转
-    if normalize:
-        l = np.linalg.norm(v, axis=-1)
-        return v/l[:, None]
-    return v
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        out (Tensor, optional): The output tensor. Defaults to None.
+
+    Returns:
+        Tensor: Length of edges, shaped [...].
+    """
+    return np.linalg.norm(points[..., 0, :] - points[..., 1, :], axis=-1)
+
+def edge_normal(points: NDArray, unit: bool=False, out=None) -> NDArray:
+    """Edge normal for 2D meshes.
+
+    Parameters:
+        points (Tensor): Coordinates of points in two ends of edges, shaped [..., 2, GD].\n
+        unit (bool, optional): Whether to normalize the normal. Defaults to False.\n
+        out (Tensor, optional): The output tensor. Defaults to None.
+
+    Returns:
+        Tensor: Normal of edges, shaped [..., GD].
+    """
+    if points.shape[-1] != 2:
+        raise ValueError("Only 2D meshes are supported.")
+    edges = points[..., 1, :] - points[..., 0, :]
+    if unit:
+        edges /= np.linalg.norm(edges, axis=-1, keepdims=True)
+    return np.stack([edges[..., 1], -edges[..., 0]], axis=-1)
 
 def edge_tangent(edge: NDArray, node: NDArray, 
         normalize: bool=False) -> NDArray:

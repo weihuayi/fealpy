@@ -80,17 +80,24 @@ def bilinear_integral(input1: NDArray, input2: NDArray, weights: NDArray, measur
         Tensor[C, I, J]: The result of the integration.
         If `batched == True`, the shape of the output is (B, C, I, J).
     """
+    if len(input1.shape)==4:
+        input1sub = 'qcid'
+        input2sub = 'qcjd'
+    else:
+        input1sub = 'qci'
+        input2sub = 'qcj'
+
     if coef is None:
-        return np.einsum('q, c, qcid, qcjd -> cij', weights, measure, input1, input2)
+        return np.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2)
 
     NQ = weights.shape[0]
     NC = measure.shape[0]
 
     if is_scalar(coef):
-        return np.einsum('q, c, qcid, qcjd -> cij', weights, measure, input1, input2) * coef
+        return np.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2) * coef
     elif is_tensor(coef):
         out_subs = 'cij'
         subs = get_coef_subscripts(coef.shape, NQ, NC)
-        return np.einsum(f'q, c, qcid, qcjd, {subs} -> {out_subs}', weights, measure, input1, input2, coef)
+        return np.einsum(f'q, c, {input1sub}, {input2sub}, {subs} -> {out_subs}', weights, measure, input1, input2, coef)
     else:
         raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")

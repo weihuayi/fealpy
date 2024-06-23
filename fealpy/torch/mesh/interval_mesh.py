@@ -42,13 +42,13 @@ class IntervalMesh(SimplexMesh):
             return torch.zeros((1,), dtype=node.dtype, device=node.device)
         elif etype == 1:
             edge = self.entity(1, index)
-            return F.edge_length(node[edge])
+            return F.edge_length(edge, node)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    # integrator
-    def integrator(self, q: int, etype: Union[int, str]='cell',
-                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+    # quadrature
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import GaussLegendreQuadrature
 
         if isinstance(etype, str):
@@ -95,7 +95,7 @@ class IntervalMesh(SimplexMesh):
 
     # shape function
     def grad_lambda(self, index: Index=_S):
-        return F.int_grad_lambda(self.node[self.cell[index]])
+        return F.int_grad_lambda(self.cell[index], self.node)
 
     # constructor
     @classmethod

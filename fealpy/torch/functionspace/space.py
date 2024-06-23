@@ -16,7 +16,7 @@ class _FunctionSpace(metaclass=ABCMeta):
     ftype: torch.dtype
     itype: torch.dtype
 
-    ### basis
+    # basis
     @abstractmethod
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
     @abstractmethod
@@ -43,6 +43,18 @@ class _FunctionSpace(metaclass=ABCMeta):
                     uh: Tensor, dim: Optional[int]=None, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
+    # function
+    def array(self, dim: int=0) -> Tensor:
+        GDOF = self.number_of_global_dofs()
+        kwargs = {'device': self.device, 'dtype': self.ftype}
+
+        if dim  == 0:
+            shape = (GDOF, )
+        else:
+            shape = (GDOF, dim)
+
+        return torch.zeros(shape, **kwargs)
+
 
 _FS = TypeVar('_FS', bound=_FunctionSpace)
 
@@ -54,14 +66,14 @@ class Function(Tensor, Generic[_FS]):
     # and subject to change. Please do not use them for anything important until
     # they are released as stable.
     @staticmethod
-    def __new__(cls, space: _FS, tensor: Tensor, dim: int) -> Tensor:
+    def __new__(cls, space: _FS, tensor: Tensor, dof_dim: int) -> Tensor:
         assert isinstance(space, _FunctionSpace)
         tensor = tensor.to(device=space.device, dtype=space.ftype)
         names = [None] * tensor.ndim
-        names[dim] = 'gdof'
+        names[dof_dim] = 'gdof'
         return Tensor._make_subclass(cls, tensor).refine_names(*names)
 
-    def __init__(self, space: _FS, tensor: Tensor, dim: int) -> None:
+    def __init__(self, space: _FS, tensor: Tensor, dof_dim: int) -> None:
         self.space = space
 
     def __call__(self, bc: Tensor, index=_S) -> Tensor:
@@ -79,6 +91,11 @@ class Function(Tensor, Generic[_FS]):
 
 
 class FunctionSpace(_FunctionSpace):
-    def function(self, tensor: Optional[Tensor]=None, dim: int=-1):
-        func_ = Function(self, tensor, dim)
+    def function(self, tensor: Optional[Tensor]=None, dim: int=0):
+        if tensor is None:
+            tensor = self.array(dim=dim)
+
+        dof_dim = -1 if dim == 0 else -2
+        func_ = Function(self, tensor, dof_dim=dof_dim)
+
         return func_
