@@ -14,7 +14,7 @@ import jax.numpy as jnp
 ### Mesh
 ##################################################
 
-def multi_index_matrix(p: int, etype: int, *, dtype=None) -> Array:
+def multi_index_matrix(p: int, etype: int, *, dtype=None) -> ArrayLike:
     r"""Create a multi-index matrix."""
     dtype = dtype or jnp.int_
     sep = np.flip(np.array(
@@ -31,7 +31,7 @@ def multi_index_matrix(p: int, etype: int, *, dtype=None) -> Array:
 ### Homogeneous Mesh
 ##################################################
 
-def bc_tensor(bcs: Sequence[Array]):
+def bc_tensor(bcs: Sequence[ArrayLike]):
     num = len(bcs)
     NVC = reduce(lambda x, y: x * y.shape[-1], bcs, 1)
     desp1 = 'mnopq'
@@ -41,19 +41,19 @@ def bc_tensor(bcs: Sequence[Array]):
     return jnp.einsum(string, *bcs).reshape(-1, NVC)
 
 
-def bc_to_points(bcs: Union[Array, Sequence[Array]], node: Array,
-                 entity: Array, order: Optional[Array]) -> Array:
+def bc_to_points(bcs: Union[ArrayLike, Sequence[ArrayLike]], node: ArrayLike,
+                 entity:ArrayLike, order: Optional[ArrayLike]) -> ArrayLike:
     r"""Barycentric coordinates to cartesian coordinates in homogeneous meshes."""
     if order is not None:
         entity = entity[:, order]
     points = node[entity, :]
 
-    if not isinstance(bcs, Array):
+    if not isinstance(bcs, ArrayLike):
         bcs = bc_tensor(bcs)
     return jnp.einsum('ijk, ...j -> ...ik', points, bcs)
 
 
-def homo_entity_barycenter(entity: Array, node: Array):
+def homo_entity_barycenter(entity: ArrayLike, node: ArrayLike):
     r"""Entity barycenter in homogeneous meshes."""
     return jnp.mean(node[entity, :], axis=1)
 
