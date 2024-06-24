@@ -117,7 +117,7 @@ class Screen:
         self.eillposid_overlapmesh = []
         self.eillposid_nonoverlapmesh = []
 
-        # self.optimize()
+        self.optimize()
         self.meshing()
         self.compute_uv()
 
@@ -168,12 +168,12 @@ class Screen:
         ub = init_x.copy()
         ub[:, 0:3] += 0.1
         ub[:, 3:6] += 0.01
-        ub[:, 6:]  += 0.1
+        ub[:, 6:]  += 10
         lb = init_x.copy()
         lb[:, 0:3] -= 0.1
         lb[:, 3:6] -= 0.01
         lb[:, 6]  -= 0.1
-        Max_iter = 10
+        Max_iter = 50
 
         opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
                       object_function, init_x.flatten())
