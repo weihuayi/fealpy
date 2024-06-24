@@ -1,12 +1,10 @@
 
-
 from typing import (
     Literal, Callable, Optional, Union, TypeVar,
     overload, Dict, Any, Sequence, Tuple
 )
 from numpy.typing import NDArray
 
-import jax
 import jax.numpy as jnp
 
 from . import functional as F
