@@ -3,7 +3,7 @@ from typing import (
     Literal, Callable, Optional, Union, TypeVar,
     overload, Dict, Any, Sequence, Tuple
 )
-from numpy.typing import NDArray
+import numpy as np
 
 import jax.numpy as jnp
 
@@ -11,6 +11,10 @@ from . import functional as F
 from .quadrature import Quadrature
 from .utils import Array, EntityName, Index, _int_func, _S, _T, _dtype, _device, estr2dim, edim2entity, edim2node, mesh_top_csr
 from .. import logger
+
+from jax.config import config
+
+config.update("jax_enable_x64", True)
 
 ##################################################
 ### Mesh Data Structure Base
@@ -49,22 +53,10 @@ class MeshDS():
         else:
             super().__setattr__(name, value)
 
-    ### cuda
-    def to(self, device: Union[_device, str, None]=None, non_blocking=False):
-        for entity_Array in self._entity_storage.values():
-            entity_Array.to(device, non_blocking=non_blocking)
-        for attr in self.__dict__:
-            value = self.__dict__[attr]
-            if isinstance(value, Array):
-                self.__dict__[attr] = value.to(device, non_blocking=non_blocking)
-        return self
-
     ### properties
     def top_dimension(self) -> int: return self.TD
     @property
     def itype(self) -> _dtype: return self.cell.dtype
-    @property
-    def device(self) -> _device: return self.cell.device
     def storage(self) -> Dict[int, Array]:
         return self._entity_storage
 
@@ -229,12 +221,13 @@ class MeshDS():
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
-        NC = self.cell.shape[0]
-        NFC = self.cell.shape[1]
+        NC = self.number_of_cells()
+        NFC = self.number_of_faces_of_cells()
 
         totalFace = self.total_face()
+        sorted_face = jnp.sort(totalFace, axis=1)
         _, i0_np, j_np = jnp.unique(
-            jnp.sort(totalFace, dim=1)[0],
+            sorted_face,
             return_index=True,
             return_inverse=True,
             axis=0
@@ -243,7 +236,7 @@ class MeshDS():
         NF = i0_np.shape[0]
 
         i1_np = jnp.zeros(NF, dtype=i0_np.dtype)
-        i1_np[j_np] = jnp.arange(NFC*NC, dtype=i0_np.dtype)
+        i1_np = i1_np.at[j_np].set(jnp.arange(NFC*NC, dtype=i0_np.dtype))
 
         self.cell2edge = j_np.reshape(NC, NFC)
         self.cell2face = self.cell2edge
@@ -269,7 +262,7 @@ class MeshDS():
             self.edge2cell = self.face2cell
 
         logger.info(f"Mesh toplogy relation constructed, with {NF} faces, "
-                    f"on device {self.device}")
+                    f"on cpu")
 
 
 ##################################################
@@ -295,7 +288,7 @@ class Mesh(MeshDS):
     GD = property(geo_dimension)
 
     def multi_index_matrix(self, p: int, etype: int) -> Array:
-        return F.multi_index_matrix(p, etype, dtype=self.itype, device=self.device)
+        return F.multi_index_matrix(p, etype, dtype=self.itype)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> Array:
         """Get the barycenter of the entity.
@@ -469,7 +462,7 @@ class SimplexMesh(HomogeneousMesh):
     def shape_function(self, bc: Array, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[Array]=None) -> Array:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
         phi = F.simplex_shape_function(bc, p, mi)
         if variable == 'u':
             return phi
@@ -482,7 +475,7 @@ class SimplexMesh(HomogeneousMesh):
     def grad_shape_function(self, bc: Array, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Array]=None) -> Array:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype, device=self.device)
+        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
         R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R
