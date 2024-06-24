@@ -125,8 +125,9 @@ class MeshDS():
 
     ### cuda
     def to(self, device: Union[_device, str, None]=None, non_blocking=False):
-        for entity_tensor in self._entity_storage.values():
-            entity_tensor.to(device, non_blocking=non_blocking)
+        for edim in self._entity_storage.keys():
+            entity = self._entity_storage[edim]
+            self._entity_storage[edim] = entity.to(device, non_blocking=non_blocking)
         for attr in self.__dict__:
             value = self.__dict__[attr]
             if isinstance(value, torch.Tensor):
@@ -303,8 +304,8 @@ class MeshDS():
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
-        NC = self.cell.shape[0]
-        NFC = self.cell.shape[1]
+        NC = self.number_of_cells()
+        NFC = self.number_of_faces_of_cells()
 
         totalFace = self.total_face()
         _, i0_np, j_np = np.unique(
@@ -319,12 +320,10 @@ class MeshDS():
         i1_np = np.zeros(NF, dtype=i0_np.dtype)
         i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
 
-        self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
-        self.cell2face = self.cell2edge
+        self.cell2face = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
 
         face2cell_np = np.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
         self.face2cell = torch.from_numpy(face2cell_np).to(self.device)
-        self.edge2cell = self.face2cell
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
@@ -341,6 +340,7 @@ class MeshDS():
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell
+            self.cell2edge = self.cell2face
 
         logger.info(f"Mesh toplogy relation constructed, with {NF} faces, "
                     f"on device {self.device}")
