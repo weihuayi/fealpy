@@ -36,8 +36,10 @@ class TriangleMesh(SimplexMesh):
         self.construct()
 
         self.node = node
-        GD = node.size(-1)
+        self._attach_functionals()
 
+    def _attach_functionals(self):
+        GD = self.geo_dimension()
         if GD == 2:
             self._cell_area = F.simplex_measure
             self._grad_lambda = F.tri_grad_lambda_2d
@@ -225,3 +227,28 @@ class TriangleMesh(SimplexMesh):
         node.requires_grad_(require_grad)
 
         return cls(node, cell)
+
+    @classmethod
+    def from_numpy(cls, mesh):
+        import numpy as np
+
+        new_mesh = cls.__new__(cls)
+        SimplexMesh.__init__(new_mesh, TD=2)
+
+        for name, tensor_obj in mesh.__dict__.items():
+            if isinstance(tensor_obj, np.ndarray):
+                setattr(new_mesh, name, torch.from_numpy(tensor_obj))
+
+        # NOTE: Meshes in old numpy version has `ds`` instead of `_entity_storage`.
+        if hasattr(mesh, '_entity_storage'):
+            for etype, entity in mesh._entity_storage.items():
+                new_mesh._entity_storage[etype] = torch.from_numpy(entity)
+
+        if hasattr(mesh, 'ds'):
+            for name, tensor_obj in mesh.ds.__dict__.items():
+                if isinstance(tensor_obj, np.ndarray):
+                    setattr(new_mesh, name, torch.from_numpy(tensor_obj))
+
+        new_mesh._attach_functionals()
+
+        return new_mesh

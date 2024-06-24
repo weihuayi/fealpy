@@ -47,7 +47,7 @@ class NodeMesh():
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
 
-    def neighbors(self, r, h, boxsize):
+    def neighbors(self, box_size, h):
         """
         参数:
         - box_size: 模拟盒子的大小

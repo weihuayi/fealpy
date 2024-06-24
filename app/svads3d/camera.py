@@ -163,7 +163,7 @@ class Camera():
         # 偏移量
         offset = self.location - init_loc
         self.feature_points['camera_sphere'] = self.picture_to_self(self.picture.feature_point['image'])
-        self.feature_points['ground'] = self.picture.feature_point['ground']+offset[:2]
+        #self.feature_points['ground'] = self.picture.feature_point['ground']+offset[:2]
 
 
     def projecte_to_self(self, points):

@@ -49,7 +49,7 @@ class OpenGLPlotter:
         glViewport(0, 0, width, height)
 
         # 顶点着色器源码
-        self.vertex_shader_source = """
+        self.general_vertex_shader_source = """
         #version 460 core
         layout (location = 0) in vec3 aPos;
         layout (location = 1) in vec2 aTexCoords;
@@ -66,14 +66,14 @@ class OpenGLPlotter:
         """
 
         # 片段着色器源码
-        self.fragment_shader_source = """
+        self.general_fragment_shader_source = """
         #version 460 core
         in vec2 TexCoords;
 
         uniform int mode;  // 0: 显示面 1: 显示边 2: 显示面和边 3: 如果有纹理数据显示纹理
         uniform vec4 faceColor;
         uniform vec4 edgeColor;
-        uniform sampler2D textureSampler;
+        uniform sampler2D textureSampler0;
         out vec4 FragColor;
 
         void main()
@@ -85,13 +85,75 @@ class OpenGLPlotter:
             } else if (mode == 2) {
                 FragColor = faceColor;  // 同时显示面和边
             } else if (mode == 3) {
-                FragColor = texture(textureSampler, TexCoords); // 使用纹理
+                FragColor = texture(textureSampler0, TexCoords); // 使用纹理
+            }
+        }
+        """
+
+        self.mix_vertex_shader_source = """
+        #version 460 core
+        layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec2 auv0;
+        layout (location = 2) in vec2 auv1;
+        layout (location = 3) in float aWeight;
+        uniform mat4 transform; // 变换矩阵
+
+        out vec2 uv0;
+        out vec2 uv1;
+        out float Weight;
+
+        void main()
+        {
+            gl_Position = transform * vec4(aPos.x, -aPos.y, aPos.z, 1.0);
+            uv0 = auv0;
+            uv1 = auv1;
+            Weight = aWeight;
+        }
+        """
+
+        self.mix_fragment_shader_source = """
+        #version 460 core
+        in vec2 uv0;
+        in vec2 uv1;
+        in float Weight;
+
+        uniform int mode;  // 0: 显示面 1: 显示边 2: 显示面和边 3: 如果有纹理数据显示纹理
+        uniform vec4 faceColor;
+        uniform vec4 edgeColor;
+        uniform sampler2D textureSampler0;
+        uniform sampler2D textureSampler1;
+
+        out vec4 FragColor;
+
+        void main()
+        {
+
+            if (mode == 0) {
+                FragColor = faceColor;  // 只显示面
+            } else if (mode == 1) {
+                FragColor = edgeColor;  // 只显示边
+            } else if (mode == 2) {
+                FragColor = faceColor;  // 同时显示面和边
+            } else if (mode == 3) {
+                vec4 color1 = texture(textureSampler0, uv0);
+                vec4 color2 = texture(textureSampler1, uv1);
+                FragColor = mix(color1, color2, Weight);
+                //FragColor = Weight * color1 + (1.0 - Weight) * color2;
+                //FragColor = color1;
+                //FragColor = color2;
             }
         }
         """
 
         # 编译着色器
-        self.shader_program = self.create_shader_program()
+        self.general_shader_program = self.create_shader_program(self.general_vertex_shader_source, self.general_fragment_shader_source)
+        self.mix_shader_program = self.create_shader_program(self.mix_vertex_shader_source, self.mix_fragment_shader_source)
+
+        loc = glGetUniformLocation(self.mix_shader_program, "textureSampler0")
+        print("loc0 : ", loc)
+        loc = glGetUniformLocation(self.mix_shader_program, "textureSampler1")
+        print("loc1 : ", loc)
+
 
         # 设置鼠标键盘回调函数
         glfw.set_key_callback(self.window, self.key_callback)
@@ -118,16 +180,24 @@ class OpenGLPlotter:
         self.projection[1, 1] = 1 / np.tan(fov / 2)
         self.projection[2, 2] = -(far + near) / (far - near)
         self.projection[2, 3] = -(2 * far * near) / (far - near)
+
         self.projection[3, 2] = -1
 
-    def add_mesh(self, node, cell=None, texture_path=None, flip='LR'):
+    def add_mesh(self, node, cell=None, texture_paths=[], flip='LR'):
         logger.info(f"Add GLMesh with {len(node)} nodes!")
-        self.meshes.append(GLMesh(node, 
-            cell=cell, 
-            texture_path=texture_path,
-            texture_unit=self.texture_unit, flip=flip))
-        if texture_path is not None:
-            self.texture_unit += 1
+        if len(texture_paths) < 2:
+            self.meshes.append(GLMesh(node, 
+                cell=cell, 
+                texture_paths=texture_paths,
+                texture_unit=self.texture_unit, flip=flip, 
+                shader_program=self.general_shader_program))
+        else:
+            self.meshes.append(GLMesh(node, 
+                cell=cell, 
+                texture_paths=texture_paths,
+                texture_unit=self.texture_unit, flip=flip, 
+                shader_program=self.mix_shader_program))
+        self.texture_unit += len(texture_paths)
 
     def compile_shader(self, source, shader_type):
         shader = glCreateShader(shader_type)
@@ -138,12 +208,12 @@ class OpenGLPlotter:
             raise Exception(f"Shader compile failure: {error}")
         return shader
 
-    def create_shader_program(self):
+    def create_shader_program(self, vertex_shader_source, fragment_shader_source):
         """
         @brief 创建着色程序
         """
-        vertex_shader = self.compile_shader(self.vertex_shader_source, GL_VERTEX_SHADER)
-        fragment_shader = self.compile_shader(self.fragment_shader_source, GL_FRAGMENT_SHADER)
+        vertex_shader = self.compile_shader(vertex_shader_source, GL_VERTEX_SHADER)
+        fragment_shader = self.compile_shader(fragment_shader_source, GL_FRAGMENT_SHADER)
         shader_program = glCreateProgram()
         glAttachShader(shader_program, vertex_shader)
         glAttachShader(shader_program, fragment_shader)
@@ -157,6 +227,25 @@ class OpenGLPlotter:
 
         return shader_program
 
+    def _bind_uinform(self, shader_program):
+        """
+        @brief 绑定uniform变量
+        """
+        # 使用着色器程序
+        glUseProgram(shader_program)
+
+        # 更新着色器的uniform变量
+        glUniform4fv(glGetUniformLocation(shader_program, "faceColor"), 1, self.faceColor)
+        glUniform4fv(glGetUniformLocation(shader_program, "edgeColor"), 1, self.edgeColor)
+
+        # 应用变换
+        transform_location = glGetUniformLocation(shader_program, "transform")
+
+        if transform_location != -1:
+            glUniformMatrix4fv(transform_location, 1, GL_FALSE, self.transform)
+        else:
+            logger.error("Transform location is invalid.")
+
     def run(self):
         """
         @brief 
@@ -168,22 +257,11 @@ class OpenGLPlotter:
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             glClearColor(*self.bgColor)
 
-            # 使用着色器程序
-            glUseProgram(self.shader_program)
-
-            # 更新着色器的uniform变量
-            glUniform4fv(glGetUniformLocation(self.shader_program, "faceColor"), 1, self.faceColor)
-            glUniform4fv(glGetUniformLocation(self.shader_program, "edgeColor"), 1, self.edgeColor)
-
-            # 应用变换
-            transform_location = glGetUniformLocation(self.shader_program, "transform")
-            if transform_location != -1:
-                glUniformMatrix4fv(transform_location, 1, GL_FALSE, self.transform)
-            else:
-                logger.error("Transform location is invalid.")
+            self._bind_uinform(self.mix_shader_program)
+            self._bind_uinform(self.general_shader_program)
 
             for mesh in self.meshes:
-                mesh.draw(self.shader_program, self.mode)
+                mesh.draw(self.mode)
 
             # 关闭深度测试，确保坐标轴总是绘制在最前面
             # glDisable(GL_DEPTH_TEST)

@@ -54,7 +54,7 @@ class LaplaceFEMSolver():
         self.ndof = space.number_of_global_dofs()
 
         bform = BilinearForm(space)
-        bform.add_domain_integrator(ScalarDiffusionIntegrator(c=sigma))
+        bform.add_domain_integrator(ScalarDiffusionIntegrator(c=sigma, q=3))
         self.A_ = bform.assembly()
 
     def _init_gd(self):
@@ -98,7 +98,7 @@ class LaplaceFEMSolver():
     def _init_gn(self):
         space = self.space
         A_ = self.A_
-        C_ = ScalarNeumannSourceIntegrator(1.).assembly_face_vector(space)
+        C_ = ScalarNeumannSourceIntegrator(1., q=3).assembly_face_vector(space)
 
         A_C = hstack([A_, C_.reshape(-1, 1)])
         A_C = vstack([A_C, hstack([C_.reshape(1, -1), csr_matrix((1, 1), dtype=space.ftype)])])
@@ -114,7 +114,7 @@ class LaplaceFEMSolver():
         if not hasattr(self, "AC_lu"):
             self._init_gn()
 
-        intergrator = ScalarNeumannSourceIntegrator(gn)
+        intergrator = ScalarNeumannSourceIntegrator(gn, q=3)
         F_ = np.zeros((self.ndof+1, ), dtype=space.ftype)
         intergrator.assembly_face_vector(space, out=F_[:-1])
 
@@ -172,16 +172,17 @@ class LaplaceDataGenerator2d():
         self.shape = (nx, ny)
 
         # set the value of sigma
-        cell_center = self.mesh.entity_barycenter('cell')
-        NC = self.mesh.number_of_cells()
-        sigma = np.empty((NC, ), dtype=np.float64)
+        def _coef_func(p: NDArray):
+            inclusion = levelset(p) < 0.
+            sigma = np.empty(p.shape[:2], dtype=p.dtype) # (Q, C)
+            sigma[inclusion] = sigma_vals[0]
+            sigma[~inclusion] = sigma_vals[1]
+            return sigma
 
         if levelset is None:
-            sigma[:] = sigma_vals[1]
+            sigma = None
         else:
-            flag = levelset(cell_center) < 0. # (NC, )
-            sigma[flag] = sigma_vals[0]
-            sigma[~flag] = sigma_vals[1]
+            sigma = _coef_func
 
         self.gn_funcs = gn_funcs
         self.levelset = levelset
