@@ -39,7 +39,7 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
 
         index = mesh.boundary_face_index()
         fm = mesh.entity_measure('face', index=index)
-        qf = mesh.integrator(q, 'face')
+        qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index, variable='x')
 

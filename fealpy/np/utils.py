@@ -17,7 +17,8 @@ def process_coef_func(
     bcs: Optional[NDArray]=None,
     mesh: Optional[HomogeneousMesh]=None,
     etype: Optional[Union[int, str]]=None,
-    index: Optional[NDArray]=None
+    index: Optional[NDArray]=None,
+    n: Optional[NDArray]=None,
 ):
     r"""Fetch the result Tensor if `coef` is a function."""
     if callable(coef):
@@ -33,7 +34,10 @@ def process_coef_func(
                                    'Note that only homogeneous meshes are supported here.')
 
             ps = mesh.bc_to_point(bcs, etype=etype, index=index)
-            coef_val = coef(ps)
+            if n is not None:
+                coef_val = coef(ps, n)
+            else:
+                coef_val = coef(ps)
         else:
             coef_val = coef(bcs, index=index)
     else:
@@ -41,14 +45,14 @@ def process_coef_func(
     return coef_val
 
 
-def is_scalar(input: Union[int, float, NDArray]) -> bool:
+def is_scalar(input: Union[int, float,complex, NDArray]) -> bool:
     if isinstance(input, np.ndarray):
         return input.size == 1
     else:
-        return isinstance(input, (int, float))
+        return isinstance(input, (int, float, complex))
 
 
-def is_tensor(input: Union[int, float, NDArray]) -> bool:
+def is_tensor(input: Union[int, float,complex, NDArray]) -> bool:
     if isinstance(input, np.ndarray):
         return input.size >= 2
     return False

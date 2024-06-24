@@ -1,6 +1,6 @@
 
 from typing import (
-    Union, Optional, Dict, Sequence, overload, Callable, Literal
+    Union, Optional, Dict, Sequence, overload, Callable, Literal, Tuple
 )
 
 import numpy as np
@@ -69,9 +69,7 @@ def edim2entity(dict_: Dict, edim: int, index=None):
         et = dict_[edim]
         if index is None:
             return et
-        else: # TODO: finish this
-            if et.ndim == 1:
-                raise RuntimeError("index is not supported for flattened entity.")
+        else: # TODO: finish this for homogeneous mesh
             return et[index]
     else:
         logger.info(f'entity {edim} is not found and a NoneType is returned.')
@@ -127,8 +125,9 @@ class MeshDS():
 
     ### cuda
     def to(self, device: Union[_device, str, None]=None, non_blocking=False):
-        for entity_tensor in self._entity_storage.values():
-            entity_tensor.to(device, non_blocking=non_blocking)
+        for edim in self._entity_storage.keys():
+            entity = self._entity_storage[edim]
+            self._entity_storage[edim] = entity.to(device, non_blocking=non_blocking)
         for attr in self.__dict__:
             value = self.__dict__[attr]
             if isinstance(value, torch.Tensor):
@@ -305,8 +304,8 @@ class MeshDS():
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
-        NC = self.cell.shape[0]
-        NFC = self.cell.shape[1]
+        NC = self.number_of_cells()
+        NFC = self.number_of_faces_of_cells()
 
         totalFace = self.total_face()
         _, i0_np, j_np = np.unique(
@@ -321,12 +320,10 @@ class MeshDS():
         i1_np = np.zeros(NF, dtype=i0_np.dtype)
         i1_np[j_np] = np.arange(NFC*NC, dtype=i0_np.dtype)
 
-        self.cell2edge = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
-        self.cell2face = self.cell2edge
+        self.cell2face = torch.from_numpy(j_np).to(self.device).reshape(NC, NFC)
 
         face2cell_np = np.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
         self.face2cell = torch.from_numpy(face2cell_np).to(self.device)
-        self.edge2cell = self.face2cell
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
@@ -343,6 +340,7 @@ class MeshDS():
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell
+            self.cell2edge = self.cell2face
 
         logger.info(f"Mesh toplogy relation constructed, with {NF} faces, "
                     f"on device {self.device}")
@@ -404,7 +402,7 @@ class Mesh(MeshDS):
             Tensor[NE,]: Length of edges, shaped [NE,].
         """
         edge = self.entity(1, index=index)
-        return F.edge_length(self.node[edge], out=out)
+        return F.edge_length(edge, self.node, out=out)
 
     def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> Tensor:
         """Calculate the normal of the edges.
@@ -418,7 +416,7 @@ class Mesh(MeshDS):
             Tensor[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return F.edge_normal(self.node[edge], unit=unit, out=out)
+        return F.edge_normal(edge, self.node, unit=unit, out=out)
 
     def edge_unit_normal(self, index: Index=_S, out=None) -> Tensor:
         """Calculate the unit normal of the edges.
@@ -426,7 +424,7 @@ class Mesh(MeshDS):
         """
         return self.edge_normal(index=index, unit=True, out=out)
 
-    def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
         """Get the quadrature points and weights.
 
         Parameters:
@@ -439,25 +437,58 @@ class Mesh(MeshDS):
         """
         raise NotImplementedError
 
+    def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
+        logger.warning("The `integrator` is deprecated and will be removed after 3.0. "
+                       "Use `quadrature_formula` instead.")
+        return self.quadrature_formula(q, etype, qtype)
+
+    # ipoints
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        """Get the relationship between edges and integration points."""
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        edges = self.edge[index]
+        kwargs = {'dtype': edges.dtype, 'device': self.device}
+        indices = torch.arange(NE, **kwargs)[index]
+        return torch.cat([
+            edges[:, 0].reshape(-1, 1),
+            (p-1) * indices.reshape(-1, 1) + torch.arange(p-1, **kwargs) + NN,
+            edges[:, 1].reshape(-1, 1),
+        ], dim=-1)
+
+    # shape function
     def shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
         """Shape function value on the given bc points, in shape (..., ldof).
 
         Parameters:
-            bc (Tensor): The bc points, in shape (..., NVC).\n
+            bc (Tensor): The bc points, in shape (NQ, bc).\n
             p (int, optional): The order of the shape function. Defaults to 1.\n
             index (int | slice | Tensor, optional): The index of the cell.\n
             variable (str, optional): The variable name. Defaults to 'u'.\n
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
-            Tensor: The shape function value with shape (..., ldof). The shape will\
-            be (..., 1, ldof) if `variable == 'x'`.
+            Tensor: The shape function value with shape (NQ, ldof). The shape will\
+            be (1, NQ, ldof) if `variable == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
     def grad_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        """Gradient of shape function on the given bc points, in shape (..., ldof, bc).
+
+        Parameters:
+            bc (Tensor): The bc points, in shape (NQ, bc).\n
+            p (int, optional): The order of the shape function. Defaults to 1.\n
+            index (int | slice | Tensor, optional): The index of the cell.\n
+            variable (str, optional): The variable name. Defaults to 'u'.\n
+            mi (Tensor, optional): The multi-index matrix. Defaults to None.
+
+        Returns:
+            Tensor: The shape function value with shape (NQ, ldof, bc). The shape will\
+            be (NC, NQ, ldof, GD) if `variable == 'x'`.
+        """
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
     def hess_shape_function(self, bc: Tensor, p: int=1, *, index: Index=_S,
@@ -494,19 +525,6 @@ class HomogeneousMesh(Mesh):
     def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
-    def edge_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
-        """Get the relationship between edges and integration points."""
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        edges = self.edge[index]
-        kwargs = {'dtype': edges.dtype, 'device': self.device}
-        indices = torch.arange(NE, **kwargs)[index]
-        return torch.cat([
-            edges[:, 0].reshape(-1, 1),
-            (p-1) * indices.reshape(-1, 1) + torch.arange(p-1, **kwargs) + NN,
-            edges[:, 1].reshape(-1, 1),
-        ], dim=-1)
-
 
 class SimplexMesh(HomogeneousMesh):
     # ipoints
@@ -530,7 +548,7 @@ class SimplexMesh(HomogeneousMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(1)
+            return phi.unsqueeze_(0)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -544,9 +562,72 @@ class SimplexMesh(HomogeneousMesh):
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = torch.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
-            # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
+            gphi = torch.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
+            # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
+
+
+class TensorMesh(HomogeneousMesh):
+    # ipoints
+    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
+        if isinstance(iptype, str):
+            iptype = estr2dim(self, iptype)
+        return F.tensor_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p: int) -> int:
+        return F.tensor_gdof(p, self)
+
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> Tensor:
+        raise NotImplementedError
+
+    def shape_function(self, bc: Tuple[Tensor], p: int=1, *, index: Index=_S,
+                       variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        pass
+
+    def grad_shape_function(self, bc: Tuple[Tensor], p: int=1, *, index: Index=_S,
+                            variable: str='u', mi: Optional[Tensor]=None) -> Tensor:
+        pass
+
+
+class StructuredMesh(HomogeneousMesh):
+    _STORAGE_METH = ['_node', '_edge', '_face', '_cell']
+
+    @overload
+    def __getattr__(self, name: EntityName) -> Tensor: ...
+    def __getattr__(self, name: str):
+        if name not in self._STORAGE_ATTR:
+            return object.__getattribute__(self, name)
+        etype_dim = estr2dim(self, name)
+
+        if etype_dim in self._entity_storage:
+            return self._entity_storage[etype_dim]
+        else:
+            _method = self._STORAGE_METH[etype_dim]
+
+            if not hasattr(self, _method):
+                raise AttributeError(
+                    f"'{name}' in structured mesh requires a factory method "
+                    f"'{_method}' to generate the entity data when {name} "
+                    "is not in the storage."
+                )
+
+            entity = getattr(self, _method)()
+            self._entity_storage[etype_dim] = entity
+
+            return entity
+
+    def _node(self):
+        raise NotImplementedError
+
+    def _edge(self):
+        raise NotImplementedError
+
+    def _face(self):
+        raise NotImplementedError
+
+    def _cell(self):
+        raise NotImplementedError
