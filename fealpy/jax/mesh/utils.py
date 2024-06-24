@@ -6,7 +6,9 @@ from typing import (
 import jax
 import jax.numpy as jnp 
 from jax.experimental.sparse import BCOO
-import torch
+from jax.config import config
+
+config.update("jax_enable_x64", True)
 
 from .. import logger
 
@@ -32,7 +34,7 @@ def mesh_top_csr(entity: Array, num_targets: int, location: Optional[Array]=None
         crow = location
     elif entity.ndim == 2: # for homogeneous case
         crow = jnp.arange(
-            entity.shape[0] + 1, dtype=entity.dtype)/(entity.shape[1])
+            entity.shape[0] + 1, dtype=entity.dtype)*(entity.shape[1])
     else:
         raise ValueError('dimension of entity must be 1 or 2.')
     data = jnp.ones(jnp.prod(entity.shape), dtype=dtype)

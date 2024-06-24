@@ -7,6 +7,9 @@ from math import factorial, comb
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax.config import config
+
+config.update("jax_enable_x64", True)
 
 from .utils import Array
 
@@ -239,82 +242,52 @@ def int_grad_lambda(line: Array, node: Array) -> Array:
 
 # Triangle Mesh
 # =============
-def tri_area_2d(points):
+def tri_area_3d(tri: Array, node: Array, out: Optional[Array]=None) -> Array:
+    points = node[tri, :]
+    return jnp.cross(points[..., 1, :] - points[..., 0, :],
+                 points[..., 2, :] - points[..., 0, :], axis=-1) / 2.0
+
+
+def tri_grad_lambda_2d(tri: Array, node: Array) -> Array:
+    """grad_lambda function for the triangle mesh in 2D.
+
+    Parameters:
+        tri (Tensor[..., 3]): Indices of vertices of triangles.\n
+        node (Tensor[N, 2]): Node coordinates.
+
+    Returns:
+        Tensor[..., 3, 2]:
     """
-    @brief 给定一个单元的三个顶点的坐标，计算三角形的面积
+    points = node[tri, :]
+    e0 = points[..., 2, :] - points[..., 1, :]
+    e1 = points[..., 0, :] - points[..., 2, :]
+    e2 = points[..., 1, :] - points[..., 0, :]
+    nv = jnp.linalg.det(jnp.stack([e0, e1], axis=-2)) # (...)
+    e0 = jnp.flip(e0, axis=-1)
+    e1 = jnp.flip(e1, axis=-1)
+    e2 = jnp.flip(e2, axis=-1)
+    result = jnp.stack([e0, e1, e2], axis=-2)
+    result[..., 0]*=-1
+    return result/(nv[..., None, None])
+
+def tri_grad_lambda_3d(tri: Array, node: Array) -> Array:
     """
-    v1 = points[1] - points[0]
-    v2 = points[2] - points[0]
-    nv = jnp.cross(v1, v2)
-    return nv/2.0
+    Parameters:
+        points (Tensor[..., 3]): Indices of vertices of triangles.\n
+        node (Tensor[N, 3]): Node coordinates.
 
-def tri_area_3d(points):
+    Returns:
+        Tensor[..., 3, 3]:
     """
-    @brief 给定一个单元的三个顶点的坐标，计算三角形的面积
-
-    @params points : (3, 3) 
-    """
-    v1 = points[1] - points[0]
-    v2 = points[2] - points[0]
-    nv = jnp.cross(v1, v2)
-    a = jnp.linalg.norm(nv)/2.0
-    return nv/2.0
-
-def tri_area_2d_with_jac(points):
-    return value_and_jacfwd(tri_area_2d, points)
-
-def tri_area_3d_with_jac(points):
-    return value_and_jacfwd(tri_area_3d, points)
-
-def tri_quality_radius_ratio(points):
-    v0 = points[2] - points[1]
-    v1 = points[0] - points[2]
-    v2 = points[1] - points[0]
-
-    l0 = jnp.linalg.norm(v0)
-    l1 = jnp.linalg.norm(v1)
-    l2 = jnp.linalg.norm(v2)
-
-    p = l0 + l1 + l2
-    q = l0*l1*l2
-    nv = np.cross(v1, v2)
-    a = jnp.linalg.norm(nv)/2.0
-    quality = p*q/(16*a**2)
-    return quality
-
-def tri_quality_radius_ratio_with_jac(points):
-    return value_and_jacfwd(tri_quality_radius_ratio, points)
-
-def tri_grad_lambda_2d(points):
-    """
-    @brief 计算2D三角形单元的形函数梯度 
-
-    @params points : 形状为  (3, 2), 存储一个三角形单元的坐标，逆时针方向
-    """
-    v0 = points[2] - points[1]
-    v1 = points[0] - points[2]
-    v2 = points[1] - points[0]
-    nv = jnp.cross(v1, v2) # 三角形面积的 2 倍 
-    Dlambda = jnp.array([
-        [-v0[1], v0[0]], 
-        [-v1[1], v1[0]], 
-        [-v2[1], v2[0]]], dtype=jnp.float64)/nv
-    return Dlambda 
-
-def tri_grad_lambda_3d(points):
-    """
-    @brief 计算 3D 三角形单元的形函数梯度 
-
-    @params points : 形状为  (3, 3), 存储一个三角形单元的坐标(逆时针方向)
-    """
-    v0 = points[2] - points[1]
-    v1 = points[0] - points[2]
-    v2 = points[1] - points[0]
-    nv = jnp.cross(v1, v2) # 三角形面积的 2 倍 
-    length = jnp.linalg.norm(nv)
+    points = node[tri, :]
+    e0 = points[..., 2, :] - points[..., 1, :] # (..., 3)
+    e1 = points[..., 0, :] - points[..., 2, :]
+    e2 = points[..., 1, :] - points[..., 0, :]
+    nv = jnp.cross(e0, e1, axis=-1) # (..., 3)
+    length = jnp.linalg.norm(nv, axis=-1, keepdims=True) # (..., 1)
     n = nv/length
-    n0 = jnp.cross(n, v0)
-    n1 = jnp.cross(n, v1)
-    n2 = jnp.cross(n, v2)
-    Dlambda = jnp.array([n0, n1, n2], dtype=jnp.float64)/length
-    return Dlambda 
+    return jnp.stack([
+        jnp.cross(n, e0, axis=-1),
+        jnp.cross(n, e1, axis=-1),
+        jnp.cross(n, e2, axis=-1)
+    ], axis=-2)/(length.unsqueeze(-2)) # (..., 3, 3)
