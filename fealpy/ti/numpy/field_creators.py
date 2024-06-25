@@ -44,8 +44,10 @@ def field(input_array: Any, dtype = None) -> Field:
     """
     input_array = np.asarray(input_array)
     shape = input_array.shape
-    dtype = dtype or dtype_map[input_array.dtype]
+    if dtype is None:
+        dtype = dtype_map[input_array.dtype]
     ti_field = ti.field(dtype=dtype, shape=shape)
+    ti_field.from_numpy(input_array)
     return ti_field
 
 array = field
