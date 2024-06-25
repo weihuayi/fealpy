@@ -14,6 +14,7 @@ from .. import numpy as tnp
 
 from .utils import EntityName, Entity, Field, Index, _S, _int_func
 from .utils import estr2dim
+from .quadrature import Quadrature
 from . import functional as F
 
 @ti.data_oriented
@@ -318,7 +319,7 @@ class MeshDS():
 
 class Mesh(MeshDS):
     @property
-    def ftype(self) -> _dtype:
+    def ftype(self):
         node = self.entity(0)
         if node is None:
             raise RuntimeError('Can not get the float type as the node '
@@ -356,6 +357,11 @@ class Mesh(MeshDS):
         node = self.entity(0)
         entity = self.entity(etype)
         return F.entity_barycenter(entity, node)
+
+    def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
+        logger.warning("The `integrator` is deprecated and will be removed after 3.0. "
+                       "Use `quadrature_formula` instead.")
+        return self.quadrature_formula(q, etype, qtype)
 
 
 class HomogeneousMesh(Mesh):
