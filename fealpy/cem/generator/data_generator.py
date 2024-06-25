@@ -35,7 +35,7 @@ class EITDataGenerator():
         self.space = space
 
         # fetch boundary nodes to output gd and gn
-        bd_node_index = mesh.ds.boundary_node_index()
+        bd_node_index = mesh.boundary_node_index()
         bd_node = mesh.entity('node', index=bd_node_index) # (Q, C, 2)
         self.bd_node = bd_node
         self._bd_node_index = bd_node_index
@@ -62,7 +62,7 @@ class EITDataGenerator():
             size=(1, gdof)
         )
         self.ZERO = torch.sparse_coo_tensor(
-            torch.zeros((2, 1), dtype=mesh.ds.itype, device=mesh.device),
+            torch.zeros((2, 1), dtype=mesh.itype, device=mesh.device),
             torch.zeros((1,), **kwargs),
             size=(1, 1)
         )

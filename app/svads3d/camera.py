@@ -32,15 +32,18 @@ class Camera():
 
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), data_path + chessboard_dir)
 
-        self.ground_feature_points = self.picture_to_self(picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
-        self.feature_points = self.picture_to_self(picture.feature_point)
-        self.screen_feature_points = None
+        self.theta2rho = lambda theta: theta 
+        self.picture.rho2theta = lambda rho: fsolve(lambda theta: self.theta2rho(theta)-rho, 0)[0]
+
+        self.feature_points = {}
+        self.feature_points['camera_sphere'] = self.picture_to_self(picture.feature_point['image'])
+        self.feature_points['ground'] = picture.feature_point['ground']
         self.camera_system = None
 
     def set_screen_frature_points(self, feature_point):
         """
         @brief 设置相机的屏幕特征点。
-        @param args: 屏幕特征点。
+        @param feature_point: 屏幕特征点。
         @return:
         """
         if isinstance(feature_point, list):
@@ -99,6 +102,8 @@ class Camera():
         fy = self.K[1, 1]
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
+        print(fx, fy, u0, v0)
+        print(self.picture.center, self.picture.radius)
 
         """
         w = self.width
@@ -118,8 +123,9 @@ class Camera():
         uv = np.zeros((NN, 2), dtype=np.float64)
 
         if maptype == 'L': # 等距投影
-            uv[:, 0] = fx * theta * np.cos(phi) + u0
-            uv[:, 1] = fy * theta * np.sin(phi) + v0
+            rho = self.theta2rho(theta)
+            uv[:, 0] = fx * rho * np.cos(phi) + u0
+            uv[:, 1] = fy * rho * np.sin(phi) + v0
         elif maptype == 'O': # 正交投影
             uv[:, 0] = fx * np.sin(theta) * np.cos(phi) + u0
             uv[:, 1] = fy * np.sin(theta) * np.sin(phi) + v0
@@ -138,19 +144,26 @@ class Camera():
         return uv
 
 
-    def set_parameters(self, location, eular_angle):
+    def set_parameters(self, location, eular_angle, project_coefficient):
         """
         @brief 设置相机的位置与朝向。
         @param location: 相机的位置。
         @param eular_angle: 相机的欧拉角。
         @return:
         """
+        init_loc = self.location.copy()
         self.location = np.array(location)
         self.eular_angle = eular_angle
         self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
 
-        self.ground_feature_points = self.picture_to_self(self.picture.mark_board.reshape(-1,2)).reshape(2,-1,3)
-        self.feature_points = self.picture_to_self(self.picture.feature_point)
+        k1, k2, k3, k4 = project_coefficient
+        self.theta2rho = lambda theta: k1*theta + k2*theta**2 + k3*theta**3 + k4*theta**4 
+        self.picture.rho2theta = lambda rho: fsolve(lambda theta: self.theta2rho(theta)-rho, 0)[0]
+
+        # 偏移量
+        offset = self.location - init_loc
+        self.feature_points['camera_sphere'] = self.picture_to_self(self.picture.feature_point['image'])
+        #self.feature_points['ground'] = self.picture.feature_point['ground']+offset[:2]
 
 
     def projecte_to_self(self, points):

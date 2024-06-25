@@ -24,7 +24,7 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> Tensor:
-        index = space.mesh.ds.boundary_face_index()
+        index = space.mesh.boundary_face_index()
         return space.face_to_dof()[index]
 
     @enable_cache
@@ -37,9 +37,9 @@ class ScalarBoundarySourceIntegrator(FaceSourceIntegrator):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        index = mesh.ds.boundary_face_index()
+        index = mesh.boundary_face_index()
         fm = mesh.entity_measure('face', index=index)
-        qf = mesh.integrator(q, 'face')
+        qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index, variable='x')
 

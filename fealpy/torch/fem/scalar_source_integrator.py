@@ -37,7 +37,7 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.integrator(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index, variable='x')
 

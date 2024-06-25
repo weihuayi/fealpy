@@ -10,7 +10,7 @@ from fealpy.torch.mesh.quadrature import Quadrature
 
 from .. import logger
 from . import functional as F
-from .mesh_base import MeshDS, SimplexMesh, entity_str2dim
+from .mesh_base import SimplexMesh, estr2dim
 
 Index = Union[Tensor, int, slice]
 _dtype = torch.dtype
@@ -19,44 +19,40 @@ _device = torch.device
 _S = slice(None)
 
 
-class IntervalMeshDataStructure(MeshDS):
-    def __init__(self, NN: int, cell: Tensor) -> None:
-        super().__init__(NN, 1)
+class IntervalMesh(SimplexMesh):
+    def __init__(self, node: Tensor, cell: Tensor):
+        super().__init__(TD=1)
         self.cell = cell
 
         self.construct()
 
-    def total_face(self):
-        return self.cell.reshape(-1, 1)
-
-
-class IntervalMesh(SimplexMesh):
-    def __init__(self, node: Tensor, cell: Tensor):
         if node.ndim == 1:
             node = node.reshape(-1, 1)
         self.node = node
-        self.ds = IntervalMeshDataStructure(node.shape[0], cell)
+
+    def total_face(self):
+        return self.cell.reshape(-1, 1)
 
     # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
         node = self.node
         if isinstance(etype, str):
-            etype = entity_str2dim(self.ds, etype)
+            etype = estr2dim(self, etype)
         if etype == 0:
             return torch.zeros((1,), dtype=node.dtype, device=node.device)
         elif etype == 1:
             edge = self.entity(1, index)
-            return F.edge_length(node[edge])
+            return F.edge_length(edge, node)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    # integrator
-    def integrator(self, q: int, etype: Union[int, str]='cell',
-                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+    # quadrature
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import GaussLegendreQuadrature
 
         if isinstance(etype, str):
-            etype = entity_str2dim(self.ds, etype)
+            etype = estr2dim(self, etype)
         kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 1:
             quad = GaussLegendreQuadrature(q, **kwargs)
@@ -66,14 +62,6 @@ class IntervalMesh(SimplexMesh):
         return quad
 
     # ipoints
-    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
-        if isinstance(iptype, str):
-            iptype = entity_str2dim(self.ds, iptype)
-        return F.simplex_ldof(p, iptype)
-
-    def number_of_global_ipoints(self, p: int):
-        return F.simplex_gdof(p, self)
-
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         """Fetch all p-order interpolation points on the interval mesh."""
         node = self.entity('node')
@@ -103,11 +91,11 @@ class IntervalMesh(SimplexMesh):
 
     def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
         NN = self.number_of_nodes()
-        return torch.arange(NN, dtype=self.ds.itype, device=self.device)
+        return torch.arange(NN, dtype=self.itype, device=self.device)
 
     # shape function
     def grad_lambda(self, index: Index=_S):
-        return F.int_grad_lambda(self.node[self.ds.cell[index]])
+        return F.int_grad_lambda(self.cell[index], self.node)
 
     # constructor
     @classmethod
@@ -127,10 +115,10 @@ class IntervalMesh(SimplexMesh):
         if mesh.top_dimension() != 2:
             raise ValueError("The top-dimension of the mesh must be 2.")
 
-        itype = mesh.ds.itype
+        itype = mesh.itype
         device = mesh.device
-        is_bd_node = mesh.ds.boundary_node_flag()
-        is_bd_face = mesh.ds.boundary_face_flag()
+        is_bd_node = mesh.boundary_node_flag()
+        is_bd_face = mesh.boundary_face_flag()
         node = mesh.entity('node', index=is_bd_node)
         face = mesh.entity('face', index=is_bd_face)
         NN = mesh.number_of_nodes()

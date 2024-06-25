@@ -17,10 +17,7 @@ from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import ScalarInterfaceIntegrator 
 
 #双线性形
-from fealpy.fem import BilinearForm
-
-#线性形
-from fealpy.fem import LinearForm
+from fealpy.fem import NonlinearForm
 
 import numpy as np
 from fealpy.decorator import cartesian
@@ -61,10 +58,6 @@ class LineInterfaceData():
         A_coe[flag[1]] = self.a1
         return A_coe
 
-    def diffusion_coefficient_right(self, p):
-
-        return -self.diffusion_coefficient(p)
-
     #反应项系数
     @cartesian
     def reaction_coefficient(self, p):
@@ -74,10 +67,6 @@ class LineInterfaceData():
         B_coe[flag[0]] = self.b0
         B_coe[flag[1]] = self.b1
         return B_coe
-
-    def reaction_coefficient_right(self, p):
-
-        return -self.reaction_coefficient(p)
 
     #真解
     @cartesian
@@ -185,12 +174,13 @@ def interface_edge_index(mesh, pde):
     InterfaceEdgeIdx = np.nonzero(isInterfaceEdge)
     InterfaceEdgeIdx = InterfaceEdgeIdx[0]
     return InterfaceEdgeIdx
+#非线性项函数以及导函数形式
 def nonlinear_func(u):
 
     val = u**3
     return val
 
-def nonlinear_func_gradient(u):
+def nonlinear_gradient_func(u):
 
     val = 3*u**2
     return val
@@ -221,25 +211,17 @@ for i in range(maxit):
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
     isIDof = ~isDDof
 
-    D = ScalarDiffusionIntegrator(c=pde.diffusion_coefficient, q=p+2)
-    D0 = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient_right, q=p+2)
-
-    M = ScalarMassIntegrator(uh=u0, uh_func=nonlinear_func_gradient, c=pde.reaction_coefficient, q=p+2)
-    M0 = ScalarMassIntegrator(uh=u0, uh_func=nonlinear_func, c=pde.reaction_coefficient_right, q=p+2)
+    D = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient, q=p+2)
+    M = ScalarMassIntegrator(uh=u0, uh_func=nonlinear_func, grad_uh_func=nonlinear_gradient_func, c=pde.reaction_coefficient, q=p+2)
 
     f = ScalarSourceIntegrator(pde.source, q=p+2)
     I = ScalarInterfaceIntegrator(gI=pde.interfaceFun,  threshold=interface_edge_index(mesh, pde) , q=p+2)
 
     while True:
-        b = BilinearForm(space)
-        b.add_domain_integrator([D, M])
-
-        l = LinearForm(space)
-        l.add_domain_integrator([f, D0, M0])
-        l.add_boundary_integrator([I])
-
-        A = b.assembly() 
-        F = l.assembly()
+        n = NonlinearForm(space)
+        n.add_domain_integrator([D, M, f])
+        n.add_boundary_integrator([I])
+        A, F = n.assembly()
 
         du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
         u0 += du

@@ -56,26 +56,26 @@ def is_tensor(input: Union[int, float, Tensor]) -> bool:
 def get_coef_subscripts(shape: Tensor, nq: int, nc: int, batched: bool):
     if batched:
         coef_shape = shape[1:]
-        if coef_shape == (nq, nc):
-            subs = "bqc"
+        if coef_shape == (nc, nq):
+            subs = "bcq"
         elif coef_shape == (nq, ):
             subs = "bq"
         elif coef_shape == (nc, ):
             subs = "bc"
         else:
-            raise RuntimeError(f"The shape of the coef should be (Batch, {nq}, {nc}), "
+            raise RuntimeError(f"The shape of the coef should be (Batch, {nc}, {nq}), "
                                f"(Batch, {nq}) or (Batch, {nc}), but got {tuple(shape)}.")
 
     else:
         coef_shape = shape
-        if coef_shape == (nq, nc):
-            subs = "qc"
+        if coef_shape == (nc, nq):
+            subs = "cq"
         elif coef_shape == (nq, ):
             subs = "q"
         elif coef_shape == (nc, ):
             subs = "c"
         else:
-            raise RuntimeError(f"The shape of the coef should be ({nq}, {nc}), "
+            raise RuntimeError(f"The shape of the coef should be ({nc}, {nq}), "
                                f"({nq}) or ({nc}), but got {tuple(shape)}.")
 
     return subs
