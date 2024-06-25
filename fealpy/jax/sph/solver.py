@@ -31,6 +31,14 @@ class SPHSolver:
 
     #状态方程更新压力
     def tait_eos(self, rho, c0, rho0, gamma=1.0, X=0.0):
+        """
+
+        Parameters:
+            
+
+        Notes:
+            
+        """
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
     
     #计算密度
