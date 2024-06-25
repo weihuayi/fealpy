@@ -9,8 +9,11 @@
 '''  
 from jax import ops, vmap
 import jax.numpy as jnp
+import numpy as np
 import h5py
+import pyvista
 from typing import Dict
+
 '''
 #设置标签
 class Tag(enum.IntEnum):
@@ -21,6 +24,7 @@ class Tag(enum.IntEnum):
     dirichlet_wall = 3 #温度边界条件的狄利克雷墙壁粒子
 '''
 EPS = jnp.finfo(float).eps
+
 class SPHSolver:
     def __init__(self, mesh):
         self.mesh = mesh 
@@ -89,3 +93,29 @@ class SPHSolver:
         for k, v in data_dict.items():
             hf.create_dataset(k, data=jnp.array(v))
         hf.close()
+    
+    def dict2pyvista(self, data_dict):
+        # PyVista works only with 3D objects, thus we check whether the inputs
+        # are 2D and then increase the degrees of freedom of the second dimension.
+        # N is the number of points and dim the dimension
+        r = np.asarray(data_dict["position"])
+        N, dim = r.shape
+        # PyVista treats the position information differently than the rest
+        if dim == 2:
+            r = np.hstack([r, np.zeros((N, 1))])
+        data_pv = pyvista.PolyData(r)
+        # copy all the other information also to pyvista, using plain numpy arrays
+        for k, v in data_dict.items():
+            # skip r because we already considered it above
+            if k == "r":
+                continue
+            # working in 3D or scalar features do not require special care
+            if dim == 2 and v.ndim == 2:
+                v = np.hstack([v, np.zeros((N, 1))])
+            data_pv[k] = np.asarray(v)
+        return data_pv
+
+    def write_vtk(self, data_dict: Dict, path: str):
+        """Store a .vtk file for ParaView."""
+        data_pv = self.dict2pyvista(data_dict)
+        data_pv.save(path)

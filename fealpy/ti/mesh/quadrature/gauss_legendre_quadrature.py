@@ -1,5 +1,5 @@
 import numpy as np
-import taiti as ti 
+import taichi as ti 
 
 from .quadrature import Quadrature
 
@@ -268,8 +268,8 @@ class GaussLegendreQuadrature(Quadrature):
             raise NotImplementedError('quadrature index higher than 20 is not supported now.')
 
         A /= 2.0
-        self.weights = tnp.field(A[:, 1].copy())
+        self.weights = tnp.array(A[:, 1].copy())
         A[:, 0] += 0.5
-        self.quadpts = tnp.field([0.5 + A[:, 0], 0.5 - A[:, 0]])
+        self.quadpts = tnp.array([0.5 + A[:, 0], 0.5 - A[:, 0]])
         self.NQ = self.weights.shape[0]
         self.order = self.NQ

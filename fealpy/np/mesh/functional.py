@@ -1,3 +1,4 @@
+
 from typing import Union, Optional, Sequence
 from functools import reduce
 
@@ -5,8 +6,12 @@ import numpy as np
 from numpy.typing import NDArray
 from numpy.linalg import det
 
-from .utils import estr2dim
 from math import factorial, comb
+
+
+##################################################
+### Mesh
+##################################################
 
 def multi_index_matrix(p: int, TD: int, dtype=np.int_) -> NDArray:
     """
@@ -78,8 +83,7 @@ def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None, dtype=
 
     """
     TD = bc.shape[-1] - 1
-    if mi is None:
-        mi = multi_index_matrix(p, TD)
+    mi = mi or multi_index_matrix(p, TD)
     ldof = mi.shape[0] # p 次 Lagrange 形函数的个数
 
     c = np.arange(1, p+1)
@@ -150,8 +154,10 @@ def edge_tangent(edge: NDArray, node: NDArray,
         return v/l[:, None]
     return v
 
-def entity_barycenter(entity: NDArray, node: NDArray) -> NDArray:
-    raise NotImplementedError
+def entity_barycenter(etn: NDArray, node: NDArray) -> NDArray:
+    summary = etn@node
+    count = etn@np.ones((node.shape[0], 1), dtype=node.dtype)
+    return summary/count
 
 ##################################################
 ### Homogeneous Mesh
@@ -184,7 +190,7 @@ def homo_entity_barycenter(entity: NDArray, node: NDArray) -> NDArray:
     return np.mean(node[entity, :], axis=1)
 
 
-# Interval Mesh & Triangle Mesh & Tetrahedron Mesh
+# Interval  & Triangle  & Tetrahedron 
 # ================================================
 
 def simplex_ldof(p: int, iptype: int) -> int:
@@ -226,6 +232,49 @@ def simplex_measure(points: NDArray):
                            "to form a simplex.")
     edges = points[..., 1:, :] - points[..., :-1, :]
     return det(edges)/(factorial(TD))
+
+
+# Quadrangle & Hexahedron
+# =======================
+
+def tensor_ldof(p: int, iptype: int) -> int:
+    r"""Number of local DoFs of a tensor shape."""
+    return (p + 1) ** iptype
+
+
+def tensor_gdof(p: int, mesh) -> int:
+    r"""Number of global DoFs of a mesh with tensor cells."""
+    coef = 1
+    count = mesh.node.shape[0]
+
+    for i in range(1, mesh.TD + 1):
+        coef = coef * (p-i)
+        count += coef * mesh.entity(i).shape[0]
+    return count
+
+
+##################################################
+### Final Mesh
+##################################################
+
+# Interval Mesh
+# =============
+
+def int_grad_lambda(line: NDArray, node: NDArray) -> NDArray:
+    """grad_lambda function on lines.
+
+    Args:
+        line (Tensor[..., 2]): Indices of vertices of lines.\n
+        node (Tensor[N, GD]): Node coordinates.
+
+    Returns:
+        Tensor: grad lambda tensor shaped [..., 2, GD].
+    """
+    points = node[line, :]
+    v = points[..., 1, :] - points[..., 0, :] # (NC, GD)
+    h2 = np.sum(v**2, axis=-1, keepdims=True)
+    v /= h2
+    return np.stack([-v, v], axis=-2)
 
 
 # Triangle Mesh

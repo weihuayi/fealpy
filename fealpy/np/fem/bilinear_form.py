@@ -4,7 +4,7 @@ from typing import TypeVar, Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from scipy.sparse import csr_matrix, coo_matrix
+from scipy.sparse import csr_matrix
 
 from .. import logger
 from ..functionspace.space import FunctionSpace

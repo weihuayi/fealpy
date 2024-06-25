@@ -1,10 +1,10 @@
 from typing import Tuple
-from .mesh_base import HomoMesh
+# from .mesh_base import HomoMesh
 
 import jax.numpy as jnp
 
 
-class UniformMesh2d(HomoMesh):
+class UniformMesh2d():
 
     def __init__(self):
         """

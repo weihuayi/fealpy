@@ -39,8 +39,8 @@ class TriangleMesh(SimplexMesh):
         elif etype in ('face', 'edge', 1):
             return GaussLegendreQuadrature(index) 
 
-    integrator = quadrature_formula
-            
+    quadrature_rules = quadrature_formula
+
 
     def view(self, name='Window Title', res=(640, 360), fps_limit=200, pos = (150, 150)): 
         GD = self.geo_dimension()
