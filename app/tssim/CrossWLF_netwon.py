@@ -91,37 +91,6 @@ for i in range(1):
     delta = solver.delta_epsion(phi1)
     kappa = solver.kappa(phi1)
     
-    #ipcs_0
-    @barycentric
-    def source(bcs, index=None):
-        result = 1/pde.WE*kappa(bcs)*delta(bcs)
-        result = np.einsum('ij,ijk->ijk', result, phi1.grad_value(bcs))
-        return result.transpose(0,2,1)
-
-    A0 = NSSolver.ipcs_A_0(mu=eta, rho=rho, threshold=pde.is_outflow_boundary, Re=Re)
-    b0 = NSSolver.ipcs_b_0(un=u0, p0=p0, source=source, Re=Re, rho=rho, threshold=pde.is_outflow_boundary)
-    b0 = b0 - A0@uxx.flatten()     
-    A0 = uD0@A0@uD0 + uD1
-    b0[is_u_bdof] = uxx.flatten()[is_u_bdof]
-    us[:] = spsolve(A0, b0).reshape(2,-1)
-    
-    #ipcs_1
-    A1 = NSSolver.ipcs_A_1()
-    b1 = NSSolver.ipcs_b_1(us, p0, rho)
-    A1,b1 = pbc.apply(A1,b1)
-    p1[:] = spsolve(A1, b1)
-    
-    #ipcs_2
-    A2 = NSSolver.ipcs_A_2(rho) 
-    b2 = NSSolver.ipcs_b_2(us, p1, p0, rho)
-    b2 = b2 - A2@uxx.flatten()     
-    A2 = uD0@A2@uD0 + uD1
-    b2[is_u_bdof] = uxx.flatten()[is_u_bdof]
-    u1[:] = spsolve(A2,b2).reshape((2,-1))
-
-    #tempture
-    A3 = NSSolver.temperature_A(u1, C, rho, lam, pde.Pe) 
-    b3 = NSSolver.temperature_b(T0, u1, p1, eta, Br, pde.Pe, rho, C) 
 
 
 fname = 'test' + 'test_.vtu'
