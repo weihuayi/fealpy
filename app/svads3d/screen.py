@@ -118,6 +118,7 @@ class Screen:
         self.eillposid_nonoverlapmesh = []
 
         self.optimize()
+        self.draw_frature_points()
         self.meshing()
         self.compute_uv()
 
@@ -134,14 +135,13 @@ class Screen:
         相机参数优化方法，根据特征信息优化当前相机系统中的所有相机的位置和角度。
         """
         camsys = self.camera_system
-        #self.i=0
+        self.i=0
         def object_function(x):
             """
             @brief The object function to be optimized.
             @param x The parameters to be optimized.
             """
-            #self.i+=1
-            #print("Optimization iteration: ", self.i)
+            self.i+=1
             x = x.reshape(6, -1)
             camsys.set_parameters(x)
 
@@ -149,9 +149,11 @@ class Screen:
             for i in range(6):
                 ps0 = camsys.cameras[i].feature_points["ground"]
                 ps1 = camsys.cameras[i].feature_points["camera_sphere"]
-                ps2 = camsys.cameras[i].to_screen(ps1)
+                ps2 = camsys.cameras[i].to_screen(ps1, on_ground=True)
+                ps0 = np.array(ps0)
                 error += np.sum((ps0 - ps2[:, :-1])**2)
-            print("Error: ", error)
+            if i%50==0:
+                print("Error: ", error)
             return error
 
         # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
@@ -168,18 +170,20 @@ class Screen:
         ub = init_x.copy()
         ub[:, 0:3] += 0.1
         ub[:, 3:6] += 0.01
-        ub[:, 6:]  += 10
+        ub[:, 6:]  += 1
         lb = init_x.copy()
         lb[:, 0:3] -= 0.1
         lb[:, 3:6] -= 0.01
         lb[:, 6]  -= 0.1
-        Max_iter = 50
+        Max_iter = 100
 
         opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
                       object_function, init_x.flatten())
         bestfitness,best_position,_ = opt_alg.cal()
         print(bestfitness)
         print(best_position)
+
+        camsys.set_parameters(best_position.reshape(6, -1))
 
     def get_implict_function(self):
         """
@@ -549,7 +553,21 @@ class Screen:
         """
         return self.camera_system.projecte_to_view_point(points)
 
-    def sphere_to_self(self, points, center, radius):
+    def _sphere_to_ground(self, points, center, radius):
+        """
+        将一个球面上的点投影到地面屏幕上。
+        @param points: 球面上的点 (NP, 3)。
+        @param center: 球心。
+        @param radius: 半径。
+        @return: 投影到地面屏幕上的点。
+        """
+        z0 = -self.center_height
+        v = points - center[None, :]
+        t = (z0-center[2])/v[:, 2]
+        val = center + t[:, None]*v
+        return val
+
+    def sphere_to_self(self, points, center, radius, on_ground=False):
         """
         将一个球面上的点投影到屏幕上。
         @param points: 球面上的点 (NP, 3)。
@@ -557,6 +575,9 @@ class Screen:
         @param radius: 半径。
         @return: 投影到屏幕上的点。
         """
+        if on_ground:
+            return self._sphere_to_ground(points, center, radius)
+
         if len(points.shape)==1:
             points = points[None, :]
         f0, f1 = self.get_implict_function()
@@ -571,7 +592,7 @@ class Screen:
         g1 = lambda p : sphere_to_implict_function(p, center, radius, f1)
         for i, node in enumerate(points):
             val = g1(node)
-            if f0(val) > 0:
+            if (f0(val) > 0):
                 val = g0(node)
             ret[i] = val
         return ret
@@ -669,4 +690,28 @@ class Screen:
         for mesh in self.eillposid_overlapmesh:
             self._display_overlap_mesh(plotter, mesh)
 
+    def draw_frature_points(self):
+        """
+        绘制地面区域。
+        @param plotter: 绘图器。
+        """
+        import matplotlib.pyplot as plt
+        cams = self.camera_system.cameras
+        for i in range(6):
+            ps0 = cams[i].feature_points["ground"]
+            ps1 = cams[i].feature_points["camera_sphere"]
+            ps2 = cams[i].to_screen(ps1)
+            fig = plt.figure()
+            ps0 = np.array(ps0)
+            # 绘制地面特征点并加上编号
+            ax = fig.add_subplot(111)
+            ax.scatter(ps0[:, 0], ps0[:, 1], c='r', marker='o')
+            for j in range(len(ps0)):
+                ax.text(ps0[j, 0], ps0[j, 1], str(j), fontsize=12)
+
+            # 绘制相机球面特征点并加上编号
+            ax.scatter(ps2[:, 0], ps2[:, 1], c='b', marker='o')
+            for j in range(len(ps2)):
+                ax.text(ps2[j, 0], ps2[j, 1], str(j), fontsize=12)
+        plt.show()
 

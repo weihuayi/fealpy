@@ -18,13 +18,15 @@ class TriangleMesh(SimplexMesh):
         super().__init__(node.shape[0], TD)
         self.node = node 
         self.cell = cell
-        self.localEdge = tnp.field([(1, 2), (2, 0), (0, 1)], dtype=ti.i8)
-        self.localFace = tnp.field([(1, 2), (2, 0), (0, 1)], dtype=ti.i8)
-        self.ccw = tnp.field([0, 1, 2], dtype=ti.i8)
+        kwargs = {'dtype': cell.dtype}
+        self.localEdge = tnp.field([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localFace = tnp.field([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.ccw = tnp.field([0, 1, 2], **kwargs)
         self.localCell = tnp.field([
             (0, 1, 2),
             (1, 2, 0),
-            (2, 0, 1)], dtype=ti.i8)
+            (2, 0, 1)], **kwargs)
+        self.construct()
 
         self.p = 1  # 平面三角形
         self.celldata = {}
@@ -39,7 +41,7 @@ class TriangleMesh(SimplexMesh):
         elif etype in ('face', 'edge', 1):
             return GaussLegendreQuadrature(index) 
 
-    quadrature_rules = quadrature_formula
+    quadrature_rule = quadrature_formula
 
 
     def view(self, name='Window Title', res=(640, 360), fps_limit=200, pos = (150, 150)): 

@@ -102,8 +102,6 @@ class Camera():
         fy = self.K[1, 1]
         u0 = self.K[0, 2]
         v0 = self.K[1, 2]
-        print(fx, fy, u0, v0)
-        print(self.picture.center, self.picture.radius)
 
         """
         w = self.width
@@ -182,14 +180,14 @@ class Camera():
         p = self.picture.to_camera(point, "L")
         return self.camera_to_world(p)
 
-    def to_screen(self, points):
+    def to_screen(self, points, on_ground=False):
         """
         将相机球面上的点投影到屏幕上。
         @param args: 相机球面上的点。
         @return:
         """
         screen = self.camera_system.screen
-        ret = screen.sphere_to_self(points, self.location, 1.0)
+        ret = screen.sphere_to_self(points, self.location, 1.0, on_ground)
         return ret
 
     def world_to_camera(self, points):

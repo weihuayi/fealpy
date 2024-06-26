@@ -276,9 +276,9 @@ class MeshDS():
         NF = i0.shape[0]
         face = tface[i0, :]
 
-        face2cell = np.zeros((NF, 4), dtype=self.itype)
-        i1 = np.zeros(NF, dtype=self.itype)
-        i1[j] = np.arange(NFC*NC, dtype=self.itype)
+        face2cell = np.zeros((NF, 4), dtype=np.int32)
+        i1 = np.zeros(NF, dtype=np.int32)
+        i1[j] = np.arange(NFC*NC, dtype=np.int32)
 
         face2cell[:, 0] = i0 // NFC
         face2cell[:, 1] = i1 // NFC
