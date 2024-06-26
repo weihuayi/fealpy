@@ -13,16 +13,18 @@ import numpy as np
 import h5py
 import pyvista
 from typing import Dict
+import enum
 
-'''
 #设置标签
 class Tag(enum.IntEnum):
+    """Particle types."""
     fill_value = -1 #当粒子数量变化时，用 -1 填充
     fluid = 0
     solid_wall = 1 #固壁墙粒子
     moving_wall = 2 #移动墙粒子
     dirichlet_wall = 3 #温度边界条件的狄利克雷墙壁粒子
-'''
+wall_tags = jnp.array([tag.value for tag in Tag if "WALL" in tag.name])
+
 EPS = jnp.finfo(float).eps
 
 class SPHSolver:
