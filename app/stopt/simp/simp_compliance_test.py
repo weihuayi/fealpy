@@ -7,15 +7,6 @@ from utilfuncs import compute_filter
 class TopSimp:
     def __init__(self, mesh=None, space=None, bc=None, material=None, \
                 filter=None, global_volume_constraints=None):
-        '''
-        Initialize the topology optimization problem.
-
-        Parameters:
-        - space (LagrangeFESpace): Function space for the problem.
-        - mesh (UniformMesh2d): Mesh for the problem.
-        - bc (dict): Boundary conditions and loads for the problem.
-        - material (dict): Material parameters for the problem.
-        '''
 
         # Default mesh parameters
         if mesh is None:
@@ -63,6 +54,7 @@ class TopSimp:
             H, Hs = compute_filter(mesh, filter_radius)
             ft = {'type':1, 'H':H, 'Hs':Hs}
 
+        # Default global volume constraints
         if global_volume_constraints is None:
             global_volume_constraints = {'isOn':True, 'volfrac':0.5}
 
