@@ -65,17 +65,15 @@ class TopSimp:
         return E
 
     def fe_analysis(self, rho):
-        from fealpy.fem import LinearElasticityOperatorIntegrator
+        from linear_elasticity_operator_intergrator_test import BeamOperatorIntegrator
         from fealpy.fem import BilinearForm
         from scipy.sparse import spdiags
         from scipy.sparse.linalg import spsolve
         GD = 2
         uh = self.space.function(dim=GD)
-        lambda_ = (self.material['E0'] * self.material['nu']) / ((1+self.material['nu']) * (1-2*self.material['nu']))
-        mu = (self.material['E0']) / (2 * (1+self.material['nu']))
         
-        p = 1
-        integrator = LinearElasticityOperatorIntegrator(lam=lambda_, mu=mu, q=p+1)
+        integrator = BeamOperatorIntegrator(rho=rho, penal=self.material['penal'], \
+                                            nu=self.material['nu'], E0=self.material['E0'])
         vspace = GD * (self.space, )
         bform = BilinearForm(vspace)
         bform.add_domain_integrator(integrator)
@@ -105,7 +103,70 @@ class TopSimp:
         # 线性方程组求解
         uh.flat[:] = spsolve(K, F)
 
-        return uh
+        ldof = self.space.number_of_local_dofs()
+        vldof = GD * ldof
+        cell2dof = vspace[0].cell_to_dof()
+        NC = self.mesh.number_of_cells()
+        ue = np.zeros((NC, vldof, 1))
+
+        reshaped_uh = uh.reshape(-1)
+        # 每个单元的自由度（每个节点两个自由度）
+        updated_cell2dof = np.repeat(cell2dof*GD, GD, axis=1) + np.tile(np.array([0, 1]), (NC, ldof))
+        idx = np.array([0, 1, 4, 5, 6, 7, 2, 3], dtype=np.int_)
+        # 用 Top 中的自由度替换 FEALPy 中的自由度
+        updated_cell2dof = updated_cell2dof[:, idx]
+        ue = reshaped_uh[updated_cell2dof]
+
+        return uh, ue
     
     def compute_compliance(self, rho):
-        pass
+
+        uh, ue = self.fe_analysis(rho)
+        c1 = np.dot(self.bc['force'].T, uh.flat)
+
+        nu = self.material['nu']
+        E0 = self.material['E0']
+        k = np.array([1/2 - nu/6,   1/8 + nu/8,   -1/4 - nu/12, -1/8 + 3 * nu/8,
+                -1/4 + nu/12,  -1/8 - nu/8,    nu/6,         1/8 - 3 * nu/8])
+        KE = E0 / (1 - nu**2) * np.array([
+            [k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7]],
+            [k[1], k[0], k[7], k[6], k[5], k[4], k[3], k[2]],
+            [k[2], k[7], k[0], k[5], k[6], k[3], k[4], k[1]],
+            [k[3], k[6], k[5], k[0], k[7], k[2], k[1], k[4]],
+            [k[4], k[5], k[6], k[7], k[0], k[1], k[2], k[3]],
+            [k[5], k[4], k[3], k[2], k[1], k[0], k[7], k[6]],
+            [k[6], k[3], k[4], k[1], k[2], k[7], k[0], k[5]],
+            [k[7], k[2], k[1], k[4], k[3], k[6], k[5], k[0]]
+            ])
+
+        temp1 = rho ** self.material['penal']
+        temp2 = np.einsum('ij, jk, ki -> i', ue, KE, ue.T)
+        c2 = np.einsum('i, j -> ', temp1, temp2)
+
+        return c1, c2
+    
+    def compute_compliance_sensitivity(self, rho):
+
+        uh, ue = self.fe_analysis(rho)
+        c1 = np.dot(self.bc['force'].T, uh.flat)
+
+        nu = self.material['nu']
+        E0 = self.material['E0']
+        k = np.array([1/2 - nu/6,   1/8 + nu/8,   -1/4 - nu/12, -1/8 + 3 * nu/8,
+                -1/4 + nu/12,  -1/8 - nu/8,    nu/6,         1/8 - 3 * nu/8])
+        KE = E0 / (1 - nu**2) * np.array([
+            [k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7]],
+            [k[1], k[0], k[7], k[6], k[5], k[4], k[3], k[2]],
+            [k[2], k[7], k[0], k[5], k[6], k[3], k[4], k[1]],
+            [k[3], k[6], k[5], k[0], k[7], k[2], k[1], k[4]],
+            [k[4], k[5], k[6], k[7], k[0], k[1], k[2], k[3]],
+            [k[5], k[4], k[3], k[2], k[1], k[0], k[7], k[6]],
+            [k[6], k[3], k[4], k[1], k[2], k[7], k[0], k[5]],
+            [k[7], k[2], k[1], k[4], k[3], k[6], k[5], k[0]]
+            ])
+
+        temp1 = -self.material['penal'] * rho ** (self.material['penal'] - 1)
+        temp2 = np.einsum('ij, jk, ki -> i', ue, KE, ue.T)
+        dc = np.einsum('i, j -> ', temp1, temp2)
+
+        return dc
