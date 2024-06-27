@@ -6,20 +6,11 @@ from utilfuncs import compute_filter
 
 class TopSimp:
     def __init__(self, mesh=None, space=None, bc=None, material=None, filter=None):
-        '''
-        Initialize the topology optimization problem.
-
-        Parameters:
-        - space (LagrangeFESpace): Function space for the problem.
-        - mesh (UniformMesh2d): Mesh for the problem.
-        - bc (dict): Boundary conditions and loads for the problem.
-        - material (dict): Material parameters for the problem.
-        '''
 
         # Default mesh parameters
         if mesh is None:
-            nelx, nely = 6, 4
-            domain = [0, 6, 0, 4]
+            nelx, nely = 3, 2
+            domain = [0, 3, 0, 2]
             hx = (domain[1] - domain[0]) / nelx
             hy = (domain[3] - domain[2]) / nely
             mesh = UniformMesh2d(extent=(0, nelx, 0, nely), h=(hx, hy), origin=(domain[0], domain[2]))
@@ -38,8 +29,11 @@ class TopSimp:
                 gdof = vspace[0].number_of_global_dofs()
                 vgdof = gdof * GD
                 force = np.zeros( (vgdof, 1) )
-                force[1, 0] = -1
-                fixeddofs = np.union1d( np.arange(0, 2*(nely+1), 2), np.array([2*(nelx+1)*(nely+1) - 1]) )
+                force[vgdof-1, 0] = -1
+                #force[1, 0] = -1
+                fixeddofs = np.arange(0, 2*(mesh.ny+1), 1)
+                # np.union1d( np.arange(0, 2*(nely+1), 2), np.array([2*(nelx+1)*(nely+1) - 1]) )
+
 
             bc = {'force': force, 'fixeddofs': fixeddofs}
 
@@ -82,17 +76,17 @@ class TopSimp:
         KK = integrator.assembly_cell_matrix(space=vspace)
         print("KK:", KK.shape, "\n", KK[0].round(4))
         K = bform.assembly()
-        print("K:", K.shape, "\n", K.toarray().round(4))
+        #print("K:", K.shape, "\n", K.toarray().round(4))
 
         dflag = self.bc['fixeddofs']
-        print("dflag:", dflag)
+        #print("dflag:", dflag)
         uh.flat[dflag] = 0
 
         F = self.bc['force']
-        print("F:", F.shape, "\n", F.T.round(4))
+        #print("F:", F.shape, "\n", F.T.round(4))
         F -= K@uh.reshape(-1, 1)
         F[dflag.flat] = uh.reshape(-1, 1)[dflag.flat]
-        print("F:", F.shape, "\n", F.T.round(4))
+        #print("F:", F.shape, "\n", F.T.round(4))
 
         bdIdx = np.zeros(K.shape[0], dtype=np.int_)
         bdIdx[dflag.flat] = 1
@@ -100,7 +94,7 @@ class TopSimp:
         D0 = spdiags(1-bdIdx, 0, K.shape[0], K.shape[0])
         D1 = spdiags(bdIdx, 0, K.shape[0], K.shape[0])
         K = D0@K@D0 + D1
-        print("K:", K.shape, "\n", K.toarray().round(4))
+        #print("K:", K.shape, "\n", K.toarray().round(4))
 
         # 线性方程组求解
         uh.flat[:] = spsolve(K, F)
