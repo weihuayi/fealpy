@@ -463,7 +463,7 @@ class SimplexMesh(HomogeneousMesh):
                        variable: str='u', mi: Optional[Array]=None) -> Array:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
-        phi = F.simplex_shape_function(bc, p, mi)
+        phi = F.simplex_shape_function(bc, mi, p)
         if variable == 'u':
             return phi
         elif variable == 'x':
@@ -475,12 +475,14 @@ class SimplexMesh(HomogeneousMesh):
     def grad_shape_function(self, bc: Array, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Array]=None) -> Array:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
-        R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
+        if mi is not None:
+            mi= F.multi_index_matrix(p, TD, dtype=self.itype)
+        R = F.simplex_grad_shape_function(bc, mi, p) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
+            print(Dlambda.shape, R.shape)
             gphi = jnp.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi

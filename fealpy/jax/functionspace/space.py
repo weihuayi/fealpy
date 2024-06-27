@@ -2,49 +2,61 @@
 from typing import Union, Callable, Optional, Generic, TypeVar
 from abc import ABCMeta, abstractmethod
 
-import numpy as np
-from numpy.typing import NDArray
+import jax.numpy as jnp
 
-Index = Union[int, slice, NDArray]
+from ..mesh.utils import Array
+
+Index = Union[int, slice, Array]
 Number = Union[int, float]
 _S = slice(None)
 
 
 class _FunctionSpace(metaclass=ABCMeta):
     r"""THe base class of function spaces"""
-    ftype: np.dtype
-    itype: np.dtype
-    doforder: str='vdims'
+    ftype: jnp.dtype
+    itype: jnp.dtype
 
-    ### basis
+    # basis
     @abstractmethod
-    def basis(self, p: NDArray, index: Index=_S, **kwargs) -> NDArray: raise NotImplementedError
+    def basis(self, p: Array, index: Index=_S, **kwargs) -> Array: raise NotImplementedError
     @abstractmethod
-    def grad_basis(self, p: NDArray, index: Index=_S, **kwargs) -> NDArray: raise NotImplementedError
+    def grad_basis(self, p: Array, index: Index=_S, **kwargs) -> Array: raise NotImplementedError
     @abstractmethod
-    def hess_basis(self, p: NDArray, index: Index=_S, **kwargs) -> NDArray: raise NotImplementedError
+    def hess_basis(self, p: Array, index: Index=_S, **kwargs) -> Array: raise NotImplementedError
 
     # values
     @abstractmethod
-    def value(self, uh: NDArray, p: NDArray, index: Index=_S) -> NDArray: raise NotImplementedError
+    def value(self, uh: Array, p: Array, index: Index=_S) -> Array: raise NotImplementedError
     @abstractmethod
-    def grad_value(self, uh: NDArray, p: NDArray, index: Index=_S) -> NDArray: raise NotImplementedError
+    def grad_value(self, uh: Array, p: Array, index: Index=_S) -> Array: raise NotImplementedError
 
     # counters
     def number_of_global_dofs(self) -> int: raise NotImplementedError
     def number_of_local_dofs(self, doftype='cell') -> int: raise NotImplementedError
 
     # relationships
-    def cell_to_dof(self) -> NDArray: raise NotImplementedError
-    def face_to_dof(self) -> NDArray: raise NotImplementedError
+    def cell_to_dof(self) -> Array: raise NotImplementedError
+    def face_to_dof(self) -> Array: raise NotImplementedError
 
     # interpolation
-    def interpolate(self, source: Union[Callable[..., NDArray], NDArray, Number],
-                    uh: NDArray, dim: Optional[int]=None, index: Index=_S) -> NDArray:
+    def interpolate(self, source: Union[Callable[..., Array], Array, Number],
+                    uh: Array, dim: Optional[int]=None, index: Index=_S) -> Array:
         raise NotImplementedError
 
+    # function
+    def array(self, dim: int=0) -> Array:
+        GDOF = self.number_of_global_dofs()
+        kwargs = {'dtype': self.ftype}
 
-class Function(NDArray):
+        if dim  == 0:
+            shape = (GDOF, )
+        else:
+            shape = (GDOF, dim)
+
+        return jnp.zeros(shape, **kwargs)
+
+
+class Function(Array):
     """
 
     Notes
@@ -59,7 +71,7 @@ class Function(NDArray):
     >> from fealpy.functionspace import 
     """
     def __new__(cls, space, dim=None, array=None, coordtype=None,
-            dtype=np.float64):
+            dtype=jnp.float64):
         if array is None:
             self = space.array(dim=dim, dtype=dtype).view(cls)
         else:
@@ -71,7 +83,7 @@ class Function(NDArray):
     def index(self, i):
         return Function(self.space, array=self[:, i], coordtype=self.coordtype)
 
-    def __call__(self, bc, index=np.s_[:]):
+    def __call__(self, bc, index=jnp.s_[:]):
         space = self.space
         return space.value(self, bc, index=index)
 
@@ -121,12 +133,12 @@ class Function(NDArray):
                 NN = mesh.number_of_nodes()
                 NV = mesh.number_of_vertices_of_cells()
                 bc = mesh.entity_barycenter('cell')
-                val = np.repeat(self(bc), NV)
+                val = jnp.repeat(self(bc), NV)
                 cell, cellLocation = mesh.entity('cell')
-                uh = np.zeros(NN, dtype=mesh.ftype)
-                deg = np.zeros(NN, dtype=mesh.itype)
-                np.add.at(uh, cell, val)
-                np.add.at(deg, cell, 1)
+                uh = jnp.zeros(NN, dtype=mesh.ftype)
+                deg = jnp.zeros(NN, dtype=mesh.itype)
+                jnp.add.at(uh, cell, val)
+                jnp.add.at(deg, cell, 1)
                 uh /= deg
                 axes.plot_trisurf(
                         node[:, 0], node[:, 1], uh, cmap=cmap, lw=0.0)
@@ -135,28 +147,13 @@ class Function(NDArray):
                         node[:, 0], node[:, 1], self, cmap=cmap, lw=0.0)
             return axes
         elif mesh.meshtype in {'stri'}:
-            bc = np.array([1/3, 1/3, 1/3])
+            bc = jnp.array([1/3, 1/3, 1/3])
             mesh.add_plot(axes, cellcolor=self(bc), showcolorbar=True)
         else:
             return None
     
     
-    
-
 class FunctionSpace(_FunctionSpace):
-    def function(self, dim=None, array=None, dtype=np.float64):
+    def function(self, dim=None, array=None, dtype=jnp.float64):
         return Function(self, dim=dim, array=array,
                 coordtype='barycentric', dtype=dtype)
-    
-    def array(self, dim=None, dtype=np.float64):
-        gdof = self.number_of_global_dofs()
-        if dim is None:
-            dim = tuple()
-        if type(dim) is int:
-            dim = (dim, )
-
-        if self.doforder == 'sdofs':
-            shape = dim + (gdof, )
-        elif self.doforder == 'vdims':
-            shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=dtype)
