@@ -3,9 +3,20 @@ from typing import (Callable, Optional, Union,)
 
 import jax
 import jax.numpy as jnp
+
 from ..sph.jax_md import space, partition
 from ..sph.jax_md.partition import (NeighborListFormat)
 from jax import vmap
+
+import numpy as np
+from jax_md import space, partition
+from jax import jit, vmap
+
+import numpy as np
+from jax_md import space, partition
+from jax import jit, vmap
+from omegaconf import OmegaConf
+from fealpy.jax.sph.solver import Tag
 
 from .mesh_base import MeshDS 
 from .utils import Array, Dict
@@ -24,6 +35,12 @@ class NodeMesh(MeshDS):
         else:
             self.nodedata = nodedata
 
+        self.nodedata = {} # the data defined on node
+        self.meshdata = {}
+
+    def number_of_node(self):
+        return self.ds.NN 
+    
     def geo_dimension(self):
         return self.node.shape[1]
 
@@ -100,11 +117,72 @@ class NodeMesh(MeshDS):
         return kernel_function, kernel_grad
     
     @classmethod
-    def from_tgv_domain(cls, box_size, dx=0.02):
+    def from_tgv_domain(cls, box_size, dx=0.02, dy=0.02, rho0=1.0, eta0=0.01):
         n = np.array((box_size / dx).round(), dtype=int)
         grid = np.meshgrid(range(n[0]), range(n[1]), indexing="xy")
-        r = (jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx
-        return cls(r)
+
+        r = jnp.array((jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx)
+        NN = r.shape[0]
+        tag = jnp.full(NN, 0, dtype=int)
+        mv = jnp.zeros((NN, 2), dtype=jnp.float64)
+        tv = jnp.zeros((NN, 2), dtype=jnp.float64)
+        x = r[:, 0]
+        y = r[:, 1]
+        u0 = -jnp.cos(2.0 * jnp.pi * x) * jnp.sin(2.0 * jnp.pi * y)
+        v0 = jnp.sin(2.0 * jnp.pi * x) * jnp.cos(2.0 * jnp.pi * y)
+        mv = mv.at[:,0].set(u0)
+        mv = mv.at[:,1].set(v0)
+        tv = mv
+        volume = jnp.ones(NN, dtype=jnp.float64) * dx * dy
+        rho = jnp.ones(NN, dtype=jnp.float64) * rho0
+        mass = jnp.ones(NN, dtype=jnp.float64) * dx * dy * rho0
+        eta = jnp.ones(NN, dtype=jnp.float64) * eta0
+
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "mv": mv,
+            "tv": tv,
+            "dmvdt": jnp.zeros_like(mv),
+            "dtvdt": jnp.zeros_like(mv),
+            "rho": rho,
+            "mass": mass,
+            "eta": eta,
+        }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_heat_transfer_domain(cls, dx=0.02, n_walls=3):
+        sp = OmegaConf.create({"L": 1.0, "H": 0.2, "hot_wall_half_width": 0.25})
+        #墙粒子生成
+        dxn1 = dx * n_walls
+        n1 = np.array((np.array([sp.L, dxn1]) / dx).round(), dtype=int)
+        grid1 = np.meshgrid(range(n1[0]), range(n1[1]), indexing="xy")
+        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
+        wall_b = r1.copy()
+        wall_t = r1.copy() + np.array([0.0, sp.H + dxn1])
+        r_w = jnp.concatenate([wall_b, wall_t])
+        
+        #流体粒子生成
+        n2 = np.array((np.array([sp.L, sp.H]) / dx).round(), dtype=int)
+        grid2 = np.meshgrid(range(n2[0]), range(n2[1]), indexing="xy")
+        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
+        r_f = np.array([0.0, 1.0]) * n_walls * dx + r2
+
+        #设置标签
+        tag_f = jnp.full(len(r_f), Tag.fluid, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.solid_wall, dtype=int)
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+
+        #设置温度标签
+        dx2n = dx * n_walls * 2
+        _box_size = np.array([sp.L, sp.H + dx2n])
+        mask_hot_wall = ((r[:, 1] < dx * n_walls) * (r[:, 0] < (_box_size[0] / 2) + sp.hot_wall_half_width) * (r[:, 0] > (_box_size[0] / 2) - sp.hot_wall_half_width))
+        tag = jnp.where(mask_hot_wall, Tag.dirichlet_wall, tag)
+
+        return cls(r), tag
+
 
     @classmethod
     def from_ringshaped_channel_domain(cls, dx=0.02, dy=0.02):
