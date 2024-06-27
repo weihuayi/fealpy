@@ -10,6 +10,7 @@
 from jax import ops, vmap
 import jax.numpy as jnp
 import numpy as np
+import jax.random
 import h5py
 import pyvista
 from typing import Dict
@@ -95,6 +96,11 @@ class SPHSolver:
     def forward(self, state, neighbors):
         position = state['position']
         tag = state['tag']
+
+    def get_noise_masked(self, shape: tuple, mask: jnp.array, key: jax.random.PRNGKey, std: float):
+        noise = std * jax.random.normal(key, shape)
+        masked_noise = jnp.where(mask[:, None], noise, 0.0)
+        return masked_noise
 
 
     def write_h5(self, data_dict: Dict, path: str):
