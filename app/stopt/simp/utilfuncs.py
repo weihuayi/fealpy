@@ -23,17 +23,6 @@ def compute_filter(mesh, rmin):
 
 
 def sensitivity_filter(ft, rho, dc, dv):
-    """
-    应用 mesh-independency filter 进行每个单元的灵敏度过滤.
-
-    Parameters:
-    - rmin (float): Filter 半径.
-    - rho (ndarray - (nely, nelx) ): 密度分布矩阵.
-    - dc (ndarray - (nely, nelx) ): 原始的灵敏度矩阵.
-
-    Returns:
-    - dcn(ndarray - (nely, nelx) ): 过滤后的灵敏度矩阵.
-    """
 
     if (ft['type'] == 1):
         dc = np.matmul(ft['H'], \
