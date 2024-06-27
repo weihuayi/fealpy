@@ -8,7 +8,8 @@ from fealpy import logger
 import ipdb
 
 class GLMesh:
-    def __init__(self, node, cell=None, texture_path=None, texture_unit=0, flip='LR'):
+    def __init__(self, node, cell=None, texture_paths=[], texture_unit=0,
+                 flip='LR', tag = 'single', shader_program = None):
         """
         @brief 初始化网格类，根据节点的数据格式配置顶点属性，并加载纹理（如果提供）。
 
@@ -19,12 +20,14 @@ class GLMesh:
         @param cell: 单元格的索引数组，用于绘制网格。如果为None，则使用顶点数组直接绘制。
         @param texture_path: 纹理图片的路径。如果为None，则不加载纹理。
         """
+
         self.flip = flip
         self.node = node 
         self.cell = cell if cell is not None else None
-        self.texture_path = texture_path
-        self.texture_id = None
-        self.texture_unit = texture_unit
+        self.texture_paths = texture_paths
+        self.texture_ids = None
+        self.texture_unit = texture_unit # TODO 作用?
+        self.shader_program = shader_program
 
         self.vao = glGenVertexArrays(1)
         self.vbo = glGenBuffers(1)
@@ -48,6 +51,13 @@ class GLMesh:
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * self.node.itemsize, c_void_p(0))
         elif self.node.shape[1] == 5:  # Positions and texture coordinates
             glEnableVertexAttribArray(0)
+            # 解释每个参数的意义
+            # 0: 顶点属性的索引
+            # 3: 每个顶点属性的大小
+            # GL_FLOAT: 数据类型
+            # GL_FALSE: 是否需要归一化
+            # 5 * self.node.itemsize: 步长
+            # c_void_p(0): 偏移量
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * self.node.itemsize, c_void_p(0))
 
             glEnableVertexAttribArray(1)
@@ -63,6 +73,19 @@ class GLMesh:
             glEnableVertexAttribArray(2)
             glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * self.node.itemsize, c_void_p(5 * self.node.itemsize))
 
+        elif self.node.shape[1] == 8:  # Positions, uv0, uv1, and weight
+            glEnableVertexAttribArray(0)
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * self.node.itemsize, c_void_p(0))
+
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * self.node.itemsize, c_void_p(3 * self.node.itemsize))
+
+            glEnableVertexAttribArray(2)
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * self.node.itemsize, c_void_p(5 * self.node.itemsize))
+
+            glEnableVertexAttribArray(3)
+            glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 8 * self.node.itemsize, c_void_p(7 * self.node.itemsize))
+
         # Unbind the VBO and VAO
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
@@ -71,17 +94,21 @@ class GLMesh:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
         # Load texture if provided
-        if self.texture_path:
-            self.load_texture()
+        if len(self.texture_paths) > 0:
+            self.texture_ids = [self.load_texture(path) for path in self.texture_paths]
+        if len(self.texture_paths) > 1:
+            print(self.texture_ids)
+            print(self.texture_paths)
+            #self.load_texture()
 
-    def load_texture(self):
+    def load_texture(self, texture_path):
         """
         @brief 加载并配置网格的纹理。
 
         纹理图片从指定的路径加载。加载后的纹理将绑定到纹理单元并配置相应的纹理参数。
         """
         # Load the image with Pillow
-        image = Image.open(self.texture_path)
+        image = Image.open(texture_path)
         if self.flip == 'TB':
             image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image for OpenGL
         elif self.flip == 'LR':
@@ -89,8 +116,8 @@ class GLMesh:
         img_data = image.convert("RGBA").tobytes()  # Convert the image to RGBA format
 
         # Generate a texture ID and bind it
-        self.texture_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
+        texture_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
 
         # Set texture parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
@@ -107,11 +134,13 @@ class GLMesh:
 
         # Unbind the texture
         glBindTexture(GL_TEXTURE_2D, 0)
+        return texture_id
 
-    def draw_face(self, shader_program):
+    def draw_face(self):
         """
         @brief 画面
         """
+        shader_program = self.shader_program
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 0)
         if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
@@ -119,10 +148,11 @@ class GLMesh:
         else:
             glDrawArrays(GL_TRIANGLES, 0, len(self.node))
 
-    def draw_edge(self, shader_program):
+    def draw_edge(self):
         """
         @brief 画边
         """
+        shader_program = self.shader_program
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 1)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)  # 绘制线框
         if self.ebo is not None:
@@ -132,22 +162,37 @@ class GLMesh:
             glDrawArrays(GL_TRIANGLES, 0, len(self.node))
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)  # 恢复默认模式
 
-    def draw_texture(self, shader_program):
+    def bind_texture(self, texture_id, i):
+        """
+        @brief 绑定纹理
+        """
+        shader_program = self.shader_program
+        glActiveTexture(GL_TEXTURE0 + self.texture_unit + i)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+
+        loc = glGetUniformLocation(shader_program, "textureSampler"+str(i))
+        glUniform1i(loc, self.texture_unit+i)
+
+        #value = np.zeros(1, dtype=np.int32)
+        #glGetUniformiv(shader_program, loc, value)
+
+    def draw_texture(self):
         """
         @brief 显示纹理
         """
+        shader_program = self.shader_program
         glUniform1i(glGetUniformLocation(shader_program, "mode"), 3)
-        glActiveTexture(GL_TEXTURE0 + self.texture_unit)
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
-        glUniform1i(glGetUniformLocation(shader_program, "textureSampler"), self.texture_unit)
+
+        for i, texture_id in enumerate(self.texture_ids):
+            self.bind_texture(texture_id, i)
+
         if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
             glDrawElements(GL_TRIANGLES, len(self.cell), GL_UNSIGNED_INT, None)
         else:
             glDrawArrays(GL_TRIANGLES, 0, len(self.node))
 
-
-    def draw(self, shader_program, mode):
+    def draw(self, mode):
         """
         @brief 使用提供的着色器程序绘制网格。
 
@@ -157,24 +202,26 @@ class GLMesh:
         该方法绑定网格的VAO和纹理（如果有），并根据是否提供了单元格索引来执行绘制命令。
         """
         glBindVertexArray(self.vao)  # Bind the VAO for this mesh
+        glUseProgram(self.shader_program)
+
 
         if mode == 3:
-            if self.texture_id is not None and self.node.shape[1] == 5: 
-                self.draw_texture(shader_program)
+            if self.texture_ids is not None and self.node.shape[1] in [5, 8]: 
+                self.draw_texture()
             else:
-                self.draw_face(shader_program)
+                self.draw_face()
         elif mode == 2:
-            self.draw_edge(shader_program) # 先画边，后画面
-            self.draw_face(shader_program)
+            self.draw_edge() # 先画边，后画面
+            self.draw_face()
         elif mode == 1:
-            self.draw_edge(shader_program)
+            self.draw_edge()
         elif mode == 0:
-            self.draw_face(shader_program)
+            self.draw_face()
 
         glBindVertexArray(0)
         if self.ebo is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-        if self.texture_id is not None:
+        if len(self.texture_paths) > 0:
             glBindTexture(GL_TEXTURE_2D, 0)
 
 

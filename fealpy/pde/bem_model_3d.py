@@ -37,7 +37,7 @@ class PoissonModelConstantDirichletBC3d:
         y = p[..., 1]
         z = p[..., 2]
         pi = np.pi
-        val = -3 * pi * pi * np.cos(pi * x) * np.cos(pi * y) * np.cos(pi * z)
+        val = 3 * pi * pi * np.cos(pi * x) * np.cos(pi * y) * np.cos(pi * z)
         return val
 
     def gradient(self, p):

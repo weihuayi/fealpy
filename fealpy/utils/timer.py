@@ -18,10 +18,48 @@ def _timer_core() -> Generator[None, str, List[Tuple[str, float]]]:
 
 
 def timer() -> Generator[None, str, None]:
-    """Build a timer.
+    """A generator function that acts as a timer to measure the elapsed time between events.
+
+    Usage:
+
+    - Call `next()` on the generator to start it.
+
+    - Send strings (labels) to the generator using the `send()` method to mark events.
+
+    - Sending `None` will stop the timer and print a summary of the elapsed times between events,
+      along with their proportions relative to the total time.
 
     Yields:
-        None.
+        None: The generator yields nothing but accepts labels via `send()`.
+
+    Returns:
+        None: After receiving `None`, the generator returns None and prints the timing results.
+
+    Example:
+
+        >>> t = timer()
+
+        >>> next(t)
+
+        >>> t.send('Event 1')
+
+        >>> # Perform some operations
+
+        >>> t.send('Event 2')
+
+        >>> # Perform more operations
+
+        >>> t.send(None)
+
+        ```
+        Timer received None and paused.
+        =================================================
+           ID       Time        Proportion(%)    Label
+        -------------------------------------------------
+          ...       ...             ...         Event 1
+          ...       ...             ...         Event 2
+        =================================================
+        ```
     """
     while True:
         result = yield from _timer_core()

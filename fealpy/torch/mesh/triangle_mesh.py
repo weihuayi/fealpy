@@ -1,7 +1,6 @@
 
 from typing import Optional, Union, List
 
-import numpy as np
 import torch
 from torch import Tensor
 
@@ -37,8 +36,10 @@ class TriangleMesh(SimplexMesh):
         self.construct()
 
         self.node = node
-        GD = node.size(-1)
+        self._attach_functionals()
 
+    def _attach_functionals(self):
+        GD = self.geo_dimension()
         if GD == 2:
             self._cell_area = F.simplex_measure
             self._grad_lambda = F.tri_grad_lambda_2d
@@ -59,16 +60,16 @@ class TriangleMesh(SimplexMesh):
             return torch.tensor([0,], dtype=self.ftype, device=self.device)
         elif etype == 1:
             edge = self.entity(1, index)
-            return F.edge_length(node[edge])
+            return F.edge_length(edge, node)
         elif etype == 2:
             cell = self.entity(2, index)
-            return self._cell_area(node[cell])
+            return self._cell_area(cell, node)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    # integrator
-    def integrator(self, q: int, etype: Union[int, str]='cell',
-                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+    # quadrature
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import TriangleQuadrature
         from .quadrature import GaussLegendreQuadrature
 
@@ -85,14 +86,6 @@ class TriangleMesh(SimplexMesh):
         return quad
 
     # ipoints
-    def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
-        if isinstance(iptype, str):
-            iptype = estr2dim(self, iptype)
-        return F.simplex_ldof(p, iptype)
-
-    def number_of_global_ipoints(self, p: int):
-        return F.simplex_gdof(p, self)
-
     def interpolation_points(self, p: int, index: Index=_S) -> Tensor:
         """Fetch all p-order interpolation points on the triangle mesh."""
         node = self.entity('node')
@@ -179,7 +172,7 @@ class TriangleMesh(SimplexMesh):
 
     # shape function
     def grad_lambda(self, index: Index=_S):
-        return self._grad_lambda(self.node[self.cell[index]])
+        return self._grad_lambda(self.cell[index], self.node)
 
     # constructor
     @classmethod
@@ -188,16 +181,14 @@ class TriangleMesh(SimplexMesh):
                  ftype: Optional[_dtype]=torch.float64,
                  device: Union[_device, str, None]=None,
                  require_grad: bool=False):
-        """Generate a uniform triangle mesh for a box domain .
+        """Generate a uniform triangle mesh for a box domain.
 
         Parameters:
-            box (List[int]):
-
-            nx (int): Number of divisions along the x-axis (default: 10)
-
-            ny (int): Number of divisions along the y-axis (default: 10)
-
-            threshold: Optional function to filter cells based on their barycenter coordinates (default: None)
+            box (List[int]): 4 integers, the left, right, bottom, top of the box.\n
+            nx (int, optional): Number of divisions along the x-axis, defaults to 10.\n
+            ny (int, optional): Number of divisions along the y-axis, defaults to 10.\n
+            threshold (Callable | None, optional): Optional function to filter cells.
+                Based on their barycenter coordinates, defaults to None.
 
         Returns:
             TriangleMesh: Triangle mesh instance.
@@ -236,3 +227,28 @@ class TriangleMesh(SimplexMesh):
         node.requires_grad_(require_grad)
 
         return cls(node, cell)
+
+    @classmethod
+    def from_numpy(cls, mesh):
+        import numpy as np
+
+        new_mesh = cls.__new__(cls)
+        SimplexMesh.__init__(new_mesh, TD=2)
+
+        for name, tensor_obj in mesh.__dict__.items():
+            if isinstance(tensor_obj, np.ndarray):
+                setattr(new_mesh, name, torch.from_numpy(tensor_obj))
+
+        # NOTE: Meshes in old numpy version has `ds`` instead of `_entity_storage`.
+        if hasattr(mesh, '_entity_storage'):
+            for etype, entity in mesh._entity_storage.items():
+                new_mesh._entity_storage[etype] = torch.from_numpy(entity)
+
+        if hasattr(mesh, 'ds'):
+            for name, tensor_obj in mesh.ds.__dict__.items():
+                if isinstance(tensor_obj, np.ndarray):
+                    setattr(new_mesh, name, torch.from_numpy(tensor_obj))
+
+        new_mesh._attach_functionals()
+
+        return new_mesh

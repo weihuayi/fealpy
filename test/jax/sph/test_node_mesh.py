@@ -2,18 +2,11 @@ import jax
 import jax.numpy as jnp
 from jax import random, jit, vmap
 from fealpy.jax.sph.node_mesh import NodeMesh
+from fealpy.jax.sph.partition import *
 from fealpy.jax.sph.kernel_function import QuinticKernel
+from jax_md.partition import space
 import matplotlib.pyplot as plt
-
-def test_neighbor():
-    box_size = 1.0
-    h = 0.2
-    key = random.PRNGKey(0)
-    num_particles = 100
-    positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
-    node_mesh = NodeMesh(positions)
-    idx = node_mesh.neighbor(box_size,h)
-    print(idx)
+from omegaconf import OmegaConf
 
 def test_neighbors():
     box_size = 1.0  
@@ -22,17 +15,33 @@ def test_neighbors():
     num_particles = 10
     positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
     node_mesh = NodeMesh(positions)
-    
     # 计算邻近列表
-    neighbors_dict = node_mesh.neighbors(box_size, cutoff)
-    print(neighbors_dict)
-    '''
-    for i, data in neighbors_dict.items():
-        print(f"Particle {i} neighbors: {data['indices']}")
-        for j, distance in zip(data['indices'], data['distances']):
-            print(f"  Distance between particle {i} and {j}: {distance}")
-    '''
+    index, indptr = node_mesh.neighbors(box_size, cutoff)
+    print(index)
+    print(indptr)
     
+def test_neighbors_jax():
+    box_size = 1.0  
+    cutoff = 0.2
+    key = random.PRNGKey(0)
+    num_particles = 10
+    positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
+    node_mesh = NodeMesh(positions)
+    
+    displacement_fn, shift_fn = space.periodic(side=box_size)
+    neighbor_fn = neighbor_list(
+        displacement_fn,
+        box_size,
+        r_cutoff=cutoff,
+        mask_self=False
+    )
+    neighbors = neighbor_fn.allocate(positions)
+    neighbors = neighbor_fn.allocate(positions)
+    # 计算邻近列表
+    #index, indptr = node_mesh.neighbors(box_size, cutoff)
+    #print(index)
+    print(neighbors.idx)
+
 def test_add_node_data():
     #创建初始粒子
     nodes = jnp.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]])
@@ -68,10 +77,10 @@ def test_interpolate():
     print(a[1])
 
 def test_from_tgv_domain():
-    node_fluid, node_dummy = NodeMesh.from_tgv_domain()
+    box_size = jnp.array([1.0,1.0])
+    node = NodeMesh.from_tgv_domain(box_size)
     fig, ax = plt.subplots()
-    node_fluid.add_plot(ax, color='red', markersize=25)
-    node_dummy.add_plot(ax,color='blue', markersize=25)
+    node.add_plot(ax, color='red', markersize=25)
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.title('NodeSet from TGV Domain')
@@ -95,11 +104,31 @@ def test_dam_break_domain():
     plt.title('NodeSet from dam break Domain')
     plt.show()
 
+def test_from_heat_transfer_domain():
+    r, tag = NodeMesh.from_heat_transfer_domain()
+    node = r.node
+    color_map = {
+        0: 'red',    # 流体节点为红色
+        1: 'blue',   # 固体节点为蓝色
+        3: 'green'   # 温度节点为绿色
+    }
+    fig, ax = plt.subplots()
+    for t in np.unique(tag):
+        idx = tag == t
+        ax.scatter(node[idx, 0], node[idx, 1], color=color_map[t], s=25, label=f'Tag {t}')
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('NodeSet from dam break Domain')
+    ax.legend()  
+    plt.show()
+
 if __name__ == "__main__":
     #test_neighbor()
     #test_neighbors()
+    #test_neighbors_jax()
     #test_add_node_data()
     #test_interpolate()
-    test_from_tgv_domain()
+    #test_from_tgv_domain()
     #test_from_ringshaped_channel_domain()
     #test_dam_break_domain()
+    test_from_heat_transfer_domain()

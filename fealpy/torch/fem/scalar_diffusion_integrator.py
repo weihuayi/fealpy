@@ -45,7 +45,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.integrator(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index
@@ -69,7 +69,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
 
         cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.integrator(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='u')
 
