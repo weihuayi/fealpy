@@ -107,7 +107,9 @@ class NodeMesh():
         return kernel_function, kernel_grad
     
     @classmethod
-    def from_tgv_domain(cls, box_size, dx=0.02, dy=0.02, rho0=1.0, eta0=0.01):
+    def from_tgv_domain(cls, box_size, dx=0.02, dy=0.02):
+        rho0 = 1.0 #参考密度
+        eta0 = 0.01 #参考动态粘度
         n = np.array((box_size / dx).round(), dtype=int)
         grid = np.meshgrid(range(n[0]), range(n[1]), indexing="xy")
 
@@ -142,7 +144,14 @@ class NodeMesh():
         return cls(r, nodedata=nodedata)
 
     @classmethod
-    def from_heat_transfer_domain(cls, dx=0.02, n_walls=3):
+    def from_heat_transfer_domain(cls, dx=0.02, dy=0.02):
+        n_walls = 3
+        rho0 = 1.0 #参考密度
+        eta0 = 0.01 #参考动态粘度
+        T0 = 1.0 #参考温度
+        kappa0 = 7.313 #参考导热系数
+        Cp0 = 305.27 #参考热容
+
         sp = OmegaConf.create({"L": 1.0, "H": 0.2, "hot_wall_half_width": 0.25})
         #墙粒子生成
         dxn1 = dx * n_walls
@@ -162,7 +171,7 @@ class NodeMesh():
         #设置标签
         tag_f = jnp.full(len(r_f), Tag.fluid, dtype=int)
         tag_w = jnp.full(len(r_w), Tag.solid_wall, dtype=int)
-        r = np.concatenate([r_w, r_f])
+        r = np.array(np.concatenate([r_w, r_f]))
         tag = np.concatenate([tag_w, tag_f])
 
         #设置温度标签
@@ -170,9 +179,34 @@ class NodeMesh():
         _box_size = np.array([sp.L, sp.H + dx2n])
         mask_hot_wall = ((r[:, 1] < dx * n_walls) * (r[:, 0] < (_box_size[0] / 2) + sp.hot_wall_half_width) * (r[:, 0] > (_box_size[0] / 2) - sp.hot_wall_half_width))
         tag = jnp.where(mask_hot_wall, Tag.dirichlet_wall, tag)
+        
+        NN_sum = r.shape[0]
+        mv = jnp.zeros_like(r)
+        rho = jnp.ones(NN_sum) * rho0
+        mass = jnp.ones(NN_sum) * dx * dy * rho0
+        eta = jnp.ones(NN_sum) * eta0
+        temperature = jnp.ones(NN_sum) * T0
+        kappa = jnp.ones(NN_sum) * kappa0
+        Cp = jnp.ones(NN_sum) * Cp0
 
-        return cls(r), tag
-
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "mv": mv,
+            "tv": mv,
+            "dmvdt": jnp.zeros_like(mv),
+            "dtvdt": jnp.zeros_like(mv),
+            "drhodt": jnp.zeros_like(rho),
+            "rho": rho,
+            "p": jnp.zeros_like(rho),
+            "mass": mass,
+            "eta": eta,
+            "dTdt": jnp.zeros_like(rho),
+            "T": temperature,
+            "kappa": kappa,
+            "Cp": Cp,
+        }
+        return cls(r, nodedata=nodedata)
 
     @classmethod
     def from_ringshaped_channel_domain(cls, dx=0.02, dy=0.02):
