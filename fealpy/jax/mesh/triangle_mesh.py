@@ -1,7 +1,6 @@
 
 from typing import Optional, Union, List
 
-import jax
 import jax.numpy as jnp
 
 from fealpy.jax.mesh.mesh_base import _S
@@ -125,7 +124,7 @@ class TriangleMesh(SimplexMesh):
 
         return jnp.concatenate(ipoint_list, axis=0)  # (gdof, GD)
 
-    def cell_to_ipoint(self, p: int, index: Index=_S) -> Array:
+    def cell_to_ipoint(self, p: int, index: jnp.ndarray=_S) -> jnp.ndarray:
         cell = self.cell
         if p == 1:
             return cell[index]
@@ -149,7 +148,8 @@ class TriangleMesh(SimplexMesh):
         c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
 
         flag = face2cell[:, 2] == 1
-        c2p[face2cell[flag, 0][:, None], jnp.flip(idx1,axis=0)] = e2p[flag]
+        idx1_ = jnp.flip(idx1, axis=0)
+        c2p[face2cell[flag, 0][:, None], idx1_] = e2p[flag]
 
         flag = face2cell[:, 2] == 2
         c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
@@ -157,13 +157,15 @@ class TriangleMesh(SimplexMesh):
         iflag = face2cell[:, 0] != face2cell[:, 1]
 
         flag = iflag & (face2cell[:, 3] == 0)
-        c2p[face2cell[flag, 1][:, None], jnp.flip(idx0, axis=0)] = e2p[flag]
+        idx0_ = jnp.flip(idx0, axis=0)
+        c2p[face2cell[flag, 1][:, None], idx0_] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 1)
         c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 2)
-        c2p[face2cell[flag, 1][:, None], jnp.flip(idx2, axis=0)] = e2p[flag]
+        idx2_ = jnp.flip(idx2, axis=0)
+        c2p[face2cell[flag, 1][:, None], idx2_] = e2p[flag]
 
         cdof = (p-1)*(p-2)//2
         flag = jnp.sum(mi > 0, axis=1) == 3
