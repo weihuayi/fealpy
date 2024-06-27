@@ -1,41 +1,36 @@
 
+from typing import (Callable, Optional, Union,)
+
 import jax
 import jax.numpy as jnp
-import numpy as np
-from jax_md import space, partition
-from jax import jit, vmap
+from ..sph.jax_md import space, partition
+from ..sph.jax_md.partition import (NeighborListFormat)
+from jax import vmap
 
-class NodeMeshDataStructure():
-    def __init__(self, NN):
-        self.NN = NN
+from .mesh_base import MeshDS 
+from .utils import Array, Dict
+from jax.config import config
 
-    '''
-    def construct(self, node, box=None):
-        self.neighbor = None
-        self.neighborLocation = None
-    '''
+config.update("jax_enable_x64", True)
 
-class NodeMesh():
+class NodeMesh(MeshDS):
 
-    def __init__(self, node, box=None):
+    def __init__(self, node:Array, nodedata:Optional[Dict]=None, box=None):
+        super().__init__(TD=0)
         self.node = node
+ 
+        if nodedata is None:
+            self.nodedata = {} # the data defined on node
+        else:
+            self.nodedata = nodedata
 
-        #self.ds = NodeSetDataStructure(NN)
-        #self.ds.construct(node, box=box)
-
-        self.nodedata = {} # the data defined on node
-        self.meshdata = {}
-
-    def number_of_node(self):
-        return self.ds.NN 
-    
     def geo_dimension(self):
         return self.node.shape[1]
 
     def top_dimension(self):
-        return self.node.shape[1]
-       
-    def add_node_data(self, name, dtype=jnp.float64):
+        return self.top_dimension()
+    
+    def add_node_data(self, name:str, dtype=jnp.float64):
         NN = self.NN
         self.nodedata.update({names: jnp.zeros(NN, dtypes) 
                               for names, dtypes in zip(name, dtype)})
