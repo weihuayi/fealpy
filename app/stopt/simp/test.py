@@ -44,6 +44,7 @@ for xi in range(len(gauss_points)):
 
         # 形函数及其导数
         N, dN_dxi = shape_functions(gp_xi, gp_eta)
+        print("dN_dxi:", dN_dxi.shape)
 
         # Jacobi矩阵和Jacobi行列式
         J = dN_dxi.T @ np.array([
