@@ -1,23 +1,27 @@
-#!/usr/bin/env python3
-# 
 import argparse
+
 import numpy as np
+
 import matplotlib.pyplot as plt
+
 from scipy.sparse.linalg import spsolve
 
-from fealpy.pde.poisson_3d import CosCosCosData
-from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh 
-from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import DiffusionIntegrator 
-from fealpy.fem import ScalarSourceIntegrator
-from fealpy.fem import BilinearForm
-from fealpy.fem import LinearForm
-from fealpy.fem import DirichletBC
+from fealpy.pde.poisson_2d import CosCosData
+
+from fealpy.mesh.triangle_mesh import TriangleMesh 
+
+from fealpy.functionspace.lagrange_fe_space import LagrangeFESpace
+
+from fealpy.fem.diffusion_integrator import DiffusionIntegrator 
+from fealpy.fem.scalar_source_integrator import ScalarSourceIntegrator
+from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem.linear_form import LinearForm
+from fealpy.fem.dirichlet_bc import DirichletBC
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        TetrahedronMesh 上任意次有限元方法
+        TriangleMesh 上任意次有限元方法
         """)
 
 parser.add_argument('--degree',
@@ -32,10 +36,6 @@ parser.add_argument('--ny',
         default=4, type=int,
         help='初始网格剖分段数.')
 
-parser.add_argument('--nz',
-        default=4, type=int,
-        help='初始网格剖分段数.')
-
 parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
@@ -45,14 +45,12 @@ args = parser.parse_args()
 p = args.degree
 nx = args.nx
 ny = args.ny
-nz = args.nz
 maxit = args.maxit
 
-
-pde = CosCosCosData()
+pde = CosCosData()
 domain = pde.domain()
 
-mesh = TetrahedronMesh.from_box(domain, nx=nx, ny=ny, nz=nz)
+mesh = TriangleMesh.from_box(box = domain, nx = nx, ny = ny)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$', 
         '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$',
@@ -62,22 +60,25 @@ NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
-    space = LagrangeFESpace(mesh, p=p)
+    space = LagrangeFESpace(mesh, p = p, spacetype = 'C', doforder = 'vdims')
     NDof[i] = space.number_of_global_dofs()
 
+    uI = space.interpolate(pde.solution)
+
     bform = BilinearForm(space)
-    bform.add_domain_integrator(DiffusionIntegrator(q=p+2))
+    bform.add_domain_integrator(DiffusionIntegrator(q = p+2))
     A = bform.assembly()
 
     lform = LinearForm(space)
-    lform.add_domain_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
+    lform.add_domain_integrator(ScalarSourceIntegrator(f = pde.source, q = p+2))
     F = lform.assembly()
-    uI = space.interpolate(pde.solution)
+    print('F:', np.max(np.abs(F)))
 
-    bc = DirichletBC(space, pde.dirichlet) 
+    bc = DirichletBC(space = space, gD = pde.dirichlet) 
     uh = space.function() 
     A, F = bc.apply(A, F, uh)
     err0 = np.max(np.abs(A@uI-F))
+
     uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
