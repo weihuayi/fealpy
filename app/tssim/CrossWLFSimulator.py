@@ -159,9 +159,44 @@ class CrossSolver():
     '''
     计算温度方程
     '''
-    def Tempeture():
-        pass
+    def temperature_A(self, u, C, rho, lam, pe):
+        bform = BilinearForm(self.Tspace)
+        dt = self.dt
 
+        @barycentric
+        def coef(bcs, index): 
+            return pe*rho(bcs,index) * C(bcs,index)
+
+        @barycentric
+        def coef1(bcs, index):
+            result = np.einsum('ikj,ij->ikj',u(bcs,index),coef(bcs,index))
+            return dt*result
+
+        @barycentric
+        def coef2(bcs, index):
+            return dt*lam(bcs,index)
+        bform.add_domain_integrator(ScalarMassIntegrator(c=coef, q=self.q))
+        bform.add_domain_integrator(ScalarConvectionIntegrator(c=coef1, q=self.q))
+        bform.add_domain_integrator(ScalarDiffusionIntegrator(c=coef2, q=self.q))
+        A = bform.assembly()         
+
+    def temperature_b(self, Tn, u, p, eta, br, pe, rho, c):
+        dt = self.dt
+
+        @barycentric
+        def coef(bcs, index): 
+            gradu = u.grad_value(bcs,index)
+            D = 0.5*(gradu + gradu.transpose(0,2,1,3))
+            D = np.einsum('ij, imnj->imnj',eta(bcs,index), D)
+            D[:,0,0,:] -= p(bcs,index)
+            D[:,1,1,:] -= p(bcs,index)
+            result = br*np.einsum('imnj,imnj->ij',D, gradu)
+            result = pe*c(bcs,index)*rho(bcs,index)*Tn(bcs,index) + dt*result
+            return result
+        L = LinearForm(self.Tspace)
+        L.add_domain_integrator(ScalarSourceIntegrator(coef, self.q))
+        b = L.assembly()
+        return b
     
      
 

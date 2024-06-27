@@ -1,6 +1,4 @@
 import jax
-jax.config.update("jax_enable_x64", True) # 启用 float64 支持
-#jax.config.update('jax_platform_name', 'cpu')
 import jax.numpy as jnp
 import numpy as np
 from fealpy.jax.sph import NodeMesh
@@ -11,6 +9,9 @@ from jax_md.partition import Sparse
 from fealpy.jax.sph.kernel_function import QuinticKernel
 from jax_md import space
 from omegaconf import OmegaConf
+
+jax.config.update("jax_enable_x64", True) # 启用 float64 支持
+jax.config.update('jax_platform_name', 'cpu')
 
 EPS = jnp.finfo(float).eps
 dx = 0.02
@@ -29,12 +30,7 @@ p_bg = 5.0 #背景压力,用于计算压力p
 
 #时间步长和步数
 g_ext = 2.3 #场外力
-cfl = 0.25 #CFL 条件因子
 eta0 = 0.01 #参考动态粘度
-dt_convective = cfl * h / (c0 + V)
-dt_viscous = cfl * h**2 * rho0 / (eta0 + EPS)
-dt_body_force = cfl * (h / (g_ext + EPS)) ** 0.5
-dt = jnp.amin(jnp.array([dt_convective, dt_viscous, dt_body_force])).item()
 T = 1.5
 t_num = int(T / dt)
 
