@@ -1,9 +1,11 @@
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax_md import space, partition
 from jax import jit, vmap
-from scipy.sparse import csr_matrix
+from omegaconf import OmegaConf
+from fealpy.jax.sph.solver import Tag
 
 class NodeMeshDataStructure():
     def __init__(self, NN):
@@ -17,13 +19,13 @@ class NodeMeshDataStructure():
 
 class NodeMesh():
 
-    def __init__(self, node, box=None):
+    def __init__(self, node, nodedata=None, box=None):
         self.node = node
 
         #self.ds = NodeSetDataStructure(NN)
         #self.ds.construct(node, box=box)
 
-        self.nodedata = {} # the data defined on node
+        self.nodedata = nodedata if nodedata is not None else {} # the data defined on node
         self.meshdata = {}
 
     def number_of_node(self):
@@ -47,54 +49,30 @@ class NodeMesh():
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
 
-    def neighbors(self, box_size, cutoff):
+    def neighbors(self, box_size, h):
         """
         参数:
         - box_size: 模拟盒子的大小
-        - cutoff: 邻近搜索的截断距离
+        - h: 平滑长度
         返回:
-        - neighbors_dict: 一个字典，包含每个粒子的邻近粒子索引和距离
+        - index: 每个粒子的邻近粒子索引
+        - indptr: 每行邻近索引的计数
         """
         # 定义邻近列表的参数
         displacement, shift = space.periodic(box_size)
-        neighbor_fn = partition.neighbor_list(displacement, box_size, cutoff)
+        neighbor_fn = partition.neighbor_list(displacement, box_size, h)
         # 初始化邻近列表，用于分配内存
         nbrs = neighbor_fn.allocate(self.node)
         # 更新邻近列表
         nbrs = neighbor_fn.update(self.node, nbrs)
-        neighbors_dict = {}
-        # 遍历每个粒子，获取邻近粒子的索引和距离
-        for i in range(self.node.shape[0]):
-            neighbors = nbrs.idx[i, nbrs.idx[i] < self.node.shape[0]]  # 获取粒子 i 的邻近粒子索引
-            neighbors_dict[i] = {'indices': [], 'distances': []}
-            for j in neighbors:
-                if i != j:  # 不计算自身粒子
-                    r_ij = displacement(self.node[i], self.node[j])
-                    distance = jnp.linalg.norm(r_ij)
-                    neighbors_dict[i]['indices'].append(j)
-                    neighbors_dict[i]['distances'].append(distance)
-
-        return nbrs
-
-    def neighbor(self, box_size, h):
-        position = self.node
-        num = position.shape[0]
-        @jit
-        def distance(p1, p2):
-            delta = jnp.abs(p1-p2)
-            delta = jnp.where(delta > box_size * 0.5, box_size - delta, delta)  # 周期边界条件
-            return jnp.sqrt(jnp.sum(delta**2))
-        @jit
-        def neighbor_row(i,position):
-            def element(j):
-                dist = distance(position[i], position[j])
-                return jnp.where(dist <= h, dist, 0)
-            return jax.vmap(element)(jnp.arange(num))
-        nbrs = jax.vmap(lambda i: neighbor_row(i, position))(jnp.arange(num))
-        row, col = jnp.nonzero(nbrs)
-        data = nbrs[row,col]
-        csr = csr_matrix((data, (row, col)),shape=nbrs.shape)
-        return csr
+        neighbor = nbrs.idx
+        num = self.node.shape[0]
+        index = jax.vmap(lambda idx, row: jnp.hstack([row, jnp.array([idx])]))(jnp.arange(neighbor.shape[0]), neighbor)
+        row_len = jnp.sum(index != num,axis=1)
+        indptr = jax.lax.scan(lambda carry, x: (carry + x, carry + x), 0, row_len)[1]
+        indptr = jnp.concatenate((jnp.array([0]), indptr))
+        index = index[index != num]
+        return index, indptr
     
     def interpolate(self, u, kernel, neighbor, h):
         """
@@ -129,14 +107,72 @@ class NodeMesh():
         return kernel_function, kernel_grad
     
     @classmethod
-    def from_tgv_domain(cls, dx=0.2, dy=0.2):
-        dummy_d = jnp.mgrid[-3*dx:1+3.99*dx:dx, -3*dy:0:(3*dy)/3].reshape(2, -1).T
-        dummy_u = jnp.mgrid[-3*dx:1+3.99*dx:dx, 1+dy:1+3.99*dy:(3*dy)/3].reshape(2, -1).T
-        dummy_l = jnp.mgrid[-2.99*dx:0:(3*dx)/3, 0:1+dy:dy].reshape(2, -1).T
-        dummy_r = jnp.mgrid[1+dx:1+3.99*dx:(3*dx)/3, 0:1+dy:dy].reshape(2, -1).T
-        dummy = jnp.vstack((dummy_d, dummy_u, dummy_l, dummy_r))
-        fluid = jnp.mgrid[0:1+dx:dx, 0:1+dy:dy].reshape(2, -1).T
-        return cls(fluid), cls(dummy)
+    def from_tgv_domain(cls, box_size, dx=0.02, dy=0.02, rho0=1.0, eta0=0.01):
+        n = np.array((box_size / dx).round(), dtype=int)
+        grid = np.meshgrid(range(n[0]), range(n[1]), indexing="xy")
+
+        r = jnp.array((jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx)
+        NN = r.shape[0]
+        tag = jnp.full(NN, 0, dtype=int)
+        mv = jnp.zeros((NN, 2), dtype=jnp.float64)
+        tv = jnp.zeros((NN, 2), dtype=jnp.float64)
+        x = r[:, 0]
+        y = r[:, 1]
+        u0 = -jnp.cos(2.0 * jnp.pi * x) * jnp.sin(2.0 * jnp.pi * y)
+        v0 = jnp.sin(2.0 * jnp.pi * x) * jnp.cos(2.0 * jnp.pi * y)
+        mv = mv.at[:,0].set(u0)
+        mv = mv.at[:,1].set(v0)
+        tv = mv
+        volume = jnp.ones(NN, dtype=jnp.float64) * dx * dy
+        rho = jnp.ones(NN, dtype=jnp.float64) * rho0
+        mass = jnp.ones(NN, dtype=jnp.float64) * dx * dy * rho0
+        eta = jnp.ones(NN, dtype=jnp.float64) * eta0
+
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "mv": mv,
+            "tv": tv,
+            "dmvdt": jnp.zeros_like(mv),
+            "dtvdt": jnp.zeros_like(mv),
+            "rho": rho,
+            "mass": mass,
+            "eta": eta,
+        }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_heat_transfer_domain(cls, dx=0.02, n_walls=3):
+        sp = OmegaConf.create({"L": 1.0, "H": 0.2, "hot_wall_half_width": 0.25})
+        #墙粒子生成
+        dxn1 = dx * n_walls
+        n1 = np.array((np.array([sp.L, dxn1]) / dx).round(), dtype=int)
+        grid1 = np.meshgrid(range(n1[0]), range(n1[1]), indexing="xy")
+        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
+        wall_b = r1.copy()
+        wall_t = r1.copy() + np.array([0.0, sp.H + dxn1])
+        r_w = jnp.concatenate([wall_b, wall_t])
+        
+        #流体粒子生成
+        n2 = np.array((np.array([sp.L, sp.H]) / dx).round(), dtype=int)
+        grid2 = np.meshgrid(range(n2[0]), range(n2[1]), indexing="xy")
+        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
+        r_f = np.array([0.0, 1.0]) * n_walls * dx + r2
+
+        #设置标签
+        tag_f = jnp.full(len(r_f), Tag.fluid, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.solid_wall, dtype=int)
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+
+        #设置温度标签
+        dx2n = dx * n_walls * 2
+        _box_size = np.array([sp.L, sp.H + dx2n])
+        mask_hot_wall = ((r[:, 1] < dx * n_walls) * (r[:, 0] < (_box_size[0] / 2) + sp.hot_wall_half_width) * (r[:, 0] > (_box_size[0] / 2) - sp.hot_wall_half_width))
+        tag = jnp.where(mask_hot_wall, Tag.dirichlet_wall, tag)
+
+        return cls(r), tag
+
 
     @classmethod
     def from_ringshaped_channel_domain(cls, dx=0.02, dy=0.02):

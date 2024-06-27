@@ -1,7 +1,9 @@
-from typing import Union, Optional
+from typing import Any, Union, Optional, TypeVar
 
 import numpy as np
 import taichi as ti
+
+Field = TypeVar('Field')
 
 # dtype map from numpy to taichi
 dtype_map = {
@@ -26,6 +28,30 @@ def from_numpy(a: np.ndarray):
         return tarr
     else:
         return a
+
+def field(input_array: Any, dtype = None) -> Field:
+    """
+    Create a Taichi field from a given array-like input.
+
+    Parameters:
+        input_array (Any): The input data to be converted to a Taichi field. Can 
+            be list, tuple, or other array-like object.
+        dtype (optional): The data type of the Taichi field. If None, the data 
+            type of the input array is used.
+
+    Returns:
+        ti.field: A Taichi field containing the input data.
+    """
+    input_array = np.asarray(input_array)
+    shape = input_array.shape
+    if dtype is None:
+        dtype = dtype_map[input_array.dtype]
+    ti_field = ti.field(dtype=dtype, shape=shape)
+    ti_field.from_numpy(input_array)
+    return ti_field
+
+array = field
+
 
 def zeros(shape, dtype=ti.i32):
     """

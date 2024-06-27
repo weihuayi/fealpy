@@ -1,7 +1,8 @@
 
 from typing import Sequence, overload, List, Generic, TypeVar, Dict, Tuple, Optional
 
-from torch import Tensor
+import numpy as np
+from numpy.typing import NDArray
 
 from .integrator import Integrator as _I
 from ..functionspace.space import FunctionSpace
@@ -14,16 +15,13 @@ _FS = TypeVar('_FS', bound=FunctionSpace)
 class Form(Generic[_FS]):
     space: _FS
     integrators: Dict[str, Tuple[_I, ...]]
-    memory: Dict[str, Tuple[Tensor, Tensor]]
-    batch_size: int
+    memory: Dict[str, Tuple[NDArray, NDArray]]
 
-    def __init__(self, space: _FS, batch_size: int=0):
+    def __init__(self, space: _FS):
         self.space = space
         self.integrators = {}
         self.memory = {}
-        self._M: Optional[Tensor] = None
-        self.batch_size = batch_size
-
+        self._M: Optional[NDArray] = None
     def __len__(self) -> int:
         return len(self.integrators)
 
@@ -68,20 +66,23 @@ class Form(Generic[_FS]):
             return self.memory[group]
 
         INTS = self.integrators[group]
-        ct = INTS[0](self.space)
+        ct = INTS[0](self.space) 
         etg = INTS[0].to_global_dof(self.space)
 
         for int_ in INTS[1:]:
             new_ct = int_(self.space)
             fdim = min(ct.ndim, new_ct.ndim)
+            
             if ct.shape[:fdim] != new_ct.shape[:fdim]:
                 raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "
-                                   f"has an incompatible shape {tuple(new_ct.shape)} "
-                                   f"with the previous {tuple(ct.shape)} in the group '{group}'.")
+                                f"has an incompatible shape {tuple(new_ct.shape)} "
+                                f"with the previous {tuple(ct.shape)} in the group '{group}'.")
+            
             if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct.unsqueeze(0)
+                ct = np.concatenate((new_ct, np.expand_dims(ct, axis=0)), axis=0)
             elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct.unsqueeze(0)
+                new_ct = np.expand_dims(new_ct, axis=0)
+                ct = ct + new_ct
             else:
                 ct = ct + new_ct
 

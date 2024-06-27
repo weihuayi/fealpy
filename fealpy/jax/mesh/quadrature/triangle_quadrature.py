@@ -19,6 +19,7 @@ Reference
 class TriangleQuadrature(Quadrature):
     def make(self, index: int):
         if index==1: #  Order 1, nQuad 1
+            self.order = 1 
             A = jnp.array([
                 [0.3333333333333330,	0.3333333333333330, 0.3333333333333330, 1.0000000000000000]], dtype=jnp.float64)
         elif index==2: #  Order 2, nQuad 3
