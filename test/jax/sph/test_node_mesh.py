@@ -1,12 +1,12 @@
 import jax
 import jax.numpy as jnp
 from jax import random, jit, vmap
-from fealpy.jax.sph.node_mesh import NodeMesh
+from fealpy.jax.mesh.node_mesh import NodeMesh
 from fealpy.jax.sph.partition import *
 from fealpy.jax.sph.kernel_function import QuinticKernel
 from jax_md.partition import space
 import matplotlib.pyplot as plt
-from omegaconf import OmegaConf
+
 
 def test_neighbors():
     box_size = 1.0  
@@ -15,10 +15,11 @@ def test_neighbors():
     num_particles = 10
     positions = random.uniform(key, (num_particles, 2), minval=0.0, maxval=box_size)
     node_mesh = NodeMesh(positions)
+    print(node_mesh.number_of_node())
     # 计算邻近列表
-    index, indptr = node_mesh.neighbors(box_size, cutoff)
-    print(index)
-    print(indptr)
+    #index, indptr = node_mesh.neighbors(box_size, cutoff)
+    #print(index)
+    #print(indptr)
     
 def test_neighbors_jax():
     box_size = 1.0  
@@ -105,14 +106,15 @@ def test_dam_break_domain():
     plt.show()
 
 def test_from_heat_transfer_domain():
-    r, tag = NodeMesh.from_heat_transfer_domain()
-    node = r.node
+    nodemesh = NodeMesh.from_heat_transfer_domain()
+    node = nodemesh.node
     color_map = {
         0: 'red',    # 流体节点为红色
         1: 'blue',   # 固体节点为蓝色
         3: 'green'   # 温度节点为绿色
     }
     fig, ax = plt.subplots()
+    tag = nodemesh.nodedata["tag"]
     for t in np.unique(tag):
         idx = tag == t
         ax.scatter(node[idx, 0], node[idx, 1], color=color_map[t], s=25, label=f'Tag {t}')
@@ -123,7 +125,7 @@ def test_from_heat_transfer_domain():
     plt.show()
 
 if __name__ == "__main__":
-    #test_neighbor()
+    #test_neighbors()
     #test_neighbors()
     #test_neighbors_jax()
     #test_add_node_data()
