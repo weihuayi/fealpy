@@ -2,7 +2,7 @@
 from typing import TypeVar, Optional
 
 import jax.numpy as jnp
-from jax.experimental.sparse import BCOO
+from jax.experimental.sparse import BCOO, BCSR
 
 from .. import logger
 from ..functionspace.space import FunctionSpace
@@ -38,11 +38,14 @@ class LinearForm(Form[_FS]):
         space = self.space
         gdof = space.number_of_global_dofs()
         global_mat_shape = (gdof, )
+        # M = BCOO._empty(shape=global_mat_shape, dtype=space.ftype, index_dtype=space.itype)
         self._V = jnp.zeros(global_mat_shape, dtype=space.ftype)
         
         for group in self.integrators.keys():
             group_tensor, e2dof = self._assembly_group(group, retain_ints)
-            jnp.add.at(self._V, e2dof, group_tensor)
+            # indices = e2dof.reshape(1, -1).T
+            self._V = self._V.at[e2dof.reshape(-1, ).T].add(group_tensor.ravel())
+            # M += BCOO((group_tensor.ravel(), indices), shape=global_mat_shape)
         return self._V
 
     def assembly_for_vspace_with_scalar_basis(self, retain_ints: bool):
