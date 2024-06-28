@@ -35,8 +35,8 @@ def test_coalesce_with_values():
     # 验证值是否正确累积
     expected_indices = torch.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
     expected_values = torch.tensor([1, 7, 3, 4], dtype=torch.float64)
-    assert_close(coalesced_coo.indices, expected_indices)
-    assert_close(coalesced_coo.values, expected_values)
+    assert_close(coalesced_coo._indices, expected_indices)
+    assert_close(coalesced_coo._values, expected_values)
 
 
 def test_coalesce_without_values_accumulate():
@@ -55,8 +55,8 @@ def test_coalesce_without_values_accumulate():
     # 验证输出的值是否正确
     expected_indices = torch.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
     expected_values = torch.tensor([1, 2, 1, 1])
-    assert_close(coalesced_coo.indices, expected_indices)
-    assert_close(coalesced_coo.values, expected_values)
+    assert_close(coalesced_coo._indices, expected_indices)
+    assert_close(coalesced_coo._values, expected_values)
 
 
 def test_coalesce_without_values_not_accumulate():
@@ -73,7 +73,7 @@ def test_coalesce_without_values_not_accumulate():
     assert coalesced_coo.is_coalesced
 
     # 验证输出的值是否为None
-    assert coalesced_coo.values is None
+    assert coalesced_coo._values is None
 
 
 def test_to_dense():
@@ -93,3 +93,21 @@ def test_to_dense():
                        [8, 0, 0],
                        [9, 0, 0]]], dtype=torch.float64)
     )
+
+
+def test_ravel():
+    indices = torch.tensor([[0, 2], [1, 1]])
+    values = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+    sparse_shape = (3, 4) # strides = (4, 1)
+    coo_tensor = COOTensor(indices, values, sparse_shape)
+
+    raveled_coo_tensor = coo_tensor.ravel()
+
+    expected_indices = torch.tensor([[1, 9]])
+    expected_sparse_shape = (12, )
+
+    assert torch.equal(raveled_coo_tensor.indices(), expected_indices)
+    assert raveled_coo_tensor.values() is coo_tensor.values() # must be the same object
+    assert raveled_coo_tensor.sparse_shape == expected_sparse_shape
+    # make sure the COOTensor is shaped (*dense_shape, 1)
+    assert raveled_coo_tensor.indices().shape[0] == 1
