@@ -39,3 +39,13 @@ def _flatten_indices(indices: Tensor, shape: _Size) -> Tensor:
         flatten += indices[d, :] * s
 
     return flatten.unsqueeze_(0)
+
+
+def check_shape_match(shape1: _Size, shape2: _Size):
+    if shape1 != shape2:
+        raise ValueError(f"shape mismatch: {shape1} != {shape2}")
+
+
+def check_spshape_match(spshape1: _Size, spshape2: _Size):
+    if spshape1 != spshape2:
+        raise ValueError(f"sparse shape mismatch: {spshape1} != {spshape2}")

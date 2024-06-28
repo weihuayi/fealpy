@@ -3,7 +3,10 @@ from typing import Optional, Union, overload, List
 
 import torch
 
-from .utils import _dense_ndim, _dense_shape, _flatten_indices
+from .utils import (
+    _dense_ndim, _dense_shape, _flatten_indices,
+    check_shape_match, check_spshape_match
+)
 
 
 _Size = torch.Size
@@ -226,14 +229,66 @@ class COOTensor():
     @overload
     def add(self, other: Tensor, alpha: float=1.0) -> Tensor: ...
     def add(self, other: Union[Number, 'COOTensor', Tensor], alpha: float=1.0) -> Union['COOTensor', Tensor]:
-        pass
+        """Adds another tensor or scalar to this COOTensor, with an optional scaling factor.
 
-    @overload
-    def mul(self, other: Union[Number, 'COOTensor']) -> 'COOTensor': ...
-    @overload
-    def mul(self, other: Tensor) -> Tensor: ...
-    def mul(self, other: Union[Number, 'COOTensor', Tensor]) -> Union['COOTensor', Tensor]:
-        pass
+        Parameters:
+            other (Number | COOTensor | Tensor): The tensor or scalar to be added.\n
+            alpha (float, optional): The scaling factor for the other tensor. Defaults to 1.0.
+
+        Raises:
+            TypeError: If the type of `other` is not supported for addition.
+            ValueError: If the shapes of `self` and `other` are not compatible.
+            ValueError: If one has value and another does not.
+
+        Returns:
+            COOTensor | Tensor: A new COOTensor if `other` is a COOTensor,\
+            or a Tensor if `other` is a dense tensor.
+        """
+        if isinstance(other, COOTensor):
+            check_shape_match(self.shape, other.shape)
+            check_spshape_match(self.sparse_shape, other.sparse_shape)
+            new_indices = torch.cat((self._indices, other._indices), dim=1)
+            if self._values is None:
+                if other._values is None:
+                    new_values = None
+                else:
+                    raise ValueError("self has no value while other does")
+            else:
+                if other._values is None:
+                    raise ValueError("self has value while other does not")
+                new_values = torch.cat((self._values, other._values*alpha), dim=-1)
+            return COOTensor(new_indices, new_values, self.sparse_shape)
+
+        elif isinstance(other, Tensor):
+            check_shape_match(self.shape, other.shape)
+            output = other * alpha
+            slicing = [self._indices[i] for i in range(self.sparse_ndim)]
+            slicing = [slice(None),] * self.dense_ndim + slicing
+            if self._values is None:
+                output[slicing] += 1.
+            else:
+                output[slicing] += self._values
+            return output
+
+        elif isinstance(other, (int, float)):
+            new_values = self._values + alpha * other
+            return COOTensor(self._indices.clone(), new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in addition")
+
+    def mul(self, other: Union[Number, 'COOTensor', Tensor]) -> 'COOTensor': # TODO: finish this
+        if isinstance(other, COOTensor):
+            pass
+        elif isinstance(other, Tensor):
+            pass
+        elif isinstance(other, (int, float)):
+            if self._values is None:
+                raise ValueError("Cannot multiply COOTensor without value with scalar")
+            new_values = self._values * other
+            return COOTensor(self._indices.clone(), new_values, self.sparse_shape)
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in multiplication")
 
     def div(self, other: Union[Number, Tensor]) -> 'COOTensor':
         pass
