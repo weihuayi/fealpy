@@ -10,7 +10,6 @@
 from jax import ops, vmap
 import jax.numpy as jnp
 import numpy as np
-import jax.random
 import h5py
 import pyvista
 from typing import Dict
@@ -34,15 +33,13 @@ class SPHSolver:
 
     #状态方程更新压力
     def tait_eos(self, rho, c0, rho0, gamma=1.0, X=0.0):
-        """
-
-        Parameters:
-            
-
-        Notes:
-            
-        """
+        """Equation of state update pressure"""
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
+    
+    def tait_eos_p2rho(slef, p, p0, rho0, gamma=1.0, X=0.0):
+        """Calculate density by pressure."""
+        p_temp = p + p0 - X
+        return rho0 * (p_temp / p0) ** (1 / gamma)
     
     #计算密度
     def compute_rho(self, mass, i_node, w_ij):
@@ -97,11 +94,106 @@ class SPHSolver:
         position = state['position']
         tag = state['tag']
 
-    def get_noise_masked(self, shape: tuple, mask: jnp.array, key: jax.random.PRNGKey, std: float):
-        noise = std * jax.random.normal(key, shape)
-        masked_noise = jnp.where(mask[:, None], noise, 0.0)
-        return masked_noise
+    def boundary_conditions(self, state, box_size, n_walls=3, dx=0.02, T0=1.0, hot_T=1.23): 
+        fluid = state["tag"] == 0
 
+        #将输入流体温度设置为参考温度
+        inflow = fluid * (state["position"][:,0] < n_walls * dx)
+        state["T"] = jnp.where(inflow, T0, state["T"])
+        state["dTdt"] = jnp.where(inflow, 0.0, state["dTdt"])
+
+        #设置热壁温度
+        hot = state["tag"] == 3
+        state["T"] = jnp.where(hot, hot_T, state["T"])
+        state["dTdt"] = jnp.where(hot, 0.0, state["dTdt"])
+
+        #将墙设置为参考温度
+        solid = state["tag"] == 1
+        state["T"] = jnp.where(solid, T0, state["T"])
+        state["dTdt"] = jnp.where(solid, 0, state["dTdt"])
+
+        #确保静态墙没有速度或加速度
+        static = (hot + solid)[:, None]
+        state["mv"] = jnp.where(static, 0.0, state["mv"])
+        state["tv"] = jnp.where(static, 0.0, state["tv"])
+        state["dmvdt"] = jnp.where(static, 0.0, state["dmvdt"])
+        state["dtvdt"] = jnp.where(static, 0.0, state["dtvdt"])
+        
+        #将出口温度梯度设置为零，以避免与流入相互作用
+        bound = np.array([np.zeros_like(box_size), box_size]).T.tolist()
+        outflow = fluid * (state["position"][:, 0] > bound[0][1] - n_walls * dx)
+        state["dTdt"] = jnp.where(outflow, 0.0, state["dTdt"])
+        return state
+
+    def external_acceleration(self, position, box_size, n_walls=3, dx=0.02, g_ext=2.3):
+        dxn = n_walls * dx
+        res = jnp.zeros_like(position)
+        force = jnp.ones((len(position)))
+        fluid = (position[:, 1] < box_size[1] - dxn) * (position[:, 1] > dxn)
+        force = jnp.where(fluid, force, 0)
+        res = res.at[:, 0].set(force)
+        return res * g_ext
+
+    def rho_summation(self, state, i_s, w_dist):
+        """Density summation."""
+        return state["mass"] * ops.segment_sum(jnp.array(w_dist), jnp.array(i_s), len(state["position"]))
+
+    def enforce_wall_boundary(self, state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, p0=100.0):
+        """Enforce wall boundary conditions by treating boundary particles in a special way."""
+        mask_bc = jnp.isin(state["tag"], jnp.array([1, 3]))
+        mask_j_s_fluid = jnp.where(state["tag"][j_s] == 0, 1.0, 0.0)
+        w_j_s_fluid = w_dist * mask_j_s_fluid
+        w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, len(state["position"]))
+        
+        #no-slip边界条件
+        def no_slip_bc(x):
+            #对于墙粒子，流体速度求和
+            x_wall_unnorm = ops.segment_sum(w_j_s_fluid[:, None] * x[j_s], i_s, len(state["position"]))
+            #广义壁边界条件
+            x_wall = x_wall_unnorm / (w_i_sum_wf[:, None] + EPS)
+            x = jnp.where(mask_bc[:, None], 2 * x - x_wall, x)
+            return x
+        mv = no_slip_bc(state["mv"])
+        tv = no_slip_bc(state["tv"])
+        
+        #对于墙粒子，流体压力求和
+        p_wall_unnorm = ops.segment_sum(w_j_s_fluid * p[j_s], i_s, len(state["position"]))
+        
+        #外流体加速度项
+        rho_wf_sum = (state["rho"][j_s] * w_j_s_fluid)[:, None] * dr_i_j
+        rho_wf_sum = ops.segment_sum(rho_wf_sum, i_s, len(state["position"]))
+        p_wall_ext = (g_ext * rho_wf_sum).sum(axis=1)
+        
+        #normalize
+        p_wall = (p_wall_unnorm + p_wall_ext) / (w_i_sum_wf + EPS)
+        p = jnp.where(mask_bc, p_wall, p)
+        
+        rho = self.tait_eos_p2rho(p, p0, rho0, X=5.0)
+        
+        #对于墙粒子，流体温度求和
+        t_wall_unnorm = ops.segment_sum(w_j_s_fluid * state["T"][j_s], i_s, len(state["position"]))
+        t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
+        """1:SOLID_WALL,2:MOVING_WALL"""
+        mask = jnp.isin(state["tag"], jnp.array([1, 2]))
+        t_wall = jnp.where(mask, t_wall, state["T"])
+        T = t_wall
+        return p, rho, mv, tv, T
+
+    def temperature_derivative(self, state, kernel, e_s, dr_i_j, dist, i_s, j_s):
+        """compute temperature derivative for next step."""
+        kernel_grad = vmap(kernel.grad_value)(dist)
+        kernel_grad_vector = kernel_grad[:, None] * e_s
+        k = (state["kappa"][i_s] * state["kappa"][j_s]) / \
+            (state["kappa"][i_s] + state["kappa"][j_s])
+        '''
+        F_ab = jnp.sum(dr_i_j * kernel_grad_vector) / ((dist * dist)[:, None] + EPS) #标量
+        dTdt = (4 * state["mass"][j_s] * k * (state["T"][i_s] - state["T"][j_s]) * F_ab.squeeze()) / \
+            (state["Cp"][i_s] * state["rho"][i_s] * state["rho"][j_s])
+        '''
+        #print(dr_i_j)
+        #dTdt = ops.segment_sum(dTdt, i_s, len(state["position"]))
+        
+        return 0     
 
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""
