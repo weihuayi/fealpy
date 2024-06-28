@@ -56,7 +56,7 @@ def linear_integral(input: Array, weights: Array, measure: Array,
     elif is_tensor(coef):
         out_subs = 'ci'
         subs = get_coef_subscripts(coef.shape, NQ, NC)
-        return jnp.einsum(f'q, c, qci, {subs} -> {out_subs}', weights, measure, input, coef)
+        return jnp.einsum(f'q, c, cqi, {subs} -> {out_subs}', weights, measure, input, coef)
     else:
         raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
 

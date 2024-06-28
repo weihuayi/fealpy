@@ -15,6 +15,7 @@ class _FunctionSpace(metaclass=ABCMeta):
     r"""THe base class of function spaces"""
     ftype: jnp.dtype
     itype: jnp.dtype
+    doforder: str='vdims'
 
     # basis
     @abstractmethod
@@ -70,15 +71,15 @@ class Function(Array):
     >> from fealpy.pde.poisson_2d import CosCosData
     >> from fealpy.functionspace import 
     """
-    def __new__(cls, space, dim=None, array=None, coordtype=None,
+    def __init__(self, space, dim=None, array=None, coordtype=None,
             dtype=jnp.float64):
         if array is None:
-            self = space.array(dim=dim, dtype=dtype).view(cls)
+            self.array = space.array(dim=dim, dtype=dtype)
         else:
-            self = array.view(cls)
+            self.array = array
         self.space = space
         self.coordtype = coordtype
-        return self
+        # return self
 
     def index(self, i):
         return Function(self.space, array=self[:, i], coordtype=self.coordtype)
@@ -156,4 +157,17 @@ class Function(Array):
 class FunctionSpace(_FunctionSpace):
     def function(self, dim=None, array=None, dtype=jnp.float64):
         return Function(self, dim=dim, array=array,
-                coordtype='barycentric', dtype=dtype)
+                coordtype='barycentric', dtype=dtype).array
+    
+    def array(self, dim=None, dtype=jnp.float64):
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            dim = tuple()
+        if type(dim) is int:
+            dim = (dim, )
+
+        if self.doforder == 'sdofs':
+            shape = dim + (gdof, )
+        elif self.doforder == 'vdims':
+            shape = (gdof, ) + dim
+        return jnp.zeros(shape, dtype=dtype)

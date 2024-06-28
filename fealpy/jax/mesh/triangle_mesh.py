@@ -104,8 +104,8 @@ class TriangleMesh(SimplexMesh):
 
         edge = self.entity('edge')
         w = jnp.zeros((p - 1, 2), **kwargs)
-        w[:, 0] = jnp.arange(p - 1, 0, -1, **kwargs)/p
-        w[:, 1] = jnp.flip(w[:, 0], axis=0)
+        w = w.at[:, 0].set(jnp.arange(p - 1, 0, -1, **kwargs)/p)
+        w = w.at[:, 1].set(jnp.flip(w[:, 0], axis=0))
         ipoints_from_edge = jnp.einsum('ij, ...jm->...im', w,
                                          node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]
         ipoint_list.append(ipoints_from_edge)
@@ -145,31 +145,38 @@ class TriangleMesh(SimplexMesh):
         c2p = jnp.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
-        c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
+        c2p = c2p.at[tuple([face2cell[flag, 0][:, None], idx0])].set(e2p[flag])
+        # c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
 
         flag = face2cell[:, 2] == 1
         idx1_ = jnp.flip(idx1, axis=0)
-        c2p[face2cell[flag, 0][:, None], idx1_] = e2p[flag]
+        c2p = c2p.at[tuple([face2cell[flag, 0][:, None], idx1_])].set(e2p[flag])
+        # c2p[face2cell[flag, 0][:, None], idx1_] = e2p[flag]
 
         flag = face2cell[:, 2] == 2
-        c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
+        c2p = c2p.at[tuple([face2cell[flag, 0][:, None], idx2])].set(e2p[flag])
+        # c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
 
         iflag = face2cell[:, 0] != face2cell[:, 1]
 
         flag = iflag & (face2cell[:, 3] == 0)
         idx0_ = jnp.flip(idx0, axis=0)
-        c2p[face2cell[flag, 1][:, None], idx0_] = e2p[flag]
+        c2p = c2p.at[tuple([face2cell[flag, 1][:, None], idx0_])].set(e2p[flag])
+        # c2p[face2cell[flag, 1][:, None], idx0_] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 1)
-        c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
+        c2p = c2p.at[tuple([face2cell[flag, 1][:, None], idx1])].set(e2p[flag])
+        # c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
 
         flag = iflag & (face2cell[:, 3] == 2)
         idx2_ = jnp.flip(idx2, axis=0)
-        c2p[face2cell[flag, 1][:, None], idx2_] = e2p[flag]
+        c2p = c2p.at[tuple([face2cell[flag, 1][:, None], idx2_])].set(e2p[flag])
+        # c2p[face2cell[flag, 1][:, None], idx2_] = e2p[flag]
 
         cdof = (p-1)*(p-2)//2
         flag = jnp.sum(mi > 0, axis=1) == 3
-        c2p[:, flag] = NN + NE*(p-1) + jnp.arange(NC*cdof, **kwargs).reshape(NC, cdof)
+        c2p = c2p.at[:, flag].set(NN + NE*(p-1) + jnp.arange(NC*cdof, **kwargs).reshape(NC, cdof))
+        # c2p[:, flag] = NN + NE*(p-1) + jnp.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         return c2p[index]
 
     def face_to_ipoint(self, p: int, index: Index=_S) -> Array:
