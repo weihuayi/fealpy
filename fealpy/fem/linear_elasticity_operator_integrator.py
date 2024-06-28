@@ -49,9 +49,6 @@ class LinearElasticityOperatorIntegrator:
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
-            if np.isscalar(cellmeasure):
-                cellmeasure = np.full( (NC, ), cellmeasure)
-
         if GD == 2:
             # 每个元组代表一个弹性张量的二阶导数的索引对
             idx = [(0, 0), (0, 1), (1, 1)]
@@ -68,6 +65,9 @@ class LinearElasticityOperatorIntegrator:
         grad = space[0].grad_basis(bcs, index=index)  # (NQ, NC, ldof, GD)
         NQ = len(ws)
 
+        if np.isscalar(cellmeasure):
+                cellmeasure = np.full( (NC, ), cellmeasure)
+                
         NC = len(cellmeasure)
 
         if out is None:
