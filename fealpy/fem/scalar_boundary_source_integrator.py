@@ -47,6 +47,7 @@ class ScalarBoundarySourceIntegrator:
         if callable(source):
             if ~hasattr(source, 'coordtype') or source.coordtype == 'cartesian':
                 n = mesh.face_unit_normal(index=index)
+                print(n)
                 ps = mesh.bc_to_point(bcs, index=index)
                 # 在实际问题当中，法向 n  这个参数一般不需要
                 # 传入 n， 用户可根据需要来计算边界面上的法向梯度

@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.mesh import TriangleMesh, MeshFactory
+from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian, barycentric
 
 class pLaplaceData():
@@ -15,7 +15,7 @@ class pLaplaceData():
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh2d(box, nx=3, ny=3, meshtype='tri')
+        mesh = TriangleMesh.from_box(box, nx=3, ny=3)
         mesh.uniform_refine(n)
         return mesh
 

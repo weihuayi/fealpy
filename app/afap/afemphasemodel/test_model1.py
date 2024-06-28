@@ -112,7 +112,7 @@ force = np.zeros_like(disp)
 
 for i in range(len(disp)-1):
     print('i:', i)
-    simulation.newton_raphson(disp[i+1], theta=0.1, solve='gpu')
+    simulation.newton_raphson(disp[i+1], theta=0.2, solve='gpu')
 
     force[i+1] = simulation.force
     stored_energy[i+1] = simulation.stored_energy

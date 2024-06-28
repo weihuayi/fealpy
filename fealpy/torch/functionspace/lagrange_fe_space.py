@@ -27,7 +27,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             self.dof = LinearMeshCFEDof(mesh, p)
 
         self.ftype = mesh.ftype
-        self.itype = mesh.ds.itype
+        self.itype = mesh.itype
         self.device = mesh.device
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
@@ -55,16 +55,21 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     def interpolate(self, source: Union[Callable[..., Tensor], Tensor, Number],
                     uh: Tensor, dim: Optional[int]=None, index: Index=_S) -> Tensor:
-        """@brief Interpolate the given Tensor or function `source` to the dofs.
+        """Interpolate the given Tensor or function `source` to the dofs.
+        This is an in-place operation for uh.
 
-        @params source: The source to be interpolated.
-        @params uh: The output Tensor.
-        @params dim: The dimension of the dofs in the uh and source.
-        This arg will be set to -1 if the `doforder` of space is 'sdofs' when not given,\
-        otherwise 0.
-        @params index: The index of the dofs to be interpolated.
+        Parameters:
+            source (Callable | Tensor | Number): The source to be interpolated.
 
-        @return: The interpolated Tensor `uh`.
+            uh (Tensor): The output Tensor.
+
+            dim (int | None): The dimension of the dofs in the uh and source.
+                This arg will be set to -1 if the `doforder` of space is 'sdofs' when not given,\
+                otherwise 0.
+            index (Index, optional): The index of the dofs to be interpolated.
+
+        Returns:
+            Tensor: The interpolated `uh`.
         """
         if callable(source):
             ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
@@ -90,23 +95,26 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     def grad_basis(self, bc: Tensor, index: Index=_S, variable='u'):
         """
-        @brief
         """
         return self.mesh.grad_shape_function(bc, self.p, index=index, variable=variable)
 
     def hess_basis(self, bc: Tensor, index: Index=_S, variable='u'):
         """
-        @brief
         """
         return self.mesh.hess_shape_function(bc, self.p, index=index, variable=variable)
 
-    def value(self, uh: Tensor, bc: Tensor, index: Index=_S):
+    def value(self, uh: Tensor, bc: Tensor,
+              dim: Optional[int]=None, index: Index=_S) -> Tensor:
         """Calculate the value of the finite element function.
 
-        Args:
-            uh (Tensor): Dofs of the function, shaped (..., gdof) for 'sdofs' and
+        Parameters:
+            uh (Tensor): Dofs of the function, shaped (..., gdof) for 'sdofs' and\
             'batched', (gdof, ...) for 'vdims'.
+
             bc (Tensor): Input points in barycentric coordinates, shaped (NQ, NVC).
+
+            dim (int | None, optional):
+
             index (Index, optional): _description_.
 
         Raises:
