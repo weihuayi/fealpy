@@ -4,7 +4,7 @@ from typing import (Callable, Optional, Union,)
 import jax
 import jax.numpy as jnp
 from jax import vmap
-from jax_md import space, partition
+# from jax_md import space, partition
 
 import numpy as np
 

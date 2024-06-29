@@ -185,11 +185,11 @@ class MeshDS():
         bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
-    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    def boundary_node_index(self): return self.boundary_node_flag().nonzero()[0]
     # TODO: finish this:
     # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
-    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
-    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
+    def boundary_face_index(self): return self.boundary_face_flag().nonzero()[0]
+    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero()[0]
 
     ### Homogeneous Mesh ###
     def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
@@ -463,11 +463,11 @@ class SimplexMesh(HomogeneousMesh):
                        variable: str='u', mi: Optional[Array]=None) -> Array:
         TD = bc.shape[-1] - 1
         mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
-        phi = F.simplex_shape_function(bc, p, mi)
+        phi = F.simplex_shape_function(bc, mi, p)
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(0)
+            return jnp.expand_dims(phi, axis=0)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -475,8 +475,9 @@ class SimplexMesh(HomogeneousMesh):
     def grad_shape_function(self, bc: Array, p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[Array]=None) -> Array:
         TD = bc.shape[-1] - 1
-        mi = mi or F.multi_index_matrix(p, TD, dtype=self.itype)
-        R = F.simplex_grad_shape_function(bc, p, mi) # (NQ, ldof, bc)
+        if mi is not None:
+            mi= F.multi_index_matrix(p, TD, dtype=self.itype)
+        R = F.simplex_grad_shape_function(bc, mi, p) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':

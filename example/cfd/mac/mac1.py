@@ -18,8 +18,8 @@ pde = taylor_greenData(Re,T=[0,T])
 domain = pde.domain()
 
 #建立网格
-nx = 50
-ny = 50
+nx = 32
+ny = 32
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
 mesh = UniformMesh2d([0,nx,0,ny],h=(hx,hy),origin=(0,0))
@@ -52,7 +52,7 @@ values_1_u = solver.umesh.interpolate(lambda p:pde.solution_u(p,tau)).reshape(-1
 values_1_v = solver.vmesh.interpolate(lambda p:pde.solution_v(p,tau)).reshape(-1)
 values_1_p = solver.pmesh.interpolate(lambda p:pde.solution_p(p,tau)).reshape(-1)
 
-for i in range(2,100):
+for i in range(30):
     # 更新时间层 ti
     tl = tmesh.next_time_level()
     print("当前时间", tl)
@@ -166,9 +166,9 @@ for i in range(2,100):
     values_2_u = u_1-tau*phi_x 
     phi_y = solver.update_y(rdphi_y,solver.vmesh) 
     values_2_v = v_1-tau*phi_y 
-    #values_2_p = values_1_p + K - (nu*(dpm_u*u_1+dpm_v*v_1))/2
-    values_2_p = values_1_p + K + nu*(dpm_u*values_2_u+dpm_v*values_2_v) - (nu*(dpm_u*u_1+dpm_v*v_1+dpm_u*values_1_u+dpm_v*values_1_v))/2
-
+    values_2_p = values_1_p + K - (nu*(dpm_u*u_1+dpm_v*v_1))/2
+    #values_2_p = values_1_p + K + nu*(dpm_u*values_2_u+dpm_v*values_2_v) - (nu*(dpm_u*u_1+dpm_v*v_1+dpm_u*values_1_u+dpm_v*values_1_v))/2
+    values_2_p = values_2_p - np.mean(values_2_p)
     #print(dpm_u*values_2_u)
     #print(dpm_u*values_1_u)
     #print(dpm_u*u_1)
@@ -188,6 +188,7 @@ for i in range(2,100):
     erru1 = uu-values_2_u
     errv1 = vv-values_2_v
     errp1 = pp-values_2_p
+    #print(erru)
     print(errp)
     
     # 时间层进一步

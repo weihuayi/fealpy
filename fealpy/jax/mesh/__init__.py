@@ -1,4 +1,6 @@
 
+from .mesh_base import MeshDS
+from .mesh_base import Mesh, HomogeneousMesh, SimplexMesh
 
 from .triangle_mesh import TriangleMesh
 from .node_mesh import NodeMesh

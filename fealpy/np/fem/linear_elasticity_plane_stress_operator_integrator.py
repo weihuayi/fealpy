@@ -1,4 +1,3 @@
-
 from typing import Optional
 
 import numpy as np
@@ -15,14 +14,16 @@ from .integrator import (
     _S, Index, CoefLike
 )
 
-
-class ScalarDiffusionIntegrator(CellOperatorIntegrator):
-    r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+class LinearElasticityPlaneStressOperatorIntegrator(CellOperatorIntegrator):
+    r"""The linear elasticity integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, lam, mu, 
+                 coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
+        self.lam = lam
+        self.mu = mu
         self.coef = coef
         self.q = q
         self.index = index
@@ -38,7 +39,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarDiffusionIntegrator only support spaces on"
+            raise RuntimeError("The LinearElasticityPlaneStrainOperatorIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -52,26 +53,15 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.fetch(space)
+        print("gphi:", gphi.shape, "\n", gphi)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
 
         return bilinear_integral(gphi, gphi, ws, cm, coef)
-
+    
     @assemblymethod('fast')
     def fast_assembly(self, space: _FS) -> NDArray:
         """
         限制：常系数、单纯形网格
         TODO: 加入 assert
         """
-        q = self.q
-        index = self.index
-        mesh = getattr(space, 'mesh', None)
-
-        cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.integrator(q, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable='u')
-
-        glambda = mesh.grad_lambda()
-        M = np.einsum('q, qik, qjl->ijkl', ws, gphi, gphi)
-        A = np.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
-        return A
+        pass
