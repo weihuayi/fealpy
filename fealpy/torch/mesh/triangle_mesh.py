@@ -37,6 +37,8 @@ class TriangleMesh(SimplexMesh):
 
         self.node = node
         self._attach_functionals()
+        self.nodedata = {}
+        self.celldata = {}
 
     def _attach_functionals(self):
         GD = self.geo_dimension()
@@ -252,3 +254,39 @@ class TriangleMesh(SimplexMesh):
         new_mesh._attach_functionals()
 
         return new_mesh
+    
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_TRIANGLE = 5
+            return VTK_TRIANGLE
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
+    
+    def to_vtk(self, fname:Optional[str]=None, etype:Union[int, str]='cell', index:Index=_S):
+        """
+        @brief 把网格转化为 vtk 的数据格式
+        """
+        from .vtk_extent import write_to_vtu
+
+        fkwargs = {'dtype': self.ftype, 'device': self.device}
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = torch.concatenate((node, torch.zeros((node.shape[0], 1), **fkwargs)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        NV = cell.shape[-1]
+
+        cell = torch.cat((torch.zeros((len(cell), 1), **fkwargs), cell), dim=1)
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                         nodedata=self.nodedata,
+                         celldata=self.celldata)

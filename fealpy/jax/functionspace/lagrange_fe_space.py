@@ -75,7 +75,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             source = source(ipoints[index])
 
         if uh.ndim == 1:
-            if isinstance(source, Array) and source.shape[-1] == 1:
+            if isinstance(source, jnp.ndarray) and source.shape[-1] == 1:
                 source = source.squeeze(-1)
             uh = uh.at[index].set(source)
             return uh
@@ -204,6 +204,6 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             elif self.doforder == 'vdims':
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
             isDDof = jnp.broadcast_to(isDDof.reshape(shape), shape=uh.shape)
-        return isDDof
+        return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate
