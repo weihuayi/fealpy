@@ -20,14 +20,14 @@ from fealpy.jax.fem import (
     ScalarSourceIntegrator,
     DirichletBC
 )
-
+# from fealpy.np.fem import DirichletBC
 from scipy.sparse.linalg import spsolve
 
 from jax.numpy import cos, pi
 
 from matplotlib import pyplot as plt
 
-NX, NY = 32, 32
+NX, NY = 64, 64
 def source(points: Array):
     x = points[..., 0]
     y = points[..., 1]
@@ -48,7 +48,7 @@ next(tmr)
 mesh = TriangleMesh.from_box(nx=NX, ny=NY)
 NC = mesh.number_of_cells()
 
-space = LagrangeFESpace(mesh, p=1)
+space = LagrangeFESpace(mesh, p=3)
 tmr.send('mesh_and_space')
 
 bform = BilinearForm(space)
@@ -62,9 +62,7 @@ tmr.send('forms')
 A = bform.assembly()
 F = lform.assembly()
 tmr.send('assembly')
-
 uh = space.function()
-A, F = DirichletBC(space).apply(A, F, gd=solution)
 values = A.data
 indices = A.indices
 
@@ -72,9 +70,9 @@ indices = A.indices
 rows = indices[:, 0]
 cols = indices[:, 1]
 
-# 创建 SciPy 的 CSR 矩阵
+# # 创建 SciPy 的 CSR 矩阵
 A = csr_matrix((values, (rows, cols)), shape=A.shape)
-print(A)
+A, F = DirichletBC(space, gD = solution).apply(A, F, uh)
 tmr.send('dirichlet')
 
 uh = spsolve(A, F)
