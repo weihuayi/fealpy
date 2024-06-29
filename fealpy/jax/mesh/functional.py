@@ -164,22 +164,37 @@ def _simplex_shape_function(bc, mi, p):
     Returns:
         Tensor[ldof, ]: phi.
     """
+    # TD = bc.shape[-1] - 1
+    # itype = jnp.int_ # Choose the appropriate integer type
+    # shape = (1, TD+1)
+    # c = jnp.arange(1, p+1, dtype=itype)
+    # P = 1.0 / jnp.cumprod(c, axis=0)
+    # t = jnp.arange(0, p, dtype=itype)
+    # Ap = p * jnp.expand_dims(bc, -2) - t[..., jnp.newaxis]
+    # Ap = jnp.cumprod(Ap, axis=-2)
+    # Ap = Ap * P[..., None]
+    # A = jnp.concatenate([jnp.ones((1, TD+1), dtype=bc.dtype), Ap], axis=-2)
+    # idx = jnp.arange(TD + 1, dtype=itype)
+    # phi = jnp.prod(A[mi, idx], axis=-1)
+    # print(phi.shape)
+    # return phi
     if p == 1:
         return bc
     TD = bc.shape[-1] - 1
     if mi is None:
         mi = multi_index_matrix(p, TD)
     c = jnp.arange(1, p+1, dtype=jnp.int_)
-    P = 1.0/jnp.cumprod(c)
+    P = 1.0 / jnp.cumprod(c)
     t = jnp.arange(0, p)
     shape = bc.shape[:-1]+(p+1, TD+1)
-    A = jnp.ones(shape, dtype=jnp.int_)
+    A = jnp.ones(shape, dtype=bc.dtype)
     A = A.at[..., 1:, :].set(p*bc[..., None, :] - t.reshape(-1, 1))
     A = jnp.cumprod(A, axis=-2)
-    A = A.at[..., 1:, :].multiply(P.reshape(-1, 1))
+    A = A.at[..., 1:, :].set(A[..., 1:, :] * P.reshape(-1, 1))
     idx = jnp.arange(TD+1)
     phi = jnp.prod(A[..., mi, idx], axis=-1)
     return phi
+
 
 
 @partial(jax.jit, static_argnums=(2, ))
@@ -202,6 +217,7 @@ def simplex_diff_shape_function(bcs, mi, p, n):
             )(bcs, mi, p, n)
 
 def simplex_grad_shape_function(bcs, mi, p): 
+    # print(simplex_diff_shape_function(bcs, mi, p, n=1))
     return simplex_diff_shape_function(bcs, mi, p, n=1)
 
 # Quadrangle & Hexahedron
