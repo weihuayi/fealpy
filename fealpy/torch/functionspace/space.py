@@ -93,7 +93,6 @@ class FunctionSpace(_FunctionSpace):
         if tensor is None:
             tensor = self.array(dim=dim)
 
-        dof_dim = -1 if dim == 0 else -2
-        func_ = Function(self, tensor, dof_dim=dof_dim)
+        func_ = Function(self, tensor)
 
         return func_
