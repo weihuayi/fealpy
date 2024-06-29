@@ -66,14 +66,12 @@ class Function(Tensor, Generic[_FS]):
     # and subject to change. Please do not use them for anything important until
     # they are released as stable.
     @staticmethod
-    def __new__(cls, space: _FS, tensor: Tensor, dof_dim: int) -> Tensor:
+    def __new__(cls, space: _FS, tensor: Tensor) -> Tensor:
         assert isinstance(space, _FunctionSpace)
         tensor = tensor.to(device=space.device, dtype=space.ftype)
-        names = [None] * tensor.ndim
-        names[dof_dim] = 'gdof'
-        return Tensor._make_subclass(cls, tensor).refine_names(*names)
+        return Tensor._make_subclass(cls, tensor)
 
-    def __init__(self, space: _FS, tensor: Tensor, dof_dim: int) -> None:
+    def __init__(self, space: _FS, tensor: Tensor) -> None:
         self.space = space
 
     def __call__(self, bc: Tensor, index=_S) -> Tensor:
@@ -95,7 +93,6 @@ class FunctionSpace(_FunctionSpace):
         if tensor is None:
             tensor = self.array(dim=dim)
 
-        dof_dim = -1 if dim == 0 else -2
-        func_ = Function(self, tensor, dof_dim=dof_dim)
+        func_ = Function(self, tensor)
 
         return func_

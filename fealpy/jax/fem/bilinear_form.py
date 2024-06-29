@@ -53,20 +53,14 @@ class BilinearForm(Form[_FS]):
         
         for group in self.integrators.keys():
             group_tensor, e2dof = self._assembly_group(group, retain_ints)
-            
             # Broadcast and flatten indices I and J
             I = jnp.broadcast_to(e2dof[:, :, None], shape=group_tensor.shape)
             J = jnp.broadcast_to(e2dof[:, None, :], shape=group_tensor.shape)
             I = I.ravel()
             J = J.ravel()
-            
-            # Flatten the group_tensor to prepare for BCOO creation
-            data = group_tensor.ravel()
-            
-            # Create sparse tensor from indices and data, and add it to M
             indices = jnp.stack([I, J], axis=0).T
-            M += BCOO((data, indices), shape=global_mat_shape)
-            self.M = M
+            M += BCOO((group_tensor.ravel(), indices), shape=global_mat_shape)
+        self.M = M
         
         return self.M
     
