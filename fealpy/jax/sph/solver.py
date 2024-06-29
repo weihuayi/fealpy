@@ -43,27 +43,27 @@ class SPHSolver:
     
     #计算密度
     def compute_rho(self, mass, i_node, w_ij):
+        """Density summation."""
         return mass * ops.segment_sum(w_ij, i_node, len(mass))
 
-    #计算运输速度的加速度``
-    def compute_tv_acceleration(self, state, i_node, j_node, grad_w_ij):
-        mesh = self.mesh
+    #计算运输速度的加速度
+    def compute_tv_acceleration(self, state, i_node, j_node, r_ij, dij, grad, pb):
         m_i = state["mass"][i_node]
         m_j = state["mass"][j_node]
         rho_i = state["rho"][i_node]
         rho_j = state["rho"][j_node]
-        pb = state["pb"][i_node]
 
-        volume_square = ((m_i/rho_i)**2 + (m_j/rho_j)**2) / m_i
-        a = volume_square[:, None] * pb[:, None] * grad_w_ij
+        volume_square = ((m_i/rho_i)**2 + (m_j/rho_j)**2) / m_i 
+        c = volume_square * grad / (dij + EPS)
+        a = c[:, None] * 1.0 * pb[i_node][:, None] * r_ij       
         return ops.segment_sum(a, i_node, len(state["mass"]))
 
-    #计算A
-    def compute_A(self, state):
-        rho = state["rho"]
-        mv = state["mv"]
-        tv = state["tv"]
-        return rho[:, None] * mv * (tv - mv)
+    #计算张量A，用于计算动量速度的加速度
+    def compute_A(self, rho, mv, tv):
+        a = rho[:, jnp.newaxis] * mv
+        dv = tv - mv
+        result = jnp.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
+        return result
 
     #计算动量速度的加速度
     def compute_mv_acceleration(self, state, i_node, j_node, r_ij, dij, grad, p):
@@ -77,17 +77,17 @@ class SPHSolver:
         m_j = state["mass"][j_node]
         mv_i = state["mv"][i_node]
         mv_j = state["mv"][j_node]
-        
+        tv_i = state["tv"][i_node]
+        tv_j = state["tv"][j_node]   
 
         volume_square = ((m_i/rho_i)**2 + (m_j/rho_j)**2) / m_i
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS) 
         p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
         c = volume_square * grad / (dij + EPS)
-
-        #A = (self.compute_A(state)[i_node] + self.compute_A(state)[j_node])/2
-        mv_ij = mv_i - mv_j
-        #a = volume_square[:, None] * grad_w_ij * (-p_ij[:, None] + A + (eta_ij[:, None] * mv_ij / position_ij[:,None]))
-        a = c[:, None] * (-p_ij[:, None] * r_ij + (eta_ij[:, None] * mv_ij))
+        A = (self.compute_A(rho_i, mv_i, tv_i) + self.compute_A(rho_j, mv_j, tv_j))/2
+        mv_ij = mv_i -mv_j
+        b = jnp.sum(A * r_ij[:, jnp.newaxis, :], axis=2)
+        a = c[:, None] * (-p_ij[:, None] * r_ij + b + (eta_ij[:, None] * mv_ij))
         return ops.segment_sum(a, i_node, len(state["mass"]))
 
     def forward(self, state, neighbors):
@@ -134,10 +134,6 @@ class SPHSolver:
         res = res.at[:, 0].set(force)
         return res * g_ext
 
-    def rho_summation(self, state, i_s, w_dist):
-        """Density summation."""
-        return state["mass"] * ops.segment_sum(jnp.array(w_dist), jnp.array(i_s), len(state["position"]))
-
     def enforce_wall_boundary(self, state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, p0=100.0):
         """Enforce wall boundary conditions by treating boundary particles in a special way."""
         mask_bc = jnp.isin(state["tag"], jnp.array([1, 3]))
@@ -179,21 +175,17 @@ class SPHSolver:
         T = t_wall
         return p, rho, mv, tv, T
 
-    def temperature_derivative(self, state, kernel, e_s, dr_i_j, dist, i_s, j_s):
+    def temperature_derivative(self, state, kernel, e_s, dr_i_j, dist, i_s, j_s, grad):
         """compute temperature derivative for next step."""
-        kernel_grad = vmap(kernel.grad_value)(dist)
-        kernel_grad_vector = kernel_grad[:, None] * e_s
+        kernel_grad_vector = grad[:, None] * e_s
         k = (state["kappa"][i_s] * state["kappa"][j_s]) / \
             (state["kappa"][i_s] + state["kappa"][j_s])
-        '''
-        F_ab = jnp.sum(dr_i_j * kernel_grad_vector) / ((dist * dist)[:, None] + EPS) #标量
-        dTdt = (4 * state["mass"][j_s] * k * (state["T"][i_s] - state["T"][j_s]) * F_ab.squeeze()) / \
-            (state["Cp"][i_s] * state["rho"][i_s] * state["rho"][j_s])
-        '''
-        #print(dr_i_j)
-        #dTdt = ops.segment_sum(dTdt, i_s, len(state["position"]))
-        
-        return 0     
+        a = jnp.sum(dr_i_j * kernel_grad_vector, axis=1)
+        F_ab = a / ((dist * dist) + EPS) 
+        b = 4 * state["mass"][j_s] * k * (state["T"][i_s] - state["T"][j_s])
+        dTdt = (b * F_ab) / (state["Cp"][i_s] * state["rho"][i_s] * state["rho"][j_s])
+        result = ops.segment_sum(dTdt, i_s, len(state["position"]))
+        return result
 
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""
