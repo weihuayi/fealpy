@@ -213,7 +213,7 @@ for i in range(2):
     uvvalues2 = np.stack((uvalues2,vvalues2),axis=1)
     
     #更新压力
-    pvalues2 = pvalues1+K-(nu*tau*(dpm_u*u_1+dpm_v*v_1))/2
+    pvalues2 = pvalues1 + K - (nu*tau*(dpm_u*u_1+dpm_v*v_1))/2
     
     uu = pde.solution_u(nodes_u,tl)
     vv = pde.solution_v(nodes_v,tl)
