@@ -228,9 +228,6 @@ class FlowPastCylinder:
         return value
     
 class ChannelFlowWithLevelSet:
-    '''
-    @brief 圆柱绕流
-    '''
     def __init__(self, domain ,eps=1e-12, rho=1, mu=0.001):
         self.eps = eps
         self.rho = rho
