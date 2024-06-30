@@ -79,7 +79,7 @@ from fealpy.np.functionspace import LagrangeFESpace as Space
 from fealpy.np.mesh.triangle_mesh import TriangleMesh
 
 from fealpy.np.fem import (
-    LinearElasticityPlaneStrainOperatorIntegrator, BilinearForm, LinearForm
+    LinearElasticityOperatorIntegrator, BilinearForm, LinearForm
     )
 
 from fealpy.utils import timer
@@ -90,16 +90,25 @@ mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=2, ny=2)
 next(tmr)
 
 space = Space(mesh, p=1, ctype='C')
-GD = 2
-vspace = GD*(space, )
 tmr.send('mesh_and_vspace')
 
-uh = vspace[0].function(dim=GD)
+uh = space.function(dim=2)
 print("uh:", uh.shape, "\n", uh)
-gdof = vspace[0].number_of_global_dofs()
-vgdof = gdof * GD
-ldof = vspace[0].number_of_local_dofs()
-vldof = ldof * GD
+integrator = LinearElasticityOperatorIntegrator(e=1.0, nu=0.3)
+bcs, ws, gphi, cm, index = integrator.fetch(space=space)
+#print("gphi:", gphi.shape, "\n", gphi)
+print("lam:", integrator.lam, "\n", "mu:", integrator.mu)
+D2_stress, D4_stress, D2_strain, D2, D4 = integrator.assembly1(space=space)
+print("D2_stress:", D2_stress.shape, "\n", D2_stress)
+print("D4_stress:", D4_stress.shape, "\n", D4_stress)
+print("D2_strain:", D2_strain.shape, "\n", D2_strain)
+print("D2:", D2.shape, "\n", D2)
+print("D4:", D4.shape, "\n", D4)
+
+
+gphi = space.grad_basis()
+gdof = space.number_of_global_dofs()
+ldof = space.number_of_local_dofs()
 cell2dof = space.cell_to_dof()
 
 
