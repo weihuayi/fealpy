@@ -1,24 +1,31 @@
 
-from typing import Sequence, overload, List, Generic, TypeVar, Dict, Tuple, Optional
+from typing import Sequence, overload, List, Dict, Tuple, Optional
 
 from torch import Tensor
 
 from .integrator import Integrator as _I
-from ..functionspace.space import FunctionSpace
+from ..functionspace import FunctionSpace as _FS
 from ..import logger
 
 
-_FS = TypeVar('_FS', bound=FunctionSpace)
-
-
-class Form(Generic[_FS]):
-    space: _FS
+class Form():
+    _spaces: Tuple[_FS, ...]
     integrators: Dict[str, Tuple[_I, ...]]
-    memory: Dict[str, Tuple[Tensor, Tensor]]
+    memory: Dict[str, Tuple[Tensor, List[Tensor]]]
     batch_size: int
 
-    def __init__(self, space: _FS, batch_size: int=0):
-        self.space = space
+    @overload
+    def __init__(self, space: _FS, *, batch_size: int=0): ...
+    @overload
+    def __init__(self, space: Tuple[_FS, ...], *, batch_size: int=0): ...
+    @overload
+    def __init__(self, *space: _FS, batch_size: int=0): ...
+    def __init__(self, *space, batch_size: int=0):
+        if len(space) == 0:
+            raise ValueError("No space is given.")
+        if isinstance(space[0], Sequence):
+            space = space[0]
+        self._spaces = space
         self.integrators = {}
         self.memory = {}
         self._M: Optional[Tensor] = None
@@ -26,6 +33,13 @@ class Form(Generic[_FS]):
 
     def __len__(self) -> int:
         return len(self.integrators)
+
+    @property
+    def space(self):
+        if len(self._spaces) == 1:
+            return self._spaces[0]
+        else:
+            return self._spaces
 
     @overload
     def add_integrator(self, I: _I, *, group: str=...) -> Tuple[_I]: ...
@@ -69,7 +83,7 @@ class Form(Generic[_FS]):
 
         INTS = self.integrators[group]
         ct = INTS[0](self.space)
-        etg = INTS[0].to_global_dof(self.space)
+        etg = [INTS[0].to_global_dof(s) for s in self._spaces]
 
         for int_ in INTS[1:]:
             new_ct = int_(self.space)
