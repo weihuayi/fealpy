@@ -26,10 +26,10 @@ class BilinearForm(Form):
                              f"but got {len(self._spaces)} spaces.")
         if len(self._spaces) == 2:
             s0, s1 = self._spaces
-            if s0.device != self._spaces[1].device:
+            if s0.device != s1.device:
                 raise ValueError("Spaces should have the same device, "
                                 f"but got {s0.device} and {s1.device}.")
-            if s0.ftype != self._spaces[1].ftype:
+            if s0.ftype != s1.ftype:
                 raise ValueError("Spaces should have the same dtype, "
                                 f"but got {s0.ftype} and {s1.ftype}.")
 
@@ -92,12 +92,12 @@ class BilinearForm(Form):
     def assembly(self, coalesce=True, retain_ints: bool=False) -> Tensor:
         """Assembly the bilinear form matrix.
 
-        Args:
-            coalesce (bool, optional): Whether to coalesce the sparse tensor.
+        Parameters:
+            coalesce (bool, optional): Whether to coalesce the sparse tensor.\n
             retain_ints (bool, optional): Whether to retain the integrator cache.
 
         Returns:
-            Tensor[gdof, gdof]. Batch is placed in the LAST dimension as
+            Tensor[gdof, gdof]. Batch is placed in the LAST dimension as\
             Hybrid COO Tensor format.
         """
         if self.batch_size == 0:
@@ -115,8 +115,8 @@ class BilinearForm(Form):
     def mult(self, x: Tensor, out: Optional[Tensor]=None) -> Tensor:
         """Maxtrix vector multiplication.
 
-        Args:
-            x (Tensor): Vector, accepts batch on the first dimension.
+        Parameters:
+            x (Tensor): Vector, accepts batch on the first dimension.\n
             out (Tensor, optional): Output vector. Defaults to None.
 
         Returns:

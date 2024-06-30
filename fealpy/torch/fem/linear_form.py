@@ -73,13 +73,13 @@ class LinearForm(Form):
     def assembly(self, coalesce=True, retain_ints: bool=False, return_dense=True) -> Tensor:
         """Assembly the linear form vector.
 
-        Args:
-            coalesce (bool, optional): Whether to coalesce the sparse tensor.
-            retain_ints (bool, optional): Whether to retain the integrator cache.
+        Parameters:
+            coalesce (bool, optional): Whether to coalesce the sparse tensor.\n
+            retain_ints (bool, optional): Whether to retain the integrator cache.\n
             return_dense (bool, optional): Whether to return dense tensor.
 
         Returns:
-            Tensor[gdof,]. Batch is placed in the FIRST dimension for dense tensor,
+            Tensor[gdof,]. Batch is placed in the FIRST dimension for dense tensor,\
             and in the LAST dimension for sparse tensor (Hybrid COO Tensor).
         """
         if self.batch_size == 0:

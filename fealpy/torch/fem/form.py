@@ -27,12 +27,16 @@ class Form():
             space = space[0]
         self._spaces = space
         self.integrators = {}
+        self._cursor = 0
         self.memory = {}
         self._M: Optional[Tensor] = None
         self.batch_size = batch_size
 
     def __len__(self) -> int:
         return len(self.integrators)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}{self._spaces}"
 
     @property
     def space(self):
@@ -48,14 +52,25 @@ class Form():
     @overload
     def add_integrator(self, *I: _I, group: str=...) -> Tuple[_I, ...]: ...
     def add_integrator(self, *I, group=None):
+        """Add integrator(s) to the form.
+
+        Args:
+            *I (Integrator): The integrator(s) to add as a new group.
+                Also accepts sequence of integrators.
+            group (str | None, optional): Name of the group. Defaults to None.
+
+        Returns:
+            Tuple[Integrator, ...] | None: The integrator instance(s) added.
+        """
         if len(I) == 0:
             logger.info("add_integrator() is called with no arguments.")
-            return None
+            return tuple()
 
         if len(I) == 1:
             if isinstance(I[0], Sequence):
                 I = tuple(I[0])
-        group = f'_group_{len(self)}' if group is None else group
+        group = f'_group_{self._cursor}' if group is None else group
+        self._cursor += 1
 
         if group in self.integrators:
             self.integrators[group] += I
@@ -68,8 +83,8 @@ class Form():
     def clear_memory(self, group: Optional[str]=None) -> None:
         """Clear the cache of the form, including global output and group output.
 
-        Args:
-            group (Optional[str], optional): The name of integrator group to clear
+        Parameters:
+            group (str | None, optional): The name of integrator group to clear\
             the result from. Defaults to None. Clear all cache if `None`.
         """
         if group is None:
