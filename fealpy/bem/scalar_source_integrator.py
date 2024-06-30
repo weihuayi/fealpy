@@ -75,6 +75,9 @@ class ScalarSourceIntegrator():
         # r = np.sqrt(np.sum((ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]) ** 2, axis=-1))
         t = ps[np.newaxis, ...] - xi[:, np.newaxis, np.newaxis, ...]
         r = np.linalg.norm(t, axis=-1)
+        # r = np.zeros((len(xi),)+ps.shape[:-1])
+        # for i, x in enumerate(xi):
+        #     r[i] = np.linalg.norm(ps - x, axis=-1)
         # ps = np.broadcast_to(ps[np.newaxis, ...], (num_of_xi, len(ws), NC, GD)).reshape((-1, GD))
         # xi = np.broadcast_to(xi[:, np.newaxis, np.newaxis, ...], (num_of_xi, len(ws), NC, GD)).reshape((-1, GD))
         # r = cdist(ps, xi).reshape((num_of_xi, len(ws), NC))

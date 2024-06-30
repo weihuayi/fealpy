@@ -57,7 +57,7 @@ for k in range(maxite):
 
     H, G, F = bd_operator.assembly()
     bc = DirichletBC(space=space, gD=pde.dirichlet)
-    G, F = bc.apply(H, G, F)
+    G, F, _ = bc.apply(H, G, F)
     xi = space.xi
     u = pde.dirichlet(xi)
     q = np.linalg.solve(G, F)

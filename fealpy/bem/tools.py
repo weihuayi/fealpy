@@ -32,16 +32,16 @@ def error_calculator(mesh, u, v, q=3, power=2):
     ps = mesh.bc_to_point(bcs)
 
     cell = mesh.entity('cell')
-    cell_node_val = u[cell]
+    cell_node_location = u[cell]
     if type(mesh).__name__ == "UniformMesh3d":
         bc0 = bcs[0].reshape(-1, 2)  # (NQ0, 2)
         bc1 = bcs[1].reshape(-1, 2)  # (NQ1, 2)
         bc2 = bcs[2].reshape(-1, 2)  # (NQ2, 2)
         bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
 
-        u = np.einsum('...j, cj->...c', bc, cell_node_val)
+        u = np.einsum('...j, cj->...c', bc, cell_node_location)
     else:
-        u = np.einsum('...j, cj->...c', bcs, cell_node_val)
+        u = np.einsum('...j, cj->...c', bcs, cell_node_location)
     if callable(v):
         if not hasattr(v, 'coordtype'):
             v = v(ps)
