@@ -1,6 +1,8 @@
 
 import torch
 
+from fealpy.torch.functionspace.space import _S
+
 from .space import FunctionSpace, _S, Index
 from . import utils as U
 
@@ -25,15 +27,19 @@ class TensorFunctionSpace(FunctionSpace):
     def number_of_local_dofs(self, doftype='cell') -> int:
         return self.ndim_dof * self.scalar_space.number_of_local_dofs(doftype)
 
-    def basis(self, p: torch.Tensor, index: Index=_S, **kwargs) -> Tensor:
+    def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         phi = self.scalar_space.basis(p, index, **kwargs) # (NC, NQ, ldof)
+        # TODO: finish this
+
+    def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
+        gphi = self.scalar_space.grad_basis(p, index, **kwargs)
         # TODO: finish this
 
     def strain(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         """_summary_
 
-        Args:
-            p (Tensor): Inputs for the grad_basis.
+        Parameters:
+            p (Tensor): Inputs for the grad_basis.\n
             index (Index, optional): indices of entities.
 
         Returns:
