@@ -8,7 +8,7 @@ from .nonlinear_form import NonlinearForm
 ### Cell Operator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
-from .linear_elasticity_plane_strain_operator_integrator import LinearElasticityPlaneStrainOperatorIntegrator
+from .linear_elasticity_operator_integrator import LinearElasticityOperatorIntegrator
 
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
