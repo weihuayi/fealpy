@@ -1,5 +1,5 @@
 
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable, TypeVar, Tuple, Any
 
 import torch
 
@@ -7,6 +7,7 @@ from .. import logger
 
 Tensor = torch.Tensor
 _dtype = torch.dtype
+_Meth = TypeVar('_Meth', bound=Callable)
 
 
 ##################################################
@@ -81,3 +82,48 @@ def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
     if NN <= 0:
         raise RuntimeError('No valid node is found in the mesh.')
     return mesh_top_csr(entity, NN, location, dtype=dtype)
+
+
+# NOTE: this meta class is used to register the entity factory method.
+# The entity factory methods can works in Structured meshes such as
+# UniformMesh2d to construct entities like `cell`.
+
+# NOTE: When query a entity, the factory method is called if the entity
+# is not found in the storage.
+# The result from the factory method is cached in the storage automatically.
+# Therefore, the storage is regarded as a cache for structured meshes.
+
+# TODO: This feature does not hinder the unstructured mesh, but wee still need
+# to see if it is an over-design or if there is a better way to do this.
+
+class MeshMeta(type):
+    def __init__(self, name: str, bases: Tuple[type, ...], dict: Dict[str, Any], /, **kwds: Any):
+        if '_entity_dim_method_name_map' in dict:
+            raise RuntimeError('_entity_method is a reserved attribute.')
+        self._entity_dim_method_name_map = {}
+
+        # NOTE: Look up the functions to build the class, seeing if there are
+        # any functions having the `__entity__` attribute which is marked
+        # by the entitymethod decorator.
+        for name, item in dict.items():
+            if callable(item):
+                if hasattr(item, '__entity__'):
+                    dim = getattr(item, '__entity__')
+                    assert isinstance(dim, int)
+                    self._entity_dim_method_name_map[dim] = item.__name__
+
+        return type.__init__(self, name, bases, dict, **kwds)
+
+
+def entitymethod(top_dim: int):
+    """A decorator registering the method as an entity factory method.
+
+    Requires that the metaclass is MeshMeta or derived from it.
+
+    Parameters:
+        top_dim (int): Topological dimension of the entity.
+    """
+    def decorator(meth: _Meth) -> _Meth:
+        meth.__entity__ = top_dim
+        return meth
+    return decorator

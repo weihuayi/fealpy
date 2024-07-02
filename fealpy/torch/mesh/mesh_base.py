@@ -1,7 +1,6 @@
 
 from typing import (
-    Union, Optional, Dict, Sequence, overload, Callable, Literal, Tuple, Any,
-    TypeVar
+    Union, Optional, Dict, Sequence, overload, Callable, Literal, Tuple
 )
 
 import numpy as np
@@ -9,48 +8,17 @@ import torch
 
 from .. import logger
 from . import functional as F
-from .utils import estr2dim, edim2entity, edim2node, mesh_top_csr
+from .utils import estr2dim, edim2entity, edim2node, mesh_top_csr, MeshMeta
 from .quadrature import Quadrature
 
 Tensor = torch.Tensor
 Index = Union[Tensor, int, slice]
 EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
-_Meth = TypeVar('_Meth', bound=Callable)
 _int_func = Callable[..., int]
 _dtype = torch.dtype
 _device = torch.device
 
 _S = slice(None, None, None)
-
-
-class MeshMeta(type):
-    def __init__(self, name: str, bases: Tuple[type, ...], dict: Dict[str, Any], /, **kwds: Any):
-        if '_entity_dim_method_name_map' in dict:
-            raise RuntimeError('_entity_method is a reserved attribute.')
-        self._entity_dim_method_name_map = {}
-
-        for name, item in dict.items():
-            if callable(item):
-                if hasattr(item, '__entity__'):
-                    dim = getattr(item, '__entity__')
-                    assert isinstance(dim, int)
-                    self._entity_dim_method_name_map[dim] = item.__name__
-
-        return type.__init__(self, name, bases, dict, **kwds)
-
-
-def entitymethod(top_dim: int):
-    """A decorator registering the method as an entity factory method.
-
-    Requires that the metaclass is MeshMeta or derived from it.
-
-    Parameters:
-        top_dim (int): Topological dimension of the entity.
-    """
-    def decorator(meth: _Meth) -> _Meth:
-        meth.__entity__ = top_dim
-        return meth
-    return decorator
 
 
 ##################################################
