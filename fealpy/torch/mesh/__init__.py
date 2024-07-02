@@ -1,6 +1,7 @@
 
 from .mesh_base import MeshDS
-from .mesh_base import Mesh, HomogeneousMesh, SimplexMesh
+from .mesh_base import Mesh, HomogeneousMesh
+from .mesh_base import SimplexMesh, TensorMesh, StructuredMesh
 
 from .interval_mesh import IntervalMesh
 from .triangle_mesh import TriangleMesh
