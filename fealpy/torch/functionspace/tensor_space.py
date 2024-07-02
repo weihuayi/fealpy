@@ -17,6 +17,8 @@ class TensorFunctionSpace(FunctionSpace):
         self.shape = torch.Size(shape)
         self.dof_last = dof_last
 
+        self.mesh = scalar_space.mesh
+
     @property
     def ndim_dof(self) -> int:
         return self.shape.numel()
@@ -30,10 +32,12 @@ class TensorFunctionSpace(FunctionSpace):
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         phi = self.scalar_space.basis(p, index, **kwargs) # (NC, NQ, ldof)
         # TODO: finish this
+        pass
 
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         gphi = self.scalar_space.grad_basis(p, index, **kwargs)
         # TODO: finish this
+        pass
 
     def strain(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         """_summary_
@@ -54,4 +58,4 @@ class TensorFunctionSpace(FunctionSpace):
             indices = U.flatten_indices((ldof, GD), (0, 1))
 
         return torch.cat([U.normal_strain(gphi, indices),
-                          U.shear_strain(gphi, indices)], dim=-2)
+                            U.shear_strain(gphi, indices)], dim=-2)

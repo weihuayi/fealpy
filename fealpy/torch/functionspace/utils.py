@@ -42,7 +42,7 @@ def normal_strain(gphi: Tensor, indices: Tensor, *, out: Optional[Tensor]=None) 
     new_shape = gphi.shape[:-2] + (GD, GD*ldof)
 
     if out is None:
-        out = torch.empty(new_shape, **kwargs)
+        out = torch.zeros(new_shape, **kwargs)
     else:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')
@@ -68,11 +68,11 @@ def shear_strain(gphi: Tensor, indices: Tensor, *, out: Optional[Tensor]=None) -
     ldof, GD = gphi.shape[-2:]
     if GD < 2:
         raise ValueError(f"The shear strain requires GD >= 2, but GD = {GD}")
-    NNZ = (GD + (GD+1))//2
+    NNZ = (GD * (GD-1))//2
     new_shape = gphi.shape[:-2] + (NNZ, GD*ldof)
 
     if out is None:
-        out = torch.empty(new_shape, **kwargs)
+        out = torch.zeros(new_shape, **kwargs)
     else:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')
