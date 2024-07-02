@@ -100,7 +100,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         print("K2_strain:", K2_strain.shape, "\n", K2_strain[0])
         K2_stress = torch.einsum('q, c, cqkj, kl, cqli-> cij',\
                         ws, cm, B2_strain, D2_stress, B2_strain)
-        print("K2_strain:", K2_stress.shape, "\n", K2_stress[0])
+        print("K2_stress:", K2_stress.shape, "\n", K2_stress[0])
 
 
 
