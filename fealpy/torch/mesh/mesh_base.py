@@ -13,7 +13,7 @@ from .quadrature import Quadrature
 
 Tensor = torch.Tensor
 Index = Union[Tensor, int, slice]
-EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
+EntityName = Literal['cell', 'face', 'edge', 'node']
 _int_func = Callable[..., int]
 _dtype = torch.dtype
 _device = torch.device
