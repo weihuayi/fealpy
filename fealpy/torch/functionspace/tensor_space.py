@@ -14,6 +14,10 @@ class TensorFunctionSpace(FunctionSpace):
         self.shape = Size(shape)
         self.dof_last = dof_last
 
+        self.ftype = self.mesh.ftype
+        self.itype = self.mesh.itype
+        self.device = scalar_space.device
+        
     @property
     def mesh(self):
         return self.scalar_space.mesh
