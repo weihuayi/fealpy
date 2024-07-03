@@ -1,10 +1,11 @@
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 
 from ..typing import Tensor
 from ..typing import Size
+from ..typing import _dtype, _device
 
 
 def flatten_indices(shape: Size, permute: Size) -> Tensor:
@@ -51,7 +52,8 @@ def to_tensor_dof(to_dof: Tensor, dof_numel: int, gdof: int, dof_priority: bool=
     return indices[to_dof].reshape(num_entity, -1)
 
 
-def tensor_basis(shape: Tuple[int, ...], *, dtype=None, device=None) -> Tensor:
+def tensor_basis(shape: Tuple[int, ...], *, dtype: Optional[_dtype]=None,
+                 device: Union[str, _device, None]=None) -> Tensor:
     """Generate tensor basis with 0-1 elements.
 
     Parameters:

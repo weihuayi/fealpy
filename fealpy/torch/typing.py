@@ -1,13 +1,17 @@
 
-from typing import Tuple
+from typing import Tuple, Union
 from functools import reduce
 
 import torch
 
 
+### Types
+
 Tensor = torch.Tensor
+Index = Union[int, slice, Tuple[int, ...], Tensor]
 _dtype = torch.dtype
 _device = torch.device
+DeviceLike = Union[str, _device]
 
 _bool = torch.bool
 _int = torch.int
@@ -20,6 +24,13 @@ _float64 = torch.float16
 _float32 = torch.float32
 _float64 = torch.float64
 _uint8 = torch.uint8
+
+Number = Union[int, float]
+
+
+### Constants
+
+_S = slice(None)
 
 
 class Size(Tuple[int, ...]):

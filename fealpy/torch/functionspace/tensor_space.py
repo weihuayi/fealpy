@@ -1,9 +1,7 @@
 
 from typing import Tuple
 
-from fealpy.torch.functionspace.space import _S
-
-from ..typing import Tensor, Size
+from ..typing import Tensor, Size, _S
 from .functional import generate_tensor_basis
 from .space import FunctionSpace, _S, Index
 from .utils import to_tensor_dof
@@ -16,7 +14,9 @@ class TensorFunctionSpace(FunctionSpace):
         self.shape = Size(shape)
         self.dof_last = dof_last
 
-        self.mesh = scalar_space.mesh
+    @property
+    def mesh(self):
+        return self.scalar_space.mesh
 
     @property
     def dof_numel(self) -> int:

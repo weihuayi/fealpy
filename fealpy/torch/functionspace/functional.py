@@ -1,11 +1,10 @@
 
 from typing import Tuple
 
-import torch
+from torch import tensordot
 
+from ..typing import Tensor
 from .utils import tensor_basis
-
-Tensor = torch.Tensor
 
 
 def generate_tensor_basis(basis: Tensor, shape: Tuple[int, ...], dof_priority=True) -> Tensor:
@@ -22,7 +21,7 @@ def generate_tensor_basis(basis: Tensor, shape: Tuple[int, ...], dof_priority=Tr
         where numel is the number of elements in the shape.
     """
     factor = tensor_basis(shape, dtype=basis.dtype, device=basis.device)
-    tb = torch.tensordot(basis, factor, dims=0)
+    tb = tensordot(basis, factor, dims=0)
     ldof = basis.shape[-1]
     numel = factor.shape[0]
 
