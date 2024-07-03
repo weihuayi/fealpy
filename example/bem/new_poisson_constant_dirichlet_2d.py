@@ -2,17 +2,18 @@ import numpy as np
 from matplotlib import pyplot as plt
 import argparse
 
-from fealpy.mesh import UniformMesh3d
-from fealpy.pde.bem_model_3d import PoissonModelConstantDirichletBC3d
+from fealpy.mesh import TriangleMesh
+from fealpy.pde.bem_model_2d import PoissonModelConstantDirichletBC2d
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.bem import BoundaryOperator, InternalOperator, PotentialFluxIntegrator, ScalarSourceIntegrator, DirichletBC
+from fealpy.bem import BoundaryElementModel
 from fealpy.bem.tools import boundary_mesh_build, error_calculator
 from fealpy.tools.show import showmultirate
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        UniformMesh3d 上任意次边界元方法
+        TriangleMesh 上任意次边界元方法
         """)
 
 parser.add_argument('--degree',
@@ -20,64 +21,53 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 0 次.')
 
 parser.add_argument('--nx',
-        default=3, type=int,
+        default=5, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--ny',
-        default=3, type=int,
-        help='初始网格剖分段数.')
-
-parser.add_argument('--nz',
-        default=3, type=int,
+        default=5, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=3, type=int,
-        help='默认网格加密求解的次数, 默认加密求解 3 次')
+        default=4, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 args = parser.parse_args()
 
-pde = PoissonModelConstantDirichletBC3d()
-# 定义网格对象
+pde = PoissonModelConstantDirichletBC2d()
+box = pde.domain()
 nx = args.nx
 ny = args.ny
-nz = args.nz
-hx = (1 - 0) / nx
-hy = (1 - 0) / ny
-hz = (1 - 0) / nz
-mesh = UniformMesh3d((0, nx, 0, ny, 0, nz), h=(hx, hy, hz), origin=(0, 0, 0))
+# 定义网格对象
+mesh = TriangleMesh.from_box(box, nx, ny)
 
 p = args.degree
+q = 3
 maxite = args.maxit
 errorMatrix = np.zeros(maxite)
 N = np.zeros(maxite)
 
 for k in range(maxite):
-    bd_mesh = boundary_mesh_build(mesh)
-    # bd_mesh.to_vtk(fname='test_quad.vtu')
+    # 数学模型构建与预处理
+    bd_mesh = BoundaryElementModel.boundary_mesh_build(mesh)
     space = LagrangeFESpace(bd_mesh, p=p)
     space.domain_mesh = mesh
 
-    bd_operator = BoundaryOperator(space)
-    bd_operator.add_boundary_integrator(PotentialFluxIntegrator(q=2))
-    bd_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
-
-    H, G, F = bd_operator.assembly()
+    # 边界元模型构建
+    bem = BoundaryElementModel(space, PotentialFluxIntegrator(q=q-1), ScalarSourceIntegrator(f=pde.source, q=q))
     bc = DirichletBC(space=space, gD=pde.dirichlet)
-    G, F, _ = bc.apply(H, G, F)
-    xi = space.xi
-    u = pde.dirichlet(xi)
-    q = np.linalg.solve(G, F)
+    bem.boundary_condition_apply(bc)
+    bem.build()
 
-    inter_operator = InternalOperator(space)
-    inter_operator.add_boundary_integrator(PotentialFluxIntegrator(q=2))
-    inter_operator.add_domain_integrator(ScalarSourceIntegrator(f=pde.source, q=3))
-    inter_H, inter_G, inter_F = inter_operator.assembly()
-    u_inter = inter_G @ q - inter_H @ u + inter_F
+    # 内部点计算
+    xi = mesh.entity('node')[~mesh.ds.boundary_node_flag()]
+    u_inter = bem(xi)
 
     result_u = np.zeros(mesh.number_of_nodes())
     result_u[mesh.ds.boundary_node_flag()] = pde.dirichlet(mesh.entity('node')[mesh.ds.boundary_node_flag()])
     result_u[~mesh.ds.boundary_node_flag()] = u_inter
+
+    # errorMatrix[k] = bem.error_calculate(pde.solution, q=q-1)
 
     errorMatrix[k] = error_calculator(mesh, result_u, pde.solution)
 
