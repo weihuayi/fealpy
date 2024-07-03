@@ -1,24 +1,19 @@
 
 from typing import (
-    Union, Optional, Dict, Sequence, overload, Callable, Literal, Tuple
+    Union, Optional, Dict, Sequence, overload, Callable, Tuple, Any
 )
 
 import numpy as np
 import torch
 
+from ..typing import (
+    Tensor, Index, EntityName, _S,
+    _int_func, _dtype, _device
+)
 from .. import logger
 from . import functional as F
 from .utils import estr2dim, edim2entity, edim2node, mesh_top_csr, MeshMeta
 from .quadrature import Quadrature
-
-Tensor = torch.Tensor
-Index = Union[Tensor, int, slice]
-EntityName = Literal['cell', 'face', 'edge', 'node']
-_int_func = Callable[..., int]
-_dtype = torch.dtype
-_device = torch.device
-
-_S = slice(None, None, None)
 
 
 ##################################################
@@ -55,7 +50,7 @@ class MeshDS(metaclass=MeshMeta):
         else:
             return object.__getattribute__(self, name)
 
-    def __setattr__(self, name: str, value: torch.Any) -> None:
+    def __setattr__(self, name: str, value: Any) -> None:
         if name in self._STORAGE_ATTR:
             if not hasattr(self, '_entity_storage'):
                 raise RuntimeError('please call super().__init__() before setting attributes.')
@@ -77,7 +72,7 @@ class MeshDS(metaclass=MeshMeta):
             self._entity_storage[edim] = entity.to(device, non_blocking=non_blocking)
         for attr in self.__dict__:
             value = self.__dict__[attr]
-            if isinstance(value, torch.Tensor):
+            if isinstance(value, Tensor):
                 self.__dict__[attr] = value.to(device, non_blocking=non_blocking)
         return self
 
