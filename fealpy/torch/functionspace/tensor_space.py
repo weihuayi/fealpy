@@ -18,6 +18,9 @@ class TensorFunctionSpace(FunctionSpace):
         self.dof_last = dof_last
 
         self.mesh = scalar_space.mesh
+        self.ftype = self.mesh.ftype
+        self.itype = self.mesh.itype
+        self.device = scalar_space.device
 
     @property
     def ndim_dof(self) -> int:
