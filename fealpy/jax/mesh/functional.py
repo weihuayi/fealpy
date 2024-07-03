@@ -27,8 +27,8 @@ def multi_index_matrix(p: int, etype: int, *, dtype=None) -> Array:
         dtype=jnp.int_
     ), axis=0)
     raw = jnp.zeros((sep.shape[0], etype+2), dtype=jnp.int_)
-    raw[:, -1] = p
-    raw[:, 1:-1] = sep
+    raw = raw.at[:, -1].set(p)
+    raw = raw.at[:, 1:-1].set(sep)
     return jnp.array(raw[:, 1:] - raw[:, :-1]).astype(dtype)
 
 
@@ -138,8 +138,8 @@ def simplex_measure(simplex: Array, node: Array) -> Array:
         Tensor[...,].
     """
     points = node[simplex, :]
-    TD = points.size(-2) - 1
-    if TD != points.size(-1):
+    TD = points.shape[0-2] - 1
+    if TD != points.shape[-1]:
         raise RuntimeError("The geometric dimension of points must be NVC-1"
                            "to form a simplex.")
     edges = points[..., 1:, :] - points[..., :-1, :]
@@ -154,27 +154,47 @@ def value_and_jacfwd(f, x):
 
 # simplex 
 def _simplex_shape_function(bc, mi, p):
-    """
-    @brief 给定一组重心坐标点 `bc`, 计算单纯形单元上 `p` 次 Lagrange
-    基函数在这一组重心坐标点处的函数值
+    """`p`-order shape function values on these barycentry points.
 
-    @param[in] bc : (TD+1, )
-    @param[in] p : 基函数的次数，为正整数
-    @param[in] mi : p 次的多重指标矩阵
+    Parameters:
+        bc (Tensor[TD+1, ]):
+        p (inr): order of the shape function.
+        mi (Tensor): p-order multi-index matrix.
 
-    @return phi : 形状为 (NQ, ldof)
+    Returns:
+        Tensor[ldof, ]: phi.
     """
+    # TD = bc.shape[-1] - 1
+    # itype = jnp.int_ # Choose the appropriate integer type
+    # shape = (1, TD+1)
+    # c = jnp.arange(1, p+1, dtype=itype)
+    # P = 1.0 / jnp.cumprod(c, axis=0)
+    # t = jnp.arange(0, p, dtype=itype)
+    # Ap = p * jnp.expand_dims(bc, -2) - t[..., jnp.newaxis]
+    # Ap = jnp.cumprod(Ap, axis=-2)
+    # Ap = Ap * P[..., None]
+    # A = jnp.concatenate([jnp.ones((1, TD+1), dtype=bc.dtype), Ap], axis=-2)
+    # idx = jnp.arange(TD + 1, dtype=itype)
+    # phi = jnp.prod(A[mi, idx], axis=-1)
+    # print(phi.shape)
+    # return phi
+    if p == 1:
+        return bc
     TD = bc.shape[-1] - 1
-    c = jnp.arange(1, p+1)
-    P = 1.0/jnp.cumprod(c)
+    if mi is None:
+        mi = multi_index_matrix(p, TD)
+    c = jnp.arange(1, p+1, dtype=jnp.int_)
+    P = 1.0 / jnp.cumprod(c)
     t = jnp.arange(0, p)
-    A = p*bc - jnp.arange(0, p).reshape(-1, 1)
-    A = P.reshape(-1, 1)*jnp.cumprod(A, axis=-2) # (p, TD+1)
-    B = jnp.ones((p+1, TD+1), dtype=A.dtype)
-    B = B.at[1:, :].set(A)
+    shape = bc.shape[:-1]+(p+1, TD+1)
+    A = jnp.ones(shape, dtype=bc.dtype)
+    A = A.at[..., 1:, :].set(p*bc[..., None, :] - t.reshape(-1, 1))
+    A = jnp.cumprod(A, axis=-2)
+    A = A.at[..., 1:, :].set(A[..., 1:, :] * P.reshape(-1, 1))
     idx = jnp.arange(TD+1)
-    phi = jnp.prod(B[mi, idx], axis=-1)
+    phi = jnp.prod(A[..., mi, idx], axis=-1)
     return phi
+
 
 
 @partial(jax.jit, static_argnums=(2, ))
@@ -182,7 +202,7 @@ def simplex_shape_function(bcs, mi, p):
     fn = jax.vmap(_simplex_shape_function, in_axes=(0, None, None))
     return fn(bcs, mi, p)
 
-def _simplex_grad_shape_function(bc, mi, p, n):
+def _simplex_diff_shape_function(bc, mi, p, n):
     fn = _simplex_shape_function
     for i in range(n):
         fn = jax.jacfwd(fn)
@@ -190,12 +210,15 @@ def _simplex_grad_shape_function(bc, mi, p, n):
 
 
 @partial(jax.jit, static_argnums=(2, 3))
-def simplex_grad_shape_function(bcs, mi, p, n): 
+def simplex_diff_shape_function(bcs, mi, p, n): 
     return jax.vmap(
-            _simplex_grad_shape_function, 
+            _simplex_diff_shape_function, 
             in_axes=(0, None, None, None)
             )(bcs, mi, p, n)
 
+def simplex_grad_shape_function(bcs, mi, p): 
+    # print(simplex_diff_shape_function(bcs, mi, p, n=1))
+    return simplex_diff_shape_function(bcs, mi, p, n=1)
 
 # Quadrangle & Hexahedron
 # =======================
@@ -267,7 +290,7 @@ def tri_grad_lambda_2d(tri: Array, node: Array) -> Array:
     e1 = jnp.flip(e1, axis=-1)
     e2 = jnp.flip(e2, axis=-1)
     result = jnp.stack([e0, e1, e2], axis=-2)
-    result[..., 0]*=-1
+    result = result.at[..., 0].mul(-1)
     return result/(nv[..., None, None])
 
 def tri_grad_lambda_3d(tri: Array, node: Array) -> Array:

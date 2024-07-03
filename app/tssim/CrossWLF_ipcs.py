@@ -118,10 +118,11 @@ for i in range(1):
     A2 = uD0@A2@uD0 + uD1
     b2[is_u_bdof] = uxx.flatten()[is_u_bdof]
     u1[:] = spsolve(A2,b2).reshape((2,-1))
-        
+    
     #tempture
     A3 = NSSolver.temperature_A(u1, C, rho, lam, pde.Pe) 
     b3 = NSSolver.temperature_b(T0, u1, p1, eta, Br, pde.Pe, rho, C) 
+    #T1[:] = spsolve(A3,b3)
 
 fname = 'test' + 'test_.vtu'
 mesh.nodedata['u0'] = u0.transpose(1,0)
@@ -131,6 +132,7 @@ mesh.nodedata['p1'] = p1
 mesh.nodedata['phi1'] = phi1
 mesh.nodedata['phi0'] = phi0
 mesh.nodedata['rho'] = rho
+mesh.nodedata['T'] = rho
 mesh.to_vtk(fname=fname)
 
 

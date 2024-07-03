@@ -268,7 +268,7 @@ class NSFEMSolver:
         def coef(bcs, index): 
             if callable(rho):
                 result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
-                #result = np.einsum('ij,ij->ij',rho(bcs,index), result)
+                result = np.einsum('ij,ij->ij',rho(bcs,index), result)
                 return -result
             else:
                 result = us.grad_value(bcs, index)[:,0,0,:] + us.grad_value(bcs,index)[:,1,1,:]
@@ -286,8 +286,8 @@ class NSFEMSolver:
             A = self.M
         else:
             bform = BilinearForm((self.uspace,)*2)
-            #bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
-            bform.add_domain_integrator(VectorMassIntegrator(q=self.q))
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
+            #bform.add_domain_integrator(VectorMassIntegrator(q=self.q))
             A = bform.assembly()         
         return A
     
@@ -301,8 +301,8 @@ class NSFEMSolver:
         def coef(bcs, index): 
             if callable(rho):
                 result0 = p1.grad_value(bcs, index) - p0.grad_value(bcs, index)
-                #result =  np.einsum('ij,ikj->ikj',rho(bcs,index), us(bcs,index))
-                result =  us(bcs,index)
+                result =  np.einsum('ij,ikj->ikj',rho(bcs,index), us(bcs,index))
+                #result =  us(bcs,index)
                 result -= dt * result0.transpose(0,2,1)
                 return result
             else:
