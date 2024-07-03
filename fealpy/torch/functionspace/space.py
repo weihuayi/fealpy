@@ -10,24 +10,24 @@ Number = Union[int, float]
 _S = slice(None)
 
 
-class _FunctionSpace(metaclass=ABCMeta):
+class _FunctionSpace():
     r"""THe base class of function spaces"""
     device: torch.device
     ftype: torch.dtype
     itype: torch.dtype
 
     # basis
-    @abstractmethod
+
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-    @abstractmethod
+
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-    @abstractmethod
+
     def hess_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
 
     # values
-    @abstractmethod
+
     def value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
-    @abstractmethod
+
     def grad_value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
 
     # counters
