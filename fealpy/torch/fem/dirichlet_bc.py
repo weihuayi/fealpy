@@ -126,15 +126,19 @@ class DirichletBC():
         # Here the adjustment is done by operating the sparse structure directly.
         isDDof = self.is_boundary_dof
         A = self.check_matrix(matrix) if check else matrix
-        new_values = torch.zeros_like(A.values(), requires_grad=False)
+        kwargs = {'dtype': A.dtype, "device": A.device}
         indices = A.indices()
-        IDX = isDDof[indices[0, :]] & (indices[1, :] == indices[0, :])
-        new_values[IDX] = 1.0
-        IDX = ~(isDDof[indices[0, :]] | isDDof[indices[1, :]])
-        new_values[IDX] = A.values()[IDX]
-        A = torch.sparse_coo_tensor(indices, new_values, A.size())
+        new_values = A.values().clone()
+        IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
+        new_values[IDX] = 0
+        A = torch.sparse_coo_tensor(indices, new_values, A.size(), **kwargs)
+        index, = torch.nonzero(isDDof, as_tuple=True) 
+        one_values = torch.ones(len(index))
+        one_indices = torch.stack([index,index], dim=0)
+        A1 = torch.sparse_coo_tensor(one_indices, one_values, A.size(), **kwargs)
+        A += A1 
         A = A.coalesce()
-
+        
         return A
 
     def apply_vector(self, vector: Tensor, matrix: Tensor, uh: Optional[Tensor]=None,
