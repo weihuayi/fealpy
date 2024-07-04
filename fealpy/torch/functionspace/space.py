@@ -1,9 +1,8 @@
 
 from typing import Union, Callable, Optional, Generic, TypeVar
 
-import torch
-
-from ..typing import Tensor, _dtype, _device, Index, Number, _S
+from ..typing import Tensor, _dtype, _device, Index, Number, _S, Size
+from .utils import zero_dofs
 
 
 class _FunctionSpace():
@@ -13,17 +12,12 @@ class _FunctionSpace():
     itype: _dtype
 
     # basis
-
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-
     def hess_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
 
     # values
-
     def value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
-
     def grad_value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
 
     # counters
@@ -40,16 +34,17 @@ class _FunctionSpace():
         raise NotImplementedError
 
     # function
-    def array(self, dim: int=0) -> Tensor:
+    def array(self, dim: Union[Size, int, None]=None) -> Tensor:
+        """Initialize a Tensor filled with zeros as values of DoFs.
+
+        Parameters:
+            dim (Tuple[int, ...] | int | None, optional): Shape of DoFs. Defaults to None.
+
+        Returns:
+            Tensor: Values of DoFs shaped (GDOF, *dim).
+        """
         GDOF = self.number_of_global_dofs()
-        kwargs = {'device': self.device, 'dtype': self.ftype}
-
-        if dim  == 0:
-            shape = (GDOF, )
-        else:
-            shape = (GDOF, dim)
-
-        return torch.zeros(shape, **kwargs)
+        return zero_dofs(GDOF, dim, dtype=self.ftype, device=self.device)
 
 
 _FS = TypeVar('_FS', bound=_FunctionSpace)
@@ -85,7 +80,7 @@ class Function(Tensor, Generic[_FS]):
 
 
 class FunctionSpace(_FunctionSpace):
-    def function(self, tensor: Optional[Tensor]=None, dim: int=0):
+    def function(self, tensor: Optional[Tensor]=None, dim: Union[Size, int, None]=None) -> Tensor:
         if tensor is None:
             tensor = self.array(dim=dim)
 

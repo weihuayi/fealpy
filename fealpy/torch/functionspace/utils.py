@@ -8,6 +8,19 @@ from ..typing import Size
 from ..typing import _dtype, _device
 
 
+def zero_dofs(gdofs: int, dims: Union[Size, int, None]=None, *, dtype=None, device=None):
+    kwargs = {'device': device, 'dtype': dtype}
+
+    if dims is None:
+        shape = (gdofs, )
+    elif isinstance(dims, int):
+        shape = (gdofs, ) if dims == 0 else (gdofs, dims)
+    else:
+        shape = (gdofs, *dims)
+
+    return torch.zeros(shape, **kwargs)
+
+
 def flatten_indices(shape: Size, permute: Size) -> Tensor:
     """Construct indices of elements in the flattened tensor.
 
@@ -27,14 +40,14 @@ def flatten_indices(shape: Size, permute: Size) -> Tensor:
     return permuted_indices.permute(inv_permute)
 
 
-def to_tensor_dof(to_dof: Tensor, dof_numel: int, gdof: int, dof_priority: bool=True):
+def to_tensor_dof(to_dof: Tensor, dof_numel: int, gdof: int, dof_priority: bool=True) -> Tensor:
     """Expand the relationship between entity and scalar dof to the tensor dof.
 
     Parameters:
         to_dof (Tensor): Entity to the scalar dof.\n
         dof_numel (int): Number of dof elements.\n
         gdof (int): total number of dofs.\n
-        dof_priority (bool, optional): If True, the degrees of freedom are ranked\
+        dof_priority (bool, optional): If True, the degrees of freedom are arranged\
         prior to their components. Defaults to True.
 
     Returns:
