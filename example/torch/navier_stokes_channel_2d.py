@@ -10,11 +10,11 @@
 import torch
 from torch import Tensor
 
+import numpy as np
+from fealpy.utils import timer
+
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch.functionspace import LagrangeFESpace
-import numpy as np
-from fealpy.mesh import IntervalMesh
-from fealpy.utils import timer
 from fealpy.torch.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
