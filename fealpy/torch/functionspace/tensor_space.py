@@ -8,18 +8,28 @@ from .utils import to_tensor_dof
 
 
 class TensorFunctionSpace(FunctionSpace):
-    def __init__(self, scalar_space: FunctionSpace, shape: Tuple[int, ...], *,
-                 dof_priority: bool=True) -> None:
+    def __init__(self, scalar_space: FunctionSpace, shape: Tuple[int, ...]) -> None:
         """_summary_
 
         Parameters:
             scalar_space (FunctionSpace): The scalar space to build tensor space from.\n
-            shape (Tuple[int, ...]): Shape of each dof.\n
-            dof_priority (bool, optional): _description_. Defaults to True.
+            shape (Tuple[int, ...]): Shape of each dof.
+                Requires a `-1` be the first or last element to mark the priority
+                of the DoF in arrangement.
         """
         self.scalar_space = scalar_space
-        self.shape = Size(shape)
-        self.dof_priority = dof_priority
+
+        if len(shape) < 2:
+            raise ValueError('shape must be a tuple of at least two element')
+
+        if shape[0] == -1:
+            self.dof_shape = Size(shape[1:])
+            self.dof_priority = False
+        elif shape[-1] == -1:
+            self.dof_shape = Size(shape[:-1])
+            self.dof_priority = True
+        else:
+            raise ValueError('`-1` is required as the first or last element')
 
     @property
     def mesh(self):
@@ -34,11 +44,11 @@ class TensorFunctionSpace(FunctionSpace):
 
     @property
     def dof_numel(self) -> int:
-        return self.shape.numel()
+        return self.dof_shape.numel()
 
     @property
     def dof_ndim(self) -> int:
-        return len(self.shape)
+        return len(self.dof_shape)
 
     def number_of_global_dofs(self) -> int:
         return self.dof_numel * self.scalar_space.number_of_global_dofs()
@@ -48,11 +58,11 @@ class TensorFunctionSpace(FunctionSpace):
 
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         phi = self.scalar_space.basis(p, index, **kwargs) # (NC, NQ, ldof)
-        return generate_tensor_basis(phi, self.shape, self.dof_priority)
+        return generate_tensor_basis(phi, self.dof_shape, self.dof_priority)
 
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
         gphi = self.scalar_space.grad_basis(p, index, **kwargs)
-        return generate_tensor_grad_basis(gphi, self.shape, self.dof_priority)
+        return generate_tensor_grad_basis(gphi, self.dof_shape, self.dof_priority)
 
     def cell_to_dof(self) -> Tensor:
         """Get the cell to dof mapping.
