@@ -13,17 +13,12 @@ class _FunctionSpace():
     itype: _dtype
 
     # basis
-
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-
     def hess_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
 
     # values
-
     def value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
-
     def grad_value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
 
     # counters
