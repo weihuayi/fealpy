@@ -51,7 +51,6 @@ class SinCosData:
         val[..., 1] = -2*y/(y**2 + 1)**2 - 2*pi**2*sin(pi*y)*cos(pi*x) + pi*sin(pi*y)*cos(pi*x) 
         return val
 
-
     @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
