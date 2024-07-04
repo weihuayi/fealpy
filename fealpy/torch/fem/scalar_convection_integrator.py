@@ -13,6 +13,7 @@ import torch
 from torch import Tensor
 
 from ..mesh import HomogeneousMesh
+from ..utils import is_tensor
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import (
     CellOperatorIntegrator,
@@ -67,5 +68,11 @@ class ScalarConvectionIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, gphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        print(coef.shape)
-        return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
+        if is_tensor(coef):
+            if self.batched:
+                result = torch.einsum('q, cqk, cqmd, bcqd, c->bckm', ws, phi, gphi, coef.squeeze(0), cm)
+            else:
+                result = torch.einsum('q, cqk, cqmd, cqd, c->ckm', ws, phi, gphi, coef, cm)
+        else:
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        return result
