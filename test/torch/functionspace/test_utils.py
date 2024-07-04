@@ -3,6 +3,8 @@ import torch
 
 from fealpy.torch.functionspace.utils import (
     flatten_indices,
+    to_tensor_dof,
+    tensor_basis,
     normal_strain,
     shear_strain
 )
@@ -23,6 +25,63 @@ def test_flatten_indices():
     )
 
     assert torch.equal(indices, expected)
+
+
+def test_to_tensor_dof():
+    to_dof = torch.tensor([[0, 1, 2],
+                           [2, 3, 4],
+                           [4, 5, 6],
+                           [6, 7, 8]])
+    dof_numel = 3
+    gdof = 9
+    result = to_tensor_dof(to_dof, dof_numel, gdof, dof_priority=False)
+    expected = torch.tensor(
+        [[0, 1, 2, 3, 4, 5, 6, 7, 8],
+         [6, 7, 8, 9, 10, 11, 12, 13, 14],
+         [12, 13, 14, 15, 16, 17, 18, 19, 20],
+         [18, 19, 20, 21, 22, 23, 24, 25, 26]]
+    )
+
+    assert torch.equal(result, expected)
+
+    result = to_tensor_dof(to_dof, dof_numel, gdof, dof_priority=True)
+    expected = torch.tensor(
+        [[0, 9, 18, 1, 10, 19, 2, 11, 10],
+         [2, 11, 20, 3, 12, 21, 4, 13, 22],
+         [4, 13, 22, 5, 14, 23, 6, 15, 24],
+         [6, 15, 24, 7, 16, 25, 8, 27, 26]]
+    )
+
+
+def test_tensor_basis():
+    result = tensor_basis((2, 3), dtype=torch.float32)
+    expected = torch.tensor(
+        [[[1, 0, 0],
+          [0, 0, 0]],
+         [[0, 1, 0],
+          [0, 0, 0]],
+         [[0, 0, 1],
+          [0, 0, 0]],
+         [[0, 0, 0],
+          [1, 0, 0]],
+         [[0, 0, 0],
+          [0, 1, 0]],
+         [[0, 0, 0],
+          [0, 0, 1]]],
+          dtype=torch.float32
+    ) # (6, 2, 3)
+
+    assert torch.allclose(result, expected)
+
+    result = tensor_basis((3, ), dtype=torch.float32)
+    expected = torch.tensor(
+        [[1, 0, 0],
+         [0, 1, 0],
+         [0, 0, 1]],
+          dtype=torch.float32
+    ) # (6, 3)
+
+    assert torch.allclose(result, expected)
 
 
 def test_normal_strain():

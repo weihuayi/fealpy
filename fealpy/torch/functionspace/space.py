@@ -1,20 +1,16 @@
 
 from typing import Union, Callable, Optional, Generic, TypeVar
-from abc import ABCMeta, abstractmethod
 
 import torch
-from torch import Tensor
 
-Index = Union[int, slice, Tensor]
-Number = Union[int, float]
-_S = slice(None)
+from ..typing import Tensor, _dtype, _device, Index, Number, _S
 
 
 class _FunctionSpace():
-    r"""THe base class of function spaces"""
-    device: torch.device
-    ftype: torch.dtype
-    itype: torch.dtype
+    r"""The base class of function spaces"""
+    device: _device
+    ftype: _dtype
+    itype: _dtype
 
     # basis
 
