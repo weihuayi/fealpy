@@ -96,37 +96,3 @@ def bilinear_integral(input1: Tensor, input2: Tensor, weights: Tensor, measure: 
         return einsum(f'c, q, cqi..., cqj..., {subs} -> {out_subs}', measure, weights, input1, input2, coef)
     else:
         raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
-    
-def Trlinear_integral(input1: Tensor, input2: Tensor, input3: Tensor, weights: Tensor, measure: Tensor,
-                      coef: Union[Number, Tensor, None]=None,
-                      batched: bool=False) -> Tensor:
-    """Numerical integration.
-
-    Args:
-        input1 (Tensor[C, Q, I, ...]): The values on the quadrature points to be integrated.\n
-        input2 (Tensor[C, Q, J, ...]): The values on the quadrature points to be integrated.\n
-        weights (Tensor[Q,]): The weights of the quadrature points.\n
-        measure (Tensor[C,]): The measure of the quadrature points.\n
-        coef (Number, Tensor, optional): The coefficient of the integration. Defaults to None.
-            Must be int, float, Tensor, or callable returning Tensor with shape (Q,), (C,) or (C, Q).
-            If `batched == True`, the shape of the coef should be (B, C, Q) or (B, C).
-        batched (bool, optional): Whether the coef are batched. Defaults to False.
-
-    Returns:
-        Tensor[C, I, J]: The result of the integration.
-            If `batched == True`, the shape of the output is (B, C, I, J).
-    """
-    if coef is None:
-        return einsum('q, c, cqki, kl, cqlj -> cij', weights, measure, input1, input2, input3)
-        #return einsum('c, q, cqi..., cqj... -> cij', measure, weights, input1, input2)
-
-    NQ = weights.shape[0]
-    NC = measure.shape[0]
-
-    if is_scalar(coef):
-        return einsum('q, c, cqkj, kl, cqli -> cij', weights, measure, input1, input2, input3) * coef
-        #return einsum('c, q, cqi..., cqj... -> cij', measure, weights, input1, input2) * coef
-    elif is_tensor(coef):
-        pass
-    else:
-        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")

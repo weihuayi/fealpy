@@ -12,7 +12,6 @@ from ..functionspace.utils import flatten_indices
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
-from ..functional import Trlinear_integral
 from .integrator import (
     CellOperatorIntegrator,
     enable_cache,
@@ -21,7 +20,9 @@ from .integrator import (
 )
 
 class LinearElasticityIntegrator(CellOperatorIntegrator):
-    r"""The linear elasticity integrator for function spaces based on homogeneous meshes."""
+    """
+    The linear elasticity integrator for function spaces based on homogeneous meshes.
+    """
     def __init__(self, 
                  lam: Optional[float]=None, mu: Optional[float]=None,
                  e: Optional[float]=None, nu: Optional[float]=None, 
@@ -63,7 +64,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
     
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The LinearElasticityPlaneStrainOperatorIntegrator only support spaces on"
+            raise RuntimeError("The LinearElasticityIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
     
@@ -133,115 +134,17 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         D = self.elasticity_matrix(space)
         B = self.strain_matrix(space)
 
-        return Trlinear_integral(B, D, B , ws, cm, coef, batched=self.batched)
+        return trilinear_integral(B, D, B , ws, cm, coef, batched=self.batched)
 
 
+    @assemblymethod('fast_strain')
+    def fast_assembly_strain_constant(self, space: _FS) -> Tensor:
+        pass
 
-        # ldof, GD = gphi.shape[-2:]
-        # elasticity_type = self.elasticity_type
+    @assemblymethod('fast_stress')
+    def fast_assembly_stress_constant(self, space: _FS) -> Tensor:
+        pass
 
-        # if elasticity_type == 'stress':
-        #     e, nu = self.e, self.nu
-        #     if GD == 2:
-        #         D = e / (1 - nu**2) *\
-        #             torch.tensor([[1, nu, 0],
-        #                           [nu, 1, 0],
-        #                           [0, 0, (1 - nu) / 2]], dtype=torch.float64)
-        #     elif GD == 3:
-        #         raise ValueError("Invalid GD dimension for stress.")
-        #     else:
-        #         raise ValueError("Invalid GD dimension.")
-        # elif elasticity_type == 'strain':
-        #     mu, lam = self.mu, self.lam
-        #     if GD == 2:
-        #         D = torch.tensor([[2 * mu + lam, lam, 0],
-        #                           [lam, 2 * mu + lam, 0],
-        #                           [0, 0, mu]], dtype=torch.float64)
-        #     elif GD == 3:
-        #         D = torch.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],
-        #                           [lam, 2 * mu + lam, lam, 0, 0, 0],
-        #                           [lam, lam, 2 * mu + lam, 0, 0, 0],
-        #                           [0, 0, 0, mu, 0, 0],
-        #                           [0, 0, 0, 0, mu, 0],
-        #                           [0, 0, 0, 0, 0, mu]], dtype=torch.float64)
-        #     else:
-        #         raise ValueError("Invalid GD dimension.")
-        # else:
-        #     raise ValueError("Unknown type.")
-        # print("D:", D.shape, "\n", D)
-        # if space.dof_last:
-        #     indices = flatten_indices((ldof, GD), (1, 0))
-        # else:
-        #     indices = flatten_indices((ldof, GD), (0, 1))
-        # B = torch.cat([normal_strain(gphi, indices),
-        #                shear_strain(gphi, indices)], dim=-2)
-        
-        
-        # if coef is None:
-        #     KK = torch.einsum('q, c, cqkj, kl, cqli -> cij', ws, cm, B, D, B)
-        #     print("KK:", KK.shape, "\n", KK[0])
-
-        
-        # K2_strain = torch.einsum('q, c, cqkj, kl, cqli-> cij', ws, cm, B, D, B)
-        # print("K2_strain:", K2_strain.shape, "\n", K2_strain[0])
-        # K2_stress = torch.einsum('q, c, cqkj, kl, cqli-> cij',\
-        #                 ws, cm, B2_strain, D2_stress, B2_strain)
-        # print("K2_stress:", K2_stress.shape, "\n", K2_stress[0])
-        #B_dim2 = space.strain(p=bcs, variable='x')
-        # print("B_dim2:", B_dim2.shape, "\n", B_dim2[0][0])
-
-
-        #
-        # I = torch.eye(2)
-        # factor = e / (1 - nu**2)
-        # D4_stress = factor * (
-        #     (1 - nu) / 2 * (torch.einsum('ik,jl->ijkl', I, I) + torch.einsum('il,jk->ijkl', I, I)) +
-        #     nu * torch.einsum('ij,kl->ijkl', I, I) +
-        #     (1 - nu) * torch.einsum('ik,jl->ijkl', I, I)
-        # )
-        
-        
-        
-        # q = self.q
-        # index = self.index
-        # mesh = getattr(space, 'mesh', None)
-        # cm = mesh.entity_measure('cell', index=index)
-        # print("cm:", cm.shape)
-        # qf = mesh.integrator(q, 'cell')
-        # bcs, ws = qf.get_quadrature_points_and_weights()
-        # print("ws:", ws.shape)
-        # B2_strain = space.strain(p=bcs, variable='x')
-        # print("B2_strain:", B2_strain.shape, "\n", B2_strain[0][0])
-
-
-
-        # K2_strain = torch.einsum('q, c, cqkj, kl, cqli-> cij',\
-        #                 ws, cm, B2_strain, D2_strain, B2_strain)
-        # print("K2_strain:", K2_strain.shape, "\n", K2_strain[0])
-        # K2_stress = torch.einsum('q, c, cqkj, kl, cqli-> cij',\
-        #                 ws, cm, B2_strain, D2_stress, B2_strain)
-        # print("K2_stress:", K2_stress.shape, "\n", K2_stress[0])
-
-
-
-
-        # D2 = torch.tensor([
-        #     [2 * mu + lam, lam, lam, 0, 0, 0],
-        #     [lam, 2 * mu + lam, lam, 0, 0, 0],
-        #     [lam, lam, 2 * mu + lam, 0, 0, 0],
-        #     [0, 0, 0, mu, 0, 0],
-        #     [0, 0, 0, 0, mu, 0],
-        #     [0, 0, 0, 0, 0, mu]
-        # ], dtype=torch.float64)
-
-
-
-        #
-        # GD = 3
-        # I = torch.eye(GD)
-        # D4 = mu * (torch.einsum('ik,jl->ijkl', I, I) \
-        #           + torch.einsum('il,jk->ijkl', I, I)) \
-        #     + lam * torch.einsum('ij,kl->ijkl', I, I)
-        #
-        # return D2_stress, D4_stress, D2_strain, D2, D4
-        # return KK
+    @assemblymethod('fast_3d')
+    def fast_assembly_constant(self, space: _FS) -> Tensor:
+        pass
