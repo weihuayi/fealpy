@@ -124,6 +124,44 @@ def test_from_heat_transfer_domain():
     ax.legend()  
     plt.show()
 
+def test_from_four_heat_transfer_domain():
+    nodemesh = NodeMesh.from_four_heat_transfer_domain()
+    node = nodemesh.node
+    color_map = {
+        0: 'red',    # 流体节点为红色
+        1: 'blue',   # 固体节点为蓝色
+        3: 'green'   # 温度节点为绿色
+    }
+    fig, ax = plt.subplots()
+    tag = nodemesh.nodedata["tag"]
+    for t in np.unique(tag):
+        idx = tag == t
+        ax.scatter(node[idx, 0], node[idx, 1], color=color_map[t], s=25, label=f'Tag {t}')
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('NodeSet from dam break Domain')
+    ax.legend()  
+    plt.show()
+
+def test_from_slip_stick_domain():
+    nodemesh = NodeMesh.from_slip_stick_domain()
+    node = nodemesh.node
+    color_map = {
+        0: 'red',    # 流体节点为红色
+        1: 'blue',   # 固体节点为蓝色
+        3: 'green'   # 速度节点为绿色
+    }
+    fig, ax = plt.subplots()
+    tag = nodemesh.nodedata["tag"]
+    for t in np.unique(tag):
+        idx = tag == t
+        ax.scatter(node[idx, 0], node[idx, 1], color=color_map[t], s=25, label=f'Tag {t}')
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('NodeSet from dam break Domain')
+    ax.legend()  
+    plt.show()
+
 if __name__ == "__main__":
     #test_neighbors()
     #test_neighbors()
@@ -133,4 +171,6 @@ if __name__ == "__main__":
     #test_from_tgv_domain()
     #test_from_ringshaped_channel_domain()
     #test_dam_break_domain()
-    test_from_heat_transfer_domain()
+    #test_from_heat_transfer_domain()
+    #test_from_four_heat_transfer_domain()
+    test_from_slip_stick_domain()
