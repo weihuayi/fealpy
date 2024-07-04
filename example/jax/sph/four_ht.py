@@ -9,6 +9,7 @@ from fealpy.jax.sph.jax_md.partition import Sparse
 from fealpy.jax.sph.kernel_function import QuinticKernel
 from jax_md import space
 from jax import vmap
+import matplotlib.pyplot as plt
 
 jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 jax.config.update('jax_platform_name', 'cpu')
@@ -17,7 +18,7 @@ EPS = jnp.finfo(float).eps
 dx = 0.02
 h = dx
 n_walls = 3 #墙粒子层数
-L, H = 1.0, 0.2
+L, H = 1.5, 0.2
 dx2n = dx * n_walls * 2 #墙粒子总高度
 box_size = np.array([L, H + dx2n])
 rho0 = 1.0 #参考密度
@@ -32,16 +33,15 @@ path = "./"
 
 #时间步长和步数
 T = 1.5
-dt = 0.00045454545454545455
+dt = 0.0004
 t_num = int(T / dt)
 
 #初始化
-mesh = NodeMesh.from_heat_transfer_domain(dx=dx,dy=dx)
+mesh = NodeMesh.from_four_heat_transfer_domain(dx=dx,dy=dx)
 
 solver = SPHSolver(mesh)
 kernel = QuinticKernel(h=h, dim=2)
 displacement, shift = space.periodic(side=box_size)
-
 mesh.nodedata["p"] = solver.tait_eos(mesh.nodedata["rho"],c0,rho0,X=p_bg)
 mesh.nodedata = solver.boundary_conditions(mesh.nodedata, box_size, dx=dx)
 
@@ -126,3 +126,5 @@ for i in range(t_num+2):
     #solver.write_h5(mesh.nodedata, fname)
     #fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'
     #solver.write_vtk(mesh.nodedata, fname)
+    
+    
