@@ -8,13 +8,18 @@
 	@ref 
 '''  
 import torch
-from torch import Tensor
 
 import numpy as np
 from fealpy.utils import timer
+from fealpy.timeintegratoralg import UniformTimeLine
+from fealpy.pde.navier_stokes_equation_2d import Poisuille
 
+from fealpy.torch.typing import Tensor, Index
 from fealpy.torch.mesh import TriangleMesh
+
 from fealpy.torch.functionspace import LagrangeFESpace
+from fealpy.torch.functionspace import TensorFunctionSpace
+
 from fealpy.torch.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
@@ -23,15 +28,8 @@ from fealpy.torch.fem import (
     ScalarSourceIntegrator,
     DirichletBC
 )
-from fealpy.timeintegratoralg import UniformTimeLine
-from fealpy.pde.navier_stokes_equation_2d import Poisuille
-from fealpy.torch.fem.integrator import (_S, Index, CoefLike)
 
-from fealpy.mesh import TriangleMesh as OTM
-from fealpy.fem import ScalarConvectionIntegrator as oSC
-from fealpy.fem import BilinearForm as oBilinearForm
 from fealpy.decorator import barycentric
-from fealpy.functionspace import LagrangeFESpace as OLFE
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 ns = 16
@@ -51,8 +49,9 @@ next(time)
 mesh = TriangleMesh.from_box(pde.domain(), nx = ns, ny = ns)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
-uspace = LagrangeFESpace(mesh,p=udegree)
-pspace = LagrangeFESpace(mesh,p=pdegree)
+
+pspace = LagrangeFESpace(mesh, p=pdegree)
+uspace = TensorFunctionSpace(LagrangeFESpace(mesh, p=udegree), (2, ), dof_last=False)
 time.send("mesh_and_space")
 
 u0 = uspace.function(dim=2)
