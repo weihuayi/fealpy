@@ -1,5 +1,5 @@
 
-from typing import Tuple, Union
+from typing import Tuple, Union, Literal, Callable
 from functools import reduce
 
 import torch
@@ -8,10 +8,8 @@ import torch
 ### Types
 
 Tensor = torch.Tensor
-Index = Union[int, slice, Tuple[int, ...], Tensor]
 _dtype = torch.dtype
 _device = torch.device
-DeviceLike = Union[str, _device]
 
 _bool = torch.bool
 _int = torch.int
@@ -26,6 +24,10 @@ _float64 = torch.float64
 _uint8 = torch.uint8
 
 Number = Union[int, float]
+DeviceLike = Union[str, _device]
+Index = Union[int, slice, Tuple[int, ...], Tensor]
+EntityName = Literal['cell', 'face', 'edge', 'node']
+_int_func = Callable[..., int]
 
 
 ### Constants
