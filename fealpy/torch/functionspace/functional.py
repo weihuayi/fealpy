@@ -13,7 +13,7 @@ def generate_tensor_basis(basis: Tensor, shape: Tuple[int, ...], dof_priority=Tr
     Parameters:
         basis (Tensor): Basis of a scalar space, shaped (..., ldof).\n
         shape (Tuple[int, ...]): Shape of the dof.\n
-        dof_priority (bool, optional): If True, the degrees of freedom are ranked\
+        dof_priority (bool, optional): If True, the degrees of freedom are arranged\
         prior to their components. Defaults to True.
 
     Returns:
@@ -38,7 +38,7 @@ def generate_tensor_grad_basis(grad_basis: Tensor, shape: Tuple[int, ...], dof_p
     Parameters:
         grad_basis (Tensor): Gradient of basis of a scalar space, shaped (..., ldof, GD).\n
         shape (Tuple[int, ...]): Shape of the dof.\n
-        dof_priority (bool, optional): If True, the degrees of freedom are ranked\
+        dof_priority (bool, optional): If True, the degrees of freedom are arranged\
         prior to their components. Defaults to True.
 
     Returns:
