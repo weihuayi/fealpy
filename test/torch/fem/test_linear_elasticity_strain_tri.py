@@ -7,6 +7,13 @@ from fealpy.fem import LinearElasticityOperatorIntegrator, BilinearForm
 from fealpy.functionspace import LagrangeFESpace as LFS
 from fealpy.mesh import TriangleMesh as TMD
 
+from fealpy.torch.fem.integrator import (
+    CellOperatorIntegrator,
+    enable_cache,
+    assemblymethod,
+    _S, Index, CoefLike
+)
+
 @pytest.fixture
 def device():
     return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -16,9 +23,14 @@ def test_assembly(device):
     NY = 4
     mesh_torch = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=NX, ny=NY, device=device)
     space_torch = LagrangeFESpace(mesh_torch, p=1, ctype='C')
-    tensor_space = TensorFunctionSpace(space_torch, shape=(2, ), dof_last=True)
+    qf = mesh_torch.integrator(3, 'cell')
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    gphi = space_torch.grad_basis(bcs, index=_S, variable='u')
+    print("gphi:", gphi.shape)
+    tensor_space = TensorFunctionSpace(space_torch, shape=(2, -1))
 
-    integrator_torch = LinearElasticityIntegrator(e=1.0, nu=0.3, elasticity_type='strain', device=device)
+    integrator_torch = LinearElasticityIntegrator(E=1.0, nu=0.3,\
+                elasticity_type='strain', device=device, method='fast_strain')
     KK_torch = integrator_torch.assembly(space=tensor_space)
 
     mesh = TMD.from_box(box=[0, 1, 0, 1], nx=NX, ny=NY)
