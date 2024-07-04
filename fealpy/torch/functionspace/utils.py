@@ -1,13 +1,14 @@
 
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 import torch
 
-Tensor = torch.Tensor
-_Size = torch.Size
+from ..typing import Tensor
+from ..typing import Size
+from ..typing import _dtype, _device
 
 
-def flatten_indices(shape: _Size, permute: _Size) -> Tensor:
+def flatten_indices(shape: Size, permute: Size) -> Tensor:
     """Construct indices of elements in the flattened tensor.
 
     Parameters:
@@ -26,6 +27,47 @@ def flatten_indices(shape: _Size, permute: _Size) -> Tensor:
     return permuted_indices.permute(inv_permute)
 
 
+def to_tensor_dof(to_dof: Tensor, dof_numel: int, gdof: int, dof_priority: bool=True):
+    """Expand the relationship between entity and scalar dof to the tensor dof.
+
+    Parameters:
+        to_dof (Tensor): Entity to the scalar dof.\n
+        dof_numel (int): Number of dof elements.\n
+        gdof (int): total number of dofs.\n
+        dof_priority (bool, optional): If True, the degrees of freedom are ranked\
+        prior to their components. Defaults to True.
+
+    Returns:
+        Tensor: Global indices of tensor dofs in each entity.
+    """
+    kwargs = {'dtype': to_dof.dtype, 'device': to_dof.device}
+    num_entity = to_dof.shape[0]
+    indices = torch.arange(gdof*dof_numel, **kwargs)
+
+    if dof_priority:
+        indices = indices.reshape(dof_numel, gdof).T
+    else:
+        indices = indices.reshape(gdof, dof_numel)
+
+    return indices[to_dof].reshape(num_entity, -1)
+
+
+def tensor_basis(shape: Tuple[int, ...], *, dtype: Optional[_dtype]=None,
+                 device: Union[str, _device, None]=None) -> Tensor:
+    """Generate tensor basis with 0-1 elements.
+
+    Parameters:
+        shape (Tuple[int, ...]): Shape of each tensor basis.
+
+    Returns:
+        Tensor: Tensor basis shaped (numel, *shape).
+    """
+    kwargs = {'dtype': dtype, 'device': device}
+    shape = torch.Size(shape)
+    numel = shape.numel()
+    return torch.eye(numel, **kwargs).reshape((numel,) + shape)
+
+
 def normal_strain(gphi: Tensor, indices: Tensor, *, out: Optional[Tensor]=None) -> Tensor:
     """Assembly normal strain tensor.
 
@@ -42,7 +84,7 @@ def normal_strain(gphi: Tensor, indices: Tensor, *, out: Optional[Tensor]=None) 
     new_shape = gphi.shape[:-2] + (GD, GD*ldof)
 
     if out is None:
-        out = torch.empty(new_shape, **kwargs)
+        out = torch.zeros(new_shape, **kwargs)
     else:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')
@@ -68,11 +110,11 @@ def shear_strain(gphi: Tensor, indices: Tensor, *, out: Optional[Tensor]=None) -
     ldof, GD = gphi.shape[-2:]
     if GD < 2:
         raise ValueError(f"The shear strain requires GD >= 2, but GD = {GD}")
-    NNZ = (GD + (GD+1))//2
+    NNZ = (GD * (GD-1))//2
     new_shape = gphi.shape[:-2] + (NNZ, GD*ldof)
 
     if out is None:
-        out = torch.empty(new_shape, **kwargs)
+        out = torch.zeros(new_shape, **kwargs)
     else:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')

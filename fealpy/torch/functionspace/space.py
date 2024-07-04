@@ -1,33 +1,29 @@
 
 from typing import Union, Callable, Optional, Generic, TypeVar
-from abc import ABCMeta, abstractmethod
 
 import torch
-from torch import Tensor
 
-Index = Union[int, slice, Tensor]
-Number = Union[int, float]
-_S = slice(None)
+from ..typing import Tensor, _dtype, _device, Index, Number, _S
 
 
-class _FunctionSpace(metaclass=ABCMeta):
-    r"""THe base class of function spaces"""
-    device: torch.device
-    ftype: torch.dtype
-    itype: torch.dtype
+class _FunctionSpace():
+    r"""The base class of function spaces"""
+    device: _device
+    ftype: _dtype
+    itype: _dtype
 
     # basis
-    @abstractmethod
+
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-    @abstractmethod
+
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-    @abstractmethod
+
     def hess_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
 
     # values
-    @abstractmethod
+
     def value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
-    @abstractmethod
+
     def grad_value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
 
     # counters

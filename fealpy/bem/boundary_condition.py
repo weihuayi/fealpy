@@ -34,7 +34,7 @@ class DirichletBC():
         # TODO: 完善边界处理
         xi = self.space.xi
         u = self.gD(xi)
-        return G, H@u - f
+        return G, H@u - f, u
 
     def apply_for_other_space(self, A, f, uh) -> Tuple[csr_matrix, np.ndarray]:
         raise NotImplemented
