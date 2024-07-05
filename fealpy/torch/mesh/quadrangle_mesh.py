@@ -8,7 +8,7 @@ from .quadrature import Quadrature
 
 from .. import logger
 from . import functional as F #TODO: maybe just import nessesary functioals
-from .mesh_base import HomogeneousMesh, estr2dim
+from .mesh_base import TensorMesh, estr2dim
 
 Index = Union[Tensor, int, slice]
 _dtype = torch.dtype
@@ -16,11 +16,12 @@ _device = torch.device
 _S = slice(None)
 
 
-class QuadrangleMesh(HomogeneousMesh):
+class QuadrangleMesh(TensorMesh):
     def __init__(self, node: Tensor, cell: Tensor) -> None:
         super().__init__(TD=2)
         # constant tensors
         kwargs = {'dtype': cell.dtype, 'device': cell.device}
+        self.cell = cell
         self.localEdge = torch.tensor([(0, 1), (1, 2), (2, 3), (3, 0)], **kwargs)
         self.localFace = torch.tensor([(0, 1), (1, 2), (2, 3), (3, 0)], **kwargs)
         self.ccw = torch.tensor([0, 1, 2, 3], **kwargs)
@@ -37,8 +38,8 @@ class QuadrangleMesh(HomogeneousMesh):
         GD = node.size(-1)
 
         if GD == 2: # TODO: implement functionals here.
-            self._cell_area = F.simplex_measure
-            self._grad_lambda = F.tri_grad_lambda_2d
+            self._cell_area = F.tensor_measure
+            self._grad_lambda = F.quad_grad_lambda_2d
         elif GD == 3:
             self._cell_area = F.tri_area_3d
             self._grad_lambda = F.tri_grad_lambda_3d
@@ -46,6 +47,81 @@ class QuadrangleMesh(HomogeneousMesh):
             logger.warn(f"{GD}D quadrangle mesh is not well supported: "
                         "cell_area and grad_lambda are not available. "
                         "Any operation involving them will fail.")
+            
+    # entity
+    def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> Tensor:
+        node = self.node
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            return torch.tensor([0,], dtype=self.ftype, device=self.device)
+        elif etype == 1:
+            edge = self.entity(1, index)
+            return F.edge_length(edge, node)
+        elif etype == 2:
+            cell = self.entity(2, index)
+            return self._cell_area(cell, node)
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+        
+    # quadrature
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre') -> Quadrature: # TODO: other qtype
+        from .quadrature import QuadrangleQuadrature
+        from .quadrature import GaussLegendreQuadrature
+
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+        if etype == 2:
+            quad = QuadrangleQuadrature(q, **kwargs)
+        elif etype == 1:
+            quad = GaussLegendreQuadrature(q, **kwargs)
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+        return quad
+
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        cell = self.cell
+        kwargs = {'dtype': self.itype, 'device': self.device}
+        if p == 0:
+            return torch.arange(len(cell), **kwargs).reshape((-1, 1))[index]
+        if p == 1:
+            return cell[index, [0, 3, 1, 2]] # 先排 y 方向，再排 x 方向
+
+        edge2cell = self.ds.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        cell2ipoint = torch.zeros((NC, (p+1)*(p+1)), **kwargs)
+        c2p= cell2ipoint.reshape((NC, p+1, p+1))
+
+        e2p = self.edge_to_ipoint(p)
+        flag = edge2cell[:, 2] == 0
+        c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+        flag = edge2cell[:, 2] == 1
+        c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+        flag = edge2cell[:, 2] == 2
+        c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+        flag = edge2cell[:, 2] == 3
+        c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        flag = iflag & (edge2cell[:, 3] == 0)
+        c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+        flag = iflag & (edge2cell[:, 3] == 3)
+        c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+        c2p[:, 1:-1, 1:-1] = NN + NE*(p-1) + torch.arange(NC*(p-1)*(p-1), **kwargs).reshape(NC, p-1, p-1)
+
+        return cell2ipoint[index]
             
     # constructor
     @classmethod
@@ -78,13 +154,11 @@ class QuadrangleMesh(HomogeneousMesh):
         node = torch.stack([X.ravel(), Y.ravel()], dim=-1)
 
         idx = torch.arange(NN, **ikwargs).reshape(nx + 1, ny + 1)
-        cell = torch.zeros((2 * NC, 3), **ikwargs)
-        cell[:NC, 0] = idx[1:, 0:-1].T.flatten()
-        cell[:NC, 1] = idx[1:, 1:].T.flatten()
-        cell[:NC, 2] = idx[0:-1, 0:-1].T.flatten()
-        cell[NC:, 0] = idx[0:-1, 1:].T.flatten()
-        cell[NC:, 1] = idx[0:-1, 0:-1].T.flatten()
-        cell[NC:, 2] = idx[1:, 1:].T.flatten()
+        cell = torch.zeros((NC, 4), **ikwargs)
+        cell[:, 0] = idx[0:-1, 0:-1].flatten()
+        cell[:, 1] = idx[1:, 0:-1].flatten()
+        cell[:, 2] = idx[1:, 1:].flatten()
+        cell[:, 3] = idx[0:-1, 1:].flatten()
 
         if threshold is not None:
             bc = torch.sum(node[cell, :], axis=1) / cell.shape[1]
