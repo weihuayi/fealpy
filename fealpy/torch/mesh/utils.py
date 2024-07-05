@@ -75,7 +75,7 @@ def edim2entity(storage: Dict, factory: Dict, edim: int, index=None):
 
 def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
     r"""Get the <entiry>_to_node sparse matrix by entity's top dimension."""
-    entity = edim2entity(mesh.storage(), mesh._entity_dim_method_map,
+    entity = edim2entity(mesh.storage(), mesh._entity_factory,
                          etype_dim, index)
     location = getattr(entity, 'location', None)
     NN = mesh.count('node')
