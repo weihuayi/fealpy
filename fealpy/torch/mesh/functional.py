@@ -226,6 +226,24 @@ def tensor_gdof(p: int, mesh) -> int:
         count += coef * mesh.entity(i).size(0)
     return count
 
+def tensor_measure(tensor: Tensor, node: Tensor) -> Tensor:
+    """Entity measurement of a tensor.
+
+    Parameters:
+        simplex (Tensor[..., NVC]): Indices of vertices of the simplex.\n
+        node (Tensor[N, GD]): Node coordinates.
+
+    Returns:
+        Tensor[...,].
+    """
+    points = node[simplex, :]
+    TD = points.size(-2) - 1
+    if TD != points.size(-1):
+        raise RuntimeError("The geometric dimension of points must be NVC-1"
+                           "to form a simplex.")
+    edges = points[..., 1:, :] - points[..., :-1, :]
+    return det(edges).div(factorial(TD))
+
 
 ##################################################
 ### Final Mesh
@@ -302,3 +320,31 @@ def tri_grad_lambda_3d(tri: Tensor, node: Tensor) -> Tensor:
         cross(n, e1, dim=-1),
         cross(n, e2, dim=-1)
     ], dim=-2).div_(length.unsqueeze(-2)) # (..., 3, 3)
+
+# Quadrangle Mesh
+# ===============
+
+def quad_grad_lambda_2d(quad: Tensor, node: Tensor) -> Tensor:
+    """grad_lambda function for the Quadrangle mesh in 2D.
+
+    Parameters:
+        tri (Tensor[..., 3]): Indices of vertices of triangles.\n
+        node (Tensor[N, 2]): Node coordinates.
+
+    Returns:
+        Tensor[..., 3, 2]:
+    """
+    pass
+
+# Tetrahedron Mesh
+# ================
+def tet_grad_lambda_3d(tet: Tensor, node: Tensor, localFace: Tensor) -> Tensor:
+    NC = tet.shape[0]
+    Dlambda = torch.zeros((NC, 4, 3), dtype=node.dtype)
+    volume = simplex_measure(tet, node)
+    for i in range(4):
+        j,k,m = localFace[i]
+        vjk = node[tet[:, k],:] - node[tet[:, j],:]
+        vjm = node[tet[:, m],:] - node[tet[:, j],:]
+        Dlambda[:, i, :] = np.cross(vjm, vjk) / (6*volume.reshape(-1, 1))
+    return Dlambda
