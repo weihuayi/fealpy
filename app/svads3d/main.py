@@ -26,6 +26,7 @@ if __name__ == '__main__':
 
     feature_points = [data[name+"_feature_points"] for name in data['name']]
     pictures = [Picture(data_path, picture, fp) for picture, fp in zip(data['pictures'], feature_points)]
+    [print(pic.fname) for pic in pictures]
 
     cameras = [Camera(pic, data_path, chessboard_dir, loc, axes) 
                for pic, chessboard_dir, loc, axes in 
