@@ -1,61 +1,91 @@
 
-import torch
+from typing import Tuple
 
-from fealpy.torch.functionspace.space import _S
-
+from ..typing import Tensor, Size, _S
+from .functional import generate_tensor_basis, generate_tensor_grad_basis
 from .space import FunctionSpace, _S, Index
-from . import utils as U
-
-_Size = torch.Size
-Tensor = torch.Tensor
+from .utils import to_tensor_dof
 
 
 class TensorFunctionSpace(FunctionSpace):
-    def __init__(self, scalar_space: FunctionSpace, shape: _Size, *,
-                 dof_last: bool=True) -> None:
-        self.scalar_space = scalar_space
-        self.shape = torch.Size(shape)
-        self.dof_last = dof_last
-
-        self.mesh = scalar_space.mesh
-
-    @property
-    def ndim_dof(self) -> int:
-        return self.shape.numel()
-
-    def number_of_global_dofs(self) -> int:
-        return self.ndim_dof * self.scalar_space.number_of_global_dofs()
-
-    def number_of_local_dofs(self, doftype='cell') -> int:
-        return self.ndim_dof * self.scalar_space.number_of_local_dofs(doftype)
-
-    def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
-        phi = self.scalar_space.basis(p, index, **kwargs) # (NC, NQ, ldof)
-        # TODO: finish this
-        pass
-
-    def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
-        gphi = self.scalar_space.grad_basis(p, index, **kwargs)
-        # TODO: finish this
-        pass
-
-    def strain(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
+    def __init__(self, scalar_space: FunctionSpace, shape: Tuple[int, ...]) -> None:
         """_summary_
 
         Parameters:
-            p (Tensor): Inputs for the grad_basis.\n
-            index (Index, optional): indices of entities.
+            scalar_space (FunctionSpace): The scalar space to build tensor space from.\n
+            shape (Tuple[int, ...]): Shape of each dof.
+                Requires a `-1` be the first or last element to mark the priority
+                of the DoF in arrangement.
+        """
+        self.scalar_space = scalar_space
+
+        if len(shape) < 2:
+            raise ValueError('shape must be a tuple of at least two element')
+
+        if shape[0] == -1:
+            self.dof_shape = Size(shape[1:])
+            self.dof_priority = False
+        elif shape[-1] == -1:
+            self.dof_shape = Size(shape[:-1])
+            self.dof_priority = True
+        else:
+            raise ValueError('`-1` is required as the first or last element')
+
+    @property
+    def mesh(self):
+        return self.scalar_space.mesh
+
+    @property
+    def device(self): return self.scalar_space.device
+    @property
+    def ftype(self): return self.scalar_space.ftype
+    @property
+    def itype(self): return self.scalar_space.itype
+
+    @property
+    def dof_numel(self) -> int:
+        return self.dof_shape.numel()
+
+    @property
+    def dof_ndim(self) -> int:
+        return len(self.dof_shape)
+
+    def number_of_global_dofs(self) -> int:
+        return self.dof_numel * self.scalar_space.number_of_global_dofs()
+
+    def number_of_local_dofs(self, doftype='cell') -> int:
+        return self.dof_numel * self.scalar_space.number_of_local_dofs(doftype)
+
+    def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
+        phi = self.scalar_space.basis(p, index, **kwargs) # (NC, NQ, ldof)
+        return generate_tensor_basis(phi, self.dof_shape, self.dof_priority)
+
+    def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor:
+        gphi = self.scalar_space.grad_basis(p, index, **kwargs)
+        return generate_tensor_grad_basis(gphi, self.dof_shape, self.dof_priority)
+
+    def cell_to_dof(self) -> Tensor:
+        """Get the cell to dof mapping.
 
         Returns:
-            Tensor: _description_
+            Tensor: Cell to dof mapping, shaped (NC, ldof*dof_numel).
         """
-        gphi = self.scalar_space.grad_basis(p, index, **kwargs)
-        ldof, GD = gphi.shape[-2:]
+        return to_tensor_dof(
+            self.scalar_space.cell_to_dof(),
+            self.dof_numel,
+            self.scalar_space.number_of_global_dofs(),
+            self.dof_priority
+        )
 
-        if self.dof_last:
-            indices = U.flatten_indices((ldof, GD), (1, 0))
-        else:
-            indices = U.flatten_indices((ldof, GD), (0, 1))
+    def face_to_dof(self) -> Tensor:
+        """Get the face to dof mapping.
 
-        return torch.cat([U.normal_strain(gphi, indices),
-                            U.shear_strain(gphi, indices)], dim=-2)
+        Returns:
+            Tensor: Face to dof mapping, shaped (NF, ldof*dof_numel).
+        """
+        return to_tensor_dof(
+            self.scalar_space.face_to_dof(),
+            self.dof_numel,
+            self.scalar_space.number_of_global_dofs(),
+            self.dof_priority
+        )

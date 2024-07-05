@@ -134,7 +134,7 @@ class SPHSolver:
         res = res.at[:, 0].set(force)
         return res * g_ext
 
-    def enforce_wall_boundary(self, state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, p0=100.0):
+    def enforce_wall_boundary(self, state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, p0=100.0, with_temperature=False):
         """Enforce wall boundary conditions by treating boundary particles in a special way."""
         mask_bc = jnp.isin(state["tag"], jnp.array([1, 3]))
         mask_j_s_fluid = jnp.where(state["tag"][j_s] == 0, 1.0, 0.0)
@@ -166,14 +166,17 @@ class SPHSolver:
         
         rho = self.tait_eos_p2rho(p, p0, rho0, X=5.0)
         
-        #对于墙粒子，流体温度求和
-        t_wall_unnorm = ops.segment_sum(w_j_s_fluid * state["T"][j_s], i_s, len(state["position"]))
-        t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-        """1:SOLID_WALL,2:MOVING_WALL"""
-        mask = jnp.isin(state["tag"], jnp.array([1, 2]))
-        t_wall = jnp.where(mask, t_wall, state["T"])
-        T = t_wall
-        return p, rho, mv, tv, T
+        if with_temperature:
+            #对于墙粒子，流体温度求和
+            t_wall_unnorm = ops.segment_sum(w_j_s_fluid * state["T"][j_s], i_s, len(state["position"]))
+            t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
+            """1:SOLID_WALL,2:MOVING_WALL"""
+            mask = jnp.isin(state["tag"], jnp.array([1, 2]))
+            t_wall = jnp.where(mask, t_wall, state["T"])
+            T = t_wall
+            return p, rho, mv, tv, T
+        else:
+            return p, rho, mv, tv
 
     def temperature_derivative(self, state, kernel, e_s, dr_i_j, dist, i_s, j_s, grad):
         """compute temperature derivative for next step."""

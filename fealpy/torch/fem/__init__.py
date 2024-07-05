@@ -8,6 +8,7 @@ from .linear_form import LinearForm
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
+from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator1
 from .linear_elasticity_integrator import LinearElasticityIntegrator
 
 ### Cell Source

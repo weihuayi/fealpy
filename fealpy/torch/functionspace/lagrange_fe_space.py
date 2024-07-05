@@ -128,7 +128,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
             Defaults to 'batched' if the space does not have `doforder` attribute.
         """
-        phi = self.basis(bc, index=index)
+        phi = self.basis(bc, index=index, variable='x')
         cell2dof = self.dof.cell_to_dof(index)
 
         dim = len(uh.shape) - 1
@@ -147,11 +147,11 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             # uh.shape == (gdof, GD)
             # uh[cell2dof, ...].shape == (NC, ldof, ...)
             # val.shape == (NQ, NC, ...)
-            s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"
+            s1 = f"c...i, ci{s0[:dim]}->c...{s0[:dim]}"
             val = torch.einsum(s1, phi, uh[cell2dof, ...])
         elif doforder == 'batched':
             # Here 'batched' case is added.
-            s1 = f"...ci, {s0[:dim]}ci -> {s0[:dim]}...c"
+            s1 = f"c...i, {s0[:dim]}ci ->{s0[:dim]}c..."
             val = torch.einsum(s1, phi, uh[..., cell2dof])
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")

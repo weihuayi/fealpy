@@ -1,13 +1,27 @@
 
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 import torch
 
-Tensor = torch.Tensor
-_Size = torch.Size
+from ..typing import Tensor
+from ..typing import Size
+from ..typing import _dtype, _device
 
 
-def flatten_indices(shape: _Size, permute: _Size) -> Tensor:
+def zero_dofs(gdofs: int, dims: Union[Size, int, None]=None, *, dtype=None, device=None):
+    kwargs = {'device': device, 'dtype': dtype}
+
+    if dims is None:
+        shape = (gdofs, )
+    elif isinstance(dims, int):
+        shape = (gdofs, ) if dims == 0 else (gdofs, dims)
+    else:
+        shape = (gdofs, *dims)
+
+    return torch.zeros(shape, **kwargs)
+
+
+def flatten_indices(shape: Size, permute: Size) -> Tensor:
     """Construct indices of elements in the flattened tensor.
 
     Parameters:
@@ -24,6 +38,47 @@ def flatten_indices(shape: _Size, permute: _Size) -> Tensor:
     for d in range(len(permute)):
         inv_permute[permute[d]] = d
     return permuted_indices.permute(inv_permute)
+
+
+def to_tensor_dof(to_dof: Tensor, dof_numel: int, gdof: int, dof_priority: bool=True) -> Tensor:
+    """Expand the relationship between entity and scalar dof to the tensor dof.
+
+    Parameters:
+        to_dof (Tensor): Entity to the scalar dof.\n
+        dof_numel (int): Number of dof elements.\n
+        gdof (int): total number of dofs.\n
+        dof_priority (bool, optional): If True, the degrees of freedom are arranged\
+        prior to their components. Defaults to True.
+
+    Returns:
+        Tensor: Global indices of tensor dofs in each entity.
+    """
+    kwargs = {'dtype': to_dof.dtype, 'device': to_dof.device}
+    num_entity = to_dof.shape[0]
+    indices = torch.arange(gdof*dof_numel, **kwargs)
+
+    if dof_priority:
+        indices = indices.reshape(dof_numel, gdof).T
+    else:
+        indices = indices.reshape(gdof, dof_numel)
+
+    return indices[to_dof].reshape(num_entity, -1)
+
+
+def tensor_basis(shape: Tuple[int, ...], *, dtype: Optional[_dtype]=None,
+                 device: Union[str, _device, None]=None) -> Tensor:
+    """Generate tensor basis with 0-1 elements.
+
+    Parameters:
+        shape (Tuple[int, ...]): Shape of each tensor basis.
+
+    Returns:
+        Tensor: Tensor basis shaped (numel, *shape).
+    """
+    kwargs = {'dtype': dtype, 'device': device}
+    shape = torch.Size(shape)
+    numel = shape.numel()
+    return torch.eye(numel, **kwargs).reshape((numel,) + shape)
 
 
 def normal_strain(gphi: Tensor, indices: Tensor, *, out: Optional[Tensor]=None) -> Tensor:
