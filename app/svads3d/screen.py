@@ -152,7 +152,7 @@ class Screen:
                 ps2 = camsys.cameras[i].to_screen(ps1, on_ground=True)
                 ps0 = np.array(ps0)
                 error += np.sum((ps0 - ps2[:, :-1])**2)
-            if i%50==0:
+            if self.i%50==0:
                 print("Error: ", error)
             return error
 
@@ -477,8 +477,8 @@ class Screen:
         gmsh.initialize()
 
 
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 1)  # 最大网格尺寸
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 0.5)    # 最小网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMax", 0.25)  # 最大网格尺寸
+        gmsh.option.setNumber("Mesh.MeshSizeMin", 0.125)    # 最小网格尺寸
 
         camerasys = self.camera_system
 
