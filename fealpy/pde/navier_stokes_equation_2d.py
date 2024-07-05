@@ -133,20 +133,35 @@ class FlowPastCylinder:
 
 
     def mesh1(self,h):
+        from meshpy.triangle import MeshInfo, build
+        from fealpy.mesh import IntervalMesh
         points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
                 dtype=np.float64)
         facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
 
 
-        p, f = MF.circle_interval_mesh([0.2, 0.2], 0.05, 0.01) 
+        mm = IntervalMesh.from_circle_boundary([0.2, 0.2], 0.1, int(2*0.1*np.pi/0.01))
+        p = mm.entity('node')
+        f = mm.entity('cell')
 
         points = np.append(points, p, axis=0)
         facets = np.append(facets, f+4, axis=0)
 
         fm = np.array([0, 1, 2, 3])
 
-        smesh = MF.meshpy2d(points, facets, h, hole_points=[[0.2, 0.2]], facet_markers=fm, meshtype='tri')
-        return smesh
+
+        mesh_info = MeshInfo()
+        mesh_info.set_points(points)
+        mesh_info.set_facets(facets)
+
+        mesh_info.set_holes([[0.2, 0.2]])
+
+        mesh = build(mesh_info, max_volume=h**2)
+
+        node = np.array(mesh.points, dtype=np.float64)
+        cell = np.array(mesh.elements, dtype=np.int_)
+        mesh = TriangleMesh(node,cell)  
+        return mesh
 
     def mesh(self): 
         gmsh.initialize()

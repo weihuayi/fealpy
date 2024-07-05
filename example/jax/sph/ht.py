@@ -62,7 +62,7 @@ num_particles = (mesh.nodedata["tag"] != -1).sum()
 neighbors = neighbor_fn.allocate(mesh.nodedata["position"], num_particles=num_particles)
 
 for i in range(t_num+2):
-
+    print("i:", i)
     mesh.nodedata["mv"] += 1.0*dt*mesh.nodedata["dmvdt"]
     mesh.nodedata["tv"] = mesh.nodedata["mv"] + tvf*0.5*dt*mesh.nodedata["dtvdt"]
     mesh.nodedata["position"] = shift(mesh.nodedata["position"], 1.0*dt*mesh.nodedata["tv"])
@@ -124,5 +124,5 @@ for i in range(t_num+2):
     
     #fname = path + 'test_'+ str(i+1).zfill(10) + '.h5'
     #solver.write_h5(mesh.nodedata, fname)
-    #fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'
-    #solver.write_vtk(mesh.nodedata, fname)
+    fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'
+    solver.write_vtk(mesh.nodedata, fname)

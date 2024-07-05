@@ -8,134 +8,207 @@
 	@ref 
 '''  
 import torch
-from torch import Tensor
-from fealpy.torch.mesh import TriangleMesh
-from fealpy.torch.functionspace import LagrangeFESpace
 import numpy as np
-from fealpy.mesh import IntervalMesh
+import scipy.sparse as sp
+
 from fealpy.utils import timer
+from fealpy.timeintegratoralg import UniformTimeLine
+from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
+
+from fealpy.torch.typing import Tensor, Index
+from fealpy.torch.mesh import TriangleMesh
+from fealpy.mesh import IntervalMesh
+from fealpy.mesh import TriangleMesh as OTM
+from fealpy.torch.solver import sparse_cg
+
+from fealpy.torch.functionspace import LagrangeFESpace
+from fealpy.torch.functionspace import TensorFunctionSpace
+
+from fealpy.decorator import barycentric, cartesian
 from fealpy.torch.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
     ScalarConvectionIntegrator,
+    ScalarMassIntegrator,
     ScalarSourceIntegrator,
+    PressWorkIntegrator,PressWorkIntegrator1,
     DirichletBC
 )
-from fealpy.timeintegratoralg import UniformTimeLine
-from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder as PDE
-
-from fealpy.mesh import TriangleMesh as OTM
-from fealpy.fem import ScalarConvectionIntegrator as oSC
-from fealpy.fem import BilinearForm as oBilinearForm
-from fealpy.decorator import barycentric
-from fealpy.functionspace import LagrangeFESpace as OLFE
-
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 #device = torch.device('cpu')
-
-def meshpy2d(points, facets, h, hole_points=None, facet_markers=None, point_markers=None, meshtype='tri'):
-    from meshpy.triangle import MeshInfo, build
-
-    mesh_info = MeshInfo()
-    mesh_info.set_points(points)
-    mesh_info.set_facets(facets)
-
-    mesh_info.set_holes(hole_points)
-
-    mesh = build(mesh_info, max_volume=h**2)
-
-    node = np.array(mesh.points, dtype=np.float64)
-    cell = np.array(mesh.elements, dtype=np.int_)
-    mesh = OTM(node,cell) 
-    return mesh
 
 tmr = timer()
 next(tmr)
 
-points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
-        dtype=np.float64)
-facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
-mm = IntervalMesh.from_circle_boundary([0.2, 0.2], 0.1, int(2*0.1*np.pi/0.01))
-p = mm.entity('node')
-f = mm.entity('cell')
-points = np.append(points, p, axis=0)
-facets = np.append(facets, f+4, axis=0)
-fm = np.array([0, 1, 2, 3])
-omesh = meshpy2d(points, facets, 0.01, hole_points=[[0.2, 0.2]], facet_markers=fm)
+output = './'
+udegree = 2
+pdegree = 1
+T = 5
+nt = 5000
+q = 3
+eps=1e-12
+pde = FlowPastCylinder()
+rho = pde.rho
+mu = pde.mu
+fwargs = {'dtype': torch.float64, "device": device}
+iwargs = {'dtype': torch.int32, "device": device}
 
-fkwargs = {'dtype': torch.float64, 'device': device}
-ikwargs = {'dtype': torch.int, 'device': device}
-node = torch.from_numpy(omesh.entity('node')).to(**fkwargs)
-cell = torch.from_numpy(omesh.entity('cell')).to(**ikwargs)
+@cartesian
+def is_inflow_boundary( p:Tensor):
+    return torch.abs(p[..., 0]) < eps
 
+@cartesian
+def is_outflow_boundary(p:Tensor):
+    return torch.abs(p[..., 0] - 2.2) < eps
+
+@cartesian
+def is_circle_boundary( p:Tensor):
+    x = p[...,0]
+    y = p[...,1]
+    return (torch.sqrt(x**2 + y**2) - 0.05) < eps
+  
+@cartesian
+def is_wall_boundary( p:Tensor):
+    return (torch.abs(p[..., 1] -0.41) < eps) | \
+           (torch.abs(p[..., 1] ) < eps)
+
+@cartesian
+def u_inflow_dirichlet( p:Tensor):
+    x = p[...,0]
+    y = p[...,1]
+    value = torch.zeros(p.shape, **fwargs)
+    value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
+    value[...,1] = 0
+    return value
+
+omesh = pde.mesh1(0.01)
+node = torch.from_numpy(omesh.entity('node')).to(**fwargs)
+cell = torch.from_numpy(omesh.entity('cell')).to(**iwargs)
 mesh = TriangleMesh(node, cell)
+
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
-udim = 2
-udegree = 2
-pdegree = 1
+pspace = LagrangeFESpace(mesh, p=pdegree)
+uspace = LagrangeFESpace(mesh, p=udegree)
 
-uspace = LagrangeFESpace(mesh,p=udegree)
-pspace = LagrangeFESpace(mesh,p=pdegree)
-tmr.send("mesh_and_space")
-
-ouspace = OLFE(omesh,p=udegree)
-ou0 = ouspace.function(dim=udim)
-
-u0 = uspace.function(dim=udim)
-u1 = uspace.function(dim=udim)
+u0 = uspace.function(dim=2)
+u1 = uspace.function(dim=2)
 p1 = pspace.function()
 
-pde = PDE()
+ugdof = uspace.number_of_global_dofs()
+pgdof = pspace.number_of_global_dofs()
+gdof = pgdof+2*ugdof
 
-output = './'
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['velocity'] = u0 
 mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
 
+uspace.doforder = 'vdims'
 
-
-for i in range(0,nt):
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-@barycentric
-def ocoef(bcs, index):
-    return ou0(bcs,index)
-
-obform = oBilinearForm(ouspace)
-obform.add_domain_integrator(oSC(c=ocoef, q=4))
-oC = obform.assembly() 
-
-_S = slice(None)
-
-
-@barycentric
-def coef(bcs:Tensor, index=_S):
-    kwargs = {'dtype': bcs.dtype, "device": bcs.device}
-    return u0(bcs, index).to(**kwargs)
-integrator = ScalarConvectionIntegrator(coef, q=4)
-bcs, ws, phi, gphi, cm, index = integrator.fetch(uspace)
-
-a = coef(bcs)
 bform = BilinearForm(uspace)
-bform.add_integrator(ScalarConvectionIntegrator(coef, q=4))
-C = bform.assembly() 
-'''
+bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
+M = bform.assembly()
+
+bform = BilinearForm(uspace)
+bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q))
+S = bform.assembly()
+
+bform = BilinearForm((pspace, uspace))
+bform.add_integrator(PressWorkIntegrator(q=q)) 
+APX = bform.assembly()
+
+bform = BilinearForm((pspace, uspace))
+bform.add_integrator(PressWorkIntegrator1(q=q)) 
+APY = bform.assembly()
+
+#边界处理
+xx = torch.zeros(gdof, **fwargs)
+u_isbddof_u0 = uspace.is_boundary_dof()
+u_isbddof_in = uspace.is_boundary_dof(threshold = is_inflow_boundary)
+u_isbddof_out = uspace.is_boundary_dof(threshold = is_outflow_boundary)
+u_isbddof_circle = uspace.is_boundary_dof(threshold = is_circle_boundary)
+
+u_isbddof_u0[u_isbddof_in] = False 
+u_isbddof_u0[u_isbddof_out] = False 
+xx[0:ugdof][u_isbddof_u0] = 0
+xx[ugdof:2*ugdof][u_isbddof_u0] = 0
+
+u_isbddof = u_isbddof_u0
+u_isbddof[u_isbddof_in] = True
+ipoint = uspace.interpolation_points()[u_isbddof_in]
+uinfow = u_inflow_dirichlet(ipoint)
+xx[0:ugdof][u_isbddof_in] = uinfow[:,0]
+xx[ugdof:2*ugdof][u_isbddof_in] = uinfow[:,1]
+
+p_isBdDof_p0 = pspace.is_boundary_dof(threshold =  is_outflow_boundary) 
+xx[2*ugdof:][p_isBdDof_p0] = 0 
+isBdDof = torch.cat([u_isbddof, u_isbddof, p_isBdDof_p0], dim=0)
 
 
+for i in range(nt):
+    t1 = timeline.next_time_level()
+    print("time=", t1)
+    
+    @barycentric
+    def concoef(bcs:Tensor, index):
+        kwargs = {'dtype': bcs.dtype, "device": bcs.device}
+        return u0(bcs, index).to(**kwargs)
+    
+    bform = BilinearForm(uspace)
+    bform.add_integrator(ScalarConvectionIntegrator(concoef, q=4))
+    C = bform.assembly() 
+    
+    indices = torch.tensor([[],[]], **iwargs)
+    data = torch.tensor([], **fwargs)
+    zeros_0 = torch.sparse_coo_tensor(indices, data, (ugdof,ugdof))
+    zeros_1 = torch.sparse_coo_tensor(indices, data, (pgdof,pgdof))
+    
+    A0 = torch.cat([M+S+C, zeros_0, -APX], dim=1)
+    A1 = torch.cat([zeros_0, M+S+C, -APY], dim=1)
+    A2 = torch.cat([-APX.T, -APY.T ,zeros_1], dim=1)
+    A = torch.cat((A0,A1,A2),dim=0)
+    
+    b0 = M@u0[:,0] 
+    b1 = M@u0[:,1]
+    b2 = torch.zeros(pgdof, **fwargs) 
+    b = torch.cat([b0,b1,b2])
+    
+    b -= A@xx
+    b[isBdDof] = xx[isBdDof]
+    
+    A = A.coalesce()
+    indices = A.indices()
+    new_values = A.values().clone()
+    IDX = isBdDof[indices[0, :]] | isBdDof[indices[1, :]]
+    new_values[IDX] = 0
+    A = torch.sparse_coo_tensor(indices, new_values, A.size(), **fwargs)
+    index, = torch.nonzero(isBdDof, as_tuple=True) 
+    one_values = torch.ones(len(index))
+    one_indices = torch.stack([index,index], dim=0)
+    A1 = torch.sparse_coo_tensor(one_indices, one_values, A.size(), **fwargs)
+    A += A1 
+    A = A.coalesce()
+    
+    values = A.values().cpu().numpy()
+    indices = A.indices().cpu().numpy()
+    A = sp.coo_matrix((values, (indices[0], indices[1])), shape=A.shape) 
+    A = A.tocsr()
+    b = b.cpu().numpy()
+    
+    x = sp.linalg.spsolve(A,b)
+    x = torch.from_numpy(x).to(**fwargs)
+    #x = sparse_cg(A, b, maxiter=10000)
 
-
-
+    u1[:,0] = x[:ugdof]
+    u1[:,1] = x[ugdof:2*ugdof]
+    p1[:] = x[2*ugdof:]
+    
+    fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
+    mesh.nodedata['velocity'] = u1
+    mesh.nodedata['pressure'] = p1
+    mesh.to_vtk(fname=fname)
+    
+    u0[:] = u1
+    timeline.advance() 

@@ -10,7 +10,7 @@ import numpy as np
 
 from .mesh_base import MeshDS 
 from .utils import Array, Dict
-from jax.config import config
+from jax import config
 
 config.update("jax_enable_x64", True)
 

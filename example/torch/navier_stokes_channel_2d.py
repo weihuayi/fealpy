@@ -8,6 +8,7 @@
 	@ref 
 '''  
 import torch
+import scipy.sparse as sp
 
 import numpy as np
 from fealpy.utils import timer
@@ -16,9 +17,12 @@ from fealpy.pde.navier_stokes_equation_2d import Poisuille
 
 from fealpy.torch.typing import Tensor, Index
 from fealpy.torch.mesh import TriangleMesh
+from fealpy.torch.solver import sparse_cg
 
 from fealpy.torch.functionspace import LagrangeFESpace
 from fealpy.torch.functionspace import TensorFunctionSpace
+from fealpy.solver import  CupySolver
+
 
 from fealpy.decorator import barycentric, cartesian
 from fealpy.torch.fem import (
@@ -32,10 +36,10 @@ from fealpy.torch.fem import (
 )
 
 
-#device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-device = torch.device('cpu') 
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+#device = torch.device('cpu') 
 
-ns = 16
+ns = 32
 output = './'
 udegree = 2
 pdegree = 1
@@ -71,8 +75,9 @@ timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
+uspace = LagrangeFESpace(mesh, p=udegree)
 
-uspace = TensorFunctionSpace(LagrangeFESpace(mesh, p=udegree), (-1, 2))
+#uspace = TensorFunctionSpace(LagrangeFESpace(mesh, p=udegree), (-1, 2))
 time.send("mesh_and_space")
 
 u0 = uspace.function(dim=2)
@@ -89,9 +94,6 @@ mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
 
 uspace.doforder = 'vdims'
-@barycentric
-def coefu0(bcs, index=_S):
-    return rho*u0(bcs, index).to(**kwargs)
 
 bform = BilinearForm(uspace)
 bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
@@ -125,20 +127,16 @@ xx[ugdof:2*ugdof][is_u_bdof] = uso[:,1][is_u_bdof]
 xx[2*ugdof:][is_p_bdof] = pso[is_p_bdof]
 errorMatrix = torch.zeros((4,nt), **fwargs)
 
-bdIdx = np.zeros(gdof, dtype=np.int_)
-bdIdx[isBdDof] = 1
-Tbd = spdiags(bdIdx, 0, gdof, gdof)
-T = spdiags(1-bdIdx, 0, gdof, gdof)
-
+solver  = CupySolver()
 time.send('forms')
 
 
-for i in range(nt):
+for i in range(5):
     t1 = timeline.next_time_level()
     print("time=", t1)
     
     @barycentric
-    def concoef(bcs:Tensor, index=_S):
+    def concoef(bcs:Tensor, index):
         kwargs = {'dtype': bcs.dtype, "device": bcs.device}
         return u0(bcs, index).to(**kwargs)
     
@@ -169,16 +167,28 @@ for i in range(nt):
     new_values = A.values().clone()
     IDX = isBdDof[indices[0, :]] | isBdDof[indices[1, :]]
     new_values[IDX] = 0
-    A = torch.sparse_coo_tensor(indices, new_values, A.size())
+    A = torch.sparse_coo_tensor(indices, new_values, A.size(), **fwargs)
     index, = torch.nonzero(isBdDof, as_tuple=True) 
     one_values = torch.ones(len(index))
     one_indices = torch.stack([index,index], dim=0)
-    A1 = torch.sparse_coo_tensor(one_indices, one_values, A.size())
+    A1 = torch.sparse_coo_tensor(one_indices, one_values, A.size(), **fwargs)
     A += A1 
     A = A.coalesce()
     
+    time.send('ready')
+    values = A.values().cpu().numpy()
+    indices = A.indices().cpu().numpy()
+    A = sp.coo_matrix((values, (indices[0], indices[1])), shape=A.shape) 
+    A = A.tocsr()
+    b = b.cpu().numpy()
+    x = solver.cg_solver(A, b)
+    x = torch.from_numpy(x).to(**fwargs)
+    '''
     x = sparse_cg(A, b, maxiter=5000)
+    ''' 
     
+    time.send('solver')
+
     u1[:,0] = x[:ugdof]
     u1[:,1] = x[ugdof:2*ugdof]
     p1[:] = x[2*ugdof:]
@@ -189,5 +199,4 @@ for i in range(nt):
     errorMatrix[3,i] = torch.max(torch.abs(pso-p1))
     timeline.advance()
     
-
-
+next(time)

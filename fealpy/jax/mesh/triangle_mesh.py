@@ -10,7 +10,7 @@ from .. import logger
 from . import functional as F
 from .mesh_base import SimplexMesh, estr2dim
 from .utils import Array
-from jax.config import config
+from jax import config
 
 config.update("jax_enable_x64", True)
 

@@ -12,7 +12,7 @@ from .quadrature import Quadrature
 from .utils import Array, EntityName, Index, _int_func, _S, _T, _dtype, _device, estr2dim, edim2entity, edim2node, mesh_top_csr
 from .. import logger
 
-from jax.config import config
+from jax import config
 
 config.update("jax_enable_x64", True)
 
