@@ -1,0 +1,3 @@
+
+class ScalarBoundarySourceIntegrator():
+    pass

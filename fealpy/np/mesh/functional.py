@@ -83,7 +83,8 @@ def simplex_grad_shape_function(bc: NDArray, p: int =1, mi: NDArray=None, dtype=
 
     """
     TD = bc.shape[-1] - 1
-    mi = mi or multi_index_matrix(p, TD)
+    if mi is not None:
+        mi = multi_index_matrix(p, TD)
     ldof = mi.shape[0] # p 次 Lagrange 形函数的个数
 
     c = np.arange(1, p+1)

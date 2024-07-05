@@ -1,18 +1,14 @@
 
-from typing import TypeVar, Optional
+from typing import Optional
 
 import torch
 from torch import Tensor
 
 from .. import logger
-from ..functionspace.space import FunctionSpace
 from .form import Form
 
 
-_FS = TypeVar('_FS', bound=FunctionSpace)
-
-
-class LinearForm(Form[_FS]):
+class LinearForm(Form):
     def check_local_shape(self, entity_to_global: Tensor, local_tensor: Tensor):
         if entity_to_global.ndim != 2:
             raise ValueError("entity-to-global relationship should be a 2D tensor, "
@@ -24,8 +20,13 @@ class LinearForm(Form[_FS]):
                              "(or 4D with batch in the first dimension), "
                              f"but got shape {tuple(local_tensor.shape)}.")
 
+    def check_space(self):
+        if len(self._spaces) != 1:
+            raise ValueError("LinearForm should have only one space.")
+
     def _single_assembly(self, retain_ints: bool) -> Tensor:
-        space = self.space
+        self.check_space()
+        space = self._spaces[0]
         device = space.device
         gdof = space.number_of_global_dofs()
         global_mat_shape = (gdof,)
@@ -36,14 +37,15 @@ class LinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self._assembly_group(group, retain_ints)
-            indices = e2dof.reshape(1, -1)
+            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
+            indices = e2dofs[0].reshape(1, -1)
             M += torch.sparse_coo_tensor(indices, group_tensor.ravel(), size=global_mat_shape)
 
         return M
 
     def _batch_assembly(self, retain_ints: bool, batch_size: int) -> Tensor:
-        space = self.space
+        self.check_space()
+        space = self._spaces[0]
         device = space.device
         gdof = space.number_of_global_dofs()
         ldof = space.number_of_local_dofs()
@@ -55,14 +57,14 @@ class LinearForm(Form[_FS]):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dof = self._assembly_group(group, retain_ints)
-            NC = e2dof.size(0)
+            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
+            NC = e2dofs[0].size(0)
             local_mat_shape = (batch_size, NC, ldof)
 
             if group_tensor.ndim == 2:
                 group_tensor = group_tensor.unsqueeze(0).expand(local_mat_shape)
 
-            indices = e2dof.reshape(1, -1)
+            indices = e2dofs[0].reshape(1, -1)
             group_tensor = group_tensor.reshape(batch_size, -1).transpose(0, 1)
             M += torch.sparse_coo_tensor(indices, group_tensor, size=global_mat_shape)
 
@@ -71,13 +73,13 @@ class LinearForm(Form[_FS]):
     def assembly(self, coalesce=True, retain_ints: bool=False, return_dense=True) -> Tensor:
         """Assembly the linear form vector.
 
-        Args:
-            coalesce (bool, optional): Whether to coalesce the sparse tensor.
-            retain_ints (bool, optional): Whether to retain the integrator cache.
+        Parameters:
+            coalesce (bool, optional): Whether to coalesce the sparse tensor.\n
+            retain_ints (bool, optional): Whether to retain the integrator cache.\n
             return_dense (bool, optional): Whether to return dense tensor.
 
         Returns:
-            Tensor[gdof,]. Batch is placed in the FIRST dimension for dense tensor,
+            Tensor[gdof,]. Batch is placed in the FIRST dimension for dense tensor,\
             and in the LAST dimension for sparse tensor (Hybrid COO Tensor).
         """
         if self.batch_size == 0:

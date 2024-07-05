@@ -44,7 +44,6 @@ class _FunctionSpace(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-# class Function(NDArray, Generic[_FS]):
 class Function(NDArray):
     """
 

@@ -1,89 +1,19 @@
 
 from typing import (
-    Union, Optional, Dict, Sequence, overload, Callable, Literal, Tuple
+    Union, Optional, Dict, Sequence, overload, Callable, Tuple, Any
 )
 
 import numpy as np
 import torch
 
+from ..typing import (
+    Tensor, Index, EntityName, _S,
+    _int_func, _dtype, _device
+)
 from .. import logger
 from . import functional as F
+from .utils import estr2dim, edim2entity, edim2node, mesh_top_csr, MeshMeta
 from .quadrature import Quadrature
-
-Tensor = torch.Tensor
-Index = Union[Tensor, int, slice]
-EntityName = Literal['cell', 'cell_location', 'face', 'face_location', 'edge']
-_int_func = Callable[..., int]
-_dtype = torch.dtype
-_device = torch.device
-
-_S = slice(None, None, None)
-
-
-##################################################
-### Utils
-##################################################
-
-def mesh_top_csr(entity: Tensor, num_targets: int, location: Optional[Tensor]=None, *,
-                 dtype: Optional[_dtype]=None) -> Tensor:
-    r"""CSR format of a mesh topology relaionship matrix."""
-    device = entity.device
-
-    if entity.ndim == 1: # for polygon case
-        if location is None:
-            raise ValueError('location is required for 1D entity (usually for polygon mesh).')
-        crow = location
-    elif entity.ndim == 2: # for homogeneous case
-        crow = torch.arange(
-            entity.size(0) + 1, dtype=entity.dtype, device=device
-        ).mul_(entity.size(1))
-    else:
-        raise ValueError('dimension of entity must be 1 or 2.')
-
-    return torch.sparse_csr_tensor(
-        crow,
-        entity.reshape(-1),
-        torch.ones(entity.numel(), dtype=dtype, device=device),
-        size=(entity.size(0), num_targets),
-        dtype=dtype, device=device
-    )
-
-
-def estr2dim(mesh, estr: str) -> int:
-    if estr == 'cell':
-        return mesh.top_dimension()
-    elif estr == 'face':
-        TD = mesh.top_dimension()
-        return TD - 1
-    elif estr == 'edge':
-        return 1
-    elif estr == 'node':
-        return 0
-    else:
-        raise KeyError(f'{estr} is not a valid entity name in FEALPy.')
-
-
-def edim2entity(dict_: Dict, edim: int, index=None):
-    r"""Get entity tensor by its top dimension. Returns None if not found."""
-    if edim in dict_:
-        et = dict_[edim]
-        if index is None:
-            return et
-        else: # TODO: finish this for homogeneous mesh
-            return et[index]
-    else:
-        logger.info(f'entity {edim} is not found and a NoneType is returned.')
-        return None
-
-
-def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
-    r"""Get the <entiry>_to_node sparse matrix by entity's top dimension."""
-    entity = edim2entity(mesh.storage(), etype_dim, index)
-    location = getattr(entity, 'location', None)
-    NN = mesh.count('node')
-    if NN <= 0:
-        raise RuntimeError('No valid node is found in the mesh.')
-    return mesh_top_csr(entity, NN, location, dtype=dtype)
 
 
 ##################################################
@@ -91,7 +21,7 @@ def edim2node(mesh, etype_dim: int, index=None, dtype=None) -> Tensor:
 ##################################################
 # NOTE: MeshDS provides a storage for mesh entities and all topological methods.
 
-class MeshDS():
+class MeshDS(metaclass=MeshMeta):
     _STORAGE_ATTR = ['cell', 'face', 'edge', 'node']
     cell: Tensor
     face: Tensor
@@ -103,18 +33,24 @@ class MeshDS():
     localFace: Tensor # only for homogeneous mesh
 
     def __init__(self, TD: int) -> None:
+        assert hasattr(self, '_entity_dim_method_name_map')
         self._entity_storage: Dict[int, Tensor] = {}
+        self._entity_factory: Dict[int, Callable] = {
+            k: getattr(self, self._entity_dim_method_name_map[k])
+            for k in self._entity_dim_method_name_map
+        }
         self.TD = TD
 
     @overload
     def __getattr__(self, name: EntityName) -> Tensor: ...
     def __getattr__(self, name: str):
-        if name not in self._STORAGE_ATTR:
+        if name in self._STORAGE_ATTR:
+            etype_dim = estr2dim(self, name)
+            return edim2entity(self._entity_storage, self._entity_factory, etype_dim)
+        else:
             return object.__getattribute__(self, name)
-        etype_dim = estr2dim(self, name)
-        return edim2entity(self.storage(), etype_dim)
 
-    def __setattr__(self, name: str, value: torch.Any) -> None:
+    def __setattr__(self, name: str, value: Any) -> None:
         if name in self._STORAGE_ATTR:
             if not hasattr(self, '_entity_storage'):
                 raise RuntimeError('please call super().__init__() before setting attributes.')
@@ -123,6 +59,12 @@ class MeshDS():
         else:
             super().__setattr__(name, value)
 
+    def __delattr__(self, name: str) -> None:
+        if name in self._STORAGE_ATTR:
+            del self._entity_storage[estr2dim(self, name)]
+        else:
+            super().__delattr__(name)
+
     ### cuda
     def to(self, device: Union[_device, str, None]=None, non_blocking=False):
         for edim in self._entity_storage.keys():
@@ -130,7 +72,7 @@ class MeshDS():
             self._entity_storage[edim] = entity.to(device, non_blocking=non_blocking)
         for attr in self.__dict__:
             value = self.__dict__[attr]
-            if isinstance(value, torch.Tensor):
+            if isinstance(value, Tensor):
                 self.__dict__[attr] = value.to(device, non_blocking=non_blocking)
         return self
 
@@ -146,9 +88,7 @@ class MeshDS():
     ### counters
     def count(self, etype: Union[int, str]) -> int:
         """Return the number of entities of the given type."""
-        if isinstance(etype, str):
-            edim = estr2dim(self, etype)
-        entity = edim2entity(self.storage(), edim)
+        entity = self.entity(etype)
 
         if entity is None:
             logger.info(f'count: entity {etype} is not found and 0 is returned.')
@@ -183,11 +123,9 @@ class MeshDS():
         """Get entities in mesh structure.
 
         Parameters:
-            index (int | slice | Tensor): The index of the entity.
-
-            etype (int | str): The topological dimension of the entity, or name
-            'cell' | 'face' | 'edge' | 'node'.
-
+            index (int | slice | Tensor): The index of the entity.\n
+            etype (int | str): The topological dimension of the entity, or name\
+            'cell' | 'face' | 'edge' | 'node'.\n
             index (int | slice | Tensor): The index of the entity.
 
         Returns:
@@ -195,7 +133,7 @@ class MeshDS():
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        return edim2entity(self.storage(), etype, index)
+        return edim2entity(self.storage(), self._entity_factory, etype, index)
 
     ### topology
     def cell_to_node(self, index: Optional[Index]=None, *, dtype: Optional[_dtype]=None) -> Tensor:
@@ -594,40 +532,23 @@ class TensorMesh(HomogeneousMesh):
 
 
 class StructuredMesh(HomogeneousMesh):
-    _STORAGE_METH = ['_node', '_edge', '_face', '_cell']
+    pass
 
-    @overload
-    def __getattr__(self, name: EntityName) -> Tensor: ...
-    def __getattr__(self, name: str):
-        if name not in self._STORAGE_ATTR:
-            return object.__getattribute__(self, name)
-        etype_dim = estr2dim(self, name)
+    # NOTE: Here are some examples for entity factories:
+    # implement them in subclasses if necessary.
 
-        if etype_dim in self._entity_storage:
-            return self._entity_storage[etype_dim]
-        else:
-            _method = self._STORAGE_METH[etype_dim]
+    # @entitymethod
+    # def _node(self, index: Index=_S):
+    #     raise NotImplementedError
 
-            if not hasattr(self, _method):
-                raise AttributeError(
-                    f"'{name}' in structured mesh requires a factory method "
-                    f"'{_method}' to generate the entity data when {name} "
-                    "is not in the storage."
-                )
+    # @entitymethod
+    # def _edge(self, index: Index=_S):
+    #     raise NotImplementedError
 
-            entity = getattr(self, _method)()
-            self._entity_storage[etype_dim] = entity
+    # @entitymethod
+    # def _face(self, index: Index=_S):
+    #     raise NotImplementedError
 
-            return entity
-
-    def _node(self):
-        raise NotImplementedError
-
-    def _edge(self):
-        raise NotImplementedError
-
-    def _face(self):
-        raise NotImplementedError
-
-    def _cell(self):
-        raise NotImplementedError
+    # @entitymethod
+    # def _cell(self, index: Index=_S):
+    #     raise NotImplementedError

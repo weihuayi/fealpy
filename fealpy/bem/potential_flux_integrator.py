@@ -11,7 +11,7 @@ class PotentialFluxIntegrator:
         self.coef = c
         self.q = q
 
-    def assembly_face_matrix(self, bd_space, xi:np.ndarray=None):
+    def assembly_face_matrix(self, bd_space, xi: np.ndarray=None):
         space = bd_space
         mesh = space.mesh
 
@@ -28,7 +28,7 @@ class PotentialFluxIntegrator:
         # 获取计算节点坐标
         # (bd_gdof, dim) or (len(xi), dim)
         if xi is None:
-            if  not hasattr(space, 'xi'):
+            if not hasattr(space, 'xi'):
                 cell2dof = space.dof.cell_to_dof()
                 if space.p == 0:
                     gdof = cell.shape[0]

@@ -3,7 +3,10 @@ from typing import Optional, Union, overload, List
 
 import torch
 
-from .utils import _dense_ndim, _dense_shape
+from .utils import (
+    _dense_ndim, _dense_shape, _flatten_indices,
+    check_shape_match, check_spshape_match
+)
 
 
 _Size = torch.Size
@@ -40,12 +43,12 @@ class COOTensor():
         if values is not None and dtype is not None:
             values = values.to(dtype=dtype)
 
-        self.indices = indices
-        self.values = values
+        self._indices = indices
+        self._values = values
         self.is_coalesced = is_coalesced
 
         if spshape is None:
-            self._spshape = torch.Size(torch.max(indices, dim=1)[0] + 1)
+            self._spshape = torch.Size((torch.max(indices, dim=1)[0] + 1,))
         else:
             self._spshape = torch.Size(spshape)
 
@@ -77,7 +80,7 @@ class COOTensor():
             raise TypeError(f"values must be a Tensor or None, but got {type(values)}")
 
     def __repr__(self) -> str:
-        return f"COOTensor(indices={self.indices}, values={self.values}, shape={self.shape})"
+        return f"COOTensor(indices={self._indices}, values={self._values}, shape={self.shape})"
 
     @overload
     def size(self) -> _Size: ...
@@ -90,40 +93,37 @@ class COOTensor():
             return self.shape[dim]
 
     @property
-    def device(self): return self.indices.device
+    def device(self): return self._indices.device
     @property
     def dtype(self):
-        if self.values is None:
-            return self.indices.dtype
+        if self._values is None:
+            return self._indices.dtype
         else:
-            return self.values.dtype
+            return self._values.dtype
 
     @property
     def shape(self): return _Size(self.dense_shape + self.sparse_shape)
     @property
-    def dense_shape(self): return _dense_shape(self.values)
+    def dense_shape(self): return _dense_shape(self._values)
     @property
     def sparse_shape(self): return self._spshape
 
     @property
     def ndim(self): return self.dense_ndim + self.sparse_ndim
     @property
-    def dense_ndim(self): return _dense_ndim(self.values)
+    def dense_ndim(self): return _dense_ndim(self._values)
     @property
-    def sparse_ndim(self): return self.indices.shape[0]
+    def sparse_ndim(self): return self._indices.shape[0]
     @property
-    def nnz(self): return self.indices.shape[1]
+    def nnz(self): return self._indices.shape[1]
 
-    def clone_indices(self):
+    def indices(self) -> Tensor:
         """Return the indices of the non-zero elements."""
-        return self.indices.clone()
+        return self._indices
 
-    def clone_values(self):
+    def values(self) -> Optional[Tensor]:
         """Return the non-zero elements."""
-        if self.values is None:
-            return None
-        else:
-            return self.values.clone()
+        return self._values
 
     def to_dense(self) -> Tensor:
         """Convert the COO tensor to a dense tensor and return as a new object."""
@@ -132,15 +132,17 @@ class COOTensor():
 
         kwargs = {'dtype': self.dtype, 'device': self.device}
         dense_tensor = torch.zeros(self.shape, **kwargs)
-        slicing = [self.indices[i] for i in range(self.sparse_ndim)]
+        slicing = [self._indices[i] for i in range(self.sparse_ndim)]
 
-        if self.values is None:
+        if self._values is None:
             dense_tensor[slicing] = 1
         else:
             slicing = [slice(None),] * self.dense_ndim + slicing
-            dense_tensor[slicing] = self.values
+            dense_tensor[slicing] = self._values
 
         return dense_tensor
+
+    toarray = to_dense
 
     def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False) -> Tensor:
         """Return a new COOTensor object with the same indices and values on the
@@ -149,6 +151,7 @@ class COOTensor():
 
     def coalesce(self, accumulate: bool=True) -> 'COOTensor':
         """Merge duplicate indices and return as a new COOTensor object.
+        Returns self if the indices are already coalesced.
 
         Parameters:
             accumulate (bool, optional): Whether to count the occurrences of indices\
@@ -157,19 +160,22 @@ class COOTensor():
         Returns:
             COOTensor: coalesced COO tensor.
         """
+        if self.is_coalesced:
+            return self
+
         kwargs = {'dtype': self.dtype, 'device': self.device}
 
         unique_indices, inverse_indices = torch.unique(
-            self.indices, return_inverse=True, dim=1
+            self._indices, return_inverse=True, dim=1
         )
 
-        if self.values is not None:
+        if self._values is not None:
             dense_ndim = self.dense_ndim
             value_shape = self.dense_shape + (unique_indices.size(-1), )
             new_values = torch.zeros(value_shape, **kwargs)
             inverse_indices = inverse_indices[(None,) * dense_ndim + (slice(None),)]
-            inverse_indices = inverse_indices.broadcast_to(self.values.shape)
-            new_values.scatter_add_(-1, inverse_indices, self.values)
+            inverse_indices = inverse_indices.broadcast_to(self._values.shape)
+            new_values.scatter_add_(-1, inverse_indices, self._values)
 
             return COOTensor(
                 unique_indices, new_values, self.sparse_shape, is_coalesced=True
@@ -188,18 +194,101 @@ class COOTensor():
             )
 
     @overload
+    def reshape(self, shape: _Size, /) -> 'COOTensor': ...
+    @overload
+    def reshape(self, *shape: int) -> 'COOTensor': ...
+    def reshape(self, *shape) -> 'COOTensor':
+        pass
+
+    def ravel(self) -> 'COOTensor':
+        """Return a view with flatten indices on sparse dimensions.
+
+        Returns:
+            COOTensor: A flatten COO tensor, shaped (*dense_shape, 1).
+        """
+        spshape = self.sparse_shape
+        new_indices = _flatten_indices(self._indices, spshape)
+        return COOTensor(new_indices, self._values, (spshape.numel(),))
+
+    def flatten(self) -> 'COOTensor':
+        """Return a copy with flatten indices on sparse dimensions.
+
+        Returns:
+            COOTensor: A flatten COO tensor, shaped (*dense_shape, 1).
+        """
+        spshape = self.sparse_shape
+        new_indices = _flatten_indices(self._indices, spshape)
+        if self._values is None:
+            values = None
+        else:
+            values = self._values.clone()
+        return COOTensor(new_indices, values, (spshape.numel(),))
+
+    @overload
     def add(self, other: Union[Number, 'COOTensor'], alpha: float=1.0) -> 'COOTensor': ...
     @overload
     def add(self, other: Tensor, alpha: float=1.0) -> Tensor: ...
     def add(self, other: Union[Number, 'COOTensor', Tensor], alpha: float=1.0) -> Union['COOTensor', Tensor]:
-        pass
+        """Adds another tensor or scalar to this COOTensor, with an optional scaling factor.
 
-    @overload
-    def mul(self, other: Union[Number, 'COOTensor']) -> 'COOTensor': ...
-    @overload
-    def mul(self, other: Tensor) -> Tensor: ...
-    def mul(self, other: Union[Number, 'COOTensor', Tensor]) -> Union['COOTensor', Tensor]:
-        pass
+        Parameters:
+            other (Number | COOTensor | Tensor): The tensor or scalar to be added.\n
+            alpha (float, optional): The scaling factor for the other tensor. Defaults to 1.0.
+
+        Raises:
+            TypeError: If the type of `other` is not supported for addition.
+            ValueError: If the shapes of `self` and `other` are not compatible.
+            ValueError: If one has value and another does not.
+
+        Returns:
+            COOTensor | Tensor: A new COOTensor if `other` is a COOTensor,\
+            or a Tensor if `other` is a dense tensor.
+        """
+        if isinstance(other, COOTensor):
+            check_shape_match(self.shape, other.shape)
+            check_spshape_match(self.sparse_shape, other.sparse_shape)
+            new_indices = torch.cat((self._indices, other._indices), dim=1)
+            if self._values is None:
+                if other._values is None:
+                    new_values = None
+                else:
+                    raise ValueError("self has no value while other does")
+            else:
+                if other._values is None:
+                    raise ValueError("self has value while other does not")
+                new_values = torch.cat((self._values, other._values*alpha), dim=-1)
+            return COOTensor(new_indices, new_values, self.sparse_shape)
+
+        elif isinstance(other, Tensor):
+            check_shape_match(self.shape, other.shape)
+            output = other * alpha
+            slicing = [self._indices[i] for i in range(self.sparse_ndim)]
+            slicing = [slice(None),] * self.dense_ndim + slicing
+            if self._values is None:
+                output[slicing] += 1.
+            else:
+                output[slicing] += self._values
+            return output
+
+        elif isinstance(other, (int, float)):
+            new_values = self._values + alpha * other
+            return COOTensor(self._indices.clone(), new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in addition")
+
+    def mul(self, other: Union[Number, 'COOTensor', Tensor]) -> 'COOTensor': # TODO: finish this
+        if isinstance(other, COOTensor):
+            pass
+        elif isinstance(other, Tensor):
+            pass
+        elif isinstance(other, (int, float)):
+            if self._values is None:
+                raise ValueError("Cannot multiply COOTensor without value with scalar")
+            new_values = self._values * other
+            return COOTensor(self._indices.clone(), new_values, self.sparse_shape)
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in multiplication")
 
     def div(self, other: Union[Number, Tensor]) -> 'COOTensor':
         pass
