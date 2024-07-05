@@ -7,7 +7,7 @@ from math import factorial, comb
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax.config import config
+from jax import config
 
 config.update("jax_enable_x64", True)
 
