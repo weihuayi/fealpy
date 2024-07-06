@@ -23,8 +23,6 @@ class LagrangeTriangleMesh(LagrangeMesh):
         mesh = TriangleMesh(node, cell)
         NN = mesh.number_of_nodes()
 
-        self.ftype = node.dtype
-        self.itype = cell.dtype
         self.meshtype = 'ltri'
 
         self.p = p
@@ -72,7 +70,8 @@ class LagrangeTriangleMesh(LagrangeMesh):
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
 
-        cell = self.entity(etype)[index]
+        #cell = self.entity(etype)[index]
+        cell = self.entity(etype, index)
         cellType = self.vtk_cell_type(etype)
         idx = vtk_cell_index(self.p, cellType)
         NV = cell.shape[-1]
