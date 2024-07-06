@@ -18,34 +18,46 @@ _S = slice(None)
 
 
 class LagrangeTriangleMesh(LagrangeMesh):
-    def __init__(self, node: NDArray, cell: NDArray, p=1, surface=None):
+    def __init__(self, node: NDArray, cell: NDArray, p=1, surface=None,
+            construct=False):
         super().__init__(TD=2)
-        mesh = TriangleMesh(node, cell)
-        NN = mesh.number_of_nodes()
-
-        self.ftype = node.dtype
-        self.itype = cell.dtype
-        self.meshtype = 'ltri'
 
         self.p = p
         self.surface = surface
+        self.node = node
+        self.cell = cell
+        NN = mesh.number_of_nodes()
 
-        self.node = mesh.interpolation_points(p)
+        self.localEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
 
-        if surface is not None:
-            self.node,_ = surface.project(self.node)
-        cell = mesh.cell_to_ipoint(p)
+        self.localLEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs) #TODO
+        self.localLFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs) #TODO
+
+        if construct:
+            self.construct()
+
+        self.meshtype = 'ltri'
 
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
         self.meshdata = {}
+
+
+    def construct():
+        pass
     
     @classmethod
-    def from_triangle_mesh(cls, mesh, p):
-        node = mesh.entity("node")
-        cell = mesh.entity("cell")
-        return cls(node, cell, p=p)
+    def from_triangle_mesh(cls, mesh, p, surface=None):
+        node = mesh.interpolation_points(p)
+        cell = mesh.cell_to_ipoint(p)
+        lmesh = cls(node, cell, p=p, construct=False)
+
+        lmesh.face2cell = mesh.face_to_cell() # (NF, 4)
+        lmesh.cell2face = mesh.cell_to_face()
+        lmesh.face  = mesh.face_to_ipoint()
+        return mesh 
  
     def vtk_cell_type(self, etype='cell'):
         """
@@ -72,7 +84,8 @@ class LagrangeTriangleMesh(LagrangeMesh):
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
 
-        cell = self.entity(etype)[index]
+        #cell = self.entity(etype)[index]
+        cell = self.entity(etype, index)
         cellType = self.vtk_cell_type(etype)
         idx = vtk_cell_index(self.p, cellType)
         NV = cell.shape[-1]

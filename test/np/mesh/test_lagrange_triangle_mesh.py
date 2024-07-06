@@ -20,4 +20,4 @@ node = mesh.entity('node')
 cell = mesh.entity('cell')
 
 fname = f"test.vtu"
-mesh.to_vtk(fname=fname)
+mesh1.to_vtk(fname=fname)
