@@ -1,5 +1,5 @@
 
-from typing import Dict, Optional, Union
+from typing import Tuple, Optional, Union
 
 import torch
 
@@ -10,69 +10,40 @@ _device = torch.device
 
 class Quadrature():
     r"""Base class for quadrature generators."""
-    def __init__(self, index: Optional[int]=None, in_memory: bool=True,
+    def __init__(self, index: Optional[int]=None, *,
                  dtype: Optional[_dtype]=None,
                  device: Union[_device, str, None]=None) -> None:
-        self._cache: Optional[Dict[int, Tensor]] = {} if in_memory else None
-        self._latest_index = index
         self.dtype = dtype
         self.device = device
+        self.quadpts, self.weights = self.make(index)
 
     def __len__(self) -> int:
         return self.number_of_quadrature_points()
 
-    def _get_latest_index(self, index: Optional[int]=None) -> int:
-        if index is not None:
-            if (not isinstance(index, int)) or (index <= 0):
-                raise ValueError("The index must be a positive integer.")
-            self._latest_index = index
-            return index
-        if self._latest_index == -1:
-            raise ValueError("The index has not been specified yet.")
-        return self._latest_index
-
-    def __getitem__(self, index: int) -> Tensor:
-        return self.get(index)
-
-    def __getattr__(self, name: str):
-        if name not in {'quadpts', 'weights'}:
-            return super().__getattr__(name)
-        else:
-            if name == 'quadpts':
-                return self.get_quadrature_points_and_weights()[0]
-            else:
-                return self.get_quadrature_points_and_weights()[1]
-
-    def get(self, index: int, *, refresh: bool=False) -> Tensor:
-        self._latest_index = index
-        if self._cache is not None:
-            if (index in self._cache) and (not refresh):
-                return self._cache[index]
-            else:
-                result = self.make(index)
-                self._cache[index] = result
-                return result
-        else:
-            return self.make(index)
-
-    def clear(self) -> None:
-        self._cache.clear()
+    def __getitem__(self, i: int) -> Tensor:
+        return self.get_quadrature_point_and_weight(i)
 
     def make(self, index: int) -> Tensor:
         raise NotImplementedError
 
-    def number_of_quadrature_points(self, index: Optional[int]=None) -> int:
-        if index is None:
-            index = self._get_latest_index(index)
-        qw = self.get(index)
-        return qw.shape[0]
+    def number_of_quadrature_points(self) -> int:
+        return self.weights.shape[0]
 
-    def get_quadrature_points_and_weights(self, index: Optional[int]=None) -> Tensor:
-        if index is None:
-            index = self._get_latest_index(index)
-        return self[index][:, :-1], self[index][:, -1]
+    def get_quadrature_points_and_weights(self) -> Tuple[Tensor, Tensor]:
+        """Get all quadrature points and weights in the formula.
 
-    def get_quadrature_point_and_weight(self, i: int, index: Optional[int]=None) -> Tensor:
-        if index is None:
-            index = self._get_latest_index(index)
-        return self[index][i, :-1], self[index][i, -1]
+        Returns:
+            (Tensor, Tensor): Quadrature points and weights.
+        """
+        return self.quadpts, self.weights
+
+    def get_quadrature_point_and_weight(self, i: int) -> Tuple[Tensor, Tensor]:
+        """Get the i-th quadrature point and weight.
+
+        Parameters:
+            i (int): _description_
+
+        Returns:
+            (Tensor, Tensor): A quadrature point and weight.
+        """
+        return self.quadpts[i, :], self.weights[i]
