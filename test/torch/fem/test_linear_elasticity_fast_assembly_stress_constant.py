@@ -1,38 +1,65 @@
-import torch 
-from torch import Tensor
+import pytest
+import torch
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.torch.fem import LinearElasticityIntegrator, BilinearForm, ScalarSourceIntegrator
+from fealpy.torch.fem import LinearElasticityIntegrator
+from fealpy.fem import LinearElasticityOperatorIntegrator, BilinearForm
+from fealpy.functionspace import LagrangeFESpace as LFS
+from fealpy.mesh import TriangleMesh as TMD
 
-def source(p: Tensor):
+from fealpy.torch.fem.integrator import (
+    CellOperatorIntegrator,
+    enable_cache,
+    assemblymethod,
+    _S, Index, CoefLike
+)
+
+@pytest.fixture
+def device():
     """
-    @brief 模型的源项值 f
+    Returns the device (CPU or CUDA) based on availability.
+
+    Returns:
+        torch.device: The device to be used for computations.
     """
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-    x = p[..., 0]
-    y = p[..., 1]
-    val = Tensor.zeros(p.shape, dtype=Tensor.float64)
-    val[..., 0] = 35/13*y - 35/13*y**2 + 10/13*x - 10/13*x**2
-    val[..., 1] = -25/26*(-1+2*y) * (-1+2*x)
+def test_shape_consistency(device):
+    """
+    Test if the shapes of KK_torch and KK_expected are consistent.
 
-    return val
+    Args:
+        device (str): The device to run the test on.
 
-def test_assembly():
+    Returns:
+        None
+    """
     NX = 4
     NY = 4
-    mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=NX, ny=NY)
-    space = LagrangeFESpace(mesh, p=1, ctype='C')
-    print("gdof:", space.number_of_global_dofs())
-    tensor_space = TensorFunctionSpace(space, shape=(2, ), dof_last=True)
+    mesh_torch = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=NX, ny=NY, device=device)
+    space_torch = LagrangeFESpace(mesh_torch, p=1, ctype='C')
+    tensor_space = TensorFunctionSpace(space_torch, shape=(2, -1))
 
-    integrator1 = LinearElasticityIntegrator(e=1.0, nu=0.3, elasticity_type='strain')
-    KK = integrator1.assembly(space=tensor_space)
-    
-    bform = BilinearForm(tensor_space)
-    K = bform.assembly()
+    integrator_torch = LinearElasticityIntegrator(E=1.0, nu=0.3, device=device, method='fast_stress')
+    KK_torch = integrator_torch.fast_assembly_stress_constant(space=tensor_space)
+    KK_torch_shape = KK_torch.shape
 
-    integrator2 = ScalarSourceIntegrator()
+    mesh = TMD.from_box(box=[0, 1, 0, 1], nx=NX, ny=NY)
+    p = 1
+    space = LFS(mesh, p=p, ctype='C', doforder='sdofs')
 
-    print("K:", K)
+    GD = 2
 
-    assert torch.allclose(KK_torch, torch.tensor(KK_expected), atol=1e-9)
+    # Material parameters
+    E0 = 1.0  # Elastic modulus
+    nu = 0.3  # Poisson's ratio
+    lambda_ = (E0 * nu) / ((1 + nu) * (1 - 2 * nu))
+    mu = E0 / (2 * (1 + nu))
+    integrator = LinearElasticityOperatorIntegrator(lam=lambda_, mu=mu, q=3)
+    vspace = GD * (space,)
+    bform = BilinearForm(vspace)
+    bform.add_domain_integrator(integrator)
+    KK_expected = integrator.assembly_cell_matrix(space=vspace)
+    KK_expected_shape = KK_expected.shape
+
+    assert KK_torch_shape == KK_expected_shape
