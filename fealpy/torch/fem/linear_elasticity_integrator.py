@@ -6,7 +6,7 @@ from torch import Tensor, einsum
 
 
 from .utils import shear_strain, normal_strain
-from ..utils import process_coef_func
+from ..utils import process_coef_func, is_scalar, is_tensor
 from ..functionspace.utils import flatten_indices
 
 
@@ -143,6 +143,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
     def fast_assembly_strain_constant(self, space: _FS) -> Tensor:
         q = self.q
         index = self.index
+        coef = self.coef
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
         GD = mesh.geo_dimension()
@@ -177,13 +178,22 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         KK[:, :ldof, ldof:] = lam * A_xy + mu * A_yx
         KK[:, ldof:, :ldof] = lam * A_yx + mu * A_xy
 
-        return KK
+        if coef is None:
+            return KK
+        
+        if is_scalar(coef):
+            KK[:] = KK * coef
+            return KK
+        elif is_tensor(coef):
+            KK[:] = einsum('cij, c -> cij', KK, coef)
+            return KK
         
 
     @assemblymethod('fast_stress')
     def fast_assembly_stress_constant(self, space: _FS) -> Tensor:
         q = self.q
         index = self.index
+        coef = self.coef
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
         GD = mesh.geo_dimension()
@@ -219,12 +229,21 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
 
         KK *= E / (1 - nu**2)
 
-        return KK
+        if coef is None:
+            return KK
+        
+        if is_scalar(coef):
+            KK[:] = KK * coef
+            return KK
+        elif is_tensor(coef):
+            KK[:] = einsum('cij, c -> cij', KK, coef)
+            return KK
     
     @assemblymethod('fast_3d')
     def fast_assembly_constant(self, space: _FS) -> Tensor:
         q = self.q
         index = self.index
+        coef = self.coef
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
         GD = mesh.geo_dimension()
@@ -269,7 +288,17 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         KK[:, 2*ldof:, :ldof] = lam * A_zx + mu * A_xz
         KK[:, 2*ldof:, ldof:2*ldof] = lam * A_zy + mu * A_yz
 
-        return KK
+        if coef is None:
+            return KK
+        
+        if is_scalar(coef):
+            KK[:] = KK * coef
+            return KK
+        elif is_tensor(coef):
+            KK[:] = einsum('cij, c -> cij', KK, coef)
+            return KK
+
+
 
 class LinearElasticityCoefficient():
     def __init__(self, lam: Optional[float]=None, mu: Optional[float]=None,
