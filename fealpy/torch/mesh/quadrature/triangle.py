@@ -1,7 +1,7 @@
 
 import torch
-from .quadrature import Quadrature
 
+from .quadrature import Quadrature
 
 # Reference
 # ---------

@@ -1,5 +1,6 @@
 
 import torch
+
 from .quadrature import Quadrature
 
 # http://keisan.casio.com/exec/system/1280624821
