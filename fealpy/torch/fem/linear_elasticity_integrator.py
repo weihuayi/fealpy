@@ -168,6 +168,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         KK = torch.zeros((NC, GD * ldof, GD * ldof), device=self.device, dtype=torch.float64)
 
         mu, lam = self.mu, self.lam
+        
         # Fill the diagonal part
         KK[:, :ldof, :ldof] = (2 * mu + lam) * A_xx + mu * A_yy
         KK[:, ldof:, ldof:] = (2 * mu + lam) * A_yy + mu * A_xx
@@ -222,8 +223,53 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
     
     @assemblymethod('fast_3d')
     def fast_assembly_constant(self, space: _FS) -> Tensor:
-        pass
+        q = self.q
+        index = self.index
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+        GD = mesh.geo_dimension()
+        cm = mesh.entity_measure('cell', index=index)
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
+        # (NQ, LDOF, BC)
+        gphi_lambda = scalar_space.grad_basis(bcs, index=index, variable='u')
+        # (LDOF, LDOF, BC, BC)
+        M = torch.einsum('q, qik, qjl->ijkl', ws, gphi_lambda, gphi_lambda)
+
+        # (NC, LDOF, GD)
+        glambda_x = mesh.grad_lambda()
+        # (NC, LDOF, LDOF)
+        A_xx = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 0], cm)
+        A_yy = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 1], cm)
+        A_zz = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 2], glambda_x[..., 2], cm)
+        A_xy = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 1], cm)
+        A_xz = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 2], cm)
+        A_yx = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 0], cm)
+        A_yz = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 2], cm)
+        A_zx = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 2], glambda_x[..., 0], cm)
+        A_zy = torch.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 2], glambda_x[..., 1], cm)
+
+
+        NC = mesh.number_of_cells()
+        ldof = scalar_space.number_of_local_dofs()
+        KK = torch.zeros((NC, GD * ldof, GD * ldof), device=self.device, dtype=torch.float64)
+
+        mu, lam = self.mu, self.lam
+        # Fill the diagonal part
+        KK[:, :ldof, :ldof] = (2 * mu + lam) * A_xx + mu * (A_yy + A_zz)
+        KK[:, ldof:2*ldof, ldof:2*ldof] = (2 * mu + lam) * A_yy + mu * (A_xx + A_zz)
+        KK[:, 2*ldof:, 2*ldof:] = (2 * mu + lam) * A_zz + mu * (A_xx + A_yy)
+
+        # Fill the off-diagonal part
+        KK[:, :ldof, ldof:2*ldof] = lam * A_xy + mu * A_yx
+        KK[:, :ldof, 2*ldof:] = lam * A_xz + mu * A_zx
+        KK[:, ldof:2*ldof, :ldof] = lam * A_yx + mu * A_xy
+        KK[:, ldof:2*ldof, 2*ldof:] = lam * A_yz + mu * A_zy
+        KK[:, 2*ldof:, :ldof] = lam * A_zx + mu * A_xz
+        KK[:, 2*ldof:, ldof:2*ldof] = lam * A_zy + mu * A_yz
+
+        return KK
 
 class LinearElasticityCoefficient():
     def __init__(self, lam: Optional[float]=None, mu: Optional[float]=None,
