@@ -7,6 +7,7 @@ from .utils import (
     _dense_ndim, _dense_shape, _flatten_indices,
     check_shape_match, check_spshape_match
 )
+from ._spspmm import spspmm_coo
 
 
 _Size = torch.Size
@@ -236,8 +237,8 @@ class COOTensor():
             alpha (float, optional): The scaling factor for the other tensor. Defaults to 1.0.
 
         Raises:
-            TypeError: If the type of `other` is not supported for addition.
-            ValueError: If the shapes of `self` and `other` are not compatible.
+            TypeError: If the type of `other` is not supported for addition.\n
+            ValueError: If the shapes of `self` and `other` are not compatible.\n
             ValueError: If one has value and another does not.
 
         Returns:
@@ -295,3 +296,36 @@ class COOTensor():
 
     def inner(self, other: Tensor, dims: List[int]) -> 'COOTensor':
         pass
+
+    @overload
+    def matmul(self, other: 'COOTensor') -> 'COOTensor': ...
+    @overload
+    def matmul(self, other: Tensor) -> Tensor: ...
+    def matmul(self, other: Union['COOTensor', Tensor]):
+        """Matrix-multiply this COOTensor with another tensor.
+
+        Parameters:
+            other (COOTensor | Tensor): A 2-D tensor.
+
+        Raises:
+            TypeError: If the type of `other` is not supported for matmul.
+
+        Returns:
+            COOTensor | Tensor: A new COOTensor if `other` is a COOTensor,\
+            or a Tensor if `other` is a dense tensor.
+        """
+        if isinstance(other, COOTensor):
+            if (self.values() is None) or (other.values() is None):
+                raise ValueError("Matrix multiplication between COOTensor without "
+                                 "value is not implemented now")
+            indices, values, spshape = spspmm_coo(
+                self.indices(), self.values(), self.sparse_shape,
+                other.indices(), other.values(), other.sparse_shape,
+            )
+            return COOTensor(indices, values, spshape).coalesce()
+
+        elif isinstance(other, Tensor):
+            pass
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
