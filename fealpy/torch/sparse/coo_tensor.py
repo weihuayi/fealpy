@@ -3,23 +3,18 @@ from typing import Optional, Union, overload, List
 
 import torch
 
+from ..typing import Tensor, Number, Size, _dtype, _device
 from .utils import (
     _dense_ndim, _dense_shape, _flatten_indices,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_coo
-
-
-_Size = torch.Size
-_dtype = torch.dtype
-_device = torch.device
-Tensor = torch.Tensor
-Number = Union[int, float]
+from ._spmm import spmm_coo
 
 
 class COOTensor():
     def __init__(self, indices: Tensor, values: Optional[Tensor],
-                 spshape: Optional[_Size]=None, *,
+                 spshape: Optional[Size]=None, *,
                  dtype: Optional[_dtype]=None,
                  device: Union[str, _device, None]=None,
                  is_coalesced: Optional[bool]=None):
@@ -49,13 +44,13 @@ class COOTensor():
         self.is_coalesced = is_coalesced
 
         if spshape is None:
-            self._spshape = torch.Size((torch.max(indices, dim=1)[0] + 1,))
+            self._spshape = Size((torch.max(indices, dim=1)[0] + 1,))
         else:
-            self._spshape = torch.Size(spshape)
+            self._spshape = Size(spshape)
 
         self._check(indices, values, spshape)
 
-    def _check(self, indices: Tensor, values: Optional[Tensor], spshape: _Size):
+    def _check(self, indices: Tensor, values: Optional[Tensor], spshape: Size):
         if not isinstance(indices, Tensor):
             raise TypeError(f"indices must be a Tensor, but got {type(indices)}")
         if indices.ndim != 2:
@@ -84,7 +79,7 @@ class COOTensor():
         return f"COOTensor(indices={self._indices}, values={self._values}, shape={self.shape})"
 
     @overload
-    def size(self) -> _Size: ...
+    def size(self) -> Size: ...
     @overload
     def size(self, dim: int) -> int: ...
     def size(self, dim: Optional[int]=None):
@@ -103,7 +98,7 @@ class COOTensor():
             return self._values.dtype
 
     @property
-    def shape(self): return _Size(self.dense_shape + self.sparse_shape)
+    def shape(self): return Size(self.dense_shape + self.sparse_shape)
     @property
     def dense_shape(self): return _dense_shape(self._values)
     @property
@@ -195,7 +190,7 @@ class COOTensor():
             )
 
     @overload
-    def reshape(self, shape: _Size, /) -> 'COOTensor': ...
+    def reshape(self, shape: Size, /) -> 'COOTensor': ...
     @overload
     def reshape(self, *shape: int) -> 'COOTensor': ...
     def reshape(self, *shape) -> 'COOTensor':
@@ -325,7 +320,9 @@ class COOTensor():
             return COOTensor(indices, values, spshape).coalesce()
 
         elif isinstance(other, Tensor):
-            pass
+            if self.values() is None:
+                raise ValueError()
+            return spmm_coo(self.indices(), self.values(), self.sparse_shape, other)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
