@@ -267,5 +267,4 @@ class GaussLegendreQuadrature(Quadrature):
 
         A = A.div_(2)
         return torch.stack([(0.5 + A[:, 0]),
-                            (0.5 - A[:, 0]),
-                            A[:, 1]], dim=-1)
+                            (0.5 - A[:, 0])], dim=-1), A[:, -1]

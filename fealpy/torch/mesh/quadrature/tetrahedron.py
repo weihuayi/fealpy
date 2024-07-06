@@ -241,4 +241,4 @@ class TetrahedronQuadrature(Quadrature):
         else:
             raise NotImplementedError('quadrature index higher than 7 is not supported now.')
 
-        return A
+        return A[:, :-1], A[:, -1]

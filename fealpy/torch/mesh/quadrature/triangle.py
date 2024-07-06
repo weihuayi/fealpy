@@ -327,4 +327,4 @@ class TriangleQuadrature(Quadrature):
         else:
             raise NotImplementedError('quadrature index higher than 11 is not supported now.')
 
-        return A
+        return A[:, :-1], A[:, -1]
