@@ -5,7 +5,6 @@ from numpy.typing import NDArray
 
 from .mesh_base import _S
 from .lagrange_mesh import LagrangeMesh
-from .triangle_mesh import TriangleMesh
 from .quadrature import Quadrature
 
 from .. import logger
@@ -22,17 +21,23 @@ class LagrangeTriangleMesh(LagrangeMesh):
             construct=False):
         super().__init__(TD=2)
 
+        kwargs = {'dtype': cell.dtype}
         self.p = p
-        self.surface = surface
         self.node = node
         self.cell = cell
-        NN = mesh.number_of_nodes()
+        self.surface = surface
 
         self.localEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
         self.localFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.ccw  = np.array([0, 1, 2], **kwargs)
+        
+        self.localCell = np.array([
+            (0, 1, 2),
+            (1, 2, 0),
+            (2, 0, 1)], **kwargs)
 
-        self.localLEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs) #TODO
-        self.localLFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs) #TODO
+        self.localLEdge = self.generate_local_lagrange_edges(p) #TODO
+        self.localLFace = self.generate_local_lagrange_faces(p) #TODO
 
         if construct:
             self.construct()
@@ -45,8 +50,32 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.meshdata = {}
 
 
-    def construct():
+    def construct(self):
         pass
+
+    def generate_local_lagrange_edges(self, p: int) -> NDArray:
+        """
+        Generate the local edges for Lagrange elements of order p.
+        """
+        if p == 1:
+            return np.array([(0, 1), (1, 2), (2, 0)], dtype=int)
+        local_edges = []
+        for i in range(3):
+            edge = [(i+j) % 3 for j in range(p+1)]
+            local_egdes(edge)
+        return np.array(local_edges, dtype=int)
+
+    def generate_local_lagrange_faces(self, p: int) -> NDArray:
+        """
+        Generate the local faces for Lagrange elements of order p.
+        """
+        if p == 1:
+            return np.array([(0, 1, 2)], dtype=int)
+        faces = [list(range(3))]
+        for j in range(1, p):
+            for i in range(j):
+                faces[0].append(3 + j * (p - 1) + i)
+        return np.array(faces, dtype=int)
     
     @classmethod
     def from_triangle_mesh(cls, mesh, p, surface=None):
@@ -77,7 +106,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
 
         @berif 把网格转化为 VTK 的格式
         """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()
