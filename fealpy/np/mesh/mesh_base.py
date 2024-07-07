@@ -186,7 +186,7 @@ class MeshDS():
     def boundary_cell_index(self): return self.boundary_cell_flag().nonzero()[0]
 
     ### Homogeneous Mesh ###
-    def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
+    def is_(self, etype: Union[int, str]='cell') -> bool:
         """Return True if the mesh entity is homogeneous.
 
         Returns:
