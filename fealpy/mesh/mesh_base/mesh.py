@@ -557,7 +557,9 @@ class Mesh():
         if v.shape[-1] == NC:
             v = np.swapaxes(v, 1, -1)
         f = np.power(np.abs(u - v), power)
-        
+        if len(f.shape) == 1: 
+            f = f[:, None]
+
         if isinstance(f, (int, float)): # f为标量常函数
             e = f*cm
         elif isinstance(f, np.ndarray):
