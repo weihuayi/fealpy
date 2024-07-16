@@ -27,17 +27,19 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.cell = cell
         self.surface = surface
 
-        self.localEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
-        self.localFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
-        self.ccw  = np.array([0, 1, 2], **kwargs)
+        #self.localEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
+        #self.localFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
+        #self.ccw  = np.array([0, 1, 2], **kwargs)
         
+        '''
         self.localCell = np.array([
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
+        '''
 
-        self.localLEdge = self.generate_local_lagrange_edges(p) #TODO
-        self.localLFace = self.generate_local_lagrange_faces(p) #TODO
+        self.localEdge = self.generate_local_lagrange_edges(p) #TODO
+        self.localFace = self.localEdge
 
         if construct:
             self.construct()
@@ -57,25 +59,20 @@ class LagrangeTriangleMesh(LagrangeMesh):
         """
         Generate the local edges for Lagrange elements of order p.
         """
-        if p == 1:
-            return np.array([(0, 1), (1, 2), (2, 0)], dtype=int)
-        local_edges = []
-        for i in range(3):
-            edge = [(i+j) % 3 for j in range(p+1)]
-            local_egdes(edge)
-        return np.array(local_edges, dtype=int)
+        TD = self.top_dimension()
+        ldof = (p+1)*(p+2) // 2
+        multiIndex = self.multi_index_matrix(p, TD)
 
-    def generate_local_lagrange_faces(self, p: int) -> NDArray:
-        """
-        Generate the local faces for Lagrange elements of order p.
-        """
-        if p == 1:
-            return np.array([(0, 1, 2)], dtype=int)
-        faces = [list(range(3))]
-        for j in range(1, p):
-            for i in range(j):
-                faces[0].append(3 + j * (p - 1) + i)
-        return np.array(faces, dtype=int)
+        localEdge = np.zeros(3, p+1) 
+        a2  = np.where(multiIndex[:, 2] == 0)
+        a1  = np.where(multiIndex[:, 1] == 0)
+        a0  = np.where(multiIndex[:, 0] == 0)
+
+        localEdge[:, 2] = np.array(a2)
+        localEdge[:, 1] = np.array(a1)[:, -1]
+        localEdge[:, 0] = np.array(a0)
+        return localEdge
+
     
     @classmethod
     def from_triangle_mesh(cls, mesh, p, surface=None):
