@@ -53,7 +53,11 @@ values_1_v = solver.vmesh.interpolate(lambda p:pde.solution_v(p,tau)).reshape(-1
 values_1_p = solver.pmesh.interpolate(lambda p:pde.solution_p(p,tau)).reshape(-1)
 values_half_p = (values_0_p + values_1_p)/2
 
-for i in range(400):
+# 初始化误差数组
+erru_values = np.zeros(nt)
+errp_values = np.zeros(nt)
+
+for i in range(nt):
     # 更新时间层 ti
     tl = tmesh.next_time_level()
     print("当前时间", tl)
@@ -181,6 +185,23 @@ for i in range(400):
     values_1_v[:] = values_2_v
     values_half_p[:] = values_2_p
 
+    # 记录误差
+    erru_values[i] = erru
+    errp_values[i] = errp
+
     # 时间层进一步
     tmesh.advance()
-    
+
+'''
+# 绘制误差随时间的变化图像
+time_levels = np.linspace(0, T, nt)
+plt.figure(figsize=(10, 6))
+plt.plot(time_levels, erru_values, label='Error in u')
+plt.plot(time_levels, errp_values, label='Error in p')
+plt.xlabel('Time')
+plt.ylabel('Error')
+plt.title('Error Evolution over Time')
+plt.legend()
+plt.grid(True)
+plt.show()
+'''
