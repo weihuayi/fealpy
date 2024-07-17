@@ -27,19 +27,14 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.cell = cell
         self.surface = surface
 
-        #self.localEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
-        #self.localFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
-        #self.ccw  = np.array([0, 1, 2], **kwargs)
+        self.localEdge = self.generate_local_lagrange_edges(p) 
+        self.localFace = self.localEdge
+        self.ccw  = np.array([0, 1, 2], **kwargs)
         
-        '''
         self.localCell = np.array([
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
-        '''
-
-        self.localEdge = self.generate_local_lagrange_edges(p) #TODO
-        self.localFace = self.localEdge
 
         if construct:
             self.construct()
@@ -60,17 +55,16 @@ class LagrangeTriangleMesh(LagrangeMesh):
         Generate the local edges for Lagrange elements of order p.
         """
         TD = self.top_dimension()
-        ldof = (p+1)*(p+2) // 2
-        multiIndex = self.multi_index_matrix(p, TD)
+        multiIndex = F.multi_index_matrix(p, TD)
 
-        localEdge = np.zeros(3, p+1) 
+        localEdge = np.zeros((3, p+1), dtype=np.int_)
         a2  = np.where(multiIndex[:, 2] == 0)
         a1  = np.where(multiIndex[:, 1] == 0)
         a0  = np.where(multiIndex[:, 0] == 0)
 
-        localEdge[:, 2] = np.array(a2)
-        localEdge[:, 1] = np.array(a1)[:, -1]
-        localEdge[:, 0] = np.array(a0)
+        localEdge[2, :] = np.array(a2)
+        localEdge[1, :] = np.flip(np.array(a1))
+        localEdge[0, :] = np.array(a0)
         return localEdge
 
     
@@ -84,7 +78,10 @@ class LagrangeTriangleMesh(LagrangeMesh):
         lmesh.cell2face = mesh.cell_to_face()
         lmesh.face  = mesh.face_to_ipoint()
         return mesh 
- 
+    
+    def cell_area():
+        pass
+
     def vtk_cell_type(self, etype='cell'):
         """
         @berif  返回网格单元对应的 vtk类型。
