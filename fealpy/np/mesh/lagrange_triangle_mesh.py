@@ -72,15 +72,32 @@ class LagrangeTriangleMesh(LagrangeMesh):
     def from_triangle_mesh(cls, mesh, p, surface=None):
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
+        if surface is not None:
+            node, _ = surface.project(node)
+
         lmesh = cls(node, cell, p=p, construct=False)
 
-        lmesh.face2cell = mesh.face_to_cell() # (NF, 4)
-        lmesh.cell2face = mesh.cell_to_face()
-        lmesh.face  = mesh.face_to_ipoint()
-        return mesh 
+        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
+        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.edge  = mesh.edge_to_ipoint(p)
+        return lmesh 
     
-    def cell_area():
-        pass
+    def cell_area(self, q=None, index=np.s_[:]):
+        """
+        Calculate the area of a cell.
+        """
+        p = self.p
+        q = p if q is None else q
+        GD = self.geo_dimension()
+
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        if GD == 3:
+            n = np.sqrt(np.sum(n**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, n)/2.0
+        return a
 
     def vtk_cell_type(self, etype='cell'):
         """
