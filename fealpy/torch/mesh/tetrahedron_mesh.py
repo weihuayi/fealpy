@@ -90,6 +90,92 @@ class TetrahedronMesh(SimplexMesh):
 
         return quad
     
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        TD = self.top_dimension()
+        edof = p+1
+        fdof = (p+1)*(p+2)//2
+        ldof = (p+1)*(p+2)*(p+3)//6
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+        kwargs = {'dtype': self.itype, 'device': self.device}
+
+        face = self.face
+        cell = self.cell
+        cell2face = self.cell_to_face()
+
+        cell2ipoint = torch.zeros((NC, ldof), **kwargs)
+
+        face2ipoint = self.face_to_ipoint(p)
+        m2 = self.multi_index_matrix(p, TD-1).T
+        m3 = self.multi_index_matrix(p, TD).T
+        isFaceIPoint = (m3 == 0)
+
+        fidx = torch.argsort(face, axis=1) # 第 i 个全局面顶点做一个排序
+        fidx = torch.argsort(fidx, axis=1)
+        for i in range(4):
+            idx = list(range(4))
+            idx.remove(i)
+            idxj = torch.argsort(cell[:, idx], axis=1) #  (NC, 3)
+
+            idxi = fidx[cell2face[:, i]]
+
+            order = idxj[torch.arange(NC).reshape(-1, 1), idxi] # (NC, 3)
+            # order 满足条件: fi - fj[np.arange(NC)[:, None], idx] = 0
+
+            mi = m2[order]  # (NC, 3, fdof)
+            k = mi[:, 1] + mi[:, 2] # (NC, fdof)
+            a = k*(k+1)//2 + mi[:, 2] # (NC, fdof)
+            cell2ipoint[:, isFaceIPoint[i]] = face2ipoint[cell2face[:, [i]], a]
+
+        if p > 3:
+            base = NN + (p-1)*NE + (fdof - 3*p)*NF
+            idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
+            isInCellIPoint = ~(isFaceIPoint[0] | isFaceIPoint[1] | isFaceIPoint[2] | isFaceIPoint[3])
+            cell2ipoint[:, isInCellIPoint] = base + torch.arange(NC*idof).reshape(NC, idof)
+
+        return cell2ipoint
+    
+    def face_to_ipoint(self, p: int, index: Index=_S) -> Tensor:
+        TD = self.top_dimension()
+        fdof = (p + 1) * (p + 2) // 2
+        kwargs = {'dtype': self.itype, 'device': self.device}
+
+        edgeIdx = torch.zeros((2, p + 1), **kwargs)
+        edgeIdx[0, :] = torch.arange(p + 1, **kwargs)
+        edgeIdx[1, :] = torch.flip(edgeIdx[0], dims=[0])
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+
+        face = self.face
+        edge = self.edge
+        face2edge = self.face_to_edge()
+        edge2ipoint = self.edge_to_ipoint(p)
+        face2ipoint = torch.zeros((NF, fdof), **kwargs)
+
+        faceIdx = self.multi_index_matrix(p, TD - 1)
+        isEdgeIPoint = (faceIdx == 0)
+
+        fe = torch.tensor([1, 0, 0], **kwargs)
+        for i in range(3):
+            I = torch.ones(NF, **kwargs)
+            sign = (face[:, fe[i]] == edge[face2edge[:, i], 0])
+            I[sign] = 0
+            face2ipoint[:, isEdgeIPoint[:, i]] = edge2ipoint[face2edge[:, i], edgeIdx[I]]
+
+        if p > 2:
+            base = NN + (p - 1) * NE
+            isInFaceIPoint = ~(isEdgeIPoint[:, 0] | isEdgeIPoint[:, 1] | isEdgeIPoint[:, 2])
+            fidof = fdof - 3 * p
+            face2ipoint[:, isInFaceIPoint] = base + torch.arange(NF * fidof,**kwargs).reshape(NF, fidof)
+
+        return face2ipoint[index]
+
+    
     # shape function
     def grad_lambda(self, index: Index=_S):
         return self._grad_lambda(self.cell[index], self.node, localFace=self.localFace)

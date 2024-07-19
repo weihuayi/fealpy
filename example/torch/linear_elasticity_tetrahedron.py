@@ -32,50 +32,50 @@ def solution(points: Tensor) -> Tensor:
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-NX = 2
-NY = 2
-NZ = 2
-mesh_tri = TetrahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], nx=NX, ny=NY, nz=NZ)
-NN_tri = mesh_tri.number_of_nodes()
-NE_tri = mesh_tri.number_of_edges()
-NC_tri = mesh_tri.number_of_cells()
-NF_tri = mesh_tri.number_of_faces()
-print("NN_tri:", NN_tri)
-print("NE_tri:", NE_tri)
-print("NC_tro:", NC_tri)
-print("NF_tri:", NF_tri)
+NX = 1
+NY = 1
+NZ = 1
+mesh_tet = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=NX, ny=NY, nz=NZ, device=device)
+NN_tet = mesh_tet.number_of_nodes()
+NC_tet = mesh_tet.number_of_cells()
+NE_tet = mesh_tet.number_of_edges()
+NF_tet = mesh_tet.number_of_faces()
+print("NN_tet:", NN_tet)
+print("NC_tet:", NC_tet)
+print("NE_tet:", NE_tet)
+print("NF_tet:", NF_tet)
 
-cell_tri = mesh_tri.cell
-print("cell_tri:\n", cell_tri)
-edge_tri = mesh_tri.edge
-print("edge_tri:\n", edge_tri)
-node_tri = mesh_tri.node
-print("node_tri:\n", node_tri)
-face_tri = mesh_tri.face
-print("face_tri:\n", face_tri)
+cell_tet = mesh_tet.cell
+print("cell_tet:", cell_tet.shape, "\n", cell_tet)
+face_tet = mesh_tet.face
+print("face_tet:", face_tet.shape, "\n", face_tet)
+edge_tet = mesh_tet.edge
+print("edge_tet:", edge_tet.shape, "\n", edge_tet)
+node_tet = mesh_tet.node
+print("node_tet:", node_tet.shape, "\n", node_tet)
 
-GD_tri = mesh_tri.geo_dimension()
-print("GD_tri:", GD_tri)
+GD_tet = mesh_tet.geo_dimension()
+print("GD_tet:", GD_tet)
 
-qf = mesh_tri.quadrature_formula(3, 'cell')
+qf_tet = mesh_tet.integrator(3, 'cell')
 # bcs-(NQ, BC), ws-(NQ, )
-bcs, ws = qf.get_quadrature_points_and_weights()
+bcs, ws = qf_tet.get_quadrature_points_and_weights()
 print("bcs_tri:", bcs.shape, "\n", bcs)
 print("ws:", ws.shape, "\n", ws)
 
 # (NC, BC, GD)
-glambda_x_tri = mesh_tri.grad_lambda()
-print("glambda_x_tri:", glambda_x_tri.shape, "\n", glambda_x_tri)
+glambda_x_tet = mesh_tet.grad_lambda()
+print("glambda_x_tet:", glambda_x_tet.shape, "\n", glambda_x_tet)
 # (NC, (p+1)*(p+2)/2)
-ipoints_tri = mesh_tri.cell_to_ipoint(p=3)
-print("ipoints_tri:", ipoints_tri.shape, "\n", ipoints_tri)
+ipoints_tet = mesh_tet.cell_to_ipoint(p=3)
+print("ipoints_tet:", ipoints_tet.shape, "\n", ipoints_tet)
 
-space_tri = LagrangeFESpace(mesh_tri, p=1, ctype='C')
-print("ldof_tri-(p+1)*(p+2)/2:", space_tri.number_of_local_dofs())
-print("gdof_tri:", space_tri.number_of_global_dofs())
+space_tet = LagrangeFESpace(mesh_tet, p=1, ctype='C')
+print("ldof_tet-(p+1)*(p+2)*(p+3)/6:", space_tet.number_of_local_dofs())
+print("gdof_tet:", space_tet.number_of_global_dofs())
 # (NC, LDOF)
-cell2dof_tri = space_tri.cell_to_dof()
-print("cell2dof_tri:", cell2dof_tri.shape, "\n", cell2dof_tri)
+cell2dof_tet = space_tet.cell_to_dof()
+print("cell2dof_tet:", cell2dof_tet.shape, "\n", cell2dof_tet)
 # (NQ, LDOF, BC)
 gphi_lambda_tri = space_tri.grad_basis(bcs, variable='u')
 print("gphi_lambda_tri:", gphi_lambda_tri.shape, "\n", gphi_lambda_tri)
