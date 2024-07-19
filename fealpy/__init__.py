@@ -2,6 +2,8 @@
 ====
 """
 import logging
+from .backend import backend_manager
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
