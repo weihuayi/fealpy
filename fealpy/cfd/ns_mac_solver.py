@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse import diags
-from scipy.sparse import diags, lil_matrix,csr_matrix
+from scipy.sparse import diags, lil_matrix,csr_matrix,coo_matrix
 from scipy.sparse import vstack,hstack
 from scipy.sparse.linalg import spsolve
 from ..mesh import UniformMesh2d
@@ -186,7 +186,8 @@ class NSMacSolver():
         k = np.arange(NN).reshape(n0,n1)
         A0 = diags([cx,-cx], [0,-n1], shape=(NN, NN), format='csr')
         A1 = diags([0], [0], shape=(n1, NN), format='csr')
-        A = vstack([A0, A1], format='csr')   
+        A = vstack([A0, A1], format='csr')  
+        A[ :n1, : ] = 0 
         return A
     
     def dp_v(self):
@@ -322,26 +323,3 @@ class NSMacSolver():
         unodes[ku[:,1:-1],0] = 0
         unodes[ku[:,1:-1],1] = 0
         return unodes
-
-    def update_x(self,p,mesh):
-        Nrow = mesh.node.shape[1] 
-        Ncol = mesh.node.shape[0] 
-        N = Nrow*Ncol 
-        L = np.zeros((Nrow,))
-        phi_x = np.concatenate((p,L))
-        index = np.arange(0,N)
-        phi_x[index[:Nrow]] = 0
-        return phi_x
-
-    def update_y(self,p,mesh):
-        Nrow = mesh.node.shape[1] 
-        Ncol = mesh.node.shape[0] 
-        N = Nrow*Ncol 
-        phi_y = np.zeros((N,))
-        index0 = np.arange(N)
-        index0 = np.where(index0 % Nrow != Nrow-1)
-        phi_y[index0] = p
-        index1 = np.arange(N)
-        index1 = np.where(index1 % Nrow == 0)
-        phi_y[index1] = 0
-        return phi_y

@@ -88,40 +88,43 @@ class QuadrangleMesh(TensorMesh):
         if p == 0:
             return torch.arange(len(cell), **kwargs).reshape((-1, 1))[index]
         if p == 1:
-            return cell[index, [0, 3, 1, 2]] # 先排 y 方向，再排 x 方向
+            return cell[index, [0, 3, 1, 2]] # Sort by y direction first, then by x direction
 
-        edge2cell = self.ds.edge_to_cell()
+        face2cell = self.face_to_cell()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
 
         cell2ipoint = torch.zeros((NC, (p+1)*(p+1)), **kwargs)
-        c2p= cell2ipoint.reshape((NC, p+1, p+1))
+        c2p = cell2ipoint.reshape((NC, p+1, p+1))
 
         e2p = self.edge_to_ipoint(p)
-        flag = edge2cell[:, 2] == 0
-        c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
-        flag = edge2cell[:, 2] == 1
-        c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
-        flag = edge2cell[:, 2] == 2
-        c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
-        flag = edge2cell[:, 2] == 3
-        c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+        flag = face2cell[:, 2] == 0
+        c2p[face2cell[flag, 0], :, 0] = e2p[flag]
+        flag = face2cell[:, 2] == 1
+        c2p[face2cell[flag, 0], -1, :] = e2p[flag]
+        flag = face2cell[:, 2] == 2
+        c2p[face2cell[flag, 0], :, -1] = torch.flip(e2p[flag], dims=[1])
+        flag = face2cell[:, 2] == 3
+        c2p[face2cell[flag, 0], 0, :] = torch.flip(e2p[flag], dims=[1])
 
-
-        iflag = edge2cell[:, 0] != edge2cell[:, 1]
-        flag = iflag & (edge2cell[:, 3] == 0)
-        c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
-        flag = iflag & (edge2cell[:, 3] == 1)
-        c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
-        flag = iflag & (edge2cell[:, 3] == 2)
-        c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
-        flag = iflag & (edge2cell[:, 3] == 3)
-        c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+        iflag = face2cell[:, 0] != face2cell[:, 1]
+        flag = iflag & (face2cell[:, 3] == 0)
+        c2p[face2cell[flag, 1], :, 0] = torch.flip(e2p[flag], dims=[1])
+        flag = iflag & (face2cell[:, 3] == 1)
+        c2p[face2cell[flag, 1], -1, :] = torch.flip(e2p[flag], dims=[1])
+        flag = iflag & (face2cell[:, 3] == 2)
+        c2p[face2cell[flag, 1], :, -1] = e2p[flag]
+        flag = iflag & (face2cell[:, 3] == 3)
+        c2p[face2cell[flag, 1], 0, :] = e2p[flag]
 
         c2p[:, 1:-1, 1:-1] = NN + NE*(p-1) + torch.arange(NC*(p-1)*(p-1), **kwargs).reshape(NC, p-1, p-1)
 
         return cell2ipoint[index]
+    
+    # shape function
+    def grad_lambda(self, index: Index=_S):
+        return self._grad_lambda(self.cell[index], self.node)
             
     # constructor
     @classmethod
