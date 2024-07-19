@@ -46,10 +46,8 @@ class VectorSourceIntegrator(CellSourceIntegrator):
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        print("bcs:", bcs.shape)
         # val-(NC, NQ, GD)
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        print("val:", val.shape)
         coef = val
         measure = cm
         weights = ws
