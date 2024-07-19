@@ -34,7 +34,8 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 
 NX = 2
 NY = 2
-mesh_tri = TetrahedronMesh.from_box(box=[0, 1, 0, 1], nx=NX, ny=NY)
+NZ = 2
+mesh_tri = TetrahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], nx=NX, ny=NY, nz=NZ)
 NN_tri = mesh_tri.number_of_nodes()
 NE_tri = mesh_tri.number_of_edges()
 NC_tri = mesh_tri.number_of_cells()
