@@ -27,6 +27,7 @@ ATTRIBUTE_MAPPING = {
     'dtype': 'dtype',
     'device': 'device',
     'bool_': 'bool_',
+    'uint8': 'uint8',
     'int_': 'int_',
     'int8': 'int8',
     'int16': 'int16',
@@ -59,9 +60,13 @@ class Backend(Generic[_DT]):
             raise ValueError("Backend name cannot be empty.")
 
     @classmethod
-    def attach_attributes(cls, mapping: Dict[str, str], source: type):
+    def attach_attributes(cls, mapping: Dict[str, str], source: Any):
         for target_key, source_key in mapping.items():
             if (source_key is None) or (source_key == ''):
                 continue
             if hasattr(source, source_key):
                 setattr(cls, target_key, getattr(source, source_key))
+
+    @classmethod
+    def is_tensor(cls, obj: Any, /) -> bool:
+        return isinstance(obj, cls.DATA_CLASS)
