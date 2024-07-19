@@ -183,7 +183,7 @@ def bc_to_points(bcs: Union[NDArray, Sequence[NDArray]], node: NDArray,
 
     if not isinstance(bcs, np.ndarray):
         bcs = bc_tensor(bcs)
-    return np.einsum('ijk, ...j -> ...ik', points, bcs)
+    return np.einsum('ijk, ...j -> i...k', points, bcs)
 
 
 def homo_entity_barycenter(entity: NDArray, node: NDArray) -> NDArray:
