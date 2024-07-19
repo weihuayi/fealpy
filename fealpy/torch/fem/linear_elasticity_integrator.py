@@ -74,55 +74,6 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index, q
     
-    # @enable_cache
-    # def elasticity_matrix(self, space: _FS):
-    #     elasticity_type = self.elasticity_type
-    #     scalar_space = space.scalar_space
-    #     _, _, gphi, _, _, _ = self.fetch(scalar_space)
-    #     _, GD = gphi.shape[-2:]
-
-    #     if GD == 2:
-    #         if elasticity_type == 'stress':
-    #             E, nu = self.E, self.nu
-    #             D = E / (1 - nu**2) *\
-    #                 torch.tensor([[1, nu, 0],
-    #                               [nu, 1, 0],
-    #                               [0, 0, (1 - nu) / 2]], device=self.device, dtype=torch.float64)
-    #         elif elasticity_type == 'strain':
-    #             mu, lam = self.mu, self.lam
-    #             D = torch.tensor([[2 * mu + lam, lam, 0],
-    #                               [lam, 2 * mu + lam, 0],
-    #                               [0, 0, mu]], device=self.device, dtype=torch.float64)
-    #         else:
-    #             raise ValueError("Unknown type.")
-    #     elif GD == 3:
-    #         if elasticity_type is None:
-    #             D = torch.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],
-    #                               [lam, 2 * mu + lam, lam, 0, 0, 0],
-    #                               [lam, lam, 2 * mu + lam, 0, 0, 0],
-    #                               [0, 0, 0, mu, 0, 0],
-    #                               [0, 0, 0, 0, mu, 0],
-    #                               [0, 0, 0, 0, 0, mu]], device=self.device, dtype=torch.float64)
-    #         else:
-    #             raise ValueError("Unnecessary Input.")
-    #     else:
-    #         raise ValueError("Invalid GD dimension.")
-        
-    #     return D
-    
-    @enable_cache
-    def strain_matrix(self, space: _FS):
-        scalar_space = space.scalar_space
-        _, _, gphi, _, _, _ = self.fetch(scalar_space)
-        ldof, GD = gphi.shape[-2:]
-        if space.dof_priority:
-            indices = flatten_indices((ldof, GD), (1, 0))
-        else:
-            indices = flatten_indices((ldof, GD), (0, 1))
-        B = torch.cat([normal_strain(gphi, indices),
-                       shear_strain(gphi, indices)], dim=-2)
-        return B
-    
     def assembly(self, space: _FS) -> Tensor:
         pass
         # coef = self.coef
@@ -137,7 +88,6 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         #     KK = einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
         
         # return KK
-
 
     @assemblymethod('fast_strain')
     def fast_assembly_strain_constant(self, space: _FS) -> Tensor:
@@ -299,7 +249,6 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
             return KK
 
 
-
 class LinearElasticityCoefficient():
     def __init__(self, lam: Optional[float]=None, mu: Optional[float]=None,
                  E: Optional[float]=None, nu: Optional[float]=None, 
@@ -354,3 +303,15 @@ class LinearElasticityCoefficient():
             raise ValueError("Invalid GD dimension.")
         
         return D
+    
+    def strain_matrix(self, space: _FS):
+        scalar_space = space.scalar_space
+        _, _, gphi, _, _, _ = self.fetch(scalar_space)
+        ldof, GD = gphi.shape[-2:]
+        if space.dof_priority:
+            indices = flatten_indices((ldof, GD), (1, 0))
+        else:
+            indices = flatten_indices((ldof, GD), (0, 1))
+        B = torch.cat([normal_strain(gphi, indices),
+                       shear_strain(gphi, indices)], dim=-2)
+        return B

@@ -32,7 +32,9 @@ def process_coef_func(
                                    'Note that only homogeneous meshes are supported here.')
 
             ps = mesh.bc_to_point(bcs, etype=etype, index=index)
+            print("ps:", ps.shape)
             coef_val = coef(ps)
+            print("coef_val:", coef_val.shape)
         else:
             coef_val = coef(bcs, index=index)
     else:
