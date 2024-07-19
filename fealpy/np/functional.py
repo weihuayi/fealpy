@@ -63,6 +63,7 @@ def linear_integral(input: NDArray, weights: NDArray, measure: NDArray,
 
 
 def bilinear_integral(input1: NDArray, input2: NDArray, weights: NDArray, measure: NDArray,
+                      term: NDArray,
                       coef: Union[Number, NDArray, None]=None) -> NDArray:
     r"""Numerical integration.
 
@@ -80,24 +81,41 @@ def bilinear_integral(input1: NDArray, input2: NDArray, weights: NDArray, measur
         Tensor[C, I, J]: The result of the integration.
         If `batched == True`, the shape of the output is (B, C, I, J).
     """
-    if len(input1.shape)==4:
+    if len(input1.shape)==5:
+        input1sub = 'qcidl'
+        input2sub = 'qcjdl'
+    
+    elif len(input1.shape)==4:
         input1sub = 'qcid'
         input2sub = 'qcjd'
     else:
         input1sub = 'qci'
         input2sub = 'qcj'
 
-    if coef is None:
-        return np.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2)
-
     NQ = weights.shape[0]
     NC = measure.shape[0]
-
-    if is_scalar(coef):
-        return np.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2) * coef
-    elif is_tensor(coef):
-        out_subs = 'cij'
-        subs = get_coef_subscripts(coef.shape, NQ, NC)
-        return np.einsum(f'q, c, {input1sub}, {input2sub}, {subs} -> {out_subs}', weights, measure, input1, input2, coef)
+    
+    if term is None:
+        if coef is None:
+            return np.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2)
+        
+        if is_scalar(coef):
+            return np.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2) * coef
+        elif is_tensor(coef):
+            out_subs = 'cij'
+            subs = get_coef_subscripts(coef.shape, NQ, NC)
+            return np.einsum(f'q, c, {input1sub}, {input2sub}, {subs} -> {out_subs}', weights, measure, input1, input2, coef)
+        else:
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
     else:
-        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        if coef is None:
+            return np.einsum(f'q, c, {input1sub}, {input2sub}, ij -> cij', weights, measure, input1, input2, term)
+
+        if is_scalar(coef):
+            return np.einsum(f'q, c, {input1sub}, {input2sub}, ij -> cij', weights, measure, input1, input2, term) * coef
+        elif is_tensor(coef):
+            out_subs = 'ij'
+            subs = get_coef_subscripts(coef.shape, NQ, NC)
+            return np.einsum(f'q, c, {input1sub}, {input2sub}, ij, {subs} -> {out_subs}', weights, measure, input1, input2, term, coef)
+        else:
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
