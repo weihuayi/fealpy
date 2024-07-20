@@ -335,10 +335,24 @@ class Mesh(MeshDS):
         Equivalent to `edge_normal(index=index, unit=True)`.
         """
         return self.edge_normal(index=index, unit=True, out=out)
+    
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
+        """Get the quadrature points and weights.
+
+        Parameters:
+            q (int): The index of the quadrature points.
+            etype (int | str, optional): The topology dimension of the entity to\
+            generate the quadrature points on. Defaults to 'cell'.
+
+        Returns:
+            Quadrature: Object for quadrature points and weights.
+        """
+        raise NotImplementedError
 
     def integrator(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
-        """Get the quadrature points and weights."""
-        raise NotImplementedError
+        logger.warning("The `integrator` is deprecated and will be removed after 3.0. "
+                       "Use `quadrature_formula` instead.")
+        return self.quadrature_formula(q, etype, qtype)
 
     def shape_function(self, bc: NDArray, p: int=1, *, index: Index=_S,
                        variable: str='u', mi: Optional[NDArray]=None) -> NDArray:
@@ -430,7 +444,7 @@ class SimplexMesh(HomogeneousMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return  np.expand_dims(phi, axis=1)
+            return  np.expand_dims(phi, axis=0)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -444,7 +458,8 @@ class SimplexMesh(HomogeneousMesh):
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = np.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
+            # gphi = np.einsum('...bm, kjb -> k...jm', Dlambda, R) # (NQ, NC, ldof, dim)
+            gphi = np.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'k': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:

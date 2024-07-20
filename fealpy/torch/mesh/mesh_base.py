@@ -14,6 +14,8 @@ from .. import logger
 from . import functional as F
 from .utils import estr2dim, edim2entity, edim2node, mesh_top_csr, MeshMeta
 from .quadrature import Quadrature
+import torch
+from scipy.sparse import csr_matrix
 
 
 ##################################################
@@ -157,6 +159,54 @@ class MeshDS(metaclass=MeshMeta):
             return mesh_top_csr(cell2edge[index], self.number_of_edges(), dtype=dtype)
         else:
             return cell2edge[index]
+        
+    def face_to_edge(self, return_sparse=False):
+        cell2edge = self.cell2edge
+        face2cell = self.face2cell
+        localFace2edge = self.localFace2edge
+        face2edge = cell2edge[
+            face2cell[:, [0]],
+            localFace2edge[face2cell[:, 2]]
+        ]
+        if return_sparse is False:
+            return face2edge
+        else:
+            NF = self.number_of_faces()
+            NE = self.number_of_edges()
+            NEF = self.number_of_edges_of_faces()
+            f2e = csr_matrix(
+                (
+                    torch.ones(NEF*NF, dtype=torch.bool),
+                    (
+                        torch.repeat(torch.arange(NF), NEF),
+                        face2edge.view(-1)
+                    )
+                ), shape=(NF, NE))
+            return f2e
+    
+    def cell_to_face(self, index: Index=_S, *, dtype: Optional[_dtype]=None, return_sparse=False) -> Tensor:
+        NC = self.number_of_cells()
+        NF = self.number_of_faces()
+        NFC = self.number_of_faces_of_cells()
+
+        face2cell = self.face2cell
+        dtype = dtype if dtype is not None else self.itype
+
+        if not torch.is_floating_point(torch.tensor(0, dtype=dtype)):
+            dtype = torch.int64
+
+        cell2face = torch.zeros((NC, NFC), dtype=dtype)
+        arange_tensor = torch.arange(NF, dtype=dtype)
+
+        assert cell2face.dtype == arange_tensor.dtype, f"Data type mismatch: cell2face is {cell2face.dtype}, arange_tensor is {arange_tensor.dtype}"
+
+        cell2face[face2cell[:, 0], face2cell[:, 2]] = arange_tensor
+        cell2face[face2cell[:, 1], face2cell[:, 3]] = arange_tensor
+        if not return_sparse:
+            return cell2face
+        else:
+            return mesh_top_csr(cell2face[index], self.number_of_faces(), dtype=dtype)
+
 
     def face_to_cell(self, index: Index=_S, *, dtype: Optional[_dtype]=None,
                      return_sparse=False) -> Tensor:

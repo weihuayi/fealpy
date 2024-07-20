@@ -27,17 +27,14 @@ class LagrangeTriangleMesh(LagrangeMesh):
         self.cell = cell
         self.surface = surface
 
-        self.localEdge = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
-        self.localFace = np.array([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localEdge = self.generate_local_lagrange_edges(p) 
+        self.localFace = self.localEdge
         self.ccw  = np.array([0, 1, 2], **kwargs)
         
         self.localCell = np.array([
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
-
-        self.localLEdge = self.generate_local_lagrange_edges(p) #TODO
-        self.localLFace = self.generate_local_lagrange_faces(p) #TODO
 
         if construct:
             self.construct()
@@ -57,37 +54,51 @@ class LagrangeTriangleMesh(LagrangeMesh):
         """
         Generate the local edges for Lagrange elements of order p.
         """
-        if p == 1:
-            return np.array([(0, 1), (1, 2), (2, 0)], dtype=int)
-        local_edges = []
-        for i in range(3):
-            edge = [(i+j) % 3 for j in range(p+1)]
-            local_egdes(edge)
-        return np.array(local_edges, dtype=int)
+        TD = self.top_dimension()
+        multiIndex = F.multi_index_matrix(p, TD)
 
-    def generate_local_lagrange_faces(self, p: int) -> NDArray:
-        """
-        Generate the local faces for Lagrange elements of order p.
-        """
-        if p == 1:
-            return np.array([(0, 1, 2)], dtype=int)
-        faces = [list(range(3))]
-        for j in range(1, p):
-            for i in range(j):
-                faces[0].append(3 + j * (p - 1) + i)
-        return np.array(faces, dtype=int)
+        localEdge = np.zeros((3, p+1), dtype=np.int_)
+        a2  = np.where(multiIndex[:, 2] == 0)
+        a1  = np.where(multiIndex[:, 1] == 0)
+        a0  = np.where(multiIndex[:, 0] == 0)
+
+        localEdge[2, :] = np.array(a2)
+        localEdge[1, :] = np.flip(np.array(a1))
+        localEdge[0, :] = np.array(a0)
+        return localEdge
+
     
     @classmethod
     def from_triangle_mesh(cls, mesh, p, surface=None):
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
+        if surface is not None:
+            node, _ = surface.project(node)
+
         lmesh = cls(node, cell, p=p, construct=False)
 
-        lmesh.face2cell = mesh.face_to_cell() # (NF, 4)
-        lmesh.cell2face = mesh.cell_to_face()
-        lmesh.face  = mesh.face_to_ipoint()
-        return mesh 
- 
+        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
+        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.edge  = mesh.edge_to_ipoint(p)
+        return lmesh 
+    
+    def cell_area(self, q=None, index=np.s_[:]):
+        """
+        Calculate the area of a cell.
+        """
+        p = self.p
+        q = p if q is None else q
+        GD = self.geo_dimension()
+
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        if GD == 3:
+            n = np.sqrt(np.sum(n**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, n)/2.0
+        return a
+
     def vtk_cell_type(self, etype='cell'):
         """
         @berif  返回网格单元对应的 vtk类型。

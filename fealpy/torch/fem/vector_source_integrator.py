@@ -1,11 +1,11 @@
 
 from typing import Optional
 
-from torch import Tensor
+from torch import Tensor, einsum
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
+from ..utils import is_scalar, is_tensor, process_coef_func
 from ..functional import linear_integral
 from .integrator import CellSourceIntegrator, _S, Index, CoefLike, enable_cache
 
@@ -29,8 +29,7 @@ class VectorSourceIntegrator(CellSourceIntegrator):
     def fetch(self, space: _FS):
         q = self.q
         index = self.index
-        scalar_space = space.scalar_space
-        mesh = getattr(scalar_space, 'mesh', None)
+        mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The VectorSourceIntegrator only support spaces on"
@@ -40,18 +39,27 @@ class VectorSourceIntegrator(CellSourceIntegrator):
         cm = mesh.entity_measure('cell', index=index)
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = scalar_space.basis(bcs, index=index, variable='x')
+        phi = space.basis(bcs, index=index, variable='x')
 
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> Tensor:
         f = self.source
-        scalar_space = space.scalar_space
-        print("ldof:", scalar_space.number_of_local_dofs())
-        mesh = getattr(scalar_space, 'mesh', None)
+        mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
         # val-(NC, NQ, GD)
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        print("val:", val.shape)
+        coef = val
+        measure = cm
+        weights = ws
+        inputs = phi
 
-        return linear_integral(phi, ws, cm, val, batched=self.batched)
+        if coef is None:
+            return einsum('c, q, cqid -> cid', measure, weights, inputs)
+
+        if is_tensor(coef):
+            return einsum('c, q, cqid, cqd -> ci', measure, weights, inputs, coef)
+        else:
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+
+        # return linear_integral(phi, ws, cm, val, batched=self.batched)
