@@ -1,8 +1,5 @@
-"""FEALPy: Finite Element Analysis Library in Python
-====
-"""
-import logging
 
+import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -14,4 +11,4 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.propagate = False
 
-__version__ = "2.0.0"
+__version__ = "0.0.1"
