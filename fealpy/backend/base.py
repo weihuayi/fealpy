@@ -1,6 +1,7 @@
 
 from abc import ABCMeta
 from typing import Union, Optional, Dict, Any, Tuple, Type, Generic, TypeVar
+from math import comb
 
 from .. import logger
 
@@ -107,3 +108,36 @@ class Backend(Generic[_DT]):
     @classmethod
     def is_tensor(cls, obj: Any, /) -> bool:
         return isinstance(obj, cls.DATA_CLASS)
+
+    ### FEALPy functionals ###
+
+    @staticmethod
+    def simplex_ldof(p: int, iptype: int) -> int:
+        """test"""
+        if iptype == 0:
+            return 1
+        return comb(p + iptype, iptype)
+
+    @staticmethod
+    def simplex_gdof(p: int, nums: Tuple[int, ...]) -> int:
+        coef = 1
+        count = nums[0]
+
+        for i in range(1, len(nums)):
+            coef = (coef * (p-i)) // i
+            count += coef * nums[i]
+        return count
+
+    @staticmethod
+    def tensor_ldof(p: int, iptype: int) -> int:
+        return (p + 1) ** iptype
+
+    @staticmethod
+    def tensor_gdof(p: int, nums: Tuple[int, ...]) -> int:
+        coef = 1
+        count = nums[0]
+
+        for i in range(1, len(nums)):
+            coef = coef * (p-i)
+            count += coef * nums[i]
+        return count
