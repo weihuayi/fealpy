@@ -1,4 +1,6 @@
 
+from typing import Union
+
 try:
     import torch
 except ImportError:
@@ -13,10 +15,15 @@ from .base import (
 )
 
 Tensor = torch.Tensor
+_device = torch.device
 
 
 class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
+
+    @staticmethod
+    def set_default_device(device: Union[str, _device]) -> None:
+        torch.set_default_device(device)
 
     ### Tensor creation methods ###
 

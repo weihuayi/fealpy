@@ -1,5 +1,5 @@
 
-from typing import Any, Tuple, Union, Optional, overload
+from typing import Any, Tuple, Union, Optional, overload, TypeGuard
 
 from .base import Backend, Size, Number
 from .base import TensorLike as _DT
@@ -37,7 +37,7 @@ class BackendManager():
     ### Backend tools ###
 
     @staticmethod
-    def is_tensor(obj: Any, /) -> bool: ...
+    def is_tensor(obj: Any, /) -> TypeGuard[_DT]: ...
     @staticmethod # PyTorch
     def set_default_device(device: str) -> None: ...
 

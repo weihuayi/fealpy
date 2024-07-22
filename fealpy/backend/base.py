@@ -47,7 +47,7 @@ UNARY_MAPPING = _make_default_mapping(
 )
 BINARY_MAPPING = _make_default_mapping(
     # Binary functions
-    'add', 'substract', 'multiply', 'divide', 'matmul', 'dot', 'cross', 'tensordot'
+    'add', 'subtract', 'multiply', 'divide', 'matmul', 'dot', 'cross', 'tensordot'
 )
 OTHER_MAPPING = _make_default_mapping(
     # Other functions
@@ -88,19 +88,19 @@ class Backend(Generic[_DT]):
                 continue
             if hasattr(cls, target_key):
                 # Methods will not be copied from source if implemented manually.
-                logger.debug(f"Backend: {target_key} is already defined. "
-                             f"Skip the copy from {source.__class__.__name__}.")
+                logger.debug(f"{target_key} is already defined. "
+                             f"Skip the copy from {source.__name__}.")
                 continue
             if hasattr(source, source_key):
                 setattr(cls, target_key, staticmethod(getattr(source, source_key)))
             else:
-                logger.debug(f"Backend: {source} is not found in {source.__class__.__name__}. "
+                logger.debug(f"{source_key} is not found in {source.__name__}. "
                              f"Method {target_key} remains unimplemented.")
 
     @classmethod
     def show_unsupported(cls, signal: bool, function_name: str, arg_name: str) -> None:
         if signal:
-            logger.warning(f"Backend: {cls.__name__} does not support the "
+            logger.warning(f"{cls.__name__} does not support the "
                            f"'{arg_name}' argument in the function {function_name}. "
                            f"The argument will be ignored.")
 
