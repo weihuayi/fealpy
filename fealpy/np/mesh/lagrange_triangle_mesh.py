@@ -98,7 +98,7 @@ class LagrangeTriangleMesh(LagrangeMesh):
             n = np.sqrt(np.sum(n**2, axis=-1))
         a = np.einsum('i, ij->j', ws, n)/2.0
         return a
-
+    
     def vtk_cell_type(self, etype='cell'):
         """
         @berif  返回网格单元对应的 vtk类型。
