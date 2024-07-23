@@ -319,12 +319,7 @@ class BernsteinFESpace:
         glambda = mesh.grad_lambda()
 
         ## 获得张量对称部分的索引
-        f = lambda x: np.array([int(ss) for ss in '0'*(m-len(np.base_repr(x,
-            GD)))+np.base_repr(x, GD) ], dtype=np.int_)
-        idx = np.array(list(map(f, np.arange(GD**m))))
-        flag = np.ones(len(idx), dtype=np.bool_)
-        for i in range(m-1):
-            flag = flag & (idx[:, i]>=idx[:, i+1])
+        symidx = symmetry_index(GD, m)
 
         ## 计算多重指标编号
         if GD==2:
@@ -337,7 +332,7 @@ class BernsteinFESpace:
         midxp_0 = mesh.multi_index_matrix(p, GD) # p   次多重指标
         midxp_1 = mesh.multi_index_matrix(m, GD) # m   次多重指标
 
-        N, N1 = flag.sum(), midxp_1.shape[0]
+        N, N1 = len(symidx), midxp_1.shape[0]
         B = np.zeros((N1, NQ, ldof), dtype=np.float_)
         symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float_)
         gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float_)
@@ -345,7 +340,7 @@ class BernsteinFESpace:
             midxp_0 -= beta[None, :]
             idx = np.where(np.all(midxp_0>-1, axis=1))[0]
             num = midx2num(midxp_0[idx]) 
-            symi[:] = symmetry_span_array(glambda, beta).reshape(NC, -1)[:, flag] #(NC, N)
+            symi[:] = symmetry_span_array(glambda, beta).reshape(NC, -1)[:, symidx] #(NC, N)
             c = (factorial(m)**2)*comb(p, m)/np.prod(factorial(beta)) # 数
             Bi[:, idx] = c*phi[:, num] #(NQ, ldof)
             midxp_0 += beta[None, :]
@@ -462,6 +457,13 @@ class BernsteinFESpace:
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
 
+        return val
+
+    @barycentric
+    def grad_m_value(self, uh, bcs, m):
+        gmphi = self.grad_m_basis(bcs, m) # (NQ, 1, ldof)
+        cell2dof = self.dof.cell_to_dof()
+        val = np.einsum('qclg, cl->qcg', gmphi, uh[cell2dof])
         return val
 
     @barycentric

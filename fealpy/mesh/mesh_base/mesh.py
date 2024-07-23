@@ -517,13 +517,13 @@ class Mesh():
         else:
             return np.sum(e)
 
-    def error(self, u, v, q=3, power=2, celltype=False):
+    def error(self, u, v, q=3, power=2, celltype=False, integrator=None):
         """
         @brief Calculate the error between two functions.
         """
         GD = self.geo_dimension()
 
-        qf = self.integrator(q, etype='cell')
+        qf = self.integrator(q, etype='cell') if integrator is None else integrator
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
 
@@ -554,10 +554,12 @@ class Mesh():
         cm = self.entity_measure('cell')
 
         NC = self.number_of_cells()
-        if v.shape[-1] == NC:
-            v = np.swapaxes(v, 1, -1)
+        #if v.shape[-1] == NC:
+        #    v = np.swapaxes(v, 1, -1)
         f = np.power(np.abs(u - v), power)
-        
+        if len(f.shape) == 1: 
+            f = f[:, None]
+
         if isinstance(f, (int, float)): # f为标量常函数
             e = f*cm
         elif isinstance(f, np.ndarray):

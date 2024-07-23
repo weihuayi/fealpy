@@ -34,12 +34,26 @@ class NodeMesh(MeshDS):
 
     def top_dimension(self):
         return self.top_dimension()
-    
+    '''
     def add_node_data(self, name:str, dtype=jnp.float64):
         NN = self.NN
         self.nodedata.update({names: jnp.zeros(NN, dtypes) 
                               for names, dtypes in zip(name, dtype)})
-
+    '''
+    
+    def add_node_data(self, name: Union[str, list], data: Array):
+        if isinstance(name, str):
+            if name in self.nodedata:
+                self.nodedata[name] = jnp.concatenate([self.nodedata[name], data], axis=0)
+            else:
+                self.nodedata[name] = data
+        else:
+            for n, d in zip(name, data):
+                if n in self.nodedata:
+                    self.nodedata[n] = jnp.concatenate([self.nodedata[n], d], axis=0)
+                else:
+                    self.nodedata[n] = d
+    
     def set_node_data(self, name, val):
         self.nodedata[name] = self.nodedata[name].at[:].set(val)
 
@@ -288,6 +302,45 @@ class NodeMesh(MeshDS):
             "kappa": kappa,
             "Cp": Cp,
         }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_long_rectangular_cavity_domain(cls, dx=0.125):
+        dy = dx
+        rho0 = 737.54
+
+        #固壁粒子生成
+        wp0 = jnp.mgrid[0:50:dx, 0:dy:dy].reshape(2, -1).T
+        wp1 = jnp.mgrid[0:50:dx, 5:5+dy:dy].reshape(2, -1).T
+        wp = jnp.vstack((wp0,wp1))
+        #设置标签
+        tag_w = jnp.full((wp.shape[0],), 1, dtype=int)
+        #虚粒子生成
+        dp0 = jnp.mgrid[0:50:dx, -3*dy:0:dy].reshape(2, -1).T
+        dp1 = jnp.mgrid[0:50:dx, 5+dy:5+4*dy:dy].reshape(2, -1).T
+        dp = jnp.vstack((dp0,dp1))
+        #设置标签
+        tag_d = jnp.full((dp.shape[0],), 2,dtype=int)
+        
+        r = jnp.vstack((wp, dp))
+        NN = r.shape[0]
+        tag = jnp.hstack((tag_w, tag_d))
+        mv = jnp.zeros_like(r)
+        rho = jnp.ones(NN) * rho0
+        mass = jnp.ones(NN) * dx * dy * rho0
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "mv": mv,
+            "tv": mv,
+            "dmvdt": jnp.zeros_like(mv),
+            "dtvdt": jnp.zeros_like(mv),
+            "drhodt": jnp.zeros_like(rho),
+            "rho": rho,
+            "p": jnp.zeros_like(rho),
+            "sound": jnp.zeros_like(rho),
+            "mass": mass,
+        } 
         return cls(r, nodedata=nodedata)
 
     @classmethod

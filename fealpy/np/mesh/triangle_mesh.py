@@ -62,10 +62,10 @@ class TriangleMesh(SimplexMesh):
             return self._cell_area(node[cell])
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-
-    # integrator
-    def integrator(self, q: int, etype: Union[int, str]='cell',
-                   qtype: str='legendre') -> Quadrature: # TODO: other qtype
+        
+    # quadrature
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre') -> Quadrature: # TODO: other qtype
         from .quadrature import TriangleQuadrature
         from .quadrature import GaussLegendreQuadrature
 
@@ -80,6 +80,24 @@ class TriangleMesh(SimplexMesh):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
         return quad
+
+    # # integrator
+    # def integrator(self, q: int, etype: Union[int, str]='cell',
+    #                qtype: str='legendre') -> Quadrature: # TODO: other qtype
+    #     from .quadrature import TriangleQuadrature
+    #     from .quadrature import GaussLegendreQuadrature
+
+    #     if isinstance(etype, str):
+    #         etype = estr2dim(self, etype)
+    #     kwargs = {'dtype': self.ftype}
+    #     if etype == 2:
+    #         quad = TriangleQuadrature(q, **kwargs)
+    #     elif etype == 1:
+    #         quad = GaussLegendreQuadrature(q, **kwargs)
+    #     else:
+    #         raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+    #     return quad
 
     # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
