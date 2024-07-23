@@ -1,5 +1,6 @@
-import numpy as np
+# import numpy as np
 from .Quadrature import Quadrature
+from ..backend import backend_manager as np
 
 # http://keisan.casio.com/exec/system/1280624821
 

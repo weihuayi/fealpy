@@ -182,7 +182,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
             idx = list(range(TD+1))
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return R # (..., ldof, TD+1)
+        return R # (..., ldof, bc)
 
     @staticmethod
     def simplex_hess_shape_function(bc: NDArray, p: int, mi=None) -> NDArray:

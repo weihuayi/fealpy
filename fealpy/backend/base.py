@@ -23,6 +23,9 @@ class TensorLike(metaclass=ABCMeta):
     @property
     def size(self) -> int: raise NotImplementedError
 
+    def __len__(self) -> int: raise NotImplementedError
+    def __getitem__(self, index: Any) -> 'TensorLike': raise NotImplementedError
+
 
 def _make_default_mapping(*names: str):
     return {k: k for k in names}
@@ -51,7 +54,7 @@ UNARY_MAPPING = _make_default_mapping(
 )
 BINARY_MAPPING = _make_default_mapping(
     # Binary functions
-    'add', 'subtract', 'multiply', 'divide', 'matmul', 'dot', 'cross', 'tensordot'
+    'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot'
 )
 OTHER_MAPPING = _make_default_mapping(
     # Other functions
