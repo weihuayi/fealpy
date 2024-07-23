@@ -1,6 +1,9 @@
 
 from abc import ABCMeta
-from typing import Union, Optional, Dict, Any, Tuple, Type, Generic, TypeVar
+from typing import(
+    Union, Optional, Dict, Iterable, Tuple, List, Any, Type, Generic, TypeVar,
+    Hashable, OrderedDict
+)
 from math import comb
 
 from .. import logger
@@ -113,7 +116,6 @@ class Backend(Generic[_DT]):
 
     @staticmethod
     def simplex_ldof(p: int, iptype: int) -> int:
-        """test"""
         if iptype == 0:
             return 1
         return comb(p + iptype, iptype)
@@ -141,3 +143,16 @@ class Backend(Generic[_DT]):
             coef = coef * (p-i)
             count += coef * nums[i]
         return count
+
+    @staticmethod
+    def occurrence(iterable: Iterable[Hashable], /) -> Tuple[List[Hashable], List[int], List[int]]:
+        # TODO: Implement a C version for higher performance.
+        first = OrderedDict()
+        last = OrderedDict()
+
+        for i, item in enumerate(iterable):
+            if item not in first:
+                first[item] = i
+            last[item] = i
+
+        return list(first.keys()), list(first.values()), list(last.values())

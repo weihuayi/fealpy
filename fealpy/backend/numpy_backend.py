@@ -227,6 +227,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
         result[..., 0] *= -1
         return result / np.expand_dims(nv, axis=(-1, -2))
 
+    @staticmethod
     def triangle_grad_lambda_3d(tri: NDArray, node: NDArray) -> NDArray:
         points = node[tri, :]
         e0 = points[..., 2, :] - points[..., 1, :]  # (..., 3)
