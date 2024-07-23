@@ -58,13 +58,10 @@ class LagrangeTriangleMesh(LagrangeMesh):
         multiIndex = F.multi_index_matrix(p, TD)
 
         localEdge = np.zeros((3, p+1), dtype=np.int_)
-        a2  = np.where(multiIndex[:, 2] == 0)
-        a1  = np.where(multiIndex[:, 1] == 0)
-        a0  = np.where(multiIndex[:, 0] == 0)
+        localEdge[2, :], = np.where(multiIndex[:, 2] == 0)
+        localEdge[1, -1::-1], = np.where(multiIndex[:, 1] == 0)
+        localEdge[0, :],  = np.where(multiIndex[:, 0] == 0)
 
-        localEdge[2, :] = np.array(a2)
-        localEdge[1, :] = np.flip(np.array(a1))
-        localEdge[0, :] = np.array(a0)
         return localEdge
 
     
