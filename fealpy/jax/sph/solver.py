@@ -7,7 +7,7 @@
 	@bref 
 	@ref 
 '''  
-from jax import ops, vmap
+from jax import ops, vmap, jit
 import jax.numpy as jnp
 import numpy as np
 import h5py
@@ -189,6 +189,15 @@ class SPHSolver:
         dTdt = (b * F_ab) / (state["Cp"][i_s] * state["rho"][i_s] * state["rho"][j_s])
         result = ops.segment_sum(dTdt, i_s, len(state["position"]))
         return result
+
+    def compute_distances(self, p1, p2):
+        # 扩展维度以计算每对粒子的距离
+        p1_expand = jnp.expand_dims(p1, 1) #(N,1,2)
+        p2_expand = jnp.expand_dims(p2, 0) #(1,M,2)
+        
+        # 计算平方距离
+        distance = jnp.sum((p1_expand - p2_expand)**2, axis=2)  # (N,M)
+        return distance
 
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""
