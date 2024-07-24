@@ -190,14 +190,50 @@ class SPHSolver:
         result = ops.segment_sum(dTdt, i_s, len(state["position"]))
         return result
 
-    def compute_distances(self, p1, p2):
-        # 扩展维度以计算每对粒子的距离
-        p1_expand = jnp.expand_dims(p1, 1) #(N,1,2)
-        p2_expand = jnp.expand_dims(p2, 0) #(1,M,2)
+    def free_surface(self, state, i_s, j_s, kernel, grad_kernel, h):
+        #计算流体粒子的浓度
+        m_j = state["mass"][j_s]
+        rho_j = state["rho"][j_s]
+        ci = (m_j/rho_j) * kernel
+        grad_ci = (m_j/rho_j)[:, None] * grad_kernel 
+        #grad_ci = ops.segment_sum(grad_ci, i_s, len(state["position"][state["tag"] == 0]))
+        w_tag = state['tag'] == 1
+        d_tag = state['tag'] == 2
+        NN_wd = (jnp.where(w_tag==True)[0]).size + (jnp.where(d_tag==True)[0]).size
         
-        # 计算平方距离
-        distance = jnp.sum((p1_expand - p2_expand)**2, axis=2)  # (N,M)
-        return distance
+        #找浓度<0.75的流体粒子的索引
+        result = ops.segment_sum(ci, i_s, len(state["position"]))
+        result = result[state["tag"] == 0]
+        #idx = jnp.where(result < 0.75)[0] + NN_wd
+        idx = jnp.where(result< 0.75)[0]
+        
+        #判断区域内是否有其他的粒子
+        xji = state["position"][j_s] - state["position"][i_s]
+        gx = jnp.einsum('ki,kj->kij', xji, grad_kernel).reshape(xji.shape[0], 2, 2)
+        As = (m_j/rho_j).reshape(xji.shape[0],1,1) * gx
+        #As = ops.segment_sum(As, i_s, len(state["position"][state["tag"] == 0]))
+        normal = jnp.einsum('ijk,ik->ij', As, grad_ci) / \
+                 jnp.linalg.norm(jnp.einsum('ijk,ik->ij', As, grad_ci), axis=1, keepdims=True)
+        a = jnp.array([-normal[:, 1], normal[:, 0]]).T
+        b = jnp.linalg.norm(a, axis=1)
+        perpen = a / b[:, jnp.newaxis]
+        nodeT = state["position"][i_s] + normal*h
+       
+        cond1 = jnp.linalg.norm(-xji, axis=1) >= jnp.sqrt(2)*h
+        cond2 = jnp.linalg.norm(state["position"][j_s] - nodeT) < h
+        cond3 = jnp.linalg.norm(-xji, axis=1) < jnp.sqrt(2)*h
+        cond4 = (jnp.abs(jnp.dot(normal, (state["position"][j_s] - nodeT).T)).sum()) + \
+                (jnp.abs(jnp.dot(perpen, (state["position"][j_s] - nodeT).T)).sum()) < h
+        
+        cond = ~(cond1 & cond2) | ~(cond3 & cond4)
+        is_free = idx[cond[idx]]
+        return is_free
+
+    def change_p(self, state,B, rho0, c1):
+        #更新流体粒子的压力
+        #state["p"][state["tag"]==0] = B * (jnp.exp((jnp.eye()-)/c1))
+        
+        return 0
 
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""
