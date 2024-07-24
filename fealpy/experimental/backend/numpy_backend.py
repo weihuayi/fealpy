@@ -16,6 +16,14 @@ from .base import (
 class NumpyBackend(Backend[NDArray], backend_name='numpy'):
     DATA_CLASS = np.ndarray
 
+    @staticmethod
+    def to_numpy(tensor_like: NDArray, /) -> NDArray:
+        return tensor_like
+
+    @staticmethod
+    def from_numpy(ndarray: NDArray, /) -> NDArray:
+        return ndarray
+
     ### Tensor creation methods ###
     # NOTE: all copied
 
@@ -182,7 +190,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
             idx = list(range(TD+1))
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return R # (..., ldof, TD+1)
+        return R # (..., ldof, bc)
 
     @staticmethod
     def simplex_hess_shape_function(bc: NDArray, p: int, mi=None) -> NDArray:
@@ -227,6 +235,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
         result[..., 0] *= -1
         return result / np.expand_dims(nv, axis=(-1, -2))
 
+    @staticmethod
     def triangle_grad_lambda_3d(tri: NDArray, node: NDArray) -> NDArray:
         points = node[tri, :]
         e0 = points[..., 2, :] - points[..., 1, :]  # (..., 3)

@@ -1,5 +1,5 @@
 
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
 from math import factorial
@@ -30,6 +30,12 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
         torch.set_default_device(device)
+
+    @staticmethod
+    def to_numpy(tensor_like: Tensor, /) -> Any:
+        return tensor_like.detach().cpu().numpy()
+
+    from_numpy = torch.from_numpy
 
     ### Tensor creation methods ###
 
@@ -300,6 +306,8 @@ creation_mapping.update(array='tensor')
 PyTorchBackend.attach_methods(CREATION_MAPPING, torch)
 PyTorchBackend.attach_methods(REDUCTION_MAPPING, torch)
 PyTorchBackend.attach_methods(UNARY_MAPPING, torch)
+binary_mapping = BINARY_MAPPING.copy()
+binary_mapping.update(power='pow')
 PyTorchBackend.attach_methods(BINARY_MAPPING, torch)
 other_mapping = OTHER_MAPPING.copy()
 other_mapping.update(transpose='permute')
