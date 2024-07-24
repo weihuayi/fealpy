@@ -124,3 +124,13 @@ lform.add_integrator(integrator_source)
 # F_tri - (TGDOF)
 F_tri = lform.assembly()
 print("F_tri:", F_tri.shape, "\n", F_tri)
+
+uh_tri = tensor_space_tri_node.function(dim=2)
+print("uh_tri:", uh_tri.shape)
+
+isDDof = tensor_space_tri_node.is_boundary_dof()
+print("is_DDof:", isDDof.shape, "\n", isDDof)
+uh_tri_interpolate = space_tri.interpolate(source=source, uh=uh_tri)
+print("uh_tri_interpolate:", uh_tri_interpolate.shape, "\n", uh_tri_interpolate)
+uh_tri[isDDof] = solution(uh_tri_interpolate[isDDof])
+print("uh_tri:", uh_tri.shape, "\n", uh_tri)

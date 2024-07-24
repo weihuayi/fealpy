@@ -260,6 +260,10 @@ class OpenGLPlotter:
             self._bind_uinform(self.mix_shader_program)
             self._bind_uinform(self.general_shader_program)
 
+            # 只显示背面
+            glEnable(GL_CULL_FACE)
+            glCullFace(GL_BACK)
+
             for mesh in self.meshes:
                 mesh.draw(self.mode)
 
