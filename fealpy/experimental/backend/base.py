@@ -34,36 +34,77 @@ class TensorLike(metaclass=ABCMeta):
     def reshape(self, *newshape) -> 'TensorLike': raise NotImplementedError
 
 
+Number = Union[int, float, TensorLike]
+_DT = TypeVar("_DT")
+
+
+# NOTE: WHAT ARE THE NAMES LISTED BELOW?
+#
+# These are mappings with names of attributes and functions in fealpy backend as keys,
+# and the values are the corresponding names in the backend such as numpy.
+#
+#   - If a functions is NOT defined in the subclass of Backend (the base), FEALPy will try to
+#     copy the function from the backend according to the mapping.
+#
+#   - Each mapping have a format of {target_name: source_name}. Where `target_name` is
+#     how we call the function or attribute in FEALPy, while `source_name` is the original
+#     name in the backend.
+#
+#   - For example, the mapping {'transpose': 'permute'} means that the function `transpose` in
+#     FEALPy will be copied from the function `permute` in the backend, and we can
+#     use `backend_manager.transpose(x)` to use the `permute` function.
+#
+#   - The names below are actually the target names. Using the function `_make_default_mapping`,
+#     a default mapping is created with the SAME source names.
+#     These default mappings will be imported by the Backend subclasses and
+#     may be updated to adapt to the backend.
+
+
 def _make_default_mapping(*names: str):
     return {k: k for k in names}
 
-Number = Union[int, float, TensorLike]
-_DT = TypeVar("_DT")
+
+# NOTE: To add new attributes, just add the target names here, then for each
+# backend, see if the names are supported.
+# Update the source name in the backend file if necessary.
+#
 ATTRIBUTE_MAPPING = _make_default_mapping(
     'pi', 'e', 'nan', 'inf', 'dtype', 'device',
     'bool_', 'uint8', 'int_', 'int8', 'int16', 'int32', 'int64',
     'float_', 'float16', 'float32', 'float64',
     'complex_', 'complex64', 'complex128'
 )
-CREATION_MAPPING = _make_default_mapping(
+
+# NOTE: For adding new functions:
+#
+# 1. Add the target function names in the correct category.
+#
+# 2. Go to the stub file and add typehints for the functions.
+#    (define the args and return of the function)
+#
+# 3. For each backend, see if the functions we expected are supported. There may be some cases:
+#
+#    - Not supported: implement manually.
+#    - Supported, but with different names: update the source name in the backend file.
+#    - Supported, but the args or returns are in different format: make a wrapper function
+#      in the backend subclass.
+#    - Totally the same: nothing need to do.
+#
+FUNCTION_MAPPING = _make_default_mapping(
     # Creation functions
     'array', 'tensor', 'arange', 'linspace',
     'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like', 'eye',
-)
-REDUCTION_MAPPING = _make_default_mapping(
+
     # Reduction functions
-    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min'
-)
-UNARY_MAPPING = _make_default_mapping(
+    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min',
+
     # Unary functions
     'abs', 'sign', 'sqrt', 'log', 'log10', 'log2', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh',
-    'reshape', 'ravel', 'flatten', 'broadcast_to', 'einsum'
-)
-BINARY_MAPPING = _make_default_mapping(
+    'reshape', 'ravel', 'flatten', 'broadcast_to', 'einsum',
+
     # Binary functions
-    'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot'
-)
-OTHER_MAPPING = _make_default_mapping(
+    'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
+
     # Other functions
     'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'transpose', 'swapaxes'

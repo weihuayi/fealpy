@@ -15,10 +15,7 @@ except ImportError:
                       'the PyTorch backend in fealpy. '
                       'See https://pytorch.org/ for installation.')
 
-from .base import (
-    Backend, ATTRIBUTE_MAPPING, CREATION_MAPPING, REDUCTION_MAPPING,
-    UNARY_MAPPING, BINARY_MAPPING, OTHER_MAPPING
-)
+from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 
 Tensor = torch.Tensor
 _device = torch.device
@@ -306,14 +303,6 @@ attribute_mapping.update({
     'complex_': 'complex'
 })
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
-creation_mapping = CREATION_MAPPING.copy()
-creation_mapping.update(array='tensor')
-PyTorchBackend.attach_methods(CREATION_MAPPING, torch)
-PyTorchBackend.attach_methods(REDUCTION_MAPPING, torch)
-PyTorchBackend.attach_methods(UNARY_MAPPING, torch)
-binary_mapping = BINARY_MAPPING.copy()
-binary_mapping.update(power='pow')
-PyTorchBackend.attach_methods(BINARY_MAPPING, torch)
-other_mapping = OTHER_MAPPING.copy()
-other_mapping.update(transpose='permute')
-PyTorchBackend.attach_methods(OTHER_MAPPING, torch)
+function_mapping = FUNCTION_MAPPING.copy()
+function_mapping.update(array='tensor', power='pow', transpose='permute')
+PyTorchBackend.attach_methods(function_mapping, torch)

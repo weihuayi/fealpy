@@ -8,8 +8,7 @@ from numpy.typing import NDArray
 from numpy.linalg import det
 
 from .base import (
-    Backend, ATTRIBUTE_MAPPING, CREATION_MAPPING, REDUCTION_MAPPING,
-    UNARY_MAPPING, BINARY_MAPPING, OTHER_MAPPING
+    Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 )
 
 
@@ -261,10 +260,6 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
 
 
 NumpyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
-creation_mapping = CREATION_MAPPING.copy()
-creation_mapping['tensor'] = 'array'
-NumpyBackend.attach_methods(CREATION_MAPPING, np)
-NumpyBackend.attach_methods(REDUCTION_MAPPING, np)
-NumpyBackend.attach_methods(UNARY_MAPPING, np)
-NumpyBackend.attach_methods(BINARY_MAPPING, np)
-NumpyBackend.attach_methods(OTHER_MAPPING, np)
+function_mapping = FUNCTION_MAPPING.copy()
+function_mapping.update(tensor='array')
+NumpyBackend.attach_methods(function_mapping, np)
