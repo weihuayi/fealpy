@@ -8,13 +8,20 @@ from numpy.typing import NDArray
 from numpy.linalg import det
 
 from .base import (
-    Backend, ATTRIBUTE_MAPPING, CREATION_MAPPING, REDUCTION_MAPPING,
-    UNARY_MAPPING, BINARY_MAPPING, OTHER_MAPPING
+    Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 )
 
 
 class NumpyBackend(Backend[NDArray], backend_name='numpy'):
     DATA_CLASS = np.ndarray
+
+    @staticmethod
+    def to_numpy(tensor_like: NDArray, /) -> NDArray:
+        return tensor_like
+
+    @staticmethod
+    def from_numpy(ndarray: NDArray, /) -> NDArray:
+        return ndarray
 
     ### Tensor creation methods ###
     # NOTE: all copied
@@ -182,7 +189,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
             idx = list(range(TD+1))
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-        return R # (..., ldof, TD+1)
+        return R # (..., ldof, bc)
 
     @staticmethod
     def simplex_hess_shape_function(bc: NDArray, p: int, mi=None) -> NDArray:
@@ -227,6 +234,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
         result[..., 0] *= -1
         return result / np.expand_dims(nv, axis=(-1, -2))
 
+    @staticmethod
     def triangle_grad_lambda_3d(tri: NDArray, node: NDArray) -> NDArray:
         points = node[tri, :]
         e0 = points[..., 2, :] - points[..., 1, :]  # (..., 3)
@@ -252,10 +260,6 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
 
 
 NumpyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
-creation_mapping = CREATION_MAPPING.copy()
-creation_mapping['tensor'] = 'array'
-NumpyBackend.attach_methods(CREATION_MAPPING, np)
-NumpyBackend.attach_methods(REDUCTION_MAPPING, np)
-NumpyBackend.attach_methods(UNARY_MAPPING, np)
-NumpyBackend.attach_methods(BINARY_MAPPING, np)
-NumpyBackend.attach_methods(OTHER_MAPPING, np)
+function_mapping = FUNCTION_MAPPING.copy()
+function_mapping.update(tensor='array')
+NumpyBackend.attach_methods(function_mapping, np)
