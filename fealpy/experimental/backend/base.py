@@ -2,7 +2,7 @@
 from abc import ABCMeta
 from typing import(
     Union, Optional, Dict, Iterable, Tuple, List, Any, Type, Generic, TypeVar,
-    Hashable, OrderedDict
+    Hashable, OrderedDict, overload
 )
 from math import comb
 
@@ -22,9 +22,16 @@ class TensorLike(metaclass=ABCMeta):
     def ndim(self) -> int: raise NotImplementedError
     @property
     def size(self) -> int: raise NotImplementedError
+    @property
+    def T(self) -> 'TensorLike': raise NotImplementedError
 
     def __len__(self) -> int: raise NotImplementedError
     def __getitem__(self, index: Any) -> 'TensorLike': raise NotImplementedError
+    @overload
+    def reshape(self, newshape: Size, /) -> 'TensorLike': raise NotImplementedError
+    @overload
+    def reshape(self, *newshape: int) -> 'TensorLike': raise NotImplementedError
+    def reshape(self, *newshape) -> 'TensorLike': raise NotImplementedError
 
 
 def _make_default_mapping(*names: str):
@@ -41,7 +48,7 @@ ATTRIBUTE_MAPPING = _make_default_mapping(
 CREATION_MAPPING = _make_default_mapping(
     # Creation functions
     'array', 'tensor', 'arange', 'linspace',
-    'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like'
+    'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like', 'eye',
 )
 REDUCTION_MAPPING = _make_default_mapping(
     # Reduction functions
@@ -59,7 +66,7 @@ BINARY_MAPPING = _make_default_mapping(
 OTHER_MAPPING = _make_default_mapping(
     # Other functions
     'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
-    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'transpose'
+    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'transpose', 'swapaxes'
 )
 
 

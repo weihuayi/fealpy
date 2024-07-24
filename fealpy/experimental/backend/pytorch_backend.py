@@ -43,6 +43,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
         return torch.linspace(start, stop, steps=num, dtype=dtype, **kwargs)
 
+    @staticmethod
+    def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
+        assert k == 0, "Only k=0 is supported by `eye` in PyTorchBackend."
+        return torch.eye(n, m, dtype=dtype, **kwargs)
+
     ### Reduction methods ###
 
     @staticmethod
