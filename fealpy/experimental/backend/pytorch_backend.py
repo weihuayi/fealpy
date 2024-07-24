@@ -304,5 +304,6 @@ attribute_mapping.update({
 })
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(array='tensor', power='pow', transpose='permute')
+function_mapping.update(array='tensor', power='pow', transpose='permute',
+                        repeat='repeat_interleave')
 PyTorchBackend.attach_methods(function_mapping, torch)
