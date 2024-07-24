@@ -31,7 +31,7 @@ def make_sphere_mesh():
     node = node - d[..., np.newaxis] * n
     return TriangleMesh(node, cell)
 
-def test_to_vtk(p=3):
+def test_to_vtk(p=4):
     surface = SphereSurface() # 以原点为球心，1为半径的球
 
     mesh = make_sphere_mesh()
