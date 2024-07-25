@@ -359,7 +359,7 @@ class NodeMesh(MeshDS):
             "rho": rho,
             "p": jnp.zeros_like(rho),
             "sound": jnp.zeros_like(rho),
-            "mass": mass, #待确认
+            "mass": mass, 
         } 
         return cls(r, nodedata=nodedata)
         
