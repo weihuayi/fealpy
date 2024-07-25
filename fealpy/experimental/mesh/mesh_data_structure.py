@@ -1,7 +1,7 @@
 
 from typing import Union, Optional, Dict, overload, Callable, Any
 
-from ..backend import backend_manager as fealpy
+from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, EntityName, _S, _int_func
 from .. import logger
 from .utils import estr2dim, edim2entity, MeshMeta
@@ -91,7 +91,7 @@ class MeshDS(metaclass=MeshMeta):
             loc = entity.location
             return loc[1:] - loc[:-1]
         else:
-            return fealpy.tensor((entity.shape[-1],), dtype=self.itype)
+            return bm.tensor((entity.shape[-1],), dtype=self.itype)
 
     def number_of_vertices_of_cells(self): return self._nv_entity('cell')
     def number_of_vertices_of_faces(self): return self._nv_entity('face')
@@ -151,8 +151,8 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell
         dtype = self.itype
 
-        cell2face = fealpy.zeros((NC, NFC), dtype=dtype)
-        arange_tensor = fealpy.arange(0, NF, dtype=dtype)
+        cell2face = bm.zeros((NC, NFC), dtype=dtype)
+        arange_tensor = bm.arange(0, NF, dtype=dtype)
 
         assert cell2face.dtype == arange_tensor.dtype, f"Data type mismatch: cell2face is {cell2face.dtype}, arange_tensor is {arange_tensor.dtype}"
 
@@ -178,7 +178,7 @@ class MeshDS(metaclass=MeshMeta):
         bd_face_flag = self.boundary_face_flag()
         kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
         bd_face2node = self.entity('face', index=bd_face_flag)
-        bd_node_flag = fealpy.zeros((NN,), **kwargs)
+        bd_node_flag = bm.zeros((NN,), **kwargs)
         bd_node_flag[bd_face2node.ravel()] = True
         return bd_node_flag
 
@@ -200,7 +200,7 @@ class MeshDS(metaclass=MeshMeta):
         bd_face_flag = self.boundary_face_flag()
         kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
         bd_face2cell = self.face2cell[bd_face_flag, 0]
-        bd_cell_flag = fealpy.zeros((NC,), **kwargs)
+        bd_cell_flag = bm.zeros((NC,), **kwargs)
         bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
@@ -245,8 +245,8 @@ class MeshDS(metaclass=MeshMeta):
         NFC = self.number_of_faces_of_cells()
 
         totalFace = self.total_face()
-        _, i0_np, j_np = fealpy.unique(
-            fealpy.sort(totalFace, axis=1),
+        _, i0_np, j_np = bm.unique(
+            bm.sort(totalFace, axis=1),
             return_index=True,
             return_inverse=True,
             axis=0
@@ -254,20 +254,20 @@ class MeshDS(metaclass=MeshMeta):
         self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
         NF = i0_np.shape[0]
 
-        i1_np = fealpy.zeros(NF, dtype=i0_np.dtype)
-        i1_np[j_np] = fealpy.arange(0, NFC*NC, dtype=i0_np.dtype)
+        i1_np = bm.zeros(NF, dtype=i0_np.dtype)
+        i1_np[j_np] = bm.arange(0, NFC*NC, dtype=i0_np.dtype)
 
         self.cell2face = j_np.reshape(NC, NFC)
 
-        face2cell_np = fealpy.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
+        face2cell_np = bm.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
         self.face2cell = face2cell_np
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
 
             total_edge = self.total_edge()
-            _, i2, j = fealpy.unique(
-                fealpy.sort(total_edge, axis=1),
+            _, i2, j = bm.unique(
+                bm.sort(total_edge, axis=1),
                 return_index=True,
                 return_inverse=True,
                 axis=0

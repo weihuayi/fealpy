@@ -1,8 +1,7 @@
 
-from typing import Optional, Dict, Callable, TypeVar, Tuple, Any
+from typing import Dict, Callable, TypeVar, Tuple, Any
 
 from .. import logger
-from ..backend import TensorLike
 
 _Meth = TypeVar('_Meth', bound=Callable)
 
