@@ -4,7 +4,7 @@ __all__ = ['LinearMeshCFEDof']
 from typing import Union, Generic, TypeVar
 
 from ..backend import TensorLike
-from ..backend import backend_manager as fealpy
+from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
 
 
@@ -23,9 +23,9 @@ class LinearMeshCFEDof(Generic[_MT]):
     def is_boundary_dof(self, threshold=None):
         TD = self.mesh.top_dimension()
         gdof = self.number_of_global_dofs()
-        if fealpy.is_tensor(threshold):
+        if bm.is_tensor(threshold):
             index = threshold
-            if (index.dtype == fealpy.bool_) and (len(index) == gdof):
+            if (index.dtype == bm.bool_) and (len(index) == gdof):
                 return index
         else:
             index = self.mesh.boundary_face_index()
@@ -35,7 +35,7 @@ class LinearMeshCFEDof(Generic[_MT]):
                 index = index[flag]
 
         face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
-        isBdDof = fealpy.zeros(gdof, dtype=fealpy.bool_)
+        isBdDof = bm.zeros(gdof, dtype=bm.bool_)
         isBdDof[face2dof] = True
         return isBdDof
 

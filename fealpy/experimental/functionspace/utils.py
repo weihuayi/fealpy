@@ -1,7 +1,7 @@
 
 from typing import Optional, Tuple, Union
 
-from ..backend import backend_manager as fealpy
+from ..backend import backend_manager as bm
 from ..typing import TensorLike
 from ..typing import Size
 
@@ -16,7 +16,7 @@ def zero_dofs(gdofs: int, dims: Union[Size, int, None]=None, *, dtype=None):
     else:
         shape = (gdofs, *dims)
 
-    return fealpy.zeros(shape, **kwargs)
+    return bm.zeros(shape, **kwargs)
 
 
 def flatten_indices(shape: Size, permute: Size) -> TensorLike:
@@ -31,11 +31,11 @@ def flatten_indices(shape: Size, permute: Size) -> TensorLike:
     """
     permuted_shape = Size([shape[d] for d in permute])
     numel = permuted_shape.numel()
-    permuted_indices = fealpy.arange(numel, dtype=fealpy.int_).reshape(permuted_shape)
+    permuted_indices = bm.arange(numel, dtype=bm.int_).reshape(permuted_shape)
     inv_permute = [None, ] * len(permute)
     for d in range(len(permute)):
         inv_permute[permute[d]] = d
-    return fealpy.transpose(permuted_indices, inv_permute)
+    return bm.transpose(permuted_indices, inv_permute)
 
 
 def to_tensor_dof(to_dof: TensorLike, dof_numel: int, gdof: int, dof_priority: bool=True) -> TensorLike:
@@ -56,7 +56,7 @@ def to_tensor_dof(to_dof: TensorLike, dof_numel: int, gdof: int, dof_priority: b
         kwargs['device'] = to_dof.device
 
     num_entity = to_dof.shape[0]
-    indices = fealpy.arange(gdof*dof_numel, **kwargs)
+    indices = bm.arange(gdof*dof_numel, **kwargs)
 
     if dof_priority:
         indices = indices.reshape(dof_numel, gdof).T
@@ -77,7 +77,7 @@ def tensor_basis(shape: Tuple[int, ...], *, dtype=None) -> TensorLike:
     """
     shape = Size(shape)
     numel = shape.numel()
-    return fealpy.eye(numel, dtype=dtype).reshape((numel,) + shape)
+    return bm.eye(numel, dtype=dtype).reshape((numel,) + shape)
 
 
 def normal_strain(gphi: TensorLike, indices: TensorLike, *, out: Optional[TensorLike]=None) -> TensorLike:
@@ -99,7 +99,7 @@ def normal_strain(gphi: TensorLike, indices: TensorLike, *, out: Optional[Tensor
     new_shape = gphi.shape[:-2] + (GD, GD*ldof)
 
     if out is None:
-        out = fealpy.zeros(new_shape, **kwargs)
+        out = bm.zeros(new_shape, **kwargs)
     else:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')
@@ -132,7 +132,7 @@ def shear_strain(gphi: TensorLike, indices: TensorLike, *, out: Optional[TensorL
     new_shape = gphi.shape[:-2] + (NNZ, GD*ldof)
 
     if out is None:
-        out = fealpy.zeros(new_shape, **kwargs)
+        out = bm.zeros(new_shape, **kwargs)
     else:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')

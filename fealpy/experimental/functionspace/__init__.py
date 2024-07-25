@@ -1,5 +1,5 @@
 
-from .space import FunctionSpace, Function
+from .space import FunctionSpace
 
 from .dofs import LinearMeshCFEDof
 

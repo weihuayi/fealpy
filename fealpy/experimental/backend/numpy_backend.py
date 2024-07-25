@@ -16,6 +16,14 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
     DATA_CLASS = np.ndarray
 
     @staticmethod
+    def set_default_device(device) -> None:
+        raise NotImplementedError("`set_default_device` is not supported by NumpyBackend")
+
+    @staticmethod
+    def get_device(tensor_like, /):
+        return 'cpu'
+
+    @staticmethod
     def to_numpy(tensor_like: NDArray, /) -> NDArray:
         return tensor_like
 

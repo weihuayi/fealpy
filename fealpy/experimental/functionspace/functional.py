@@ -2,7 +2,7 @@
 from typing import Tuple
 
 from ..typing import TensorLike
-from ..backend import backend_manager as fealpy
+from ..backend import backend_manager as bm
 from .utils import tensor_basis
 
 
@@ -20,13 +20,13 @@ def generate_tensor_basis(basis: TensorLike, shape: Tuple[int, ...], dof_priorit
         where numel is the number of elements in the shape.
     """
     factor = tensor_basis(shape, dtype=basis.dtype)
-    tb = fealpy.tensordot(basis, factor, axes=0)
+    tb = bm.tensordot(basis, factor, axes=0)
     ldof = basis.shape[-1]
     numel = factor.shape[0]
 
     if dof_priority:
         ndim = len(shape)
-        tb = fealpy.swapaxes(tb, -ndim-1, -ndim-2)
+        tb = bm.swapaxes(tb, -ndim-1, -ndim-2)
 
     return tb.reshape(basis.shape[:-1] + (numel*ldof,) + shape)
 
@@ -46,12 +46,12 @@ def generate_tensor_grad_basis(grad_basis: TensorLike, shape: Tuple[int, ...], d
     """
     factor = tensor_basis(shape, dtype=grad_basis.dtype)
     s0 = "abcde"[:len(shape)]
-    tb = fealpy.einsum(f'...jz, n{s0} -> ...jn{s0}z', grad_basis, factor)
+    tb = bm.einsum(f'...jz, n{s0} -> ...jn{s0}z', grad_basis, factor)
     ldof, GD = grad_basis.shape[-2:]
     numel = factor.shape[0]
 
     if dof_priority:
         ndim = len(shape)
-        tb = fealpy.swapaxes(tb, -ndim-2, -ndim-3)
+        tb = bm.swapaxes(tb, -ndim-2, -ndim-3)
 
     return tb.reshape(grad_basis.shape[:-2] + (numel*ldof,) + shape + (GD,))
