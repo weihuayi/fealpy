@@ -2,7 +2,7 @@
 from typing import Union, TypeVar, Generic, Callable, Optional
 
 from ..backend import TensorLike
-from ..backend import backend_manager as fealpy
+from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof
@@ -75,7 +75,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             source = source(ipoints[index])
 
         if uh.ndim == 1:
-            if fealpy.is_tensor(source) and source.shape[-1] == 1:
+            if bm.is_tensor(source) and source.shape[-1] == 1:
                 source = source.squeeze(-1)
             uh[index] = source
             return uh
@@ -140,18 +140,18 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             # uh[..., cell2dof].shape == (..., NC, ldof)
             # val.shape == (NQ, ..., NC)
             s1 = f"...ci, {s0[:dim]}ci->...{s0[:dim]}c"
-            val = fealpy.einsum(s1, phi, uh[..., cell2dof])
+            val = bm.einsum(s1, phi, uh[..., cell2dof])
         elif doforder == 'vdims':
             # phi.shape == (NQ, NC, ldof)
             # uh.shape == (gdof, GD)
             # uh[cell2dof, ...].shape == (NC, ldof, ...)
             # val.shape == (NQ, NC, ...)
             s1 = f"c...i, ci{s0[:dim]}->c...{s0[:dim]}"
-            val = fealpy.einsum(s1, phi, uh[cell2dof, ...])
+            val = bm.einsum(s1, phi, uh[cell2dof, ...])
         elif doforder == 'batched':
             # Here 'batched' case is added.
             s1 = f"c...i, {s0[:dim]}ci ->{s0[:dim]}c..."
-            val = fealpy.einsum(s1, phi, uh[..., cell2dof])
+            val = bm.einsum(s1, phi, uh[..., cell2dof])
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
         return val
