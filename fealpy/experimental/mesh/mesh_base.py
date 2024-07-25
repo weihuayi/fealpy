@@ -1,7 +1,7 @@
 
 from typing import Union, Optional, Sequence, Tuple, Any
 
-from ..backend import backend_manager as fealpy
+from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 from ..quadrature import Quadrature
@@ -32,7 +32,7 @@ class Mesh(MeshDS):
     GD = property(geo_dimension)
 
     def multi_index_matrix(self, p: int, etype: int) -> TensorLike:
-        return fealpy.multi_index_matrix(p, etype, dtype=self.itype)
+        return bm.multi_index_matrix(p, etype, dtype=self.itype)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """Get the barycenter of the entity.
@@ -66,7 +66,7 @@ class Mesh(MeshDS):
             Tensor[NE,]: Length of edges, shaped [NE,].
         """
         edge = self.entity(1, index=index)
-        return fealpy.edge_length(edge, self.node, out=out)
+        return bm.edge_length(edge, self.node, out=out)
 
     def edge_normal(self, index: Index=_S, normalize: bool=False, out=None) -> TensorLike:
         """Calculate the normal of the edges.
@@ -80,7 +80,7 @@ class Mesh(MeshDS):
             Tensor[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return fealpy.edge_normal(edge, self.node, normalize=normalize, out=out)
+        return bm.edge_normal(edge, self.node, normalize=normalize, out=out)
 
     def edge_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
         """Calculate the unit normal of the edges.
@@ -100,7 +100,7 @@ class Mesh(MeshDS):
             TensorLike[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return fealpy.edge_tengent(edge, self.node, normalize=normalize, out=out)
+        return bm.edge_tengent(edge, self.node, normalize=normalize, out=out)
 
     def cell_normal(self, index: Index=_S, node: Optional[TensorLike]=None) -> TensorLike:
         """
@@ -111,7 +111,7 @@ class Mesh(MeshDS):
         cell = self.entity('cell', index=index)
         v1 = node[cell[:, 1]] - node[cell[:, 0]]
         v2 = node[cell[:, 2]] - node[cell[:, 1]]
-        normal = fealpy.cross(v1, v2)
+        normal = bm.cross(v1, v2)
         return normal
 
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell', qtype: str='legendre') -> Quadrature:
@@ -139,10 +139,10 @@ class Mesh(MeshDS):
         NE = self.number_of_edges()
         edges = self.edge[index]
         kwargs = {'dtype': edges.dtype, 'device': self.device}
-        indices = fealpy.arange(NE, **kwargs)[index]
-        return fealpy.cat([
+        indices = bm.arange(NE, **kwargs)[index]
+        return bm.cat([
             edges[:, 0].reshape(-1, 1),
-            (p-1) * indices.reshape(-1, 1) + fealpy.arange(0, p-1, **kwargs) + NN,
+            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
             edges[:, 1].reshape(-1, 1),
         ], dim=-1)
 
@@ -185,101 +185,7 @@ class Mesh(MeshDS):
                             variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
-    def integral(self, f, q=3, celltype=False) -> TensorLike:
-        """
-        @brief 在网格中数值积分一个函数
-        """
-        GD = self.geo_dimension()
-        qf = self.integrator(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = self.bc_to_point(bcs)
-
-        if callable(f):
-            if not hasattr(f, 'coordtype'):
-                f = f(ps)
-            else:
-                if f.coordtype == 'cartesian':
-                    f = f(ps)
-                elif f.coordtype == 'barycentric':
-                    f = f(bcs)
-        cm = self.entity_measure('cell')
-
-        if isinstance(f, (int, float)): #  u 为标量常函数
-            e = f*cm
-        elif fealpy.is_tensor(f):
-            if f.shape == (GD, ): # 常向量函数
-                e = cm[:, None]*f
-            elif f.shape == (GD, GD):
-                e = cm[:, None, None]*f
-            else:
-                e = fealpy.einsum('q, qc..., c->c...', ws, f, cm)
-        else:
-            raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
-
-        if celltype:
-            return e
-        else:
-            return fealpy.sum(e)
-
-    def error(self, u, v, q=3, power=2, celltype=False, integrator=None) -> TensorLike:
-        """
-        @brief Calculate the error between two functions.
-        """
-        GD = self.geo_dimension()
-
-        qf = self.integrator(q, etype='cell') if integrator is None else integrator
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = self.bc_to_point(bcs)
-
-        if callable(u):
-            if not hasattr(u, 'coordtype'):
-                u = u(ps)
-            else:
-                if u.coordtype == 'cartesian':
-                    u = u(ps)
-                elif u.coordtype == 'barycentric':
-                    u = u(bcs)
-
-        if callable(v):
-            if not hasattr(v, 'coordtype'):
-                v = v(ps)
-            else:
-                if v.coordtype == 'cartesian':
-                    v = v(ps)
-                elif v.coordtype == 'barycentric':
-                    v = v(bcs)
-
-        if u.shape[-1] == 1:
-           u = u[..., 0]
-
-        if v.shape[-1] == 1:
-           v = v[..., 0]
-
-        cm = self.entity_measure('cell')
-
-        NC = self.number_of_cells()
-        #if v.shape[-1] == NC:
-        #    v = np.swapaxes(v, 1, -1)
-        f = fealpy.power(fealpy.abs(u - v), power)
-        if len(f.shape) == 1:
-            f = f[:, None]
-
-        if isinstance(f, (int, float)): # f为标量常函数
-            e = f*cm
-        elif fealpy.is_tensor(f):
-            if f.shape == (GD, ): # 常向量函数
-                e = cm[:, None]*f
-            elif f.shape == (GD, GD):
-                e = cm[:, None, None]*f
-            else:
-                e = fealpy.einsum('q, qc..., c->c...', ws, f, cm)
-
-        if celltype is False:
-            e = fealpy.power(fealpy.sum(e), 1/power)
-        else:
-            e = fealpy.power(fealpy.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
-        return e # float or (NC, )
-
+    # tools
     def paraview(self, file_name = "temp.vtu",
             background_color='1.0, 1.0, 1.0',
             show_type='Surface With Edges',
@@ -359,7 +265,7 @@ class Mesh(MeshDS):
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
         cell[:, 0] = NV
-        cell = cell.astype(fealpy.int64)
+        cell = cell.astype(np.int64)
 
         points = vtk.vtkPoints()
         points.SetData(vnp.numpy_to_vtk(node))
@@ -417,7 +323,7 @@ class HomogeneousMesh(Mesh):
         if etype in ('node', 0):
             return node if index is None else node[index]
         entity = self.entity(etype, index)
-        return fealpy.barycenter(entity, node)
+        return bm.barycenter(entity, node)
 
     def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]],
                     etype: Union[int, str]='cell', index: Index=_S) -> TensorLike:
@@ -427,9 +333,9 @@ class HomogeneousMesh(Mesh):
         node = self.entity('node')
         entity = self.entity(etype, index)
         order = getattr(entity, 'bc_order', None)
-        return fealpy.bc_to_points(bcs, node, entity, order)
+        return bm.bc_to_points(bcs, node, entity, order)
 
-    ### ipoints
+    # ipoints
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
         raise NotImplementedError
 
@@ -439,17 +345,103 @@ class HomogeneousMesh(Mesh):
     def face_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
         raise NotImplementedError
 
+    # tools
+    def integral(self, f, q=3, celltype=False) -> TensorLike:
+        """
+        @brief 在网格中数值积分一个函数
+        """
+        GD = self.geo_dimension()
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        if callable(f):
+            if getattr(f, 'coordtype', None) == 'barycentric':
+                f = f(bcs)
+            else:
+                f = f(ps)
+
+        cm = self.entity_measure('cell')
+
+        if isinstance(f, (int, float)): #  u 为标量常函数
+            e = f*cm
+        elif bm.is_tensor(f):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
+        else:
+            raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
+
+        if celltype:
+            return e
+        else:
+            return bm.sum(e)
+
+    def error(self, u, v, q=3, power=2, celltype=False, integrator=None) -> TensorLike:
+        """
+        @brief Calculate the error between two functions.
+        """
+        GD = self.geo_dimension()
+
+        qf = self.integrator(q, etype='cell') if integrator is None else integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        if callable(u):
+            if getattr(u, 'coordtype', None) == 'barycentric':
+                u = u(bcs)
+            else:
+                u = u(ps)
+
+        if callable(v):
+            if getattr(v, 'coordtype', None) == 'barycentric':
+                v = v(bcs)
+            else:
+                v = v(ps)
+
+        if u.shape[-1] == 1:
+           u = u[..., 0]
+
+        if v.shape[-1] == 1:
+           v = v[..., 0]
+
+        cm = self.entity_measure('cell')
+        #if v.shape[-1] == NC:
+        #    v = np.swapaxes(v, 1, -1)
+        f = bm.power(bm.abs(u - v), power)
+        if len(f.shape) == 1:
+            f = f[:, None]
+
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*cm
+        elif bm.is_tensor(f):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = bm.einsum('q, qc..., c -> c...', ws, f, cm)
+
+        if celltype is False:
+            e = bm.power(bm.sum(e), 1/power)
+        else:
+            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e # float or (NC, )
+
 
 class SimplexMesh(HomogeneousMesh):
     # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return fealpy.simplex_ldof(p, iptype)
+        return bm.simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
-        return fealpy.simplex_gdof(p, nums)
+        return bm.simplex_gdof(p, nums)
 
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
@@ -459,8 +451,8 @@ class SimplexMesh(HomogeneousMesh):
                        variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = bcs.shape[-1] - 1
         if mi is None:
-            mi = fealpy.multi_index_matrix(p, TD, dtype=self.itype)
-        phi = fealpy.simplex_shape_function(bcs, p, mi)
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        phi = bm.simplex_shape_function(bcs, p, mi)
         if variable == 'u':
             return phi
         elif variable == 'x':
@@ -473,13 +465,13 @@ class SimplexMesh(HomogeneousMesh):
                             variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = bcs.shape[-1] - 1
         if mi is None:
-            mi = fealpy.multi_index_matrix(p, TD, dtype=self.itype)
-        R = fealpy.simplex_grad_shape_function(bcs, p, mi) # (NQ, ldof, bc)
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        R = bm.simplex_grad_shape_function(bcs, p, mi) # (NQ, ldof, bc)
         if variable == 'u':
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = fealpy.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
+            gphi = bm.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:
@@ -492,11 +484,11 @@ class TensorMesh(HomogeneousMesh):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return fealpy.tensor_ldof(p, iptype)
+        return bm.tensor_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int) -> int:
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
-        return fealpy.tensor_gdof(p, nums)
+        return bm.tensor_gdof(p, nums)
 
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
@@ -506,9 +498,9 @@ class TensorMesh(HomogeneousMesh):
                        variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = len(bcs)
         if mi is None:
-            mi = fealpy.multi_index_matrix(p, TD, dtype=self.itype)
-        raw_phi = [fealpy.simplex_shape_function(bc, p, mi) for bc in bcs]
-        phi = fealpy.tensorprod(*raw_phi)
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
+        phi = bm.tensorprod(*raw_phi)
         if variable == 'u':
             return phi
         elif variable == 'x':

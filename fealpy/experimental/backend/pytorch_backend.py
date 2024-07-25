@@ -117,6 +117,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def stack(arrays, axis=0, out=None, *, dtype=None):
+        if dtype is not None:
+            arrays = [a.to(dtype=dtype) for a in arrays]
         return torch.stack(arrays, dim=axis, out=out)
 
     ### FEALPy functionals ###
