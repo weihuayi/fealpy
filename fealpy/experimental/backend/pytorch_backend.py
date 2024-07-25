@@ -95,7 +95,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
-        return torch.sort(a, dim=axis, **kwargs)
+        return torch.sort(a, dim=axis, **kwargs)[0]
 
     @staticmethod
     def nonzero(a, /, as_tuple=True):

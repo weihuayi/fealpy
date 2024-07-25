@@ -1,8 +1,8 @@
 
 from typing import Tuple, Optional
 
-from ...backend import TensorLike
-from ...backend import backend_manager as fealpy
+from ..backend import TensorLike
+from ..backend import backend_manager as fealpy
 
 
 class Quadrature():

@@ -76,9 +76,9 @@ class MeshDS(metaclass=MeshMeta):
             return 0
 
         if hasattr(entity, 'location'):
-            return entity.location.size(0) - 1
+            return entity.location.shape[0] - 1
         else:
-            return entity.size(0)
+            return entity.shape[0]
 
     def number_of_nodes(self): return self.count('node')
     def number_of_edges(self): return self.count('edge')
@@ -245,7 +245,7 @@ class MeshDS(metaclass=MeshMeta):
 
         totalFace = self.total_face()
         _, i0_np, j_np = fealpy.unique(
-            fealpy.sort(totalFace, dim=1)[0],
+            fealpy.sort(totalFace, axis=1),
             return_index=True,
             return_inverse=True,
             axis=0
@@ -266,7 +266,7 @@ class MeshDS(metaclass=MeshMeta):
 
             total_edge = self.total_edge()
             _, i2, j = fealpy.unique(
-                fealpy.sort(total_edge, dim=1)[0],
+                fealpy.sort(total_edge, axis=1),
                 return_index=True,
                 return_inverse=True,
                 axis=0
