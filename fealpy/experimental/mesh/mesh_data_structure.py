@@ -240,6 +240,7 @@ class MeshDS(metaclass=MeshMeta):
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NFC = self.number_of_faces_of_cells()
 
@@ -278,5 +279,6 @@ class MeshDS(metaclass=MeshMeta):
             self.edge2cell = self.face2cell
             self.cell2edge = self.cell2face
 
-        logger.info(f"Mesh toplogy relation constructed, with {NF} faces, "
-                    f"on device {self.device}")
+        logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
+                    f"faces, {NN} nodes "
+                    f"on device ?")
