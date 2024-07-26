@@ -18,8 +18,8 @@ pde = taylor_greenData(Re,T=[0,T])
 domain = pde.domain()
 
 #建立网格
-nx = 32
-ny = 32
+nx = 16
+ny = 16
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
 mesh = UniformMesh2d([0,nx,0,ny],h=(hx,hy),origin=(0,0))
@@ -171,7 +171,7 @@ for i in range(nt):
     # 计算误差
     uu = pde.solution_u(nodes_u,(i+2)*tau)
     vv = pde.solution_v(nodes_v,(i+2)*tau)
-    pp = pde.solution_p(nodes_p,(i+2)*tau)
+    pp = pde.solution_p(nodes_p,(i+3/2)*tau)
     erru = np.sqrt(np.sum((uu-values_2_u)**2+(vv-values_2_v)**2))/(num_nodes_u+num_nodes_v)
     errp = np.sqrt(np.sum(pp-values_2_p)**2)/num_nodes_p
     #errp = np.abs(np.mean(pp-values_2_p))/num_nodes_p

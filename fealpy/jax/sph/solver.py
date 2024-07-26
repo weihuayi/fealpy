@@ -14,6 +14,7 @@ import h5py
 import pyvista
 from typing import Dict
 import enum
+from jax_md import space
 
 #设置标签
 class Tag(enum.IntEnum):
@@ -32,7 +33,8 @@ class SPHSolver:
         self.mesh = mesh 
 
     #状态方程更新压力
-    def tait_eos(self, rho, c0, rho0, gamma=1.0, X=0.0):
+    @staticmethod
+    def tait_eos(rho, c0, rho0, gamma=1.0, X=0.0):
         """Equation of state update pressure"""
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
     
@@ -42,7 +44,8 @@ class SPHSolver:
         return rho0 * (p_temp / p0) ** (1 / gamma)
     
     #计算密度
-    def compute_rho(self, mass, i_node, w_ij):
+    @staticmethod
+    def compute_rho(mass, i_node, w_ij):
         """Density summation."""
         return mass * ops.segment_sum(w_ij, i_node, len(mass))
 
@@ -58,15 +61,15 @@ class SPHSolver:
         a = c[:, None] * 1.0 * pb[i_node][:, None] * r_ij       
         return ops.segment_sum(a, i_node, len(state["mass"]))
 
-    #计算张量A，用于计算动量速度的加速度
-    def compute_A(self, rho, mv, tv):
-        a = rho[:, jnp.newaxis] * mv
-        dv = tv - mv
-        result = jnp.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
-        return result
 
     #计算动量速度的加速度
-    def compute_mv_acceleration(self, state, i_node, j_node, r_ij, dij, grad, p):
+    @staticmethod 
+    def compute_mv_acceleration(state, i_node, j_node, r_ij, dij, grad, p):
+        def compute_A(rho, mv, tv):
+            a = rho[:, jnp.newaxis] * mv
+            dv = tv - mv
+            result = jnp.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
+            return result
         eta_i = state["eta"][i_node]
         eta_j = state["eta"][j_node]
         p_i = p[i_node]
@@ -84,16 +87,12 @@ class SPHSolver:
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS) 
         p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
         c = volume_square * grad / (dij + EPS)
-        A = (self.compute_A(rho_i, mv_i, tv_i) + self.compute_A(rho_j, mv_j, tv_j))/2
+        A = (compute_A(rho_i, mv_i, tv_i) + compute_A(rho_j, mv_j, tv_j))/2
         mv_ij = mv_i -mv_j
         b = jnp.sum(A * r_ij[:, jnp.newaxis, :], axis=2)
         a = c[:, None] * (-p_ij[:, None] * r_ij + b + (eta_ij[:, None] * mv_ij))
         return ops.segment_sum(a, i_node, len(state["mass"]))
-
-    def forward(self, state, neighbors):
-        position = state['position']
-        tag = state['tag']
-
+    
     def boundary_conditions(self, state, box_size, n_walls=3, dx=0.02, T0=1.0, hot_T=1.23): 
         fluid = state["tag"] == 0
 
@@ -387,8 +386,50 @@ class SPHSolver:
                 v = np.hstack([v, np.zeros((N, 1))])
             data_pv[k] = np.asarray(v)
         return data_pv
+    
+    def forward_wrapper(self, displacement, kernel):
+        def forward(state, neighbors): 
+            r = state["position"]
+            i_s, j_s = neighbors.idx
+            r_i_s, r_j_s = r[i_s], r[j_s]
+            dr_i_j = vmap(displacement)(r_i_s, r_j_s)
+            dist = space.distance(dr_i_j)
+            w_dist = vmap(kernel.value)(dist)  
+            e_s = dr_i_j / (dist[:, None] + EPS) 
+            grad_w_dist_norm = vmap(kernel.grad_value)(dist)
+            grad_w_dist = grad_w_dist_norm[:, None] * e_s
+            
+            state['rho'] = self.compute_rho(state['mass'], i_s, w_dist)
+            p = self.tait_eos(state['rho'],10,1)
+            
+            state["dmvdt"] = self.compute_mv_acceleration(\
+                state, i_s, j_s, dr_i_j, dist, grad_w_dist_norm, p)
+            
+            return state
+        return forward
 
     def write_vtk(self, data_dict: Dict, path: str):
         """Store a .vtk file for ParaView."""
         data_pv = self.dict2pyvista(data_dict)
         data_pv.save(path)
+
+def TimeLine(model, shift_fn):
+    def advance(dt, state, neighbors):
+        state["mv"] += 1.0 * dt * state["dmvdt"]
+        state["tv"] = state["mv"] 
+
+        # 2. Integrate position with velocity v
+        state["position"] = shift_fn(state["position"], 1.0 * dt * state["tv"])
+
+        # 3. Update neighbor list
+        neighbors = neighbors.update(state["position"], num_particles=state["position"].shape[0])
+
+        # 4. Compute accelerations
+        state = model(state, neighbors)
+
+        # 5. Impose boundary conditions on dummy particles (if applicable)
+        #state = bc_fn(state)
+        return state, neighbors
+
+    return advance
+
