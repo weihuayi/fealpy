@@ -1,5 +1,5 @@
 
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
 from math import factorial
@@ -15,10 +15,7 @@ except ImportError:
                       'the PyTorch backend in fealpy. '
                       'See https://pytorch.org/ for installation.')
 
-from .base import (
-    Backend, ATTRIBUTE_MAPPING, CREATION_MAPPING, REDUCTION_MAPPING,
-    UNARY_MAPPING, BINARY_MAPPING, OTHER_MAPPING
-)
+from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 
 Tensor = torch.Tensor
 _device = torch.device
@@ -31,11 +28,26 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def set_default_device(device: Union[str, _device]) -> None:
         torch.set_default_device(device)
 
+    @staticmethod
+    def get_device(tensor_like: Tensor, /):
+        return tensor_like.device
+
+    @staticmethod
+    def to_numpy(tensor_like: Tensor, /) -> Any:
+        return tensor_like.detach().cpu().numpy()
+
+    from_numpy = torch.from_numpy
+
     ### Tensor creation methods ###
 
     @staticmethod
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
         return torch.linspace(start, stop, steps=num, dtype=dtype, **kwargs)
+
+    @staticmethod
+    def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
+        assert k == 0, "Only k=0 is supported by `eye` in PyTorchBackend."
+        return torch.eye(n, m, dtype=dtype, **kwargs)
 
     ### Reduction methods ###
 
@@ -87,7 +99,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
-        return torch.sort(a, dim=axis, **kwargs)
+        return torch.sort(a, dim=axis, **kwargs)[0]
 
     @staticmethod
     def nonzero(a, /, as_tuple=True):
@@ -109,6 +121,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def stack(arrays, axis=0, out=None, *, dtype=None):
+        if dtype is not None:
+            arrays = [a.to(dtype=dtype) for a in arrays]
         return torch.stack(arrays, dim=axis, out=out)
 
     ### FEALPy functionals ###
@@ -295,12 +309,7 @@ attribute_mapping.update({
     'complex_': 'complex'
 })
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
-creation_mapping = CREATION_MAPPING.copy()
-creation_mapping.update(array='tensor')
-PyTorchBackend.attach_methods(CREATION_MAPPING, torch)
-PyTorchBackend.attach_methods(REDUCTION_MAPPING, torch)
-PyTorchBackend.attach_methods(UNARY_MAPPING, torch)
-PyTorchBackend.attach_methods(BINARY_MAPPING, torch)
-other_mapping = OTHER_MAPPING.copy()
-other_mapping.update(transpose='permute')
-PyTorchBackend.attach_methods(OTHER_MAPPING, torch)
+function_mapping = FUNCTION_MAPPING.copy()
+function_mapping.update(array='tensor', power='pow', transpose='permute',
+                        repeat='repeat_interleave')
+PyTorchBackend.attach_methods(function_mapping, torch)

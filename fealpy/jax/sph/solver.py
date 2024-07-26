@@ -189,14 +189,120 @@ class SPHSolver:
         result = ops.segment_sum(dTdt, i_s, len(state["position"]))
         return result
 
-    def compute_distances(self, p1, p2):
-        # 扩展维度以计算每对粒子的距离
-        p1_expand = jnp.expand_dims(p1, 1) #(N,1,2)
-        p2_expand = jnp.expand_dims(p2, 0) #(1,M,2)
+    def wall_extrapolation(self, state, kernel, i_s, j_s):
+        #只更新流体粒子对固壁粒子的影响
+        fw_m = state["mass"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_rho = state["rho"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_v = state["v"][(state["tag"] == 0) | (state["tag"] == 1)]
+        v_wall = jnp.zeros_like(fw_v)
+
+        sum0 = (fw_m[j_s]/fw_rho[j_s])[:, None] * fw_v[j_s] * kernel[:, None]
+        sum1 = (fw_m[j_s]/fw_rho[j_s]) * kernel
+        a = ops.segment_sum(sum0, i_s, len(fw_m))
+        b = ops.segment_sum(sum1, i_s, len(fw_m))
+        v_ave = a / b[:, None]
+        result = 2 * v_wall - v_ave
+
+        fw_tag = state["tag"][(state["tag"] == 0) | (state["tag"] == 1)]
+        idx = jnp.where(fw_tag == 1)[0]
+        result = result[idx]
+        return result
+
+    def gate_change(self, state, domain, dt, dx, uin):
+        H = 1.5 * dx
+        dy = dx
+        rho0 = 737.54
+
+        #更新位置
+        g_idx = jnp.where(state["tag"] == 3)[0]
+        r = state["position"][g_idx] + dt * state["v"][g_idx] 
+        state["position"] = state["position"].at[state["tag"]==3].set(r)
+
+        #将进入流体区域的门粒子更换标签为0
+        g_x = state["position"][:, 0]
+        g_i = jnp.where((state["tag"] == 3) & (g_x >= 0))[0] 
+        state["tag"] = state["tag"].at[g_i].set(0)
+
+        #更新物理量
+        y = jnp.arange(domain[2]+dx, domain[3], dx)
+        gp = jnp.column_stack((jnp.full_like(y, domain[0]-4*H), y))
+        state["position"] = jnp.vstack((gp, state["position"]))
+        tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
+        state["tag"] = jnp.concatenate((tag_g, state["tag"]))
+        v_g = jnp.ones_like(gp) * uin
+        state["v"] = jnp.concatenate((v_g, state["v"]))
+        state["rho"] = jnp.concatenate((jnp.ones(gp.shape[0])*rho0, state["rho"]))
+        state["p"] = jnp.concatenate((jnp.zeros_like(tag_g), state["p"]))
+        state["sound"] = jnp.concatenate((jnp.zeros_like(tag_g), state["sound"]))
+        mass_g = jnp.ones(gp.shape[0]) * dx * dy * rho0
+        state["mass"] = jnp.concatenate((mass_g, state["mass"]))
+        return state
+
+    def free_surface(self, state, i_s, j_s, kernel, grad_kernel, h):
+        #计算流体粒子的浓度
+        m_j = state["mass"][j_s]
+        rho_j = state["rho"][j_s]
+        ci = (m_j/rho_j) * kernel
+        grad_ci = (m_j/rho_j)[:, None] * grad_kernel 
+        #grad_ci = ops.segment_sum(grad_ci, i_s, len(state["position"][state["tag"] == 0]))
+        w_tag = state['tag'] == 1
+        d_tag = state['tag'] == 2
+        NN_wd = (jnp.where(w_tag==True)[0]).size + (jnp.where(d_tag==True)[0]).size
         
-        # 计算平方距离
-        distance = jnp.sum((p1_expand - p2_expand)**2, axis=2)  # (N,M)
-        return distance
+        #找浓度<0.75的流体粒子的索引
+        result = ops.segment_sum(ci, i_s, len(state["position"]))
+        result = result[state["tag"] == 0]
+        #idx = jnp.where(result < 0.75)[0] + NN_wd
+        idx = jnp.where(result< 0.75)[0]
+        
+        #判断区域内是否有其他的粒子
+        xji = state["position"][j_s] - state["position"][i_s]
+        gx = jnp.einsum('ki,kj->kij', xji, grad_kernel).reshape(xji.shape[0], 2, 2)
+        As = (m_j/rho_j).reshape(xji.shape[0],1,1) * gx
+        #As = ops.segment_sum(As, i_s, len(state["position"][state["tag"] == 0]))
+        normal = jnp.einsum('ijk,ik->ij', As, grad_ci) / \
+                 jnp.linalg.norm(jnp.einsum('ijk,ik->ij', As, grad_ci), axis=1, keepdims=True)
+        a = jnp.array([-normal[:, 1], normal[:, 0]]).T
+        b = jnp.linalg.norm(a, axis=1)
+        perpen = a / b[:, jnp.newaxis]
+        nodeT = state["position"][i_s] + normal*h
+       
+        cond1 = jnp.linalg.norm(-xji, axis=1) >= jnp.sqrt(2)*h
+        cond2 = jnp.linalg.norm(state["position"][j_s] - nodeT) < h
+        cond3 = jnp.linalg.norm(-xji, axis=1) < jnp.sqrt(2)*h
+        cond4 = (jnp.abs(jnp.dot(normal, (state["position"][j_s] - nodeT).T)).sum()) + \
+                (jnp.abs(jnp.dot(perpen, (state["position"][j_s] - nodeT).T)).sum()) < h
+        
+        cond = ~(cond1 & cond2) | ~(cond3 & cond4)
+        is_free = idx[cond[idx]]
+        return is_free
+
+    def change_p(self, state, kernel, i_s, j_s, d_s, B, rho0, c1):
+        #更新流体粒子的压力和声速
+        p_rho = B * (jnp.exp((jnp.ones_like(state["rho"])-rho0/state["rho"])/c1)-1)
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        state["p"] = state["p"].at[f_tag].set(p_rho[f_tag])
+        sound = jnp.sqrt(B * (rho0/(c1*state["rho"]**2)) * jnp.exp((jnp.ones_like(state["rho"])-rho0/state["rho"])/c1))
+        state["sound"] = state["sound"].at[f_tag].set(sound[f_tag])
+
+        #计算固壁粒子的压力
+        w_tag = jnp.where(state["tag"] == 1)[0]
+        fw_m = state["mass"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_rho = state["rho"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_p = state["p"][(state["tag"] == 0) | (state["tag"] == 1)]
+        sum0 = (fw_m[j_s]*fw_p[j_s]/fw_rho[j_s]) * kernel
+        sum1 = (fw_m[j_s]/fw_rho[j_s]) * kernel
+        a = ops.segment_sum(sum0, i_s, len(fw_m))
+        b = ops.segment_sum(sum1, i_s, len(fw_m))
+        p_w = a / b
+        fw_tag = state["tag"][(state["tag"] == 0) | (state["tag"] == 1)]
+        idx = jnp.where(fw_tag == 1)[0]
+        state["p"] = state["p"].at[w_tag].set(p_w[idx])
+    
+        #计算虚粒子的压力
+        d_tag = jnp.where(state["tag"] == 2)[0]
+        state["p"] = state["p"].at[d_tag].set(state["p"][d_s])
+        return state
 
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""

@@ -29,7 +29,7 @@ class BackendManager():
         """Load a backend by name."""
         if name not in Backend._available_backends:
             try:
-                importlib.import_module(f"fealpy.backend.{name}_backend")
+                importlib.import_module(f"fealpy.experimental.backend.{name}_backend")
             except ImportError:
                 raise RuntimeError(f"Backend '{name}' is not found.")
 
