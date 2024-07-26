@@ -105,6 +105,18 @@ def test_dam_break_domain():
     plt.title('NodeSet from dam break Domain')
     plt.show()
 
+def test_long_rectangular_cavity_domain():
+    node_set = NodeMesh.from_long_rectangular_cavity_domain()
+    wall_particles = node_set.nodedata["position"][node_set.nodedata["tag"] == 1]
+    dummy_particles = node_set.nodedata["position"][node_set.nodedata["tag"] == 2]
+    fig, ax = plt.subplots()
+    ax.scatter(wall_particles[:,0], wall_particles[:,1], color='red', s=25, label='wall_particles')
+    ax.scatter(dummy_particles[:,0], dummy_particles[:,1], color='blue', s=25, label='dummy_particles')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.title('NodeSet from Domain')
+    plt.show()
+
 def test_from_heat_transfer_domain():
     nodemesh = NodeMesh.from_heat_transfer_domain()
     node = nodemesh.node
@@ -112,6 +124,44 @@ def test_from_heat_transfer_domain():
         0: 'red',    # 流体节点为红色
         1: 'blue',   # 固体节点为蓝色
         3: 'green'   # 温度节点为绿色
+    }
+    fig, ax = plt.subplots()
+    tag = nodemesh.nodedata["tag"]
+    for t in np.unique(tag):
+        idx = tag == t
+        ax.scatter(node[idx, 0], node[idx, 1], color=color_map[t], s=25, label=f'Tag {t}')
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('NodeSet from dam break Domain')
+    ax.legend()  
+    plt.show()
+
+def test_from_four_heat_transfer_domain():
+    nodemesh = NodeMesh.from_four_heat_transfer_domain()
+    node = nodemesh.node
+    color_map = {
+        0: 'red',    # 流体节点为红色
+        1: 'blue',   # 固体节点为蓝色
+        3: 'green'   # 温度节点为绿色
+    }
+    fig, ax = plt.subplots()
+    tag = nodemesh.nodedata["tag"]
+    for t in np.unique(tag):
+        idx = tag == t
+        ax.scatter(node[idx, 0], node[idx, 1], color=color_map[t], s=25, label=f'Tag {t}')
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('NodeSet from dam break Domain')
+    ax.legend()  
+    plt.show()
+
+def test_from_slip_stick_domain():
+    nodemesh = NodeMesh.from_slip_stick_domain()
+    node = nodemesh.node
+    color_map = {
+        0: 'red',    # 流体节点为红色
+        1: 'blue',   # 固体节点为蓝色
+        3: 'green'   # 速度节点为绿色
     }
     fig, ax = plt.subplots()
     tag = nodemesh.nodedata["tag"]
@@ -133,4 +183,7 @@ if __name__ == "__main__":
     #test_from_tgv_domain()
     #test_from_ringshaped_channel_domain()
     #test_dam_break_domain()
-    test_from_heat_transfer_domain()
+    #test_from_heat_transfer_domain()
+    #test_from_four_heat_transfer_domain()
+    #test_from_slip_stick_domain()
+    test_long_rectangular_cavity_domain()

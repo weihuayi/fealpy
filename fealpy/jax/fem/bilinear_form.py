@@ -44,24 +44,25 @@ class BilinearForm(Form[_FS]):
             return self.assembly_for_sspace_and_vspace_with_vector_basis(retain_ints=False)
     
     def assembly_for_sspace_and_vspace_with_vector_basis(self, retain_ints: bool) ->BCOO:
+        
         space = self.space
         gdof = space.number_of_global_dofs()
         global_mat_shape = (gdof, gdof)
-
-        M_ = jnp.zeros(global_mat_shape)
-        M = BCOO.fromdense(M_)
-
+        
+        M = BCOO._empty(shape=global_mat_shape, dtype=space.ftype, index_dtype=space.itype)
+        
         for group in self.integrators.keys():
             group_tensor, e2dof = self._assembly_group(group, retain_ints)
+            # Broadcast and flatten indices I and J
             I = jnp.broadcast_to(e2dof[:, :, None], shape=group_tensor.shape)
             J = jnp.broadcast_to(e2dof[:, None, :], shape=group_tensor.shape)
             I = I.ravel()
             J = J.ravel()
-            data = group_tensor.ravel()
-            M += BCOO((data, (I, J)), shape=global_mat_shape)
-        self._M = M
-
-        return self._M
+            indices = jnp.stack([I, J], axis=0).T
+            M += BCOO((group_tensor.ravel(), indices), shape=global_mat_shape)
+        self.M = M
+        
+        return self.M
     
     def assembly_for_vspace_with_scalar_basis(self, retain_ints: bool) -> BCOO:
         pass

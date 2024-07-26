@@ -28,7 +28,7 @@ from absl import logging
 from jax import eval_shape, jit, lax, ops, tree_map, vmap
 from jax.core import ShapedArray
 
-from jax_sph.jax_md import dataclasses, space, util
+from fealpy.jax.sph.jax_md import dataclasses, space, util
 
 # Types
 

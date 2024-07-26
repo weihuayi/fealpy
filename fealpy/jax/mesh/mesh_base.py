@@ -12,7 +12,7 @@ from .quadrature import Quadrature
 from .utils import Array, EntityName, Index, _int_func, _S, _T, _dtype, _device, estr2dim, edim2entity, edim2node, mesh_top_csr
 from .. import logger
 
-from jax.config import config
+from jax import config
 
 config.update("jax_enable_x64", True)
 
@@ -185,11 +185,11 @@ class MeshDS():
         bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
-    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    def boundary_node_index(self): return self.boundary_node_flag().nonzero()[0]
     # TODO: finish this:
     # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
-    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
-    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
+    def boundary_face_index(self): return self.boundary_face_flag().nonzero()[0]
+    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero()[0]
 
     ### Homogeneous Mesh ###
     def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
@@ -467,7 +467,7 @@ class SimplexMesh(HomogeneousMesh):
         if variable == 'u':
             return phi
         elif variable == 'x':
-            return phi.unsqueeze_(0)
+            return jnp.expand_dims(phi, axis=0)
         else:
             raise ValueError("Variable type is expected to be 'u' or 'x', "
                              f"but got '{variable}'.")
@@ -482,7 +482,6 @@ class SimplexMesh(HomogeneousMesh):
             return R
         elif variable == 'x':
             Dlambda = self.grad_lambda(index=index)
-            print(Dlambda.shape, R.shape)
             gphi = jnp.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi

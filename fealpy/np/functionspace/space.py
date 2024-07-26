@@ -17,17 +17,12 @@ class _FunctionSpace(metaclass=ABCMeta):
     doforder: str='vdims'
 
     ### basis
-    @abstractmethod
     def basis(self, p: NDArray, index: Index=_S, **kwargs) -> NDArray: raise NotImplementedError
-    @abstractmethod
     def grad_basis(self, p: NDArray, index: Index=_S, **kwargs) -> NDArray: raise NotImplementedError
-    @abstractmethod
     def hess_basis(self, p: NDArray, index: Index=_S, **kwargs) -> NDArray: raise NotImplementedError
 
     # values
-    @abstractmethod
     def value(self, uh: NDArray, p: NDArray, index: Index=_S) -> NDArray: raise NotImplementedError
-    @abstractmethod
     def grad_value(self, uh: NDArray, p: NDArray, index: Index=_S) -> NDArray: raise NotImplementedError
 
     # counters

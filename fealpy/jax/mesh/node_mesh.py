@@ -4,13 +4,13 @@ from typing import (Callable, Optional, Union,)
 import jax
 import jax.numpy as jnp
 from jax import vmap
-from jax_md import space, partition
+# from jax_md import space, partition
 
 import numpy as np
 
 from .mesh_base import MeshDS 
 from .utils import Array, Dict
-from jax.config import config
+from jax import config
 
 config.update("jax_enable_x64", True)
 
@@ -34,12 +34,26 @@ class NodeMesh(MeshDS):
 
     def top_dimension(self):
         return self.top_dimension()
-    
+    '''
     def add_node_data(self, name:str, dtype=jnp.float64):
         NN = self.NN
         self.nodedata.update({names: jnp.zeros(NN, dtypes) 
                               for names, dtypes in zip(name, dtype)})
-
+    '''
+    
+    def add_node_data(self, name: Union[str, list], data: Array):
+        if isinstance(name, str):
+            if name in self.nodedata:
+                self.nodedata[name] = jnp.concatenate([self.nodedata[name], data], axis=0)
+            else:
+                self.nodedata[name] = data
+        else:
+            for n, d in zip(name, data):
+                if n in self.nodedata:
+                    self.nodedata[n] = jnp.concatenate([self.nodedata[n], d], axis=0)
+                else:
+                    self.nodedata[n] = d
+    
     def set_node_data(self, name, val):
         self.nodedata[name] = self.nodedata[name].at[:].set(val)
 
@@ -211,6 +225,209 @@ class NodeMesh(MeshDS):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
+        }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_four_heat_transfer_domain(cls, dx=0.02, dy=0.02):
+        n_walls = 3 #墙壁层数
+        rho0 = 1.0 #参考密度
+        eta0 = 0.01 #参考动态粘度
+        T0 = 1.0 #参考温度
+        kappa0 = 7.313 #参考导热系数
+        Cp0 = 305.27 #参考热容
+        L,H = 1.5,0.2
+        velocity_wall = 0.3 #每段温度边界长度
+
+        #墙粒子生成
+        dxn1 = dx * n_walls
+        n1 = np.array((np.array([L, dxn1]) / dx).round(), dtype=int)
+        grid1 = np.meshgrid(range(n1[0]), range(n1[1]), indexing="xy")
+        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
+        wall_b = r1.copy()
+        wall_t = r1.copy() + np.array([0.0, H + dxn1])
+        r_w = jnp.concatenate([wall_b, wall_t])
+
+        #流体粒子生成
+        n2 = np.array((np.array([L, H]) / dx).round(), dtype=int)
+        grid2 = np.meshgrid(range(n2[0]), range(n2[1]), indexing="xy")
+        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
+        r_f = np.array([0.0, 1.0]) * n_walls * dx + r2
+
+        #设置标签
+        '''
+        0 fluid
+        1 solid wall
+        2 moving wall
+        3 velocity wall
+        '''
+        r = np.array(np.concatenate([r_w, r_f])) 
+        tag_f = jnp.full(len(r_f), 0, dtype=int)
+        tag_w = jnp.full(len(r_w), 1, dtype=int)
+        r = np.array(np.concatenate([r_w, r_f]))
+        tag = np.concatenate([tag_w, tag_f])
+
+        #设置温度粒子标签
+        dx2n = dx * n_walls * 2
+        _box_size = np.array([L, H + dx2n])
+        mask_hot_wall = (
+        ((r[:, 1] < dx * n_walls) | (r[:, 1] > H + dx * n_walls)) &
+        (((r[:, 0] > 0.3) & (r[:, 0] < 0.6)) | ((r[:, 0] > 0.9) & (r[:, 0] < 1.2)))
+    )
+        tag = jnp.where(mask_hot_wall, 3, tag)
+
+        NN_sum = r.shape[0]
+        mv = jnp.zeros_like(r)
+        rho = jnp.ones(NN_sum) * rho0
+        mass = jnp.ones(NN_sum) * dx * dy * rho0
+        eta = jnp.ones(NN_sum) * eta0
+        temperature = jnp.ones(NN_sum) * T0
+        kappa = jnp.ones(NN_sum) * kappa0
+        Cp = jnp.ones(NN_sum) * Cp0
+
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "mv": mv,
+            "tv": mv,
+            "dmvdt": jnp.zeros_like(mv),
+            "dtvdt": jnp.zeros_like(mv),
+            "drhodt": jnp.zeros_like(rho),
+            "rho": rho,
+            "p": jnp.zeros_like(rho),
+            "mass": mass,
+            "eta": eta,
+            "dTdt": jnp.zeros_like(rho),
+            "T": temperature,
+            "kappa": kappa,
+            "Cp": Cp,
+        }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_long_rectangular_cavity_domain(cls, init_domain, domain, uin, dx=1.25e-4):
+        H = 1.5 * dx
+        dy = dx
+        rho0 = 737.54
+
+        #fluid particles
+        fp = jnp.mgrid[init_domain[0]:init_domain[1]:dx, \
+            init_domain[2]+dx:init_domain[3]:dx].reshape(2,-1).T
+        
+        #wall particles
+        x0 = jnp.arange(domain[0],domain[1],dx)
+
+        bwp = jnp.column_stack((x0,np.full_like(x0,domain[2])))
+        uwp = jnp.column_stack((x0,np.full_like(x0,domain[3])))
+        wp = jnp.vstack((bwp,uwp))
+        
+        #dummy particles
+        bdp = jnp.mgrid[domain[0]:domain[1]:dx, \
+                domain[2]-dx:domain[2]-dx*4:-dx].reshape(2,-1).T
+        udp = jnp.mgrid[domain[0]:domain[1]:dx, \
+                domain[3]+dx:domain[3]+dx*3:dx].reshape(2,-1).T
+        dp = jnp.vstack((bdp,udp))
+        
+        #gate particles
+        gp = jnp.mgrid[-dx:-dx-4*H:-dx, \
+                domain[2]+dx:domain[3]:dx].reshape(2,-1).T
+        
+        #tag
+        '''
+        fluid particles: 0 
+        wall particles: 1 
+        dummy particles: 2
+        gate particles: 3
+        '''
+        tag_f = jnp.full((fp.shape[0],), 0, dtype=int)
+        tag_w = jnp.full((wp.shape[0],), 1, dtype=int)
+        tag_d = jnp.full((dp.shape[0],), 2,dtype=int)
+        tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
+
+        r = jnp.vstack((fp, gp, wp, dp))
+        NN = r.shape[0]
+        tag = jnp.hstack((tag_f, tag_g, tag_w, tag_d))
+        fg_v =  jnp.ones_like(jnp.vstack((fp, gp))) * uin
+        wd_v =  jnp.zeros_like(jnp.vstack((wp, dp)))
+        v = jnp.vstack((fg_v, wd_v))
+        rho = jnp.ones(NN) * rho0
+        mass = jnp.ones(NN) * dx * dy * rho0 
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "v": v,
+            "rho": rho,
+            "p": jnp.zeros_like(rho),
+            "sound": jnp.zeros_like(rho),
+            "mass": mass, 
+        } 
+        return cls(r, nodedata=nodedata)
+        
+    @classmethod
+    def from_slip_stick_domain(cls, dx=0.02, dy=0.02):
+        n_walls = 3 #墙壁层数
+        rho0 = 1.0 #参考密度
+        eta0 = 0.01 #参考动态粘度
+        L,H = 1.5,0.2
+        velocity_wall = 0.3 #每段速度边界长度
+
+        #墙粒子生成
+        dxn1 = dx * n_walls
+        n1 = np.array((np.array([L, dxn1]) / dx).round(), dtype=int)
+        grid1 = np.meshgrid(range(n1[0]), range(n1[1]), indexing="xy")
+        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
+        wall_b = r1.copy()
+        wall_t = r1.copy() + np.array([0.0, H + dxn1])
+        r_w = jnp.concatenate([wall_b, wall_t])
+
+        #流体粒子生成
+        n2 = np.array((np.array([L, H]) / dx).round(), dtype=int)
+        grid2 = np.meshgrid(range(n2[0]), range(n2[1]), indexing="xy")
+        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
+        r_f = np.array([0.0, 1.0]) * n_walls * dx + r2
+
+        #设置标签
+        '''
+        0 fluid
+        1 solid wall
+        2 moving wall
+        3 velocity wall
+        '''
+        r = np.array(np.concatenate([r_w, r_f])) 
+        tag_f = jnp.full(len(r_f), 0, dtype=int)
+        tag_w = jnp.full(len(r_w), 1, dtype=int)
+        r = np.array(np.concatenate([r_w, r_f]))
+        tag = np.concatenate([tag_w, tag_f])
+
+        #设置速度粒子标签
+        dx2n = dx * n_walls * 2
+        _box_size = np.array([L, H + dx2n])
+        mask_hot_wall = (
+        ((r[:, 1] < dx * n_walls) | (r[:, 1] > H + dx * n_walls)) &
+        (((r[:, 0] > 0.3) & (r[:, 0] < 0.6)) | ((r[:, 0] > 0.9) & (r[:, 0] < 1.2)))
+    )
+        tag = jnp.where(mask_hot_wall, 3, tag)
+
+        NN_sum = r.shape[0]
+        mv = jnp.zeros_like(r)
+        mv = jnp.where(tag[:, None] == 1, jnp.array([1.0, 0.0]), mv)
+        rho = jnp.ones(NN_sum) * rho0
+        mass = jnp.ones(NN_sum) * dx * dy * rho0
+        eta = jnp.ones(NN_sum) * eta0
+
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "mv": mv,
+            "tv": mv,
+            "dmvdt": jnp.zeros_like(mv),
+            "dtvdt": jnp.zeros_like(mv),
+            "drhodt": jnp.zeros_like(rho),
+            "rho": rho,
+            "p": jnp.zeros_like(rho),
+            "mass": mass,
+            "eta": eta,
+            "dTdt": jnp.zeros_like(rho),
         }
         return cls(r, nodedata=nodedata)
 

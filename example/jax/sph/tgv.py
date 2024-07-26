@@ -4,10 +4,10 @@ jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 import enum
 import jax.numpy as jnp
 import numpy as np
-from fealpy.jax.sph import NodeMesh
-from fealpy.jax.sph import SPHSolver
+from fealpy.jax.mesh.node_mesh import NodeMesh
+from fealpy.jax.sph import SPHSolver,TimeLine
 from fealpy.jax.sph import partition 
-from jax_md.partition import Sparse
+from fealpy.jax.sph.jax_md.partition import Sparse
 from fealpy.jax.sph.kernel_function import QuinticKernel
 from jax_md import space
 from jax import ops, vmap
@@ -36,6 +36,7 @@ mesh = NodeMesh.from_tgv_domain(box_size, dx)
 solver = SPHSolver(mesh)
 kernel = QuinticKernel(h=h, dim=2)
 displacement, shift = space.periodic(side=box_size) #TODO
+timeline = TimeLine
 
 #邻近搜索
 neighbor_fn = partition.neighbor_list(

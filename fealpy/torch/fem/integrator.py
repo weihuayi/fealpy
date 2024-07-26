@@ -31,9 +31,9 @@ def assemblymethod(call_name: Optional[str]=None):
 
     Requires that the metaclass is IntegratorMeta or derived from it.
 
-    Args:
-        call_name (str, optional): The name for the users to choose the assembly method with.
-        Use the name of the method if None. Defaults to None.
+    Parameters:
+        call_name (str, optional): The name for the users to choose the assembly method.
+            Use the name of the method if None. Defaults to None.
 
     Example:
     ```
@@ -102,6 +102,9 @@ class Integrator(metaclass=IntegratorMeta):
             self._value = getattr(self, self._assembly)(space)
             return self._value
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._assembly})"
+
     def to_global_dof(self, space: _FS) -> Tensor:
         """Return the relationship between the integral entities
         and the global dofs."""
@@ -114,7 +117,7 @@ class Integrator(metaclass=IntegratorMeta):
     def clear(self, result_only=True) -> None:
         """Clear the cache of the integrators.
 
-        Args:
+        Parameters:
             result_only (bool, optional): Whether to only clear the cached result.
             Other cache may be basis, entity measures, bc points... Defaults to True.
             If `False`, anything cached will be cleared.
@@ -133,7 +136,7 @@ class OperatorIntegrator(Integrator):
         """Set a new coefficient of the equation to the integrator.
         This will clear the cached result.
 
-        Args:
+        Parameters:
             coef (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
         """
         self.coef = coef
@@ -147,7 +150,7 @@ class SourceIntegrator(Integrator):
         """Set a new source term of the equation to the integrator.
         This will clear the cached result.
 
-        Args:
+        Parameters:
             source (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
         """
         self.source = source

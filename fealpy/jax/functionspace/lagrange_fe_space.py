@@ -75,17 +75,17 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             source = source(ipoints[index])
 
         if uh.ndim == 1:
-            if isinstance(source, Array) and source.shape[-1] == 1:
+            if isinstance(source, jnp.ndarray) and source.shape[-1] == 1:
                 source = source.squeeze(-1)
-            uh[index] = source
+            uh = uh.at[index].set(source)
             return uh
 
         if dim is None:
             dim = -1 if (getattr(self, 'doforder', None) == 'sdofs') else 0
 
         slicing = [slice(None)] * uh.ndim
-        slicing[dim] = index
-        uh[slicing] = source
+        slicing = slicing.at[dim].set(index)
+        uh = uh.at[slicing].set(source)
 
         return uh
 
@@ -183,11 +183,10 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         if callable(gD):
             gD = gD(ipoints[isDDof])
 
-
         if (len(uh.shape) == 1) or (self.doforder == 'vdims'):
             if len(uh.shape) == 1 and gD.shape[-1] == 1:
                 gD = gD[..., 0]
-            uh[isDDof] = gD
+            uh = uh.at[isDDof].set(gD)
         elif self.doforder == 'sdofs':
             if isinstance(gD, (int, float)):
                 uh[..., isDDof] = gD
@@ -205,6 +204,6 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             elif self.doforder == 'vdims':
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
             isDDof = jnp.broadcast_to(isDDof.reshape(shape), shape=uh.shape)
-        return isDDof
+        return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate

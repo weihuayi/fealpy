@@ -355,7 +355,7 @@ class NSFEMSolver:
             return b
 
 
-    #u \cdot u   \approx   u^n \cdot u^{n+1}
+    #u \cdot \nabla u   \approx   u^n \cdot \nabla u^{n+1}
     def ossen_A(self,un, mu=None ,rho=None):
         AP = self.AP
         if rho is None:
@@ -397,7 +397,7 @@ class NSFEMSolver:
         if rho is None:
             M = self.M
         else:
-            bform = BilinearForm((self.uspace,)*2)
+            bform = LinearForm((self.uspace,)*2)
             bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
             M = bform.assembly() 
         
