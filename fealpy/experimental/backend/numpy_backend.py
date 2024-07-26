@@ -12,12 +12,12 @@ from .base import (
 )
 
 
-class NumpyBackend(Backend[NDArray], backend_name='numpy'):
+class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     DATA_CLASS = np.ndarray
 
     @staticmethod
     def set_default_device(device) -> None:
-        raise NotImplementedError("`set_default_device` is not supported by NumpyBackend")
+        raise NotImplementedError("`set_default_device` is not supported by NumPyBackend")
 
     @staticmethod
     def get_device(tensor_like, /):
@@ -89,7 +89,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def edge_length(edge: NDArray, node: NDArray, *, out=None) -> NDArray:
-        assert out == None, "`out` is not supported by edge_length in NumpyBackend"
+        assert out == None, "`out` is not supported by edge_length in NumPyBackend"
         points = node[edge, :]
         return np.linalg.norm(points[..., 0, :] - points[..., 1, :], axis=-1)
 
@@ -267,7 +267,7 @@ class NumpyBackend(Backend[NDArray], backend_name='numpy'):
         pass
 
 
-NumpyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
+NumPyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(tensor='array')
-NumpyBackend.attach_methods(function_mapping, np)
+NumPyBackend.attach_methods(function_mapping, np)

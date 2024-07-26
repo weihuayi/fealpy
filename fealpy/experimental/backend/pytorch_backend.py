@@ -29,6 +29,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         torch.set_default_device(device)
 
     @staticmethod
+    def get_device(tensor_like: Tensor, /):
+        return tensor_like.device
+
+    @staticmethod
     def to_numpy(tensor_like: Tensor, /) -> Any:
         return tensor_like.detach().cpu().numpy()
 
