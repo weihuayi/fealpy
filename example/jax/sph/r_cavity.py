@@ -15,8 +15,7 @@ jax.config.update('jax_platform_name', 'cpu')
 
 EPS = jnp.finfo(float).eps
 dx = 1.25e-4 * 10
-#dy = 1.25e-4
-h = 1.5 * dx
+h = 0.5 * dx
 rho0 = 737.54 
 uin = jnp.array([5.0, 0.0])
 n = 0.3083
@@ -46,17 +45,6 @@ box_size = jnp.array([x1, y1])
 w_idx = jnp.where(mesh.nodedata['tag'] == 1)[0]
 d_w_idx = jnp.repeat(w_idx, 3)
 
-'''
-#新增粒子物理量
-new_node = jnp.mgrid[0:dx:dx, dy:5:dy].reshape(2, -1).T
-new_tag = jnp.full((new_node.shape[0],), 0, dtype=int)
-new_mv = jnp.tile(jnp.array([5, 0]), (new_node.shape[0], 1))
-new_rho = jnp.ones(new_node.shape[0]) * rho0
-new_mass = jnp.ones(new_node.shape[0]) * dx * dy * rho0
-mesh.add_node_data(['position', 'tag', 'mv', 'tv', 'dmvdt', 'dtvdt', 'drhodt', 'rho', 'p', 'sound', 'mass'],
-                    [new_node, new_tag, new_mv,new_mv,jnp.zeros_like(new_mv),jnp.zeros_like(new_mv),
-                    jnp.zeros_like(new_rho), new_rho, jnp.zeros_like(new_rho), jnp.zeros_like(new_rho), new_mass])
-'''
 #邻近搜索
 neighbor_fn = partition.neighbor_list(
         displacement,
@@ -70,19 +58,25 @@ neighbor_fn = partition.neighbor_list(
         num_partitions=1,
         pbc=np.array([False, False]),
     )
-num_particles = (mesh.nodedata["tag"] != -1).sum()
 #所有粒子
+num_particles = mesh.nodedata['position'].shape[0]
 neighbors = neighbor_fn.allocate(mesh.nodedata["position"], num_particles=num_particles)
+
+#流体粒子和固壁粒子
+fw_particles = ((mesh.nodedata["tag"] == 0) | (mesh.nodedata["tag"] == 1)).sum()
+fw_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][(mesh.nodedata["tag"] == 0)\
+             | (mesh.nodedata["tag"] == 1)], num_particles=fw_particles)
+
 #流体粒子
 f_particles = (mesh.nodedata["tag"] == 0).sum()
-f_neughbors = neighbor_fn.allocate(mesh.nodedata["position"][mesh.nodedata["tag"]==0], num_particles=f_particles)
-'''
+f_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][mesh.nodedata["tag"]==0], num_particles=f_particles)
+
 for i in range(1):
 
+    #所有粒子
     i_s, j_s = neighbors.idx
-    i_s0 = [(len(mesh.nodedata["position"])-1) if x == len(mesh.nodedata["position"]) else x for x in i_s]
-    j_s0 = [(len(mesh.nodedata["position"])-1) if x == len(mesh.nodedata["position"]) else x for x in j_s]
-    r_i_s, r_j_s = mesh.nodedata["position"][jnp.array(i_s0)], mesh.nodedata["position"][jnp.array(j_s0)]
+    i_s, j_s = i_s[i_s != jnp.max(i_s)], j_s[j_s != jnp.max(j_s)]
+    r_i_s, r_j_s = mesh.nodedata["position"][jnp.array(i_s)], mesh.nodedata["position"][jnp.array(j_s)]
     dr_i_j = vmap(displacement)(r_i_s, r_j_s)
     dist = space.distance(dr_i_j)
     w_dist = vmap(kernel)(dist)
@@ -91,6 +85,30 @@ for i in range(1):
     grad_w_dist_norm = vmap(kernel.grad_value)(dist)
     grad_w_dist = grad_w_dist_norm[:, None] * e_s
 
+    #流体粒子和固壁粒子
+    fwi_s, fwj_s = fw_neighbors.idx
+    fwi_s, fwj_s = fwi_s[fwi_s != jnp.max(fwi_s)], fwj_s[fwj_s != jnp.max(fwj_s)]
+    fw_position = mesh.nodedata["position"][(mesh.nodedata["tag"] == 0) | (mesh.nodedata["tag"] == 1)]
+    fwr_i_s, fwr_j_s = fw_position[jnp.array(fwi_s)], fw_position[jnp.array(fwj_s)]
+    fwdr_i_j = vmap(displacement)(fwr_i_s, fwr_j_s)
+    dist = space.distance(fwdr_i_j)
+    fww_dist = vmap(kernel)(dist)
+    
+    #更新固壁粒子外推速度(？待确认：是只更新虚粒子的外推速度，固壁粒子仍然为0还是固壁粒子和虚粒子一起更新)
+    v_ext = solver.wall_extrapolation(mesh.nodedata, fww_dist, fwi_s, fwj_s)
+    mesh.nodedata["v"] = mesh.nodedata["v"].at[mesh.nodedata["tag"] == 1].set(v_ext)
+    mesh.nodedata["v"] = mesh.nodedata["v"].at[mesh.nodedata["tag"] == 2].set(mesh.nodedata["v"][d_w_idx])
+
+    #更新半步压力和声速
+    mesh.nodedata = solver.change_p(mesh.nodedata, fww_dist, fwi_s, fwj_s, d_w_idx, B=B, rho0=rho0, c1=c1)
+    
+
+
+    #增加门粒子并更新位置
+    jnp.set_printoptions(threshold=jnp.inf)
+    mesh.nodedata = solver.gate_change(mesh.nodedata, domain, dt=dt, dx=dx, uin=uin)
+    '''
+    #流体粒子
     fi_s, fj_s = f_neughbors.idx
     fi_s, fj_s = fi_s[fi_s != jnp.max(fi_s)], fj_s[fj_s != jnp.max(fj_s)]    
     fr_i_s, fr_j_s = mesh.nodedata["position"][fi_s], mesh.nodedata["position"][fj_s]
@@ -105,10 +123,9 @@ for i in range(1):
 
     jnp.set_printoptions(threshold=jnp.inf)
     #solver.free_surface(mesh.nodedata, fi_s, fj_s, fw_dist, fgrad_w_dist, h=h)
-    solver.change_p(mesh.nodedata, B=B, rho0=rho0, c1=c1)
-    
-'''
+    '''
 
+'''
 # 获取不同类型粒子的位置
 fluid_particles = mesh.nodedata["position"][mesh.nodedata["tag"] == 0]  # 流体粒子
 solid_particles = mesh.nodedata["position"][mesh.nodedata["tag"] == 1]  # 固壁粒子
@@ -131,4 +148,4 @@ plt.ylim(y0, y1)
 plt.legend()
 plt.grid()
 plt.show()
-
+'''
