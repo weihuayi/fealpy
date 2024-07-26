@@ -100,7 +100,6 @@ FUNCTION_MAPPING = _make_default_mapping(
 
     # Unary functions
     'abs', 'sign', 'sqrt', 'log', 'log10', 'log2', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh',
-    'reshape', 'ravel', 'flatten', 'broadcast_to', 'einsum',
 
     # Binary functions
     'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
