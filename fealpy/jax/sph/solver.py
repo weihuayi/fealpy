@@ -304,6 +304,61 @@ class SPHSolver:
         state["p"] = state["p"].at[d_tag].set(state["p"][d_s])
         return state
 
+    def continue_equation(self, state, i_s, j_s, grad_kernel):
+        v = state["v"]
+        x = state["position"]
+        rho = state["rho"]
+        c = state["sound"]
+        p = state["p"]
+        m = state["mass"]
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        f_rho = state["rho"][state["tag"] == 0]
+
+        v_ij = v[i_s] - v[j_s]
+        x_ij = x[i_s] - x[j_s]
+        r_ij = jnp.linalg.norm(x_ij, axis=1)
+        rho_c = ((rho[i_s]+rho[j_s])/2) * ((c[i_s]+c[j_s])/2)
+        p_ij = p[i_s] - p[j_s]
+
+        a = jnp.sum(((v_ij+(p_ij/rho_c)[:, None]*(x_ij/r_ij[:, None]))*grad_kernel), axis=1, keepdims=True)
+        sum0 = (m[j_s]/rho[j_s])[:, None] * a
+        sum1 = (ops.segment_sum(sum0, i_s, len(rho)))[f_tag]
+        result = f_rho[f_tag][:, None] * sum1
+        result = jnp.squeeze(result)
+        return result
+
+    def mu_wlf(self, state, i_s, j_s, grad_kernel, mu0, tau, n):
+        a = state["v"][j_s][:,:,jnp.newaxis] * grad_kernel[:,jnp.newaxis,:]
+        a_t = jnp.transpose(a, (0, 2, 1))
+        D = (a + a_t) / 2 #待确认？
+        gamma = jnp.sqrt(2 * jnp.einsum('ijk,ijk->i', D, D))
+        gamma = ops.segment_sum(gamma, i_s, len(state["rho"]))
+        mu = mu0 / (1 + (mu0 * gamma / tau)**(1-n))    
+        return mu
+
+    def momentum_equation(self, state, i_s, j_s, grad_kernel, mu, eta, h):
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        x_ij = state["position"][i_s] - state["position"][j_s]
+        r_ij = jnp.linalg.norm(x_ij,axis=1)
+        v_ij = state["v"][i_s] - state["v"][j_s]
+        a0 = eta * (mu[i_s] + mu[j_s]) / r_ij
+        a1 = ((state["rho"][i_s]+state["rho"][j_s])/2) * ((state["sound"][i_s]+state["sound"][j_s])/2)
+        beta = jnp.minimum(a0, a1)
+
+        b0 = state["mass"][j_s]/(state["rho"][i_s]*state["rho"][j_s])  
+        b1 = state["p"][i_s]+state["p"][j_s]-beta*(jnp.einsum('ij,ij->i', x_ij, v_ij)/r_ij)
+        sum0 = (b0 * b1)[:, None] * grad_kernel
+        sum0 = ops.segment_sum(sum0, i_s, len(state["rho"]))
+        
+        m_j = state["mass"][j_s]
+        c0 = (mu[i_s]+mu[j_s])/(state["rho"][i_s]*state["rho"][j_s])
+        c1 = jnp.einsum('ij,ij->i', x_ij, grad_kernel)/(r_ij**2+(0.01*h)**2)
+        sum1 = (m_j * c0 * c1)[:, None] * v_ij
+        sum1 = ops.segment_sum(sum1, i_s, len(state["rho"]))
+        
+        result = (-sum0 + sum1)[f_tag]
+        return result
+
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""
         hf = h5py.File(path, "w")
