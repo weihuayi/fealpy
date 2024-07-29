@@ -100,7 +100,7 @@ class Mesh(MeshDS):
             TensorLike[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return bm.edge_tengent(edge, self.node, normalize=normalize, out=out)
+        return bm.edge_tangent(edge, self.node, normalize=normalize, out=out)
 
     def cell_normal(self, index: Index=_S, node: Optional[TensorLike]=None) -> TensorLike:
         """
@@ -140,11 +140,11 @@ class Mesh(MeshDS):
         edges = self.edge[index]
         kwargs = {'dtype': edges.dtype, 'device': self.device}
         indices = bm.arange(NE, **kwargs)[index]
-        return bm.cat([
+        return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
             (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
             edges[:, 1].reshape(-1, 1),
-        ], dim=-1)
+        ], axis=-1)
 
     # shape function
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
@@ -252,14 +252,14 @@ class Mesh(MeshDS):
         NC = self.number_of_cells()
         GD = self.geo_dimension()
 
-        node = self.entity('node')
+        node = bm.to_numpy(self.entity('node'))
         if GD == 2:
             node = np.concatenate(
                 (node, np.zeros((node.shape[0], 1), dtype=self.ftype)),
                 axis=1
             )
 
-        cell = self.entity('cell')
+        cell = bm.to_numpy(self.entity('cell'))
         cellType = self.vtk_cell_type('cell')
         NV = cell.shape[-1]
 
@@ -511,11 +511,48 @@ class TensorMesh(HomogeneousMesh):
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
-        pass
+        assert isinstance(bcs, tuple)
+        TD = len(bcs)
+        Dlambda = bm.array([-1, 1], dtype=self.ftype)
+        phi = bm.simplex_shape_function(bcs[0], p=p)
+        R = bm.simplex_grad_shape_function(bcs[0], p=p)
+        dphi = bm.einsum('...ij, j->...i', R, Dlambda) # (..., ldof)
 
+        n = phi.shape[0]**TD
+        ldof = phi.shape[-1]**TD
+        shape = (n, ldof, TD)
+        gphi = bm.zeros(shape, dtype=self.ftype)
+
+        if TD == 3:
+            gphi0 = bm.einsum('im, jn, ko->ijkmno', dphi, 
+                              phi, phi).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn, ko->ijkmno', phi, dphi,
+                              phi).reshape(-1, ldof, 1)
+            gphi2 = bm.einsum('im, jn, ko->ijkmno', phi, phi,
+                                     dphi).reshape(-1, ldof, 1)
+            gphi = bm.concatenate((gphi0, gphi1, gphi2), axis=-1) 
+            if variable == 'x':
+                J = self.jacobi_matrix(bcs, index=index)
+                J = bm.linalg.inv(J)
+                # J^{-T}\nabla_u phi
+                gphi = bm.einsum('qcmn, qlm->qcln', J, gphi)
+                return gphi
+        elif TD == 2:
+            gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
+            gphi = bm.concatenate((gphi0, gphi1), axis=-1)
+            if variable == 'x':
+                J = self.jacobi_matrix(bcs, index=index)
+                G = self.first_fundamental_form(J)
+                G = bm.linalg.inv(G)
+                gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
+                return gphi
+        return gphi
 
 class StructuredMesh(HomogeneousMesh):
-    pass
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> TensorLike:
+        raise NotImplementedError
 
     # NOTE: Here are some examples for entity factories:
     # implement them in subclasses if necessary.
