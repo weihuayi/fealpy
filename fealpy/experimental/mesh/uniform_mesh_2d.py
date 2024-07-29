@@ -9,7 +9,7 @@ from .. import logger
 
 from .mesh_base import StructuredMesh
 
-class UniformMesh2D(StructuredMesh):
+class UniformMesh2d(StructuredMesh):
     def __init__(self,
                  extent: Tuple[int, int, int, int],
                  h: Tuple[float, float] = (1.0, 1.0),
@@ -49,7 +49,7 @@ class UniformMesh2D(StructuredMesh):
         x = bm.linspace(box[0], box[1], nx + 1)
         y = bm.linspace(box[2], box[3], ny + 1)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
-        node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.int32)
+        node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.float64)
         node[..., 0] = xx
         node[..., 1] = yy
         # node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.int32)
