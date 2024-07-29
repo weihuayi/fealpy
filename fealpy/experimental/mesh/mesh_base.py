@@ -140,11 +140,11 @@ class Mesh(MeshDS):
         edges = self.edge[index]
         kwargs = {'dtype': edges.dtype, 'device': self.device}
         indices = bm.arange(NE, **kwargs)[index]
-        return bm.cat([
+        return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
             (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
             edges[:, 1].reshape(-1, 1),
-        ], dim=-1)
+        ], axis=-1)
 
     # shape function
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
@@ -252,14 +252,14 @@ class Mesh(MeshDS):
         NC = self.number_of_cells()
         GD = self.geo_dimension()
 
-        node = self.entity('node')
+        node = bm.to_numpy(self.entity('node'))
         if GD == 2:
             node = np.concatenate(
                 (node, np.zeros((node.shape[0], 1), dtype=self.ftype)),
                 axis=1
             )
 
-        cell = self.entity('cell')
+        cell = bm.to_numpy(self.entity('cell'))
         cellType = self.vtk_cell_type('cell')
         NV = cell.shape[-1]
 
