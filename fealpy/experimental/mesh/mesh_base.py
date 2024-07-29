@@ -515,7 +515,9 @@ class TensorMesh(HomogeneousMesh):
 
 
 class StructuredMesh(HomogeneousMesh):
-    pass
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> TensorLike:
+        raise NotImplementedError
 
     # NOTE: Here are some examples for entity factories:
     # implement them in subclasses if necessary.
