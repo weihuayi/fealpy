@@ -1,6 +1,6 @@
 import jax
-jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 #jax.config.update('jax_platform_name', 'cpu')
+jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 import enum
 import jax.numpy as jnp
 import numpy as np
@@ -9,13 +9,13 @@ from fealpy.jax.sph import SPHSolver,TimeLine
 from fealpy.jax.sph import partition 
 from fealpy.jax.sph.jax_md.partition import Sparse
 from fealpy.jax.sph.kernel_function import QuinticKernel
+#from fealpy.jax.sph.jax_md import space
 from jax_md import space
 from jax import ops, vmap
 from jax import lax, jit
 import matplotlib.pyplot as plt
 import warnings
 import time
-
 
 
 EPS = jnp.finfo(float).eps
