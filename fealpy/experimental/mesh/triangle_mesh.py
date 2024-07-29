@@ -154,25 +154,24 @@ class TriangleMesh(SimplexMesh):
         """
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
-        node = bm.zeros((NN, 2))
-        X, Y = bm.mgrid[
-               box[0]:box[1]:(nx + 1) * 1j,
-               box[2]:box[3]:(ny + 1) * 1j]
-
+        x = bm.linspace(box[0], box[1], nx+1)
+        y = bm.linspace(box[2], box[3], ny+1)
+        X, Y = bm.meshgrid(x, y, indexing='ij')
     
-        # TODO: can't work on JAX
-        node[:, 0] = X.flat
-        node[:, 1] = Y.flat
+        node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
-        # TODO: can't work on JAX
-        cell = bm.zeros((2 * NC, 3), dtype=itype)
-        cell[:NC, 0] = idx[1:, 0:-1].flatten(order='F')
-        cell[:NC, 1] = idx[1:, 1:].flatten(order='F')
-        cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
-        cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
-        cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
-        cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+        cell0 = bm.concatenate((
+            idx[1:, 0:-1].reshape(-1, 1),
+            idx[1:, 1:].reshape(-1, 1),
+            idx[0:-1, 0:-1].reshape(-1, 1),
+            ), axis=1)
+        cell1 = bm.concatenate((
+            idx[0:-1, 1:].reshape(-1, 1),
+            idx[0:-1, 0:-1].reshape(-1, 1),
+            idx[1:, 1:].reshape(-1, 1)
+            ), axis=1)
+        cell = bm.concatenate((cell0, cell1), axis=0)
 
         if threshold is not None:
             bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
@@ -189,33 +188,38 @@ class TriangleMesh(SimplexMesh):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_torus_surface(cls, R, r, nu, nv):
+    def from_torus_surface(cls, R, r, nu, nv, ftype=bm.float64, itype=bm.int32):
         """
         """
         NN = nu * nv
         NC = nu * nv
-        node = bm.zeros((NN, 3), dtype=bm.float64)
+        node = bm.zeros((NN, 3), dtype=ftype)
 
-        U, V = bm.mgrid[0:2 * bm.pi:nu * 1j, 0:2 * bm.pi:nv * 1j]
+        x = bm.linspace(0, 2*bm.pi, nu)
+        y = bm.linspace(0, 2*bm.pi, nv)
+        U, V = bm.meshgrid(x, y, indexing='ij')
+        
         X = (R + r * bm.cos(V)) * bm.cos(U)
         Y = (R + r * bm.cos(V)) * bm.sin(U)
         Z = r * bm.sin(V)
-        node[:, 0] = X.flatten()
-        node[:, 1] = Y.flatten()
-        node[:, 2] = Z.flatten()
+        node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
 
-        idx = bm.zeros((nu + 1, nv + 1), bm.int32)
+        idx = bm.zeros((nu + 1, nv + 1), dtype=itype)
         idx[0:-1, 0:-1] = bm.arange(NN).reshape(nu, nv)
         idx[-1, :] = idx[0, :]
         idx[:, -1] = idx[:, 0]
-        cell = bm.zeros((2 * NC, 3), dtype=bm.int32)
-        cell[:NC, 0] = idx[1:, 0:-1].flatten(order='F')
-        cell[:NC, 1] = idx[1:, 1:].flatten(order='F')
-        cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
-        cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
-        cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
-        cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
-
+        cell = bm.zeros((2 * NC, 3), dtype=itype)
+        cell0 = bm.concatenate((
+            idx[1:, 0:-1].reshape(-1, 1),
+            idx[1:, 1:].reshape(-1, 1),
+            idx[0:-1, 0:-1].reshape(-1, 1),
+            ), axis=1)
+        cell1 = bm.concatenate((
+            idx[0:-1, 1:].reshape(-1, 1),
+            idx[0:-1, 0:-1].reshape(-1, 1),
+            idx[1:, 1:].reshape(-1, 1)
+            ), axis=1)
+        cell = bm.concatenate((cell0, cell1), axis=0)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators

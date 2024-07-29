@@ -9,7 +9,7 @@ from math import comb
 from .. import logger
 
 
-Size = tuple[int, ...]
+Size = Tuple[int, ...]
 
 class TensorLike(metaclass=ABCMeta):
     @property
@@ -106,7 +106,8 @@ FUNCTION_MAPPING = _make_default_mapping(
 
     # Other functions
     'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
-    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes'
+    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
+    
 )
 
 
