@@ -1,15 +1,15 @@
-import numpy as np
-from fealpy.mesh.edge_mesh import EdgeMesh
+from fealpy.experimental.backend import backend_manager as bm
+from fealpy.experimental.mesh.edge_mesh import EdgeMesh
 from fealpy.quadrature import GaussLegendreQuadrature
 import pytest
 
 def test_init():
     # Define sample node and cell arrays
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+    node = bm.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.tensor([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
 
     # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
+    edge_mesh = edge_mesh(node, cell)
 
     # Test __init__ method
     assert edge_mesh.node is node
@@ -34,16 +34,20 @@ def test_add_plot():
     mesh = EdgeMesh.from_tower()
     mesh.add_plot(plt)
 
-def test_grad_function():
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+def test_integrator():
+    node = bm.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.tensor([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
 
     # Create EdgeMesh object
     edge_mesh = EdgeMesh(node, cell)
-    bc = np.array([[0.2,0.8]],dtype=np.float_)
-    va = edge_mesh.grad_shape_function(bc,p=1)
-    print(va)
+    q = 4
+    inte = edge_mesh.integrator(q)
+    a,b = inte.get_quadrature_points_and_weights()
+    print(a)
+    print("\n")
+    print(b)
+
 
 if __name__ == "__main__":
-    # test_add_plot()
-    test_grad_function()
+    test_integrator()
+    
