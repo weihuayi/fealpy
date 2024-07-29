@@ -94,7 +94,6 @@ FUNCTION_MAPPING = _make_default_mapping(
     # Creation functions
     'array', 'tensor', 'arange', 'linspace',
     'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like', 'eye',
-    'meshgrid',
 
     # Reduction functions
     'all', 'any', 'sum', 'prod', 'mean', 'max', 'min',
