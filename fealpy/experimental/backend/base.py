@@ -9,7 +9,7 @@ from math import comb
 from .. import logger
 
 
-Size = tuple[int, ...]
+Size = Tuple[int, ...]
 
 class TensorLike(metaclass=ABCMeta):
     @property
