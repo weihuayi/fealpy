@@ -48,6 +48,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
         assert k == 0, "Only k=0 is supported by `eye` in PyTorchBackend."
         return torch.eye(n, m, dtype=dtype, **kwargs)
+    
+    @staticmethod
+    def meshgrid(*xi, copy=None, sparse=None, indexing='xy', **kwargs) -> Tuple[Tensor, ...]:
+        return torch.meshgrid(*xi, indexing=indexing)
 
     ### Reduction methods ###
 
