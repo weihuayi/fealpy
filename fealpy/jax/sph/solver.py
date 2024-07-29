@@ -15,6 +15,9 @@ import pyvista
 from typing import Dict
 import enum
 from jax_md import space
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.animation import PillowWriter
 
 #设置标签
 class Tag(enum.IntEnum):
@@ -221,21 +224,24 @@ class SPHSolver:
         #将进入流体区域的门粒子更换标签为0
         g_x = state["position"][:, 0]
         g_i = jnp.where((state["tag"] == 3) & (g_x >= 0))[0] 
-        state["tag"] = state["tag"].at[g_i].set(0)
+        
+        if g_i.size > 0:
+            state["tag"] = state["tag"].at[g_i].set(0)
 
-        #更新物理量
-        y = jnp.arange(domain[2]+dx, domain[3], dx)
-        gp = jnp.column_stack((jnp.full_like(y, domain[0]-4*H), y))
-        state["position"] = jnp.vstack((gp, state["position"]))
-        tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
-        state["tag"] = jnp.concatenate((tag_g, state["tag"]))
-        v_g = jnp.ones_like(gp) * uin
-        state["v"] = jnp.concatenate((v_g, state["v"]))
-        state["rho"] = jnp.concatenate((jnp.ones(gp.shape[0])*rho0, state["rho"]))
-        state["p"] = jnp.concatenate((jnp.zeros_like(tag_g), state["p"]))
-        state["sound"] = jnp.concatenate((jnp.zeros_like(tag_g), state["sound"]))
-        mass_g = jnp.ones(gp.shape[0]) * dx * dy * rho0
-        state["mass"] = jnp.concatenate((mass_g, state["mass"]))
+            #更新物理量
+            y = jnp.arange(domain[2]+dx, domain[3], dx)
+            gp = jnp.column_stack((jnp.full_like(y, domain[0]-4*H), y))
+            state["position"] = jnp.vstack((gp, state["position"]))
+            tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
+            state["tag"] = jnp.concatenate((tag_g, state["tag"]))
+            v_g = jnp.ones_like(gp) * uin
+            state["v"] = jnp.concatenate((v_g, state["v"]))
+            state["rho"] = jnp.concatenate((jnp.ones(gp.shape[0])*rho0, state["rho"]))
+            state["p"] = jnp.concatenate((jnp.zeros_like(tag_g), state["p"]))
+            state["sound"] = jnp.concatenate((jnp.zeros_like(tag_g), state["sound"]))
+            mass_g = jnp.ones(gp.shape[0]) * dx * dy * rho0
+            state["mass"] = jnp.concatenate((mass_g, state["mass"]))
+        
         return state
 
     def free_surface(self, state, i_s, j_s, kernel, grad_kernel, h):
@@ -303,6 +309,109 @@ class SPHSolver:
         d_tag = jnp.where(state["tag"] == 2)[0]
         state["p"] = state["p"].at[d_tag].set(state["p"][d_s])
         return state
+
+    def continue_equation(self, state, i_s, j_s, grad_kernel):
+        v = state["v"]
+        x = state["position"]
+        rho = state["rho"]
+        c = state["sound"]
+        p = state["p"]
+        m = state["mass"]
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        f_rho = state["rho"][state["tag"] == 0]
+
+        v_ij = v[i_s] - v[j_s]
+        x_ij = x[i_s] - x[j_s]
+        r_ij = jnp.linalg.norm(x_ij, axis=1)
+        rho_c = ((rho[i_s]+rho[j_s])/2) * ((c[i_s]+c[j_s])/2)
+        p_ij = p[i_s] - p[j_s]
+
+        a = jnp.sum(((v_ij+(p_ij/rho_c)[:, None]*(x_ij/r_ij[:, None]))*grad_kernel), axis=1, keepdims=True)
+        sum0 = (m[j_s]/rho[j_s])[:, None] * a
+        sum1 = (ops.segment_sum(sum0, i_s, len(rho)))[f_tag]
+        result = f_rho[f_tag][:, None] * sum1
+        result = jnp.squeeze(result)
+        return result
+
+    def mu_wlf(self, state, i_s, j_s, grad_kernel, mu0, tau, n):
+        a = state["v"][j_s][:,:,jnp.newaxis] * grad_kernel[:,jnp.newaxis,:]
+        a_t = jnp.transpose(a, (0, 2, 1))
+        D = (a + a_t) / 2 #待确认？
+        gamma = jnp.sqrt(2 * jnp.einsum('ijk,ijk->i', D, D))
+        gamma = ops.segment_sum(gamma, i_s, len(state["rho"]))
+        mu = mu0 / (1 + (mu0 * gamma / tau)**(1-n))    
+        return mu
+
+    def momentum_equation(self, state, i_s, j_s, grad_kernel, mu, eta, h):
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        x_ij = state["position"][i_s] - state["position"][j_s]
+        r_ij = jnp.linalg.norm(x_ij,axis=1)
+        v_ij = state["v"][i_s] - state["v"][j_s]
+        a0 = eta * (mu[i_s] + mu[j_s]) / r_ij
+        a1 = ((state["rho"][i_s]+state["rho"][j_s])/2) * ((state["sound"][i_s]+state["sound"][j_s])/2)
+        beta = jnp.minimum(a0, a1)
+
+        b0 = state["mass"][j_s]/(state["rho"][i_s]*state["rho"][j_s])  
+        b1 = state["p"][i_s]+state["p"][j_s]-beta*(jnp.einsum('ij,ij->i', x_ij, v_ij)/r_ij)
+        sum0 = (b0 * b1)[:, None] * grad_kernel
+        sum0 = ops.segment_sum(sum0, i_s, len(state["rho"]))
+        
+        m_j = state["mass"][j_s]
+        c0 = (mu[i_s]+mu[j_s])/(state["rho"][i_s]*state["rho"][j_s])
+        c1 = jnp.einsum('ij,ij->i', x_ij, grad_kernel)/(r_ij**2+(0.01*h)**2)
+        sum1 = (m_j * c0 * c1)[:, None] * v_ij
+        sum1 = ops.segment_sum(sum1, i_s, len(state["rho"]))
+        
+        result = (-sum0 + sum1)[f_tag]
+        return result
+
+    def change_position(self, state, i_s, j_s, kernel):
+        f_tag = jnp.where(state["tag"] == 0)[0] 
+        v_ji = state["v"][j_s] - state["v"][i_s]
+        rho_ij = (state["rho"][i_s] + state["rho"][j_s]) / 2
+        sum0 = (state["mass"][j_s]*kernel/rho_ij)[:, None] * v_ji
+        sum0 = 0.5 * ops.segment_sum(sum0, i_s, len(state["position"]))
+        result = (state["v"] + sum0)[f_tag]        
+        return result
+
+    def create_animation(self, state_history, output_file='animation.gif'):
+        fig, ax = plt.subplots(figsize=(20, 5))
+
+        def update(frame):
+            ax.clear()
+            state = state_history[frame]
+            positions = np.array(state["position"])  # 确保数据为 NumPy 数组
+            tags = np.array(state["tag"])
+            velocities = np.array(state["v"])
+
+            # 计算每个粒子的速度大小
+            speed = np.linalg.norm(velocities, axis=1)
+
+            # 画出不同标签的粒子
+            fluid_particles = positions[tags == 0]
+            wall_particles = positions[tags == 1]
+            ghost_particles = positions[tags == 2]
+            gate_particles = positions[tags == 3]
+
+            fluid_speeds = speed[tags == 0]
+            wall_speeds = speed[tags == 1]
+            ghost_speeds = speed[tags == 2]
+            gate_speeds = speed[tags == 3]
+            
+            sc = ax.scatter(fluid_particles[:, 0], fluid_particles[:, 1], c=fluid_speeds, cmap='viridis', s=10, label='Fluid')
+            ax.scatter(wall_particles[:, 0], wall_particles[:, 1], c=wall_speeds, cmap='viridis', s=10, label='Wall')
+            ax.scatter(ghost_particles[:, 0], ghost_particles[:, 1], c=ghost_speeds, cmap='viridis', s=10, label='Ghost')
+            ax.scatter(gate_particles[:, 0], gate_particles[:, 1], c=gate_speeds, cmap='viridis', s=10, label='Gate')
+
+            ax.legend()
+            ax.set_xlim(-0.002, 0.05)
+            ax.set_ylim(-0.002, 0.006)
+            ax.set_title(f"Frame {frame}")
+
+        ani = animation.FuncAnimation(fig, update, frames=len(state_history), repeat=False)
+        plt.show()
+        #writer = PillowWriter(fps=20)  # 设置每秒帧数
+        #ani.save(output_file, writer=writer)
 
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""

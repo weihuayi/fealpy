@@ -14,7 +14,7 @@ jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 jax.config.update('jax_platform_name', 'cpu')
 
 EPS = jnp.finfo(float).eps
-dx = 1.25e-4 * 10
+dx = 1.25e-4 
 h = 0.5 * dx
 rho0 = 737.54 
 uin = jnp.array([5.0, 0.0])
@@ -25,8 +25,8 @@ c1 = 0.0894
 B = 5.914e7
 eta = 0.5 #动量方程中的参数
 dt = 1e-7
-domain=[0,0.05,0,0.005] * 10
-init_domain=[0.0,0.005,0,0.005] * 10
+domain=[0,0.05,0,0.005] 
+init_domain=[0.0,0.005,0,0.005] 
 
 #初始化
 mesh = NodeMesh.from_long_rectangular_cavity_domain(init_domain=init_domain, domain=domain, uin=uin, dx=dx)
@@ -71,11 +71,18 @@ fw_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][(mesh.nodedata["ta
 f_particles = (mesh.nodedata["tag"] == 0).sum()
 f_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][mesh.nodedata["tag"]==0], num_particles=f_particles)
 
-for i in range(1):
+state_history = []
+for i in range(10000): 
+    print("i",i)
+    state_history.append(mesh.nodedata.copy())
 
-    #所有粒子
-    i_s, j_s = neighbors.idx
-    i_s, j_s = i_s[i_s != jnp.max(i_s)], j_s[j_s != jnp.max(j_s)]
+    #所有粒子（删除自身索引）
+    i, j = neighbors.idx 
+    i, j = i[i != jnp.max(i)], j[j != jnp.max(j)] 
+    vstack_s = jnp.vstack((i, j))
+    mask = vstack_s[0] != vstack_s[1]
+    mask_idx = vstack_s[:, mask]
+    i_s, j_s = mask_idx[0], mask_idx[1]
     r_i_s, r_j_s = mesh.nodedata["position"][jnp.array(i_s)], mesh.nodedata["position"][jnp.array(j_s)]
     dr_i_j = vmap(displacement)(r_i_s, r_j_s)
     dist = space.distance(dr_i_j)
@@ -91,26 +98,16 @@ for i in range(1):
     fw_position = mesh.nodedata["position"][(mesh.nodedata["tag"] == 0) | (mesh.nodedata["tag"] == 1)]
     fwr_i_s, fwr_j_s = fw_position[jnp.array(fwi_s)], fw_position[jnp.array(fwj_s)]
     fwdr_i_j = vmap(displacement)(fwr_i_s, fwr_j_s)
-    dist = space.distance(fwdr_i_j)
-    fww_dist = vmap(kernel)(dist)
+    fwdist = space.distance(fwdr_i_j)
+    fww_dist = vmap(kernel)(fwdist)
     
-    #更新固壁粒子外推速度(？待确认：是只更新虚粒子的外推速度，固壁粒子仍然为0还是固壁粒子和虚粒子一起更新)
-    v_ext = solver.wall_extrapolation(mesh.nodedata, fww_dist, fwi_s, fwj_s)
-    mesh.nodedata["v"] = mesh.nodedata["v"].at[mesh.nodedata["tag"] == 1].set(v_ext)
-    mesh.nodedata["v"] = mesh.nodedata["v"].at[mesh.nodedata["tag"] == 2].set(mesh.nodedata["v"][d_w_idx])
-
-    #更新半步压力和声速
-    mesh.nodedata = solver.change_p(mesh.nodedata, fww_dist, fwi_s, fwj_s, d_w_idx, B=B, rho0=rho0, c1=c1)
-    
-
-
-    #增加门粒子并更新位置
-    jnp.set_printoptions(threshold=jnp.inf)
-    mesh.nodedata = solver.gate_change(mesh.nodedata, domain, dt=dt, dx=dx, uin=uin)
-    '''
-    #流体粒子
-    fi_s, fj_s = f_neughbors.idx
-    fi_s, fj_s = fi_s[fi_s != jnp.max(fi_s)], fj_s[fj_s != jnp.max(fj_s)]    
+    #流体粒子（删除自身索引）
+    fi, fj = f_neighbors.idx
+    fi, fj = fi[fi != jnp.max(fi)], fj[fj != jnp.max(fj)]
+    fvstack_s = jnp.vstack((fi, fj))
+    fmask = fvstack_s[0] != fvstack_s[1]
+    fmask_idx = fvstack_s[:, fmask]
+    fi_s, fj_s = fmask_idx[0], fmask_idx[1]
     fr_i_s, fr_j_s = mesh.nodedata["position"][fi_s], mesh.nodedata["position"][fj_s]
     fdr_i_j = vmap(displacement)(fr_i_s, fr_j_s)
     fdist = space.distance(fdr_i_j)
@@ -119,30 +116,101 @@ for i in range(1):
     fe_s = fdr_i_j / (fdist[:, None] + EPS)
     fgrad_w_dist_norm = vmap(kernel.grad_value)(fdist)
     fgrad_w_dist = fgrad_w_dist_norm[:, None] * fe_s
-    
 
-    jnp.set_printoptions(threshold=jnp.inf)
-    #solver.free_surface(mesh.nodedata, fi_s, fj_s, fw_dist, fgrad_w_dist, h=h)
-    '''
+    #更新固壁粒子外推速度赋值到虚粒子上
+    v_ext = solver.wall_extrapolation(mesh.nodedata, fww_dist, fwi_s, fwj_s)
+    v_repeat = jnp.repeat(v_ext, repeats=3, axis=0)
+    mesh.nodedata["v"] = mesh.nodedata["v"].at[mesh.nodedata["tag"] == 2].set(v_repeat)
+    
+    #更新半步压力和声速
+    mesh.nodedata = solver.change_p(mesh.nodedata, fww_dist, fwi_s, fwj_s, d_w_idx, B=B, rho0=rho0, c1=c1)
+
+    #更新半步密度
+    drho = solver.continue_equation(mesh.nodedata, i_s, j_s, grad_w_dist)
+    rho_1 = mesh.nodedata["rho"][mesh.nodedata["tag"] == 0] + 0.5*dt*drho
+    f_tag = jnp.where(mesh.nodedata["tag"] == 0)[0]
+    mesh.nodedata["rho"] = mesh.nodedata["rho"].at[f_tag].set(rho_1)
+    
+    #更新 mu
+    mu = solver.mu_wlf(mesh.nodedata, i_s, j_s, grad_w_dist, mu0=mu0, tau=tau_s, n=n)
+
+    #更新半步速度
+    dv = solver.momentum_equation(mesh.nodedata, i_s, j_s, grad_w_dist, mu=mu, eta=eta, h=h)
+    v_1 = mesh.nodedata["v"][mesh.nodedata["tag"] == 0] + 0.5*dt*dv
+    mesh.nodedata["v"] = mesh.nodedata["v"].at[f_tag].set(v_1)
+    
+    #更新固壁粒子外推速度赋值到虚粒子上
+    v_ext = solver.wall_extrapolation(mesh.nodedata, fww_dist, fwi_s, fwj_s)
+    v_repeat = jnp.repeat(v_ext, repeats=3, axis=0)
+    mesh.nodedata["v"] = mesh.nodedata["v"].at[mesh.nodedata["tag"] == 2].set(v_repeat)
+
+    #更新半步位置
+    dr = solver.change_position(mesh.nodedata, i_s, j_s, w_dist)
+    r_1 = mesh.nodedata["position"][mesh.nodedata["tag"] == 0] + 0.5*dt*dr
+    mesh.nodedata["position"] = mesh.nodedata["position"].at[f_tag].set(r_1)
+
+    #更新半步后的质量
+    mesh.nodedata["mass"] = dx**2 * mesh.nodedata["rho"]
+    
+    #更新压力和声速
+    mesh.nodedata = solver.change_p(mesh.nodedata, fww_dist, fwi_s, fwj_s, d_w_idx, B=B, rho0=rho0, c1=c1)
+
+    #更新密度
+    drho = solver.continue_equation(mesh.nodedata, i_s, j_s, grad_w_dist)
+    rho_1 = mesh.nodedata["rho"][mesh.nodedata["tag"] == 0] + 0.5*dt*drho
+    f_tag = jnp.where(mesh.nodedata["tag"] == 0)[0]
+    mesh.nodedata["rho"] = mesh.nodedata["rho"].at[f_tag].set(rho_1)
+
+    #更新 mu
+    mu = solver.mu_wlf(mesh.nodedata, i_s, j_s, grad_w_dist, mu0=mu0, tau=tau_s, n=n)
+
+    #更新速度
+    dv = solver.momentum_equation(mesh.nodedata, i_s, j_s, grad_w_dist, mu=mu, eta=eta, h=h)
+    v_1 = mesh.nodedata["v"][mesh.nodedata["tag"] == 0] + 0.5*dt*dv
+    mesh.nodedata["v"] = mesh.nodedata["v"].at[f_tag].set(v_1)
+
+    #更新位置
+    dr = solver.change_position(mesh.nodedata, i_s, j_s, w_dist)
+    r_1 = mesh.nodedata["position"][mesh.nodedata["tag"] == 0] + 0.5*dt*dr
+    mesh.nodedata["position"] = mesh.nodedata["position"].at[f_tag].set(r_1)
+
+    #更新质量
+    mesh.nodedata["mass"] = dx**2 * mesh.nodedata["rho"]
+
+    #增加门粒子并更新位置
+    mesh.nodedata = solver.gate_change(mesh.nodedata, domain, dt=dt, dx=dx, uin=uin)
+
+    #索引更新
+    num_particles = mesh.nodedata['position'].shape[0]
+    neighbors = neighbor_fn.allocate(mesh.nodedata["position"], num_particles=num_particles)
+
+    fw_particles = ((mesh.nodedata["tag"] == 0) | (mesh.nodedata["tag"] == 1)).sum()
+    fw_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][(mesh.nodedata["tag"] == 0)\
+             | (mesh.nodedata["tag"] == 1)], num_particles=fw_particles)
+
+    f_particles = (mesh.nodedata["tag"] == 0).sum()
+    f_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][mesh.nodedata["tag"]==0], num_particles=f_particles)
+
+solver.create_animation(state_history, 'animation.gif')
 
 '''
 # 获取不同类型粒子的位置
-fluid_particles = mesh.nodedata["position"][mesh.nodedata["tag"] == 0]  # 流体粒子
-solid_particles = mesh.nodedata["position"][mesh.nodedata["tag"] == 1]  # 固壁粒子
-dummy_particles = mesh.nodedata["position"][mesh.nodedata["tag"] == 2]  # 虚粒子
-gate_particles = mesh.nodedata["position"][mesh.nodedata["tag"] == 3] #门粒子
+fluid = mesh.nodedata["position"][mesh.nodedata["tag"] == 0]  # 流体粒子
+solid = mesh.nodedata["position"][mesh.nodedata["tag"] == 1]  # 固壁粒子
+dummy = mesh.nodedata["position"][mesh.nodedata["tag"] == 2]  # 虚粒子
+gate = mesh.nodedata["position"][mesh.nodedata["tag"] == 3] #门粒子
 
 # 创建图形
 plt.figure(figsize=(10, 5))
-plt.scatter(fluid_particles[:, 0], fluid_particles[:, 1], color='blue', label='Fluid Particles (tag=0)', s=10)
-plt.scatter(solid_particles[:, 0], solid_particles[:, 1], color='red', label='Solid Particles (tag=1)', s=10)
-plt.scatter(dummy_particles[:, 0], dummy_particles[:, 1], color='green', label='Dummy Particles (tag=2)', s=10)
-plt.scatter(gate_particles[:, 0], gate_particles[:, 1], color='black', label='Gate Particles (tag=3)', s=10)
+plt.scatter(fluid[:, 0], fluid[:, 1], color='blue', label='Fluid Particles (tag=0)', s=10)
+plt.scatter(solid[:, 0], solid[:, 1], color='red', label='Solid Particles (tag=1)', s=10)
+plt.scatter(dummy[:, 0], dummy[:, 1], color='green', label='Dummy Particles (tag=2)', s=10)
+plt.scatter(gate[:, 0], gate[:, 1], color='black', label='Gate Particles (tag=3)', s=10)
 
 # 设置图形属性
 plt.title('Particle Types Visualization')
-plt.xlabel('X Position')
-plt.ylabel('Y Position')
+plt.xlabel('X ')
+plt.ylabel('Y ')
 plt.xlim(x0, x1)
 plt.ylim(y0, y1)
 plt.legend()
