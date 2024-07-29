@@ -9,7 +9,7 @@ from math import comb
 from .. import logger
 
 
-Size = tuple[int, ...]
+Size = Tuple[int, ...]
 
 class TensorLike(metaclass=ABCMeta):
     @property
@@ -95,7 +95,11 @@ FUNCTION_MAPPING = _make_default_mapping(
     'array', 'tensor', 'arange', 'linspace',
     'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like', 'eye',
     'meshgrid',
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> upstream/master
     # Reduction functions
     'all', 'any', 'sum', 'prod', 'mean', 'max', 'min',
 
