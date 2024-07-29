@@ -7,7 +7,7 @@ import numpy as np
 try:
     import jax
     import jax.numpy as jnp
-    from jax import config
+    from jax import config, jit
 
     config.update("jax_enable_x64", True)
 
@@ -28,7 +28,7 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
         jax.default_device = device 
-
+    
     @staticmethod
     def to_numpy(jax_array: Array, /) -> Any:
         return np.array(jax_array) 
@@ -67,26 +67,59 @@ class JAXBackend(Backend[Array], backend_name='jax'):
         p = jnp.broadcast_to(p, shape=(sep.shape[0], 1))
         raw = jnp.concatenate((z, sep, p), axis=1)
         return jnp.array(raw[:, 1:] - raw[:, :-1]).astype(dtype)
-
+    
     @staticmethod
+    @jit
     def edge_length(edge: Array, node: Array, *, out=None) -> Array:
         return jnp.linalg.norm(node[edge[:, 0]] - node[edge[:, 1]], axis=-1)
 
+    @staticmethod
+    @jit
+    def edge_normal(edge: Array, node: Array, unit=False, *, out=None) -> Array:
+        points = node[edge, :]
+        if points.shape[-1] != 2:
+            raise ValueError("Only 2D meshes are supported.")
+        edges = points[..., 1, :] - points[..., 0, :]
+        if [unit]:
+            edges /= jnp.linalg.norm(edges, axis=-1, keepdims=True)
+        return jnp.stack([edges[..., 1], -edges[...,0]], axis=-1, out=out)    
+
+    @staticmethod
+    @jit
+    def edge_tangent(edge: Array, node: Array, unit=False, *, out=None) -> Array:
+        edges = node[edge[:, 1], :] - node[edge[:, 0], :]
+        if [unit]:
+            l = jnp.linalg.norm(edges, axis=-1, keepdims=True)
+            edges /= l
+        return jnp.stack([edges[..., 0], edges[...,1]], axis=-1, out=out)    
+    
+    @staticmethod
+    @jit
+    def simplex_measure(entity: Array, node: Array) -> Array:
+        points = node[entity, :]
+        TD = points.shape[-2] - 1
+        if TD != points.size(-1):
+            raise RuntimeError("The geometric dimension of points must be NVC-1"
+                            "to form a simplex.")
+        edges = points[..., 1:, :] - points[..., :-1, :]
+        return jnp.linalg.det(edges)/jax.scipy.special.factorial(TD)
+    
+    @staticmethod
+    @jit
+    def barycenter(entity: Array, node: Array, loc: Optional[Array]=None) -> Array:
+        return jnp.mean(node[entity, :], axis=1) # TODO: polygon mesh case
+    
     # Triangle Mesh
     # =============
-    @staticmethod
-    def tri_area(cell: Array, node: Array, out: Optional[Array]=None) -> Array:
-        """
-        """
-        assert cell.shape[-1] == 3
-        GD = node.shape[-1]
-        e0 = node[cell[:, 1]] - node[cell[:, 0]]
-        e1 = node[cell[:, 2]] - node[cell[:, 0]]
-        v = jnp.cross(e0, e1, axis=-1)
-        if GD == 3:
-            v = jnp.norm(v)
-        return v/2.0
 
+    #TODO:out
+    @staticmethod
+    @jit
+    def triangle_area_3d(tri: Array, node: Array, out: Optional[Array]=None) -> Array:
+        points = node[tri, :]
+        return jnp.cross(points[..., 1, :] - points[..., 0, :],
+                    points[..., 2, :] - points[..., 0, :], axis=-1) / 2.0
+    
     @staticmethod
     def tri_grad_lambda_2d(cell: Array, node: Array) -> Array:
         """grad_lambda function for the triangle mesh in 2D.
