@@ -2,8 +2,9 @@ import pytest
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import UniformMesh2d
 
-bm.set_backend('numpy')
+#bm.set_backend('numpy')
 #bm.set_backend('pytorch')
+bm.set_backend('jax')
 
 def test_uniform_mesh_2d_init():
     nelx, nely = 2, 2
