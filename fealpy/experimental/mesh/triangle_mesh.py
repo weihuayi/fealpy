@@ -50,18 +50,6 @@ class TriangleMesh(SimplexMesh):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
   
-    # shape function
-    def grad_lambda(self, index: Index=_S) -> TensorLike:
-        """
-        """
-        node = self.node
-        cell = self.cell[index]
-        GD = self.GD
-        if GD == 2:
-            return bm.triangle_grad_lambda_2d(cell, node)
-        elif GD == 3:
-            return bm.triangle_grad_lambda_3d(cell, node)
-
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
@@ -78,6 +66,64 @@ class TriangleMesh(SimplexMesh):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         return quad
+
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> TensorLike:
+        """
+        """
+        node = self.node
+        cell = self.cell[index]
+        GD = self.GD
+        if GD == 2:
+            return bm.triangle_grad_lambda_2d(cell, node)
+        elif GD == 3:
+            return bm.triangle_grad_lambda_3d(cell, node)
+    
+    def rot_lambda(self, index: Index=_S): # TODO
+        pass
+    
+    def grad_shape_function(self, bc, p=1, index: Index=_S, variables='x'):
+        """
+        @berif 这里调用的是网格空间基函数的梯度
+        """
+        R = bm.simplex_grad_shape_function(bc, p)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index)
+            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
+            return gphi  # (NQ, NC, ldof, GD)
+        elif variables == 'u':
+            return R  # (NQ, ldof, TD+1)
+
+    cell_grad_shape_function = grad_shape_function
+
+    def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
+        """
+        @brief 计算单元上所有形函数在边上的积分点处的导函数值
+
+        @param bc 边上的一组积分点
+        @param cindex 边所在的单元编号
+        @param lidx 边在该单元的局部编号
+        @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致
+        """
+
+        NC = len(cindex)
+        nmap = bm.array([1, 2, 0])
+        pmap = bm.array([2, 0, 1])
+        shape = (NC,) + bc.shape[0:-1] + (3,)
+        bcs = bm.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = bm.arange(NC)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
+
+        return gphi
+
+    grad_shape_function_on_face = grad_shape_function_on_edge
 
     # ipoint
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
@@ -203,6 +249,81 @@ class TriangleMesh(SimplexMesh):
                     (p[:,[0,5,4]], p[:,[5,1,3]], p[:,[4,3,2]], p[:,[3,4,5]]),
                     axis=0)
             self.construct()
+    def is_crossed_cell(self, point, segment): # TODO
+        """
+        Notes: 给定一组线段，找到这些线段的一个邻域单元集合，
+              且这些单元要满足一定的连通性。
+        """
+        pass 
+
+    def location(self, points):  # TODO
+
+        """
+        Notes: 给定一组点 p，找扫这些点所在的单元
+        """
+        pass
+
+    def circumcenter(self, index: Index=_S, returnradius=False):
+        """
+        @brief 计算三角形外接圆的圆心和半径
+        """
+        node = self.node
+        cell = self.cell
+        GD = self.geo_dimension()
+
+        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
+        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
+        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
+        nv = bm.cross(v2, -v1)
+        if GD == 2:
+            area = nv / 2.0
+            x2 = bm.sum(node ** 2, axis=1, keepdims=True)
+            w0 = x2[cell[index, 2]] + x2[cell[index, 1]]
+            w1 = x2[cell[index, 0]] + x2[cell[index, 2]]
+            w2 = x2[cell[index, 1]] + x2[cell[index, 0]]
+            W = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
+            fe0 = w0 * v0 @ W
+            fe1 = w1 * v1 @ W
+            fe2 = w2 * v2 @ W
+            c = 0.25 * (fe0 + fe1 + fe2) / area.reshape(-1, 1)
+            R = bm.sqrt(bm.sum((c - node[cell[index, 0], :]) ** 2, axis=1))
+        elif GD == 3:
+            length = bm.sqrt(bm.sum(nv ** 2, axis=1))
+            n = nv / length.reshape((-1, 1))
+            l02 = bm.sum(v1 ** 2, axis=1, keepdims=True)
+            l01 = bm.sum(v2 ** 2, axis=1, keepdims=True)
+            d = 0.5 * (l02 * bm.cross(n, v2) + l01 * bm.cross(-v1, n)) / length.reshape(-1, 1)
+            c = node[cell[index, 0]] + d
+            R = bm.sqrt(bm.sum(d ** 2, axis=1))
+
+        if returnradius:
+            return c, R
+        else:
+            return c
+
+    def angle(self):
+        NC = self.number_of_cells()
+        cell = self.cell
+        node = self.node
+        localEdge = self.localEdge
+        angle = bm.zeros((NC, 3), dtype=self.ftype)
+        for i, (j, k) in zip(range(3), localEdge):
+            v0 = node[cell[:, j]] - node[cell[:, i]]
+            v1 = node[cell[:, k]] - node[cell[:, i]]
+            # NumPyBacked has no arccos
+            angle[:, i] = bm.arccos(
+                bm.sum(v0 * v1, axis=1) / bm.sqrt(bm.sum(v0 ** 2, axis=1) * np.sum(v1 ** 2, axis=1)))
+        return angle  
+
+    def show_angle(self, axes, angle=None): # TODO 
+        """
+        Note: 显示网格角度的分布直方图
+        """
+        pass
+
+    def unifrom_bisect(self, n=1):
+        for i in range(n):
+            self.bisect()
 
     @classmethod
     def from_one_triangle(cls, meshtype='iso', ftype=bm.float64, itype=bm.int32):
@@ -210,7 +331,7 @@ class TriangleMesh(SimplexMesh):
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, np.sqrt(3) / 2]], dtype=ftype)
+                [0.5, bm.sqrt(3) / 2]], dtype=ftype)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0],
