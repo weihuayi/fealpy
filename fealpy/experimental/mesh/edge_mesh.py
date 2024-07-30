@@ -71,11 +71,10 @@ class EdgeMesh(SimplexMesh):
         v = node[cell[:, 1]] - node[cell[:, 0]]
         NC = len(cell) 
         GD = self.geo_dimension()
-        Dlambda = bm.zeros((NC, 2, GD), dtype=self.ftype)
         h2 = bm.sum(v**2, axis=-1)
         v /=h2.reshape(-1, 1)
-        Dlambda[:, 0, :] = -v
-        Dlambda[:, 1, :] = v
+        v = v[:,None,:]
+        Dlambda = bm.concatenate([-v,v],axis=1)
         return Dlambda
     
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
@@ -96,16 +95,15 @@ class EdgeMesh(SimplexMesh):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
             gdof = NN + NC*(p-1)
-            ipoint = bm.zeros((gdof, GD), dtype=self.ftype)
-            ipoint[:NN] = node
             cell = self.entity('cell')
-            w = bm.zeros((p-1,2), dtype=bm.float64)
-            w[:,0] = bm.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
+            a = bm.arange(p-1,0,-1,dtype=bm.float64)/p
+            a = a.reshape(p-1,-1)
+            b = bm.arange(1,p,1,dtype=bm.float64)/p
+            b = b.reshape(p-1,-1)
+            w = bm.concatenate([a,b],axis=1)
             GD = self.geo_dimension()
-            ipoint[NN:NN+(p-1)*NC] = bm.einsum('ij, kj...->ki...', w,
-                    node[cell]).reshape(-1, GD)
-
+            cip = bm.einsum('ij, kj...->ki...', w,node[cell]).reshape(-1, GD)
+            ipoint = bm.concatenate([node,cip],axis=0)
             return ipoint
     
     def face_unit_normal(self, index=None, node=None):
