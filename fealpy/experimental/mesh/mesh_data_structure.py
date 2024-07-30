@@ -245,34 +245,37 @@ class MeshDS(metaclass=MeshMeta):
         NFC = self.number_of_faces_of_cells()
 
         totalFace = self.total_face()
-        _, i0_np, j_np = bm.unique(
+        _, i0, j = bm.unique(
             bm.sort(totalFace, axis=1),
             return_index=True,
             return_inverse=True,
             axis=0
         )
-        self.face = totalFace[i0_np, :] # this also adds the edge in 2-d meshes
-        NF = i0_np.shape[0]
+        self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
+        NF = i0.shape[0]
 
-        i1_np = bm.zeros(NF, dtype=i0_np.dtype)
-        i1_np[j_np] = bm.arange(0, NFC*NC, dtype=i0_np.dtype)
+        i1 = bm.zeros(NF, dtype=i0.dtype)
+        b = bm.arange(0, NFC*NC, dtype=i0.dtype)
+        if bm.backend_name == 'jax':
+            i1 = i1.at[j].set(b)
+        else:
+            i1[j] = b 
 
-        self.cell2face = j_np.reshape(NC, NFC)
+        self.cell2face = j.reshape(NC, NFC)
 
-        face2cell_np = bm.stack([i0_np//NFC, i1_np//NFC, i0_np%NFC, i1_np%NFC], axis=-1)
-        self.face2cell = face2cell_np
+        self.face2cell = bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1)
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
 
-            total_edge = self.total_edge()
+            totalEdge = self.total_edge()
             _, i2, j = bm.unique(
-                bm.sort(total_edge, axis=1),
+                bm.sort(totalEdge, axis=1),
                 return_index=True,
                 return_inverse=True,
                 axis=0
             )
-            self.edge = total_edge[i2, :]
+            self.edge = totalEdge[i2, :]
             self.cell2edge = j.reshape(NC, NEC)
 
         elif self.TD == 2:
