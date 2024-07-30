@@ -22,6 +22,7 @@ class TestBackendInterfaces:
                            return_inverse=True,
                            return_counts=True, axis=0)
 
+
         expected = np.unique(bm.to_numpy(a), return_index=True, 
                              return_inverse=True, 
                              return_counts=True, axis=0)
