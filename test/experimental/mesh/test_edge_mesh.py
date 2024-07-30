@@ -105,13 +105,12 @@ def test_cell_normal():
 
 
 if __name__ == "__main__":
-    test_quadrature_formula()
+    # test_quadrature_formula()
     # test_entity_measure()
     # test_grad_lambda()
     # test_number_of_local_ipoints()
     # test_number_of_global_ipoints()
-    # test_interpolation_points()
+    test_interpolation_points()
     # test_cell_normal()
 
-   
     
