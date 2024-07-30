@@ -34,20 +34,84 @@ def test_add_plot():
     mesh = EdgeMesh.from_tower()
     mesh.add_plot(plt)
 
-def test_integrator():
+def test_quadrature_formula():
     node = bm.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
     cell = bm.tensor([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
 
     # Create EdgeMesh object
     edge_mesh = EdgeMesh(node, cell)
     q = 4
-    inte = edge_mesh.integrator(q)
+    inte = edge_mesh.quadrature_formula(q)
     a,b = inte.get_quadrature_points_and_weights()
     print(a)
     print("\n")
     print(b)
 
+def test_entity_measure():
+    node = bm.tensor([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.tensor([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+
+    # Create EdgeMesh object
+    edge_mesh = EdgeMesh(node, cell)
+    a = edge_mesh.entity_measure()
+    print(a)
+
+def test_grad_lambda():
+    node = bm.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+
+    # Create EdgeMesh object
+    edge_mesh = EdgeMesh(node, cell)
+    val = edge_mesh.grad_lambda()
+    print(val)
+
+
+def test_number_of_local_ipoints():
+    node = bm.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+
+    # Create EdgeMesh object
+    edge_mesh = EdgeMesh(node, cell)
+    a = edge_mesh.number_of_local_ipoints(p=1)
+    print(a)
+
+
+def test_number_of_global_ipoints():
+    node = bm.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+
+    # Create EdgeMesh object
+    edge_mesh = EdgeMesh(node, cell)
+    val = edge_mesh.number_of_global_ipoints(p=3)
+    print(val)
+
+def test_interpolation_points():
+    node = bm.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+
+    # Create EdgeMesh object
+    edge_mesh = EdgeMesh(node, cell)
+    a = edge_mesh.interpolation_points(p=2)
+    print(a)
+
+def test_cell_normal():
+    node = bm.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+
+    # Create EdgeMesh object
+    edge_mesh = EdgeMesh(node, cell)
+    val = edge_mesh.cell_normal()
+    print(val)
+
 
 if __name__ == "__main__":
-    test_integrator()
+    test_quadrature_formula()
+    # test_entity_measure()
+    # test_grad_lambda()
+    # test_number_of_local_ipoints()
+    # test_number_of_global_ipoints()
+    # test_interpolation_points()
+    # test_cell_normal()
+
+   
     
