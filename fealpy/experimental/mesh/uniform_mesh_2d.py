@@ -127,6 +127,7 @@ class UniformMesh2d(StructuredMesh):
            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
     def uniform_refine(self, n=1):
+        # TODO: There is a problem with this code
         for i in range(n):
             self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
