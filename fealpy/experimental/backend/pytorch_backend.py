@@ -100,6 +100,12 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ### Other methods ###
     # TODO: unique
+    @staticmethod
+    def unique(self, a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
+        b = torch.unique(a, 
+                return_inverse=return_inverse, 
+                return_counts=return_counts,
+                dim=axis, **kwargs)
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
