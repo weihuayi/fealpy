@@ -1,7 +1,7 @@
 import numpy as np 
 from typing import Union, Optional, Sequence, Tuple, Any
 
-from .utils import entitymethod
+from .utils import entitymethod, estr2dim
 
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
@@ -62,38 +62,34 @@ class UniformMesh2d(StructuredMesh):
         ny = self.ny
 
         NN = self.NN
-        NE = self.NE
+        NE = self.NE    
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
         edge = bm.zeros((NE, 2), dtype=bm.int32)
 
-        NE0 = 0
-        NE1 = nx * (ny + 1)
-        edge_horiz_0 = idx[:-1, :].reshape(-1)
-        edge_horiz_1 = idx[1:, :].reshape(-1)
-        edge_horiz = bm.concatenate([edge_horiz_0[:, None], edge_horiz_1[:, None]], axis=-1)
-        last_horiz_edges = np.flip(edge_horiz[ny::ny+1], axis=-1)
-        #edge[NE0:NE1, 0] = idx[:-1, :].reshape(-1)
-        #edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
-        #edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            NE0 = 0
+            NE1 = nx * (ny + 1)
+            edge[NE0:NE1, 0] = idx[:-1, :].reshape(-1)
+            edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
+            edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
 
-        #edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
+            edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
 
-        NE0 = NE1
-        NE1 += ny * (nx + 1)
-        edge_vert_0 = idx[:, :-1].reshape(-1)
-        edge_vert_1 = idx[:, 1:].reshape(-1)
-        edge_vert = np.concatenate([edge_vert_0[:, None], edge_vert_1[:, None]], axis=-1)
-        first_vert_edges = np.flip(edge_vert[:ny], axis=-1)
-        #edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
-        #edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
-        #edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
+            NE0 = NE1
+            NE1 += ny * (nx + 1)
+            edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
+            edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
+            edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
 
-        #edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
-        edge = np.concatenate([edge_horiz[:ny], last_horiz_edges, edge_horiz[ny+1:], first_vert_edges, edge_vert[ny:]], axis=0)
+            edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
 
+            return edge
+        elif bm.backend_name == 'jax':
+            raise NotImplementedError("Jax backend is not yet implemented.")
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
         
-        return edge
     
     @entitymethod(2)
     def _get_cell(self):
@@ -117,18 +113,30 @@ class UniformMesh2d(StructuredMesh):
 
         return cell
 
-    
-
     # entity
-    def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
+    def entity_measure(self, etype: Union[int, str]) -> TensorLike:
+       if isinstance(etype, str):
+           etype = estr2dim(self, etype)
+       if etype == 0:
+           return bm.tensor(0, dtype=bm.float64)
+       elif etype == 1:
+           return self.h[0], self.h[1]
+       elif etype == 2:
+           return self.h[0] * self.h[1]
+       else:
+           raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-        if etype == 0:
-            return bm.tensor([0,], dtype=self.ftype)
-        elif etype == 1:
-            edge = self.entity(1, index)
-            return self.h[0], self.h[1]
-        elif etype == 2:
-            cell = self.entity(2, index)
-            return self.h[0] * self.h[1]
-        else:
-            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            self.extent = [i * 2 for i in self.extent]
+            self.h = [h / 2.0 for h in self.h]
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+
+            self.NC = self.nx * self.ny
+            self.NN = (self.nx + 1) * (self.ny + 1)
+
+            # self._entity_storage.clear()
+            # self._entity_factory.clear()
+
+
