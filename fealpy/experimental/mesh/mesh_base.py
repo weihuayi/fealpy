@@ -490,6 +490,38 @@ class TensorMesh(HomogeneousMesh):
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
         return bm.tensor_gdof(p, nums)
 
+    def bc_to_point(self, bc, index=None):
+        """
+        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
+        """
+        node = self.entity('node')
+        if isinstance(bc, tuple) and len(bc) == 3:
+            cell = self.entity('cell', index)
+
+            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
+            bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
+            bc = bm.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
+
+            # node[cell].shape == (NC, 8, 3)
+            # bc.shape == (NQ, 8)
+            p = bm.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
+
+        elif isinstance(bc, tuple) and len(bc) == 2:
+            face = self.entity(2, index=index)
+
+            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
+            bc = bm.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+
+            # node[cell].shape == (NC, 4, 2)
+            # bc.shape == (NQ, 4)
+            p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+        else:
+            edge = self.entity('edge', index=index)[index]
+            p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        return p
+
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
         raise NotImplementedError
@@ -549,7 +581,60 @@ class TensorMesh(HomogeneousMesh):
                 return gphi
         return gphi
 
+    def quad_to_ipoint(self, p, index=None):
+        """
+        @brief 生成每个面上的插值点全局编号
+        @note 本函数可能出现 jax 不兼容问题
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        edge = self.entity('edge')
+        face = self.entity('face')
+        face2edge = self.face_to_edge()
+        edge2ipoint = self.edge_to_ipoint(p)
+
+        multiIndex = bm.multi_index_matrix(p, 1) 
+
+        dofidx = [0 for i in range(4)] 
+        dofidx[0], = bm.where(multiIndex[:, 1]==0)
+        dofidx[1], = bm.where(multiIndex[:, 0]==p)
+        dofidx[2], = bm.where(multiIndex[:, 1]==p)
+        dofidx[3], = bm.where(multiIndex[:, 0]==0)
+
+        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=bm.int_)
+        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=bm.int_)
+        for i in range(4): #边上的自由度
+            ge = face2edge[:, i]
+            idx = bm.where(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+
+            face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
+            face2ipoint[idx[:, None], dofidx[i]] = edge2ipoint[ge[idx], ::-1] # TODO jax 不兼容
+
+        indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+        face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
+                NN+NE*(p-1)+NF*(p-1)**2).reshape(NF, -1) # TODO jax 不兼容
+        return face2ipoint
+
+
 class StructuredMesh(HomogeneousMesh):
+    ### counters
+    def count(self, etype: Union[int, str]) -> int:
+        """Return the number of entities of the given type."""
+        entity = self.entity(etype)
+
+        if entity is None:
+            logger.info(f'count: entity {etype} is not found and 0 is returned.')
+            return 0
+
+        if hasattr(entity, 'location'):
+            return entity.location.shape[0] - 1
+        else:
+            if etype == 'node':
+                return entity.shape[0] * entity.shape[1]
+            else:
+                return entity.shape[0]
+
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
         raise NotImplementedError

@@ -50,12 +50,10 @@ class UniformMesh2d(StructuredMesh):
         y = bm.linspace(box[2], box[3], ny + 1)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
         node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.float64)
-        node[..., 0] = xx
-        node[..., 1] = yy
-        # node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.int32)
-        # node[..., 0], node[..., 1] = bm.mgrid[
-        #                              box[0]:box[1]:(nx + 1) * 1j,
-        #                              box[2]:box[3]:(ny + 1) * 1j]
+        #node[..., 0] = xx
+        #node[..., 1] = yy
+        node = bm.concatenate((xx[..., np.newaxis], yy[..., np.newaxis]), axis=-1)
+
         return node
     
     @entitymethod(1)
@@ -71,19 +69,29 @@ class UniformMesh2d(StructuredMesh):
 
         NE0 = 0
         NE1 = nx * (ny + 1)
-        edge[NE0:NE1, 0] = idx[:-1, :].reshape(-1)
-        edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
-        edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], dims=[1])
+        edge_horiz_0 = idx[:-1, :].reshape(-1)
+        edge_horiz_1 = idx[1:, :].reshape(-1)
+        edge_horiz = bm.concatenate([edge_horiz_0[:, None], edge_horiz_1[:, None]], axis=-1)
+        last_horiz_edges = np.flip(edge_horiz[ny::ny+1], axis=-1)
+        #edge[NE0:NE1, 0] = idx[:-1, :].reshape(-1)
+        #edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
+        #edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
 
-        # edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
+        #edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
 
         NE0 = NE1
         NE1 += ny * (nx + 1)
-        edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
-        edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
-        edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], dims=[1])
+        edge_vert_0 = idx[:, :-1].reshape(-1)
+        edge_vert_1 = idx[:, 1:].reshape(-1)
+        edge_vert = np.concatenate([edge_vert_0[:, None], edge_vert_1[:, None]], axis=-1)
+        first_vert_edges = np.flip(edge_vert[:ny], axis=-1)
+        #edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
+        #edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
+        #edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
 
-        # edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
+        #edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
+        edge = np.concatenate([edge_horiz[:ny], last_horiz_edges, edge_horiz[ny+1:], first_vert_edges, edge_vert[ny:]], axis=0)
+
         
         return edge
     
@@ -97,10 +105,15 @@ class UniformMesh2d(StructuredMesh):
         cell = bm.zeros((NC, 4), dtype=bm.int32)
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
         c = idx[:-1, :-1]
-        cell[:, 0] = c.reshape(-1)
-        cell[:, 1] = cell[:, 0] + 1
-        cell[:, 2] = cell[:, 0] + ny + 1
-        cell[:, 3] = cell[:, 2] + 1
+        #cell[:, 0] = c.reshape(-1)
+        #cell[:, 1] = cell[:, 0] + 1
+        #cell[:, 2] = cell[:, 0] + ny + 1
+        #cell[:, 3] = cell[:, 2] + 1
+        cell_0 = c.reshape(-1)
+        cell_1 = cell_0 + 1
+        cell_2 = cell_0 + ny + 1
+        cell_3 = cell_2 + 1
+        cell = bm.concatenate([cell_0[:, None], cell_1[:, None], cell_2[:, None], cell_3[:, None]], axis=-1)
 
         return cell
 
