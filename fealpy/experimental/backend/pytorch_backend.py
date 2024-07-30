@@ -107,13 +107,37 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.tensordot(a, b, dims=axes)
 
     ### Other methods ###
-    # TODO: unique
     @staticmethod
     def unique(self, a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         b = torch.unique(a,
                 return_inverse=return_inverse,
                 return_counts=return_counts,
+    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
+        """
+        unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
+        """
+        b, inverse, counts = torch.unique(a, return_inverse=True,
+                return_counts=True,
                 dim=axis, **kwargs)
+        any_return = return_index or return_inverse or return_counts
+        if any_return:
+            result = (b, )
+        else:
+            retult = b
+
+        if return_index:
+            kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
+            indices = torch.zeros(counts.shape, **kwargs)
+            indices[inverse] = torch.arange(a.shape[axis], **kwargs)
+            result += (indices, )
+
+        if return_inverse:
+            result += (inverse, )
+
+        if return_counts:
+            result += (counts, )
+
+        return result
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
