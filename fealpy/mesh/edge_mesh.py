@@ -93,7 +93,7 @@ class EdgeMesh(Mesh, Plotable):
             return np.array([0.0], dtype=self.ftype)
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
-
+    
     def grad_lambda(self, index=np.s_[:]):
         """
         @brief 计算所有单元上重心坐标函数的导数
@@ -109,6 +109,7 @@ class EdgeMesh(Mesh, Plotable):
         Dlambda[:, 0, :] = -v
         Dlambda[:, 1, :] = v
         return Dlambda
+    
 
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         return p + 1
