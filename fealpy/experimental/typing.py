@@ -1,5 +1,5 @@
 
-from typing import Tuple, Union, Literal, Callable
+from typing import Tuple, Union, Literal, Callable, Dict
 from functools import reduce
 
 from .backend import TensorLike

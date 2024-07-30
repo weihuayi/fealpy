@@ -97,17 +97,19 @@ FUNCTION_MAPPING = _make_default_mapping(
     'meshgrid',
 
     # Reduction functions
-    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min',
+    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax',
 
     # Unary functions
-    'abs', 'sign', 'sqrt', 'log', 'log10', 'log2', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh',
+    'abs', 'sign', 'sqrt', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    'sinh', 'cosh', 'tanh', 'clip', 'floor', 'ceil', 'round',
 
     # Binary functions
     'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
 
     # Other functions
-    'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
-    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes'
+    'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
+    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
+    'flip', 'where', 'tile'
 )
 
 
