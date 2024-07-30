@@ -2,9 +2,9 @@ import pytest
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import UniformMesh2d
 
-#bm.set_backend('numpy')
+bm.set_backend('numpy')
 #bm.set_backend('pytorch')
-bm.set_backend('jax')
+#bm.set_backend('jax')
 
 def test_uniform_mesh_2d_init():
     nelx, nely = 2, 2
@@ -23,3 +23,6 @@ def test_uniform_mesh_2d_init():
     assert mesh.number_of_edges() == 12
     assert mesh.number_of_faces() == 12
     assert mesh.number_of_cells() == nelx * nely
+
+    assert mesh.entity_measure('edge') == (hx, hy)
+    assert mesh.entity_measure('cell') == hx * hy
