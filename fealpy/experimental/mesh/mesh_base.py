@@ -550,6 +550,23 @@ class TensorMesh(HomogeneousMesh):
         return gphi
 
 class StructuredMesh(HomogeneousMesh):
+    ### counters
+    def count(self, etype: Union[int, str]) -> int:
+        """Return the number of entities of the given type."""
+        entity = self.entity(etype)
+
+        if entity is None:
+            logger.info(f'count: entity {etype} is not found and 0 is returned.')
+            return 0
+
+        if hasattr(entity, 'location'):
+            return entity.location.shape[0] - 1
+        else:
+            if etype == 'node':
+                return entity.shape[0] * entity.shape[1]
+            else:
+                return entity.shape[0]
+
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
         raise NotImplementedError

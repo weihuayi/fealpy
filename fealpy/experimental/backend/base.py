@@ -108,6 +108,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     # Other functions
     'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
+    'flip',
     
 )
 

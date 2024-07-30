@@ -52,10 +52,7 @@ class UniformMesh2d(StructuredMesh):
         node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.float64)
         node[..., 0] = xx
         node[..., 1] = yy
-        # node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.int32)
-        # node[..., 0], node[..., 1] = bm.mgrid[
-        #                              box[0]:box[1]:(nx + 1) * 1j,
-        #                              box[2]:box[3]:(ny + 1) * 1j]
+
         return node
     
     @entitymethod(1)
@@ -73,7 +70,7 @@ class UniformMesh2d(StructuredMesh):
         NE1 = nx * (ny + 1)
         edge[NE0:NE1, 0] = idx[:-1, :].reshape(-1)
         edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
-        edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], dims=[1])
+        edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
 
         # edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
 
@@ -81,7 +78,7 @@ class UniformMesh2d(StructuredMesh):
         NE1 += ny * (nx + 1)
         edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
         edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
-        edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], dims=[1])
+        edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
 
         # edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
         
