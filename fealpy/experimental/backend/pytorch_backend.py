@@ -48,7 +48,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
         assert k == 0, "Only k=0 is supported by `eye` in PyTorchBackend."
         return torch.eye(n, m, dtype=dtype, **kwargs)
-    
+
     @staticmethod
     def meshgrid(*xi, copy=None, sparse=None, indexing='xy', **kwargs) -> Tuple[Tensor, ...]:
         return torch.meshgrid(*xi, indexing=indexing)
@@ -85,6 +85,14 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def min(a, axis=None, out=None, keepdims=False):
         return torch.min(a, dim=axis, keepdim=keepdims, out=out)
 
+    @staticmethod
+    def argmax(a, axis=None, out=None, keepdims=False):
+        return torch.argmax(a, dim=axis, out=out, keepdim=keepdims)
+
+    @staticmethod
+    def argmin(a, axis=None, out=None, keepdims=False):
+        return torch.argmin(a, dim=axis, out=out, keepdim=keepdims)
+
     ### Unary methods ###
     # NOTE: all copied
 
@@ -102,14 +110,18 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     # TODO: unique
     @staticmethod
     def unique(self, a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
-        b = torch.unique(a, 
-                return_inverse=return_inverse, 
+        b = torch.unique(a,
+                return_inverse=return_inverse,
                 return_counts=return_counts,
                 dim=axis, **kwargs)
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
         return torch.sort(a, dim=axis, **kwargs)[0]
+
+    @staticmethod
+    def argsort(a, axis=-1, **kwargs):
+        return torch.argsort(a, dim=axis, **kwargs)
 
     @staticmethod
     def nonzero(a, /, as_tuple=True):
@@ -144,6 +156,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         elif isinstance(axis, tuple):
             axis = list(axis)
         return torch.flip(a, dims=axis)
+
+    @staticmethod
+    def where(cond, x=None, y=None, out=None):
+        if x is None or y is None:
+            return torch.as_tensor(cond).nonzero(as_tuple=True)
+        else:
+            return torch.where(cond, x, y, out=out)
 
     ### FEALPy functionals ###
 
