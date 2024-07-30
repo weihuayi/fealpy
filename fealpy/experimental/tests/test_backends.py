@@ -22,11 +22,10 @@ class TestBackendInterfaces:
                            return_inverse=True,
                            return_counts=True, axis=0)
 
-
         expected = np.unique(bm.to_numpy(a), return_index=True, 
                              return_inverse=True, 
                              return_counts=True, axis=0)
-
+        
         for r, e, s in zip(result, expected, name):
             np.testing.assert_array_equal(bm.to_numpy(r), e, 
                                           err_msg=f"The {s} of `bm.unique` function is not equal to numpy result in backend {backend}")
