@@ -16,10 +16,13 @@ def test_jacobi_matrix():
 
     bcs, ws = integrator.get_quadrature_points_and_weights()
     jacobi = mesh.jacobi_matrix(bcs)
-    print(jacobi)
+
 
 if __name__ == "__main__":
     #test_bc_to_point()
     test_jacobi_matrix()
+    a =  bm.zeros(10)
+    print(a.device)
+
 
 

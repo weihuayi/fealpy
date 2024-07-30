@@ -150,9 +150,58 @@ class HexahedronMesh(TensorMesh):
             J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
 
+    def first_fundamental_form(self, J):
+        """
+        @brief 由 Jacobi 矩阵计算第一基本形式。
+        """
+        TD = J.shape[-1]
+        shape = J.shape[0:-2] + (TD, TD)
+        data = [[0 for i in range(TD)] for j in range(TD)]
 
+        for i in range(TD):
+            data[i][i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
+            for j in range(i+1, TD):
+                data[i][j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
+                data[j][i] = data[i][j]
+        data = [val.reshape(val.shape+(1,)) for data_ in data for val in data_]  
+        G = np.concatenate(data, axis=-1).reshape(shape)
+        return G
 
+    def face_to_ipoint(self, p, index=None):
+        """
+        @brief 生成每个面上的插值点全局编号
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        edge = self.entity('edge')
+        face = self.entity('face')
+        face2edge = self.ds.face_to_edge()
+        edge2ipoint = self.edge_to_ipoint(p)
 
+        multiIndex = np.zeros([(p+1)**2, 2], dtype=np.int_)
+        multiIndex[:, 0] = np.repeat(np.arange(p+1), p+1)
+        multiIndex[:, 1] = np.tile(np.arange(p+1), p+1)
+
+        dofidx = np.zeros((4, p+1), dtype=np.int_) #四条边上自由度的局部编号
+        dofidx[0], = np.where(multiIndex[:, 1]==0)
+        dofidx[1], = np.where(multiIndex[:, 0]==p)
+        dofidx[2], = np.where(multiIndex[:, 1]==p)
+        dofidx[3], = np.where(multiIndex[:, 0]==0)
+
+        face2ipoint = np.zeros([NF, (p+1)**2], dtype=np.int_)
+        localEdge = np.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=np.int_)
+        for i in range(4): #边上的自由度
+            ge = face2edge[:, i]
+            idx = np.where(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+
+            face2ipoint[:, dofidx[i]] = edge2ipoint[ge]
+            face2ipoint[idx[:, None], dofidx[i]] = edge2ipoint[ge[idx], ::-1]
+
+        indof = np.all(multiIndex>0, axis=-1)&np.all(multiIndex<p, axis=-1)
+        face2ipoint[:, indof] = np.arange(NN+NE*(p-1),
+                NN+NE*(p-1)+NF*(p-1)**2).reshape(NF, -1)
+        return face2ipoint
 
 
     @classmethod
@@ -174,17 +223,6 @@ class HexahedronMesh(TensorMesh):
 
         cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=bm.int_)
         return cls(node, cell)
-
-
-
-
-
-
-
-
-
-
-
 
 
 

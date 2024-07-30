@@ -198,7 +198,7 @@ class MeshDS(metaclass=MeshMeta):
         """
         NC = self.number_of_cells()
         bd_face_flag = self.boundary_face_flag()
-        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        kwargs = {'dtype': bd_face_flag.dtype}
         bd_face2cell = self.face2cell[bd_face_flag, 0]
         bd_cell_flag = bm.zeros((NC,), **kwargs)
         bd_cell_flag[bd_face2cell.ravel()] = True
