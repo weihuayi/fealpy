@@ -99,37 +99,6 @@ class HexahedronMesh(TensorMesh):
         node = self.entity('node')
         return bm.edge_length(edge, node)
 
-    def bc_to_point(self, bc, index=None):
-        """
-        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
-        """
-        node = self.entity('node')
-        if isinstance(bc, tuple) and len(bc) == 3:
-            cell = self.entity('cell', index)
-
-            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
-            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
-            bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
-            bc = bm.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
-
-            # node[cell].shape == (NC, 8, 3)
-            # bc.shape == (NQ, 8)
-            p = bm.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
-
-        elif isinstance(bc, tuple) and len(bc) == 2:
-            face = self.entity('face', index=index)
-
-            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
-            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
-            bc = bm.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
-
-            # node[cell].shape == (NC, 4, 2)
-            # bc.shape == (NQ, 4)
-            p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
-        else:
-            edge = self.entity('edge', index=index)[index]
-            p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
-        return p
     edge_bc_to_point = bc_to_point
     face_bc_to_point = bc_to_point
     cell_bc_to_point = bc_to_point
@@ -159,49 +128,20 @@ class HexahedronMesh(TensorMesh):
         data = [[0 for i in range(TD)] for j in range(TD)]
 
         for i in range(TD):
-            data[i][i] = np.einsum('...d, ...d->...', J[..., i], J[..., i])
+            data[i][i] = bm.einsum('...d, ...d->...', J[..., i], J[..., i])
             for j in range(i+1, TD):
-                data[i][j] = np.einsum('...d, ...d->...', J[..., i], J[..., j])
+                data[i][j] = bm.einsum('...d, ...d->...', J[..., i], J[..., j])
                 data[j][i] = data[i][j]
         data = [val.reshape(val.shape+(1,)) for data_ in data for val in data_]  
-        G = np.concatenate(data, axis=-1).reshape(shape)
+        G = bm.concatenate(data, axis=-1).reshape(shape)
         return G
 
     def face_to_ipoint(self, p, index=None):
         """
         @brief 生成每个面上的插值点全局编号
         """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NF = self.number_of_faces()
-        edge = self.entity('edge')
-        face = self.entity('face')
-        face2edge = self.ds.face_to_edge()
-        edge2ipoint = self.edge_to_ipoint(p)
+        return self.quad_to_ipoint(p, index) 
 
-        multiIndex = np.zeros([(p+1)**2, 2], dtype=np.int_)
-        multiIndex[:, 0] = np.repeat(np.arange(p+1), p+1)
-        multiIndex[:, 1] = np.tile(np.arange(p+1), p+1)
-
-        dofidx = np.zeros((4, p+1), dtype=np.int_) #四条边上自由度的局部编号
-        dofidx[0], = np.where(multiIndex[:, 1]==0)
-        dofidx[1], = np.where(multiIndex[:, 0]==p)
-        dofidx[2], = np.where(multiIndex[:, 1]==p)
-        dofidx[3], = np.where(multiIndex[:, 0]==0)
-
-        face2ipoint = np.zeros([NF, (p+1)**2], dtype=np.int_)
-        localEdge = np.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=np.int_)
-        for i in range(4): #边上的自由度
-            ge = face2edge[:, i]
-            idx = np.where(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
-
-            face2ipoint[:, dofidx[i]] = edge2ipoint[ge]
-            face2ipoint[idx[:, None], dofidx[i]] = edge2ipoint[ge[idx], ::-1]
-
-        indof = np.all(multiIndex>0, axis=-1)&np.all(multiIndex<p, axis=-1)
-        face2ipoint[:, indof] = np.arange(NN+NE*(p-1),
-                NN+NE*(p-1)+NF*(p-1)**2).reshape(NF, -1)
-        return face2ipoint
 
 
     @classmethod
@@ -209,7 +149,6 @@ class HexahedronMesh(TensorMesh):
         """
         @brief 构造一个只有一个六面体的网格
         """
-        print('aaa')
         node = bm.array([
             [0.0, 0.0, 0.0],
             [1.0, 0.0, 0.0],
