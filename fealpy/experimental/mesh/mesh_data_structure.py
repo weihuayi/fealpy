@@ -255,7 +255,11 @@ class MeshDS(metaclass=MeshMeta):
         NF = i0.shape[0]
 
         i1 = bm.zeros(NF, dtype=i0.dtype)
-        i1[j] = bm.arange(0, NFC*NC, dtype=i0.dtype)
+        b = bm.arange(0, NFC*NC, dtype=i0.dtype)
+        if bm.backend_name == 'jax':
+            i1 = i1.at[j].set(b)
+        else:
+            i1[j] = b 
 
         self.cell2face = j.reshape(NC, NFC)
 
