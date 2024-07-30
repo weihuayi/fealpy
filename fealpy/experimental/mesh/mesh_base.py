@@ -100,7 +100,7 @@ class Mesh(MeshDS):
             TensorLike[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return bm.edge_tengent(edge, self.node, normalize=normalize, out=out)
+        return bm.edge_tangent(edge, self.node, normalize=normalize, out=out)
 
     def cell_normal(self, index: Index=_S, node: Optional[TensorLike]=None) -> TensorLike:
         """
@@ -550,7 +550,9 @@ class TensorMesh(HomogeneousMesh):
         return gphi
 
 class StructuredMesh(HomogeneousMesh):
-    pass
+    # shape function
+    def grad_lambda(self, index: Index=_S) -> TensorLike:
+        raise NotImplementedError
 
     # NOTE: Here are some examples for entity factories:
     # implement them in subclasses if necessary.

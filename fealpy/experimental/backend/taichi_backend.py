@@ -44,5 +44,39 @@ class TaichiBackend(Backend[Field], backend_name='taichi'):
 
     ### math constant ###
 
-    e = ti.math.e
-    pi = ti.math.pi
+    e = tm.e
+    pi = tm.pi
+    nan = tm.nan 
+    inf = tm.inf
+    dtype = ti._lib.core.DataType
+    
+    # Creation functions
+    # 'array', 'tensor', 'arange', 'linspace',
+    #'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like', 'eye',
+    # 'meshgrid',
+
+    # Reduction functions
+    # 'all', 'any', 'sum', 'prod', 'mean', 'max', 'min',
+
+    # Unary functions
+    #'abs', 'sign', 'sqrt', 'log', 'log10', 'log2', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh',
+
+    # Binary functions
+    #'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
+
+    # Other functions
+    #'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
+    #'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes'
+
+attribute_mapping = ATTRIBUTE_MAPPING.copy()
+attribute_mapping.update({
+    'bool_': 'uint8',
+    'int_': 'int32',
+    'float_': 'float64',
+})
+
+TaichiBackend.attach_attributes(attribute_mapping, torch)
+function_mapping = FUNCTION_MAPPING.copy()
+function_mapping.update(array='tensor', power='pow', transpose='permute',
+                        repeat='repeat_interleave')
+TaichiBackend.attach_methods(function_mapping, torch)

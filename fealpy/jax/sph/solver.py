@@ -14,7 +14,8 @@ import h5py
 import pyvista
 from typing import Dict
 import enum
-from jax_md import space
+from fealpy.jax.sph.jax_md import space
+#from jax_md import space
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.animation import PillowWriter
@@ -41,7 +42,8 @@ class SPHSolver:
         """Equation of state update pressure"""
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
     
-    def tait_eos_p2rho(slef, p, p0, rho0, gamma=1.0, X=0.0):
+    @staticmethod
+    def tait_eos_p2rho(p, p0, rho0, gamma=1.0, X=0.0):
         """Calculate density by pressure."""
         p_temp = p + p0 - X
         return rho0 * (p_temp / p0) ** (1 / gamma)
