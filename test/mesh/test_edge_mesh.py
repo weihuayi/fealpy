@@ -85,5 +85,5 @@ if __name__ == "__main__":
     # test_grad_function()
     # test_entity_measure()
     # test_grad_lambda()
-    # test_interpolation_points()
-    test_cell_normal()
+    test_interpolation_points()
+    # test_cell_normal()
