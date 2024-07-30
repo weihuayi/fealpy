@@ -4,7 +4,7 @@ import pytest
 from fealpy.experimental.backend import backend_manager as bm
 
 # 测试不同的后端
-backends = ['numpy', 'pytorch']
+backends = ['numpy', 'pytorch', 'jax']
 
 class TestBackendInterfaces:
     @pytest.fixture(scope="class", params=backends)
@@ -21,6 +21,7 @@ class TestBackendInterfaces:
         result = bm.unique(a, return_index=True, 
                            return_inverse=True,
                            return_counts=True, axis=0)
+
 
         expected = np.unique(bm.to_numpy(a), return_index=True, 
                              return_inverse=True, 
