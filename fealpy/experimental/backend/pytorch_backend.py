@@ -124,7 +124,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if return_index:
             kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
             indices = torch.zeros(counts.shape, **kwargs)
-            indices[inverse] = torch.arange(a.shape[axis], **kwargs)
+            indices[inverse.flip(dims=[0])] = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
             result += (indices, )
 
         if return_inverse:

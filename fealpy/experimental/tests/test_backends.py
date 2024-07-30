@@ -4,7 +4,7 @@ import pytest
 from fealpy.experimental.backend import backend_manager as bm
 
 # 测试不同的后端
-backends = ['numpy', 'pytorch']
+backends = ['numpy', 'pytorch', 'jax']
 
 class TestBackendInterfaces:
     @pytest.fixture(scope="class", params=backends)
