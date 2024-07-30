@@ -99,37 +99,6 @@ class HexahedronMesh(TensorMesh):
         node = self.entity('node')
         return bm.edge_length(edge, node)
 
-    def bc_to_point(self, bc, index=None):
-        """
-        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
-        """
-        node = self.entity('node')
-        if isinstance(bc, tuple) and len(bc) == 3:
-            cell = self.entity('cell', index)
-
-            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
-            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
-            bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
-            bc = bm.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
-
-            # node[cell].shape == (NC, 8, 3)
-            # bc.shape == (NQ, 8)
-            p = bm.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
-
-        elif isinstance(bc, tuple) and len(bc) == 2:
-            face = self.entity('face', index=index)
-
-            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
-            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
-            bc = bm.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
-
-            # node[cell].shape == (NC, 4, 2)
-            # bc.shape == (NQ, 4)
-            p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
-        else:
-            edge = self.entity('edge', index=index)[index]
-            p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
-        return p
     edge_bc_to_point = bc_to_point
     face_bc_to_point = bc_to_point
     cell_bc_to_point = bc_to_point
@@ -150,8 +119,28 @@ class HexahedronMesh(TensorMesh):
             J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
 
+    def first_fundamental_form(self, J):
+        """
+        @brief 由 Jacobi 矩阵计算第一基本形式。
+        """
+        TD = J.shape[-1]
+        shape = J.shape[0:-2] + (TD, TD)
+        data = [[0 for i in range(TD)] for j in range(TD)]
 
+        for i in range(TD):
+            data[i][i] = bm.einsum('...d, ...d->...', J[..., i], J[..., i])
+            for j in range(i+1, TD):
+                data[i][j] = bm.einsum('...d, ...d->...', J[..., i], J[..., j])
+                data[j][i] = data[i][j]
+        data = [val.reshape(val.shape+(1,)) for data_ in data for val in data_]  
+        G = bm.concatenate(data, axis=-1).reshape(shape)
+        return G
 
+    def face_to_ipoint(self, p, index=None):
+        """
+        @brief 生成每个面上的插值点全局编号
+        """
+        return self.quad_to_ipoint(p, index) 
 
 
 
@@ -160,7 +149,6 @@ class HexahedronMesh(TensorMesh):
         """
         @brief 构造一个只有一个六面体的网格
         """
-        print('aaa')
         node = bm.array([
             [0.0, 0.0, 0.0],
             [1.0, 0.0, 0.0],
@@ -174,17 +162,6 @@ class HexahedronMesh(TensorMesh):
 
         cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=bm.int_)
         return cls(node, cell)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
