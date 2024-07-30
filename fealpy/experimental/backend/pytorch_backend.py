@@ -108,10 +108,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ### Other methods ###
     @staticmethod
-    def unique(self, a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
-        b = torch.unique(a,
-                return_inverse=return_inverse,
-                return_counts=return_counts,
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
         unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
