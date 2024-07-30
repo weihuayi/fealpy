@@ -155,6 +155,16 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             arrays = [a.to(dtype=dtype) for a in arrays]
         return torch.stack(arrays, dim=axis, out=out)
 
+    @staticmethod
+    def flip(a, axis=None):
+        if axis is None:
+            axis = list(range(a.dim()))
+        elif isinstance(axis, int):
+            axis = [axis]
+        elif isinstance(axis, tuple):
+            axis = list(axis)
+        return torch.flip(a, dims=axis)
+
     ### FEALPy functionals ###
 
     @staticmethod
