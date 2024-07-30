@@ -229,7 +229,7 @@ class TriangleMesh(SimplexMesh):
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
-        @brief 一致加密三角形网格
+
         """
 
         for i in range(n):
@@ -248,6 +248,7 @@ class TriangleMesh(SimplexMesh):
             self.cell = bm.concatenate(
                     (p[:,[0,5,4]], p[:,[5,1,3]], p[:,[4,3,2]], p[:,[3,4,5]]),
                     axis=0)
+            #TODO: call self.clear() 清理暂存的数据
             self.construct()
     def is_crossed_cell(self, point, segment): # TODO
         """
