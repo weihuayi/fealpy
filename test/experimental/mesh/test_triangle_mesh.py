@@ -28,50 +28,6 @@ def test_triangle_mesh_entity_measure():
     assert all(mesh.entity_measure(1) == bm.tensor([1.0, 1.0, np.sqrt(2)], dtype=bm.float64))
     assert all(mesh.entity_measure('cell') == bm.tensor([0.5], dtype=bm.float64))
 
-def test_quadrature_formula():
-    q = 3
-    mesh = TriangleMesh.from_one_triangle(meshtype='iso')
-    quad0 = mesh.quadrature_formula(q=q)
-
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    tmesh = TMesh(node, cell)
-    quad1 = tmesh.integrator(q=q)
-
-def test_grad_lambda():
-    mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=16, ny=16)
-    flag = mesh.boundary_cell_flag()
-    NC = bm.sum(flag)
-    val = mesh.grad_lambda(index=flag)
-    assert val.shape == (NC, 3, 2)
-
-def test_interpolation_points():
-    mesh = TriangleMesh.from_box(nx=2, ny=2)
-    
-    gdof0 = mesh.number_of_global_ipoints(p=1)
-    inode0 = mesh.interpolation_points(p=1)
-    
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    tmesh = TMesh(node, cell)
-    inode1 = tmesh.interpolation_points(p=1)
-    gdof1 = tmesh.number_of_global_ipoints(p=1)
-    
-    assert np.array_equal(inode0, inode1)
-    assert inode0.shape == inode1.shape
-
-def test_cell_to_ipoint():
-    mesh = TriangleMesh.from_box(nx=2, ny=2)
-
-    icell0 = mesh.cell_to_ipoint(p=1)
-    
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    tmesh = TMesh(node, cell)
-    icell1 = tmesh.cell_to_ipoint(p=1)
-
-    assert np.array_equal(icell0, icell1)
-    assert icell0.shape == icell1.shape 
 
 def test_triangle_mesh_uniform_refine():
 
@@ -86,7 +42,6 @@ def test_triangle_mesh_uniform_refine():
 
 def test_triangle_mesh_from_box():
     mesh = TriangleMesh.from_box(nx=2, ny=2)
-    
     assert mesh.node.shape == (9, 2)
     assert mesh.cell.shape == (8, 3)
 
@@ -128,15 +83,92 @@ def test_triangle_mesh_from_sphere_surface():
     assert mesh.number_of_nodes() == 12 
     assert mesh.number_of_cells() == 20 
 
+def test_grad_lambda():
+    mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=16, ny=16)
+    flag = mesh.boundary_cell_flag()
+    NC = bm.sum(flag)
+    val = mesh.grad_lambda(index=flag)
+    assert val.shape == (NC, 3, 2)
+
+def test_gard_shape_function():
+    p = 2
+    q = 3
+
+    mesh = TriangleMesh.from_box(nx=2, ny=2)
+    qf = mesh.quadrature_formula(q)
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    gphi = mesh.grad_shape_function(bcs, p)
+
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    tmesh = TMesh(node, cell)
+    qf = tmesh.integrator(q)
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    tgphi = tmesh.grad_shape_function(bcs, p)
+
+    assert np.array_equal(gphi, tgphi)
+    assert gphi.shape == tgphi.shape
+
+def test_interpolation_points():
+    mesh = TriangleMesh.from_box(nx=2, ny=2)
+    
+    gdof0 = mesh.number_of_global_ipoints(p=1)
+    inode0 = mesh.interpolation_points(p=1)
+    
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    tmesh = TMesh(node, cell)
+    inode1 = tmesh.interpolation_points(p=1)
+    gdof1 = tmesh.number_of_global_ipoints(p=1)
+    
+    assert np.array_equal(inode0, inode1)
+    assert inode0.shape == inode1.shape
+
+def test_cell_to_ipoint():
+    mesh = TriangleMesh.from_box(nx=2, ny=2)
+
+    icell0 = mesh.cell_to_ipoint(p=1)
+    
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    tmesh = TMesh(node, cell)
+    icell1 = tmesh.cell_to_ipoint(p=1)
+
+    assert np.array_equal(icell0, icell1)
+    assert icell0.shape == icell1.shape 
+
+def test_circumcenter():
+    mesh = TriangleMesh.from_one_triangle(meshtype='iso')
+    cr = mesh.circumcenter()
+
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    tmesh = TMesh(node, cell)
+    CR = tmesh.circumcenter()
+
+    assert np.array_equal(cr, CR)
+
+def test_angle():
+    mesh = TriangleMesh.from_box(nx=2, ny=2)
+    angle = mesh.angle()
+    
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    tmesh = TMesh(node, cell)
+    angle1 = tmesh.angle()
+
+    assert np.array_equal(angle, angle1)
 
 if __name__ == "__main__":
-    test_triangle_mesh_init()
-    test_triangle_mesh_entity_measure()
-    test_quadrature_formula()
-    #test_grad_lambda()
-    #test_interpolation_points()
-    #test_cell_to_ipoint()
+    #test_triangle_mesh_init()
+    #test_triangle_mesh_entity_measure()
     #test_triangle_mesh_uniform_refine()
     #test_triangle_mesh_from_box()
     #test_triangle_mesh_from_torus_surface()
     #test_triangle_mesh_from_sphere_surface()
+    #test_gard_shape_function()
+    #test_grad_lambda()
+    #test_interpolation_points()
+    #test_cell_to_ipoint()
+    test_circumcenter()
+    test_angle()
