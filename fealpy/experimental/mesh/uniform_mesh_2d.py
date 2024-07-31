@@ -126,35 +126,35 @@ class UniformMesh2d(StructuredMesh):
        else:
            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    def interpolation_points(self, p, index: Index=_S):
-        cell = self.entity('cell')
-        node = self.entity('node')
-        if p <= 0:
-            raise ValueError("p must be a integer larger than 0.")
-        if p == 1:
-            return node
+    # def interpolation_points(self, p, index: Index=_S):
+    #     cell = self.entity('cell')
+    #     node = self.entity('node')
+    #     if p <= 0:
+    #         raise ValueError("p must be a integer larger than 0.")
+    #     if p == 1:
+    #         return node
 
-        NN = self.number_of_nodes()
-        GD = self.geo_dimension()
+    #     NN = self.number_of_nodes()
+    #     GD = self.geo_dimension()
 
-        gdof = self.number_of_global_ipoints(p)
-        ipoints = np.zeros((gdof, GD), dtype=self.ftype)
-        ipoints[:NN, :] = node
+    #     gdof = self.number_of_global_ipoints(p)
+    #     ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+    #     ipoints[:NN, :] = node
 
-        NE = self.number_of_edges()
+    #     NE = self.number_of_edges()
 
-        edge = self.entity('edge')
+    #     edge = self.entity('edge')
 
-        multiIndex = self.multi_index_matrix(p, 1)
-        w = multiIndex[1:-1, :] / p
-        ipoints[NN:NN + (p-1) * NE, :] = np.einsum('ij, ...jm -> ...im', w,
-                node[edge,:]).reshape(-1, GD)
+    #     multiIndex = self.multi_index_matrix(p, 1)
+    #     w = multiIndex[1:-1, :] / p
+    #     ipoints[NN:NN + (p-1) * NE, :] = np.einsum('ij, ...jm -> ...im', w,
+    #             node[edge,:]).reshape(-1, GD)
 
-        w = np.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
-        ipoints[NN + (p-1) * NE:, :] = np.einsum('ij, kj... -> ki...', w,
-                node[cell[:]]).reshape(-1, GD)
+    #     w = np.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
+    #     ipoints[NN + (p-1) * NE:, :] = np.einsum('ij, kj... -> ki...', w,
+    #             node[cell[:]]).reshape(-1, GD)
 
-        return ipoints
+    #     return ipoints
        
     def uniform_refine(self, n=1):
         # TODO: There is a problem with this code
