@@ -13,7 +13,7 @@ _Meth = TypeVar('_Meth', bound=Callable)
 def estr2dim(mesh, estr: str) -> int:
     if estr == 'cell':
         return mesh.top_dimension()
-    elif estr == 'face':
+    elif estr == 'face': #TODO: for interval mesh TD - 1 == 0 which is conflict with node
         TD = mesh.top_dimension()
         return TD - 1
     elif estr == 'edge':

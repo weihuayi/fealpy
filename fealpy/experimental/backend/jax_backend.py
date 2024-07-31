@@ -195,7 +195,7 @@ class JAXBackend(Backend[Array], backend_name='jax'):
         return fn(bcs)
     
     @staticmethod
-    def tensor_measure(entity: Tensor, node: Tensor) -> Tensor:
+    def tensor_measure(entity: Array, node: Array) -> Array:
         # TODO
         raise NotImplementedError
     
