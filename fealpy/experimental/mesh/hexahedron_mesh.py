@@ -112,7 +112,7 @@ class HexahedronMesh(TensorMesh):
         TD = len(bc)
         node = self.entity('node')
         entity = self.entity(TD, index=index)
-        gphi = self.grad_shape_function(bc, p=1, variable='u')
+        gphi = self.grad_shape_function(bc, p=1, variables='u')
         if TD == 3:
             J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
         elif TD == 2:

@@ -23,6 +23,8 @@ _device = torch.device
 
 class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
+    linalg = torch.linalg
+    random = torch.random
 
     @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
@@ -79,7 +81,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def max(a, axis=None, out=None, keepdims=False):
-        return torch.max(a, dim=axis, keepdim=keepdims, out=out)
+        if axis is None:
+            return torch.max(a, keepdim=keepdims, out=out)
+        else:
+            return torch.max(a, axis, keepdim=keepdims, out=out)
+
 
     @staticmethod
     def min(a, axis=None, out=None, keepdims=False):
@@ -196,7 +202,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         sep = torch.flip(torch.tensor(
             tuple(combinations_with_replacement(range(p+1), dim)),
             dtype=dtype
-        ), dims=0)
+        ), dims=(0,))
         raw = torch.zeros((sep.shape[0], dim+2), dtype=dtype)
         raw[:, -1] = p
         raw[:, 1:-1] = sep
@@ -376,3 +382,11 @@ function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(array='tensor', power='pow', transpose='permute',
                         repeat='repeat_interleave', index_add_= 'index_add_')
 PyTorchBackend.attach_methods(function_mapping, torch)
+
+PyTorchBackend.random.rand = torch.rand
+PyTorchBackend.random.rand_like = torch.rand_like
+PyTorchBackend.random.randint = torch.randint
+PyTorchBackend.random.randint_like = torch.randint_like
+PyTorchBackend.random.randn = torch.randn
+PyTorchBackend.random.randn_like = torch.randn_like
+PyTorchBackend.random.randperm = torch.randperm
