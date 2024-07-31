@@ -47,7 +47,8 @@ def test_triangle_mesh_from_box():
 
     node = mesh.entity('node')
     cell = mesh.entity('cell')
-    
+    print(node)
+    print('cell', cell)
     if False:
         tmesh = TMesh(node, cell)
         fig = plt.figure()
@@ -163,7 +164,7 @@ if __name__ == "__main__":
     #test_triangle_mesh_init()
     #test_triangle_mesh_entity_measure()
     #test_triangle_mesh_uniform_refine()
-    #test_triangle_mesh_from_box()
+    test_triangle_mesh_from_box()
     #test_triangle_mesh_from_torus_surface()
     #test_triangle_mesh_from_sphere_surface()
     #test_gard_shape_function()

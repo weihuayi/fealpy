@@ -12,7 +12,7 @@ Index = Union[int, slice, Tuple[int, ...], TensorLike]
 EntityName = Literal['cell', 'face', 'edge', 'node']
 _int_func = Callable[..., int]
 Barycenters = Union[Tuple[TensorLike, ...], TensorLike]
-CoefLike = Union[Number, Tensor, Callable[..., Tensor]]
+CoefLike = Union[Number, TensorLike, Callable[..., TensorLike]]
 
 
 ### Constants

@@ -1,6 +1,7 @@
 
 import ipdb
-import numpy as np 
+import numpy as np
+import matplotlib.pyplot as plt
 import pytest
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
@@ -12,7 +13,7 @@ backends = ['numpy', 'pytorch', 'jax']
 mesh_data = [
     {
         "node": np.array([[0, 0], [1, 0], [0, 1]], dtype=np.float64),
-        "edge": None, 
+        "edge": np.array([[0, 1], [2, 0], [1, 2]], dtype=np.int32), 
         "cell": np.array([[0, 1, 2]], dtype=np.int32),
         "face2cell": np.array([[0, 0, 2, 2], [0, 0, 1, 1], [0, 0, 0, 0]], dtype=np.int32),
         "NN": 3,
@@ -22,9 +23,9 @@ mesh_data = [
     },
     {
         "node": np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64),
-        "edge": None,
+        "edge": np.array([[0, 1], [2, 0], [3, 0], [1, 2], [2, 3]], dtype=np.int32),
         "cell": np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int32),
-        "face2cell": None,
+        "face2cell": np.array([[0, 0, 1, 1], [0, 1, 0, 0], [1, 1, 2, 2], [0, 0, 2, 2],[1, 1, 1, 1]], dtype=np.int32),
         "NN": 4,
         "NE": 5, 
         "NF": 5,
@@ -38,7 +39,7 @@ class TestTriangleMeshInterfaces:
         bm.set_backend(request.param)
         return request.param
 
-    @pytest.mark.parametrize("mesh_data", mesh_data)
+    @pytest.mark.parametrize("meshdata", mesh_data)
     def test_init(self, meshdata, backend):
 
         node = bm.from_numpy(meshdata['node'])
@@ -54,6 +55,21 @@ class TestTriangleMeshInterfaces:
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), meshdata["face2cell"])
 
+    def test_from_box():
+        mesh = TriangleMesh.from_box(nx=2, ny=2)
+        assert mesh.node.shape == (9, 2)
+        assert mesh.cell.shape == (8, 3)
 
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        
+        if False:
+            tmesh = TMesh(node, cell)
+            fig = plt.figure()
+            axes = fig.gca()
+            tmesh.add_plot(axes)
+            tmesh.find_node(axes, showindex=True)
+            tmesh.find_cell(axes, showindex=True)
+            plt.show()
 if __name__ == "__main__":
     pytest.main()
