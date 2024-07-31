@@ -23,6 +23,8 @@ _device = torch.device
 
 class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
+    linalg = torch.linalg
+    random = torch.random
 
     @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
