@@ -100,7 +100,8 @@ FUNCTION_MAPPING = _make_default_mapping(
     'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax',
 
     # Unary functions
-    'abs', 'sign', 'sqrt', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    'abs', 'sign', 'sqrt', 'square', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    'arcsin', 'arccos', 'arctan', 'arctan2', 'arcsinh', 'arccosh', 'arctanh',
     'sinh', 'cosh', 'tanh', 'clip', 'floor', 'ceil', 'round',
 
     # Binary functions
