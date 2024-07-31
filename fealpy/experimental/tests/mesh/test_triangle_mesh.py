@@ -7,7 +7,7 @@ from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
 from fealpy.experimental.tests.mesh.triangle_mesh_data import *
 
 # 测试不同的后端
-backends = ['numpy', 'pytorch', 'jax']
+backends = ['numpy', 'pytorch', 'jax', 'mindspore']
 
 class TestTriangleMeshInterfaces:
     @pytest.fixture(scope="class", params=backends)

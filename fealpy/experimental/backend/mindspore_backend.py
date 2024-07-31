@@ -40,6 +40,11 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
     def to_numpy(tensor_like: Tensor) -> Any:
         return tensor_like.asnumpy()
     
+    @staticmethod
+    def from_numpy(numpy_array: np.ndarray, /) -> Any:
+
+        return ms.Tensor(numpy_array)
+    
     ### Tensor creation methods ###
 
     @staticmethod
@@ -105,7 +110,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
                 return_counts=True,
                 axis=axis, **kwargs)
         any_return = return_index or return_inverse or return_counts
-        
+
         if any_return:
             result = (ms.Tensor(b), )
         else:

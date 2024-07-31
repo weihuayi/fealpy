@@ -6,8 +6,7 @@ from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
 from fealpy.experimental.tests.mesh.uniform_mesh_2d_data import * 
 
 # Test different backends
-backends = ['numpy', 'pytorch']  # TODO: Add 'jax' backend later
-
+backends = ['numpy', 'pytorch', 'mindspore']  # TODO: Add 'jax' backend later
 
 class TestUniformMesh2dInterfaces:
     @pytest.fixture(scope="class", params=backends)
