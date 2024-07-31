@@ -326,7 +326,22 @@ class TriangleMesh(SimplexMesh):
     def unifrom_bisect(self, n=1):
         for i in range(n):
             self.bisect()
+    def bisect_options(
+            self,
+            HB=None,
+            IM=None,
+            data=None,
+            disp=True,
+    ):
 
+        options = {
+            'HB': HB,
+            'IM': IM,
+            'data': data,
+            'disp': disp
+        }
+        return options
+    
     def bisect(self, isMarkedCell=None, options={'disp': True}):
 
         if options['disp']:
