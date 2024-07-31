@@ -81,7 +81,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def max(a, axis=None, out=None, keepdims=False):
-        return torch.max(a, dim=axis, keepdim=keepdims, out=out)
+        if axis is None:
+            return torch.max(a, keepdim=keepdims, out=out)
+        else:
+            return torch.max(a, axis, keepdim=keepdims, out=out)
+
 
     @staticmethod
     def min(a, axis=None, out=None, keepdims=False):
@@ -194,7 +198,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         sep = torch.flip(torch.tensor(
             tuple(combinations_with_replacement(range(p+1), dim)),
             dtype=dtype
-        ), dims=0)
+        ), dims=(0,))
         raw = torch.zeros((sep.shape[0], dim+2), dtype=dtype)
         raw[:, -1] = p
         raw[:, 1:-1] = sep
