@@ -72,3 +72,12 @@ class TestUniformMesh2dInterfaces:
         assert len(bcs_qf2) == len(meshdata['bcs_q2']), "The tuples for qf2 must have the same length."
         for a, b in zip(bcs_qf2, meshdata['bcs_q2']):
             assert np.all(np.abs(bm.to_numpy(a) - b) < 1e-7), f"Difference in quadrature points for qf2 between {a} and {b} is greater than 1e-7"
+    @pytest.mark.parametrize("meshdata", mesh_data)
+    def test_shape_function(self, mesh, meshdata):
+        qf1 = mesh.quadrature_formula(q=1)
+        bcs_qf1, ws_qf1 = qf1.get_quadrature_points_and_weights()
+
+        shape_funciton_p1 = mesh.shape_function(bcs=bcs_qf1, p=1)
+        shape_funciton_p2 = mesh.shape_function(bcs=bcs_qf1, p=2)
+        assert all((shape_funciton_p1.reshape(-1) - bm.from_numpy(meshdata['shape_function_p1']).reshape(-1)) < 1e-7), "Shape function do not match."
+        assert all((shape_funciton_p2.reshape(-1) - bm.from_numpy(meshdata['shape_function_p2']).reshape(-1)) < 1e-7), "Shape function do not match."
