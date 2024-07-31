@@ -96,4 +96,7 @@ mesh_data = [
                              [0.21132487, 0.78867513]], dtype=np.float64),
                    np.array([[0.78867513, 0.21132487],
                              [0.21132487, 0.78867513]], dtype=np.float64)),
+        "shape_function_p1": np.array([[0.25, 0.25, 0.25, 0.25]], dtype=np.float64),
+        "shape_function_p2": np.array([[0, 0, 0, 0, 1, 0, 0, 0, 0]], dtype=np.float64),
+
     }]
