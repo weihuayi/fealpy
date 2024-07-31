@@ -138,7 +138,7 @@ class Mesh(MeshDS):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.edge[index]
-        kwargs = {'dtype': edges.dtype, 'device': self.device}
+        kwargs = {'dtype': edges.dtype}
         indices = bm.arange(NE, **kwargs)[index]
         return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
@@ -518,9 +518,13 @@ class TensorMesh(HomogeneousMesh):
             # bc.shape == (NQ, 4)
             p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
         else:
-            edge = self.entity('edge', index=index)[index]
+            edge = self.entity('edge', index=index)
             p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
         return p
+
+    edge_bc_to_point = bc_to_point
+    face_bc_to_point = bc_to_point
+    cell_bc_to_point = bc_to_point
 
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
@@ -594,26 +598,29 @@ class TensorMesh(HomogeneousMesh):
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
 
-        multiIndex = bm.multi_index_matrix(p, 1) 
+        mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
+        multiIndex0 = mi.flatten().reshape(-1, 1);
+        multiIndex1 = mi.T.flatten().reshape(-1, 1);
+        multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
 
         dofidx = [0 for i in range(4)] 
-        dofidx[0], = bm.where(multiIndex[:, 1]==0)
-        dofidx[1], = bm.where(multiIndex[:, 0]==p)
-        dofidx[2], = bm.where(multiIndex[:, 1]==p)
-        dofidx[3], = bm.where(multiIndex[:, 0]==0)
+        dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
+        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
+        dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
+        dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
 
-        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=bm.int_)
-        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=bm.int_)
+        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
+        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=self.itype)
         for i in range(4): #边上的自由度
             ge = face2edge[:, i]
-            idx = bm.where(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+            idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
 
             face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
-            face2ipoint[idx[:, None], dofidx[i]] = edge2ipoint[ge[idx], ::-1] # TODO jax 不兼容
+            face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
 
         indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
         face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
-                NN+NE*(p-1)+NF*(p-1)**2).reshape(NF, -1) # TODO jax 不兼容
+                NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
         return face2ipoint
 
 
