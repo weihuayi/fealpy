@@ -1,5 +1,5 @@
 
-from typing import Any, Tuple, Union, Optional, overload, TypeGuard
+from typing import Any, Tuple, Union, Optional, overload, TypeGuard, Literal
 
 from .base import Backend, Size, Number
 from .base import TensorLike as _DT
@@ -142,6 +142,10 @@ class BackendManager():
 
     # Numpy + PyTorch
     def add(self, __x1: _DT, __x2: _DT, out=None, **kwargs) -> _DT: ...
+    # -
+    def add_at(self, a: _DT, indices, src: _DT, /) -> None: ...
+    # PyTorch only
+    def index_add_(self, a: _DT, /, dim: int, index: _DT, src: _DT, *, alpha: Number=1.) -> _DT: ...
     # Numpy + PyTorch
     def substract(self, __x1: _DT, __x2: _DT, out=None, **kwargs) -> _DT: ...
     # Numpy + PyTorch
@@ -159,7 +163,7 @@ class BackendManager():
     # Numpy
     def tensordot(self, a: _DT, b: _DT, axes: Union[int, Tuple]) -> _DT: ...
 
-    ### Other methods ##
+    ### Other methods ###
 
     # Numpy + PyTorch
     def reshape(self, a: _DT, newshape: Size, /) -> _DT: ...
@@ -174,7 +178,12 @@ class BackendManager():
     # Numpy
     def argsort(self, a: _DT, axis=-1, **kwargs) -> _DT: ...
     # -
-    def nonzero(self, a: _DT, /, as_tuple=True) -> Union[_DT, Tuple[_DT, ...]]: ...
+    @overload
+    def nonzero(self, a: _DT, /) -> Tuple[_DT, ...]: ...
+    @overload
+    def nonzero(self, a: _DT, /, as_tuple: Literal[True]) -> Tuple[_DT, ...]: ...
+    @overload
+    def nonzero(self, a: _DT, /, as_tuple: Literal[False]) -> _DT: ...
     # Numpy
     def cumsum(self, a: _DT, axis=None, dtype=None, out=None) -> _DT: ...
     # Numpy
