@@ -194,7 +194,27 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         else:
             return torch.where(cond, x, y, out=out)
 
+    ### Functional programming
+    @staticmethod
+    def apply_along_axis(func1d, axis, x, *args, **kwargs):
+        """
+        Parameters:
+            func1d : function (M,) -> (Nj...)
+            This function should accept 1-D arrays. It is applied to 1-D slices of `arr` along the specified axis.
+            axis : integer
+                Axis along which `arr` is sliced.
+            arr : ndarray (Ni..., M, Nk...)
+            Input array.
+            args : any Additional arguments to `func1d`.
+            kwargs : any Additional named arguments to `func1d`.
+        """
+        if axis==0:
+            x = torch.transpose(x)
+        return vmap(func1d)(x)
+
+
     ### FEALPy functionals ###
+
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Tensor:
