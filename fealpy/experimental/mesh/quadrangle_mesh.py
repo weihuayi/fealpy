@@ -125,12 +125,10 @@ class QuadrangleMesh(TensorMesh):
         if variables == 'x':
             J = self.jacobi_matrix(bcs, index=index)
             G = self.first_fundamental_form(J)
-            # TODO: numpy 后端未实现 linalg
             G = bm.linalg.inv(G)
             gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
         return gphi
 
-    # TODO: test
     def jacobi_matrix(self, bc, index: Index=_S):
         """
         @brief 计算参考单元 (xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
@@ -143,7 +141,6 @@ class QuadrangleMesh(TensorMesh):
         J = bm.einsum( 'cim, ...in->...cmn', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 
-    # TODO: test
     def first_fundamental_form(self, J):
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。
