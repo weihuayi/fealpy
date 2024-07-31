@@ -549,7 +549,7 @@ class HexahedronMesh(Mesh, Plotable):
         return cell2ipoint[index]
 
     @classmethod
-    def from_one_hexahedron(cls):
+    def from_one_hexahedron(cls, twist=False):
         """
         @brief 构造一个只有一个六面体的网格
         """
@@ -563,6 +563,12 @@ class HexahedronMesh(Mesh, Plotable):
             [1.0, 1.0, 1.0],
             [0.0, 1.0, 1.0],
             ], dtype=np.float64)
+
+        if twist:
+            upnode = node[4:]
+            upnode -= np.array([[0.5, 0.5, 1]])
+            upnode = np.cross(np.array([[0, 0, 1]]), upnode)
+            node[4:] = upnode + np.array([[0.5, 0.5, 1]])
 
         cell = np.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=np.int_)
         return cls(node, cell)
