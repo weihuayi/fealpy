@@ -44,7 +44,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
-        return torch.linspace(start, stop, steps=num, dtype=dtype, **kwargs)
+        """
+        """
+        assert endpoint == True
+        vmap_fun = partial(torch.linspace, dtype=dtype, **kwargs)
+        for _ in range(start.ndim):
+            vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
+        return vmap_fun(start, stop, num)
 
     @staticmethod
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
