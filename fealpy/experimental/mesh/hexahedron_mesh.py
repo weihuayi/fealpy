@@ -31,8 +31,6 @@ class HexahedronMesh(TensorMesh):
         self.celldata = {}
         self.meshdata = {}
 
-   
-
     def ref_cell_measure(self):
         return 1.0
 
@@ -44,7 +42,7 @@ class HexahedronMesh(TensorMesh):
         @brief 获取不同维度网格实体上的积分公式
         """
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        qf = GaussLegendreQuadrature(q)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype)
         if etype in {'cell', 3}:
             return TensorProductQuadrature((qf, qf, qf))
         elif etype in {'face', 2}:
@@ -62,7 +60,7 @@ class HexahedronMesh(TensorMesh):
         elif etype in {'edge', 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
-            return bm.zeros(1, dtype=bm.ftype)
+            return bm.zeros(1, dtype=self.ftype)
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 
@@ -136,7 +134,15 @@ class HexahedronMesh(TensorMesh):
 
         c2ip = self.cell_to_ipoint(p)
         gp = self.number_of_global_ipoints(p)
-        ipoint = bm.zeros([gp, 3], dtype=bm.float64)
+        ipoint = bm.zeros([gp, 3], dtype=self.ftype)
+
+        line = (bm.linspace(0, p, p+1, endpoint=True)/p).reshape(-1, 1)
+        line = bm.concatenate([line, 1-line], axis=1)
+        bcs = (line, line, line)
+
+        ipoint0 = bm.zeros_like(ipoint)
+        cip = self.bc_to_point(bcs)
+        ipoint0[c2ip] = cip
 
         p04 = bm.linspace(node[cell[:, 0]], node[cell[:, 4]], p+1, endpoint=True).swapaxes(0, 1)
         p37 = bm.linspace(node[cell[:, 3]], node[cell[:, 7]], p+1, endpoint=True).swapaxes(0, 1)
@@ -146,6 +152,7 @@ class HexahedronMesh(TensorMesh):
         p0 = bm.linspace(p04, p37, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
         p1 = bm.linspace(p15, p26, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
         ipoint[c2ip] = bm.linspace(p0, p1, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
+        print("asdasd : ", np.max(np.abs(ipoint - ipoint0)))
         return ipoint
 
     def face_to_ipoint(self, p, index=None):
@@ -180,12 +187,12 @@ class HexahedronMesh(TensorMesh):
 
         mi = bm.repeat(bm.arange(p+1), (p+1)**2).reshape(-1, p+1, p+1)
         multiIndex0 = mi.flatten().reshape(-1, 1)
-        multiIndex1 = mi.transpose(2, 0, 1).flatten().reshape(-1, 1)
-        multiIndex2 = mi.transpose(1, 2, 0).flatten().reshape(-1, 1)
+        multiIndex1 = bm.transpose(mi, (2, 0, 1)).flatten().reshape(-1, 1)
+        multiIndex2 = bm.transpose(mi, (1, 2, 0)).flatten().reshape(-1, 1)
 
         multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
 
-        dofidx = bm.zeros((6, (p+1)**2), dtype=bm.int_) #四条边上自由度的局部编号
+        dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
         dofidx[0], = bm.nonzero(multiIndex[:, 2]==0)
         dofidx[1], = bm.nonzero(multiIndex[:, 2]==p)
         dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
@@ -193,10 +200,10 @@ class HexahedronMesh(TensorMesh):
         dofidx[4], = bm.nonzero(multiIndex[:, 1]==0)
         dofidx[5], = bm.nonzero(multiIndex[:, 1]==p)
 
-        cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=bm.int_)
+        cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
         lf2e = bm.array([[0, 1, 2, 3], [8, 9, 10, 11],
                          [3, 7, 11, 4], [1, 6, 9, 5],
-                         [0, 5, 8, 4], [2, 6, 10, 7]], dtype=bm.int_)
+                         [0, 5, 8, 4], [2, 6, 10, 7]], dtype=self.itype)
 
         multiIndex2d = multiIndex[:(p+1)**2, 1:]
         multiIndex2d = bm.concatenate([multiIndex2d, p-multiIndex2d], axis=-1)
@@ -340,15 +347,15 @@ class HexahedronMesh(TensorMesh):
             [1.0, 0.0, 1.0],
             [1.0, 1.0, 1.0],
             [0.0, 1.0, 1.0],
-            ], dtype=bm.float_)
+            ], dtype=bm.float64)
 
         if twist:
             upnode = node[4:]
-            upnode -= bm.array([[0.5, 0.5, 1]], dtype=bm.float_)
-            upnode = bm.cross(bm.array([[0.0, 0.0, 1.0]], dtype=bm.float_), upnode)
-            node[4:] = upnode + bm.array([[0.5, 0.5, 1]])
+            upnode -= bm.array([[0.5, 0.5, 1]], dtype=bm.float64)
+            upnode = bm.cross(bm.array([[0.0, 0.0, 1.0]], dtype=bm.float64), upnode)
+            node[4:] = upnode + bm.array([[0.5, 0.5, 1]], dtype=bm.float64)
 
-        cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=bm.int_)
+        cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=bm.int32)
         return cls(node, cell)
 
     @classmethod
@@ -442,7 +449,7 @@ class HexahedronMesh(TensorMesh):
         """
         NN = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
-        node = bm.zeros((NN, 3), dtype=bm.float64)
+        node = bm.zeros((NN, 3), dtype=self.ftype)
         X, Y, Z = bm.mgrid[
                 box[0]:box[1]:(nx+1)*1j,
                 box[2]:box[3]:(ny+1)*1j,
@@ -455,7 +462,7 @@ class HexahedronMesh(TensorMesh):
         idx = bm.arange(NN).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
-        cell = bm.zeros((NC, 8), dtype=bm.int_)
+        cell = bm.zeros((NC, 8), dtype=self.itype)
         nyz = (ny + 1)*(nz + 1)
         cell[:, 0] = c.flatten()
         cell[:, 1] = cell[:, 0] + nyz
@@ -617,7 +624,7 @@ class HexahedronMesh(TensorMesh):
         #gmsh.fltk.run()
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)
+        node = bm.array(node_coords, dtype=self.ftype).reshape(-1, 3)
 
         #节点的编号映射
         nodetags_map = dict({j:i for i,j in enumerate(node_tags)})

@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 
-from fealpy.mesh import HexahedronMesh as HexahedronMesh_old
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
 
@@ -14,103 +13,102 @@ class TestHexahedronMeshInterfaces:
         bm.set_backend(request.param)
         return request.param
 
-    @pytest.fixture("bc_to_point", bc_to_point_data)
+    @pytest.mark.parametrize("bpdata", bc_to_point_data)
     def test_bc_to_point(self, bpdata, backend):
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
 
         bcs = bpdata["bcs"] 
+        for i in range(len(bcs)):
+            bcs[i] = bm.array(bcs[i])
+        bcs = tuple(bcs)
         point_true = bpdata["point"]
 
         point = mesh.bc_to_point(bcs)
-        np.testing.assert_allclose(bm.to_numpy(point), point_true, atol=1e-12)
+        np.testing.assert_allclose(bm.to_numpy(point), point_true, atol=1e-14)
 
 
-    def test_jacobi_matrix_and_first_fundamental_form():
+    @pytest.mark.parametrize("jacobi_and_fff_data", jacobi_matrix_and_first_fundamental_form_data)
+    def test_jacobi_matrix_and_first_fundamental_form(self, jacobi_and_fff_data, backend):
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
-        mesh_old = HexahedronMesh_old.from_one_hexahedron(twist=True)
 
-        integrator = mesh.quadrature_formula(2, 'cell')
-        integrator_old = mesh_old.integrator(2, 'cell')
-
-        bcs, ws = integrator.get_quadrature_points_and_weights()
-        bcs_old, ws_old = integrator_old.get_quadrature_points_and_weights()
+        bcs = jacobi_and_fff_data["bcs"]
+        for i in range(len(bcs)):
+            bcs[i] = bm.array(bcs[i])
+        bcs = tuple(bcs)
+        jacobi_true = jacobi_and_fff_data["jacobi"]
+        fff_true = jacobi_and_fff_data["first_fundamental_form"]
 
         jacobi = mesh.jacobi_matrix(bcs)
-        jacobi_old = mesh_old.jacobi_matrix(bcs_old)
-
-        print("result of jacobi_matrix : ", bm.max(bm.abs(jacobi - jacobi_old))<1e-12)
-
         fff = mesh.first_fundamental_form(jacobi)
-        fff_old = mesh_old.first_fundamental_form(jacobi_old)
 
-        print("result of first_fundamental_form : ", bm.max(bm.abs(fff - fff_old))<1e-12)
+        np.testing.assert_allclose(bm.to_numpy(jacobi), jacobi_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(fff), fff_true, atol=1e-14)
 
-    def test_cell_and_face_to_ipoint():
+    @pytest.mark.parametrize("cipfip", cell_and_face_to_ipoint_data)
+    def test_cell_and_face_to_ipoint(self, cipfip, backend):
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
-        mesh_old = HexahedronMesh_old.from_one_hexahedron(twist=True)
 
         cip = mesh.cell_to_ipoint(2)
-        cip_old = mesh_old.cell_to_ipoint(2)
-
-        print("result of cell_to_ipoint : ", bm.max(bm.abs(cip - cip_old))<1e-12)
-
         fip = mesh.face_to_ipoint(2)
-        fip_old = mesh_old.face_to_ipoint(2)
 
-        print("result of face_to_ipoint : ", bm.max(bm.abs(fip - fip_old))<1e-12)
+        cip_true = cipfip["cip"]
+        fip_true = cipfip["fip"]
 
-    def test_interpolation_points():
+        np.testing.assert_allclose(bm.to_numpy(cip), cip_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(fip), fip_true, atol=1e-14)
+
+    @pytest.mark.parametrize("ip", interpolation_points_data)
+    def test_interpolation_points(self, ip, backend):
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
-        mesh_old = HexahedronMesh_old.from_one_hexahedron(twist=True)
 
+        ip_true = ip["ip"]
         ip = mesh.interpolation_points(2)
-        ip_old = mesh_old.interpolation_points(2)
 
-        print("result of interpolation_points : ", bm.max(bm.abs(ip - ip_old))<1e-12)
+        np.testing.assert_allclose(bm.to_numpy(ip), ip_true, atol=1e-14)
 
-    def test_uniform_refine():
+    @pytest.mark.parametrize("urdata",  uniform_refine_data)
+    def test_uniform_refine(self, urdata, backend):
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
-        mesh_old = HexahedronMesh_old.from_one_hexahedron(twist=True)
-
         mesh.uniform_refine(2)
-        mesh_old.uniform_refine(2)
 
         node = mesh.entity('node')
         cell = mesh.entity('cell')
+        face2cell = mesh.face_to_cell()
+        cell2edge = mesh.cell_to_edge()
+        cell2face = mesh.cell_to_face()
+        face2edge = mesh.face_to_edge()
 
-        node_old = mesh_old.entity('node')
-        cell_old = mesh_old.entity('cell')
+        node_true = urdata["node"]
+        cell_true = urdata["cell"]
+        face2cell_true = urdata["face2cell"]
+        cell2edge_true = urdata["cell2edge"]
+        cell2face_true = urdata["cell2face"]
+        face2edge_true = urdata["face2edge"]
 
-        print("result of uniform_refine : ", bm.max(bm.abs(node - node_old))<1e-12, bm.max(bm.abs(cell - cell_old))<1e-12)
+        np.testing.assert_allclose(bm.to_numpy(node), node_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(cell), cell_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(face2cell), face2cell_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(cell2edge), cell2edge_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(cell2face), cell2face_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(face2edge), face2edge_true, atol=1e-14)
 
-    def test_entity_measure():
+    @pytest.mark.parametrize("emdata", entity_measure_data)
+    def test_entity_measure(self, emdata, backend):
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
-        mesh_old = HexahedronMesh_old.from_one_hexahedron(twist=True)
 
         cm = mesh.entity_measure('cell')
         fm = mesh.entity_measure('face')
         em = mesh.entity_measure('edge')
 
-        cm_old = mesh_old.entity_measure('cell')
-        fm_old = mesh_old.entity_measure('face')
-        em_old = mesh_old.entity_measure('edge')
+        cm_true = emdata["cell"]
+        fm_true = emdata["face"]
+        em_true = emdata["edge"]
 
-        print("result of entity_measure : ", bm.max(bm.abs(cm - cm_old))<1e-12, bm.max(bm.abs(fm - fm_old))<1e-12, bm.max(bm.abs(em - em_old))<1e-12)
-
-
-
-if __name__ == "__main__":
-    pytest.main()
+        np.testing.assert_allclose(bm.to_numpy(cm), cm_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(fm), fm_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(em), em_true, atol=1e-14)
 
 
-    
-if __name__ == "__main__":
-    test_bc_to_point()
-    test_jacobi_matrix_and_first_fundamental_form()
-    test_cell_and_face_to_ipoint()
-    test_interpolation_points()
-    test_uniform_refine()
-    test_entity_measure()
 
 
 

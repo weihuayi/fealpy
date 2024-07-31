@@ -609,18 +609,18 @@ class TensorMesh(HomogeneousMesh):
         dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
         dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
 
-        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=bm.int_)
-        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=bm.int_)
+        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
+        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=self.itype)
         for i in range(4): #边上的自由度
             ge = face2edge[:, i]
             idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
 
             face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
-            face2ipoint[idx[:, None], dofidx[i]] = edge2ipoint[ge[idx], ::-1] # TODO jax 不兼容
+            face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
 
         indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
         face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
-                NN+NE*(p-1)+NF*(p-1)**2).reshape(NF, -1) # TODO jax 不兼容
+                NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
         return face2ipoint
 
 
