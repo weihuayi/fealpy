@@ -350,7 +350,7 @@ class TriangleMesh(SimplexMesh):
         cell2edge = self.cell_to_edge()
         cell2cell = self.cell_to_cell()
         cell2ipoint = self.cell_to_ipoint(self.p)
-        isCutEdge = np.zeros((NE,), dtype=np.bool_)
+        isCutEdge = bm.zeros((NE,), dtype=bm.bool_)
 
         if options['disp']:
             print('The initial number of marked elements:', isMarkedCell.sum())
@@ -365,7 +365,7 @@ class TriangleMesh(SimplexMesh):
             print('The number of markedg edges: ', isCutEdge.sum())
 
         edge2newNode = np.zeros((NE,), dtype=self.itype)
-        edge2newNode[isCutEdge] = np.arange(NN, NN + isCutEdge.sum())
+        edge2newNode[isCutEdge] = bm.arange(NN, NN + isCutEdge.sum())
 
         node = self.node
         newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
@@ -420,25 +420,25 @@ class TriangleMesh(SimplexMesh):
                         options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
-                            value = bm.r_['0', value, np.zeros((nn,), dtype=self.ftype)]
+                            value = bm.r_['0', value, bm.zeros((nn,), dtype=self.ftype)]
                             value[NN:] = 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]])
                             options['data'][key] = value
                     else:
                         ldof = value.shape[-1]
-                        p = int((np.sqrt(1 + 8 * ldof) - 3) // 2)
+                        p = int((bm.sqrt(1 + 8 * ldof) - 3) // 2)
                         bc = self.multi_index_matrix(p, etype=2) / p
 
-                        bcl = np.zeros_like(bc)
+                        bcl = bm.zeros_like(bc)
                         bcl[:, 0] = bc[:, 1]
                         bcl[:, 1] = 1 / 2 * bc[:, 0] + bc[:, 2]
                         bcl[:, 2] = 1 / 2 * bc[:, 0]
 
-                        bcr = np.zeros_like(bc)
+                        bcr = bm.zeros_like(bc)
                         bcr[:, 0] = bc[:, 2]
                         bcr[:, 1] = 1 / 2 * bc[:, 0]
                         bcr[:, 2] = 1 / 2 * bc[:, 0] + bc[:, 1]
 
-                        value = bm.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
+                        value = bm.r_['0', value, bm.zeros((nc, ldof), dtype=self.ftype)]
 
                         phi = self.shape_function(bcr, p=p)
                         value[NC:, :] = bm.einsum('cj,kj->ck', value[idx], phi)
@@ -452,7 +452,7 @@ class TriangleMesh(SimplexMesh):
             p1 = cell[idx, 1]
             p2 = cell[idx, 2]
             p3 = edge2newNode[cell2edge0[idx]]
-            cell = bm.concatenate((cell, np.zeros((nc, 3), dtype=self.itype)), axis=0)
+            cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
             cell[L, 0] = p3
             cell[L, 1] = p0
             cell[L, 2] = p1
