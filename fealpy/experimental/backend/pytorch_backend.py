@@ -410,8 +410,13 @@ attribute_mapping.update({
 })
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(array='tensor', power='pow', transpose='permute',
-                        repeat='repeat_interleave', index_add_= 'index_add_')
+function_mapping.update(
+        array='tensor', 
+        power='pow', 
+        transpose='permute',
+        repeat='repeat_interleave', 
+        index_add_= 'index_add_',
+        copy='clone')
 PyTorchBackend.attach_methods(function_mapping, torch)
 
 PyTorchBackend.random.rand = torch.rand
