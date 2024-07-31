@@ -107,7 +107,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
 
     # Other functions
-    'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
+    'copy', 'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
     'flip', 'where', 'tile'
 )
@@ -191,9 +191,8 @@ class Backend(Generic[_DT]):
     def tensor_gdof(p: int, nums: Tuple[int, ...]) -> int:
         coef = 1
         count = nums[0]
-
         for i in range(1, len(nums)):
-            coef = coef * (p-i)
+            coef *= (p-1)
             count += coef * nums[i]
         return count
 

@@ -123,6 +123,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.tensordot(a, b, dims=axes)
 
     ### Other methods ###
+
+    @staticmethod
+    def copy(a, /, **kwargs):
+        return torch.clone(a, **kwargs)
+
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """

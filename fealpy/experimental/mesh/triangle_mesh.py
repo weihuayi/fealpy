@@ -341,7 +341,6 @@ class TriangleMesh(SimplexMesh):
             'disp': disp
         }
         return options
-    
     def bisect(self, isMarkedCell=None, options={'disp': True}):
 
         if options['disp']:
