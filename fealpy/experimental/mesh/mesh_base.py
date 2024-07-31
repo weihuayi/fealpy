@@ -448,7 +448,7 @@ class SimplexMesh(HomogeneousMesh):
         raise NotImplementedError
 
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                       variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = bcs.shape[-1] - 1
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
@@ -462,7 +462,7 @@ class SimplexMesh(HomogeneousMesh):
                              f"but got '{variable}'.")
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = bcs.shape[-1] - 1
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
@@ -527,7 +527,7 @@ class TensorMesh(HomogeneousMesh):
         raise NotImplementedError
 
     def shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                       variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = len(bcs)
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
@@ -542,7 +542,7 @@ class TensorMesh(HomogeneousMesh):
                              f"but got '{variable}'.")
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         assert isinstance(bcs, tuple)
         TD = len(bcs)
         Dlambda = bm.array([-1, 1], dtype=self.ftype)
