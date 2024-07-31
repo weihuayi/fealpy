@@ -148,41 +148,41 @@ class Mesh(MeshDS):
 
     # shape function
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                       variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                       variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         """Shape function value on the given bc points, in shape (..., ldof).
 
         Parameters:
             bcs (Tensor): The bc points, in shape (NQ, bc).\n
             p (int, optional): The order of the shape function. Defaults to 1.\n
             index (int | slice | Tensor, optional): The index of the cell.\n
-            variable (str, optional): The variable name. Defaults to 'u'.\n
+            variables (str, optional): The variables name. Defaults to 'u'.\n
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
             Tensor: The shape function value with shape (NQ, ldof). The shape will\
-            be (1, NQ, ldof) if `variable == 'x'`.
+            be (1, NQ, ldof) if `variables == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         """Gradient of shape function on the given bc points, in shape (..., ldof, bc).
 
         Parameters:
             bcs (Tensor): The bc points, in shape (NQ, bc).\n
             p (int, optional): The order of the shape function. Defaults to 1.\n
             index (int | slice | Tensor, optional): The index of the cell.\n
-            variable (str, optional): The variable name. Defaults to 'u'.\n
+            variables (str, optional): The variables name. Defaults to 'u'.\n
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
             Tensor: The shape function value with shape (NQ, ldof, bc). The shape will\
-            be (NC, NQ, ldof, GD) if `variable == 'x'`.
+            be (NC, NQ, ldof, GD) if `variables == 'x'`.
         """
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
 
     def hess_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
     # tools
@@ -209,7 +209,7 @@ class Mesh(MeshDS):
             print("On Ubuntu, you can install ParaView using the following commands:")
             print("sudo apt-get update")
             print("sudo apt-get install paraview python3-paraview")
-            print("\nAdditionally, you may need to set the PYTHONPATH environment variable to include the path to the ParaView Python modules.")
+            print("\nAdditionally, you may need to set the PYTHONPATH environment variables to include the path to the ParaView Python modules.")
             print("You can do this by adding the following line to your .bashrc file:")
             print("export PYTHONPATH=$PYTHONPATH:/usr/lib/python3/dist-packages")
             return  # 退出函数
@@ -453,13 +453,13 @@ class SimplexMesh(HomogeneousMesh):
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         phi = bm.simplex_shape_function(bcs, p, mi)
-        if variable == 'u':
+        if variables == 'u':
             return phi
-        elif variable == 'x':
+        elif variables == 'x':
             return phi[None, ...]
         else:
-            raise ValueError("Variable type is expected to be 'u' or 'x', "
-                             f"but got '{variable}'.")
+            raise ValueError("Variables type is expected to be 'u' or 'x', "
+                             f"but got '{variables}'.")
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -467,16 +467,16 @@ class SimplexMesh(HomogeneousMesh):
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         R = bm.simplex_grad_shape_function(bcs, p, mi) # (NQ, ldof, bc)
-        if variable == 'u':
+        if variables == 'u':
             return R
-        elif variable == 'x':
+        elif variables == 'x':
             Dlambda = self.grad_lambda(index=index)
             gphi = bm.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
         else:
-            raise ValueError("Variable type is expected to be 'u' or 'x', "
-                             f"but got '{variable}'.")
+            raise ValueError("Variables type is expected to be 'u' or 'x', "
+                             f"but got '{variables}'.")
 
 
 class TensorMesh(HomogeneousMesh):
@@ -533,13 +533,13 @@ class TensorMesh(HomogeneousMesh):
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
         phi = bm.tensorprod(*raw_phi)
-        if variable == 'u':
+        if variables == 'u':
             return phi
-        elif variable == 'x':
+        elif variables == 'x':
             return phi[None, ...]
         else:
-            raise ValueError("Variable type is expected to be 'u' or 'x', "
-                             f"but got '{variable}'.")
+            raise ValueError("Variables type is expected to be 'u' or 'x', "
+                             f"but got '{variables}'.")
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -563,7 +563,7 @@ class TensorMesh(HomogeneousMesh):
             gphi2 = bm.einsum('im, jn, ko->ijkmno', phi, phi,
                                      dphi).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1, gphi2), axis=-1) 
-            if variable == 'x':
+            if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 J = bm.linalg.inv(J)
                 # J^{-T}\nabla_u phi
@@ -573,7 +573,7 @@ class TensorMesh(HomogeneousMesh):
             gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
             gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1), axis=-1)
-            if variable == 'x':
+            if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 G = self.first_fundamental_form(J)
                 G = bm.linalg.inv(G)
