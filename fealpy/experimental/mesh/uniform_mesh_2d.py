@@ -173,7 +173,7 @@ class UniformMesh2d(StructuredMesh):
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 
-    def number_of_local_ipoints(self, p, iptype='node'):
+    def number_of_local_ipoints(self, p, iptype='cell'):
         if iptype in {'cell', 2}:
             return (p+1) * (p+1)
         elif iptype in {'face', 'edge',  1}:
@@ -214,7 +214,79 @@ class UniformMesh2d(StructuredMesh):
                 node[cell[:]]).reshape(-1, GD)
 
         return ipoints
+    
+    def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
+        """
+        @brief 计算参考单元 (xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
+
+        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """
+        node = self.entity('node')
+        cell = self.entity('cell', index=index)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u', index=index)
+        J = bm.einsum( 'cim, ...in->...cmn', node[cell[:]], gphi)
+
+        return J
+    
+    def first_fundamental_form(self, J: TensorLike) -> TensorLike:
+        """
+        @brief 由 Jacobi 矩阵计算第一基本形式。
+        """
+        TD = J.shape[-1]
+
+        shape = J.shape[0:-2] + (TD, TD)
+        G = bm.zeros(shape, dtype=self.ftype)
+        for i in range(TD):
+            G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+            for j in range(i+1, TD):
+                G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+                G[..., j, i] = G[..., i, j]
+        return G
        
+    def shape_function(self, bcs: TensorLike, p: int=1, 
+                    mi: Optional[TensorLike]=None) -> TensorLike:
+        assert isinstance(bcs, tuple)
+
+        TD = bcs[0].shape[-1] - 1
+        if mi is None:
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
+        ldof = self.number_of_local_ipoints(p)
+
+        return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
+    
+    def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, index: Index=_S, 
+                        variables: str='x') -> TensorLike:
+        assert isinstance(bcs, tuple)
+
+        Dlambda = bm.array([-1, 1], dtype=self.ftype)
+
+        phi0 = bm.simplex_shape_function(bcs[0], p=p)
+        R0 = bm.simplex_grad_shape_function(bcs[0], p=p)
+        gphi0 = bm.einsum('...ij, j -> ...i', R0, Dlambda) # (..., ldof)
+
+        phi1 = bm.simplex_shape_function(bcs[1], p=p)
+        R1 = bm.simplex_grad_shape_function(bcs[1], p=p)
+        gphi1 = bm.einsum('...ij, j->...i', R1, Dlambda) # (..., ldof)
+
+        n = phi0.shape[0] * phi1.shape[0]
+        ldof = phi0.shape[-1] * phi1.shape[-1]
+
+        shape = (n, ldof, 2)
+        gphi = bm.zeros(shape, dtype=self.ftype)
+
+        gphi[..., 0] = bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof)
+        gphi[..., 1] = bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof)
+
+        if variables == 'u':
+            return gphi
+        elif variables == 'x':
+            J = self.jacobi_matrix(bcs, index=index)
+            G = self.first_fundamental_form(J)
+            G = bm.linalg.inv(G)
+            gphi = bm.einsum('...ikm, ...imn, ...ln -> ...ilk', J, G, gphi)
+            return gphi
+    
     def uniform_refine(self, n=1):
         # TODO: There is a problem with this code
         for i in range(n):
