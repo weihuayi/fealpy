@@ -18,7 +18,6 @@ class UniformMesh2d(StructuredMesh):
         # Mesh properties
         self.extent: Tuple[int, int, int, int] = extent
         self.h: Tuple[float, float] = h
-        print("h00", self.h[0])
         self.origin: Tuple[float, float] = origin
 
         # Mesh dimensions
@@ -38,7 +37,6 @@ class UniformMesh2d(StructuredMesh):
         self.meshtype = 'UniformMesh2d'
 
         self.face_to_ipoint = self.edge_to_ipoint
-
 
     @entitymethod(0)
     def _get_node(self):
@@ -90,7 +88,6 @@ class UniformMesh2d(StructuredMesh):
             raise NotImplementedError("Jax backend is not yet implemented.")
         else:
             raise NotImplementedError("Backend is not yet implemented.")
-        
     
     @entitymethod(2)
     def _get_cell(self):
@@ -113,7 +110,19 @@ class UniformMesh2d(StructuredMesh):
         cell = bm.concatenate([cell_0[:, None], cell_1[:, None], cell_2[:, None], cell_3[:, None]], axis=-1)
 
         return cell
-
+    
+    # entity
+    def entity(self, etype, index=_S):
+        GD = 2
+        if etype in {'cell', 2}:
+            return self.cell[index, ...]
+        elif etype in {'edge', 'face', 1}:
+            return self.edge[index, ...]
+        elif etype in {'node', 0}:
+            return self.node.reshape(-1, GD)[index, ...]
+        else:
+            raise ValueError("`etype` is wrong!")
+    
     # entity
     def entity_measure(self, etype: Union[int, str]) -> TensorLike:
        if isinstance(etype, str):
@@ -121,42 +130,53 @@ class UniformMesh2d(StructuredMesh):
        if etype == 0:
            return bm.tensor(0, dtype=bm.float64)
        elif etype == 1:
-           print("h0", self.h[0])
            return self.h[0], self.h[1]
        elif etype == 2:
            return self.h[0] * self.h[1]
        else:
            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+    
+    def number_of_local_ipoints(self, p, iptype='node'):
+        if iptype in {'cell', 2}:
+            return (p+1) * (p+1)
+        elif iptype in {'face', 'edge',  1}:
+            return p + 1
+        elif iptype in {'node', 0}:
+            return 1
+        
+    def number_of_global_ipoints(self, p: int) -> int:
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-1)*(p-1)*NC
 
-    # def interpolation_points(self, p, index: Index=_S):
-    #     cell = self.entity('cell')
-    #     node = self.entity('node')
-    #     if p <= 0:
-    #         raise ValueError("p must be a integer larger than 0.")
-    #     if p == 1:
-    #         return node
+    def interpolation_points(self, p):
+        cell = self.cell
+        edge = self.edge
+        node = self.entity('node')
 
-    #     NN = self.number_of_nodes()
-    #     GD = self.geo_dimension()
+        GD = self.geo_dimension()
+        if p <= 0:
+            raise ValueError("p must be a integer larger than 0.")
+        if p == 1:
+            return node.reshape(-1, GD)
 
-    #     gdof = self.number_of_global_ipoints(p)
-    #     ipoints = np.zeros((gdof, GD), dtype=self.ftype)
-    #     ipoints[:NN, :] = node
+        NN = self.number_of_nodes()
+        gdof = self.number_of_global_ipoints(p)
+        ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
+        ipoints[:NN, :] = node
 
-    #     NE = self.number_of_edges()
+        NE = self.number_of_edges()
+        multiIndex = self.multi_index_matrix(p, 1)
+        w = multiIndex[1:-1, :] / p
+        ipoints[NN:NN + (p-1) * NE, :] = bm.einsum('ij, ...jm -> ...im', w,
+                node[edge,:]).reshape(-1, GD)
 
-    #     edge = self.entity('edge')
+        w = np.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
+        ipoints[NN + (p-1) * NE:, :] = bm.einsum('ij, kj... -> ki...', w,
+                node[cell[:]]).reshape(-1, GD)
 
-    #     multiIndex = self.multi_index_matrix(p, 1)
-    #     w = multiIndex[1:-1, :] / p
-    #     ipoints[NN:NN + (p-1) * NE, :] = np.einsum('ij, ...jm -> ...im', w,
-    #             node[edge,:]).reshape(-1, GD)
-
-    #     w = np.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
-    #     ipoints[NN + (p-1) * NE:, :] = np.einsum('ij, kj... -> ki...', w,
-    #             node[cell[:]]).reshape(-1, GD)
-
-    #     return ipoints
+        return ipoints
        
     def uniform_refine(self, n=1):
         # TODO: There is a problem with this code

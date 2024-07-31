@@ -16,7 +16,7 @@ class TestUniformMesh2dInterfaces:
         return request.param
 
     @pytest.mark.parametrize("meshdata", mesh_data)
-    def test_init(self, meshdata, backend):
+    def test_init(self, meshdata):
         extent = meshdata['extent']
         h = meshdata['h']
         origin = meshdata['origin']
@@ -37,12 +37,37 @@ class TestUniformMesh2dInterfaces:
         assert mesh.number_of_faces() == meshdata['NF']
         assert mesh.number_of_cells() == meshdata['NC']
 
+    @pytest.mark.parametrize("meshdata", mesh_data)
+    def test_entity(self, meshdata):
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        assert all((mesh.entity('node').reshape(-1) - bm.from_numpy(meshdata['entity_node']).reshape(-1)) < 1e-7)
+
+    @pytest.mark.parametrize("meshdata", mesh_data)
+    def test_entity_measure(self, meshdata):
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
         assert len(mesh.entity_measure('edge')) == len(meshdata['edge_length']), "The tuples must have the same length."
         for a, b in zip(mesh.entity_measure('edge'), meshdata['edge_length']):
             assert abs(a - b) < 1e-7, f"Difference between {a} and {b} is greater than 1e-7"
 
         assert (mesh.entity_measure('cell') - meshdata['cell_area']) < 1e-7
 
+    @pytest.mark.parametrize("meshdata", mesh_data)
+    def test_interpolation_points(self, meshdata):
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+        ipoints_p1 = mesh.interpolation_points(p=1)
+        ipoints_p2 = mesh.interpolation_points(p=2)
 
-if __name__ == "__main__":
-    pytest.main()
+        assert all((ipoints_p1.reshape(-1) - bm.from_numpy(meshdata['ipoints_p1']).reshape(-1)) < 1e-7)
+        assert all((ipoints_p2.reshape(-1) - bm.from_numpy(meshdata['ipoints_p2']).reshape(-1)) < 1e-7)
+
