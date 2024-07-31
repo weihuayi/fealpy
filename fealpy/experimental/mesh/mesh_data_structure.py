@@ -57,6 +57,10 @@ class MeshDS(metaclass=MeshMeta):
         else:
             super().__delattr__(name)
 
+    def clear(self) -> None:
+        """Remove all entities from the storage."""
+        self._entity_storage.clear()
+
     ### properties
     def top_dimension(self) -> int: return self.TD
     @property
