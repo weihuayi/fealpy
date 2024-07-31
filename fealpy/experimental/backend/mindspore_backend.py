@@ -2,7 +2,7 @@ from typing import Union, Optional, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
 from math import factorial
-import numpy
+import numpy as np
 
 try:
 
@@ -97,10 +97,35 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         return mnp.tensordot(a, b, axes=axes)
     
     ### Other methods ###
-    # TODO: unique
+    @staticmethod
+    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
+
+        a = a.asnumpy()
+        b, index, inverse, counts = np.unique(a, return_index=True, return_inverse=True,
+                return_counts=True,
+                axis=axis, **kwargs)
+        any_return = return_index or return_inverse or return_counts
+        
+        if any_return:
+            result = (ms.Tensor(b), )
+        else:
+            result = ms.Tensor(b)
+
+        if return_index:
+            result += (ms.Tensor(index), )
+
+        if return_inverse:
+            result += (ms.Tensor(inverse), )
+
+        if return_counts:
+            result += (ms.Tensor(counts), )
+
+        return result
+
     @staticmethod
     def sort(a, axis=0, **kwargs):
-        return ops.sort(a, axis=axis, **kwargs)
+        sorted_values, _ = ops.sort(a, axis=axis, **kwargs)
+        return sorted_values
 
     @staticmethod
     def nonzero(a):
@@ -315,6 +340,7 @@ MindSporeBackend.attach_attributes(attribute_mapping, ms)
 MindSporeBackend.attach_attributes(attribute_mapping, mnp)
 MindSporeBackend.attach_attributes(attribute_mapping, ops)
 function_mapping = FUNCTION_MAPPING.copy()
+function_mapping.update(unique='unique')
 MindSporeBackend.attach_methods(function_mapping, ms)
 MindSporeBackend.attach_methods(function_mapping, mnp)
 MindSporeBackend.attach_methods(function_mapping, ops)
