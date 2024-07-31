@@ -38,6 +38,22 @@ class UniformMesh2d(StructuredMesh):
 
         self.face_to_ipoint = self.edge_to_ipoint
 
+    @property
+    def ftype(self) -> Any:
+        h = self.h
+        if h is None:
+            raise RuntimeError('Can not get the float type as the h '
+                               'has not been assigned.')
+        return type(h[0])
+    
+    @property
+    def itype(self) -> Any:
+        extent = self.extent
+        if extent is None:
+            raise RuntimeError('Can not get the int type as the extent '
+                               'has not been assigned.')
+        return type(extent[0])
+
     @entitymethod(0)
     def _get_node(self):
         GD = 2
@@ -48,7 +64,8 @@ class UniformMesh2d(StructuredMesh):
         x = bm.linspace(box[0], box[1], nx + 1)
         y = bm.linspace(box[2], box[3], ny + 1)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
-        node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.float64)
+        node = bm.zeros((nx + 1, ny + 1, GD), dtype=self.ftype)
+        #node = bm.zeros((nx + 1, ny + 1, GD), dtype=bm.float64)
         #node[..., 0] = xx
         #node[..., 1] = yy
         node = bm.concatenate((xx[..., np.newaxis], yy[..., np.newaxis]), axis=-1)
@@ -64,7 +81,8 @@ class UniformMesh2d(StructuredMesh):
         NE = self.NE
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
-        edge = bm.zeros((NE, 2), dtype=bm.int32)
+        edge = bm.zeros((NE, 2), dtype=self.itype)
+        #edge = bm.zeros((NE, 2), dtype=bm.int32)
 
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
             NE0 = 0
@@ -96,7 +114,8 @@ class UniformMesh2d(StructuredMesh):
 
         NN = self.NN
         NC = self.NC
-        cell = bm.zeros((NC, 4), dtype=bm.int32)
+        cell = bm.zeros((NC, 4), dtype=self.itype)
+        #cell = bm.zeros((NC, 4), dtype=bm.int32)
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
         c = idx[:-1, :-1]
         #cell[:, 0] = c.reshape(-1)
@@ -111,24 +130,30 @@ class UniformMesh2d(StructuredMesh):
 
         return cell
     
-    # entity
-    def entity(self, etype, index=_S):
+    def entity(self, etype: Union[int, str], index=_S) -> TensorLike:
         GD = 2
-        if etype in {'cell', 2}:
+        if isinstance(etype, str):
+           etype = estr2dim(self, etype)
+        # if etype in {'cell', 2}:
+        #     return self.cell[index, ...]
+        # elif etype in {'edge', 'face', 1}:
+        #     return self.edge[index, ...]
+        # elif etype in {'node', 0}:
+        #     return self.node.reshape(-1, GD)[index, ...]
+        if etype == 2:
             return self.cell[index, ...]
-        elif etype in {'edge', 'face', 1}:
+        elif etype == 1:
             return self.edge[index, ...]
-        elif etype in {'node', 0}:
+        elif etype == 0:
             return self.node.reshape(-1, GD)[index, ...]
         else:
             raise ValueError("`etype` is wrong!")
     
-    # entity
     def entity_measure(self, etype: Union[int, str]) -> TensorLike:
        if isinstance(etype, str):
            etype = estr2dim(self, etype)
        if etype == 0:
-           return bm.tensor(0, dtype=bm.float64)
+           return bm.tensor(0, dtype=self.ftype)
        elif etype == 1:
            return self.h[0], self.h[1]
        elif etype == 2:
@@ -136,6 +161,18 @@ class UniformMesh2d(StructuredMesh):
        else:
            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
     
+    def quadrature_formula(self, q, etype:Union[int, str]='cell'):
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        qf = GaussLegendreQuadrature(q)
+        if etype == 2:
+            return TensorProductQuadrature((qf, qf))
+        elif etype == 1:
+            return qf
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
+
     def number_of_local_ipoints(self, p, iptype='node'):
         if iptype in {'cell', 2}:
             return (p+1) * (p+1)

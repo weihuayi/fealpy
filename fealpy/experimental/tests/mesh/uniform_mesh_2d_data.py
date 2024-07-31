@@ -90,4 +90,10 @@ mesh_data = [
                 [0.5, 1.5],
                 [1.5, 0.5],
                 [1.5, 1.5]], dtype=np.float64),
+        "bcs_q1": (np.array([[0.5, 0.5]], dtype=np.float64), 
+                   np.array([[0.5, 0.5]], dtype=np.float64)),
+        "bcs_q2": (np.array([[0.78867513, 0.21132487],
+                             [0.21132487, 0.78867513]], dtype=np.float64),
+                   np.array([[0.78867513, 0.21132487],
+                             [0.21132487, 0.78867513]], dtype=np.float64)),
     }]
