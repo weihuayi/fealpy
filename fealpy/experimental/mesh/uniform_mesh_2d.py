@@ -18,6 +18,7 @@ class UniformMesh2d(StructuredMesh):
         # Mesh properties
         self.extent: Tuple[int, int, int, int] = extent
         self.h: Tuple[float, float] = h
+        print("h00", self.h[0])
         self.origin: Tuple[float, float] = origin
 
         # Mesh dimensions
@@ -120,6 +121,7 @@ class UniformMesh2d(StructuredMesh):
        if etype == 0:
            return bm.tensor(0, dtype=bm.float64)
        elif etype == 1:
+           print("h0", self.h[0])
            return self.h[0], self.h[1]
        elif etype == 2:
            return self.h[0] * self.h[1]

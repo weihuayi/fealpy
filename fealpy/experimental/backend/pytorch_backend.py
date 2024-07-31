@@ -105,6 +105,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Binary methods ###
 
     @staticmethod
+    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
+        a.index_add_(indices.ravel(), src.ravel())
+
+    @staticmethod
     def cross(a, b, axis=-1, **kwargs):
         return torch.cross(a, b, dim=axis, **kwargs)
 
@@ -376,7 +380,7 @@ attribute_mapping.update({
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(array='tensor', power='pow', transpose='permute',
-                        repeat='repeat_interleave')
+                        repeat='repeat_interleave', index_add_= 'index_add_')
 PyTorchBackend.attach_methods(function_mapping, torch)
 
 PyTorchBackend.random.rand = torch.rand
