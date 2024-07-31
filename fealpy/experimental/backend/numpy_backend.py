@@ -16,6 +16,9 @@ from .base import (
 class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     DATA_CLASS = np.ndarray
 
+    linalg = np.linalg
+    random = np.random
+
     @staticmethod
     def set_default_device(device) -> None:
         raise NotImplementedError("`set_default_device` is not supported by NumPyBackend")
@@ -54,6 +57,8 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     @staticmethod
     def cat(iterable, axis=0, out=None) -> NDArray:
         return np.concatenate(iterable, axis=axis, out=out)
+
+
 
     ### FEALPy methods ###
 
