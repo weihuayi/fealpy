@@ -122,7 +122,7 @@ class QuadrangleMesh(TensorMesh):
         gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
         gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
         gphi = bm.concatenate((gphi0, gphi1), axis=-1)
-        if variable == 'x':
+        if variables == 'x':
             J = self.jacobi_matrix(bcs, index=index)
             G = self.first_fundamental_form(J)
             # TODO: numpy 后端未实现 linalg
