@@ -107,7 +107,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
 
     # Other functions
-    'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
+    'copy', 'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
     'flip', 'where', 'tile'
 )
