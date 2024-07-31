@@ -71,6 +71,5 @@ class TestTriangleMeshInterfaces:
             tmesh.find_node(axes, showindex=True)
             tmesh.find_cell(axes, showindex=True)
             plt.show()
-
 if __name__ == "__main__":
     pytest.main()
