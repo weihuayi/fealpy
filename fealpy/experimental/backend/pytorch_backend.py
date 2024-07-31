@@ -374,3 +374,11 @@ function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(array='tensor', power='pow', transpose='permute',
                         repeat='repeat_interleave')
 PyTorchBackend.attach_methods(function_mapping, torch)
+
+PyTorchBackend.random.rand = torch.rand
+PyTorchBackend.random.rand_like = torch.rand_like
+PyTorchBackend.random.randint = torch.randint
+PyTorchBackend.random.randint_like = torch.randint_like
+PyTorchBackend.random.randn = torch.randn
+PyTorchBackend.random.randn_like = torch.randn_like
+PyTorchBackend.random.randperm = torch.randperm
