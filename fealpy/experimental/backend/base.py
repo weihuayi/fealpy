@@ -192,7 +192,7 @@ class Backend(Generic[_DT]):
         coef = 1
         count = nums[0]
         for i in range(1, len(nums)):
-            coef = (p-1)**i
+            coef *= (p-1)
             count += coef * nums[i]
         return count
 
