@@ -165,6 +165,8 @@ class BackendManager():
 
     ### Other methods ###
 
+    # Numpy
+    def copy(self, a: _DT, /, **kwargs) -> _DT: ...
     # Numpy + PyTorch
     def reshape(self, a: _DT, newshape: Size, /) -> _DT: ...
     # Numpy + PyTorch
