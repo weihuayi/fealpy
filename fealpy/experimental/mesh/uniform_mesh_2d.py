@@ -62,7 +62,7 @@ class UniformMesh2d(StructuredMesh):
         ny = self.ny
 
         NN = self.NN
-        NE = self.NE    
+        NE = self.NE
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
         edge = bm.zeros((NE, 2), dtype=bm.int32)
@@ -74,7 +74,7 @@ class UniformMesh2d(StructuredMesh):
             edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
             edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
 
-            edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
+            #edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
 
             NE0 = NE1
             NE1 += ny * (nx + 1)
@@ -82,7 +82,7 @@ class UniformMesh2d(StructuredMesh):
             edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
             edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
 
-            edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
+            #edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
 
             return edge
         elif bm.backend_name == 'jax':
@@ -126,6 +126,36 @@ class UniformMesh2d(StructuredMesh):
        else:
            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
+    # def interpolation_points(self, p, index: Index=_S):
+    #     cell = self.entity('cell')
+    #     node = self.entity('node')
+    #     if p <= 0:
+    #         raise ValueError("p must be a integer larger than 0.")
+    #     if p == 1:
+    #         return node
+
+    #     NN = self.number_of_nodes()
+    #     GD = self.geo_dimension()
+
+    #     gdof = self.number_of_global_ipoints(p)
+    #     ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+    #     ipoints[:NN, :] = node
+
+    #     NE = self.number_of_edges()
+
+    #     edge = self.entity('edge')
+
+    #     multiIndex = self.multi_index_matrix(p, 1)
+    #     w = multiIndex[1:-1, :] / p
+    #     ipoints[NN:NN + (p-1) * NE, :] = np.einsum('ij, ...jm -> ...im', w,
+    #             node[edge,:]).reshape(-1, GD)
+
+    #     w = np.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
+    #     ipoints[NN + (p-1) * NE:, :] = np.einsum('ij, kj... -> ki...', w,
+    #             node[cell[:]]).reshape(-1, GD)
+
+    #     return ipoints
+       
     def uniform_refine(self, n=1):
         # TODO: There is a problem with this code
         for i in range(n):
@@ -135,9 +165,14 @@ class UniformMesh2d(StructuredMesh):
             self.ny = self.extent[3] - self.extent[2]
 
             self.NC = self.nx * self.ny
+            self.NF = self.NE
+            self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
             self.NN = (self.nx + 1) * (self.ny + 1)
+        
+        del self.node
+        del self.edge
+        del self.cell
+        # TODO: Implement cache clearing mechanism
 
-            # self._entity_storage.clear()
-            # self._entity_factory.clear()
 
 
