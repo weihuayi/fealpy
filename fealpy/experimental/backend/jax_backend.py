@@ -54,6 +54,32 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     ### Binary methods ###
     # NOTE: all copied
 
+    @staticmethod
+    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
+        """
+        unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
+        """
+        b, index, inverse, counts = jnp.unique(a, return_index=True, 
+                return_inverse=True,
+                return_counts=True,
+                axis=axis, **kwargs)
+        any_return = return_index or return_inverse or return_counts
+        if any_return:
+            result = (b, )
+        else:
+            retult = b
+
+        if return_index:
+            result += (index, )
+
+        if return_inverse:
+            inverse = inverse.reshape(-1)
+            result += (inverse, )
+
+        if return_counts:
+            result += (counts, )
+
+        return result
     ### FEALPy functionals ###
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Array:
