@@ -1,4 +1,4 @@
-
+import torch
 import builtins
 from typing import Tuple, Union, Literal, Callable, Dict
 from functools import reduce
@@ -6,7 +6,7 @@ from functools import reduce
 from .backend import TensorLike
 
 ### Types
-
+Tensor = torch.Tensor
 Number = Union[builtins.int, builtins.float]
 Index = Union[int, slice, Tuple[int, ...], TensorLike]
 EntityName = Literal['cell', 'face', 'edge', 'node']
