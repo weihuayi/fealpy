@@ -106,7 +106,7 @@ class QuadrangleMesh(TensorMesh):
             raise ValueError(f"entity type: {etype} is wrong!")
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
-                            variable: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         assert isinstance(bcs, tuple)
         TD = len(bcs)
         Dlambda = bm.array([-1, 1], dtype=self.ftype)
@@ -122,7 +122,7 @@ class QuadrangleMesh(TensorMesh):
         gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
         gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
         gphi = bm.concatenate((gphi0, gphi1), axis=-1)
-        if variable == 'x':
+        if variables == 'x':
             J = self.jacobi_matrix(bcs, index=index)
             G = self.first_fundamental_form(J)
             # TODO: numpy 后端未实现 linalg
@@ -139,7 +139,7 @@ class QuadrangleMesh(TensorMesh):
         """
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        gphi = self.grad_shape_function(bc, p=1, variable='u', index=index)
+        gphi = self.grad_shape_function(bc, p=1, variables='u', index=index)
         J = bm.einsum( 'cim, ...in->...cmn', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 

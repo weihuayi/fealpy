@@ -24,6 +24,8 @@ _device = jax.Device
 
 class JAXBackend(Backend[Array], backend_name='jax'):
     DATA_CLASS = Array 
+    linalg = jnp.linalg
+    random = jax.random
 
     @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
