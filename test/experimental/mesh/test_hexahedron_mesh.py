@@ -3,7 +3,7 @@ from fealpy.mesh import HexahedronMesh as HexahedronMesh_old
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
 
-#bm.set_backend('pytorch')
+bm.set_backend('pytorch')
 
 np.set_printoptions(precision=16)
 
@@ -19,6 +19,8 @@ def test_bc_to_point():
 
     point = mesh.bc_to_point(bcs)
     point_old = mesh_old.bc_to_point(bcs_old)
+    print("point : ", point)
+    print("point : ", (point, ))
 
     print("result of bc_to_point : ", bm.sum(bm.abs(point - point_old)))
 
@@ -64,8 +66,6 @@ def test_interpolation_points():
     ip = mesh.interpolation_points(2)
     ip_old = mesh_old.interpolation_points(2)
 
-    print("ip: ", (ip, ))
-
     print("result of interpolation_points : ", bm.sum(bm.abs(ip - ip_old))<1e-12)
 
 def test_uniform_refine():
@@ -93,13 +93,6 @@ def test_uniform_refine():
     face2edge = mesh.face_to_edge()
     face2edge_old = mesh_old.ds.face_to_edge()
 
-    print("node : ", (node, ))
-    print("cell : ", (cell, ))
-    print("face2cell : ",  (face2cell, ))
-    print("cell2edge : ",  (cell2edge, ))
-    print("cell2face : ",  (cell2face, ))
-    print("face2edge : ",  (face2edge, ))
-
     print("result of uniform_refine : ", bm.sum(bm.abs(node - node_old))<1e-12, bm.sum(bm.abs(cell - cell_old))<1e-12)
     print("result of face2cell: ", bm.sum(bm.abs(face2cell - face2cell_old))<1e-12)
     print("result of cell2edge: ", bm.sum(bm.abs(cell2edge - cell2edge_old))<1e-12)
@@ -118,12 +111,15 @@ def test_entity_measure():
     fm_old = mesh_old.entity_measure('face')
     em_old = mesh_old.entity_measure('edge')
 
-    print("cm : ", (cm, ))
-    print("fm : ", (fm, ))
-    print("em : ", (em, ))
-
     print("result of entity_measure : ", bm.sum(bm.abs(cm - cm_old))<1e-12, bm.sum(bm.abs(fm - fm_old))<1e-12, bm.sum(bm.abs(em - em_old))<1e-12)
-    
+
+def test_linspace():
+    a = np.int64(1.021321413413414)
+    b = np.float32(2.214124213312455)
+    c = bm.linspace(a, b, 10)
+    print(c)
+
+
 if __name__ == "__main__":
     test_bc_to_point()
     test_jacobi_matrix_and_first_fundamental_form()
@@ -131,6 +127,7 @@ if __name__ == "__main__":
     test_interpolation_points()
     test_uniform_refine()
     test_entity_measure()
+    test_linspace()
 
 
 

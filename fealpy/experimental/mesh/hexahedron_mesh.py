@@ -1,5 +1,6 @@
 from ..backend import backend_manager as bm
 from .mesh_base import TensorMesh
+from ..typing import TensorLike, Index, _S
 
 class HexahedronMesh(TensorMesh):
     def __init__(self, node, cell):
@@ -52,7 +53,7 @@ class HexahedronMesh(TensorMesh):
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 
-    def entity_measure(self, etype=3, index=None):
+    def entity_measure(self, etype=3, index=_S):
         if etype in {'cell', 3}:
             return self.cell_volume(index=index)
         elif etype in {'face', 2}:
@@ -64,7 +65,7 @@ class HexahedronMesh(TensorMesh):
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 
-    def cell_volume(self, index=None):
+    def cell_volume(self, index=_S):
         """
         @brief 计算单元的体积, 体积的计算公式为
             int_c dx = int_tau |J| d xi
@@ -77,7 +78,7 @@ class HexahedronMesh(TensorMesh):
         val = bm.einsum('q, qc->c', ws, detJ)
         return val
 
-    def face_area(self, index=None):
+    def face_area(self, index=_S):
         """
         @brief 计算面的面积, 面积的计算公式为
                         int_f ds = int_tau |J| d xi
@@ -91,7 +92,7 @@ class HexahedronMesh(TensorMesh):
         val = bm.einsum('q, qi->i', ws, n)
         return val
 
-    def jacobi_matrix(self, bc, index=None):
+    def jacobi_matrix(self, bc, index=_S):
         """
         @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵。
             x(u, v, w) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
@@ -124,7 +125,7 @@ class HexahedronMesh(TensorMesh):
         G = bm.concatenate(data, axis=-1).reshape(shape)
         return G
 
-    def interpolation_points(self, p, index=None):
+    def interpolation_points(self, p, index=_S):
         """
         @brief 生成整个网格上的插值点
         """
@@ -136,32 +137,21 @@ class HexahedronMesh(TensorMesh):
         gp = self.number_of_global_ipoints(p)
         ipoint = bm.zeros([gp, 3], dtype=self.ftype)
 
-        line = (bm.linspace(0, p, p+1, endpoint=True)/p).reshape(-1, 1)
-        line = bm.concatenate([line, 1-line], axis=1)
+        line = (bm.linspace(0, 1, p+1, endpoint=True, dtype=self.ftype)).reshape(-1, 1)
+        line = bm.concatenate([1-line, line], axis=1)
         bcs = (line, line, line)
 
-        ipoint0 = bm.zeros_like(ipoint)
         cip = self.bc_to_point(bcs)
-        ipoint0[c2ip] = cip
-
-        p04 = bm.linspace(node[cell[:, 0]], node[cell[:, 4]], p+1, endpoint=True).swapaxes(0, 1)
-        p37 = bm.linspace(node[cell[:, 3]], node[cell[:, 7]], p+1, endpoint=True).swapaxes(0, 1)
-        p15 = bm.linspace(node[cell[:, 1]], node[cell[:, 5]], p+1, endpoint=True).swapaxes(0, 1)
-        p26 = bm.linspace(node[cell[:, 2]], node[cell[:, 6]], p+1, endpoint=True).swapaxes(0, 1)
-
-        p0 = bm.linspace(p04, p37, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
-        p1 = bm.linspace(p15, p26, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
-        ipoint[c2ip] = bm.linspace(p0, p1, p+1, endpoint=True).swapaxes(0, 1).reshape(NC, -1, 3)
-        print("asdasd : ", np.max(np.abs(ipoint - ipoint0)))
+        ipoint[c2ip] = cip.swapaxes(0, 1)
         return ipoint
 
-    def face_to_ipoint(self, p, index=None):
+    def face_to_ipoint(self, p, index=_S):
         """
         @brief 生成每个面上的插值点全局编号
         """
         return self.quad_to_ipoint(p, index) 
 
-    def cell_to_ipoint(self, p, index=None):
+    def cell_to_ipoint(self, p, index=_S):
         """!
         @brief 生成每个单元上的插值点全局编号
         @note 本函数在 jax 后端下不可用
