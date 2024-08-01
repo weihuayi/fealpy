@@ -47,10 +47,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         """
         """
         assert endpoint == True
-        vmap_fun = partial(torch.linspace, dtype=dtype, **kwargs)
-        for _ in range(start.ndim):
-            vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
-        return vmap_fun(start, stop, num)
+        if isinstance(start, (int, float)) and isinstance(stop, (int, float)):
+            return torch.linspace(start, stop, num, dtype=dtype, **kwargs);
+        else:
+            vmap_fun = partial(torch.linspace, dtype=dtype, **kwargs)
+            for _ in range(start.ndim):
+                vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
+            return vmap_fun(start, stop, num)
 
     @staticmethod
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
