@@ -4,15 +4,6 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
 from fealpy.experimental.tests.mesh.uniform_mesh_2d_data import *
 
-#@pytest.fixture(params=meshing_data)
-#def meshing(request):
-#    meshdata = request.param
-#    extent = meshdata['extent']
-#    h = meshdata['h']
-#    origin = meshdata['origin']
-#    mesh = UniformMesh2d(extent, h, origin)
-#    return mesh
-
 class TestUniformMesh2dInterfaces:
 
     @pytest.mark.parametrize("meshdata", init_mesh_data)
@@ -26,17 +17,17 @@ class TestUniformMesh2dInterfaces:
         mesh = UniformMesh2d(extent, h, origin)
 
         node = bm.to_numpy(mesh.node)
-        node_old = meshdata['node']
-        np.testing.assert_almost_equal(node, node_old, decimal=7)
+        node_true = meshdata['node']
+        np.testing.assert_almost_equal(node, node_true, decimal=7)
         edge = bm.to_numpy(mesh.edge)
-        edge_old = meshdata['edge']
-        np.testing.assert_almost_equal(edge, edge_old, decimal=7)
+        edge_true = meshdata['edge']
+        np.testing.assert_almost_equal(edge, edge_true, decimal=7)
         face = bm.to_numpy(mesh.face)
-        face_old = meshdata['face']
-        np.testing.assert_almost_equal(face, face_old, decimal=7)
+        face_true = meshdata['face']
+        np.testing.assert_almost_equal(face, face_true, decimal=7)
         cell = bm.to_numpy(mesh.cell)
-        cell_old = meshdata['cell']
-        np.testing.assert_almost_equal(cell, cell_old, decimal=7)
+        cell_true = meshdata['cell']
+        np.testing.assert_almost_equal(cell, cell_true, decimal=7)
 
         assert mesh.node.shape == meshdata['node'].shape, "Node shapes do not match."
         assert mesh.edge.shape == meshdata['edge'].shape, "Edge shapes do not match."
@@ -130,44 +121,35 @@ class TestUniformMesh2dInterfaces:
         origin = meshdata['origin']
         mesh = UniformMesh2d(extent, h, origin)
 
-        qf = mesh.quadrature_formula(q=1)
+        qf = mesh.quadrature_formula(q=3)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         shape_function_p1 = bm.to_numpy(mesh.shape_function(bcs=bcs, p=1))
         shape_function_p2 = bm.to_numpy(mesh.shape_function(bcs=bcs, p=2))
 
-        shape_function_p1_true = meshdata['shape_function_p1']
-        shape_function_p2_true = meshdata['shape_function_p2']
+        shape_function_p1_true = meshdata['shape_function_q3_p1']
+        shape_function_p2_true = meshdata['shape_function_q3_p2']
 
         np.testing.assert_allclose(shape_function_p1, shape_function_p1_true, atol=1e-8)
         np.testing.assert_allclose(shape_function_p2, shape_function_p2_true, atol=1e-8)
 
-    # @pytest.mark.parametrize("meshdata", grad_shape_function_data)
-    # @pytest.mark.parametrize("backend", ['pytorch'])
-    # def test_grad_shape_function(self, meshing, meshdata, backend):
-    #     bm.set_backend(backend)
-    #     mesh = meshing
-    #
-    #     qf = mesh.quadrature_formula(q=1)
-    #     bcs, ws = qf.get_quadrature_points_and_weights()
-    #
-    #     print("------------------")
-    #     grad_shape_function_u = mesh.grad_shape_function(bcs=bcs, p=1, variables='u')
-    #     print("sss:", grad_shape_function_u)
-    #     #grad_shape_function_u = bm.to_numpy(grad_shape_function_u, dtype=np.float64)
-    #     #print(type(grad_shape_function_u))
-    #     #print(grad_shape_function_u)
-    #     #print("-------------------")
-    #     #grad_shape_function_u_true = meshdata['grad_shape_function_u']
-    #     #print(type(grad_shape_function_u_true))
-    #     #print(grad_shape_function_u_true)
-    #     #grad_shape_function_x = mesh.grad_shape_function(bcs=bcs, p=1, variables='x')
-    #
-    #     #a = grad_shape_function_u - grad_shape_function_u_true
-    #     #print(a)
-    #     #np.testing.assert_almost_equal(grad_shape_function_u, grad_shape_function_u_true, decimal=7)
-    #
-    #     #assert all((grad_shape_function_u.reshape(-1) - bm.from_numpy(meshdata['grad_shape_function_u']).reshape(-1)) < 1e-7), \
-    #     #     "Grad shape function are not as expected."
-    #     #assert all((grad_shape_function_x.reshape(-1) - bm.from_numpy(meshdata['grad_shape_function_x']).reshape(-1)) < 1e-7), \
-    #     #     "Grad shape function are not as expected."
+    @pytest.mark.parametrize("meshdata", grad_shape_function_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    def test_grad_shape_function(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        qf = mesh.quadrature_formula(q=3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        grad_shape_function_u = bm.to_numpy(mesh.grad_shape_function(bcs=bcs, p=1, variables='u'))
+        grad_shape_function_x = bm.to_numpy(mesh.grad_shape_function(bcs=bcs, p=1, variables='x'))
+        grad_shape_function_u_true = meshdata['grad_shape_function_u_q3_p1']
+        grad_shape_function_x_true = meshdata['grad_shape_function_x_q3_p1']
+
+        np.testing.assert_allclose(grad_shape_function_u, grad_shape_function_u_true, atol=1e-8)
+        np.testing.assert_allclose(grad_shape_function_x, grad_shape_function_x_true, atol=1e-8)
