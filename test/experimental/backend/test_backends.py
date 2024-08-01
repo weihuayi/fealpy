@@ -14,10 +14,9 @@ class TestBackendInterfaces:
         return request.param
 
     def test_unique(self, backend):
-
         name = ('result', 'indices', 'inverse', 'counts')
         a = bm.array([
-            [0, 3], [2, 5], [0, 3], [1, 4], [7, 8], [1, 4]], dtype=np.int32)
+            [0, 3], [2, 5], [0, 3], [1, 4], [7, 8], [1, 4]], dtype=bm.int32)
 
         result = bm.unique(a, return_index=True, 
                            return_inverse=True,
@@ -26,6 +25,8 @@ class TestBackendInterfaces:
         expected = np.unique(a, return_index=True, 
                              return_inverse=True, 
                              return_counts=True, axis=0)
+        print(result)
+        print(expected)
 
         for r, e, s in zip(result, expected, name):
             np.testing.assert_array_equal(bm.to_numpy(r), expected, 
