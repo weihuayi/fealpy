@@ -90,9 +90,11 @@ class TriangleMesh(SimplexMesh):
         @berif 这里调用的是网格空间基函数的梯度
         """
         R = bm.simplex_grad_shape_function(bc, p)
+        print('R.dtype:', R.dtype)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
+            print(Dlambda.dtype)
+            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda)
             return gphi  # (NQ, NC, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
