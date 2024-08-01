@@ -174,7 +174,7 @@ class TriangleMesh(SimplexMesh):
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
             ipoint_list.append(ipoints_from_cell)
 
-        return np.concatenate(ipoint_list, axis=0)  # (gdof, GD)
+        return bm.concatenate(ipoint_list, axis=0)  # (gdof, GD)
 
     def cell_to_ipoint(self, p: int, index: Index=_S):
         cell = self.cell
@@ -221,7 +221,7 @@ class TriangleMesh(SimplexMesh):
 
         cdof = (p-1)*(p-2)//2
         flag = bm.sum(mi > 0, axis=1) == 3
-        c2p[:, flag] = NN + NE*(p-1) + np.arange(NC*cdof, **kwargs).reshape(NC, cdof)
+        c2p[:, flag] = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         return c2p[index]
 
     def face_to_ipoint(self, p: int, index: Index=_S):
@@ -341,7 +341,6 @@ class TriangleMesh(SimplexMesh):
             'disp': disp
         }
         return options
-    
     def bisect(self, isMarkedCell=None, options={'disp': True}):
 
         if options['disp']:
@@ -562,14 +561,14 @@ class TriangleMesh(SimplexMesh):
 
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
         cell0 = bm.concatenate((
-            idx[1:, 0:-1].reshape(-1, 1),
-            idx[1:, 1:].reshape(-1, 1),
-            idx[0:-1, 0:-1].reshape(-1, 1),
+            idx[1:, 0:-1].T.reshape(-1, 1),
+            idx[1:, 1:].T.reshape(-1, 1),
+            idx[0:-1, 0:-1].T.reshape(-1, 1),
             ), axis=1)
         cell1 = bm.concatenate((
-            idx[0:-1, 1:].reshape(-1, 1),
-            idx[0:-1, 0:-1].reshape(-1, 1),
-            idx[1:, 1:].reshape(-1, 1)
+            idx[0:-1, 1:].T.reshape(-1, 1),
+            idx[0:-1, 0:-1].T.reshape(-1, 1),
+            idx[1:, 1:].T.reshape(-1, 1)
             ), axis=1)
         cell = bm.concatenate((cell0, cell1), axis=0)
 
@@ -610,14 +609,14 @@ class TriangleMesh(SimplexMesh):
         idx[:, -1] = idx[:, 0]
         cell = bm.zeros((2 * NC, 3), dtype=itype)
         cell0 = bm.concatenate((
-            idx[1:, 0:-1].reshape(-1, 1),
-            idx[1:, 1:].reshape(-1, 1),
-            idx[0:-1, 0:-1].reshape(-1, 1),
+            idx[1:, 0:-1].T.reshape(-1, 1),
+            idx[1:, 1:].T.reshape(-1, 1),
+            idx[0:-1, 0:-1].T.reshape(-1, 1),
             ), axis=1)
         cell1 = bm.concatenate((
-            idx[0:-1, 1:].reshape(-1, 1),
-            idx[0:-1, 0:-1].reshape(-1, 1),
-            idx[1:, 1:].reshape(-1, 1)
+            idx[0:-1, 1:].T.reshape(-1, 1),
+            idx[0:-1, 0:-1].T.reshape(-1, 1),
+            idx[1:, 1:].T.reshape(-1, 1)
             ), axis=1)
         cell = bm.concatenate((cell0, cell1), axis=0)
         return cls(node, cell)

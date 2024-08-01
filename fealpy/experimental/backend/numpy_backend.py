@@ -45,7 +45,16 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     # NOTE: all copied
 
     ### Binary methods ###
-    # NOTE: all copied
+
+    add_at = staticmethod(np.add.at)
+
+    @staticmethod
+    def index_add_(a: NDArray, /, dim, index, src, *, alpha=1):
+        assert index.ndim == 1
+        indexing = [slice(None)] * a.ndim
+        indexing[dim] = index
+        np.add.at(a, indexing, alpha*src)
+        return a
 
     ### Other methods ###
 

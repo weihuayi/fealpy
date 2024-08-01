@@ -44,7 +44,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
-        return torch.linspace(start, stop, steps=num, dtype=dtype, **kwargs)
+        """
+        """
+        assert endpoint == True
+        vmap_fun = partial(torch.linspace, dtype=dtype, **kwargs)
+        for _ in range(start.ndim):
+            vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
+        return vmap_fun(start, stop, num)
 
     @staticmethod
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
@@ -105,6 +111,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Binary methods ###
 
     @staticmethod
+    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
+        a.index_add_(indices.ravel(), src.ravel())
+
+    @staticmethod
     def cross(a, b, axis=-1, **kwargs):
         return torch.cross(a, b, dim=axis, **kwargs)
 
@@ -113,6 +123,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.tensordot(a, b, dims=axes)
 
     ### Other methods ###
+
+    @staticmethod
+    def copy(a, /, **kwargs):
+        return torch.clone(a, **kwargs)
+
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
@@ -190,7 +205,27 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         else:
             return torch.where(cond, x, y, out=out)
 
+    ### Functional programming
+    @staticmethod
+    def apply_along_axis(func1d, axis, x, *args, **kwargs):
+        """
+        Parameters:
+            func1d : function (M,) -> (Nj...)
+            This function should accept 1-D arrays. It is applied to 1-D slices of `arr` along the specified axis.
+            axis : integer
+                Axis along which `arr` is sliced.
+            arr : ndarray (Ni..., M, Nk...)
+            Input array.
+            args : any Additional arguments to `func1d`.
+            kwargs : any Additional named arguments to `func1d`.
+        """
+        if axis==0:
+            x = torch.transpose(x)
+        return vmap(func1d)(x)
+
+
     ### FEALPy functionals ###
+
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Tensor:
@@ -377,8 +412,13 @@ attribute_mapping.update({
 })
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(array='tensor', power='pow', transpose='permute',
-                        repeat='repeat_interleave')
+function_mapping.update(
+        array='tensor', 
+        power='pow', 
+        transpose='permute',
+        repeat='repeat_interleave', 
+        index_add_= 'index_add_',
+        copy='clone')
 PyTorchBackend.attach_methods(function_mapping, torch)
 
 PyTorchBackend.random.rand = torch.rand

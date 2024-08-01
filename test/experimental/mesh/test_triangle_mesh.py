@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TMesh
 
 def test_triangle_mesh_init():
@@ -45,18 +45,21 @@ def test_triangle_mesh_from_box():
     assert mesh.node.shape == (9, 2)
     assert mesh.cell.shape == (8, 3)
 
+    face2cell = mesh.face_to_cell()
+    print('face2cell:', face2cell)
+
     node = mesh.entity('node')
     cell = mesh.entity('cell')
-    print(node)
-    print('cell', cell)
-    if False:
-        tmesh = TMesh(node, cell)
-        fig = plt.figure()
-        axes = fig.gca()
-        tmesh.add_plot(axes)
-        tmesh.find_node(axes, showindex=True)
-        tmesh.find_cell(axes, showindex=True)
-        plt.show()
+    #if False:
+    tmesh = TMesh(node, cell)
+    face2cell1 = tmesh.ds.face_to_cell()
+    #print("face2cell1:", face2cell1)
+    fig = plt.figure()
+    axes = fig.gca()
+    tmesh.add_plot(axes)
+    tmesh.find_node(axes, showindex=True)
+    tmesh.find_cell(axes, showindex=True)
+    plt.show()
 
 def test_triangle_mesh_from_torus_surface():
     mesh = TriangleMesh.from_torus_surface(R=10, r=2, nu=10, nv=10)
@@ -171,5 +174,5 @@ if __name__ == "__main__":
     #test_grad_lambda()
     #test_interpolation_points()
     #test_cell_to_ipoint()
-    test_circumcenter()
-    test_angle()
+    #test_circumcenter()
+    #test_angle()
