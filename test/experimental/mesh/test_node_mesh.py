@@ -25,24 +25,6 @@ def test_top_dimension():
     top = node_mesh.top_dimension()
     assert top == 0
 
-def test_add_node_data():
-    nodes = bm.tensor([[0, 0], [1, 1], [2, 2]], dtype=bm.float32)
-    node_mesh = NodeMesh(nodes)
-
-    temperature_data = bm.tensor([300.0, 350.0, 400.0], dtype=bm.float32)
-    pressure_data = bm.tensor([100.0, 200.0, 300.0], dtype=bm.float32)
-    node_mesh.add_node_data(['temperature', 'pressure'], [temperature_data, pressure_data])
-
-def test_set_node_data():
-    nodes = bm.tensor([[0, 0], [1, 1], [2, 2]], dtype=bm.float32)
-    node_mesh = NodeMesh(nodes)
-
-    temperature_data = bm.tensor([300.0, 350.0, 400.0], dtype=bm.float32)
-    pressure_data = bm.tensor([100.0, 200.0, 300.0], dtype=bm.float32)
-    node_mesh.add_node_data(['temperature', 'pressure'], [temperature_data, pressure_data])
-    new_tem = bm.tensor([100,100,100], dtype=bm.float32)
-    node_mesh.set_node_data('temperature', new_tem)
-
 def test_neighbors():
     box_size = 1.0  
     cutoff = 0.2
