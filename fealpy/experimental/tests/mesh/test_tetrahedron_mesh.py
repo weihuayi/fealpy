@@ -14,6 +14,7 @@ class TestTetrahedronMeshInterfaces:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
     @pytest.mark.parametrize("data", init_data)
     def test_init(self, data, backend):
+        bm.set_backend(backend)
         node = bm.from_numpy(data['node'])
         cell = bm.from_numpy(data['cell'])
 
@@ -30,6 +31,7 @@ class TestTetrahedronMeshInterfaces:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
     @pytest.mark.parametrize("data", from_one_tetrahedron_data)
     def test_from_one_tetrahedron(self, data, backend):
+        bm.set_backend(backend)
         mesh = TetrahedronMesh.from_one_tetrahedron(meshtype=data['meshtype'])
 
         assert mesh.number_of_nodes() == data["NN"] 
@@ -40,5 +42,17 @@ class TestTetrahedronMeshInterfaces:
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", face_to_edge_sign_data)
+    def test_face_to_edge_sign(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
+        sign = mesh.face_to_edge_sign() 
+        np.testing.assert_array_equal(bm.to_numpy(sign), data["sign"])
+
+
 if __name__ == "__main__":
+    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
     pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
+    pytest.main(["./test_tetrahedron_mesh.py", "-k",
+        "test_from_face_to_edge_sign"])
