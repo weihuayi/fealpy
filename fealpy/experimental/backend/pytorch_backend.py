@@ -255,9 +255,9 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.stack([edges[..., 1], -edges[..., 0]], dim=-1, out=out)
 
     @staticmethod
-    def edge_tangent(edge: Tensor, node: Tensor, normalize=False, *, out=None) -> Tensor:
+    def edge_tangent(edge: Tensor, node: Tensor, unit=False, *, out=None) -> Tensor:
         v = torch.sub(node[edge[:, 1], :], node[edge[:, 0], :], out=out)
-        if normalize:
+        if unit:
             l = torch.norm(v, dim=-1, keepdim=True)
             v.div_(l)
         return v
@@ -352,8 +352,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triangle_area_3d(tri: Tensor, node: Tensor, out: Optional[Tensor]=None) -> Tensor:
         points = node[tri, :]
-        return cross(points[..., 1, :] - points[..., 0, :],
+        cross_product = cross(points[..., 1, :] - points[..., 0, :],
                     points[..., 2, :] - points[..., 0, :], dim=-1, out=out) / 2.0
+        result = norm(cross_product, dim=-1)
+        return result
 
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
@@ -397,7 +399,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             j, k, m = localFace[i]
             vjk = node[tet[:, k],:] - node[tet[:, j],:]
             vjm = node[tet[:, m],:] - node[tet[:, j],:]
-            Dlambda[:, i, :] = torch.cross(vjm, vjk) / (6*volume.reshape(-1, 1))
+            Dlambda[:, i, :] = cross(vjm, vjk, dim=-1) / (6*volume.reshape(-1, 1))
         return Dlambda
 
 

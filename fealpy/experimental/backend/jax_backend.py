@@ -102,21 +102,21 @@ class JAXBackend(Backend[Array], backend_name='jax'):
         return jnp.linalg.norm(node[edge[:, 0]] - node[edge[:, 1]], axis=-1)
 
     @staticmethod
-    @jit
+    @partial(jit, static_argnames=['unit'])
     def edge_normal(edge: Array, node: Array, unit=False, *, out=None) -> Array:
         points = node[edge, :]
         if points.shape[-1] != 2:
             raise ValueError("Only 2D meshes are supported.")
         edges = points[..., 1, :] - points[..., 0, :]
-        if [unit]:
+        if unit:
             edges /= jnp.linalg.norm(edges, axis=-1, keepdims=True)
         return jnp.stack([edges[..., 1], -edges[...,0]], axis=-1, out=out)    
 
     @staticmethod
-    @jit
+    @partial(jit, static_argnames=['unit'])
     def edge_tangent(edge: Array, node: Array, unit=False, *, out=None) -> Array:
         edges = node[edge[:, 1], :] - node[edge[:, 0], :]
-        if [unit]:
+        if unit:
             l = jnp.linalg.norm(edges, axis=-1, keepdims=True)
             edges /= l
         return jnp.stack([edges[..., 0], edges[...,1]], axis=-1, out=out)    
@@ -139,7 +139,7 @@ class JAXBackend(Backend[Array], backend_name='jax'):
         if not isinstance(bcs, Array):
             bcs = cls.tensorprod(*bcs)
         return jnp.einsum('ijk, ...j -> i...k', points, bcs)
-    
+     
     @staticmethod
     @jit
     def barycenter(entity: Array, node: Array, loc: Optional[Array]=None) -> Array:
@@ -245,8 +245,12 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     @jit
     def triangle_area_3d(tri: Array, node: Array) -> Array:
         points = node[tri, :]
-        return jnp.cross(points[..., 1, :] - points[..., 0, :],
-                    points[..., 2, :] - points[..., 0, :], axis=-1) / 2.0
+        edge1 = points[..., 1, :] - points[..., 0, :]
+        edge2 = points[..., 2, :] - points[..., 0, :]
+        points = node[tri, :]
+        cross_product = jnp.cross(edge1, edge2, axis=-1)
+        area = 0.5 * jnp.linalg.norm(cross_product, axis=-1)
+        return area
     
     @staticmethod
     def triangle_grad_lambda_2d(cell: Array, node: Array) -> Array:
@@ -290,7 +294,7 @@ class JAXBackend(Backend[Array], backend_name='jax'):
             jnp.cross(n, e0, axis=-1),
             jnp.cross(n, e1, axis=-1),
             jnp.cross(n, e2, axis=-1)
-        ], axis=-2)/(length.unsqueeze(-2)) # (..., 3, 3)
+        ], axis=-2)/length[...,jnp.newaxis] # (..., 3, 3)
 
     # Quadrangle Mesh
     # =============
@@ -317,7 +321,7 @@ class JAXBackend(Backend[Array], backend_name='jax'):
             j, k, m = localFace[i]
             vjk = node[tet[:, k],:] - node[tet[:, j],:]
             vjm = node[tet[:, m],:] - node[tet[:, j],:]
-            Dlambda[:, i, :] = jnp.cross(vjm, vjk) / (6*volume.reshape(-1, 1))
+            Dlambda = Dlambda.at[:, i, :].set(jnp.cross(vjm, vjk) / (6*volume.reshape(-1, 1)))
         return Dlambda
 
 JAXBackend.attach_attributes(ATTRIBUTE_MAPPING, jnp)
