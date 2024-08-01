@@ -38,6 +38,7 @@ bcs = bm.array([
 bcs1d = bm.array([
      [1/2,1/2],
      [0,1]], dtype=bm.float_)
+
 def test_multi_index_matrix():
     m = bm.multi_index_matrix(3, 2)
     print(m)
