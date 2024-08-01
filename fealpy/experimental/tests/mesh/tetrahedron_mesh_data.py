@@ -1,8 +1,4 @@
-
 import numpy as np
-
-
-
 init_data  = [
     {
         "node": np.array([
@@ -74,5 +70,13 @@ from_one_tetrahedron_data  = [
         "NE": 6,
         "NF": 4,
         "NC": 1
+    },
+]
+face_to_edge_sign_data = [
+    {
+            "sign": np.array([[False, False,  True],
+                [ True, False,  True],
+                [False, False,  True],
+                [ True, False,  True]]),
     },
 ]
