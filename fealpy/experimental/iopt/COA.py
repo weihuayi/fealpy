@@ -30,11 +30,10 @@ class COA:
         fitness_f, X,  best_position, Best_fitness = I.initialize()
         
         fitness_f = fitness_f.reshape((1,self.N))
-        #Xnew = X.copy()
         Xnew = bm.copy(X)
         global_position = best_position
         global_fitness = Best_fitness
-        cuve_f[:,0]=Best_fitness
+        cuve_f[:, 0]=Best_fitness
         t=0
 
         while t < self.Max_iter:
@@ -43,6 +42,8 @@ class COA:
             xf = (best_position + global_position) / 2
             Xfood = best_position
 
+
+            """
             for i in range(self.N):            
                 if temp > 30:
                     #summer resort stage
@@ -68,6 +69,7 @@ class COA:
                         Xnew_i = (X[i,:]-Xfood)* self.p_obj(temp)+ self.p_obj(temp) * bm.random.rand(1, self.dim) * X[i,:]
                         for j in range(self.dim):
                             Xnew[i][j] = Xnew_i[:,j]
+            """
             
             for i in range(self.N):  
                 for j in range(self.dim):  
