@@ -12,7 +12,7 @@ class TriangleMesh(SimplexMesh):
         """
         """
         super().__init__(TD=2)
-        kwargs = {'dtype': cell.dtype}
+        kwargs = bm.context(cell) 
         self.node = node
         self.cell = cell
         self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
@@ -34,13 +34,16 @@ class TriangleMesh(SimplexMesh):
 
     # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
+        """
+        """
         node = self.node
+        kwargs = bm.context(node)
 
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
 
         if etype == 0:
-            return bm.tensor([0,], dtype=self.ftype)
+            return bm.tensor([0,], **kwargs)
         elif etype == 1:
             edge = self.entity(1, index)
             return bm.edge_length(edge, node)

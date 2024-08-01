@@ -28,6 +28,10 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     random = jax.random
 
     @staticmethod
+    def context(tensor):
+        return {"dtype": tensor.dtype}
+
+    @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
         jax.default_device = device 
     
