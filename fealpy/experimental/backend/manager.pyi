@@ -50,6 +50,9 @@ class BackendManager():
     # PyTorch
     def from_numpy(self, ndarray: Any, /) -> _DT: ...
 
+    ###Functional programming
+    def apply_along_axis(self, func1d, axis, arr: _DT, *args, **kwargs) 
+
     ### Tensor creation methods ###
 
     # Numpy + PyTorch(tensor)

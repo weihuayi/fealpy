@@ -58,7 +58,10 @@ print(mesh.ds.cell)
 print(mesh.grad_lambda())
 #print(mesh.entity_measure('cell'))
 
-
+def format_array(arr):
+    rows = [np.array2string(row, separator=', ') for row in arr]
+    formatted_rows = [f' [{row}],\n' for row in rows]
+    return 'np.array([\n' + ''.join(formatted_rows) + '])'
 
 
 '''
