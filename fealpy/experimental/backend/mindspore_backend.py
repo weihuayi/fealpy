@@ -39,7 +39,11 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
     @staticmethod
     def to_numpy(tensor_like: Tensor) -> Any:
         return tensor_like.asnumpy()
-    
+
+    @staticmethod
+    def from_numpy(tensor_like: Tensor) -> Any:
+        return ms.Tensor(tensor_like)
+
     ### Tensor creation methods ###
 
     @staticmethod
@@ -50,39 +54,39 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
         assert k == 0, "Only k=0 is supported by `eye` in MindSporeBackend."
         return mnp.eye(n, m, k=k, dtype=dtype, **kwargs)
-    
+
     ### Reduction methods ###
 
     @staticmethod
     def all(a, axis=None, keepdims=False):
         return ops.all(a, axis=axis, keep_dims=keepdims)
-    
+
     @staticmethod
     def any(a, axis=None, keepdims=False):
         return ops.any(a, axis=axis, keep_dims=keepdims)
-    
+
     @staticmethod
     def sum(a, axis=None, dtype=None, keepdims=False, initial=None):
-        result = mnp.sum(a, axis=axis, dtype=dtype, keepdim=keepdims, initial=initial)
+        result = mnp.sum(a, axis=axis, dtype=dtype, keepdims=keepdims, initial=initial)
         return result if (initial is None) else result + initial
-    
+
     @staticmethod
     def prod(a, axis=None, keepdims=False, initial=None):
         result = ops.prod(a, axis=axis, keep_dims=keepdims)
         return result if (initial is None) else result * initial
-    
+
     @staticmethod
     def mean(a, axis=None, dtype=None, keepdims=False):
         return mnp.mean(a, axis=axis, keepdims=keepdims, dtype=dtype)
-    
+
     @staticmethod
     def max(a, axis=None, keepdims=False):
         return mnp.max(a, axis=axis, keepdims=keepdims)
-    
+
     @staticmethod
     def min(a, axis=None, keepdims=False):
         return mnp.min(a, axis=axis, keepdims=keepdims)
-    
+
     ### Unary methods ###
     # NOTE: all copied
 
@@ -95,7 +99,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
     @staticmethod
     def tensordot(a, b, axes):
         return mnp.tensordot(a, b, axes=axes)
-    
+
     ### Other methods ###
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
@@ -105,7 +109,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
                 return_counts=True,
                 axis=axis, **kwargs)
         any_return = return_index or return_inverse or return_counts
-        
+
         if any_return:
             result = (ms.Tensor(b), )
         else:
@@ -130,7 +134,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
     @staticmethod
     def nonzero(a):
         return ops.nonzero(a)
-    
+
     @staticmethod
     def cumsum(a, axis=None, dtype=None):
         result = mnp.cumsum(a, axis=axis, dtype=dtype)
@@ -154,7 +158,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
             arrays = [a.astype(dtype=dtype) for a in arrays]
         result = mnp.stack(arrays, axis=axis)
         return result
-    
+
     ### FEALPy functionals ###
 
     @staticmethod
@@ -168,7 +172,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         raw[:, -1] = p
         raw[:, 1:-1] = sep
         return (raw[:, 1:] - raw[:, :-1])
-    
+
     @staticmethod
     def edge_length(edge: Tensor, node: Tensor) -> Tensor:
         points = node[edge, :]
@@ -186,7 +190,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
             edges = edges / norm_edges
         normals = mnp.stack([edges[..., 1], -edges[..., 0]], axis=-1)
         return normals
-    
+
     @staticmethod
     def edge_tangent(edge: Tensor, node: Tensor, normalize=False) -> Tensor:
         edge = ms.Tensor(edge.asnumpy()) if isinstance(edge, Tensor) else edge
@@ -196,7 +200,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
             l = mnp.sqrt(mnp.sum(mnp.square(v), axis=-1, keepdims=True))
             v = v / l
         return v
-    
+
     @staticmethod
     def tensorprod(*tensors: Tensor) -> Tensor:
         tensors = [ms.Tensor(t.asnumpy()) if isinstance(t, Tensor) else t for t in tensors]
@@ -206,10 +210,10 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         desp2 = 'abcde'
         string = ", ".join([f"{desp1[i]}{desp2[i]}" for i in range(num)])
         string += f" -> {desp1[:num]}{desp2[:num]}"
-        
+
         result = ops.einsum(string, *tensors)
         return result.reshape(-1, int(NVC))
-    
+
     @classmethod
     def bc_to_points(cls, bcs: Union[Tensor, Tuple[Tensor, ...]], node: Tensor, entity: Tensor) -> Tensor:
         points = node[entity, :]
@@ -217,11 +221,11 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         if not isinstance(bcs, Tensor):
             bcs = cls.tensorprod(*bcs)
         return ops.einsum('ijk, ...j -> i...k', points, bcs)
-    
+
     @staticmethod
     def barycenter(entity: Tensor, node: Tensor, loc: Optional[Tensor]=None) -> Tensor:
         return mnp.mean(node[entity, :], dim=1) # TODO: polygon mesh case
-    
+
     @staticmethod
     def simplex_measure(entity: Tensor, node: Tensor) -> Tensor:
         points = node[entity, :]
@@ -231,7 +235,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
                             "to form a simplex.")
         edges = points[..., 1:, :] - points[..., :-1, :]
         return ops.det(edges)/(factorial(TD))
-    
+
     @classmethod
     def _simplex_shape_function_kernel(cls, bc: Tensor, p: int, mi: Optional[Tensor]=None) -> Tensor:
         TD = bc.shape[-1] - 1
@@ -251,26 +255,26 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         idx = mnp.arange(TD + 1, dtype=itype)
         phi = ops.prod(A[mi, idx], axis=-1)
         return phi
-    
+
     @classmethod
     def simplex_shape_function(cls, bcs: Tensor, p: int, mi=None) -> Tensor:
         fn = F.vmap(
             partial(cls._simplex_shape_function_kernel, p=p, mi=mi)
         )
         return fn(bcs)
-    
+
     @classmethod
     def simplex_grad_shape_function(cls, bcs: Tensor, p: int, mi=None) -> Tensor:
         fn = F.vmap(F.jacfwd(
             partial(cls._simplex_shape_function_kernel, p=p, mi=mi)
         ))
         return fn(bcs)
-    
+
     @staticmethod
     def tensor_measure(entity: Tensor, node: Tensor) -> Tensor:
         # TODO
         raise NotImplementedError
-    
+
     @staticmethod
     def interval_grad_lambda(line: Tensor, node: Tensor) -> Tensor:
         points = node[line, :]
@@ -278,13 +282,13 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         h2 = mnp.sum(v**2, axis=-1, keepdims=True)
         v = v/(h2)
         return mnp.stack([-v, v], axis=-2)
-    
+
     @staticmethod
     def triangle_area_3d(tri: Tensor, node: Tensor) -> Tensor:
         points = node[tri, :]
         return mnp.cross(points[..., 1, :] - points[..., 0, :],
                     points[..., 2, :] - points[..., 0, :], axis=-1) / 2.0
-    
+
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
         points = node[tri, :]
@@ -292,13 +296,13 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
         e1 = points[..., 0, :] - points[..., 2, :]
         e2 = points[..., 1, :] - points[..., 0, :]
         nv = ops.det(mnp.stack([e0, e1], axis=-2)) # (...)
-        e0 = e0.flip(-1)
-        e1 = e1.flip(-1)
-        e2 = e2.flip(-1)
+        e0 = e0.flip([-1])
+        e1 = e1.flip([-1])
+        e2 = e2.flip([-1])
         result = mnp.stack([e0, e1, e2], axis=-2)
         result[..., 0] * (-1)
         return result / (nv[..., None, None])
-    
+
     @staticmethod
     def triangle_grad_lambda_3d(tri: Tensor, node: Tensor) -> Tensor:
         points = node[tri, :]
@@ -313,7 +317,7 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
             mnp.cross(n, e1, axis=-1),
             mnp.cross(n, e2, axis=-1)
         ], axis=-2) / (length.unsqueeze(-2)) # (..., 3, 3)
-    
+
     @staticmethod
     def quadrangle_grad_lambda_2d(quad: Tensor, node: Tensor) -> Tensor:
         pass
@@ -332,8 +336,6 @@ class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
 
 attribute_mapping = ATTRIBUTE_MAPPING.copy()
 attribute_mapping.update({
-    'int_': 'int64',
-    'float_': 'float64',
     'complex_': 'complex128'
 })
 MindSporeBackend.attach_attributes(attribute_mapping, ms)
