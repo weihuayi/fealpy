@@ -7,11 +7,51 @@ init_mesh_data = [
         "node": np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64),
         "edge": np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int32), 
         "cell": np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int32),
-        "face2cell": np.array([[ True,  True, False, False],[ True, False,  True,  True],[False,  True,  True, False],[False, False, False,  True]],dtype = np.bool_),
+        "cell2node": np.array([[0, 1],
+                               [0, 2],
+                               [1, 2],
+                               [1, 3]]),
         "NN": 4,
         "NE": 4,
-        "NC": 4
-    },
+        "NC": 4,
+        
+        
+        "edge_tangent":np.array([[ 1.,  0.],
+                                 [ 0.,  1.],
+                                 [-1.,  1.],
+                                 [ 0.,  1.]]),
+        
+        "edge_length":np.array([1.        , 1.        , 1.41421356, 1.        ],dtype = np.float64),
+        
+        
+        "grad_lambda":np.array([[[-1. , -0. ],
+                                 [ 1. ,  0. ]],
+
+                                [[-0. , -1. ],
+                                 [ 0. ,  1. ]],
+
+                                [[ 0.5, -0.5],
+                                 [-0.5,  0.5]],
+
+                                [[-0. , -1. ],
+                                 [ 0. ,  1. ]]]),
+ 
+        "interpolation_points":np.array([[0. , 0. ],
+                                         [1. , 0. ],
+                                         [0. , 1. ],
+                                         [1. , 1. ],
+                                         [0.5, 0. ],
+                                         [0. , 0.5],
+                                         [0.5, 0.5],
+                                         [1. , 0.5]]) , # p=2
+        
+        "cell_normal":np.array([[ 0., -1.],
+                                [ 1.,  0.],
+                                [ 1.,  1.],
+                                [ 1.,  0.]])
+
+        
+    }
 ]
 
 

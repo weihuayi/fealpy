@@ -80,10 +80,19 @@ def test_cell_normal():
     val = edge_mesh.cell_normal()
     print(val)
 
+'''
 if __name__ == "__main__":
     # test_add_plot()
     # test_grad_function()
     # test_entity_measure()
     # test_grad_lambda()
-    test_interpolation_points()
+    # test_interpolation_points()
     # test_cell_normal()
+'''
+node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
+cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+
+# Create EdgeMesh object
+mesh = EdgeMesh(node, cell)
+a = mesh.cell_normal()
+print((a,))

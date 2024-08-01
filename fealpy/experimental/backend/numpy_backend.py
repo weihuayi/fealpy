@@ -76,12 +76,12 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     ### FEALPy methods ###
 
     @staticmethod
-    def multi_index_matrix(p: int, dim: int, *, dtype=None) -> NDArray:
+    def multi_index_matrix(p: int, dim: int, *, dtype=np.int32) -> NDArray:
         sep = np.flip(np.array(
             tuple(combinations_with_replacement(range(p+1), dim)),
-            dtype=np.int_
+            dtype=dtype
         ), axis=0)
-        raw = np.zeros((sep.shape[0], dim+2), dtype=np.int_)
+        raw = np.zeros((sep.shape[0], dim+2), dtype=dtype)
         raw[:, -1] = p
         raw[:, 1:-1] = sep
         return (raw[:, 1:] - raw[:, :-1])
