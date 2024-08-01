@@ -80,19 +80,19 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         return np.linalg.norm(points[..., 0, :] - points[..., 1, :], axis=-1)
 
     @staticmethod
-    def edge_normal(edge: NDArray, node: NDArray, normalize=False, *, out=None) -> NDArray:
+    def edge_normal(edge: NDArray, node: NDArray, unit=False, *, out=None) -> NDArray:
         points = node[edge, :]
         if points.shape[-1] != 2:
             raise ValueError("Only 2D meshes are supported.")
         edges = points[..., 1, :] - points[..., 0, :]
-        if normalize:
+        if unit:
             edges /= np.linalg.norm(edges, axis=-1, keepdims=True)
         return np.stack([edges[..., 1], -edges[..., 0]], axis=-1, out=out)
 
     @staticmethod
-    def edge_tangent(edge: NDArray, node: NDArray, normalize=False, *, out=None) -> NDArray:
+    def edge_tangent(edge: NDArray, node: NDArray, unit=False, *, out=None) -> NDArray:
         v = np.subtract(node[edge[:, 1], :], node[edge[:, 0], :], out=out)
-        if normalize:
+        if unit:
             l = np.linalg.norm(v, axis=-1, keepdims=True)
             v /= l
         return v
@@ -184,6 +184,7 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return R # (..., ldof, bc)
+    
 
     @staticmethod
     def simplex_hess_shape_function(bc: NDArray, p: int, mi=None) -> NDArray:
@@ -237,21 +238,28 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         nv = np.cross(e0, e1, axis=-1)  # Normal vector, (..., 3)
         length = np.linalg.norm(nv, axis=-1, keepdims=True)  # Length of normal vector, (..., 1)
         n = nv / length  # Unit normal vector
-        # Compute the gradient by crossing the unit normal with each edge
         return np.stack([
             np.cross(n, e0, axis=-1),
             np.cross(n, e1, axis=-1),
             np.cross(n, e2, axis=-1)
-        ], axis=-2) / length[..., np.newaxis, np.newaxis]  # Scale by inverse length to normalize
+        ], axis=-2) / length[..., np.newaxis]  # Scale by inverse length to normalize
 
     @staticmethod
     def quadrangle_grad_lambda_2d(quad: NDArray, node: NDArray) -> NDArray:
         pass
 
-    @staticmethod
-    def tetrahedron_grad_lambda_3d(tet: NDArray, node: NDArray, local_face: NDArray) -> NDArray:
-        pass
-
+    @classmethod
+    def tetrahedron_grad_lambda_3d(cls, tet: NDArray, node: NDArray, localFace: NDArray) -> NDArray:
+        NC = tet.shape[0]
+        Dlambda = np.zeros((NC, 4, 3), dtype=node.dtype)
+        volume = cls.simplex_measure(tet, node)
+        for i in range(4):
+            j, k, m = localFace[i]
+            vjk = node[tet[:, k],:] - node[tet[:, j],:]
+            vjm = node[tet[:, m],:] - node[tet[:, j],:]
+            Dlambda[:, i, :] = np.cross(vjm, vjk) / (6*volume.reshape(-1, 1))
+        return Dlambda
+         
 
 NumPyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
 function_mapping = FUNCTION_MAPPING.copy()
