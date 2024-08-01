@@ -1,7 +1,5 @@
-import numpy as bm
 from fealpy.experimental.backend import backend_manager as bm
-#bm.set_backend('jax')
-bm.set_backend('pytorch')
+
 class initialize:
     def __init__ (self, N, dim, ub, lb, MaxIT, fobj):
         self.N = N
