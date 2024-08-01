@@ -93,14 +93,15 @@ ATTRIBUTE_MAPPING = _make_default_mapping(
 FUNCTION_MAPPING = _make_default_mapping(
     # Creation functions
     'array', 'tensor', 'arange', 'linspace',
-    'empty', 'zeros', 'ones', 'empty_like', 'zeros_like', 'ones_like', 'eye',
-    'meshgrid',
+    'empty', 'zeros', 'ones', 'full', 'empty_like', 'zeros_like', 'ones_like', 'full_like',
+    'eye', 'meshgrid',
 
     # Reduction functions
     'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax',
 
     # Unary functions
-    'abs', 'sign', 'sqrt', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    'abs', 'sign', 'sqrt', 'square', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    'arcsin', 'arccos', 'arctan', 'arctan2', 'arcsinh', 'arccosh', 'arctanh',
     'sinh', 'cosh', 'tanh', 'clip', 'floor', 'ceil', 'round',
 
     # Binary functions
