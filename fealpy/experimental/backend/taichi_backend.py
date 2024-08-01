@@ -10,7 +10,17 @@ except ImportError:
                       'the Taichi backend in FEALPy. '
                       'See https://taichi-lang.cn/ for installation.')
 
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+from .base import Backend, _make_default_mapping
+
+ATTRIBUTE_MAPPING = _make_default_mapping(
+    'pi', 'e', 'nan', 'inf', 
+    'dtype', 'device',
+    'uint8', 'uint16', 'uint32', 'uint64',
+    'bool_', 'bool', 
+    'int_', 'int8', 'int16', 'int32', 'int64',
+    'float_', 'float16', 'float32', 'float64',
+    'complex_', 'complex64', 'complex128'
+)
 
 Field = ti.Field 
 _device = ti._lib.core.Arch 
@@ -42,13 +52,15 @@ class TaichiBackend(Backend[Field], backend_name='taichi'):
         """
         return jax.device_put(numpy_array)
 
-    ### math constant ###
-
-    e = tm.e
+    ### constant ###
     pi = tm.pi
+    e = tm.e
     nan = tm.nan 
     inf = tm.inf
     dtype = ti._lib.core.DataType
+    device = ti._lib.core.Arch 
+
+    ### 
     
     # Creation functions
     # 'array', 'tensor', 'arange', 'linspace',
@@ -67,16 +79,3 @@ class TaichiBackend(Backend[Field], backend_name='taichi'):
     # Other functions
     #'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'nonzero',
     #'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes'
-
-attribute_mapping = ATTRIBUTE_MAPPING.copy()
-attribute_mapping.update({
-    'bool_': 'uint8',
-    'int_': 'int32',
-    'float_': 'float64',
-})
-
-TaichiBackend.attach_attributes(attribute_mapping, torch)
-function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(array='tensor', power='pow', transpose='permute',
-                        repeat='repeat_interleave')
-TaichiBackend.attach_methods(function_mapping, torch)

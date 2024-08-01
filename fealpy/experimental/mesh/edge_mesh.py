@@ -118,7 +118,7 @@ class EdgeMesh(SimplexMesh):
         """
         assert self.geo_dimension() == 2
         v = self.cell_tangent(index=index)
-        w = bm.tensor([(0, -1),(1, 0)])
+        w = bm.tensor([(0, -1),(1, 0)],dtype=self.ftype)
         return v@w
     
     ## @ingroup MeshGenerators

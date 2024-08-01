@@ -103,6 +103,13 @@ def test_cell_normal():
     val = edge_mesh.cell_normal()
     print(val)
 
+def test_edge_length():
+    node = bm.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=bm.float64)
+    cell = bm.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=bm.int_)
+    mesh = EdgeMesh(node,cell)
+    edge_length = mesh.edge_length()
+    print(edge_length)
+    print(edge_length.dtype)
 
 if __name__ == "__main__":
     # test_quadrature_formula()
@@ -110,7 +117,8 @@ if __name__ == "__main__":
     # test_grad_lambda()
     # test_number_of_local_ipoints()
     # test_number_of_global_ipoints()
-    test_interpolation_points()
+    # test_interpolation_points()
     # test_cell_normal()
+    test_edge_length()
 
     

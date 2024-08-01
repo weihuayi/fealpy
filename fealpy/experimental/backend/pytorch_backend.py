@@ -27,6 +27,14 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     random = torch.random
 
     @staticmethod
+    def context(tensor):
+        return {
+                "dtype": tensor.dtype,
+                "device": tensor.device,
+                "requires_grad": tensor.requires_grad,
+        }
+
+    @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
         torch.set_default_device(device)
 
@@ -44,7 +52,16 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
-        return torch.linspace(start, stop, steps=num, dtype=dtype, **kwargs)
+        """
+        """
+        assert endpoint == True
+        if isinstance(start, (int, float)) and isinstance(stop, (int, float)):
+            return torch.linspace(start, stop, num, dtype=dtype, **kwargs);
+        else:
+            vmap_fun = partial(torch.linspace, dtype=dtype, **kwargs)
+            for _ in range(start.ndim):
+                vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
+            return vmap_fun(start, stop, num)
 
     @staticmethod
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
@@ -105,6 +122,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Binary methods ###
 
     @staticmethod
+    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
+        a.index_add_(indices.ravel(), src.ravel())
+
+    @staticmethod
     def cross(a, b, axis=-1, **kwargs):
         return torch.cross(a, b, dim=axis, **kwargs)
 
@@ -113,6 +134,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.tensordot(a, b, dims=axes)
 
     ### Other methods ###
+
+    @staticmethod
+    def copy(a, /, **kwargs):
+        return torch.clone(a, **kwargs)
+
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
@@ -190,10 +216,34 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         else:
             return torch.where(cond, x, y, out=out)
 
+    ### Functional programming
+    @staticmethod
+    def apply_along_axis(func1d, axis, x, *args, **kwargs):
+        """
+        Parameters:
+            func1d : function (M,) -> (Nj...)
+            This function should accept 1-D arrays. It is applied to 1-D slices of `arr` along the specified axis.
+            axis : integer
+                Axis along which `arr` is sliced.
+            arr : ndarray (Ni..., M, Nk...)
+            Input array.
+            args : any Additional arguments to `func1d`.
+            kwargs : any Additional named arguments to `func1d`.
+        """
+        if axis==0:
+            x = torch.transpose(x)
+        return vmap(func1d)(x)
+
+
     ### FEALPy functionals ###
+
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Tensor:
+        """
+        TODO:
+            1. context?
+        """
         dtype = dtype or torch.int
         sep = torch.flip(torch.tensor(
             tuple(combinations_with_replacement(range(p+1), dim)),
@@ -220,9 +270,9 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.stack([edges[..., 1], -edges[..., 0]], dim=-1, out=out)
 
     @staticmethod
-    def edge_tangent(edge: Tensor, node: Tensor, normalize=False, *, out=None) -> Tensor:
+    def edge_tangent(edge: Tensor, node: Tensor, unit=False, *, out=None) -> Tensor:
         v = torch.sub(node[edge[:, 1], :], node[edge[:, 0], :], out=out)
-        if normalize:
+        if unit:
             l = torch.norm(v, dim=-1, keepdim=True)
             v.div_(l)
         return v
@@ -317,8 +367,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triangle_area_3d(tri: Tensor, node: Tensor, out: Optional[Tensor]=None) -> Tensor:
         points = node[tri, :]
-        return cross(points[..., 1, :] - points[..., 0, :],
+        cross_product = cross(points[..., 1, :] - points[..., 0, :],
                     points[..., 2, :] - points[..., 0, :], dim=-1, out=out) / 2.0
+        result = norm(cross_product, dim=-1)
+        return result
 
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
@@ -362,7 +414,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             j, k, m = localFace[i]
             vjk = node[tet[:, k],:] - node[tet[:, j],:]
             vjm = node[tet[:, m],:] - node[tet[:, j],:]
-            Dlambda[:, i, :] = torch.cross(vjm, vjk) / (6*volume.reshape(-1, 1))
+            Dlambda[:, i, :] = cross(vjm, vjk, dim=-1) / (6*volume.reshape(-1, 1))
         return Dlambda
 
 
@@ -375,8 +427,13 @@ attribute_mapping.update({
 })
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(array='tensor', power='pow', transpose='permute',
-                        repeat='repeat_interleave')
+function_mapping.update(
+        array='tensor', 
+        power='pow', 
+        transpose='permute',
+        repeat='repeat_interleave', 
+        index_add_= 'index_add_',
+        copy='clone')
 PyTorchBackend.attach_methods(function_mapping, torch)
 
 PyTorchBackend.random.rand = torch.rand
