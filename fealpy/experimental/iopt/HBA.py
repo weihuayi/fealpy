@@ -1,12 +1,12 @@
 import time 
 import random
+import math
 import matplotlib.pyplot as plt  
 from fealpy.experimental.iopt import initialize
 from fealpy.experimental.backend import backend_manager as bm
-# bm.set_backend('pytorch')
-from Function import Function
-from Function_plot import Function_plot
 
+#bm.set_backend('pytorch')
+#bm.set_backend('jax')
 
 class HBA():
     def __init__(self,N, dim, UB, LB, T, fobj):
@@ -29,26 +29,27 @@ class HBA():
 
         gbest_idx = bm.argmin(fit)
         f_prey = fit[gbest_idx,0]
-        x_prey = x[gbest_idx,:].copy()  
+        #x_prey = x[gbest_idx,:].copy()  
+        x_prey = bm.copy(x[gbest_idx,:]) 
         CNVG = bm.zeros(self.T)
         eps=2.2204e-16
 
         for t in range(0,self.T):
-            alpha = C*bm.exp(-t/self.T)
+            alpha = C*math.exp(-t/self.T)
             for i in range(0,self.N):
                 if i == self.N-1:
                     S = bm.linalg.norm(x[i, :] - x[0, :] + eps) ** 2  
                 else:
                     S = bm.linalg.norm(x[i, :] - x[i + 1, :] + eps) ** 2  
                 di = bm.linalg.norm(x[i,:] - x_prey + eps)**2
-                r2 = bm.random.rand()  
+                r2 = bm.random.rand(1)  
                 I = r2 * S / (4 * bm.pi * di)
-                rr = bm.random.rand() 
+                rr = bm.random.rand(1) 
                 if rr < 0.5:
                     F = 1
                 else:
                     F = -1
-                r = bm.random.rand() 
+                r = bm.random.rand(1) 
                 di = x_prey-x[i,:]
                 if r < 0.5:
                     r3 = bm.random.rand(1,self.dim) 
@@ -65,11 +66,13 @@ class HBA():
                 if fnew < fit[i,0]:
                 
                     fit[i,0] = fnew
-                    x[i,:] = Xnew.copy()
+                    #x[i,:] = Xnew.copy()
+                    x[i,:] = bm.copy(Xnew)
             gbest_idx = bm.argmin(fit)
             if fit[gbest_idx,0] < f_prey:
                 f_prey = fit[gbest_idx,0]
-                x_prey = x[gbest_idx,:].copy()
+                #x_prey = x[gbest_idx,:].copy()
+                x_prey = bm.copy(x[gbest_idx,:])
             CNVG[t] = f_prey
         return x_prey,f_prey,CNVG
     
