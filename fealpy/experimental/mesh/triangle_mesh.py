@@ -227,6 +227,24 @@ class TriangleMesh(SimplexMesh):
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
 
+    def prolongation_matrix(self, po: int, p1: int):
+        """
+        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
+        """
+        pass
+
+    def edge_frame(self, index: Index=_S):
+        """
+        @brief 计算二维网格中每条边上的局部标架
+        """
+        pass
+     
+    def edge_normal(self, index: Index=_S):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        pass
+
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
 
@@ -251,17 +269,22 @@ class TriangleMesh(SimplexMesh):
             #TODO: call self.clear() 清理暂存的数据
             self.construct()
 
-    def is_crossed_cell(self, point, segment): # TODO
+    def is_crossed_cell(self, point, segment):
         """
-        Notes: 给定一组线段，找到这些线段的一个邻域单元集合，
-              且这些单元要满足一定的连通性。
+        @berif 给定一组线段，找到这些线段的一个邻域单元集合, 且这些单元要满足一定的连通
+        性
         """
-        pass 
+        pass
+    
+    def location(self, points):
+        """
+        @breif  给定一组点 p , 找到这些点所在的单元
 
-    def location(self, points):  # TODO
+        这里假设：
 
-        """
-        Notes: 给定一组点 p，找扫这些点所在的单元
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
         """
         pass
 
@@ -304,23 +327,28 @@ class TriangleMesh(SimplexMesh):
             return c
 
     def angle(self):
-        NC = self.number_of_cells()
-        cell = self.cell
-        node = self.node
-        localEdge = self.localEdge
-        angle = bm.zeros((NC, 3), dtype=self.ftype)
-        for i, (j, k) in zip(range(3), localEdge):
-            v0 = node[cell[:, j]] - node[cell[:, i]]
-            v1 = node[cell[:, k]] - node[cell[:, i]]
-            # NumPyBacked has no arccos
-            angle[:, i] = bm.arccos(
-                bm.sum(v0 * v1, axis=1) / bm.sqrt(bm.sum(v0 ** 2, axis=1) * np.sum(v1 ** 2, axis=1)))
-        return angle  
+        pass
 
-    def show_angle(self, axes, angle=None): # TODO 
+    def show_angle(self, axes, angle=None):
         """
-        Note: 显示网格角度的分布直方图
+        @brief 显示网格角度的分布直方图
         """
+        pass
+    
+    def cell_quality(self, measure='radius_ratio'):
+        if measure == 'radius_ratio':
+            return radius_ratio(self)
+
+    def show_quality(self, axes, qtype=None, quality=None):
+        """
+        @brief 显示网格质量分布的分布直方图
+        """
+        pass
+
+    def edge_swap(self):
+        pass
+
+    def odt_iterate(self):
         pass
 
     def unifrom_bisect(self, n=1):
@@ -378,7 +406,7 @@ class TriangleMesh(SimplexMesh):
         if options['disp']:
             print('The number of markedg edges: ', isCutEdge.sum())
 
-        edge2newNode = np.zeros((NE,), dtype=self.itype)
+        edge2newNode = bm.zeros((NE,), dtype=self.itype)
         edge2newNode[isCutEdge] = bm.arange(NN, NN + isCutEdge.sum())
 
         node = self.node
@@ -391,14 +419,14 @@ class TriangleMesh(SimplexMesh):
 
         if 'IM' in options:
             nn = len(newNode)
-            IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
+            IM = coo_matrix((bm.ones(NN), (bm.arange(NN), bm.arange(NN))),
                             shape=(NN + nn, NN), dtype=self.ftype)
-            val = np.full(nn, 0.5)
+            val = bm.full(nn, 0.5)
             IM += coo_matrix(
                 (
                     val,
                     (
-                        NN + np.arange(nn),
+                        NN + bm.arange(nn),
                         edge[isCutEdge, 0]
                     )
                 ), shape=(NN + nn, NN), dtype=self.ftype)
@@ -406,7 +434,7 @@ class TriangleMesh(SimplexMesh):
                 (
                     val,
                     (
-                        NN + np.arange(nn),
+                        NN + bm.arange(nn),
                         edge[isCutEdge, 1]
                     )
                 ), shape=(NN + nn, NN), dtype=self.ftype)
@@ -482,6 +510,125 @@ class TriangleMesh(SimplexMesh):
 
         NN = self.node.shape[0]
         self.reinit(NN, cell)
+
+    def coarsen(self, isMarkedCell=None, options={}):
+        pass
+
+    def label(self, node=None, cell=None, cellidx=None):
+        """
+        单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
+        Parameter
+        -------
+        Return 
+        -------
+        cell ： in-place modify
+        """
+        pass
+
+    def delete_degree_4(self):
+        pass
+
+    @staticmethodh
+    def adaptive_options(
+            method='mean',
+            maxrefine=5,
+            maxcoarsen=0,
+            theta=1.0,
+            tol=1e-6,  # 目标误差
+            HB=None,
+            imatrix=False,
+            data=None,
+            disp=True,
+        ):
+
+        options = {
+            'method': method,
+            'maxrefine': maxrefine,
+            'maxcoarsen': maxcoarsen,
+            'theta': theta,
+            'tol': tol,
+            'data': data,
+            'HB': HB,
+            'imatrix': imatrix,
+            'disp': disp
+        }
+        return options
+
+    def adaptive(self, eta, options):
+        pass
+
+    def bisect_1(self, isMarkedCell=None, options={'disp': True}):
+        pass
+
+    def jacobian_matrix(self, index: Index=_S):
+        """
+        @brief 获得三角形单元对应的 Jacobian 矩阵
+        """
+        NC = self.number_of_cells()
+        GD = self.geo_dimension()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        J = bm.zeros((NC, GD, 2), dtype=self.ftype)
+
+        J[..., 0] = node[cell[:, 1]] - node[cell[:, 0]]
+        J[..., 1] = node[cell[:, 2]] - node[cell[:, 0]]
+
+        return J
+
+    def point_to_bc(self, point):
+        """
+        @brief 找到定点 point 所在的单元，并计算其重心坐标 
+        """
+        pass
+
+    def mark_interface_cell(self, phi):
+        """
+        @brief 标记穿过界面的单元
+        """
+        pass
+
+    def mark_interface_cell_with_curvature(self, phi, hmax=None):
+        """
+        @brief 标记曲率大的单元
+        """
+        pass
+
+    def mark_interface_cell_with_type(self, phi, interface):
+        """
+        @brief 等腰直角三角形，可以分为两类
+            - Type A：两条直角边和坐标轴平行
+            - Type B: 最长边和坐标轴平行
+        """
+        pass
+
+    def bisect_interface_cell_with_curvature(self, interface, hmax):
+        pass
+
+    def show_function(self, plot, uh, cmap=None):
+        pass
+
+    @classmethod
+    def show_lattice(cls, p=1, shownltiindex=False):
+        """
+        @berif 展示三角形上的单纯形格点
+        """
+        pass
+
+    @classmethod
+    def show_shape_function(cls, p=1, funtype='L'):
+        """
+        @brief 可视化展示三角形单元上的 p 次基函数
+        """
+        pass
+
+    @classmethod
+    def show_global_basis_function(cls, p=3):
+        """
+        @brief 展示通过单元基函数的拼接+零扩展的方法获取整体基函数的过程
+        """
+        pass
 
     @classmethod
     def from_one_triangle(cls, meshtype='iso'):

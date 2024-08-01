@@ -106,7 +106,17 @@ class TestTriangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(face2cell), urdata["face2cell"], atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(cell2edge), urdata["cell2edge"], atol=1e-14)
 
-'''
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("jmdata", jacobian_matrix_data)
+    def test_unifrom_refine(self, jmdata, backend):
+        bm.set_backend(backend)
+
+        mesh = TriangleMesh.from_box(nx=2, ny=2)
+
+        jacobian = mesh.jacobian_matrix()
+
+        np.testing.assert_allclose(bm.to_numpy(jacobian), jmdata["jacobian_matrix"], atol=1e-14)
+
     @pytest.mark.parametrize("meshdata", from_torus_surface_data)
     def test_from_torus_surface(self, meshdata, backend):
         R = meshdata["R"]
@@ -123,7 +133,6 @@ class TestTriangleMeshInterfaces:
 
         assert node.shape == expected_node_shape
         assert cell.shape == expected_cell_shape
-''' 
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
