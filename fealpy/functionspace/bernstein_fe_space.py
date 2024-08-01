@@ -6,6 +6,7 @@ from .fem_dofs import *
 from .Function import Function
 from ..common.tensor import *
 
+from fealpy.quadrature.TetrahedronQuadrature import TetrahedronQuadrature
 from scipy.special import factorial, comb
 from scipy.sparse import csc_matrix, csr_matrix
 
@@ -56,6 +57,7 @@ class BernsteinFESpace:
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
+        #self.integrator = TetrahedronQuadrature(p+4)
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
@@ -160,6 +162,48 @@ class BernsteinFESpace:
         Dlambda = self.mesh.grad_lambda()
         gphi = P[0, -1, 0]*np.einsum("qlm, cmd->qcld", R, Dlambda, optimize=True)
         return gphi[:, index]
+    def mass_matrix(self):
+        # TODO 优化效率, Bernstein 基的质量矩阵每个单元是相同的
+        import ipdb
+        ipdb.set_trace()
+        p = self.p
+        gdof = self.dof.number_of_global_dofs()
+        cell2dof = self.dof.cell_to_dof()
+        print('111',cell2dof.shape)
+        integrator = self.integrator
+        bcs, ws = integrator.get_quadrature_points_and_weights()#p=5 order=9 NQ=19
+
+        cm = self.mesh.entity_measure("cell")
+        phi = self.basis(bcs)
+        print('222',phi.shape)
+        M = np.einsum('qcl, qcm, q, c->clm', phi, phi, ws, cm, optimize=True)
+
+        I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
+        J = np.broadcast_to(cell2dof[:, None, :], M.shape) 
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof), dtype=np.float_)
+        return M
+
+    def grad_m_matrix(self, m):
+        p = self.p
+        gdof = self.dof.number_of_global_dofs()
+        cell2dof = self.dof.cell_to_dof()
+        integrator = self.integrator #p+4
+        bcs, ws = integrator.get_quadrature_points_and_weights()#p=5 order=9 NQ=19
+
+        GD = self.mesh.geo_dimension()
+        idx = self.mesh.multi_index_matrix(m, GD-1)
+        num = factorial(m)/np.prod(factorial(idx), axis=1)
+        #|m|/m！m是相加为m的多重数组,两个 T_1^m
+
+        cm = self.mesh.entity_measure("cell")
+        gmphi = self.grad_m_basis(bcs, m)
+        M = np.einsum('qclg, qcmg, g, q, c->clm', gmphi, gmphi, num, ws, cm, optimize=True)
+
+        I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
+        J = np.broadcast_to(cell2dof[:, None, :], M.shape) 
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof), dtype=np.float_)
+        return M
+
 
     def partial_matrix_dense(self):
         """
