@@ -1,10 +1,9 @@
-#import numpy as np 
 import math
 import matplotlib.pyplot as plt
 import random
 from fealpy.experimental.iopt import initialize
 from ..backend import backend_manager as bm
-#bm.set_backend('pytorch')
+
 class COA:
     def __init__(self, N, dim,  ub, lb, Max_iter, fobj):
         """
