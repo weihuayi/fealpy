@@ -7,7 +7,7 @@ from fealpy.experimental.tests.backend.backend_data import *
 class TestBackendInterfaces:
     ######## Constants
     @pytest.mark.parametrize("backend", ['numpy'])
-    def test_e(self,backend):
+    def test_e(self, backend):
         '''
         Euler’s number, base of natural logarithms, Napier’s constant.
         https://en.wikipedia.org/wiki/E_%28mathematical_constant%29
@@ -15,7 +15,7 @@ class TestBackendInterfaces:
         pass
 
     @pytest.mark.parametrize("backend", ['numpy'])
-    def test_euler_gamma(self,backend):
+    def test_euler_gamma(self, backend):
         '''
         Euler's constant, Euler–Mascheroni constant
         
@@ -130,6 +130,10 @@ class TestBackendInterfaces:
         '''
         Create an array.
         '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_tensor(self, backend):
         pass
 
     @pytest.mark.parametrize("backend", ['numpy'])
