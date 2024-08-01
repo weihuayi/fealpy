@@ -6,6 +6,7 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
 
 from hexahedron_mesh_data import *
+from edge_mesh_data import *
 
 
 class TestHexahedronMeshInterfaces:
@@ -117,7 +118,8 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(fm), fm_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(em), em_true, atol=1e-14)
 
-
+if __name__ == "__main__":
+    pytest.main(["-k", "test_hexahedron_mesh.py"])
 
 
 

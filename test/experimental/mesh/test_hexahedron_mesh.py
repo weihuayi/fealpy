@@ -19,6 +19,8 @@ def test_bc_to_point():
 
     point = mesh.bc_to_point(bcs)
     point_old = mesh_old.bc_to_point(bcs_old)
+    print("point : ", point)
+    print("point : ", (point, ))
 
     print("result of bc_to_point : ", bm.sum(bm.abs(point - point_old)))
 
@@ -110,7 +112,14 @@ def test_entity_measure():
     em_old = mesh_old.entity_measure('edge')
 
     print("result of entity_measure : ", bm.sum(bm.abs(cm - cm_old))<1e-12, bm.sum(bm.abs(fm - fm_old))<1e-12, bm.sum(bm.abs(em - em_old))<1e-12)
-    
+
+def test_linspace():
+    a = np.int64(1.021321413413414)
+    b = np.float32(2.214124213312455)
+    c = bm.linspace(a, b, 10)
+    print(c)
+
+
 if __name__ == "__main__":
     test_bc_to_point()
     test_jacobi_matrix_and_first_fundamental_form()
@@ -118,6 +127,7 @@ if __name__ == "__main__":
     test_interpolation_points()
     test_uniform_refine()
     test_entity_measure()
+    test_linspace()
 
 
 
