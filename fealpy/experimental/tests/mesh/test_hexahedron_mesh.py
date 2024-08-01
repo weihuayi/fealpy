@@ -7,14 +7,13 @@ from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
 
 from hexahedron_mesh_data import *
 
-class TestHexahedronMeshInterfaces:
-    @pytest.fixture(scope="class", params=backends)
-    def backend(self, request):
-        bm.set_backend(request.param)
-        return request.param
 
+class TestHexahedronMeshInterfaces:
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("bpdata", bc_to_point_data)
     def test_bc_to_point(self, bpdata, backend):
+        bm.set_backend(backend)
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
 
         bcs = bpdata["bcs"] 
@@ -27,8 +26,10 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(point), point_true, atol=1e-14)
 
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("jacobi_and_fff_data", jacobi_matrix_and_first_fundamental_form_data)
     def test_jacobi_matrix_and_first_fundamental_form(self, jacobi_and_fff_data, backend):
+        bm.set_backend(backend)
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
 
         bcs = jacobi_and_fff_data["bcs"]
@@ -44,8 +45,10 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(jacobi), jacobi_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(fff), fff_true, atol=1e-14)
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("cipfip", cell_and_face_to_ipoint_data)
     def test_cell_and_face_to_ipoint(self, cipfip, backend):
+        bm.set_backend(backend)
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
 
         cip = mesh.cell_to_ipoint(2)
@@ -57,8 +60,10 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(cip), cip_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(fip), fip_true, atol=1e-14)
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("ip", interpolation_points_data)
     def test_interpolation_points(self, ip, backend):
+        bm.set_backend(backend)
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
 
         ip_true = ip["ip"]
@@ -66,8 +71,10 @@ class TestHexahedronMeshInterfaces:
 
         np.testing.assert_allclose(bm.to_numpy(ip), ip_true, atol=1e-14)
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("urdata",  uniform_refine_data)
     def test_uniform_refine(self, urdata, backend):
+        bm.set_backend(backend)
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
         mesh.uniform_refine(2)
 
@@ -92,8 +99,10 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(cell2face), cell2face_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(face2edge), face2edge_true, atol=1e-14)
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("emdata", entity_measure_data)
     def test_entity_measure(self, emdata, backend):
+        bm.set_backend(backend)
         mesh = HexahedronMesh.from_one_hexahedron(twist=True)
 
         cm = mesh.entity_measure('cell')

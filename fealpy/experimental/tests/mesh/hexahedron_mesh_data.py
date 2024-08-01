@@ -1,8 +1,6 @@
 
 import numpy as np
 
-# 测试不同的后端
-backends = ['numpy', 'pytorch']#, 'jax']
 
 # 定义多个典型的 HexahedronMesh 对象
 bc_to_point_data = [{
@@ -159,8 +157,8 @@ jacobi_matrix_and_first_fundamental_form_data = [{
  }]
 
 cell_and_face_to_ipoint_data = [{
-    "cip" : np.array([[[ 0, 10,  4,  9, 22, 17,  3, 15,  7,  8, 21, 16, 20, 26, 25, 13,
-         24, 19,  1, 12,  5, 11, 23, 18,  2, 14,  6]]], dtype=np.int_),
+    "cip" : np.array([[ 0, 10,  4,  9, 22, 17,  3, 15,  7,  8, 21, 16, 20, 26, 25, 13,
+         24, 19,  1, 12,  5, 11, 23, 18,  2, 14,  6]], dtype=np.int_),
     "fip" : np.array([[ 0,  8,  1,  9, 20, 11,  3, 13,  2],
        [ 0, 10,  4,  8, 21, 16,  1, 12,  5],
        [ 0,  9,  3, 10, 22, 15,  4, 17,  7],
