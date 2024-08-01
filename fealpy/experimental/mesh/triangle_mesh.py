@@ -163,12 +163,12 @@ class TriangleMesh(SimplexMesh):
         if p >= 3:
             TD = self.top_dimension()
             cell = self.entity('cell')
-            multiIndex = self.multi_index_matrix(p, TD)
+            multiIndex = bm.multi_index_matrix(p, TD)
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
                                 isEdgeIPoints[:, 2])
             multiIndex = multiIndex[isInCellIPoints, :]
-            w = multiIndex.astype(self.ftype) / p
+            w = multiIndex / p
 
             ipoints_from_cell = bm.einsum('ij, kj...->ki...', w,
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
@@ -484,23 +484,23 @@ class TriangleMesh(SimplexMesh):
         self.reinit(NN, cell)
 
     @classmethod
-    def from_one_triangle(cls, meshtype='iso', ftype=bm.float64, itype=bm.int32):
+    def from_one_triangle(cls, meshtype='iso'):
         if meshtype == 'equ':
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, bm.sqrt(3) / 2]], dtype=ftype)
+                [0.5, bm.sqrt(3) / 2]], dtype=bm.float64)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
                 [0.0, 1.0]], dtype=bm.float64)
-        cell = bm.tensor([[0, 1, 2]], dtype=itype)
+        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_square_domain_with_fracture(cls, ftype=bm.float64, itype=bm.int32):
+    def from_square_domain_with_fracture(cls):
         node = bm.tensor([
             [0.0, 0.0],
             [0.0, 0.5],
@@ -511,7 +511,7 @@ class TriangleMesh(SimplexMesh):
             [0.5, 1.0],
             [1.0, 0.0],
             [1.0, 0.5],
-            [1.0, 1.0]], dtype=ftype)
+            [1.0, 1.0]], dtype=bm.float64)
 
         cell = bm.tensor([
             [1, 0, 5],
@@ -521,13 +521,13 @@ class TriangleMesh(SimplexMesh):
             [4, 7, 5],
             [8, 5, 7],
             [6, 5, 9],
-            [8, 9, 5]], dtype=itype)
+            [8, 9, 5]], dtype=bm.int32)
 
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_unit_square(cls, nx=10, ny=10, threshold=None, ftype=bm.float64, itype=bm.int32):
+    def from_unit_square(cls, nx=10, ny=10, threshold=None):
         """
         Generate a triangle mesh for a unit square.
 
@@ -537,11 +537,11 @@ class TriangleMesh(SimplexMesh):
         @return TriangleMesh instance
         """
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, 
-                threshold=threshold, ftype=ftype, itype=itype)
+                threshold=threshold, ftype=bm.float64, itype=bm.int32)
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None, ftype=bm.float64, itype=bm.int32):
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
         """
         Generate a triangle mesh for a box domain .
 
@@ -587,7 +587,7 @@ class TriangleMesh(SimplexMesh):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_torus_surface(cls, R, r, nu, nv, ftype=bm.float64, itype=bm.int32):
+    def from_torus_surface(cls, R, r, nu, nv):
         """
         """
         NN = nu * nv
@@ -603,11 +603,11 @@ class TriangleMesh(SimplexMesh):
         Z = r * bm.sin(V)
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
 
-        idx = bm.zeros((nu + 1, nv + 1), dtype=itype)
+        idx = bm.zeros((nu + 1, nv + 1), dtype=bm.int32)
         idx[0:-1, 0:-1] = bm.arange(NN).reshape(nu, nv)
         idx[-1, :] = idx[0, :]
         idx[:, -1] = idx[:, 0]
-        cell = bm.zeros((2 * NC, 3), dtype=itype)
+        cell = bm.zeros((2 * NC, 3), dtype=bm.int32)
         cell0 = bm.concatenate((
             idx[1:, 0:-1].T.reshape(-1, 1),
             idx[1:, 1:].T.reshape(-1, 1),
@@ -623,7 +623,7 @@ class TriangleMesh(SimplexMesh):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_unit_sphere_surface(cls, refine=0, ftype=bm.float64, itype=bm.int32):
+    def from_unit_sphere_surface(cls, refine=0):
         """
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
@@ -632,13 +632,13 @@ class TriangleMesh(SimplexMesh):
         node = bm.tensor([
             [0, 1, t], [0, 1, -t], [1, t, 0], [1, -t, 0],
             [0, -1, -t], [0, -1, t], [t, 0, 1], [-t, 0, 1],
-            [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=ftype)
+            [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=bm.float64)
         cell = bm.tensor([
             [6, 2, 0], [3, 2, 6], [5, 3, 6], [5, 6, 7],
             [6, 0, 7], [3, 8, 2], [2, 8, 1], [2, 1, 0],
             [0, 1, 10], [1, 9, 10], [8, 9, 1], [4, 8, 3],
             [4, 3, 5], [4, 5, 11], [7, 10, 11], [0, 10, 7],
-            [4, 11, 9], [8, 4, 9], [5, 7, 11], [10, 9, 11]], dtype=itype)
+            [4, 11, 9], [8, 4, 9], [5, 7, 11], [10, 9, 11]], dtype=bm.int32)
         mesh = cls(node, cell)
         mesh.uniform_refine(refine)
         node = mesh.node
