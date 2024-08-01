@@ -166,13 +166,13 @@ class TriangleMesh(SimplexMesh):
         if p >= 3:
             TD = self.top_dimension()
             cell = self.entity('cell')
-            multiIndex = bm.multi_index_matrix(p, TD)
+            multiIndex = bm.multi_index_matrix(p, TD, dtype=self.ftype)
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
                                 isEdgeIPoints[:, 2])
             multiIndex = multiIndex[isInCellIPoints, :]
             w = multiIndex / p
-
+            
             ipoints_from_cell = bm.einsum('ij, kj...->ki...', w,
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
             ipoint_list.append(ipoints_from_cell)
@@ -531,7 +531,7 @@ class TriangleMesh(SimplexMesh):
     def delete_degree_4(self):
         pass
 
-    @staticmethodh
+    @staticmethod
     def adaptive_options(
             method='mean',
             maxrefine=5,

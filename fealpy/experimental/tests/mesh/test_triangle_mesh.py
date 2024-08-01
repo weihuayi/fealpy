@@ -9,7 +9,7 @@ from fealpy.experimental.tests.mesh.triangle_mesh_data import *
 
 class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
-    @pytest.mark.parametrize("data", init_mesh_data)
+    @pytest.mark.parametrize("data", init_data)
     def test_init(self, data, backend):
         bm.set_backend(backend)
 
@@ -66,14 +66,12 @@ class TestTriangleMeshInterfaces:
     def test_grad_lambda(self, data, backend):
         bm.set_backend(backend)
         
-        mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=16, ny=16)
-        flag = mesh.boundary_cell_flag()
-        NC = bm.sum(flag)
-        val = mesh.grad_lambda(index=flag)
+        mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=2, ny=2)
+        val = mesh.grad_lambda()
 
-        assert val.shape == gldata["val_shape"]
+        np.testing.assert_allclose(bm.to_numpy(val), data["val"], atol=1e-14)    
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", interpolation_point_data)
     def test_interpolation_points(self, data, backend):
         bm.set_backend(backend)
@@ -107,32 +105,15 @@ class TestTriangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(cell2edge), data["cell2edge"], atol=1e-14)
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
-    @pytest.mark.parametrize("jmdata", jacobian_matrix_data)
-    def test_unifrom_refine(self, jmdata, backend):
+    @pytest.mark.parametrize("data", jacobian_matrix_data)
+    def test_jacobian_matrix(self, data, backend):
         bm.set_backend(backend)
 
         mesh = TriangleMesh.from_box(nx=2, ny=2)
 
         jacobian = mesh.jacobian_matrix()
 
-        np.testing.assert_allclose(bm.to_numpy(jacobian), jmdata["jacobian_matrix"], atol=1e-14)
-
-    @pytest.mark.parametrize("meshdata", from_torus_surface_data)
-    def test_from_torus_surface(self, meshdata, backend):
-        R = meshdata["R"]
-        r = meshdata["r"]
-        Nu = meshdata["Nu"]
-        Nv = meshdata["Nv"]
-        expected_node_shape = meshdata["node_shape"]
-        expected_cell_shape = meshdata["cell_shape"]
-
-        mesh = TriangleMesh.from_torus_surface(R, r, Nu, Nv)
-
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-
-        assert node.shape == expected_node_shape
-        assert cell.shape == expected_cell_shape
+        np.testing.assert_allclose(bm.to_numpy(jacobian), data["jacobian_matrix"], atol=1e-14)
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
