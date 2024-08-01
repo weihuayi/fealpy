@@ -2101,6 +2101,36 @@ class TestBackendInterfaces:
         Computes the number of 1-bits in the absolute value of x.
         '''
         pass
+    
+    ########Random
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_random_rand(self, backend):
+        '''
+        Random values in a given shape.
+        '''
+        pass
+    
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_random_choice(self, backend):
+        '''
+        Generates a random sample from a given 1-D array
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_random_randn(self, backend):
+        '''
+        Return a sample (or samples) from the "standard normal" distribution.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_random_randint(self, backend):
+        '''
+        Return random integers from low (inclusive) to high (exclusive).
+        '''
+        pass
 
     ########Fealpy Function
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])

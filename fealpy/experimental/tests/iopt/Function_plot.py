@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-
 import numpy as np
 import matplotlib.pyplot as plt
 from Function import Function
 from fealpy.experimental.backend import backend_manager as bm
-
+# bm.set_backend('pytorch')
 #测试函数绘图
 class Function_plot:
 
