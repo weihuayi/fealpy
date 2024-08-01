@@ -68,39 +68,39 @@ class Mesh(MeshDS):
         edge = self.entity(1, index=index)
         return bm.edge_length(edge, self.node, out=out)
 
-    def edge_normal(self, index: Index=_S, normalize: bool=False, out=None) -> TensorLike:
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
         """Calculate the normal of the edges.
 
         Parameters:
             index (int | slice | Tensor, optional): Index of edges.\n
-            normalize (bool, optional): _description_. Defaults to False.\n
+            unit (bool, optional): _description_. Defaults to False.\n
             out (Tensor, optional): _description_. Defaults to None.
 
         Returns:
             Tensor[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return bm.edge_normal(edge, self.node, normalize=normalize, out=out)
+        return bm.edge_normal(edge, self.node, unit=unit, out=out)
 
     def edge_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
         """Calculate the unit normal of the edges.
         Equivalent to `edge_normal(index=index, unit=True)`.
         """
-        return self.edge_normal(index=index, normalize=True, out=out)
+        return self.edge_normal(index=index, unit=True, out=out)
 
-    def edge_tangent(self, index: Index=_S, normalize: bool=False, out=None) -> TensorLike:
+    def edge_tangent(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
         """Calculate the tangent of the edges.
 
         Parameters:
             index (Index, optional): _description_. Defaults to _S.\n
-            normalize (bool, optional): _description_. Defaults to False.\n
+            unit (bool, optional): _description_. Defaults to False.\n
             out (TensorLike, optional): _description_. Defaults to None.
 
         Returns:
             TensorLike[NE, GD]: _description_
         """
         edge = self.entity(1, index=index)
-        return bm.edge_tangent(edge, self.node, normalize=normalize, out=out)
+        return bm.edge_tangent(edge, self.node, unit=unit, out=out)
 
     def cell_normal(self, index: Index=_S, node: Optional[TensorLike]=None) -> TensorLike:
         """
