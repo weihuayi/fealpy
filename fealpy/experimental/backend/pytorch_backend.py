@@ -240,6 +240,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Tensor:
+        """
+        TODO:
+            1. context?
+        """
         dtype = dtype or torch.int
         sep = torch.flip(torch.tensor(
             tuple(combinations_with_replacement(range(p+1), dim)),

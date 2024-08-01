@@ -1,8 +1,6 @@
 import time
 import matplotlib.pyplot as plt
 import os
-
-#from HBA import HBA
 from Function import Function
 from Function_plot import Function_plot
 from fealpy.experimental.iopt import COA
@@ -13,30 +11,45 @@ from fealpy.experimental.backend import backend_manager as bm
 
 
 #运行
-for i in range(3, 4):
-    F = 'F' + str(i) 
+def test_alg(alg_name):
+    for i in range(3, 4):
+        F = 'F' + str(i) 
 
-    N = 100
-    T = 1000
+        N = 100
+        T = 1000
 
-    f = Function(F)
-    fobj, lb, ub, dim = f.Functions()
+        f = Function(F)
+        fobj, lb, ub, dim = f.Functions()
 
-    f_plot = Function_plot(F)
-    X, Y, Z = f_plot.Functions_plot()
+        f_plot = Function_plot(F)
+        # X, Y, Z = f_plot.Functions_plot()
 
-    start_time = time.time()
-    C = QPSO(N, dim,  ub, lb, T,fobj)#N, dim,  ub, lb, Max_iter, fobj
-    Best_pos, Best_score, Convergence_curve = C.cal()
-    end_time = time.time()
+        start_time = time.time()
 
-    #结果展示
-    print('F', i,'----------------------------------------')
-    print('The best solution obtained is:', Best_pos)
-    print('The best optimal value of the objective function found by HBA is:', Best_score)
-    print('HBA execution time:', end_time - start_time)
-    print('----------------------------------------')
+        algorithm_dict = {  
+            'HBA': HBA,  
+            'COA': COA,  
+            'QPSO': QPSO,  
+            'SAO': SAO  
+        }  
+        if alg_name in algorithm_dict:   
+            C = algorithm_dict[alg_name](N, dim, ub, lb, T, fobj)  
+        else:  
+            print(f"Unrecognized algorithm name: {alg_name}")  
 
+        #C = HBA(N,dim,  ub, lb, T,fobj)#N, dim,  ub, lb, Max_iter, fobj
+        Best_pos, Best_score, Convergence_curve = C.cal()
+        end_time = time.time()
+
+        #结果展示
+        print('F', i,'----------------------------------------')
+        print('The best solution obtained is:', Best_pos)
+        print('The best optimal value of the objective function found by HBA is:', Best_score)
+        print('HBA execution time:', end_time - start_time)
+        print('----------------------------------------')
+
+# test("HBA")
+'''
     # 绘制参数空间图像、收敛曲线
     fig = plt.figure(figsize=(10, 5))
 
@@ -71,3 +84,4 @@ for i in range(3, 4):
     plt.savefig(os.path.join(save_folder, 'Function_' + F + '_plot.png'))
 
     #plt.show()
+'''

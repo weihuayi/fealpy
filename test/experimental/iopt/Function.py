@@ -1,6 +1,6 @@
 import numpy as np
 from fealpy.experimental.backend import backend_manager as bm
-
+#bm.set_backend('pytorch')
 class Function:
 
     def __init__(self, F):
