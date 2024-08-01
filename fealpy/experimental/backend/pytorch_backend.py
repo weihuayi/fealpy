@@ -27,6 +27,14 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     random = torch.random
 
     @staticmethod
+    def context(tensor):
+        return {
+                "dtype": tensor.dtype,
+                "device": tensor.device,
+                "requires_grad": tensor.requires_grad,
+        }
+
+    @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
         torch.set_default_device(device)
 

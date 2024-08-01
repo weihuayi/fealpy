@@ -1,5 +1,7 @@
 
-from typing import Any, Tuple, Union, Optional, overload, TypeGuard, Literal
+from typing import (
+        Any, Tuple, Union, Optional, overload, TypeGuard, 
+        Literal, Dict)
 
 from .base import Backend, Size, Number
 from .base import TensorLike as _DT
@@ -17,6 +19,7 @@ class BackendManager():
     def load_backend(self, name: str) -> None: ... # instance method
     def get_current_backend(self) -> Backend: ... # instance method
 
+    def context(self, tensor) -> Dict: ...
     ### constants ###
 
     pi: float
