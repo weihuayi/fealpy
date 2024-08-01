@@ -71,28 +71,42 @@ class QuadrangleMesh(Mesh, Plotable):
         else:
             raise ValueError(f"Invalid entity type '{etype}'.")
 
-    def cell_area(self, index=np.s_[:]):
+    def cell_area(self, index=np.s_[:], GD=2):
         """
         @brief 根据散度定理计算多边形的面积
         @note 请注意下面的计算方式不方便实现部分单元面积的计算
         """
-        NC = self.number_of_cells()
-        node = self.entity('node')
-        edge = self.entity('edge')
-        edge2cell = self.ds.edge_to_cell()
+        GD = self.geo_dimension()
+        if GD == 2:
+            NC = self.number_of_cells()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            edge2cell = self.ds.edge_to_cell()
 
-        t = self.edge_tangent()
-        val = t[:, 1]*node[edge[:, 0], 0] - t[:, 0]*node[edge[:, 0], 1]
+            t = self.edge_tangent()
+            val = t[:, 1] * node[edge[:, 0], 0] - t[:, 0] * node[edge[:, 0], 1]
 
-        a = np.zeros(NC, dtype=self.ftype)
-        np.add.at(a, edge2cell[:, 0], val)
+            a = np.zeros(NC, dtype=self.ftype)
+            np.add.at(a, edge2cell[:, 0], val)
 
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+            np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
 
-        a /= 2.0
+            a /= 2.0
 
-        return a[index]
+            return a[index]
+        elif GD == 3:
+            node = self.entity('node')
+            cell = self.entity('cell')[index]
+
+            v0 = node[cell[:, 1]] - node[cell[:, 0]]
+            v1 = node[cell[:, 2]] - node[cell[:, 0]]
+            v2 = node[cell[:, 3]] - node[cell[:, 0]]
+
+            s1 = 0.5*np.linalg.norm(np.cross(v0, v1), axis=-1)
+            s2 = 0.5*np.linalg.norm(np.cross(v1, v2), axis=-1)
+            s = s1 + s2
+            return s
 
     def bc_to_point(self, bc, index=np.s_[:]):
         """
@@ -342,6 +356,9 @@ class QuadrangleMesh(Mesh, Plotable):
         """
 
         cell = self.entity('cell')
+
+        if p == 0:
+            return np.arange(len(cell)).reshape((-1, 1))[index]
 
         if p==1:
             return cell[index, [0, 3, 1, 2]] # 先排 y 方向，再排 x 方向

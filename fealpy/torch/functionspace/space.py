@@ -1,33 +1,23 @@
 
 from typing import Union, Callable, Optional, Generic, TypeVar
-from abc import ABCMeta, abstractmethod
 
-import torch
-from torch import Tensor
-
-Index = Union[int, slice, Tensor]
-Number = Union[int, float]
-_S = slice(None)
+from ..typing import Tensor, _dtype, _device, Index, Number, _S, Size
+from .utils import zero_dofs
 
 
-class _FunctionSpace(metaclass=ABCMeta):
-    r"""THe base class of function spaces"""
-    device: torch.device
-    ftype: torch.dtype
-    itype: torch.dtype
+class _FunctionSpace():
+    r"""The base class of function spaces"""
+    device: _device
+    ftype: _dtype
+    itype: _dtype
 
-    ### basis
-    @abstractmethod
+    # basis
     def basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-    @abstractmethod
     def grad_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
-    @abstractmethod
     def hess_basis(self, p: Tensor, index: Index=_S, **kwargs) -> Tensor: raise NotImplementedError
 
     # values
-    @abstractmethod
     def value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
-    @abstractmethod
     def grad_value(self, uh: Tensor, p: Tensor, index: Index=_S) -> Tensor: raise NotImplementedError
 
     # counters
@@ -43,6 +33,19 @@ class _FunctionSpace(metaclass=ABCMeta):
                     uh: Tensor, dim: Optional[int]=None, index: Index=_S) -> Tensor:
         raise NotImplementedError
 
+    # function
+    def array(self, dim: Union[Size, int, None]=None) -> Tensor:
+        """Initialize a Tensor filled with zeros as values of DoFs.
+
+        Parameters:
+            dim (Tuple[int, ...] | int | None, optional): Shape of DoFs. Defaults to None.
+
+        Returns:
+            Tensor: Values of DoFs shaped (GDOF, *dim).
+        """
+        GDOF = self.number_of_global_dofs()
+        return zero_dofs(GDOF, dim, dtype=self.ftype, device=self.device)
+
 
 _FS = TypeVar('_FS', bound=_FunctionSpace)
 
@@ -54,14 +57,12 @@ class Function(Tensor, Generic[_FS]):
     # and subject to change. Please do not use them for anything important until
     # they are released as stable.
     @staticmethod
-    def __new__(cls, space: _FS, tensor: Tensor, dim: int) -> Tensor:
+    def __new__(cls, space: _FS, tensor: Tensor) -> Tensor:
         assert isinstance(space, _FunctionSpace)
         tensor = tensor.to(device=space.device, dtype=space.ftype)
-        names = [None] * tensor.ndim
-        names[dim] = 'gdof'
-        return Tensor._make_subclass(cls, tensor).refine_names(*names)
+        return Tensor._make_subclass(cls, tensor)
 
-    def __init__(self, space: _FS, tensor: Tensor, dim: int) -> None:
+    def __init__(self, space: _FS, tensor: Tensor) -> None:
         self.space = space
 
     def __call__(self, bc: Tensor, index=_S) -> Tensor:
@@ -79,6 +80,10 @@ class Function(Tensor, Generic[_FS]):
 
 
 class FunctionSpace(_FunctionSpace):
-    def function(self, tensor: Optional[Tensor]=None, dim: int=-1):
-        func_ = Function(self, tensor, dim)
+    def function(self, tensor: Optional[Tensor]=None, dim: Union[Size, int, None]=None) -> Tensor:
+        if tensor is None:
+            tensor = self.array(dim=dim)
+
+        func_ = Function(self, tensor)
+
         return func_

@@ -1,10 +1,10 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import jax.numpy as jnp
 from jax import grad
 
 
-class KernelFunctionBase():
+class KernelFunctionBase(ABC):
     def __init__(self, h: float):
         self.h_derivative = 1.0/h
 

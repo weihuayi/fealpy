@@ -1,13 +1,13 @@
 
 from typing import Union, Callable, Optional, Any, TypeVar, Tuple, Dict
 
-from torch import Tensor
+from numpy.typing import NDArray
 
 from ..functionspace.space import FunctionSpace as _FS
 
-Index = Union[int, slice, Tensor]
+Index = Union[int, slice, NDArray]
 _S = slice(None)
-CoefLike = Union[float, int, Tensor, Callable[..., Tensor]]
+CoefLike = Union[float, int, NDArray, Callable[..., NDArray]]
 _Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
 
@@ -70,7 +70,7 @@ def enable_cache(meth: _Meth) -> _Meth:
     Note that as the result of the integral is automatically cached, assembly
     methods producing determinant values for a space is unnecessary to use cache.
     """
-    def wrapper(self, space: _FS) -> Tensor:
+    def wrapper(self, space: _FS) -> NDArray:
         if getattr(self, '_cache', None) is None:
             self._cache = {}
         _cache = self._cache
@@ -83,7 +83,7 @@ def enable_cache(meth: _Meth) -> _Meth:
 
 class Integrator(metaclass=IntegratorMeta):
     """The base class for integrators on function spaces."""
-    _value: Optional[Tensor] = None
+    _value: Optional[NDArray] = None
     _assembly_map: Dict[str, str] = {}
 
     def __init__(self, method='assembly') -> None:
@@ -91,7 +91,7 @@ class Integrator(metaclass=IntegratorMeta):
             raise ValueError(f"No assembly method is registered as '{method}'.")
         self._assembly = self._assembly_map[method]
 
-    def __call__(self, space: _FS) -> Tensor:
+    def __call__(self, space: _FS) -> NDArray:
         if hasattr(self, '_value') and self._value is not None:
             return self._value
         else:
@@ -102,13 +102,13 @@ class Integrator(metaclass=IntegratorMeta):
             self._value = getattr(self, self._assembly)(space)
             return self._value
 
-    def to_global_dof(self, space: _FS) -> Tensor:
+    def to_global_dof(self, space: _FS) -> NDArray:
         """Return the relationship between the integral entities
         and the global dofs."""
         raise NotImplementedError
 
     @assemblymethod('assembly')
-    def assembly(self, space: _FS) -> Tensor:
+    def assembly(self, space: _FS) -> NDArray:
         raise NotImplementedError
 
     def clear(self, result_only=True) -> None:

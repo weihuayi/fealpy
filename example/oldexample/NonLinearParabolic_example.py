@@ -12,13 +12,13 @@ from fealpy.pde.nonlinear_parabolic2d import pLaplaceData as Pde
 NNN = 4
 pde = Pde(n=NNN)
 
-N = 300
+N = 3000
 T = 1
 t = np.linspace(0, T, N+1)
 t = np.cumsum(t)
 t = T*t/t[-1]
 
-mesh = pde.init_mesh(n=3)
+mesh = pde.init_mesh(n=5)
 space = LagrangeFiniteElementSpace(mesh, p=1)
 gdof = space.dof.number_of_global_dofs()
 
@@ -59,6 +59,7 @@ for i in range(1, N+1):
 
     #边界条件
     BC = DirichletBC(space, pde.dirichlet)
+    k = 0
     while(True):
         S = space.stiff_matrix(c=pde.a(uh[i]))
         B = B_matrix(space, pde.a_u(uh[i]), uh[i]) 
@@ -70,9 +71,13 @@ for i in range(1, N+1):
 
         dU = spsolve(A, F)
         uh[i][:] = uh[i][:] + dU
-        print("i = ", i, "err = ", np.max(np.abs(dU)), np.max(abs(uh[i])))
+        print("### 当前时间层 ### ", i)
+        print("### 迭代次数   ### ", k+1)
+        print("### 残差       ### ", np.max(np.abs(dU)))
+        print("### delta u    ### ", np.max(np.abs(uh[i])))
         if(np.max(np.abs(dU))<1e-12):
             break
+        k += 1
 
 # vtk
 mesh3d = copy.deepcopy(mesh)

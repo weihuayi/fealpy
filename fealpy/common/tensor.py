@@ -65,7 +65,7 @@ def symmetry_index(d, r):
     idx = np.array(list(map(mapp, np.arange(d**r))))
     flag = np.ones(len(idx), dtype=np.bool_)
     for i in range(r-1):
-        flag = flag & (idx[:, i]>=idx[:, i+1])
+        flag = flag & (idx[:, i]<=idx[:, i+1])
     return np.where(flag)[0]
 
 

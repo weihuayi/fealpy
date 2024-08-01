@@ -469,6 +469,18 @@ class Mesh():
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
 
+    def cell_normal(self, index=np.s_[:], node: Optional[NDArray]=None):
+        """
+        @brief 计算网格单元的外法线方向，适用于三维空间中单元拓扑维数为 2 的情况，
+        比如三维空间中的三角形或四边形网格.
+        """
+        node = self.entity('node') if node is None else node
+        cell = self.entity('cell', index=index)
+        v1 = node[cell[:, 1]] - node[cell[:, 0]]
+        v2 = node[cell[:, 2]] - node[cell[:, 1]]
+        normal = np.cross(v1, v2)
+        return normal
+
     def integral(self, f, q=3, celltype=False):
         """
         @brief 在网格中数值积分一个函数
@@ -505,13 +517,13 @@ class Mesh():
         else:
             return np.sum(e)
 
-    def error(self, u, v, q=3, power=2, celltype=False):
+    def error(self, u, v, q=3, power=2, celltype=False, integrator=None):
         """
         @brief Calculate the error between two functions.
         """
         GD = self.geo_dimension()
 
-        qf = self.integrator(q, etype='cell')
+        qf = self.integrator(q, etype='cell') if integrator is None else integrator
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
 
@@ -542,10 +554,12 @@ class Mesh():
         cm = self.entity_measure('cell')
 
         NC = self.number_of_cells()
-        if v.shape[-1] == NC:
-            v = np.swapaxes(v, 1, -1)
+        #if v.shape[-1] == NC:
+        #    v = np.swapaxes(v, 1, -1)
         f = np.power(np.abs(u - v), power)
-        
+        if len(f.shape) == 1: 
+            f = f[:, None]
+
         if isinstance(f, (int, float)): # f为标量常函数
             e = f*cm
         elif isinstance(f, np.ndarray):

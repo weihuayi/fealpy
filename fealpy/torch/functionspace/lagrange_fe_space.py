@@ -55,16 +55,21 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     def interpolate(self, source: Union[Callable[..., Tensor], Tensor, Number],
                     uh: Tensor, dim: Optional[int]=None, index: Index=_S) -> Tensor:
-        """@brief Interpolate the given Tensor or function `source` to the dofs.
+        """Interpolate the given Tensor or function `source` to the dofs.
+        This is an in-place operation for uh.
 
-        @params source: The source to be interpolated.
-        @params uh: The output Tensor.
-        @params dim: The dimension of the dofs in the uh and source.
-        This arg will be set to -1 if the `doforder` of space is 'sdofs' when not given,\
-        otherwise 0.
-        @params index: The index of the dofs to be interpolated.
+        Parameters:
+            source (Callable | Tensor | Number): The source to be interpolated.
 
-        @return: The interpolated Tensor `uh`.
+            uh (Tensor): The output Tensor.
+
+            dim (int | None): The dimension of the dofs in the uh and source.
+                This arg will be set to -1 if the `doforder` of space is 'sdofs' when not given,\
+                otherwise 0.
+            index (Index, optional): The index of the dofs to be interpolated.
+
+        Returns:
+            Tensor: The interpolated `uh`.
         """
         if callable(source):
             ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
@@ -90,23 +95,26 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     def grad_basis(self, bc: Tensor, index: Index=_S, variable='u'):
         """
-        @brief
         """
         return self.mesh.grad_shape_function(bc, self.p, index=index, variable=variable)
 
     def hess_basis(self, bc: Tensor, index: Index=_S, variable='u'):
         """
-        @brief
         """
         return self.mesh.hess_shape_function(bc, self.p, index=index, variable=variable)
 
-    def value(self, uh: Tensor, bc: Tensor, index: Index=_S):
+    def value(self, uh: Tensor, bc: Tensor,
+              dim: Optional[int]=None, index: Index=_S) -> Tensor:
         """Calculate the value of the finite element function.
 
-        Args:
-            uh (Tensor): Dofs of the function, shaped (..., gdof) for 'sdofs' and
+        Parameters:
+            uh (Tensor): Dofs of the function, shaped (..., gdof) for 'sdofs' and\
             'batched', (gdof, ...) for 'vdims'.
+
             bc (Tensor): Input points in barycentric coordinates, shaped (NQ, NVC).
+
+            dim (int | None, optional):
+
             index (Index, optional): _description_.
 
         Raises:
@@ -120,7 +128,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
             Defaults to 'batched' if the space does not have `doforder` attribute.
         """
-        phi = self.basis(bc, index=index)
+        phi = self.basis(bc, index=index, variable='x')
         cell2dof = self.dof.cell_to_dof(index)
 
         dim = len(uh.shape) - 1
@@ -139,11 +147,11 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             # uh.shape == (gdof, GD)
             # uh[cell2dof, ...].shape == (NC, ldof, ...)
             # val.shape == (NQ, NC, ...)
-            s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"
+            s1 = f"c...i, ci{s0[:dim]}->c...{s0[:dim]}"
             val = torch.einsum(s1, phi, uh[cell2dof, ...])
         elif doforder == 'batched':
             # Here 'batched' case is added.
-            s1 = f"...ci, {s0[:dim]}ci -> {s0[:dim]}...c"
+            s1 = f"c...i, {s0[:dim]}ci ->{s0[:dim]}c..."
             val = torch.einsum(s1, phi, uh[..., cell2dof])
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
