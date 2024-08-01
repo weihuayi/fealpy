@@ -20,6 +20,10 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     random = np.random
 
     @staticmethod
+    def context(tensor):
+        return {"dtype": tensor.dtype}
+
+    @staticmethod
     def set_default_device(device) -> None:
         raise NotImplementedError("`set_default_device` is not supported by NumPyBackend")
 
