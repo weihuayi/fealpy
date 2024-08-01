@@ -14,14 +14,6 @@ from .utils import estr2dim
 ##################################################
 
 class Mesh(MeshDS):
-    @property
-    def ftype(self) -> Any:
-        node = self.entity(0)
-        if node is None:
-            raise RuntimeError('Can not get the float type as the node '
-                               'has not been assigned.')
-        return node.dtype
-
     def geo_dimension(self) -> int:
         node = self.entity(0)
         if node is None:
