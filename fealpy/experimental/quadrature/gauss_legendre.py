@@ -265,6 +265,7 @@ class GaussLegendreQuadrature(Quadrature):
         else:
             raise NotImplementedError('quadrature index higher than 20 is not supported now.')
 
-        A = bm.divide(A, 2.0, out=A)
+        # Removed out=A
+        A = bm.divide(A, 2.0)
         return bm.stack([(0.5 + A[:, 0]),
                          (0.5 - A[:, 0])], axis=-1), A[:, -1]
