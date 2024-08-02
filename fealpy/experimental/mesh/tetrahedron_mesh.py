@@ -84,19 +84,16 @@ class TetrahedronMesh(SimplexMesh):
         """
         NN = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
-        print(NC)
         node = bm.zeros((NN, 3), dtype=bm.float64)
-        import numpy as np
         x = bm.linspace(box[0], box[1], nx+1)
         y = bm.linspace(box[2], box[3], ny+1)
         z = bm.linspace(box[4], box[5], nz+1)
         X, Y, Z = bm.meshgrid(x, y, z, indexing='ij')
  
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
-        print(node)
 
         idx = bm.arange(NN).reshape(nx+1, ny+1, nz+1)
-        #c = idx[:-1, :-1, :-1]
+        c = idx[:-1, :-1, :-1]
 
         nyz = (ny + 1)*(nz + 1)
         cell0 = idx[:-1, :-1, :-1] 
@@ -107,26 +104,18 @@ class TetrahedronMesh(SimplexMesh):
         cell5 = cell4 + nyz
         cell6 = cell5 + nz + 1
         cell7 = cell4 + nz + 1
-        print(555)
+        cell = bm.concatenate((cell0.reshape(-1, 1), cell1.reshape(-1, 1),
+            cell2.reshape(-1, 1), cell3.reshape(-1, 1), cell4.reshape(-1, 1),
+            cell5.reshape(-1, 1), cell6.reshape(-1, 1), cell7.reshape(-1, 1)),
+            axis = 1)
 
-        cell = bm.zeros((NC, 8), dtype=bm.int_)
-        cell[:, 0] = c.flatten()
-        cell[:, 1] = cell[:, 0] + nyz
-        cell[:, 2] = cell[:, 1] + nz + 1
-        cell[:, 3] = cell[:, 0] + nz + 1
-        cell[:, 4] = cell[:, 0] + 1
-        cell[:, 5] = cell[:, 4] + nyz
-        cell[:, 6] = cell[:, 5] + nz + 1
-        cell[:, 7] = cell[:, 4] + nz + 1
-        print('cell',cell)
-
-        localCell = bm.array([
+        localCell = bm.tensor([
             [0, 1, 2, 6],
             [0, 5, 1, 6],
             [0, 4, 5, 6],
             [0, 7, 4, 6],
             [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=bm.int_)
+            [0, 2, 3, 6]], dtype=bm.int32)
         cell = cell[:, localCell].reshape(-1, 4)
 
         if threshold is not None:
@@ -141,8 +130,9 @@ class TetrahedronMesh(SimplexMesh):
             idxMap[isValidNode] = range(isValidNode.sum())
             cell = idxMap[cell]
         mesh = TetrahedronMesh(node, cell)
-
-        bdface = mesh.ds.boundary_face_index()
+        import ipdb
+        ipdb.set_trace()
+        bdface = mesh.boundary_face_index()
         f2n = mesh.face_unit_normal()[bdface]
         isLeftBd   = bm.abs(f2n[:, 0]+1)<1e-14
         isRightBd  = bm.abs(f2n[:, 0]-1)<1e-14
