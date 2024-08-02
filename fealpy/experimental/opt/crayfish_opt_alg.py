@@ -7,19 +7,26 @@ from .optimizer_base import Optimizer, Problem
 
 
 class CrayfishOptAlg(Optimizer):
-
     def __init__(self, problem: Problem) -> None:
-        super().__init__(problme)
+        super().__init__(problem)
 
     @classmethod
     def get_options(
-            cls, *,
-            x0: TensorLike
-            objective: ,
+            cls,
+            x0: TensorLike,
+            objective,
+            NP: int,
+            MaxIters: int = 1000,
+            MaxFunEvals: int = 10000,
+            Print: bool = True,
             ) -> Problem:
         return Problem(
-                x0=x0,
-                objective=objective,
+                x0,
+                objective,
+                NP=NP,
+                MaxIters= MaxIters,
+                MaxFunEvals=MaxFunEvals,
+                Print=Print,
                 )
 
     def run(self):

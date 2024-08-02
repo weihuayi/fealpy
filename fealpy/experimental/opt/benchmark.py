@@ -123,14 +123,15 @@ iopt_benchmark_data = [
         "objective": F1, 
         "ndim": 30,
         "domain": (-5.12, 5.12), # (lower bound, higher bound)
-        "argmin": None, # 极小值点
-        "minima": None, # 极小值
+        "minimum": None, # 极小值点
+        "optimal": None, # 极小值
     },
     {
         "objective": F2,
-        "domain": (-100, 100, 30),
-        "argmin": None,
-        "minima": None,
+        "ndim": 30,
+        "domain": (-100, 100),
+        "minimum": None,
+        "optimal": None,
     },
 ]
 
