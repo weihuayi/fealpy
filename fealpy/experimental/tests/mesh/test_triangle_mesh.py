@@ -27,6 +27,24 @@ class TestTriangleMeshInterfaces:
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
     
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("data", from_one_triangle_data)
+    def test_from_one_triangle(self, data, backend):
+        bm.set_backend(backend)
+
+        mesh = TriangleMesh.from_one_triangle(meshtype='equ')
+
+        assert mesh.number_of_nodes() == data["NN"] 
+        assert mesh.number_of_edges() == data["NE"] 
+        assert mesh.number_of_faces() == data["NF"] 
+        assert mesh.number_of_cells() == data["NC"] 
+        
+        cell =  mesh.entity('cell')
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+    
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("data", from_box_data)
     def test_from_box(self, data, backend):
         bm.set_backend(backend)
@@ -128,8 +146,26 @@ class TestTriangleMeshInterfaces:
 
         np.testing.assert_allclose(bm.to_numpy(jacobian), data["jacobian_matrix"], atol=1e-14)
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("data", from_unit_sphere_surface_data)
+    def test_from_unit_sphere_surface(self, data, backend):
+        bm.set_backend(backend)
+
+        mesh = TriangleMesh.from_unit_sphere_surface()
+
+        assert mesh.number_of_nodes() == data["NN"] 
+        assert mesh.number_of_edges() == data["NE"] 
+        assert mesh.number_of_faces() == data["NF"] 
+        assert mesh.number_of_cells() == data["NC"] 
+        
+        cell =  mesh.entity('cell')
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
-    #a.test_grad_shape_function(grad_shape_function_data[0], 'pytorch')
+    #a.test_from_unit_sphere_surface(from_unit_sphere_surface_data[0], 'pytorch')
     pytest.main(["./test_triangle_mesh.py"])
 

@@ -484,7 +484,7 @@ class TriangleMesh(SimplexMesh):
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, bm.sqrt(3) / 2]], dtype=bm.float64)
+                [0.5, bm.sqrt(bm.tensor(3)) / 2]], dtype=bm.float64)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0],
@@ -592,4 +592,23 @@ class TriangleMesh(SimplexMesh):
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
         """
-        pass
+        t = (bm.sqrt(bm.tensor(5)) - 1) / 2
+        node = bm.array([
+            [0, 1, t], [0, 1, -t], [1, t, 0], [1, -t, 0],
+            [0, -1, -t], [0, -1, t], [t, 0, 1], [-t, 0, 1],
+            [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=bm.float64)
+        cell = bm.array([
+            [6, 2, 0], [3, 2, 6], [5, 3, 6], [5, 6, 7],
+            [6, 0, 7], [3, 8, 2], [2, 8, 1], [2, 1, 0],
+            [0, 1, 10], [1, 9, 10], [8, 9, 1], [4, 8, 3],
+            [4, 3, 5], [4, 5, 11], [7, 10, 11], [0, 10, 7],
+            [4, 11, 9], [8, 4, 9], [5, 7, 11], [10, 9, 11]], dtype=bm.int32)
+        mesh = cls(node, cell)
+        mesh.uniform_refine(refine)
+        node = mesh.node
+        cell = mesh.entity('cell')
+        d = bm.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2 + node[:, 2] ** 2) - 1
+        l = bm.sqrt(bm.sum(node ** 2, axis=1))
+        n = node / l[..., None]
+        node = node - d[..., None] * n
+        return cls(node, cell)
