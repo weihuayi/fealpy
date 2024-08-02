@@ -8,30 +8,30 @@ def F2(x):
 
 def F3(x):
     dim = x.shape[0]
-    return bm.sum(bm.arange(1, dim + 1) * (x ** 2))
+    return bm.sum(bm.arange(1, dim + 1) * (x ** 2), axis=-1)
 
 def F4(x):
     dim = x.shape[0]
-    return x[0] ** 2 + bm.sum(1e6 * x[1:] ** 2)
+    return x[:,0] ** 2 + bm.sum(1e6 * x[:,1:] ** 2, axis=-1)
 
 def F5(x):
-    return (1.5 - x[0] + x[0] * x[1]) ** 2 + (2.25 - x[0] + x[0] * x[1] ** 2) ** 2 + (2.625 - x[0] + x[0] * x[1] ** 3) ** 2
+    return (1.5 - x[:,0] + x[:,0] * x[:,1]) ** 2 + (2.25 - x[:,0] + x[:,0] * x[:,1] ** 2) ** 2 + (2.625 - x[:,0] + x[:,0] * x[:,1] ** 3) ** 2
 
 def F6(x):
-    return -bm.cos(x[0]) * bm.cos(x[1]) * bm.exp(-((x[0] - bm.pi) ** 2 + (x[1] - bm.pi) ** 2))
+    return -bm.cos(x[:,0]) * bm.cos(x[:,1]) * bm.exp(-((x[:,0] - bm.pi) ** 2 + (x[:,1] - bm.pi) ** 2))
 
 def F7(x):
-    return 0.26 * (x[0] ** 2 + x[1] ** 2) - 0.48 * x[0] * x[1]
+    return 0.26 * (x[:,0] ** 2 + x[:,1] ** 2) - 0.48 * x[:,0] * x[:,1]
 
 def F8(x):
-    return 100 * (x[0] ** 2 - x[1]) ** 2 + (x[0] - 1) ** 2 + (x[2] - 1) ** 2 + 90 * (x[2] ** 2 - x[3]) ** 2 + 10.1 * ((x[1] - 1) ** 2 + (x[3] - 1) ** 2) + 19.8 * (x[1] - 1) * (x[3] - 1)
+    return 100 * (x[:,0] ** 2 - x[:,1]) ** 2 + (x[:,0] - 1) ** 2 + (x[:,2] - 1) ** 2 + 90 * (x[:,2] ** 2 - x[:,3]) ** 2 + 10.1 * ((x[:,1] - 1) ** 2 + (x[:,3] - 1) ** 2) + 19.8 * (x[:,1] - 1) * (x[:,3] - 1)
 
 def F9(x):
     dim = x.shape[0]
-    return bm.sum(x ** 2) + (bm.sum(0.5 * bm.arange(1, dim + 1) * x)) ** 2 + (bm.sum(0.5 * bm.arange(1, dim + 1) * x)) ** 4
+    return bm.sum(x ** 2, axis= -1) + (bm.sum(0.5 * bm.arange(1, dim + 1) * x, axis= -1)) ** 2 + (bm.sum(0.5 * bm.arange(1, dim + 1) * x, axis=-1)) ** 4
 
 def F10(x):
-    return bm.sum(bm.abs(x)) + bm.prod(bm.abs(x))
+    return bm.sum(bm.abs(x), axis= -1) + bm.prod(bm.abs(x), axis= -1)
 
 def F11(x):
     dim = x.shape[0]
@@ -39,7 +39,7 @@ def F11(x):
     for j in range(1, dim + 1):
         oo = 0
         for k in range(1, j + 1):
-            oo += x[k - 1]
+            oo += x[:,k - 1]
         o += oo ** 2
     return o
 
@@ -47,49 +47,50 @@ def F12(x):
     dim = x.shape[0]
     o = (x[0] - 1) ** 2
     for j in range(2, dim + 1):
-        o += j * (2 * x[j - 1] ** 2 - x[j - 1] - 1) ** 2
+        o += j * (2 * x[:,j - 1] ** 2 - x[:,j - 1] - 1) ** 2
     return o
 
 def F13(x):
-    return x[0] ** 2 + 2 * x[1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[0]) - 0.4 * bm.cos(4 * bm.pi * x[1]) + 0.7
+    return x[:,0] ** 2 + 2 * x[:,1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[:,0]) - 0.4 * bm.cos(4 * bm.pi * x[:,1]) + 0.7
 
 def F14(x):
-    return (x[0] + 2 * x[1]) ** 2 + (2 * x[0] + x[1] - 5) ** 2
+    return (x[:,0] + 2 * x[:,1]) ** 2 + (2 * x[:,0] + x[:,1] - 5) ** 2
 
 def F15(x):
     dim = x.shape[0]
-    return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20))  
+    return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis= -1)  
 
 def F16(x):
     dim = x.shape[0]
-    return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20))
+    return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis=-1)
 
 def F17(x):
     dim = x.shape[0]
-    return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20))
+    return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis=-1)
 
 def F18(x):
     n = len(x)
     o = 0
     for i in range(n):
-        o += x[i] ** 2 - 10 * bm.cos(2 * bm.pi * x[i]) + 10
+        o += x[:,i] ** 2 - 10 * bm.cos(2 * bm.pi * x[:,i]) + 10
     return o
 
 def F19(x):
-    return 0.5 + ((bm.sin(bm.linalg.norm(x))) ** 2 - 0.5) / ((1 + 0.001 * (bm.linalg.norm(x) ** 2)) ** 2)
+    return 0.5 + ((bm.sin(bm.linalg.norm(x, axis= -1))) ** 2 - 0.5) / ((1 + 0.001 * (bm.linalg.norm(x,axis=-1) ** 2)) ** 2)
+
 
 def F20(x):
-    return 4 * x[0] ** 2 - 2.1 * x[0] ** 4 + (1 / 3) * x[0] ** 6 + x[0] * x[1] - 4 * x[1] ** 2 + 4 * x[1] ** 4
+    return 4 * x[:,0] ** 2 - 2.1 * x[:,0] ** 4 + (1 / 3) * x[:,0] ** 6 + x[:,0] * x[:,1] - 4 * x[:,1] ** 2 + 4 * x[:,1] ** 4
 
 def F21(x):
-    return x[0] ** 2 + 2 * x[1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[0]) * bm.cos(4 * bm.pi * x[1]) + 0.3
+    return x[:,0] ** 2 + 2 * x[:,1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[:,0]) * bm.cos(4 * bm.pi * x[:,1]) + 0.3
 
 def F22(x):
-    return x[0] ** 2 + 2 * x[1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[0] + 4 * bm.pi * x[1]) + 0.3
+    return x[:,0] ** 2 + 2 * x[:,1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[:,0]) * bm.cos(4 * bm.pi * x[:,1]) + 0.3
 
 def F23(x):
-    x1 = x[0]
-    x2 = x[1]
+    x1 = x[:,0]
+    x2 = x[:,1]
     sum1 = 0
     sum2 = 0
     for i in range(1, 6):
@@ -101,37 +102,211 @@ def F24(x):
     o = 0
     n = len(x)
     for i in range(n - 1):
-        o += 100 * (x[i + 1] - x[i] ** 2) ** 2 + (x[i] - 1) ** 2
+        o += 100 * (x[:,i + 1] - x[:,i] ** 2) ** 2 + (x[:,i] - 1) ** 2
     return o
 
 def F25(x):
     n = len(x)
-    y1 = bm.sum(x ** 2) / 4000
+    y1 = bm.sum(x ** 2, axis =-1) / 4000
     y2 = 1
     for i in range(n):
-        y2 *= bm.cos(x[i] / bm.sqrt(i + 1))
+        y2 *= bm.cos(x[:,i] / bm.sqrt(i + 1))
     return 1 + y1 - y2
 
 def F26(x):
-    y1 = bm.sum(x ** 2)
-    y2 = bm.sum(bm.cos(2 * bm.pi * x))
+    y1 = bm.sum(x ** 2, axis= -1)
+    y2 = bm.sum(bm.cos(2 * bm.pi * x), axis=-1 )
     n = len(x)
     return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(1)
 
 iopt_benchmark_data = [
     {
-        "objective": F1, 
+        "objective": F1, #Step
         "ndim": 30,
         "domain": (-5.12, 5.12), # (lower bound, higher bound)
-        "minimum": None, # 极小值点
-        "optimal": None, # 极小值
+        "minimum": -0.5*bm.ones(30), # 极小值0点
+        "optimal": 0, # 极小值
     },
     {
-        "objective": F2,
+        "objective": F2,#Sphere
         "ndim": 30,
         "domain": (-100, 100),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F3,#Sum Squares
+        "ndim": 30,
+        "domain": (-10, 10),
         "minimum": None,
-        "optimal": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F4,#Bent Cigar
+        "ndim": 30,
+        "domain": (-100, 100),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F5,
+        "ndim": 2,
+        "domain": (-4.5, 4.5),
+        "minimum": [3,0.5],
+        "optimal": 0,
+    },
+    {
+        "objective": F6,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": [0,0],
+        "optimal": -1,
+    },
+    {
+        "objective": F7,
+        "ndim": 2,
+        "domain": (-10, 10),
+        "minimum": [0,0],
+        "optimal": 0,
+    },
+    {
+        "objective": F8,
+        "ndim": 4,
+        "domain": (-10, 10),
+        "minimum": [1,1,1,1],
+        "optimal": 0,
+    },
+    {
+        "objective": F9,
+        "ndim": 10,
+        "domain": (-5, 10),
+        "minimum": bm.zeros(10),
+        "optimal": 0,
+    },
+    {
+        "objective": F10,
+        "ndim": 30,
+        "domain": (-10, 10),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F11,
+        "ndim": 10,
+        "domain": (-10, 10),
+        "minimum": bm.zeros(10),
+        "optimal": 0,
+    },
+    ##########
+    {
+        "objective": F12,
+        "ndim": 30,
+        "domain": (-10, 10),
+        "minimum": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F13,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": [0,0],
+        "optimal": 0,
+    },
+    #########
+    {
+        "objective": F14,
+        "ndim": 2,
+        "domain": (-10, 10),
+        "minimum": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F15,
+        "ndim": 2,
+        "domain": (-bm.pi, bm.pi),
+        "minimum": [0,0],
+        "optimal": -1.8013,
+    },
+    #########
+    {
+        "objective": F16,
+        "ndim": 5,
+        "domain": (-bm.pi, bm.pi),
+        "minimum": None,
+        "optimal": -4.6877,
+    },
+    ######
+    {
+        "objective": F17,
+        "ndim": 10,
+        "domain": (-bm.pi, bm.pi),
+        "minimum": None,
+        "optimal": -9.6602,
+    },
+    {
+        "objective": F18,
+        "ndim": 30,
+        "domain": (-5.12, 5.12),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F19,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": [0,0],
+        "optimal": 0,
+    },
+    {
+        "objective": F20,
+        "ndim": 2,
+        "domain": (-5, 5),
+        "minimum": [[-0.08984201368301331, 0.7126564032704135],[-0.08984201368301331, -0.7126564032704135]],#有两个x最优取值
+        "optimal": -1.03163,
+    },
+    ###############
+    {
+        "objective": F21,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": None,
+        "optimal": 0,
+    },
+    #############
+    {
+        "objective": F22,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F23,
+        "ndim": 5,
+        "domain": (-10, 10),
+        "minimum": [-7.0835,4.8580],#and many others
+        "optimal": -186.7309,
+    },
+    {
+        "objective": F24,
+        "ndim": 30,
+        "domain": (-30, 30),
+        "minimum": bm.ones(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F25,
+        "ndim": 30,
+        "domain": (-600, 600),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F26,
+        "ndim": 30,
+        "domain": (-32, 32),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
     },
 ]
 
