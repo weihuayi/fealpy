@@ -568,8 +568,8 @@ class TriangleMesh(SimplexMesh):
         """
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
-        x = bm.linspace(box[0], box[1], nx+1)
-        y = bm.linspace(box[2], box[3], ny+1)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64)
         X, Y = bm.meshgrid(x, y, indexing='ij')
     
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)

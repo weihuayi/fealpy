@@ -75,6 +75,7 @@ class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("data", grad_shape_function_data)
     def test_grad_shape_function(self, data, backend):
         bm.set_backend(backend)
+        print("Test grad_shape_function")
         
         mesh = TriangleMesh.from_box(nx=2, ny=2)
         qf = mesh.quadrature_formula(q=3)
