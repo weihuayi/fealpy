@@ -120,18 +120,192 @@ def F26(x):
 
 iopt_benchmark_data = [
     {
-        "objective": F1, 
+        "objective": F1, #Step
         "ndim": 30,
         "domain": (-5.12, 5.12), # (lower bound, higher bound)
-        "minimum": None, # 极小值点
-        "optimal": None, # 极小值
+        "minimum": -0.5*bm.ones(30), # 极小值0点
+        "optimal": 0, # 极小值
     },
     {
-        "objective": F2,
+        "objective": F2,#Sphere
         "ndim": 30,
         "domain": (-100, 100),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F3,#Sum Squares
+        "ndim": 30,
+        "domain": (-10, 10),
         "minimum": None,
-        "optimal": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F4,#Bent Cigar
+        "ndim": 30,
+        "domain": (-100, 100),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F5,
+        "ndim": 2,
+        "domain": (-4.5, 4.5),
+        "minimum": [3,0.5],
+        "optimal": 0,
+    },
+    {
+        "objective": F6,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": [0,0],
+        "optimal": -1,
+    },
+    {
+        "objective": F7,
+        "ndim": 2,
+        "domain": (-10, 10),
+        "minimum": [0,0],
+        "optimal": 0,
+    },
+    {
+        "objective": F8,
+        "ndim": 4,
+        "domain": (-10, 10),
+        "minimum": [1,1,1,1],
+        "optimal": 0,
+    },
+    {
+        "objective": F9,
+        "ndim": 10,
+        "domain": (-5, 10),
+        "minimum": bm.zeros(10),
+        "optimal": 0,
+    },
+    {
+        "objective": F10,
+        "ndim": 30,
+        "domain": (-10, 10),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F11,
+        "ndim": 10,
+        "domain": (-10, 10),
+        "minimum": bm.zeros(10),
+        "optimal": 0,
+    },
+    ##########
+    {
+        "objective": F12,
+        "ndim": 30,
+        "domain": (-10, 10),
+        "minimum": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F13,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": [0,0],
+        "optimal": 0,
+    },
+    #########
+    {
+        "objective": F14,
+        "ndim": 2,
+        "domain": (-10, 10),
+        "minimum": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F15,
+        "ndim": 2,
+        "domain": (-bm.pi, bm.pi),
+        "minimum": [0,0],
+        "optimal": -1.8013,
+    },
+    #########
+    {
+        "objective": F16,
+        "ndim": 5,
+        "domain": (-bm.pi, bm.pi),
+        "minimum": None,
+        "optimal": -4.6877,
+    },
+    ######
+    {
+        "objective": F17,
+        "ndim": 10,
+        "domain": (-bm.pi, bm.pi),
+        "minimum": None,
+        "optimal": -9.6602,
+    },
+    {
+        "objective": F18,
+        "ndim": 30,
+        "domain": (-5.12, 5.12),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F19,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": [0,0],
+        "optimal": 0,
+    },
+    {
+        "objective": F20,
+        "ndim": 2,
+        "domain": (-5, 5),
+        "minimum": [[-0.08984201368301331, 0.7126564032704135],[-0.08984201368301331, -0.7126564032704135]],#有两个x最优取值
+        "optimal": -1.03163,
+    },
+    ###############
+    {
+        "objective": F21,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": None,
+        "optimal": 0,
+    },
+    #############
+    {
+        "objective": F22,
+        "ndim": 2,
+        "domain": (-100, 100),
+        "minimum": None,
+        "optimal": 0,
+    },
+    {
+        "objective": F23,
+        "ndim": 5,
+        "domain": (-10, 10),
+        "minimum": [-7.0835,4.8580],#and many others
+        "optimal": -186.7309,
+    },
+    {
+        "objective": F24,
+        "ndim": 30,
+        "domain": (-30, 30),
+        "minimum": bm.ones(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F25,
+        "ndim": 30,
+        "domain": (-600, 600),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
+    },
+    {
+        "objective": F26,
+        "ndim": 30,
+        "domain": (-32, 32),
+        "minimum": bm.zeros(30),
+        "optimal": 0,
     },
 ]
 
