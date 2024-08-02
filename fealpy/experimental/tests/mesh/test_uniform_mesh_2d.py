@@ -7,7 +7,7 @@ from fealpy.experimental.tests.mesh.uniform_mesh_2d_data import *
 class TestUniformMesh2dInterfaces:
 
     @pytest.mark.parametrize("meshdata", init_mesh_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_init(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -18,15 +18,15 @@ class TestUniformMesh2dInterfaces:
 
         node = bm.to_numpy(mesh.node)
         node_true = meshdata['node']
-        np.testing.assert_almost_equal(node, node_true, decimal=7)
         edge = bm.to_numpy(mesh.edge)
         edge_true = meshdata['edge']
-        np.testing.assert_almost_equal(edge, edge_true, decimal=7)
         face = bm.to_numpy(mesh.face)
         face_true = meshdata['face']
-        np.testing.assert_almost_equal(face, face_true, decimal=7)
         cell = bm.to_numpy(mesh.cell)
         cell_true = meshdata['cell']
+        np.testing.assert_almost_equal(node, node_true, decimal=7)
+        np.testing.assert_almost_equal(edge, edge_true, decimal=7)
+        np.testing.assert_almost_equal(face, face_true, decimal=7)
         np.testing.assert_almost_equal(cell, cell_true, decimal=7)
 
         assert mesh.node.shape == meshdata['node'].shape, "Node shapes do not match."
@@ -40,7 +40,7 @@ class TestUniformMesh2dInterfaces:
         assert mesh.number_of_cells() == meshdata['NC'], "Number of cells do not match."
 
     @pytest.mark.parametrize("meshdata", entity_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_entity(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -54,7 +54,7 @@ class TestUniformMesh2dInterfaces:
         np.testing.assert_almost_equal(node, node_true, decimal=7)
 
     @pytest.mark.parametrize("meshdata", entity_measure_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_entity_measure(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -70,7 +70,7 @@ class TestUniformMesh2dInterfaces:
         assert (mesh.entity_measure('cell') - meshdata['cell_area']) < 1e-7, "Cell areas are not as expected."
 
     @pytest.mark.parametrize("meshdata", interpolation_points_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_interpolation_points(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -89,7 +89,7 @@ class TestUniformMesh2dInterfaces:
         np.testing.assert_almost_equal(ipoints_p2, ipoints_p2_true, decimal=7)
 
     @pytest.mark.parametrize("meshdata", quadrature_formula_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_quadrature_formula(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -112,7 +112,7 @@ class TestUniformMesh2dInterfaces:
             assert np.all(np.abs(bm.to_numpy(a) - b) < 1e-7), f"Difference in quadrature points for qf2 between {a} and {b} is greater than 1e-7"
 
     @pytest.mark.parametrize("meshdata", shape_function_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_shape_function(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -134,7 +134,7 @@ class TestUniformMesh2dInterfaces:
         np.testing.assert_allclose(shape_function_p2, shape_function_p2_true, atol=1e-8)
 
     @pytest.mark.parametrize("meshdata", grad_shape_function_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_grad_shape_function(self, meshdata, backend):
         bm.set_backend(backend)
 
@@ -153,3 +153,75 @@ class TestUniformMesh2dInterfaces:
 
         np.testing.assert_allclose(grad_shape_function_u, grad_shape_function_u_true, atol=1e-8)
         np.testing.assert_allclose(grad_shape_function_x, grad_shape_function_x_true, atol=1e-8)
+
+    @pytest.mark.parametrize("meshdata", barycenter_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_entity_barycenter(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        cell_barycenter = bm.to_numpy(mesh.cell_barycenter())
+        edgex_barycenter = bm.to_numpy(mesh.edgex_barycenter())
+        edgey_barycenter = bm.to_numpy(mesh.edgey_barycenter())
+
+        cell_barycenter_true = meshdata['cell_barycenter']
+        edgex_barycenter_true = meshdata['edgex_barycenter']
+        edgey_barycenter_true = meshdata['edgey_barycenter']
+
+        np.testing.assert_allclose(cell_barycenter, cell_barycenter_true, atol=1e-8)
+        np.testing.assert_allclose(edgex_barycenter, edgex_barycenter_true, atol=1e-8)
+        np.testing.assert_allclose(edgey_barycenter, edgey_barycenter_true, atol=1e-8)
+
+    @pytest.mark.parametrize("meshdata", bc2point_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_bc_to_point(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        qf = mesh.quadrature_formula(q=3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        bc2point = bm.to_numpy(mesh.bc_to_point(bcs=bcs))
+        bc2point_true = meshdata['bc2point_q3']
+
+        np.testing.assert_allclose(bc2point, bc2point_true, atol=1e-8)
+
+    @pytest.mark.parametrize("meshdata", topology_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_bc_to_point(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        edge2cell = bm.to_numpy(mesh.edge_to_cell())
+        edge2cell_true = meshdata['edge2cell']
+
+        np.testing.assert_allclose(edge2cell, edge2cell_true, atol=1e-8)
+
+    # @pytest.mark.parametrize("meshdata", uniform_refine_data)
+    # @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    # def test_uniform_refine(self, meshdata, backend):
+    #     bm.set_backend(backend)
+    #
+    #     extent = meshdata['extent']
+    #     h = meshdata['h']
+    #     origin = meshdata['origin']
+    #     mesh = UniformMesh2d(extent, h, origin)
+    #
+    #     mesh.uniform_refine(n=1)
+    #
+    #     node_refined = mesh.entity('node')
+    #     node_refined_true = meshdata['node_refined']
+    #
+    #     np.testing.assert_allclose(node_refined, node_refined_true, atol=1e-8)
