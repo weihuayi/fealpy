@@ -209,19 +209,20 @@ class TestUniformMesh2dInterfaces:
 
         np.testing.assert_allclose(edge2cell, edge2cell_true, atol=1e-8)
 
-    # @pytest.mark.parametrize("meshdata", uniform_refine_data)
-    # @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
-    # def test_uniform_refine(self, meshdata, backend):
-    #     bm.set_backend(backend)
-    #
-    #     extent = meshdata['extent']
-    #     h = meshdata['h']
-    #     origin = meshdata['origin']
-    #     mesh = UniformMesh2d(extent, h, origin)
-    #
-    #     mesh.uniform_refine(n=1)
-    #
-    #     node_refined = mesh.entity('node')
-    #     node_refined_true = meshdata['node_refined']
-    #
-    #     np.testing.assert_allclose(node_refined, node_refined_true, atol=1e-8)
+    @pytest.mark.parametrize("meshdata", uniform_refine_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_uniform_refine(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+        node_test = mesh.node
+
+        mesh.uniform_refine(n=1)
+
+        node_refined = mesh.node
+        node_refined_true = meshdata['node_refined']
+
+        np.testing.assert_allclose(node_refined, node_refined_true, atol=1e-8)

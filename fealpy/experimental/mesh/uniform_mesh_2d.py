@@ -530,8 +530,16 @@ class UniformMesh2d(StructuredMesh):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
     
-    def uniform_refine(self, n=1):
-        # TODO: There is a problem with this code
+    def uniform_refine(self, n: int=1):
+        """
+        @brief Uniformly refine the 2D structured mesh.
+
+        Note:
+        clear method is used at the end to clear the cache of entities. This is necessary because even after refinement, 
+        the entities remain the same as before refinement due to the caching mechanism.
+        Structured mesh have their own entity generation methods, so the cache needs to be manually cleared.
+        Unstructured mesh do not require this because they do not have entity generation methods.
+        """
         for i in range(n):
             self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
@@ -542,11 +550,8 @@ class UniformMesh2d(StructuredMesh):
             self.NF = self.NE
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
             self.NN = (self.nx + 1) * (self.ny + 1)
+        self.clear() 
         
-        del self.node
-        del self.edge
-        del self.cell
-        # TODO: Implement cache clearing mechanism
 
 
 
