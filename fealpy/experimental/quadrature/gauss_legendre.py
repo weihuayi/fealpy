@@ -6,7 +6,7 @@ from .quadrature import backend_manager as bm
 
 class GaussLegendreQuadrature(Quadrature):
     def make(self, index: int):
-        kwargs = {'dtype': self.dtype}
+        kwargs = {'dtype': bm.float64}
         if index == 1:
             A = bm.tensor([[0.0, 2.0]], **kwargs)
         elif index == 2:
