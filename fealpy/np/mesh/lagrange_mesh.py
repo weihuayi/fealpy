@@ -139,7 +139,7 @@ class LagrangeMesh(HomogeneousMesh):
 
         @berif 把网格转化为 VTK 的格式
         """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()

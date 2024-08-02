@@ -17,8 +17,8 @@ def process_coef_func(
     bcs: Optional[NDArray]=None,
     mesh: Optional[HomogeneousMesh]=None,
     etype: Optional[Union[int, str]]=None,
-    index: Optional[NDArray]=None,
-    n: Optional[NDArray]=None,
+    index: Optional[NDArray]=None
+    #n: Optional[NDArray]=None,
 ):
     r"""Fetch the result Tensor if `coef` is a function."""
     if callable(coef):
@@ -32,12 +32,8 @@ def process_coef_func(
             if (mesh is None) or (not isinstance(mesh, HomogeneousMesh)):
                 raise RuntimeError('The mesh should be provided for cartesian coef functions.'
                                    'Note that only homogeneous meshes are supported here.')
-
             ps = mesh.bc_to_point(bcs, etype=etype, index=index)
-            if n is not None:
-                coef_val = coef(ps, n)
-            else:
-                coef_val = coef(ps)
+            coef_val = coef(ps)
         else:
             coef_val = coef(bcs, index=index)
     else:

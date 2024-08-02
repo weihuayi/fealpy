@@ -7,13 +7,18 @@
 	@bref 
 	@ref 
 '''  
-from jax import ops, vmap
+from jax import ops, vmap, jit
 import jax.numpy as jnp
 import numpy as np
 import h5py
 import pyvista
 from typing import Dict
 import enum
+from fealpy.jax.sph.jax_md import space
+#from jax_md import space
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.animation import PillowWriter
 
 #设置标签
 class Tag(enum.IntEnum):
@@ -32,17 +37,20 @@ class SPHSolver:
         self.mesh = mesh 
 
     #状态方程更新压力
-    def tait_eos(self, rho, c0, rho0, gamma=1.0, X=0.0):
+    @staticmethod
+    def tait_eos(rho, c0, rho0, gamma=1.0, X=0.0):
         """Equation of state update pressure"""
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
     
-    def tait_eos_p2rho(slef, p, p0, rho0, gamma=1.0, X=0.0):
+    @staticmethod
+    def tait_eos_p2rho(p, p0, rho0, gamma=1.0, X=0.0):
         """Calculate density by pressure."""
         p_temp = p + p0 - X
         return rho0 * (p_temp / p0) ** (1 / gamma)
     
     #计算密度
-    def compute_rho(self, mass, i_node, w_ij):
+    @staticmethod
+    def compute_rho(mass, i_node, w_ij):
         """Density summation."""
         return mass * ops.segment_sum(w_ij, i_node, len(mass))
 
@@ -58,15 +66,15 @@ class SPHSolver:
         a = c[:, None] * 1.0 * pb[i_node][:, None] * r_ij       
         return ops.segment_sum(a, i_node, len(state["mass"]))
 
-    #计算张量A，用于计算动量速度的加速度
-    def compute_A(self, rho, mv, tv):
-        a = rho[:, jnp.newaxis] * mv
-        dv = tv - mv
-        result = jnp.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
-        return result
 
     #计算动量速度的加速度
-    def compute_mv_acceleration(self, state, i_node, j_node, r_ij, dij, grad, p):
+    @staticmethod 
+    def compute_mv_acceleration(state, i_node, j_node, r_ij, dij, grad, p):
+        def compute_A(rho, mv, tv):
+            a = rho[:, jnp.newaxis] * mv
+            dv = tv - mv
+            result = jnp.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
+            return result
         eta_i = state["eta"][i_node]
         eta_j = state["eta"][j_node]
         p_i = p[i_node]
@@ -84,16 +92,12 @@ class SPHSolver:
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS) 
         p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
         c = volume_square * grad / (dij + EPS)
-        A = (self.compute_A(rho_i, mv_i, tv_i) + self.compute_A(rho_j, mv_j, tv_j))/2
+        A = (compute_A(rho_i, mv_i, tv_i) + compute_A(rho_j, mv_j, tv_j))/2
         mv_ij = mv_i -mv_j
         b = jnp.sum(A * r_ij[:, jnp.newaxis, :], axis=2)
         a = c[:, None] * (-p_ij[:, None] * r_ij + b + (eta_ij[:, None] * mv_ij))
         return ops.segment_sum(a, i_node, len(state["mass"]))
-
-    def forward(self, state, neighbors):
-        position = state['position']
-        tag = state['tag']
-
+    
     def boundary_conditions(self, state, box_size, n_walls=3, dx=0.02, T0=1.0, hot_T=1.23): 
         fluid = state["tag"] == 0
 
@@ -190,6 +194,227 @@ class SPHSolver:
         result = ops.segment_sum(dTdt, i_s, len(state["position"]))
         return result
 
+    def wall_extrapolation(self, state, kernel, i_s, j_s):
+        #只更新流体粒子对固壁粒子的影响
+        fw_m = state["mass"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_rho = state["rho"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_v = state["v"][(state["tag"] == 0) | (state["tag"] == 1)]
+        v_wall = jnp.zeros_like(fw_v)
+
+        sum0 = (fw_m[j_s]/fw_rho[j_s])[:, None] * fw_v[j_s] * kernel[:, None]
+        sum1 = (fw_m[j_s]/fw_rho[j_s]) * kernel
+        a = ops.segment_sum(sum0, i_s, len(fw_m))
+        b = ops.segment_sum(sum1, i_s, len(fw_m))
+        v_ave = a / b[:, None]
+        result = 2 * v_wall - v_ave
+
+        fw_tag = state["tag"][(state["tag"] == 0) | (state["tag"] == 1)]
+        idx = jnp.where(fw_tag == 1)[0]
+        result = result[idx]
+        return result
+
+    def gate_change(self, state, domain, dt, dx, uin):
+        H = 1.5 * dx
+        dy = dx
+        rho0 = 737.54
+
+        #更新位置
+        g_idx = jnp.where(state["tag"] == 3)[0]
+        r = state["position"][g_idx] + dt * state["v"][g_idx] 
+        state["position"] = state["position"].at[state["tag"]==3].set(r)
+
+        #将进入流体区域的门粒子更换标签为0
+        g_x = state["position"][:, 0]
+        g_i = jnp.where((state["tag"] == 3) & (g_x >= 0))[0] 
+        
+        if g_i.size > 0:
+            state["tag"] = state["tag"].at[g_i].set(0)
+
+            #更新物理量
+            y = jnp.arange(domain[2]+dx, domain[3], dx)
+            gp = jnp.column_stack((jnp.full_like(y, domain[0]-4*H), y))
+            state["position"] = jnp.vstack((gp, state["position"]))
+            tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
+            state["tag"] = jnp.concatenate((tag_g, state["tag"]))
+            v_g = jnp.ones_like(gp) * uin
+            state["v"] = jnp.concatenate((v_g, state["v"]))
+            state["rho"] = jnp.concatenate((jnp.ones(gp.shape[0])*rho0, state["rho"]))
+            state["p"] = jnp.concatenate((jnp.zeros_like(tag_g), state["p"]))
+            state["sound"] = jnp.concatenate((jnp.zeros_like(tag_g), state["sound"]))
+            mass_g = jnp.ones(gp.shape[0]) * dx * dy * rho0
+            state["mass"] = jnp.concatenate((mass_g, state["mass"]))
+        
+        return state
+
+    def free_surface(self, state, i_s, j_s, kernel, grad_kernel, h):
+        #计算流体粒子的浓度
+        m_j = state["mass"][j_s]
+        rho_j = state["rho"][j_s]
+        ci = (m_j/rho_j) * kernel
+        grad_ci = (m_j/rho_j)[:, None] * grad_kernel 
+        #grad_ci = ops.segment_sum(grad_ci, i_s, len(state["position"][state["tag"] == 0]))
+        w_tag = state['tag'] == 1
+        d_tag = state['tag'] == 2
+        NN_wd = (jnp.where(w_tag==True)[0]).size + (jnp.where(d_tag==True)[0]).size
+        
+        #找浓度<0.75的流体粒子的索引
+        result = ops.segment_sum(ci, i_s, len(state["position"]))
+        result = result[state["tag"] == 0]
+        #idx = jnp.where(result < 0.75)[0] + NN_wd
+        idx = jnp.where(result< 0.75)[0]
+        
+        #判断区域内是否有其他的粒子
+        xji = state["position"][j_s] - state["position"][i_s]
+        gx = jnp.einsum('ki,kj->kij', xji, grad_kernel).reshape(xji.shape[0], 2, 2)
+        As = (m_j/rho_j).reshape(xji.shape[0],1,1) * gx
+        #As = ops.segment_sum(As, i_s, len(state["position"][state["tag"] == 0]))
+        normal = jnp.einsum('ijk,ik->ij', As, grad_ci) / \
+                 jnp.linalg.norm(jnp.einsum('ijk,ik->ij', As, grad_ci), axis=1, keepdims=True)
+        a = jnp.array([-normal[:, 1], normal[:, 0]]).T
+        b = jnp.linalg.norm(a, axis=1)
+        perpen = a / b[:, jnp.newaxis]
+        nodeT = state["position"][i_s] + normal*h
+       
+        cond1 = jnp.linalg.norm(-xji, axis=1) >= jnp.sqrt(2)*h
+        cond2 = jnp.linalg.norm(state["position"][j_s] - nodeT) < h
+        cond3 = jnp.linalg.norm(-xji, axis=1) < jnp.sqrt(2)*h
+        cond4 = (jnp.abs(jnp.dot(normal, (state["position"][j_s] - nodeT).T)).sum()) + \
+                (jnp.abs(jnp.dot(perpen, (state["position"][j_s] - nodeT).T)).sum()) < h
+        
+        cond = ~(cond1 & cond2) | ~(cond3 & cond4)
+        is_free = idx[cond[idx]]
+        return is_free
+
+    def change_p(self, state, kernel, i_s, j_s, d_s, B, rho0, c1):
+        #更新流体粒子的压力和声速
+        p_rho = B * (jnp.exp((jnp.ones_like(state["rho"])-rho0/state["rho"])/c1)-1)
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        state["p"] = state["p"].at[f_tag].set(p_rho[f_tag])
+        sound = jnp.sqrt(B * (rho0/(c1*state["rho"]**2)) * jnp.exp((jnp.ones_like(state["rho"])-rho0/state["rho"])/c1))
+        state["sound"] = state["sound"].at[f_tag].set(sound[f_tag])
+
+        #计算固壁粒子的压力
+        w_tag = jnp.where(state["tag"] == 1)[0]
+        fw_m = state["mass"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_rho = state["rho"][(state["tag"] == 0) | (state["tag"] == 1)]
+        fw_p = state["p"][(state["tag"] == 0) | (state["tag"] == 1)]
+        sum0 = (fw_m[j_s]*fw_p[j_s]/fw_rho[j_s]) * kernel
+        sum1 = (fw_m[j_s]/fw_rho[j_s]) * kernel
+        a = ops.segment_sum(sum0, i_s, len(fw_m))
+        b = ops.segment_sum(sum1, i_s, len(fw_m))
+        p_w = a / b
+        fw_tag = state["tag"][(state["tag"] == 0) | (state["tag"] == 1)]
+        idx = jnp.where(fw_tag == 1)[0]
+        state["p"] = state["p"].at[w_tag].set(p_w[idx])
+    
+        #计算虚粒子的压力
+        d_tag = jnp.where(state["tag"] == 2)[0]
+        state["p"] = state["p"].at[d_tag].set(state["p"][d_s])
+        return state
+
+    def continue_equation(self, state, i_s, j_s, grad_kernel):
+        v = state["v"]
+        x = state["position"]
+        rho = state["rho"]
+        c = state["sound"]
+        p = state["p"]
+        m = state["mass"]
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        f_rho = state["rho"][state["tag"] == 0]
+
+        v_ij = v[i_s] - v[j_s]
+        x_ij = x[i_s] - x[j_s]
+        r_ij = jnp.linalg.norm(x_ij, axis=1)
+        rho_c = ((rho[i_s]+rho[j_s])/2) * ((c[i_s]+c[j_s])/2)
+        p_ij = p[i_s] - p[j_s]
+
+        a = jnp.sum(((v_ij+(p_ij/rho_c)[:, None]*(x_ij/r_ij[:, None]))*grad_kernel), axis=1, keepdims=True)
+        sum0 = (m[j_s]/rho[j_s])[:, None] * a
+        sum1 = (ops.segment_sum(sum0, i_s, len(rho)))[f_tag]
+        result = f_rho[f_tag][:, None] * sum1
+        result = jnp.squeeze(result)
+        return result
+
+    def mu_wlf(self, state, i_s, j_s, grad_kernel, mu0, tau, n):
+        a = state["v"][j_s][:,:,jnp.newaxis] * grad_kernel[:,jnp.newaxis,:]
+        a_t = jnp.transpose(a, (0, 2, 1))
+        D = (a + a_t) / 2 #待确认？
+        gamma = jnp.sqrt(2 * jnp.einsum('ijk,ijk->i', D, D))
+        gamma = ops.segment_sum(gamma, i_s, len(state["rho"]))
+        mu = mu0 / (1 + (mu0 * gamma / tau)**(1-n))    
+        return mu
+
+    def momentum_equation(self, state, i_s, j_s, grad_kernel, mu, eta, h):
+        f_tag = jnp.where(state["tag"] == 0)[0]
+        x_ij = state["position"][i_s] - state["position"][j_s]
+        r_ij = jnp.linalg.norm(x_ij,axis=1)
+        v_ij = state["v"][i_s] - state["v"][j_s]
+        a0 = eta * (mu[i_s] + mu[j_s]) / r_ij
+        a1 = ((state["rho"][i_s]+state["rho"][j_s])/2) * ((state["sound"][i_s]+state["sound"][j_s])/2)
+        beta = jnp.minimum(a0, a1)
+
+        b0 = state["mass"][j_s]/(state["rho"][i_s]*state["rho"][j_s])  
+        b1 = state["p"][i_s]+state["p"][j_s]-beta*(jnp.einsum('ij,ij->i', x_ij, v_ij)/r_ij)
+        sum0 = (b0 * b1)[:, None] * grad_kernel
+        sum0 = ops.segment_sum(sum0, i_s, len(state["rho"]))
+        
+        m_j = state["mass"][j_s]
+        c0 = (mu[i_s]+mu[j_s])/(state["rho"][i_s]*state["rho"][j_s])
+        c1 = jnp.einsum('ij,ij->i', x_ij, grad_kernel)/(r_ij**2+(0.01*h)**2)
+        sum1 = (m_j * c0 * c1)[:, None] * v_ij
+        sum1 = ops.segment_sum(sum1, i_s, len(state["rho"]))
+        
+        result = (-sum0 + sum1)[f_tag]
+        return result
+
+    def change_position(self, state, i_s, j_s, kernel):
+        f_tag = jnp.where(state["tag"] == 0)[0] 
+        v_ji = state["v"][j_s] - state["v"][i_s]
+        rho_ij = (state["rho"][i_s] + state["rho"][j_s]) / 2
+        sum0 = (state["mass"][j_s]*kernel/rho_ij)[:, None] * v_ji
+        sum0 = 0.5 * ops.segment_sum(sum0, i_s, len(state["position"]))
+        result = (state["v"] + sum0)[f_tag]        
+        return result
+
+    def create_animation(self, state_history, output_file='animation.gif'):
+        fig, ax = plt.subplots(figsize=(20, 5))
+
+        def update(frame):
+            ax.clear()
+            state = state_history[frame]
+            positions = np.array(state["position"])  # 确保数据为 NumPy 数组
+            tags = np.array(state["tag"])
+            velocities = np.array(state["v"])
+
+            # 计算每个粒子的速度大小
+            speed = np.linalg.norm(velocities, axis=1)
+
+            # 画出不同标签的粒子
+            fluid_particles = positions[tags == 0]
+            wall_particles = positions[tags == 1]
+            ghost_particles = positions[tags == 2]
+            gate_particles = positions[tags == 3]
+
+            fluid_speeds = speed[tags == 0]
+            wall_speeds = speed[tags == 1]
+            ghost_speeds = speed[tags == 2]
+            gate_speeds = speed[tags == 3]
+            
+            sc = ax.scatter(fluid_particles[:, 0], fluid_particles[:, 1], c=fluid_speeds, cmap='viridis', s=10, label='Fluid')
+            ax.scatter(wall_particles[:, 0], wall_particles[:, 1], c=wall_speeds, cmap='viridis', s=10, label='Wall')
+            ax.scatter(ghost_particles[:, 0], ghost_particles[:, 1], c=ghost_speeds, cmap='viridis', s=10, label='Ghost')
+            ax.scatter(gate_particles[:, 0], gate_particles[:, 1], c=gate_speeds, cmap='viridis', s=10, label='Gate')
+
+            ax.legend()
+            ax.set_xlim(-0.002, 0.05)
+            ax.set_ylim(-0.002, 0.006)
+            ax.set_title(f"Frame {frame}")
+
+        ani = animation.FuncAnimation(fig, update, frames=len(state_history), repeat=False)
+        plt.show()
+        #writer = PillowWriter(fps=20)  # 设置每秒帧数
+        #ani.save(output_file, writer=writer)
+
     def write_h5(self, data_dict: Dict, path: str):
         """Write a dict of numpy or jax arrays to a .h5 file."""
         hf = h5py.File(path, "w")
@@ -217,8 +442,50 @@ class SPHSolver:
                 v = np.hstack([v, np.zeros((N, 1))])
             data_pv[k] = np.asarray(v)
         return data_pv
+    
+    def forward_wrapper(self, displacement, kernel):
+        def forward(state, neighbors): 
+            r = state["position"]
+            i_s, j_s = neighbors.idx
+            r_i_s, r_j_s = r[i_s], r[j_s]
+            dr_i_j = vmap(displacement)(r_i_s, r_j_s)
+            dist = space.distance(dr_i_j)
+            w_dist = vmap(kernel.value)(dist)  
+            e_s = dr_i_j / (dist[:, None] + EPS) 
+            grad_w_dist_norm = vmap(kernel.grad_value)(dist)
+            grad_w_dist = grad_w_dist_norm[:, None] * e_s
+            
+            state['rho'] = self.compute_rho(state['mass'], i_s, w_dist)
+            p = self.tait_eos(state['rho'],10,1)
+            
+            state["dmvdt"] = self.compute_mv_acceleration(\
+                state, i_s, j_s, dr_i_j, dist, grad_w_dist_norm, p)
+            
+            return state
+        return forward
 
     def write_vtk(self, data_dict: Dict, path: str):
         """Store a .vtk file for ParaView."""
         data_pv = self.dict2pyvista(data_dict)
         data_pv.save(path)
+
+def TimeLine(model, shift_fn):
+    def advance(dt, state, neighbors):
+        state["mv"] += 1.0 * dt * state["dmvdt"]
+        state["tv"] = state["mv"] 
+
+        # 2. Integrate position with velocity v
+        state["position"] = shift_fn(state["position"], 1.0 * dt * state["tv"])
+
+        # 3. Update neighbor list
+        neighbors = neighbors.update(state["position"], num_particles=state["position"].shape[0])
+
+        # 4. Compute accelerations
+        state = model(state, neighbors)
+
+        # 5. Impose boundary conditions on dummy particles (if applicable)
+        #state = bc_fn(state)
+        return state, neighbors
+
+    return advance
+

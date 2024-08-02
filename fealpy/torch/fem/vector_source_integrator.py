@@ -1,0 +1,65 @@
+
+from typing import Optional
+
+from torch import Tensor, einsum
+
+from ..mesh import HomogeneousMesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import is_scalar, is_tensor, process_coef_func
+from ..functional import linear_integral
+from .integrator import CellSourceIntegrator, _S, Index, CoefLike, enable_cache
+
+
+class VectorSourceIntegrator(CellSourceIntegrator):
+    r"""The domain source integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
+                 index: Index=_S,
+                 batched: bool=False) -> None:
+        super().__init__()
+        self.source = source
+        self.q = q
+        self.index = index
+        self.batched = batched
+
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> Tensor:
+        return space.cell_to_dof()[self.index]
+
+    @enable_cache
+    def fetch(self, space: _FS):
+        q = self.q
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
+
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The VectorSourceIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+
+        cm = mesh.entity_measure('cell', index=index)
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = space.basis(bcs, index=index, variable='x')
+
+        return bcs, ws, phi, cm, index
+
+    def assembly(self, space: _FS) -> Tensor:
+        f = self.source
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, cm, index = self.fetch(space)
+        # val-(NC, NQ, GD)
+        val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        coef = val
+        measure = cm
+        weights = ws
+        inputs = phi
+
+        if coef is None:
+            return einsum('c, q, cqid -> cid', measure, weights, inputs)
+
+        if is_tensor(coef):
+            return einsum('c, q, cqid, cqd -> ci', measure, weights, inputs, coef)
+        else:
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+
+        # return linear_integral(phi, ws, cm, val, batched=self.batched)

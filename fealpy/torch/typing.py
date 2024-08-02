@@ -28,6 +28,7 @@ DeviceLike = Union[str, _device]
 Index = Union[int, slice, Tuple[int, ...], Tensor]
 EntityName = Literal['cell', 'face', 'edge', 'node']
 _int_func = Callable[..., int]
+Barycenters = Union[Tuple[Tensor, ...], Tensor]
 
 
 ### Constants

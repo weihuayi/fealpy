@@ -34,12 +34,26 @@ class NodeMesh(MeshDS):
 
     def top_dimension(self):
         return self.top_dimension()
-    
+    '''
     def add_node_data(self, name:str, dtype=jnp.float64):
         NN = self.NN
         self.nodedata.update({names: jnp.zeros(NN, dtypes) 
                               for names, dtypes in zip(name, dtype)})
-
+    '''
+    
+    def add_node_data(self, name: Union[str, list], data: Array):
+        if isinstance(name, str):
+            if name in self.nodedata:
+                self.nodedata[name] = jnp.concatenate([self.nodedata[name], data], axis=0)
+            else:
+                self.nodedata[name] = data
+        else:
+            for n, d in zip(name, data):
+                if n in self.nodedata:
+                    self.nodedata[n] = jnp.concatenate([self.nodedata[n], d], axis=0)
+                else:
+                    self.nodedata[n] = d
+    
     def set_node_data(self, name, val):
         self.nodedata[name] = self.nodedata[name].at[:].set(val)
 
@@ -290,6 +304,65 @@ class NodeMesh(MeshDS):
         }
         return cls(r, nodedata=nodedata)
 
+    @classmethod
+    def from_long_rectangular_cavity_domain(cls, init_domain, domain, uin, dx=1.25e-4):
+        H = 1.5 * dx
+        dy = dx
+        rho0 = 737.54
+
+        #fluid particles
+        fp = jnp.mgrid[init_domain[0]:init_domain[1]:dx, \
+            init_domain[2]+dx:init_domain[3]:dx].reshape(2,-1).T
+        
+        #wall particles
+        x0 = jnp.arange(domain[0],domain[1],dx)
+
+        bwp = jnp.column_stack((x0,np.full_like(x0,domain[2])))
+        uwp = jnp.column_stack((x0,np.full_like(x0,domain[3])))
+        wp = jnp.vstack((bwp,uwp))
+        
+        #dummy particles
+        bdp = jnp.mgrid[domain[0]:domain[1]:dx, \
+                domain[2]-dx:domain[2]-dx*4:-dx].reshape(2,-1).T
+        udp = jnp.mgrid[domain[0]:domain[1]:dx, \
+                domain[3]+dx:domain[3]+dx*3:dx].reshape(2,-1).T
+        dp = jnp.vstack((bdp,udp))
+        
+        #gate particles
+        gp = jnp.mgrid[-dx:-dx-4*H:-dx, \
+                domain[2]+dx:domain[3]:dx].reshape(2,-1).T
+        
+        #tag
+        '''
+        fluid particles: 0 
+        wall particles: 1 
+        dummy particles: 2
+        gate particles: 3
+        '''
+        tag_f = jnp.full((fp.shape[0],), 0, dtype=int)
+        tag_w = jnp.full((wp.shape[0],), 1, dtype=int)
+        tag_d = jnp.full((dp.shape[0],), 2,dtype=int)
+        tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
+
+        r = jnp.vstack((fp, gp, wp, dp))
+        NN = r.shape[0]
+        tag = jnp.hstack((tag_f, tag_g, tag_w, tag_d))
+        fg_v =  jnp.ones_like(jnp.vstack((fp, gp))) * uin
+        wd_v =  jnp.zeros_like(jnp.vstack((wp, dp)))
+        v = jnp.vstack((fg_v, wd_v))
+        rho = jnp.ones(NN) * rho0
+        mass = jnp.ones(NN) * dx * dy * rho0 
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "v": v,
+            "rho": rho,
+            "p": jnp.zeros_like(rho),
+            "sound": jnp.zeros_like(rho),
+            "mass": mass, 
+        } 
+        return cls(r, nodedata=nodedata)
+        
     @classmethod
     def from_slip_stick_domain(cls, dx=0.02, dy=0.02):
         n_walls = 3 #墙壁层数

@@ -175,7 +175,7 @@ class Screen:
         lb[:, 0:3] -= 0.1
         lb[:, 3:6] -= 0.01
         lb[:, 6]  -= 0.1
-        Max_iter = 10
+        Max_iter = 50
 
         opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
                       object_function, init_x.flatten())

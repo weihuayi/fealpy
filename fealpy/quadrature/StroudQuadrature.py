@@ -44,6 +44,8 @@ class StroudQuadrature:
     def get_points_and_weights(self):
         return self.points, self.weights
 
+    get_quadrature_points_and_weights = get_points_and_weights
+
 
 
 
