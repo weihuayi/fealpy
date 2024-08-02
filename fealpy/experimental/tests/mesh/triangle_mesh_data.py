@@ -433,11 +433,6 @@ grad_shape_function_data = [
             }
 ]
 
-grad_shape_function_on_edge_data = [
-        {
-            "gval":
-            }
-]
 interpolation_point_data = [
         {
             "ips": np.array([[0.  , 0.  ],
@@ -514,11 +509,3 @@ jacobian_matrix_data = [
         [-0.5,  0. ]]], dtype=np.float64)
             }
 ]
-
-from_torus_surface_data = [
-        {"R": 3, "r": 1, "Nu": 20, "Nv": 20, "node_shape": (20*20, 3), "cell_shape": (2*20*20, 3)},
-        {"R": 5, "r": 2, "Nu": 30, "Nv": 30, "node_shape": (30*30, 3), "cell_shape": (2*30*30, 3)},
-        {"R": 4, "r": 1.5, "Nu": 15, "Nv": 10, "node_shape": (15*10, 3), "cell_shape": (2*15*10, 3)},
-        {"R": 6, "r": 3, "Nu": 25, "Nv": 10, "node_shape": (25*10, 3), "cell_shape": (2*25*10, 3)}
-]
-

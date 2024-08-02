@@ -75,6 +75,7 @@ class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("data", grad_shape_function_data)
     def test_grad_shape_function(self, data, backend):
         bm.set_backend(backend)
+        print("Test grad_shape_function")
         
         mesh = TriangleMesh.from_box(nx=2, ny=2)
         qf = mesh.quadrature_formula(q=3)
@@ -83,18 +84,6 @@ class TestTriangleMeshInterfaces:
 
         np.testing.assert_allclose(bm.to_numpy(gphi), data["gphi"], atol=1e-14)    
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
-    @pytest.mark.parametrize("data", grad_shape_function_on_edge_data)
-    def test_grad_shape_function_on_edge(self, data, backend):
-        bm.set_backend(backend)
-        
-        mesh = TriangleMesh.from_box(nx=2, ny=2)
-        qf = mesh.quadrature_formula(q=3)
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        gval = mesh.grad_shape_function_on_edge(bcs, p=1)
-
-        np.testing.assert_allclose(bm.to_numpy(gval), data["gval"], atol=1e-14)    
-
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", interpolation_point_data)
     def test_interpolation_points(self, data, backend):
@@ -140,7 +129,7 @@ class TestTriangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(jacobian), data["jacobian_matrix"], atol=1e-14)
 
 if __name__ == "__main__":
-    a = TestTriangleMeshInterfaces()
-    a.test_grad_shape_function(grad_shape_function_data[0], 'pytorch')
-    #pytest.main(["./test_triangle_mesh.py"])
+    #a = TestTriangleMeshInterfaces()
+    #a.test_grad_shape_function(grad_shape_function_data[0], 'pytorch')
+    pytest.main(["./test_triangle_mesh.py"])
 
