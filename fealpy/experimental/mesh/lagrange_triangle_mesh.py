@@ -8,7 +8,7 @@ from .mesh_base import HomogeneousMesh, estr2dim
 from .triangle_mesh import TriangleMesh
 
 class LagrangeTriangleMesh(HomogeneousMesh):
-    def __init__(self, node: NDArray, cell: NDArray, p=1, surface=None,
+    def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
             construct=False):
         super().__init__(TD=2)
 
@@ -40,7 +40,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
     def construct(self):
         pass
 
-    def generate_local_lagrange_edges(self, p: int) -> NDArray:
+    def generate_local_lagrange_edges(self, p: int) -> TensorLike:
         """
         Generate the local edges for Lagrange elements of order p.
         """
