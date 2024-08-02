@@ -356,9 +356,10 @@ class TriangleMesh(SimplexMesh):
     def odt_iterate(self):
         pass
 
-    def unifrom_bisect(self, n=1):
+    def uniform_bisect(self, n=1):
         for i in range(n):
             self.bisect()
+
     def bisect_options(
             self,
             HB=None,
@@ -374,147 +375,9 @@ class TriangleMesh(SimplexMesh):
             'disp': disp
         }
         return options
-    def bisect(self, isMarkedCell=None, options={'disp': True}):
 
-        if options['disp']:
-            print('Bisection begining......')
-
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NE = self.number_of_edges()
-
-        if options['disp']:
-            print('Current number of nodes:', NN)
-            print('Current number of edges:', NE)
-            print('Current number of cells:', NC)
-
-        if isMarkedCell is None:
-            isMarkedCell = bm.ones(NC, dtype=bm.bool_)
-
-        cell = self.entity('cell')
-        edge = self.entity('edge')
-
-        cell2edge = self.cell_to_edge()
-        cell2cell = self.cell_to_cell()
-        cell2ipoint = self.cell_to_ipoint(self.p)
-        isCutEdge = bm.zeros((NE,), dtype=bm.bool_)
-
-        if options['disp']:
-            print('The initial number of marked elements:', isMarkedCell.sum())
-
-        markedCell, = bm.nonzero(isMarkedCell)
-        while len(markedCell) > 0:
-            isCutEdge[cell2edge[markedCell, 0]] = True
-            refineNeighbor = cell2cell[markedCell, 0]
-            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor, 0]]]
-
-        if options['disp']:
-            print('The number of markedg edges: ', isCutEdge.sum())
-
-        edge2newNode = bm.zeros((NE,), dtype=self.itype)
-        edge2newNode[isCutEdge] = bm.arange(NN, NN + isCutEdge.sum())
-
-        node = self.node
-        newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
-        self.node = bm.concatenate((node, newNode), axis=0)
-        cell2edge0 = cell2edge[:, 0]
-
-        if 'data' in options:
-            pass
-
-        if 'IM' in options:
-            nn = len(newNode)
-            IM = coo_matrix((bm.ones(NN), (bm.arange(NN), bm.arange(NN))),
-                            shape=(NN + nn, NN), dtype=self.ftype)
-            val = bm.full(nn, 0.5)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + bm.arange(nn),
-                        edge[isCutEdge, 0]
-                    )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + bm.arange(nn),
-                        edge[isCutEdge, 1]
-                    )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
-            options['IM'] = IM.tocsr()
-
-        if 'HB' in options:
-            options['HB'] = bm.arange(NC)
-
-        for k in range(2):
-            idx, = bm.nonzero(edge2newNode[cell2edge0] > 0)
-            nc = len(idx)
-            if nc == 0:
-                break
-
-            if 'HB' in options:
-                HB = options['HB']
-                options['HB'] = bm.concatenate((HB, HB[idx]), axis=0)
-
-            L = idx
-            R = bm.arange(NC, NC + nc)
-            if ('data' in options) and (options['data'] is not None):
-                for key, value in options['data'].items():
-                    if value.shape == (NC,):  # 分片常数
-                        value = bm.r_[value[:], value[idx]]
-                        options['data'][key] = value
-                    elif value.shape == (NN + k * nn,):
-                        if k == 0:
-                            value = bm.r_['0', value, bm.zeros((nn,), dtype=self.ftype)]
-                            value[NN:] = 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]])
-                            options['data'][key] = value
-                    else:
-                        ldof = value.shape[-1]
-                        p = int((bm.sqrt(1 + 8 * ldof) - 3) // 2)
-                        bc = self.multi_index_matrix(p, etype=2) / p
-
-                        bcl = bm.zeros_like(bc)
-                        bcl[:, 0] = bc[:, 1]
-                        bcl[:, 1] = 1 / 2 * bc[:, 0] + bc[:, 2]
-                        bcl[:, 2] = 1 / 2 * bc[:, 0]
-
-                        bcr = bm.zeros_like(bc)
-                        bcr[:, 0] = bc[:, 2]
-                        bcr[:, 1] = 1 / 2 * bc[:, 0]
-                        bcr[:, 2] = 1 / 2 * bc[:, 0] + bc[:, 1]
-
-                        value = bm.r_['0', value, bm.zeros((nc, ldof), dtype=self.ftype)]
-
-                        phi = self.shape_function(bcr, p=p)
-                        value[NC:, :] = bm.einsum('cj,kj->ck', value[idx], phi)
-
-                        phi = self.shape_function(bcl, p=p)
-                        value[idx, :] = bm.einsum('cj,kj->ck', value[idx], phi)
-
-                        options['data'][key] = value
-
-            p0 = cell[idx, 0]
-            p1 = cell[idx, 1]
-            p2 = cell[idx, 2]
-            p3 = edge2newNode[cell2edge0[idx]]
-            cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
-            cell[L, 0] = p3
-            cell[L, 1] = p0
-            cell[L, 2] = p1
-            cell[R, 0] = p3
-            cell[R, 1] = p2
-            cell[R, 2] = p0
-            if k == 0:
-                cell2edge0 = bm.zeros((NC + nc,), dtype=self.itype)
-                cell2edge0[0:NC] = cell2edge[:, 0]
-                cell2edge0[L] = cell2edge[idx, 2]
-                cell2edge0[R] = cell2edge[idx, 1]
-            NC = NC + nc
-
-        NN = self.node.shape[0]
-        self.reinit(NN, cell)
+    def bisect(): #TODO
+        pass
 
     def coarsen(self, isMarkedCell=None, options={}):
         pass
