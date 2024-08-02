@@ -50,6 +50,14 @@ class TestTetrahedronMeshInterfaces:
         sign = mesh.face_to_edge_sign() 
         np.testing.assert_array_equal(bm.to_numpy(sign), data["sign"])
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", face_unit_norm)
+    def test_face_init_norm(self, data, backend):
+        bm.set_backend(backend)
+        np.set_printoptions(precision=16)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
+        n = mesh.face_unit_normal()
+        np.testing.assert_allclose(bm.to_numpy(n), data["fn"], atol=1e-14)
 
 if __name__ == "__main__":
     pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])

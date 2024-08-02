@@ -732,7 +732,7 @@ class TriangleMesh(SimplexMesh):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
             cell = idxMap[cell]
 
         return cls(node, cell)

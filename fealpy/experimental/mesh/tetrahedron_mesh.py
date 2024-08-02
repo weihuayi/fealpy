@@ -1,4 +1,5 @@
 from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
 
 class TetrahedronMesh(SimplexMesh): 
@@ -69,7 +70,18 @@ class TetrahedronMesh(SimplexMesh):
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
         return face2edgeSign
-    
+
+    def face_unit_normal(self, index=_S):
+        face = self.face
+        node = self.node
+
+        v01 = node[face[index, 1], :] - node[face[index, 0], :]
+        v02 = node[face[index, 2], :] - node[face[index, 0], :]
+        nv = bm.cross(v01, v02)
+        length = bm.sqrt(bm.square(nv).sum(axis=1))
+        return nv/length.reshape(-1, 1)
+
+   
     ## @ingroup MeshGenerators
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):
@@ -127,12 +139,12 @@ class TetrahedronMesh(SimplexMesh):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
             cell = idxMap[cell]
         mesh = TetrahedronMesh(node, cell)
 
-#        bdface = mesh.boundary_face_index()
-#        f2n = mesh.face_unit_normal()[bdface]
+        bdface = mesh.boundary_face_index()
+        f2n = mesh.face_unit_normal()[bdface]
 #        isLeftBd   = bm.abs(f2n[:, 0]+1)<1e-14
 #        isRightBd  = bm.abs(f2n[:, 0]-1)<1e-14
 #        isFrontBd  = bm.abs(f2n[:, 1]+1)<1e-14
