@@ -370,15 +370,16 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
-        points = node[tri, :]
-        e0 = points[..., 2, :] - points[..., 1, :]
-        e1 = points[..., 0, :] - points[..., 2, :]
-        e2 = points[..., 1, :] - points[..., 0, :]
-        nv = det(torch.stack([e0, e1], dim=-2)) # (...)
-        e0 = e0.flip(-1)
-        e1 = e1.flip(-1)
-        e2 = e2.flip(-1)
-        result = torch.stack([e0, e1, e2], dim=-2)
+        shape = tri.shape[:-1] + (3, 2)
+        result = torch.zeros(shape, dtype=node.dtype) 
+
+        result[..., 0, :] = node[tri[..., 2]] - node[tri[..., 1]]
+        result[..., 1, :] = node[tri[..., 0]] - node[tri[..., 2]]
+        result[..., 2, :] = node[tri[..., 1]] - node[tri[..., 0]]
+
+        nv = result[..., 0, 0]*result[..., 1, 1] - result[..., 0, 1]*result[..., 1, 0]
+
+        result = result.flip(-1)
         result[..., 0].mul_(-1)
         return result.div_(nv[..., None, None])
 
