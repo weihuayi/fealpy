@@ -27,6 +27,14 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     random = torch.random
 
     @staticmethod
+    def context(tensor):
+        return {
+            "dtype": tensor.dtype,
+            "device": tensor.device,
+            "requires_grad": tensor.requires_grad,
+        }
+
+    @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
         torch.set_default_device(device)
 
@@ -44,8 +52,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
-        """
-        """
         assert endpoint == True
         if isinstance(start, (int, float)) and isinstance(stop, (int, float)):
             return torch.linspace(start, stop, num, dtype=dtype, **kwargs);
@@ -226,12 +232,14 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             x = torch.transpose(x)
         return vmap(func1d)(x)
 
-
     ### FEALPy functionals ###
-
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Tensor:
+        """
+        TODO:
+            1. context?
+        """
         dtype = dtype or torch.int
         sep = torch.flip(torch.tensor(
             tuple(combinations_with_replacement(range(p+1), dim)),
@@ -426,12 +434,13 @@ attribute_mapping.update({
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
-        array='tensor', 
-        power='pow', 
-        transpose='permute',
-        repeat='repeat_interleave', 
-        index_add_= 'index_add_',
-        copy='clone')
+    array='tensor',
+    power='pow',
+    transpose='permute',
+    repeat='repeat_interleave',
+    index_add_= 'index_add_',
+    copy='clone'
+)
 PyTorchBackend.attach_methods(function_mapping, torch)
 
 PyTorchBackend.random.rand = torch.rand

@@ -110,7 +110,10 @@ FUNCTION_MAPPING = _make_default_mapping(
     # Other functions
     'copy', 'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
-    'flip', 'where', 'tile'
+    'flip', 'where', 'tile',
+
+    # Functional programming
+    'apply_along_axis',
 )
 
 

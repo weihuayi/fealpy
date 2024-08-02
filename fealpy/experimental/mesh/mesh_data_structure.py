@@ -24,7 +24,7 @@ class MeshDS(metaclass=MeshMeta):
     localFace: TensorLike # only for homogeneous mesh
     localFace2Edge: TensorLike
 
-    def __init__(self, TD: int) -> None:
+    def __init__(self, *, TD: int, itype=None, ftype=None) -> None:
         assert hasattr(self, '_entity_dim_method_name_map')
         self._entity_storage: Dict[int, TensorLike] = {}
         self._entity_factory: Dict[int, Callable] = {
@@ -32,6 +32,8 @@ class MeshDS(metaclass=MeshMeta):
             for k in self._entity_dim_method_name_map
         }
         self.TD = TD
+        self.itype = itype or bm.int32
+        self.ftype = ftype or bm.float64
 
     @overload
     def __getattr__(self, name: EntityName) -> TensorLike: ...
@@ -63,8 +65,6 @@ class MeshDS(metaclass=MeshMeta):
 
     ### properties
     def top_dimension(self) -> int: return self.TD
-    @property
-    def itype(self) -> Any: return self.cell.dtype
     @property
     def device(self) -> Any: return self.cell.device
     def storage(self) -> Dict[int, TensorLike]:
