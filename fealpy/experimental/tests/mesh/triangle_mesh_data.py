@@ -435,7 +435,7 @@ grad_shape_function_data = [
 
 grad_shape_function_on_edge_data = [
         {
-            "gval":
+            "gval": 1
             }
 ]
 interpolation_point_data = [
