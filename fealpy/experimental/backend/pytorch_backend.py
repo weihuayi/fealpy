@@ -372,6 +372,16 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         e2 = e2.flip(-1)
         result = torch.stack([e0, e1, e2], dim=-2)
         result[..., 0].mul_(-1)
+
+        e0 = node[tri[..., 2]] - node[tri[..., 1]]
+        e1 = node[tri[..., 0]] - node[tri[..., 2]]
+        e2 = node[tri[..., 1]] - node[tri[..., 0]]
+        nv0 = e0[..., 0]*e1[..., 1] - e0[..., 1]*e1[..., 0]
+        result0 = torch.stack([e0, e1, e2], dim=-2)
+        result0 = result0.flip(-1)
+        result0[..., 0].mul_(-1)
+        print("triangle_grad_lambda_2d : ", np.testing.assert_allclose(result, result0))
+        print("triangle_grad_lambda_2d : ", np.testing.assert_allclose(nv, nv0))
         return result.div_(nv[..., None, None])
 
     @staticmethod
