@@ -130,22 +130,21 @@ class TetrahedronMesh(SimplexMesh):
             idxMap[isValidNode] = range(isValidNode.sum())
             cell = idxMap[cell]
         mesh = TetrahedronMesh(node, cell)
-        import ipdb
-        ipdb.set_trace()
-        bdface = mesh.boundary_face_index()
-        f2n = mesh.face_unit_normal()[bdface]
-        isLeftBd   = bm.abs(f2n[:, 0]+1)<1e-14
-        isRightBd  = bm.abs(f2n[:, 0]-1)<1e-14
-        isFrontBd  = bm.abs(f2n[:, 1]+1)<1e-14
-        isBackBd   = bm.abs(f2n[:, 1]-1)<1e-14
-        isBottomBd = bm.abs(f2n[:, 2]+1)<1e-14
-        isUpBd     = bm.abs(f2n[:, 2]-1)<1e-14
-        mesh.meshdata["leftface"]   = bdface[isLeftBd]
-        mesh.meshdata["rightface"]  = bdface[isRightBd]
-        mesh.meshdata["frontface"]  = bdface[isFrontBd]
-        mesh.meshdata["backface"]   = bdface[isBackBd]
-        mesh.meshdata["upface"]     = bdface[isUpBd]
-        mesh.meshdata["bottomface"] = bdface[isBottomBd]
+
+#        bdface = mesh.boundary_face_index()
+#        f2n = mesh.face_unit_normal()[bdface]
+#        isLeftBd   = bm.abs(f2n[:, 0]+1)<1e-14
+#        isRightBd  = bm.abs(f2n[:, 0]-1)<1e-14
+#        isFrontBd  = bm.abs(f2n[:, 1]+1)<1e-14
+#        isBackBd   = bm.abs(f2n[:, 1]-1)<1e-14
+#        isBottomBd = bm.abs(f2n[:, 2]+1)<1e-14
+#        isUpBd     = bm.abs(f2n[:, 2]-1)<1e-14
+#        mesh.meshdata["leftface"]   = bdface[isLeftBd]
+#        mesh.meshdata["rightface"]  = bdface[isRightBd]
+#        mesh.meshdata["frontface"]  = bdface[isFrontBd]
+#        mesh.meshdata["backface"]   = bdface[isBackBd]
+#        mesh.meshdata["upface"]     = bdface[isUpBd]
+#        mesh.meshdata["bottomface"] = bdface[isBottomBd]
         return mesh
 
 
