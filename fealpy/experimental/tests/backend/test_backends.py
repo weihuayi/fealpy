@@ -825,7 +825,7 @@ class TestBackendInterfaces:
         '''
         pass
     
-    ########Linear algebra
+    ######## Linear algebra
     # Matrix and vector products
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_dot(self, backend):
@@ -1090,8 +1090,210 @@ class TestBackendInterfaces:
         Generic Python-exception-derived object raised by linalg functions.
         '''
         pass
+    
+    ####### Logic funtions
+    ## Truth value testing
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_all(self, backend):
+        '''
+        Test whether all array elements along a given axis evaluate to True.
+        '''
+        pass
 
-    ########Inedxing routines
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_any(self, backend):
+        '''
+        Test whether any array element along a given axis evaluates to True.
+        '''
+        pass
+    
+    ## Array contents
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isfinite(self, backend):
+        '''
+        Test element-wise for finiteness (not infinity and not Not a Number).
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isinf(self, backend):
+        '''
+        Test element-wise for positive or negative infinity.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isnan(self, backend):
+        '''
+        Test element-wise for NaN and return result as a boolean array.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isnat(self, backend):
+        '''
+        Test element-wise for NaT (not a time) and return result as a boolean array.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isneginf(self, backend):
+        '''
+        Test element-wise for negative infinity, return result as bool array.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isposinf(self, backend):
+        '''
+        Test element-wise for positive infinity, return result as bool array.
+        '''
+        pass
+    
+    ## Arrat type testing
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_iscomplex(self, backend):
+        '''
+        Returns a bool array, where True if input element is complex.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_iscomplexobj(self, backend):
+        '''
+        Check for a complex type or an array of complex numbers.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isfortran(self, backend):
+        '''
+        Check if the array is Fortran contiguous but not C contiguous.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isreal(self, backend):
+        '''
+        Returns a bool array, where True if input element is real.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isrealobj(self, backend):
+        '''
+        Return True if x is a not complex type or an array of complex numbers.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isscalar(self, backend):
+        '''
+        Returns True if the type of element is a scalar type.
+        '''
+        pass
+    
+    ## Logical operations
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_logical_and(self, backend):
+        '''
+        Compute the truth value of x1 AND x2 element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_logical_or(self, backend):
+        '''
+        Compute the truth value of x1 OR x2 element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_logical_not(self, backend):
+        '''
+        Compute the truth value of NOT x element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_logical_xor(self, backend):
+        '''
+        Compute the truth value of x1 XOR x2, element-wise.
+        '''
+        pass
+    
+    ## Comparsion
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_allclose(self, backend):
+        '''
+        Returns True if two arrays are element-wise equal within a tolerance.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_isclose(self, backend):
+        '''
+        Returns a boolean array where two arrays are element-wise equal within a tolerance.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_array_equal(self, backend):
+        '''
+        True if two arrays have the same shape and elements, False otherwise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_array_equiv(self, backend):
+        '''
+        Returns True if input arrays are shape consistent and all elements equal.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_greater(self, backend):
+        '''
+        Return the truth value of (x1 > x2) element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_greater_equal(self, backend):
+        '''
+        Return the truth value of (x1 >= x2) element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_less(self, backend):
+        '''
+        Return the truth value of (x1 < x2) element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_less_equal(self, backend):
+        '''
+        Return the truth value of (x1 <= x2) element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_equal(self, backend):
+        '''
+        Return (x1 == x2) element-wise.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_not_equal(self, backend):
+        '''
+        Return (x1 != x2) element-wise.
+        '''
+        pass
+
+    ######## Inedxing routines
     # Generating index arrays
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_c_(self, backend):
@@ -1326,7 +1528,8 @@ class TestBackendInterfaces:
         Check whether or not an object can be iterated over.
         '''
         pass
-    ########Mathematical functions
+    
+    ######## Mathematical functions
     # Trigonometric functions
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_sin(self, backend):
@@ -2102,7 +2305,7 @@ class TestBackendInterfaces:
         '''
         pass
     
-    ########Random
+    ######## Random
 
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_random_rand(self, backend):
@@ -2131,8 +2334,140 @@ class TestBackendInterfaces:
         Return random integers from low (inclusive) to high (exclusive).
         '''
         pass
+    
+    ####### Sorting, searching, and counting
+    ## Sorting
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_sort(self, backend):
+        '''
+        Return a sorted copy of an array.
+        '''
+        pass
 
-    ########Fealpy Function
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_lexsort(self, backend):
+        '''
+        Perform an indirect stable sort using a sequence of keys.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_argsort(self, backend):
+        '''
+        Returns the indices that would sort an array.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_ndarray_sort(self, backend):
+        '''
+        Sort an array in-place.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_sort_complex(self, backend):
+        '''
+        Sort a complex array using the real part first, then the imaginary part.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_partition(self, backend):
+        '''
+        Return a partitioned copy of an array.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_argpartition(self, backend):
+        '''
+        Perform an indirect partition along the given axis using the algorithm specified by the kind keyword.
+        '''
+        pass
+    
+    ## Searching
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_argmax(self, backend):
+        '''
+        Returns the indices of the maximum values along an axis.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_nanargmax(self, backend):
+        '''
+        Return the indices of the maximum values in the specified axis ignoring NaNs.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_argmin(self, backend):
+        '''
+        Returns the indices of the minimum values along an axis.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_nanargmin(self, backend):
+        '''
+        Return the indices of the minimum values in the specified axis ignoring NaNs.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_argwhere(self, backend):
+        '''
+        Find the indices of array elements that are non-zero, grouped by element.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_nonzero(self, backend):
+        '''
+        Return the indices of the elements that are non-zero.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_flatnonzero(self, backend):
+        '''
+        Return indices that are non-zero in the flattened version of a.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_where(self, backend):
+        '''
+        Return elements chosen from x or y depending on condition.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_searchsorted(self, backend):
+        '''
+        Find indices where elements should be inserted to maintain order.
+        '''
+        pass
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_extract(self, backend):
+        '''
+        Return the elements of an array that satisfy some condition.
+        '''
+        pass
+    
+    ## Counting
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_count_nonzero(self, backend):
+        '''
+        Counts the number of non-zero values in the array a
+        '''
+        pass
+
+
+
+    ######## Fealpy Function
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("data", unique_data)
     def test_unique(self, backend, data):
