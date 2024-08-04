@@ -180,7 +180,7 @@ class MeshDS(metaclass=MeshMeta):
         """
         NN = self.number_of_nodes()
         bd_face_flag = self.boundary_face_flag()
-        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        kwargs = bm.context(bd_face_flag)
         bd_face2node = self.entity('face', index=bd_face_flag)
         bd_node_flag = bm.zeros((NN,), **kwargs)
         bd_node_flag[bd_face2node.ravel()] = True

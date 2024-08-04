@@ -72,12 +72,12 @@ class UniformMesh2d(StructuredMesh):
         x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
         y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
-        node = bm.concatenate((xx[..., np.newaxis], yy[..., np.newaxis]), axis=-1)
+        node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
 
         return node
     
     @entitymethod(1)
-    def _get_edge(self):
+    def _get_edge(self) -> TensorLike:
         """
         @berif Generate the edges in a structured mesh.
         """
@@ -88,7 +88,7 @@ class UniformMesh2d(StructuredMesh):
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
         edge = bm.zeros((NE, 2), dtype=self.itype)
-
+        # TODO: Provide a unified implementation that is not backend-specific
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
             NE0 = 0
             NE1 = nx * (ny + 1)
@@ -96,25 +96,32 @@ class UniformMesh2d(StructuredMesh):
             edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
             edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
 
-            #edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
-
             NE0 = NE1
             NE1 += ny * (nx + 1)
             edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
             edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
             edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
 
-            #edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
-
             return edge
         elif bm.backend_name == 'jax':
-            # TODO: Jax backend is not yet implemented.
-            raise NotImplementedError("Jax backend is not yet implemented.")
+            NE0 = 0
+            NE1 = nx * (ny + 1)
+            edge = edge.at[NE0:NE1, 0].set(idx[:-1, :].reshape(-1))
+            edge = edge.at[NE0:NE1, 1].set(idx[1:, :].reshape(-1))
+            edge = edge.at[NE0 + ny:NE1:ny + 1, :].set(bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=1))
+
+            NE0 = NE1
+            NE1 += ny * (nx + 1)
+            edge = edge.at[NE0:NE1, 0].set(idx[:, :-1].reshape(-1))
+            edge = edge.at[NE0:NE1, 1].set(idx[:, 1:].reshape(-1))
+            edge = edge.at[NE0:NE0 + ny, :].set(bm.flip(edge[NE0:NE0 + ny], axis=1))
+
+            return edge
         else:
             raise NotImplementedError("Backend is not yet implemented.")
     
     @entitymethod(2)
-    def _get_cell(self):
+    def _get_cell(self) -> TensorLike:
         """
         @berif Generate the cells in a structured mesh.
         """
@@ -126,15 +133,12 @@ class UniformMesh2d(StructuredMesh):
         cell = bm.zeros((NC, 4), dtype=self.itype)
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
         c = idx[:-1, :-1]
-        #cell[:, 0] = c.reshape(-1)
-        #cell[:, 1] = cell[:, 0] + 1
-        #cell[:, 2] = cell[:, 0] + ny + 1
-        #cell[:, 3] = cell[:, 2] + 1
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1
         cell_2 = cell_0 + ny + 1
         cell_3 = cell_2 + 1
-        cell = bm.concatenate([cell_0[:, None], cell_1[:, None], cell_2[:, None], cell_3[:, None]], axis=-1)
+        cell = bm.concatenate([cell_0[:, None], cell_1[:, None], cell_2[:, None], 
+                            cell_3[:, None]], axis=-1)
 
         return cell
     
@@ -171,78 +175,85 @@ class UniformMesh2d(StructuredMesh):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
        
-    # def cell_barycenter(self):
-    #     GD = self.geo_dimension()
-    #     nx = self.nx
-    #     ny = self.ny
-    #     box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
-    #            self.origin[1] + self.h[1] / 2, self.origin[1] + self.h[1] / 2 + (ny - 1) * self.h[1]]
-    #     bc = bm.zeros((nx, ny, 2), dtype=self.ftype)
-    #     bc[..., 0], bc[..., 1] = np.mgrid[
-    #                              box[0]:box[1]:nx * 1j,
-    #                              box[2]:box[3]:ny * 1j]
-    #     return bc
+    def cell_barycenter(self) -> TensorLike:
+        '''
+        @brief Calculate the barycenter coordinates of the cells.
+        '''
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
+               self.origin[1] + self.h[1] / 2, self.origin[1] + self.h[1] / 2 + (ny - 1) * self.h[1]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny)
+        X, Y = bm.meshgrid(x, y, indexing='ij')
+        bc = bm.zeros((nx, ny, 2), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None]), axis=-1)
 
-    # def edge_barycenter(self):
-    #     """
-    #     @brief
-    #     """
-    #     bcx = self.edgex_barycenter()
-    #     bcy = self.edgey_barycenter()
-    #     return bcx, bcy
+        return bc
 
-    # ## @ingroup FDMInterface
-    # def edgex_barycenter(self):
-    #     """
-    #     @brief
-    #     """
-    #     GD = self.geo_dimension()
-    #     nx = self.nx
-    #     ny = self.ny
-    #     box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
-    #            self.origin[1], self.origin[1] + ny * self.h[1]]
-    #     bc = np.zeros((nx, ny + 1, 2), dtype=self.ftype)
-    #     bc[..., 0], bc[..., 1] = np.mgrid[
-    #                              box[0]:box[1]:nx * 1j,
-    #                              box[2]:box[3]:(ny + 1) * 1j]
-    #     return bc
+    def edge_barycenter(self) -> Tuple:
+        """
+        @brief Calculate the coordinates range for the edge centers.
+        """
+        bcx = self.edgex_barycenter()
+        bcy = self.edgey_barycenter()
 
-    # ## @ingroup FDMInterface
-    # def edgey_barycenter(self):
-    #     """
-    #     @breif
-    #     """
-    #     GD = self.geo_dimension()
-    #     nx = self.nx
-    #     ny = self.ny
-    #     box = [self.origin[0], self.origin[0] + nx * self.h[0],
-    #            self.origin[1] + self.h[1] / 2, self.origin[1] + self.h[1] / 2 + (ny - 1) * self.h[1]]
-    #     bc = np.zeros((nx + 1, ny, 2), dtype=self.ftype)
-    #     bc[..., 0], bc[..., 1] = np.mgrid[
-    #                              box[0]:box[1]:(nx + 1) * 1j,
-    #                              box[2]:box[3]:ny * 1j]
-    #     return bc
+        return bcx, bcy
 
-    # def gradient(self, f, order=1):
-    #     """
-    #     @brief 求网格函数 f 的梯度
-    #     """
-    #     hx = self.h[0]
-    #     hy = self.h[1]
-    #     fx, fy = np.gradient(f, hx, hy, edge_order=order)
-    #     return fx, fy
+    def edgex_barycenter(self) -> TensorLike:
+        """
+        @brief Calculate the coordinates range for the edge centers in the x-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        X, Y = bm.meshgrid(x, y, indexing='ij') 
+        bc = bm.zeros((nx, ny + 1, 2), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None]), axis=-1)
 
-    # ## @ingroup FDMInterface
-    # def divergence(self, f_x, f_y, order=1):
-    #     """
-    #     @brief 求向量网格函数 (fx, fy) 的散度
-    #     """
+        return bc
 
-    #     hx = self.h[0]
-    #     hy = self.h[1]
-    #     f_xx, f_xy = np.gradient(f_x, hx, edge_order=order)
-    #     f_yx, f_yy = np.gradient(f_y, hy, edge_order=order)
-    #     return f_xx + f_yy
+    def edgey_barycenter(self) -> TensorLike:
+        """
+        @brief Calculate the coordinates range for the edge centers in the x-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny)
+        X, Y = bm.meshgrid(x, y, indexing='ij') 
+        bc = bm.zeros((nx, ny + 1, 2), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None]), axis=-1)
+
+        return bc
+
+    def bc_to_point(self, bcs: Tuple, index=_S):
+        """
+        @brief Transform the barycentric coordinates of integration points
+        to Cartesian coordinates on the actual mesh entities.
+
+        Returns
+            TensorLike: (NQ, NC, GD)
+        """
+        node = self.entity('node')
+
+        assert len(bcs) == 2
+        cell = self.entity('cell')[index]
+
+        bcs0 = bcs[0].reshape(-1, 2)
+        bcs1 = bcs[1].reshape(-1, 2)
+        bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
+
+        p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
+        if p.shape[0] == 1:
+            p = p.reshape(-1, 2)
+
+        return p
     
     def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
         """
@@ -292,22 +303,43 @@ class UniformMesh2d(StructuredMesh):
         if p == 1:
             return node.reshape(-1, GD)
 
-        NN = self.number_of_nodes()
-        gdof = self.number_of_global_ipoints(p)
-        ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
-        ipoints[:NN, :] = node
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            NN = self.number_of_nodes()
+            gdof = self.number_of_global_ipoints(p)
+            ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
+            ipoints[:NN, :] = node
 
-        NE = self.number_of_edges()
-        multiIndex = self.multi_index_matrix(p, 1, dtype=node.dtype)
-        w = multiIndex[1:-1, :] / p
-        ipoints[NN:NN + (p-1) * NE, :] = bm.einsum('ij, ...jm -> ...im', w,
-                node[edge,:]).reshape(-1, GD)
+            NE = self.number_of_edges()
+            multiIndex = self.multi_index_matrix(p, 1, dtype=node.dtype)
+            w = multiIndex[1:-1, :] / p
+            ipoints[NN:NN + (p-1) * NE, :] = bm.einsum('ij, ...jm -> ...im', w,
+                    node[edge,:]).reshape(-1, GD)
 
-        w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
-        ipoints[NN + (p-1) * NE:, :] = bm.einsum('ij, kj... -> ki...', w,
-                node[cell[:]]).reshape(-1, GD)
+            w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
+            ipoints[NN + (p-1) * NE:, :] = bm.einsum('ij, kj... -> ki...', w,
+                    node[cell[:]]).reshape(-1, GD)
 
-        return ipoints
+            return ipoints
+        elif bm.backend_name == 'jax':
+            NN = self.number_of_nodes()
+            gdof = self.number_of_global_ipoints(p)
+            ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
+            ipoints = ipoints.at[:NN, :].set(node)
+
+            NE = self.number_of_edges()
+            multiIndex = self.multi_index_matrix(p, 1, dtype=node.dtype)
+            w = multiIndex[1:-1, :] / p
+            ipoints = ipoints.at[NN:NN + (p-1) * NE, :].set(bm.einsum('ij, ...jm -> ...im', 
+                                                        w, node[edge, :]).reshape(-1, GD))
+
+            w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
+            ipoints = ipoints.at[NN + (p-1) * NE:, :].set(bm.einsum('ij, kj... -> ki...', 
+                                                        w, node[cell[:]]).reshape(-1, GD))
+            
+            return ipoints
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
     
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
@@ -331,13 +363,26 @@ class UniformMesh2d(StructuredMesh):
 
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
-        for i in range(TD):
-            G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
-            for j in range(i+1, TD):
-                G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
-                G[..., j, i] = G[..., i, j]
-                
-        return G
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            for i in range(TD):
+                G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+                for j in range(i+1, TD):
+                    G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+                    G[..., j, i] = G[..., i, j]
+                    
+            return G
+        elif bm.backend_name == 'jax':
+            for i in range(TD):
+                G = G.at[..., i, i].set(bm.einsum('...d, ...d -> ...', 
+                                                J[..., i], J[..., i]))
+                for j in range(i + 1, TD):
+                    G = G.at[..., i, j].set(bm.einsum('...d, ...d -> ...', 
+                                                    J[..., i], J[..., j]))
+                    G = G.at[..., j, i].set(G[..., i, j])
+            return G
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
        
     def shape_function(self, bcs: TensorLike, p: int=1, 
                     mi: Optional[TensorLike]=None) -> TensorLike:
@@ -384,14 +429,20 @@ class UniformMesh2d(StructuredMesh):
         gphi1 = bm.einsum('...ij, j -> ...i', R1, Dlambda)
 
         n = phi0.shape[0] * phi1.shape[0]
-        #ldof = phi0.shape[-1] * phi1.shape[-1]
         ldof = self.number_of_local_ipoints(p, etype=2)
 
         shape = (n, ldof, 2)
         gphi = bm.zeros(shape, dtype=self.ftype)
 
-        gphi[..., 0] = bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof)
-        gphi[..., 1] = bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            gphi[..., 0] = bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof)
+            gphi[..., 1] = bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof)
+        elif bm.backend_name == 'jax':
+            gphi = gphi.at[..., 0].set(bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof))
+            gphi = gphi.at[..., 1].set(bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof))
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
 
         if variables == 'u':
             return gphi
@@ -400,10 +451,95 @@ class UniformMesh2d(StructuredMesh):
             G = self.first_fundamental_form(J)
             G = bm.linalg.inv(G)
             gphi = bm.einsum('...ikm, ...imn, ...ln -> ...ilk', J, G, gphi)
+
             return gphi
+        
+    def edge_to_cell(self):
+        """
+        @brief 边与单元的邻接关系，储存与每条边相邻的两个单元的信息
+        """
+
+        nx = self.nx
+        ny = self.ny
+        NC = self.NC
+        NE = self.NE
+
+        edge2cell = bm.zeros((NE, 4), dtype=self.itype)
+
+        idx = bm.arange(NC, dtype=self.itype).reshape(nx, ny).T
+
+        # x direction
+        idx0 = bm.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
+        # y direction
+        idx1 = bm.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
+        NE0 = nx * (ny + 1)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # left element
+            edge2cell[idx0[:-1], 0] = idx
+            edge2cell[idx0[:-1], 2] = 0
+            edge2cell[idx0[-1], 0] = idx[-1]
+            edge2cell[idx0[-1], 2] = 1
+
+            # right element
+            edge2cell[idx0[1:], 1] = idx
+            edge2cell[idx0[1:], 3] = 1
+            edge2cell[idx0[0], 1] = idx[0]
+            edge2cell[idx0[0], 3] = 0
+
+            # left element
+            edge2cell[NE0 + idx1[:, 1:], 0] = idx
+            edge2cell[NE0 + idx1[:, 1:], 2] = 3
+            edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+            edge2cell[NE0 + idx1[:, 0], 2] = 2
+
+            # right element
+            edge2cell[NE0 + idx1[:, :-1], 1] = idx
+            edge2cell[NE0 + idx1[:, :-1], 3] = 2
+            edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+            edge2cell[NE0 + idx1[:, -1], 3] = 3
+
+            return edge2cell
+        elif bm.backend_name == 'jax':
+            # left element
+            edge2cell = edge2cell.at[idx0[:-1], 0].set(idx)
+            edge2cell = edge2cell.at[idx0[:-1], 2].set(0)
+            edge2cell = edge2cell.at[idx0[-1], 0].set(idx[-1])
+            edge2cell = edge2cell.at[idx0[-1], 2].set(1)
+
+            # right element
+            edge2cell = edge2cell.at[idx0[1:], 1].set(idx)
+            edge2cell = edge2cell.at[idx0[1:], 3].set(1)
+            edge2cell = edge2cell.at[idx0[0], 1].set(idx[0])
+            edge2cell = edge2cell.at[idx0[0], 3].set(0)
+
+            # left element
+            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 0].set(idx)
+            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 2].set(3)
+            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 0].set(idx[:, 0])
+            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 2].set(2)
+
+            # right element
+            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 1].set(idx)
+            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 3].set(2)
+            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 1].set(idx[:, -1])
+            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 3].set(3)
+
+            return edge2cell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
     
-    def uniform_refine(self, n=1):
-        # TODO: There is a problem with this code
+    def uniform_refine(self, n: int=1):
+        """
+        @brief Uniformly refine the 2D structured mesh.
+
+        Note:
+        clear method is used at the end to clear the cache of entities. This is necessary because even after refinement, 
+        the entities remain the same as before refinement due to the caching mechanism.
+        Structured mesh have their own entity generation methods, so the cache needs to be manually cleared.
+        Unstructured mesh do not require this because they do not have entity generation methods.
+        """
         for i in range(n):
             self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
@@ -414,11 +550,8 @@ class UniformMesh2d(StructuredMesh):
             self.NF = self.NE
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
             self.NN = (self.nx + 1) * (self.ny + 1)
+        self.clear() 
         
-        del self.node
-        del self.edge
-        del self.cell
-        # TODO: Implement cache clearing mechanism
 
 
 
