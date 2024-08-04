@@ -25,6 +25,8 @@ class TriangleMesh(SimplexMesh):
             (2, 0, 1)], **kwargs)
 
         self.construct()
+        print("Construct over")
+        print(self.face_to_cell())
 
         self.nodedata = {}
         self.edgedata = {}
@@ -575,7 +577,7 @@ class TriangleMesh(SimplexMesh):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
             cell = idxMap[cell]
 
         return cls(node, cell)

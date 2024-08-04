@@ -20,13 +20,13 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         self.localEdge = self.generate_local_lagrange_edges(p)
         self.localFace = self.localEdge
-        self.ccw  = np.array([0, 1, 2], **kwargs)
+        self.ccw  = bm.array([0, 1, 2], **kwargs)
 
-        self.localCell = np.array([
+        self.localCell = bm.array([
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
-
+        
         if construct:
             self.construct()
 
@@ -40,17 +40,24 @@ class LagrangeTriangleMesh(HomogeneousMesh):
     def construct(self):
         pass
 
+    # 重载拓扑关系函数
+    def cell_to_edge(self):
+        return self.cell2edge
+
+    def edge_to_cell(self):
+        return self.edge2cell
+
     def generate_local_lagrange_edges(self, p: int) -> TensorLike:
         """
         Generate the local edges for Lagrange elements of order p.
         """
         TD = self.top_dimension()
-        multiIndex = F.multi_index_matrix(p, TD)
+        multiIndex = bm.multi_index_matrix(p, TD)
 
-        localEdge = np.zeros((3, p+1), dtype=np.int_)
-        localEdge[2, :], = np.where(multiIndex[:, 2] == 0)
-        localEdge[1, -1::-1], = np.where(multiIndex[:, 1] == 0)
-        localEdge[0, :],  = np.where(multiIndex[:, 0] == 0)
+        localEdge = bm.zeros((3, p+1), dtype=bm.int32)
+        localEdge[2, :], = bm.where(multiIndex[:, 2] == 0)
+        localEdge[1, -1::-1], = bm.where(multiIndex[:, 1] == 0)
+        localEdge[0, :],  = bm.where(multiIndex[:, 0] == 0)
 
         return localEdge
 
