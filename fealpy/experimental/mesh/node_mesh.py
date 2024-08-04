@@ -7,6 +7,7 @@ from .. import logger
 from .mesh_base import MeshDS 
 
 import jax.numpy as jnp
+import jax
 from jax_md import space, partition
 from jax import vmap, lax
 
@@ -42,28 +43,6 @@ class NodeMesh(MeshDS):
         '''
         return 0
 
-    def add_node_data(self, name:Union[str, list], data: TensorLike) -> Union:
-        '''
-        @brief Add particle attributes and assign values.
-        '''
-        if isinstance(name, str):
-            if name in self.nodedata:
-                self.nodedata[name] = bm.concatenate([self.nodedata[name], bm.tensor(data)], axis=0)
-            else:
-                self.nodedata[name] = bm.tensor(data)
-        else:
-            for n, d in zip(name, data):
-                if n in self.nodedata:
-                    self.nodedata[n] = bm.concatenate([self.nodedata[n], bm.tensor(d)], axis=0)
-                else:
-                    self.nodedata[n] = bm.tensor(d)
-    
-    def set_node_data(self, name:Union[str, list], data:TensorLike) -> Union:
-        '''
-        @brief Replace the values of an attribute.
-        '''
-        self.nodedata[name] = self.nodedata[name].at[:].set(data)
-
     def add_plot(self, axes, color='k', markersize=20):
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
@@ -78,11 +57,10 @@ class NodeMesh(MeshDS):
         neighbor_fn = partition.neighbor_list(displacement, box_size, h)
 
         nbrs = neighbor_fn.allocate(self.node)
-
         nbrs = neighbor_fn.update(self.node, nbrs)
         neighbor = nbrs.idx
         num = self.node.shape[0]
-        index = vmap(lambda idx, row: jnp.hstack([row, bm.tensor([idx])]))(bm.arange(neighbor.shape[0]), neighbor)
+        index = vmap(lambda idx, row: jnp.hstack([row, jnp.array([idx])]))(bm.arange(neighbor.shape[0]), neighbor)
         row_len = bm.sum(index != num,axis=1)
         indptr = lax.scan(lambda carry, x: (carry + x, carry + x), 0, row_len)[1]
         indptr = bm.concatenate((bm.tensor([0]), indptr))
@@ -106,8 +84,12 @@ class NodeMesh(MeshDS):
         y = r[:, 1]
         u0 = -bm.cos(2.0 * bm.pi * x) * bm.sin(2.0 * bm.pi * y)
         v0 = bm.sin(2.0 * bm.pi * x) * bm.cos(2.0 * bm.pi * y)
-        mv = mv.at[:,0].set(u0)
-        mv = mv.at[:,1].set(v0)
+        if hasattr(mv, 'at'):  
+            mv = mv.at[:, 0].set(u0)
+            mv = mv.at[:, 1].set(v0)
+        else:  
+            mv[:, 0] = u0
+            mv[:, 1] = v0
         tv = mv
         volume = bm.ones(NN, dtype=bm.float64) * dx * dy
         rho = bm.ones(NN, dtype=bm.float64) * rho0
@@ -278,7 +260,7 @@ class NodeMesh(MeshDS):
         return cls(r, nodedata=nodedata)
 
     @classmethod
-    def from_long_rectangular_cavity_domain(cls, init_domain, domain, uin, dx=1.25e-4):
+    def from_long_rectangular_cavity_domain(cls, init_domain=bm.tensor([0.0,0.005,0,0.005]), domain=bm.tensor([0,0.05,0,0.005]), uin=bm.tensor([5.0, 0.0]), dx=1.25e-4):
         H = 1.5 * dx
         dy = dx
         rho0 = 737.54
@@ -335,75 +317,6 @@ class NodeMesh(MeshDS):
             "sound": bm.zeros_like(rho),
             "mass": mass, 
         } 
-        
-        return cls(r, nodedata=nodedata)
-
-
-    @classmethod
-    def from_slip_stick_domain(cls, dx=0.02, dy=0.02):
-        n_walls = 3 #墙壁层数
-        rho0 = 1.0 #参考密度
-        eta0 = 0.01 #参考动态粘度
-        L,H = 1.5,0.2
-        velocity_wall = 0.3 #每段速度边界长度
-
-        #wall particles
-        dxn1 = dx * n_walls
-        n1 = bm.tensor((bm.tensor([L, dxn1]) / dx).round(), dtype=int)
-        grid1 = bm.meshgrid(bm.arange(n1[0]), bm.arange(n1[1]), indexing="xy")
-        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
-        wall_b = r1.copy()
-        wall_t = r1.copy() + bm.tensor([0.0, H + dxn1])
-        r_w = bm.concatenate([wall_b, wall_t])
-
-        #fuild particles
-        n2 = bm.tensor((bm.tensor([L, H]) / dx).round(), dtype=int)
-        grid2 = bm.meshgrid(bm.arange(n2[0]), bm.arange(n2[1]), indexing="xy")
-        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
-        r_f = bm.tensor([0.0, 1.0]) * n_walls * dx + r2
-
-        #tag
-        '''
-        0 fluid
-        1 solid wall
-        2 moving wall
-        3 velocity wall
-        '''
-        r = bm.tensor(bm.concatenate([r_w, r_f])) 
-        tag_f = jnp.full(len(r_f), 0, dtype=int)
-        tag_w = jnp.full(len(r_w), 1, dtype=int)
-        r = bm.tensor(bm.concatenate([r_w, r_f]))
-        tag = bm.concatenate([tag_w, tag_f])
-
-        dx2n = dx * n_walls * 2
-        _box_size = bm.tensor([L, H + dx2n])
-        mask_hot_wall = (
-        ((r[:, 1] < dx * n_walls) | (r[:, 1] > H + dx * n_walls)) &
-        (((r[:, 0] > 0.3) & (r[:, 0] < 0.6)) | ((r[:, 0] > 0.9) & (r[:, 0] < 1.2)))
-    )
-        tag = jnp.where(mask_hot_wall, 3, tag)
-
-        NN_sum = r.shape[0]
-        mv = bm.zeros_like(r)
-        mv = jnp.where(tag[:, None] == 1, bm.tensor([1.0, 0.0]), mv)
-        rho = bm.ones(NN_sum) * rho0
-        mass = bm.ones(NN_sum) * dx * dy * rho0
-        eta = bm.ones(NN_sum) * eta0
-
-        nodedata = {
-            "position": r,
-            "tag": tag,
-            "mv": mv,
-            "tv": mv,
-            "dmvdt": bm.zeros_like(mv),
-            "dtvdt": bm.zeros_like(mv),
-            "drhodt": bm.zeros_like(rho),
-            "rho": rho,
-            "p": bm.zeros_like(rho),
-            "mass": mass,
-            "eta": eta,
-            "dTdt": bm.zeros_like(rho),
-        }
         
         return cls(r, nodedata=nodedata)
 

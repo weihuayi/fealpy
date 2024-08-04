@@ -29,9 +29,9 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def context(tensor):
         return {
-                "dtype": tensor.dtype,
-                "device": tensor.device,
-                "requires_grad": tensor.requires_grad,
+            "dtype": tensor.dtype,
+            "device": tensor.device,
+            "requires_grad": tensor.requires_grad,
         }
 
     @staticmethod
@@ -52,8 +52,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
-        """
-        """
         assert endpoint == True
         if isinstance(start, (int, float)) and isinstance(stop, (int, float)):
             return torch.linspace(start, stop, num, dtype=dtype, **kwargs);
@@ -234,12 +232,14 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             x = torch.transpose(x)
         return vmap(func1d)(x)
 
-
     ### FEALPy functionals ###
-
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Tensor:
+        """
+        TODO:
+            1. context?
+        """
         dtype = dtype or torch.int
         sep = torch.flip(torch.tensor(
             tuple(combinations_with_replacement(range(p+1), dim)),
@@ -370,15 +370,16 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
-        points = node[tri, :]
-        e0 = points[..., 2, :] - points[..., 1, :]
-        e1 = points[..., 0, :] - points[..., 2, :]
-        e2 = points[..., 1, :] - points[..., 0, :]
-        nv = det(torch.stack([e0, e1], dim=-2)) # (...)
-        e0 = e0.flip(-1)
-        e1 = e1.flip(-1)
-        e2 = e2.flip(-1)
-        result = torch.stack([e0, e1, e2], dim=-2)
+        shape = tri.shape[:-1] + (3, 2)
+        result = torch.zeros(shape, dtype=node.dtype) 
+
+        result[..., 0, :] = node[tri[..., 2]] - node[tri[..., 1]]
+        result[..., 1, :] = node[tri[..., 0]] - node[tri[..., 2]]
+        result[..., 2, :] = node[tri[..., 1]] - node[tri[..., 0]]
+
+        nv = result[..., 0, 0]*result[..., 1, 1] - result[..., 0, 1]*result[..., 1, 0]
+
+        result = result.flip(-1)
         result[..., 0].mul_(-1)
         return result.div_(nv[..., None, None])
 
@@ -424,12 +425,13 @@ attribute_mapping.update({
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
-        array='tensor', 
-        power='pow', 
-        transpose='permute',
-        repeat='repeat_interleave', 
-        index_add_= 'index_add_',
-        copy='clone')
+    array='tensor',
+    power='pow',
+    transpose='permute',
+    repeat='repeat_interleave',
+    index_add_= 'index_add_',
+    copy='clone'
+)
 PyTorchBackend.attach_methods(function_mapping, torch)
 
 PyTorchBackend.random.rand = torch.rand

@@ -1,9 +1,9 @@
-#import numpy as np 
+import math
 import matplotlib.pyplot as plt
 import random
 from fealpy.experimental.iopt import initialize
 from ..backend import backend_manager as bm
-#bm.set_backend('pytorch')
+
 class COA:
     def __init__(self, N, dim,  ub, lb, Max_iter, fobj):
         """
@@ -18,7 +18,7 @@ class COA:
         #self.init_x = init_x
     
     def p_obj(self, x):
-        y =  0.2 * ( 1 / (bm.sqrt(2 * bm.pi) * 3)) * bm.exp(-(x-25) ** 2 / (2*3 ** 2))
+        y =  0.2 * ( 1 / (math.sqrt(2 * bm.pi) * 3)) * math.exp(-(x-25) ** 2 / (2*3 ** 2))
         return y 
     
     def cal(self):
@@ -30,10 +30,10 @@ class COA:
         fitness_f, X,  best_position, Best_fitness = I.initialize()
         
         fitness_f = fitness_f.reshape((1,self.N))
-        Xnew = X.copy()
+        Xnew = bm.copy(X)
         global_position = best_position
         global_fitness = Best_fitness
-        cuve_f[:,0]=Best_fitness
+        cuve_f[:, 0]=Best_fitness
         t=0
 
         while t < self.Max_iter:
@@ -42,6 +42,8 @@ class COA:
             xf = (best_position + global_position) / 2
             Xfood = best_position
 
+
+            """
             for i in range(self.N):            
                 if temp > 30:
                     #summer resort stage
@@ -62,11 +64,12 @@ class COA:
                         Xfood = bm.exp(-1/P) * Xfood
                         
                         for j in range(self.dim):                        
-                            Xnew[i][j] = X[i][j] + bm.cos(2*bm.pi*random.random()) * Xfood[j] * self.p_obj(temp) - bm.sin(2 * bm.pi* random.random()) * Xfood[j] * self.p_obj(temp)
+                            Xnew[i][j] = X[i][j] + math.cos(2*bm.pi*random.random()) * Xfood[j] * self.p_obj(temp) - math.sin(2 * bm.pi* random.random()) * Xfood[j] * self.p_obj(temp)
                     else:
                         Xnew_i = (X[i,:]-Xfood)* self.p_obj(temp)+ self.p_obj(temp) * bm.random.rand(1, self.dim) * X[i,:]
                         for j in range(self.dim):
                             Xnew[i][j] = Xnew_i[:,j]
+            """
             
             for i in range(self.N):  
                 for j in range(self.dim):  
@@ -89,7 +92,8 @@ class COA:
                     fitness_f[:,i]  = new_fitness
 
                     for j in range(self.dim):
-                        X[i][j] = Xnew[i][j].copy()
+                        #X[i][j] = Xnew[i][j].copy()
+                        X[i][j] = bm.copy(Xnew[i][j])
 
                     if  fitness_f[:,i]  < Best_fitness:
                         Best_fitness= fitness_f[:,i] 
@@ -97,7 +101,7 @@ class COA:
            
             cuve_f[:,t] = Best_fitness
             t = t + 1
-            if bm.mod(t, 50) == 0:
+            if t % 50 == 0:
                 print("COA" + " iter" , t , ":", Best_fitness)
 
         return Best_fitness,best_position,cuve_f

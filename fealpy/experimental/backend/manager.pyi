@@ -1,7 +1,8 @@
 
 from typing import (
-        Any, Tuple, Union, Optional, overload, TypeGuard, 
-        Literal, Dict)
+    Any, Tuple, Union, Optional, overload, TypeGuard, 
+    Literal, Dict
+)
 
 from .base import Backend, Size, Number
 from .base import TensorLike as _DT
@@ -19,7 +20,8 @@ class BackendManager():
     def load_backend(self, name: str) -> None: ... # instance method
     def get_current_backend(self) -> Backend: ... # instance method
 
-    def context(self, tensor) -> Dict: ...
+    def context(self, tensor) -> Dict[str, Any]: ...
+
     ### constants ###
 
     pi: float
@@ -52,6 +54,9 @@ class BackendManager():
     # PyTorch
     def from_numpy(self, ndarray: Any, /) -> _DT: ...
 
+    ### Functional programming ###
+
+    def apply_along_axis(self, func1d, axis, arr: _DT, *args, **kwargs) -> _DT: ...
 
     ### Tensor creation routines ###
     ## From shape or value

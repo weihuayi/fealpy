@@ -1,12 +1,15 @@
 import argparse
 
 import numpy as np
+import sympy as sp
+from scipy.sparse.linalg import spsolve
 
 import matplotlib.pyplot as plt
 
 from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData
+from pde import LaplacePDE
 
 from fealpy.mesh.triangle_mesh import TriangleMesh 
 
@@ -50,8 +53,11 @@ nx = args.nx
 ny = args.ny
 maxit = args.maxit
 
-pde = CosCosData()
-domain = pde.domain()
+x = sp.symbols('x')
+y = sp.symbols('y')
+u = x**4*y**5#(sp.sin(4*sp.pi*x)*sp.sin(4*sp.pi*y))**6
+pde = LaplacePDE(u)
+domain =[0,1,0,1] #pde.domain()
 
 mesh = TriangleMesh.from_box(box = domain, nx = nx, ny = ny)
 
@@ -69,12 +75,10 @@ for i in range(maxit):
     bform.add_domain_integrator(DiffusionIntegrator(q = p+2))
     A = bform.assembly()
 
-    print(A.toarray())
 
     lform = LinearForm(space)
     lform.add_domain_integrator(ScalarSourceIntegrator(f = pde.source, q = p+2))
     F = lform.assembly()
-    print(F)
 
     bc = DirichletBC(space = space, gD = pde.dirichlet) 
     uh = space.function() 
@@ -83,6 +87,7 @@ for i in range(maxit):
     solver = GAMGSolver(ptype='W', sstep=2)
     solver.setup(A)
     uh[:] = solver.solve(F)
+    #uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
     errorMatrix[1, i] = mesh.error(pde.gradient, uh.grad_value)

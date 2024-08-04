@@ -9,7 +9,7 @@ from fealpy.experimental.tests.mesh.triangle_mesh_data import *
 
 class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
-    @pytest.mark.parametrize("data", init_mesh_data)
+    @pytest.mark.parametrize("data", init_data)
     def test_init(self, data, backend):
         bm.set_backend(backend)
 
@@ -23,6 +23,24 @@ class TestTriangleMeshInterfaces:
         assert mesh.number_of_faces() == data["NF"] 
         assert mesh.number_of_cells() == data["NC"] 
         
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+    
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("data", from_one_triangle_data)
+    def test_from_one_triangle(self, data, backend):
+        bm.set_backend(backend)
+
+        mesh = TriangleMesh.from_one_triangle(meshtype='equ')
+
+        assert mesh.number_of_nodes() == data["NN"] 
+        assert mesh.number_of_edges() == data["NE"] 
+        assert mesh.number_of_faces() == data["NF"] 
+        assert mesh.number_of_cells() == data["NC"] 
+        
+        cell =  mesh.entity('cell')
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
     
@@ -66,14 +84,25 @@ class TestTriangleMeshInterfaces:
     def test_grad_lambda(self, data, backend):
         bm.set_backend(backend)
         
-        mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=16, ny=16)
-        flag = mesh.boundary_cell_flag()
-        NC = bm.sum(flag)
-        val = mesh.grad_lambda(index=flag)
+        mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=2, ny=2)
+        val = mesh.grad_lambda()
 
-        assert val.shape == gldata["val_shape"]
+        np.testing.assert_allclose(bm.to_numpy(val), data["val"], atol=1e-14)    
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("data", grad_shape_function_data)
+    def test_grad_shape_function(self, data, backend):
+        bm.set_backend(backend)
+        print("Test grad_shape_function")
+        
+        mesh = TriangleMesh.from_box(nx=2, ny=2)
+        qf = mesh.quadrature_formula(q=3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi = mesh.grad_shape_function(bcs, p=2)
+
+        np.testing.assert_allclose(bm.to_numpy(gphi), data["gphi"], atol=1e-14)    
+    
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", interpolation_point_data)
     def test_interpolation_points(self, data, backend):
         bm.set_backend(backend)
@@ -106,27 +135,37 @@ class TestTriangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(face2cell), data["face2cell"], atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(cell2edge), data["cell2edge"], atol=1e-14)
 
-'''
-    @pytest.mark.parametrize("meshdata", from_torus_surface_data)
-    def test_from_torus_surface(self, meshdata, backend):
-        R = meshdata["R"]
-        r = meshdata["r"]
-        Nu = meshdata["Nu"]
-        Nv = meshdata["Nv"]
-        expected_node_shape = meshdata["node_shape"]
-        expected_cell_shape = meshdata["cell_shape"]
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", jacobian_matrix_data)
+    def test_jacobian_matrix(self, data, backend):
+        bm.set_backend(backend)
 
-        mesh = TriangleMesh.from_torus_surface(R, r, Nu, Nv)
+        mesh = TriangleMesh.from_box(nx=2, ny=2)
 
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
+        jacobian = mesh.jacobian_matrix()
 
-        assert node.shape == expected_node_shape
-        assert cell.shape == expected_cell_shape
-''' 
+        np.testing.assert_allclose(bm.to_numpy(jacobian), data["jacobian_matrix"], atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("data", from_unit_sphere_surface_data)
+    def test_from_unit_sphere_surface(self, data, backend):
+        bm.set_backend(backend)
+
+        mesh = TriangleMesh.from_unit_sphere_surface()
+
+        assert mesh.number_of_nodes() == data["NN"] 
+        assert mesh.number_of_edges() == data["NE"] 
+        assert mesh.number_of_faces() == data["NF"] 
+        assert mesh.number_of_cells() == data["NC"] 
+        
+        cell =  mesh.entity('cell')
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
-    #a.test_interpolation_points(interpolation_point_data[0], 'pytorch')
+    #a.test_from_unit_sphere_surface(from_unit_sphere_surface_data[0], 'pytorch')
     pytest.main(["./test_triangle_mesh.py"])
 

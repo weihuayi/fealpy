@@ -92,7 +92,7 @@ class TriangleMesh(SimplexMesh):
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
+            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda)
             return gphi  # (NQ, NC, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
@@ -108,25 +108,7 @@ class TriangleMesh(SimplexMesh):
         @param lidx 边在该单元的局部编号
         @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致
         """
-
-        NC = len(cindex)
-        nmap = bm.array([1, 2, 0])
-        pmap = bm.array([2, 0, 1])
-        shape = (NC,) + bc.shape[0:-1] + (3,)
-        bcs = bm.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
-        idx = bm.arange(NC)
-        if direction:
-            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
-            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
-        else:
-            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
-            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
-
-        gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
-
-        return gphi
-
-    grad_shape_function_on_face = grad_shape_function_on_edge
+        pass
 
     # ipoint
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
@@ -166,13 +148,13 @@ class TriangleMesh(SimplexMesh):
         if p >= 3:
             TD = self.top_dimension()
             cell = self.entity('cell')
-            multiIndex = bm.multi_index_matrix(p, TD)
+            multiIndex = bm.multi_index_matrix(p, TD, dtype=self.ftype)
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
                                 isEdgeIPoints[:, 2])
             multiIndex = multiIndex[isInCellIPoints, :]
             w = multiIndex / p
-
+            
             ipoints_from_cell = bm.einsum('ij, kj...->ki...', w,
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
             ipoint_list.append(ipoints_from_cell)
@@ -230,6 +212,24 @@ class TriangleMesh(SimplexMesh):
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
 
+    def prolongation_matrix(self, po: int, p1: int):
+        """
+        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
+        """
+        pass
+
+    def edge_frame(self, index: Index=_S):
+        """
+        @brief 计算二维网格中每条边上的局部标架
+        """
+        pass
+     
+    def edge_normal(self, index: Index=_S):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        pass
+
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
 
@@ -254,17 +254,22 @@ class TriangleMesh(SimplexMesh):
             #TODO: call self.clear() 清理暂存的数据
             self.construct()
 
-    def is_crossed_cell(self, point, segment): # TODO
+    def is_crossed_cell(self, point, segment):
         """
-        Notes: 给定一组线段，找到这些线段的一个邻域单元集合，
-              且这些单元要满足一定的连通性。
+        @berif 给定一组线段，找到这些线段的一个邻域单元集合, 且这些单元要满足一定的连通
+        性
         """
-        pass 
+        pass
+    
+    def location(self, points):
+        """
+        @breif  给定一组点 p , 找到这些点所在的单元
 
-    def location(self, points):  # TODO
+        这里假设：
 
-        """
-        Notes: 给定一组点 p，找扫这些点所在的单元
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
         """
         pass
 
@@ -307,28 +312,34 @@ class TriangleMesh(SimplexMesh):
             return c
 
     def angle(self):
-        NC = self.number_of_cells()
-        cell = self.cell
-        node = self.node
-        localEdge = self.localEdge
-        angle = bm.zeros((NC, 3), dtype=self.ftype)
-        for i, (j, k) in zip(range(3), localEdge):
-            v0 = node[cell[:, j]] - node[cell[:, i]]
-            v1 = node[cell[:, k]] - node[cell[:, i]]
-            # NumPyBacked has no arccos
-            angle[:, i] = bm.arccos(
-                bm.sum(v0 * v1, axis=1) / bm.sqrt(bm.sum(v0 ** 2, axis=1) * np.sum(v1 ** 2, axis=1)))
-        return angle  
+        pass
 
-    def show_angle(self, axes, angle=None): # TODO 
+    def show_angle(self, axes, angle=None):
         """
-        Note: 显示网格角度的分布直方图
+        @brief 显示网格角度的分布直方图
+        """
+        pass
+    
+    def cell_quality(self, measure='radius_ratio'):
+        if measure == 'radius_ratio':
+            return radius_ratio(self)
+
+    def show_quality(self, axes, qtype=None, quality=None):
+        """
+        @brief 显示网格质量分布的分布直方图
         """
         pass
 
-    def unifrom_bisect(self, n=1):
+    def edge_swap(self):
+        pass
+
+    def odt_iterate(self):
+        pass
+
+    def uniform_bisect(self, n=1):
         for i in range(n):
             self.bisect()
+
     def bisect_options(
             self,
             HB=None,
@@ -344,147 +355,128 @@ class TriangleMesh(SimplexMesh):
             'disp': disp
         }
         return options
-    def bisect(self, isMarkedCell=None, options={'disp': True}):
 
-        if options['disp']:
-            print('Bisection begining......')
+    def bisect(): #TODO
+        pass
 
-        NN = self.number_of_nodes()
+    def coarsen(self, isMarkedCell=None, options={}):
+        pass
+
+    def label(self, node=None, cell=None, cellidx=None):
+        """
+        单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
+        Parameter
+        -------
+        Return 
+        -------
+        cell ： in-place modify
+        """
+        pass
+
+    def delete_degree_4(self):
+        pass
+
+    @staticmethod
+    def adaptive_options(
+            method='mean',
+            maxrefine=5,
+            maxcoarsen=0,
+            theta=1.0,
+            tol=1e-6,  # 目标误差
+            HB=None,
+            imatrix=False,
+            data=None,
+            disp=True,
+        ):
+
+        options = {
+            'method': method,
+            'maxrefine': maxrefine,
+            'maxcoarsen': maxcoarsen,
+            'theta': theta,
+            'tol': tol,
+            'data': data,
+            'HB': HB,
+            'imatrix': imatrix,
+            'disp': disp
+        }
+        return options
+
+    def adaptive(self, eta, options):
+        pass
+
+    def bisect_1(self, isMarkedCell=None, options={'disp': True}):
+        pass
+
+    def jacobian_matrix(self, index: Index=_S):
+        """
+        @brief 获得三角形单元对应的 Jacobian 矩阵
+        """
         NC = self.number_of_cells()
-        NE = self.number_of_edges()
+        GD = self.geo_dimension()
 
-        if options['disp']:
-            print('Current number of nodes:', NN)
-            print('Current number of edges:', NE)
-            print('Current number of cells:', NC)
-
-        if isMarkedCell is None:
-            isMarkedCell = bm.ones(NC, dtype=bm.bool_)
-
+        node = self.entity('node')
         cell = self.entity('cell')
-        edge = self.entity('edge')
 
-        cell2edge = self.cell_to_edge()
-        cell2cell = self.cell_to_cell()
-        cell2ipoint = self.cell_to_ipoint(self.p)
-        isCutEdge = bm.zeros((NE,), dtype=bm.bool_)
+        J = bm.zeros((NC, GD, 2), dtype=self.ftype)
 
-        if options['disp']:
-            print('The initial number of marked elements:', isMarkedCell.sum())
+        J[..., 0] = node[cell[:, 1]] - node[cell[:, 0]]
+        J[..., 1] = node[cell[:, 2]] - node[cell[:, 0]]
 
-        markedCell, = bm.nonzero(isMarkedCell)
-        while len(markedCell) > 0:
-            isCutEdge[cell2edge[markedCell, 0]] = True
-            refineNeighbor = cell2cell[markedCell, 0]
-            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor, 0]]]
+        return J
 
-        if options['disp']:
-            print('The number of markedg edges: ', isCutEdge.sum())
+    def point_to_bc(self, point):
+        """
+        @brief 找到定点 point 所在的单元，并计算其重心坐标 
+        """
+        pass
 
-        edge2newNode = np.zeros((NE,), dtype=self.itype)
-        edge2newNode[isCutEdge] = bm.arange(NN, NN + isCutEdge.sum())
+    def mark_interface_cell(self, phi):
+        """
+        @brief 标记穿过界面的单元
+        """
+        pass
 
-        node = self.node
-        newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
-        self.node = bm.concatenate((node, newNode), axis=0)
-        cell2edge0 = cell2edge[:, 0]
+    def mark_interface_cell_with_curvature(self, phi, hmax=None):
+        """
+        @brief 标记曲率大的单元
+        """
+        pass
 
-        if 'data' in options:
-            pass
+    def mark_interface_cell_with_type(self, phi, interface):
+        """
+        @brief 等腰直角三角形，可以分为两类
+            - Type A：两条直角边和坐标轴平行
+            - Type B: 最长边和坐标轴平行
+        """
+        pass
 
-        if 'IM' in options:
-            nn = len(newNode)
-            IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
-                            shape=(NN + nn, NN), dtype=self.ftype)
-            val = np.full(nn, 0.5)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + np.arange(nn),
-                        edge[isCutEdge, 0]
-                    )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + np.arange(nn),
-                        edge[isCutEdge, 1]
-                    )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
-            options['IM'] = IM.tocsr()
+    def bisect_interface_cell_with_curvature(self, interface, hmax):
+        pass
 
-        if 'HB' in options:
-            options['HB'] = bm.arange(NC)
+    def show_function(self, plot, uh, cmap=None):
+        pass
 
-        for k in range(2):
-            idx, = bm.nonzero(edge2newNode[cell2edge0] > 0)
-            nc = len(idx)
-            if nc == 0:
-                break
+    @classmethod
+    def show_lattice(cls, p=1, shownltiindex=False):
+        """
+        @berif 展示三角形上的单纯形格点
+        """
+        pass
 
-            if 'HB' in options:
-                HB = options['HB']
-                options['HB'] = bm.concatenate((HB, HB[idx]), axis=0)
+    @classmethod
+    def show_shape_function(cls, p=1, funtype='L'):
+        """
+        @brief 可视化展示三角形单元上的 p 次基函数
+        """
+        pass
 
-            L = idx
-            R = bm.arange(NC, NC + nc)
-            if ('data' in options) and (options['data'] is not None):
-                for key, value in options['data'].items():
-                    if value.shape == (NC,):  # 分片常数
-                        value = bm.r_[value[:], value[idx]]
-                        options['data'][key] = value
-                    elif value.shape == (NN + k * nn,):
-                        if k == 0:
-                            value = bm.r_['0', value, bm.zeros((nn,), dtype=self.ftype)]
-                            value[NN:] = 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]])
-                            options['data'][key] = value
-                    else:
-                        ldof = value.shape[-1]
-                        p = int((bm.sqrt(1 + 8 * ldof) - 3) // 2)
-                        bc = self.multi_index_matrix(p, etype=2) / p
-
-                        bcl = bm.zeros_like(bc)
-                        bcl[:, 0] = bc[:, 1]
-                        bcl[:, 1] = 1 / 2 * bc[:, 0] + bc[:, 2]
-                        bcl[:, 2] = 1 / 2 * bc[:, 0]
-
-                        bcr = bm.zeros_like(bc)
-                        bcr[:, 0] = bc[:, 2]
-                        bcr[:, 1] = 1 / 2 * bc[:, 0]
-                        bcr[:, 2] = 1 / 2 * bc[:, 0] + bc[:, 1]
-
-                        value = bm.r_['0', value, bm.zeros((nc, ldof), dtype=self.ftype)]
-
-                        phi = self.shape_function(bcr, p=p)
-                        value[NC:, :] = bm.einsum('cj,kj->ck', value[idx], phi)
-
-                        phi = self.shape_function(bcl, p=p)
-                        value[idx, :] = bm.einsum('cj,kj->ck', value[idx], phi)
-
-                        options['data'][key] = value
-
-            p0 = cell[idx, 0]
-            p1 = cell[idx, 1]
-            p2 = cell[idx, 2]
-            p3 = edge2newNode[cell2edge0[idx]]
-            cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
-            cell[L, 0] = p3
-            cell[L, 1] = p0
-            cell[L, 2] = p1
-            cell[R, 0] = p3
-            cell[R, 1] = p2
-            cell[R, 2] = p0
-            if k == 0:
-                cell2edge0 = bm.zeros((NC + nc,), dtype=self.itype)
-                cell2edge0[0:NC] = cell2edge[:, 0]
-                cell2edge0[L] = cell2edge[idx, 2]
-                cell2edge0[R] = cell2edge[idx, 1]
-            NC = NC + nc
-
-        NN = self.node.shape[0]
-        self.reinit(NN, cell)
+    @classmethod
+    def show_global_basis_function(cls, p=3):
+        """
+        @brief 展示通过单元基函数的拼接+零扩展的方法获取整体基函数的过程
+        """
+        pass
 
     @classmethod
     def from_one_triangle(cls, meshtype='iso'):
@@ -492,7 +484,7 @@ class TriangleMesh(SimplexMesh):
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, bm.sqrt(3) / 2]], dtype=bm.float64)
+                [0.5, bm.sqrt(bm.tensor(3)) / 2]], dtype=bm.float64)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0],
@@ -556,8 +548,8 @@ class TriangleMesh(SimplexMesh):
         """
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
-        x = bm.linspace(box[0], box[1], nx+1)
-        y = bm.linspace(box[2], box[3], ny+1)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64)
         X, Y = bm.meshgrid(x, y, indexing='ij')
     
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
@@ -583,7 +575,7 @@ class TriangleMesh(SimplexMesh):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
             cell = idxMap[cell]
 
         return cls(node, cell)
@@ -591,38 +583,7 @@ class TriangleMesh(SimplexMesh):
     ## @ingroup MeshGenerators
     @classmethod
     def from_torus_surface(cls, R, r, nu, nv):
-        """
-        """
-        NN = nu * nv
-        NC = nu * nv
-        node = bm.zeros((NN, 3), dtype=ftype)
-
-        x = bm.linspace(0, 2*bm.pi, nu)
-        y = bm.linspace(0, 2*bm.pi, nv)
-        U, V = bm.meshgrid(x, y, indexing='ij')
-        
-        X = (R + r * bm.cos(V)) * bm.cos(U)
-        Y = (R + r * bm.cos(V)) * bm.sin(U)
-        Z = r * bm.sin(V)
-        node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
-
-        idx = bm.zeros((nu + 1, nv + 1), dtype=bm.int32)
-        idx[0:-1, 0:-1] = bm.arange(NN).reshape(nu, nv)
-        idx[-1, :] = idx[0, :]
-        idx[:, -1] = idx[:, 0]
-        cell = bm.zeros((2 * NC, 3), dtype=bm.int32)
-        cell0 = bm.concatenate((
-            idx[1:, 0:-1].T.reshape(-1, 1),
-            idx[1:, 1:].T.reshape(-1, 1),
-            idx[0:-1, 0:-1].T.reshape(-1, 1),
-            ), axis=1)
-        cell1 = bm.concatenate((
-            idx[0:-1, 1:].T.reshape(-1, 1),
-            idx[0:-1, 0:-1].T.reshape(-1, 1),
-            idx[1:, 1:].T.reshape(-1, 1)
-            ), axis=1)
-        cell = bm.concatenate((cell0, cell1), axis=0)
-        return cls(node, cell)
+        pass
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -631,12 +592,12 @@ class TriangleMesh(SimplexMesh):
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
         """
-        t = (bm.sqrt(5) - 1) / 2
-        node = bm.tensor([
+        t = (bm.sqrt(bm.tensor(5)) - 1) / 2
+        node = bm.array([
             [0, 1, t], [0, 1, -t], [1, t, 0], [1, -t, 0],
             [0, -1, -t], [0, -1, t], [t, 0, 1], [-t, 0, 1],
             [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=bm.float64)
-        cell = bm.tensor([
+        cell = bm.array([
             [6, 2, 0], [3, 2, 6], [5, 3, 6], [5, 6, 7],
             [6, 0, 7], [3, 8, 2], [2, 8, 1], [2, 1, 0],
             [0, 1, 10], [1, 9, 10], [8, 9, 1], [4, 8, 3],
@@ -645,11 +606,9 @@ class TriangleMesh(SimplexMesh):
         mesh = cls(node, cell)
         mesh.uniform_refine(refine)
         node = mesh.node
-        cell = mesh.cell
-        # project
+        cell = mesh.entity('cell')
         d = bm.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2 + node[:, 2] ** 2) - 1
         l = bm.sqrt(bm.sum(node ** 2, axis=1))
         n = node / l[..., None]
         node = node - d[..., None] * n
         return cls(node, cell)
-

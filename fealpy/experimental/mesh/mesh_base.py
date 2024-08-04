@@ -14,14 +14,6 @@ from .utils import estr2dim
 ##################################################
 
 class Mesh(MeshDS):
-    @property
-    def ftype(self) -> Any:
-        node = self.entity(0)
-        if node is None:
-            raise RuntimeError('Can not get the float type as the node '
-                               'has not been assigned.')
-        return node.dtype
-
     def geo_dimension(self) -> int:
         node = self.entity(0)
         if node is None:
@@ -31,8 +23,9 @@ class Mesh(MeshDS):
 
     GD = property(geo_dimension)
 
-    def multi_index_matrix(self, p: int, etype: int) -> TensorLike:
-        return bm.multi_index_matrix(p, etype, dtype=self.itype)
+    def multi_index_matrix(self, p: int, etype: int, dtype=None) -> TensorLike:
+        dtype = self.itype if dtype is None else dtype
+        return bm.multi_index_matrix(p, etype, dtype=dtype)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """Get the barycenter of the entity.
