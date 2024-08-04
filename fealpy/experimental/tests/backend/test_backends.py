@@ -825,7 +825,7 @@ class TestBackendInterfaces:
         '''
         pass
     
-    ########Linear algebra
+    ######## Linear algebra
     # Matrix and vector products
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_dot(self, backend):
@@ -1091,7 +1091,7 @@ class TestBackendInterfaces:
         '''
         pass
 
-    ########Inedxing routines
+    ######## Inedxing routines
     # Generating index arrays
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_c_(self, backend):
@@ -1326,7 +1326,8 @@ class TestBackendInterfaces:
         Check whether or not an object can be iterated over.
         '''
         pass
-    ########Mathematical functions
+    
+    ######## Mathematical functions
     # Trigonometric functions
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_sin(self, backend):
@@ -2102,7 +2103,7 @@ class TestBackendInterfaces:
         '''
         pass
     
-    ########Random
+    ######## Random
 
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_random_rand(self, backend):
@@ -2132,7 +2133,7 @@ class TestBackendInterfaces:
         '''
         pass
 
-    ########Fealpy Function
+    ######## Fealpy Function
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("data", unique_data)
     def test_unique(self, backend, data):
