@@ -56,4 +56,4 @@ def test_cell_area(p=3):
 
 if __name__ == "__main__":
     test_to_vtk()
-    test_generate_local_lagrange_edge()
+    #test_generate_local_lagrange_edge()
