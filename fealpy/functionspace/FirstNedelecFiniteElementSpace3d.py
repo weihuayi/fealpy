@@ -254,7 +254,7 @@ class FirstNedelecFiniteElementSpace3d:
         uI[:] = np.sum(u(point)*et, axis=-1)
         return uI
 
-    def mass_matrix(self, c=None, q=None, dtype=np.float_):
+    def mass_matrix(self, c=None, q=None, dtype=np.float64):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, 6, 3)
         cm = self.mesh.cell_volume()
@@ -267,7 +267,7 @@ class FirstNedelecFiniteElementSpace3d:
         return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
                 dtype=dtype)
 
-    def curl_matrix(self, c=None, q=None, dtype=np.float_):
+    def curl_matrix(self, c=None, q=None, dtype=np.float64):
         """
 
         Notes:
@@ -304,7 +304,7 @@ class FirstNedelecFiniteElementSpace3d:
         EM = c*csr_matrix((EMc.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return EM
 
-    def source_vector(self, f, dtype=np.float_):
+    def source_vector(self, f, dtype=np.float64):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, 6, 3)
         cm = self.mesh.cell_volume()

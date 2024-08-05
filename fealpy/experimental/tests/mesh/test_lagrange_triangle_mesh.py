@@ -6,26 +6,27 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 from fealpy.experimental.tests.mesh.lagrange_triangle_mesh_data import *
 
-class LagrangeTestTriangleMeshInterfaces:
+class TestLagrangeTriangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
-    @pytest.mark.parametrize("data", init_data)
-    def test_init(self, data, backend, p):
+    @pytest.mark.parametrize("data", from_triangle_mesh_data)
+    def test_from_triangle_mesh(self, data, backend):
         bm.set_backend(backend)
- 
-        p = bm.from_numpy(data['p'])
-        node = bm.from_numpy(data['node'])
-        cell = bm.from_numpy(data['cell'])
-        surface = bm.from_numpy(data['surface'])
 
-        mesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
+        p = data['p']
+        tmesh = data['mesh']
+        surface = data['surface']
+
+        mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p=p, surface=surface)
         
         assert mesh.number_of_nodes() == data["NN"] 
+        assert mesh.number_of_edges() == data["NE"] 
         assert mesh.number_of_cells() == data["NC"] 
         
-        face2cell = mesh.face_to_cell()
-        np.testing.assert_allclose(bm.to_numpy(face2cell), data["face2cell"], atol=1e-14)   
+        edge2cell = mesh.edge_to_cell()
+        print(data['face2cell']-edge2cell)
+        np.testing.assert_allclose(bm.to_numpy(edge2cell), data["face2cell"], atol=1e-14)   
 
 if __name__ == "__main__":
-    #a = LagrangeTestTriangleMeshInterfaces()
-    #a.test_grad_shape_function(grad_shape_function_data[0], 'pytorch')
-    pytest.main(["./test_lagrange_triangle_mesh.py"])
+    a = TestLagrangeTriangleMeshInterfaces()
+    a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
+    #pytest.main(["./test_lagrange_triangle_mesh.py"])
