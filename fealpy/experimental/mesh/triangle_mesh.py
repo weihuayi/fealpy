@@ -182,6 +182,8 @@ class TriangleMesh(SimplexMesh):
         c2p = bm.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
+        print(face2cell[flag, 0])
+    
         c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
 
         flag = face2cell[:, 2] == 1
