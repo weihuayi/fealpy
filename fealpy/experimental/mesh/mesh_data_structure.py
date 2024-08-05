@@ -180,7 +180,7 @@ class MeshDS(metaclass=MeshMeta):
         """
         NN = self.number_of_nodes()
         bd_face_flag = self.boundary_face_flag()
-        kwargs = {'dtype': bd_face_flag.dtype, 'device': bd_face_flag.device}
+        kwargs = bm.context(bd_face_flag)
         bd_face2node = self.entity('face', index=bd_face_flag)
         bd_node_flag = bm.zeros((NN,), **kwargs)
         bd_node_flag[bd_face2node.ravel()] = True
@@ -208,11 +208,14 @@ class MeshDS(metaclass=MeshMeta):
         bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
-    def boundary_node_index(self): return self.boundary_node_flag().nonzero().ravel()
+    def boundary_node_index(self):
+        return bm.nonzero(self.boundary_node_flag(), as_tuple=True)[0]
     # TODO: finish this:
-    # def boundary_edge_index(self): return self.boundary_edge_flag().nonzero().ravel()
-    def boundary_face_index(self): return self.boundary_face_flag().nonzero().ravel()
-    def boundary_cell_index(self): return self.boundary_cell_flag().nonzero().ravel()
+    # def boundary_edge_index(self):
+    def boundary_face_index(self):
+        return bm.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+    def boundary_cell_index(self):
+        return bm.nonzero(self.boundary_cell_flag(), as_tuple=True)[0]
 
     ### Homogeneous Mesh ###
     def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:

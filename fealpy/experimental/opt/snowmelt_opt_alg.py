@@ -6,7 +6,7 @@ from .. import logger
 from .optimizer_base import Optimizer, Problem
 
 
-class CrayfishOptAlg(Optimizer):
+class SnowmeltOptAlg(Optimizer):
     def __init__(self, problem: Problem) -> None:
         super().__init__(problem)
 
@@ -31,3 +31,4 @@ class CrayfishOptAlg(Optimizer):
 
     def run(self):
         pass
+

@@ -9,9 +9,9 @@ class Problem():
     def __init__(
         self,
         x0: TensorLike,
-        objjective: ,
-        NN: int = 1,
-        Preconditioner: = None,
+        objective,
+        NP: int = 1, # the number of solution points
+        Preconditioner = None,
         MaxIters: int = 1000,
         MaxFunEvals: int = 10000,
         NormGradTol: float = 1e-6,
@@ -19,12 +19,12 @@ class Problem():
         StepLength: float = 1.0,
         StepLengthTol: float = 1e-8,
         NumGrad: int = 10,
+        LineSearch: Optional[str] = None,
         Print: bool = True,
-        Linesearch: Optional[str] = None 
     ):
         self.x0 = x0
         self.objective = objective
-        self.NN = NN # number of solution 
+        self.NP = NP # number of solution 
         self.Preconditioner = Preconditioner
         self.MaxIters = MaxIters
         self.MaxFunEvals = MaxFunEvals
@@ -33,8 +33,8 @@ class Problem():
         self.StepLength = StepLength
         self.StepLengthTol = StepLengthTol
         self.NumGrad = NumGrad
+        self.LineSearch = LineSearch
         self.Print = Print
-        self.Linesearch = Linesearch
 
 class Optimizer():
     def __init__(self, problem: Problem) -> None:
@@ -61,7 +61,7 @@ class Optimizer():
         Return:
             The function value, with gradient value for gradient methods.
         """
-        self.__NF += problem.NN 
+        self.__NF += problem.NP 
         return self.problem.objective(x)
 
 

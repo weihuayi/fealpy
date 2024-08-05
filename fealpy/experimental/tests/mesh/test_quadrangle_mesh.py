@@ -28,31 +28,44 @@ class TestQuadrangleMeshInterfaces:
         box = bm.from_numpy(meshdata['box'])
         nx = bm.from_numpy(meshdata['nx'])
         ny = bm.from_numpy(meshdata['ny'])
-        mesh = QuadrangleMesh.from_box(box, nx, ny)
-
-        assert mesh.number_of_nodes() == meshdata["NN"]
-        assert mesh.number_of_edges() == meshdata["NE"]
-        assert mesh.number_of_faces() == meshdata["NF"]
-        assert mesh.number_of_cells() == meshdata["NC"]
+        threshold = bm.from_numpy(meshdata['threshold'])
+        mesh = QuadrangleMesh.from_box(box, nx, ny, threshold)
 
         node = mesh.node
         np.testing.assert_array_equal(bm.to_numpy(node), meshdata["node"])
         cell = mesh.cell
         np.testing.assert_array_equal(bm.to_numpy(cell), meshdata["cell"])
+        edge = mesh.edge
+        np.testing.assert_array_equal(bm.to_numpy(edge), meshdata["edge"])
         face2cell = mesh.face2cell
         np.testing.assert_array_equal(bm.to_numpy(face2cell), meshdata["face2cell"])
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("meshdata", entity_data)
     def test_entity(self, meshdata, backend):
-        node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
-        cell = np.array([[0, 1, 2, 3]], dtype=np.int32)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
         mesh = QuadrangleMesh(node, cell)
-        q = 2
+        q = bm.from_numpy(meshdata['q'])
 
         assert mesh.entity_measure(0) == meshdata["entity_measure"][0]
         assert all(mesh.entity_measure(1) == meshdata["entity_measure"][1])
         assert all(mesh.entity_measure('cell') == meshdata["entity_measure"][2])
+
+        edge_barycenter = mesh.entity_barycenter('edge')
+        cell_barycenter = mesh.entity_barycenter('cell')
+        np.testing.assert_allclose(bm.to_numpy(edge_barycenter), meshdata["edge_barycenter"], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(cell_barycenter), meshdata["cell_barycenter"], atol=1e-7)
+
+        # TODO: have no boundary_edge_index
+        boundary_node_index = mesh.boundary_node_index()
+        boundary_cell_index = mesh.boundary_cell_index()
+        boundary_face_index = mesh.boundary_face_index()
+        # boundary_edge_index = mesh.boundary_edge_index()
+        np.testing.assert_array_equal(bm.to_numpy(boundary_node_index), meshdata["boundary_node_index"])
+        np.testing.assert_array_equal(bm.to_numpy(boundary_face_index), meshdata["boundary_node_index"])
+        np.testing.assert_array_equal(bm.to_numpy(boundary_cell_index), meshdata["boundary_cell_index"])
+        # np.testing.assert_array_equal(bm.to_numpy(boundary_edge_index), meshdata["boundary_edge_index"])
 
         integrator = mesh.quadrature_formula(q)
         bcs, ws = integrator.get_quadrature_points_and_weights()
@@ -66,8 +79,8 @@ class TestQuadrangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("meshdata", geo_data)
     def test_geo(self, meshdata, backend):
-        node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
-        cell = np.array([[0, 1, 2, 3]], dtype=np.int32)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
         mesh = QuadrangleMesh(node, cell)
 
         edge_frame = mesh.edge_frame()
@@ -79,10 +92,9 @@ class TestQuadrangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("meshdata", cal_data)
     def test_cal_data(self, meshdata, backend):
-        node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
-        cell = np.array([[0, 1, 2, 3]], dtype=np.int32)
-        bcs = (bm.tensor([[0.78867513, 0.21132487], [0.21132487, 0.78867513]], dtype=bm.float64),
-               bm.tensor([[0.78867513, 0.21132487], [0.21132487, 0.78867513]], dtype=bm.float64))
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
+        bcs = bm.from_numpy(meshdata['bcs'])
         mesh = QuadrangleMesh(node, cell)
 
         shape_function = mesh.shape_function(bcs)
@@ -100,8 +112,8 @@ class TestQuadrangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("meshdata", extend_data)
     def test_extend_data(self, meshdata, backend):
-        node = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
-        cell = np.array([[0, 1, 2, 3]], dtype=np.int32)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
         mesh = QuadrangleMesh(node, cell)
         p = meshdata["p"]
 
@@ -109,7 +121,7 @@ class TestQuadrangleMeshInterfaces:
         assert mesh.number_of_local_ipoints(p) == meshdata["number_of_local_ipoints"]
         assert mesh.number_of_corner_nodes() == meshdata["number_of_corner_nodes"]
 
-        # 不兼容 jax
+        # TODO: 不兼容 jax
         # cell_to_ipoint = mesh.cell_to_ipoint(p)
         # np.testing.assert_allclose(bm.to_numpy(cell_to_ipoint), meshdata["cell_to_ipoint"], atol=1e-7)
 
@@ -124,6 +136,24 @@ class TestQuadrangleMeshInterfaces:
 
         cell_quality = mesh.cell_quality()
         np.testing.assert_allclose(bm.to_numpy(cell_quality), meshdata["cell_quality"], atol=1e-7)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("meshdata", refine_data)
+    def test_refine(self, meshdata, backend):
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
+        mesh = QuadrangleMesh(node, cell)
+        n = meshdata["n"]
+
+        mesh.uniform_refine(n)
+        refine_node = mesh.node
+        np.testing.assert_allclose(bm.to_numpy(refine_node), meshdata["refine_node"], atol=1e-7)
+        refine_cell = mesh.cell
+        np.testing.assert_allclose(bm.to_numpy(refine_cell), meshdata["refine_cell"], atol=1e-7)
+        refine_edge = mesh.edge
+        np.testing.assert_allclose(bm.to_numpy(refine_edge), meshdata["refine_edge"], atol=1e-7)
+        refine_face_to_cell = mesh.face2cell
+        np.testing.assert_allclose(bm.to_numpy(refine_face_to_cell),meshdata["refine_face_to_cell"], atol=1e-7)
 
 
 if __name__ == "__main__":
