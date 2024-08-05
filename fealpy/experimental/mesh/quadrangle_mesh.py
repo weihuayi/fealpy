@@ -170,17 +170,13 @@ class QuadrangleMesh(TensorMesh):
         """
         @brief 计算二维网格中每条边上单位法线
         """
-        assert self.GD == 2
-        v = self.edge_unit_tangent(index=index)
-        w = bm.tensor([(0, -1), (1, 0)])
-        return v @ w
+        return self.edge_normal(index=index, unit=True)
 
     def edge_frame(self, index: Index = _S):
         """
         @brief 计算二维网格中每条边上的局部标架
         """
         assert self.GD == 2
-        # TODO: index 出错
         t = self.edge_unit_tangent(index=index)
         w = bm.tensor([(0, -1), (1, 0)])
         n = t @ w
@@ -309,6 +305,126 @@ class QuadrangleMesh(TensorMesh):
         jacobi = self.jacobi_at_corner()
         return jacobi.sum(axis=1)/4
 
+    def reorder_cell(self, idx):
+        raise NotImplementedError
+        # NC = self.number_of_cells()
+        # NN = self.number_of_nodes()
+        # cell = self.cell
+        # # localCell 似乎之前未初始化
+        # cell = cell[bm.arange(NC).reshape(-1, 1), self.localCell[idx]]
+        # self.ds.reinit(NN, cell)
+
+    def uniform_refine(self, n=1):
+        """
+        @brief 一致加密四边形网格
+        """
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+
+            # Find the cutted edge
+            cell2edge = self.cell2edge
+            edgeCenter = self.entity_barycenter('edge')
+            cellCenter = self.entity_barycenter('cell')
+
+            edge2center = bm.arange(NN, NN + NE)
+
+            cell = self.cell
+            cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
+            ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
+            cc = bm.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
+
+            if bm.backend_name in ["numpy", "pytorch"]:
+                cell = bm.zeros((4 * NC, 4), dtype=bm.int_)
+                cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
+                cell[1::4, :] = bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1)
+                cell[2::4, :] = bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1)
+                cell[3::4, :] = bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1)
+            elif bm.backend_name == "jax":
+                # TODO: 考虑拼接次数太多导致的效率问题
+                cell_blocks = []
+                for i in range(NC):
+                    block = bm.concatenate([
+                        bm.array([cp[0][i], ep[0][i], cc[i], ep[3][i]]).reshape(1, -1),
+                        bm.array([ep[0][i], cp[1][i], ep[1][i], cc[i]]).reshape(1, -1),
+                        bm.array([cc[i], ep[1][i], cp[2][i], ep[2][i]]).reshape(1, -1),
+                        bm.array([ep[3][i], cc[i], ep[2][i], cp[3][i]]).reshape(1, -1)
+                    ], axis=0)
+                    cell_blocks.append(block)
+
+                # 将所有单元块沿行方向拼接
+                cell = bm.concatenate(cell_blocks, axis=0)
+            else:
+                raise ValueError("Unsupported backend")
+
+            self.node = bm.concatenate([self.node, edgeCenter, cellCenter], axis=0)
+            self.cell = cell
+            self.construct()
+
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_Quad = 9
+            return VTK_Quad
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
+
+    def to_vtk(self, etype='cell', index: Index = _S, fname=None):
+        """
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        raise NotImplementedError
+
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.GD
+        if GD == 2:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        NV = cell.shape[-1]
+
+        cell = bm.concatenate([NV, cell], axis=1)
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+
+    def show_function(self, plot, uh, cmap=None):
+        """
+        TODO: no test
+        """
+        from types import ModuleType
+        import matplotlib.colors as colors
+        import matplotlib.cm as cm
+        from mpl_toolkits.mplot3d import Axes3D
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = plot.axes(projection='3d')
+        else:
+            axes = plot
+
+        node = self.node
+        cax = axes.plot_trisurf(
+                node[:, 0], node[:, 1],
+                uh, cmap=cmap, lw=0.0)
+        axes.figure.colorbar(cax, ax=axes)
+        return axes
+
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
         """
@@ -335,14 +451,27 @@ class QuadrangleMesh(TensorMesh):
                                idx[0:-1, 1:].T.reshape(-1, 1),), axis=1)
 
         if threshold is not None:
-            bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
-            isDelCell = threshold(bc)
-            cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
-            isValidNode[cell] = True
-            node = node[isValidNode]
-            idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
-            cell = idxMap[cell]
+            if bm.backend_name in ["numpy", "pytorch"]:
+                bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+                isDelCell = threshold(bc)
+                cell = cell[~isDelCell]
+                isValidNode = bm.zeros(NN, dtype=bm.bool_)
+                isValidNode[cell] = True
+                node = node[isValidNode]
+                idxMap = bm.zeros(NN, dtype=cell.dtype)
+                idxMap[isValidNode] = range(isValidNode.sum())
+                cell = idxMap[cell]
+            elif bm.backend_name == "jax":
+                bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+                isDelCell = threshold(bc)
+                cell = cell[~isDelCell]
+                isValidNode = bm.zeros(NN, dtype=bm.bool_)
+                isValidNode = isValidNode.at[cell].set(True)
+                node = node[isValidNode]
+                idxMap = bm.zeros(NN, dtype=cell.dtype)
+                idxMap.at[isValidNode].set(bm.arange(isValidNode.sum()))
+                cell = idxMap[cell]
+            else:
+                raise ValueError("Unsupported backend")
 
         return cls(node, cell)

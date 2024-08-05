@@ -90,10 +90,8 @@ class TriangleMesh(SimplexMesh):
         @berif 这里调用的是网格空间基函数的梯度
         """
         R = bm.simplex_grad_shape_function(bc, p)
-        print('R.dtype:', R.dtype)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            print(Dlambda.dtype)
             gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda)
             return gphi  # (NQ, NC, ldof, GD)
         elif variables == 'u':
@@ -110,25 +108,7 @@ class TriangleMesh(SimplexMesh):
         @param lidx 边在该单元的局部编号
         @param direction  True 表示边的方向和单元的逆时针方向一致，False 表示不一致
         """
-
-        NC = len(cindex)
-        nmap = bm.array([1, 2, 0])
-        pmap = bm.array([2, 0, 1])
-        shape = (NC,) + bc.shape[0:-1] + (3,)
-        bcs = bm.zeros(shape, dtype=self.ftype)  # (NE, 3) or (NE, NQ, 3)
-        idx = bm.arange(NC)
-        if direction:
-            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
-            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
-        else:
-            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
-            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
-
-        gphi = self.grad_shape_function(bcs, p=p, index=cindex, variables='x')
-
-        return gphi
-
-    grad_shape_function_on_face = grad_shape_function_on_edge
+        pass
 
     # ipoint
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
@@ -356,9 +336,10 @@ class TriangleMesh(SimplexMesh):
     def odt_iterate(self):
         pass
 
-    def unifrom_bisect(self, n=1):
+    def uniform_bisect(self, n=1):
         for i in range(n):
             self.bisect()
+
     def bisect_options(
             self,
             HB=None,
@@ -374,147 +355,9 @@ class TriangleMesh(SimplexMesh):
             'disp': disp
         }
         return options
-    def bisect(self, isMarkedCell=None, options={'disp': True}):
 
-        if options['disp']:
-            print('Bisection begining......')
-
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NE = self.number_of_edges()
-
-        if options['disp']:
-            print('Current number of nodes:', NN)
-            print('Current number of edges:', NE)
-            print('Current number of cells:', NC)
-
-        if isMarkedCell is None:
-            isMarkedCell = bm.ones(NC, dtype=bm.bool_)
-
-        cell = self.entity('cell')
-        edge = self.entity('edge')
-
-        cell2edge = self.cell_to_edge()
-        cell2cell = self.cell_to_cell()
-        cell2ipoint = self.cell_to_ipoint(self.p)
-        isCutEdge = bm.zeros((NE,), dtype=bm.bool_)
-
-        if options['disp']:
-            print('The initial number of marked elements:', isMarkedCell.sum())
-
-        markedCell, = bm.nonzero(isMarkedCell)
-        while len(markedCell) > 0:
-            isCutEdge[cell2edge[markedCell, 0]] = True
-            refineNeighbor = cell2cell[markedCell, 0]
-            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor, 0]]]
-
-        if options['disp']:
-            print('The number of markedg edges: ', isCutEdge.sum())
-
-        edge2newNode = bm.zeros((NE,), dtype=self.itype)
-        edge2newNode[isCutEdge] = bm.arange(NN, NN + isCutEdge.sum())
-
-        node = self.node
-        newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
-        self.node = bm.concatenate((node, newNode), axis=0)
-        cell2edge0 = cell2edge[:, 0]
-
-        if 'data' in options:
-            pass
-
-        if 'IM' in options:
-            nn = len(newNode)
-            IM = coo_matrix((bm.ones(NN), (bm.arange(NN), bm.arange(NN))),
-                            shape=(NN + nn, NN), dtype=self.ftype)
-            val = bm.full(nn, 0.5)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + bm.arange(nn),
-                        edge[isCutEdge, 0]
-                    )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + bm.arange(nn),
-                        edge[isCutEdge, 1]
-                    )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
-            options['IM'] = IM.tocsr()
-
-        if 'HB' in options:
-            options['HB'] = bm.arange(NC)
-
-        for k in range(2):
-            idx, = bm.nonzero(edge2newNode[cell2edge0] > 0)
-            nc = len(idx)
-            if nc == 0:
-                break
-
-            if 'HB' in options:
-                HB = options['HB']
-                options['HB'] = bm.concatenate((HB, HB[idx]), axis=0)
-
-            L = idx
-            R = bm.arange(NC, NC + nc)
-            if ('data' in options) and (options['data'] is not None):
-                for key, value in options['data'].items():
-                    if value.shape == (NC,):  # 分片常数
-                        value = bm.r_[value[:], value[idx]]
-                        options['data'][key] = value
-                    elif value.shape == (NN + k * nn,):
-                        if k == 0:
-                            value = bm.r_['0', value, bm.zeros((nn,), dtype=self.ftype)]
-                            value[NN:] = 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]])
-                            options['data'][key] = value
-                    else:
-                        ldof = value.shape[-1]
-                        p = int((bm.sqrt(1 + 8 * ldof) - 3) // 2)
-                        bc = self.multi_index_matrix(p, etype=2) / p
-
-                        bcl = bm.zeros_like(bc)
-                        bcl[:, 0] = bc[:, 1]
-                        bcl[:, 1] = 1 / 2 * bc[:, 0] + bc[:, 2]
-                        bcl[:, 2] = 1 / 2 * bc[:, 0]
-
-                        bcr = bm.zeros_like(bc)
-                        bcr[:, 0] = bc[:, 2]
-                        bcr[:, 1] = 1 / 2 * bc[:, 0]
-                        bcr[:, 2] = 1 / 2 * bc[:, 0] + bc[:, 1]
-
-                        value = bm.r_['0', value, bm.zeros((nc, ldof), dtype=self.ftype)]
-
-                        phi = self.shape_function(bcr, p=p)
-                        value[NC:, :] = bm.einsum('cj,kj->ck', value[idx], phi)
-
-                        phi = self.shape_function(bcl, p=p)
-                        value[idx, :] = bm.einsum('cj,kj->ck', value[idx], phi)
-
-                        options['data'][key] = value
-
-            p0 = cell[idx, 0]
-            p1 = cell[idx, 1]
-            p2 = cell[idx, 2]
-            p3 = edge2newNode[cell2edge0[idx]]
-            cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
-            cell[L, 0] = p3
-            cell[L, 1] = p0
-            cell[L, 2] = p1
-            cell[R, 0] = p3
-            cell[R, 1] = p2
-            cell[R, 2] = p0
-            if k == 0:
-                cell2edge0 = bm.zeros((NC + nc,), dtype=self.itype)
-                cell2edge0[0:NC] = cell2edge[:, 0]
-                cell2edge0[L] = cell2edge[idx, 2]
-                cell2edge0[R] = cell2edge[idx, 1]
-            NC = NC + nc
-
-        NN = self.node.shape[0]
-        self.reinit(NN, cell)
+    def bisect(): #TODO
+        pass
 
     def coarsen(self, isMarkedCell=None, options={}):
         pass
@@ -641,7 +484,7 @@ class TriangleMesh(SimplexMesh):
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, bm.sqrt(3) / 2]], dtype=bm.float64)
+                [0.5, bm.sqrt(bm.tensor(3)) / 2]], dtype=bm.float64)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0],
@@ -705,8 +548,8 @@ class TriangleMesh(SimplexMesh):
         """
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
-        x = bm.linspace(box[0], box[1], nx+1)
-        y = bm.linspace(box[2], box[3], ny+1)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64)
         X, Y = bm.meshgrid(x, y, indexing='ij')
     
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
@@ -732,7 +575,7 @@ class TriangleMesh(SimplexMesh):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
             cell = idxMap[cell]
 
         return cls(node, cell)
@@ -740,38 +583,7 @@ class TriangleMesh(SimplexMesh):
     ## @ingroup MeshGenerators
     @classmethod
     def from_torus_surface(cls, R, r, nu, nv):
-        """
-        """
-        NN = nu * nv
-        NC = nu * nv
-        node = bm.zeros((NN, 3), dtype=ftype)
-
-        x = bm.linspace(0, 2*bm.pi, nu)
-        y = bm.linspace(0, 2*bm.pi, nv)
-        U, V = bm.meshgrid(x, y, indexing='ij')
-        
-        X = (R + r * bm.cos(V)) * bm.cos(U)
-        Y = (R + r * bm.cos(V)) * bm.sin(U)
-        Z = r * bm.sin(V)
-        node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
-
-        idx = bm.zeros((nu + 1, nv + 1), dtype=bm.int32)
-        idx[0:-1, 0:-1] = bm.arange(NN).reshape(nu, nv)
-        idx[-1, :] = idx[0, :]
-        idx[:, -1] = idx[:, 0]
-        cell = bm.zeros((2 * NC, 3), dtype=bm.int32)
-        cell0 = bm.concatenate((
-            idx[1:, 0:-1].T.reshape(-1, 1),
-            idx[1:, 1:].T.reshape(-1, 1),
-            idx[0:-1, 0:-1].T.reshape(-1, 1),
-            ), axis=1)
-        cell1 = bm.concatenate((
-            idx[0:-1, 1:].T.reshape(-1, 1),
-            idx[0:-1, 0:-1].T.reshape(-1, 1),
-            idx[1:, 1:].T.reshape(-1, 1)
-            ), axis=1)
-        cell = bm.concatenate((cell0, cell1), axis=0)
-        return cls(node, cell)
+        pass
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -780,12 +592,12 @@ class TriangleMesh(SimplexMesh):
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
         """
-        t = (bm.sqrt(5) - 1) / 2
-        node = bm.tensor([
+        t = (bm.sqrt(bm.tensor(5)) - 1) / 2
+        node = bm.array([
             [0, 1, t], [0, 1, -t], [1, t, 0], [1, -t, 0],
             [0, -1, -t], [0, -1, t], [t, 0, 1], [-t, 0, 1],
             [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=bm.float64)
-        cell = bm.tensor([
+        cell = bm.array([
             [6, 2, 0], [3, 2, 6], [5, 3, 6], [5, 6, 7],
             [6, 0, 7], [3, 8, 2], [2, 8, 1], [2, 1, 0],
             [0, 1, 10], [1, 9, 10], [8, 9, 1], [4, 8, 3],
@@ -794,11 +606,9 @@ class TriangleMesh(SimplexMesh):
         mesh = cls(node, cell)
         mesh.uniform_refine(refine)
         node = mesh.node
-        cell = mesh.cell
-        # project
+        cell = mesh.entity('cell')
         d = bm.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2 + node[:, 2] ** 2) - 1
         l = bm.sqrt(bm.sum(node ** 2, axis=1))
         n = node / l[..., None]
         node = node - d[..., None] * n
         return cls(node, cell)
-
