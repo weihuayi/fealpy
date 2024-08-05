@@ -11,7 +11,7 @@ class TriangleMesh(SimplexMesh):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
         """
-        super().__init__(TD=2)
+        super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell) 
         self.node = node
         self.cell = cell
@@ -182,8 +182,6 @@ class TriangleMesh(SimplexMesh):
         c2p = bm.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
-        print(face2cell[flag, 0])
-    
         c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
 
         flag = face2cell[:, 2] == 1
