@@ -1,5 +1,6 @@
 
-from typing import Union, TypeVar, Generic, Callable, Optional
+from typing import Optional, TypeVar, Union, Generic, Callable
+from ..typing import TensorLike, Index, _S
 
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
@@ -27,7 +28,8 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
-        self.device = mesh.device
+        #TODO:JAX
+        #self.device = mesh.device
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
@@ -40,11 +42,14 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def interpolation_points(self) -> TensorLike:
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self) -> TensorLike:
-        return self.dof.cell_to_dof()
+    def cell_to_dof(self, index: Index=_S) -> TensorLike:
+        return self.dof.cell_to_dof()[index]
 
-    def face_to_dof(self) -> TensorLike:
-        return self.dof.face_to_dof()
+    def face_to_dof(self, index: Index=_S) -> TensorLike:
+        return self.dof.face_to_dof()[index]
+    
+    def edge_to_dof(self, index=_S):
+        return self.dof.edge_to_dof()[index]
 
     def is_boundary_dof(self, threshold=None) -> TensorLike:
         if self.ctype == 'C':

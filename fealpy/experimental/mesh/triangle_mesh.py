@@ -11,7 +11,7 @@ class TriangleMesh(SimplexMesh):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
         """
-        super().__init__(TD=2)
+        super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell) 
         self.node = node
         self.cell = cell
