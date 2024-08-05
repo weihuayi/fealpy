@@ -4,41 +4,44 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 
-
-class Problem():
-    def __init__(
-        self,
-        x0: TensorLike,
-        objective,
-        NP: int = 1, # the number of solution points
-        Preconditioner = None,
-        MaxIters: int = 1000,
-        MaxFunEvals: int = 10000,
-        NormGradTol: float = 1e-6,
-        FunValDiff: float = 1e-6,
-        StepLength: float = 1.0,
-        StepLengthTol: float = 1e-8,
-        NumGrad: int = 10,
-        LineSearch: Optional[str] = None,
-        Print: bool = True,
-    ):
-        self.x0 = x0
-        self.objective = objective
-        self.NP = NP # number of solution 
-        self.Preconditioner = Preconditioner
-        self.MaxIters = MaxIters
-        self.MaxFunEvals = MaxFunEvals
-        self.NormGradTol = NormGradTol
-        self.FunValDiff = FunValDiff
-        self.StepLength = StepLength
-        self.StepLengthTol = StepLengthTol
-        self.NumGrad = NumGrad
-        self.LineSearch = LineSearch
-        self.Print = Print
+def opt_alg_options(
+    x0: TensorLike,
+    objective,
+    domain = None,
+    NP: int = 1, # the number of solution points
+    Preconditioner = None,
+    MaxIters: int = 1000,
+    MaxFunEvals: int = 10000,
+    NormGradTol: float = 1e-6,
+    FunValDiff: float = 1e-6,
+    StepLength: float = 1.0,
+    StepLengthTol: float = 1e-8,
+    NumGrad: int = 10,
+    LineSearch: Optional[str] = None,
+    Print: bool = True,
+):
+    options = {
+            "x0": x0,
+            "objective": objective,
+            "NP": NP,
+            "ndim": x0.shape[-1],
+            "domain": domain,
+            "Preconditioner": Preconditioner,
+            "MaxIters": MaxIters,
+            "MaxFunEvals": MaxFunEvals,
+            "NormGradTol": NormGradTol,
+            "FunValDiff": FunValDiff,
+            "StepLength": StepLength,
+            "StepLengthTol": StepLengthTol,
+            "NumGrad": NumGrad,
+            "LineSearch": LineSearch,
+            "Print": Print,
+            }
+    return options 
 
 class Optimizer():
-    def __init__(self, problem: Problem) -> None:
-        self.problem = problem
+    def __init__(self, options) -> None:
+        self.options = options 
         self.debug: bool = False
         self.__NF: int = 0
 
