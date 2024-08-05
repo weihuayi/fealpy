@@ -4,14 +4,15 @@ from .mesh_base import SimplexMesh
 
 class TetrahedronMesh(SimplexMesh): 
     def __init__(self, node, cell):
-        super(TetrahedronMesh, self).__init__(TD=3)
+        super().__init__(TD=3,itype=cell.dtype,ftype=node.dtype)
         self.node = node
         self.cell = cell
 
         self.meshtype = 'tet'
         self.p = 1 # linear mesh
 
-        kwargs = {"dtype": self.cell.dtype, } # TODO: 增加 device 参数
+        #kwargs = {"dtype": self.cell.dtype, } # TODO: 增加 device 参数
+        kwargs = bm.context(cell)
         self.localEdge = bm.tensor([
             (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)], **kwargs)
         self.localFace = bm.tensor([
@@ -86,14 +87,16 @@ class TetrahedronMesh(SimplexMesh):
         @brief 获取不同维度网格实体上的积分公式
         """
         if etype in {'cell', 3}:
+            a = self.ftype
+            print(a)
             from ..quadrature import TetrahedronQuadrature
-            return TetrahedronQuadrature(q)
+            return TetrahedronQuadrature(q, dtype=self.ftype)
         elif etype in {'face', 2}:
             from ..quadrature import TriangleQuadrature
-            return TriangleQuadrature(q)
+            return TriangleQuadrature(q, dtype=self.dtype)
         elif etype in {'edge', 1}:
             from ..quadrature import GaussLegendreQuadrature
-            return GaussLegendreQuadrature(q)
+            return GaussLegendreQuadrature(q, dtype=self.dtype)
 
     def cell_volume(self, index=_S):
         """
@@ -148,15 +151,86 @@ class TetrahedronMesh(SimplexMesh):
         return Dlambda
 
     def grad_shape_function(self, bc, p=1, index=_S, variables='x'):
-        R = self._grad_shape_function(bc, p=p)
+        R = bm.simplex_grad_shape_function(bc, p=p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
+            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda)
             return gphi #(..., NC, ldof, GD)
         elif variables == 'u':
             return R
 
     cell_grad_shape_function = grad_shape_function
+
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        """
+        @brief 每个四面体单元上插值点的个数
+        """
+        if iptype in {'cell', 3}:
+            return (p+1)*(p+2)*(p+3)//6
+        elif iptype in {'face', 2}:
+            return (p+1)*(p+2)//2
+        elif iptype in {'edge', 1}:
+            return self.p + 1
+        elif iptype in {'node', 0}:
+            return 1
+
+    def number_of_global_ipoints(self, p):
+        """
+        @brief 四面体网格上插值点的总数
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+        return NN + NE*(p-1) + NF*(p-2)*(p-1)//2 + NC*(p-3)*(p-2)*(p-1)//6
+
+    def interpolation_points(self, p, index=_S):
+        """
+        @brief 获取整个四面体网格上的全部插值点
+        """
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        if p == 1:
+            return node
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        GD = self.geo_dimension()
+        TD = self.top_dimension()
+
+        ldof = self.number_of_local_ipoints(p)
+        gdof = self.number_of_global_ipoints(p)
+        ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
+        ipoints[:NN, :] = node
+
+        if p > 1:
+            NE = self.number_of_edges()
+            import ipdb
+            ipdb.set_trace()
+            edge = self.entity('edge')
+            w = bm.zeros((p-1,2), dtype=self.ftype) #TODO: fix it
+            w[:, 0] = bm.arange(p-1, 0, -1)/p
+            w[:, 1] = bm.flip(w,axis=1)[:,0]
+            ipoints[NN:NN+(p-1)*NE, :] = bm.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, GD)
+
+        if p > 2:
+            mi = self.multi_index_matrix(p, TD-1)
+            NF = self.number_of_faces()
+            fidof = (p+1)*(p+2)//2 - 3*p
+            face = self.entity('face')
+            isInFaceIPoints = bm.sum(mi > 0, axis=-1) == 3
+            w = mi[isInFaceIPoints, :]/p
+            ipoints[NN+(p-1)*NE:NN+(p-1)*NE+fidof*NF, :] = bm.einsum('ij, kj...->ki...', w, node[face, :]).reshape(-1, GD)
+
+        if p > 3:
+            mi = self.multi_index_matrix(p, TD)
+            isInCellIPoints = bm.sum(mi > 0, axis=-1) == 4
+            w = mi[isInCellIPoints, :]/p
+            ipoints[NN+(p-1)*NE+fidof*NF:, :] = bm.einsum('ij, kj...->ki...', w,
+                    node[cell,:]).reshape(-1, GD)
+        return ipoints[index]
 
 
 
