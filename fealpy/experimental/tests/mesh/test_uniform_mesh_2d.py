@@ -196,7 +196,7 @@ class TestUniformMesh2dInterfaces:
 
     @pytest.mark.parametrize("meshdata", topology_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
-    def test_bc_to_point(self, meshdata, backend):
+    def test_topology_data(self, meshdata, backend):
         bm.set_backend(backend)
 
         extent = meshdata['extent']
@@ -207,7 +207,37 @@ class TestUniformMesh2dInterfaces:
         edge2cell = bm.to_numpy(mesh.edge_to_cell())
         edge2cell_true = meshdata['edge2cell']
 
+        # cell2cell = bm.to_numpy(mesh.cell_to_cell())
+        # print("cell2cell:", cell2cell)
+        # cell2cell_true = meshdata['cell2cell']
+        # print("cell2cell_true:", cell2cell_true)
+
         np.testing.assert_allclose(edge2cell, edge2cell_true, atol=1e-8)
+        # np.testing.assert_allclose(cell2cell, cell2cell_true, atol=1e-8)
+
+    @pytest.mark.parametrize("meshdata", boundary_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_boundary_data(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        boundary_node_flag = bm.to_numpy(mesh.boundary_node_flag())
+        boundary_node_flag_ture = meshdata['boundary_node_flag']
+        boundary_edge_flag = bm.to_numpy(mesh.boundary_edge_flag())
+        boundary_edge_flag_true = meshdata['boundary_edge_flag']
+        boundary_cell_flag = bm.to_numpy(mesh.boundary_cell_flag())
+        boundary_cell_flag_true = meshdata['boundary_cell_flag']
+
+        np.testing.assert_allclose(boundary_node_flag, boundary_node_flag_ture, 
+                                atol=1e-8)
+        np.testing.assert_allclose(boundary_edge_flag, boundary_edge_flag_true, 
+                                atol=1e-8)
+        np.testing.assert_allclose(boundary_cell_flag, boundary_cell_flag_true, 
+                                atol=1e-8)
 
     @pytest.mark.parametrize("meshdata", uniform_refine_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
@@ -218,7 +248,6 @@ class TestUniformMesh2dInterfaces:
         h = meshdata['h']
         origin = meshdata['origin']
         mesh = UniformMesh2d(extent, h, origin)
-        node_test = mesh.node
 
         mesh.uniform_refine(n=1)
 
