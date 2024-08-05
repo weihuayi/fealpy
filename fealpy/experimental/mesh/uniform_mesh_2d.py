@@ -456,7 +456,8 @@ class UniformMesh2d(StructuredMesh):
         
     def edge_to_cell(self):
         """
-        @brief 边与单元的邻接关系，储存与每条边相邻的两个单元的信息
+        @brief Adjacency relationship between edges and cells, 
+        storing information about the two cells adjacent to each edge.
         """
 
         nx = self.nx
@@ -529,6 +530,103 @@ class UniformMesh2d(StructuredMesh):
             return edge2cell
         else:
             raise NotImplementedError("Backend is not yet implemented.")
+        
+    # def cell_to_cell(self):
+    #     """
+    #     @brief Adjacency relationship between cells, storing the indices of neighboring cells
+    #     for each cell.
+    #     """
+    #     NC = self.NC
+    #     nx = self.nx
+    #     ny = self.ny
+
+    #     idx = bm.arange(NC).reshape(nx, ny)
+    #     cell2cell = np.zeros((NC, 4), dtype=self.itype)
+
+    #     # x direction
+    #     NE0 = 0
+    #     NE1 = ny
+    #     NE2 = nx * ny
+    #     cell2cell[NE0: NE1, 0] = idx[0, :].flatten()
+    #     cell2cell[NE1: NE2, 0] = idx[:-1, :].flatten()
+    #     cell2cell[NE0: NE2 - NE1, 1] = idx[1:, :].flatten()
+    #     cell2cell[NE2 - NE1: NE2, 1] = idx[-1, :].flatten()
+
+    #     # y direction
+    #     idx0 = bm.arange(0, nx * ny, ny).reshape(nx, 1)
+    #     idx0 = idx0.flatten()
+
+    #     idx1 = idx0 + ny - 1
+    #     idx1 = idx1.flatten()
+
+    #     # TODO: Provide a unified implementation that is not backend-specific
+    #     if bm.backend_name == 'numpy':
+    #         cell2cell[idx0, 2] = idx0
+    #         ii = np.setdiff1d(idx.flatten(), idx0)
+    #         cell2cell[ii, 2] = ii - 1
+
+    #         cell2cell[idx1, 3] = idx1
+    #         ii = np.setdiff1d(idx.flatten(), idx1)
+    #         cell2cell[ii, 3] = ii + 1
+
+    #         return cell2cell
+
+    #     elif bm.backend_name == 'pytorch':
+    #         raise NotImplementedError("PyTorch is not yet implemented.")
+    #     elif bm.backend_name == 'jax':
+    #         raise NotImplementedError("Jax is not yet implemented.")
+    #     else:
+    #         raise NotImplementedError("Backend is not yet implemented.")
+
+        
+    def boundary_node_flag(self):
+        """
+        @brief Determine if a point is a boundary point.
+        """
+        NN = self.NN
+        edge = self.edge
+        isBdEdge = self.boundary_edge_flag()
+        isBdPoint = bm.zeros((NN,), dtype=bm.bool_)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdPoint[edge[isBdEdge, :]] = True
+            return isBdPoint
+        elif bm.backend_name == 'jax':
+            isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)
+            return isBdPoint
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
+    
+    def boundary_edge_flag(self):
+        """
+        @brief Determine if an edge is a boundary edge.
+        """
+        edge2cell = self.edge_to_cell()
+        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+        return isBdEdge
+    
+    
+    def boundary_cell_flag(self):
+        """
+        @brief Determine if a cell is a boundary cell.
+        """
+        NC = self.NC
+
+        edge2cell = self.edge_to_cell()
+        isBdCell = bm.zeros((NC,), dtype=bm.bool_)
+        isBdEdge = self.boundary_edge_flag()
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdCell[edge2cell[isBdEdge, 0]] = True
+            return isBdCell
+        elif bm.backend_name == 'jax':
+            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
+            return isBdCell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+    
     
     def uniform_refine(self, n: int=1):
         """
