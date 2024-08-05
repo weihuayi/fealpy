@@ -25,8 +25,6 @@ class TriangleMesh(SimplexMesh):
             (2, 0, 1)], **kwargs)
 
         self.construct()
-        print("Construct over")
-        print(self.face_to_cell())
 
         self.nodedata = {}
         self.edgedata = {}
