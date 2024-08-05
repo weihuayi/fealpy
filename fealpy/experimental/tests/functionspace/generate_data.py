@@ -21,10 +21,10 @@ space = LagrangeFESpace(mesh, 2)
 
 print(space.number_of_local_dofs())
 print(space.number_of_global_dofs())
-print(format_array(space.interpolation_points()))
-print(format_array(space.cell_to_dof()))
-print(format_array(space.face_to_dof()))
-print(format_array(space.edge_to_dof()))
+print(space.interpolation_points())
+print(space.cell_to_dof())
+print(space.face_to_dof())
+print(space.edge_to_dof())
 
 
 '''
