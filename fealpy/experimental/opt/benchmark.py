@@ -1,4 +1,6 @@
-from ..backend import backend_manager as bm
+# from ..backend import backend_manager as bm
+import math
+import numpy as bm
 
 def F1(x):
     return bm.sum((x + 0.5) ** 2, axis=-1)
@@ -7,11 +9,11 @@ def F2(x):
     return bm.sum(x ** 2, axis=-1)
 
 def F3(x):
-    dim = x.shape[0]
+    dim = x.shape[-1]
     return bm.sum(bm.arange(1, dim + 1) * (x ** 2), axis=-1)
 
 def F4(x):
-    dim = x.shape[0]
+    # dim = x.shape[0]
     return x[:,0] ** 2 + bm.sum(1e6 * x[:,1:] ** 2, axis=-1)
 
 def F5(x):
@@ -27,14 +29,14 @@ def F8(x):
     return 100 * (x[:,0] ** 2 - x[:,1]) ** 2 + (x[:,0] - 1) ** 2 + (x[:,2] - 1) ** 2 + 90 * (x[:,2] ** 2 - x[:,3]) ** 2 + 10.1 * ((x[:,1] - 1) ** 2 + (x[:,3] - 1) ** 2) + 19.8 * (x[:,1] - 1) * (x[:,3] - 1)
 
 def F9(x):
-    dim = x.shape[0]
+    dim = x.shape[-1]
     return bm.sum(x ** 2, axis= -1) + (bm.sum(0.5 * bm.arange(1, dim + 1) * x, axis= -1)) ** 2 + (bm.sum(0.5 * bm.arange(1, dim + 1) * x, axis=-1)) ** 4
 
 def F10(x):
     return bm.sum(bm.abs(x), axis= -1) + bm.prod(bm.abs(x), axis= -1)
 
 def F11(x):
-    dim = x.shape[0]
+    dim = x.shape[-1]
     o = 0
     for j in range(1, dim + 1):
         oo = 0
@@ -44,8 +46,8 @@ def F11(x):
     return o
 
 def F12(x):
-    dim = x.shape[0]
-    o = (x[0] - 1) ** 2
+    dim = x.shape[-1]
+    o = (x[:,0] - 1) ** 2
     for j in range(2, dim + 1):
         o += j * (2 * x[:,j - 1] ** 2 - x[:,j - 1] - 1) ** 2
     return o
@@ -57,19 +59,19 @@ def F14(x):
     return (x[:,0] + 2 * x[:,1]) ** 2 + (2 * x[:,0] + x[:,1] - 5) ** 2
 
 def F15(x):
-    dim = x.shape[0]
+    dim = x.shape[-1]
     return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis= -1)  
 
 def F16(x):
-    dim = x.shape[0]
+    dim = x.shape[-1]
     return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis=-1)
 
 def F17(x):
-    dim = x.shape[0]
+    dim = x.shape[-1]
     return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis=-1)
 
 def F18(x):
-    n = len(x)
+    n = x.shape[-1]
     o = 0
     for i in range(n):
         o += x[:,i] ** 2 - 10 * bm.cos(2 * bm.pi * x[:,i]) + 10
@@ -100,13 +102,14 @@ def F23(x):
 
 def F24(x):
     o = 0
-    n = len(x)
+    n = x.shape[-1]
     for i in range(n - 1):
         o += 100 * (x[:,i + 1] - x[:,i] ** 2) ** 2 + (x[:,i] - 1) ** 2
     return o
 
 def F25(x):
-    n = len(x)
+    n = x.shape[-1]
+    #print("%%%%%%%%%%%%%%%%%%",x)
     y1 = bm.sum(x ** 2, axis =-1) / 4000
     y2 = 1
     for i in range(n):
