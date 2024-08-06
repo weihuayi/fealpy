@@ -1,7 +1,7 @@
 
 from typing import Optional
 
-from ..backend import backend_manager as bm 
+from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 
 from ..mesh import HomogeneousMesh
@@ -12,7 +12,7 @@ from .integrator import (
     CellOperatorIntegrator,
     enable_cache,
     assemblymethod,
-    _S, Index, CoefLike
+    CoefLike
 )
 
 
@@ -30,7 +30,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         self.batched = batched
 
     @enable_cache
-    def to_global_dof(self, space: _FS) -> Tensor:
+    def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
 
     @enable_cache
@@ -50,7 +50,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index
 
-    def assembly(self, space: _FS) -> Tensor:
+    def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.fetch(space)
@@ -59,7 +59,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
 
     @assemblymethod('fast')
-    def fast_assembly(self, space: _FS) -> Tensor:
+    def fast_assembly(self, space: _FS) -> TensorLike:
         """
         限制：常系数、单纯形网格
         TODO: 加入 assert
@@ -74,6 +74,6 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         gphi = space.grad_basis(bcs, index=index, variable='u')
 
         glambda = mesh.grad_lambda()
-        M = torch.einsum('q, qik, qjl->ijkl', ws, gphi, gphi)
-        A = torch.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
+        M = bm.einsum('q, qik, qjl->ijkl', ws, gphi, gphi)
+        A = bm.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
         return A
