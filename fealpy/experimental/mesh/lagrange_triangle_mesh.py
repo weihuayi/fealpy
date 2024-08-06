@@ -10,7 +10,7 @@ from .triangle_mesh import TriangleMesh
 class LagrangeTriangleMesh(HomogeneousMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
             construct=False):
-        super().__init__(TD=2)
+        super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
         self.p = p
@@ -26,7 +26,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
-        
+
         if construct:
             self.construct()
 
@@ -39,13 +39,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     def construct(self):
         pass
-
-    # 重载拓扑关系函数
-    def cell_to_edge(self):
-        return self.cell2edge
-
-    def edge_to_cell(self):
-        return self.edge2cell
 
     def generate_local_lagrange_edges(self, p: int) -> TensorLike:
         """
@@ -75,8 +68,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-        return quad
- 
+        return quad 
+
+    # ipoints
+    def interpolation_points(self, p: int, index: Index=_S):
+        """
+        Fetch all p-order interpolation points on the Lagrange triangle mesh.
+        """
+        node = self.entity('node')
+
     @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
         node = mesh.interpolation_points(p)
