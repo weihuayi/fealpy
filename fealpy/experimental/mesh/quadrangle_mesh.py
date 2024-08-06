@@ -1,4 +1,4 @@
-from typing import Union, Optional, Sequence, Tuple, Any
+from typing import Union, Optional, Sequence, Tuple, Any, Callable
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
@@ -147,7 +147,7 @@ class QuadrangleMesh(TensorMesh):
         J = bm.einsum('cim, ...in->...cmn', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 
-    def first_fundamental_form(self, J) -> TensorLike:
+    def first_fundamental_form(self, J:TensorLike) -> TensorLike:
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。
         """
@@ -182,7 +182,7 @@ class QuadrangleMesh(TensorMesh):
         n = t @ w
         return n, t
 
-    def interpolation_points(self, p, index: Index = _S):
+    def interpolation_points(self, p:int, index: Index = _S):
         """
         @brief 获取四边形网格上所有 p 次插值点
         """
@@ -213,7 +213,7 @@ class QuadrangleMesh(TensorMesh):
     def number_of_corner_nodes(self):
         return self.number_of_nodes()
 
-    def cell_to_ipoint(self, p, index: Index = _S):
+    def cell_to_ipoint(self, p:int, index: Index = _S):
         """
         @brief 获取单元上的双 p 次插值点
         """
@@ -268,7 +268,7 @@ class QuadrangleMesh(TensorMesh):
         """
         raise NotImplementedError
 
-    def jacobi_at_corner(self):
+    def jacobi_at_corner(self) -> TensorLike:
         NC = self.number_of_cells()
         node = self.entity('node')
         cell = self.entity('cell')
@@ -283,7 +283,7 @@ class QuadrangleMesh(TensorMesh):
         jacobi = bm.concatenate(jacobis, axis=-1)
         return jacobi
 
-    def angle(self):
+    def angle(self) -> TensorLike:
         NC = self.number_of_cells()
         node = self.node
         cell = self.cell
@@ -301,7 +301,7 @@ class QuadrangleMesh(TensorMesh):
         angle = bm.concatenate(angles, axis=-1)
         return angle
 
-    def cell_quality(self):
+    def cell_quality(self)  -> TensorLike:
         jacobi = self.jacobi_at_corner()
         return jacobi.sum(axis=1)/4
 
@@ -314,7 +314,7 @@ class QuadrangleMesh(TensorMesh):
         # cell = cell[bm.arange(NC).reshape(-1, 1), self.localCell[idx]]
         # self.ds.reinit(NN, cell)
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n:int=1) -> 'QuadrangleMesh':
         """
         @brief 一致加密四边形网格
         """
@@ -420,7 +420,7 @@ class QuadrangleMesh(TensorMesh):
         return axes
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold:Optional[Callable]=None) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a rectangular domain.
 
@@ -471,7 +471,7 @@ class QuadrangleMesh(TensorMesh):
         return cls(node, cell)
 
     @classmethod
-    def from_unit_square(cls, nx=10, ny=10, threshold=None):
+    def from_unit_square(cls, nx=10, ny=10, threshold:Optional[Callable]=None) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a unit square.
 
@@ -483,7 +483,7 @@ class QuadrangleMesh(TensorMesh):
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
 
     @classmethod
-    def from_polygon_gmsh(cls, vertices, h):
+    def from_polygon_gmsh(cls, vertices: list[tuple], h: float) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a polygonal region by gmsh.
 
@@ -564,7 +564,7 @@ class QuadrangleMesh(TensorMesh):
         raise NotImplementedError
 
     @classmethod
-    def from_one_quadrangle(cls, meshtype='square'):
+    def from_one_quadrangle(cls, meshtype='square') -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a single quadrangle.
 
@@ -593,9 +593,11 @@ class QuadrangleMesh(TensorMesh):
         return cls(node, cell)
 
     @classmethod
-    def from_triangle_mesh(cls, mesh):
+    def from_triangle_mesh(cls, mesh) -> 'QuadrangleMesh':
         """
-        @brief 把每个三角形分成三个四边形
+        把每个三角形分成三个四边形
+        @param mesh: 三角形网格
+        @return:
         """
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
