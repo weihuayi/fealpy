@@ -113,7 +113,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     ### Array manipulation routines ###
     'copy', 'reshape', 'broadcast_to', 'unique', 'sort', 'argsort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
-    'flip', 'where', 'tile', 'size'
+    'flip', 'where', 'tile', 'size',
 
     ### Linear algebra ###
     'einsum',
