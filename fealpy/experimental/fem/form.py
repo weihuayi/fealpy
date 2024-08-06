@@ -33,6 +33,8 @@ class Form():
         self._M: Optional[TensorLike] = None
         self.batch_size = batch_size
 
+        self._values_ravel_shape = (-1,) if self.batch_size == 0 else (self.batch_size, -1)
+
     def __len__(self) -> int:
         return len(self.integrators)
 
