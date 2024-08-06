@@ -7,11 +7,11 @@ from fealpy.experimental.opt.optimizer_base import Optimizer
 
 
 class HoneybadgerOptAlg(Optimizer):
-    # def __init__(self, problem: Problem) -> None:
-    #     super().__init__(problem)
+    def __init__(self, option) -> None:
+        super().__init__(option)
 
-    def __init__(self, option):
-        self.options = option
+    # def __init__(self, option):
+        # self.options = option
 
     '''
     @classmethod
@@ -39,11 +39,12 @@ class HoneybadgerOptAlg(Optimizer):
         x = option["x0"]
         N =  option["NP"]
         T = option["MaxIters"]
-        fobj = option["objective"]
+        fit = self.fun(x)
+        # fobj = option["objective"]
         dim = option["ndim"]
         lb, ub = option["domain"]
         #print("##################################", x.shape)
-        fit = fobj(x)
+        # fit = fobj(x)
         #print("##################################",fit.shape)
 
         gbest_idx = bm.argmin(fit)
@@ -70,7 +71,7 @@ class HoneybadgerOptAlg(Optimizer):
                      (r > 0.5) * 
                      (gbest + F * alpha * rand_r[3] * (x - gbest)))
             x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
-            fit_new = fobj(x_new)
+            fit_new = self.fun(x_new)
             mask = fit_new < fit 
             # print("###################",mask)
             x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
