@@ -134,6 +134,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Other methods ###
 
     @staticmethod
+    def size(a, axis=None):
+        if axis is None:
+            return a.numel()
+        else:
+            return a.size(axis)
+
+    @staticmethod
     def copy(a, /, **kwargs):
         return torch.clone(a, **kwargs)
 
