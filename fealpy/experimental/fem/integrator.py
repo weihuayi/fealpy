@@ -1,7 +1,7 @@
 
 from typing import Union, Callable, Optional, Any, TypeVar, Tuple, Dict
 
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike
 from ..functionspace.space import FunctionSpace as _FS
 
 __all__ = [
@@ -78,7 +78,7 @@ def enable_cache(meth: _Meth) -> _Meth:
     Note that as the result of the integral is automatically cached, assembly
     methods producing determinant values for a space is unnecessary to use cache.
     """
-    def wrapper(self, space: _FS) -> Tensor:
+    def wrapper(self, space: _FS) -> TensorLike:
         if getattr(self, '_cache', None) is None:
             self._cache = {}
         _cache = self._cache
@@ -127,8 +127,8 @@ class Integrator(metaclass=IntegratorMeta):
 
         Parameters:
             result_only (bool, optional): Whether to only clear the cached result.
-            Other cache may be basis, entity measures, bc points... Defaults to True.
-            If `False`, anything cached will be cleared.
+                Other cache may be basis, entity measures, bc points... Defaults to True.
+                If `False`, anything cached will be cleared.
         """
         self._value = None
 

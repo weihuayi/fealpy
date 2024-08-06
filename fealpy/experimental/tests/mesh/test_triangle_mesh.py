@@ -93,7 +93,6 @@ class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("data", grad_shape_function_data)
     def test_grad_shape_function(self, data, backend):
         bm.set_backend(backend)
-        print("Test grad_shape_function")
         
         mesh = TriangleMesh.from_box(nx=2, ny=2)
         qf = mesh.quadrature_formula(q=3)
@@ -107,8 +106,8 @@ class TestTriangleMeshInterfaces:
     def test_interpolation_points(self, data, backend):
         bm.set_backend(backend)
        
-        mesh = TriangleMesh.from_one_triangle()
-
+        mesh = TriangleMesh.from_box(nx=2, ny=2)
+        mesh.itype=bm.int64
         ip = mesh.interpolation_points(4)
         cip = mesh.cell_to_ipoint(4)
         fip = mesh.face_to_ipoint(4)
@@ -166,6 +165,6 @@ class TestTriangleMeshInterfaces:
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
-    #a.test_from_unit_sphere_surface(from_unit_sphere_surface_data[0], 'pytorch')
+    #a.test_interpolation_points(interpolation_point_data[0], 'pytorch')
     pytest.main(["./test_triangle_mesh.py"])
 
