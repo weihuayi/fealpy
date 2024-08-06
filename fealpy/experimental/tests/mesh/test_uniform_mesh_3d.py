@@ -52,3 +52,59 @@ class TestUniformMesh3dInterfaces:
         "Number of faces do not match."
         assert mesh.number_of_cells() == meshdata['NC'], \
         "Number of cells do not match."
+
+    @pytest.mark.parametrize("meshdata", entity_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_entity(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh3d(extent, h, origin)
+
+        node = bm.to_numpy(mesh.entity('node'))
+        node_true = meshdata['entity_node']
+        np.testing.assert_almost_equal(node, node_true, decimal=7)
+
+    @pytest.mark.parametrize("meshdata", entity_measure_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_entity_measure(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh3d(extent, h, origin)
+
+        assert len(mesh.entity_measure('edge')) == len(meshdata['edge_length']), \
+        "Edge lengths must have the same length."
+        for a, b in zip(mesh.entity_measure('edge'), meshdata['edge_length']):
+            assert abs(a - b) < 1e-7, \
+            f"Difference between {a} and {b} is greater than 1e-7"
+
+        assert len(mesh.entity_measure('face')) == len(meshdata['face_area']), \
+        "Face areas must have the same area."
+        for a, b in zip(mesh.entity_measure('face'), meshdata['face_area']):
+            assert abs(a - b) < 1e-7, \
+            f"Difference between {a} and {b} is greater than 1e-7"
+
+        assert (mesh.entity_measure('cell') - meshdata['cell_volume']) < 1e-7, \
+        "Cell volumes are not as expected."
+
+    @pytest.mark.parametrize("meshdata", uniform_refine_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_uniform_refine(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh3d(extent, h, origin)
+
+        mesh.uniform_refine(n=1)
+
+        node_refined = mesh.node
+        node_refined_true = meshdata['node_refined']
+
+        np.testing.assert_allclose(node_refined, node_refined_true, atol=1e-8)
