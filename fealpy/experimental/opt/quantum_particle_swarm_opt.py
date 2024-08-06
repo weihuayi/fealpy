@@ -26,7 +26,7 @@ class QuantumParticleSwarmOpt(Optimizer):
         # fit = self.fun(a)
         
         fit = fobj(a)
-        print("Mia")
+        
         pbest = bm.copy(a)
         pbest_f = bm.copy(fit)
         gbest_index = bm.argmin(pbest_f)
