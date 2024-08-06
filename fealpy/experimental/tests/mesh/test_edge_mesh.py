@@ -6,11 +6,6 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.edge_mesh import EdgeMesh
 from fealpy.experimental.tests.mesh.edge_mesh_data import *
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> upstream/master
 class TestEdgeMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("meshdata", init_mesh_data)
