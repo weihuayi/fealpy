@@ -101,7 +101,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     ### Mathematical functions ###
 
     # Reductions
-    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax',
+    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax', 'allclose',
 
     'abs', 'sign', 'sqrt', 'square', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
     'arcsin', 'arccos', 'arctan', 'arctan2', 'arcsinh', 'arccosh', 'arctanh',

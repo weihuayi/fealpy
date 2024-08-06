@@ -7,7 +7,7 @@ from ..backend import TensorLike, Size
 
 def _dense_shape(values: Optional[TensorLike]):
     if values is None:
-        return Size()
+        return tuple()
     else:
         return values.shape[:-1]
 
