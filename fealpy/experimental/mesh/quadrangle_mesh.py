@@ -12,7 +12,7 @@ class QuadrangleMesh(TensorMesh):
     def __init__(self, node, cell):
         """
         """
-        super().__init__(TD=2)
+        super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = {'dtype': cell.dtype}
         self.node = node
         self.cell = cell
@@ -335,26 +335,20 @@ class QuadrangleMesh(TensorMesh):
             ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
             cc = bm.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
 
+            cell = bm.zeros((4 * NC, 4), dtype=bm.int64)
             if bm.backend_name in ["numpy", "pytorch"]:
-                cell = bm.zeros((4 * NC, 4), dtype=bm.int_)
                 cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
                 cell[1::4, :] = bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1)
                 cell[2::4, :] = bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1)
                 cell[3::4, :] = bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1)
             elif bm.backend_name == "jax":
-                # TODO: 考虑拼接次数太多导致的效率问题
-                cell_blocks = []
-                for i in range(NC):
-                    block = bm.concatenate([
-                        bm.array([cp[0][i], ep[0][i], cc[i], ep[3][i]]).reshape(1, -1),
-                        bm.array([ep[0][i], cp[1][i], ep[1][i], cc[i]]).reshape(1, -1),
-                        bm.array([cc[i], ep[1][i], cp[2][i], ep[2][i]]).reshape(1, -1),
-                        bm.array([ep[3][i], cc[i], ep[2][i], cp[3][i]]).reshape(1, -1)
-                    ], axis=0)
-                    cell_blocks.append(block)
+                row_indices = bm.arange(4 * NC).reshape(NC, 4)
+                # 将单元块的行索引和列索引拼接在一起
+                cell = cell.at[row_indices[:, 0]].set(bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=-1))
+                cell = cell.at[row_indices[:, 1]].set(bm.concatenate([ep[0], cp[1], ep[1], cc], axis=-1))
+                cell = cell.at[row_indices[:, 2]].set(bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=-1))
+                cell = cell.at[row_indices[:, 3]].set(bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=-1))
 
-                # 将所有单元块沿行方向拼接
-                cell = bm.concatenate(cell_blocks, axis=0)
             else:
                 raise ValueError("Unsupported backend")
 
@@ -445,10 +439,10 @@ class QuadrangleMesh(TensorMesh):
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
-        cell = bm.concatenate((idx[0:-1, 0:-1].T.reshape(-1, 1),
-                               idx[1:, 0:-1].T.reshape(-1, 1),
-                               idx[1:, 1:].T.reshape(-1, 1),
-                               idx[0:-1, 1:].T.reshape(-1, 1),), axis=1)
+        cell = bm.concatenate((idx[0:-1, 0:-1].reshape(-1, 1),
+                               idx[1:, 0:-1].reshape(-1, 1),
+                               idx[1:, 1:].reshape(-1, 1),
+                               idx[0:-1, 1:].reshape(-1, 1),), axis=1)
 
         if threshold is not None:
             if bm.backend_name in ["numpy", "pytorch"]:
@@ -475,3 +469,179 @@ class QuadrangleMesh(TensorMesh):
                 raise ValueError("Unsupported backend")
 
         return cls(node, cell)
+
+    @classmethod
+    def from_unit_square(cls, nx=10, ny=10, threshold=None):
+        """
+        Generate a quadrilateral mesh for a unit square.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return QuadrangleMesh instance
+        """
+        return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
+
+    @classmethod
+    def from_polygon_gmsh(cls, vertices, h):
+        """
+        Generate a quadrilateral mesh for a polygonal region by gmsh.
+
+        @param vertices List of tuples representing vertices of the polygon
+        @param h Parameter controlling mesh density
+        @return QuadrilateralMesh instance
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("Polygon")
+
+        # 创建多边形
+        lc = h  # 设置网格大小
+        polygon_points = []
+        for i, vertex in enumerate(vertices):
+            point = gmsh.model.geo.addPoint(vertex[0], vertex[1], 0, lc)
+            polygon_points.append(point)
+
+        # 添加线段和循环
+        lines = []
+        for i in range(len(polygon_points)):
+            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i+1) % len(polygon_points)])
+            lines.append(line)
+        curve_loop = gmsh.model.geo.addCurveLoop(lines)
+
+        # 创建平面表面
+        surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+
+        # 同步几何模型
+        gmsh.model.geo.synchronize()
+
+        # 添加物理组
+        gmsh.model.addPhysicalGroup(2, [surface], tag=1)
+        gmsh.model.setPhysicalName(2, 1, "Polygon")
+
+        # 设置网格算法选项，使用 Quadrangle 2D 算法
+        gmsh.option.setNumber("Mesh.Algorithm", 8)
+        gmsh.option.setNumber("Mesh.RecombineAll", 1)
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = bm.tensor(node_coords, dtype=bm.float64).reshape(-1, 3)[:, 0:2].copy()
+
+        # 获取四边形单元信息
+        quadrilateral_type = 3  # 四边形单元的类型编号为 3
+        quad_tags, quad_connectivity = gmsh.model.mesh.getElementsByType(quadrilateral_type)
+        cell = bm.tensor(quad_connectivity, dtype=bm.int64).reshape(-1, 4) - 1
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of quadrilaterals: {cell.shape[0]}")
+
+        gmsh.finalize()
+
+        NN = len(node)
+        if bm.backend_name in ["numpy", "pytorch"]:
+            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+        elif bm.backend_name == "jax":
+            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode.at[cell].set(True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap.at[isValidNode].set(bm.arange(isValidNode.sum()))
+        else:
+            raise ValueError("Unsupported backend")
+        cell = idxMap[cell]
+
+        return cls(node, cell)
+
+    @classmethod
+    def from_fuel_rod_gmsh(cls,R1,R2,L,w,h,meshtype='normal'):
+        raise NotImplementedError
+
+    @classmethod
+    def from_one_quadrangle(cls, meshtype='square'):
+        """
+        Generate a quadrilateral mesh for a single quadrangle.
+
+        @param meshtype Type of quadrangle mesh, options are 'square', 'zhengfangxing', 'rectangle', 'rec', 'juxing', 'rhombus', 'lingxing' (default: 'square')
+        @return QuadrangleMesh instance
+        """
+        if meshtype in {'square'}:
+            node = bm.tensor([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.0, 1.0]], dtype=bm.float64)
+        elif meshtype in {'rectangle'}:
+            node = bm.tensor([
+                [0.0, 0.0],
+                [2.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0]], dtype=bm.float64)
+        elif meshtype in {'rhombus'}:
+            node = bm.tensor([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.5, bm.sqrt(3) / 2],
+                [0.5, bm.sqrt(3) / 2]], dtype=bm.float64)
+        cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int64)
+        return cls(node, cell)
+
+    @classmethod
+    def from_triangle_mesh(cls, mesh):
+        """
+        @brief 把每个三角形分成三个四边形
+        """
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        node0 = mesh.node
+        cell0 = mesh.cell
+        ec = mesh.entity_barycenter('edge')
+        cc = mesh.entity_barycenter('cell')
+        cell2edge = mesh.cell2edge
+
+        node = bm.concatenate([node0, ec, cc], axis=0)
+        idx = bm.arange(NC)
+
+        cell1 = bm.concatenate([(NN+NE+idx).reshape(-1, 1),
+                                (cell2edge[:, 0] + NN).reshape(-1, 1),
+                                (cell0[:, 2]).reshape(-1, 1),
+                                (cell2edge[:, 1] + NN).reshape(-1, 1)], axis=1)
+        cell2 = bm.concatenate([(cell1[:, 0]).reshape(-1, 1),
+                                (cell2edge[:, 1] + NN).reshape(-1, 1),
+                                (cell0[:, 0]).reshape(-1, 1),
+                                (cell2edge[:, 2] + NN).reshape(-1, 1)], axis=1)
+        cell3 = bm.concatenate([(cell1[:, 0]).reshape(-1, 1),
+                                (cell2edge[:, 2] + NN).reshape(-1, 1),
+                                (cell0[:, 1]).reshape(-1, 1),
+                                (cell2edge[:, 0] + NN).reshape(-1, 1)], axis=1)
+        cell = bm.concatenate([cell1, cell2, cell3], axis=0)
+
+        return cls(node, cell)
+
+
+
+    @classmethod
+    def polygon_domain_generator(cls, num_vertices=20, radius=1.0, center=[0.0, 0.0]):
+        raise NotImplementedError
+
+    @classmethod
+    def rand_quad_mesh_generator(cls, num, filename=None, h=0.382, radius=0.5, center=[0.5, 0.5]):
+        """
+        @brief 随机生成指定区域的，指定数量的，随机四边形网格
+
+        @param num: 需要生成的网格数量
+        @param filename: 输出文件名，如果非 None，输出文件，如果为 None，返回网格列表
+        @param h: 网格密度
+        @param radius: 区域半径
+        @param center: 区域中点坐标
+
+        @return: None 或网格列表
+        """
+        raise NotImplementedError

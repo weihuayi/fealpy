@@ -11,8 +11,7 @@ class EdgeMesh(SimplexMesh):
     """
     """
     def __init__(self, node, cell):
-        super().__init__(TD=1)
-        kwargs = {'dtype': cell.dtype}
+        super().__init__(TD=1, itype=cell.dtype, ftype=node.dtype)
         self.node = node
         self.cell = cell
 
@@ -239,7 +238,7 @@ class EdgeMesh(SimplexMesh):
 
         return mesh 
     
-        ## @ingroup MeshGenerators
+    ## @ingroup MeshGenerators
     @classmethod
     def plane_frame(cls):
         # 单位为 m
