@@ -14,7 +14,7 @@ import numpy as np
 
 class TestIntervalMeshInterfaces:
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", init_mesh_data)
     def test_init(self,meshdata,backend):
         node = bm.from_numpy(meshdata['node'])
@@ -38,7 +38,7 @@ class TestIntervalMeshInterfaces:
         print('cell2edge:',cell2edge)
         np.testing.assert_array_equal(bm.to_numpy(cell2edge), meshdata["cell2edge"])
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", from_interval_domain_data)
     def test_from_interval_domain(self,meshdata ,backend):
         interval = bm.from_numpy(meshdata['interval'])
@@ -65,7 +65,7 @@ class TestIntervalMeshInterfaces:
         cell2edge = mesh.cell_to_edge()
         np.testing.assert_array_equal(bm.to_numpy(cell2edge), meshdata["cell2edge"])
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' , 'jax'])
     @pytest.mark.parametrize("meshdata", from_mesh_boundary_data)
     def test_from_mesh_boundary(self,meshdata ,backend):
         node = bm.from_numpy(meshdata['node'])
@@ -88,7 +88,7 @@ class TestIntervalMeshInterfaces:
         np.testing.assert_array_equal(bm.to_numpy(cell2edge), meshdata["cell2edge"])
 
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' ,'jax'])
     @pytest.mark.parametrize("meshdata", from_circle_boundary_data)
     def test_from_circle_boundary(self,meshdata ,backend):
         center = bm.from_numpy(meshdata['center'])
@@ -115,7 +115,7 @@ class TestIntervalMeshInterfaces:
         cell2edge = mesh.cell_to_edge()
         np.testing.assert_array_equal(bm.to_numpy(cell2edge), meshdata["cell2edge"])
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' , 'jax'])
     @pytest.mark.parametrize("meshdata", integrator_data)
     def test_integrator(self,meshdata, backend):
         node = bm.tensor([0,1,2,3],dtype=bm.float64)
@@ -144,7 +144,7 @@ class TestIntervalMeshInterfaces:
         gphi = mesh.grad_shape_function(bcs,p)
         np.testing.assert_allclose(bm.to_numpy(gphi), meshdata["gphi"] , rtol= 1e-7)
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", entity_measure_data)
     def test_entity_measure(self,meshdata , backend):
         node = bm.from_numpy(meshdata['node'])
@@ -159,7 +159,7 @@ class TestIntervalMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(em), meshdata["em"] , rtol= 1e-7)
         np.testing.assert_allclose(bm.to_numpy(fm), meshdata["fm"] , rtol= 1e-7)
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' , 'jax'])
     @pytest.mark.parametrize("meshdata", grad_lambda_data)
     def test_grad_lambda(self,meshdata , backend):
         node = bm.from_numpy(meshdata['node'])
@@ -169,7 +169,7 @@ class TestIntervalMeshInterfaces:
         print(Dlambda)
         np.testing.assert_allclose(bm.to_numpy(Dlambda), meshdata["Dlambda"])
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' ,'jax'])
     @pytest.mark.parametrize("meshdata", prolongation_matrix_data)
     def test_prolongation_matrix(self,meshdata , backend):
         node = bm.from_numpy(meshdata['node'])
@@ -181,7 +181,7 @@ class TestIntervalMeshInterfaces:
 
         np.testing.assert_allclose(bm.to_numpy(PMatrix), meshdata["prolongation_matrix"])
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' , 'jax'])
     @pytest.mark.parametrize("meshdata", number_of_local_ipoints_data)
     def test_number_of_local_ipoints(self,meshdata , backend):
         node = bm.from_numpy(meshdata['node'])
@@ -192,7 +192,7 @@ class TestIntervalMeshInterfaces:
 
         assert nlip == meshdata['nlip']
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' ,'jax'])
     @pytest.mark.parametrize("meshdata", interpolation_points_data)
     def test_interpolation_points(self,meshdata , backend):
         node = bm.from_numpy(meshdata['node'])
@@ -203,7 +203,7 @@ class TestIntervalMeshInterfaces:
 
         np.testing.assert_allclose(bm.to_numpy(ipoints), meshdata["ipoints"])
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch' ,'jax'])
     @pytest.mark.parametrize("meshdata", cell_normal_data)
     def test_cell_normal(self,meshdata ,backend):
         center = bm.from_numpy(meshdata['center'])
@@ -213,7 +213,7 @@ class TestIntervalMeshInterfaces:
         cn = mesh.cell_normal()
         np.testing.assert_allclose(bm.to_numpy(cn), meshdata["cn"])
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", uniform_refine_data)
     def test_uniform_refine(self,meshdata,backend):
         node_init = bm.from_numpy(meshdata['node_init'])
@@ -246,7 +246,7 @@ class TestIntervalMeshInterfaces:
         np.testing.assert_array_equal(bm.to_numpy(edge2cell), meshdata["edge2cell"])
 
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", refine_data)
     def test_refine(self,meshdata,backend):
         node_init = bm.from_numpy(meshdata['node_init'])
@@ -279,5 +279,6 @@ class TestIntervalMeshInterfaces:
         np.testing.assert_array_equal(bm.to_numpy(edge2cell), meshdata["edge2cell"])
 
 if __name__ == "__main__":
-    pytest.main(["./test_interval_mesh.py", "-k", "test_refine"])
+    pytest.main(["./test_interval_mesh.py","-k", "test_refine"])
+
         

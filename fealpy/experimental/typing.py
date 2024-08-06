@@ -2,6 +2,7 @@
 import builtins
 from typing import Tuple, Union, Literal, Callable
 from functools import reduce
+from math import prod
 
 from .backend import TensorLike
 
@@ -21,4 +22,4 @@ _S = slice(None)
 
 class Size(Tuple[int, ...]):
     def numel(self) -> int:
-        return reduce(lambda x, y: x * y, self, 1)
+        return prod(self)
