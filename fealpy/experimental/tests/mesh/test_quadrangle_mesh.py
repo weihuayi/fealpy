@@ -22,6 +22,10 @@ class TestQuadrangleMeshInterfaces:
         face2cell = mesh.face2cell
         np.testing.assert_array_equal(bm.to_numpy(face2cell), meshdata["face2cell"])
 
+        mesh_from_one_quadrangle_1 = QuadrangleMesh.from_one_quadrangle()
+        mesh_from_one_quadrangle_2 = QuadrangleMesh.from_one_quadrangle(meshtype='rectangle')
+        mesh_from_one_quadrangle_3 = QuadrangleMesh.from_one_quadrangle(meshtype='rhombus')
+
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     @pytest.mark.parametrize("meshdata", box_data)
     def test_from_box(self, meshdata, backend):
@@ -154,6 +158,43 @@ class TestQuadrangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(refine_edge), meshdata["refine_edge"], atol=1e-7)
         refine_face_to_cell = mesh.face2cell
         np.testing.assert_allclose(bm.to_numpy(refine_face_to_cell),meshdata["refine_face_to_cell"], atol=1e-7)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("meshdata", mesh_from_polygon_gmsh_data)
+    def test_mesh_from_polygon_gmsh(self, meshdata, backend):
+        vertices = bm.from_numpy(meshdata['vertices'])
+        h = bm.from_numpy(meshdata['h'])
+        mesh = QuadrangleMesh.from_polygon_gmsh(vertices, h)
+
+        node = mesh.node
+        np.testing.assert_allclose(bm.to_numpy(node), meshdata["node"], atol=1e-7)
+        edge = mesh.edge
+        np.testing.assert_allclose(bm.to_numpy(edge), meshdata["edge"], atol=1e-7)
+        cell = mesh.cell
+        np.testing.assert_allclose(bm.to_numpy(cell), meshdata["cell"], atol=1e-7)
+        face2cell = mesh.face2cell
+        np.testing.assert_allclose(bm.to_numpy(face2cell), meshdata["face2cell"], atol=1e-7)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("meshdata", mesh_from_triangle_data)
+    def test_mesh_from_triangle(self, meshdata, backend):
+        from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
+        tri_node = bm.from_numpy(meshdata['tri_node'])
+        tri_cell = bm.from_numpy(meshdata['tri_cell'])
+        tri_mesh = TriangleMesh(tri_node, tri_cell)
+
+        mesh = QuadrangleMesh.from_triangle_mesh(tri_mesh)
+
+        node = mesh.node
+        np.testing.assert_allclose(bm.to_numpy(node), meshdata["node"], atol=1e-7)
+        edge = mesh.edge
+        np.testing.assert_allclose(bm.to_numpy(edge), meshdata["edge"], atol=1e-7)
+        cell = mesh.cell
+        np.testing.assert_allclose(bm.to_numpy(cell), meshdata["cell"], atol=1e-7)
+        face2cell = mesh.face2cell
+        np.testing.assert_allclose(bm.to_numpy(face2cell), meshdata["face2cell"], atol=1e-7)
+
+
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-
 import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +9,6 @@ from fealpy.experimental.tests.mesh.tetrahedron_mesh_data import *
 
 
 class TestTetrahedronMeshInterfaces:
-
     @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
     @pytest.mark.parametrize("data", init_data)
     def test_init(self, data, backend):
@@ -112,11 +110,38 @@ class TestTetrahedronMeshInterfaces:
     @pytest.mark.parametrize("data", grad_shape_function)
     def test_grad_shape_function(self, data, backend):
         bm.set_backend(backend)
-        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
-        qf = mesh.integrator(q=5)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=1,ny=1,nz=1)
+        qf = mesh.integrator(q=3)
         bcs, ws = qf.get_quadrature_points_and_weights()
+        gsf = mesh.grad_shape_function(bcs, p=2, variables=data['variables'])
 
+        np.testing.assert_allclose(bm.to_numpy(gsf), data["grad_shape_function"], atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", number_of_local_ipoints)
+    def test_number_of_local_ipoints(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
      
+        ldof = mesh.number_of_local_ipoints(p=3,iptype=data["iptype"])
+        assert ldof == data["ldof"] 
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", number_of_global_ipoints)
+    def test_number_of_global_ipoints(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
+     
+        gdof = mesh.number_of_global_ipoints(p=4)
+        assert gdof == data["gdof"] 
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", interpolation_points)
+    def test_interpolation_points(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
+        ipoint = mesh.interpolation_points(p=2)
+        np.testing.assert_allclose(bm.to_numpy(ipoint), data["ipoint"], atol=1e-14)
 if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
