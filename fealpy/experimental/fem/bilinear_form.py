@@ -1,12 +1,10 @@
 
 from typing import Optional
 
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor
-
 from .form import Form
-
 from .. import logger
 
 
@@ -36,7 +34,7 @@ class BilinearForm(Form):
                 raise ValueError("Spaces should have the same dtype, "
                                 f"but got {s0.ftype} and {s1.ftype}.")
 
-    def _scalar_assembly(self, retain_ints: bool, batch_size: int) -> TensorLike:
+    def _scalar_assembly(self, retain_ints: bool, batch_size: int):
         self.check_space()
         space = self._spaces
         ugdof = space[0].number_of_global_dofs()
@@ -67,7 +65,7 @@ class BilinearForm(Form):
 
         return M
 
-    def assembly(self, coalesce=True, retain_ints: bool=False) -> TensorLike:
+    def assembly(self, *, coalesce=True, retain_ints: bool=False) -> COOTensor:
         """Assembly the bilinear form matrix.
 
         Parameters:
@@ -75,8 +73,7 @@ class BilinearForm(Form):
             retain_ints (bool, optional): Whether to retain the integrator cache.
 
         Returns:
-            TensorLike[gdof, gdof]. Batch is placed in the LAST dimension as\
-            Hybrid COO Tensor format.
+            global_matrix (COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
         """
         M = self._scalar_assembly(retain_ints, self.batch_size)
 
