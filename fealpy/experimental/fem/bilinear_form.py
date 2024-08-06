@@ -2,7 +2,8 @@
 from typing import Optional
 
 from ..typing import TensorLike, Index, _S
-from ..backend import backend_manager as bm 
+from ..backend import backend_manager as bm
+from ..sparse import COOTensor
 
 from .form import Form
 
@@ -35,59 +36,34 @@ class BilinearForm(Form):
                 raise ValueError("Spaces should have the same dtype, "
                                 f"but got {s0.ftype} and {s1.ftype}.")
 
-    def _single_assembly(self, retain_ints: bool) -> TensorLike:
+    def _scalar_assembly(self, retain_ints: bool, batch_size: int) -> TensorLike:
         self.check_space()
         space = self._spaces
-        device = space[0].device
         ugdof = space[0].number_of_global_dofs()
         vgdof = space[1].number_of_global_dofs() if (len(space) > 1) else ugdof
-        global_mat_shape = (vgdof, ugdof)
-        M = bm.sparse_coo_tensor(
-            bm.empty((2, 0), dtype=space[0].itype, device=device),
-            bm.empty((0,), dtype=space[0].ftype, device=device),
-            size=global_mat_shape
+        init_value_shape = (0,) if (batch_size == 0) else (batch_size, 0)
+        sparse_shape = (vgdof, ugdof)
+
+        M = COOTensor(
+            indices = bm.empty((2, 0), dtype=space[0].itype),
+            values = bm.empty(init_value_shape, dtype=space[0].ftype),
+            spshape = sparse_shape
         )
 
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
-            I = bm.broadcast_to(ve2dof[:, :, None], size=group_tensor.shape)
-            J = bm.broadcast_to(ue2dof[:, None, :], size=group_tensor.shape)
-            indices = bm.stack([I.ravel(), J.ravel()], dim=0)
-            M += bm.sparse_coo_tensor(indices, group_tensor.ravel(), size=global_mat_shape)
+            local_shape = group_tensor.shape[-3:] # (NC, ldof, ldof)
 
-        return M
+            if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
+                group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
 
-    def _batch_assembly(self, retain_ints: bool, batch_size: int) -> TensorLike:
-        self.check_space()
-        space = self._spaces
-        device = space[0].device
-        ugdof = space[0].number_of_global_dofs()
-        vgdof = space[1].number_of_global_dofs() if (len(space) > 1) else ugdof
-        ldof = space.number_of_local_dofs()
-        global_mat_shape = (vgdof, ugdof, batch_size)
-        M = bm.sparse_coo_tensor(
-            bm.empty((2, 0), dtype=space.itype, device=device),
-            bm.empty((0, batch_size), dtype=space.ftype, device=device),
-            size=global_mat_shape
-        )
-
-        for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
-            ue2dof = e2dofs[0]
-            ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
-            NC = ue2dof.size(0)
-            local_mat_shape = (batch_size, NC, ldof, ldof)
-
-            if group_tensor.ndim == 3:
-                group_tensor = group_tensor.unsqueeze(0).expand(local_mat_shape)
-
-            I = bm.broadcast_to(ve2dof[:, :, None], size=group_tensor.shape)
-            J = bm.broadcast_to(ue2dof[:, None, :], size=group_tensor.shape)
-            indices = bm.stack([I.ravel(), J.ravel()], dim=0)
-            group_tensor = group_tensor.reshape(batch_size, -1).transpose(0, 1)
-            M += bm.sparse_coo_tensor(indices, group_tensor, size=global_mat_shape)
+            I = bm.broadcast_to(ve2dof[:, :, None], local_shape)
+            J = bm.broadcast_to(ue2dof[:, None, :], local_shape)
+            indices = bm.stack([I.ravel(), J.ravel()], axis=0)
+            group_tensor = bm.reshape(group_tensor, self._values_ravel_shape)
+            M = M.add(COOTensor(indices, group_tensor, sparse_shape))
 
         return M
 
@@ -102,12 +78,7 @@ class BilinearForm(Form):
             TensorLike[gdof, gdof]. Batch is placed in the LAST dimension as\
             Hybrid COO Tensor format.
         """
-        if self.batch_size == 0:
-            M = self._single_assembly(retain_ints)
-        elif self.batch_size > 0:
-            M = self._batch_assembly(retain_ints, self.batch_size)
-        else:
-            raise ValueError("batch_size must be a non-negative integer.")
+        M = self._scalar_assembly(retain_ints, self.batch_size)
 
         self._M = M.coalesce() if coalesce else M
         logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
