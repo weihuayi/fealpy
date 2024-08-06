@@ -14,21 +14,63 @@ class UniformMesh3d(StructuredMesh):
     Topological data structure of a structured hexahedral mesh
 
     The ordering of the nodes in each element is as follows:
-    
-      6 ------- 7
+      3 ------- 7
      / |       /|
-    4 ------- 5 |
+    1 ------- 5 |
     |  |      | |
-    |  2------|-3
+    |  2------|-6
     | /       |/
-    0 ------- 1
+    0 ------- 4
+
+    The ordering of the edges in each element is as follows:
+          ----- 3---
+        / |       / |
+       5  |      7  |
+      /   9     /   11
+      ----1----     |
+     |    |    |    |
+     |     ----|2---     
+     8   /     10  /
+     |  4      |  6
+     | /       | /
+      ----0---- 
+    * Edge 0: (0, 4)
+    * Edge 1: (1, 5)
+    * Edge 2: (2, 6)
+    * Edge 3: (3, 7)
+    * Edge 4: (0, 2)
+    * Edge 5: (1, 3)
+    * Edge 6: (4, 6)
+    * Edge 7: (5, 7)
+    * Edge 8: (0, 1)
+    * Edge 9: (2, 3)
+    * Edge 10: (4, 5)
+    * Edge 11: (6, 7)
+
+    The ordering of the faces in each element is as follows:
+          ----------
+        / |       / |
+       /  | 5    /  |
+      /   |    3/   |
+      ---------     |
+     | 0  |    | 1  |
+     |     ----|----     
+     |   /2    |   /
+     |  /   4  |  /
+     | /       | /
+      --------- 
+    * Face 0: (1, 0, 3, 2)
+    * Face 1: (4, 5, 6, 7)
+    * Face 2: (0, 1, 4, 5)
+    * Face 3: (3, 2, 7, 6)
+    * Face 4: (2, 0, 6, 4)
+    * Face 5: (1, 3, 5, 7)
 
     The ordering of entities in the entire mesh is as follows:
 
     * Node numbering rule: first in the z direction, then in the y direction, and then in the x direction
     * Edge numbering rule: first in the z direction, then in the y direction, and then in the x direction
     * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
-
     """
     def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), 
                 origin=(0.0, 0.0, 0.0), itype=None, ftype=None):
@@ -334,8 +376,12 @@ class UniformMesh3d(StructuredMesh):
             self.ny = self.extent[3] - self.extent[2]
             self.nz = self.extent[5] - self.extent[4]
 
-            self.NC = self.nx * self.ny * self.nz
-            self.NF = 2 * (self.nx * self.ny * (self.nz + 1) + self.nx * (self.ny + 1) * self.nz + (self.nx + 1) * self.ny * self.nz)
-            self.NE = (self.nx + 1) * self.ny * self.nz + self.nx * (self.ny + 1) * self.nz + self.nx * self.ny * (self.nz + 1)
             self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+            self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \
+                    (self.nx + 1) * (self.ny + 1) * self.nz + \
+                    self.nx * (self.ny + 1) * (self.nz + 1)
+            self.NF = self.nx * self.ny * (self.nz + 1) + \
+                    self.nx * (self.ny + 1) * self.nz + \
+                    (self.nx + 1) * self.ny * self.nz
+            self.NC = self.nx * self.ny * self.nz
         self.clear() 
