@@ -1,7 +1,7 @@
 from typing import Sequence, overload, List, Dict, Tuple, Optional
 
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
+from ..backend import backend_manager as bm
+from ..typing import TensorLike
 
 from .integrator import Integrator as _I
 from ..functionspace import FunctionSpace as _FS
@@ -57,13 +57,13 @@ class Form():
     def add_integrator(self, *I, group=None):
         """Add integrator(s) to the form.
 
-        Args:
+        Parameters:
             *I (Integrator): The integrator(s) to add as a new group.
                 Also accepts sequence of integrators.
             group (str | None, optional): Name of the group. Defaults to None.
 
         Returns:
-            Tuple[Integrator, ...] | None: The integrator instance(s) added.
+            out (Tuple[Integrator, ...]): The integrator instance(s) added.
         """
         if len(I) == 0:
             logger.info("add_integrator() is called with no arguments.")
@@ -111,9 +111,9 @@ class Form():
                                    f"has an incompatible shape {tuple(new_ct.shape)} "
                                    f"with the previous {tuple(ct.shape)} in the group '{group}'.")
             if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct.unsqueeze(0)
+                ct = new_ct + ct[None, ...]
             elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct.unsqueeze(0)
+                ct = ct + new_ct[None, ...]
             else:
                 ct = ct + new_ct
 
