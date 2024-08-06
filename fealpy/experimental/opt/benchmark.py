@@ -1,5 +1,5 @@
-from fealpy.experimental.backend import backend_manager as bm
-# import numpy as bm
+from ..backend import backend_manager as bm
+
 
 def F1(x):
     return bm.sum((x + 0.5) ** 2, axis=-1)
@@ -108,7 +108,6 @@ def F24(x):
 
 def F25(x):
     n = x.shape[-1]
-    #print("%%%%%%%%%%%%%%%%%%",x)
     y1 = bm.sum(x ** 2, axis =-1) / 4000
     y2 = 1
     for i in range(n):
@@ -118,8 +117,8 @@ def F25(x):
 def F26(x):
     y1 = bm.sum(x ** 2, axis= -1)
     y2 = bm.sum(bm.cos(2 * bm.pi * x), axis=-1 )
-    n = len(x)
-    return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(bm.array(1))
+    n = x.shape[-1]
+    return -20*bm.exp(-0.2 * bm.sqrt(y1 / n))- bm.exp(y2 / n) + 20 + bm.exp(bm.array(1)) 
 
 iopt_benchmark_data = [
     {

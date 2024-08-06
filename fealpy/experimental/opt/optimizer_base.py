@@ -64,8 +64,8 @@ class Optimizer():
         Return:
             The function value, with gradient value for gradient methods.
         """
-        self.__NF += self.options['NP'] 
-        return self.options['objective'](x)
+        self.__NF += self.options["NP"] 
+        return self.options["objective"](x)
 
 
     def run(self):

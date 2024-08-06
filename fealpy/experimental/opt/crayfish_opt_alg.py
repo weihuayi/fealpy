@@ -2,7 +2,6 @@
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
-import math
 import random
 import numpy as bm
 from .optimizer_base import Optimizer, opt_alg_options
@@ -65,7 +64,7 @@ class CrayfishOptAlg(Optimizer):
             C = 2 - (t / T)
             temp = bm.random.rand() * 15 + 20
             xf = (gbest + global_position) / 2
-            p = 0.2 * ( 1 / (math.sqrt(2 * bm.pi) * 3)) * math.exp( - (temp - 25) ** 2 / (2 * 3 ** 2))
+            p = 0.2 * ( 1 / (bm.sqrt(2 * bm.pi) * 3)) * bm.exp( - (temp - 25) ** 2 / (2 * 3 ** 2))
             rand = bm.random.rand(N, 1)
             rr = bm.random.rand(4, N, dim)
             z = [random.randint(0, N - 1) for _ in range(N)]
@@ -93,8 +92,8 @@ class CrayfishOptAlg(Optimizer):
                 print("COA" + " iter" , t  + 1 , ":", gbest_f)
         return gbest, gbest_f
         
-    def plot(self):
-        plt.show()
+    # def plot(self):
+    #     plt.show()
 
 
 
