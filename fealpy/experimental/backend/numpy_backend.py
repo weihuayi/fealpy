@@ -53,10 +53,11 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     add_at = staticmethod(np.add.at)
 
     @staticmethod
-    def index_add_(a: NDArray, /, dim, index, src, *, alpha=1):
+    def index_add(a: NDArray, /, dim, index, src, *, alpha=1):
         assert index.ndim == 1
         indexing = [slice(None)] * a.ndim
         indexing[dim] = index
+        a = np.copy(a)
         np.add.at(a, indexing, alpha*src)
         return a
 
@@ -68,10 +69,8 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         return np.nonzero(a)
 
     @staticmethod
-    def cat(iterable, axis=0, out=None) -> NDArray:
-        return np.concatenate(iterable, axis=axis, out=out)
-
-
+    def cat(iterable, dim=0, out=None) -> NDArray:
+        return np.concatenate(iterable, axis=dim, out=out)
 
     ### FEALPy methods ###
 

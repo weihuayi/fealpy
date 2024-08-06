@@ -27,6 +27,37 @@ class UniformMesh2d(StructuredMesh):
     * Edge numbering rule: first in the y direction, then in the x direction
     * Cell numbering rule: first in the y direction, then in the x direction
 
+    Example for a 2x2 mesh:
+
+    Nodes:
+    2 ------- 5 ------- 8
+    |         |         |
+    |         |         |
+    |         |         |
+    1 ------- 4 ------- 7
+    |         |         |
+    |         |         |
+    |         |         |
+    0 ------- 3 ------- 6
+
+    Edges:
+     ---2--- ---5--- 
+    |       |       |
+    7       9       11
+    |       |       |
+     ---1--- ---4---
+    |       |       |
+    6       8       10
+    |       |       |
+     ---0--- ---3--- 
+
+    Cells:
+      -------   -------  
+    |    1    |    3    |
+      -------   -------  
+    |    0    |    2    |
+      -------   -------  
+
     """
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
                 itype=None, ftype=None):
@@ -544,53 +575,6 @@ class UniformMesh2d(StructuredMesh):
             return edge2cell
         else:
             raise NotImplementedError("Backend is not yet implemented.")
-        
-    # def cell_to_cell(self):
-    #     """
-    #     @brief Adjacency relationship between cells, storing the indices of neighboring cells
-    #     for each cell.
-    #     """
-    #     NC = self.NC
-    #     nx = self.nx
-    #     ny = self.ny
-
-    #     idx = bm.arange(NC).reshape(nx, ny)
-    #     cell2cell = np.zeros((NC, 4), dtype=self.itype)
-
-    #     # x direction
-    #     NE0 = 0
-    #     NE1 = ny
-    #     NE2 = nx * ny
-    #     cell2cell[NE0: NE1, 0] = idx[0, :].flatten()
-    #     cell2cell[NE1: NE2, 0] = idx[:-1, :].flatten()
-    #     cell2cell[NE0: NE2 - NE1, 1] = idx[1:, :].flatten()
-    #     cell2cell[NE2 - NE1: NE2, 1] = idx[-1, :].flatten()
-
-    #     # y direction
-    #     idx0 = bm.arange(0, nx * ny, ny).reshape(nx, 1)
-    #     idx0 = idx0.flatten()
-
-    #     idx1 = idx0 + ny - 1
-    #     idx1 = idx1.flatten()
-
-    #     # TODO: Provide a unified implementation that is not backend-specific
-    #     if bm.backend_name == 'numpy':
-    #         cell2cell[idx0, 2] = idx0
-    #         ii = np.setdiff1d(idx.flatten(), idx0)
-    #         cell2cell[ii, 2] = ii - 1
-
-    #         cell2cell[idx1, 3] = idx1
-    #         ii = np.setdiff1d(idx.flatten(), idx1)
-    #         cell2cell[ii, 3] = ii + 1
-
-    #         return cell2cell
-
-    #     elif bm.backend_name == 'pytorch':
-    #         raise NotImplementedError("PyTorch is not yet implemented.")
-    #     elif bm.backend_name == 'jax':
-    #         raise NotImplementedError("Jax is not yet implemented.")
-    #     else:
-    #         raise NotImplementedError("Backend is not yet implemented.")
 
         
     def boundary_node_flag(self):

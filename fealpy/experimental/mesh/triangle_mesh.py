@@ -138,8 +138,8 @@ class TriangleMesh(SimplexMesh):
         ipoint_list.append(node) # ipoints[:NN, :]
 
         edge = self.entity('edge')
-        w = bm.zeros((p - 1, 2), **kwargs)
-        w[:, 0] = bm.arange(p - 1, 0, -1, **kwargs) / p
+        w = bm.zeros((p - 1, 2), dtype=bm.float64)
+        w[:, 0] = bm.arange(p - 1, 0, -1, dtype=bm.float64) / p
         w[:, 1] = bm.flip(w[:, 0], axis=0) 
         ipoints_from_edge = bm.einsum('ij, ...jm->...im', w,
                                          node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]

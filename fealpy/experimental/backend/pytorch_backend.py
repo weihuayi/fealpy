@@ -98,13 +98,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def max(a, axis=None, out=None, keepdims=False):
         if axis is None:
             return torch.max(a, keepdim=keepdims, out=out)
-        else:
-            return torch.max(a, axis, keepdim=keepdims, out=out)
-
+        return torch.max(a, axis, keepdim=keepdims, out=out)[0]
 
     @staticmethod
     def min(a, axis=None, out=None, keepdims=False):
-        return torch.min(a, dim=axis, keepdim=keepdims, out=out)
+        if axis is None:
+            return torch.min(a, keepdim=keepdims, out=out)
+        return torch.min(a, dim=axis, keepdim=keepdims, out=out)[0]
 
     @staticmethod
     def argmax(a, axis=None, out=None, keepdims=False):
@@ -442,7 +442,7 @@ function_mapping.update(
     power='pow',
     transpose='permute',
     repeat='repeat_interleave',
-    index_add_= 'index_add_',
+    index_add='index_add',
     copy='clone'
 )
 PyTorchBackend.attach_methods(function_mapping, torch)

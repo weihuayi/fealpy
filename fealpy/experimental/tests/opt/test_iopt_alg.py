@@ -37,7 +37,8 @@ class TestIOptInterfaces:
         # problem = HoneybadgerOptAlg.get_options(x0, data['objective'], NP,data['domain'])
         option = opt_alg_options( x0, data['objective'], data['domain'] , NP)
         optimizer = HoneybadgerOptAlg(option)
-        optimizer.run()
+        gbest,gbest_f = optimizer.run()
+        assert abs(gbest_f - data["optimal"]) < 5
 
     # @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     # @pytest.mark.parametrize("data", iopt_data)
