@@ -107,6 +107,7 @@ class BackendManager():
 
     ### Array manipulation routines ###
     ## Basic operations
+    def size(self, a: _DT, axis: Optional[int]=None, /) -> int: ...
     
     ## Change array shape
     def reshape(self, a: _DT, newshape: Size, /) -> _DT: ...
