@@ -1,6 +1,4 @@
-# from ..backend import backend_manager as bm
-import math
-import numpy as bm
+from ..backend import backend_manager as bm
 
 def F1(x):
     return bm.sum((x + 0.5) ** 2, axis=-1)
@@ -13,7 +11,7 @@ def F3(x):
     return bm.sum(bm.arange(1, dim + 1) * (x ** 2), axis=-1)
 
 def F4(x):
-    # dim = x.shape[0]
+
     return x[:,0] ** 2 + bm.sum(1e6 * x[:,1:] ** 2, axis=-1)
 
 def F5(x):
@@ -109,18 +107,17 @@ def F24(x):
 
 def F25(x):
     n = x.shape[-1]
-    #print("%%%%%%%%%%%%%%%%%%",x)
     y1 = bm.sum(x ** 2, axis =-1) / 4000
     y2 = 1
     for i in range(n):
-        y2 *= bm.cos(x[:,i] / bm.sqrt(i + 1))
+        y2 *= bm.cos(x[:,i] / bm.sqrt(bm.array(i + 1)))
     return 1 + y1 - y2
 
 def F26(x):
     y1 = bm.sum(x ** 2, axis= -1)
     y2 = bm.sum(bm.cos(2 * bm.pi * x), axis=-1 )
     n = len(x)
-    return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(1)
+    return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(bm.array(1))
 
 iopt_benchmark_data = [
     {
@@ -200,7 +197,6 @@ iopt_benchmark_data = [
         "minimum": bm.zeros(10),
         "optimal": 0,
     },
-    ##########
     {
         "objective": F12,
         "ndim": 30,
@@ -215,7 +211,6 @@ iopt_benchmark_data = [
         "minimum": [0,0],
         "optimal": 0,
     },
-    #########
     {
         "objective": F14,
         "ndim": 2,
@@ -230,7 +225,6 @@ iopt_benchmark_data = [
         "minimum": [0,0],
         "optimal": -1.8013,
     },
-    #########
     {
         "objective": F16,
         "ndim": 5,
@@ -238,7 +232,6 @@ iopt_benchmark_data = [
         "minimum": None,
         "optimal": -4.6877,
     },
-    ######
     {
         "objective": F17,
         "ndim": 10,
@@ -267,7 +260,6 @@ iopt_benchmark_data = [
         "minimum": [[-0.08984201368301331, 0.7126564032704135],[-0.08984201368301331, -0.7126564032704135]],#有两个x最优取值
         "optimal": -1.03163,
     },
-    ###############
     {
         "objective": F21,
         "ndim": 2,
@@ -275,7 +267,6 @@ iopt_benchmark_data = [
         "minimum": None,
         "optimal": 0,
     },
-    #############
     {
         "objective": F22,
         "ndim": 2,

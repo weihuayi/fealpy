@@ -6,7 +6,7 @@ from .. import logger
 from .optimizer_base import Optimizer, Problem
 
 
-class QuantumParticleswarmOptAlg(Optimizer):
+class HoneyBadgerAlg(Optimizer):
     def __init__(self, problem: Problem) -> None:
         super().__init__(problem)
 
