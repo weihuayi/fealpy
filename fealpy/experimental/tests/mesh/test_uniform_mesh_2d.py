@@ -29,15 +29,23 @@ class TestUniformMesh2dInterfaces:
         np.testing.assert_almost_equal(face, face_true, decimal=7)
         np.testing.assert_almost_equal(cell, cell_true, decimal=7)
 
-        assert mesh.node.shape == meshdata['node'].shape, "Node shapes do not match."
-        assert mesh.edge.shape == meshdata['edge'].shape, "Edge shapes do not match."
-        assert mesh.face.shape == meshdata['face'].shape, "Face shapes do not match."
-        assert mesh.cell.shape == meshdata['cell'].shape, "Cell shapes do not match."
+        assert mesh.node.shape == meshdata['node'].shape, \
+        "Node shapes do not match."
+        assert mesh.edge.shape == meshdata['edge'].shape, \
+        "Edge shapes do not match."
+        assert mesh.face.shape == meshdata['face'].shape, \
+        "Face shapes do not match."
+        assert mesh.cell.shape == meshdata['cell'].shape, \
+        "Cell shapes do not match."
 
-        assert mesh.number_of_nodes() == meshdata['NN'], "Number of nodes do not match."
-        assert mesh.number_of_edges() == meshdata['NE'], "Number of edges do not match."
-        assert mesh.number_of_faces() == meshdata['NF'], "Number of faces do not match."
-        assert mesh.number_of_cells() == meshdata['NC'], "Number of cells do not match."
+        assert mesh.number_of_nodes() == meshdata['NN'], \
+        "Number of nodes do not match."
+        assert mesh.number_of_edges() == meshdata['NE'], \
+        "Number of edges do not match."
+        assert mesh.number_of_faces() == meshdata['NF'], \
+        "Number of faces do not match."
+        assert mesh.number_of_cells() == meshdata['NC'], \
+        "Number of cells do not match."
 
     @pytest.mark.parametrize("meshdata", entity_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])

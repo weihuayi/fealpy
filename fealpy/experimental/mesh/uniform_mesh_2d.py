@@ -55,8 +55,6 @@ class UniformMesh2d(StructuredMesh):
 
         self.meshtype = 'UniformMesh2d'
 
-        self.face_to_ipoint = self.edge_to_ipoint
-
 
     @entitymethod(0)
     def _get_node(self) -> TensorLike:
@@ -141,6 +139,22 @@ class UniformMesh2d(StructuredMesh):
                             cell_3[:, None]], axis=-1)
 
         return cell
+    
+    def geo_dimension(self):
+        return 2
+
+    def top_dimension(self):
+        return 2
+    
+    def number_of_nodes_of_cells(self):
+        return 4
+
+    def number_of_edges_of_cells(self):
+        return 4
+
+    def number_of_faces_of_cells(self):
+        return 4
+
     
     def entity(self, etype: Union[int, str], index=_S) -> TensorLike:
         """
