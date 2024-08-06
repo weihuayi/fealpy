@@ -140,7 +140,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
-        unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
         """
         b, inverse, counts = torch.unique(a, return_inverse=True,
                 return_counts=True,
@@ -164,6 +163,19 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             result += (counts, )
 
         return result
+
+    @staticmethod
+    def unique_all(a, axis=None, **kwargs):
+        if axis is None:
+            a = torch.flatten(a)
+            axis = 0
+        b, inverse, counts = torch.unique(a, return_inverse=True,
+                return_counts=True,
+                dim=axis, **kwargs)
+        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
+        indices = torch.zeros(counts.shape, **kwargs)
+        indices[inverse.flip(dims=[0])] = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        return b, indices, inverse, counts
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
@@ -416,12 +428,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
 
 attribute_mapping = ATTRIBUTE_MAPPING.copy()
-attribute_mapping.update({
-    'bool_': 'bool',
-    'int_': 'int',
-    'float_': 'float',
-    'complex_': 'complex'
-})
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(

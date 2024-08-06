@@ -114,6 +114,8 @@ FUNCTION_MAPPING = _make_default_mapping(
 
     # Functional programming
     'apply_along_axis',
+
+    'setdiff1d',
 )
 
 
