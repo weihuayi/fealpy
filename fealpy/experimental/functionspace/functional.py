@@ -1,5 +1,9 @@
 
+import string
+import numpy as np
 from typing import Tuple
+
+from itertools import combinations_with_replacement
 
 from ..typing import TensorLike
 from ..backend import backend_manager as bm
@@ -55,3 +59,87 @@ def generate_tensor_grad_basis(grad_basis: TensorLike, shape: Tuple[int, ...], d
         tb = bm.swapaxes(tb, -ndim-2, -ndim-3)
 
     return tb.reshape(grad_basis.shape[:-2] + (numel*ldof,) + shape + (GD,))
+
+def custom_next_permutation(arr, compare_function):
+    """
+    @brief 生成下一个排列
+    """
+    n = len(arr)
+    i = n - 2
+    while i >= 0 and compare_function(arr[i], arr[i + 1]) >= 0:
+        i -= 1
+    if i == -1:
+        # 如果没有找到降序的元素，说明当前排列已经是最大的排列
+        return False
+    # 从右向左查找第一个大于arr[i]的元素
+    j = n - 1
+    while compare_function(arr[j], arr[i]) <= 0:
+        j -= 1
+    # 交换arr[i]和arr[j]
+    arr[i], arr[j] = arr[j], arr[i]
+    # 反转arr[i+1:]，使其成为升序
+    arr[i + 1:] = arr[i + 1:][::-1]
+    return True
+
+def span_array(arr, alpha):
+    """
+    @brief 计算 arr^alpha
+    @param arr : (NC, l, d)
+    alpha : (l, )
+    """
+    N = bm.sum(alpha)
+    s = string.ascii_lowercase[:N]
+    ss = 'i'+',i'.join(s)
+    s = ss+'->i'+s
+
+    tup = (s, )
+    for i in range(len(alpha)):
+        for j in range(alpha[i]):
+            tup = tup + (arr[:, i], )
+    return bm.einsum(*tup)
+
+def symmetry_span_array(arr, alpha):
+    """
+    @brief 计算 arr^alpha 的对称部分
+    @param arr : (NC, l, d)
+    alpha : (l, )
+    """
+    M = span_array(arr, alpha)
+
+    N = bm.sum(alpha)
+    idx = [i for i in range(N)]
+    idx1 = []
+    for count, value in enumerate(alpha):
+        idx1.extend([count] * value)
+    ret = bm.zeros_like(M) # TODO 可以优化
+    count = 0
+    while True:
+        ret += bm.transpose(M, (0, ) + tuple([i+1 for i in idx]))
+        count += 1
+        sss = custom_next_permutation(idx, lambda x, y : idx1[x]-idx1[y])
+        if not sss:
+            ret /= count
+            break
+    return ret
+
+def symmetry_index(d, r):
+    """
+    @brief 将 d 维 r 阶张量拉长以后，其对称部分对应的索引和出现的次数
+    """
+    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)), dtype=bm.int32)
+    coe = bm.flip(d**bm.arange(r, dtype=bm.int32))
+    symidx = bm.einsum('ij,j->i', symidx0, coe)
+
+
+    midx = bm.multi_index_matrix(r, d-1)
+    #midx0 = bm.zeros_like(midx) 
+    #for i in range(d):
+    #    midx0[:, i] = bm.sum(symidx0 == i, axis=1) 
+    #print(midx0-midx)
+    #midx = midx0
+
+
+    P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)], axis=0)
+    num = P[r]/bm.prod(P[midx], axis=1)
+    return symidx, num
+

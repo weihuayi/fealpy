@@ -124,6 +124,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         a.index_add_(indices.ravel(), src.ravel())
 
     @staticmethod
+    def index_add_(a: Tensor, /, dim, index, src, *, alpha=1):
+        return a.index_add_(dim, index, src, alpha=alpha)
+
+    @staticmethod
     def cross(a, b, axis=-1, **kwargs):
         return torch.cross(a, b, dim=axis, **kwargs)
 
@@ -442,7 +446,6 @@ function_mapping.update(
     power='pow',
     transpose='permute',
     repeat='repeat_interleave',
-    index_add='index_add',
     copy='clone'
 )
 PyTorchBackend.attach_methods(function_mapping, torch)

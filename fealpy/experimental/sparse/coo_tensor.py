@@ -15,7 +15,6 @@ from ._spmm import spmm_coo
 class COOTensor():
     def __init__(self, indices: TensorLike, values: Optional[TensorLike],
                  spshape: Optional[Size]=None, *,
-                 dtype=None,
                  is_coalesced: Optional[bool]=None):
         """
         Initialize COO format sparse tensor.
@@ -27,9 +26,6 @@ class COOTensor():
             values (Tensor | None): non-zero elements, shaped (..., N).
             spshape (Size | None, optional): shape in the sparse dimensions.
         """
-        if values is not None and dtype is not None:
-            values = values.to(dtype=dtype)
-
         self._indices = indices
         self._values = values
         self.is_coalesced = is_coalesced
@@ -69,13 +65,9 @@ class COOTensor():
     def __repr__(self) -> str:
         return f"COOTensor(indices={self._indices}, values={self._values}, shape={self.shape})"
 
-    @overload
-    def size(self) -> Size: ...
-    @overload
-    def size(self, dim: int) -> int: ...
-    def size(self, dim: Optional[int]=None):
+    def size(self, dim: Optional[int]=None) -> int:
         if dim is None:
-            return self.shape
+            return prod(self.shape)
         else:
             return self.shape[dim]
 
@@ -125,7 +117,7 @@ class COOTensor():
         """Convert the COO tensor to a dense tensor and return as a new object.
 
         Parameters:
-            fill_value (int | float): The value to fill the dense tensor with
+            fill_value (int | float, optional): The value to fill the dense tensor with
                 when `self.values` is None.
 
         Returns:
@@ -166,7 +158,7 @@ class COOTensor():
         if self._values is not None:
             value_shape = self.dense_shape + (unique_indices.shape[-1], )
             new_values = bm.zeros(value_shape, **self.values_context)
-            new_values = bm.index_add(new_values, -1, inverse_indices, self._values)
+            new_values = bm.index_add_(new_values, -1, inverse_indices, self._values)
 
             return COOTensor(
                 unique_indices, new_values, self.sparse_shape, is_coalesced=True
@@ -177,7 +169,7 @@ class COOTensor():
                 kwargs = self.indices_context
                 ones = bm.ones((self.nnz, ), **kwargs)
                 new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-                new_values = bm.index_add(new_values, -1, inverse_indices, ones)
+                new_values = bm.index_add_(new_values, -1, inverse_indices, ones)
             else:
                 new_values = None
 
@@ -196,7 +188,7 @@ class COOTensor():
         """Return a view with flatten indices on sparse dimensions.
 
         Returns:
-            COOTensor: A flatten COO tensor, shaped (*dense_shape, 1).
+            COOTensor: A flatten COO tensor, shaped (*dense_shape, nnz).
         """
         spshape = self.sparse_shape
         new_indices = _flatten_indices(self._indices, spshape)
@@ -206,7 +198,7 @@ class COOTensor():
         """Return a copy with flatten indices on sparse dimensions.
 
         Returns:
-            COOTensor: A flatten COO tensor, shaped (*dense_shape, 1).
+            COOTensor: A flatten COO tensor, shaped (*dense_shape, nnz).
         """
         spshape = self.sparse_shape
         new_indices = _flatten_indices(self._indices, spshape)
@@ -233,7 +225,7 @@ class COOTensor():
             ValueError: If one has value and another does not.
 
         Returns:
-            COOTensor | Tensor: A new COOTensor if `other` is a COOTensor,\
+            out (COOTensor | Tensor): A new COOTensor if `other` is a COOTensor,\
             or a Tensor if `other` is a dense tensor.
         """
         if isinstance(other, COOTensor):
@@ -322,7 +314,7 @@ class COOTensor():
             TypeError: If the type of `other` is not supported for matmul.
 
         Returns:
-            COOTensor | Tensor: A new COOTensor if `other` is a COOTensor,\
+            out (COOTensor | Tensor): A new COOTensor if `other` is a COOTensor,\
             or a Tensor if `other` is a dense tensor.
         """
         if isinstance(other, COOTensor):
