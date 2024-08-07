@@ -17,32 +17,29 @@ class TestUniformMesh3dInterfaces:
         mesh = UniformMesh3d(extent, h, origin)
 
         node = bm.to_numpy(mesh.node)
+        node_entity = bm.to_numpy(mesh.entity('node'))
         node_true = meshdata['node']
-
-        assert node.shape == node_true.shape, \
-        "Node shapes do not match."
-        np.testing.assert_allclose(node, node_true, atol=1e-8)
+        np.testing.assert_almost_equal(node, node_true, decimal=7)
+        np.testing.assert_almost_equal(node_entity, node_true, decimal=7)
 
         edge = bm.to_numpy(mesh.edge)
+        edge_entity = bm.to_numpy(mesh.entity('edge'))
         edge_true = meshdata['edge']
-        
-        assert edge.shape == edge_true.shape, \
-            "Edge shapes do not match."
-        np.testing.assert_allclose(edge, edge_true, atol=1e-8)
+        np.testing.assert_almost_equal(edge, edge_true, decimal=7)
+        np.testing.assert_almost_equal(edge_entity, edge_true, decimal=7)
+
 
         face = bm.to_numpy(mesh.face)
+        face_entity = bm.to_numpy(mesh.entity('face'))
         face_true = meshdata['face']
-
-        assert face.shape == face_true.shape, \
-            "Face shapes do not match."
-        np.testing.assert_allclose(face, face_true, atol=1e-8)
+        np.testing.assert_almost_equal(face, face_true, decimal=7)
+        np.testing.assert_almost_equal(face_entity, face_true, decimal=7)
 
         cell = bm.to_numpy(mesh.cell)
+        cell_entity = bm.to_numpy(mesh.entity('cell'))
         cell_true = meshdata['cell']
-
-        assert cell.shape == cell_true.shape, \
-            "Cell shapes do not match."
-        np.testing.assert_allclose(cell, cell_true, atol=1e-8)
+        np.testing.assert_almost_equal(cell, cell_true, decimal=7)
+        np.testing.assert_almost_equal(cell_entity, cell_true, decimal=7)
 
         assert mesh.number_of_nodes() == meshdata['NN'], \
         "Number of nodes do not match."
@@ -53,19 +50,6 @@ class TestUniformMesh3dInterfaces:
         assert mesh.number_of_cells() == meshdata['NC'], \
         "Number of cells do not match."
 
-    @pytest.mark.parametrize("meshdata", entity_data)
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
-    def test_entity(self, meshdata, backend):
-        bm.set_backend(backend)
-
-        extent = meshdata['extent']
-        h = meshdata['h']
-        origin = meshdata['origin']
-        mesh = UniformMesh3d(extent, h, origin)
-
-        node = bm.to_numpy(mesh.entity('node'))
-        node_true = meshdata['entity_node']
-        np.testing.assert_almost_equal(node, node_true, decimal=7)
 
     @pytest.mark.parametrize("meshdata", entity_measure_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
@@ -91,6 +75,24 @@ class TestUniformMesh3dInterfaces:
 
         assert (mesh.entity_measure('cell') - meshdata['cell_volume']) < 1e-7, \
         "Cell volumes are not as expected."
+
+    
+    @pytest.mark.parametrize("meshdata", barycenter_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_entity_barycenter(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh3d(extent, h, origin)
+
+        cell_barycenter = bm.to_numpy(mesh.cell_barycenter())
+        cell_barycenter_true = meshdata['cell_barycenter']
+
+        np.testing.assert_allclose(cell_barycenter, cell_barycenter_true, atol=1e-8)
+
+
 
     @pytest.mark.parametrize("meshdata", uniform_refine_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
