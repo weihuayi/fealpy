@@ -76,7 +76,7 @@ class CSRTensor():
     @property
     def values_context(self):
         if self._values is None:
-            raise RuntimeError("Can not access context of None values.")
+            return {}
         return bm.context(self._values)
 
     @property
@@ -112,22 +112,25 @@ class CSRTensor():
         """Return the non-zero elements"""
         return self._values
 
-    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
+    def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
         """Convert the CSRTensor to a dense tensor and return as a new object.
 
         Parameters:
-            fill_value (int | float, optional):
+            fill_value (int | float, optional): The value to fill the dense tensor with
+                when `self.values()` is None.
 
         Returns:
             Tensor: The dense tensor.
         """
-        kwargs = self.indices_context
-        dense_tensor = bm.zeros(self.shape, **kwargs)
+        context = self.indices_context
+        context.update(kwargs)
+        dense_tensor = bm.zeros(self.shape, **context)
 
         for i in range(1, self._crow.shape[0]):
             start = self._crow[i - 1]
             end = self._crow[i]
-            dense_tensor[..., i - 1, self._col[start:end]] = self._values[..., start:end]
+            val = fill_value if (self._values is None) else self._values[..., start:end]
+            dense_tensor[..., i - 1, self._col[start:end]] = val
 
         return dense_tensor
 

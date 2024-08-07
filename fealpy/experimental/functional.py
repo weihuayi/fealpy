@@ -82,7 +82,7 @@ def bilinear_integral(input1: TensorLike, input2: TensorLike, weights: TensorLik
     if len(input1.shape)==5:
         input1sub = 'cqidl'
         input2sub = 'cqjdl'
-    
+
     elif len(input1.shape)==4:
         input1sub = 'cqid'
         input2sub = 'cqjd'
