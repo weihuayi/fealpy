@@ -4,10 +4,10 @@ import pytest
 from fealpy.experimental.sparse.coo_tensor import COOTensor
 from fealpy.experimental.backend import backend_manager as bm
 
-ALL_BACKEND = ['numpy', 'pytorch']
+ALL_BACKENDS = ['numpy', 'pytorch']
 
 
-@pytest.mark.parametrize("backend", ALL_BACKEND)
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_dims_and_shape(backend):
     bm.set_backend(backend)
     indices = bm.tensor([[0, 0, 1, 2, 0], [1, 2, 0, 0, 2]])
@@ -24,7 +24,7 @@ def test_dims_and_shape(backend):
     assert coo.dense_shape == (2, )
 
 
-@pytest.mark.parametrize("backend", ALL_BACKEND)
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_coalesce_with_values(backend):
     bm.set_backend(backend)
     # 创建一个未合并的COOTensor对象
@@ -46,7 +46,7 @@ def test_coalesce_with_values(backend):
     bm.allclose(coalesced_coo._values, expected_values)
 
 
-@pytest.mark.parametrize("backend", ALL_BACKEND)
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_coalesce_without_values_accumulate(backend):
     bm.set_backend(backend)
     # 创建一个未合并的COOTensor对象，但没有值
@@ -68,7 +68,7 @@ def test_coalesce_without_values_accumulate(backend):
     bm.allclose(coalesced_coo._values, expected_values)
 
 
-@pytest.mark.parametrize("backend", ALL_BACKEND)
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_coalesce_without_values_not_accumulate(backend):
     bm.set_backend(backend)
     # 创建一个未合并的COOTensor对象，但没有值
@@ -87,7 +87,7 @@ def test_coalesce_without_values_not_accumulate(backend):
     assert coalesced_coo._values is None
 
 
-@pytest.mark.parametrize("backend", ALL_BACKEND)
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_to_dense(backend):
     bm.set_backend(backend)
     indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
@@ -108,7 +108,7 @@ def test_to_dense(backend):
     )
 
 
-@pytest.mark.parametrize("backend", ALL_BACKEND)
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_ravel(backend):
     bm.set_backend(backend)
     indices = bm.tensor([[0, 2], [1, 1]])
@@ -134,7 +134,7 @@ def create_coo_tensor(indices, values, shape):
 
 # COOTensor.add 测试用例
 class TestCOOTensorAdd:
-    @pytest.mark.parametrize("backend", ALL_BACKEND)
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_coo_tensor(self, backend):
         bm.set_backend(backend)
         # 初始化两个 COOTensors
@@ -171,7 +171,7 @@ class TestCOOTensorAdd:
         assert bm.allclose(result2._indices, expected_indices2)
         assert result2.values() is None
 
-    @pytest.mark.parametrize("backend", ALL_BACKEND)
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_tensor(self, backend):
         bm.set_backend(backend)
         # 初始化一个 COOTensor 和一个 dense Tensor
@@ -188,7 +188,7 @@ class TestCOOTensorAdd:
                                          [0., 0., 0., 0.]]])
         assert bm.allclose(result, expected_tensor)
 
-    @pytest.mark.parametrize("backend", ALL_BACKEND)
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_number(self, backend):
         bm.set_backend(backend)
         # 初始化一个 COOTensor 和一个数值
@@ -201,7 +201,7 @@ class TestCOOTensorAdd:
         # 验证结果的值（注意，这里只是演示，实际上 result 仍然是 COOTensor 类型）
         assert bm.allclose(result._values, bm.tensor([[3], [4]]))
 
-    @pytest.mark.parametrize("backend", ALL_BACKEND)
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_type_error(self, backend):
         bm.set_backend(backend)
         # 初始化一个 COOTensor
