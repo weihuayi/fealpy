@@ -92,8 +92,8 @@ class TriangleMesh(SimplexMesh):
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda)
-            return gphi  # (NQ, NC, ldof, GD)
+            gphi = bm.einsum('...ij, kjm->k...im', R, Dlambda)
+            return gphi  # (NC, NQ, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
 

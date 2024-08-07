@@ -3,31 +3,41 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 
-from .optimizer_base import Optimizer, Problem
+from .optimizer_base import Optimizer
 
 
-class QuantumParticleswarmOptAlg(Optimizer):
-    def __init__(self, problem: Problem) -> None:
-        super().__init__(problem)
+class QuantumParticleSwarmOptAlg(Optimizer):
+    def __init__(self, option) -> None:
+        super().__init__(option)
 
-    @classmethod
-    def get_options(
-            cls,
-            x0: TensorLike,
-            objective,
-            NP: int,
-            MaxIters: int = 1000,
-            MaxFunEvals: int = 10000,
-            Print: bool = True,
-            ) -> Problem:
-        return Problem(
-                x0,
-                objective,
-                NP=NP,
-                MaxIters= MaxIters,
-                MaxFunEvals=MaxFunEvals,
-                Print=Print,
-                )
 
     def run(self):
-        pass
+        options = self.options
+        a = options["x0"]
+        N = options["NP"]
+        fit = self.fun(a)
+        MaxIT = options["MaxIters"]
+        dim = options["ndim"]
+        lb, ub = options["domain"]
+        pbest = bm.copy(a)
+        pbest_f = bm.copy(fit)
+        gbest_index = bm.argmin(pbest_f)
+        gbest = pbest[gbest_index]
+        gbest_f = pbest_f[gbest_index]
+        for it in range(0, MaxIT):
+            alpha = 1 - (it + 1) / (2 * MaxIT)
+            mbest = sum(pbest) / N
+            phi = bm.random.rand(N, dim)
+            u = bm.random.rand(N, dim)
+            rand = bm.random.rand(N)
+            p = phi * pbest + (1 - phi) * gbest
+            u = bm.random.rand(N, dim)
+            rand = bm.random.rand(N, 1)
+            a = p + alpha * bm.abs(mbest - a) * bm.log(1 / u) * (1 - 2 * (rand >= 0.5))
+            a = a + (lb - a) * (a < lb) + (ub - a) * (a > ub)
+            fit = self.fun(a)
+            mask = fit < pbest_f
+            pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
+            gbest_idx = bm.argmin(pbest_f)
+            (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
+        return gbest, gbest_f
