@@ -90,8 +90,6 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.shape_function(bc, self.p, index=index, variables=variable)
 
     def grad_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
-        """
-        """
         return self.mesh.grad_shape_function(bc, self.p, index=index, variables=variable)
 
     def hess_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
@@ -117,7 +115,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('iclm, cl->cim', gphi, uh[cell2dof])
+        val = bm.einsum('cilm, cl->cim', gphi, uh[cell2dof])
         return val[None, ...]
 
 
