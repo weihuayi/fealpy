@@ -325,8 +325,7 @@ class HomogeneousMesh(Mesh):
         """
         node = self.entity('node')
         entity = self.entity(etype, index)
-        order = getattr(entity, 'bc_order', None)
-        return bm.bc_to_points(bcs, node, entity, order)
+        return bm.bc_to_points(bcs, node, entity)
 
     # ipoints
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:

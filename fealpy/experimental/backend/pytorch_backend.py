@@ -97,7 +97,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def max(a, axis=None, out=None, keepdims=False):
         if axis is None:
-            return torch.max(a, keepdim=keepdims, out=out)
+            return torch.max(a, out=out)
         return torch.max(a, axis, keepdim=keepdims, out=out)[0]
 
     @staticmethod

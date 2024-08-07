@@ -22,7 +22,7 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
         self.batched = batched
 
     @enable_cache
-    def to_global_dof(self, space: _FS) -> Tensor:
+    def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
 
     @enable_cache
@@ -43,7 +43,7 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
 
         return bcs, ws, phi, cm, index
 
-    def assembly(self, space: _FS) -> Tensor:
+    def assembly(self, space: _FS) -> TensorLike:
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
