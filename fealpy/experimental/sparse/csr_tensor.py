@@ -1,18 +1,20 @@
 
 from typing import Optional, Union, overload, List
+from math import prod
 
 from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
-from .utils import _dense_ndim, _dense_shape
-
-
-Number = Union[int, float]
+from .utils import (
+    _dense_ndim, _dense_shape,
+    check_shape_match, check_spshape_match
+)
+from ._spspmm import spspmm_csr
+from ._spmm import spmm_csr
 
 
 class CSRTensor():
     def __init__(self, crow: TensorLike, col: TensorLike, values: Optional[TensorLike],
-                 spshape: Optional[Size]=None, *,
-                 dtype=None) -> None:
+                 spshape: Optional[Size]=None) -> None:
         """Initializes CSR format sparse tensor.
 
         Parameters:
@@ -21,16 +23,16 @@ class CSRTensor():
             values (Tensor | None): _description_
             spshape (Size | None, optional): _description_
         """
-        self.crow = crow
-        self.col = col
-        self.values = values
+        self._crow = crow
+        self._col = col
+        self._values = values
 
         if spshape is None:
-            nrow = crow.size(0) - 1
-            ncol = col.max().item() + 1
-            self._spshape = Size((nrow, ncol))
+            nrow = crow.shape[0] - 1
+            ncol = bm.max(col) + 1
+            self._spshape = (nrow, ncol)
         else:
-            self._spshape = Size(spshape)
+            self._spshape = tuple(spshape)
 
         self._check(crow, col, values, spshape)
 
@@ -40,11 +42,11 @@ class CSRTensor():
         if col.ndim != 1:
             raise ValueError(f"col must be a 1-D tensor, but got {col.ndim}")
         if len(spshape) != 2:
-                raise ValueError(f"spshape must be a 2-tuple, but got {spshape}")
+                raise ValueError(f"spshape must be a 2-tuple for CSR format, but got {spshape}")
 
-        if spshape[0] != crow.size(0) - 1:
-            raise ValueError(f"crow.size(0) - 1 must be equal to spshape[0], "
-                             f"but got {crow.size(0) - 1} and {spshape[0]}")
+        if spshape[0] != crow.shape[0] - 1:
+            raise ValueError(f"crow.shape[0] - 1 must be equal to spshape[0], "
+                             f"but got {crow.shape[0] - 1} and {spshape[0]}")
 
         if isinstance(values, TensorLike):
             if values.ndim < 1:
@@ -60,55 +62,107 @@ class CSRTensor():
             raise ValueError(f"values must be a Tensor or None, but got {type(values)}")
 
     def __repr__(self) -> str:
-        return f"CSRTensor(crow={self.crow}, col={self.col}, "\
-               + f"values={self.values}, shape={self.shape})"
+        return f"CSRTensor(crow={self._crow}, col={self._col}, "\
+               + f"values={self._values}, shape={self.shape})"
 
-    @overload
-    def size(self) -> Size: ...
-    @overload
-    def size(self, dim: int) -> int: ...
-    def size(self, dim: Optional[int]=None):
+    def size(self, dim: Optional[int]=None) -> int:
         if dim is None:
-            return self.shape
+            return prod(self.shape)
         else:
             return self.shape[dim]
 
     @property
-    def device(self): return self.crow.device
+    def indices_context(self): return bm.context(self._crow)
     @property
-    def dtype(self):
-        if self.values is None:
-            return self.crow.dtype
-        else:
-            return self.values.dtype
+    def values_context(self):
+        if self._values is None:
+            return {}
+        return bm.context(self._values)
 
     @property
-    def shape(self): return Size(self.dense_shape + self.sparse_shape)
+    def itype(self): return self._crow.dtype
     @property
-    def dense_shape(self): return _dense_shape(self.values)
+    def ftype(self): return None if self._values is None else self._values.dtype
+
+    @property
+    def shape(self): return self.dense_shape + self.sparse_shape
+    @property
+    def dense_shape(self): return _dense_shape(self._values)
     @property
     def sparse_shape(self): return self._spshape
 
     @property
     def ndim(self): return self.dense_ndim + self.sparse_ndim
     @property
-    def dense_ndim(self): return _dense_ndim(self.values)
+    def dense_ndim(self): return _dense_ndim(self._values)
     @property
     def sparse_ndim(self): return 2
     @property
-    def nnz(self): return self.col.shape[1]
+    def nnz(self): return self._col.shape[1]
 
-    def to_dense(self) -> TensorLike:
-        """Convert the CSRTensor to a dense tensor and return as a new object."""
-        kwargs = {'dtype': self.dtype, 'device': self.device}
-        dense_tensor = bm.zeros(self.shape, **kwargs)
+    def crow(self) -> TensorLike:
+        """Return the row location of non-zero elements."""
+        return self._crow
 
-        for i in range(1, self.crow.shape[0]):
-            start = self.crow[i - 1]
-            end = self.crow[i]
-            dense_tensor[..., i - 1, self.col[start:end]] = self.values[..., start:end]
+    def col(self) -> TensorLike:
+        """Return the column of non-zero elements."""
+        return self._col
+
+    def values(self) -> Optional[TensorLike]:
+        """Return the non-zero elements"""
+        return self._values
+
+    def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
+        """Convert the CSRTensor to a dense tensor and return as a new object.
+
+        Parameters:
+            fill_value (int | float, optional): The value to fill the dense tensor with
+                when `self.values()` is None.
+
+        Returns:
+            Tensor: The dense tensor.
+        """
+        context = self.indices_context
+        context.update(kwargs)
+        dense_tensor = bm.zeros(self.shape, **context)
+
+        for i in range(1, self._crow.shape[0]):
+            start = self._crow[i - 1]
+            end = self._crow[i]
+            val = fill_value if (self._values is None) else self._values[..., start:end]
+            dense_tensor[..., i - 1, self._col[start:end]] = val
 
         return dense_tensor
 
-    # def to(self, device: Union[_device, str, None]=None, non_blocking: bool=False):
-    #     pass
+    @overload
+    def reshape(self, shape: Size, /) -> 'CSRTensor': ...
+    @overload
+    def reshape(self, *shape: int) -> 'CSRTensor': ...
+    def reshape(self, *shape) -> 'CSRTensor':
+        pass
+
+    def ravel(self) -> 'CSRTensor':
+        pass
+
+    def flatten(self) -> 'CSRTensor':
+        pass
+
+    @overload
+    def add(self, other: Union[Number, 'CSRTensor'], alpha: Number=1) -> 'CSRTensor': ...
+    @overload
+    def add(self, other: TensorLike, alpha: Number=1) -> TensorLike: ...
+    def add(self, other: Union[Number, 'CSRTensor', TensorLike], alpha: Number=1) -> Union['CSRTensor', TensorLike]:
+        pass
+
+    def mul(self, other: Union[Number, 'CSRTensor', TensorLike]) -> 'CSRTensor':
+        pass
+
+    def div(self, other: Union[Number, TensorLike]) -> 'CSRTensor':
+        pass
+
+    @overload
+    def matmul(self, other: 'CSRTensor') -> 'CSRTensor': ...
+    @overload
+    def matmul(self, other: TensorLike) -> TensorLike: ...
+    def matmul(self, other: Union['CSRTensor', TensorLike]):
+        pass
