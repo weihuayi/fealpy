@@ -60,8 +60,6 @@ class CrayfishOptAlg(Optimizer):
                 print("COA" + " iter" , t  + 1 , ":", gbest_f)
         return gbest, gbest_f
         
-    def plot(self):
-        plt.show()
 
 
 

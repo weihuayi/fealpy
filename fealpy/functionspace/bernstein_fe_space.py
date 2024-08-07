@@ -392,6 +392,8 @@ class BernsteinFESpace:
         return gmphi
 
     def hess_basis(self, bcs, index=np.s_[:]):
+        if self.p<2:
+            return np.zeros([1, 1, 1, 1], dtype=np.float_)
         g2phi = self.grad_m_basis(bcs, 2, index=index)
         TD = self.mesh.top_dimension()
         shape = g2phi.shape[:-1] + (TD, TD)

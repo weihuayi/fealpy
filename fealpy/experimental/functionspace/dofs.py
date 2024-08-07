@@ -25,7 +25,7 @@ class LinearMeshCFEDof(Generic[_MT]):
         gdof = self.number_of_global_dofs()
         if bm.is_tensor(threshold):
             index = threshold
-            if (index.dtype == bm.bool_) and (len(index) == gdof):
+            if (index.dtype == bm.bool) and (len(index) == gdof):
                 return index
         else:
             index = self.mesh.boundary_face_index()
@@ -35,7 +35,7 @@ class LinearMeshCFEDof(Generic[_MT]):
                 index = index[flag]
 
         face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
-        isBdDof = bm.zeros(gdof, dtype=bm.bool_)
+        isBdDof = bm.zeros(gdof, dtype=bm.bool)
         isBdDof[face2dof] = True
         return isBdDof
 
