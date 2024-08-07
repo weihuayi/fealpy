@@ -63,6 +63,7 @@ uh = space.function()
 A, F = DirichletBC(space, gD = solution).apply(A, F, uh)
 tmr.send('dirichlet')
 
+print(np.sum(np.abs(A.toarray())))
 uh = spsolve(A, F)
 value = space.value(uh, np.array([[1/3, 1/3, 1/3]], dtype=np.float64))
 tmr.send('spsolve')

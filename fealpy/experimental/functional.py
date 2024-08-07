@@ -92,10 +92,10 @@ def bilinear_integral(input1: TensorLike, input2: TensorLike, weights: TensorLik
 
     NQ = weights.shape[0]
     NC = measure.shape[0]
-
+    
     if coef is None:
         return bm.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2)
-
+    
     if is_scalar(coef):
         return bm.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2) * coef
     elif is_tensor(coef):
