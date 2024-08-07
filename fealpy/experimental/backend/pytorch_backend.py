@@ -149,6 +149,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.clone(a, **kwargs)
 
     @staticmethod
+    def scatter(x, indices, val):
+        x.scatter_(0, indices, val)
+        return x
+
+    @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
         """
