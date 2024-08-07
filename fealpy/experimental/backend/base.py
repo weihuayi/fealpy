@@ -69,10 +69,14 @@ def _make_default_mapping(*names: str):
 # Update the source name in the backend file if necessary.
 #
 ATTRIBUTE_MAPPING = _make_default_mapping(
-    'pi', 'e', 'nan', 'inf', 'dtype', 'device',
-    'bool_', 'uint8', 'int_', 'int8', 'int16', 'int32', 'int64',
-    'float_', 'float16', 'float32', 'float64',
-    'complex_', 'complex64', 'complex128'
+    'pi', 'e', 'nan', 'inf', 
+    'dtype', 
+    'device',
+    'bool',
+    'uint8', 'uint16', 'uint32', 'uint64',
+    'int8', 'int16', 'int32', 'int64',
+    'float16', 'float32', 'float64',
+    'complex64', 'complex128',
 )
 
 # NOTE: For adding new functions:
