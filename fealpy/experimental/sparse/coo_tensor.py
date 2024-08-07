@@ -15,7 +15,6 @@ from ._spmm import spmm_coo
 class COOTensor():
     def __init__(self, indices: TensorLike, values: Optional[TensorLike],
                  spshape: Optional[Size]=None, *,
-                 dtype=None,
                  is_coalesced: Optional[bool]=None):
         """
         Initialize COO format sparse tensor.
@@ -27,9 +26,6 @@ class COOTensor():
             values (Tensor | None): non-zero elements, shaped (..., N).
             spshape (Size | None, optional): shape in the sparse dimensions.
         """
-        if values is not None and dtype is not None:
-            values = values.to(dtype=dtype)
-
         self._indices = indices
         self._values = values
         self.is_coalesced = is_coalesced
@@ -69,13 +65,9 @@ class COOTensor():
     def __repr__(self) -> str:
         return f"COOTensor(indices={self._indices}, values={self._values}, shape={self.shape})"
 
-    @overload
-    def size(self) -> Size: ...
-    @overload
-    def size(self, dim: int) -> int: ...
-    def size(self, dim: Optional[int]=None):
+    def size(self, dim: Optional[int]=None) -> int:
         if dim is None:
-            return self.shape
+            return prod(self.shape)
         else:
             return self.shape[dim]
 
@@ -84,7 +76,7 @@ class COOTensor():
     @property
     def values_context(self):
         if self._values is None:
-            raise RuntimeError("Can not access context of None values.")
+            return {}
         return bm.context(self._values)
 
     @property
@@ -121,12 +113,12 @@ class COOTensor():
         """Return the non-zero elements."""
         return self._values
 
-    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
+    def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
         """Convert the COO tensor to a dense tensor and return as a new object.
 
         Parameters:
             fill_value (int | float, optional): The value to fill the dense tensor with
-                when `self.values` is None.
+                when `self.values()` is None.
 
         Returns:
             Tensor: dense tensor.
@@ -134,7 +126,9 @@ class COOTensor():
         if not self.is_coalesced:
             raise ValueError("indices must be coalesced before calling to_dense()")
 
-        dense_tensor = bm.zeros(self.shape, **self.values_context)
+        context = self.values_context
+        context.update(kwargs)
+        dense_tensor = bm.zeros(self.shape, **context)
 
         if self._values is None:
             dense_tensor[self.nonzero_slice] = fill_value
@@ -316,13 +310,16 @@ class COOTensor():
         """Matrix-multiply this COOTensor with another tensor.
 
         Parameters:
-            other (COOTensor | Tensor): A 2-D tensor.
+            other (COOTensor | Tensor): A 1-D tensor for matrix-vector multiply,
+                or a 2-D tensor for matrix-matrix multiply.
+                Batched matrix-matrix multiply is available for dimensions
+                (*B, M, K) and (*B, K, N). *B means any number of batch dimensions.
 
         Raises:
             TypeError: If the type of `other` is not supported for matmul.
 
         Returns:
-            COOTensor | Tensor: A new COOTensor if `other` is a COOTensor,\
+            out (COOTensor | Tensor): A new COOTensor if `other` is a COOTensor,\
             or a Tensor if `other` is a dense tensor.
         """
         if isinstance(other, COOTensor):

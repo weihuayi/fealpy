@@ -5,8 +5,12 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.sparse._spspmm import spspmm_coo
 from fealpy.experimental.sparse import COOTensor
 
+ALL_BACKENDS = ['numpy', 'pytorch']
 
-def test_spspmm_coo_shapes_mismatch():
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_spspmm_coo_shapes_mismatch(backend):
+    bm.set_backend(backend)
     indices1 = bm.tensor([[0, 0], [1, 1]])
     values1 = bm.tensor([1.0, 2.0])
     spshape1 = (2, 3)
@@ -19,7 +23,9 @@ def test_spspmm_coo_shapes_mismatch():
         spspmm_coo(indices1, values1, spshape1, indices2, values2, spshape2)
 
 
-def test_spspmm_coo_valid_input():
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_spspmm_coo_valid_input(backend):
+    bm.set_backend(backend)
     indices1 = bm.tensor([[0, 0, 1, 2],
                           [0, 1, 1, 2]])
     values1 = bm.tensor([1., 3., 4., 2.], dtype=bm.float64)

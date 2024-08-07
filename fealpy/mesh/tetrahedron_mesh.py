@@ -353,6 +353,7 @@ class TetrahedronMesh(Mesh, Plotable):
         edgeIdx[0, :] = range(p+1)
         edgeIdx[1, :] = edgeIdx[0, -1::-1]
 
+
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NF = self.number_of_faces()
@@ -1056,6 +1057,9 @@ class TetrahedronMesh(Mesh, Plotable):
             newCell[7*NC:, 1] = p[range(NC), T[:, 0]]
             newCell[7*NC:, 2] = p[range(NC), T[:, 4]]
             newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
+            import ipdb
+            ipdb.set_trace()
+            print(newCell)
 
             self.ds.reinit(NN+NE, newCell)
 
