@@ -91,29 +91,37 @@ ATTRIBUTE_MAPPING = _make_default_mapping(
 #    - Totally the same: nothing need to do.
 #
 FUNCTION_MAPPING = _make_default_mapping(
-    # Creation functions
+
+    ### Tensor creation routines ###
+
     'array', 'tensor', 'arange', 'linspace',
     'empty', 'zeros', 'ones', 'full', 'empty_like', 'zeros_like', 'ones_like', 'full_like',
     'eye', 'meshgrid',
 
-    # Reduction functions
-    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax',
+    ### Mathematical functions ###
 
-    # Unary functions
+    # Reductions
+    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax', 'allclose',
+
     'abs', 'sign', 'sqrt', 'square', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
     'arcsin', 'arccos', 'arctan', 'arctan2', 'arcsinh', 'arccosh', 'arctanh',
     'sinh', 'cosh', 'tanh', 'clip', 'floor', 'ceil', 'round',
 
-    # Binary functions
+    # Arithmetic operations
     'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
 
-    # Other functions
-    'copy', 'reshape', 'broadcast_to', 'einsum', 'unique', 'sort', 'argsort', 'nonzero',
+    ### Array manipulation routines ###
+    'copy', 'reshape', 'broadcast_to', 'unique', 'sort', 'argsort', 'nonzero',
     'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
-    'flip', 'where', 'tile',
+    'flip', 'where', 'tile', 'size',
+
+    ### Linear algebra ###
+    'einsum',
 
     # Functional programming
     'apply_along_axis',
+
+    'setdiff1d',
 )
 
 

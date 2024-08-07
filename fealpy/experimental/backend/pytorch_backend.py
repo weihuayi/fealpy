@@ -98,13 +98,13 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def max(a, axis=None, out=None, keepdims=False):
         if axis is None:
             return torch.max(a, keepdim=keepdims, out=out)
-        else:
-            return torch.max(a, axis, keepdim=keepdims, out=out)
-
+        return torch.max(a, axis, keepdim=keepdims, out=out)[0]
 
     @staticmethod
     def min(a, axis=None, out=None, keepdims=False):
-        return torch.min(a, dim=axis, keepdim=keepdims, out=out)
+        if axis is None:
+            return torch.min(a, keepdim=keepdims, out=out)
+        return torch.min(a, dim=axis, keepdim=keepdims, out=out)[0]
 
     @staticmethod
     def argmax(a, axis=None, out=None, keepdims=False):
@@ -134,13 +134,19 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Other methods ###
 
     @staticmethod
+    def size(a, axis=None):
+        if axis is None:
+            return a.numel()
+        else:
+            return a.size(axis)
+
+    @staticmethod
     def copy(a, /, **kwargs):
         return torch.clone(a, **kwargs)
 
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
-        unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
         """
         b, inverse, counts = torch.unique(a, return_inverse=True,
                 return_counts=True,
@@ -164,6 +170,19 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             result += (counts, )
 
         return result
+
+    @staticmethod
+    def unique_all(a, axis=None, **kwargs):
+        if axis is None:
+            a = torch.flatten(a)
+            axis = 0
+        b, inverse, counts = torch.unique(a, return_inverse=True,
+                return_counts=True,
+                dim=axis, **kwargs)
+        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
+        indices = torch.zeros(counts.shape, **kwargs)
+        indices[inverse.flip(dims=[0])] = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        return b, indices, inverse, counts
 
     @staticmethod
     def sort(a, axis=0, **kwargs):
@@ -416,12 +435,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
 
 attribute_mapping = ATTRIBUTE_MAPPING.copy()
-attribute_mapping.update({
-    'bool_': 'bool',
-    'int_': 'int',
-    'float_': 'float',
-    'complex_': 'complex'
-})
 PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
@@ -429,7 +442,7 @@ function_mapping.update(
     power='pow',
     transpose='permute',
     repeat='repeat_interleave',
-    index_add_= 'index_add_',
+    index_add='index_add',
     copy='clone'
 )
 PyTorchBackend.attach_methods(function_mapping, torch)

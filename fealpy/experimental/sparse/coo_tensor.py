@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, List
+from typing import Optional, Union, overload, List, Tuple
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -35,9 +35,9 @@ class COOTensor():
         self.is_coalesced = is_coalesced
 
         if spshape is None:
-            self._spshape = Size((bm.max(indices, dim=1)[0] + 1,))
+            self._spshape = (bm.max(indices, axis=1) + 1,)
         else:
-            self._spshape = Size(spshape)
+            self._spshape = tuple(spshape)
 
         self._check(indices, values, spshape)
 
@@ -80,16 +80,20 @@ class COOTensor():
             return self.shape[dim]
 
     @property
-    def device(self): return self._indices.device
+    def indices_context(self): return bm.context(self._indices)
     @property
-    def dtype(self):
+    def values_context(self):
         if self._values is None:
-            return self._indices.dtype
-        else:
-            return self._values.dtype
+            raise RuntimeError("Can not access context of None values.")
+        return bm.context(self._values)
 
     @property
-    def shape(self): return Size(self.dense_shape + self.sparse_shape)
+    def itype(self): return self._indices.dtype
+    @property
+    def ftype(self): return None if self._values is None else self._values.dtype
+
+    @property
+    def shape(self): return self.dense_shape + self.sparse_shape
     @property
     def dense_shape(self): return _dense_shape(self._values)
     @property
@@ -105,9 +109,9 @@ class COOTensor():
     def nnz(self): return self._indices.shape[1]
 
     @property
-    def nonzero_slice(self) -> List[Union[slice, TensorLike]]:
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
         slicing = [self._indices[i] for i in range(self.sparse_ndim)]
-        return [slice(None),] * self.dense_ndim + slicing
+        return (slice(None),) * self.dense_ndim + tuple(slicing)
 
     def indices(self) -> TensorLike:
         """Return the indices of the non-zero elements."""
@@ -117,7 +121,7 @@ class COOTensor():
         """Return the non-zero elements."""
         return self._values
 
-    def to_dense(self, *, fill_value: Number) -> TensorLike:
+    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
         """Convert the COO tensor to a dense tensor and return as a new object.
 
         Parameters:
@@ -130,12 +134,11 @@ class COOTensor():
         if not self.is_coalesced:
             raise ValueError("indices must be coalesced before calling to_dense()")
 
-        dense_tensor = bm.zeros(self.shape, dtype=self.dtype)
+        dense_tensor = bm.zeros(self.shape, **self.values_context)
 
         if self._values is None:
             dense_tensor[self.nonzero_slice] = fill_value
         else:
-            slicing = [slice(None),] * self.dense_ndim + slicing
             dense_tensor[self.nonzero_slice] = self._values
 
         return dense_tensor
@@ -156,16 +159,14 @@ class COOTensor():
         if self.is_coalesced:
             return self
 
-        kwargs = {'dtype': self.dtype}
-
         unique_indices, inverse_indices = bm.unique(
-            self._indices, return_inverse=True, dim=1
+            self._indices, return_inverse=True, axis=1
         )
 
         if self._values is not None:
             value_shape = self.dense_shape + (unique_indices.shape[-1], )
-            new_values = bm.zeros(value_shape, **kwargs)
-            bm.index_add_(new_values, -1, inverse_indices, self._values)
+            new_values = bm.zeros(value_shape, **self.values_context)
+            new_values = bm.index_add(new_values, -1, inverse_indices, self._values)
 
             return COOTensor(
                 unique_indices, new_values, self.sparse_shape, is_coalesced=True
@@ -173,9 +174,10 @@ class COOTensor():
 
         else:
             if accumulate:
+                kwargs = self.indices_context
                 ones = bm.ones((self.nnz, ), **kwargs)
                 new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-                new_values.scatter_add_(-1, inverse_indices, ones)
+                new_values = bm.index_add(new_values, -1, inverse_indices, ones)
             else:
                 new_values = None
 
@@ -215,10 +217,10 @@ class COOTensor():
         return COOTensor(new_indices, values, (prod(spshape),))
 
     @overload
-    def add(self, other: Union[Number, 'COOTensor'], alpha: float=1.0) -> 'COOTensor': ...
+    def add(self, other: Union[Number, 'COOTensor'], alpha: Number=1) -> 'COOTensor': ...
     @overload
-    def add(self, other: TensorLike, alpha: float=1.0) -> TensorLike: ...
-    def add(self, other: Union[Number, 'COOTensor', TensorLike], alpha: float=1.0) -> Union['COOTensor', TensorLike]:
+    def add(self, other: TensorLike, alpha: Number=1) -> TensorLike: ...
+    def add(self, other: Union[Number, 'COOTensor', TensorLike], alpha: Number=1) -> Union['COOTensor', TensorLike]:
         """Adds another tensor or scalar to this COOTensor, with an optional scaling factor.
 
         Parameters:

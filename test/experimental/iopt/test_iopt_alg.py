@@ -3,16 +3,16 @@ import matplotlib.pyplot as plt
 import os
 from Function import Function
 from Function_plot import Function_plot
-from fealpy.experimental.opt import COA
-from fealpy.experimental.opt import HBA
-from fealpy.experimental.opt import SAO
-from fealpy.experimental.opt import QPSO
+from fealpy.experimental.iopt import COA
+from fealpy.experimental.iopt import HBA
+from fealpy.experimental.iopt import SAO
+from fealpy.experimental.iopt import QPSO
 from fealpy.experimental.backend import backend_manager as bm
 
 
 #运行
 def test_alg(alg_name):
-    for i in range(11, 12):
+    for i in range(3, 4):
         F = 'F' + str(i) 
 
         N = 100
@@ -25,7 +25,6 @@ def test_alg(alg_name):
         # X, Y, Z = f_plot.Functions_plot()
 
         start_time = time.time()
-
         algorithm_dict = {  
             'HBA': HBA,  
             'COA': COA,  
@@ -37,7 +36,6 @@ def test_alg(alg_name):
         else:  
             print(f"Unrecognized algorithm name: {alg_name}")  
 
-        #C = HBA(N,dim,  ub, lb, T,fobj)#N, dim,  ub, lb, Max_iter, fobj
         Best_pos, Best_score, Convergence_curve = C.cal()
         end_time = time.time()
 

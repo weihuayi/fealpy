@@ -86,6 +86,17 @@ class JAXBackend(Backend[Array], backend_name='jax'):
             result += (counts, )
 
         return result
+
+    @staticmethod
+    def unique_all(x, axis=None, **kwargs):
+        """
+        unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
+        """
+        return jnp.unique(x, return_index=True, 
+                return_inverse=True,
+                return_counts=True,
+                axis=axis, **kwargs)
+
     ### FEALPy functionals ###
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=None) -> Array:

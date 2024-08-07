@@ -2,7 +2,7 @@
 from typing import Optional, Union, Callable
 
 
-from .backend import backend_manager as bm 
+from .backend import backend_manager as bm
 from .typing import TensorLike, Index, Number, CoefLike, _S
 
 from .mesh import HomogeneousMesh, Mesh
@@ -40,14 +40,14 @@ def process_coef_func(
 
 def is_scalar(input: Union[int, float, TensorLike]) -> bool:
     if isinstance(input, TensorLike):
-        return input.numel() == 1
+        return bm.size(input) == 1
     else:
         return isinstance(input, (int, float))
 
 
 def is_tensor(input: Union[int, float, TensorLike]) -> bool:
     if isinstance(input, TensorLike):
-        return input.numel() >= 2
+        return bm.size(input) >= 2
     return False
 
 

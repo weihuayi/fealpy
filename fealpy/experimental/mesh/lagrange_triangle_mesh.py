@@ -10,7 +10,7 @@ from .triangle_mesh import TriangleMesh
 class LagrangeTriangleMesh(HomogeneousMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
             construct=False):
-        super().__init__(TD=2)
+        super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
         self.p = p
@@ -26,7 +26,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             (0, 1, 2),
             (1, 2, 0),
             (2, 0, 1)], **kwargs)
-        
+
         if construct:
             self.construct()
 
@@ -37,16 +37,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         self.celldata = {}
         self.meshdata = {}
 
-    def construct(self):
-        pass
-
-    # 重载拓扑关系函数
-    def cell_to_edge(self):
-        return self.cell2edge
-
-    def edge_to_cell(self):
-        return self.edge2cell
-
     def generate_local_lagrange_edges(self, p: int) -> TensorLike:
         """
         Generate the local edges for Lagrange elements of order p.
@@ -56,15 +46,16 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         localEdge = bm.zeros((3, p+1), dtype=bm.int32)
         localEdge[2, :], = bm.where(multiIndex[:, 2] == 0)
-        localEdge[1, -1::-1], = bm.where(multiIndex[:, 1] == 0)
+        localEdge[1,:] = bm.flip(bm.where(multiIndex[:, 1] == 0)[0])
+        #localEdge[1, -1::-1], = bm.where(multiIndex[:, 1] == 0)
         localEdge[0, :],  = bm.where(multiIndex[:, 0] == 0)
 
         return localEdge
 
      # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell'):
-        from .quadrature import TriangleQuadrature
-        from .quadrature import GaussLegendreQuadrature
+        from ..quadrature import TriangleQuadrature
+        from ..quadrature import GaussLegendreQuadrature
 
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
@@ -76,7 +67,126 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
         return quad
- 
+
+    def bc_to_point(self, bc: TensorLike, index: Index=_S, etype='cell'):
+        """
+        """
+        node = self.node
+        TD = bc.shape[-1] - 1
+        entity = self.entity(TD, index=index) # 
+        phi = self.shape_function(bc) # (NQ, 1, ldof)
+        p = np.einsum('ijk, jkn->ijn', phi, node[entity])
+        return p
+    
+    # shape function
+    def shape_function(self, bc: TensorLike, p=None):
+        p = self.p if p is None else p
+        phi = bm.simplex_shape_function(bc, p=p)
+        return phi[..., None, :]
+
+    def grad_shape_function(self, bc: TensorLike, p=None, index: Index=_S, variables='u'):
+        """
+        Notes
+        -----
+        计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+
+        lambda_0 = 1 - xi - eta
+        lambda_1 = xi
+        lambda_2 = eta
+
+        """
+        p = self.p if p is None else p 
+        TD = bc.shape[-1] - 1
+        if TD == 2:
+            Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
+        else:
+            Dlambda = bm.array([[-1], [1]], dtype=bm.float64)
+        R = bm.simplex_grad_shape_function(bc, p=p) # (..., ldof, TD+1)
+        gphi = bm.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
+
+        if variables == 'u':
+            return gphi[..., None, :, :] #(..., 1, ldof, TD)
+        elif variables == 'x':
+            G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
+            G = bm.linalg.inv(G)
+            gphi = bm.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
+            return gphi
+
+    def cell_area(self, q=None, index: Index=_S):
+        """
+        """
+        p = self.p
+        q = p if q is None else q
+        GD = self.geo_dimension()
+
+        qf = self.quadrature_formula(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs, index=index)
+        n = bm.cross(J[..., 0], J[..., 1], axis=-1)
+        if GD == 3:
+            n = bm.sqrt(bm.sum(n**2, axis=-1))
+        a = bm.einsum('i, ij->j', ws, n)/2.0
+        return a
+
+    def jacobi_matrix(self, bc: Union[TensorLike, Tuple[TensorLike]], p=None, 
+            index: Index=_S, return_grad=False):
+        """
+        Notes
+        -----
+        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
+
+        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """
+
+        TD = bc.shape[-1] - 1
+        entity = self.entity(TD, index)
+        gphi = self.grad_shape_function(bc, p=p)
+        J = bm.einsum(
+                'cin, ...cim->...cnm',
+                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)
+        if return_grad is False:
+            return J #(NQ,NC,GD,TD)
+        else:
+            return J, gphi
+
+    # fundamental form
+    def first_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
+            index: Index=_S, return_jacobi=False, return_grad=False):
+        """
+        Compute the first fundamental form of a mesh surface at integration points.
+        """
+        TD = bc.shape[-1] - 1
+
+        J = self.jacobi_matrix(bc, index=index,
+                return_grad=return_grad)
+        
+        if return_grad:
+            J, gphi = J
+
+        shape = J.shape[0:-2] + (TD, TD)
+        G = bm.zeros(shape, dtype=self.ftype)
+        for i in range(TD):
+            G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
+            for j in range(i+1, TD):
+                G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
+                G[..., j, i] = G[..., i, j]
+        if (return_jacobi is False) & (return_grad is False):
+            return G
+        elif (return_jacobi is True) & (return_grad is False): 
+            return G, J
+        elif (return_jacobi is False) & (return_grad is True): 
+            return G, gphi 
+        else:
+            return G, J, gphi
+
+    def second_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
+            index: Index=_S, return_jacobi=False, return_grad=False):
+        """
+        Compute the second fundamental form of a mesh surface at integration points.
+        """
+        TD = bc.shape[-1] - 1
+        pass
+
     @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
         node = mesh.interpolation_points(p)
@@ -84,9 +194,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         if surface is not None:
             node, _ = surface.project(node)
 
-        lmesh = cls(node, cell, p=p, construct=False)
+        lmesh = cls(node, cell, p=p, construct=True)
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
         lmesh.cell2edge = mesh.cell_to_edge()
-        lmesh.edge  = mesh.edge_to_ipoint(p)
+        #lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh 

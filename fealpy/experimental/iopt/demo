@@ -1,0 +1,20 @@
+# import time 
+# import random
+# import matplotlib.pyplot as plt  
+# # from fealpy.experimental.iopt import initialize
+# from fealpy.experimental.backend import backend_manager as bm
+# bm.set_backend('pytorch')
+
+
+# a = bm.random.uniform(2)
+# # b = bm.random.rand(1)
+# print("#############",a)
+import numpy  as np
+
+# np.random.seed(1214)
+# a = np.random.rand()
+# print(a)
+a = np.diag([1,2,3,4])
+b = a[-1,:]
+c = (a,b)
+print(c)
