@@ -24,10 +24,10 @@ space = LagrangeFESpace(mesh, 2)
 uh = space.interpolate(test_fun)
 bcs = np.array([[0, 0, 1], [0, 1, 0], [1/3, 1/3, 1/3]], dtype=np.float64)
 
-print(uh)
+#print(uh)
 #print(space.value(uh, bcs).swapaxes(1,0))
-print(space.grad_value(uh, bcs).swapaxes(0,1))
-print(space.grad_value(uh, bcs).shape)
+print(space.grad_basis(bcs).swapaxes(0,1))
+#print(space.grad_value(uh, bcs).shape)
 
 
 '''
