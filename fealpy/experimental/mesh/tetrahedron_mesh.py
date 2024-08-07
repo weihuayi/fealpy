@@ -66,7 +66,7 @@ class TetrahedronMesh(SimplexMesh):
         face = self.face
         NF = len(face2edge)
         NEF = 3
-        face2edgeSign = bm.zeros((NF, NEF), dtype=bm.bool_)
+        face2edgeSign = bm.zeros((NF, NEF), dtype=bm.bool)
         n = [1, 2, 0]
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
@@ -504,7 +504,7 @@ class TetrahedronMesh(SimplexMesh):
             bc = bm.sum(node[cell, :], axis=1)/cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)

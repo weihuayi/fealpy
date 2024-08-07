@@ -1625,7 +1625,7 @@ face_unit_norm = [{
        [ 1.                ,  0.                ,  0.                ],
        [ 1.                , -0.                ,  0.                ],
        [ 1.                ,  0.                ,  0.                ]],
-       dtype=np.float_)   
+       dtype=np.float64)   
        },
 ]
 grad_lambda = [{
