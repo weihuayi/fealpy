@@ -4,7 +4,12 @@ from math import prod
 
 from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
-from .utils import _dense_ndim, _dense_shape
+from .utils import (
+    _dense_ndim, _dense_shape,
+    check_shape_match, check_spshape_match
+)
+from ._spspmm import spspmm_csr
+from ._spmm import spmm_csr
 
 
 class CSRTensor():
