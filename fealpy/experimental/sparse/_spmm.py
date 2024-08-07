@@ -7,7 +7,7 @@ from ..backend import TensorLike as _DT
 _Size = Tuple[int, ...]
 
 
-def spmm_coo(indices: _DT, values: _DT, spshape: _Size, x: _DT):
+def spmm_coo(indices: _DT, values: _DT, spshape: _Size, x: _DT) -> _DT:
     if len(spshape) != 2:
         raise ValueError("COO tensor to matrix-vector multiplication must be"
                          f"2-D in sparse dims, but got shape {spshape}")
@@ -23,7 +23,7 @@ def spmm_coo(indices: _DT, values: _DT, spshape: _Size, x: _DT):
         new_vals = values * x[col]
         shape = new_vals.shape[:-1] + (spshape[0], )
         result = bm.zeros(shape, dtype=x.dtype)
-        result = bm.index_add_(result, -1, row, new_vals)
+        bm.index_add_(result, -1, row, new_vals)
         return result
 
     elif x.ndim >= 2:
@@ -34,7 +34,7 @@ def spmm_coo(indices: _DT, values: _DT, spshape: _Size, x: _DT):
         new_vals = values[..., None] * x[..., col, :] # (*batch, nnz, x_col)
         shape = new_vals.shape[:-2] + (spshape[0], x.shape[-1])
         result = bm.zeros(shape, dtype=x.dtype)
-        result = bm.index_add_(result, -2, row, new_vals)
+        bm.index_add_(result, -2, row, new_vals)
         return result
 
     else:

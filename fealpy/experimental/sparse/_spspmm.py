@@ -35,9 +35,9 @@ def spspmm_coo(indices1: _DT, values1: _DT, spshape1: _Size,
 
         row = indices1[0, left_col_flag]
         col = indices2[1, right_row_flag]
-        nnz = col.size(0) * row.size(0)
+        nnz = col.shape[0] * row.shape[0]
         idx = bm.meshgrid(row, col, indexing='ij')
-        idx = bm.reshape(bm.stack(idx, dim=0), (2, nnz))
+        idx = bm.reshape(bm.stack(idx, axis=0), (2, nnz))
         val1 = values1[..., left_col_flag]
         val2 = values2[..., right_row_flag]
         val = bm.einsum('...i, ...j -> ...ij', val1, val2).reshape(*structure, nnz)
