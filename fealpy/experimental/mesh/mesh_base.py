@@ -527,7 +527,7 @@ class TensorMesh(HomogeneousMesh):
                        variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         TD = len(bcs)
         if mi is None:
-            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+            mi = bm.multi_index_matrix(p, 1, dtype=self.itype)
         raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
         phi = bm.tensorprod(*raw_phi)
         if variables == 'u':
