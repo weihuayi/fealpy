@@ -1,7 +1,14 @@
+<<<<<<< HEAD
+from ..backend import backend_manager as bm 
+from ..typing import TensorLike, Index, _S
+from .. import logger
+from .optimizer_base import Optimizer, opt_alg_options
+=======
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike, Index, _S
 from fealpy.experimental import logger
 from fealpy.experimental.opt.optimizer_base import Optimizer
+>>>>>>> upstream/master
 import random
 
 
@@ -98,7 +105,12 @@ class SnowmeltOptAlg(Optimizer):
             Elite_pool[2] = third_best
             Elite_pool[3] = half_best_mean
             Convergence_curve.append(Best_score)
+<<<<<<< HEAD
+            # if (t + 1) % 50 == 0:
+            #     print("SAO" + " iter" , t  + 1 , ":", Best_score)
+=======
 
+>>>>>>> upstream/master
         return Best_pos, Best_score
 
 
