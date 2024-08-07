@@ -132,10 +132,11 @@ def symmetry_index(d, r):
 
 
     midx = bm.multi_index_matrix(r, d-1)
-    midx0 = bm.zeros_like(midx) 
-    for i in range(d):
-        midx0[:, i] = np.sum(symidx0 == i, axis=1) 
-    print(midx0-midx)
+    #midx0 = bm.zeros_like(midx) 
+    #for i in range(d):
+    #    midx0[:, i] = bm.sum(symidx0 == i, axis=1) 
+    #print(midx0-midx)
+    #midx = midx0
 
 
     P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)], axis=0)
