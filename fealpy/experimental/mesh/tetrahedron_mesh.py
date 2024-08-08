@@ -23,7 +23,7 @@ class TetrahedronMesh(SimplexMesh):
             (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
             (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)], **kwargs)
 
-        self.ccw = bm.tensor([0, 1, 2, 4], **kwargs)
+        self.ccw = bm.tensor([0, 1, 2], **kwargs)
         self.construct()
         self.OFace = bm.tensor([
             (1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)], **kwargs)
@@ -510,7 +510,7 @@ class TetrahedronMesh(SimplexMesh):
             idxMap = bm.zeros(NN, dtype=cell.dtype)
             idxMap[isValidNode] = bm.arange(isValidNode.sum(), dtype=cell.dtype)
             cell = idxMap[cell]
-        mesh = TetrahedronMesh(node, cell)
+        mesh = cls(node, cell)
 
         bdface = mesh.boundary_face_index()
         f2n = mesh.face_unit_normal()[bdface]
