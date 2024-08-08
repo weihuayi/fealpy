@@ -199,6 +199,136 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     def number_of_faces_of_cells(self):
         return 4
     
+    def edge_to_cell(self) -> TensorLike:
+        """
+        @brief Adjacency relationship between edges and cells, 
+        storing information about the two cells adjacent to each edge.
+        Notes:
+        - The first and second columns store the indices of the left and right cells adjacent to each edge. 
+        When the two indices are the same, it indicates that the edge is a boundary edge.
+        - The third and fourth columns store the local indices of the edge in the left and right cells, respectively.
+        """
+
+        nx = self.nx
+        ny = self.ny
+        NC = self.NC
+        NE = self.NE
+
+        edge2cell = bm.zeros((NE, 4), dtype=self.itype)
+
+        idx = bm.arange(NC, dtype=self.itype).reshape(nx, ny).T
+
+        # x direction
+        idx0 = bm.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
+        # y direction
+        idx1 = bm.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
+        NE0 = nx * (ny + 1)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # left element
+            edge2cell[idx0[:-1], 0] = idx
+            edge2cell[idx0[:-1], 2] = 0
+            edge2cell[idx0[-1], 0] = idx[-1]
+            edge2cell[idx0[-1], 2] = 1
+
+            # right element
+            edge2cell[idx0[1:], 1] = idx
+            edge2cell[idx0[1:], 3] = 1
+            edge2cell[idx0[0], 1] = idx[0]
+            edge2cell[idx0[0], 3] = 0
+
+            # left element
+            edge2cell[NE0 + idx1[:, 1:], 0] = idx
+            edge2cell[NE0 + idx1[:, 1:], 2] = 3
+            edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+            edge2cell[NE0 + idx1[:, 0], 2] = 2
+
+            # right element
+            edge2cell[NE0 + idx1[:, :-1], 1] = idx
+            edge2cell[NE0 + idx1[:, :-1], 3] = 2
+            edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+            edge2cell[NE0 + idx1[:, -1], 3] = 3
+
+            return edge2cell
+        elif bm.backend_name == 'jax':
+            # left element
+            edge2cell = edge2cell.at[idx0[:-1], 0].set(idx)
+            edge2cell = edge2cell.at[idx0[:-1], 2].set(0)
+            edge2cell = edge2cell.at[idx0[-1], 0].set(idx[-1])
+            edge2cell = edge2cell.at[idx0[-1], 2].set(1)
+
+            # right element
+            edge2cell = edge2cell.at[idx0[1:], 1].set(idx)
+            edge2cell = edge2cell.at[idx0[1:], 3].set(1)
+            edge2cell = edge2cell.at[idx0[0], 1].set(idx[0])
+            edge2cell = edge2cell.at[idx0[0], 3].set(0)
+
+            # left element
+            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 0].set(idx)
+            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 2].set(3)
+            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 0].set(idx[:, 0])
+            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 2].set(2)
+
+            # right element
+            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 1].set(idx)
+            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 3].set(2)
+            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 1].set(idx[:, -1])
+            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 3].set(3)
+
+            return edge2cell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
+        
+    def boundary_node_flag(self):
+        """
+        @brief Determine if a point is a boundary point.
+        """
+        NN = self.NN
+        edge = self.edge
+        isBdEdge = self.boundary_edge_flag()
+        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdPoint[edge[isBdEdge, :]] = True
+            return isBdPoint
+        elif bm.backend_name == 'jax':
+            isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)   
+            return isBdPoint
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
+    
+    def boundary_edge_flag(self):
+        """
+        @brief Determine if an edge is a boundary edge.
+        """
+        edge2cell = self.edge_to_cell()
+        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+        return isBdEdge
+    
+    
+    def boundary_cell_flag(self):
+        """
+        @brief Determine if a cell is a boundary cell.
+        """
+        NC = self.NC
+
+        edge2cell = self.edge_to_cell()
+        isBdCell = bm.zeros((NC,), dtype=bool)
+        isBdEdge = self.boundary_edge_flag()
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdCell[edge2cell[isBdEdge, 0]] = True
+            return isBdCell
+        elif bm.backend_name == 'jax':
+            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
+            return isBdCell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+    
     
     # 实体几何
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> TensorLike:
@@ -427,12 +557,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             # 确定哪些边在它的左边单元内是局部的第 1 号边
             flag = edge2cell[:, 2] == 1
             # 将这些边放在每个单元的最后 1 列上，注意此时是逆序
-            c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+            #c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 0], :, -1] = bm.flip(e2p[flag], axis=[1])
 
             # 确定哪些边在它的左边单元内是局部的第 2 号边
             flag = edge2cell[:, 2] == 2
             # 将这些边放在每个单元的第 0 行上
-            c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+            #c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 0], 0, :] = bm.flip(e2p[flag], axis=[1])
 
             # 确定哪些边在它的左边单元内是局部的第 3 号边
             flag = edge2cell[:, 2] == 3
@@ -446,12 +578,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             rflag = edge2cell[:, 3] == 0
             flag = iflag & rflag
             # 将这些边放在每个单元的第 1 列上，注意此时是逆序
-            c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+            #c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 1], :, 0] = bm.flip(e2p[flag], axis=[1])
 
             # 确定哪些边在它的右边单元内是局部的第 1 号边
             rflag = edge2cell[:, 3] == 1
             flag = iflag & rflag
-            # 将这些边放在每个单元的最后 1 列上
+            # 将这些边放在每个单元的最后 1 列上 
             c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
 
             # 确定哪些边在它的右边单元内是局部的第 2 号边
@@ -464,7 +597,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             rflag = edge2cell[:, 3] == 3
             flag = iflag & rflag
             # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
-            c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+            #c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 1], -1, :] = bm.flip(e2p[flag], axis=[1])
 
             c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + \
                 bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1)
@@ -497,56 +631,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             return cell2ipoint[index]
         else:
             raise NotImplementedError("Backend is not yet implemented.")
-
-    
-    def cell_to_ipoints(self, p:int, index: Index = _S):
-        """
-        @brief 获取单元上的双 p 次插值点
-        """
-
-        cell = self.entity('cell')
-
-        if p == 0:
-            return bm.arange(len(cell)).reshape((-1, 1))[index]
-
-        if p == 1:
-            return cell[index]  # 先排 y 方向，再排 x 方向
-
-        edge2cell = self.edge_to_cell()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-
-        if bm.backend_name in ["numpy", "pytorch"]:
-            cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
-            c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
-
-            e2p = self.edge_to_ipoint(p)
-            flag = edge2cell[:, 2] == 0
-            c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
-            flag = edge2cell[:, 2] == 1
-            c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
-            flag = edge2cell[:, 2] == 2
-            c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
-            flag = edge2cell[:, 2] == 3
-            c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
-
-            iflag = edge2cell[:, 0] != edge2cell[:, 1]
-            flag = iflag & (edge2cell[:, 3] == 0)
-            c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
-            flag = iflag & (edge2cell[:, 3] == 1)
-            c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
-            flag = iflag & (edge2cell[:, 3] == 2)
-            c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
-            flag = iflag & (edge2cell[:, 3] == 3)
-            c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
-
-            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
-        elif bm.backend_name == "jax":
-            raise NotImplementedError
-        else:
-            raise ValueError("Unsupported backend")
-        return cell2ipoint[index]
         
     
     # 形函数
@@ -664,131 +748,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     #         return gphi
         
-    def edge_to_cell(self) -> TensorLike:
-        """
-        @brief Adjacency relationship between edges and cells, 
-        storing information about the two cells adjacent to each edge.
-        """
-
-        nx = self.nx
-        ny = self.ny
-        NC = self.NC
-        NE = self.NE
-
-        edge2cell = bm.zeros((NE, 4), dtype=self.itype)
-
-        idx = bm.arange(NC, dtype=self.itype).reshape(nx, ny).T
-
-        # x direction
-        idx0 = bm.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
-        # y direction
-        idx1 = bm.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
-        NE0 = nx * (ny + 1)
-
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            # left element
-            edge2cell[idx0[:-1], 0] = idx
-            edge2cell[idx0[:-1], 2] = 0
-            edge2cell[idx0[-1], 0] = idx[-1]
-            edge2cell[idx0[-1], 2] = 1
-
-            # right element
-            edge2cell[idx0[1:], 1] = idx
-            edge2cell[idx0[1:], 3] = 1
-            edge2cell[idx0[0], 1] = idx[0]
-            edge2cell[idx0[0], 3] = 0
-
-            # left element
-            edge2cell[NE0 + idx1[:, 1:], 0] = idx
-            edge2cell[NE0 + idx1[:, 1:], 2] = 3
-            edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
-            edge2cell[NE0 + idx1[:, 0], 2] = 2
-
-            # right element
-            edge2cell[NE0 + idx1[:, :-1], 1] = idx
-            edge2cell[NE0 + idx1[:, :-1], 3] = 2
-            edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
-            edge2cell[NE0 + idx1[:, -1], 3] = 3
-
-            return edge2cell
-        elif bm.backend_name == 'jax':
-            # left element
-            edge2cell = edge2cell.at[idx0[:-1], 0].set(idx)
-            edge2cell = edge2cell.at[idx0[:-1], 2].set(0)
-            edge2cell = edge2cell.at[idx0[-1], 0].set(idx[-1])
-            edge2cell = edge2cell.at[idx0[-1], 2].set(1)
-
-            # right element
-            edge2cell = edge2cell.at[idx0[1:], 1].set(idx)
-            edge2cell = edge2cell.at[idx0[1:], 3].set(1)
-            edge2cell = edge2cell.at[idx0[0], 1].set(idx[0])
-            edge2cell = edge2cell.at[idx0[0], 3].set(0)
-
-            # left element
-            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 0].set(idx)
-            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 2].set(3)
-            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 0].set(idx[:, 0])
-            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 2].set(2)
-
-            # right element
-            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 1].set(idx)
-            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 3].set(2)
-            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 1].set(idx[:, -1])
-            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 3].set(3)
-
-            return edge2cell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-
-        
-    def boundary_node_flag(self):
-        """
-        @brief Determine if a point is a boundary point.
-        """
-        NN = self.NN
-        edge = self.edge
-        isBdEdge = self.boundary_edge_flag()
-        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdPoint[edge[isBdEdge, :]] = True
-            return isBdPoint
-        elif bm.backend_name == 'jax':
-            isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)
-            return isBdPoint
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-
     
-    def boundary_edge_flag(self):
-        """
-        @brief Determine if an edge is a boundary edge.
-        """
-        edge2cell = self.edge_to_cell()
-        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
-        return isBdEdge
-    
-    
-    def boundary_cell_flag(self):
-        """
-        @brief Determine if a cell is a boundary cell.
-        """
-        NC = self.NC
-
-        edge2cell = self.edge_to_cell()
-        isBdCell = bm.zeros((NC,), dtype=bool)
-        isBdEdge = self.boundary_edge_flag()
-
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdCell[edge2cell[isBdEdge, 0]] = True
-            return isBdCell
-        elif bm.backend_name == 'jax':
-            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
-            return isBdCell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
     
 
     # 其他方法
