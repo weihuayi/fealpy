@@ -143,6 +143,14 @@ barycenter_data = [
     }
 ]
 
+bc2point_data = [
+    {
+        "extent": (0, 2, 0, 2, 0, 2),
+        "h": (1, 1, 1),
+        "origin": (0, 0, 0),
+    }
+]
+
 uniform_refine_data = [
     {
         "extent": (0, 2, 0, 2, 0, 2),

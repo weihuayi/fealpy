@@ -308,7 +308,18 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
                                cell_3[:, None], cell_4[:, None], cell_5[:, None], 
                                cell_6[:, None], cell_7[:, None]], axis=-1)
 
-        return cell
+        return cell    
+    
+    
+    # 实体拓扑
+    def number_of_nodes_of_cells(self):
+        return 8
+
+    def number_of_edges_of_cells(self):
+        return 12
+
+    def number_of_faces_of_cells(self):
+        return 6
 
 
     # 实体几何
@@ -489,77 +500,41 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
         bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
         return bc
-        
     
-    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
-        """
-        @brief Get the quadrature formula for numerical integration.
-        """
-        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        if isinstance(etype, str):
-            etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
-        if etype == 3:
-            return TensorProductQuadrature((qf, qf, qf))
-        elif etype == 2:
-            return TensorProductQuadrature((qf, qf))
-        elif etype == 1:
-            return qf
-        else:
-            raise ValueError(f"entity type: {etype} is wrong!")
-        
-
-    def bc_to_point(self, bcs: Tuple, index=_S):
+    def bc_to_point(self, bcs: Union[Tuple, TensorLike], index=_S):
         """
         @brief Transform the barycentric coordinates of integration points
         to Cartesian coordinates on the actual mesh entities.
 
         Returns
-            TensorLike: (NQ, NC, GD)
+            TensorLike: (NQ, NC, GD) or (NQ, NE, GD)
         """
         node = self.entity('node')
+        if isinstance(bcs, tuple) and len(bcs) == 3:
+            cell = self.entity('cell', index)
 
-        assert len(bcs) == 3
-        cell = self.entity('cell')[index]
+            bcs0 = bcs[0].reshape(-1, 2)
+            bcs1 = bcs[1].reshape(-1, 2)
+            bcs2 = bcs[2].reshape(-1, 2)
+            bcs = bm.einsum('im, jn, ko -> ijkmno', bcs0, bcs1, bcs2).reshape(-1, 8)
 
-        bcs0 = bcs[0].reshape(-1, 2)
-        bcs1 = bcs[1].reshape(-1, 2)
-        bcs2 = bcs[2].reshape(-1, 2)
-        bcs = np.einsum('im, jn, kl -> ijkmnl', bcs0, bcs1, bcs2).reshape(-1, 8)
+            p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
+        elif isinstance(bcs, tuple) and len(bcs) == 2:
+            face = self.entity('face', index)
 
-        p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
-        if p.shape[0] == 1:
-            p = p.reshape(-1, 3)
+            bcs0 = bcs[0].reshape(-1, 2)
+            bcs1 = bcs[1].reshape(-1, 2)
+            bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
 
-        return p
+            p = bm.einsum('...j, cjk -> ...ck', bcs, node[face[:]])
+        else:
+            edge = self.entity('edge', index=index)
+            p = bm.einsum('...j, ejk -> ...ek', bcs, node[edge]) 
+
+        return p 
+    
         
-    
-    def number_of_local_ipoints(self, p, etype:Union[int, str]='cell'):
-        """
-        @brief Get the number of local interpolation points on the mesh.
-        """
-        if isinstance(etype, str):
-            etype = estr2dim(self, etype)
-        if etype == 3:
-            return (p+1) * (p+1) * (p+1)
-        elif etype == 2:
-            return (p+1) * (p+1)
-        elif etype == 1:
-            return p + 1
-        elif etype == 0:
-            return 1
-        
-    
-    def number_of_global_ipoints(self, p: int) -> int:
-        """
-        @brief Get the number of global interpolation points on the mesh.
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NF = self.number_of_faces()
-        NC = self.number_of_cells()
-        return NN + (p-1)*NE + (p-1)*(p-1)*NF + (p-1)*(p-1)*(p-1)*NC
-    
+    # 插值点
     def interpolation_points(self, p):
         cell = self.cell
         face = self.face
@@ -583,23 +558,42 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
         raise NotImplementedError("Interpolation points for p > 1 are not yet implemented for 3D structured meshes.")
 
 
-    def shape_function(self, bcs: TensorLike, p: int=1, 
-                    mi: Optional[TensorLike]=None) -> TensorLike:
+    # def shape_function(self, bcs: TensorLike, p: int=1, 
+    #                 mi: Optional[TensorLike]=None) -> TensorLike:
+    #     """
+    #     @brief Compute the shape function of a 3D structured mesh.
+
+    #     Returns:
+    #         TensorLike: Shape function with shape (NQ, ldof).
+    #     """
+    #     assert isinstance(bcs, tuple)
+
+    #     TD = bcs[0].shape[-1] - 1
+    #     if mi is None:
+    #         mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+    #     phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
+    #     ldof = self.number_of_local_ipoints(p, etype=3)
+
+    #     return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
+    
+
+    # 其他方法
+    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
         """
-        @brief Compute the shape function of a 3D structured mesh.
-
-        Returns:
-            TensorLike: Shape function with shape (NQ, ldof).
+        @brief Get the quadrature formula for numerical integration.
         """
-        assert isinstance(bcs, tuple)
-
-        TD = bcs[0].shape[-1] - 1
-        if mi is None:
-            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
-        phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
-        ldof = self.number_of_local_ipoints(p, etype=3)
-
-        return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        qf = GaussLegendreQuadrature(q)
+        if etype == 3:
+            return TensorProductQuadrature((qf, qf, qf))
+        elif etype == 2:
+            return TensorProductQuadrature((qf, qf))
+        elif etype == 1:
+            return qf
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
 
     def uniform_refine(self, n: int=1):
         """
