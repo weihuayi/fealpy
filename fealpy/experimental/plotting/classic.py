@@ -1,7 +1,8 @@
 
 from typing import (
-    Callable, Sequence, Optional, TypeVar, Any, Union, Generic,
-    Dict, Type, overload
+    Callable, Iterable, Sequence, Dict,
+    Any, Optional, Union, Type,
+    overload, Generic, TypeVar,
 )
 from types import ModuleType
 
@@ -112,7 +113,7 @@ class MeshPloter(Generic[_MT]):
 
                 etype: Any = ...,             # specify the entity for Finders
                 showindex = False,            # show the index of entity for Finders
-                multiindex: Sequence[Any] = ...,
+                multiindex: Iterable[Any] = ...,
                 index: slice = ...,           # specify the index of entity to plot
                 threshold: Callable = ...,
 
@@ -172,7 +173,7 @@ class EntityFinder(MeshPloter[_MT]):
         color = kwargs['color']
 
         if isinstance(etype_or_node, (int, str)):
-            bc = self.mesh.entity_barycenter(etype=etype_or_node)[kwargs['index']]
+            bc = self.mesh.entity_barycenter(etype=etype_or_node, index=kwargs['index'])
         elif isinstance(etype_or_node, np.ndarray):
             bc = etype_or_node
         else:
@@ -187,8 +188,8 @@ class EntityFinder(MeshPloter[_MT]):
             mapper = array_color_map(color, 'rainbow')
             color = mapper.to_rgba(color)
 
-        A.scatter(axes=axes, points=bc, color=color,
-                  marker=kwargs['marker'], markersize=kwargs['markersize'])
+        coll = A.scatter(axes=axes, points=bc, color=color,
+                         marker=kwargs['marker'], markersize=kwargs['markersize'])
 
         if kwargs['showindex']:
             if kwargs['multiindex'] is None:
@@ -197,6 +198,8 @@ class EntityFinder(MeshPloter[_MT]):
             else:
                 A.show_multi_index(axes=axes, location=bc, text_list=kwargs['multiindex'],
                                    fontcolor=kwargs['fontcolor'], fontsize=kwargs['fontsize'])
+
+        return coll
 
 EntityFinder.register('finder')
 

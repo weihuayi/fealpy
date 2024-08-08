@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 import numpy as np
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.collections import PathCollection
 
 
 def _validate_geo_dim(axes: Axes, points: NDArray):
@@ -89,15 +90,15 @@ def show_multi_index(axes: Axes, location: NDArray, text_list: Sequence[Any],
 
 
 def scatter(axes: Axes, points: NDArray, *, color: str,
-            marker: str='o', markersize: float=12):
+            marker: str='o', markersize: float=12) -> PathCollection:
     """Show points in the axes.
 
     Parameters:
-        points (NDArray): An NDArray[float] containing positions with shape (NN, GD)
-            where NN is the number of points and GD is their geometry dimension.
-        color (str): Color of the node markers.
-        marker (str): Style of the node markers.
-        markersize (float): The size of the node markers.
+        points (NDArray): An NDArray[float] containing positions with shape (NN, GD)\
+            where NN is the number of points and GD is their geometry dimension.\n
+        color (str): Color of the node markers.\n
+        marker (str, optional): Style of the node markers. Defaults to 'o'.\n
+        markersize (float, optional): The size of the node markers. Defaults to 12.\n
 
     Returns:
         PathCollection.
@@ -109,7 +110,7 @@ def scatter(axes: Axes, points: NDArray, *, color: str,
         return axes.scatter(
             loc[:, 0], loc[:, 1], loc[:, 2],
             color=color, s=markersize, marker=marker
-        ),
+        )
     else:
         return axes.scatter(
             loc[:, 0], loc[:, 1],
@@ -143,7 +144,8 @@ def line(axes: Axes, points: NDArray, struct: NDArray, *, color: str, linewidths
         from matplotlib.collections import LineCollection
         lines = LineCollection(vts, linewidths=linewidths, colors=color)
 
-    return axes.add_collection(lines)
+    axes.add_collection(lines)
+    return lines
 
 
 def poly(axes: Axes, points: NDArray, struct: NDArray, *, edgecolor: str,
@@ -176,13 +178,13 @@ def poly(axes: Axes, points: NDArray, struct: NDArray, *, edgecolor: str,
     poly.set_facecolor(cellcolor)
     poly.set_alpha(alpha)
 
-    return axes.add_collection(collection=poly)
+    axes.add_collection(collection=poly)
+    return poly
 
 
 def poly_(axes: Axes, points: NDArray, struct_seq: Sequence[NDArray],
           edgecolor, cellcolor, linewidths=0.1, alpha=1.0):
-    """Show polygons (may have different shape of cells) in the axes.
-    """
+    """Show polygons (may have different shape of cells) in the axes."""
     GD = points.shape[-1]
     if GD != 2:
         raise NotImplementedError('Polygons with points with geometry dimension'
@@ -204,4 +206,5 @@ def poly_(axes: Axes, points: NDArray, struct_seq: Sequence[NDArray],
     poly.set_facecolor(cellcolor)
     poly.set_alpha(alpha)
 
-    return axes.add_collection(collection=poly)
+    axes.add_collection(collection=poly)
+    return poly
