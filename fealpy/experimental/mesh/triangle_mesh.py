@@ -92,7 +92,7 @@ class TriangleMesh(SimplexMesh):
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = bm.einsum('...ij, kjm->k...im', R, Dlambda)
+            gphi = bm.einsum('...ij, kjm -> k...im', R, Dlambda)
             return gphi  # (NC, NQ, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
@@ -571,7 +571,7 @@ class TriangleMesh(SimplexMesh):
             bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
@@ -612,3 +612,71 @@ class TriangleMesh(SimplexMesh):
         n = node / l[..., None]
         node = node - d[..., None] * n
         return cls(node, cell)
+
+    
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_ellipsoid_surface(cls, ntheta=10, nphi=10,
+                               radius=(1, 1, 1),
+                               theta=(bm.pi / 4, 3 * bm.pi / 4),
+                               phi=None,
+                               returnuv=False
+                               ):
+        """
+        @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
+        生成相应带状区域的三角形网格
+
+        x = a \sin\theta \cos\phi
+        y = b \sin\theta \sin\phi
+        z = c \cos\theta
+
+        @param[in] ntheta \theta 方向的剖分段数
+        @param[in] nphi \phi 方向的剖分段数 
+        """
+
+        a, b, c = radius
+        if phi is None:  # 默认为一封闭的带状区域
+            NN = (ntheta + 1) * nphi
+        else:  # 否则为四边形区域
+            NN = (ntheta + 1) * (nphi + 1)
+
+        NC = ntheta * nphi
+
+        if phi is None:
+            theta = bm.linspace(theta[0], theta[1], ntheta+1, dtype=bm.float64)
+            l = bm.linspace(0, 2*bm.pi, nphi+1, dtype=bm.float64)
+            U, V = bm.meshgrid(theta, l, indexing='ij')
+            U = U[:, 0:-1]  # 去掉最后一列
+            V = V[:, 0:-1]  # 去年最后一列
+        else:
+            theta = bm.linspace(theta[0], theta[1], ntheta+1, dtype=bm.float64)
+            phi = bm.linspace(phi[0], phi[1], nphi+1, dtype=bm.float64)
+            U, V = bm.meshgrid(theta, phi, indexing='ij')
+
+        node = bm.zeros((NN, 3), dtype=bm.float64)
+        X = a * bm.sin(U) * bm.cos(V)
+        Y = b * bm.sin(U) * bm.sin(V)
+        Z = c * bm.cos(U)
+        node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
+        
+        idx = bm.zeros((ntheta + 1, nphi + 1), dtype=bm.int32)
+        if phi is None:
+            idx[:, 0:-1] = bm.arange(NN).reshape(ntheta + 1, nphi)
+            idx[:, -1] = idx[:, 0]
+        else:
+            idx = bm.arange(NN).reshape(ntheta + 1, nphi + 1)
+        cell = bm.zeros((2 * NC, 3), dtype=bm.int32)
+        cell0 = bm.concatenate((
+            idx[1:, 0:-1].T.reshape(-1, 1),
+            idx[1:, 1:].T.reshape(-1, 1),
+            idx[0:-1, 0:-1].T.reshape(-1, 1)), axis=1)
+        cell1 = bm.concatenate((
+            idx[0:-1, 1:].T.reshape(-1, 1),
+            idx[0:-1, 0:-1].T.reshape(-1, 1),
+            idx[1:, 1:].T.reshape(-1, 1)), axis=1)
+        cell = bm.concatenate((cell0, cell1), axis=1).reshape(-1, 3)
+
+        if returnuv:
+            return cls(node, cell), U.flatten(), V.flatten()
+        else:
+            return cls(node, cell)

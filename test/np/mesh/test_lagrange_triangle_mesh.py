@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.np.mesh.triangle_mesh import TriangleMesh
 from fealpy.np.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh 
-from fealpy.geometry import SphereSurface
+from fealpy.geometry import SphereSurface, EllipsoidSurface
 from fealpy.np.mesh.lagrange_mesh import LagrangeMesh
 from fealpy.np.mesh import functional as F
 
@@ -31,7 +31,7 @@ def make_sphere_mesh():
     node = node - d[..., np.newaxis] * n
     return TriangleMesh(node, cell)
 
-def test_to_vtk(p=4):
+def test_to_vtk(p=3):
     surface = SphereSurface() # 以原点为球心，1为半径的球
 
     mesh = make_sphere_mesh()
@@ -49,9 +49,6 @@ def test_generate_local_lagrange_edge(p=3):
     localEdge = lmesh.localEdge
     
     print("localEdge:", localEdge)
-
-def test_cell_area(p=3):
-    pass
 
 
 if __name__ == "__main__":

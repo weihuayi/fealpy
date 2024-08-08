@@ -4,15 +4,15 @@ from math import prod
 
 from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
+from .sparse_tensor import SparseTensor
 from .utils import (
-    _dense_ndim, _dense_shape,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_csr
 from ._spmm import spmm_csr
 
 
-class CSRTensor():
+class CSRTensor(SparseTensor):
     def __init__(self, crow: TensorLike, col: TensorLike, values: Optional[TensorLike],
                  spshape: Optional[Size]=None) -> None:
         """Initializes CSR format sparse tensor.
@@ -65,38 +65,9 @@ class CSRTensor():
         return f"CSRTensor(crow={self._crow}, col={self._col}, "\
                + f"values={self._values}, shape={self.shape})"
 
-    def size(self, dim: Optional[int]=None) -> int:
-        if dim is None:
-            return prod(self.shape)
-        else:
-            return self.shape[dim]
-
-    @property
-    def indices_context(self): return bm.context(self._crow)
-    @property
-    def values_context(self):
-        if self._values is None:
-            raise RuntimeError("Can not access context of None values.")
-        return bm.context(self._values)
-
     @property
     def itype(self): return self._crow.dtype
-    @property
-    def ftype(self): return None if self._values is None else self._values.dtype
 
-    @property
-    def shape(self): return self.dense_shape + self.sparse_shape
-    @property
-    def dense_shape(self): return _dense_shape(self._values)
-    @property
-    def sparse_shape(self): return self._spshape
-
-    @property
-    def ndim(self): return self.dense_ndim + self.sparse_ndim
-    @property
-    def dense_ndim(self): return _dense_ndim(self._values)
-    @property
-    def sparse_ndim(self): return 2
     @property
     def nnz(self): return self._col.shape[1]
 
@@ -112,22 +83,25 @@ class CSRTensor():
         """Return the non-zero elements"""
         return self._values
 
-    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
+    def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
         """Convert the CSRTensor to a dense tensor and return as a new object.
 
         Parameters:
-            fill_value (int | float, optional):
+            fill_value (int | float, optional): The value to fill the dense tensor with
+                when `self.values()` is None.
 
         Returns:
             Tensor: The dense tensor.
         """
-        kwargs = self.indices_context
-        dense_tensor = bm.zeros(self.shape, **kwargs)
+        context = self.values_context()
+        context.update(kwargs)
+        dense_tensor = bm.zeros(self.shape, **context)
 
         for i in range(1, self._crow.shape[0]):
             start = self._crow[i - 1]
             end = self._crow[i]
-            dense_tensor[..., i - 1, self._col[start:end]] = self._values[..., start:end]
+            val = fill_value if (self._values is None) else self._values[..., start:end]
+            dense_tensor[..., i - 1, self._col[start:end]] = val
 
         return dense_tensor
 
@@ -144,6 +118,17 @@ class CSRTensor():
     def flatten(self) -> 'CSRTensor':
         pass
 
+    def copy(self):
+        return CSRTensor(bm.copy(self._crow), bm.copy(self._col),
+                         bm.copy(self._values), self._spshape)
+
+    def neg(self) -> 'CSRTensor':
+        """Negation of the CSR tensor. Returns self if values is None."""
+        if self._values is None:
+            return self
+        else:
+            return CSRTensor(self._crow, self._col, -self._values, self._spshape)
+
     @overload
     def add(self, other: Union[Number, 'CSRTensor'], alpha: Number=1) -> 'CSRTensor': ...
     @overload
@@ -155,6 +140,9 @@ class CSRTensor():
         pass
 
     def div(self, other: Union[Number, TensorLike]) -> 'CSRTensor':
+        pass
+
+    def pow(self, other: Union[TensorLike, Number]) -> 'CSRTensor':
         pass
 
     @overload

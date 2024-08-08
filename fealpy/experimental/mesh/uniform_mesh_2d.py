@@ -7,9 +7,9 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
-from .mesh_base import StructuredMesh
+from .mesh_base import StructuredMesh, TensorMesh
 
-class UniformMesh2d(StructuredMesh):
+class UniformMesh2d(StructuredMesh, TensorMesh):
     """
     Topological data structure of a structured quadrilateral mesh
 
@@ -61,7 +61,10 @@ class UniformMesh2d(StructuredMesh):
     """
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
                 itype=None, ftype=None):
-        
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
         super().__init__(TD=2, itype=itype, ftype=ftype)
 
         # Mesh properties
@@ -87,11 +90,13 @@ class UniformMesh2d(StructuredMesh):
         self.meshtype = 'UniformMesh2d'
 
 
+    # 实体生成方法
     @entitymethod(0)
     def _get_node(self) -> TensorLike:
         """
         @berif Generate the nodes in a structured mesh.
         """
+        GD = 2
         nx = self.nx
         ny = self.ny
 
@@ -103,7 +108,7 @@ class UniformMesh2d(StructuredMesh):
         xx, yy = bm.meshgrid(x, y, indexing='ij')
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
 
-        return node
+        return node.reshape(-1, GD)
     
     @entitymethod(1)
     def _get_edge(self) -> TensorLike:
@@ -171,12 +176,7 @@ class UniformMesh2d(StructuredMesh):
 
         return cell
     
-    def geo_dimension(self):
-        return 2
-
-    def top_dimension(self):
-        return 2
-    
+    # 实体拓扑
     def number_of_nodes_of_cells(self):
         return 4
 
@@ -185,26 +185,10 @@ class UniformMesh2d(StructuredMesh):
 
     def number_of_faces_of_cells(self):
         return 4
-
     
-    def entity(self, etype: Union[int, str], index=_S) -> TensorLike:
-        """
-        @brief Get the entities of the specified type.
-        """
-        GD = 2
-        if isinstance(etype, str):
-           etype = estr2dim(self, etype)
-
-        if etype == 2:
-            return self.cell[index, ...]
-        elif etype == 1:
-            return self.edge[index, ...]
-        elif etype == 0:
-            return self.node.reshape(-1, GD)[index, ...]
-        else:
-            raise ValueError("`etype` is wrong!")
     
-    def entity_measure(self, etype: Union[int, str]) -> TensorLike:
+    # 实体几何
+    def entity_measure(self, etype: Union[int, str], index: Index = _S) -> TensorLike:
         """
         @brief Get the measure of the entities of the specified type.
         """
@@ -219,11 +203,13 @@ class UniformMesh2d(StructuredMesh):
             return self.h[0] * self.h[1]
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+        
        
     def cell_barycenter(self) -> TensorLike:
         '''
         @brief Calculate the barycenter coordinates of the cells.
         '''
+        GD = self.geo_dimension()
         nx = self.nx
         ny = self.ny
         box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
@@ -231,10 +217,11 @@ class UniformMesh2d(StructuredMesh):
         x = bm.linspace(box[0], box[1], nx)
         y = bm.linspace(box[2], box[3], ny)
         X, Y = bm.meshgrid(x, y, indexing='ij')
-        bc = bm.zeros((nx, ny, 2), dtype=self.ftype)
+        bc = bm.zeros((nx, ny, GD), dtype=self.ftype)
         bc = bm.concatenate((X[..., None], Y[..., None]), axis=-1)
 
         return bc
+    
 
     def edge_barycenter(self) -> Tuple:
         """
@@ -251,12 +238,13 @@ class UniformMesh2d(StructuredMesh):
         """
         nx = self.nx
         ny = self.ny
+        GD = self.geo_dimension()
         box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
         x = bm.linspace(box[0], box[1], nx)
         y = bm.linspace(box[2], box[3], ny + 1)
         X, Y = bm.meshgrid(x, y, indexing='ij') 
-        bc = bm.zeros((nx, ny + 1, 2), dtype=self.ftype)
+        bc = bm.zeros((nx, ny + 1, GD), dtype=self.ftype)
         bc = bm.concatenate((X[..., None], Y[..., None]), axis=-1)
 
         return bc
@@ -276,77 +264,65 @@ class UniformMesh2d(StructuredMesh):
         bc = bm.concatenate((X[..., None], Y[..., None]), axis=-1)
 
         return bc
-
-    def bc_to_point(self, bcs: Tuple, index=_S):
+    
+    def bc_to_point(self, bcs: Union[Tuple, TensorLike], index=_S):
         """
         @brief Transform the barycentric coordinates of integration points
         to Cartesian coordinates on the actual mesh entities.
 
         Returns
-            TensorLike: (NQ, NC, GD)
+            TensorLike: (NQ, NC, GD) or (NQ, NE, GD)
         """
         node = self.entity('node')
+        if isinstance(bcs, tuple):
+            assert len(bcs) == 2
+            cell = self.entity('cell', index)
 
-        assert len(bcs) == 2
-        cell = self.entity('cell')[index]
+            bcs0 = bcs[0].reshape(-1, 2)
+            bcs1 = bcs[1].reshape(-1, 2)
+            bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
 
-        bcs0 = bcs[0].reshape(-1, 2)
-        bcs1 = bcs[1].reshape(-1, 2)
-        bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
-
-        p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
-        if p.shape[0] == 1:
-            p = p.reshape(-1, 2)
-
-        return p
-    
-    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
-        """
-        @brief Get the quadrature formula for numerical integration.
-        """
-        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        if isinstance(etype, str):
-            etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
-        if etype == 2:
-            return TensorProductQuadrature((qf, qf))
-        elif etype == 1:
-            return qf
+            p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
         else:
-            raise ValueError(f"entity type: {etype} is wrong!")
+            edge = self.entity('edge', index=index)
+            p = bm.einsum('...j, ejk -> ...ek', bcs, node[edge]) 
 
-    def number_of_local_ipoints(self, p, etype:Union[int, str]='cell'):
-        """
-        @brief Get the number of local interpolation points on the mesh.
-        """
-        if isinstance(etype, str):
-            etype = estr2dim(self, etype)
-        if etype == 2:
-            return (p+1) * (p+1)
-        elif etype == 1:
-            return p + 1
-        elif etype == 0:
-            return 1
-        
-    def number_of_global_ipoints(self, p: int) -> int:
-        """
-        @brief Get the number of global interpolation points on the mesh.
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        return NN + (p-1)*NE + (p-1)*(p-1)*NC
+        return p    
+    
 
+    # 插值点
     def interpolation_points(self, p):
-        cell = self.cell
-        edge = self.edge
+        '''
+        Ordering of 1st order interpolation points:
+        2 ------- 5 ------- 8
+        |         |         |
+        |         |         |
+        |         |         |
+        1 ------- 4 ------- 7
+        |         |         |
+        |         |         |
+        |         |         |
+        0 ------- 3 ------- 6
+        Ordering of 2nd order interpolation points:
+        2 --11--- 5 --14----8
+        |         |         |
+        16        18        20
+        |         |         |
+        1 --10--- 4 --13----7
+        |         |         |
+        15        17        19
+        |         |         |
+        0 ---9--- 3 --12--- 6
+        '''
+        cell = self.entity('cell')
+        edge = self.entity('edge')
         node = self.entity('node')
 
         GD = self.geo_dimension()
         if p <= 0:
             raise ValueError("p must be a integer larger than 0.")
         if p == 1:
-            return node.reshape(-1, GD)
+            return node
 
         # TODO: Provide a unified implementation that is not backend-specific
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
@@ -356,11 +332,10 @@ class UniformMesh2d(StructuredMesh):
             ipoints[:NN, :] = node
 
             NE = self.number_of_edges()
-            multiIndex = self.multi_index_matrix(p, 1, dtype=node.dtype)
+            multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
             w = multiIndex[1:-1, :] / p
             ipoints[NN:NN + (p-1) * NE, :] = bm.einsum('ij, ...jm -> ...im', w,
                     node[edge,:]).reshape(-1, GD)
-
             w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
             ipoints[NN + (p-1) * NE:, :] = bm.einsum('ij, kj... -> ki...', w,
                     node[cell[:]]).reshape(-1, GD)
@@ -373,18 +348,19 @@ class UniformMesh2d(StructuredMesh):
             ipoints = ipoints.at[:NN, :].set(node)
 
             NE = self.number_of_edges()
-            multiIndex = self.multi_index_matrix(p, 1, dtype=node.dtype)
+            multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
             w = multiIndex[1:-1, :] / p
-            ipoints = ipoints.at[NN:NN + (p-1) * NE, :].set(bm.einsum('ij, ...jm -> ...im', 
-                                                        w, node[edge, :]).reshape(-1, GD))
+            ipoints = ipoints.at[NN:NN + (p-1) * NE, :].set(
+                bm.einsum('ij, ...jm -> ...im', w, node[edge, :]).reshape(-1, GD))
 
             w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
-            ipoints = ipoints.at[NN + (p-1) * NE:, :].set(bm.einsum('ij, kj... -> ki...', 
-                                                        w, node[cell[:]]).reshape(-1, GD))
+            ipoints = ipoints.at[NN + (p-1) * NE:, :].set(
+                bm.einsum('ij, kj... -> ki...', w, node[cell[:]]).reshape(-1, GD))
             
             return ipoints
         else:
             raise NotImplementedError("Backend is not yet implemented.")
+        
     
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
@@ -429,77 +405,78 @@ class UniformMesh2d(StructuredMesh):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
        
-    def shape_function(self, bcs: TensorLike, p: int=1, 
-                    mi: Optional[TensorLike]=None) -> TensorLike:
-        """
-        @brief Compute the shape function of a 2D structured mesh.
 
-        Returns:
-            TensorLike: Shape function with shape (NQ, ldof).
-        """
-        assert isinstance(bcs, tuple)
+    # def shape_function(self, bcs: TensorLike, p: int=1, 
+    #                 mi: Optional[TensorLike]=None) -> TensorLike:
+    #     """
+    #     @brief Compute the shape function of a 2D structured mesh.
 
-        TD = bcs[0].shape[-1] - 1
-        if mi is None:
-            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
-        phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
-        ldof = self.number_of_local_ipoints(p, etype=2)
+    #     Returns:
+    #         TensorLike: Shape function with shape (NQ, ldof).
+    #     """
+    #     assert isinstance(bcs, tuple)
+
+    #     TD = bcs[0].shape[-1] - 1
+    #     if mi is None:
+    #         mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+    #     phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
+    #     ldof = self.number_of_local_ipoints(p, etype=2)
 
         return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
     
-    def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, index: Index=_S, 
-                        variables: str='x') -> TensorLike:
-        '''
-        @brief Calculate the gradient of shape functions on a 2D structured grid.
+    # def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, index: Index=_S, 
+    #                     variables: str='x') -> TensorLike:
+    #     '''
+    #     @brief Calculate the gradient of shape functions on a 2D structured grid.
 
-        @note Compute the gradient of the shape functions with respect to the reference element variable u = (xi, eta)
-        or the actual variable x.
+    #     @note Compute the gradient of the shape functions with respect to the reference element variable u = (xi, eta)
+    #     or the actual variable x.
 
-        Returns:
-        gphi : TensorLike
-        The shape of gphi depends on the 'variables' parameter:
-        - If variables == 'u': gphi has shape (NQ, ldof, GD).
-        - If variables == 'x': gphi has shape (NQ, NCN, ldof, GD).
-        '''
-        assert isinstance(bcs, tuple)
+    #     Returns:
+    #     gphi : TensorLike
+    #     The shape of gphi depends on the 'variables' parameter:
+    #     - If variables == 'u': gphi has shape (NQ, ldof, GD).
+    #     - If variables == 'x': gphi has shape (NQ, NCN, ldof, GD).
+    #     '''
+    #     assert isinstance(bcs, tuple)
 
-        Dlambda = bm.array([-1, 1], dtype=self.ftype)
+    #     Dlambda = bm.array([-1, 1], dtype=self.ftype)
 
-        phi0 = bm.simplex_shape_function(bcs[0], p=p)
-        R0 = bm.simplex_grad_shape_function(bcs[0], p=p)
-        gphi0 = bm.einsum('...ij, j -> ...i', R0, Dlambda)
+    #     phi0 = bm.simplex_shape_function(bcs[0], p=p)
+    #     R0 = bm.simplex_grad_shape_function(bcs[0], p=p)
+    #     gphi0 = bm.einsum('...ij, j -> ...i', R0, Dlambda)
 
-        phi1 = bm.simplex_shape_function(bcs[1], p=p)
-        R1 = bm.simplex_grad_shape_function(bcs[1], p=p)
-        gphi1 = bm.einsum('...ij, j -> ...i', R1, Dlambda)
+    #     phi1 = bm.simplex_shape_function(bcs[1], p=p)
+    #     R1 = bm.simplex_grad_shape_function(bcs[1], p=p)
+    #     gphi1 = bm.einsum('...ij, j -> ...i', R1, Dlambda)
 
-        n = phi0.shape[0] * phi1.shape[0]
-        ldof = self.number_of_local_ipoints(p, etype=2)
+    #     n = phi0.shape[0] * phi1.shape[0]
+    #     ldof = self.number_of_local_ipoints(p, etype=2)
 
-        shape = (n, ldof, 2)
-        gphi = bm.zeros(shape, dtype=self.ftype)
+    #     shape = (n, ldof, 2)
+    #     gphi = bm.zeros(shape, dtype=self.ftype)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            gphi[..., 0] = bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof)
-            gphi[..., 1] = bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof)
-        elif bm.backend_name == 'jax':
-            gphi = gphi.at[..., 0].set(bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof))
-            gphi = gphi.at[..., 1].set(bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof))
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+    #     # TODO: Provide a unified implementation that is not backend-specific
+    #     if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+    #         gphi[..., 0] = bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof)
+    #         gphi[..., 1] = bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof)
+    #     elif bm.backend_name == 'jax':
+    #         gphi = gphi.at[..., 0].set(bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof))
+    #         gphi = gphi.at[..., 1].set(bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof))
+    #     else:
+    #         raise NotImplementedError("Backend is not yet implemented.")
 
-        if variables == 'u':
-            return gphi
-        elif variables == 'x':
-            J = self.jacobi_matrix(bcs, index=index)
-            G = self.first_fundamental_form(J)
-            G = bm.linalg.inv(G)
-            gphi = bm.einsum('...ikm, ...imn, ...ln -> ...ilk', J, G, gphi)
+    #     if variables == 'u':
+    #         return gphi
+    #     elif variables == 'x':
+    #         J = self.jacobi_matrix(bcs, index=index)
+    #         G = self.first_fundamental_form(J)
+    #         G = bm.linalg.inv(G)
+    #         gphi = bm.einsum('...ikm, ...imn, ...ln -> ...ilk', J, G, gphi)
 
-            return gphi
+    #         return gphi
         
-    def edge_to_cell(self):
+    def edge_to_cell(self) -> TensorLike:
         """
         @brief Adjacency relationship between edges and cells, 
         storing information about the two cells adjacent to each edge.
@@ -584,7 +561,7 @@ class UniformMesh2d(StructuredMesh):
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = bm.zeros((NN,), dtype=bm.bool_)
+        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
         # TODO: Provide a unified implementation that is not backend-specific
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
             isBdPoint[edge[isBdEdge, :]] = True
@@ -612,7 +589,7 @@ class UniformMesh2d(StructuredMesh):
         NC = self.NC
 
         edge2cell = self.edge_to_cell()
-        isBdCell = bm.zeros((NC,), dtype=bm.bool_)
+        isBdCell = bm.zeros((NC,), dtype=bool)
         isBdEdge = self.boundary_edge_flag()
 
         # TODO: Provide a unified implementation that is not backend-specific
@@ -625,6 +602,22 @@ class UniformMesh2d(StructuredMesh):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
     
+
+    # 其他方法
+    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
+        """
+        @brief Get the quadrature formula for numerical integration.
+        """
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        qf = GaussLegendreQuadrature(q)
+        if etype == 2:
+            return TensorProductQuadrature((qf, qf))
+        elif etype == 1:
+            return qf
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
     
     def uniform_refine(self, n: int=1):
         """

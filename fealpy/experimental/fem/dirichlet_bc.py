@@ -129,11 +129,11 @@ class DirichletBC():
         new_values = bm.copy(A.values())
         IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
         new_values[IDX] = 0
-        A = COOTensor(indices, new_values, A.sparse_shape, **kwargs)
+        A = COOTensor(indices, new_values, A.sparse_shape)
         index, = bm.nonzero(isDDof, as_tuple=True) 
         one_values = bm.ones(len(index), **kwargs)
         one_indices = bm.stack([index, index], axis=0)
-        A1 = COOTensor(one_indices, one_values, A.sparse_shape, **kwargs)
+        A1 = COOTensor(one_indices, one_values, A.sparse_shape)
         A = A.add(A1).coalesce()
 
         return A
@@ -167,8 +167,8 @@ class DirichletBC():
 
         if uh is None:
             uh = bm.zeros_like(f)
-        self.space.interpolate(gd, uh, dim=DIM, index=bd_idx) # isDDof.shape == uh.shape
-
+        self.space.boundary_interpolate(gd, uh, self.threshold)
+        
         if uh.ndim == 1:
             f = f - A.matmul(uh)
             f[bd_idx] = uh[bd_idx]

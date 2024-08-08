@@ -1,5 +1,6 @@
 
-from typing import overload, Union, Optional, Tuple
+from abc import ABCMeta
+from typing import overload, Optional, Tuple
 
 from .. import logger
 from ..backend import TensorLike as _DT
@@ -8,8 +9,14 @@ from .coo_tensor import COOTensor
 from .csr_tensor import CSRTensor
 
 
-SparseTensor = Union[COOTensor, CSRTensor]
-logger.warning('fealpy.torch.sparse module is still in progress. DO NOT USE IT NOW.')
+# For type checking
+class SparseTensor(metaclass=ABCMeta):
+    pass
+
+SparseTensor.register(COOTensor)
+SparseTensor.register(CSRTensor)
+
+logger.warning('fealpy.torch.sparse module is still in progress.')
 
 
 @overload

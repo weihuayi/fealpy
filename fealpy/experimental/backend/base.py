@@ -34,7 +34,7 @@ class TensorLike(metaclass=ABCMeta):
     def reshape(self, *newshape) -> 'TensorLike': raise NotImplementedError
 
 
-Number = Union[int, float, TensorLike]
+Number = Union[int, float]
 _DT = TypeVar("_DT")
 
 

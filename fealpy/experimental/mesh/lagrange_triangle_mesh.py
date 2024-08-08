@@ -52,7 +52,21 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         return localEdge
 
-     # quadrature
+    @classmethod
+    def from_triangle_mesh(cls, mesh, p: int, surface=None):
+        node = mesh.interpolation_points(p)
+        cell = mesh.cell_to_ipoint(p)
+        if surface is not None:
+            node, _ = surface.project(node)
+
+        lmesh = cls(node, cell, p=p, construct=True)
+
+        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
+        lmesh.cell2edge = mesh.cell_to_edge()
+        #lmesh.edge  = mesh.edge_to_ipoint(p)
+        return lmesh 
+
+    # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell'):
         from ..quadrature import TriangleQuadrature
         from ..quadrature import GaussLegendreQuadrature
@@ -114,6 +128,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     def cell_area(self, q=None, index: Index=_S):
         """
+        Calculate the area of a cell.
         """
         p = self.p
         q = p if q is None else q
@@ -128,8 +143,32 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         a = bm.einsum('i, ij->j', ws, n)/2.0
         return a
 
-    def jacobi_matrix(self, bc: Union[TensorLike, Tuple[TensorLike]], p=None, 
-            index: Index=_S, return_grad=False):
+    def edge_length(self, q=None, index: Index=_S):
+        """
+        Calculate the length of the side.
+        """
+        p = self.p
+        q = p if q is None else q
+        qf = self.quadrature_formula(q, etype='edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        
+        J = self.jacobi_matrix(bcs, index=index)
+        a = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
+        l = bm.einsum('i, ij -> j', ws, a)
+        return l
+
+    def cell_unit_normal(self, bc: TensorLike, index: Index=_S):
+        """
+        When calculating the surface,the direction of the unit normal at the integration point. 
+        """
+        J = self.jacobi_matrix(bc, index=index)
+        n = bm.cross(J[..., 0], J[..., 1], axis=-1)
+        if self.GD == 3:
+            l = bm.sqrt(bm.sum(n**2, axis=-1, keepdims=True))
+            n /= l
+        return n
+
+    def jacobi_matrix(self, bc: TensorLike, p=None, index: Index=_S, return_grad=False):
         """
         Notes
         -----
@@ -187,16 +226,45 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         TD = bc.shape[-1] - 1
         pass
 
-    @classmethod
-    def from_triangle_mesh(cls, mesh, p: int, surface=None):
-        node = mesh.interpolation_points(p)
-        cell = mesh.cell_to_ipoint(p)
-        if surface is not None:
-            node, _ = surface.project(node)
+    def vtk_cell_type(self, etype='cell'):
+        """
+        @berif  返回网格单元对应的 vtk类型。
+        """
+        if etype in {'cell', 2}:
+            VTK_LAGRANGE_TRIANGLE = 69
+            return VTK_LAGRANGE_TRIANGLE 
+        elif etype in {'face', 'edge', 1}:
+            VTK_LAGRANGE_CURVE = 68
+            return VTK_LAGRANGE_CURVE
 
-        lmesh = cls(node, cell, p=p, construct=True)
+    def to_vtk(self, etype='cell', index: Index=_S, fname=None):
+        """
+        Parameters
+        ----------
 
-        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
-        lmesh.cell2edge = mesh.cell_to_edge()
-        #lmesh.edge  = mesh.edge_to_ipoint(p)
-        return lmesh 
+        @berif 把网格转化为 VTK 的格式
+        """
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        #cell = self.entity(etype)[index]
+        cell = self.entity(etype, index)
+        cellType = self.vtk_cell_type(etype)
+        idx = vtk_cell_index(self.p, cellType)
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)

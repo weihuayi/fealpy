@@ -140,8 +140,103 @@ class TestTetrahedronMeshInterfaces:
     def test_interpolation_points(self, data, backend):
         bm.set_backend(backend)
         mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
-        ipoint = mesh.interpolation_points(p=2)
+        ipoint = mesh.interpolation_points(p=4)
         np.testing.assert_allclose(bm.to_numpy(ipoint), data["ipoint"], atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", face_to_ipoint)
+    def test_face_to_ipoint(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
+        face2ipoint = mesh.face_to_ipoint(p=4)
+        np.testing.assert_allclose(bm.to_numpy(face2ipoint), data["f2p"], atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", cell_to_ipoint)
+    def test_cell_to_ipoint(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
+        cell2ipoint = mesh.cell_to_ipoint(p=4)
+        np.testing.assert_allclose(bm.to_numpy(cell2ipoint), data["cell2ipoint"], atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", face_unit_normal)
+    def test_face_normal(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=1,ny=1,nz=1)
+        fn = mesh.face_unit_normal()
+        np.testing.assert_allclose(bm.to_numpy(fn), data["fn"], atol=1e-14)
+
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", uniform_refine)
+    def test_unifrom_refine(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=1,ny=1,nz=1)
+        mesh.uniform_refine(n=2)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-14)
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", circumcenter)
+    def test_circumcenter(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=3,ny=2,nz=1)
+        c = mesh.circumcenter()
+        np.testing.assert_allclose(bm.to_numpy(c), data["c"], atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", from_unit_sphere_gmsh)
+    def test_from_unit_sphere_gmsh(self, data, backend):
+        bm.set_backend(backend)
+        sphere = TetrahedronMesh.from_unit_sphere_gmsh(1)
+        node = sphere.entity('node')
+        cell = sphere.entity('cell')
+
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-14)
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = sphere.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", from_unit_cube)
+    def test_from_unit_cube(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_unit_cube(3,2,1)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-14)
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", from_cylinder_gmsh)
+    def test_from_cylinder_gmsh(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_cylinder_gmsh(1,1,1)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-14)
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+
+
+
+
 if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
