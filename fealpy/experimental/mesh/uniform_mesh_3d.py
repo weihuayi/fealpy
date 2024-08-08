@@ -323,7 +323,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
 
 
     # 实体几何
-    def entity_measure(self, etype: Union[int, str]) -> Union[Tuple, int]:
+    def entity_measure(self, etype: Union[int, str], index: Index = _S) -> Union[Tuple, int]:
         """
         @brief Get the measure of the entities of the specified type.
         """

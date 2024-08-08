@@ -31,7 +31,7 @@ def flatten_indices(shape: Size, permute: Size) -> TensorLike:
     """
     permuted_shape = Size([shape[d] for d in permute])
     numel = permuted_shape.numel()
-    permuted_indices = bm.arange(numel, dtype=bm.int_).reshape(permuted_shape)
+    permuted_indices = bm.arange(numel, dtype=bm.int32).reshape(permuted_shape)
     inv_permute = [None, ] * len(permute)
     for d in range(len(permute)):
         inv_permute[permute[d]] = d
