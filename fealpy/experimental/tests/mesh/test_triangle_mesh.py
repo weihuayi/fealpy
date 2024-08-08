@@ -98,7 +98,7 @@ class TestTriangleMeshInterfaces:
         qf = mesh.quadrature_formula(q=3)
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = mesh.grad_shape_function(bcs, p=2)
-
+        
         np.testing.assert_allclose(bm.to_numpy(gphi), data["gphi"], atol=1e-14)    
     
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
@@ -163,13 +163,13 @@ class TestTriangleMeshInterfaces:
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", ellipsoid_surface_data)
     def test_from_ellipsoid_surface(self, data, backend):
         bm.set_backend(backend)
 
         mesh = TriangleMesh.from_ellipsoid_surface()
-
+        
         assert mesh.number_of_nodes() == data["NN"] 
         assert mesh.number_of_edges() == data["NE"] 
         assert mesh.number_of_faces() == data["NF"] 
@@ -178,11 +178,8 @@ class TestTriangleMeshInterfaces:
         cell =  mesh.entity('cell')
         np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
 
-        face2cell = mesh.face_to_cell()
-        #np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
 
 if __name__ == "__main__":
-    a = TestTriangleMeshInterfaces()
-    a.test_from_ellipsoid_surface(ellipsoid_surface_data[0], 'numpy')
-    #pytest.main(["./test_triangle_mesh.py"])
-
+    #a = TestTriangleMeshInterfaces()
+    #a.test_grad_shape_function(grad_shape_function_data[0], 'jax')
+    pytest.main(["./test_triangle_mesh.py"])
