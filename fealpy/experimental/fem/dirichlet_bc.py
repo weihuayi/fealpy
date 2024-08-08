@@ -167,7 +167,7 @@ class DirichletBC():
 
         if uh is None:
             uh = bm.zeros_like(f)
-        uh[bd_idx] = self.space.interpolate(gd)[bd_idx] # isDDof.shape == uh.shape
+        self.space.boundary_interpolate(gd, uh, self.threshold)
         
         if uh.ndim == 1:
             f = f - A.matmul(uh)

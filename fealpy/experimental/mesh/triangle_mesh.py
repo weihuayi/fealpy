@@ -92,7 +92,7 @@ class TriangleMesh(SimplexMesh):
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = bm.einsum('...ij, kjm->k...im', R, Dlambda)
+            gphi = bm.einsum('...ij, kjm -> k...im', R, Dlambda)
             return gphi  # (NC, NQ, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
@@ -644,8 +644,8 @@ class TriangleMesh(SimplexMesh):
 
         if phi is None:
             theta = bm.linspace(theta[0], theta[1], ntheta+1, dtype=bm.float64)
-            phi = bm.linspace(0, 2*bm.pi, nphi+1, dtype=bm.float64)
-            U, V = bm.meshgrid(theta, phi, indexing='ij')
+            l = bm.linspace(0, 2*bm.pi, nphi+1, dtype=bm.float64)
+            U, V = bm.meshgrid(theta, l, indexing='ij')
             U = U[:, 0:-1]  # 去掉最后一列
             V = V[:, 0:-1]  # 去年最后一列
         else:
@@ -659,7 +659,7 @@ class TriangleMesh(SimplexMesh):
         Z = c * bm.cos(U)
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
         
-        idx = bm.zeros((ntheta + 1, nphi + 1), bm.int32)
+        idx = bm.zeros((ntheta + 1, nphi + 1), dtype=bm.int32)
         if phi is None:
             idx[:, 0:-1] = bm.arange(NN).reshape(ntheta + 1, nphi)
             idx[:, -1] = idx[:, 0]
@@ -674,7 +674,7 @@ class TriangleMesh(SimplexMesh):
             idx[0:-1, 1:].T.reshape(-1, 1),
             idx[0:-1, 0:-1].T.reshape(-1, 1),
             idx[1:, 1:].T.reshape(-1, 1)), axis=1)
-        cell = bm.concatenate((cell0, cell1), axis=0)
+        cell = bm.concatenate((cell0, cell1), axis=1).reshape(-1, 3)
 
         if returnuv:
             return cls(node, cell), U.flatten(), V.flatten()
