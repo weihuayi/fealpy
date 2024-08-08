@@ -92,6 +92,43 @@ class TestUniformMesh3dInterfaces:
 
         np.testing.assert_allclose(cell_barycenter, cell_barycenter_true, atol=1e-8)
 
+    
+    @pytest.mark.parametrize("meshdata", bc2point_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_bc_to_point(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh3d(extent, h, origin)
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        NF = mesh.number_of_faces()
+        NE = mesh.number_of_edges()
+
+        qf = mesh.quadrature_formula(q=3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        
+
+        bc_to_point_cell = bm.to_numpy(mesh.bc_to_point(bcs=bcs))
+        CNQ = ws.shape[0]
+        ture_shape = (CNQ, NC, GD)
+        assert bc_to_point_cell.shape == ture_shape, \
+        f"Expected shape {ture_shape}, but got {bc_to_point_cell.shape}"
+
+        bc_to_point_face = bm.to_numpy(mesh.bc_to_point(bcs=bcs[0:2]))
+        FNQ = bcs[0].shape[0] * bcs[1].shape[0]
+        ture_shape = (FNQ, NF, GD)
+        assert bc_to_point_face.shape == ture_shape, \
+        f"Expected shape {ture_shape}, but got {bc_to_point_face.shape}"
+
+        bc_to_point_edge = bm.to_numpy(mesh.bc_to_point(bcs=bcs[0]))
+        ENQ = bcs[0].shape[0]
+        ture_shape = (ENQ, NE, GD)
+        assert bc_to_point_edge.shape == ture_shape, \
+        f"Expected shape {ture_shape}, but got {bc_to_point_edge.shape}"
+
 
 
     @pytest.mark.parametrize("meshdata", uniform_refine_data)
