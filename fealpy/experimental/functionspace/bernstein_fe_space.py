@@ -57,7 +57,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
 
     @barycentric
-    def basis(self, bcs: TensorLike, index: Index=_S, p = None):
+    def basis(self, bcs: TensorLike, variable = 'x', index: Index=_S, p = None):
         """
         compute the basis function values at barycentric point bc
 
@@ -98,7 +98,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         # B[:, multiIndex, bm.arange(TD+1).reshape(1, -1)]: (NQ, ldof, TD+1)
         phi = P[0, -1, 0]*bm.prod(B[:, multiIndex, 
             bm.arange(TD+1).reshape(1, -1)], axis=-1)
-        return phi[..., None, :]
+        return phi[None, :]
 
     @barycentric
     def grad_basis(self, bcs: TensorLike, index: Index=_S, variable='u',p=None):
@@ -154,7 +154,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
                     axis=-1)*F[..., multiIndex[:, i], [i]]
 
         Dlambda = self.mesh.grad_lambda()
-        gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->qcld", R, Dlambda)# TODO: optimize
+        gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->cqld", R, Dlambda)# TODO: optimize
         return gphi[:, index]
 
     @barycentric
@@ -174,7 +174,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         return hval
 
     @barycentric
-    def grad_m_basis(self, bcs, m, index = _S):
+    def grad_m_basis(self, bcs: TensorLike, m: int, index = _S):
         """
         @brief Compute the m-th order gradient of the basis function values at
                the barycentric point `bc`. The gradient is a GD-dim and m-th
@@ -199,7 +199,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         NQ = bcs.shape[0]
 
         if m==0: return phi # 函数值
-        phi = phi[:, 0] # 去掉单元轴更方便
+        phi = phi[0] # 去掉单元轴更方便 (NQ, ldof)
 
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
@@ -223,7 +223,6 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         N, N1 = len(symidx), midxp_1.shape[0]
         B = bm.zeros((N1, NQ, ldof), dtype=self.ftype)
         symLambdaBeta = bm.zeros((N1, NC, N), dtype=self.ftype)
-        gmphi = bm.zeros((NQ, ldof, NC, N), dtype=self.ftype)
         for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
             midxp_0 -= beta[None, :]
             idx = bm.where(bm.all(midxp_0>-1, axis=1))[0]
@@ -233,51 +232,47 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             c = (factorial(m)**2)*comb(p, m)/bm.prod(fbeta,axis=0,dtype=self.itype) # 数
             Bi[:, idx] = c*phi[:, num] #(NQ, ldof)
             midxp_0 += beta[None, :]
-        gmphi = bm.einsum('iql, icn->qcln', B, symLambdaBeta[:, index])
+        gmphi = bm.einsum('iql, icn->cqln', B, symLambdaBeta[:, index])
         return gmphi
 
     @barycentric
-    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
-        
-        phi = self.basis(bc, index=index)
-        #TD = bc.shape[-1] - 1
-        #e2d = self.dof.entity_to_dof(etype=TD, index=index)
-        e2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('cil, cl -> ci', phi, uh[..., e2dof])
-        return val[None, ...]
+    def value(self, uh: TensorLike, bcs: TensorLike, index: Index=_S) -> TensorLike:
+        phi = self.basis(bcs, index=index)
+        TD = bcs.shape[-1] - 1
+        e2d = self.dof.entity_to_dof(etype=TD, index=index)
+        val = bm.einsum('cql, cl -> cq', phi, uh[e2d])
+        return val
 
     @barycentric
-    def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+    def grad_value(self, uh: TensorLike, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
         @brief
         """
-        gphi = self.grad_basis(bc, index=index)
+        gphi = self.grad_basis(bcs, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('cilm, cl->cim', gphi, uh[cell2dof])
-        return val[None, ...]
+        val = bm.einsum('cqlm, cl->cqm', gphi, uh[cell2dof])
+        return val
     
     @barycentric
     def grad_m_value(self, uh, bcs, m):
         gmphi = self.grad_m_basis(bcs, m) # (NQ, 1, ldof)
         cell2dof = self.dof.cell_to_dof()
-        val = bm.einsum('qclg, cl->qcg', gmphi, uh[cell2dof])
+        val = bm.einsum('cqlg, cl->cqg', gmphi, uh[cell2dof])
         return val
 
     @barycentric
     def hessian_value(self, 
             uh: TensorLike, 
-            bc: TensorLike, 
+            bcs: TensorLike, 
             index: Union[TensorLike, slice]=_S
             ) -> TensorLike:
         """
         @note
         """
         gdof = self.dof.number_of_global_dofs()
-        gphi = self.hess_basis(bc, index=index)
+        hphi = self.hess_basis(bcs, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
-        dim = len(uh.shape) - 1
-        s0 = 'abdefg'
-        val = bm.einsum('...cimn, ci->...cmn', gphi, uh[cell2dof[index]])
+        val = bm.einsum('cqlij, cl->cqij', hphi, uh[cell2dof[index]])
         return val    
 
     def lagrange_to_bernstein(self, p = 1, TD = 1):
@@ -289,7 +284,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             coefficients.
         '''
         bcs = self.mesh.multi_index_matrix(p, TD)/p # p   次多重指标
-        return self.basis(bcs, p=p)[:, 0]
+        return self.basis(bcs, p=p)[0]
 
 
     def bernstein_to_lagrange(self, p=1, TD=1):
@@ -326,6 +321,46 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         c2d = self.cell_to_dof()
         uI[c2d] = bm.einsum('ij, cj->ci', l2b, uI[c2d])
         return uI
+
+    def boundary_interpolate(self, gD: Union[Callable, int, float],
+            uh: TensorLike, threshold) -> TensorLike:
+        """
+        @brief Interpolates the Dirichlet boundary condition.
+        """
+
+        gdof = self.number_of_global_dofs()
+        isbdface = self.mesh.boundary_face_flag()
+        f2d  = self.face_to_dof()[isbdface]
+
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        isDDof[f2d] = True
+
+        if callable(gD):
+            ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
+            gD = gD(ipoints[isDDof])
+
+        uh[isDDof] = gD
+
+        l2b = self.bernstein_to_lagrange(self.p, self.TD - 1) 
+        uh[f2d] = bm.einsum('ij, fj->fi', l2b, uh[f2d]) 
+        return isDDof
+
+    set_dirichlet_bc = boundary_interpolate
+
+    def L2error(self, u: Callable, uh: TensorLike) -> Number:
+        """
+        @brief Compute the L2 error of the finite element solution `uh` and the
+               exact solution `u`.
+        """
+        qf = self.mesh.quadrature_formula(self.p+1, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        points = self.mesh.bc_to_point(bcs) # (NQ, NC, GD)
+        uval = u(points)                     # (NQ, NC) 
+        uhval = self.value(uh, bcs)          # (NC, NQ)
+        cm = self.mesh.entity_measure('cell')
+        error = bm.einsum('q, cq, c->', ws, (uval - uhval)**2, cm)
+        return bm.sqrt(error)
 
 
 

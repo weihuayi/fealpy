@@ -449,7 +449,7 @@ class QuadrangleMesh(TensorMesh):
                 bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
                 isDelCell = threshold(bc)
                 cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool_)
+                isValidNode = bm.zeros(NN, dtype=bm.bool)
                 isValidNode[cell] = True
                 node = node[isValidNode]
                 idxMap = bm.zeros(NN, dtype=cell.dtype)
@@ -459,7 +459,7 @@ class QuadrangleMesh(TensorMesh):
                 bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
                 isDelCell = threshold(bc)
                 cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool_)
+                isValidNode = bm.zeros(NN, dtype=bm.bool)
                 isValidNode = isValidNode.at[cell].set(True)
                 node = node[isValidNode]
                 idxMap = bm.zeros(NN, dtype=cell.dtype)
@@ -542,13 +542,13 @@ class QuadrangleMesh(TensorMesh):
 
         NN = len(node)
         if bm.backend_name in ["numpy", "pytorch"]:
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
             idxMap[isValidNode] = range(isValidNode.sum())
         elif bm.backend_name == "jax":
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode.at[cell].set(True)
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)

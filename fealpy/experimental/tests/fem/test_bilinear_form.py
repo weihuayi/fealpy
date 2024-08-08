@@ -29,14 +29,19 @@ class TestBilinearFormInterface:
         space = LagrangeFESpace(mesh, p)
         gdof = space.number_of_global_dofs()
 
-        kwargs = bm.context(mesh.node)
-        x = bm.ones(gdof, **kwargs)
+        if backend == "pytorch":
+            kwargs = bm.context(mesh.node)
+            x = bm.random.rand(gdof, **kwargs)
+        else:
+            x = bm.random.rand(gdof)
         bform = BilinearForm(space)
         bform.add_integrator(ScalarDiffusionIntegrator())
-        y = bform @ x # 只组装单元刚度矩阵
+        y = bm.to_numpy(bform @ x) # 只组装单元刚度矩阵
+        assert bform._M is None
         bform.assembly() # 组装整体矩阵
-        z = bform @ x
-        np.testing.assert_array_equal(bm.to_numpy(y), bm.to_numpy(z))
+        assert bform._M is not None
+        z = bm.to_numpy(bform @ x)
+        assert np.linalg.norm(y-z) < 1e-12 
 
 
 if __name__ == "__main__":
