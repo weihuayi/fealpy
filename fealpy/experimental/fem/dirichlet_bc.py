@@ -124,7 +124,7 @@ class DirichletBC():
         # Here the adjustment is done by operating the sparse structure directly.
         isDDof = self.is_boundary_dof
         A = self.check_matrix(matrix) if check else matrix
-        kwargs = A.values_context
+        kwargs = A.values_context()
         indices = A.indices()
         new_values = bm.copy(A.values())
         IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
