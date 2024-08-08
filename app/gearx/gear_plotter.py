@@ -1,24 +1,43 @@
 import numpy as np
+from fealpy.experimental.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 
 # 定义渐开线的函数，增加旋转方向的控制参数 direction
 def involute_curve(phi, r_b, theta_offset, direction=1):
-    x = r_b * (np.cos(direction * phi + theta_offset) + direction * phi * np.sin(direction * phi + theta_offset))
-    y = r_b * (np.sin(direction * phi + theta_offset) - direction * phi * np.cos(direction * phi + theta_offset))
+    x = r_b * (bm.cos(direction * phi + theta_offset) + direction * phi * bm.sin(direction * phi + theta_offset))
+    y = r_b * (bm.sin(direction * phi + theta_offset) - direction * phi * bm.cos(direction * phi + theta_offset))
     return x, y
 
-# 参数
-m = 5
-z = 22
-alpha = 20
-r_p = m*z
-r_b = r_p*np.cos(np.radians(alpha))
-r_a = r_p + m
-r_f = r_p - 1.25*m
+def inv(alpha):
+    return bm.tan(alpha)-alpha
 
-phi_range = np.linspace(0, np.pi/4, 100)  # 参数范围
-theta_offsets = np.linspace(0, 2*np.pi, z)  # 四条渐开线的起始角度
-delta_theta = np.pi/z/1.5
+# 参数
+x = 0  # 变位系数
+m = 5  # 模数
+z = 22  # 齿数
+alpha = 20  # 压力角
+alpha = alpha/180*bm.pi
+
+r_p = m*z  # 分度圆半径
+r_b = r_p*bm.cos(alpha)  # 基圆半径
+r_a = r_p + m  # 齿顶圆半径
+r_f = r_p - 1.25*m  # 齿根圆半径
+
+# 齿厚计算公式 1
+# 分度圆齿厚
+s = 0.5*m*bm.pi+2*m*x*bm.tan(alpha)
+# 基圆齿厚
+s_b = bm.cos(s+2*m*x*bm.tan(alpha)+m*z*inv(alpha))
+
+# 齿厚计算公式 2
+# 分度圆齿厚
+s = 0.5*m*bm.pi+2*x*bm.tan(alpha)
+# 基圆齿厚
+s_b = bm.cos(s+2*m*x*bm.tan(alpha)+m*z*inv(alpha))
+
+phi_range = bm.linspace(0, bm.pi/4, 100)  # 参数范围
+theta_offsets = bm.linspace(0, 2*bm.pi, z)  # 四条渐开线的起始角度
+delta_theta = s_b/np.pi/2
 
 # 选择旋转方向: 1 为逆时针，-1 为顺时针
 direction = -1  # 修改为 -1 可以得到顺时针旋转的渐开线
@@ -37,28 +56,27 @@ for theta_offset in theta_offsets:
     plt.plot(x, y)
 
 # 绘制基圆
-theta = np.linspace(0, 2*np.pi, 300)
-x_circle = r_b * np.cos(theta)
-y_circle = r_b * np.sin(theta)
+theta = bm.linspace(0, 2*bm.pi, 300)
+x_circle = r_b * bm.cos(theta)
+y_circle = r_b * bm.sin(theta)
 plt.plot(x_circle, y_circle)
 
 # 绘制分度圆
-r_p = r_b/np.cos(np.radians(alpha))
-theta = np.linspace(0, 2*np.pi, 300)
-x_circle = r_p * np.cos(theta)
-y_circle = r_p * np.sin(theta)
+theta = bm.linspace(0, 2*bm.pi, 300)
+x_circle = r_p * bm.cos(theta)
+y_circle = r_p * bm.sin(theta)
 plt.plot(x_circle, y_circle)
 
 # 绘制齿顶圆
-theta = np.linspace(0, 2*np.pi, 300)
-x_circle = r_a * np.cos(theta)
-y_circle = r_a * np.sin(theta)
+theta = bm.linspace(0, 2*bm.pi, 300)
+x_circle = r_a * bm.cos(theta)
+y_circle = r_a * bm.sin(theta)
 plt.plot(x_circle, y_circle)
 
 # 绘制齿根圆
-theta = np.linspace(0, 2*np.pi, 300)
-x_circle = r_f * np.cos(theta)
-y_circle = r_f * np.sin(theta)
+theta = bm.linspace(0, 2*bm.pi, 300)
+x_circle = r_f * bm.cos(theta)
+y_circle = r_f * bm.sin(theta)
 plt.plot(x_circle, y_circle)
 
 # 图形设置
