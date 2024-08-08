@@ -4,15 +4,15 @@ from math import prod
 
 from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
+from .sparse_tensor import SparseTensor
 from .utils import (
-    _dense_ndim, _dense_shape,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_csr
 from ._spmm import spmm_csr
 
 
-class CSRTensor():
+class CSRTensor(SparseTensor):
     def __init__(self, crow: TensorLike, col: TensorLike, values: Optional[TensorLike],
                  spshape: Optional[Size]=None) -> None:
         """Initializes CSR format sparse tensor.
@@ -65,38 +65,9 @@ class CSRTensor():
         return f"CSRTensor(crow={self._crow}, col={self._col}, "\
                + f"values={self._values}, shape={self.shape})"
 
-    def size(self, dim: Optional[int]=None) -> int:
-        if dim is None:
-            return prod(self.shape)
-        else:
-            return self.shape[dim]
-
-    @property
-    def indices_context(self): return bm.context(self._crow)
-    @property
-    def values_context(self):
-        if self._values is None:
-            return {}
-        return bm.context(self._values)
-
     @property
     def itype(self): return self._crow.dtype
-    @property
-    def ftype(self): return None if self._values is None else self._values.dtype
 
-    @property
-    def shape(self): return self.dense_shape + self.sparse_shape
-    @property
-    def dense_shape(self): return _dense_shape(self._values)
-    @property
-    def sparse_shape(self): return self._spshape
-
-    @property
-    def ndim(self): return self.dense_ndim + self.sparse_ndim
-    @property
-    def dense_ndim(self): return _dense_ndim(self._values)
-    @property
-    def sparse_ndim(self): return 2
     @property
     def nnz(self): return self._col.shape[1]
 
@@ -122,7 +93,7 @@ class CSRTensor():
         Returns:
             Tensor: The dense tensor.
         """
-        context = self.indices_context
+        context = self.values_context()
         context.update(kwargs)
         dense_tensor = bm.zeros(self.shape, **context)
 
@@ -147,6 +118,17 @@ class CSRTensor():
     def flatten(self) -> 'CSRTensor':
         pass
 
+    def copy(self):
+        return CSRTensor(bm.copy(self._crow), bm.copy(self._col),
+                         bm.copy(self._values), self._spshape)
+
+    def neg(self) -> 'CSRTensor':
+        """Negation of the CSR tensor. Returns self if values is None."""
+        if self._values is None:
+            return self
+        else:
+            return CSRTensor(self._crow, self._col, -self._values, self._spshape)
+
     @overload
     def add(self, other: Union[Number, 'CSRTensor'], alpha: Number=1) -> 'CSRTensor': ...
     @overload
@@ -158,6 +140,9 @@ class CSRTensor():
         pass
 
     def div(self, other: Union[Number, TensorLike]) -> 'CSRTensor':
+        pass
+
+    def pow(self, other: Union[TensorLike, Number]) -> 'CSRTensor':
         pass
 
     @overload
