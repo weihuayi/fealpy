@@ -146,6 +146,3 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return val[None, ...]
 
 
-
-
-
