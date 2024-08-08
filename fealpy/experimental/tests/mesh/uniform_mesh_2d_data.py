@@ -109,13 +109,13 @@ interpolation_points_data = [
     }
 ]
 
+
 entity_to_ipoints_data = [
     {
         "extent": (0, 2, 0, 2),
         "h": (1.0, 1.0),
         "origin": (0, 0),
 
-        "cell_to_ipoints": np.array([1, 2, 3])
     }
 ]
 
