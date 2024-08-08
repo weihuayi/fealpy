@@ -79,17 +79,28 @@ def bilinear_integral(input1: TensorLike, input2: TensorLike, weights: TensorLik
         TensorLike: The result of the integration shaped (C, I, J).
             If `batched` is True, the shape of the output is (B, C, I, J).
     """
-    if coef is None:
-        return bm.einsum('c, q, cqi..., cqj... -> cij', measure, weights, input1, input2)
+    if len(input1.shape)==5:
+        input1sub = 'cqidl'
+        input2sub = 'cqjdl'
+
+    elif len(input1.shape)==4:
+        input1sub = 'cqid'
+        input2sub = 'cqjd'
+    else:
+        input1sub = 'cqi'
+        input2sub = 'cqj'
 
     NQ = weights.shape[0]
     NC = measure.shape[0]
-
+    
+    if coef is None:
+        return bm.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2)
+    
     if is_scalar(coef):
-        return bm.einsum('c, q, cqi..., cqj... -> cij', measure, weights, input1, input2) * coef
+        return bm.einsum(f'q, c, {input1sub}, {input2sub} -> cij', weights, measure, input1, input2) * coef
     elif is_tensor(coef):
-        out_subs = 'bcij' if batched else 'cij'
-        subs = get_coef_subscripts(coef.shape, NQ, NC, batched)
-        return bm.einsum(f'c, q, cqi..., cqj..., {subs} -> {out_subs}', measure, weights, input1, input2, coef)
+        out_subs = 'cij'
+        subs = get_coef_subscripts(coef.shape, NQ, NC)
+        return bm.einsum(f'q, c, {input1sub}, {input2sub}, {subs} -> {out_subs}', weights, measure, input1, input2, coef)
     else:
-        raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
+        raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")

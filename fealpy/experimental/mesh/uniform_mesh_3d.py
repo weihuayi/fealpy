@@ -7,9 +7,9 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
-from .mesh_base import StructuredMesh
+from .mesh_base import StructuredMesh, TensorMesh
 
-class UniformMesh3d(StructuredMesh):
+class UniformMesh3d(StructuredMesh, TensorMesh):
     """
     Topological data structure of a structured hexahedral mesh
 
@@ -74,7 +74,10 @@ class UniformMesh3d(StructuredMesh):
     """
     def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), 
                 origin=(0.0, 0.0, 0.0), itype=None, ftype=None):
-        
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
         super().__init__(TD=3, itype=itype, ftype=ftype)
 
         # Mesh properties
@@ -104,11 +107,14 @@ class UniformMesh3d(StructuredMesh):
 
         self.meshtype = 'UniformMesh3d'
 
+
+    # 实体生成方法
     @entitymethod(0)
     def _get_node(self) -> TensorLike:
         """
         @brief Generate the nodes in a structured mesh.
         """
+        GD = 3
         nx, ny, nz = self.nx, self.ny, self.nz
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1],
@@ -120,7 +126,7 @@ class UniformMesh3d(StructuredMesh):
         xx, yy, zz = bm.meshgrid(x, y, z, indexing='ij')
         node = bm.concatenate((xx[..., None], yy[..., None], zz[..., None]), axis=-1)
 
-        return node
+        return node.reshape(-1, GD)
     
     @entitymethod(1)
     def _get_edge(self) -> TensorLike:
@@ -304,41 +310,9 @@ class UniformMesh3d(StructuredMesh):
 
         return cell
 
-    def geo_dimension(self):
-        return 3
 
-    def top_dimension(self):
-        return 3
-    
-    def number_of_nodes_of_cells(self):
-        return 8
-
-    def number_of_edges_of_cells(self):
-        return 12
-
-    def number_of_faces_of_cells(self):
-        return 6
-
-    def entity(self, etype: Union[int, str], index=_S) -> TensorLike:
-        """
-        @brief Get the entities of the specified type.
-        """
-        GD = 3
-        if isinstance(etype, str):
-           etype = estr2dim(self, etype)
-
-        if etype == 3:
-            return self.cell[index, ...]
-        elif etype == 2:
-            return self.face[index, ...]
-        elif etype == 1:
-            return self.edge[index, ...]
-        elif etype == 0:
-            return self.node.reshape(-1, GD)[index, ...]
-        else:
-            raise ValueError("`etype` is wrong!")
-
-    def entity_measure(self, etype: Union[int, str]) -> TensorLike:
+    # 实体几何
+    def entity_measure(self, etype: Union[int, str]) -> Union[Tuple, int]:
         """
         @brief Get the measure of the entities of the specified type.
         """
@@ -355,9 +329,277 @@ class UniformMesh3d(StructuredMesh):
             return self.h[0] * self.h[1] * self.h[2]
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+        
+    def cell_barycenter(self) -> TensorLike:
+        '''
+        @brief Calculate the barycenter coordinates of the cells.
+        '''
+        GD = self.geo_dimension()
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz-1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij')
+        bc = bm.zeros((nx, ny, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-    # Define barycenter methods, quadrature formula, jacobi matrix, shape functions, etc.
-    # similarly to the 2D case, but extend them to 3D.
+        return bc
+    
+    def face_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the face centers.
+        """
+        xbc = self.facex_barycenter()
+        ybc = self.facey_barycenter()
+        zbc = self.facez_barycenter()
+
+        return xbc, ybc, zbc
+
+    def facex_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the face centers in the x-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx + 1, ny, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
+        return bc
+    
+    def facey_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the face centers in the y-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+               self.origin[1],               self.origin[1] + ny*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx, ny + 1, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
+        return bc
+
+    def facez_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the face centers in the z-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz + 1)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx, ny, nz + 1, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
+        return bc
+
+    def edge_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the edge centers.
+        """
+        xbc = self.edgex_barycenter()
+        ybc = self.edgey_barycenter()
+        zbc = self.edgez_barycenter()
+
+        return xbc, ybc, zbc
+
+    def edgex_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the edge centers in the x-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+               self.origin[1], self.origin[1] + ny*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        z = bm.linspace(box[4], box[5], nz + 1)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx, ny + 1, nz + 1, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
+        return bc
+    
+    def edgey_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the edge centers in the y-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz + 1)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx + 1, ny, nz + 1, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
+        return bc
+
+    def edgez_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the edge centers in the z-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
+               self.origin[1], self.origin[1] + ny*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx + 1, ny + 1, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
+        return bc
+        
+    
+    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
+        """
+        @brief Get the quadrature formula for numerical integration.
+        """
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        qf = GaussLegendreQuadrature(q)
+        if etype == 3:
+            return TensorProductQuadrature((qf, qf, qf))
+        elif etype == 2:
+            return TensorProductQuadrature((qf, qf))
+        elif etype == 1:
+            return qf
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
+        
+
+    def bc_to_point(self, bcs: Tuple, index=_S):
+        """
+        @brief Transform the barycentric coordinates of integration points
+        to Cartesian coordinates on the actual mesh entities.
+
+        Returns
+            TensorLike: (NQ, NC, GD)
+        """
+        node = self.entity('node')
+
+        assert len(bcs) == 3
+        cell = self.entity('cell')[index]
+
+        bcs0 = bcs[0].reshape(-1, 2)
+        bcs1 = bcs[1].reshape(-1, 2)
+        bcs2 = bcs[2].reshape(-1, 2)
+        bcs = np.einsum('im, jn, kl -> ijkmnl', bcs0, bcs1, bcs2).reshape(-1, 8)
+
+        p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
+        if p.shape[0] == 1:
+            p = p.reshape(-1, 3)
+
+        return p
+        
+    
+    def number_of_local_ipoints(self, p, etype:Union[int, str]='cell'):
+        """
+        @brief Get the number of local interpolation points on the mesh.
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 3:
+            return (p+1) * (p+1) * (p+1)
+        elif etype == 2:
+            return (p+1) * (p+1)
+        elif etype == 1:
+            return p + 1
+        elif etype == 0:
+            return 1
+        
+    
+    def number_of_global_ipoints(self, p: int) -> int:
+        """
+        @brief Get the number of global interpolation points on the mesh.
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-1)*(p-1)*NF + (p-1)*(p-1)*(p-1)*NC
+    
+    def interpolation_points(self, p):
+        cell = self.cell
+        face = self.face
+        edge = self.edge
+        node = self.entity('node')
+
+        GD = self.geo_dimension()
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+        if p == 1:
+            return node.reshape(-1, GD)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name in ['numpy', 'pytorch']:
+            pass
+        elif bm.backend_name == 'jax':
+            pass
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        # TODO: Implement the interpolation points for p > 1
+        raise NotImplementedError("Interpolation points for p > 1 are not yet implemented for 3D structured meshes.")
+
+
+    def shape_function(self, bcs: TensorLike, p: int=1, 
+                    mi: Optional[TensorLike]=None) -> TensorLike:
+        """
+        @brief Compute the shape function of a 3D structured mesh.
+
+        Returns:
+            TensorLike: Shape function with shape (NQ, ldof).
+        """
+        assert isinstance(bcs, tuple)
+
+        TD = bcs[0].shape[-1] - 1
+        if mi is None:
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
+        ldof = self.number_of_local_ipoints(p, etype=3)
+
+        return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
 
     def uniform_refine(self, n: int=1):
         """

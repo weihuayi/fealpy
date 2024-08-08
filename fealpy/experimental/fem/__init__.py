@@ -7,5 +7,7 @@ from .linear_form import LinearForm
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 
 ### Cell Source
-#from .scalar_source_integrator import ScalarSourceIntegrator
+from .scalar_source_integrator import ScalarSourceIntegrator
 
+### Dirichlet BC
+from .dirichlet_bc import DirichletBC

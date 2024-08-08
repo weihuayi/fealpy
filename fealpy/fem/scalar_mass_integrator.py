@@ -1,5 +1,4 @@
 import numpy as np
-from pyamg import test
 from fealpy.fem.precomp_data import data
 
 class ScalarMassIntegrator:

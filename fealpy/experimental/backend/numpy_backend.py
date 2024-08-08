@@ -71,6 +71,11 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     def cat(iterable, dim=0, out=None) -> NDArray:
         return np.concatenate(iterable, axis=dim, out=out)
 
+    @staticmethod
+    def scatter(x, indices, val):
+        x[indices] = val
+        return x
+
     ### FEALPy methods ###
 
     @staticmethod

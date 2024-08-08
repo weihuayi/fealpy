@@ -97,7 +97,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def max(a, axis=None, out=None, keepdims=False):
         if axis is None:
-            return torch.max(a, keepdim=keepdims, out=out)
+            return torch.max(a, out=out)
         return torch.max(a, axis, keepdim=keepdims, out=out)[0]
 
     @staticmethod
@@ -149,6 +149,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.clone(a, **kwargs)
 
     @staticmethod
+    def scatter(x, indices, val):
+        x.scatter_(0, indices, val)
+        return x
+
+    @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
         """
@@ -164,7 +169,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if return_index:
             kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
             indices = torch.zeros(counts.shape, **kwargs)
-            indices[inverse.flip(dims=[0])] = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+            idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+            indices.scatter_(0, inverse.flip(dims=[0]), idx)
             result += (indices, )
 
         if return_inverse:
@@ -185,7 +191,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
                 dim=axis, **kwargs)
         kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
         indices = torch.zeros(counts.shape, **kwargs)
-        indices[inverse.flip(dims=[0])] = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        indices.scatter_(0, inverse.flip(dims=[0]), idx)
         return b, indices, inverse, counts
 
     @staticmethod

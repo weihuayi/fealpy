@@ -61,6 +61,14 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     # NOTE: all copied
 
     @staticmethod
+    def scatter(x, indices, val):
+        """
+        TODO:
+            1. test case for multi-thread
+        """
+        return x.at[indices].set(val)
+
+    @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
         """
         unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]

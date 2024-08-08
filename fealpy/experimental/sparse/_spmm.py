@@ -49,9 +49,23 @@ def spmm_coo(indices: _DT, values: _DT, spshape: _Size, x: _DT) -> _DT:
 
 def spmm_csr(crow: _DT, col: _DT, values: _DT, spshape: _Size, x: _DT) -> _DT:
     _shape_check(spshape, x.shape)
+    nrow = spshape[0]
+    unsqueezed = False
 
     if x.ndim == 1:
-        pass
+        x = x[:, None]
+        unsqueezed = True
 
-    else: # x.ndim >= 2
-        pass
+    shape = x.shape[:-2] + (nrow, x.shape[-1])
+    result = bm.zeros(shape, dtype=x.dtype)
+
+    for i in range(nrow):
+        start = crow[i]
+        end = crow[i + 1]
+        r = bm.einsum('...i, ...ij -> ...j', values[..., start:end], x[..., col[start:end], :])
+        result[..., i, :] = r
+
+    if unsqueezed:
+        result = result[..., 0]
+
+    return result
