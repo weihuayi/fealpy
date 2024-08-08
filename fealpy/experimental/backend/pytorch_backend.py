@@ -152,7 +152,17 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def scatter(x, indices, val):
+        """
+        """
         x.scatter_(0, indices, val)
+        return x
+
+    @staticmethod
+    def scatter_add(x, indices, val):
+        """
+
+        """
+        x.scatter_add_(0, indices, val)
         return x
 
     @staticmethod
