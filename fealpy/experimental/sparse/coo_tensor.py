@@ -4,15 +4,16 @@ from math import prod
 
 from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
+from .sparse_tensor import SparseTensor
 from .utils import (
-    _dense_ndim, _dense_shape, _flatten_indices,
+    _flatten_indices,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_coo
 from ._spmm import spmm_coo
 
 
-class COOTensor():
+class COOTensor(SparseTensor):
     def __init__(self, indices: TensorLike, values: Optional[TensorLike],
                  spshape: Optional[Size]=None, *,
                  is_coalesced: Optional[bool]=None):
@@ -65,38 +66,9 @@ class COOTensor():
     def __repr__(self) -> str:
         return f"COOTensor(indices={self._indices}, values={self._values}, shape={self.shape})"
 
-    def size(self, dim: Optional[int]=None) -> int:
-        if dim is None:
-            return prod(self.shape)
-        else:
-            return self.shape[dim]
-
-    @property
-    def indices_context(self): return bm.context(self._indices)
-    @property
-    def values_context(self):
-        if self._values is None:
-            return {}
-        return bm.context(self._values)
-
     @property
     def itype(self): return self._indices.dtype
-    @property
-    def ftype(self): return None if self._values is None else self._values.dtype
 
-    @property
-    def shape(self): return self.dense_shape + self.sparse_shape
-    @property
-    def dense_shape(self): return _dense_shape(self._values)
-    @property
-    def sparse_shape(self): return self._spshape
-
-    @property
-    def ndim(self): return self.dense_ndim + self.sparse_ndim
-    @property
-    def dense_ndim(self): return _dense_ndim(self._values)
-    @property
-    def sparse_ndim(self): return self._indices.shape[0]
     @property
     def nnz(self): return self._indices.shape[1]
 
@@ -126,7 +98,7 @@ class COOTensor():
         if not self.is_coalesced:
             raise ValueError("indices must be coalesced before calling to_dense()")
 
-        context = self.values_context
+        context = self.values_context()
         context.update(kwargs)
         dense_tensor = bm.zeros(self.shape, **context)
 
@@ -159,7 +131,7 @@ class COOTensor():
 
         if self._values is not None:
             value_shape = self.dense_shape + (unique_indices.shape[-1], )
-            new_values = bm.zeros(value_shape, **self.values_context)
+            new_values = bm.zeros(value_shape, **self.values_context())
             new_values = bm.index_add_(new_values, -1, inverse_indices, self._values)
 
             return COOTensor(
@@ -168,7 +140,7 @@ class COOTensor():
 
         else:
             if accumulate:
-                kwargs = self.indices_context
+                kwargs = bm.context(self._indices)
                 ones = bm.ones((self.nnz, ), **kwargs)
                 new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
                 new_values = bm.index_add_(new_values, -1, inverse_indices, ones)
@@ -186,7 +158,7 @@ class COOTensor():
     def reshape(self, *shape) -> 'COOTensor':
         pass
 
-    def ravel(self) -> 'COOTensor':
+    def ravel(self):
         """Return a view with flatten indices on sparse dimensions.
 
         Returns:
@@ -196,7 +168,7 @@ class COOTensor():
         new_indices = _flatten_indices(self._indices, spshape)
         return COOTensor(new_indices, self._values, (prod(spshape),))
 
-    def flatten(self) -> 'COOTensor':
+    def flatten(self):
         """Return a copy with flatten indices on sparse dimensions.
 
         Returns:
@@ -209,6 +181,16 @@ class COOTensor():
         else:
             values = bm.copy(self._values)
         return COOTensor(new_indices, values, (prod(spshape),))
+
+    def copy(self):
+        return COOTensor(bm.copy(self._indices), bm.copy(self._values), self.sparse_shape)
+
+    def neg(self) -> 'COOTensor':
+        """Negation of the COO tensor. Returns self if values is None."""
+        if self._values is None:
+            return self
+        else:
+            return COOTensor(self._indices, -self._values, self.sparse_shape)
 
     @overload
     def add(self, other: Union[Number, 'COOTensor'], alpha: Number=1) -> 'COOTensor': ...
@@ -262,6 +244,10 @@ class COOTensor():
             raise TypeError(f"Unsupported type {type(other).__name__} in addition")
 
     def mul(self, other: Union[Number, 'COOTensor', TensorLike]) -> 'COOTensor': # TODO: finish this
+        """Element-wise multiplication.
+        The result COO tensor will share the same indices with
+        the original if `other` is a number or a dense tensor.
+        """
         if isinstance(other, COOTensor):
             pass
 
@@ -270,34 +256,57 @@ class COOTensor():
             new_values = bm.copy(other[self.nonzero_slice])
             if self._values is not None:
                 bm.multiply(self._values, new_values, out=new_values)
-            return COOTensor(bm.copy(self._indices), new_values, self.sparse_shape)
+            return COOTensor(self._indices, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
             if self._values is None:
                 raise ValueError("Cannot multiply COOTensor without value with scalar")
             new_values = self._values * other
-            return COOTensor(bm.copy(self._indices), new_values, self.sparse_shape)
+            return COOTensor(self._indices, new_values, self.sparse_shape)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in multiplication")
 
     def div(self, other: Union[Number, TensorLike]) -> 'COOTensor':
+        """Element-wise division.
+        The result COO tensor will share the same indices with
+        the original if `other` is a number or a dense tensor.
+        """
+        if self._values is None:
+                raise ValueError("Cannot divide COOTensor without value")
+
         if isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
             new_values = bm.copy(other[self.nonzero_slice])
-            if self._values is None:
-                raise ValueError("Cannot divide COOTensor without value")
             bm.divide(self._values, new_values, out=new_values)
-            return COOTensor(bm.copy(self._indices), new_values, self.sparse_shape)
+            return COOTensor(self._indices, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
-            if self._values is None:
-                raise ValueError("Cannot divide COOTensor without value with scalar")
             new_values = self._values / other
-            return COOTensor(bm.copy(self._indices), new_values, self.sparse_shape)
+            return COOTensor(self._indices, new_values, self.sparse_shape)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in division")
+
+    def pow(self, other: Union[TensorLike, Number]) -> 'COOTensor':
+        """Element-wise power of COOTensor.
+        The result COO tensor will share the same indices with
+        the original if `other` is a number or a dense tensor.
+        """
+        if self._values is None:
+            raise ValueError("Cannot power COOTensor without value with tensor")
+
+        if isinstance(other, TensorLike):
+            check_shape_match(self.shape, other.shape)
+            new_values = bm.power(self._values, other[self.nonzero_slice])
+            return COOTensor(self._indices, new_values, self.sparse_shape)
+
+        elif isinstance(other, (int, float)):
+            new_values = self._values ** other
+            return COOTensor(self._indices, new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f'Unsupported type {type(other).__name__} in power')
 
     def inner(self, other: TensorLike, dims: List[int]) -> 'COOTensor':
         pass
