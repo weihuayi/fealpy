@@ -64,6 +64,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
         assert k == 0, "Only k=0 is supported by `eye` in PyTorchBackend."
+        if m is None:
+            m = n
         return torch.eye(n, m, dtype=dtype, **kwargs)
 
     @staticmethod
