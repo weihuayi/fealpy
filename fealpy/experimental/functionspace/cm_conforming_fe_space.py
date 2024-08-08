@@ -28,7 +28,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         p = self.p
         m = self.m
         if etype=="cell":
-            return (p+1)*(p+1)//2
+            return (p+1)*(p+2)//2
         if etype=="edge":
             ndof = (2*m+1)*(2*m+2)//2
             eidof = (m+1)*(2*p-7*m-2)//2
@@ -89,5 +89,69 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         c2id = bm.arange(NN*ndof + NE*eidof,
                 NN*ndof+NE*eidof+NC*cidof,dtype=self.itype).reshape(NC, cidof)
         return c2id
-#    def cell_to_dof(self):
+    def cell_to_dof(self):
+        p = self.p
+        m = self.m
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
 
+        cell = mesh.entity('cell')
+        edge = mesh.entity('edge')
+        NC = mesh.number_of_cells()
+        cell2edge = mesh.cell_to_edge()
+        ldof = self.number_of_local_dofs('cell')
+        cidof = self.number_of_internal_dofs('cell')
+        eidof = self.number_of_internal_dofs('edge')
+        ndof = self.number_of_internal_dofs('node')
+        c2d = bm.zeros((NC, ldof), dtype=self.itype)
+        e2id = self.edge_to_internal_dof()
+        n2d = self.node_to_dof()
+        c2d[:, ldof-cidof:] = bm.arange(NN*ndof + NE*eidof,
+                NN*ndof+NE*eidof+NC*cidof,dtype=self.itype).reshape(NC, cidof)
+        c2d[:, :ndof*3] = n2d[cell].reshape(NC,-1) 
+        c2eSign = mesh.cell_to_edge_sign()
+        for e in bm.arange(3):
+            N = ndof*3+eidof*e
+            flag = ~c2eSign[:, e]
+            c2d[:, N:N+eidof] = e2id[cell2edge[:, e]]
+            n0, n1 = 0, p-4*m-1
+            for l in bm.arange(m+1):
+                c2d[flag, N+n0:N+n0+n1] = bm.flip(c2d[flag,
+                    N+n0:N+n0+n1],axis=1)
+                n0 += n1
+                n1 += 1
+        return c2d
+    def is_boundary_dof(self):
+        p = self.p
+        m = self.m
+        gdof = self.number_of_global_dofs()
+        isBdDof = bm.zeros(gdof, dtype=bm.bool)
+        isBdEdge = self.mesh.boundary_face_flag() #TODO:ds 中没有edge
+        isBdNode = self.mesh.boundary_node_flag()
+        # 边界边
+        bedof = self.edge_to_internal_dof()[isBdEdge]
+        isBdDof[bedof] = True
+        # 角点所有
+        bndof = self.node_to_dof()
+        isBdDof[bndof[self.isCornerNode]] = True
+        # 非角点边界点
+        bndof = bndof[isBdNode]
+        k = 0
+        for r in range(2*m+1):
+            L = min(m+1, r+1)
+            isBdDof[bndof[:, k:k+L]] = True
+            k += r+1
+        return isBdDof
+
+    def coefficient_matrix(self):
+        p = self.p
+        m = self.m
+        mesh = self.mesh
+
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs('cell')
+        tem = bm.eye(ldof, dtype=self.ftype)
+        coeff = bm.tile(tem, (NC, 1, 1))
+        return
