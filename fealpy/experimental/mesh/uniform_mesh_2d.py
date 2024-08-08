@@ -176,6 +176,16 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
 
         return cell
     
+    # 实体拓扑
+    def number_of_nodes_of_cells(self):
+        return 4
+
+    def number_of_edges_of_cells(self):
+        return 4
+
+    def number_of_faces_of_cells(self):
+        return 4
+    
     
     # 实体几何
     def entity_measure(self, etype: Union[int, str]) -> TensorLike:
@@ -255,23 +265,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
 
         return bc
     
-
-    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
-        """
-        @brief Get the quadrature formula for numerical integration.
-        """
-        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        if isinstance(etype, str):
-            etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
-        if etype == 2:
-            return TensorProductQuadrature((qf, qf))
-        elif etype == 1:
-            return qf
-        else:
-            raise ValueError(f"entity type: {etype} is wrong!")
-        
-
     def bc_to_point(self, bcs: Union[Tuple, TensorLike], index=_S):
         """
         @brief Transform the barycentric coordinates of integration points
@@ -290,8 +283,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
             bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
 
             p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
-            if p.shape[0] == 1:
-                p = p.reshape(-1, 2)
         else:
             edge = self.entity('edge', index=index)
             p = bm.einsum('...j, ejk -> ...ek', bcs, node[edge]) 
@@ -299,33 +290,30 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
         return p    
     
 
-    # def number_of_local_ipoints(self, p, etype:Union[int, str]='cell'):
-    #     """
-    #     @brief Get the number of local interpolation points on the mesh.
-    #     """
-    #     if isinstance(etype, str):
-    #         etype = estr2dim(self, etype)
-    #     if etype == 2:
-    #         return (p+1) * (p+1)
-    #     elif etype == 1:
-    #         return p + 1
-    #     elif etype == 0:
-    #         return 1
-        
-    # def number_of_global_ipoints(self, p: int) -> int:
-    #     """
-    #     @brief Get the number of global interpolation points on the mesh.
-    #     """
-    #     NN = self.number_of_nodes()
-    #     NE = self.number_of_edges()
-    #     NC = self.number_of_cells()
-    #     return NN + (p-1)*NE + (p-1)*(p-1)*NC
-
-
+    # 插值点
     def interpolation_points(self, p):
-        # cell = self.cell
-        # edge = self.edge
-        # node = self.node
+        '''
+        Ordering of 1st order interpolation points:
+        2 ------- 5 ------- 8
+        |         |         |
+        |         |         |
+        |         |         |
+        1 ------- 4 ------- 7
+        |         |         |
+        |         |         |
+        |         |         |
+        0 ------- 3 ------- 6
+        Ordering of 2nd order interpolation points:
+        2 --11--- 5 --14----8
+        |         |         |
+        16        18        20
+        |         |         |
+        1 --10--- 4 --13----7
+        |         |         |
+        15        17        19
+        |         |         |
+        0 ---9--- 3 --12--- 6
+        '''
         cell = self.entity('cell')
         edge = self.entity('edge')
         node = self.entity('node')
@@ -372,6 +360,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
             return ipoints
         else:
             raise NotImplementedError("Backend is not yet implemented.")
+        
     
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
@@ -613,6 +602,22 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
     
+
+    # 其他方法
+    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
+        """
+        @brief Get the quadrature formula for numerical integration.
+        """
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        qf = GaussLegendreQuadrature(q)
+        if etype == 2:
+            return TensorProductQuadrature((qf, qf))
+        elif etype == 1:
+            return qf
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
     
     def uniform_refine(self, n: int=1):
         """
