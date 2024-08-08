@@ -81,6 +81,28 @@ class TestLagrangeFiniteElementSpace:
                                      err_msg=f" `grad_value` function is not equal to real result in backend {backend}")
 
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", triangle_mesh_one_box)
+    def test_boundary_interpolate(self, backend, data): 
+        bm.set_backend(backend)
+        def solution(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            return bm.sin(bm.pi*x) * bm.sin(bm.pi*y)
+        
+        mesh = TriangleMesh.from_box([0,1,0,1],2,2)
+        space = LagrangeFESpace(mesh, 2)
+        uh = np.zeros(space.number_of_global_dofs())
+        b = space.boundary_interpolate(gD=solution, uh=uh)
+        np.testing.assert_array_almost_equal(uh, data["uh"], 
+                                     err_msg=f" `uh` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(b, data["isDDof"], 
+                                     err_msg=f" `b` function is not equal to real result in backend {backend}")
+
+
+
+
+
 if __name__ == "__main__":
     #pytest.main(['test_lagrange_fe_space.py', "-q", "-k","test_basis", "-s"])
     pytest.main(['test_lagrange_fe_space.py', "-q"])
