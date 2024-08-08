@@ -67,8 +67,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def top_dimension(self):
         return self.TD
     
-    def interpolate(self, u: Union[Callable[..., TensorLike], TensorLike],
-                    index: Index=_S) -> TensorLike:
+    def interpolate(self, u: Union[Callable[..., TensorLike], TensorLike],) -> TensorLike:
         
         assert callable(u)
 
@@ -86,6 +85,34 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
                 uI = u(bcs)
         return uI
 
+    def boundary_interpolate(self,
+            gD: Union[Callable, int, float, TensorLike],
+            uh: TensorLike,
+            threshold: Union[Callable, TensorLike, None]=None) -> TensorLike:
+        """
+        @brief Set the first type (Dirichlet) boundary conditions.
+
+        @param gD: boundary condition function or value (can be a callable, int, float, or numpy.ndarray).
+        @param uh: TensorLike, FE function uh .
+        @param threshold: optional, threshold for determining boundary degrees of freedom (default: None).
+
+        @return TensorLIke, a bool array indicating the boundary degrees of freedom.
+
+        This function sets the Dirichlet boundary conditions for the FE function `uh`. It supports
+        different types for the boundary condition `gD`, such as a function, a scalar, or a array.
+        """
+        ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
+        isDDof = self.is_boundary_dof(threshold=threshold)
+        GD = self.geo_dimension()
+
+        if callable(gD):
+            gD = gD(ipoints[isDDof])
+        
+        uh[...,isDDof] = gD
+        return isDDof
+
+    set_dirichlet_bc = boundary_interpolate
+    
     def basis(self, bc: TensorLike, index: Index=_S, variable='x'):
         return self.mesh.shape_function(bc, self.p, index=index, variables=variable)
 
