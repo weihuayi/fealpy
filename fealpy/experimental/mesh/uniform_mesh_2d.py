@@ -188,7 +188,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
     
     
     # 实体几何
-    def entity_measure(self, etype: Union[int, str]) -> TensorLike:
+    def entity_measure(self, etype: Union[int, str], index: Index = _S) -> TensorLike:
         """
         @brief Get the measure of the entities of the specified type.
         """

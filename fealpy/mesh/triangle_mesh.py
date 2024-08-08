@@ -92,7 +92,7 @@ class TriangleMesh(Mesh, Plotable):
         R = self._grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
+            gphi = np.einsum('...ij, kjm-> ...kim', R, Dlambda, optimize=True)
             return gphi  # (NQ, NC, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
