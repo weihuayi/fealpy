@@ -143,6 +143,30 @@ class TestUniformMesh2dInterfaces:
         np.testing.assert_almost_equal(ipoints_p1, ipoints_p1_true, decimal=7)
         np.testing.assert_almost_equal(ipoints_p2, ipoints_p2_true, decimal=7)
 
+    
+    @pytest.mark.parametrize("meshdata", entity_to_ipoints_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_entity_to_ipoints(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        cell2ipoints_p1 = mesh.cell_to_ipoint(p=1)
+        cell2ipoints_p2 = mesh.cell_to_ipoint(p=2)
+
+        ipoints_p1 = mesh.interpolation_points(p=1)
+        ipoints_p2 = mesh.interpolation_points(p=2)
+
+        ipoints_p1_true = meshdata['ipoints_p1']
+        ipoints_p2_true = meshdata['ipoints_p2']
+
+        np.testing.assert_almost_equal(ipoints_p1, ipoints_p1_true, decimal=7)
+        np.testing.assert_almost_equal(ipoints_p2, ipoints_p2_true, decimal=7)
+
+
     @pytest.mark.parametrize("meshdata", quadrature_formula_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_quadrature_formula(self, meshdata, backend):
