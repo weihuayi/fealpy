@@ -73,9 +73,17 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def scatter(x, indices, val):
+        """
+        """
         x[indices] = val
         return x
 
+    @staticmethod
+    def scatter_add(x, indices, val):
+        """
+        """
+        np.add.at(x, indices, val)
+        return x
     ### FEALPy methods ###
 
     @staticmethod
