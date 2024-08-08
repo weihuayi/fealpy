@@ -8,8 +8,9 @@ from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
+from .plot import Plotable
 
-class UniformMesh2d(StructuredMesh, TensorMesh):
+class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured quadrilateral mesh
 
@@ -20,6 +21,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
     |         |
     |         |
     0 ------- 2
+
+    The ordering of the edges in each element is as follows:
+
+     ----1---- 
+    |         |
+    2         3
+    |         |
+     ----0---- 
 
     The ordering of entities in the entire mesh is as follows:
 
@@ -59,6 +68,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
       -------   -------  
 
     """
+
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
                 itype=None, ftype=None):
         if itype is None:
@@ -88,6 +98,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
         self.meshdata = {}
 
         self.meshtype = 'UniformMesh2d'
+
+        # Specify the counterclockwise drawing
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
 
     # 实体生成方法
@@ -291,8 +304,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
     
 
     # 插值点
-    def interpolation_points(self, p):
+    def interpolation_points(self, p: int) -> TensorLike:
         '''
+        @brief Generate all interpolation points of the mesh
+
         Ordering of 1st order interpolation points:
         2 ------- 5 ------- 8
         |         |         |
@@ -361,7 +376,180 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
         
+    def cell_to_ipoint(self, p: int, index: Index=_S):
+        """
+        @brief Get the correspondence between mesh cells and interpolation points.
+
+        The correspondence between cells and first-order interpolation points is as follows:
+        2 ------- 5 ------- 8
+        |         |         |
+        |         |         |
+        |         |         |
+        1 ------- 4 ------- 7
+        |         |         |
+        |         |         |
+        |         |         |
+        0 ------- 3 ------- 6
+        The correspondence between cells and second-order interpolation points is as follows:
+        2 ---11-- 5 ---14-- 8
+        |         |         |
+        16   22   18   24   20
+        |         |         |
+        1 ---10-- 4 ---13-- 7
+        |         |         |
+        15   21   17   23   19
+        |         |         |
+        0 ---9--- 3 ---12-- 6
+        """
+
+        cell = self.entity('cell')
+
+        if p == 1:
+            return cell[index]
+
+        edge2cell = self.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
+        c2p= cell2ipoint.reshape((NC, p + 1, p + 1))
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            e2p = self.edge_to_ipoint(p)
+
+            # 确定哪些边在它的左边单元内是局部的第 0 号边
+            flag = edge2cell[:, 2] == 0
+            # 将这些边放在每个单元的第 0 列上
+            c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+
+            # 确定哪些边在它的左边单元内是局部的第 1 号边
+            flag = edge2cell[:, 2] == 1
+            # 将这些边放在每个单元的最后 1 列上，注意此时是逆序
+            c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+
+            # 确定哪些边在它的左边单元内是局部的第 2 号边
+            flag = edge2cell[:, 2] == 2
+            # 将这些边放在每个单元的第 0 行上
+            c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+
+            # 确定哪些边在它的左边单元内是局部的第 3 号边
+            flag = edge2cell[:, 2] == 3
+            # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
+            c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+
+            # 确定哪些边是内部边
+            iflag = edge2cell[:, 0] != edge2cell[:, 1]
+
+            # 确定哪些边在它的右边单元内是局部的第 0 号边
+            rflag = edge2cell[:, 3] == 0
+            flag = iflag & rflag
+            # 将这些边放在每个单元的第 1 列上，注意此时是逆序
+            c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+
+            # 确定哪些边在它的右边单元内是局部的第 1 号边
+            rflag = edge2cell[:, 3] == 1
+            flag = iflag & rflag
+            # 将这些边放在每个单元的最后 1 列上
+            c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+
+            # 确定哪些边在它的右边单元内是局部的第 2 号边
+            rflag = edge2cell[:, 3] == 2
+            flag = iflag & rflag
+            # 将这些边放在每个单元的第 1 行上
+            c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+            # 确定哪些边在它的右边单元内是局部的第 3 号边
+            rflag = edge2cell[:, 3] == 3
+            flag = iflag & rflag
+            # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
+            c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+
+            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + \
+                bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1)
+            
+            return cell2ipoint[index]
+        elif bm.backend_name == 'jax':
+            e2p = self.edge_to_ipoint(p)
+            flag = edge2cell[:, 2] == 0
+            c2p = c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
+            flag = edge2cell[:, 2] == 1
+            c2p = c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
+            flag = edge2cell[:, 2] == 2
+            c2p = c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
+            flag = edge2cell[:, 2] == 3
+            c2p = c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
+
+            iflag = edge2cell[:, 0] != edge2cell[:, 1]
+            flag = iflag & (edge2cell[:, 3] == 0)
+            c2p = c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
+            flag = iflag & (edge2cell[:, 3] == 1)
+            c2p = c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
+            flag = iflag & (edge2cell[:, 3] == 2)
+            c2p = c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
+            flag = iflag & (edge2cell[:, 3] == 3)
+            c2p = c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
+
+            c2p = c2p.at[:, 1:-1, 1:-1].set(NN + NE * (p - 1) + \
+                bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1))
+            
+            return cell2ipoint[index]
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
     
+    def cell_to_ipoints(self, p:int, index: Index = _S):
+        """
+        @brief 获取单元上的双 p 次插值点
+        """
+
+        cell = self.entity('cell')
+
+        if p == 0:
+            return bm.arange(len(cell)).reshape((-1, 1))[index]
+
+        if p == 1:
+            return cell[index]  # 先排 y 方向，再排 x 方向
+
+        edge2cell = self.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        if bm.backend_name in ["numpy", "pytorch"]:
+            cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
+            c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
+
+            e2p = self.edge_to_ipoint(p)
+            flag = edge2cell[:, 2] == 0
+            c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+            flag = edge2cell[:, 2] == 1
+            c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+            flag = edge2cell[:, 2] == 2
+            c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+            flag = edge2cell[:, 2] == 3
+            c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+
+            iflag = edge2cell[:, 0] != edge2cell[:, 1]
+            flag = iflag & (edge2cell[:, 3] == 0)
+            c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+            flag = iflag & (edge2cell[:, 3] == 1)
+            c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+            flag = iflag & (edge2cell[:, 3] == 2)
+            c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+            flag = iflag & (edge2cell[:, 3] == 3)
+            c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
+        elif bm.backend_name == "jax":
+            raise NotImplementedError
+        else:
+            raise ValueError("Unsupported backend")
+        return cell2ipoint[index]
+        
+    
+    # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
         @brief Compute the Jacobi matrix for the mapping from the reference element (xi, eta) 
@@ -641,6 +829,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
             self.NN = (self.nx + 1) * (self.ny + 1)
         self.clear() 
         
+UniformMesh2d.set_ploter('2d')
 
 
 
