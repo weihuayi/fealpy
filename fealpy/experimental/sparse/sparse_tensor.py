@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, Dict, Any, Self
+from typing import Optional, Union, overload, Dict, Any
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -47,75 +47,75 @@ class SparseTensor():
         else:
             return self.shape[dim]
 
-    def neg(self) -> Self:
+    def neg(self) -> 'SparseTensor':
         raise NotImplementedError
 
     @overload
-    def add(self, other: Union[Number, Self], alpha: Number=1) -> Self: ...
+    def add(self, other: Union[Number, 'SparseTensor'], alpha: Number=1) -> 'SparseTensor': ...
     @overload
     def add(self, other: TensorLike, alpha: Number=1) -> TensorLike: ...
-    def add(self, other: Union[Number, Self, TensorLike], alpha: Number=1) -> Union[Self, TensorLike]:
+    def add(self, other: Union[Number, 'SparseTensor', TensorLike], alpha: Number=1) -> Union['SparseTensor', TensorLike]:
         raise NotImplementedError
 
-    def mul(self, other: Union[Number, Self, TensorLike]) -> Self:
+    def mul(self, other: Union[Number, 'SparseTensor', TensorLike]) -> 'SparseTensor':
         raise NotImplementedError
 
-    def div(self, other: Union[Number, TensorLike]) -> Self:
+    def div(self, other: Union[Number, TensorLike]) -> 'SparseTensor':
         raise NotImplementedError
 
-    def pow(self, other: Union[TensorLike, Number]) -> Self:
+    def pow(self, other: Union[TensorLike, Number]) -> 'SparseTensor':
         raise NotImplementedError
 
     @overload
-    def matmul(self, other: Self) -> Self: ...
+    def matmul(self, other: 'SparseTensor') -> 'SparseTensor': ...
     @overload
     def matmul(self, other: TensorLike) -> TensorLike: ...
-    def matmul(self, other: Union[Self, TensorLike]):
+    def matmul(self, other: Union['SparseTensor', TensorLike]):
         raise NotImplementedError
 
     def __pos__(self): return self
     def __neg__(self): return self.neg()
 
     @overload
-    def __add__(self, other: Union[Self, Number]) -> Self: ...
+    def __add__(self, other: Union['SparseTensor', Number]) -> 'SparseTensor': ...
     @overload
     def __add__(self, other: TensorLike) -> TensorLike: ...
     def __add__(self, other):
         return self.add(other)
 
     @overload
-    def __radd__(self, other: Union[Self, Number]) -> Self: ...
+    def __radd__(self, other: Union['SparseTensor', Number]) -> 'SparseTensor': ...
     @overload
     def __radd__(self, other: TensorLike) -> TensorLike: ...
     def __radd__(self, other):
         return self.add(other)
 
     @overload
-    def __sub__(self, other: Union[Self, Number]) -> Self: ...
+    def __sub__(self, other: Union['SparseTensor', Number]) -> 'SparseTensor': ...
     @overload
     def __sub__(self, other: TensorLike) -> TensorLike: ...
     def __sub__(self, other):
         return self.add(-other)
 
     @overload
-    def __rsub__(self, other: Union[Self, Number]) -> Self: ...
+    def __rsub__(self, other: Union['SparseTensor', Number]) -> 'SparseTensor': ...
     @overload
     def __rsub__(self, other: TensorLike) -> TensorLike: ...
     def __rsub__(self, other):
         return self.neg().add(other)
 
-    def __mul__(self, other: Union[Self, TensorLike, Number]) -> Self:
+    def __mul__(self, other: Union['SparseTensor', TensorLike, Number]) -> 'SparseTensor':
         return self.mul(other)
     __rmul__ = __mul__
 
-    def __truediv__(self, other: Union[TensorLike, Number]) -> Self:
+    def __truediv__(self, other: Union[TensorLike, Number]) -> 'SparseTensor':
         return self.div(other)
 
-    def __pow__(self, other: Union[TensorLike, Number]) -> Self:
+    def __pow__(self, other: Union[TensorLike, Number]) -> 'SparseTensor':
         return self.pow(other)
 
     @overload
-    def __matmul__(self, other: Self) -> Self: ...
+    def __matmul__(self, other: 'SparseTensor') -> 'SparseTensor': ...
     @overload
     def __matmul__(self, other: TensorLike) -> TensorLike: ...
     def __matmul__(self, other):
