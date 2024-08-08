@@ -609,7 +609,7 @@ from_unit_sphere_surface_data= [
             }
 ]
 
-ellipsoid_surface_data= [
+ellipsoid_surface_data = [
             {
                 "node": np.array([[ 7.07106781e-01,  0.00000000e+00,  7.07106781e-01],
                [ 5.72061403e-01,  4.15626938e-01,  7.07106781e-01],
