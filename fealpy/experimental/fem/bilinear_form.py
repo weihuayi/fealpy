@@ -52,7 +52,7 @@ class BilinearForm(Form):
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
-            local_shape = group_tensor.shape[-3:] # (NC, ldof, ldof)
+            local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
 
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
@@ -93,3 +93,19 @@ class BilinearForm(Form):
             TensorLike: self @ x
         """
         raise NotImplementedError
+
+    def __matmul__(self, u: TensorLike):
+        """
+        """
+        m, n = self.shape
+        if self._M is not None:
+            return self._M @ u 
+        kargs = bm.context(u)
+        v = bm.zeros_like(u, **kargs) 
+        for group in self.integrators.keys():
+            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
+            ue2dof = e2dofs[0]
+            ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
+            local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
+            gu = u[..., ue2dof] 
+            gv = bm.einsum('...ij, ...j->...i', group_tensor, gu) 
