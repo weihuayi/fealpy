@@ -125,9 +125,8 @@ class TestQuadrangleMeshInterfaces:
         assert mesh.number_of_local_ipoints(p) == meshdata["number_of_local_ipoints"]
         assert mesh.number_of_corner_nodes() == meshdata["number_of_corner_nodes"]
 
-        # TODO: 不兼容 jax
-        # cell_to_ipoint = mesh.cell_to_ipoint(p)
-        # np.testing.assert_allclose(bm.to_numpy(cell_to_ipoint), meshdata["cell_to_ipoint"], atol=1e-7)
+        cell_to_ipoint = mesh.cell_to_ipoint(p)
+        np.testing.assert_allclose(bm.to_numpy(cell_to_ipoint), meshdata["cell_to_ipoint"], atol=1e-7)
 
         interpolation_points = mesh.interpolation_points(p)
         np.testing.assert_allclose(bm.to_numpy(interpolation_points), meshdata["interpolation_points"], atol=1e-7)
@@ -193,8 +192,6 @@ class TestQuadrangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(cell), meshdata["cell"], atol=1e-7)
         face2cell = mesh.face2cell
         np.testing.assert_allclose(bm.to_numpy(face2cell), meshdata["face2cell"], atol=1e-7)
-
-
 
 
 if __name__ == "__main__":
