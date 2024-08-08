@@ -47,3 +47,41 @@ mesh.find_node(axes,node=mesh.node,showindex=True,color='r')
 mesh.find_edge(axes,showindex=True)
 plt.show()
 '''
+
+"""
+import numpy as np
+from fealpy.decorator import cartesian
+from fealpy.mesh import TriangleMesh    
+from fealpy.functionspace import LagrangeFESpace
+
+### 以下代码是一个示例，用于说明如何测试LagrangeFESpace类的boundary_interpolate方法
+
+# 假设你已经定义了PDE类和LagrangeFESpace类，以及TriangleMesh类
+
+class PDE:
+    def __init__(self):
+        pass
+
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.sin(np.pi*x) * np.sin(np.pi*y)
+    
+
+# 创建PDE实例
+pde = PDE()
+
+# 创建网格和有限元空间
+mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=2)
+space = LagrangeFESpace(mesh, 2)
+
+# 初始化uh，大小与自由度数量一致
+uh = np.zeros(space.number_of_global_dofs())
+
+# 设置边界条件
+b = space.boundary_interpolate(gD=pde.solution, uh=uh)
+
+# 输出结果
+print("b:", b)
+print("uh:", uh)
+"""
