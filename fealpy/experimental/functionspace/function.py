@@ -1,9 +1,11 @@
 
-from typing import Generic, Union
+from typing import Generic, Union, TypeVar
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike, Number
-from .space import _FS, Index
+from ..typing import Index
+
+_FS = TypeVar('_FS')
 
 
 class Function(Generic[_FS]):
