@@ -154,4 +154,29 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         ldof = self.number_of_local_dofs('cell')
         tem = bm.eye(ldof, dtype=self.ftype)
         coeff = bm.tile(tem, (NC, 1, 1))
+
+        # 多重指标
+        multiIndex = mesh.multi_index_matrix(p, 2)
+        S02m0 = multiIndex[multiIndex[:, 0]>=p-2*m]
+        S02m1 = S02m0[:, [1, 0, 2]]
+        S02m2 = S02m0[:, [1, 2, 0]]
+        S1m0 = multiIndex[(multiIndex[:, 0]<=m) & (bm.all(multiIndex[:, 1:]<p-2*m,
+                axis=1))]
+        S1m0 = S1m0[:, [0,2,1]][::-1]
+        S1m1 = S1m0[:, [2, 0, 1]]
+        S1m2 = S1m0[:, [1, 2, 0]]
+        S2 = multiIndex[bm.all(multiIndex>m, axis=1)]
+        dof2midx = bm.concatenate([S02m0, S02m1, S02m2, S1m0, S1m1, S1m2, S2])  
+        midx2num = lambda a: (a[:, 1]+a[:, 2])*(1+a[:, 1]+ a[:, 2])//2 + a[:, 2]
+        dof2num = midx2num(dof2midx)
+        dof2num = np.agrsort(dof2num)
+
+        # 节点局部自由度
+        S02m = [S02m0, S02m1, S02m2]
+        for v in range(3):
+            for alpha in S02m[v]:
+                
+
+
+
         return
