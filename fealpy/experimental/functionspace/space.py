@@ -1,7 +1,8 @@
 
-from typing import Union, Callable, Optional, Generic, TypeVar, Any
+from typing import Union, Callable, Optional, Any
 
 from ..typing import TensorLike, Index, Number, _S, Size
+from .function import Function
 from .utils import zero_dofs
 
 
@@ -45,5 +46,18 @@ class FunctionSpace():
         GDOF = self.number_of_global_dofs()
         return zero_dofs(GDOF, dim, dtype=self.ftype)
 
+    def function(self, data: Optional[TensorLike]=None, /, dim: Union[Size, int, None]=None):
+        """Initialize a Function in the space.
 
-_FS = TypeVar('_FS', bound=FunctionSpace)
+        Parameters:
+            data (TensorLike): Values of DoFs shaped (GDOF, *dim). Defaults to None.\n
+            dim (Tuple[int, ...] | int | None, optional): Shape of DoFs.
+                None or 0 for scalar dofs, int for vector dofs, and int tuple for tensor dofs.
+                Defaults to None.
+
+        Returns:
+            Function: A Function object.
+        """
+        if data is None:
+            data = self.array(dim=dim)
+        return Function(self, data)

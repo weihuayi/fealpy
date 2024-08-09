@@ -9,6 +9,12 @@ from .. import logger
 
 
 class BilinearForm(Form):
+    def _get_sparse_shape(self):
+        spaces = self._spaces
+        ugdof = spaces[0].number_of_global_dofs()
+        vgdof = spaces[1].number_of_global_dofs() if (len(spaces) > 1) else ugdof
+        return (vgdof, ugdof)
+
     def check_local_shape(self, entity_to_global: TensorLike, local_tensor:
                           TensorLike):
         if entity_to_global.ndim != 2:

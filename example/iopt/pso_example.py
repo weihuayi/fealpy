@@ -1,5 +1,6 @@
 from fealpy.iopt.particle_swarm_opt_alg import  PSOProblem, PSO
 import numpy as np
+import time
 
 #例：20*20虚拟地图
 #坐标：
@@ -7,6 +8,9 @@ import numpy as np
 #[[0,1]  [1,1] ………… [19,1]]
 #[ …………   …………       ………… ]
 #[[0,19] [1,19]…………[19,19]]
+
+start_time=time.perf_counter()
+
 MAP=np.array([[0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
               [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0],
               [1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0],
@@ -54,4 +58,8 @@ else:
     print('The optimal path distance: ', test1.gbest_f)
     print("The optimal path：",result["path"])
     
-    textMAP.printMAP(result)
+    # textMAP.printMAP(result)
+
+    end_time=time.perf_counter()
+    running_time=end_time-start_time
+    print("Runtime：",running_time)
