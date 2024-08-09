@@ -163,16 +163,16 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         S02m2 = S02m0[:, [1, 2, 0]]
         S1m0 = multiIndex[(multiIndex[:, 0]<=m) & (bm.all(multiIndex[:, 1:]<p-2*m,
                 axis=1))]
-        S1m0 = S1m0[:, [0,2,1]][::-1]
+        S1m0 = bm.flip(S1m0[:, [0,2,1]], axis=0)
         S1m1 = S1m0[:, [2, 0, 1]]
         S1m2 = S1m0[:, [1, 2, 0]]
         S2 = multiIndex[bm.all(multiIndex>m, axis=1)]
         dof2midx = bm.concatenate([S02m0, S02m1, S02m2, S1m0, S1m1, S1m2, S2])  
         midx2num = lambda a: (a[:, 1]+a[:, 2])*(1+a[:, 1]+ a[:, 2])//2 + a[:, 2]
         dof2num = midx2num(dof2midx)
-        dof2num = np.agrsort(dof2num)
+        dof2num = bm.argsort(dof2num)
 
-        # 节点局部自由度
+        # 局部自由度 顶点
         S02m = [S02m0, S02m1, S02m2]
         for v in range(3):
             flag = bm.ones(3, dtype=bm.bool)
@@ -180,16 +180,23 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
             for alpha in S02m[v]:
                 i = midx2num(alpha[None, :])
                 i = dof2num[i]
-                alpha = alpha[flag]
-                r = bm.sum(alpha)
-                betas = multiIndex(r, 2)
+                dalpha = alpha[flag]
+                r = int(bm.sum(dalpha))
+                betas = mesh.multi_index_matrix(r, 2)
                 for beta in betas:
                     if bm.all(alpha-beta[v]<=0):
                         continue
-                    j = bm.sum(beta) + r
-                    j = midx2num(j)
+                    beta[v] = beta[v] + alpha[v]
+                    j = midx2num(beta[None, :])
                     j = dof2num[j]
-                    coeff[:, i, j] = (-1)**(beta[v])*comb(p, r) 
+                    dbeta = beta[flag]
+                    coeff[:, i, j] = (-1)**(beta[v])*comb(bm.sum(beta),
+                            r)*bm.prod(bm.array(comb(dalpha, dbeta)),
+                                    axis=0)*factorial(r) 
+
+        # 局部自由度 边
+        n = mesh.edge_normal()
+        glambda = mesh.grad_lambda()
 
 
 
