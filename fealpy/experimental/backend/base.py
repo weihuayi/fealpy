@@ -69,9 +69,10 @@ def _make_default_mapping(*names: str):
 # Update the source name in the backend file if necessary.
 #
 ATTRIBUTE_MAPPING = _make_default_mapping(
-    'pi', 'e', 'nan', 'inf', 
-    'dtype', 
-    'device',
+    # Constants
+    'pi', 'e', 'nan', 'inf', 'newaxis',
+    'dtype', 'device',
+    # Dtype
     'bool',
     'uint8', 'uint16', 'uint32', 'uint64',
     'int8', 'int16', 'int32', 'int64',
@@ -96,11 +97,14 @@ ATTRIBUTE_MAPPING = _make_default_mapping(
 #
 FUNCTION_MAPPING = _make_default_mapping(
 
-    ### Tensor creation routines ###
-
-    'array', 'tensor', 'arange', 'linspace',
-    'empty', 'zeros', 'ones', 'full', 'empty_like', 'zeros_like', 'ones_like', 'full_like',
+    ### Creation Functions ###
+    'array', 'tensor', 
+    'asarray',
+    'arange', 'linspace',
+    'empty', 'zeros', 'ones', 'full', 
+    'empty_like', 'zeros_like', 'ones_like', 'full_like',
     'eye', 'meshgrid',
+    'tril', 'tiu',
 
     ### Mathematical functions ###
 
