@@ -84,6 +84,20 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         """
         np.add.at(x, indices, val)
         return x
+
+    @staticmethod
+    def unique_all_(a, axis=None, **kwargs):
+        """
+        """
+        b, indices0, inverse, counts = np.unique(a, 
+                                                 return_index=True,
+                                                 return_inverse=True,
+                                                 return_counts=True,
+                                                 axis=axis, **kwargs)
+        indices1 = np.zeros_like(indices0)
+        indices1[inverse] = range(inverse.shape[0]);
+        return b, indices0, indices1, inverse, counts
+
     ### FEALPy methods ###
 
     @staticmethod

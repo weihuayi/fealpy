@@ -255,18 +255,10 @@ class MeshDS(metaclass=MeshMeta):
         NFC = self.number_of_faces_of_cells()
 
         totalFace = self.total_face()
-        _, i0, j = bm.unique(
-            bm.sort(totalFace, axis=1),
-            return_index=True,
-            return_inverse=True,
-            axis=0
-        )
+        _, i0, i1, j, _ = bm.unique_all_(bm.sort(totalFace, axis=1), axis=0)
+
         self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
         NF = i0.shape[0]
-
-        i1 = bm.zeros(NF, **kwargs)
-        b = bm.arange(0, NFC*NC, **kwargs)
-        i1 = bm.scatter(i1, j, b)
 
         self.cell2face = j.reshape(NC, NFC)
 

@@ -5,9 +5,10 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 
 from .mesh_base import SimplexMesh, estr2dim
+from .plot import Plotable
 
 
-class TriangleMesh(SimplexMesh):
+class TriangleMesh(SimplexMesh, Plotable):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
         """
@@ -733,3 +734,5 @@ class TriangleMesh(SimplexMesh):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                          nodedata=self.nodedata,
                          celldata=self.celldata)
+
+TriangleMesh.set_ploter('2d')
