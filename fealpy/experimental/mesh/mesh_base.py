@@ -411,13 +411,21 @@ class HomogeneousMesh(Mesh):
         entity = self.entity(etype, index)
         return bm.barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]],
-                    etype: Union[int, str]='cell', index: Index=_S) -> TensorLike:
+    def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]], index: Index=_S) -> TensorLike:
         """Convert barycenter coordinate points to cartesian coordinate points
         on mesh entities.
         """
+        if isinstance(bcs, Sequence): # tensor type
+            etype = len(bcs)
+        elif isinstance(bcs, TensorLike): # simplex type
+            etype = bcs.shape[-1] - 1
+        else:
+            raise TypeError("bcs is expected to be a tensor or sequence of tensor, "
+                            f"but got {type(bcs).__name__}")
+
         node = self.entity('node')
         entity = self.entity(etype, index)
+
         return bm.bc_to_points(bcs, node, entity)
 
     # ipoints

@@ -39,6 +39,17 @@ class LinearMeshCFEDof(Generic[_MT]):
         isBdDof[face2dof] = True
         return isBdDof
 
+    def entity_to_dof(self, etype: int, index: Index=_S):
+        TD = self.mesh.top_dimension()
+        if etype == TD:
+            return self.cell_to_dof(index)
+        elif etype == TD-1:
+            return self.face_to_dof(index)
+        elif etype == 1:
+            return self.edge_to_dof(index)
+        else:
+            raise ValueError(f"Unknown entity type: {etype}")
+
     def edge_to_dof(self, index: Index=_S):
         return self.mesh.edge_to_ipoint(self.p, index=index)
 
