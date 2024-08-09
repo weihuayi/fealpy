@@ -3,6 +3,7 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
+from scipy.special import factorial, comb
 
 _MT = TypeVar('_MT', bound=Mesh)
 Index = Union[int, slice, TensorLike]
@@ -174,7 +175,24 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         # 节点局部自由度
         S02m = [S02m0, S02m1, S02m2]
         for v in range(3):
+            flag = bm.ones(3, dtype=bm.bool)
+            flag[v] = False
             for alpha in S02m[v]:
+                i = midx2num(alpha[None, :])
+                i = dof2num[i]
+                alpha = alpha[flag]
+                r = bm.sum(alpha)
+                betas = multiIndex(r, 2)
+                for beta in betas:
+                    if bm.all(alpha-beta[v]<=0):
+                        continue
+                    j = bm.sum(beta) + r
+                    j = midx2num(j)
+                    j = dof2num[j]
+                    coeff[:, i, j] = (-1)**(beta[v])*comb(p, r) 
+
+
+
                 
 
 
