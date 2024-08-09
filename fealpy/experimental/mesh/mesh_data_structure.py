@@ -247,6 +247,9 @@ class MeshDS(metaclass=MeshMeta):
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
+        cell = self.cell
+        kwargs = bm.context(cell)
+
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NFC = self.number_of_faces_of_cells()
@@ -261,8 +264,8 @@ class MeshDS(metaclass=MeshMeta):
         self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
         NF = i0.shape[0]
 
-        i1 = bm.zeros(NF, dtype=i0.dtype)
-        b = bm.arange(0, NFC*NC, dtype=i0.dtype)
+        i1 = bm.zeros(NF, **kwargs)
+        b = bm.arange(0, NFC*NC, **kwargs)
         i1 = bm.scatter(i1, j, b)
 
         self.cell2face = j.reshape(NC, NFC)
