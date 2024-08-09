@@ -61,8 +61,6 @@ entity_measure_data = [
         "h": (1.0, 1.0),
         "origin": (0, 0),
 
-        "edge_length": (1.0, 1.0),
-        "cell_area": 1.0,
     }
 ]
 

@@ -63,7 +63,6 @@ def get_coef_subscripts(shape: TensorLike, nq: int, nc: int, batched: bool):
         else:
             raise RuntimeError(f"The shape of the coef should be (Batch, {nc}, {nq}), "
                                f"(Batch, {nq}) or (Batch, {nc}), but got {tuple(shape)}.")
-
     else:
         coef_shape = shape
         if coef_shape == (nc, nq):
@@ -76,6 +75,25 @@ def get_coef_subscripts(shape: TensorLike, nq: int, nc: int, batched: bool):
             raise RuntimeError(f"The shape of the coef should be ({nc}, {nq}), "
                                f"({nq}) or ({nc}), but got {tuple(shape)}.")
 
+    # else:
+    #     coef_shape = shape
+    #     dim = len(coef_shape)
+    #     if coef_shape == (nc, nq):
+    #         subs = "cq"
+    #     elif coef_shape == (nq, ):
+    #         subs = "q"
+    #     elif coef_shape == (nc, ):
+    #         subs = "c"
+    #     elif dim == 3 and coef_shape[:2] == (nc, nq):
+    #         subs = "cqd"
+    #     elif dim == 3 and coef_shape[0] == nq:
+    #         subs = "qd"
+    #     elif dim == 3 and coef_shape[0] == nc:
+    #         subs = "cd"
+    #     else:
+    #         raise RuntimeError(f"The shape of the coef should be ({nc}, {nq}), "
+    #                            f"({nq}) or ({nc}), but got {tuple(shape)}.")
+        
     return subs
 
 

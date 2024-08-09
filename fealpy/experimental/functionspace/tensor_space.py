@@ -1,6 +1,7 @@
 
 from typing import Tuple
 
+from ..backend import backend_manager as bm
 from ..typing import TensorLike, Size, _S
 from .functional import generate_tensor_basis, generate_tensor_grad_basis
 from .space import FunctionSpace, _S, Index
@@ -13,7 +14,7 @@ class TensorFunctionSpace(FunctionSpace):
 
         Parameters:
             scalar_space (FunctionSpace): The scalar space to build tensor space from.\n
-            shape (Tuple[int, ...]): Shape of each dof.
+            shape (int, ...): Shape of each dof.
                 Requires a `-1` be the first or last element to mark the priority
                 of the DoF in arrangement.
         """
@@ -89,3 +90,22 @@ class TensorFunctionSpace(FunctionSpace):
             self.scalar_space.number_of_global_dofs(),
             self.dof_priority
         )
+
+    def is_boundary_dof(self, threshold=None) -> TensorLike:
+        """Return bools indicating boundary dofs.
+
+        Returns:
+            TensorLike: shaped (scalar_gdof * dof_numel,)
+        """
+        scalar_gdof = self.scalar_space.number_of_global_dofs()
+        scalar_is_bd_dof = self.scalar_space.is_boundary_dof(threshold)
+
+        if self.dof_priority:
+            is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,)*self.dof_ndim + (scalar_gdof,))
+            is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
+
+        else:
+            is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,)*self.dof_ndim)
+            is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
+
+        return is_bd_dof.reshape(-1)

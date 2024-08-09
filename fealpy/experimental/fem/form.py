@@ -14,6 +14,7 @@ class Form():
     integrators: Dict[str, Tuple[_I, ...]]
     memory: Dict[str, Tuple[TensorLike, List[TensorLike]]]
     batch_size: int
+    sparse_shape: Tuple[int, ...]
 
     @overload
     def __init__(self, space: _FS, *, batch_size: int=0): ...
@@ -34,12 +35,17 @@ class Form():
         self.batch_size = batch_size
 
         self._values_ravel_shape = (-1,) if self.batch_size == 0 else (self.batch_size, -1)
+        self.sparse_shape = self._get_sparse_shape()
 
     def __len__(self) -> int:
         return len(self.integrators)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}{self._spaces}"
+
+    def _get_sparse_shape(self) -> Tuple[int, ...]:
+        raise NotImplementedError('Please implement the _get_sparse_shape method '
+                                  'to generate the shape of the form.')
 
     @property
     def space(self):
