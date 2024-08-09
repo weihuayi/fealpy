@@ -582,11 +582,6 @@ class TriangleMesh(SimplexMesh):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_torus_surface(cls, R, r, nu, nv):
-        pass
-
-    ## @ingroup MeshGenerators
-    @classmethod
     def from_unit_sphere_surface(cls, refine=0):
         """
         @brief  Generate a triangular mesh on a unit sphere surface.
@@ -613,6 +608,23 @@ class TriangleMesh(SimplexMesh):
         node = node - d[..., None] * n
         return cls(node, cell)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_ellipsoid(cls, radius=[9, 3, 1], refine=0):
+        """
+        a: 椭球的长半轴
+        b: 椭球的中半轴
+        c: 椭球的短半轴
+        """
+        a, b, c = radius
+        mesh = TriangleMesh.from_unit_sphere_surface()
+        mesh.uniform_refine(refine)
+        node = mesh.node
+        cell = mesh.entity('cell')
+        node[:, 0]*=a 
+        node[:, 1]*=b 
+        node[:, 2]*=c
+        return cls(node, cell)
     
     ## @ingroup MeshGenerators
     @classmethod
@@ -680,3 +692,38 @@ class TriangleMesh(SimplexMesh):
             return cls(node, cell), U.flatten(), V.flatten()
         else:
             return cls(node, cell)
+
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_TRIANGLE = 5
+            return VTK_TRIANGLE
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
+
+    def to_vtk(self, fname=None, etype='cell', index: Index=_S):
+        """
+        @brief 把网格转化为 vtk 的数据格式
+        """
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = bm.concatenate((node, np.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        NV = cell.shape[-1]
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                         nodedata=self.nodedata,
+                         celldata=self.celldata)
