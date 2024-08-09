@@ -130,7 +130,6 @@ def symmetry_index(d, r):
     coe = bm.flip(d**bm.arange(r, dtype=bm.int32))
     symidx = bm.einsum('ij,j->i', symidx0, coe)
 
-
     midx = bm.multi_index_matrix(r, d-1)
     #midx0 = bm.zeros_like(midx) 
     #for i in range(d):
@@ -138,8 +137,33 @@ def symmetry_index(d, r):
     #print(midx0-midx)
     #midx = midx0
 
-
     P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)], axis=0)
     num = P[r]/bm.prod(P[midx], axis=1)
     return symidx, num
+
+def multi_index2d_to_index(midx):
+    """
+    @brief 计算二维多重指标的索引
+    @param midx : (l, 3)
+    @return idx : (l, )
+    """
+    idx = (a[..., 1]+a[..., 2])*(1+a[..., 1]+a[..., 2])//2 + a[..., 2]
+    return idx
+
+def multi_index3d_to_index(midx):
+    """
+    @brief 计算三维多重指标的索引
+    @param midx : (l, 4)
+    @return idx : (l, )
+    """
+    s1 = a[..., 1]+a[..., 2]+a[..., 3]
+    s2 = a[..., 2]+a[..., 3]
+    idx = s1*(1+s1)*(2+s1)//6 + s2*(s2+1)//2 + a[..., 3]
+    return idx
+
+
+
+
+
+
 

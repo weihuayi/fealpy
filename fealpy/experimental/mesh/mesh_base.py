@@ -178,6 +178,99 @@ class Mesh(MeshDS):
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
 
+    def integral(self, f, q=3, celltype=False):
+        """
+        
+        """
+        GD = self.geo_dimension()
+        qf = self.quadrature_formula(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        if callable(f):
+            if not hasattr(f, 'coordtype'):
+                f = f(ps)
+            else:
+                if f.coordtype == 'cartesian':
+                    f = f(ps)
+                elif f.coordtype == 'barycentric':
+                    f = f(bcs)
+        cm = self.entity_measure('cell')
+
+        if isinstance(f, (int, float)): #  u 为标量常函数
+            e = f*cm
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = bm.einsum('q, cq..., c->c...', ws, f, cm)
+        else:
+            raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
+
+        if celltype:
+            return e
+        else:
+            return bm.sum(e)
+
+    def error(self, u, v, q=3, power=2, celltype=False):
+        """
+        @brief Calculate the error between two functions.
+        """
+        GD = self.geo_dimension()
+
+        qf = self.quadrature_formula(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        if callable(u):
+            if not hasattr(u, 'coordtype'):
+                u = u(ps)
+            else:
+                if u.coordtype == 'cartesian':
+                    u = u(ps)
+                elif u.coordtype == 'barycentric':
+                    u = u(bcs)
+
+        if callable(v):
+            if not hasattr(v, 'coordtype'):
+                v = v(ps)
+            else:
+                if v.coordtype == 'cartesian':
+                    v = v(ps)
+                elif v.coordtype == 'barycentric':
+                    v = v(bcs)
+
+        if u.shape[-1] == 1:
+           u = u[..., 0]
+
+        if v.shape[-1] == 1:
+           v = v[..., 0]
+
+        cm = self.entity_measure('cell')
+
+        NC = self.number_of_cells()
+        f = bm.power(bm.abs(u - v), power)
+        if len(f.shape) == 1: 
+            f = f[:, None]
+
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*cm
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = bm.einsum('q, qc..., c->c...', ws, f, cm)
+
+        if celltype is False:
+            e = bm.power(bm.sum(e), 1/power)
+        else:
+            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e # float or (NC, )
+
     # tools
     def paraview(self, file_name = "temp.vtu",
             background_color='1.0, 1.0, 1.0',
@@ -318,13 +411,21 @@ class HomogeneousMesh(Mesh):
         entity = self.entity(etype, index)
         return bm.barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]],
-                    etype: Union[int, str]='cell', index: Index=_S) -> TensorLike:
+    def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]], index: Index=_S) -> TensorLike:
         """Convert barycenter coordinate points to cartesian coordinate points
         on mesh entities.
         """
+        if isinstance(bcs, Sequence): # tensor type
+            etype = len(bcs)
+        elif isinstance(bcs, TensorLike): # simplex type
+            etype = bcs.shape[-1] - 1
+        else:
+            raise TypeError("bcs is expected to be a tensor or sequence of tensor, "
+                            f"but got {type(bcs).__name__}")
+
         node = self.entity('node')
         entity = self.entity(etype, index)
+
         return bm.bc_to_points(bcs, node, entity)
 
     # ipoints

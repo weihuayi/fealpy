@@ -43,7 +43,7 @@ class TestBernsteinFESpace:
         bcs = bm.tensor([[0.2,0.3,0.5],
                 [0.1,0.1,0.8]],dtype=mesh.ftype)
         basis = a.basis(bcs=bcs,p=1)
-        np.testing.assert_array_equal(bm.to_numpy(basis), meshdata["basis"])
+        np.testing.assert_array_equal(bm.to_numpy(basis), meshdata["basis"].swapaxes(0,1))
         
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("meshdata", init_data)
@@ -57,7 +57,8 @@ class TestBernsteinFESpace:
                 [0.1,0.1,0.8]],dtype=mesh.ftype)
         uh = bm.tensor([1,2,3,4],dtype=mesh.ftype)
         value = a.value(uh=uh,bcs=bcs)
-        np.testing.assert_array_equal(bm.to_numpy(value), meshdata["value"])
+        print(value)
+        np.testing.assert_array_equal(bm.to_numpy(value), meshdata["value"].swapaxes(0,1))
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("meshdata", init_data)
@@ -93,7 +94,7 @@ class TestBernsteinFESpace:
                 [0.1,0.1,0.8]],dtype=mesh.ftype)
         a = BernsteinFESpace(mesh,p)
         hess_basis = a.hess_basis(bcs=bcs)
-        np.testing.assert_array_equal(bm.to_numpy(hess_basis), meshdata["hess_basis"])
+        np.testing.assert_array_equal(bm.to_numpy(hess_basis), meshdata["hess_basis"].swapaxes(0,1))
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("meshdata", init_data)
@@ -107,7 +108,7 @@ class TestBernsteinFESpace:
         a = BernsteinFESpace(mesh,p)
         m=1
         grad_m_basis = a.grad_m_basis(bcs=bcs,m=m)
-        np.testing.assert_allclose(bm.to_numpy(grad_m_basis), meshdata["gradmbasis"],1e-15)
+        np.testing.assert_allclose(bm.to_numpy(grad_m_basis), meshdata["gradmbasis"].swapaxes(0,1),1e-15)
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("meshdata", init_data)
@@ -145,8 +146,8 @@ class TestBernsteinFESpace:
         uh = bm.array([0.8430878444388449, 0.279405787552195 , 0.3932471419048877,
        0.5433132870312605, 0.1656913889905416, 0.7326699516750773,
        0.3567817609053885, 0.8039158020389613, 0.1809355630744111],dtype=mesh.ftype)
-        hessvalue = a.hessian_value(uh=uh,bc=bcs)
-        np.testing.assert_allclose(bm.to_numpy(hessvalue), meshdata["hessvalue"],1e-15)
+        hessvalue = a.hessian_value(uh=uh,bcs=bcs)
+        np.testing.assert_allclose(bm.to_numpy(hessvalue), meshdata["hessvalue"].swapaxes(0,1),1e-15)
    
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("meshdata", init_data)
@@ -168,21 +169,12 @@ class TestBernsteinFESpace:
         m=1
         mvalue = a.grad_m_value(uh=uh,bcs=bcs,m=1)
 
-        np.testing.assert_allclose(bm.to_numpy(mvalue), meshdata["mvalue"],1e-15)
+        np.testing.assert_allclose(bm.to_numpy(mvalue), meshdata["mvalue"].swapaxes(0,1),1e-15)
 
 
 
 if __name__ == "__main__":
+    #test = TestBernsteinFESpace()
+    #test.test_value(init_data[0],'numpy')
+    pytest.main()
 
-    test = TestBernsteinFESpace()
-    # test.test_init_(init_data[0],"pytorch")
-    # test.test_basis(init_data[0],"pytorch")
-    # test.test_grad_basis(init_data[0],"pytorch")
-    # test.test_value(init_data[0],"pytorch")
-    # test.test_l_to_b(init_data[0],"pytorch")
-    # test.test_b_to_l(init_data[0],"pytorch")
-    # test.test_hess_basis(init_data[0],"pytorch")
-    # test.test_grad_m_basis(init_data[0],"numpy")
-    # test.test_interpolate(init_data[0],"pytorch")
-    # test.test_hessian_value(init_data[0],"pytorch")
-    # test.test_grad_m_value(init_data[0],"pytorch")

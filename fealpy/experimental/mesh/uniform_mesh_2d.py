@@ -8,8 +8,9 @@ from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
+from .plot import Plotable
 
-class UniformMesh2d(StructuredMesh, TensorMesh):
+class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured quadrilateral mesh
 
@@ -20,6 +21,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
     |         |
     |         |
     0 ------- 2
+
+    The ordering of the edges in each element is as follows:
+
+     ----1---- 
+    |         |
+    2         3
+    |         |
+     ----0---- 
 
     The ordering of entities in the entire mesh is as follows:
 
@@ -59,6 +68,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
       -------   -------  
 
     """
+
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
                 itype=None, ftype=None):
         if itype is None:
@@ -88,6 +98,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
         self.meshdata = {}
 
         self.meshtype = 'UniformMesh2d'
+
+        # Specify the counterclockwise drawing
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
 
     # 实体生成方法
@@ -186,9 +199,139 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
     def number_of_faces_of_cells(self):
         return 4
     
+    def edge_to_cell(self) -> TensorLike:
+        """
+        @brief Adjacency relationship between edges and cells, 
+        storing information about the two cells adjacent to each edge.
+        Notes:
+        - The first and second columns store the indices of the left and right cells adjacent to each edge. 
+        When the two indices are the same, it indicates that the edge is a boundary edge.
+        - The third and fourth columns store the local indices of the edge in the left and right cells, respectively.
+        """
+
+        nx = self.nx
+        ny = self.ny
+        NC = self.NC
+        NE = self.NE
+
+        edge2cell = bm.zeros((NE, 4), dtype=self.itype)
+
+        idx = bm.arange(NC, dtype=self.itype).reshape(nx, ny).T
+
+        # x direction
+        idx0 = bm.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
+        # y direction
+        idx1 = bm.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
+        NE0 = nx * (ny + 1)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # left element
+            edge2cell[idx0[:-1], 0] = idx
+            edge2cell[idx0[:-1], 2] = 0
+            edge2cell[idx0[-1], 0] = idx[-1]
+            edge2cell[idx0[-1], 2] = 1
+
+            # right element
+            edge2cell[idx0[1:], 1] = idx
+            edge2cell[idx0[1:], 3] = 1
+            edge2cell[idx0[0], 1] = idx[0]
+            edge2cell[idx0[0], 3] = 0
+
+            # left element
+            edge2cell[NE0 + idx1[:, 1:], 0] = idx
+            edge2cell[NE0 + idx1[:, 1:], 2] = 3
+            edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+            edge2cell[NE0 + idx1[:, 0], 2] = 2
+
+            # right element
+            edge2cell[NE0 + idx1[:, :-1], 1] = idx
+            edge2cell[NE0 + idx1[:, :-1], 3] = 2
+            edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+            edge2cell[NE0 + idx1[:, -1], 3] = 3
+
+            return edge2cell
+        elif bm.backend_name == 'jax':
+            # left element
+            edge2cell = edge2cell.at[idx0[:-1], 0].set(idx)
+            edge2cell = edge2cell.at[idx0[:-1], 2].set(0)
+            edge2cell = edge2cell.at[idx0[-1], 0].set(idx[-1])
+            edge2cell = edge2cell.at[idx0[-1], 2].set(1)
+
+            # right element
+            edge2cell = edge2cell.at[idx0[1:], 1].set(idx)
+            edge2cell = edge2cell.at[idx0[1:], 3].set(1)
+            edge2cell = edge2cell.at[idx0[0], 1].set(idx[0])
+            edge2cell = edge2cell.at[idx0[0], 3].set(0)
+
+            # left element
+            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 0].set(idx)
+            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 2].set(3)
+            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 0].set(idx[:, 0])
+            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 2].set(2)
+
+            # right element
+            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 1].set(idx)
+            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 3].set(2)
+            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 1].set(idx[:, -1])
+            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 3].set(3)
+
+            return edge2cell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
+        
+    def boundary_node_flag(self):
+        """
+        @brief Determine if a point is a boundary point.
+        """
+        NN = self.NN
+        edge = self.edge
+        isBdEdge = self.boundary_edge_flag()
+        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdPoint[edge[isBdEdge, :]] = True
+            return isBdPoint
+        elif bm.backend_name == 'jax':
+            isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)   
+            return isBdPoint
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
+    
+    def boundary_edge_flag(self):
+        """
+        @brief Determine if an edge is a boundary edge.
+        """
+        edge2cell = self.edge_to_cell()
+        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+        return isBdEdge
+    
+    
+    def boundary_cell_flag(self):
+        """
+        @brief Determine if a cell is a boundary cell.
+        """
+        NC = self.NC
+
+        edge2cell = self.edge_to_cell()
+        isBdCell = bm.zeros((NC,), dtype=bool)
+        isBdEdge = self.boundary_edge_flag()
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdCell[edge2cell[isBdEdge, 0]] = True
+            return isBdCell
+        elif bm.backend_name == 'jax':
+            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
+            return isBdCell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+    
     
     # 实体几何
-    def entity_measure(self, etype: Union[int, str]) -> TensorLike:
+    def entity_measure(self, etype: Union[int, str], index: Index = _S) -> TensorLike:
         """
         @brief Get the measure of the entities of the specified type.
         """
@@ -291,8 +434,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
     
 
     # 插值点
-    def interpolation_points(self, p):
+    def interpolation_points(self, p: int) -> TensorLike:
         '''
+        @brief Generate all interpolation points of the mesh
+
         Ordering of 1st order interpolation points:
         2 ------- 5 ------- 8
         |         |         |
@@ -361,7 +506,134 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
         
+    def cell_to_ipoint(self, p: int, index: Index=_S):
+        """
+        @brief Get the correspondence between mesh cells and interpolation points.
+
+        The correspondence between cells and first-order interpolation points is as follows:
+        2 ------- 5 ------- 8
+        |         |         |
+        |         |         |
+        |         |         |
+        1 ------- 4 ------- 7
+        |         |         |
+        |         |         |
+        |         |         |
+        0 ------- 3 ------- 6
+        The correspondence between cells and second-order interpolation points is as follows:
+        2 ---11-- 5 ---14-- 8
+        |         |         |
+        16   22   18   24   20
+        |         |         |
+        1 ---10-- 4 ---13-- 7
+        |         |         |
+        15   21   17   23   19
+        |         |         |
+        0 ---9--- 3 ---12-- 6
+        """
+
+        cell = self.entity('cell')
+
+        if p == 1:
+            return cell[index]
+
+        edge2cell = self.edge_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
+        c2p= cell2ipoint.reshape((NC, p + 1, p + 1))
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            e2p = self.edge_to_ipoint(p)
+
+            # 确定哪些边在它的左边单元内是局部的第 0 号边
+            flag = edge2cell[:, 2] == 0
+            # 将这些边放在每个单元的第 0 列上
+            c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+
+            # 确定哪些边在它的左边单元内是局部的第 1 号边
+            flag = edge2cell[:, 2] == 1
+            # 将这些边放在每个单元的最后 1 列上，注意此时是逆序
+            #c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 0], :, -1] = bm.flip(e2p[flag], axis=[1])
+
+            # 确定哪些边在它的左边单元内是局部的第 2 号边
+            flag = edge2cell[:, 2] == 2
+            # 将这些边放在每个单元的第 0 行上
+            #c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 0], 0, :] = bm.flip(e2p[flag], axis=[1])
+
+            # 确定哪些边在它的左边单元内是局部的第 3 号边
+            flag = edge2cell[:, 2] == 3
+            # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
+            c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+
+            # 确定哪些边是内部边
+            iflag = edge2cell[:, 0] != edge2cell[:, 1]
+
+            # 确定哪些边在它的右边单元内是局部的第 0 号边
+            rflag = edge2cell[:, 3] == 0
+            flag = iflag & rflag
+            # 将这些边放在每个单元的第 1 列上，注意此时是逆序
+            #c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 1], :, 0] = bm.flip(e2p[flag], axis=[1])
+
+            # 确定哪些边在它的右边单元内是局部的第 1 号边
+            rflag = edge2cell[:, 3] == 1
+            flag = iflag & rflag
+            # 将这些边放在每个单元的最后 1 列上 
+            c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+
+            # 确定哪些边在它的右边单元内是局部的第 2 号边
+            rflag = edge2cell[:, 3] == 2
+            flag = iflag & rflag
+            # 将这些边放在每个单元的第 1 行上
+            c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+            # 确定哪些边在它的右边单元内是局部的第 3 号边
+            rflag = edge2cell[:, 3] == 3
+            flag = iflag & rflag
+            # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
+            #c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 1], -1, :] = bm.flip(e2p[flag], axis=[1])
+
+            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + \
+                bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1)
+            
+            return cell2ipoint[index]
+        elif bm.backend_name == 'jax':
+            e2p = self.edge_to_ipoint(p)
+            flag = edge2cell[:, 2] == 0
+            c2p = c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
+            flag = edge2cell[:, 2] == 1
+            c2p = c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
+            flag = edge2cell[:, 2] == 2
+            c2p = c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
+            flag = edge2cell[:, 2] == 3
+            c2p = c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
+
+            iflag = edge2cell[:, 0] != edge2cell[:, 1]
+            flag = iflag & (edge2cell[:, 3] == 0)
+            c2p = c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
+            flag = iflag & (edge2cell[:, 3] == 1)
+            c2p = c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
+            flag = iflag & (edge2cell[:, 3] == 2)
+            c2p = c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
+            flag = iflag & (edge2cell[:, 3] == 3)
+            c2p = c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
+
+            c2p = c2p.at[:, 1:-1, 1:-1].set(NN + NE * (p - 1) + \
+                bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1))
+            
+            return cell2ipoint[index]
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
     
+    # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
         @brief Compute the Jacobi matrix for the mapping from the reference element (xi, eta) 
@@ -476,131 +748,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
 
     #         return gphi
         
-    def edge_to_cell(self) -> TensorLike:
-        """
-        @brief Adjacency relationship between edges and cells, 
-        storing information about the two cells adjacent to each edge.
-        """
-
-        nx = self.nx
-        ny = self.ny
-        NC = self.NC
-        NE = self.NE
-
-        edge2cell = bm.zeros((NE, 4), dtype=self.itype)
-
-        idx = bm.arange(NC, dtype=self.itype).reshape(nx, ny).T
-
-        # x direction
-        idx0 = bm.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
-        # y direction
-        idx1 = bm.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
-        NE0 = nx * (ny + 1)
-
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            # left element
-            edge2cell[idx0[:-1], 0] = idx
-            edge2cell[idx0[:-1], 2] = 0
-            edge2cell[idx0[-1], 0] = idx[-1]
-            edge2cell[idx0[-1], 2] = 1
-
-            # right element
-            edge2cell[idx0[1:], 1] = idx
-            edge2cell[idx0[1:], 3] = 1
-            edge2cell[idx0[0], 1] = idx[0]
-            edge2cell[idx0[0], 3] = 0
-
-            # left element
-            edge2cell[NE0 + idx1[:, 1:], 0] = idx
-            edge2cell[NE0 + idx1[:, 1:], 2] = 3
-            edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
-            edge2cell[NE0 + idx1[:, 0], 2] = 2
-
-            # right element
-            edge2cell[NE0 + idx1[:, :-1], 1] = idx
-            edge2cell[NE0 + idx1[:, :-1], 3] = 2
-            edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
-            edge2cell[NE0 + idx1[:, -1], 3] = 3
-
-            return edge2cell
-        elif bm.backend_name == 'jax':
-            # left element
-            edge2cell = edge2cell.at[idx0[:-1], 0].set(idx)
-            edge2cell = edge2cell.at[idx0[:-1], 2].set(0)
-            edge2cell = edge2cell.at[idx0[-1], 0].set(idx[-1])
-            edge2cell = edge2cell.at[idx0[-1], 2].set(1)
-
-            # right element
-            edge2cell = edge2cell.at[idx0[1:], 1].set(idx)
-            edge2cell = edge2cell.at[idx0[1:], 3].set(1)
-            edge2cell = edge2cell.at[idx0[0], 1].set(idx[0])
-            edge2cell = edge2cell.at[idx0[0], 3].set(0)
-
-            # left element
-            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 0].set(idx)
-            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 2].set(3)
-            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 0].set(idx[:, 0])
-            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 2].set(2)
-
-            # right element
-            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 1].set(idx)
-            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 3].set(2)
-            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 1].set(idx[:, -1])
-            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 3].set(3)
-
-            return edge2cell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-
-        
-    def boundary_node_flag(self):
-        """
-        @brief Determine if a point is a boundary point.
-        """
-        NN = self.NN
-        edge = self.edge
-        isBdEdge = self.boundary_edge_flag()
-        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdPoint[edge[isBdEdge, :]] = True
-            return isBdPoint
-        elif bm.backend_name == 'jax':
-            isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)
-            return isBdPoint
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-
     
-    def boundary_edge_flag(self):
-        """
-        @brief Determine if an edge is a boundary edge.
-        """
-        edge2cell = self.edge_to_cell()
-        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
-        return isBdEdge
-    
-    
-    def boundary_cell_flag(self):
-        """
-        @brief Determine if a cell is a boundary cell.
-        """
-        NC = self.NC
-
-        edge2cell = self.edge_to_cell()
-        isBdCell = bm.zeros((NC,), dtype=bool)
-        isBdEdge = self.boundary_edge_flag()
-
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdCell[edge2cell[isBdEdge, 0]] = True
-            return isBdCell
-        elif bm.backend_name == 'jax':
-            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
-            return isBdCell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
     
 
     # 其他方法
@@ -641,6 +789,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh):
             self.NN = (self.nx + 1) * (self.ny + 1)
         self.clear() 
         
+UniformMesh2d.set_ploter('2d')
 
 
 

@@ -7,7 +7,9 @@
 	@bref 
 	@ref 
 '''  
-from jax import ops, vmap, jit
+from jax import ops, vmap, jit, lax
+import jax.lax as lax 
+from functools import partial
 import jax.numpy as jnp
 import numpy as np
 import h5py
@@ -38,6 +40,7 @@ class SPHSolver:
 
     #状态方程更新压力
     @staticmethod
+    @jit
     def tait_eos(rho, c0, rho0, gamma=1.0, X=0.0):
         """Equation of state update pressure"""
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
@@ -50,25 +53,29 @@ class SPHSolver:
     
     #计算密度
     @staticmethod
+    @jit
     def compute_rho(mass, i_node, w_ij):
         """Density summation."""
         return mass * ops.segment_sum(w_ij, i_node, len(mass))
 
     #计算运输速度的加速度
-    def compute_tv_acceleration(self, state, i_node, j_node, r_ij, dij, grad, pb):
+    @staticmethod
+    @jit
+    def compute_tv_acceleration(state, i_node, j_node, r_ij, dij, grad, pb):
         m_i = state["mass"][i_node]
         m_j = state["mass"][j_node]
         rho_i = state["rho"][i_node]
         rho_j = state["rho"][j_node]
 
-        volume_square = ((m_i/rho_i)**2 + (m_j/rho_j)**2) / m_i 
+        volume_square = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
         c = volume_square * grad / (dij + EPS)
-        a = c[:, None] * 1.0 * pb[i_node][:, None] * r_ij       
+        a = c[:, None] * pb[i_node][:, None] * r_ij       
         return ops.segment_sum(a, i_node, len(state["mass"]))
 
 
     #计算动量速度的加速度
-    @staticmethod 
+    @staticmethod
+    @jit 
     def compute_mv_acceleration(state, i_node, j_node, r_ij, dij, grad, p):
         def compute_A(rho, mv, tv):
             a = rho[:, jnp.newaxis] * mv
@@ -98,91 +105,99 @@ class SPHSolver:
         a = c[:, None] * (-p_ij[:, None] * r_ij + b + (eta_ij[:, None] * mv_ij))
         return ops.segment_sum(a, i_node, len(state["mass"]))
     
-    def boundary_conditions(self, state, box_size, n_walls=3, dx=0.02, T0=1.0, hot_T=1.23): 
+    @staticmethod
+    @jit
+    def boundary_conditions(state, box_size, n_walls=3, dx=0.02, T0=1.0, hot_T=1.23): 
         fluid = state["tag"] == 0
 
-        #将输入流体温度设置为参考温度
-        inflow = fluid * (state["position"][:,0] < n_walls * dx)
+        # 将输入流体温度设置为参考温度
+        inflow = fluid * (state["position"][:, 0] < n_walls * dx)
         state["T"] = jnp.where(inflow, T0, state["T"])
         state["dTdt"] = jnp.where(inflow, 0.0, state["dTdt"])
 
-        #设置热壁温度
+        # 设置热壁温度
         hot = state["tag"] == 3
         state["T"] = jnp.where(hot, hot_T, state["T"])
         state["dTdt"] = jnp.where(hot, 0.0, state["dTdt"])
 
-        #将墙设置为参考温度
+        # 将墙设置为参考温度
         solid = state["tag"] == 1
         state["T"] = jnp.where(solid, T0, state["T"])
         state["dTdt"] = jnp.where(solid, 0, state["dTdt"])
 
-        #确保静态墙没有速度或加速度
+        # 确保静态墙没有速度或加速度
         static = (hot + solid)[:, None]
         state["mv"] = jnp.where(static, 0.0, state["mv"])
         state["tv"] = jnp.where(static, 0.0, state["tv"])
         state["dmvdt"] = jnp.where(static, 0.0, state["dmvdt"])
         state["dtvdt"] = jnp.where(static, 0.0, state["dtvdt"])
-        
-        #将出口温度梯度设置为零，以避免与流入相互作用
-        bound = np.array([np.zeros_like(box_size), box_size]).T.tolist()
-        outflow = fluid * (state["position"][:, 0] > bound[0][1] - n_walls * dx)
+
+        # 将出口温度梯度设置为零，以避免与流入相互作用
+        bound = jnp.array([jnp.zeros_like(box_size), box_size]).T
+        outflow = fluid * (state["position"][:, 0] > bound[0, 1] - n_walls * dx)
         state["dTdt"] = jnp.where(outflow, 0.0, state["dTdt"])
+
         return state
 
-    def external_acceleration(self, position, box_size, n_walls=3, dx=0.02, g_ext=2.3):
-        dxn = n_walls * dx
-        res = jnp.zeros_like(position)
-        force = jnp.ones((len(position)))
-        fluid = (position[:, 1] < box_size[1] - dxn) * (position[:, 1] > dxn)
-        force = jnp.where(fluid, force, 0)
-        res = res.at[:, 0].set(force)
-        return res * g_ext
-
-    def enforce_wall_boundary(self, state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, p0=100.0, with_temperature=False):
+    @staticmethod
+    def external_acceleration(position, box_size, dx=0.02):
+        @jit
+        def jit_external_acceleration(position, box_size, n_walls=3, dx=0.02, g_ext=2.3):
+            dxn = n_walls * dx
+            res = jnp.zeros_like(position)
+            force = jnp.ones((len(position)))
+            fluid = (position[:, 1] < box_size[1] - dxn) * (position[:, 1] > dxn)
+            force = jnp.where(fluid, force, 0)
+            res = res.at[:, 0].set(force)
+            return res * g_ext
+        return jit_external_acceleration(position, box_size, dx=dx)
+    
+    @staticmethod
+    @jit
+    def enforce_wall_boundary(state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, p0=100.0, with_temperature=False):
         """Enforce wall boundary conditions by treating boundary particles in a special way."""
         mask_bc = jnp.isin(state["tag"], jnp.array([1, 3]))
         mask_j_s_fluid = jnp.where(state["tag"][j_s] == 0, 1.0, 0.0)
         w_j_s_fluid = w_dist * mask_j_s_fluid
         w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, len(state["position"]))
-        
-        #no-slip边界条件
+    
+        # no-slip boundary condition
         def no_slip_bc(x):
-            #对于墙粒子，流体速度求和
             x_wall_unnorm = ops.segment_sum(w_j_s_fluid[:, None] * x[j_s], i_s, len(state["position"]))
-            #广义壁边界条件
             x_wall = x_wall_unnorm / (w_i_sum_wf[:, None] + EPS)
             x = jnp.where(mask_bc[:, None], 2 * x - x_wall, x)
             return x
         mv = no_slip_bc(state["mv"])
         tv = no_slip_bc(state["tv"])
-        
-        #对于墙粒子，流体压力求和
+    
+        # Pressure summation
         p_wall_unnorm = ops.segment_sum(w_j_s_fluid * p[j_s], i_s, len(state["position"]))
-        
-        #外流体加速度项
+    
+        # External acceleration term
         rho_wf_sum = (state["rho"][j_s] * w_j_s_fluid)[:, None] * dr_i_j
         rho_wf_sum = ops.segment_sum(rho_wf_sum, i_s, len(state["position"]))
         p_wall_ext = (g_ext * rho_wf_sum).sum(axis=1)
-        
-        #normalize
+    
+        # Normalize pressure
         p_wall = (p_wall_unnorm + p_wall_ext) / (w_i_sum_wf + EPS)
         p = jnp.where(mask_bc, p_wall, p)
-        
-        rho = self.tait_eos_p2rho(p, p0, rho0, X=5.0)
-        
-        if with_temperature:
-            #对于墙粒子，流体温度求和
+    
+        rho = SPHSolver.tait_eos_p2rho(p, p0, rho0, X=5.0)
+    
+        def compute_temperature():
             t_wall_unnorm = ops.segment_sum(w_j_s_fluid * state["T"][j_s], i_s, len(state["position"]))
             t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-            """1:SOLID_WALL,2:MOVING_WALL"""
             mask = jnp.isin(state["tag"], jnp.array([1, 2]))
             t_wall = jnp.where(mask, t_wall, state["T"])
-            T = t_wall
-            return p, rho, mv, tv, T
-        else:
-            return p, rho, mv, tv
+            return t_wall
 
-    def temperature_derivative(self, state, kernel, e_s, dr_i_j, dist, i_s, j_s, grad):
+        T = lax.cond(with_temperature, compute_temperature, lambda: state["T"])
+
+        return p, rho, mv, tv, T
+
+    @staticmethod
+    @partial(jit, static_argnames=('kernel',))
+    def temperature_derivative(state, kernel, e_s, dr_i_j, dist, i_s, j_s, grad):
         """compute temperature derivative for next step."""
         kernel_grad_vector = grad[:, None] * e_s
         k = (state["kappa"][i_s] * state["kappa"][j_s]) / \
@@ -194,23 +209,23 @@ class SPHSolver:
         result = ops.segment_sum(dTdt, i_s, len(state["position"]))
         return result
 
-    def wall_extrapolation(self, state, kernel, i_s, j_s):
-        #只更新流体粒子对固壁粒子的影响
-        fw_m = state["mass"][(state["tag"] == 0) | (state["tag"] == 1)]
-        fw_rho = state["rho"][(state["tag"] == 0) | (state["tag"] == 1)]
-        fw_v = state["v"][(state["tag"] == 0) | (state["tag"] == 1)]
+    @staticmethod
+    @jit
+    def wall_extrapolation(state, kernel, i_s, j_s, fw_indices, fw_indices_wall):
+        # 只更新流体粒子对固壁粒子的影响
+        fw_m = state["mass"][fw_indices]
+        fw_rho = state["rho"][fw_indices]
+        fw_v = state["v"][fw_indices]
         v_wall = jnp.zeros_like(fw_v)
 
-        sum0 = (fw_m[j_s]/fw_rho[j_s])[:, None] * fw_v[j_s] * kernel[:, None]
-        sum1 = (fw_m[j_s]/fw_rho[j_s]) * kernel
+        sum0 = (fw_m[j_s] / fw_rho[j_s])[:, None] * fw_v[j_s] * kernel[:, None]
+        sum1 = (fw_m[j_s] / fw_rho[j_s]) * kernel
         a = ops.segment_sum(sum0, i_s, len(fw_m))
         b = ops.segment_sum(sum1, i_s, len(fw_m))
         v_ave = a / b[:, None]
         result = 2 * v_wall - v_ave
 
-        fw_tag = state["tag"][(state["tag"] == 0) | (state["tag"] == 1)]
-        idx = jnp.where(fw_tag == 1)[0]
-        result = result[idx]
+        result = result[fw_indices_wall]
         return result
 
     def gate_change(self, state, domain, dt, dx, uin):
@@ -312,68 +327,72 @@ class SPHSolver:
         state["p"] = state["p"].at[d_tag].set(state["p"][d_s])
         return state
 
-    def continue_equation(self, state, i_s, j_s, grad_kernel):
+    @staticmethod
+    @jit
+    def continue_equation(state, i_s, j_s, grad_kernel, f_tag, f_rho):
         v = state["v"]
         x = state["position"]
         rho = state["rho"]
         c = state["sound"]
         p = state["p"]
         m = state["mass"]
-        f_tag = jnp.where(state["tag"] == 0)[0]
-        f_rho = state["rho"][state["tag"] == 0]
 
         v_ij = v[i_s] - v[j_s]
         x_ij = x[i_s] - x[j_s]
         r_ij = jnp.linalg.norm(x_ij, axis=1)
-        rho_c = ((rho[i_s]+rho[j_s])/2) * ((c[i_s]+c[j_s])/2)
+        rho_c = ((rho[i_s] + rho[j_s]) / 2) * ((c[i_s] + c[j_s]) / 2)
         p_ij = p[i_s] - p[j_s]
 
-        a = jnp.sum(((v_ij+(p_ij/rho_c)[:, None]*(x_ij/r_ij[:, None]))*grad_kernel), axis=1, keepdims=True)
-        sum0 = (m[j_s]/rho[j_s])[:, None] * a
-        sum1 = (ops.segment_sum(sum0, i_s, len(rho)))[f_tag]
-        result = f_rho[f_tag][:, None] * sum1
+        a = jnp.sum(((v_ij + (p_ij / rho_c)[:, None] * (x_ij / r_ij[:, None])) * grad_kernel), axis=1, keepdims=True)
+        sum0 = (m[j_s] / rho[j_s])[:, None] * a
+        sum1 = ops.segment_sum(sum0, i_s, len(rho))[f_tag]
+        result = f_rho[:, None] * sum1
         result = jnp.squeeze(result)
         return result
 
-    def mu_wlf(self, state, i_s, j_s, grad_kernel, mu0, tau, n):
+    @staticmethod
+    @jit
+    def mu_wlf(state, i_s, j_s, grad_kernel, mu0, tau, n):
         a = state["v"][j_s][:,:,jnp.newaxis] * grad_kernel[:,jnp.newaxis,:]
         a_t = jnp.transpose(a, (0, 2, 1))
-        D = (a + a_t) / 2 #待确认？
+        D = (a + a_t) / 2
         gamma = jnp.sqrt(2 * jnp.einsum('ijk,ijk->i', D, D))
         gamma = ops.segment_sum(gamma, i_s, len(state["rho"]))
         mu = mu0 / (1 + (mu0 * gamma / tau)**(1-n))    
         return mu
 
-    def momentum_equation(self, state, i_s, j_s, grad_kernel, mu, eta, h):
-        f_tag = jnp.where(state["tag"] == 0)[0]
+    @staticmethod
+    @jit
+    def momentum_equation(state, i_s, j_s, grad_kernel, mu, eta, h, f_tag):
         x_ij = state["position"][i_s] - state["position"][j_s]
-        r_ij = jnp.linalg.norm(x_ij,axis=1)
+        r_ij = jnp.linalg.norm(x_ij, axis=1)
         v_ij = state["v"][i_s] - state["v"][j_s]
         a0 = eta * (mu[i_s] + mu[j_s]) / r_ij
-        a1 = ((state["rho"][i_s]+state["rho"][j_s])/2) * ((state["sound"][i_s]+state["sound"][j_s])/2)
+        a1 = ((state["rho"][i_s] + state["rho"][j_s]) / 2) * ((state["sound"][i_s] + state["sound"][j_s]) / 2)
         beta = jnp.minimum(a0, a1)
 
-        b0 = state["mass"][j_s]/(state["rho"][i_s]*state["rho"][j_s])  
-        b1 = state["p"][i_s]+state["p"][j_s]-beta*(jnp.einsum('ij,ij->i', x_ij, v_ij)/r_ij)
+        b0 = state["mass"][j_s] / (state["rho"][i_s] * state["rho"][j_s])
+        b1 = state["p"][i_s] + state["p"][j_s] - beta * (jnp.einsum('ij,ij->i', x_ij, v_ij) / r_ij)
         sum0 = (b0 * b1)[:, None] * grad_kernel
         sum0 = ops.segment_sum(sum0, i_s, len(state["rho"]))
-        
+
         m_j = state["mass"][j_s]
-        c0 = (mu[i_s]+mu[j_s])/(state["rho"][i_s]*state["rho"][j_s])
-        c1 = jnp.einsum('ij,ij->i', x_ij, grad_kernel)/(r_ij**2+(0.01*h)**2)
+        c0 = (mu[i_s] + mu[j_s]) / (state["rho"][i_s] * state["rho"][j_s])
+        c1 = jnp.einsum('ij,ij->i', x_ij, grad_kernel) / (r_ij**2 + (0.01 * h)**2)
         sum1 = (m_j * c0 * c1)[:, None] * v_ij
         sum1 = ops.segment_sum(sum1, i_s, len(state["rho"]))
-        
+
         result = (-sum0 + sum1)[f_tag]
         return result
 
-    def change_position(self, state, i_s, j_s, kernel):
-        f_tag = jnp.where(state["tag"] == 0)[0] 
+    @staticmethod
+    @jit
+    def change_position(state, i_s, j_s, kernel, f_tag):
         v_ji = state["v"][j_s] - state["v"][i_s]
         rho_ij = (state["rho"][i_s] + state["rho"][j_s]) / 2
-        sum0 = (state["mass"][j_s]*kernel/rho_ij)[:, None] * v_ji
+        sum0 = (state["mass"][j_s] * kernel / rho_ij)[:, None] * v_ji
         sum0 = 0.5 * ops.segment_sum(sum0, i_s, len(state["position"]))
-        result = (state["v"] + sum0)[f_tag]        
+        result = (state["v"] + sum0)[f_tag]
         return result
 
     def create_animation(self, state_history, output_file='animation.gif'):
@@ -488,4 +507,3 @@ def TimeLine(model, shift_fn):
         return state, neighbors
 
     return advance
-

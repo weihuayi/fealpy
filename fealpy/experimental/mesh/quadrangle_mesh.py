@@ -13,7 +13,7 @@ class QuadrangleMesh(TensorMesh):
         """
         """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
-        kwargs = {'dtype': cell.dtype}
+        kwargs = bm.context(cell)
         self.node = node
         self.cell = cell
         self.localEdge = bm.tensor([(0, 1), (1, 2), (2, 3), (3, 0)], **kwargs)
@@ -231,11 +231,10 @@ class QuadrangleMesh(TensorMesh):
         NE = self.number_of_edges()
         NC = self.number_of_cells()
 
+        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
+        c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
+        e2p = self.edge_to_ipoint(p)
         if bm.backend_name in ["numpy", "pytorch"]:
-            cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
-            c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
-
-            e2p = self.edge_to_ipoint(p)
             flag = edge2cell[:, 2] == 0
             c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
             flag = edge2cell[:, 2] == 1
@@ -257,7 +256,34 @@ class QuadrangleMesh(TensorMesh):
 
             c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
         elif bm.backend_name == "jax":
-            raise NotImplementedError
+            flag = edge2cell[:, 2] == 0
+            # c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+            c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
+            flag = edge2cell[:, 2] == 1
+            # c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+            c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
+            flag = edge2cell[:, 2] == 2
+            # c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+            c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
+            flag = edge2cell[:, 2] == 3
+            # c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+            c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
+
+            iflag = edge2cell[:, 0] != edge2cell[:, 1]
+            flag = iflag & (edge2cell[:, 3] == 0)
+            # c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+            c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
+            flag = iflag & (edge2cell[:, 3] == 1)
+            # c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+            c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
+            flag = iflag & (edge2cell[:, 3] == 2)
+            # c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+            c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
+            flag = iflag & (edge2cell[:, 3] == 3)
+            # c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+            c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
+
+            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
         else:
             raise ValueError("Unsupported backend")
         return cell2ipoint[index]
@@ -449,7 +475,7 @@ class QuadrangleMesh(TensorMesh):
                 bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
                 isDelCell = threshold(bc)
                 cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool_)
+                isValidNode = bm.zeros(NN, dtype=bm.bool)
                 isValidNode[cell] = True
                 node = node[isValidNode]
                 idxMap = bm.zeros(NN, dtype=cell.dtype)
@@ -459,7 +485,7 @@ class QuadrangleMesh(TensorMesh):
                 bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
                 isDelCell = threshold(bc)
                 cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool_)
+                isValidNode = bm.zeros(NN, dtype=bm.bool)
                 isValidNode = isValidNode.at[cell].set(True)
                 node = node[isValidNode]
                 idxMap = bm.zeros(NN, dtype=cell.dtype)
@@ -542,13 +568,13 @@ class QuadrangleMesh(TensorMesh):
 
         NN = len(node)
         if bm.backend_name in ["numpy", "pytorch"]:
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
             idxMap[isValidNode] = range(isValidNode.sum())
         elif bm.backend_name == "jax":
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode.at[cell].set(True)
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)

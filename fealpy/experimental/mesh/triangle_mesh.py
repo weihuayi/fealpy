@@ -211,7 +211,13 @@ class TriangleMesh(SimplexMesh):
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
-
+    def cell_to_edge_sign(self):
+        NC = self.number_of_cells()
+        NEC = self.number_of_edges_of_cells()
+        edge2cell = self.face_to_cell() #TODO：ds没有edge_to_cell
+        cell2edgeSign = bm.zeros((NC, NEC), dtype=bm.bool)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]]=True
+        return cell2edgeSign
     def prolongation_matrix(self, po: int, p1: int):
         """
         @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1

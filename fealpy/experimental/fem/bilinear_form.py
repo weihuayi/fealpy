@@ -96,16 +96,26 @@ class BilinearForm(Form):
 
     def __matmul__(self, u: TensorLike):
         """
+
+        TODO:
+            1. for batch cases
         """
-        m, n = self.shape
+        space = self._spaces
+        n = space[0].number_of_global_dofs()
+        m = space[1].number_of_global_dofs() if (len(space) > 1) else n 
         if self._M is not None:
             return self._M @ u 
         kargs = bm.context(u)
-        v = bm.zeros_like(u, **kargs) 
+        v = bm.zeros(m, **kargs) 
         for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
+            group_tensor, e2dofs = self._assembly_group(group, True)
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
             local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
             gu = u[..., ue2dof] 
-            gv = bm.einsum('...ij, ...j->...i', group_tensor, gu) 
+            # group_tensor.shape == (..., NC, vldof, uldof)
+            # gu.shape == (..., NC, uldof) 
+            # gv.shape == (..., NC, vlodf)
+            gv = bm.einsum('cij, cj->ci', group_tensor, gu) 
+            v = bm.scatter_add(v, ve2dof.reshape(-1), gv.reshape(-1))
+        return v

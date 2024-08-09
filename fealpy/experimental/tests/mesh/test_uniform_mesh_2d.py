@@ -143,6 +143,28 @@ class TestUniformMesh2dInterfaces:
         np.testing.assert_almost_equal(ipoints_p1, ipoints_p1_true, decimal=7)
         np.testing.assert_almost_equal(ipoints_p2, ipoints_p2_true, decimal=7)
 
+    
+    @pytest.mark.parametrize("meshdata", entity_to_ipoints_data)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_entity_to_ipoints(self, meshdata, backend):
+        bm.set_backend(backend)
+
+        extent = meshdata['extent']
+        h = meshdata['h']
+        origin = meshdata['origin']
+        mesh = UniformMesh2d(extent, h, origin)
+
+        cell2ipoints_p1 = mesh.cell_to_ipoint(p=1)
+        ture_shape = (mesh.number_of_cells(), mesh.number_of_local_ipoints(p=1))
+        assert cell2ipoints_p1.shape == ture_shape, \
+        f"Expected shape {ture_shape}, but got {cell2ipoints_p1.shape}"
+
+        cell2ipoints_p2 = mesh.cell_to_ipoint(p=2)
+        ture_shape = (mesh.number_of_cells(), mesh.number_of_local_ipoints(p=2))
+        assert cell2ipoints_p2.shape == ture_shape, \
+        f"Expected shape {ture_shape}, but got {cell2ipoints_p2.shape}"
+
+
     @pytest.mark.parametrize("meshdata", quadrature_formula_data)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
     def test_quadrature_formula(self, meshdata, backend):
