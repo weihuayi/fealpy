@@ -108,4 +108,4 @@ class TensorFunctionSpace(FunctionSpace):
             is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,)*self.dof_ndim)
             is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
 
-        return is_bd_dof
+        return is_bd_dof.reshape(-1)
