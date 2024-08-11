@@ -20,7 +20,6 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh: _MT, p: int=1, ctype='C'):
         self.mesh = mesh
         self.p = p
-        self.doforder = 'sdofs'
 
         assert ctype in {'C', 'D'}
         self.ctype = ctype # 空间连续性类型
@@ -348,23 +347,6 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         return isDDof
 
     set_dirichlet_bc = boundary_interpolate
-
-    def L2error(self, u: Callable, uh: TensorLike) -> Number:
-        """
-        @brief Compute the L2 error of the finite element solution `uh` and the
-               exact solution `u`.
-        """
-        qf = self.mesh.quadrature_formula(self.p+1, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        points = self.mesh.bc_to_point(bcs) # (NQ, NC, GD)
-        uval = u(points)                     # (NQ, NC) 
-        uhval = self.value(uh, bcs)          # (NC, NQ)
-        cm = self.mesh.entity_measure('cell')
-        error = bm.einsum('q, cq, c->', ws, (uval - uhval)**2, cm)
-        return bm.sqrt(error)
-
-
 
 
 
