@@ -440,7 +440,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     
 
     # 插值点
-    def interpolation_points(self, p: int) -> TensorLike:
+    def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
         '''
         @brief Generate all interpolation points of the mesh
 

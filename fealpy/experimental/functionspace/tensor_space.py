@@ -91,6 +91,36 @@ class TensorFunctionSpace(FunctionSpace):
             self.dof_priority
         )
 
+    def interpolation_points(self) -> TensorLike:
+        scalar_gdof = self.scalar_space.number_of_global_dofs()
+        scalar_ips = self.scalar_space.interpolation_points()
+
+        # Based on the priority of degrees of freedom, choose different processing methods
+        if self.dof_priority:
+            # Component priority
+            # Reshape the shape of the scalar interpolation points to obtain an array of shape (dof_ndim, scalar_dof, dim), 
+                # in order to copy the interpolation points for each degree of freedom component
+            ips = bm.reshape(scalar_ips, (-1,)*self.dof_ndim + (scalar_gdof, scalar_ips.shape[-1]))
+            # Broadcast the interpolation points to the shape of the vector space, 
+                # resulting in an array of shape (dof_shape, scalar_gdof, dim)
+            ips = bm.broadcast_to(ips, self.dof_shape + (scalar_gdof, scalar_ips.shape[-1]))
+
+        else:
+            # Node priority
+            # Reshape the shape of the scalar interpolation points to obtain an array of shape (scalar_dof, dof_ndim, dim), 
+                # in order to copy the interpolation points for each degree of freedom component
+            ips = bm.reshape(scalar_ips, (scalar_gdof,) + (-1,)*self.dof_ndim + (scalar_ips.shape[-1],))
+            # Broadcast the interpolation points to the shape of the vector space,
+                # resulting in an array of shape (scalar_gdof, dof_shape, dim)
+            ips = bm.broadcast_to(ips, (scalar_gdof,) + self.dof_shape + (scalar_ips.shape[-1],))
+
+
+        # Reshape the shape to make the degree of freedom order flat (total_dofs, dim)
+        ips = bm.reshape(ips, (-1, scalar_ips.shape[-1]))
+
+        return ips
+
+
     def is_boundary_dof(self, threshold=None) -> TensorLike:
         """Return bools indicating boundary dofs.
 
