@@ -19,7 +19,7 @@ from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.sparse.linalg import sparse_cg
-from fealpy.pde.poisson_2d import CosCosData 
+from fealpy.experimental.pde.poisson_2d import CosCosData 
 from fealpy.utils import timer
 
 ## 参数解析
