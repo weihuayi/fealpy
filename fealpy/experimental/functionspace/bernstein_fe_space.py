@@ -57,7 +57,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
 
     @barycentric
-    def basis(self, bcs: TensorLike, variable = 'x', index: Index=_S, p = None):
+    def basis(self, bcs: TensorLike, index: Index=_S, p = None):
         """
         compute the basis function values at barycentric point bc
 
@@ -237,10 +237,12 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
     @barycentric
     def value(self, uh: TensorLike, bcs: TensorLike, index: Index=_S) -> TensorLike:
+        """
+        """
         phi = self.basis(bcs, index=index)
         TD = bcs.shape[-1] - 1
         e2d = self.dof.entity_to_dof(etype=TD, index=index)
-        val = bm.einsum('cql, cl -> cq', phi, uh[e2d])
+        val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., e2d])
         return val
 
     @barycentric
@@ -250,7 +252,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         """
         gphi = self.grad_basis(bcs, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('cqlm, cl->cqm', gphi, uh[cell2dof])
+        val = bm.einsum('cqlm, ...cl->...cqm', gphi, uh[..., cell2dof])
         return val
     
     @barycentric
