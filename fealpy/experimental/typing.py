@@ -19,8 +19,4 @@ CoefLike = Union[Number, TensorLike, Callable[..., TensorLike]]
 ### Constants
 
 _S = slice(None)
-
-
-class Size(Tuple[int, ...]):
-    def numel(self) -> int:
-        return prod(self)
+Size = Tuple[int, ...]

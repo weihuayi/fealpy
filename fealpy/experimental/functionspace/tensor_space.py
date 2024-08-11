@@ -1,5 +1,6 @@
 
 from typing import Tuple
+from math import prod
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Size, _S
@@ -24,10 +25,10 @@ class TensorFunctionSpace(FunctionSpace):
             raise ValueError('shape must be a tuple of at least two element')
 
         if shape[0] == -1:
-            self.dof_shape = Size(shape[1:])
+            self.dof_shape = tuple(shape[1:])
             self.dof_priority = False
         elif shape[-1] == -1:
-            self.dof_shape = Size(shape[:-1])
+            self.dof_shape = tuple(shape[:-1])
             self.dof_priority = True
         else:
             raise ValueError('`-1` is required as the first or last element')
@@ -45,7 +46,7 @@ class TensorFunctionSpace(FunctionSpace):
 
     @property
     def dof_numel(self) -> int:
-        return self.dof_shape.numel()
+        return prod(self.dof_shape)
 
     @property
     def dof_ndim(self) -> int:

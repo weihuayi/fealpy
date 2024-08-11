@@ -105,9 +105,9 @@ FUNCTION_MAPPING = _make_default_mapping(
     'empty', 'zeros', 'ones', 'full', 
     'empty_like', 'zeros_like', 'ones_like', 'full_like',
     'eye', 'meshgrid',
-    'tril', 'tiu',
+    'tril', 'triu',
 
-    # non-standard 
+    # non-standard
     'tensor',
 
     ### Data Type Functions ###
@@ -154,7 +154,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     'matmul', 'matrix_transpose', 'tensordot',
     'vecdot',
     # non-standard
-    'cross', 'cumsum', 'cumprod',    
+    'cross', 'cumsum', 'cumprod',
     'dot', 'einsum',
 
     ### Manipulation Functions ###
@@ -191,7 +191,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     ### Statistical Functions ###
     # python array API standard v2023.12
     'cumulative_sum',
-    'max', 'mean', 'min', 
+    'max', 'mean', 'min',
     'prod', 
     'std', 'sum',
     'var',
@@ -200,10 +200,10 @@ FUNCTION_MAPPING = _make_default_mapping(
 
     ### Utility Functions ###
     # python array API standard v2023.12
-    'all', 'any', 
+    'all', 'any',
     # non-standard
     'allclose',
-    'copy', 
+    'copy',
     'size',
 
     ### Functional programming ###
