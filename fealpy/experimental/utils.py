@@ -51,6 +51,18 @@ def is_tensor(input: Union[int, float, TensorLike]) -> bool:
     return False
 
 
+def fill_axis(input: TensorLike, ndim: int):
+    diff = ndim - input.ndim
+
+    if diff > 0:
+        return bm.reshape(input, input.shape + (1, ) * diff)
+    elif diff == 0:
+        return input
+    else:
+        raise RuntimeError(f"The dimension of the input should be smaller than {ndim}, "
+                           f"but got shape {tuple(input.shape)}.")
+
+
 def get_coef_subscripts(shape: TensorLike, nq: int, nc: int, batched: bool):
     if batched:
         coef_shape = shape[1:]
