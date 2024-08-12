@@ -1232,6 +1232,67 @@ class TriangleMesh(Mesh, Plotable):
         self.node = newnode
         NN = newnode.shape[0]
         self.ds.reinit(NN,newcell)
+    
+    def degree_edgeswap(self):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        edge = self.entity('edge')
+         
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+       
+        isBdNode = self.ds.boundary_node_flag()
+        isFreeNode = ~isBdNode
+
+        node2node = self.ds.node_to_node()
+        node2cell = self.ds.node_to_cell()
+        edge2cell = self.ds.edge_to_cell()
+
+        degree = np.array(np.sum(node2cell > 0, axis=1)).reshape(-1)
+        edge_degree = degree[edge]
+        #swapflag = (edge_degree[:,0]==7) & (edge_degree[:,1]==7)
+        # 找到两个端点的度都为7的边
+        markedge = (edge_degree[:,0]==7) & (edge_degree[:,1]==7) 
+        markcell_index = edge2cell[markedge][:,:2]# 边所在的两个单元
+        
+        markcell = cell[markcell_index]
+        markcell_degree = degree[markcell]# 单元节点的度
+        # 计算两个单元节点度的和
+        markcell_degreesum = np.sum(np.sum(markcell_degree,axis=1),axis=1)
+        
+        # 两个单元节点度的和为38(四个节点度为7,7,5,5)或39(四个节点度为7,7,5,6)的单元
+        swapcellflag = (markcell_degreesum==38) | (markcell_degreesum==39)
+        swapcell = markcell[swapcellflag]# 交换边的单元
+        swapedge = edge[markedge]
+        swapedge = swapedge[swapcellflag]#要交换的边
+        swapcelldegree = markcell_degree[swapcellflag]
+        swapcelldegreeflag = np.ones_like(swapcelldegree,dtype=np.bool_)
+        swapcelldegreeflag[swapcelldegree==7] = False
+        swapnode = swapcell[swapcelldegreeflag].reshape(-1,2)# 新边的节点
+        
+        # 删除单元 
+        maskcell = np.ones(NC,dtype=np.bool_)
+        deletecell = markcell_index[swapcellflag].reshape(-1)
+        maskcell[deletecell] = False
+        newcell0 = cell[maskcell]
+
+        newcell1 = np.zeros((len(swapnode),3),dtype=np.int_)
+        newcell2 = np.zeros((len(swapnode),3),dtype=np.int_)
+
+        newcell1[:,:2] = swapnode
+        newcell2[:,:2] = swapnode
+        newcell1[:,2] = swapedge[:,0]
+        newcell2[:,2] = swapedge[:,1]
+        
+        # 调整单元节点编号顺序
+        newcell = np.r_[newcell1,newcell2]
+        v1 = node[newcell[:,1]]-node[newcell[:,0]]
+        v2 = node[newcell[:,2]]-node[newcell[:,0]]
+        flag = np.cross(v1,v2)
+        newcell[flag<0,0],newcell[flag<0,1] = newcell[flag<0,1],newcell[flag<0,0]
+
+        newcell = np.r_[newcell0,newcell]# 新的单元
+        self.ds.reinit(NN,newcell)
 
     @staticmethod
     def adaptive_options(
@@ -2051,7 +2112,7 @@ class TriangleMesh(Mesh, Plotable):
         data = meshio.read(file)
         node = data.points
         cell = data.cells_dict['triangle']
-        print(data.cells_dict)
+        #print(data.cells_dict)
         mesh = cls(node, cell)
         if show:
             import matplotlib.pyplot as plt
