@@ -83,7 +83,7 @@ class CuPyBackend(Backend[NDArray], backend_name='cupy'):
         return (raw[:, 1:] - raw[:, :-1])
 
     @staticmethod
-    def edge_length(edge: NDArray, node: NDArray, *) -> NDArray:
+    def edge_length(edge: NDArray, node: NDArray) -> NDArray:
         """
         """
         points = node[edge, :]
@@ -217,7 +217,7 @@ class CuPyBackend(Backend[NDArray], backend_name='cupy'):
         """
         """
         points = node[line, :]
-        v = node[line[:, 1]] = node[line[:, 0]]
+        v = points[..., 1, :] - points[..., 0, :]
         v /= cp.sum(v**2, axis=-1, keepdims=True)
         return cp.stack([-v, v], axis=-2)
 
