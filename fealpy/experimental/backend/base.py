@@ -13,13 +13,15 @@ Size = Tuple[int, ...]
 
 class TensorLike(metaclass=ABCMeta):
     @property
-    def shape(self) -> Tuple[int, ...]: raise NotImplementedError
-    @property
     def dtype(self) -> Any: raise NotImplementedError
     @property
     def device(self) -> Any: raise NotImplementedError
     @property
+    def mT(self) -> 'TensorLike': raise NotImplementedError
+    @property
     def ndim(self) -> int: raise NotImplementedError
+    @property
+    def shape(self) -> Tuple[int, ...]: raise NotImplementedError
     @property
     def size(self) -> int: raise NotImplementedError
     @property
