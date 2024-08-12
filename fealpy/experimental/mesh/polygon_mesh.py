@@ -5,9 +5,10 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 
 from .mesh_base import SimplexMesh, estr2dim
+from .plot import Plotable
 
 
-class PolygonMesh(Mesh):
+class PolygonMesh(Mesh, Plotable):
     def __init__(self, node: TensorLike, 
                  cell: Sequence[TensorLike, Optional[TensorLike]]) -> None:
         """
@@ -73,3 +74,6 @@ class PolygonMesh(Mesh):
         self.edge2cell[:, 2] = localIdx[i0]
         self.edge2cell[:, 3] = localIdx[i1]
         self.cell2edge = j
+
+
+PolygonMesh.set_ploter('polygon2d')

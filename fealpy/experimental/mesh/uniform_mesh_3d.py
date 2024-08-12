@@ -8,8 +8,10 @@ from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
+from .plot import Plotable
 
-class UniformMesh3d(StructuredMesh, TensorMesh):
+
+class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured hexahedral mesh
 
@@ -621,4 +623,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
                     self.nx * (self.ny + 1) * self.nz + \
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
-        self.clear() 
+        self.clear()
+
+
+UniformMesh3d.set_ploter('3d')

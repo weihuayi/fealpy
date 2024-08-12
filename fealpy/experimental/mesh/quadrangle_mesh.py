@@ -6,9 +6,10 @@ from .. import logger
 from .utils import estr2dim
 
 from .mesh_base import TensorMesh
+from .plot import Plotable
 
 
-class QuadrangleMesh(TensorMesh):
+class QuadrangleMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
         """
         """
@@ -673,3 +674,6 @@ class QuadrangleMesh(TensorMesh):
         @return: None 或网格列表
         """
         raise NotImplementedError
+
+
+QuadrangleMesh.set_ploter('2d')

@@ -1,8 +1,10 @@
 from ..backend import backend_manager as bm
 from .mesh_base import TensorMesh
 from ..typing import TensorLike, Index, _S
+from .plot import Plotable
 
-class HexahedronMesh(TensorMesh):
+
+class HexahedronMesh(TensorMeshi, Plotable):
     def __init__(self, node, cell):
         super(HexahedronMesh, self).__init__(TD=3, itype = cell.dtype, ftype = node.dtype)
         self.node = node
@@ -633,8 +635,4 @@ class HexahedronMesh(TensorMesh):
 
 
 
-
-
-
-
-
+HexahedronMesh.set_ploter('3d')
