@@ -188,6 +188,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         else:
             return J, gphi
 
+    def uniform_refine(self, n=1):
+        pass
+    
     # fundamental form
     def first_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
             index: Index=_S, return_jacobi=False, return_grad=False):
@@ -249,7 +252,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         node = self.entity('node')
         GD = self.geo_dimension()
         if GD == 2:
-            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+            node = np.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
 
         #cell = self.entity(etype)[index]
         cell = self.entity(etype, index)
@@ -257,7 +260,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         idx = vtk_cell_index(self.p, cellType)
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]), axis=1)
         cell[:, 0] = NV
 
         NC = len(cell)

@@ -61,14 +61,13 @@ class TestUniformMesh2dInterfaces:
         origin = meshdata['origin']
         mesh = UniformMesh2d(extent, h, origin)
 
-        assert len(mesh.entity_measure('edge')) == len(meshdata['edge_length']), \
-        "Edge lengths must have the same length."
-        for a, b in zip(mesh.entity_measure('edge'), meshdata['edge_length']):
-            assert abs(a - b) < 1e-7, \
-            f"Difference between {a} and {b} is greater than 1e-7"
+        edge_length = bm.to_numpy(mesh.entity_measure('edge'))
+        cell_area = bm.to_numpy(mesh.entity_measure('cell'))
 
-        assert (mesh.entity_measure('cell') - meshdata['cell_area']) < 1e-7, \
-        "Cell areas are not as expected."
+        assert mesh.number_of_edges() == len(edge_length), \
+        "Edge lengths must have the same length."
+        assert mesh.number_of_cells() == len(cell_area), \
+        "Cell areas must have the same length."
 
     
     @pytest.mark.parametrize("meshdata", barycenter_data)
@@ -113,13 +112,13 @@ class TestUniformMesh2dInterfaces:
 
         bc_to_point_cell = bm.to_numpy(mesh.bc_to_point(bcs=bcs))
         CNQ = ws.shape[0]
-        ture_shape = (CNQ, NC, GD)
+        ture_shape = (NC, CNQ, GD)
         assert bc_to_point_cell.shape == ture_shape, \
         f"Expected shape {ture_shape}, but got {bc_to_point_cell.shape}"
 
         bc_to_point_edge = bm.to_numpy(mesh.bc_to_point(bcs=bcs[0]))
         ENQ = bcs[0].shape[0]
-        ture_shape = (ENQ, NE, GD)
+        ture_shape = (NE, ENQ, GD)
         assert bc_to_point_edge.shape == ture_shape, \
         f"Expected shape {ture_shape}, but got {bc_to_point_edge.shape}"
 

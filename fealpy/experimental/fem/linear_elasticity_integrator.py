@@ -126,12 +126,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         D = self.elasticity_matrix(space)
         B = self.strain_matrix(space)
 
-        if is_scalar(cm):
-            NC = mesh.number_of_cells()
-            cm = bm.ones(NC, dtype=bm.float64)
-
-        if coef is None:
-            KK = bm.einsum('q, c, qcki, kl, qclj -> cij', ws, cm, B, D, B)
+        KK = bm.einsum('q, c, qcki, kl, qclj -> cij', ws, cm, B, D, B)
         
         return KK
 

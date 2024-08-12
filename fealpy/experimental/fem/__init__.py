@@ -9,6 +9,7 @@ from .linear_elasticity_integrator import LinearElasticityIntegrator
 
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
+from .vector_source_integrator import VectorSourceIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC

@@ -7,20 +7,23 @@
 	@bref 
 	@ref 
 '''  
+import ipdb
 import argparse
 from matplotlib import pyplot as plt
 
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
+
+from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.mesh import QuadrangleMesh
 from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.sparse.linalg import sparse_cg
-from fealpy.pde.poisson_2d import CosCosData 
+
+from fealpy.experimental.pde.poisson_2d import CosCosData 
 from fealpy.utils import timer
 
 
@@ -41,7 +44,7 @@ parser.add_argument('--n',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=2, type=int,
+        default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
@@ -80,6 +83,9 @@ for i in range(maxit):
     space= LagrangeFESpace(mesh, p=p)
     tmr.send(f'第{i}次空间时间') 
 
+    ipdb.set_trace()
+    uh = space.function() # 建立一个有限元函数
+
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator())
     lform = LinearForm(space)
@@ -93,17 +99,16 @@ for i in range(maxit):
     A, F = DirichletBC(space, gd = pde.solution).apply(A, F)
     tmr.send(f'第{i}次边界处理时间') 
 
-    uh = sparse_cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh[:] = sparse_cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间') 
     
-    value = space.value(uh, bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64))
-    real = space.interpolate(pde.solution) 
-    errorMatrix[0, i] = bm.max(bm.abs(uh-real))
+    errorMatrix[0, i] = mesh.error(pde.solution, uh)
     
     if i < maxit-1:
         mesh.uniform_refine(n=1)
     tmr.send(f'第{i}次误差计算及网格加密时间') 
 next(tmr)
 print("最终误差",errorMatrix)
+print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 
 
