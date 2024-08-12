@@ -215,7 +215,7 @@ class COOTensor(SparseTensor):
         if isinstance(other, COOTensor):
             check_shape_match(self.shape, other.shape)
             check_spshape_match(self.sparse_shape, other.sparse_shape)
-            new_indices = bm.cat((self._indices, other._indices), dim=1)
+            new_indices = bm.concat((self._indices, other._indices), axis=1)
             if self._values is None:
                 if other._values is None:
                     new_values = None
@@ -224,7 +224,7 @@ class COOTensor(SparseTensor):
             else:
                 if other._values is None:
                     raise ValueError("self has value while other does not")
-                new_values = bm.cat((self._values, other._values*alpha), dim=-1)
+                new_values = bm.concat((self._values, other._values*alpha), axis=-1)
             return COOTensor(new_indices, new_values, self.sparse_shape)
 
         elif isinstance(other, TensorLike):

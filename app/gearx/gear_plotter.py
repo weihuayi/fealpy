@@ -1,6 +1,7 @@
 import numpy as np
 from fealpy.experimental.backend import backend_manager as bm
 import matplotlib.pyplot as plt
+import json
 
 # 定义渐开线的函数，增加旋转方向的控制参数 direction
 def involute_curve(phi, r_b, theta_offset, direction=1):
@@ -11,33 +12,37 @@ def involute_curve(phi, r_b, theta_offset, direction=1):
 def inv(alpha):
     return bm.tan(alpha)-alpha
 
-# 参数
-x = 0  # 变位系数
-m = 5  # 模数
-z = 22  # 齿数
-alpha = 20  # 压力角
-alpha = alpha/180*bm.pi
+# 参数读取
+with open('./external_gear_data.json', 'r') as file:
+    data = json.load(file)
+center = data['center'][:-1]  # 中心坐标（只读取二维）
+x = data['x']  # 变位系数
+m = data['m']  # 模数
+z = data['z']  # 齿数
+alpha = data['alpha']/180*bm.pi  # 压力角
+haa = data['haa']  # 齿顶高系数
+cc = data['cc']  # 顶隙系数
 
-r_p = m*z  # 分度圆半径
+r_p = m*z/2  # 分度圆半径
 r_b = r_p*bm.cos(alpha)  # 基圆半径
-r_a = r_p + m  # 齿顶圆半径
-r_f = r_p - 1.25*m  # 齿根圆半径
+r_a = r_p + haa*m  # 齿顶圆半径
+r_f = r_p - (haa+cc)*m  # 齿根圆半径
 
 # 齿厚计算公式 1
 # 分度圆齿厚
 s = 0.5*m*bm.pi+2*m*x*bm.tan(alpha)
 # 基圆齿厚
-s_b = bm.cos(s+2*m*x*bm.tan(alpha)+m*z*inv(alpha))
+s_b = r_b/r_p*(s+2*m*x*bm.tan(alpha))+2*r_b*(inv(alpha))
 
 # 齿厚计算公式 2
 # 分度圆齿厚
-s = 0.5*m*bm.pi+2*x*bm.tan(alpha)
+# s = 0.5*m*bm.pi+2*x*bm.tan(alpha)
 # 基圆齿厚
-s_b = bm.cos(s+2*m*x*bm.tan(alpha)+m*z*inv(alpha))
+# s_b = bm.cos(s+2*m*x*bm.tan(alpha)+m*z*inv(alpha))
 
 phi_range = bm.linspace(0, bm.pi/4, 100)  # 参数范围
-theta_offsets = bm.linspace(0, 2*bm.pi, z)  # 四条渐开线的起始角度
-delta_theta = s_b/np.pi/2
+theta_offsets = bm.linspace(0, 2*bm.pi, z)  # 渐开线的起始角度
+delta_theta = s_b/r_b/2
 
 # 选择旋转方向: 1 为逆时针，-1 为顺时针
 direction = -1  # 修改为 -1 可以得到顺时针旋转的渐开线

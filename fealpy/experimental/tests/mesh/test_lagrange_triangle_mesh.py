@@ -41,8 +41,6 @@ class TestLagrangeTriangleMeshInterfaces:
         mesh = TriangleMesh.from_unit_sphere_surface()
 
         lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p, surface=surface)
-        fname = f"test.vtu"
-        lmesh.to_vtk(fname=fname)
 
         assert lmesh.number_of_nodes() == data["NN"] 
         assert lmesh.number_of_edges() == data["NE"] 
@@ -51,6 +49,24 @@ class TestLagrangeTriangleMeshInterfaces:
         
         cell = lmesh.entity('cell')
         np.testing.assert_allclose(bm.to_numpy(cell), data["cell"], atol=1e-14)   
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_surface_mesh(self, backend):
+        bm.set_backend(backend)
+
+        surface = SphereSurface()
+        mesh = TriangleMesh.from_unit_sphere_surface()
+
+        lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=3, surface=surface)
+        fname = f"sphere_test.vtu"
+        lmesh.to_vtk(fname=fname)
+        
+        ellsurface = EllipsoidSurface()
+        ellmesh = TriangleMesh.from_ellipsoid(radius=[5,5,3])
+
+        elmesh = LagrangeTriangleMesh.from_triangle_mesh(ellmesh, p=3, surface=ellsurface)
+        fname = f"elip_test.vtu"
+        elmesh.to_vtk(fname=fname)
 
     @pytest.mark.parametrize("backend", ['numpy'])
     @pytest.mark.parametrize("data", cell_area_data)
@@ -80,7 +96,7 @@ class TestLagrangeTriangleMeshInterfaces:
         print("unit_sphere:", em_ratio)
 
         ellsurface = EllipsoidSurface() #a=3,b=np.sqrt(3),c=1的椭球
-        ellmesh = TriangleMesh.from_ellipsoid_surface()
+        ellmesh = TriangleMesh.from_ellipsoid()
 
         # 计算收敛阶
         maxit1 = 4
@@ -111,8 +127,8 @@ class TestLagrangeTriangleMeshInterfaces:
         lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=3, surface=surface)
         el = lmesh.edge_length()
         
-        ellsurface = EllipsoidSurface() #a=3,b=np.sqrt(3),c=1
-        ellmesh = TriangleMesh.from_ellipsoid_surface()
+        ellsurface = EllipsoidSurface() #a=9,b=3,c=1
+        ellmesh = TriangleMesh.from_ellipsoid()
         lmesh1 = LagrangeTriangleMesh.from_triangle_mesh(ellmesh, p=3, surface=ellsurface)
         el1 = lmesh1.edge_length()
        
@@ -122,8 +138,9 @@ class TestLagrangeTriangleMeshInterfaces:
 if __name__ == "__main__":
     a = TestLagrangeTriangleMeshInterfaces()
     #a.test_init_mesh(init_data[0], 'numpy')
-    a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
-    a.test_cell_area(cell_area_data[0], 'numpy')
+    #a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
+    a.test_surface_mesh('numpy')
+    #a.test_cell_area(cell_area_data[0], 'numpy')
     #a.test_edge_length(edge_length_data[0], 'numpy')
     #a.test_(cell_[0], 'numpy')
     #pytest.main(["./test_lagrange_triangle_mesh.py"])
