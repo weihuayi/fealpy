@@ -98,38 +98,116 @@ ATTRIBUTE_MAPPING = _make_default_mapping(
 FUNCTION_MAPPING = _make_default_mapping(
 
     ### Creation Functions ###
-    'array', 'tensor', 
+    # python array API standard v2023.12
+    'array',  
     'asarray',
     'arange', 'linspace',
     'empty', 'zeros', 'ones', 'full', 
     'empty_like', 'zeros_like', 'ones_like', 'full_like',
     'eye', 'meshgrid',
-    'tril', 'tiu',
+    'tril', 'triu',
 
-    ### Mathematical functions ###
+    # non-standard
+    'tensor',
 
-    # Reductions
-    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax', 'allclose',
+    ### Data Type Functions ###
+    # python array API standard v2023.12
+    'astype', 'can_cast',
+    'finfo', 'iinfo',
+    'isdtype', 'result_type', 
 
-    'abs', 'sign', 'sqrt', 'square', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    ### Element-wise Functions ###
+    # python array API standard v2023.12
+    'abs', 'acos', 'acosh', 'add', 'asin', 'asinh', 'atan', 'atan2', 'atanh',
+    'bitwise_and', 'bitwise_left_shift', 'bitwise_invert', 'bitwise_or',
+    'bitwise_right_shift', 'bitwise_xor',
+    'ceil', 'clip', 'conj', 'copysign', 'cos', 'cosh',
+    'divide',
+    'equal', 'exp', 'expm1',
+    'floor', 'floor_divide',
+    'greater', 'greater_equal',
+    'hypot', 
+    'imag', 'isfinite', 'isinf', 'isnan',
+    'less', 'less_equal', 'log', 'log1p', 'log2', 'log10', 'logaddexp', 'logical_and',
+    'logical_not', 'logical_or', 'logical_xor',
+    'maximum', 'minimum', 'multiply',
+    'negative', 'not_equal',
+    'positive', 'pow',
+    'real', 'remainder', 'round',
+    'sign', 'signbit', 'sin', 'sinh', 'square', 'sqrt', 'subtract',
+    'tan', 'tanh', 'trunc',
+
+    # non-standard
     'arcsin', 'arccos', 'arctan', 'arctan2', 'arcsinh', 'arccosh', 'arctanh',
-    'sinh', 'cosh', 'tanh', 'clip', 'floor', 'ceil', 'round',
+    'power',
 
-    # Arithmetic operations
-    'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
+    ### Indexing Functions ###
+    # python array API standard v2023.12
+    'take',
 
-    ### Array manipulation routines ###
-    'copy', 'reshape', 'broadcast_to', 'unique', 'sort', 'argsort', 'nonzero',
-    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
-    'flip', 'where', 'tile', 'size',
+    ### Inspection ###
+    # python array API standard v2023.12
+    # non-standard
 
-    ### Linear algebra ###
-    'einsum',
+    ### Linear Algebra Functions ###
+    # python array API standard v2023.12
+    'matmul', 'matrix_transpose', 'tensordot',
+    'vecdot',
+    # non-standard
+    'cross', 'cumsum', 'cumprod',
+    'dot', 'einsum',
 
-    # Functional programming
-    'apply_along_axis',
+    ### Manipulation Functions ###
+    # python array API standard v2023.12
+    'broadcast_arrays', 'broadcast_to',
+    'concat',
+    'expand_dims',
+    'flip',
+    'moveaxis',
+    'permute_dims',
+    'repeat', 'reshape', 'roll',
+    'squeeze', 'stack',
+    'tile',
+    'unstack',
+    # non-standard
+    'concatenate', 'swapaxes', 'transpose',
 
+    ### Searching Functions ###
+    # python array API standard v2023.12
+    'argmax', 'argmin', 'nonzero', 'searchsorted', 'where',
+
+    ### Set Functions ###
+    # python array API standard v2023.12
+    'unique_all', 'unique_counts', 'unique_inverse', 'unique_values',
+
+    # non-standard
     'setdiff1d',
+    'unique',
+
+    ### Sorting Functions ###
+    # python array API standard v2023.12
+    'argsort', 'sort',
+
+    ### Statistical Functions ###
+    # python array API standard v2023.12
+    'cumulative_sum',
+    'max', 'mean', 'min',
+    'prod', 
+    'std', 'sum',
+    'var',
+    # non-standard
+
+
+    ### Utility Functions ###
+    # python array API standard v2023.12
+    'all', 'any',
+    # non-standard
+    'allclose',
+    'copy',
+    'size',
+
+    ### Functional programming ###
+    'apply_along_axis',
 )
 
 

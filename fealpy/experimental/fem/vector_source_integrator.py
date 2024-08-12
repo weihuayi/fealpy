@@ -1,16 +1,16 @@
-
 from typing import Optional
 from ..typing import TensorLike, Index, _S
+
 from ..backend import backend_manager as bm
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
+from ..utils import is_scalar, is_tensor, process_coef_func
 from ..functional import linear_integral
 from .integrator import CellSourceIntegrator, CoefLike, enable_cache
 
 
-class ScalarSourceIntegrator(CellSourceIntegrator):
+class VectorSourceIntegrator(CellSourceIntegrator):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
     def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
@@ -32,7 +32,7 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
+            raise RuntimeError("The VectorSourceIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -44,6 +44,24 @@ class ScalarSourceIntegrator(CellSourceIntegrator):
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:
+        # f = self.source
+        # mesh = getattr(space, 'mesh', None)
+        # bcs, ws, phi, cm, index = self.fetch(space)
+        # # val-(NC, NQ, GD)
+        # val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        # coef = val
+        # measure = cm
+        # weights = ws
+        # inputs = phi
+
+        # if coef is None:
+        #     return bm.einsum('c, q, cqid -> cid', measure, weights, inputs)
+
+        # if is_tensor(coef):
+        #     return bm.einsum('c, q, cqid, cqd -> ci', measure, weights, inputs, coef)
+        # else:
+        #     raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)

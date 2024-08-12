@@ -3,18 +3,19 @@ from typing import Generic, Union, TypeVar
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike, Number
-from ..typing import Index
+from ..typing import Index, _S
 
 _FS = TypeVar('_FS')
 
 
 class Function(Generic[_FS]):
-    def __init__(self, space: _FS, array: TensorLike) -> None:
+    def __init__(self, space: _FS, array: TensorLike, coordtype) -> None:
         self.space = space
         self.array = array
+        self.coordtype = coordtype
 
-    def __call__(self, bcs: TensorLike, index: Index):
-        return self.space.value(self.array, bcs, index)
+    def __call__(self, bcs: TensorLike, index: Index=_S):
+        return self.space.value(self.array, bcs, index=index)
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.space}, {self.array})'
@@ -24,7 +25,7 @@ class Function(Generic[_FS]):
 
     def __setitem__(self, index: Index, value: TensorLike):
         if bm.backend_name == 'jax':
-            self.array.at[index].set(value)
+            self.array = self.array.at[index].set(value)
         else:
             self.array[index] = value
 

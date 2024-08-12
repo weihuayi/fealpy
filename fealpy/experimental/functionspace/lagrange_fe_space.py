@@ -7,6 +7,7 @@ from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof
+from .function import Function
 from fealpy.decorator import barycentric, cartesian
 
 
@@ -113,8 +114,9 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     set_dirichlet_bc = boundary_interpolate
     
-    def basis(self, bc: TensorLike, index: Index=_S, variable='x'):
-        return self.mesh.shape_function(bc, self.p, index=index, variables=variable)
+    def basis(self, bc: TensorLike, index: Index=_S):
+        phi = self.mesh.shape_function(bc, self.p, index=index)
+        return phi[None, ...] # (NC, NQ, LDOF)
 
     def grad_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
         return self.mesh.grad_shape_function(bc, self.p, index=index, variables=variable)
@@ -126,13 +128,12 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
-        
+        """
+        """
         phi = self.basis(bc, index=index)
-        #TD = bc.shape[-1] - 1
-        #e2d = self.dof.entity_to_dof(etype=TD, index=index)
         e2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('cil, cl -> ci', phi, uh[..., e2dof])
-        return val[None, ...]
+        val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., e2dof])
+        return val
 
     
     @barycentric
@@ -144,5 +145,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         cell2dof = self.dof.cell_to_dof(index=index)
         val = bm.einsum('cilm, cl->cim', gphi, uh[cell2dof])
         return val[None, ...]
+
+
 
 

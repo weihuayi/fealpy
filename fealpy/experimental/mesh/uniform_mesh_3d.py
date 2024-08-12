@@ -326,6 +326,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> Union[Tuple, int]:
         """
         @brief Get the measure of the entities of the specified type.
+        TODO:按照 2D 的情况修改
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)

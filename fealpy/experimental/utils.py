@@ -51,6 +51,18 @@ def is_tensor(input: Union[int, float, TensorLike]) -> bool:
     return False
 
 
+def fill_axis(input: TensorLike, ndim: int):
+    diff = ndim - input.ndim
+
+    if diff > 0:
+        return bm.reshape(input, input.shape + (1, ) * diff)
+    elif diff == 0:
+        return input
+    else:
+        raise RuntimeError(f"The dimension of the input should be smaller than {ndim}, "
+                           f"but got shape {tuple(input.shape)}.")
+
+
 def get_coef_subscripts(shape: TensorLike, nq: int, nc: int, batched: bool):
     if batched:
         coef_shape = shape[1:]
@@ -63,7 +75,6 @@ def get_coef_subscripts(shape: TensorLike, nq: int, nc: int, batched: bool):
         else:
             raise RuntimeError(f"The shape of the coef should be (Batch, {nc}, {nq}), "
                                f"(Batch, {nq}) or (Batch, {nc}), but got {tuple(shape)}.")
-
     else:
         coef_shape = shape
         if coef_shape == (nc, nq):
@@ -76,6 +87,25 @@ def get_coef_subscripts(shape: TensorLike, nq: int, nc: int, batched: bool):
             raise RuntimeError(f"The shape of the coef should be ({nc}, {nq}), "
                                f"({nq}) or ({nc}), but got {tuple(shape)}.")
 
+    # else:
+    #     coef_shape = shape
+    #     dim = len(coef_shape)
+    #     if coef_shape == (nc, nq):
+    #         subs = "cq"
+    #     elif coef_shape == (nq, ):
+    #         subs = "q"
+    #     elif coef_shape == (nc, ):
+    #         subs = "c"
+    #     elif dim == 3 and coef_shape[:2] == (nc, nq):
+    #         subs = "cqd"
+    #     elif dim == 3 and coef_shape[0] == nq:
+    #         subs = "qd"
+    #     elif dim == 3 and coef_shape[0] == nc:
+    #         subs = "cd"
+    #     else:
+    #         raise RuntimeError(f"The shape of the coef should be ({nc}, {nq}), "
+    #                            f"({nq}) or ({nc}), but got {tuple(shape)}.")
+        
     return subs
 
 
