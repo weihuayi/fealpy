@@ -102,6 +102,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
+        self.edge2cell = self.edge_to_cell()
+        self.face2cell = self.edge2cell
+
 
     # 实体生成方法
     @entitymethod(0)
@@ -337,13 +340,16 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-
+        NC = self.number_of_cells()
         if etype == 0:
             return bm.tensor(0, dtype=self.ftype)
         elif etype == 1:
-            return self.h[0], self.h[1]
+            temp1 = bm.tensor([[self.h[0]], [self.h[1]]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1, (2, int(self.NE/2)))
+            return temp2.reshape(-1)
         elif etype == 2:
-            return self.h[0] * self.h[1]
+            temp = bm.tensor(self.h[0] * self.h[1], dtype=self.ftype)
+            return bm.broadcast_to(temp, (NC,))
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         
@@ -414,7 +420,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         to Cartesian coordinates on the actual mesh entities.
 
         Returns
-            TensorLike: (NQ, NC, GD) or (NQ, NE, GD)
+            TensorLike: (NC, NQ, GD) or (NE, NQ, GD)
         """
         node = self.entity('node')
         if isinstance(bcs, tuple):
@@ -424,17 +430,17 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             bcs0 = bcs[0].reshape(-1, 2)
             bcs1 = bcs[1].reshape(-1, 2)
             bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
-
-            p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
+            temp = node[cell[:]]
+            p = bm.einsum('qj, cjk -> cqk', bcs, node[cell[:]])
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('...j, ejk -> ...ek', bcs, node[edge]) 
+            p = bm.einsum('qj, ejk -> eqk', bcs, node[edge]) 
 
         return p    
     
 
     # 插值点
-    def interpolation_points(self, p: int) -> TensorLike:
+    def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
         '''
         @brief Generate all interpolation points of the mesh
 
@@ -531,7 +537,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         |         |         |
         0 ---9--- 3 ---12-- 6
         """
-
+        # TODO: Provide an efficient implementation that is distinct from unstructured meshes
         cell = self.entity('cell')
 
         if p == 1:
@@ -632,6 +638,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
         
+    face_to_ipoint = StructuredMesh.edge_to_ipoint
     
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
@@ -676,80 +683,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             return G
         else:
             raise NotImplementedError("Backend is not yet implemented.")
-       
-
-    # def shape_function(self, bcs: TensorLike, p: int=1, 
-    #                 mi: Optional[TensorLike]=None) -> TensorLike:
-    #     """
-    #     @brief Compute the shape function of a 2D structured mesh.
-
-    #     Returns:
-    #         TensorLike: Shape function with shape (NQ, ldof).
-    #     """
-    #     assert isinstance(bcs, tuple)
-
-    #     TD = bcs[0].shape[-1] - 1
-    #     if mi is None:
-    #         mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
-    #     phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
-    #     ldof = self.number_of_local_ipoints(p, etype=2)
-
-        return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
-    
-    # def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, index: Index=_S, 
-    #                     variables: str='x') -> TensorLike:
-    #     '''
-    #     @brief Calculate the gradient of shape functions on a 2D structured grid.
-
-    #     @note Compute the gradient of the shape functions with respect to the reference element variable u = (xi, eta)
-    #     or the actual variable x.
-
-    #     Returns:
-    #     gphi : TensorLike
-    #     The shape of gphi depends on the 'variables' parameter:
-    #     - If variables == 'u': gphi has shape (NQ, ldof, GD).
-    #     - If variables == 'x': gphi has shape (NQ, NCN, ldof, GD).
-    #     '''
-    #     assert isinstance(bcs, tuple)
-
-    #     Dlambda = bm.array([-1, 1], dtype=self.ftype)
-
-    #     phi0 = bm.simplex_shape_function(bcs[0], p=p)
-    #     R0 = bm.simplex_grad_shape_function(bcs[0], p=p)
-    #     gphi0 = bm.einsum('...ij, j -> ...i', R0, Dlambda)
-
-    #     phi1 = bm.simplex_shape_function(bcs[1], p=p)
-    #     R1 = bm.simplex_grad_shape_function(bcs[1], p=p)
-    #     gphi1 = bm.einsum('...ij, j -> ...i', R1, Dlambda)
-
-    #     n = phi0.shape[0] * phi1.shape[0]
-    #     ldof = self.number_of_local_ipoints(p, etype=2)
-
-    #     shape = (n, ldof, 2)
-    #     gphi = bm.zeros(shape, dtype=self.ftype)
-
-    #     # TODO: Provide a unified implementation that is not backend-specific
-    #     if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-    #         gphi[..., 0] = bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof)
-    #         gphi[..., 1] = bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof)
-    #     elif bm.backend_name == 'jax':
-    #         gphi = gphi.at[..., 0].set(bm.einsum('im, kn -> ikmn', gphi0, phi1).reshape(-1, ldof))
-    #         gphi = gphi.at[..., 1].set(bm.einsum('im, kn -> ikmn', phi0, gphi1).reshape(-1, ldof))
-    #     else:
-    #         raise NotImplementedError("Backend is not yet implemented.")
-
-    #     if variables == 'u':
-    #         return gphi
-    #     elif variables == 'x':
-    #         J = self.jacobi_matrix(bcs, index=index)
-    #         G = self.first_fundamental_form(J)
-    #         G = bm.linalg.inv(G)
-    #         gphi = bm.einsum('...ikm, ...imn, ...ln -> ...ilk', J, G, gphi)
-
-    #         return gphi
-        
-    
-    
+               
 
     # 其他方法
     def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):

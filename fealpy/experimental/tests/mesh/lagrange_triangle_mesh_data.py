@@ -162,14 +162,14 @@ from_triangle_mesh_data = [
                 }
 ]
 
-a = 3
-b = np.sqrt(3)
+a = 9
+b = 3
 c = 1
 p = 1.0675
 cell_area_data = [
         {
             "sphere_cm": 4*np.pi*(1**2),
-            "ellip_cm": 4*np.pi*((a**p*b**p+a**p*c**p+b**p*c**p)/3)**(1/p) # a=3,b=np.sqrt(3),c=1
+            "ellip_cm": 4*np.pi*((a**p*b**p+a**p*c**p+b**p*c**p)/3)**(1/p) # a=9,b=3,c=1
             }
 ]
 

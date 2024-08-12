@@ -208,6 +208,26 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return b, indices, inverse, counts
 
     @staticmethod
+    def unique_all_(a, axis=None, **kwargs):
+        if axis is None:
+            a = torch.flatten(a)
+            axis = 0
+        b, inverse, counts = torch.unique(a, return_inverse=True,
+                return_counts=True,
+                dim=axis, **kwargs)
+        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
+
+        indices0 = torch.zeros(counts.shape, **kwargs)
+        indices1 = torch.zeros(counts.shape, **kwargs)
+
+        idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        indices0.scatter_(0, inverse.flip(dims=[0]), idx)
+
+        idx = torch.arange(a.shape[0], **kwargs)
+        indices1.scatter_(0, inverse, idx)
+        return b, indices0, indices1, inverse, counts
+
+    @staticmethod
     def sort(a, axis=0, **kwargs):
         return torch.sort(a, dim=axis, **kwargs)[0]
 

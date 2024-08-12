@@ -318,13 +318,21 @@ class HomogeneousMesh(Mesh):
         entity = self.entity(etype, index)
         return bm.barycenter(entity, node)
 
-    def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]],
-                    etype: Union[int, str]='cell', index: Index=_S) -> TensorLike:
+    def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]], index: Index=_S) -> TensorLike:
         """Convert barycenter coordinate points to cartesian coordinate points
         on mesh entities.
         """
+        if isinstance(bcs, Sequence): # tensor type
+            etype = len(bcs)
+        elif isinstance(bcs, TensorLike): # simplex type
+            etype = bcs.shape[-1] - 1
+        else:
+            raise TypeError("bcs is expected to be a tensor or sequence of tensor, "
+                            f"but got {type(bcs).__name__}")
+
         node = self.entity('node')
         entity = self.entity(etype, index)
+
         return bm.bc_to_points(bcs, node, entity)
 
     # ipoints
@@ -372,13 +380,13 @@ class HomogeneousMesh(Mesh):
         else:
             return bm.sum(e)
 
-    def error(self, u, v, q=3, power=2, celltype=False, integrator=None) -> TensorLike:
+    def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
         """
         @brief Calculate the error between two functions.
         """
         GD = self.geo_dimension()
 
-        qf = self.integrator(q, etype='cell') if integrator is None else integrator
+        qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
 
@@ -394,15 +402,8 @@ class HomogeneousMesh(Mesh):
             else:
                 v = v(ps)
 
-        if u.shape[-1] == 1:
-           u = u[..., 0]
-
-        if v.shape[-1] == 1:
-           v = v[..., 0]
 
         cm = self.entity_measure('cell')
-        #if v.shape[-1] == NC:
-        #    v = np.swapaxes(v, 1, -1)
         f = bm.power(bm.abs(u - v), power)
         if len(f.shape) == 1:
             f = f[:, None]
@@ -415,7 +416,7 @@ class HomogeneousMesh(Mesh):
             elif f.shape == (GD, GD):
                 e = cm[:, None, None]*f
             else:
-                e = bm.einsum('q, qc..., c -> c...', ws, f, cm)
+                e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
 
         if celltype is False:
             e = bm.power(bm.sum(e), 1/power)
@@ -440,18 +441,12 @@ class SimplexMesh(HomogeneousMesh):
         raise NotImplementedError
 
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                       variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                       mi: Optional[TensorLike]=None) -> TensorLike:
         TD = bcs.shape[-1] - 1
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         phi = bm.simplex_shape_function(bcs, p, mi)
-        if variables == 'u':
-            return phi
-        elif variables == 'x':
-            return phi[None, ...]
-        else:
-            raise ValueError("Variables type is expected to be 'u' or 'x', "
-                             f"but got '{variables}'.")
+        return phi
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
