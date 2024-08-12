@@ -2,7 +2,7 @@
 from typing import Union, Callable, Optional, Any
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, Number, _S, Shape
+from ..typing import TensorLike, Index, Number, _S, Size
 from .function import Function
 from .utils import zero_dofs
 
@@ -34,11 +34,11 @@ class FunctionSpace():
                     uh: TensorLike, dim: Optional[int]=None, index: Index=_S) -> TensorLike:
         raise NotImplementedError
 
-    def array(self, batch: Union[int, Shape, None]=None, *, dtype=None):
+    def array(self, batch: Union[int, Size, None]=None, *, dtype=None):
         """Initialize a Tensor filled with zeros as values of DoFs.
 
         Parameters:
-            batch (int | Shape | None, optional): shape of the batch.
+            batch (int | Size | None, optional): shape of the batch.
 
         Returns:
             Tensor: Values of DoFs shaped (batch, GDOF).
@@ -58,7 +58,7 @@ class FunctionSpace():
         return bm.zeros(shape, dtype=dtype)
 
     def function(self, array: Optional[TensorLike]=None,
-                 batch: Union[int, Shape, None]=None, *,
+                 batch: Union[int, Size, None]=None, *,
                  coordtype='barycentric', dtype=None):
         """Initialize a Function in the space.
 

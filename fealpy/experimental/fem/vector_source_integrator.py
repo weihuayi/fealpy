@@ -2,7 +2,6 @@ from typing import Optional
 from ..typing import TensorLike, Index, _S
 
 from ..backend import backend_manager as bm
-from torch import Tensor, einsum
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -23,7 +22,7 @@ class VectorSourceIntegrator(CellSourceIntegrator):
         self.batched = batched
 
     @enable_cache
-    def to_global_dof(self, space: _FS) -> Tensor:
+    def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
 
     @enable_cache
@@ -40,25 +39,33 @@ class VectorSourceIntegrator(CellSourceIntegrator):
         cm = mesh.entity_measure('cell', index=index)
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs, index=index, variable='x')
+        phi = space.basis(bcs, index=index)
 
         return bcs, ws, phi, cm, index
 
-    def assembly(self, space: _FS) -> Tensor:
+    def assembly(self, space: _FS) -> TensorLike:
+        # f = self.source
+        # mesh = getattr(space, 'mesh', None)
+        # bcs, ws, phi, cm, index = self.fetch(space)
+        # # val-(NC, NQ, GD)
+        # val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        # coef = val
+        # measure = cm
+        # weights = ws
+        # inputs = phi
+
+        # if coef is None:
+        #     return bm.einsum('c, q, cqid -> cid', measure, weights, inputs)
+
+        # if is_tensor(coef):
+        #     return bm.einsum('c, q, cqid, cqd -> ci', measure, weights, inputs, coef)
+        # else:
+        #     raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        # val-(NC, NQ, GD)
+ 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        coef = val
-        measure = cm
-        weights = ws
-        inputs = phi
 
-        if coef is None:
-            return bm.einsum('c, q, cqid -> cid', measure, weights, inputs)
-
-        if is_tensor(coef):
-            return bm.einsum('c, q, cqid, cqd -> ci', measure, weights, inputs, coef)
-        else:
-            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        return linear_integral(phi, ws, cm, val, batched=self.batched)
