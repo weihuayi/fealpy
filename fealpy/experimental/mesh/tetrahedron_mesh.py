@@ -628,4 +628,4 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         return cls(node, cell)
 
 
-TetrhedronMesh.set_ploter('3d')
+TetrahedronMesh.set_ploter('3d')

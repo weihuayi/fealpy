@@ -4,7 +4,7 @@ from ..typing import TensorLike, Index, _S
 from .plot import Plotable
 
 
-class HexahedronMesh(TensorMeshi, Plotable):
+class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
         super(HexahedronMesh, self).__init__(TD=3, itype = cell.dtype, ftype = node.dtype)
         self.node = node
