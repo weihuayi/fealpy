@@ -25,6 +25,67 @@ from fealpy.fem.scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
 from fealpy.fem import VectorDarcyIntegrator, ScalarNeumannBCIntegrator
 from fealpy.pde.nonlinear_darcy_pde_2d import Data0
+import numpy as np
+import time
+from scipy.sparse import csr_matrix
+
+def plot_function(uh, u):
+    fig = plt.figure()
+    fig.set_facecolor('white')
+    axes = plt.axes(projection='3d')
+
+    NC = mesh.number_of_cells()
+
+    mid = mesh.entity_barycenter("cell")
+    node = mesh.entity("node")
+    cell = mesh.entity("cell")
+
+    coor = node[cell]
+    val = u(mid) 
+    for ii in range(NC):
+        axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], uh[ii]*np.ones(3), color = 'r', lw=0.0)#数值解图像
+        axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], val[ii]*np.ones(3), color = 'b', lw=0.0)
+    plt.show()
+
+def plot_linear_function(uh, u):
+    fig = plt.figure()
+    fig.set_facecolor('white')
+    axes = plt.axes(projection='3d')
+
+    NC = mesh.number_of_cells()
+
+    mid = mesh.entity_barycenter("cell")
+    node = mesh.entity("node")
+    cell = mesh.entity("cell")
+
+    coor = node[cell]
+    val = u(node).reshape(-1) 
+    for ii in range(NC):
+        axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], uh[cell[ii]], color = 'r', lw=0.0)#数值解图像
+        axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], val[cell[ii]], color = 'b', lw=0.0)
+    plt.show()
+
+"""
+def Solve(A, b):
+    from mumps import DMumpsContext
+    from scipy.sparse.linalg import minres, gmres
+
+    NN = len(b)
+    ctx = DMumpsContext()
+    ctx.set_silent()
+    ctx.set_centralized_sparse(A)
+
+    x = np.array(b)
+
+    ctx.set_rhs(x)
+    ctx.run(job=6)
+    ctx.destroy() # Cleanup
+    '''
+    #x, _ = minres(A, b, x0=b, tol=1e-10)
+    x, _ = gmres(A, b, tol=1e-10)
+    '''
+    return x
+"""
 
 def remove_row(matrix):
     # 获取原始数据
@@ -75,7 +136,7 @@ ny = args.ny
 maxit = args.maxit
 
 pde = Data0() 
-mesh = pde.init_mesh(nx=8, ny=8)
+mesh = pde.init_mesh(nx=nx, ny=ny)
 
 errorType = ['$||u - u_h||_{\\Omega, 0}$', 
              '$||p - p_h||_{\\Omega, 0}$']
@@ -97,6 +158,8 @@ for i in range(maxit):
     lform.add_domain_integrator(VectorSourceIntegrator(f = pde.source, q = p+2))
     F = lform.assembly()
 
+    lform = LinearForm(pspace)
+
     glform = LinearForm(pspace)
     glform.add_boundary_integrator(ScalarNeumannBCIntegrator(pde.neumann, q = p+2))
     G = glform.assembly()
@@ -106,30 +169,48 @@ for i in range(maxit):
     uh[1] = uspace.interpolate(lambda p : pde.solutionu(p)[..., 1])
     ph = pspace.function()
     ph[:] = pspace.interpolate(pde.solutionp).reshape(-1)
+    pI = ph.copy()
+    uI = uh.copy()
+    ph[:] = 0
+    uh[:] = 0
     while True:
         bform = BilinearForm((uspace, uspace))
         bform.add_domain_integrator(VectorMassIntegrator(c=pde.nonlinear_operator(uh)))
         A = bform.assembly()
         AA = bmat([[A, B], [B.T, None]], format='csr', dtype=np.float64)
         FF = np.hstack((F, G[:-1]))
+        lform = LinearForm((uspace, uspace))
+        lform.add_domain_integrator(VectorSourceIntegrator(f = pde.nonlinear_operator0(uh), q = p+2))
+        FFF = lform.assembly()
 
-        print("ppp0 : ", np.max(np.abs(A@uh.flatten() + B@ph[:-1] - F)))
-        print("ppp1 : ", np.max(np.abs(B.T@uh.flatten() - G[:-1])))
+        #print("ppp : ", np.max(np.abs(A@uh.flatten() - FFF)))
+        #print("ppp0 : ", np.max(np.abs(A@uh.flatten() + B@ph[:-1] - F)))
+        #print("ppp2 : ", np.max(np.abs(B@ph[:-1])))
+        #print("ppp1 : ", np.max(np.abs(B.T@uh.flatten() - G[:-1])))
 
         val = spsolve(AA, FF)
 
         uhval = val[:uspace.number_of_global_dofs()*2].reshape(2, -1)
         phval = val[uspace.number_of_global_dofs()*2:]
 
-        flag = np.max(np.abs(uhval-uh[:])) < 1e-2
+        flag = np.max(np.abs(uhval-uh[:])) < 1e-4
         uh[:] = uhval
         ph[:-1] = phval
         if flag:
             break
+    uhf = uh.flatten()
+    uIf = uI.flatten()
+    for i in range(len(uhf)):
+        print("uh{}: uI: {}, diff: {}".format(uhf[i], uIf[i], uhf[i] - uIf[i]))
     error0 = mesh.error(pde.solutionu, uh)
     error1 = mesh.error(pde.solutionp, ph)
     print("error0:", error0)
     print("error1:", error1)
+    #plot_function(uh[0], lambda p : pde.solutionu(p)[..., 0])
+    plot_function(uh[1], lambda p : pde.solutionu(p)[..., 1])
+
+    #plot_linear_function(ph, pde.solutionp)
+
 
     if i < maxit-1:
         mesh.uniform_refine()

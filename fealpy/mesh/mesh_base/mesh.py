@@ -554,8 +554,8 @@ class Mesh():
         cm = self.entity_measure('cell')
 
         NC = self.number_of_cells()
-        #if v.shape[-1] == NC:
-        #    v = np.swapaxes(v, 1, -1)
+        if v.shape[-1] == NC:
+            v = np.swapaxes(v, 1, -1)
         f = np.power(np.abs(u - v), power)
         if len(f.shape) == 1: 
             f = f[:, None]
