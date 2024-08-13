@@ -68,10 +68,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         return np.nonzero(a)
 
     @staticmethod
-    def cat(iterable, dim=0, out=None) -> NDArray:
-        return np.concatenate(iterable, axis=dim, out=out)
-
-    @staticmethod
     def scatter(x, indices, val):
         """
         """
@@ -302,4 +298,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 NumPyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(tensor='array')
+if int(np.__version__[:1]) < 2:
+    function_mapping.update(concat='concatenate')
 NumPyBackend.attach_methods(function_mapping, np)

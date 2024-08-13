@@ -85,7 +85,7 @@ class COOTensor(SparseTensor):
         """Return the non-zero elements."""
         return self._values
 
-    def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
+    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
         """Convert the COO tensor to a dense tensor and return as a new object.
 
         Parameters:
@@ -95,19 +95,22 @@ class COOTensor(SparseTensor):
         Returns:
             Tensor: dense tensor.
         """
-        if not self.is_coalesced:
-            raise ValueError("indices must be coalesced before calling to_dense()")
+        if self._values is None:
+            context = dict(dtype=bm.float64)
+        else:
+            context = self.values_context()
 
-        context = self.values_context()
-        context.update(kwargs)
-        dense_tensor = bm.zeros(self.shape, **context)
+        dense_tensor = bm.zeros(self.dense_shape + (prod(self._spshape),), **context)
+        flattened = _flatten_indices(self._indices, self._spshape)[0]
 
         if self._values is None:
-            dense_tensor[self.nonzero_slice] = fill_value
+            src = bm.full((1,) * (self.dense_ndim + 1), fill_value, **context)
+            src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
         else:
-            dense_tensor[self.nonzero_slice] = self._values
+            src = self._values
+        bm.index_add_(dense_tensor, -1, flattened, src)
 
-        return dense_tensor
+        return dense_tensor.reshape(self.shape)
 
     toarray = to_dense
 
@@ -230,11 +233,18 @@ class COOTensor(SparseTensor):
         elif isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
             output = other * alpha
+            context = bm.context(output)
+            output = output.reshape(self.dense_shape + (prod(self._spshape),))
+            flattened = _flatten_indices(self._indices, self._spshape)[0]
+
             if self._values is None:
-                output[self.nonzero_slice] += 1.
+                src = bm.ones((1,) * (self.dense_ndim + 1), **context)
+                src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
-                output[self.nonzero_slice] += self._values
-            return output
+                src = self._values
+            bm.index_add_(output, -1, flattened, src)
+
+            return output.reshape(self.shape)
 
         elif isinstance(other, (int, float)):
             new_values = self._values + alpha * other
