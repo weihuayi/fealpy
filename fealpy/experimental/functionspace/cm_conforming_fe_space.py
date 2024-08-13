@@ -3,7 +3,10 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
+from .functional import symmetry_span_array, symmetry_index
 from scipy.special import factorial, comb
+from scipy.linalg import solve_triangular
+
 
 _MT = TypeVar('_MT', bound=Mesh)
 Index = Union[int, slice, TensorLike]
@@ -150,6 +153,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         p = self.p
         m = self.m
         mesh = self.mesh
+        isCornerNode = self.isCornerNode
 
         NC = mesh.number_of_cells()
         ldof = self.number_of_local_dofs('cell')
@@ -186,17 +190,100 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 for beta in betas:
                     if bm.all(alpha-beta[v]<=0):
                         continue
+                    sign = (-1)**(beta[v])
                     beta[v] = beta[v] + alpha[v]
                     j = midx2num(beta[None, :])
                     j = dof2num[j]
                     dbeta = beta[flag]
-                    coeff[:, i, j] = (-1)**(beta[v])*comb(bm.sum(beta),
+                    coeff[:, i, j] = sign*comb(bm.sum(beta),
                             r)*bm.prod(bm.array(comb(dalpha, dbeta)),
                                     axis=0)*factorial(r) 
 
+
         # 局部自由度 边
-        n = mesh.edge_normal()
         glambda = mesh.grad_lambda()
+        c2e = mesh.cell_to_edge()
+        n = mesh.edge_normal()[c2e]
+        N = bm.einsum('cfd, ced->cef', glambda, n)
+        S1m = [S1m0, S1m1, S1m2]
+        for de in range(3):
+            e = bm.ones(3, dtype=bm.bool)
+            e[de] = False # e
+            for alpha in S1m[de]:
+                i = midx2num(alpha[None, :])
+                i = dof2num[i]
+                dalpha = alpha[de] 
+                betas = mesh.multi_index_matrix(int(dalpha), 2)
+                for beta in betas:
+                    val = bm.prod(N[:, de]**beta,axis=1)/bm.prod(bm.array(factorial(beta)), axis=0)
+                    beta[e] = beta[e] +alpha[e]
+                    j = midx2num(beta[None, :])
+                    j = dof2num[j]
+                    coeff[:, i, j] = comb(bm.sum(beta),
+                                          int(dalpha))*(factorial(int(dalpha)))**2*val[:, None]
+        #for i in range(NC):
+        
+        #    coeff[i] = solve_triangular(coeff[i], bm.eye(ldof), lower=True)
+        coeff = bm.linalg.inv(coeff)
+
+        # 全局自由度
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        Ndelat = bm.zeros((NC, 3, 2, 2), dtype=self.ftype)
+        t0 = node[cell[:, 2]] - node[cell[:, 1]]
+        t1 = node[cell[:, 0]] - node[cell[:, 2]]
+        t2 = node[cell[:, 1]] - node[cell[:, 0]]
+        Ndelat[:, 0, 0] = t2
+        Ndelat[:, 0, 1] = -t1
+        Ndelat[:, 1, 0] = -t2
+        Ndelat[:, 1, 1] = t0
+        Ndelat[:, 2, 0] = t1
+        Ndelat[:, 2, 1] = -t0
+        ndof = self.number_of_internal_dofs('node')
+        coeff1 = bm.zeros((NC, 3*ndof, 3*ndof), dtype=self.ftype)
+        symidx = [symmetry_index(2, r) for r in range(1, 2*m+1)]
+        # 边界自由度
+        isBdNode = mesh.boundary_node_flag()
+        isBdEdge = mesh.boundary_face_flag()
+        edge = mesh.entity('edge')[isBdEdge]
+        n = mesh.edge_unit_normal()[isBdEdge]
+        NN = isBdNode.sum()
+        coeff2 = bm.tile(bm.eye(3*ndof, dtype=self.ftype), (NC, 1, 1))
+        nodefram = bm.zeros((NN, 2, 2), dtype=self.ftype)
+        bdnidxmap = bm.zeros(len(isBdNode),dtype=self.itype) 
+        bdnidxmap[isBdNode] = bm.arange(NN, dtype=self.itype)
+        nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
+        nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
+        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0,1],[-1, 0]],
+                                                 dtype=self.ftype)
+        kk = 0
+        for v in range(3):
+            flag = bm.ones(3, dtype=bm.bool) 
+            flag[v] = False #v^*
+            coeff1[:, ndof*v, ndof*v] = 1
+            cidx = isBdNode[cell[:, v]] & ~isCornerNode[cell[:, v]] 
+            for gamma in S02m[v][1:]:
+                i = midx2num(gamma[None, :])
+                i = dof2num[i]
+                i = int(i)
+                gamma = gamma[flag]
+                Ndelta_sym = symmetry_span_array(Ndelat[:, v],
+                                                 gamma).reshape(NC, -1)
+                r = int(bm.sum(gamma))
+                j = (r+1)*(r+2)//2
+                c = symidx[r-1][1]
+                coeff1[:, i, j-r-1+kk:j+kk] = Ndelta_sym[:, symidx[r-1][0]] *c[None, :] 
+                if bm.sum(cidx)>0:
+                    tn_sym = symmetry_span_array(nodefram[bdnidxmap[cell[cidx][:, v]]], gamma).reshape(bm.sum(cidx), -1)
+                    coeff2[cidx, i, j-r-1+kk:j+kk] = tn_sym[:, symidx[r-1][0]]*c[None, :]
+            kk = kk+ndof
+
+        coeff1 = bm.einsum('cik,cjk->cij', coeff1, coeff2)
+        coeff = bm.transpose(coeff, (0, 2, 1))
+        coeff[:, :3*ndof] = bm.einsum('cji,cjk->cik', coeff1, coeff[:, :3*ndof])
+        return coeff[:, :, dof2num]
+
+
 
 
 
@@ -204,4 +291,12 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
 
 
 
-        return
+
+
+
+
+
+
+
+
+
