@@ -200,7 +200,8 @@ class AFEMPhaseFieldCrackHybridMixModel():
             self.uh = uh
             self.d = d
             self.H = H
-
+            
+            '''
             # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
             eta = self.recovery.recovery_estimate(self.d)
                 
@@ -226,7 +227,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
                     print("GD is not 2 or 3, it is incorrect")
                         
             tmr.send('refine')
-            
+            '''
             # 计算残量误差
             if k == 0:
                 er0 = np.linalg.norm(R0)
