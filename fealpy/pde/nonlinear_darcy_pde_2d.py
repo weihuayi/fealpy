@@ -36,12 +36,30 @@ class DFPDE2d():
 
 
     def nonlinear_operator(self, uh):
+        mu = self.mu
+        beta = self.beta
+        rho = self.rho
         @barycentric
         def ret(bcs, index=None):
             """非线性参数：mu + beta*｜u｜"""
             # x : uh(bcs)[..., 0] 
             # y : uh(bcs)[..., 1]
-            return (mu + beta*np.sqrt(uh(bcs)[..., 0]**2 + uh(bcs)[..., 1]**2))/rho
+            val = uh(bcs)
+            return (mu + beta*np.sqrt(val[:, 0]**2 + val[:, 1]**2))/rho
+        return ret
+
+    def nonlinear_operator0(self, uh):
+        mu = self.mu
+        beta = self.beta
+        rho = self.rho
+        @barycentric
+        def ret(bcs, index=None):
+            """非线性参数：mu + beta*｜u｜"""
+            # x : uh(bcs)[..., 0] 
+            # y : uh(bcs)[..., 1]
+            val = uh(bcs)
+            return val.swapaxes(-1, -2)*((mu + beta*np.sqrt(val[:, 0]**2 + val[:,
+                                                                              1]**2))/rho)[..., None]
         return ret
 
     @cartesian
@@ -70,7 +88,13 @@ class DFPDE2d():
     def source(self, p):
         x = p[..., 0, None]
         y = p[..., 1, None]
-        f = np.concatenate([self.fx(x, y), self.fy(x, y)], axis=-1)
+        fx = self.fx(x, y)
+        fy = self.fy(x, y)
+        if type(fx) is not np.ndarray:
+            fx = np.ones(x.shape, dtype=np.float_)*fx
+        if type(fy) is not np.ndarray:
+            fy = np.ones(x.shape, dtype=np.float_)*fy
+        f = np.concatenate([fx, fy], axis=-1)
         return f
 
     @cartesian
@@ -89,7 +113,9 @@ class Data0(DFPDE2d):
         """
         C = CoordSys3D('C')
         u = (C.x+1)**2/4*C.i -(C.x+1)*(C.y+1)/2*C.j
-        p = C.x**3 + C.y**3
+        p = C.x**3 + C.y**3 - 2
+        #u = (0*C.x + 1)*C.i + (0*C.y + 1)*C.j
+        #p = C.x + C.y - 2
         super(Data0, self).__init__(u, p, mu, beta, rho)
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):
