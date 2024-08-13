@@ -9,6 +9,8 @@ from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
 from .plot import Plotable
+from .plot import Plotable
+
 
 class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
@@ -625,6 +627,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                     self.nx * (self.ny + 1) * self.nz + \
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
-        self.clear() 
+        self.clear()
+
 
 UniformMesh3d.set_ploter('3d')

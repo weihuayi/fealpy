@@ -1,8 +1,10 @@
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
+from .plot import Plotable
 
-class TetrahedronMesh(SimplexMesh): 
+
+class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
         super().__init__(TD=3,itype=cell.dtype,ftype=node.dtype)
         self.node = node
@@ -626,3 +628,4 @@ class TetrahedronMesh(SimplexMesh):
         return cls(node, cell)
 
 
+TetrhedronMesh.set_ploter('3d')
