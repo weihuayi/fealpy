@@ -65,3 +65,7 @@ from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 from .dirichlet_bc import DirichletBC
 from .recovery_alg import recovery_alg, LinearRecoveryAlg
 from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegrator
+
+
+
+from .darcy_integrator import VectorDarcyIntegrator

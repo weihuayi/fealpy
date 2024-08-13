@@ -83,7 +83,7 @@ for i in range(maxit):
     space= LagrangeFESpace(mesh, p=p)
     tmr.send(f'第{i}次空间时间') 
 
-    ipdb.set_trace()
+    #ipdb.set_trace()
     uh = space.function() # 建立一个有限元函数
 
     bform = BilinearForm(space)
