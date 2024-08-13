@@ -1,5 +1,5 @@
 
-from typing import Tuple
+from typing import Tuple, Union, Callable
 from math import prod
 
 from ..backend import backend_manager as bm
@@ -93,6 +93,7 @@ class TensorFunctionSpace(FunctionSpace):
         )
 
     def interpolation_points(self) -> TensorLike:
+
         return self.scalar_space.interpolation_points()
         # scalar_gdof = self.scalar_space.number_of_global_dofs()
         # scalar_ips = self.scalar_space.interpolation_points()
@@ -141,3 +142,23 @@ class TensorFunctionSpace(FunctionSpace):
             is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
 
         return is_bd_dof.reshape(-1)
+    
+    def boundary_interpolate(self,
+        gD: Union[Callable, int, float, TensorLike],
+        uh: TensorLike,
+        threshold: Union[Callable, TensorLike, None]=None) -> TensorLike:
+
+        ipoints = self.interpolation_points()
+        scalar_space = self.scalar_space
+        isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold)
+
+        if callable(gD):
+            gD = gD(ipoints[isScalarBDof])
+        
+        isTensorBDof = self.is_boundary_dof(threshold=threshold)
+        if self.dof_priority:
+            uh[isTensorBDof] = gD.T.reshape(-1)
+        else:
+            uh[isTensorBDof] = gD.reshape(-1)
+
+        return uh   
