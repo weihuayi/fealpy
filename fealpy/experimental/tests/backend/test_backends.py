@@ -2468,7 +2468,7 @@ class TestBackendInterfaces:
 
 
     ######## Fealpy Function
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", unique_data)
     def test_unique(self, backend, data):
         bm.set_backend(backend)
@@ -2483,7 +2483,7 @@ class TestBackendInterfaces:
             np.testing.assert_array_equal(r, bm.to_numpy(e), 
                                           err_msg=f"The {s} of `bm.unique` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", multi_index_data)
     def test_multi_index_matrix(self, backend, data):
         bm.set_backend(backend)
@@ -2494,7 +2494,7 @@ class TestBackendInterfaces:
         np.testing.assert_array_equal(result, bm.to_numpy(test_result), 
                                       err_msg=f" `bm.multi_index_matrix` function is not equal to real result in backend {backend}")
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_edge_length(self, backend, data):
         bm.set_backend(backend)
@@ -2505,7 +2505,7 @@ class TestBackendInterfaces:
         np.testing.assert_array_equal(result, bm.to_numpy(test_result), 
                                       err_msg=f" `bm.edge_length` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_edge_normal(self, backend, data):
         bm.set_backend(backend)
@@ -2516,7 +2516,7 @@ class TestBackendInterfaces:
         np.testing.assert_array_equal(result, bm.to_numpy(test_result), 
                                       err_msg=f" `bm.edge_normal` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_edge_tangent(self, backend, data):
         bm.set_backend(backend)
