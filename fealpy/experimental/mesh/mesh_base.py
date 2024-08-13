@@ -558,17 +558,19 @@ class TensorMesh(HomogeneousMesh):
                 J = self.jacobi_matrix(bcs, index=index)
                 J = bm.linalg.inv(J)
                 # J^{-T}\nabla_u phi
-                gphi = bm.einsum('qcmn, qlm->qcln', J, gphi)
+                # gphi = bm.einsum('qcmn, qlm -> qcln', J, gphi)
+                gphi = bm.einsum('qcmn, qlm -> cqln', J, gphi)
                 return gphi
         elif TD == 2:
-            gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
-            gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
+            gphi0 = bm.einsum('im, jn -> ijmn', dphi, phi).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn -> ijmn', phi, dphi).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1), axis=-1)
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 G = self.first_fundamental_form(J)
                 G = bm.linalg.inv(G)
-                gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
+                # gphi = bm.einsum('qikm, qimn, qln -> qilk', J, G, gphi)
+                gphi = bm.einsum('qikm, qimn, qln -> iqlk', J, G, gphi)
                 return gphi
         return gphi
 
