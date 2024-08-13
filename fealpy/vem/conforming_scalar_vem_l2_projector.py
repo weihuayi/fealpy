@@ -7,10 +7,6 @@ class ConformingScalarVEML2Projector2d():
     def __init__(self, M, PI1):
         self.M = M
         self.PI1 = PI1
-        if len(M) > 23:
-            m = M[22]
-            print(m)
-
 
     def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
         self.C = self.assembly_cell_right_hand_side(space)
