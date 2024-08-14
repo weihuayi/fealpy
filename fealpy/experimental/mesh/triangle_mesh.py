@@ -33,6 +33,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         self.celldata = {}
         self.meshdata = {}
 
+
     # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """
@@ -230,12 +231,35 @@ class TriangleMesh(SimplexMesh, Plotable):
         @brief 计算二维网格中每条边上的局部标架
         """
         pass
-     
+    def edge_unit_tangent(self, index=_S):
+        """
+        @brief Calculate the tangent vector with unit length of each edge.See `Mesh.edge_tangent`.
+        """
+        node = self.entity('node') 
+        edge = self.entity('edge', index=index)
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        length = bm.sqrt(bm.square(v).sum(axis=1))
+        return v/length.reshape(-1, 1)
+
+    
     def edge_normal(self, index: Index=_S):
         """
         @brief 计算二维网格中每条边上单位法线
         """
-        pass
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
+        return v@w
+    def edge_unit_normal(self, index: Index=_S):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
+        return v@w
+
+
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
