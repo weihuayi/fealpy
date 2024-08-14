@@ -40,6 +40,31 @@ class TetrahedronMesh(SimplexMesh):
         self.celldata = {}
         self.meshdata = {}
 
+    def cell_to_face_permutation(self, locFace = None):
+        """
+        局部面到全局面的映射
+        c2f_loc[c2f_order]=c2f_glo
+        """
+        if locFace is None:
+            locFace = self.localFace
+
+        c2f  = self.cell_to_face()
+        cell = self.cell
+        face = self.face
+        face_g_idx = bm.argsort(face)
+
+        c2f_glo = face[c2f.reshape(-1)]
+        c2f_loc = cell[:, locFace].reshape(-1, 3)
+
+        c2f_glo = bm.argsort(c2f_glo, axis=1)
+        c2f_glo = bm.argsort(c2f_glo, axis=1)
+        c2f_loc = bm.argsort(c2f_loc, axis=1)
+
+        NC = len(cell)
+        c2f_order = c2f_loc[bm.arange(NC*4)[:, None], c2f_glo]
+        return c2f_order.reshape(NC, 4, 3)
+
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_one_tetrahedron(cls, meshtype='equ'):
