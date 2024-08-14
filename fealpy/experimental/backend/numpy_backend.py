@@ -293,11 +293,15 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
             vjm = node[tet[:, m],:] - node[tet[:, j],:]
             Dlambda[:, i, :] = np.cross(vjm, vjk) / (6*volume.reshape(-1, 1))
         return Dlambda
-         
 
-NumPyBackend.attach_attributes(ATTRIBUTE_MAPPING, np)
+
+attribute_mapping = ATTRIBUTE_MAPPING.copy()
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(tensor='array')
+
 if int(np.__version__[:1]) < 2:
+    attribute_mapping.update(bool='bool_')
     function_mapping.update(concat='concatenate')
+
+NumPyBackend.attach_attributes(attribute_mapping, np)
 NumPyBackend.attach_methods(function_mapping, np)
