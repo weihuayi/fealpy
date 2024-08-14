@@ -1,9 +1,16 @@
 from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh as TriangleMesh_old
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, \
                                     BilinearForm, LinearForm, \
                                     VectorSourceIntegrator
+from fealpy.fem import LinearElasticityOperatorIntegrator
+from fealpy.fem import BilinearForm as BilinearForm_old
+from fealpy.fem import LinearForm as LinearForm_old
+from fealpy.fem import VectorSourceIntegrator as VectorSourceIntegrator_old
+
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.functionspace import LagrangeFESpace as LagrangeFESpace_old
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
@@ -34,32 +41,51 @@ def solution(points: TensorLike) -> TensorLike:
 def dirichlet(points: TensorLike) -> TensorLike:
 
     return solution(points)
-
-#mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=1, ny=1)
-mesh = TriangleMesh.from_unit_square(nx=2, ny=2)
+nx = 1
+ny = 1
+mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+mesh_old = TriangleMesh_old.from_box(box = [0, 1, 0, 1], nx=nx, ny=ny)
 # mesh.uniform_refine(n=2)
+
+import matplotlib.pyplot as plt
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True)
+mesh.find_edge(axes, showindex=True)
+mesh.find_cell(axes, showindex=True)
+plt.show()
 
 NN = mesh.number_of_nodes()
 print("NN:", NN)
 NC = mesh.number_of_cells()
 print("NC:", NC)
+node = mesh.entity('node')
+edge = mesh.entity('edge')
+cell = mesh.entity('cell')
+print("cell:", cell.shape, "\n", cell)
 
 qf = mesh.quadrature_formula(3, 'cell')
 # bcs-(NQ, BC), ws-(NQ, )
 bcs, ws = qf.get_quadrature_points_and_weights()
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
+space_old = LagrangeFESpace_old(mesh_old, p=1, ctype='C', doforder='sdofs')
+# space_old = LagrangeFESpace_old(mesh_old, p=1, ctype='C', doforder='vdims')
 ldof = space.number_of_local_dofs()
 print("ldof:", ldof)
 gdof = space.number_of_global_dofs()
 print("gdof:", gdof)
 cell2dof = space.cell_to_dof()
 print("cell2dof:", cell2dof.shape, "\n", cell2dof)
+cell2dof_old = space_old.cell_to_dof()
+print("cell2dof_old:", cell2dof_old.shape, "\n", cell2dof_old)
 phi = space.basis(bc=bcs)
 print("phi:", phi.shape, "\n", phi)
 
 tensor_space = TensorFunctionSpace(space, shape=(2, -1))
-#tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+# tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+tensor_space_old = 2*(space_old, )
 tldof = tensor_space.number_of_local_dofs()
 print("tldof:", tldof)
 tgdof = tensor_space.number_of_global_dofs()
@@ -69,31 +95,55 @@ print("cell2tldof:", cell2tldof.shape, "\n", cell2tldof)
 tensor_phi = tensor_space.basis(p=bcs)
 print("tensor_phi:", tensor_phi.shape, "\n", tensor_phi)
 
-#integrator = LinearElasticityIntegrator(E=1.0, nu=0.3, method='fast_strain')
-integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-                                           elasticity_type='stress', q=5)
 # integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-#                                            elasticity_type='strain', q=5)
+#                                            method='fast_strain', q=5)
+# integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
+#                                            elasticity_type='stress', q=5)
+integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
+                                           elasticity_type='strain', q=5)
+E = 1.0
+nu = 0.3
+lambda_ = nu * E / ((1 + nu) * (1 - 2 * nu))
+mu = E / (2 * (1 + nu))
+integrator_bi_old = LinearElasticityOperatorIntegrator(lam=lambda_, mu=mu, q=5)
+
 # KK_tri_strain - (NC, TLDOF, TLDOF)
-#KK = integrator.fast_assembly_strain_constant(space=tensor_space)
-KK = integrator_bi.assembly(space=tensor_space)
-print("KK:", KK.shape, "\n", KK[0])
+# KK_strain = integrator_bi.fast_assembly_strain_constant(space=tensor_space)
+KK_strain = integrator_bi.assembly(space=tensor_space)
+print("KK_strain:", KK_strain.shape, "\n", KK_strain[0])
+KK_strain_old = integrator_bi_old.assembly_cell_matrix(space=tensor_space_old)
+print("KK_strain_old:", KK_strain_old.shape, "\n", KK_strain_old[0])
  
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_bi)
 K = bform.assembly()
 print("K:", K.shape, "\n", K.to_dense().round(4))
 
-integrator_li = VectorSourceIntegrator(source=source)
+bform_old = BilinearForm_old(tensor_space_old)
+bform_old.add_domain_integrator(integrator_bi_old)
+K_old = bform_old.assembly()
+print("K_old:", K_old.shape, "\n", K_old.toarray().round(4))
+
+integrator_li = VectorSourceIntegrator(source=source, q=5)
 # FF_tri - (NC, TLDOF)
 FF = integrator_li.assembly(space=tensor_space)
 print("FF:", FF.shape, "\n", FF[0])
+
+integrator_li_old = VectorSourceIntegrator_old(f=source, q=5)
+FF_old = integrator_li_old.assembly_cell_vector(space=tensor_space_old)
+print("FF_old:", FF_old.shape, "\n", FF_old)
 
 lform = LinearForm(tensor_space)
 lform.add_integrator(integrator_li)
 # F_tri - (TGDOF)
 F = lform.assembly()
 print("F:", F.shape, "\n", F)
+
+lform_old = LinearForm_old(tensor_space_old)
+lform_old.add_domain_integrator(integrator_li_old)
+F_old = lform_old.assembly()
+print("F_old:", F_old.shape, "\n", F_old)
+asd
 
 uh = tensor_space.function()
 print("uh:", uh.shape, "\n", uh)
@@ -192,10 +242,3 @@ plt.show()
 
 
 # ipoints = mesh.interpolation_points(p=2)
-# fig = plt.figure()
-# axes = fig.gca()
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_edge(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()

@@ -116,8 +116,8 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
             indices = flatten_indices((ldof, GD), (1, 0))
         else:
             indices = flatten_indices((ldof, GD), (0, 1))
-        B = bm.cat([normal_strain(gphi, indices),
-                       shear_strain(gphi, indices)], dim=-2)
+        B = bm.concat([normal_strain(gphi, indices),
+                       shear_strain(gphi, indices)], axis=-2)
         return B
     
     def assembly(self, space: _FS) -> TensorLike:
