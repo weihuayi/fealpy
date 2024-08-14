@@ -1394,6 +1394,12 @@ class TriangleMesh(Mesh, Plotable):
                     if mask[j] and not row_sets[i].isdisjoint(row_sets[j]):
                         mask[j] = False
         deletecell = deletecell[mask]
+        vertices = cell[deletecell[:,::2]].reshape(-1,6)
+        vertices = np.array([row[np.unique(row, return_index=True)[1]] for row in vertices])
+        insert_node = np.sum(node[vertices],axis=1)/5
+
+        polygon_edge = cell2edge[deletecell].reshape(-1,9)
+        print(polygon_edge)
 
     @staticmethod
     def adaptive_options(
