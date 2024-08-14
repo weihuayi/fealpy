@@ -43,7 +43,7 @@ class ScalarMassIntegrator(CellOperatorIntegrator):
         cm = mesh.entity_measure('cell', index=index)
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs, index=index, variable='x')
+        phi = space.basis(bcs, index=index)
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:

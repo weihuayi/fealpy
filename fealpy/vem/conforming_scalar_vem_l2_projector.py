@@ -8,7 +8,6 @@ class ConformingScalarVEML2Projector2d():
         self.M = M
         self.PI1 = PI1
 
-
     def assembly_cell_matrix(self, space: ConformingScalarVESpace2d):
         self.C = self.assembly_cell_right_hand_side(space)
         pi0 = lambda x: inv(x[0])@x[1]

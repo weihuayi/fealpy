@@ -44,7 +44,7 @@ class FunctionSpace():
             Tensor: Values of DoFs shaped (batch, GDOF).
         """
         GDOF = self.number_of_global_dofs()
-        if (batch is None) or (shape == 0):
+        if (batch is None) or (batch == 0):
             batch = tuple()
 
         elif isinstance(batch, int):

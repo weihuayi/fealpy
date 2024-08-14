@@ -25,7 +25,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
                  lam: Optional[float]=None, mu: Optional[float]=None,
                  E: Optional[float]=None, nu: Optional[float]=None, 
                  elasticity_type: Optional[str]=None,
-                 coef: Optional[CoefLike]=None, q: int=3, *,
+                 coef: Optional[CoefLike]=None, q: int=5, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
@@ -105,7 +105,10 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         
         return D
     
-    def strain_matrix(self, space: _FS):
+    def strain_matrix(self, space: _FS) -> TensorLike:
+        '''
+        (NC, NQ, 3, tldof)
+        '''
         scalar_space = space.scalar_space
         _, _, gphi, _, _, _ = self.fetch(scalar_space)
         ldof, GD = gphi.shape[-2:]
@@ -126,7 +129,8 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         D = self.elasticity_matrix(space)
         B = self.strain_matrix(space)
 
-        KK = bm.einsum('q, c, qcki, kl, qclj -> cij', ws, cm, B, D, B)
+        # KK = bm.einsum('q, c, qcki, kl, qclj -> cij', ws, cm, B, D, B)
+        KK = bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
         
         return KK
 

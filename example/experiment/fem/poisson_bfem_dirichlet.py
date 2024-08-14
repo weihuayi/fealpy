@@ -14,7 +14,7 @@ from fealpy.experimental import logger
 logger.setLevel('WARNING')
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.functionspace import BernsteinFESpace
-from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
+from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator, ScalarMassIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
 from fealpy.experimental.backend import backend_manager as bm

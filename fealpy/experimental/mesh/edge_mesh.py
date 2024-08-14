@@ -5,9 +5,10 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 
 from .mesh_base import SimplexMesh
+from .plot import Plotable
 
 
-class EdgeMesh(SimplexMesh):
+class EdgeMesh(SimplexMesh, Plotable):
     """
     """
     def __init__(self, node, cell):
@@ -250,5 +251,4 @@ class EdgeMesh(SimplexMesh):
                          [3, 9], [4, 9]])
 
 
-    
-
+EdgeMesh.set_ploter('1d')
