@@ -61,7 +61,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Creation Functions ###
     # python array API standard v2023.12
     @staticmethod
-    def arange(start, /, stop, step=1, *, dtype=None, device=None):
+    def arange(start, /, stop=None, step=1, *, dtype=None, device=None):
+        if stop is None:
+            stop = start
+            start = 0
         return torch.arange(start, stop, step, dtype=dtype, device=device)
 
     @staticmethod
