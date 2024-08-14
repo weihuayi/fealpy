@@ -1,3 +1,4 @@
+from typing import Union, Optional
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
@@ -109,21 +110,19 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         length = bm.sqrt(bm.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def integrator(self, q, etype=3):
+    def quadrature_formula(self, q:int, etype:Union[int, str]='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
         if etype in {'cell', 3}:
-            a = self.ftype
-            print(a)
             from ..quadrature import TetrahedronQuadrature
             return TetrahedronQuadrature(q, dtype=self.ftype)
         elif etype in {'face', 2}:
             from ..quadrature import TriangleQuadrature
-            return TriangleQuadrature(q, dtype=self.dtype)
+            return TriangleQuadrature(q, dtype=self.ftype)
         elif etype in {'edge', 1}:
             from ..quadrature import GaussLegendreQuadrature
-            return GaussLegendreQuadrature(q, dtype=self.dtype)
+            return GaussLegendreQuadrature(q, dtype=self.ftype)
 
     def cell_volume(self, index=_S):
         """
