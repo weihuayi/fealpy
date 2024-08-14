@@ -5,12 +5,14 @@ from .. import logger
 from scipy.sparse import coo_matrix
 from .mesh_data_structure import MeshDS
 from .utils import estr2dim
+from .plot import Plotable
+
 
 class IntervalMeshDataStructure(MeshDS):
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
-class IntervalMesh():
+class IntervalMesh(Plotable):
     def __init__(self, node: TensorLike ,cell:TensorLike):
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
@@ -551,3 +553,6 @@ class IntervalMesh():
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
+
+
+IntervalMesh.set_ploter('1d')

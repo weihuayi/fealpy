@@ -20,6 +20,16 @@ from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 Tensor = torch.Tensor
 _device = torch.device
 
+def _dim_to_axis(func):
+    def wrapper(*args, axis, **kwargs):
+        return func(*args, dim=axis, **kwargs)
+    return wrapper
+
+def _dims_to_axes(func):
+    def wrapper(*args, axes, **kwargs):
+        return func(*args, dims=axes, **kwargs)
+    return wrapper
+
 
 class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
@@ -48,18 +58,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     from_numpy = torch.from_numpy
 
-    ### Tensor creation methods ###
-
+    ### Creation Functions ###
+    # python array API standard v2023.12
     @staticmethod
-    def linspace(start, stop, num, *, endpoint=True, retstep=False, dtype=None, **kwargs):
-        assert endpoint == True
-        if isinstance(start, (int, float)) and isinstance(stop, (int, float)):
-            return torch.linspace(start, stop, num, dtype=dtype, **kwargs);
-        else:
-            vmap_fun = partial(torch.linspace, dtype=dtype, **kwargs)
-            for _ in range(start.ndim):
-                vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
-            return vmap_fun(start, stop, num)
+    def arange(start, /, stop, step=1, *, dtype=None, device=None):
+        return torch.arange(start, stop, step, dtype=dtype, device=device)
 
     @staticmethod
     def eye(n: int, m: Optional[int]=None, /, k: int=0, dtype=None, **kwargs) -> Tensor:
@@ -69,106 +72,121 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return torch.eye(n, m, dtype=dtype, **kwargs)
 
     @staticmethod
-    def meshgrid(*xi, copy=None, sparse=None, indexing='xy', **kwargs) -> Tuple[Tensor, ...]:
-        return torch.meshgrid(*xi, indexing=indexing)
-
-    ### Reduction methods ###
-
-    @staticmethod
-    def all(a, axis=None, keepdims=False):
-        return torch.all(a, dim=axis, keepdim=keepdims)
-
-    @staticmethod
-    def any(a, axis=None, keepdims=False):
-        return torch.any(a, dim=axis, keepdim=keepdims)
-
-    @staticmethod
-    def sum(a, axis=None, dtype=None, out=None, keepdims=False, initial=None):
-        result = torch.sum(a, dim=axis, keepdim=keepdims, dtype=dtype, out=out)
-        return result if (initial is None) else result + initial
-
-    @staticmethod
-    def prod(a, axis=None, dtype=None, out=None, keepdims=False, initial=None):
-        result = torch.prod(a, dim=axis, keepdim=keepdims, dtype=dtype, out=out)
-        return result if (initial is None) else result * initial
-
-    @staticmethod
-    def mean(a, axis=None, dtype=None, out=None, keepdims=False):
-        return torch.mean(a, dim=axis, keepdim=keepdims, dtype=dtype, out=out)
-
-    @staticmethod
-    def max(a, axis=None, out=None, keepdims=False):
-        if axis is None:
-            return torch.max(a, out=out)
-        return torch.max(a, axis, keepdim=keepdims, out=out)[0]
-
-    @staticmethod
-    def min(a, axis=None, out=None, keepdims=False):
-        if axis is None:
-            return torch.min(a, keepdim=keepdims, out=out)
-        return torch.min(a, dim=axis, keepdim=keepdims, out=out)[0]
-
-    @staticmethod
-    def argmax(a, axis=None, out=None, keepdims=False):
-        return torch.argmax(a, dim=axis, out=out, keepdim=keepdims)
-
-    @staticmethod
-    def argmin(a, axis=None, out=None, keepdims=False):
-        return torch.argmin(a, dim=axis, out=out, keepdim=keepdims)
-
-    ### Unary methods ###
-    # NOTE: all copied
-
-    ### Binary methods ###
-
-    @staticmethod
-    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
-        a.index_add_(indices.ravel(), src.ravel())
-
-    @staticmethod
-    def index_add_(a: Tensor, /, dim, index, src, *, alpha=1):
-        return a.index_add_(dim, index, src, alpha=alpha)
-
-    @staticmethod
-    def cross(a, b, axis=-1, **kwargs):
-        return torch.cross(a, b, dim=axis, **kwargs)
-
-    @staticmethod
-    def tensordot(a, b, axes):
-        return torch.tensordot(a, b, dims=axes)
-
-    ### Other methods ###
-
-    @staticmethod
-    def size(a, axis=None):
-        if axis is None:
-            return a.numel()
+    def linspace(start, stop, /, num, *, dtype=None, device=None, endpoint=True):
+        assert endpoint == True
+        if isinstance(start, (int, float)) and isinstance(stop, (int, float)):
+            return torch.linspace(start, stop, num, dtype=dtype, device=device)
         else:
-            return a.size(axis)
+            vmap_fun = partial(torch.linspace, dtype=dtype, device=device)
+            for _ in range(start.ndim):
+                vmap_fun = vmap(vmap_fun, in_dims=(0, 0, None), out_dims=0)
+            return vmap_fun(start, stop, num)
 
     @staticmethod
-    def copy(a, /, **kwargs):
-        return torch.clone(a, **kwargs)
+    def tril(x, /, *, k=0): return torch.tril(x, k)
 
     @staticmethod
-    def scatter(x, indices, val):
-        """
-        """
-        x.scatter_(0, indices, val)
-        return x
+    def triu(x, /, *, k=0): return torch.triu(x, k)
+
+    ### Element-wise Functions ###
+
+    ### Indexing Functions ###
+
+    ### Linear Algebra Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def matrix_transpose(x, /): return x.transpose(-1, -2)
+
+    tensordot = staticmethod(_dims_to_axes(torch.tensordot))
+    vecdot = staticmethod(_dim_to_axis(torch.linalg.vecdot))
+
+    # non-standard
+    cross = staticmethod(_dim_to_axis(torch.cross))
 
     @staticmethod
-    def scatter_add(x, indices, val):
-        """
+    def dot(x1, x2, /, *, axis=-1):
+        return torch.tensordot(x1, x2, dims=[[axis], [axis]])
 
-        """
-        x.scatter_add_(0, indices, val)
-        return x
+    ### Manipulation Functions ###
+    # python array API standard v2023.12
+    concat = staticmethod(_dim_to_axis(torch.concat))
+    expand_dims = staticmethod(_dim_to_axis(torch.unsqueeze))
+    @staticmethod
+    def flip(a, axis=None):
+        if axis is None:
+            axis = list(range(a.dim()))
+        elif isinstance(axis, int):
+            axis = [axis]
+        elif isinstance(axis, tuple):
+            axis = list(axis)
+        return torch.flip(a, dims=axis)
+
+    permute_dims = staticmethod(_dims_to_axes(torch.permute))
+    repeat = staticmethod(_dim_to_axis(torch.repeat_interleave))
+    @staticmethod
+    def roll(x, /, shift, *, axis=None):
+        return torch.roll(x, shifts=shift, dims=axis)
+
+    squeeze = staticmethod(_dim_to_axis(torch.squeeze))
+    stack = staticmethod(_dim_to_axis(torch.stack))
+    unstack = staticmethod(_dim_to_axis(torch.unbind))
+
+    # non-standard
+    @staticmethod
+    def concatenate(arrays, /, axis=0, out=None, *, dtype=None):
+        if dtype is not None:
+            arrays = [a.to(dtype) for a in arrays]
+        return torch.cat(arrays, dim=axis, out=out)
+
+    ### Searching Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def argmax(x, /, *, axis=None, keepdims=False):
+        return torch.argmax(x, dim=axis, keepdim=keepdims)
+
+    @staticmethod
+    def argmin(x, /, *, axis=None, keepdims=False):
+        return torch.argmin(x, dim=axis, keepdim=keepdims)
+
+    ### Set Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def unique_all(a, axis=None, **kwargs):
+        if axis is None:
+            a = torch.flatten(a)
+            axis = 0
+        b, inverse, counts = torch.unique(a, return_inverse=True,
+                return_counts=True,
+                dim=axis, **kwargs)
+        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
+        indices = torch.zeros(counts.shape, **kwargs)
+        idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        indices.scatter_(0, inverse.flip(dims=[0]), idx)
+        return b, indices, inverse, counts
+
+    # non-standard
+    @staticmethod
+    def unique_all_(a, axis=None, **kwargs):
+        if axis is None:
+            a = torch.flatten(a)
+            axis = 0
+        b, inverse, counts = torch.unique(a, return_inverse=True,
+                return_counts=True,
+                dim=axis, **kwargs)
+        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
+
+        indices0 = torch.zeros(counts.shape, **kwargs)
+        indices1 = torch.zeros(counts.shape, **kwargs)
+
+        idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
+        indices0.scatter_(0, inverse.flip(dims=[0]), idx)
+
+        idx = torch.arange(a.shape[0], **kwargs)
+        indices1.scatter_(0, inverse, idx)
+        return b, indices0, indices1, inverse, counts
 
     @staticmethod
     def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
-        """
-        """
         b, inverse, counts = torch.unique(a, return_inverse=True,
                 return_counts=True,
                 dim=axis, **kwargs)
@@ -193,90 +211,97 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
         return result
 
+    ###Sorting Functions ###
+    # python array API standard v2023.12
+    argsort = staticmethod(_dim_to_axis(torch.sort))
     @staticmethod
-    def unique_all(a, axis=None, **kwargs):
+    def sort(x, /, *, axis=-1, descending=False, stable=True):
+        return torch.sort(x, dim=axis, descending=descending, stable=stable)[0]
+
+    ### Statistical Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def max(x, /, *, axis=None, keepdims=False):
         if axis is None:
-            a = torch.flatten(a)
-            axis = 0
-        b, inverse, counts = torch.unique(a, return_inverse=True,
-                return_counts=True,
-                dim=axis, **kwargs)
-        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
-        indices = torch.zeros(counts.shape, **kwargs)
-        idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
-        indices.scatter_(0, inverse.flip(dims=[0]), idx)
-        return b, indices, inverse, counts
+            return torch.max(x)
+        return torch.max(x, axis, keepdim=keepdims)[0]
 
     @staticmethod
-    def unique_all_(a, axis=None, **kwargs):
+    def mean(x, /, *, axis=None, keepdims=False):
+        return torch.mean(x, axis, keepdim=keepdims)
+
+    @staticmethod
+    def min(x, /, *, axis=None, keepdims=False):
         if axis is None:
-            a = torch.flatten(a)
-            axis = 0
-        b, inverse, counts = torch.unique(a, return_inverse=True,
-                return_counts=True,
-                dim=axis, **kwargs)
-        kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
-
-        indices0 = torch.zeros(counts.shape, **kwargs)
-        indices1 = torch.zeros(counts.shape, **kwargs)
-
-        idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
-        indices0.scatter_(0, inverse.flip(dims=[0]), idx)
-
-        idx = torch.arange(a.shape[0], **kwargs)
-        indices1.scatter_(0, inverse, idx)
-        return b, indices0, indices1, inverse, counts
+            return torch.min(x)
+        return torch.min(x, axis, keepdim=keepdims)[0]
 
     @staticmethod
-    def sort(a, axis=0, **kwargs):
-        return torch.sort(a, dim=axis, **kwargs)[0]
+    def prod(x, /, *, axis=None, dtype=None, keepdims=False, initial=None):
+        result = torch.prod(x, dim=axis, keepdim=keepdims, dtype=dtype)
+        return result if (initial is None) else result * initial
 
     @staticmethod
-    def argsort(a, axis=-1, **kwargs):
-        return torch.argsort(a, dim=axis, **kwargs)
+    def std(x, /, *, axis=None, correction=0, keepdims=False):
+        return torch.std(x, dim=axis, keepdim=keepdims, correction=correction)
 
     @staticmethod
-    def nonzero(a, /, as_tuple=True):
-        return torch.nonzero(a, as_tuple=as_tuple)
+    def sum(x, /, *, axis=None, dtype=None, keepdims=False, initial=None):
+        result = torch.sum(x, dim=axis, keepdim=keepdims, dtype=dtype)
+        return result if (initial is None) else result + initial
 
     @staticmethod
-    def cumsum(a, axis=None, dtype=None, out=None):
-        return torch.cumsum(a, dim=axis, dtype=dtype, out=out)
+    def var(x, /, *, axis=None, correction=0, keepdims=False):
+        return torch.var(x, dim=axis, keepdim=keepdims, correction=correction)
 
-    @staticmethod
-    def cumprod(a, axis=None, dtype=None, out=None):
-        return torch.cumprod(a, dim=axis, dtype=dtype, out=out)
+    # non-standard
+    cumsum = staticmethod(_dim_to_axis(torch.cumsum))
+    cumprod = staticmethod(_dim_to_axis(torch.cumprod))
 
+    ### Utility Functions ###
+    # python array API standard v2023.12
     @staticmethod
-    def concatenate(arrays, /, axis=0, out=None, *, dtype=None):
-        if dtype is not None:
-            arrays = [a.to(dtype) for a in arrays]
-        return torch.cat(arrays, dim=axis, out=out)
-
-    @staticmethod
-    def stack(arrays, axis=0, out=None, *, dtype=None):
-        if dtype is not None:
-            arrays = [a.to(dtype=dtype) for a in arrays]
-        return torch.stack(arrays, dim=axis, out=out)
-
-    @staticmethod
-    def flip(a, axis=None):
+    def all(x, /, *, axis=None, keepdims=False):
         if axis is None:
-            axis = list(range(a.dim()))
-        elif isinstance(axis, int):
-            axis = [axis]
-        elif isinstance(axis, tuple):
-            axis = list(axis)
-        return torch.flip(a, dims=axis)
+            return torch.all(x)
+        return torch.all(x, dim=axis, keepdim=keepdims)
 
     @staticmethod
-    def where(cond, x=None, y=None, out=None):
-        if x is None or y is None:
-            return torch.as_tensor(cond).nonzero(as_tuple=True)
+    def any(x, /, *, axis=None, keepdims=False):
+        if axis is None:
+            return torch.any(x)
+        return torch.any(x, dim=axis, keepdim=keepdims)
+
+    # non-standard
+    @staticmethod
+    def size(x, /, *, axis=None):
+        if axis is None:
+            return x.numel()
         else:
-            return torch.where(cond, x, y, out=out)
+            return x.size(axis)
 
-    ### Functional programming
+    ### Other Functions ###
+
+    @staticmethod
+    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
+        a.index_add_(indices.ravel(), src.ravel())
+
+    @staticmethod
+    def index_add_(a: Tensor, /, dim, index, src, *, alpha=1):
+        return a.index_add_(dim, index, src, alpha=alpha)
+
+    @staticmethod
+    def scatter(x, indices, val):
+        x.scatter_(0, indices, val)
+        return x
+
+    @staticmethod
+    def scatter_add(x, indices, val):
+        x.scatter_add_(0, indices, val)
+        return x
+
+    ### Functional programming ###
+
     @staticmethod
     def apply_along_axis(func1d, axis, x, *args, **kwargs):
         """
@@ -484,8 +509,9 @@ function_mapping.update(
     array='tensor',
     power='pow',
     transpose='permute',
-    repeat='repeat_interleave',
-    copy='clone'
+    broadcast_arrays='broadcast_tensors',
+    copy='clone',
+    compile='compile'
 )
 PyTorchBackend.attach_methods(function_mapping, torch)
 
