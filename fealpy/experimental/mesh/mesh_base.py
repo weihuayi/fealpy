@@ -404,7 +404,8 @@ class HomogeneousMesh(Mesh):
 
 
         cm = self.entity_measure('cell')
-        f = bm.power(bm.abs(u - v), power)
+        #f = bm.power(bm.abs(u - v), power)
+        f = bm.abs(u - v)**power
         if len(f.shape) == 1:
             f = f[:, None]
 
@@ -419,7 +420,8 @@ class HomogeneousMesh(Mesh):
                 e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
 
         if celltype is False:
-            e = bm.power(bm.sum(e), 1/power)
+            #e = bm.power(bm.sum(e), 1/power)
+            e = bm.sum(e)**(1/power)
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )

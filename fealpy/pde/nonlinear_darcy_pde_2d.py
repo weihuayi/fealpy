@@ -113,7 +113,7 @@ class Data0(DFPDE2d):
         """
         C = CoordSys3D('C')
         u = (C.x+1)**2/4*C.i -(C.x+1)*(C.y+1)/2*C.j
-        p = C.x**3 + C.y**3 - 2
+        p = C.x**3 + C.y**3
         #u = (0*C.x + 1)*C.i + (0*C.y + 1)*C.j
         #p = C.x + C.y - 2
         super(Data0, self).__init__(u, p, mu, beta, rho)

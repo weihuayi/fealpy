@@ -200,8 +200,8 @@ for i in range(maxit):
             break
     uhf = uh.flatten()
     uIf = uI.flatten()
-    for i in range(len(uhf)):
-        print("uh{}: uI: {}, diff: {}".format(uhf[i], uIf[i], uhf[i] - uIf[i]))
+    #for i in range(len(uhf)):
+    #    print("uh{}: uI: {}, diff: {}".format(uhf[i], uIf[i], uhf[i] - uIf[i]))
     error0 = mesh.error(pde.solutionu, uh)
     error1 = mesh.error(pde.solutionp, ph)
     print("error0:", error0)
