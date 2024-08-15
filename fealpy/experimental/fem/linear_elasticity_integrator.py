@@ -92,6 +92,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
                 raise ValueError("Unknown type.")
         elif GD == 3:
             if elasticity_type is None:
+                mu, lam = self.mu, self.lam
                 D = bm.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],
                                   [lam, 2 * mu + lam, lam, 0, 0, 0],
                                   [lam, lam, 2 * mu + lam, 0, 0, 0],
@@ -107,7 +108,8 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
     
     def strain_matrix(self, space: _FS) -> TensorLike:
         '''
-        (NC, NQ, 3, tldof)
+        GD = 2: (NC, NQ, 3, tldof)
+        GD = 2: (NC, NQ, 6, tldof)
         '''
         scalar_space = space.scalar_space
         _, _, gphi, _, _, _ = self.fetch(scalar_space)
@@ -129,7 +131,6 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         D = self.elasticity_matrix(space)
         B = self.strain_matrix(space)
 
-        # KK = bm.einsum('q, c, qcki, kl, qclj -> cij', ws, cm, B, D, B)
         KK = bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
         
         return KK

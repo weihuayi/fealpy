@@ -639,6 +639,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         
     face_to_ipoint = StructuredMesh.edge_to_ipoint
     
+    
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """

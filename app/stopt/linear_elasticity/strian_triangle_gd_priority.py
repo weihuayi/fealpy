@@ -16,7 +16,7 @@ from fealpy.functionspace import LagrangeFESpace as LagrangeFESpace_old
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.sparse.linalg import sparse_cg
+from fealpy.experimental.solver import cg
 from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 
@@ -131,8 +131,8 @@ for i in range(maxit):
     F_independent = F - K_independent.matmul(uh_independent[:])
     F_independent[isDDof] = uh_independent[isDDof]
 
-    uh_dependent[:] = sparse_cg(K_dependent, F_dependent, maxiter=5000, atol=1e-14, rtol=1e-14)
-    uh_independent[:] = sparse_cg(K_independent, F_independent, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh_dependent[:] = cg(K_dependent, F_dependent, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh_independent[:] = cg(K_independent, F_independent, maxiter=5000, atol=1e-14, rtol=1e-14)
 
     u_exact = tensor_space.interpolate(solution)
     errorMatrix[0, i] = bm.max(bm.abs(bm.array(uh_dependent) - u_exact))

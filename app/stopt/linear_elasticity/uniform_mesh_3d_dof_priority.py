@@ -1,5 +1,4 @@
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.mesh import TriangleMesh as TriangleMesh_old
+from fealpy.experimental.mesh import UniformMesh3d
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, \
                                     BilinearForm, LinearForm, \
@@ -12,7 +11,6 @@ from fealpy.fem import LinearForm as LinearForm_old
 from fealpy.fem import DirichletBC as DirichletBC_old
 
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.functionspace import LagrangeFESpace as LagrangeFESpace_old
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
@@ -46,105 +44,100 @@ def dirichlet(points: TensorLike) -> TensorLike:
 
     return solution(points)
 
-nx = 2
-ny = 2
-mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+extent = [0, 2, 0, 2, 0, 2]
+h = [1, 1, 1]
+origin = [0, 0, 0]
+mesh = UniformMesh3d(extent, h, origin)
 
 maxit = 5
-errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
+errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
+import numpy as np
+errorMatrix_old = np.zeros((2, maxit), dtype=np.float64)
+errorMatrix_new_old = np.zeros((2, maxit), dtype=np.float64)
 for i in range(maxit):
-    p = 2
+    p = 1
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     tensor_space = TensorFunctionSpace(space, shape=(2, -1))
 
     # (tgdof, )
     uh_dependent = tensor_space.function()
-    uh_independent = tensor_space.function()
 
     # 与单元有关的组装方法
     integrator_bi_dependent = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-                                            elasticity_type='strain', q=5)
-    # 与单元无关的组装方法
-    integrator_bi_independent = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-                                           method='fast_strain', q=5)
+                                            elasticity_type=None, q=5)
     
     # 与单元有关的组装方法
     KK_dependent = integrator_bi_dependent.assembly(space=tensor_space)
-    # print("KK_dependent:\n", KK_dependent[0])
-    # 与单元无关的组装方法
-    KK_independent = integrator_bi_independent.fast_assembly_strain_constant(space=tensor_space)
-    # print("KK_independent:\n", KK_independent[0])
+    print("KK_dependent:\n", KK_dependent[0])
+    asd
 
     # 与单元有关的组装方法 
     bform_dependent = BilinearForm(tensor_space)
     bform_dependent.add_integrator(integrator_bi_dependent)
     K_dependent = bform_dependent.assembly()
-    # 与单元无关的组装方法
-    bform_independent = BilinearForm(tensor_space)
-    bform_independent.add_integrator(integrator_bi_independent)
-    K_independent = bform_independent.assembly()
-
+    bform_old = BilinearForm_old(tensor_space_old)
+    bform_old.add_domain_integrator(integrator_bi_old)
+    K_old = bform_old.assembly()
+    
     integrator_li = VectorSourceIntegrator(source=source, q=5)
+    integrator_li_old = VectorSourceIntegrator_old(f=source, q=5)
 
     FF = integrator_li.assembly(space=tensor_space)
+    FF_old = integrator_li_old.assembly_cell_vector(space=tensor_space_old)
 
     lform = LinearForm(tensor_space)
     lform.add_integrator(integrator_li)
     F = lform.assembly()
-    
+    lform_old = LinearForm_old(tensor_space_old)
+    lform_old.add_domain_integrator(integrator_li_old)
+    F_old = lform_old.assembly()
+
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
     isDDof = tensor_space.is_boundary_dof(threshold=None)
 
     F = dbc.check_vector(F)
-
     uh_dependent = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_dependent)
     F_dependent = F - K_dependent.matmul(uh_dependent[:])
     F_dependent[isDDof] = uh_dependent[isDDof]
-
-    uh_independent = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_independent)
-    F_independent = F - K_independent.matmul(uh_independent[:])
-    F_independent[isDDof] = uh_independent[isDDof]
-
+    
     K_dependent = dbc.check_matrix(K_dependent)
     kwargs = K_dependent.values_context()
     indices = K_dependent.indices()
     new_values = bm.copy(K_dependent.values())
     IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
     new_values[IDX] = 0
+
     K_dependent = COOTensor(indices, new_values, K_dependent.sparse_shape)
     index, = bm.nonzero(isDDof, as_tuple=True)
     one_values = bm.ones(len(index), **kwargs)
     one_indices = bm.stack([index, index], axis=0)
     K1_dependent = COOTensor(one_indices, one_values, K_dependent.sparse_shape)
     K_dependent = K_dependent.add(K1_dependent).coalesce()
+    K_dependent_dense = K_dependent.to_dense()
 
-    K_independent = dbc.check_matrix(K_independent)
-    kwargs = K_independent.values_context()
-    indices = K_independent.indices()
-    new_values = bm.copy(K_independent.values())
-    IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
-    new_values[IDX] = 0
-    K_independent = COOTensor(indices, new_values, K_independent.sparse_shape)
-    index, = bm.nonzero(isDDof, as_tuple=True)
-    one_values = bm.ones(len(index), **kwargs)
-    one_indices = bm.stack([index, index], axis=0)
-    K1_independent = COOTensor(one_indices, one_values, K_independent.sparse_shape)
-    K_independent = K_independent.add(K1_independent).coalesce()
+    dflag_old = space_old.boundary_interpolate(gD=dirichlet, uh=uh_old)
+    K_old, F_old = DirichletBC_old(space=space_old, gD=dirichlet).apply(K_old, F_old)
+    K_old_dense = K_old.toarray()
 
-    uh_independent = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_independent)
-    F_independent = F - K_independent.matmul(uh_independent[:])
-    F_independent[isDDof] = uh_independent[isDDof]
+    errorMatrix_new_old[0, i] = np.max(np.abs(bm.to_numpy(K_dependent.to_dense()) - K_old.toarray()))
+    errorMatrix_new_old[1, i] = np.max(np.abs(bm.to_numpy(F_dependent) - F_old))
 
     uh_dependent[:] = cg(K_dependent, F_dependent, maxiter=5000, atol=1e-14, rtol=1e-14)
-    uh_independent[:] = cg(K_independent, F_independent, maxiter=5000, atol=1e-14, rtol=1e-14)
+    from scipy.sparse.linalg import spsolve
+    uh_old.flat[:] = spsolve(K_old, F_old)
 
     u_exact = tensor_space.interpolate(solution)
     errorMatrix[0, i] = bm.max(bm.abs(bm.array(uh_dependent) - u_exact))
     errorMatrix[1, i] = bm.max(bm.abs(bm.array(uh_dependent) - u_exact)[isDDof])
-    errorMatrix[2, i] = bm.max(bm.abs(bm.array(uh_independent) - uh_dependent))
+    errorMatrix_old[0, i] = np.max(np.abs(uh_old.ravel() - u_exact))
+    errorMatrix_old[1, i] = np.max(np.abs(uh_old.ravel() - u_exact)[dflag_old.flat])
     
     if i < maxit-1:
         mesh.uniform_refine()
+        mesh_old.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
+print("errorMatrix_old:\n", errorMatrix_old)
+print("errorMatrix_new_old:\n", errorMatrix_new_old)
 print("order:\n ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
+print("order_old:\n ", np.log2(errorMatrix_old[0,:-1]/errorMatrix_old[0,1:]))

@@ -16,7 +16,7 @@ from fealpy.functionspace import LagrangeFESpace as LagrangeFESpace_old
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.sparse.linalg import sparse_cg
+from fealpy.experimental.solver import cg
 from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 
@@ -58,7 +58,7 @@ import numpy as np
 errorMatrix_old = np.zeros((2, maxit), dtype=np.float64)
 errorMatrix_new_old = np.zeros((2, maxit), dtype=np.float64)
 for i in range(maxit):
-    p = 2
+    p = 1
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     space_old = LagrangeFESpace_old(mesh_old, p=p, ctype='C', doforder='sdofs')
     tensor_space = TensorFunctionSpace(space, shape=(2, -1))
@@ -133,7 +133,7 @@ for i in range(maxit):
     errorMatrix_new_old[0, i] = np.max(np.abs(bm.to_numpy(K_dependent.to_dense()) - K_old.toarray()))
     errorMatrix_new_old[1, i] = np.max(np.abs(bm.to_numpy(F_dependent) - F_old))
 
-    uh_dependent[:] = sparse_cg(K_dependent, F_dependent, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh_dependent[:] = cg(K_dependent, F_dependent, maxiter=5000, atol=1e-14, rtol=1e-14)
     from scipy.sparse.linalg import spsolve
     uh_old.flat[:] = spsolve(K_old, F_old)
 
