@@ -15,7 +15,7 @@ unless explicitly annotated otherwise.
 """
 
 class BackendManager():
-    def __init__(self, *, default_backend: str): ... # instance method
+    def __init__(self, *, default_backend: Optional[str]=None): ... # instance method
     def set_backend(self, name: str) -> None: ... # instance method
     def load_backend(self, name: str) -> None: ... # instance method
     def get_current_backend(self) -> Backend: ... # instance method

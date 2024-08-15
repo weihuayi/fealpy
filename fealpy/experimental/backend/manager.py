@@ -1,8 +1,9 @@
 
-from typing import Dict
+from typing import Dict, Optional
 import importlib
 import threading
 
+from ..import logger
 from .base import Backend
 
 
@@ -14,10 +15,10 @@ class BackendManager():
     #         cls._instance = super().__new__(cls)
     #     return cls._instance
 
-    def __init__(self, *, default_backend: str):
+    def __init__(self, *, default_backend: Optional[str]=None):
         self._backends: Dict[str, Backend] = {}
         self._THREAD_LOCAL = threading.local()
-        self.set_backend(default_backend)
+        self._default_backend_name = default_backend
 
     def set_backend(self, name: str) -> None:
         """Set the current backend."""
@@ -39,17 +40,28 @@ class BackendManager():
         else:
             raise RuntimeError(f"Failed to load backend '{name}'.")
 
-    def get_current_backend(self) -> Backend:
+    def get_current_backend(self, logger_msg=None) -> Backend:
         """Get the current backend."""
+        if 'backend' not in self._THREAD_LOCAL.__dict__:
+            if self._default_backend_name is None:
+                raise RuntimeError(
+                    f"Backend properties were accessed ({logger_msg}) "
+                    "before a backend was specified, "
+                    "and no default backend was set in the backend manager."
+                )
+            self.set_backend(self._default_backend_name)
+            logger.info(f"Backend auto-setting triggered by {logger_msg}."
+                        "To reduce unnecessary backend loading, "
+                        "get backend properties and methods after executing set_backend()")
         return self._THREAD_LOCAL.__dict__['backend']
 
     def __getattr__(self, item):
         """Redirct attribute access to the current backend."""
-        return getattr(self.get_current_backend(), item)
+        return getattr(self.get_current_backend("GET_ATTR: " + item), item)
 
     def __setattr__(self, key, value):
         """Redirct attribute access to the current backend."""
-        if key in {'_backends', '_THREAD_LOCAL'}:
+        if key in {'_backends', '_THREAD_LOCAL', '_default_backend_name'}:
             super().__setattr__(key, value)
         else:
-            setattr(self.get_current_backend(), key, value)
+            setattr(self.get_current_backend("SET_ATTR: " + key), key, value)

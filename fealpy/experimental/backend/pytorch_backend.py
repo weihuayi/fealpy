@@ -226,7 +226,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ###Sorting Functions ###
     # python array API standard v2023.12
-    argsort = staticmethod(_dim_to_axis(torch.sort))
+    argsort = staticmethod(_dim_to_axis(torch.argsort))
     @staticmethod
     def sort(x, /, *, axis=-1, descending=False, stable=True):
         return torch.sort(x, dim=axis, descending=descending, stable=stable)[0]
