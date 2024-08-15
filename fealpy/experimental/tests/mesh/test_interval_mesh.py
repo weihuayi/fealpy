@@ -278,7 +278,24 @@ class TestIntervalMeshInterfaces:
         edge2cell = mesh.edge_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(edge2cell), meshdata["edge2cell"])
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
+    @pytest.mark.parametrize("meshdata", quadrature_formula_data)
+    def test_quadrature_formula(self,meshdata,backend):
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
+        q = meshdata['q']
+        qf1 = meshdata['qf1']
+        qf2 = meshdata['qf2']
+        mesh = IntervalMesh(node,cell)
+        qf_test1 = mesh.quadrature_formula(q)[0][0]
+        qf_test2 = mesh.quadrature_formula(q)[0][1]
+
+        np.testing.assert_allclose(bm.to_numpy(qf_test1), qf1)
+        assert qf_test2 == qf2
+
+
+        
 if __name__ == "__main__":
-    pytest.main(["./test_interval_mesh.py","-k", "test_refine"])
+    pytest.main(["./test_interval_mesh.py","-k", "test_quadrature_formula"])
 
         
