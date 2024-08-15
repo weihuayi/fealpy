@@ -21,12 +21,16 @@ Tensor = torch.Tensor
 _device = torch.device
 
 def _dim_to_axis(func):
-    def wrapper(*args, axis, **kwargs):
+    def wrapper(*args, axis=None, **kwargs):
+        if axis is None:
+            return func(*args, **kwargs)
         return func(*args, dim=axis, **kwargs)
     return wrapper
 
 def _dims_to_axes(func):
-    def wrapper(*args, axes, **kwargs):
+    def wrapper(*args, axes=None, **kwargs):
+        if axes is None:
+            return func(*args, **kwargs)
         return func(*args, dims=axes, **kwargs)
     return wrapper
 
