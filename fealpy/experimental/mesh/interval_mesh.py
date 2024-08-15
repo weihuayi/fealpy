@@ -6,21 +6,23 @@ from scipy.sparse import coo_matrix
 from .mesh_data_structure import MeshDS
 from .utils import estr2dim
 from .plot import Plotable
+from .mesh_base import SimplexMesh
 
 
 class IntervalMeshDataStructure(MeshDS):
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
-class IntervalMesh(Plotable):
+class IntervalMesh(SimplexMesh,Plotable):
     def __init__(self, node: TensorLike ,cell:TensorLike):
+        super().__init__(TD=1, itype=cell.dtype, ftype=node.dtype)
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
         else:
             self.node = node
         self.cell = cell
         self.edge = self.cell
-        self.face = bm.arange(self.node.shape[0]).reshape(-1,1)
+        #self.face = bm.arange(self.node.shape[0]).reshape(-1,1)
 
         self.TD = 1
 
