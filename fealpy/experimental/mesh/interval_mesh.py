@@ -45,6 +45,9 @@ class IntervalMesh(SimplexMesh,Plotable):
         self.itype = self.cell.dtype
         self.ftype = self.node.dtype
 
+        self.construct()
+        self.face2cell = self.face_to_cell()
+        self.cell2edge = self.cell_to_edge()
 
 
 
@@ -167,7 +170,14 @@ class IntervalMesh(SimplexMesh,Plotable):
                     node[cell]).reshape(-1, GD)
 
             return ipoint
-        
+    
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        return self.edge_to_ipoint(p, index)
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        NN = self.number_of_nodes()
+        return bm.arange(NN, dtype=self.itype)
+    
     def face_unit_normal(self, index: Index = _S, node=None):
         """
         @brief
@@ -268,7 +278,7 @@ class IntervalMesh(SimplexMesh,Plotable):
     
 
 
-    
+'''''
     def entity(self, etype: Union[int, str], index:Index = _S) -> TensorLike:
         """
         @brief Get entities.
@@ -321,7 +331,7 @@ class IntervalMesh(SimplexMesh,Plotable):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.edge[index]
-        kwargs = {'dtype': edges.dtype, 'device': self.device}
+        kwargs = {'dtype': edges.dtype}
         indices = bm.arange(NE, **kwargs)[index]
         return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
@@ -425,7 +435,7 @@ class IntervalMesh(SimplexMesh,Plotable):
         node = self.entity('node')
         entity = self.entity(etype, index)
         order = getattr(entity, 'bc_order', None)
-        return bm.bc_to_points(bcs, node, entity, order)
+        return bm.bc_to_points(bcs, node, entity)
     
 
     # 1D data_structure
@@ -567,3 +577,4 @@ class IntervalMesh(SimplexMesh,Plotable):
 
 
 IntervalMesh.set_ploter('1d')
+'''

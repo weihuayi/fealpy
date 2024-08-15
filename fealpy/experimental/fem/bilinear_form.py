@@ -35,7 +35,7 @@ class BilinearForm(Form):
                              f"but got {len(self._spaces)} spaces.")
         if len(self._spaces) == 2:
             s0, s1 = self._spaces
-            if s0.device != s1.device:
+            if s0.mesh.device != s1.mesh.device:
                 raise ValueError("Spaces should have the same device, "
                                 f"but got {s0.device} and {s1.device}.")
             if s0.ftype != s1.ftype:

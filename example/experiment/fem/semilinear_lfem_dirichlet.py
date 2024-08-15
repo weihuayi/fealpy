@@ -1,19 +1,21 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.sparse.linalg import spsolve
-from fealpy.tools import showmultirate
 
-#三角形网格
+import ipdb
+import argparse
+from matplotlib import pyplot as plt
+
+from fealpy.experimental import logger
+logger.setLevel('WARNING')
+
+from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import TriangleMesh
-
-# 拉格朗日有限元空间
 from fealpy.experimental.functionspace import LagrangeFESpace
-
-#区域积分子
+from fealpy.experimental.fem import NonlinearForm
 from fealpy.experimental.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
 from fealpy.experimental.fem import ScalarSourceIntegrator
+from fealpy.experimental.solver import cg
 
-from fealpy.fem import NonlinearForm
+from fealpy.utils import timer
+
 
 import numpy as np
 from fealpy.decorator import cartesian
@@ -102,6 +104,43 @@ def nonlinear_gradient_func(u):
     val = 3*u**2
     return val
 
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        任意次有限元方法求解possion方程
+        """)
+
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--n',
+        default=4, type=int,
+        help='初始网格剖分段数.')
+
+parser.add_argument('--maxit',
+        default=4, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
+
+parser.add_argument('--backend',
+        default='numpy', type=str,
+        help='默认后端为numpy')
+
+parser.add_argument('--meshtype',
+        default='tri', type=str,
+        help='默认网格为三角形网格')
+
+args = parser.parse_args()
+
+
+bm.set_backend(args.backend)
+p = args.degree
+n = args.n
+meshtype = args.meshtype
+maxit = args.maxit
+
+tmr = timer()
+next(tmr)
 
 domain = [0, 1, 0, 2]
 nx = 4
@@ -128,42 +167,42 @@ for i in range(maxit):
     # isDDof = space.is_boundary_dof(pde.dirichlet, u0)
     isIDof = ~isDDof
 
-    D = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient, q=p+2)
-    M = ScalarMassIntegrator(uh=u0, uh_func=nonlinear_func, grad_uh_func=nonlinear_gradient_func, c=pde.reaction_coefficient, q=p+2)
+    D = ScalarDiffusionIntegrator(u0, pde.diffusion_coefficient, q=p+2)
+    M = ScalarMassIntegrator(u0, nonlinear_func, nonlinear_gradient_func, pde.reaction_coefficient, q=p+2)
     f = ScalarSourceIntegrator(pde.source, q=p+2)
 
-    while True:
-        n = NonlinearForm(space)
-        n.add_domain_integrator([D, M, f])
+#     while True:
+#         n = NonlinearForm(space)
+#         n.add_domain_integrator([D, M, f])
         
-        A, F = n.assembly()
+#         A, F = n.assembly()
 
-        du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
-        u0 += du
-        err = np.max(np.abs(du))
+#         du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
+#         u0 += du
+#         err = np.max(np.abs(du))
 
-        if err < tol:
-            break
+#         if err < tol:
+#             break
 
-    uI = space.interpolate(pde.solution)
-    errorMatrix[0, i] = mesh.error(pde.solution, u0, q=p+2)
-    errorMatrix[1, i] = mesh.error(pde.gradient, u0.grad_value, q=p+2)
-    if i < maxit-1:
-        mesh.uniform_refine()
+#     uI = space.interpolate(pde.solution)
+#     errorMatrix[0, i] = mesh.error(pde.solution, u0, q=p+2)
+#     errorMatrix[1, i] = mesh.error(pde.gradient, u0.grad_value, q=p+2)
+#     if i < maxit-1:
+#         mesh.uniform_refine()
 
-#收敛阶    
-print(errorMatrix)
-print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
-showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20)   
+# #收敛阶    
+# print(errorMatrix)
+# print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
+# showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20)   
 
-#可视化
-bc = np.array([1/3, 1/3, 1/3])
-uI = space.interpolate(pde.solution)
-uI = uI(bc)
-uh = u0(bc)
+# #可视化
+# bc = np.array([1/3, 1/3, 1/3])
+# uI = space.interpolate(pde.solution)
+# uI = uI(bc)
+# uh = u0(bc)
 
-fig, axes = plt.subplots(1, 2)
-mesh.add_plot(axes[0], cellcolor=uI, linewidths=0)
-mesh.add_plot(axes[1], cellcolor=uh, linewidths=0) 
+# fig, axes = plt.subplots(1, 2)
+# mesh.add_plot(axes[0], cellcolor=uI, linewidths=0)
+# mesh.add_plot(axes[1], cellcolor=uh, linewidths=0) 
 
-plt.show()
+# plt.show()
