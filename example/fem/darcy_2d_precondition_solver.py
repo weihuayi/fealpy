@@ -2,7 +2,7 @@ import argparse
 
 import numpy as np
 import sympy as sp
-from scipy.sparse.linalg import spsolve, spdiags
+from scipy.sparse.linalg import spsolve
 
 import matplotlib.pyplot as plt
 

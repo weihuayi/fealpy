@@ -14,12 +14,6 @@ class DofDofStabilizationTermIntegrator2d():
         mesh = space.mesh
 
         f1 = lambda x: (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-        def f1(x):
-            print(np.max(np.abs(x[0])))
-            print(np.max(np.abs(x[1])))
-            print(x[0]@x[1])
-            print((np.eye(x[1].shape[1]) - x[0]@x[1]).T)
-            return (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
 
         K = list(map(f1, zip(self.D, self.PI1)))
 
