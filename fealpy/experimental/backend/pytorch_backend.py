@@ -91,6 +91,12 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triu(x, /, *, k=0): return torch.triu(x, k)
 
+    ### Data Type Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def astype(x, dtype, /, *, copy=True, device=None):
+        return x.to(dtype=dtype, device=device, copy=copy)
+
     ### Element-wise Functions ###
 
     ### Indexing Functions ###
@@ -150,6 +156,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def argmin(x, /, *, axis=None, keepdims=False):
         return torch.argmin(x, dim=axis, keepdim=keepdims)
+
+    @staticmethod
+    def nonzero(x, /):
+        return torch.nonzero(x, as_tuple=True)
 
     ### Set Functions ###
     # python array API standard v2023.12
