@@ -1373,17 +1373,19 @@ class TriangleMesh(Mesh, Plotable):
         rows,cols = local_index.shape
         node_index = cell[global_index][np.arange(rows)[:,None],np.arange(cols),local_index]
         node_degree = degree[node_index]
-        np.argmin(node_degree,axis=1) 
+        np.argmin(node_degree,axis=1)
         markcell4 = global_index[np.arange(len(global_index)),np.argmin(node_degree,axis=1)]
-        
+        markedge3 = aux_edge[np.arange(len(global_index)),np.argmin(node_degree,axis=1)]
+
         judge2 = (node_degree[:,0]!=node_degree[:,1])
 
         if np.sum(judge2)>0:
             cell_area = area[global_index[judge2]]
             markcell4[judge2] = global_index[judge2][np.arange(len(cell_area)),np.argmax(cell_area,axis=1)]
+            markedge3[judge2] = aux_edge[judge2][np.arange(len(cell_area)),np.argmax(cell_area,axis=1)]
         markcell3_index[judge] = markcell4
+        markedge2[judge] = markedge3
         deletecell[:,2] = markcell3_index
-        
         rows, cols = deletecell.shape
         mask = np.ones(rows, dtype=np.bool8)
         row_sets = [set(row) for row in deletecell]
@@ -1398,8 +1400,34 @@ class TriangleMesh(Mesh, Plotable):
         vertices = np.array([row[np.unique(row, return_index=True)[1]] for row in vertices])
         insert_node = np.sum(node[vertices],axis=1)/5
 
+        mask_cell_flag = np.ones(NC,dtype=np.bool8)
+        mask_cell_flag[deletecell.reshape(-1)] = False
+        newcell0 = cell[mask_cell_flag]
+
         polygon_edge = cell2edge[deletecell].reshape(-1,9)
-        print(polygon_edge)
+        polygon_edge_flag = (polygon_edge==markedge1[:,None]) | (polygon_edge==markedge2[:,None])
+        polygon_edge = polygon_edge[~polygon_edge_flag].reshape(-1,5)
+        newcell1 = np.zeros((len(insert_node),3),dtype=np.int64)
+        newcell2 = np.zeros((len(insert_node),3),dtype=np.int64)
+        newcell1[:,0] = np.arange(NN,NN+len(insert_node))
+        newcell2[:,0] = np.arange(NN,NN+len(insert_node))
+        newcell1[:,1] = edge[polygon_edge[:,0],0]
+        newcell1[:,2] = edge[polygon_edge[:,0],1]
+               
+        for i in range(1,5):
+            newcell2[:,1] = edge[polygon_edge[:,i],0]
+            newcell2[:,2] = edge[polygon_edge[:,i],1]
+            newcell1 = np.r_[newcell1,newcell2]
+        
+        node = np.r_[node,insert_node]
+        v1 = node[newcell1[:,1]]-node[newcell1[:,0]]
+        v2 = node[newcell1[:,2]]-node[newcell1[:,0]]
+        flag = np.cross(v1,v2)
+        newcell1[flag<0,0],newcell1[flag<0,1] = newcell1[flag<0,1],newcell1[flag<0,0]
+        newcell = np.r_[newcell0,newcell1]
+        self.node = node
+        NN = self.node.shape[0]
+        self.ds.reinit(NN,newcell)
 
     @staticmethod
     def adaptive_options(
