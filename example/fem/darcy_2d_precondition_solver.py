@@ -2,7 +2,7 @@ import argparse
 
 import numpy as np
 import sympy as sp
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, spdiags
 
 import matplotlib.pyplot as plt
 
@@ -79,6 +79,7 @@ class DarcyPreconditionSolver:
             bform = BilinearForm((uspace, uspace))
             bform.add_domain_integrator(VectorMassIntegrator(c=pde.nonlinear_operator(uh)))
             A = bform.assembly()
+
             AA = bmat([[A, B], [B.T, None]], format='csr', dtype=np.float64)
             FF = np.hstack((F, G))
 
@@ -96,6 +97,7 @@ class DarcyPreconditionSolver:
             flag = np.max(np.abs(uhval-uh[:])) < 1e-8
             uh[:] = uhval
             ph[:-1] = phval
+            break
             if flag:
                 break
         ph[:] -= Int@ph/4
@@ -123,7 +125,7 @@ class DarcyPreconditionSolver:
         return new_matrix
 
 n = 2
-maxit = 2
+maxit = 1
 pde = Data0() 
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 solver = DarcyPreconditionSolver(pde, 1)

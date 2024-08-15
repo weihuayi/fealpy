@@ -589,16 +589,18 @@ class TensorMesh(HomogeneousMesh):
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
 
-        mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
+        mi = bm.arange(p+1)[:, None]
+        mi = bm.broadcast_to(mi, (p+1, p+1)).reshape(-1, p+1)
+
         multiIndex0 = mi.flatten().reshape(-1, 1);
         multiIndex1 = mi.T.flatten().reshape(-1, 1);
         multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
 
         dofidx = [0 for i in range(4)] 
-        dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
-        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
-        dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
-        dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
+        dofidx[0] = bm.nonzero(multiIndex[:, 1]==0)[0]
+        dofidx[1] = bm.nonzero(multiIndex[:, 0]==p)[0]
+        dofidx[2] = bm.nonzero(multiIndex[:, 1]==p)[0]
+        dofidx[3] = bm.nonzero(multiIndex[:, 0]==0)[0]
 
         face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
         localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=self.itype)
