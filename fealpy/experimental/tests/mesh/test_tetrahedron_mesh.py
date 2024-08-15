@@ -250,9 +250,6 @@ class TestTetrahedronMeshInterfaces:
         mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=4,ny=3,nz=1)
         qf = mesh.quadrature_formula(5, "cell")
         bcs , ws = qf.get_quadrature_points_and_weights()
-        print(bcs)
-        print(ws)
-
 
 
 
