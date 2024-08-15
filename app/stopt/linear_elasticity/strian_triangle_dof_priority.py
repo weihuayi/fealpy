@@ -21,7 +21,9 @@ from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 
 
-bm.set_backend('numpy')
+# bm.set_backend('numpy')
+# bm.set_backend('pytorch')
+# bm.set_backend('jax')
 
 # 平面应变问题定义
 def source(points: TensorLike) -> TensorLike:

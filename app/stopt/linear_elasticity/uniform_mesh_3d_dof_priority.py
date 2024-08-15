@@ -48,6 +48,17 @@ extent = [0, 2, 0, 2, 0, 2]
 h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True)
+mesh.find_edge(axes, showindex=True)
+mesh.find_face(axes, showindex=True)
+mesh.find_cell(axes, showindex=True)
+
+plt.show()
 
 maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
