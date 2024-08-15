@@ -1232,6 +1232,174 @@ class TriangleMesh(Mesh, Plotable):
         self.node = newnode
         NN = newnode.shape[0]
         self.ds.reinit(NN,newcell)
+    
+    def degree_edgeswap(self):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        edge = self.entity('edge')
+         
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+       
+        isBdNode = self.ds.boundary_node_flag()
+        isFreeNode = ~isBdNode
+
+        node2node = self.ds.node_to_node()
+        node2cell = self.ds.node_to_cell()
+        edge2cell = self.ds.edge_to_cell()
+
+        degree = np.array(np.sum(node2cell > 0, axis=1)).reshape(-1)
+        edge_degree = degree[edge]
+        
+        # 找到两个端点的度都为7的边
+        markedge = (edge_degree[:,0]==7) & (edge_degree[:,1]==7) 
+        markcell_index = edge2cell[markedge][:,:2]# 边所在的两个单元
+        
+        markcell = cell[markcell_index]
+        markcell_degree = degree[markcell]# 单元节点的度
+        # 计算两个单元节点度的和
+        markcell_degreesum = np.sum(np.sum(markcell_degree,axis=1),axis=1)
+        
+        # 两个单元节点度的和为38(四个节点度为7,7,5,5)或39(四个节点度为7,7,5,6)的单元
+        swapcellflag = (markcell_degreesum==38) | (markcell_degreesum==39)
+        swapcell = markcell[swapcellflag]# 交换边的单元
+        swapedge = edge[markedge]
+        swapedge = swapedge[swapcellflag]#要交换的边
+        swapcelldegree = markcell_degree[swapcellflag]
+        swapcelldegreeflag = np.ones_like(swapcelldegree,dtype=np.bool_)
+        swapcelldegreeflag[swapcelldegree==7] = False
+        swapnode = swapcell[swapcelldegreeflag].reshape(-1,2)# 新边的节点
+        
+        # 删除单元 
+        maskcell = np.ones(NC,dtype=np.bool_)
+        deletecell = markcell_index[swapcellflag].reshape(-1)
+        maskcell[deletecell] = False
+        newcell0 = cell[maskcell]
+
+        newcell1 = np.zeros((len(swapnode),3),dtype=np.int_)
+        newcell2 = np.zeros((len(swapnode),3),dtype=np.int_)
+
+        newcell1[:,:2] = swapnode
+        newcell2[:,:2] = swapnode
+        newcell1[:,2] = swapedge[:,0]
+        newcell2[:,2] = swapedge[:,1]
+        
+        # 调整单元节点编号顺序
+        newcell = np.r_[newcell1,newcell2]
+        v1 = node[newcell[:,1]]-node[newcell[:,0]]
+        v2 = node[newcell[:,2]]-node[newcell[:,0]]
+        flag = np.cross(v1,v2)
+        newcell[flag<0,0],newcell[flag<0,1] = newcell[flag<0,1],newcell[flag<0,0]
+
+        newcell = np.r_[newcell0,newcell]# 新的单元
+        self.ds.reinit(NN,newcell)
+
+    def insert_node_optimize(self,angle_limit=88):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        edge = self.entity('edge')
+        area = self.entity_measure('cell')
+         
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        cell_index = np.arange(NC)
+
+        node2node = self.ds.node_to_node()
+        node2cell = self.ds.node_to_cell()
+        edge2cell = self.ds.edge_to_cell()
+        cell2edge = self.ds.cell_to_edge()
+        degree = np.array(np.sum(node2node, axis=1)).reshape(-1)
+        
+        angle = self.angle()
+        max_angle = np.max(angle,axis=1)
+        angles = max_angle*(180/np.pi)
+        markangle = (angles>angle_limit)
+
+        markcell = cell[markangle]
+        markcell_index = cell_index[markangle]
+
+        rows, cols = markcell.shape
+        mask = np.ones(rows, dtype=np.bool8)
+        row_sets = [set(row) for row in markcell]
+
+        for i in range(rows):
+            if mask[i]:
+                for j in range(i+1,rows):
+                    if mask[j] and not row_sets[i].isdisjoint(row_sets[j]):
+                        mask[j] = False
+        markcell1 = markcell[mask]
+        markcell1_index = markcell_index[mask]
+        
+        deletecell = np.zeros((len(markcell1_index),3),dtype = np.int64)
+        
+        deletecell[:,0] = markcell1_index
+        markcell1_degree = degree[markcell1]
+        markcell1_angle = angle[markcell1_index]
+        angle_max_positions = np.argmax(markcell1_angle,axis=1)
+        markcell_edgeindex = cell2edge[markcell1_index]
+        markedge1 = markcell_edgeindex[np.arange(len(angle_max_positions)),angle_max_positions]
+        markcell2_index = edge2cell[markedge1,:2]
+        
+        _,mask_index = np.where(markcell2_index==markcell1_index[:,None])
+        mask_index = 1-mask_index
+        markcell2_index = markcell2_index[np.arange(len(mask_index)),mask_index]
+        deletecell[:,1] = markcell2_index
+        
+        markedge1_degree = degree[edge[markedge1]]
+        
+        edgedegree_min_positions = np.argmin(markedge1_degree,axis=1)
+        aux_node = edge[markedge1][np.arange(len(edgedegree_min_positions)),edgedegree_min_positions]
+        markcell2 = cell[markcell2_index]
+        mask_edge2 = (markcell2 == aux_node[:,None])
+        markedge2 = cell2edge[markcell2_index][mask_edge2]
+        
+        markcell3_index = edge2cell[markedge2,:2]
+        _,mask_index = np.where(markcell3_index==markcell2_index[:,None])
+        mask_index = 1-mask_index
+        markcell3_index = markcell3_index[np.arange(len(mask_index)),mask_index]
+
+        judge = (markedge1_degree[:,0]==markedge1_degree[:,1])
+        aux_edge = markedge1[judge]
+        aux_cell_index = markcell2_index[judge]
+        aux_cell = cell[aux_cell_index]
+        mask = (aux_cell == edge[aux_edge,0,None]) | (aux_cell == edge[aux_edge,1,None])
+        aux_edge = cell2edge[aux_cell_index][mask].reshape(-1,2)
+        global_index = edge2cell[aux_edge,:2]
+        local_index = edge2cell[aux_edge,2:]
+        mask = ~(global_index == aux_cell_index[:,None,None])
+        global_index = global_index[mask].reshape(-1,2)
+        local_index = local_index[mask].reshape(-1,2)
+        
+        rows,cols = local_index.shape
+        node_index = cell[global_index][np.arange(rows)[:,None],np.arange(cols),local_index]
+        node_degree = degree[node_index]
+        np.argmin(node_degree,axis=1) 
+        markcell4 = global_index[np.arange(len(global_index)),np.argmin(node_degree,axis=1)]
+        
+        judge2 = (node_degree[:,0]!=node_degree[:,1])
+
+        if np.sum(judge2)>0:
+            cell_area = area[global_index[judge2]]
+            markcell4[judge2] = global_index[judge2][np.arange(len(cell_area)),np.argmax(cell_area,axis=1)]
+        markcell3_index[judge] = markcell4
+        deletecell[:,2] = markcell3_index
+        
+        rows, cols = deletecell.shape
+        mask = np.ones(rows, dtype=np.bool8)
+        row_sets = [set(row) for row in deletecell]
+
+        for i in range(rows):
+            if mask[i]:
+                for j in range(i+1,rows):
+                    if mask[j] and not row_sets[i].isdisjoint(row_sets[j]):
+                        mask[j] = False
+        deletecell = deletecell[mask]
+        vertices = cell[deletecell[:,::2]].reshape(-1,6)
+        vertices = np.array([row[np.unique(row, return_index=True)[1]] for row in vertices])
+        insert_node = np.sum(node[vertices],axis=1)/5
+
+        polygon_edge = cell2edge[deletecell].reshape(-1,9)
+        print(polygon_edge)
 
     @staticmethod
     def adaptive_options(
@@ -2051,7 +2219,7 @@ class TriangleMesh(Mesh, Plotable):
         data = meshio.read(file)
         node = data.points
         cell = data.cells_dict['triangle']
-        print(data.cells_dict)
+        #print(data.cells_dict)
         mesh = cls(node, cell)
         if show:
             import matplotlib.pyplot as plt
