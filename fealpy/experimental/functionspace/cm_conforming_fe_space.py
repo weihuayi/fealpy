@@ -4,9 +4,10 @@ from ..backend import TensorLike
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
 from fealpy.experimental.functionspace.bernstein_fe_space import BernsteinFESpace
-from .functional import symmetry_span_array, symmetry_index
+from .functional import symmetry_span_array, symmetry_index, span_array
 from scipy.special import factorial, comb
 from scipy.linalg import solve_triangular
+from fealpy.decorator import barycentric
 
 
 _MT = TypeVar('_MT', bound=Mesh)
@@ -131,7 +132,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 n0 += n1
                 n1 += 1
         return c2d
-    def is_boundary_dof(self):
+    def is_boundary_dof(self, threshold): #TODO:这个threshold 没有实现
         p = self.p
         m = self.m
         gdof = self.number_of_global_dofs()
@@ -178,7 +179,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         dof2midx = bm.concatenate([S02m0, S02m1, S02m2, S1m0, S1m1, S1m2, S2])  
         midx2num = lambda a: (a[:, 1]+a[:, 2])*(1+a[:, 1]+ a[:, 2])//2 + a[:, 2]
         dof2num = midx2num(dof2midx)
-        dof2num = bm.argsort(dof2num)
+        dof2num = bm.argsort(dof2num, axis=0)
 
         # 局部自由度 顶点
         S02m = [S02m0, S02m1, S02m2]
@@ -287,7 +288,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         coeff[:, :3*ndof] = bm.einsum('cji,cjk->cik', coeff1, coeff[:, :3*ndof])
         return coeff[:, :, dof2num]
 
-    def basis(self, bcs):
+    def basis(self, bcs, index=_S):#TODO:这个index没实现
         coeff = self.coeff
         bphi = self.bspace.basis(bcs)
         return bm.einsum('cil, cql->cqi', coeff, bphi)
@@ -295,9 +296,223 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
     def grad_m_basis(self, bcs, m):
         coeff = self.coeff
         bgmphi = self.bspace.grad_m_basis(bcs, m)
-        print(bgmphi.shape)
         return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
 
+
+    def boundary_interpolate(self, gD, uh, threshold=None):
+        '''
+        @param gD : [right, tr], 第一个位置为方程的右端项，第二个位置为迹函数
+        '''
+        #TODO 只处理的边界为 0 的情况
+        mesh = self.mesh
+        m = self.m
+        p = self.p
+        isCornerNode = self.isCornerNode 
+        coridx = bm.where(isCornerNode)[0]
+        isBdNode = mesh.boundary_node_flag()
+        isBdEdge = mesh.boundary_face_flag()
+        bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32)
+        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum())
+        n2id = self.node_to_dof()[isBdNode]
+        e2id = self.edge_to_internal_dof()[isBdEdge]
+
+        node = self.mesh.entity('node')[isBdNode]
+        edge = self.mesh.entity('edge')[isBdEdge]
+        NN = len(node)
+        NE = len(edge)
+
+        n = mesh.edge_unit_normal()[isBdEdge]
+        nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64) ## 注意！！！先 t 后 n
+        nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
+        nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
+        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1, 0]])
+        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2), (len(coridx), 1, 1))
+
+        # 顶点自由度
+        uh[n2id[:, 0]] = gD[0](node) 
+        k = 1; 
+        for r in range(1, 2*m+1):
+            val = gD[r](node) 
+            multiIndex = self.mesh.multi_index_matrix(r, 1)
+            symidx, num = symmetry_index(2, r)
+
+            #idx = self.mesh.multi_index_matrix(r, 1)
+            #num = factorial(r)/bm.prod(factorial(idx), axis=1)
+
+            L = min(m+1, r+1)
+            for j in range(L):
+                nt = symmetry_span_array(nodefram, multiIndex[j])
+                uh[n2id[:, k+j]] = bm.einsum("ni, ni, i->n", val, nt.reshape(NN, -1)[:, symidx], num)
+
+            for j in range(L, r+1):
+                idx = bdnidxmap[coridx]
+                nt = symmetry_span_array(nodefram[idx], multiIndex[j])
+                uh[n2id[idx, k+j]] = bm.einsum("ni, ni, i->n", val[idx], nt.reshape(idx.shape[0], -1)[:, symidx], num)
+            k += r+1
+
+        # 边上的自由度
+        n = mesh.edge_normal()[isBdEdge]
+        k = 0; l = p-4*m-1
+        for r in range(m+1):
+            bcs = self.mesh.multi_index_matrix(p-r, 1)/(p-r)
+            b2l = self.bspace.bernstein_to_lagrange(p-r, 1)
+            point = self.mesh.bc_to_point(bcs)[isBdEdge]
+            if r==0:
+                ffval = gD[0](point) #(ldof, NE)
+                bcoeff = bm.einsum('el, il->ei', ffval, b2l, optimize=True)
+                uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
+            else:
+                symidx, num = symmetry_index(2, r)
+                nnn = span_array(n[:, None, :], bm.array([r]))
+                nnn = nnn.reshape(NE, -1)[:, symidx]
+
+                #GD = self.mesh.geo_dimension()
+                #idx = self.mesh.multi_index_matrix(r, GD-1)
+                #num = factorial(r)/bm.prod(factorial(idx), axis=1)
+
+                ffval = gD[r](point) #(ldof, NE, L), L 指的是分量个数，k 阶导有 k 个
+                bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l, optimize=True)
+                uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
+            k = l
+            l += p-4*m+r
+        isDDof = self.is_boundary_dof(threshold=threshold)
+        uI = self.interpolation(gD)
+        isDDofidx = bm.where(isDDof)[0]
+        #uh[isDDof] = uI[isDDof]
+        return isDDof
+
+    def interpolation(self, flist):
+        """
+        @breif 对函数进行插值，其中 flist 是一个长度为 2m+1 的列表，flist[k] 是 f 的 k
+            阶导组成的列表, 如 m = 1 时，flist = [[f], [fx, fy], [fxx, fxy, fyy]]
+        """
+
+        m = self.m
+        p = self.p
+        mesh = self.mesh
+        fI = self.function()
+
+        n2id = self.node_to_dof()
+        e2id = self.edge_to_internal_dof()
+        c2id = self.cell_to_internal_dof()
+
+        node = self.mesh.entity('node')
+
+        # 顶点自由度
+        fI[n2id[:, 0]] = flist[0](node) 
+        k = 1; 
+        for r in range(1, 2*m+1):
+            fI[n2id[:, k:k+r+1]] = flist[r](node) 
+            k += r+1
+
+        # 边上的自由度
+        NE = mesh.number_of_edges()
+        n = mesh.edge_normal()
+        k = 0; l = p-4*m-1
+        for r in range(m+1):
+            bcs = self.mesh.multi_index_matrix(p-r, 1)/(p-r)
+            b2l = self.bspace.bernstein_to_lagrange(p-r, 1)
+            point = self.mesh.bc_to_point(bcs)
+            if r==0:
+                ffval = flist[0](point) #(ldof, NE)
+                bcoeff = bm.einsum('el, il->ei', ffval, b2l, optimize=True)
+                fI[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
+            else:
+                symidx, num = symmetry_index(2, r)
+
+                nnn = span_array(n[:, None, :], bm.array([r]))
+                nnn = nnn.reshape(NE, -1)[:, symidx]
+
+                #GD = self.mesh.geo_dimension()
+                #idx = self.mesh.multi_index_matrix(r, GD-1)
+                #num = factorial(r)/bm.prod(factorial(idx), axis=1)
+
+                ffval = flist[r](point) #(ldof, NE, L), L 指的是分量个数，k 阶导有 k 个
+                bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l, optimize=True)
+                fI[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
+            k = l
+            l += p-4*m+r
+
+        #内部自由度
+        midx = self.mesh.multi_index_matrix(p, 2)
+        bcs = self.mesh.multi_index_matrix(p, 2)/p
+        b2l = self.bspace.bernstein_to_lagrange(p, 2)
+        point = self.mesh.bc_to_point(bcs)
+        ffval = flist[0](point) #(ldof, NE)
+        bcoeff = bm.einsum('el, il->ei', ffval, b2l, optimize=True)
+
+        flag = bm.all(midx > m, axis=1)# & bm.all(midx < p-2*m-1, axis=1)
+        fI[c2id] = bcoeff[:, flag]
+    
+        # 边界节点上的自由度的处理
+        isCornerNode = self.isCornerNode 
+        coridx = bm.where(isCornerNode)[0]
+        isBdNode = mesh.boundary_node_flag()
+        isBdEdge = mesh.boundary_face_flag()
+        bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32)
+        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum())
+        n2id = self.node_to_dof()[isBdNode]
+        e2id = self.edge_to_internal_dof()[isBdEdge]
+
+        node = self.mesh.entity('node')[isBdNode]
+        edge = self.mesh.entity('edge')[isBdEdge]
+        NN = len(node)
+        NE = len(edge)
+
+        n = mesh.edge_unit_normal()[isBdEdge]
+        nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64) ## 注意！！！先 t 后 n
+        nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
+        nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
+        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1, 0]])
+        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2), (len(coridx), 1, 1))
+
+        k = 1; 
+        for r in range(1, 2*m+1):
+            val = flist[r](node) 
+            multiIndex = self.mesh.multi_index_matrix(r, 1)
+            symidx, num = symmetry_index(2, r)
+
+            #idx = self.mesh.multi_index_matrix(r, 1)
+            #num = factorial(r)/bm.prod(factorial(idx), axis=1)
+
+            L = min(m+1, r+1)
+            for j in range(r+1):
+                nt = symmetry_span_array(nodefram, multiIndex[j])
+                fI[n2id[:, k+j]] = bm.einsum("ni, ni, i->n", val, nt.reshape(NN, -1)[:, symidx], num)
+            k += r+1
+        #self.boundary_interpolate(flist, fI)
+        return fI
+
+    @barycentric
+    def value(self, uh ,bc, index=_S):
+        """
+        @brief Computes the value of a finite element function `uh` at a set of
+        barycentric coordinates `bc` for each mesh cell.
+
+        @param uh: numpy.ndarray, the dof coefficients of the basis functions.
+        @param bc: numpy.ndarray, the barycentric coordinates with shape (NQ, TD+1).
+        @param index: Union[numpy.ndarray, slice], index of the entities (default: np.s_[:]).
+        @return numpy.ndarray, the computed function values.
+
+        This function takes the dof coefficients of the finite element function `uh` and a set of barycentric
+        coordinates `bc` for each mesh cell. It computes the function values at these coordinates
+        and returns the results as a numpy.ndarray.
+        """
+        phi = self.basis(bc) # (NQ, 1, ldof)
+        cell2dof = self.cell_to_dof()
+        val = bm.einsum('cql, cl->cq', phi, uh[cell2dof])
+        return val
+
+    @barycentric
+    def grad_m_value(self, uh, bcs, m):
+        gmphi = self.grad_m_basis(bcs, m) # (NQ, 1, ldof)
+        cell2dof = self.cell_to_dof()
+        val = bm.einsum('cqlg, cl->cqg', gmphi, uh[cell2dof])
+        return val
+
+    @barycentric
+    def grad_value(self, uh, bcs):
+        return self.grad_m_value(uh, bcs, 1)
 
 
 
