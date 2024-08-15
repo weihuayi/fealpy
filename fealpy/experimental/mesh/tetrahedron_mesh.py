@@ -175,7 +175,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             vjm = node[cell[index, m],:] - node[cell[index, j],:]
             Dlambda[:, i, :] = bm.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
-
+    """
     def grad_shape_function(self, bc, p=1, index=_S, variables='x'):
         R = bm.simplex_grad_shape_function(bc, p=p)
         if variables == 'x':
@@ -184,8 +184,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             return gphi #(..., NC, ldof, GD)
         elif variables == 'u':
             return R
-
-    cell_grad_shape_function = grad_shape_function
+    """
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
