@@ -16,10 +16,13 @@ from .integrator import (
 
 
 class ScalarMassIntegrator(CellOperatorIntegrator):
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, uh=None, func=None, grad_func=None, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()
+        self.uh = uh
+        self.func = func
+        self.grad_func = grad_func
         self.coef = coef
         self.q = q
         self.index = index
@@ -57,10 +60,13 @@ class ScalarMassIntegrator(CellOperatorIntegrator):
     @assemblymethod('nonlinear')
     def nonlinear_assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
+        func = self.func
+        grad_func = self.grad_func
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, gphi, cm, index = self.fetch(space)
-        val = -uh.grad_value(bcs)# (C, Q, dof_numel)
+        bcs, ws, phi, cm, index = self.fetch(space)
+        val1 = grad_func(uh(bcs)) # (C, Q)
+        val2 = -func(uh(bcs))     # (C, Q)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)   
 
-        return nonlinear_integral(val, gphi, ws, cm, coef, batched=self.batched), bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
+        return nonlinear_integral(phi, phi, val1, val2, ws, cm, coef, batched=self.batched)
