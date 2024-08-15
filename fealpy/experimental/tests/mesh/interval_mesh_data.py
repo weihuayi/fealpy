@@ -4,7 +4,6 @@ from fealpy.mesh import IntervalMesh as IMesh
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TMesh
 
-
 init_mesh_data = [
     {
         "node": np.array([[0.] , [1.]], dtype=np.float64),
@@ -428,4 +427,19 @@ refine_data  = [
         "NC": 3
     }
 ]
-
+quadrature_formula_data = [
+    {
+        "node" : np.array([0,1,2,3],dtype=np.float64),
+        "cell" : np.array([[0,1],[1,2],[2,3]],dtype=np.int32),
+        "q"  : 1,
+        "qf1" : np.array([0.5, 0.5]),
+        "qf2" : 1.0
+    },
+    {
+        "node" : np.array([0,1,2,3],dtype=np.float64),
+        "cell" : np.array([[0,1],[1,2],[2,3]],dtype=np.int32),
+        "q"  : 3,
+        "qf1" : np.array([0.88729833, 0.11270167]),
+        "qf2" : 0.2777777777777778
+    }
+]

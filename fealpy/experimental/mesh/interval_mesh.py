@@ -71,6 +71,20 @@ class IntervalMesh(SimplexMesh,Plotable):
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre'):
+        from ..quadrature import GaussLegendreQuadrature
+
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        kwargs = {'dtype': self.ftype}
+        if etype == 1:
+            quad = GaussLegendreQuadrature(q, **kwargs)
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+        return quad
+
     def grad_lambda(self, index:Index=_S):
         """
         @brief 计算所有单元上重心坐标函数的导数
