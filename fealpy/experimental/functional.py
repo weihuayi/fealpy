@@ -100,3 +100,28 @@ def bilinear_integral(basis1: TensorLike, basis2: TensorLike, weights: TensorLik
 
     else:
         raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
+    
+
+def nonlinear_integral(value: TensorLike, basis: TensorLike, weights: TensorLike,
+                       measure: TensorLike,
+                       coef: Optional[CoefLike]=None,
+                       batched: bool=False) -> TensorLike:
+    if coef is None:
+        return bm.einsum('c, q, cq..., cq... -> c...', measure, weights, value, basis)
+
+    if is_scalar(coef):
+        return bm.einsum('c, q, cq..., cq... -> c...', measure, weights, value, basis) * coef
+
+    elif is_tensor(coef):
+        basis = basis.reshape(*basis.shape[:3], -1) # (C, Q, I, dof_numel)
+
+        if coef.ndim <= 2 + int(batched):
+            dof_shape = basis.shape[3:]
+            coef = fill_axis(coef, 3 if batched else 2)
+            r = bm.einsum(f'c, q, cqd, cqid, ...cq -> ...cid', measure, weights, value, basis, coef)
+            return bm.reshape(r, r.shape[:-1] + dof_shape)
+        else:
+            coef = fill_axis(coef, 4 if batched else 3)
+            return bm.einsum(f'c, q, cqd, cqid, ...cqd -> ...ci', measure, weights, value, basis, coef)
+    else:
+        raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
