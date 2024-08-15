@@ -247,21 +247,15 @@ class MeshDS(metaclass=MeshMeta):
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
-        cell = self.cell
-        kwargs = bm.context(cell)
-
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NFC = self.number_of_faces_of_cells()
-
         totalFace = self.total_face()
         _, i0, i1, j, _ = bm.unique_all_(bm.sort(totalFace, axis=1), axis=0)
 
-        self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
-        NF = i0.shape[0]
+        if self.TD > 1: # Do not add faces for interval mesh
+            self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
 
+        NC = self.number_of_cells()
+        NFC = self.number_of_faces_of_cells()
         self.cell2face = j.reshape(NC, NFC)
-
         self.face2cell = bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1)
 
         if self.TD == 3:
@@ -281,6 +275,8 @@ class MeshDS(metaclass=MeshMeta):
             self.edge2cell = self.face2cell
             self.cell2edge = self.cell2face
 
+        NN = self.number_of_nodes()
+        NF = i0.shape[0]
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
