@@ -1,5 +1,5 @@
 
-from typing import overload, Literal
+from typing import overload, Literal, Optional
 
 from ..typing import TensorLike
 from ..backend import backend_manager as bm 
@@ -9,6 +9,8 @@ from .. import logger
 
 
 class LinearForm(Form):
+    _V: Optional[COOTensor] = None
+
     def _get_sparse_shape(self):
         spaces = self._spaces
         ugdof = spaces[0].number_of_global_dofs()

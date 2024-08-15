@@ -22,7 +22,7 @@ class DirichletBC():
 
         isDDof = space.is_boundary_dof(threshold=self.threshold) # on the same device as space
         self.is_boundary_dof = isDDof
-        self.boundary_dof_index = bm.nonzero(isDDof, as_tuple=True)[0]
+        self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.gdof = space.number_of_global_dofs()
 
     def check_matrix(self, matrix: COOTensor, /) -> COOTensor:
@@ -131,7 +131,7 @@ class DirichletBC():
         new_values[IDX] = 0
         A = COOTensor(indices, new_values, A.sparse_shape)
 
-        index, = bm.nonzero(isDDof, as_tuple=True)
+        index, = bm.nonzero(isDDof)
         shape = new_values.shape[:-1] + (len(index), )
         one_values = bm.ones(shape, **kwargs)
         one_indices = bm.stack([index, index], axis=0)

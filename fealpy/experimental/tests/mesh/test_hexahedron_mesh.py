@@ -21,7 +21,7 @@ class TestHexahedronMeshInterfaces:
         for i in range(len(bcs)):
             bcs[i] = bm.array(bcs[i])
         bcs = tuple(bcs)
-        point_true = bpdata["point"]
+        point_true = bpdata["point"].swapaxes(0, 1)
 
         point = mesh.bc_to_point(bcs)
         np.testing.assert_allclose(bm.to_numpy(point), point_true, atol=1e-14)
@@ -117,6 +117,35 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(cm), cm_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(fm), fm_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(em), em_true, atol=1e-14)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("fbdata", from_box_data)
+    def test_from_box(self, fbdata, backend):
+        bm.set_backend(backend)
+        box = fbdata["box"]
+        nx = fbdata["nx"]
+        ny = fbdata["ny"]
+        nz = fbdata["nz"]
+
+        node_true = fbdata["node"]
+        cell_true = fbdata["cell"]
+        face_true = fbdata["face"]
+        edge_true = fbdata["edge"]
+        face2cell_true = fbdata["face2cell"]
+
+        mesh = HexahedronMesh.from_box(box, nx, ny, nz)
+
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        face = mesh.entity('face')
+        edge = mesh.entity('edge')
+
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_allclose(bm.to_numpy(node), node_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(cell), cell_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(face), face_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(edge), edge_true, atol=1e-14)
+        np.testing.assert_allclose(bm.to_numpy(face2cell), face2cell_true, atol=1e-14)
 
 if __name__ == "__main__":
     pytest.main(["-k", "test_hexahedron_mesh.py"])

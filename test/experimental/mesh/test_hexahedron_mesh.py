@@ -3,7 +3,7 @@ from fealpy.mesh import HexahedronMesh as HexahedronMesh_old
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
 
-bm.set_backend('pytorch')
+#bm.set_backend('pytorch')
 
 np.set_printoptions(precision=16)
 
@@ -119,15 +119,35 @@ def test_linspace():
     c = bm.linspace(a, b, 10)
     print(c)
 
+def test_form_box():
+    mesh = HexahedronMesh.from_box([0, 1, 0, 1, 0, 1], 2, 3, 4)
+    mesh_old = HexahedronMesh_old.from_box([0, 1, 0, 1, 0, 1], 2, 3, 4)
+
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    face = mesh.entity('face')
+    edge = mesh.entity('edge')
+
+    face2cell = mesh.face_to_cell()
+
+    node_old = mesh_old.entity('node')
+    cell_old = mesh_old.entity('cell')
+    face_old = mesh_old.entity('face')
+    edge_old = mesh_old.entity('edge')
+
+    face2cell_old = mesh_old.ds.face_to_cell()
+
+    print("result of form_box : ", bm.sum(bm.abs(node - node_old))<1e-12, bm.sum(bm.abs(cell - cell_old))<1e-12, bm.sum(bm.abs(face - face_old))<1e-12, bm.sum(bm.abs(edge - edge_old))<1e-12)
 
 if __name__ == "__main__":
-    test_bc_to_point()
-    test_jacobi_matrix_and_first_fundamental_form()
-    test_cell_and_face_to_ipoint()
-    test_interpolation_points()
-    test_uniform_refine()
-    test_entity_measure()
-    test_linspace()
+    #test_bc_to_point()
+    #test_jacobi_matrix_and_first_fundamental_form()
+    #test_cell_and_face_to_ipoint()
+    #test_interpolation_points()
+    #test_uniform_refine()
+    #test_entity_measure()
+    #test_linspace()
+    test_form_box()
 
 
 

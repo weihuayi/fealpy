@@ -661,7 +661,7 @@ class TriangleMesh(SimplexMesh, Plotable):
     @classmethod
     def from_ellipsoid_surface(cls, ntheta=10, nphi=10,
                                radius=(1, 1, 1),
-                               theta=(bm.pi / 4, 3 * bm.pi / 4),
+                               theta=None,
                                phi=None,
                                returnuv=False
                                ):
@@ -676,6 +676,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         @param[in] ntheta \theta 方向的剖分段数
         @param[in] nphi \phi 方向的剖分段数 
         """
+        if theta is None:
+            theta = (bm.pi / 4, 3 * bm.pi / 4)
 
         a, b, c = radius
         if phi is None:  # 默认为一封闭的带状区域

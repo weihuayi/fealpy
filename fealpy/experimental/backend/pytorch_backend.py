@@ -21,12 +21,16 @@ Tensor = torch.Tensor
 _device = torch.device
 
 def _dim_to_axis(func):
-    def wrapper(*args, axis, **kwargs):
+    def wrapper(*args, axis=None, **kwargs):
+        if axis is None:
+            return func(*args, **kwargs)
         return func(*args, dim=axis, **kwargs)
     return wrapper
 
 def _dims_to_axes(func):
-    def wrapper(*args, axes, **kwargs):
+    def wrapper(*args, axes=None, **kwargs):
+        if axes is None:
+            return func(*args, **kwargs)
         return func(*args, dims=axes, **kwargs)
     return wrapper
 
@@ -91,6 +95,12 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triu(x, /, *, k=0): return torch.triu(x, k)
 
+    ### Data Type Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def astype(x, dtype, /, *, copy=True, device=None):
+        return x.to(dtype=dtype, device=device, copy=copy)
+
     ### Element-wise Functions ###
 
     ### Indexing Functions ###
@@ -150,6 +160,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def argmin(x, /, *, axis=None, keepdims=False):
         return torch.argmin(x, dim=axis, keepdim=keepdims)
+
+    @staticmethod
+    def nonzero(x, /):
+        return torch.nonzero(x, as_tuple=True)
 
     ### Set Functions ###
     # python array API standard v2023.12
@@ -216,7 +230,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ###Sorting Functions ###
     # python array API standard v2023.12
-    argsort = staticmethod(_dim_to_axis(torch.sort))
+    argsort = staticmethod(_dim_to_axis(torch.argsort))
     @staticmethod
     def sort(x, /, *, axis=-1, descending=False, stable=True):
         return torch.sort(x, dim=axis, descending=descending, stable=stable)[0]
@@ -510,6 +524,7 @@ PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
+    bitwise_invert='bitwise_not',
     power='pow',
     transpose='permute',
     broadcast_arrays='broadcast_tensors',
