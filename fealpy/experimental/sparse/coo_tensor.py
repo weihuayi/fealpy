@@ -36,7 +36,7 @@ class COOTensor(SparseTensor):
         else:
             self._spshape = tuple(spshape)
 
-        self._check(indices, values, spshape)
+        self._check(indices, values, self._spshape)
 
     def _check(self, indices: TensorLike, values: Optional[TensorLike], spshape: Size):
         if not isinstance(indices, TensorLike):
