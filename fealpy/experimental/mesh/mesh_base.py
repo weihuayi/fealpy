@@ -561,8 +561,6 @@ class TensorMesh(HomogeneousMesh):
                 J = bm.linalg.inv(J)
                 # J^{-T}\nabla_u phi
                 # gphi = bm.einsum('qcmn, qlm -> qcln', J, gphi)
-                print("asdasd",J.shape)
-                print(gphi.shape)
                 gphi = bm.einsum('qcmn, qlm -> cqln', J, gphi)
                 return gphi
         elif TD == 2:
