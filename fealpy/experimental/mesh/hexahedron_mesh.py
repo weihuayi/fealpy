@@ -93,7 +93,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         n = bm.sqrt(bm.sum(n**2, axis=-1))
         val = bm.einsum('q, qi->i', ws, n)
         return val
-
+    
     def jacobi_matrix(self, bc, index=_S):
         """
         @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵。
@@ -109,6 +109,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         elif TD == 2:
             J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
+
 
     def first_fundamental_form(self, J):
         """
@@ -363,9 +364,9 @@ class HexahedronMesh(TensorMesh, Plotable):
         @return HexahedronMesh instance
         """
         shape = (nx+1, ny+1, nz+1)
-        X = bm.linspace(box[0], box[1], nx+1, endpoint=True)[:, None, None]
-        Y = bm.linspace(box[2], box[3], ny+1, endpoint=True)[None, :, None]
-        Z = bm.linspace(box[4], box[5], nz+1, endpoint=True)[None, None, :]
+        X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=bm.float64)[:, None, None]
+        Y = bm.linspace(box[2], box[3], ny+1, endpoint=True, dtype=bm.float64)[None, :, None]
+        Z = bm.linspace(box[4], box[5], nz+1, endpoint=True, dtype=bm.float64)[None, None, :]
         X = bm.broadcast_to(X, shape).reshape(-1, 1)
         Y = bm.broadcast_to(Y, shape).reshape(-1, 1)
         Z = bm.broadcast_to(Z, shape).reshape(-1, 1)
@@ -539,7 +540,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         #gmsh.fltk.run()
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = bm.array(node_coords, dtype=self.ftype).reshape(-1, 3)
+        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)
 
         #节点的编号映射
         nodetags_map = dict({j:i for i,j in enumerate(node_tags)})

@@ -91,7 +91,7 @@ class BernsteinFESpace:
         ldof = multiIndex.shape[0]
 
         B = bc
-        B = np.ones((NQ, p+1, TD+1), dtype=np.float_)
+        B = np.ones((NQ, p+1, TD+1), dtype=np.float64)
         B[:, 1:] = bc[:, None, :]
         B = np.cumprod(B, axis=1)
 
@@ -377,9 +377,9 @@ class BernsteinFESpace:
         midxp_1 = mesh.multi_index_matrix(m, GD) # m   次多重指标
 
         N, N1 = len(symidx), midxp_1.shape[0]
-        B = np.zeros((N1, NQ, ldof), dtype=np.float_)
-        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float_)
-        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float_)
+        B = np.zeros((N1, NQ, ldof), dtype=np.float64)
+        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float64)
+        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float64)
         for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
             midxp_0 -= beta[None, :]
             idx = np.where(np.all(midxp_0>-1, axis=1))[0]

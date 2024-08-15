@@ -1,4 +1,4 @@
-import ipdb
+
 import numpy as np
 import pytest
 from fealpy.experimental.backend import backend_manager as bm
