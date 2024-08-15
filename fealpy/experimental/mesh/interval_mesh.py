@@ -16,6 +16,7 @@ class IntervalMeshDataStructure(MeshDS):
 class IntervalMesh(SimplexMesh,Plotable):
     def __init__(self, node: TensorLike ,cell:TensorLike):
         super().__init__(TD=1, itype=cell.dtype, ftype=node.dtype)
+        
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
         else:
