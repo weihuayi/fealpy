@@ -2527,7 +2527,7 @@ class TestBackendInterfaces:
         np.testing.assert_array_equal(result, bm.to_numpy(test_result), 
                                      err_msg=f" `bm.edge_tangent` function is not equal to real result in backend {backend}")
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_bc_to_points(self, backend, data):
         bm.set_backend(backend)
@@ -2539,7 +2539,7 @@ class TestBackendInterfaces:
         np.testing.assert_array_equal(result, bm.to_numpy(test_result), 
                                      err_msg=f" `bm.bc_to_points` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_barycenter(self, backend, data):
         bm.set_backend(backend)
@@ -2555,7 +2555,7 @@ class TestBackendInterfaces:
         np.testing.assert_array_equal(result_edge, bm.to_numpy(test_result_edge), 
                                      err_msg=f" edge of `bm.barycenter` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_simple_measure(self, backend, data):
         bm.set_backend(backend)
@@ -2566,7 +2566,7 @@ class TestBackendInterfaces:
         np.testing.assert_almost_equal(result, bm.to_numpy(test_result),decimal=15, 
                                      err_msg=f" `bm.simple_measure` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_simple_shape_function(self, backend, data):
         bm.set_backend(backend)
@@ -2577,7 +2577,7 @@ class TestBackendInterfaces:
         np.testing.assert_almost_equal(result, bm.to_numpy(test_result),decimal=7, 
                                      err_msg=f" `bm.simple_shape_function` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_simple_grad_shape_function(self, backend, data):
         bm.set_backend(backend)
@@ -2590,7 +2590,7 @@ class TestBackendInterfaces:
     
     ##TODO:HESS_SHAPE_FUNCTION TEST    
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", interval_mesh_data)
     def test_interval_grad_lambda(self, backend, data): 
         bm.set_backend(backend)
@@ -2602,7 +2602,7 @@ class TestBackendInterfaces:
                                      err_msg=f" `bm.interval_grad_lambda` function is not equal to real result in backend {backend}")
     
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh3d_data)
     def test_triangle_area_3d(self, backend, data): 
         bm.set_backend(backend)
@@ -2613,7 +2613,7 @@ class TestBackendInterfaces:
         np.testing.assert_almost_equal(result, bm.to_numpy(test_result),decimal=7, 
                                      err_msg=f" `bm.triangle_area_3d` function is not equal to real result in backend {backend}")
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh2d_data)
     def test_triangle_grad_lambda_2d(self, backend, data): 
         bm.set_backend(backend)
@@ -2624,7 +2624,7 @@ class TestBackendInterfaces:
         np.testing.assert_almost_equal(result, bm.to_numpy(test_result),decimal=7, 
                                      err_msg=f" `bm.triangle_grad_lambda_2d` function is not equal to real result in backend {backend}")
     
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", triangle_mesh3d_data)
     def test_triangle_grad_lambda_3d(self, backend, data): 
         bm.set_backend(backend)
@@ -2637,7 +2637,7 @@ class TestBackendInterfaces:
     
     ##TODO:QUADRANGLE_GRAD_LAMBDA_2D
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax', 'cupy', 'paddle'])
     @pytest.mark.parametrize("data", tetrahedron_mesh_data)
     def test_tetrahedron_grad_lambda_3d(self, backend, data): 
         bm.set_backend(backend)
