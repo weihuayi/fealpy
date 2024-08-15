@@ -1,20 +1,25 @@
 
-from typing import Optional
+from typing import Optional, Protocol
 
-from ...backend import backend_manager as bm
-from ...backend import TensorLike
-from .. import COOTensor
+from ..backend import backend_manager as bm
+from ..backend import TensorLike
+from ..sparse import COOTensor
 
 from .. import logger
 
 
-def sparse_cg(A: COOTensor, b: TensorLike, x0: Optional[TensorLike]=None, *,
-              batch_first: bool=False,
-              atol: float=1e-12, rtol: float=1e-8, maxiter: Optional[int]=10000) -> TensorLike:
+class SupportsMatmul(Protocol):
+    def __matmul__(self, other: TensorLike) -> TensorLike: ...
+
+
+def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
+       batch_first: bool=False,
+       atol: float=1e-12, rtol: float=1e-8,
+       maxiter: Optional[int]=10000) -> TensorLike:
     """Solve a linear system Ax = b using the Conjugate Gradient (CG) method.
 
     Parameters:
-        A (COOTensor): The coefficient matrix of the linear system, must be a 2D sparse CSR or COO tensor.
+        A (SupportsMatmul): The coefficient matrix of the linear system.
         b (TensorLike): The right-hand side vector of the linear system, can be a 1D or 2D tensor.
         x0 (TensorLike): Initial guess for the solution, a 1D or 2D tensor.\
         Must have the same shape as b when reshaped appropriately.
@@ -35,21 +40,17 @@ def sparse_cg(A: COOTensor, b: TensorLike, x0: Optional[TensorLike]=None, *,
         This implementation assumes that A is a symmetric positive-definite matrix,
         which is a common requirement for the Conjugate Gradient method to work correctly.
     """
-    assert isinstance(A, COOTensor), "A must be a COOTensor"
-    assert isinstance(b, TensorLike), "b must be a torch.Tensor"
+    assert isinstance(b, TensorLike), "b must be a Tensor of current backend"
     if x0 is not None:
-        assert isinstance(x0, TensorLike), "x0 must be a torch.Tensor if not None"
-    unsqueezed = False
+        assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
+    single_vector = False
 
-    if (A.ndim != 2) or (A.shape[1] != A.shape[0]):
-        raise ValueError("A must be a square matrix (2D tensor)")
-
-    if b.ndim != 2:
+    if b.ndim in {1, 2}:
         if b.ndim == 1:
             b = b[:, None]
-            unsqueezed = True
-        else:
-            raise ValueError("b must be a 2D dense tensor")
+            single_vector = True
+    else:
+        raise ValueError("b must be a 1D or 2D dense tensor")
 
     if x0 is None:
         x0 = bm.zeros_like(b)
@@ -59,33 +60,31 @@ def sparse_cg(A: COOTensor, b: TensorLike, x0: Optional[TensorLike]=None, *,
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
 
-    if batch_first:
+    if (not single_vector) and batch_first:
         b = bm.swapaxes(b, 0, 1)
         x0 = bm.swapaxes(x0, 0, 1)
 
-    if A.shape[1] != b.shape[0]:
-        raise ValueError("b and A must have the same number of rows")
+    sol = _cg_impl(A, b, x0, atol, rtol, maxiter)
 
-    sol = _sparse_cg_impl(A, b, x0, atol, rtol, maxiter)
-
-    if unsqueezed:
+    if single_vector:
         sol = sol[:, 0]
-    if batch_first:
+    elif batch_first:
         sol = bm.swapaxes(sol, 0, 1)
+
     return sol
 
 
-def _sparse_cg_impl(A: COOTensor, b: TensorLike, x0: TensorLike, atol, rtol, maxiter):
+def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxiter):
     # initialize
-    x = x0                 # (dof, batch)
-    r = b - A.matmul(x)    # (dof, batch)
-    p = r                  # (dof, batch)
+    x = x0              # (dof, batch)
+    r = b - A @ x       # (dof, batch)
+    p = r               # (dof, batch)
     n_iter = 0
     b_norm = bm.linalg.norm(b)
 
     # iterate
     while True:
-        Ap = A.matmul(p)      # (dof, batch)
+        Ap = A @ p      # (dof, batch)
         rTr = bm.sum(r**2, axis=0)
         alpha = rTr / bm.sum(p*Ap, axis=0)  # r @ r / (p @ Ap) # (batch,)
         x = x + alpha[None, ...] * p  # (dof, batch)

@@ -6,7 +6,7 @@ from ..typing import TensorLike, Index, _S
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import bilinear_integral
+from ..functional import bilinear_integral, linear_integral, nonlinear_integral
 from .integrator import (
     CellOperatorIntegrator,
     enable_cache,
@@ -53,3 +53,14 @@ class ScalarMassIntegrator(CellOperatorIntegrator):
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
 
         return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
+    
+    @assemblymethod('nonlinear')
+    def nonlinear_assembly(self, space: _FS) -> TensorLike:
+        uh = self.uh
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, gphi, cm, index = self.fetch(space)
+        val = -uh.grad_value(bcs)# (C, Q, dof_numel)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)   
+
+        return nonlinear_integral(val, gphi, ws, cm, coef, batched=self.batched), bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)

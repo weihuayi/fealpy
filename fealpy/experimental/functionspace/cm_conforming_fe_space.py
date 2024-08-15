@@ -3,6 +3,7 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
+from fealpy.experimental.functionspace.bernstein_fe_space import BernsteinFESpace
 from .functional import symmetry_span_array, symmetry_index
 from scipy.special import factorial, comb
 from scipy.linalg import solve_triangular
@@ -20,12 +21,15 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         self.p = p
         self.m = m
         self.isCornerNode = isCornerNode
+        self.bspace = BernsteinFESpace(mesh, p)
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
+
+        self.coeff = self.coefficient_matrix()
 
     def number_of_local_dofs(self, etype) -> int: 
         # TODO:这个用到过吗
@@ -282,6 +286,17 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         coeff = bm.transpose(coeff, (0, 2, 1))
         coeff[:, :3*ndof] = bm.einsum('cji,cjk->cik', coeff1, coeff[:, :3*ndof])
         return coeff[:, :, dof2num]
+
+    def basis(self, bcs):
+        coeff = self.coeff
+        bphi = self.bspace.basis(bcs)
+        return bm.einsum('cil, cql->cqi', coeff, bphi)
+
+    def grad_m_basis(self, bcs, m):
+        coeff = self.coeff
+        bgmphi = self.bspace.grad_m_basis(bcs, m)
+        print(bgmphi.shape)
+        return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
 
 
 

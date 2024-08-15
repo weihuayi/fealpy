@@ -180,5 +180,5 @@ class TestTriangleMeshInterfaces:
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
-    #a.test_grad_shape_function(grad_shape_function_data[0], 'numpy')
+    #a.test_from_box(from_box[0], 'pytorch')
     pytest.main(["./test_triangle_mesh.py"])
