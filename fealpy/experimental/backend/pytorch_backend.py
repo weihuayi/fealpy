@@ -520,6 +520,7 @@ PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
+    bitwise_invert='bitwise_not',
     power='pow',
     transpose='permute',
     broadcast_arrays='broadcast_tensors',
