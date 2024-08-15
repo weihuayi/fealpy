@@ -17,7 +17,7 @@ from .integrator import (
 
 class ScalarDiffusionIntegrator(CellOperatorIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, uh, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, uh=None, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
@@ -84,7 +84,8 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.fetch(space)
-        val = -uh.grad_value(bcs)# (C, Q, dof_numel)
+        val1 = 1.0
+        val2 = -uh.grad_value(bcs)# (C, Q, dof_numel)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)   
 
-        return nonlinear_integral(val, gphi, ws, cm, coef, batched=self.batched), bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
+        return nonlinear_integral(gphi, gphi, val1, val2, ws, cm, coef, batched=self.batched)

@@ -102,26 +102,37 @@ def bilinear_integral(basis1: TensorLike, basis2: TensorLike, weights: TensorLik
         raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
     
 
-def nonlinear_integral(value: TensorLike, basis: TensorLike, weights: TensorLike,
+def nonlinear_integral(basis1: TensorLike, basis2: TensorLike, 
+                       value1: TensorLike, value2: TensorLike,
+                       weights: TensorLike,
                        measure: TensorLike,
                        coef: Optional[CoefLike]=None,
                        batched: bool=False) -> TensorLike:
+    
+    basis1 = basis1.reshape(*basis1.shape[:3], -1) # (C, Q, I, dof_numel)
+    basis2 = basis2.reshape(*basis2.shape[:3], -1) # (C, Q, J, dof_numel)
+    
     if coef is None:
-        return bm.einsum('c, q, cq..., cq... -> c...', measure, weights, value, basis)
+        return bm.einsum('c, q, cq..., cq..., cq... -> c...', measure, weights, value1, basis1, basis2),\
+               bm.einsum('c, q, cq..., cq... -> c...', measure, weights, value2, basis1)
+              
 
     if is_scalar(coef):
-        return bm.einsum('c, q, cq..., cq... -> c...', measure, weights, value, basis) * coef
+        return bm.einsum('c, q, cq..., cq..., cq... -> c...', measure, weights, value1, basis1, basis2) * coef,\
+               bm.einsum('c, q, cq..., cq... -> c...', measure, weights, value2, basis1) * coef,\
 
     elif is_tensor(coef):
-        basis = basis.reshape(*basis.shape[:3], -1) # (C, Q, I, dof_numel)
 
         if coef.ndim <= 2 + int(batched):
-            dof_shape = basis.shape[3:]
+            dof_shape = basis1.shape[3:]
             coef = fill_axis(coef, 3 if batched else 2)
-            r = bm.einsum(f'c, q, cqd, cqid, ...cq -> ...cid', measure, weights, value, basis, coef)
-            return bm.reshape(r, r.shape[:-1] + dof_shape)
+            r = bm.einsum(f'c, q, cqi..., cqid, ...cq -> ...cid', measure, weights, value2, basis1, coef)
+            F = bm.reshape(r, r.shape[:-1] + dof_shape)
         else:
             coef = fill_axis(coef, 4 if batched else 3)
-            return bm.einsum(f'c, q, cqd, cqid, ...cqd -> ...ci', measure, weights, value, basis, coef)
+            F = bm.einsum(f'c, q, cq..., cqid, ...cqd -> ...ci', measure, weights, value2, basis1, coef)
+        coef = fill_axis(coef, 4 if batched else 3)
+        A = bm.einsum(f'q, c, cq..., cqid, cqjd, ...cqd -> ...cij', weights, measure, basis1, basis2, coef)
+        return A, F
     else:
         raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
