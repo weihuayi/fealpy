@@ -144,7 +144,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         bcs = (line, line, line)
 
         cip = self.bc_to_point(bcs)
-        ipoint[c2ip] = cip.swapaxes(0, 1)
+        ipoint[c2ip] = cip
         return ipoint
 
     def face_to_ipoint(self, p, index=_S):

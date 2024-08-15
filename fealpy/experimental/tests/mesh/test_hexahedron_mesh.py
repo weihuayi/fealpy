@@ -21,7 +21,7 @@ class TestHexahedronMeshInterfaces:
         for i in range(len(bcs)):
             bcs[i] = bm.array(bcs[i])
         bcs = tuple(bcs)
-        point_true = bpdata["point"]
+        point_true = bpdata["point"].swapaxes(0, 1)
 
         point = mesh.bc_to_point(bcs)
         np.testing.assert_allclose(bm.to_numpy(point), point_true, atol=1e-14)
