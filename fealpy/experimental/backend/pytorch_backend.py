@@ -61,7 +61,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Creation Functions ###
     # python array API standard v2023.12
     @staticmethod
-    def arange(start, /, stop, step=1, *, dtype=None, device=None):
+    def arange(start, /, stop=None, step=1, *, dtype=None, device=None):
+        if stop is None:
+            stop = start
+            start = 0
         return torch.arange(start, stop, step, dtype=dtype, device=device)
 
     @staticmethod
@@ -87,6 +90,12 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def triu(x, /, *, k=0): return torch.triu(x, k)
+
+    ### Data Type Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def astype(x, dtype, /, *, copy=True, device=None):
+        return x.to(dtype=dtype, device=device, copy=copy)
 
     ### Element-wise Functions ###
 
@@ -147,6 +156,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def argmin(x, /, *, axis=None, keepdims=False):
         return torch.argmin(x, dim=axis, keepdim=keepdims)
+
+    @staticmethod
+    def nonzero(x, /):
+        return torch.nonzero(x, as_tuple=True)
 
     ### Set Functions ###
     # python array API standard v2023.12
@@ -507,6 +520,7 @@ PyTorchBackend.attach_attributes(attribute_mapping, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
+    bitwise_invert='bitwise_not',
     power='pow',
     transpose='permute',
     broadcast_arrays='broadcast_tensors',
