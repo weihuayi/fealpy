@@ -111,7 +111,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
             return qf
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
-
+    """
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int = 1, *, index: Index = _S,
                             variables: str = 'u', mi: Optional[TensorLike] = None) -> TensorLike:
         assert isinstance(bcs, tuple)
@@ -135,6 +135,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
             G = bm.linalg.inv(G)
             gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
         return gphi
+    """
 
     def jacobi_matrix(self, bc, index: Index = _S) -> TensorLike:
         """

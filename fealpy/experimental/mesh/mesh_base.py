@@ -494,7 +494,7 @@ class TensorMesh(HomogeneousMesh):
 
             # node[cell].shape == (NC, 8, 3)
             # bc.shape == (NQ, 8)
-            p = bm.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
+            p = bm.einsum('qj, cjk->cqk', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NC, NQ, 3)
 
         elif isinstance(bc, tuple) and len(bc) == 2:
             face = self.entity(2, index=index)
@@ -505,10 +505,10 @@ class TensorMesh(HomogeneousMesh):
 
             # node[cell].shape == (NC, 4, 2)
             # bc.shape == (NQ, 4)
-            p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+            p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+            p = bm.einsum('qj, ejk->eqk', bc, node[edge]) # (NE, NQ, 2)
         return p
 
     edge_bc_to_point = bc_to_point
@@ -589,18 +589,16 @@ class TensorMesh(HomogeneousMesh):
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
 
-        mi = bm.arange(p+1)[:, None]
-        mi = bm.broadcast_to(mi, (p+1, p+1)).reshape(-1, p+1)
-
+        mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
         multiIndex0 = mi.flatten().reshape(-1, 1);
         multiIndex1 = mi.T.flatten().reshape(-1, 1);
         multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
 
         dofidx = [0 for i in range(4)] 
-        dofidx[0] = bm.nonzero(multiIndex[:, 1]==0)[0]
-        dofidx[1] = bm.nonzero(multiIndex[:, 0]==p)[0]
-        dofidx[2] = bm.nonzero(multiIndex[:, 1]==p)[0]
-        dofidx[3] = bm.nonzero(multiIndex[:, 0]==0)[0]
+        dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
+        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
+        dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
+        dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
 
         face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
         localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=self.itype)

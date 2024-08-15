@@ -743,7 +743,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         node = self.entity('node')
         GD = self.geo_dimension()
         if GD == 2:
-            node = bm.concatenate((node, np.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
