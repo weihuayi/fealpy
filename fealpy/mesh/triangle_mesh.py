@@ -1261,7 +1261,7 @@ class TriangleMesh(Mesh, Plotable):
         markcell_degreesum = np.sum(np.sum(markcell_degree,axis=1),axis=1)
         
         # 两个单元节点度的和为38(四个节点度为7,7,5,5)或39(四个节点度为7,7,5,6)的单元
-        swapcellflag = (markcell_degreesum==38) | (markcell_degreesum==39)
+        swapcellflag = (markcell_degreesum==38) #| (markcell_degreesum==39)
         swapcell = markcell[swapcellflag]# 交换边的单元
         swapedge = edge[markedge]
         swapedge = swapedge[swapcellflag]#要交换的边
