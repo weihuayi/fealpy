@@ -183,7 +183,10 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = bm.context(bd_face_flag)
         bd_face2node = self.entity('face', index=bd_face_flag)
         bd_node_flag = bm.zeros((NN,), **kwargs)
-        bd_node_flag[bd_face2node.ravel()] = True
+        if bm.backend_name == "jax":
+            bd_node_flag = bd_node_flag.at[bd_face2node.ravel()].set(True)
+        else:
+                bd_node_flag[bd_face2node.ravel()] = True
         return bd_node_flag
 
     def boundary_face_flag(self) -> TensorLike:
@@ -205,7 +208,10 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = {'dtype': bd_face_flag.dtype}
         bd_face2cell = self.face2cell[bd_face_flag, 0]
         bd_cell_flag = bm.zeros((NC,), **kwargs)
-        bd_cell_flag[bd_face2cell.ravel()] = True
+        if bm.backend_name == "jax":
+            bd_cell_flag = bd_cell_flag.at[bd_face2cell.ravel()].set(True)
+        else:
+            bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
     def boundary_node_index(self):
