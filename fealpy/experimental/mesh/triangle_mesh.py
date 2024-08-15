@@ -33,6 +33,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         self.celldata = {}
         self.meshdata = {}
 
+
     # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """
@@ -230,12 +231,35 @@ class TriangleMesh(SimplexMesh, Plotable):
         @brief 计算二维网格中每条边上的局部标架
         """
         pass
-     
+    def edge_unit_tangent(self, index=_S):
+        """
+        @brief Calculate the tangent vector with unit length of each edge.See `Mesh.edge_tangent`.
+        """
+        node = self.entity('node') 
+        edge = self.entity('edge', index=index)
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        length = bm.sqrt(bm.square(v).sum(axis=1))
+        return v/length.reshape(-1, 1)
+
+    
     def edge_normal(self, index: Index=_S):
         """
         @brief 计算二维网格中每条边上单位法线
         """
-        pass
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
+        return v@w
+    def edge_unit_normal(self, index: Index=_S):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
+        return v@w
+
+
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
@@ -637,7 +661,7 @@ class TriangleMesh(SimplexMesh, Plotable):
     @classmethod
     def from_ellipsoid_surface(cls, ntheta=10, nphi=10,
                                radius=(1, 1, 1),
-                               theta=(bm.pi / 4, 3 * bm.pi / 4),
+                               theta=None,
                                phi=None,
                                returnuv=False
                                ):
@@ -652,6 +676,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         @param[in] ntheta \theta 方向的剖分段数
         @param[in] nphi \phi 方向的剖分段数 
         """
+        if theta is None:
+            theta = (bm.pi / 4, 3 * bm.pi / 4)
 
         a, b, c = radius
         if phi is None:  # 默认为一封闭的带状区域

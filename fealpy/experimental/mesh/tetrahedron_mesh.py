@@ -1,8 +1,10 @@
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
+from .plot import Plotable
 
-class TetrahedronMesh(SimplexMesh): 
+
+class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
         super().__init__(TD=3,itype=cell.dtype,ftype=node.dtype)
         self.node = node
@@ -39,6 +41,31 @@ class TetrahedronMesh(SimplexMesh):
         self.facedata = {} 
         self.celldata = {}
         self.meshdata = {}
+
+    def cell_to_face_permutation(self, locFace = None):
+        """
+        局部面到全局面的映射
+        c2f_loc[c2f_order]=c2f_glo
+        """
+        if locFace is None:
+            locFace = self.localFace
+
+        c2f  = self.cell_to_face()
+        cell = self.cell
+        face = self.face
+        face_g_idx = bm.argsort(face)
+
+        c2f_glo = face[c2f.reshape(-1)]
+        c2f_loc = cell[:, locFace].reshape(-1, 3)
+
+        c2f_glo = bm.argsort(c2f_glo, axis=1)
+        c2f_glo = bm.argsort(c2f_glo, axis=1)
+        c2f_loc = bm.argsort(c2f_loc, axis=1)
+
+        NC = len(cell)
+        c2f_order = c2f_loc[bm.arange(NC*4)[:, None], c2f_glo]
+        return c2f_order.reshape(NC, 4, 3)
+
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -626,3 +653,4 @@ class TetrahedronMesh(SimplexMesh):
         return cls(node, cell)
 
 
+TetrahedronMesh.set_ploter('3d')

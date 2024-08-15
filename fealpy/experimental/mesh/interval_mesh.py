@@ -5,12 +5,14 @@ from .. import logger
 from scipy.sparse import coo_matrix
 from .mesh_data_structure import MeshDS
 from .utils import estr2dim
+from .plot import Plotable
+
 
 class IntervalMeshDataStructure(MeshDS):
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
-class IntervalMesh():
+class IntervalMesh(Plotable):
     def __init__(self, node: TensorLike ,cell:TensorLike):
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
@@ -34,12 +36,12 @@ class IntervalMesh():
         self.cell_tangent = self.edge_tangent
 
         self.cell_to_ipoint = self.edge_to_ipoint
-        self.localEdge = bm.tensor([0,1],dtype=bm.int_)
-        self.localFace = bm.tensor([[0],[1]],dtype=bm.int_)
+        self.localEdge = bm.tensor([0,1],dtype=bm.int32)
+        self.localFace = bm.tensor([[0],[1]],dtype=bm.int32)
 
         self.itype = self.cell.dtype
-        self.ftype = self.ftype()
-        self.device = self.cell.device
+        self.ftype = self.node.dtype
+
 
 
 
@@ -271,12 +273,6 @@ class IntervalMesh():
             return self.face[index]
         raise ValueError(f"Invalid etype '{etype}'.")
 
-    def ftype(self) -> Any:
-        node = self.entity("node")
-        if node is None:
-            raise RuntimeError('Can not get the float type as the node '
-                               'has not been assigned.')
-        return node.dtype
 
     def geo_dimension(self) -> int:
         node = self.node
@@ -551,3 +547,6 @@ class IntervalMesh():
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
+
+
+IntervalMesh.set_ploter('1d')

@@ -8,8 +8,11 @@ from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
+from .plot import Plotable
+from .plot import Plotable
 
-class UniformMesh3d(StructuredMesh, TensorMesh):
+
+class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured hexahedral mesh
 
@@ -107,6 +110,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
 
         self.meshtype = 'UniformMesh3d'
 
+        # Specify the counterclockwise drawing
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
+
 
     # 实体生成方法
     @entitymethod(0)
@@ -135,10 +141,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
         """
         NN = self.NN
         NE = self.NE
-
         nx = self.nx
         ny = self.ny
         nz = self.nz
+
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1, nz + 1)
         edge = bm.zeros((NE, 2), dtype=self.itype)
 
@@ -621,4 +627,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
                     self.nx * (self.ny + 1) * self.nz + \
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
-        self.clear() 
+        self.clear()
+
+
+UniformMesh3d.set_ploter('3d')

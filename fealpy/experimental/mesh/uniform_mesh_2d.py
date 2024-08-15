@@ -115,7 +115,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         GD = 2
         nx = self.nx
         ny = self.ny
-
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
 

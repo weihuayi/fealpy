@@ -1,3 +1,35 @@
+from fealpy.experimental import logger
+logger.setLevel('WARNING')
+
+from fealpy.experimental.backend import backend_manager as bm
+
+bm.set_backend('pytorch')
+
+from fealpy.experimental.mesh import UniformMesh2D
+
+nelx, nely = 10, 10
+domain = [0, 10, 0, 10]
+hx = (domain[1] - domain[0]) / nelx
+hy = (domain[3] - domain[2]) / nely
+mesh = UniformMesh2D(extent=(0, nelx, 0, nely), h=(hx, hy), origin=(domain[0], domain[2]))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import torch
 
 from fealpy.torch.mesh import QuadrangleMesh
