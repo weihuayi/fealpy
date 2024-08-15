@@ -99,6 +99,24 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
         return face2edgeSign
+    
+    def cell_to_edge_sign(self, cell=None):
+        """
+        TODO: true 代表相同方向
+        """
+        if cell==None:
+            cell = self.cell
+        NC = self.number_of_cells()
+        NEC = self.number_of_edges_of_cells()
+        cell2edgeSign = bm.zeros((NC, NEC), dtype=bm.bool)
+        localEdge = self.localEdge
+        E = localEdge.shape[0]
+        #for i, (j, k) in zip(range(E), localEdge):
+        #    cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
+        edge = self.edge
+        c2e = self.cell_to_edge()
+        cell2edgeSign = edge[c2e, 0]==cell[:, localEdge[:, 0]]
+        return cell2edgeSign
 
     def face_unit_normal(self, index=_S):
         face = self.face
