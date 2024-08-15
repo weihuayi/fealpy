@@ -336,15 +336,34 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-
+        NC = self.number_of_cells()
+        # if etype == 0:
+        #     return bm.tensor(0, dtype=self.ftype)
+        # elif etype == 1:
+        #     return self.h[0], self.h[1], self.h[2]
+        # elif etype == 2:
+        #     return self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]
+        # elif etype == 3:
+        #     return self.h[0] * self.h[1] * self.h[2]
+        # else:
+        #     raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         if etype == 0:
+            # Measure of vertices (points) is 0
             return bm.tensor(0, dtype=self.ftype)
         elif etype == 1:
-            return self.h[0], self.h[1], self.h[2]
+            # Measure of edges, assuming edges are along x, y, z directions
+            temp1 = bm.tensor([[self.h[0]], [self.h[1]], [self.h[2]]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1, (3, int(self.NE/3)))
+            return temp2.reshape(-1)
         elif etype == 2:
-            return self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]
+            # Measure of faces, assuming faces are aligned with the coordinate planes
+            temp1 = bm.tensor([self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1[:, None], (3, int(self.NF/3)))
+            return temp2.reshape(-1)
         elif etype == 3:
-            return self.h[0] * self.h[1] * self.h[2]
+            # Measure of cells (volumes)
+            temp = bm.tensor(self.h[0] * self.h[1] * self.h[2], dtype=self.ftype)
+            return bm.broadcast_to(temp, (NC,))
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         
@@ -565,23 +584,27 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         raise NotImplementedError("Interpolation points for p > 1 are not yet implemented for 3D structured meshes.")
 
 
-    # def shape_function(self, bcs: TensorLike, p: int=1, 
-    #                 mi: Optional[TensorLike]=None) -> TensorLike:
-    #     """
-    #     @brief Compute the shape function of a 3D structured mesh.
+    # 形函数
+    def jacobi_matrix(self, bcs: TensorLike, index :Index=_S) -> TensorLike:
+        """
+        @brief Compute the Jacobi matrix for the mapping from the reference element 
+            (xi, eta, zeta) to the actual Lagrange hexahedron (x, y, z)
 
-    #     Returns:
-    #         TensorLike: Shape function with shape (NQ, ldof).
-    #     """
-    #     assert isinstance(bcs, tuple)
+        x(xi, eta, zeta) = phi_0(xi, eta, zeta) * x_0 + phi_1(xi, eta, zeta) * x_1 + 
+                    ... + phi_{ldof-1}(xi, eta, zeta) * x_{ldof-1}
 
-    #     TD = bcs[0].shape[-1] - 1
-    #     if mi is None:
-    #         mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
-    #     phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
-    #     ldof = self.number_of_local_ipoints(p, etype=3)
+        """
+        assert isinstance(bcs, tuple)
 
-    #     return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
+        TD = len(bcs)
+        node = self.entity('node')
+        entity = self.entity(TD, index=index)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')
+        if TD == 3:
+            J = bm.einsum( 'cim, qin -> qcmn', node[entity[:]], gphi)
+        elif TD == 2:
+            J = bm.einsum( 'cim, qin -> qcmn', node[entity[:]], gphi)
+        return J
     
 
     # 其他方法
