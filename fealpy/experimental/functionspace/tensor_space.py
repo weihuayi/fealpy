@@ -123,7 +123,6 @@ class TensorFunctionSpace(FunctionSpace):
 
         # return ips
 
-
     def is_boundary_dof(self, threshold=None) -> TensorLike:
         """Return bools indicating boundary dofs.
 

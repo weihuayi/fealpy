@@ -2,6 +2,7 @@ from typing import Optional
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
+from ..utils import is_tensor
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -38,39 +39,27 @@ class ScalarConvectionIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarDiffusionIntegrator only support spaces on"
+            raise RuntimeError("The ScalarConvectionIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable='x')
-        return bcs, ws, gphi, cm, index
+        gphi = space.grad_basis(bcs, index=index)
+        phi = space.basis(bcs, index=index)
+        return bcs, ws, phi, gphi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, gphi, cm, index = self.fetch(space)
-        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index) 
-        return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
-
-    @assemblymethod('fast')
-    def fast_assembly(self, space: _FS) -> TensorLike:
-        """
-        限制：常系数、单纯形网格
-        TODO: 加入 assert
-        """
-        q = self.q
-        index = self.index
-        mesh = getattr(space, 'mesh', None)
-
-        cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.quadrature_formula(q, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable='u')
-
-        glambda = mesh.grad_lambda()
-        M = bm.einsum('q, qik, qjl->ijkl', ws, gphi, gphi)
-        A = bm.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
-        return A
+        bcs, ws, phi, gphi, cm, index = self.fetch(space)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        if is_tensor(coef):
+            if self.batched:
+                result = bm.einsum('q, cqk, cqmd, bcqd, c->bckm', ws, phi, gphi, coef.squeeze(0), cm)
+            else:
+                result = bm.einsum('q, cqk, cqmd, cqd, c->ckm', ws, phi, gphi, coef, cm)
+        else:
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        return result
