@@ -17,12 +17,13 @@ from .integrator import (
 
 class ScalarDiffusionIntegrator(CellOperatorIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, uh, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
+        self.uh = uh
         self.coef = coef
         self.q = q
         self.index = index
