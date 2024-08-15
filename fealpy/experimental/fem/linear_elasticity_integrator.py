@@ -79,10 +79,10 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         if GD == 2:
             if elasticity_type == 'stress':
                 E, nu = self.E, self.nu
-                D = E / (1 - nu**2) *\
+                D = E / (1 - nu**2) * \
                     bm.tensor([[1, nu, 0],
-                                  [nu, 1, 0],
-                                  [0, 0, (1 - nu) / 2]], dtype=bm.float64)
+                                [nu, 1, 0],
+                                [0, 0, (1 - nu) / 2]], dtype=bm.float64)
             elif elasticity_type == 'strain':
                 mu, lam = self.mu, self.lam
                 D = bm.tensor([[2 * mu + lam, lam, 0],
@@ -153,7 +153,7 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         # (NQ, LDOF, BC)
         gphi_lambda = scalar_space.grad_basis(bcs, index=index, variable='u')
         # (LDOF, LDOF, BC, BC)
-        M = bm.einsum('q, qik, qjl->ijkl', ws, gphi_lambda, gphi_lambda)
+        M = bm.einsum('q, qik, qjl -> ijkl', ws, gphi_lambda, gphi_lambda)
 
         # (NC, LDOF, GD)
         glambda_x = mesh.grad_lambda()
@@ -165,17 +165,27 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
 
         NC = mesh.number_of_cells()
         ldof = scalar_space.number_of_local_dofs()
-        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
+        tldof = space.number_of_local_dofs()
+        KK = bm.zeros((NC, tldof, tldof), dtype=bm.float64)
 
         mu, lam = self.mu, self.lam
         
-        # Fill the diagonal part
-        KK[:, :ldof, :ldof] = (2 * mu + lam) * A_xx + mu * A_yy
-        KK[:, ldof:, ldof:] = (2 * mu + lam) * A_yy + mu * A_xx
+        if space.dof_priority:
+            # Fill the diagonal part
+            KK[:, 0:ldof:1, 0:ldof:1] = (2 * mu + lam) * A_xx + mu * A_yy
+            KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = (2 * mu + lam) * A_yy + mu * A_xx
 
-        # Fill the off-diagonal part
-        KK[:, :ldof, ldof:] = lam * A_xy + mu * A_yx
-        KK[:, ldof:, :ldof] = lam * A_yx + mu * A_xy
+            # Fill the off-diagonal part
+            KK[:, 0:ldof:1, ldof:KK.shape[1]:1] = lam * A_xy + mu * A_yx
+            KK[:, ldof:KK.shape[1]:1, 0:ldof:1] = lam * A_yx + mu * A_xy
+        else:
+            # Fill the diagonal part
+            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = (2 * mu + lam) * A_xx + mu * A_yy
+            KK[:, GD-1:KK.shape[1]:GD, GD-1:KK.shape[2]:GD] = (2 * mu + lam) * A_yy + mu * A_xx
+
+            # Fill the off-diagonal part
+            KK[:, 0:KK.shape[1]:GD, GD-1:KK.shape[2]:GD] = lam * A_xy + mu * A_yx
+            KK[:, GD-1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = lam * A_yx + mu * A_xy
 
         if coef is None:
             return KK

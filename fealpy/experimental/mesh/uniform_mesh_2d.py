@@ -717,9 +717,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             self.ny = self.extent[3] - self.extent[2]
 
             self.NC = self.nx * self.ny
-            self.NF = self.NE
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
+            self.NF = self.NE
             self.NN = (self.nx + 1) * (self.ny + 1)
+
+            self.edge2cell = self.edge_to_cell()
+            self.face2cell = self.edge2cell
+
         self.clear() 
         
 UniformMesh2d.set_ploter('2d')

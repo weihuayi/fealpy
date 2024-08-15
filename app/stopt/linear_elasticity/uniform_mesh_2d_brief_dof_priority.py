@@ -1,4 +1,4 @@
-from fealpy.experimental.mesh import UniformMesh2d, QuadrangleMesh
+from fealpy.experimental.mesh import UniformMesh2d
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, \
                                     BilinearForm, LinearForm, \
@@ -42,7 +42,7 @@ h = [1, 1]
 origin = [0, 0]
 mesh = UniformMesh2d(extent, h, origin)
 
-maxit = 4
+maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 for i in range(maxit):
 
@@ -51,11 +51,13 @@ for i in range(maxit):
 
     uh = tensor_space.function()
 
+    # 与单元有关的刚度矩阵
     integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-                                            elasticity_type='stress', q=5)
+                                            elasticity_type='strain', q=5)
     KK = integrator_bi.assembly(space=tensor_space)
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_bi)
+    # 与单元有关的刚度矩阵
     K = bform.assembly()
 
     integrator_li = VectorSourceIntegrator(source=source, q=5)
@@ -80,18 +82,17 @@ for i in range(maxit):
     K = K.add(K1).coalesce()
 
     F = dbc.check_vector(F)
-    tensor_space.boundary_interpolate(gD=dirichlet, uh=uh)
+    uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh)
     F = F - K.matmul(uh[:])
     F[isDDof] = uh[isDDof]
 
     uh[:] = sparse_cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
 
-    ipoints = tensor_space.interpolation_points()
-    u_exact = solution(ipoints)
-    errorMatrix[0, i] = bm.max(bm.abs(bm.array(uh) - u_exact.reshape(-1)))
-    errorMatrix[1, i] = bm.max(bm.abs(bm.array(uh) - u_exact.reshape(-1))[isDDof])
+    u_exact = tensor_space.interpolate(solution)
+    errorMatrix[0, i] = bm.max(bm.abs(bm.array(uh) - u_exact))
+    errorMatrix[1, i] = bm.max(bm.abs(bm.array(uh) - u_exact)[isDDof])
 
     if i < maxit-1:
-        mesh.uniform_refine(n=1)
+        mesh.uniform_refine()
 
 print("errorMatrix:", errorMatrix)
