@@ -21,12 +21,10 @@ from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.sparse.linalg import sparse_cg
+from fealpy.experimental.solver import cg
 
 from fealpy.experimental.pde.poisson_2d import CosCosData 
 from fealpy.utils import timer
-
-
 
 
 ## 参数解析
@@ -66,12 +64,12 @@ maxit = args.maxit
 
 tmr = timer()
 next(tmr)
-pde = CosCosData() 
+pde = CosCosData()
 if meshtype == 'tri':
     mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 elif meshtype == 'quad':
     mesh = QuadrangleMesh.from_box([0,1,0,1], n, n)
-else: 
+else:
     raise ValueError(f"Unsupported : {meshtype} mesh")
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
@@ -90,25 +88,23 @@ for i in range(maxit):
     bform.add_integrator(ScalarDiffusionIntegrator())
     lform = LinearForm(space)
     lform.add_integrator(ScalarSourceIntegrator(pde.source))
-    
+
     A = bform.assembly()
     F = lform.assembly()
-    tmr.send(f'第{i}次矩组装时间') 
+    tmr.send(f'第{i}次矩组装时间')
 
     gdof = space.number_of_global_dofs()
     A, F = DirichletBC(space, gd = pde.solution).apply(A, F)
-    tmr.send(f'第{i}次边界处理时间') 
+    tmr.send(f'第{i}次边界处理时间')
 
-    uh[:] = sparse_cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-    tmr.send(f'第{i}次求解器时间') 
-    
+    uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    tmr.send(f'第{i}次求解器时间')
+
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
-    
+
     if i < maxit-1:
         mesh.uniform_refine(n=1)
-    tmr.send(f'第{i}次误差计算及网格加密时间') 
+    tmr.send(f'第{i}次误差计算及网格加密时间')
 next(tmr)
 print("最终误差",errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
-
-

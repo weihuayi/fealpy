@@ -209,13 +209,13 @@ class MeshDS(metaclass=MeshMeta):
         return bd_cell_flag
 
     def boundary_node_index(self):
-        return bm.nonzero(self.boundary_node_flag(), as_tuple=True)[0]
+        return bm.nonzero(self.boundary_node_flag())[0]
     # TODO: finish this:
     # def boundary_edge_index(self):
     def boundary_face_index(self):
-        return bm.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+        return bm.nonzero(self.boundary_face_flag())[0]
     def boundary_cell_index(self):
-        return bm.nonzero(self.boundary_cell_flag(), as_tuple=True)[0]
+        return bm.nonzero(self.boundary_cell_flag())[0]
 
     ### Homogeneous Mesh ###
     def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
