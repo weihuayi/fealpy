@@ -236,12 +236,21 @@ class TestTetrahedronMeshInterfaces:
 
     @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
     @pytest.mark.parametrize("data", cell_to_face_permutation)
-    def test_unifrom_refine(self, data, backend):
+    def test_cell_to_face_permutation(self, data, backend):
         bm.set_backend(backend)
         mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=4,ny=3,nz=1)
         idx = mesh.cell_to_face_permutation()
 
         np.testing.assert_array_equal(bm.to_numpy(idx), data["idx"])
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", cell_to_face_permutation)
+    def test_quadrature_formula(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=4,ny=3,nz=1)
+        qf = mesh.quadrature_formula(5, "cell")
+        bcs , ws = qf.get_quadrature_points_and_weights()
+
 
 
 
