@@ -93,7 +93,7 @@ def test_to_dense(backend):
     indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
     values = bm.tensor([[1, 2, 3, 4], [6, 7, 8, 9]], dtype=bm.float64)
     sparse_shape = bm.tensor([3, 3])
-    coo = COOTensor(indices, values, sparse_shape, is_coalesced=True)
+    coo = COOTensor(indices, values, sparse_shape)
 
     arr = coo.to_dense()
     assert arr.dtype == bm.float64
@@ -105,6 +105,17 @@ def test_to_dense(backend):
                       [[0, 6, 7],
                        [8, 0, 0],
                        [9, 0, 0]]], dtype=bm.float64)
+    )
+    coo2 = COOTensor(indices, None, sparse_shape)
+    arr2 = coo2.to_dense(fill_value=1.22)
+    bm.allclose(
+        arr2,
+        bm.tensor([[[0, 1.22, 1.22],
+                    [1.22, 0, 0],
+                    [1.22, 0, 0]],
+                   [[0, 1.22, 1.22],
+                    [1.22, 0, 0],
+                    [1.22, 0, 0]]], dtype=bm.float64)
     )
 
 
@@ -175,8 +186,10 @@ class TestCOOTensorAdd:
     def test_add_tensor(self, backend):
         bm.set_backend(backend)
         # 初始化一个 COOTensor 和一个 dense Tensor
-        coo = create_coo_tensor(indices=bm.tensor([[0], [2]]), values=bm.tensor([[1]]), shape=(4, 4))
-        tensor = bm.zeros((1, 4, 4))
+        coo = create_coo_tensor(indices=bm.tensor([[0], [2]]),
+                                values=bm.tensor([[1]], dtype=bm.float64),
+                                shape=(4, 4))
+        tensor = bm.zeros((1, 4, 4), dtype=bm.float64)
 
         # 执行 add 操作
         result = coo.add(tensor)
@@ -185,7 +198,7 @@ class TestCOOTensorAdd:
         expected_tensor = bm.tensor([[[0., 0., 1., 0.],
                                          [0., 0., 0., 0.],
                                          [0., 0., 0., 0.],
-                                         [0., 0., 0., 0.]]])
+                                         [0., 0., 0., 0.]]], dtype=bm.float64)
         assert bm.allclose(result, expected_tensor)
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)

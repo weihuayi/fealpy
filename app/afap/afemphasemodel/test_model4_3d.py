@@ -53,12 +53,12 @@ class Brittle_Facture_model():
 start = time.time()
 
 model = Brittle_Facture_model()
-mesh = model.init_mesh(n=2)
+mesh = model.init_mesh(n=3)
 
 simulation = AFEMPhaseFieldCrackHybridMixModel(model, mesh)
 mesh.nodedata['damage'] = simulation.d
 mesh.to_vtk(fname='mesh_3d.vtu')
-
+print('mesh:', mesh.number_of_cells(), mesh.number_of_nodes())
 disp = model.is_boundary_disp()
 stored_energy = np.zeros_like(disp)
 dissipated_energy = np.zeros_like(disp)
@@ -66,7 +66,7 @@ force = np.zeros_like(disp)
 
 for i in range(len(disp)-1):
     print('i:', i)
-    simulation.newton_raphson(disp[i+1], maxit=50, solve='gpu')
+    simulation.newton_raphson(disp[i+1], maxit=50, solve='spsolve')
 #    simulation.newton_raphson(disp[i+1], maxit=50, atype=None)
 
     force[i+1] = simulation.force

@@ -36,12 +36,12 @@ class IntervalMesh(Plotable):
         self.cell_tangent = self.edge_tangent
 
         self.cell_to_ipoint = self.edge_to_ipoint
-        self.localEdge = bm.tensor([0,1],dtype=bm.int_)
-        self.localFace = bm.tensor([[0],[1]],dtype=bm.int_)
+        self.localEdge = bm.tensor([0,1],dtype=bm.int32)
+        self.localFace = bm.tensor([[0],[1]],dtype=bm.int32)
 
         self.itype = self.cell.dtype
-        self.ftype = self.ftype()
-        self.device = self.cell.device
+        self.ftype = self.node.dtype
+
 
 
 
@@ -273,12 +273,6 @@ class IntervalMesh(Plotable):
             return self.face[index]
         raise ValueError(f"Invalid etype '{etype}'.")
 
-    def ftype(self) -> Any:
-        node = self.entity("node")
-        if node is None:
-            raise RuntimeError('Can not get the float type as the node '
-                               'has not been assigned.')
-        return node.dtype
 
     def geo_dimension(self) -> int:
         node = self.node
