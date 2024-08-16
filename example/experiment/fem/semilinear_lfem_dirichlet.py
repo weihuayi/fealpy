@@ -8,12 +8,11 @@ logger.setLevel('WARNING')
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import NonlinearForm
+from fealpy.experimental.fem import SemilinearForm
 from fealpy.experimental.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
 from fealpy.experimental.fem import ScalarSourceIntegrator
 from fealpy.experimental.pde.semilinear_2d import SemilinearData
 from fealpy.experimental.solver import cg
-
 from fealpy.utils import timer
 
 
@@ -67,7 +66,21 @@ tol = 1e-8
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 errorType = ['$|| u - u_h||_{\Omega, 0}$', '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']
+def func(u):
+    return u**3
 
+def grad_func(u):
+    return 3*u**2
+
+def diffusion_coef(p):
+    return pde.diffusion_coefficient(p)
+
+def reaction_coef(p):
+    return pde.reaction_coefficient(p)
+
+reaction_coef.func = func
+reaction_coef.grad_func = grad_func
+    
 #非线性迭代
 for i in range(maxit):
 
@@ -76,15 +89,17 @@ for i in range(maxit):
 
     u0 = space.function()
     du = space.function()
+    diffusion_coef.uh = u0
+    reaction_coef.uh = u0
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
     isIDof = ~isDDof
 
-    D = ScalarDiffusionIntegrator(u0, pde.diffusion_coefficient, q=p+2, method='nonlinear')
-    M = ScalarMassIntegrator(u0, nonlinear_func, nonlinear_gradient_func, pde.reaction_coefficient, q=p+2, method='nonlinear')
+    D = ScalarDiffusionIntegrator(diffusion_coef, q=p+2, method='semilinear')
+    M = ScalarMassIntegrator(reaction_coef, q=p+2, method='semilinear')
     f = ScalarSourceIntegrator(pde.source, q=p+2)
 
     while True:
-        n = NonlinearForm(space)
+        n = SemilinearForm(space)
         n.add_integrator([D, M])
         n.add_integrator(f)
         A, F = n.assembly()
