@@ -1,6 +1,5 @@
 from fealpy.iopt.particle_swarm_opt_alg import  PSOProblem, PSO, QPSO
 from fealpy.experimental.backend import backend_manager as bm
-
 import time
 
 # bm.set_backend('pytorch')
