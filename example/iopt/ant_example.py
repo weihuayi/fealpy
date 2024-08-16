@@ -147,7 +147,7 @@ for _ in range(l):
     shortest_routes.append(bm.array(result_list))
 
 end_time = time.time()  # 记录结束时间
-elapsed_time = end_time - start_time  # 计算运行时间
+elapsed_time = (end_time - start_time) / l  # 计算运行时间
 
 # 找到最短距离的索引
 min_distance_index = bm.argmin(bm.array(shortest_lengths))
@@ -175,7 +175,7 @@ for i in range(citys.shape[0]):
 plt.scatter(citys[Best_path[0], 0], citys[Best_path[0], 1], color='red', s=100) 
 plt.xlabel('x of city location')
 plt.ylabel('y of city location')
-plt.title(f'Ant(shortest distance): {Best_length}\ntime: {elapsed_time}')
+plt.title(f'Ant(shortest distance): {Best_length}\ntime: {elapsed_time}') # 
 
 plt.figure(2)
 plt.plot(range(iter_max), Length_best, 'b')
