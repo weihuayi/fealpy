@@ -36,7 +36,7 @@ MAP=bm.array([[0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
 
 #起点终点坐标
 dataS=[0, 0]
-dataE=[18, 18]
+dataE=[19, 19]
 
 if MAP[dataS[0]][dataS[1]] != 0 or MAP[dataE[0]][dataE[1]] != 0: 
     print("Error: Wrong start point or end point") # 判断起点终点坐标是否有效
@@ -53,7 +53,7 @@ else:
     dim = textMAP.data["landmark"].shape[0]
     
     # 调用算法
-    test1 = QPSO(N,dim,ub,lb,MaxIT,fobj)
+    test1 = PSO(N,dim,ub,lb,MaxIT,fobj)
     test1.cal()
     
     _, result = fobj(test1.gbest)
@@ -63,7 +63,7 @@ else:
     print('The optimal path distance: ', test1.gbest_f[0])
     print("The optimal path: ", result["path"])
     end_time = time.perf_counter()
-    running_time = end_time-start_time
+    running_time = end_time - start_time
     textMAP.printMAP(result, running_time)
 
     

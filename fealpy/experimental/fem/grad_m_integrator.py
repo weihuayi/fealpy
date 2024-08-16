@@ -45,8 +45,6 @@ class gradmIntegrator(CellOperatorIntegrator):
                                f"homogeneous meshes, but {type(mesh).__name__}is"
                                "not a subclass of HomoMesh.")
 
-        import ipdb
-        ipdb.set_trace()
         cm = mesh.entity_measure('cell', index=index)
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -58,8 +56,8 @@ class gradmIntegrator(CellOperatorIntegrator):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         GD = mesh.geo_dimension()
-        idx = mesh.multi_index_matrix(m, GD-1)
-        num = factorial(m)/bm.prod(factorial(idx),axis=1)
+        idx = bm.array(mesh.multi_index_matrix(m, GD-1))
+        num = factorial(m)/bm.prod(bm.array(factorial(idx)), axis=1)
         bcs, ws, gmphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell',
                                  index=index)

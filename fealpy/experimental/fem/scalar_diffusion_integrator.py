@@ -6,7 +6,7 @@ from ..typing import TensorLike, Index, _S
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import bilinear_integral, linear_integral, nonlinear_integral
+from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     CellOperatorIntegrator,
     enable_cache,
@@ -26,11 +26,6 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         self.coef = coef
         if hasattr(coef, 'uh'):
             self.uh = coef.uh
-            self.func = coef.func
-            if bm.backend_name in {'jax', 'torch'}:
-                pass
-            else:
-                self.grad_func = coef.grad_func
         self.q = q
         self.index = index
         self.batched = batched
@@ -84,6 +79,17 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         A = bm.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
         return A
 
-    @assemblymethod('nonlinear')
+    @assemblymethod('semilinear')
     def semilinear_assembly(self, space: _FS) -> TensorLike:
-        pass
+        uh = self.uh
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, gphi, cm, index = self.fetch(space)
+        val_F = bm.squeeze(-uh.grad_value(bcs))   #(C, Q, dof_numel)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        coef_F = get_semilinear_coef(val_F, coef)
+        return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched), \
+               linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
+
+
+        
