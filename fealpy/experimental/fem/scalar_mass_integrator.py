@@ -21,7 +21,7 @@ class ScalarMassIntegrator(CellOperatorIntegrator):
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
-        super().__init__()
+        super().__init__(method=method)
         self.coef = coef
         if hasattr(coef, 'uh'):
             self.uh = coef.uh

@@ -100,7 +100,7 @@ for i in range(maxit):
 
     while True:
         n = SemilinearForm(space)
-        n.add_integrator([D, M])
+        n.add_integrator([M, D])
         n.add_integrator(f)
         A, F = n.assembly()
 
