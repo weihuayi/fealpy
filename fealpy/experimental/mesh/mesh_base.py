@@ -404,7 +404,8 @@ class HomogeneousMesh(Mesh):
 
 
         cm = self.entity_measure('cell')
-        f = bm.power(bm.abs(u - v), power)
+        #f = bm.power(bm.abs(u - v), power)
+        f = bm.abs(u - v)**power
         if len(f.shape) == 1:
             f = f[:, None]
 
@@ -419,7 +420,8 @@ class HomogeneousMesh(Mesh):
                 e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
 
         if celltype is False:
-            e = bm.power(bm.sum(e), 1/power)
+            #e = bm.power(bm.sum(e), 1/power)
+            e = bm.sum(e)**(1/power)
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
@@ -492,7 +494,7 @@ class TensorMesh(HomogeneousMesh):
 
             # node[cell].shape == (NC, 8, 3)
             # bc.shape == (NQ, 8)
-            p = bm.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
+            p = bm.einsum('qj, cjk->cqk', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NC, NQ, 3)
 
         elif isinstance(bc, tuple) and len(bc) == 2:
             face = self.entity(2, index=index)
@@ -503,10 +505,10 @@ class TensorMesh(HomogeneousMesh):
 
             # node[cell].shape == (NC, 4, 2)
             # bc.shape == (NQ, 4)
-            p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+            p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+            p = bm.einsum('qj, ejk->eqk', bc, node[edge]) # (NE, NQ, 2)
         return p
 
     edge_bc_to_point = bc_to_point
@@ -558,17 +560,19 @@ class TensorMesh(HomogeneousMesh):
                 J = self.jacobi_matrix(bcs, index=index)
                 J = bm.linalg.inv(J)
                 # J^{-T}\nabla_u phi
-                gphi = bm.einsum('qcmn, qlm->qcln', J, gphi)
+                # gphi = bm.einsum('qcmn, qlm -> qcln', J, gphi)
+                gphi = bm.einsum('qcmn, qlm -> cqln', J, gphi)
                 return gphi
         elif TD == 2:
-            gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
-            gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
+            gphi0 = bm.einsum('im, jn -> ijmn', dphi, phi).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn -> ijmn', phi, dphi).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1), axis=-1)
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 G = self.first_fundamental_form(J)
                 G = bm.linalg.inv(G)
-                gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
+                # gphi = bm.einsum('qikm, qimn, qln -> qilk', J, G, gphi)
+                gphi = bm.einsum('qikm, qimn, qln -> iqlk', J, G, gphi)
                 return gphi
         return gphi
 

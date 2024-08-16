@@ -2,16 +2,32 @@ from .. import logger
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres, 
-        LinearOperator, spsolve_triangular)
-try:
-    from pypardiso import spsolve
-except ImportError:
-    logger.error("Can't import spsolve from pypardiso! Please install it by `pip install -U pypardiso`.")
+from scipy.sparse.linalg import (eigs, cg,  dsolve,  gmres, lgmres,
+                                 LinearOperator, spsolve_triangular)
+#try:
+#    from pypardiso import spsolve
+#except ImportError:
+#    logger.error("Can't import spsolve from pypardiso! Please install it by `pip install -U pypardiso`.")
 
 from .amg_coarsen import ruge_stuben_chen_coarsen 
 from .amg_interpolation import two_points_interpolation
 from ..decorator import timer
+
+def spsolve(A, b):
+    from mumps import DMumpsContext
+    from scipy.sparse.linalg import minres, gmres
+
+    NN = len(b)
+    ctx = DMumpsContext()
+    ctx.set_silent()
+    ctx.set_centralized_sparse(A)
+
+    x = np.array(b)
+
+    ctx.set_rhs(x)
+    ctx.run(job=6)
+    ctx.destroy() # Cleanup
+    return x
 
 class IterationCounter(object):
     def __init__(self, disp=True):

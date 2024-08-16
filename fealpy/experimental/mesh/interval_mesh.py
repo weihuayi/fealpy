@@ -5,20 +5,25 @@ from .. import logger
 from scipy.sparse import coo_matrix
 from .mesh_data_structure import MeshDS
 from .utils import estr2dim
+from .plot import Plotable
+from .mesh_base import SimplexMesh
+
 
 class IntervalMeshDataStructure(MeshDS):
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
-class IntervalMesh():
+class IntervalMesh(SimplexMesh,Plotable):
     def __init__(self, node: TensorLike ,cell:TensorLike):
+        super().__init__(TD=1, itype=cell.dtype, ftype=node.dtype)
+        
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
         else:
             self.node = node
         self.cell = cell
         self.edge = self.cell
-        self.face = bm.arange(self.node.shape[0]).reshape(-1,1)
+        #self.face = bm.arange(self.node.shape[0]).reshape(-1,1)
 
         self.TD = 1
 
@@ -34,12 +39,14 @@ class IntervalMesh():
         self.cell_tangent = self.edge_tangent
 
         self.cell_to_ipoint = self.edge_to_ipoint
-        self.localEdge = bm.tensor([0,1],dtype=bm.int_)
-        self.localFace = bm.tensor([[0],[1]],dtype=bm.int_)
+        self.localEdge = bm.tensor([0,1],dtype=bm.int32)
+        self.localFace = bm.tensor([[0],[1]],dtype=bm.int32)
 
         self.itype = self.cell.dtype
-        self.ftype = self.ftype()
-        self.device = self.cell.device
+        self.ftype = self.node.dtype
+
+        self.construct()
+        self.face2cell = self.face_to_cell()
 
 
 
@@ -65,6 +72,20 @@ class IntervalMesh():
             return bm.tensor([0.0], dtype=self.ftype)
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
+
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre'):
+        from ..quadrature import GaussLegendreQuadrature
+
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        kwargs = {'dtype': self.ftype}
+        if etype == 1:
+            quad = GaussLegendreQuadrature(q, **kwargs)
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+        return quad
 
     def grad_lambda(self, index:Index=_S):
         """
@@ -148,7 +169,14 @@ class IntervalMesh():
                     node[cell]).reshape(-1, GD)
 
             return ipoint
-        
+    
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        return self.edge_to_ipoint(p, index)
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        NN = self.number_of_nodes()
+        return bm.arange(NN, dtype=self.itype)
+    
     def face_unit_normal(self, index: Index = _S, node=None):
         """
         @brief
@@ -249,7 +277,7 @@ class IntervalMesh():
     
 
 
-    
+'''''
     def entity(self, etype: Union[int, str], index:Index = _S) -> TensorLike:
         """
         @brief Get entities.
@@ -271,12 +299,6 @@ class IntervalMesh():
             return self.face[index]
         raise ValueError(f"Invalid etype '{etype}'.")
 
-    def ftype(self) -> Any:
-        node = self.entity("node")
-        if node is None:
-            raise RuntimeError('Can not get the float type as the node '
-                               'has not been assigned.')
-        return node.dtype
 
     def geo_dimension(self) -> int:
         node = self.node
@@ -308,7 +330,7 @@ class IntervalMesh():
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.edge[index]
-        kwargs = {'dtype': edges.dtype, 'device': self.device}
+        kwargs = {'dtype': edges.dtype}
         indices = bm.arange(NE, **kwargs)[index]
         return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
@@ -412,7 +434,7 @@ class IntervalMesh():
         node = self.entity('node')
         entity = self.entity(etype, index)
         order = getattr(entity, 'bc_order', None)
-        return bm.bc_to_points(bcs, node, entity, order)
+        return bm.bc_to_points(bcs, node, entity)
     
 
     # 1D data_structure
@@ -551,3 +573,7 @@ class IntervalMesh():
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
+
+
+IntervalMesh.set_ploter('1d')
+'''

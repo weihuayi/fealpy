@@ -22,7 +22,7 @@ class DirichletBC():
 
         isDDof = space.is_boundary_dof(threshold=self.threshold) # on the same device as space
         self.is_boundary_dof = isDDof
-        self.boundary_dof_index = bm.nonzero(isDDof, as_tuple=True)[0]
+        self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.gdof = space.number_of_global_dofs()
 
     def check_matrix(self, matrix: COOTensor, /) -> COOTensor:
@@ -122,16 +122,18 @@ class DirichletBC():
         # A = D0@A@D0 + D1
         # ```
         # Here the adjustment is done by operating the sparse structure directly.
-        isDDof = self.is_boundary_dof
         A = self.check_matrix(matrix) if check else matrix
+        isDDof = self.is_boundary_dof
         kwargs = A.values_context()
         indices = A.indices()
         new_values = bm.copy(A.values())
         IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
         new_values[IDX] = 0
         A = COOTensor(indices, new_values, A.sparse_shape)
-        index, = bm.nonzero(isDDof, as_tuple=True) 
-        one_values = bm.ones(len(index), **kwargs)
+
+        index, = bm.nonzero(isDDof)
+        shape = new_values.shape[:-1] + (len(index), )
+        one_values = bm.ones(shape, **kwargs)
         one_indices = bm.stack([index, index], axis=0)
         A1 = COOTensor(one_indices, one_values, A.sparse_shape)
         A = A.add(A1).coalesce()
@@ -168,7 +170,7 @@ class DirichletBC():
         if uh is None:
             uh = bm.zeros_like(f)
         self.space.boundary_interpolate(gd, uh, self.threshold)
-        
+
         if uh.ndim == 1:
             f = f - A.matmul(uh)
             f[bd_idx] = uh[bd_idx]

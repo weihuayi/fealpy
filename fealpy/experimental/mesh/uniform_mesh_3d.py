@@ -8,11 +8,13 @@ from ..typing import TensorLike, Index, _S, Union, Tuple
 from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
+from .plot import Plotable
+from .plot import Plotable
 
-class UniformMesh3d(StructuredMesh, TensorMesh):
+
+class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured hexahedral mesh
-
     The ordering of the nodes in each element is as follows:
       3 ------- 7
      / |       /|
@@ -107,6 +109,11 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
 
         self.meshtype = 'UniformMesh3d'
 
+        # Specify the counterclockwise drawing
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
+
+        self.face2cell = self.face_to_cell()
+
 
     # 实体生成方法
     @entitymethod(0)
@@ -135,10 +142,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
         """
         NN = self.NN
         NE = self.NE
-
         nx = self.nx
         ny = self.ny
         nz = self.nz
+
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1, nz + 1)
         edge = bm.zeros((NE, 2), dtype=self.itype)
 
@@ -320,6 +327,105 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
 
     def number_of_faces_of_cells(self):
         return 6
+    
+    def face_to_cell(self) -> TensorLike:
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        NC = self.NC
+
+        face2cell = bm.zeros((NF, 4), dtype=self.itype)
+
+        # x direction
+        NF0 = 0
+        NF1 = (nx+1) * ny * nz
+        idx = bm.arange(NC).reshape(nx, ny, nz)
+        # y direction
+        idy = bm.swapaxes(idx, 1, 0)
+        NF0 = NF1
+        NF1 += nx * (ny+1) * nz
+        fidy = bm.arange(NF0, NF1).reshape(nx, ny+1, nz).swapaxes(0, 1)
+        # z direction
+        idz = bm.transpose(idx, (2, 0, 1))
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        fidz = np.arange(NF0, NF1).reshape(nx, ny, nz+1).transpose(2, 0, 1)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # x direction
+            face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
+            face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
+            face2cell[NF0:NF1-ny*nz, 2] = 0
+            face2cell[NF0:NF1-ny*nz, 3] = 1
+
+            face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
+            face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
+            face2cell[NF1-ny*nz:NF1, 2] = 1
+            face2cell[NF0:NF0+ny*nz, 3] = 0
+
+            # y direction
+            face2cell[fidy[:-1], 0] = idy
+            face2cell[fidy[1:], 1] = idy
+            face2cell[fidy[:-1], 2] = 0
+            face2cell[fidy[1:], 3] = 1
+
+            face2cell[fidy[-1], 0] = idy[-1]
+            face2cell[fidy[0], 1] = idy[0]
+            face2cell[fidy[-1], 2] = 1
+            face2cell[fidy[0], 3] = 0
+
+            # z direction
+            face2cell[fidz[:-1], 0] = idz
+            face2cell[fidz[1:], 1] = idz
+            face2cell[fidz[:-1], 2] = 0
+            face2cell[fidz[1:], 3] = 1
+
+            face2cell[fidz[-1], 0] = idz[-1]
+            face2cell[fidz[0], 1] = idz[0]
+            face2cell[fidz[-1], 2] = 1
+            face2cell[fidz[0], 3] = 0
+
+            return face2cell
+        elif bm.backend_name == 'jax':
+            # x direction
+            face2cell = face2cell.at[NF0:NF1-ny*nz, 0].set(idx.flatten())
+            face2cell = face2cell.at[NF0+ny*nz:NF1, 1].set(idx.flatten())
+            face2cell = face2cell.at[NF0:NF1-ny*nz, 2].set(0)
+            face2cell = face2cell.at[NF0:NF1-ny*nz, 3].set(1)
+
+            face2cell = face2cell.at[NF1-ny*nz:NF1, 0].set(idx[-1].flatten())
+            face2cell = face2cell.at[NF0:NF0+ny*nz, 1].set(idx[0].flatten())
+            face2cell = face2cell.at[NF1-ny*nz:NF1, 2].set(1)
+            face2cell = face2cell.at[NF0:NF0+ny*nz, 3].set(0)
+
+            # y direction
+            face2cell = face2cell.at[fidy[:-1], 0].set(idy)
+            face2cell = face2cell.at[fidy[1:], 1].set(idy)
+            face2cell = face2cell.at[fidy[:-1], 2].set(0)
+            face2cell = face2cell.at[fidy[1:], 3].set(1)
+
+            face2cell = face2cell.at[fidy[-1], 0].set(idy[-1])
+            face2cell = face2cell.at[fidy[0], 1].set(idy[0])
+            face2cell = face2cell.at[fidy[-1], 2].set(1)
+            face2cell = face2cell.at[fidy[0], 3].set(0)
+
+            # z direction
+            face2cell = face2cell.at[fidz[:-1], 0].set(idz)
+            face2cell = face2cell.at[fidz[1:], 1].set(idz)
+            face2cell = face2cell.at[fidz[:-1], 2].set(0)
+            face2cell = face2cell.at[fidz[1:], 3].set(1)
+
+            face2cell = face2cell.at[fidz[-1], 0].set(idz[-1])
+            face2cell = face2cell.at[fidz[0], 1].set(idz[0])
+            face2cell = face2cell.at[fidz[-1], 2].set(1)
+            face2cell = face2cell.at[fidz[0], 3].set(0)
+
+            return face2cell
+        
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
 
 
     # 实体几何
@@ -330,15 +436,34 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-
+        NC = self.number_of_cells()
+        # if etype == 0:
+        #     return bm.tensor(0, dtype=self.ftype)
+        # elif etype == 1:
+        #     return self.h[0], self.h[1], self.h[2]
+        # elif etype == 2:
+        #     return self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]
+        # elif etype == 3:
+        #     return self.h[0] * self.h[1] * self.h[2]
+        # else:
+        #     raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         if etype == 0:
+            # Measure of vertices (points) is 0
             return bm.tensor(0, dtype=self.ftype)
         elif etype == 1:
-            return self.h[0], self.h[1], self.h[2]
+            # Measure of edges, assuming edges are along x, y, z directions
+            temp1 = bm.tensor([[self.h[0]], [self.h[1]], [self.h[2]]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1, (3, int(self.NE/3)))
+            return temp2.reshape(-1)
         elif etype == 2:
-            return self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]
+            # Measure of faces, assuming faces are aligned with the coordinate planes
+            temp1 = bm.tensor([self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1[:, None], (3, int(self.NF/3)))
+            return temp2.reshape(-1)
         elif etype == 3:
-            return self.h[0] * self.h[1] * self.h[2]
+            # Measure of cells (volumes)
+            temp = bm.tensor(self.h[0] * self.h[1] * self.h[2], dtype=self.ftype)
+            return bm.broadcast_to(temp, (NC,))
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         
@@ -559,23 +684,27 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
         raise NotImplementedError("Interpolation points for p > 1 are not yet implemented for 3D structured meshes.")
 
 
-    # def shape_function(self, bcs: TensorLike, p: int=1, 
-    #                 mi: Optional[TensorLike]=None) -> TensorLike:
-    #     """
-    #     @brief Compute the shape function of a 3D structured mesh.
+    # 形函数
+    def jacobi_matrix(self, bcs: TensorLike, index :Index=_S) -> TensorLike:
+        """
+        @brief Compute the Jacobi matrix for the mapping from the reference element 
+            (xi, eta, zeta) to the actual Lagrange hexahedron (x, y, z)
 
-    #     Returns:
-    #         TensorLike: Shape function with shape (NQ, ldof).
-    #     """
-    #     assert isinstance(bcs, tuple)
+        x(xi, eta, zeta) = phi_0(xi, eta, zeta) * x_0 + phi_1(xi, eta, zeta) * x_1 + 
+                    ... + phi_{ldof-1}(xi, eta, zeta) * x_{ldof-1}
 
-    #     TD = bcs[0].shape[-1] - 1
-    #     if mi is None:
-    #         mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
-    #     phi = [bm.simplex_shape_function(val, p, mi) for val in bcs]
-    #     ldof = self.number_of_local_ipoints(p, etype=3)
+        """
+        assert isinstance(bcs, tuple)
 
-    #     return bm.einsum('im, jn -> ijmn', phi[0], phi[1]).reshape(-1, ldof)
+        TD = len(bcs)
+        node = self.entity('node')
+        entity = self.entity(TD, index=index)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')
+        if TD == 3:
+            J = bm.einsum( 'cim, qin -> qcmn', node[entity[:]], gphi)
+        elif TD == 2:
+            J = bm.einsum( 'cim, qin -> qcmn', node[entity[:]], gphi)
+        return J
     
 
     # 其他方法
@@ -621,4 +750,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh):
                     self.nx * (self.ny + 1) * self.nz + \
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
-        self.clear() 
+
+            self.face2cell = self.face_to_cell()
+            
+        self.clear()
+
+
+UniformMesh3d.set_ploter('3d')

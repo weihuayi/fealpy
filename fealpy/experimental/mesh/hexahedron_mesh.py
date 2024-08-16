@@ -1,8 +1,10 @@
 from ..backend import backend_manager as bm
 from .mesh_base import TensorMesh
 from ..typing import TensorLike, Index, _S
+from .plot import Plotable
 
-class HexahedronMesh(TensorMesh):
+
+class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
         super(HexahedronMesh, self).__init__(TD=3, itype = cell.dtype, ftype = node.dtype)
         self.node = node
@@ -91,7 +93,7 @@ class HexahedronMesh(TensorMesh):
         n = bm.sqrt(bm.sum(n**2, axis=-1))
         val = bm.einsum('q, qi->i', ws, n)
         return val
-
+    
     def jacobi_matrix(self, bc, index=_S):
         """
         @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵。
@@ -107,6 +109,7 @@ class HexahedronMesh(TensorMesh):
         elif TD == 2:
             J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
+
 
     def first_fundamental_form(self, J):
         """
@@ -142,7 +145,7 @@ class HexahedronMesh(TensorMesh):
         bcs = (line, line, line)
 
         cip = self.bc_to_point(bcs)
-        ipoint[c2ip] = cip.swapaxes(0, 1)
+        ipoint[c2ip] = cip
         return ipoint
 
     def face_to_ipoint(self, p, index=_S):
@@ -175,10 +178,11 @@ class HexahedronMesh(TensorMesh):
 
         face2ipoint = self.face_to_ipoint(p)
 
-        mi = bm.repeat(bm.arange(p+1), (p+1)**2).reshape(-1, p+1, p+1)
-        multiIndex0 = mi.flatten().reshape(-1, 1)
-        multiIndex1 = bm.transpose(mi, (2, 0, 1)).flatten().reshape(-1, 1)
-        multiIndex2 = bm.transpose(mi, (1, 2, 0)).flatten().reshape(-1, 1)
+        shape = (p+1, p+1, p+1)
+        mi    = bm.arange(p+1)
+        multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
+        multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
+        multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
 
         multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
 
@@ -342,88 +346,10 @@ class HexahedronMesh(TensorMesh):
         if twist:
             upnode = node[4:]
             upnode -= bm.array([[0.5, 0.5, 1]], dtype=bm.float64)
-            upnode = bm.cross(bm.array([[0.0, 0.0, 1.0]], dtype=bm.float64), upnode)
+            upnode = bm.cross(bm.array([[0.0, 0.0, 1.0]], dtype=bm.float64), upnode, axis=1)
             node[4:] = upnode + bm.array([[0.5, 0.5, 1]], dtype=bm.float64)
 
         cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=bm.int32)
-        return cls(node, cell)
-
-    @classmethod
-    def from_one_tetrahedron(cls): #TODO 现在还没有四面体网格，等有四面体网格了再测试
-        """
-        @brief 把一个四面体区域分解为四个六面体单元
-        @note 还没有四面体网格，所以这个函数还没有测试
-        """
-        from .tetrahedron_mesh import TetrahedronMesh
-
-        mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
-        return cls.from_tetrahedron_mesh(mesh)
-
-    @classmethod
-    def from_tetrahedron_mesh(cls, mesh):
-        """
-        @brief 给定一个四面体网格，把每个四面体网格分成四个六面体
-        """
-        NN = mesh.number_of_nodes()
-        NE = mesh.number_of_edges()
-        NF = mesh.number_of_faces()
-        NC = mesh.number_of_cells()
-        node = bm.zeros((NN + NE + NF + NC, 3), dtype=mesh.ftype)
-        start = 0
-        end = NN
-        node[start:end] = mesh.entity('node')
-        start = end
-        end = start + NE
-        node[start:end] = mesh.entity_barycenter('edge')
-        start = end
-        end = start + NF
-        node[start:end] = mesh.entity_barycenter('face')
-        start = end
-        end = start + NF
-        node[start:end] = mesh.entity_barycenter('cell')
-
-        cell = bm.zeros((4*NC, 8), dtype=mesh.itype)
-        c2n = mesh.entity('cell')
-        c2e = mesh.ds.cell_to_edge() + NN
-        c2f = mesh.ds.cell_to_face() + (NN + NE)
-        c2c = bm.arange(NC) + (NN + NE + NF)
-
-        cell[0::4, 0] = c2n[:, 0]
-        cell[0::4, 1] = c2e[:, 0]
-        cell[0::4, 2] = c2f[:, 3]
-        cell[0::4, 3] = c2e[:, 1]
-        cell[0::4, 4] = c2e[:, 2]
-        cell[0::4, 5] = c2f[:, 2]
-        cell[0::4, 6] = c2c
-        cell[0::4, 7] = c2f[:, 1]
-
-        cell[1::4, 0] = c2n[:, 1]
-        cell[1::4, 1] = c2e[:, 3]
-        cell[1::4, 2] = c2f[:, 3]
-        cell[1::4, 3] = c2e[:, 0]
-        cell[1::4, 4] = c2e[:, 4]
-        cell[1::4, 5] = c2f[:, 0]
-        cell[1::4, 6] = c2c
-        cell[1::4, 7] = c2f[:, 2]
-
-        cell[2::4, 0] = c2n[:, 2]
-        cell[2::4, 1] = c2e[:, 1]
-        cell[2::4, 2] = c2f[:, 3]
-        cell[2::4, 3] = c2e[:, 3]
-        cell[2::4, 4] = c2e[:, 5]
-        cell[2::4, 5] = c2f[:, 1]
-        cell[2::4, 6] = c2c
-        cell[2::4, 7] = c2f[:, 0]
-
-        cell[3::4, 0] = c2n[:, 3]
-        cell[3::4, 1] = c2e[:, 5]
-        cell[3::4, 2] = c2f[:, 0]
-        cell[3::4, 3] = c2e[:, 4]
-        cell[3::4, 4] = c2e[:, 2]
-        cell[3::4, 5] = c2f[:, 1]
-        cell[3::4, 6] = c2c
-        cell[3::4, 7] = c2f[:, 2]
-
         return cls(node, cell)
 
     @classmethod
@@ -437,41 +363,41 @@ class HexahedronMesh(TensorMesh):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return HexahedronMesh instance
         """
-        NN = (nx+1)*(ny+1)*(nz+1)
-        NC = nx*ny*nz
-        node = bm.zeros((NN, 3), dtype=self.ftype)
-        X, Y, Z = bm.mgrid[
-                box[0]:box[1]:(nx+1)*1j,
-                box[2]:box[3]:(ny+1)*1j,
-                box[4]:box[5]:(nz+1)*1j
-                ]
-        node[:, 0] = X.flat
-        node[:, 1] = Y.flat
-        node[:, 2] = Z.flat
+        shape = (nx+1, ny+1, nz+1)
+        X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=bm.float64)[:, None, None]
+        Y = bm.linspace(box[2], box[3], ny+1, endpoint=True, dtype=bm.float64)[None, :, None]
+        Z = bm.linspace(box[4], box[5], nz+1, endpoint=True, dtype=bm.float64)[None, None, :]
+        X = bm.broadcast_to(X, shape).reshape(-1, 1)
+        Y = bm.broadcast_to(Y, shape).reshape(-1, 1)
+        Z = bm.broadcast_to(Z, shape).reshape(-1, 1)
 
-        idx = bm.arange(NN).reshape(nx+1, ny+1, nz+1)
+        node = bm.concatenate([X, Y, Z], axis=-1)
+
+        NN = (nx+1)*(ny+1)*(nz+1)
+        idx = bm.arange(0, NN).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
-        cell = bm.zeros((NC, 8), dtype=self.itype)
         nyz = (ny + 1)*(nz + 1)
-        cell[:, 0] = c.flatten()
-        cell[:, 1] = cell[:, 0] + nyz
-        cell[:, 2] = cell[:, 1] + nz + 1
-        cell[:, 3] = cell[:, 0] + nz + 1
-        cell[:, 4] = cell[:, 0] + 1
-        cell[:, 5] = cell[:, 4] + nyz
-        cell[:, 6] = cell[:, 5] + nz + 1
-        cell[:, 7] = cell[:, 4] + nz + 1
+        cell0 = c.reshape(-1, 1)
+        cell1 = cell0 + nyz
+        cell2 = cell1 + nz + 1
+        cell3 = cell0 + nz + 1
+        cell4 = cell0 + 1
+        cell5 = cell4 + nyz
+        cell6 = cell5 + nz + 1
+        cell7 = cell4 + nz + 1
+
+        cell = bm.concatenate([cell0, cell1, cell2, cell3, cell4, cell5, cell6, cell7], axis=-1)
 
         if threshold is not None:
             bc = bm.sum(node[cell, :], axis=1)/cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool_)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
             cell = idxMap[cell]
 
         return cls(node, cell)
@@ -614,7 +540,7 @@ class HexahedronMesh(TensorMesh):
         #gmsh.fltk.run()
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = bm.array(node_coords, dtype=self.ftype).reshape(-1, 3)
+        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)
 
         #节点的编号映射
         nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
@@ -633,8 +559,4 @@ class HexahedronMesh(TensorMesh):
 
 
 
-
-
-
-
-
+HexahedronMesh.set_ploter('3d')

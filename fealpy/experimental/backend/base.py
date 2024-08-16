@@ -13,13 +13,15 @@ Size = Tuple[int, ...]
 
 class TensorLike(metaclass=ABCMeta):
     @property
-    def shape(self) -> Tuple[int, ...]: raise NotImplementedError
-    @property
     def dtype(self) -> Any: raise NotImplementedError
     @property
     def device(self) -> Any: raise NotImplementedError
     @property
+    def mT(self) -> 'TensorLike': raise NotImplementedError
+    @property
     def ndim(self) -> int: raise NotImplementedError
+    @property
+    def shape(self) -> Tuple[int, ...]: raise NotImplementedError
     @property
     def size(self) -> int: raise NotImplementedError
     @property
@@ -99,10 +101,10 @@ FUNCTION_MAPPING = _make_default_mapping(
 
     ### Creation Functions ###
     # python array API standard v2023.12
-    'array',  
+    'array',
     'asarray',
     'arange', 'linspace',
-    'empty', 'zeros', 'ones', 'full', 
+    'empty', 'zeros', 'ones', 'full',
     'empty_like', 'zeros_like', 'ones_like', 'full_like',
     'eye', 'meshgrid',
     'tril', 'triu',
@@ -114,7 +116,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     # python array API standard v2023.12
     'astype', 'can_cast',
     'finfo', 'iinfo',
-    'isdtype', 'result_type', 
+    'isdtype', 'result_type',
 
     ### Element-wise Functions ###
     # python array API standard v2023.12
@@ -192,11 +194,10 @@ FUNCTION_MAPPING = _make_default_mapping(
     # python array API standard v2023.12
     'cumulative_sum',
     'max', 'mean', 'min',
-    'prod', 
+    'prod',
     'std', 'sum',
     'var',
     # non-standard
-
 
     ### Utility Functions ###
     # python array API standard v2023.12
@@ -243,14 +244,14 @@ class Backend(Generic[_DT]):
                 continue
             if hasattr(cls, target_key):
                 # Methods will not be copied from source if implemented manually.
-                logger.debug(f"{target_key} is already defined. "
+                logger.debug(f"`{target_key}` already defined. "
                              f"Skip the copy from {source.__name__}.")
                 continue
             if hasattr(source, source_key):
                 setattr(cls, target_key, staticmethod(getattr(source, source_key)))
             else:
-                logger.debug(f"{source_key} is not found in {source.__name__}. "
-                             f"Method {target_key} remains unimplemented.")
+                logger.warning(f"`{source_key}` not found in {source.__name__}. "
+                               f"Method `{target_key}` remains unimplemented.")
 
     @classmethod
     def show_unsupported(cls, signal: bool, function_name: str, arg_name: str) -> None:

@@ -1,8 +1,11 @@
+from typing import Union, Optional
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
+from .plot import Plotable
 
-class TetrahedronMesh(SimplexMesh): 
+
+class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
         super().__init__(TD=3,itype=cell.dtype,ftype=node.dtype)
         self.node = node
@@ -40,6 +43,31 @@ class TetrahedronMesh(SimplexMesh):
         self.celldata = {}
         self.meshdata = {}
 
+    def cell_to_face_permutation(self, locFace = None):
+        """
+        局部面到全局面的映射
+        c2f_loc[c2f_order]=c2f_glo
+        """
+        if locFace is None:
+            locFace = self.localFace
+
+        c2f  = self.cell_to_face()
+        cell = self.cell
+        face = self.face
+        face_g_idx = bm.argsort(face)
+
+        c2f_glo = face[c2f.reshape(-1)]
+        c2f_loc = cell[:, locFace].reshape(-1, 3)
+
+        c2f_glo = bm.argsort(c2f_glo, axis=1)
+        c2f_glo = bm.argsort(c2f_glo, axis=1)
+        c2f_loc = bm.argsort(c2f_loc, axis=1)
+
+        NC = len(cell)
+        c2f_order = c2f_loc[bm.arange(NC*4)[:, None], c2f_glo]
+        return c2f_order.reshape(NC, 4, 3)
+
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_one_tetrahedron(cls, meshtype='equ'):
@@ -71,6 +99,24 @@ class TetrahedronMesh(SimplexMesh):
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
         return face2edgeSign
+    
+    def cell_to_edge_sign(self, cell=None):
+        """
+        TODO: true 代表相同方向
+        """
+        if cell==None:
+            cell = self.cell
+        NC = self.number_of_cells()
+        NEC = self.number_of_edges_of_cells()
+        cell2edgeSign = bm.zeros((NC, NEC), dtype=bm.bool)
+        localEdge = self.localEdge
+        E = localEdge.shape[0]
+        #for i, (j, k) in zip(range(E), localEdge):
+        #    cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
+        edge = self.edge
+        c2e = self.cell_to_edge()
+        cell2edgeSign = edge[c2e, 0]==cell[:, localEdge[:, 0]]
+        return cell2edgeSign
 
     def face_unit_normal(self, index=_S):
         face = self.face
@@ -82,21 +128,19 @@ class TetrahedronMesh(SimplexMesh):
         length = bm.sqrt(bm.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def integrator(self, q, etype=3):
+    def quadrature_formula(self, q:int, etype:Union[int, str]='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
         if etype in {'cell', 3}:
-            a = self.ftype
-            print(a)
             from ..quadrature import TetrahedronQuadrature
             return TetrahedronQuadrature(q, dtype=self.ftype)
         elif etype in {'face', 2}:
             from ..quadrature import TriangleQuadrature
-            return TriangleQuadrature(q, dtype=self.dtype)
+            return TriangleQuadrature(q, dtype=self.ftype)
         elif etype in {'edge', 1}:
             from ..quadrature import GaussLegendreQuadrature
-            return GaussLegendreQuadrature(q, dtype=self.dtype)
+            return GaussLegendreQuadrature(q, dtype=self.ftype)
 
     def cell_volume(self, index=_S):
         """
@@ -149,7 +193,7 @@ class TetrahedronMesh(SimplexMesh):
             vjm = node[cell[index, m],:] - node[cell[index, j],:]
             Dlambda[:, i, :] = bm.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
-
+    """
     def grad_shape_function(self, bc, p=1, index=_S, variables='x'):
         R = bm.simplex_grad_shape_function(bc, p=p)
         if variables == 'x':
@@ -158,8 +202,7 @@ class TetrahedronMesh(SimplexMesh):
             return gphi #(..., NC, ldof, GD)
         elif variables == 'u':
             return R
-
-    cell_grad_shape_function = grad_shape_function
+    """
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         """
@@ -626,3 +669,4 @@ class TetrahedronMesh(SimplexMesh):
         return cls(node, cell)
 
 
+TetrahedronMesh.set_ploter('3d')

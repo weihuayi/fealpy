@@ -4,12 +4,10 @@ from scipy.sparse.linalg import spsolve
 from fealpy.tools import showmultirate
 
 #三角形网格
-# from fealpy.mesh import TriangleMesh
-from fealpy.np.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
 # 拉格朗日有限元空间
-# from fealpy.functionspace import LagrangeFESpace
-from fealpy.np.functionspace import LagrangeFESpace
+from fealpy.functionspace import LagrangeFESpace
 
 #区域积分子
 from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
@@ -168,4 +166,4 @@ fig, axes = plt.subplots(1, 2)
 mesh.add_plot(axes[0], cellcolor=uI, linewidths=0)
 mesh.add_plot(axes[1], cellcolor=uh, linewidths=0) 
 
-plt.show()
+# plt.show()
