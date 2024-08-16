@@ -71,13 +71,6 @@ class DoubleLaplacePDE():
 
         Lu = uxx+uyy
         L2u = sp.diff(Lu, x, 2) + sp.diff(Lu, y, 2)
-        print('u : ', u)
-        print('ux : ', ux)
-        print('uy : ', uy)
-        print("uxx : ", uxx)
-        print("uxy : ", uxy)
-        print("uyy : ", uyy)
-        print('L2u : ', L2u)
 
         self.u = sp.lambdify(('x', 'y'), u, 'numpy') 
 
