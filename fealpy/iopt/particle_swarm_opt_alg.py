@@ -1,4 +1,3 @@
-# import numpy as np
 from fealpy.experimental.backend import backend_manager as bm
 import networkx as nx
 import scipy.sparse as sp
@@ -146,14 +145,15 @@ class PSO:
         v = bm.zeros([self.N, self.dim])
         for it in range(0, self.MaxIT):
             w = 0.9 - 0.4 * (it / self.MaxIT)
+            r1 = bm.random.rand(self.N, 1)
+            r2 = bm.random.rand(self.N, 1)
+            v = w * v + c1 * r1 * (pbest - x) + c2 * r2 * (self.gbest-x)
+            v = v + (self.vlb - v) * (v < self.vlb) + (self.vub - v) * (v > self.vub)
+            x = x + v
+            x = x + (self.lb - x) * (x < self.lb) + (self.ub - x) * (x > self.ub)
             for i in range(0, self.N):
-                v[i,:] = w * v[i,:] + c1 * bm.random.rand() * (pbest[i,:] - x[i,:]) + c2 * bm.random.rand() * (self.gbest - x[i,:])
-                v[i,:] = bm.clip(v[i,:], self.vlb, self.vub)
-                x[i,:] = x[i,:] + v[i,:]
-                x[i,:] = bm.clip(x[i,:], self.lb, self.ub)
                 fit[i,0], _ = self.fobj(x[i, :])
-                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], x[i,:], pbest_f[i, 0], pbest[i, :])
-            self.best[it] = self.gbest_f   
+                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], x[i,:], pbest_f[i, 0], pbest[i, :])  
 
 class QPSO(PSO):
     def cal(self):
