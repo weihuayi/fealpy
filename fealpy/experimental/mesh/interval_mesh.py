@@ -47,7 +47,6 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         self.construct()
         self.face2cell = self.face_to_cell()
-        self.cell2edge = self.cell_to_edge()
 
 
 

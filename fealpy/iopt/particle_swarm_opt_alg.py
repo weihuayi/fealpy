@@ -172,18 +172,6 @@ class QPSO(PSO):
             a = p + alpha * bm.abs(mbest - a) * bm.log(1 / u) * (1 - 2 * (rand >= 0.5))
             a = a + (self.lb - a) * (a < self.lb) + (self.ub - a) * (a > self.ub)
             for i in range(0,self.N):
-                # phi = bm.random.rand(1, self.dim)
-                # p = phi[i, :] * pbest[i, :] + (1 - phi[i, :]) * self.gbest
-                # u = bm.random.rand(1, self.dim)
-                # rand = bm.random.rand()
-                # a[i, :] = p[i, :] + alpha * bm.abs(mbest - a[i, :]) * bm.log(1 / u[i, :]) * (1 - 2 * (rand[i] >= 0.5))
-                # a[i,:] = bm.clip(a[i], self.lb, self.ub)
                 fit[i, 0], _ = self.fobj(a[i, :])
-                pbest_f[i, 0], pbest = (fit[i, 0], a) if fit[i, 0] < pbest_f[i, 0] else (pbest_f[i, 0], pbest)
-                self.gbest_f, self.gbest = (pbest_f[i, :], pbest) if pbest_f[i, 0] < self.gbest_f else (self.gbest_f, self.gbest)
-                # pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], a[i,:], pbest_f[i, 0], pbest[i, :])    
-            # mask = fit < pbest_f 
-            # print(mask)
-            # pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
-            # gbest_idx = bm.argmin(pbest_f)
-            # (self.gbest_f, self.gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < self.gbest_f else (self.gbest_f, self.gbest)
+                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], a[i,:], pbest_f[i, 0], pbest[i, :])    
+            
