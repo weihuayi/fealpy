@@ -6,7 +6,7 @@ from ..typing import TensorLike, Index, _S
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import bilinear_integral, linear_integral, nonlinear_integral
+from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     CellOperatorIntegrator,
     enable_cache,
@@ -16,14 +16,20 @@ from .integrator import (
 
 
 class ScalarMassIntegrator(CellOperatorIntegrator):
-    def __init__(self, uh=None, func=None, grad_func=None, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
-                 batched: bool=False) -> None:
+                 batched: bool=False,
+                 method: Optional[str]=None) -> None:
+        method = 'assembly' if (method is None) else method
         super().__init__()
-        self.uh = uh
-        self.func = func
-        self.grad_func = grad_func
         self.coef = coef
+        if hasattr(coef, 'uh'):
+            self.uh = coef.uh
+            self.func = coef.func
+            if bm.backend_name in {'jax', 'torch'}:
+                pass
+            else:
+                self.grad_func = coef.grad_func
         self.q = q
         self.index = index
         self.batched = batched
@@ -57,16 +63,17 @@ class ScalarMassIntegrator(CellOperatorIntegrator):
 
         return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
     
-    @assemblymethod('nonlinear')
-    def nonlinear_assembly(self, space: _FS) -> TensorLike:
+    @assemblymethod('semilinear')
+    def semilinear_assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
-        func = self.func
-        grad_func = self.grad_func
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        val1 = grad_func(uh(bcs)) # (C, Q)
-        val2 = -func(uh(bcs))     # (C, Q)
-        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)   
+        val_A = coef.grad_func(uh(bcs))  #(C, Q)
+        val_F = -coef.func(uh(bcs))      #(C, Q)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        coef_A = get_semilinear_coef(val_A, coef)
+        coef_F = get_semilinear_coef(val_F, coef)
 
-        return nonlinear_integral(phi, phi, val1, val2, ws, cm, coef, batched=self.batched)
+        return bilinear_integral(phi, phi, ws, cm, coef_A, batched=self.batched), \
+               linear_integral(phi, ws, cm, coef_F, batched=self.batched)

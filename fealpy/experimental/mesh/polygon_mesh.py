@@ -53,18 +53,15 @@ class PolygonMesh(Mesh, Plotable):
         kwargs = bm.context(cell)
 
         totalEdge = self.total_edge()
-        _, i0, j = bm.unique_all(bm.sort(totalEdge, axis=1), axis=0)
+        _, i0, i1, j_ = bm.unique_all_(bm.sort(totalEdge, axis=1), axis=0)
 
         NE = i0.shape[0]
         self.edge2cell = bm.zeros((NE, 4), **kwargs)
 
-        i1 = np.zeros(NE, **kwargs)
-        b = bm.arange(len(self._cell), **kwargs)
-        bm.scatter(i1, j, b) 
         self.edge = totalEdge[i0]
 
-        NV = self.number_of_vertices_of_cells()
         NC = self.number_of_cells()
+        NV = self.number_of_vertices_of_cells() # (NC, )
 
         cellIdx = bm.repeat(range(NC), NV, **kwargs)
         localIdx = ranges(NV)
@@ -74,6 +71,5 @@ class PolygonMesh(Mesh, Plotable):
         self.edge2cell[:, 2] = localIdx[i0]
         self.edge2cell[:, 3] = localIdx[i1]
         self.cell2edge = j
-
 
 PolygonMesh.set_ploter('polygon2d')

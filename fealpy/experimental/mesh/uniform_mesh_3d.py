@@ -15,7 +15,6 @@ from .plot import Plotable
 class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured hexahedral mesh
-
     The ordering of the nodes in each element is as follows:
       3 ------- 7
      / |       /|
@@ -112,6 +111,13 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
+
+        self.cell2edge = self.cell_to_edge()
+        self.face2cell = self.face_to_cell()
+        self.localFace2edge = bm.array([
+        (4, 5, 8, 9), (6, 7, 10, 11),
+        (0, 1, 8, 10), (2, 3, 9, 11),
+        (0, 2, 4, 6), (1, 3, 5, 7)])
 
 
     # 实体生成方法
@@ -291,7 +297,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
 
-
     @entitymethod(3)
     def _get_cell(self) -> TensorLike:
         """
@@ -326,6 +331,263 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
     def number_of_faces_of_cells(self):
         return 6
+    
+    def cell_to_edge(self) -> TensorLike:
+        """
+        @brief 单元和边的邻接关系, 储存每个单元相邻的 12 条边的编号
+        """
+        NC = self.NC
+        NE = self.NE
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+
+        cell2edge = bm.zeros((NC, 12), dtype=self.itype)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            cell2edge[:, 0] = idx0[:, :-1, :-1].flatten()
+            cell2edge[:, 1] = idx0[:, :-1, 1:].flatten()
+            cell2edge[:, 2] = idx0[:, 1:, :-1].flatten()
+            cell2edge[:, 3] = idx0[:, 1:, 1:].flatten()
+
+            NE0 = nx * (ny + 1) * (nz + 1)
+            idx1 = np.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)  
+            cell2edge[:, 4] = (NE0 + idx1[:-1, :, :-1]).flatten()
+            cell2edge[:, 5] = (NE0 + idx1[:-1, :, 1:]).flatten()
+            cell2edge[:, 6] = (NE0 + idx1[1:, :, :-1]).flatten()
+            cell2edge[:, 7] = (NE0 + idx1[1:, :, 1:]).flatten()
+
+            NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+            idx2 = np.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
+            cell2edge[:, 8] = (NE1 + idx2[:-1, :-1, :]).flatten()
+            cell2edge[:, 9] = (NE1 + idx2[:-1, 1:, :]).flatten()
+            cell2edge[:, 10] = (NE1 + idx2[1:, :-1, :]).flatten()
+            cell2edge[:, 11] = (NE1 + idx2[1:, 1:, :]).flatten()
+
+            return cell2edge
+        elif bm.backend_name == 'jax':
+            idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            cell2edge = cell2edge.at[:, 0].set(idx0[:, :-1, :-1].flatten())
+            cell2edge = cell2edge.at[:, 1].set(idx0[:, :-1, 1:].flatten())
+            cell2edge = cell2edge.at[:, 2].set(idx0[:, 1:, :-1].flatten())
+            cell2edge = cell2edge.at[:, 3].set(idx0[:, 1:, 1:].flatten())
+
+            NE0 = nx * (ny + 1) * (nz + 1)
+            idx1 = np.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)  
+            cell2edge = cell2edge.at[:, 4].set((NE0 + idx1[:-1, :, :-1]).flatten())
+            cell2edge = cell2edge.at[:, 5].set((NE0 + idx1[:-1, :, 1:]).flatten())
+            cell2edge = cell2edge.at[:, 6].set((NE0 + idx1[1:, :, :-1]).flatten())
+            cell2edge = cell2edge.at[:, 7].set((NE0 + idx1[1:, :, 1:]).flatten())
+
+            NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+            idx2 = np.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
+            cell2edge = cell2edge.at[:, 8].set((NE1 + idx2[:-1, :-1, :]).flatten())
+            cell2edge = cell2edge.at[:, 9].set((NE1 + idx2[:-1, 1:, :]).flatten())
+            cell2edge = cell2edge.at[:, 10].set((NE1 + idx2[1:, :-1, :]).flatten())
+            cell2edge = cell2edge.at[:, 11].set((NE1 + idx2[1:, 1:, :]).flatten())
+
+            return cell2edge
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
+    def face_to_edge(self):
+        """
+        @brief 面和边的邻接关系, 储存每个面相邻的 4 条边的编号
+        """
+
+        NE = self.NE
+        NF = self.NF
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        face2edge = bm.zeros((NF, 4), dtype=self.itype)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # x direction
+            NE0 = 0
+            NE1 = (nx + 1) * ny * nz
+            idx0 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+            
+            face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+            face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+            face2edge[NE0:NE1, 2] = idx1[:, :-1, :].flatten()
+            face2edge[NE0:NE1, 3] = idx1[:, 1:, :].flatten()
+
+            # y direction
+            NE0 = NE1
+            NE1 += nx * (ny + 1) * nz
+            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+            face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+
+            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+            face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+            face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+
+            # z direction
+            NE0 = NE1
+            NE1 += nx * ny * (nz + 1)
+            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            face2edge[NE0:NE1, 0] = idx0[:, :-1, :].flatten()
+            face2edge[NE0:NE1, 1] = idx0[:, 1:, :].flatten()
+
+            idx1 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+            face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+            face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+
+            return face2edge
+        elif bm.backend_name == 'jax':
+            # x direction
+            NE0 = 0
+            NE1 = (nx + 1) * ny * nz
+            idx0 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+            
+            face2edge = face2edge.at[NE0:NE1, 0].set(idx0[:, :, :-1].flatten())
+            face2edge = face2edge.at[NE0:NE1, 1].set(idx0[:, :, 1:].flatten())
+            face2edge = face2edge.at[NE0:NE1, 2].set(idx1[:, :-1, :].flatten())
+            face2edge = face2edge.at[NE0:NE1, 3].set(idx1[:, 1:, :].flatten())
+
+            # y direction
+            NE0 = NE1
+            NE1 += nx * (ny + 1) * nz
+            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            face2edge = face2edge.at[NE0:NE1, 0].set(idx0[:, :, :-1].flatten())
+            face2edge = face2edge.at[NE0:NE1, 1].set(idx0[:, :, 1:].flatten())
+
+            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+            face2edge = face2edge.at[NE0:NE1, 2].set(idx1[:-1, :, :].flatten())
+            face2edge = face2edge.at[NE0:NE1, 3].set(idx1[1:, :, :].flatten())
+
+            # z direction
+            NE0 = NE1
+            NE1 += nx * ny * (nz + 1)
+            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            face2edge = face2edge.at[NE0:NE1, 0].set(idx0[:, :-1, :].flatten())
+            face2edge = face2edge.at[NE0:NE1, 1].set(idx0[:, 1:, :].flatten())
+
+            idx1 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+            face2edge = face2edge.at[NE0:NE1, 2].set(idx1[:-1, :, :].flatten())
+            face2edge = face2edge.at[NE0:NE1, 3].set(idx1[1:, :, :].flatten())
+
+            return face2edge
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+
+    def face_to_cell(self) -> TensorLike:
+        """
+        @brief 面和单元的邻接关系, 储存每个面相邻的 2 个单元的编号
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        NC = self.NC
+
+        face2cell = bm.zeros((NF, 4), dtype=self.itype)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # x direction
+            NF0 = 0
+            NF1 = (nx+1) * ny * nz
+            idx = bm.arange(NC).reshape(nx, ny, nz)
+            face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
+            face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
+            face2cell[NF0:NF1-ny*nz, 2] = 0
+            face2cell[NF0:NF1-ny*nz, 3] = 1
+
+            face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
+            face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
+            face2cell[NF1-ny*nz:NF1, 2] = 1
+            face2cell[NF0:NF0+ny*nz, 3] = 0
+
+            # y direction
+            idy = bm.swapaxes(idx, 1, 0)
+            NF0 = NF1
+            NF1 += nx * (ny+1) * nz
+            fidy = bm.arange(NF0, NF1).reshape(nx, ny+1, nz).swapaxes(0, 1)
+            face2cell[fidy[:-1], 0] = idy
+            face2cell[fidy[1:], 1] = idy
+            face2cell[fidy[:-1], 2] = 0
+            face2cell[fidy[1:], 3] = 1
+
+            face2cell[fidy[-1], 0] = idy[-1]
+            face2cell[fidy[0], 1] = idy[0]
+            face2cell[fidy[-1], 2] = 1
+            face2cell[fidy[0], 3] = 0
+
+            # z direction
+            idz = bm.transpose(idx, (2, 0, 1))
+            NF0 = NF1
+            NF1 += nx * ny * (nz + 1)
+            fidz = np.arange(NF0, NF1).reshape(nx, ny, nz+1).transpose(2, 0, 1)
+            face2cell[fidz[:-1], 0] = idz
+            face2cell[fidz[1:], 1] = idz
+            face2cell[fidz[:-1], 2] = 0
+            face2cell[fidz[1:], 3] = 1
+
+            face2cell[fidz[-1], 0] = idz[-1]
+            face2cell[fidz[0], 1] = idz[0]
+            face2cell[fidz[-1], 2] = 1
+            face2cell[fidz[0], 3] = 0
+
+            return face2cell
+        elif bm.backend_name == 'jax':
+            # x direction
+            NF0 = 0
+            NF1 = (nx+1) * ny * nz
+            idx = bm.arange(NC).reshape(nx, ny, nz)
+            face2cell = face2cell.at[NF0:NF1-ny*nz, 0].set(idx.flatten())
+            face2cell = face2cell.at[NF0+ny*nz:NF1, 1].set(idx.flatten())
+            face2cell = face2cell.at[NF0:NF1-ny*nz, 2].set(0)
+            face2cell = face2cell.at[NF0:NF1-ny*nz, 3].set(1)
+
+            face2cell = face2cell.at[NF1-ny*nz:NF1, 0].set(idx[-1].flatten())
+            face2cell = face2cell.at[NF0:NF0+ny*nz, 1].set(idx[0].flatten())
+            face2cell = face2cell.at[NF1-ny*nz:NF1, 2].set(1)
+            face2cell = face2cell.at[NF0:NF0+ny*nz, 3].set(0)
+
+            # y direction
+            idy = bm.swapaxes(idx, 1, 0)
+            NF0 = NF1
+            NF1 += nx * (ny+1) * nz
+            fidy = bm.arange(NF0, NF1).reshape(nx, ny+1, nz).swapaxes(0, 1)
+            face2cell = face2cell.at[fidy[:-1], 0].set(idy)
+            face2cell = face2cell.at[fidy[1:], 1].set(idy)
+            face2cell = face2cell.at[fidy[:-1], 2].set(0)
+            face2cell = face2cell.at[fidy[1:], 3].set(1)
+
+            face2cell = face2cell.at[fidy[-1], 0].set(idy[-1])
+            face2cell = face2cell.at[fidy[0], 1].set(idy[0])
+            face2cell = face2cell.at[fidy[-1], 2].set(1)
+            face2cell = face2cell.at[fidy[0], 3].set(0)
+
+            # z direction
+            idz = bm.transpose(idx, (2, 0, 1))
+            NF0 = NF1
+            NF1 += nx * ny * (nz + 1)
+            fidz = np.arange(NF0, NF1).reshape(nx, ny, nz+1).transpose(2, 0, 1)
+            face2cell = face2cell.at[fidz[:-1], 0].set(idz)
+            face2cell = face2cell.at[fidz[1:], 1].set(idz)
+            face2cell = face2cell.at[fidz[:-1], 2].set(0)
+            face2cell = face2cell.at[fidz[1:], 3].set(1)
+
+            face2cell = face2cell.at[fidz[-1], 0].set(idz[-1])
+            face2cell = face2cell.at[fidz[0], 1].set(idz[0])
+            face2cell = face2cell.at[fidz[-1], 2].set(1)
+            face2cell = face2cell.at[fidz[0], 3].set(0)
+
+            return face2cell
+        
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
 
 
     # 实体几何
@@ -337,16 +599,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
         NC = self.number_of_cells()
-        # if etype == 0:
-        #     return bm.tensor(0, dtype=self.ftype)
-        # elif etype == 1:
-        #     return self.h[0], self.h[1], self.h[2]
-        # elif etype == 2:
-        #     return self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]
-        # elif etype == 3:
-        #     return self.h[0] * self.h[1] * self.h[2]
-        # else:
-        #     raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         if etype == 0:
             # Measure of vertices (points) is 0
             return bm.tensor(0, dtype=self.ftype)
@@ -583,6 +835,45 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         # TODO: Implement the interpolation points for p > 1
         raise NotImplementedError("Interpolation points for p > 1 are not yet implemented for 3D structured meshes.")
 
+    def face_to_ipoint(self, p, index=None):
+        """
+        @brief 生成每个面上的插值点全局编号
+        TODO wrong!!!
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        edge = self.entity('edge')
+        face = self.entity('face')
+        face2edge = self.face_to_edge()
+        edge2ipoint = self.edge_to_ipoint(p)
+
+        mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
+        multiIndex0 = mi.flatten().reshape(-1, 1);
+        multiIndex1 = mi.T.flatten().reshape(-1, 1);
+        multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
+
+        dofidx = [0 for i in range(4)] 
+        dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
+        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
+        dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
+        dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
+
+        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
+        # localEdge = bm.array([[0, 1], [1, 2], [2, 3], [0, 3]], dtype=self.itype)
+        localEdge = bm.array([[0, 2], [1, 3], [0, 1], [2, 3]], dtype=self.itype)
+        for i in range(4): #边上的自由度
+            ge = face2edge[:, i]
+            idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+
+            face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
+            face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
+
+        indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+        face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
+                NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
+        return face2ipoint
+         
 
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index :Index=_S) -> TensorLike:
@@ -650,6 +941,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                     self.nx * (self.ny + 1) * self.nz + \
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
+
+            self.face2cell = self.face_to_cell()
+
         self.clear()
 
 

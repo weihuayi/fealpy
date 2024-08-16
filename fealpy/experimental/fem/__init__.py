@@ -2,7 +2,7 @@
 from .integrator import *
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
-from .nonlinear_form import NonlinearForm
+from .semilinear_form import SemilinearForm
 
 ### Cell Operator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator

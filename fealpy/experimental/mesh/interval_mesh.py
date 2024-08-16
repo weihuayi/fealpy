@@ -47,7 +47,7 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         self.construct()
         self.face2cell = self.face_to_cell()
-        self.cell2edge = self.cell_to_edge()
+
 
 
 
@@ -205,8 +205,8 @@ class IntervalMesh(SimplexMesh,Plotable):
             newNode = (node[cell[:, 0]] + self.node[cell[:, 1]])/2
             self.node = bm.concatenate((node, newNode),axis=0)
             
-            part1 = bm.concatenate((cell[:,0],range(NN,NN+NC)),axis = 0)
-            part2 = bm.concatenate((range(NN, NN+NC),cell[:, 1]),axis = 0)
+            part1 = bm.concatenate((cell[:,0],bm.arange(NN,NN+NC)),axis = 0)
+            part2 = bm.concatenate((bm.arange(NN, NN+NC),cell[:, 1]),axis = 0)
             self.cell = bm.stack((part1,part2),axis=1)
             self.construct()
 
@@ -231,7 +231,7 @@ class IntervalMesh(SimplexMesh,Plotable):
             newCell = bm.zeros((NC+N, 2), dtype=self.itype)
             newCell[:NC] = cell
             newCell[:NC][isMarkedCell, 1] = range(NN, NN+N)
-            newCell[NC:, 0] = range(NN, NN+N)
+            newCell[NC:, 0] = bm.arange(NN, NN+N)
             newCell[NC:, 1] = cell[isMarkedCell, 1]
             self.cell = newCell
             self.construct()

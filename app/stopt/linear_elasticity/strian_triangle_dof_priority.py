@@ -21,7 +21,9 @@ from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 
 
-bm.set_backend('numpy')
+# bm.set_backend('numpy')
+bm.set_backend('pytorch')
+# bm.set_backend('jax')
 
 # 平面应变问题定义
 def source(points: TensorLike) -> TensorLike:
@@ -49,7 +51,6 @@ def dirichlet(points: TensorLike) -> TensorLike:
 nx = 2
 ny = 2
 mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
-
 maxit = 5
 errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
 for i in range(maxit):
@@ -112,7 +113,7 @@ for i in range(maxit):
     IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
     new_values[IDX] = 0
     K_dependent = COOTensor(indices, new_values, K_dependent.sparse_shape)
-    index, = bm.nonzero(isDDof, as_tuple=True)
+    index, = bm.nonzero(isDDof)
     one_values = bm.ones(len(index), **kwargs)
     one_indices = bm.stack([index, index], axis=0)
     K1_dependent = COOTensor(one_indices, one_values, K_dependent.sparse_shape)
@@ -125,7 +126,7 @@ for i in range(maxit):
     IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
     new_values[IDX] = 0
     K_independent = COOTensor(indices, new_values, K_independent.sparse_shape)
-    index, = bm.nonzero(isDDof, as_tuple=True)
+    index, = bm.nonzero(isDDof)
     one_values = bm.ones(len(index), **kwargs)
     one_indices = bm.stack([index, index], axis=0)
     K1_independent = COOTensor(one_indices, one_values, K_independent.sparse_shape)
@@ -139,9 +140,9 @@ for i in range(maxit):
     uh_independent[:] = cg(K_independent, F_independent, maxiter=5000, atol=1e-14, rtol=1e-14)
 
     u_exact = tensor_space.interpolate(solution)
-    errorMatrix[0, i] = bm.max(bm.abs(bm.array(uh_dependent) - u_exact))
-    errorMatrix[1, i] = bm.max(bm.abs(bm.array(uh_dependent) - u_exact)[isDDof])
-    errorMatrix[2, i] = bm.max(bm.abs(bm.array(uh_independent) - uh_dependent))
+    errorMatrix[0, i] = bm.max(bm.abs(uh_dependent[:] - u_exact))
+    errorMatrix[1, i] = bm.max(bm.abs(uh_dependent[:] - u_exact)[isDDof])
+    errorMatrix[2, i] = bm.max(bm.abs(uh_independent[:] - uh_dependent[:]))
     
     if i < maxit-1:
         mesh.uniform_refine()
