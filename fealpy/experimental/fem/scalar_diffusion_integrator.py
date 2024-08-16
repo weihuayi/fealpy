@@ -85,7 +85,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.fetch(space)
-        val_F = bm.squeeze(-uh.grad_value(uh, bcs))   #(C, Q, dof_numel)
+        val_F = bm.squeeze(-uh.grad_value(bcs))   #(C, Q, dof_numel)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         coef_F = get_semilinear_coef(val_F, coef)
 
