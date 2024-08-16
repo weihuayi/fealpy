@@ -312,7 +312,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         isBdNode = mesh.boundary_node_flag()
         isBdEdge = mesh.boundary_face_flag()
         bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32)
-        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum())
+        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum(),dtype=bm.int32)
         n2id = self.node_to_dof()[isBdNode]
         e2id = self.edge_to_internal_dof()[isBdEdge]
 
@@ -325,8 +325,9 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64) ## 注意！！！先 t 后 n
         nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
         nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
-        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1, 0]])
-        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2), (len(coridx), 1, 1))
+        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1,
+                                                           0]],dtype=bm.float64)
+        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=bm.float64), (len(coridx), 1, 1))
 
         # 顶点自由度
         uh[n2id[:, 0]] = gD[0](node) 
@@ -354,12 +355,12 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         n = mesh.edge_normal()[isBdEdge]
         k = 0; l = p-4*m-1
         for r in range(m+1):
-            bcs = self.mesh.multi_index_matrix(p-r, 1)/(p-r)
+            bcs = self.mesh.multi_index_matrix(p-r, 1,dtype=self.ftype)/(p-r)
             b2l = self.bspace.bernstein_to_lagrange(p-r, 1)
             point = self.mesh.bc_to_point(bcs)[isBdEdge]
             if r==0:
                 ffval = gD[0](point) #(ldof, NE)
-                bcoeff = bm.einsum('el, il->ei', ffval, b2l, optimize=True)
+                bcoeff = bm.einsum('el, il->ei', ffval, b2l)
                 uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             else:
                 symidx, num = symmetry_index(2, r)
@@ -371,7 +372,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 #num = factorial(r)/bm.prod(factorial(idx), axis=1)
 
                 ffval = gD[r](point) #(ldof, NE, L), L 指的是分量个数，k 阶导有 k 个
-                bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l, optimize=True)
+                bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l)
                 uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             k = l
             l += p-4*m+r
@@ -410,12 +411,12 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         n = mesh.edge_normal()
         k = 0; l = p-4*m-1
         for r in range(m+1):
-            bcs = self.mesh.multi_index_matrix(p-r, 1)/(p-r)
+            bcs = self.mesh.multi_index_matrix(p-r, 1,dtype=self.ftype)/(p-r)
             b2l = self.bspace.bernstein_to_lagrange(p-r, 1)
             point = self.mesh.bc_to_point(bcs)
             if r==0:
                 ffval = flist[0](point) #(ldof, NE)
-                bcoeff = bm.einsum('el, il->ei', ffval, b2l, optimize=True)
+                bcoeff = bm.einsum('el, il->ei', ffval, b2l)
                 fI[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             else:
                 symidx, num = symmetry_index(2, r)
@@ -428,18 +429,18 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 #num = factorial(r)/bm.prod(factorial(idx), axis=1)
 
                 ffval = flist[r](point) #(ldof, NE, L), L 指的是分量个数，k 阶导有 k 个
-                bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l, optimize=True)
+                bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l)
                 fI[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             k = l
             l += p-4*m+r
 
         #内部自由度
-        midx = self.mesh.multi_index_matrix(p, 2)
-        bcs = self.mesh.multi_index_matrix(p, 2)/p
+        midx = self.mesh.multi_index_matrix(p, 2, dtype=self.itype)
+        bcs = self.mesh.multi_index_matrix(p, 2,dtype=self.ftype)/p
         b2l = self.bspace.bernstein_to_lagrange(p, 2)
         point = self.mesh.bc_to_point(bcs)
         ffval = flist[0](point) #(ldof, NE)
-        bcoeff = bm.einsum('el, il->ei', ffval, b2l, optimize=True)
+        bcoeff = bm.einsum('el, il->ei', ffval, b2l)
 
         flag = bm.all(midx > m, axis=1)# & bm.all(midx < p-2*m-1, axis=1)
         fI[c2id] = bcoeff[:, flag]
@@ -450,7 +451,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         isBdNode = mesh.boundary_node_flag()
         isBdEdge = mesh.boundary_face_flag()
         bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32)
-        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum())
+        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum(),dtype=bm.int32)
         n2id = self.node_to_dof()[isBdNode]
         e2id = self.edge_to_internal_dof()[isBdEdge]
 
@@ -463,8 +464,9 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64) ## 注意！！！先 t 后 n
         nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
         nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
-        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1, 0]])
-        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2), (len(coridx), 1, 1))
+        nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1,
+                                                           0]],dtype=bm.float64)
+        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=self.ftype), (len(coridx), 1, 1))
 
         k = 1; 
         for r in range(1, 2*m+1):

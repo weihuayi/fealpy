@@ -16,7 +16,8 @@ from fealpy.experimental.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, 
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
-
+from fealpy.experimental import logger
+logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -58,8 +59,6 @@ x = sp.symbols('x')
 y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
-import ipdb
-ipdb.set_trace()
 ulist = get_flist(u)[:3]
 mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 
@@ -76,16 +75,17 @@ for i in range(maxit):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n    [None, :], axis=1)<1e-10)
 
 
-    space = CmConformingFESpace2d(mesh, 5, 1, isCornerNode)
+    space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
     
 
     uh = space.function()
 
     bform = BilinearForm(space)
-    integrator = gradmIntegrator(2, 1, 9)
+    coef = 1
+    integrator = gradmIntegrator(m=2, coef=1, q=p+4)
     bform.add_integrator(integrator)
     lform = LinearForm(space)
-    lform.add_integrator(ScalarSourceIntegrator(pde.source, q=9))
+    lform.add_integrator(ScalarSourceIntegrator(pde.source, q=p+4))
 
     A = bform.assembly()
     F = lform.assembly()
@@ -97,12 +97,17 @@ for i in range(maxit):
     bc1 = DirichletBC(space, gd = ulist)
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
+    #A = A.to_dense()
+    #uh[:] = bm.linalg.solve(A, F)
     #A = A.toarray()
+    #print(bm.linalg.cond(A))
+    #import ipdb
+    #ipdb.set_trace()
     #import scipy.sparse
     #A = scipy.sparse.csr_matrix(A)
-    uh[:] = spsolve(A, F)
+    #uh[:] = spsolve(A, F)
     
-    #uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
 
     @barycentric
