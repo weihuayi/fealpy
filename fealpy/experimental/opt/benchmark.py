@@ -1,5 +1,4 @@
 from fealpy.experimental.backend import backend_manager as bm
-# import numpy as bm
 
 def F1(x):
     return bm.sum((x + 0.5) ** 2, axis=-1)
@@ -12,7 +11,6 @@ def F3(x):
     return bm.sum(bm.arange(1, dim + 1) * (x ** 2), axis=-1)
 
 def F4(x):
-    # dim = x.shape[0]
     return x[:,0] ** 2 + bm.sum(1e6 * x[:,1:] ** 2, axis=-1)
 
 def F5(x):
@@ -108,7 +106,6 @@ def F24(x):
 
 def F25(x):
     n = x.shape[-1]
-    #print("%%%%%%%%%%%%%%%%%%",x)
     y1 = bm.sum(x ** 2, axis =-1) / 4000
     y2 = 1
     for i in range(n):
