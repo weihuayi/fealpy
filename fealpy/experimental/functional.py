@@ -50,10 +50,10 @@ def linear_integral(basis: TensorLike, weights: TensorLike, measure: TensorLike,
         return bm.einsum('c, q, cq... -> c...', measure, weights, basis) * source
 
     elif is_tensor(source):
+        dof_shape = basis.shape[3:]
         basis = basis.reshape(*basis.shape[:3], -1) # (C, Q, I, dof_numel)
 
         if source.ndim <= 2 + int(batched):
-            dof_shape = basis.shape[3:]
             source = fill_axis(source, 3 if batched else 2)
             r = bm.einsum(f'c, q, cqid, ...cq -> ...cid', measure, weights, basis, source)
             return bm.reshape(r, r.shape[:-1] + dof_shape)
