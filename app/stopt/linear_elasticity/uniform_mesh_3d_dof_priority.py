@@ -45,20 +45,33 @@ def dirichlet(points: TensorLike) -> TensorLike:
     return solution(points)
 
 extent = [0, 1, 0, 1, 0, 1]
+# extent = [0, 2, 0, 2, 0, 2]
 h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
-import matplotlib.pyplot as plt
 
-fig = plt.figure()
-axes = fig.add_subplot(111, projection='3d')
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_edge(axes, showindex=True)
-mesh.find_face(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
 
-plt.show()
+edge2ipoint = mesh.edge_to_ipoint(p=1)
+print("edge2ipoint:", edge2ipoint.shape, "\n", edge2ipoint)
+face2cell = mesh.face_to_cell()
+print("face2cell:", face2cell.shape, "\n", face2cell)
+face2edge = mesh.face_to_edge()
+print("face2edge:", face2edge.shape, "\n", face2edge)
+face2ipoint = mesh.face_to_ipoint(p=1)
+print("face2ipoint:", face2ipoint.shape, "\n", face2ipoint)
+# face2ipoint_test = mesh.face_to_ipoint_test(p=1)
+# print("face2ipoint_test:", face2ipoint_test.shape, "\n", face2ipoint_test)
+# import matplotlib.pyplot as plt
+
+# fig = plt.figure()
+# axes = fig.add_subplot(111, projection='3d')
+# mesh.add_plot(axes)
+# mesh.find_node(axes, showindex=True)
+# mesh.find_edge(axes, showindex=True)
+# mesh.find_face(axes, showindex=True)
+# mesh.find_cell(axes, showindex=True)
+
+# plt.show()
 
 maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
@@ -82,15 +95,12 @@ for i in range(maxit):
     # 与单元有关的组装方法
     KK_dependent = integrator_bi_dependent.assembly(space=tensor_space)
     print("KK_dependent:\n", KK_dependent[0])
-    asd
 
     # 与单元有关的组装方法 
     bform_dependent = BilinearForm(tensor_space)
     bform_dependent.add_integrator(integrator_bi_dependent)
     K_dependent = bform_dependent.assembly()
-    bform_old = BilinearForm_old(tensor_space_old)
-    bform_old.add_domain_integrator(integrator_bi_old)
-    K_old = bform_old.assembly()
+    asd
     
     integrator_li = VectorSourceIntegrator(source=source, q=5)
     integrator_li_old = VectorSourceIntegrator_old(f=source, q=5)
