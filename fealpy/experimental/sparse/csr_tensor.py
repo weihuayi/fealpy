@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, List
+from typing import Optional, Union, overload, List,Tuple
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -34,7 +34,7 @@ class CSRTensor(SparseTensor):
         else:
             self._spshape = tuple(spshape)
 
-        self._check(crow, col, values, spshape)
+        self._check(crow, col, values, self._spshape)
 
     def _check(self, crow: TensorLike, col: TensorLike, values: Optional[TensorLike], spshape: Size):
         if crow.ndim != 1:
@@ -70,6 +70,19 @@ class CSRTensor(SparseTensor):
 
     @property
     def nnz(self): return self._col.shape[1]
+    
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        nonzero_row = bm.zeros(len(self._values),dtype=bm.int64)
+        nonzero_col = bm.zeros(len(self._values),dtype=bm.int64)
+
+        for i in range(1, self._crow.shape[0]):
+                start = self._crow[i - 1]
+                end = self._crow[i]
+                nonzero_row[start:end] = bm.zeros(end - start) + i-1
+                nonzero_col[start:end] = self._col[start:end]
+
+        return nonzero_row, nonzero_col
 
     def crow(self) -> TensorLike:
         """Return the row location of non-zero elements."""
@@ -134,20 +147,163 @@ class CSRTensor(SparseTensor):
     @overload
     def add(self, other: TensorLike, alpha: Number=1) -> TensorLike: ...
     def add(self, other: Union[Number, 'CSRTensor', TensorLike], alpha: Number=1) -> Union['CSRTensor', TensorLike]:
-        pass
+        """Adds another tensor or scalar to this CSRTensor, with an optional scaling factor.
+
+        Parameters:
+            other (Number | CSRTensor | Tensor): The tensor or scalar to be added.\n
+            alpha (float, optional): The scaling factor for the other tensor. Defaults to 1.0.
+
+        Raises:
+            TypeError: If the type of `other` is not supported for addition.\n
+            ValueError: If the shapes of `self` and `other` are not compatible.\n
+            ValueError: If one has value and another does not.
+
+        Returns:
+            out (CSRTensor | Tensor): A new CSRTensor if `other` is a CSRTensor,\
+            or a Tensor if `other` is a dense tensor.
+        """
+        if isinstance(other, CSRTensor):
+            check_shape_match(self.shape, other.shape)
+            check_spshape_match(self.sparse_shape, other.sparse_shape)
+
+            new_crow = bm.array([0],dtype=bm.int64)
+            new_col = bm.array([],dtype=bm.int64)
+            new_values = bm.array([],dtype=bm.int64)
+
+            for i in range(0, self._crow.shape[0]-1): 
+                
+                indices1 = self._col[self._crow[i]:self._crow[i+1]]
+                indices2 = other._col[other._crow[i]:other._crow[i+1]]
+                value1 = self._values[self._crow[i]:self._crow[i+1]]
+                value2 = other._values[other._crow[i]:other._crow[i+1]]
+                
+                col, inverse_indices = bm.unique(bm.concat((indices1,indices2)), return_inverse=True)
+                values = bm.zeros(col.shape[0])
+                values = bm.index_add_(values, -1, inverse_indices, bm.concat((value1,alpha*value2)))
+
+                new_crow = bm.concat((new_crow,[len(values)+new_crow[-1]]))
+                new_col = bm.concat((new_col,col))
+                new_values = bm.concat((new_values,values))
+
+            if self._values is None:
+                if other._values is None:
+                    new_values = None
+                else:
+                    raise ValueError("self has no value while other does")
+            else:
+                if other._values is None:
+                    raise ValueError("self has value while other does not")
+
+            return CSRTensor(new_crow, new_col,new_values ,self.sparse_shape)
+
 
     def mul(self, other: Union[Number, 'CSRTensor', TensorLike]) -> 'CSRTensor':
-        pass
+        """Element-wise multiplication.
+        The result CSR tensor will share the same indices with
+        the original if `other` is a number or a dense tensor.
+        """
+        if isinstance(other, CSRTensor):
+            pass
+
+        elif isinstance(other, TensorLike):
+            check_shape_match(self.shape, other.shape)
+            new_values = bm.copy(other[self.nonzero_slice])
+
+            if self._values is not None:
+                bm.multiply(self._values, new_values, out=new_values)
+
+            return CSRTensor(self._crow, self._col,new_values, self.sparse_shape)
+
+        elif isinstance(other, (int, float)):
+            if self._values is None:
+                raise ValueError("Cannot multiply CSRTensor without value with scalar")
+            new_values = self._values * other
+
+            return CSRTensor(self._crow,self._col, new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in multiplication")
 
     def div(self, other: Union[Number, TensorLike]) -> 'CSRTensor':
-        pass
+        """Element-wise division.
+        The result CSR tensor will share the same indices with
+        the original if `other` is a number or a dense tensor.
+        """
+        if self._values is None:
+                raise ValueError("Cannot divide CSRTensor without value")
+
+        if isinstance(other, TensorLike):
+            check_shape_match(self.shape, other.shape)
+            new_values = bm.copy(other[self.nonzero_slice])
+  
+            bm.divide(self._values, new_values, out=new_values)
+            return CSRTensor(self._crow,self._col,new_values, self.sparse_shape)
+
+        elif isinstance(other, (int, float)):
+            new_values = self._values / other
+            return CSRTensor(self._indices, new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in division")
+
 
     def pow(self, other: Union[TensorLike, Number]) -> 'CSRTensor':
-        pass
+        """Element-wise power of CSRTensor.
+        The result CSR tensor will share the same indices with
+        the original if `other` is a number or a dense tensor.
+        """
+        if self._values is None:
+            raise ValueError("Cannot power CSRTensor without value with tensor")
+
+        if isinstance(other, TensorLike):
+            check_shape_match(self.shape, other.shape)
+            new_values = bm.copy(other[self.nonzero_slice])
+
+            new_values = bm.power(self._values, new_values)
+            return CSRTensor(self._crow, self._col,new_values, self.sparse_shape)
+
+        elif isinstance(other, (int, float)):
+            new_values = self._values ** other
+            return CSRTensor(self._indices, new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f'Unsupported type {type(other).__name__} in power')
+
 
     @overload
     def matmul(self, other: 'CSRTensor') -> 'CSRTensor': ...
     @overload
     def matmul(self, other: TensorLike) -> TensorLike: ...
     def matmul(self, other: Union['CSRTensor', TensorLike]):
-        pass
+        """Matrix-multiply this CSRTensor with another tensor.
+
+        Parameters:
+            other (CSRTensor | Tensor): A 1-D tensor for matrix-vector multiply,
+                or a 2-D tensor for matrix-matrix multiply.
+                Batched matrix-matrix multiply is available for dimensions
+                (*B, M, K) and (*B, K, N). *B means any number of batch dimensions.
+
+        Raises:
+            TypeError: If the type of `other` is not supported for matmul.
+
+        Returns:
+            out (CSRTensor | Tensor): A new CSRTensor if `other` is a CSRTensor,\
+            or a Tensor if `other` is a dense tensor.
+        """
+        if isinstance(other, CSRTensor):
+            if (self.values() is None) or (other.values() is None):
+                raise ValueError("Matrix multiplication between CSRTensor without "
+                                 "value is not implemented now")
+            crow, col,values, spshape = spspmm_csr(
+                self._crow,self._col ,self._values, self.sparse_shape,
+                other._crow, other._col,other._values, other.sparse_shape,
+            )
+            return CSRTensor(crow, col,values, spshape)
+
+        elif isinstance(other, TensorLike):
+            if self.values() is None:
+                raise ValueError()
+            return spmm_csr(self._crow, self._col,self._values,self.sparse_shape, other)
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
