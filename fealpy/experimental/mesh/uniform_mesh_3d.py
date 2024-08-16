@@ -15,7 +15,6 @@ from .plot import Plotable
 class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
     Topological data structure of a structured hexahedral mesh
-
     The ordering of the nodes in each element is as follows:
       3 ------- 7
      / |       /|
@@ -751,6 +750,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                     self.nx * (self.ny + 1) * self.nz + \
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
+
+            self.face2cell = self.face_to_cell()
+            
         self.clear()
 
 

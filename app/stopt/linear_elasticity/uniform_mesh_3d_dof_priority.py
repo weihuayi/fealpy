@@ -44,7 +44,7 @@ def dirichlet(points: TensorLike) -> TensorLike:
 
     return solution(points)
 
-extent = [0, 2, 0, 2, 0, 2]
+extent = [0, 1, 0, 1, 0, 1]
 h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
@@ -77,6 +77,8 @@ for i in range(maxit):
     integrator_bi_dependent = LinearElasticityIntegrator(E=1.0, nu=0.3, 
                                             elasticity_type=None, q=5)
     
+    cell2tldof = tensor_space.cell_to_dof()
+    print("cell2ldof:", cell2tldof)
     # 与单元有关的组装方法
     KK_dependent = integrator_bi_dependent.assembly(space=tensor_space)
     print("KK_dependent:\n", KK_dependent[0])
