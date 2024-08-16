@@ -6,6 +6,7 @@ from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
 from .sparse_tensor import SparseTensor
 from .utils import (
+    _flatten_indices,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_csr
@@ -166,35 +167,62 @@ class CSRTensor(SparseTensor):
             check_shape_match(self.shape, other.shape)
             check_spshape_match(self.sparse_shape, other.sparse_shape)
 
+            if (self._values is None) and (not other._values is None):  
+                raise ValueError("self has no value while other does")
+            elif (not self._values is None) and (other._values is None):
+                raise ValueError("self has value while other does not")
+
             new_crow = bm.array([0],dtype=bm.int64)
             new_col = bm.array([],dtype=bm.int64)
             new_values = bm.array([],dtype=bm.int64)
 
             for i in range(0, self._crow.shape[0]-1): 
-                
                 indices1 = self._col[self._crow[i]:self._crow[i+1]]
                 indices2 = other._col[other._crow[i]:other._crow[i+1]]
-                value1 = self._values[self._crow[i]:self._crow[i+1]]
-                value2 = other._values[other._crow[i]:other._crow[i+1]]
-                
                 col, inverse_indices = bm.unique(bm.concat((indices1,indices2)), return_inverse=True)
-                values = bm.zeros(col.shape[0])
-                values = bm.index_add_(values, -1, inverse_indices, bm.concat((value1,alpha*value2)))
 
-                new_crow = bm.concat((new_crow,[len(values)+new_crow[-1]]))
-                new_col = bm.concat((new_col,col))
-                new_values = bm.concat((new_values,values))
-
-            if self._values is None:
-                if other._values is None:
+                if self._values is None:
                     new_values = None
                 else:
-                    raise ValueError("self has no value while other does")
-            else:
-                if other._values is None:
-                    raise ValueError("self has value while other does not")
+                    value1 = self._values[self._crow[i]:self._crow[i+1]]
+                    value2 = other._values[other._crow[i]:other._crow[i+1]]
+                    values = bm.zeros(col.shape[0],dtype=value2.dtype)
+                    values = bm.index_add_(values, -1, inverse_indices, bm.concat((value1,alpha*value2)))
+                    new_values = bm.concat((new_values,values))
+                new_crow = bm.concat((new_crow,bm.tensor([len(col)+new_crow[-1]])))
+                new_col = bm.concat((new_col,col))
 
             return CSRTensor(new_crow, new_col,new_values ,self.sparse_shape)
+
+        elif isinstance(other, TensorLike):
+            check_shape_match(self.shape, other.shape)
+
+            output = other * alpha
+            context = bm.context(output)
+
+            output = output.reshape(self.dense_shape + (prod(self._spshape),))
+
+            indices1 = bm.zeros([2,len(self._col)],dtype=bm.int64)
+            for x in range(self.shape[-1]):
+                indices1[0,self._crow[x]:self._crow[x+1]] = x
+            indices1[1,:] = self._col
+
+            flattened = _flatten_indices(indices1, self._spshape)[0]
+
+            if self._values is None:
+                src = bm.ones((1,) * (self.dense_ndim + 1), **context)
+                src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
+            else:
+                src = self._values
+            bm.index_add_(output, -1, flattened, src)
+
+            return output.reshape(self.shape)
+        elif isinstance(other, (int, float)):
+            new_values = self._values + alpha * other
+            return CSRTensor(bm.copy(self._crow), bm.copy(self._col),new_values, self.sparse_shape)
+
+        else:
+            raise TypeError(f"Unsupported type {type(other).__name__} in addition")
 
 
     def mul(self, other: Union[Number, 'CSRTensor', TensorLike]) -> 'CSRTensor':
