@@ -41,6 +41,8 @@ class QuadrangleMesh(TensorMesh, Plotable):
         self.face_normal = self.edge_normal
         self.face_unit_normal = self.edge_unit_normal
 
+        self.face_to_ipoint = self.edge_to_ipoint
+
     def ref_cell_measure(self):
         return 1.0
 
