@@ -85,7 +85,6 @@ reaction_coef.grad_func = grad_func
     
 #非线性迭代
 for i in range(maxit):
-    print(i)
 
     space = LagrangeFESpace(mesh, p=p)
     NDof[i] = space.number_of_global_dofs()
