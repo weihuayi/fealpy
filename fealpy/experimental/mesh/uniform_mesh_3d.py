@@ -903,7 +903,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     def face_to_ipoint(self, p, index=None):
         """
         @brief 生成每个面上的插值点的全局编号
-        TODO Provide an efficient implementation that is distinct from unstructured meshes
+        TODO Provide an efficient implementation that is distinct from 
+            unstructured meshes
         """
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -959,6 +960,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     def cell_to_ipoint(self, p, index=_S):
         """
         @brief 生成每个单元上的插值点的全局编号
+        TODO Provide an efficient implementation that is distinct from 
+            unstructured meshes
         """
 
         cell = self.entity('cell', index=index)
