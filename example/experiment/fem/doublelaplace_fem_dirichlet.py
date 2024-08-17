@@ -37,7 +37,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='pytorch', type=str,
+        default='numpy', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--meshtype',
@@ -48,6 +48,7 @@ args = parser.parse_args()
 
 
 bm.set_backend(args.backend)
+decive = "cuda"
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -72,7 +73,7 @@ for i in range(maxit):
     node = mesh.entity('node')
     isCornerNode = bm.zeros(len(node),dtype=bm.bool)
     for n in bm.array([[0,0],[1,0],[0,1],[1,1]], dtype=bm.float64):
-        isCornerNode = isCornerNode | (bm.linalg.norm(node-n    [None, :], axis=1)<1e-10)
+        isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
 
 
     space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
