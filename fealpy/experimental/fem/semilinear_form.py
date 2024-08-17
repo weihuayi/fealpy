@@ -20,17 +20,13 @@ class SemilinearForm(Form):
  
         INTS = self.integrators[group]
         ct = INTS[0](self.space)
-        print(ct)
         etg = [INTS[0].to_global_dof(s) for s in self._spaces]
         if isinstance(ct, tuple):
-            # print(INTS[0](self.space)[0].shape, INTS[0](self.space)[1].shape)
-            # print(INTS[1](self.space).shape)
             ct_A = ct[0]
             ct_F = ct[1]
             for int_ in INTS[1:]:
-                # print(int_(self.space).shape)
-                new_ct_A = int_(self.space)
-                new_ct_F = int_(self.space)
+                new_ct_A = int_(self.space)[0]
+                new_ct_F = int_(self.space)[1]
                 fdim_A = min(ct_A.ndim, new_ct_A.ndim)
                 fdim_F = min(ct_F.ndim, new_ct_F.ndim)
                 if ct_A.shape[:fdim_A] != new_ct_A.shape[:fdim_A]:
@@ -58,7 +54,7 @@ class SemilinearForm(Form):
             if retain_ints:
                 self.memory[group] = ((ct_A, etg), (ct_F, etg))
 
-            return (ct_A, etg),(ct_F, etg)
+            return (ct_A, etg), (ct_F, etg)
             
         else:
             for int_ in INTS[1:]:
@@ -78,7 +74,7 @@ class SemilinearForm(Form):
             if retain_ints:
                 self.memory[group] = (ct, etg)
 
-            return (ct, etg),(ct, etg)
+            return (ct, etg)
 
     def _scalar_assembly_A(self, retain_ints: bool, batch_size: int):
 
@@ -94,18 +90,20 @@ class SemilinearForm(Form):
             spshape = sparse_shape
         )
         for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, retain_ints)[0]
-            ue2dof = e2dofs[0]
-            ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
-            local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
+            if isinstance(self._assembly_group(group, retain_ints)[0], tuple):
+                group_tensor, e2dofs = self._assembly_group(group, retain_ints)[0]
+                ue2dof = e2dofs[0]
+                ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
+                local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
 
-            if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
-                group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
-            I = bm.broadcast_to(ve2dof[:, :, None], local_shape)
-            J = bm.broadcast_to(ue2dof[:, None, :], local_shape)
-            indices = bm.stack([I.ravel(), J.ravel()], axis=0)
-            group_tensor = bm.reshape(group_tensor, self._values_ravel_shape)
-            M = M.add(COOTensor(indices, group_tensor, sparse_shape))
+                if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
+                    group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
+                # print(ue2dof.shape, local_shape)
+                J = bm.broadcast_to(ue2dof[:, None, :], local_shape)
+                I = bm.broadcast_to(ve2dof[:, :, None], local_shape)
+                indices = bm.stack([I.ravel(), J.ravel()], axis=0)
+                group_tensor = bm.reshape(group_tensor, self._values_ravel_shape)
+                M = M.add(COOTensor(indices, group_tensor, sparse_shape))
 
         return M
     
@@ -123,7 +121,10 @@ class SemilinearForm(Form):
         )
 
         for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, retain_ints)[1]
+            if isinstance(self._assembly_group(group, retain_ints)[0], tuple):
+                group_tensor, e2dofs = self._assembly_group(group, retain_ints)[1]
+            else:
+                group_tensor, e2dofs = self._assembly_group(group, retain_ints)
 
             if (batch_size > 0) and (group_tensor.ndim == 2):
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
