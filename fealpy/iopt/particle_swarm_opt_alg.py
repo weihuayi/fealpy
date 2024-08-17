@@ -34,8 +34,9 @@ class PSOProblem:
         
         # 创建稀疏矩阵，对应在data['D']的坐标位置
         D = self.data['D'][(p1, p2)].reshape(-1, 1)
-        self.data['net'] = sp.csr_matrix((D.flatten(),(p1, p2)),shape=self.data['D'].shape)
-
+        self.data['net'] = sp.csr_matrix((D.flatten(), (p1, p2)), shape = self.data['D'].shape)
+        
+        
         # 起点和终点
         self.data['noS'] = bm.where((self.data['node'][:, 0] == self.dataS[0]) & (self.data['node'][:, 1] == self.dataS[1]))[0][0]
         self.data['noE'] = bm.where((self.data['node'][:, 0] == self.dataE[0]) & (self.data['node'][:, 1] == self.dataE[1]))[0][0]
@@ -55,6 +56,10 @@ class PSOProblem:
         for i in range(0, len(path0) - 1):
             source = path0[i]
             target = path0[i + 1]
+            source = int(source)
+            target = int(target)
+            # if not nx.has_path(G, source, target):
+            #     print(f"No path exists between {source} and {target}")
             path = nx.shortest_path(G, source = source, target = target)
             distance = nx.shortest_path_length(G, source = source, target = target, weight = None)  
             distances.append(distance)
