@@ -30,24 +30,24 @@ class COOTensor(SparseTensor):
         self._indices = indices
         self._values = values
         self.is_coalesced = is_coalesced
+        self._check(indices, values)
 
         if spshape is None:
-            self._spshape = (bm.max(indices, axis=1) + 1,)
+            self._spshape = tuple(bm.tolist(bm.max(indices, axis=1) + 1))
         else:
+            # total ndim should be equal to sparse_ndim + dense_dim
+            if len(spshape) != indices.shape[0]:
+                raise ValueError(
+                    f"length of sparse shape ({len(spshape)}) "
+                    f"must match the size of indices in dim-0 ({indices.shape[0]})"
+                )
             self._spshape = tuple(spshape)
 
-        self._check(indices, values, self._spshape)
-
-    def _check(self, indices: TensorLike, values: Optional[TensorLike], spshape: Size):
+    def _check(self, indices: TensorLike, values: Optional[TensorLike]):
         if not isinstance(indices, TensorLike):
             raise TypeError(f"indices must be a Tensor, but got {type(indices)}")
         if indices.ndim != 2:
             raise ValueError(f"indices must be a 2D tensor, but got {indices.ndim}D")
-
-        # total ndim should be equal to sparse_ndim + dense_dim
-        if len(spshape) != indices.shape[0]:
-            raise ValueError(f"size must have length {indices.shape[0]}, "
-                             f"but got {len(spshape)}")
 
         if isinstance(values, TensorLike):
             if values.ndim < 1:
