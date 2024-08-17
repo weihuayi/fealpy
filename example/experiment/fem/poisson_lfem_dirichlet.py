@@ -11,20 +11,17 @@ import ipdb
 import argparse
 from matplotlib import pyplot as plt
 
+from fealpy.utils import timer
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
 
 from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.mesh import QuadrangleMesh
 from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
 from fealpy.experimental.solver import cg
 
-from fealpy.experimental.pde.poisson_2d import CosCosData 
-from fealpy.utils import timer
 
 
 ## 参数解析
@@ -47,11 +44,15 @@ parser.add_argument('--maxit',
 
 parser.add_argument('--backend',
         default='numpy', type=str,
-        help='默认后端为numpy')
+        help="默认后端为 numpy.")
 
 parser.add_argument('--meshtype',
         default='tri', type=str,
-        help='默认网格为三角形网格')
+                    help="默认网格为 tri (三角形网格)"
+                         "int: 区间网格；tri：三角形网格；"
+                         "quad: 四边形网格；tet: 四面体网格"
+                         "hex: 六面体网格"
+                    )
 
 args = parser.parse_args()
 
@@ -64,12 +65,27 @@ maxit = args.maxit
 
 tmr = timer()
 next(tmr)
-pde = CosCosData()
-if meshtype == 'tri':
+if meshtype == 'int':
+    from fealpy.experimental.pde.poisson_1d import CosData 
+    from fealpy.experimental.mesh import IntervalMesh
+    mesh = IntervalMesh.from_interval_domain([0,1], n)
+elif meshtype == 'tri':
+    from fealpy.experimental.pde.poisson_2d import CosCosData 
+    from fealpy.experimental.mesh import TriangleMesh
     mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 elif meshtype == 'quad':
+    from fealpy.experimental.pde.poisson_2d import CosCosData 
+    from fealpy.experimental.mesh import QuadrangleMesh
     mesh = QuadrangleMesh.from_box([0,1,0,1], n, n)
-else:
+elif meshtype == 'tet':
+    from fealpy.experimental.pde.poisson_3d import CosCosCosData 
+    from fealpy.experimental.mesh import TetrahedronMesh
+    mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], n, n, n)
+elif meshtype == 'hex':
+    from fealpy.experimental.pde.poisson_3d import CosCosCosData 
+    from fealpy.experimental.mesh import HexahedronMesh
+    mesh = HexahedronMesh.from_box([0,1,0,1,0,1], n, n, n)
+else: 
     raise ValueError(f"Unsupported : {meshtype} mesh")
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
@@ -81,7 +97,6 @@ for i in range(maxit):
     space= LagrangeFESpace(mesh, p=p)
     tmr.send(f'第{i}次空间时间') 
 
-    #ipdb.set_trace()
     uh = space.function() # 建立一个有限元函数
 
     bform = BilinearForm(space)
