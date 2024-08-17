@@ -33,11 +33,11 @@ parser.add_argument('--n',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=5, type=int,
+        default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
+        default='pytorch', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--meshtype',
@@ -97,7 +97,6 @@ for i in range(maxit):
     bc1 = DirichletBC(space, gd = ulist)
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
-    #A = A.to_dense()
     #uh[:] = bm.linalg.solve(A, F)
     #A = A.toarray()
     #print(bm.linalg.cond(A))
