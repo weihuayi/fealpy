@@ -49,19 +49,39 @@ extent = [0, 1, 0, 1, 0, 1]
 h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
-mesh_text = HexahedronMesh.from_box(extent, nx=1, ny=1, nz=1)
+# ip = mesh.interpolation_points(p=1)
+# print("ip:", ip.shape, "\n", ip)
+# ip2 = mesh.interpolation_points(p=2)
+# print("ip2:", ip2.shape, "\n", ip2)
+
+# mesh_text = HexahedronMesh.from_box(extent, nx=1, ny=1, nz=1)
+# ip_text = mesh_text.interpolation_points(p=1)
+# print("ip_text:", ip_text.shape, "\n", ip_text)
+
+# import matplotlib.pyplot as plt
+
+# fig = plt.figure()
+# axes = fig.add_subplot(111, projection='3d')
+# mesh.add_plot(axes)
+# mesh.find_node(axes, node=ip2, showindex=True)
+# # mesh.find_edge(axes, showindex=True)
+# # mesh.find_face(axes, showindex=True)
+# # mesh.find_cell(axes, showindex=True)
+# plt.show()
+# asd
 
 
-# edge2ipoint = mesh.edge_to_ipoint(p=1)
-# print("edge2ipoint:", edge2ipoint.shape, "\n", edge2ipoint)
+
+edge2ipoint = mesh.edge_to_ipoint(p=2)
+print("edge2ipoint:", edge2ipoint.shape, "\n", edge2ipoint)
 # face2cell = mesh.face_to_cell()
 # print("face2cell:", face2cell.shape, "\n", face2cell)
 # face2edge = mesh.face_to_edge()
 # print("face2edge:", face2edge.shape, "\n", face2edge)
-print("node:", mesh.entity('node'))
-print("face:", mesh.entity('face'))
-print("cell:", mesh.entity('cell'))
-print("face2cell:", mesh.face_to_cell().shape, "\n", mesh.face_to_cell())
+# print("node:", mesh.entity('node'))
+# print("face:", mesh.entity('face'))
+# print("cell:", mesh.entity('cell'))
+# print("face2cell:", mesh.face_to_cell().shape, "\n", mesh.face_to_cell())
 face2ipoint = mesh.face_to_ipoint(p=2)
 print("face2ipoint:", face2ipoint.shape, "\n", face2ipoint)
 cell2ipoint = mesh.cell_to_ipoint(p=2)
