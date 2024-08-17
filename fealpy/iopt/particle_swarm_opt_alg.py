@@ -16,11 +16,11 @@ class PSOProblem:
     def builddata(self):
         self.data["R"] = 1 # 横平竖直 
         self.data['map'] = self.MAP
-        L, _ = label(self.MAP) #标记连通区
+        L, _ = label(self.MAP) # 标记连通区
 
         # 标记障碍体的转角处
-        indices = bm.where(L > 0)
-        landmark = bm.concatenate([bm.array(L[i]) for i in indices]) # bm
+        indices = bm.where(bm.array(L) > 0)
+        landmark = bm.concatenate([bm.array(L[i]) for i in indices]) 
         self.data['landmark'] = bm.array(landmark)
         
         # 标记可行区域
@@ -30,13 +30,13 @@ class PSOProblem:
         # 计算点与点之间的距离
         self.data['D'] = squareform(pdist(self.data['node']))
 
-        # 找出所有点点距离为1
-        p1, p2 = bm.where(self.data['D'] <= self.data['R'])
+        p1, p2 = bm.where(bm.array(self.data['D']) <= bm.array(self.data['R']))
         
         # 创建稀疏矩阵，对应在data['D']的坐标位置
         D = self.data['D'][(p1, p2)].reshape(-1, 1)
-        self.data['net'] = sp.csr_matrix((D.flatten(),(p1, p2)),shape=self.data['D'].shape)
-
+        self.data['net'] = sp.csr_matrix((D.flatten(), (p1, p2)), shape = self.data['D'].shape)
+        
+        
         # 起点和终点
         self.data['noS'] = bm.where((self.data['node'][:, 0] == self.dataS[0]) & (self.data['node'][:, 1] == self.dataS[1]))[0][0]
         self.data['noE'] = bm.where((self.data['node'][:, 0] == self.dataE[0]) & (self.data['node'][:, 1] == self.dataE[1]))[0][0]
@@ -55,7 +55,11 @@ class PSOProblem:
         path0 = [self.data['noS']] + sorted_numbers_flat + [self.data['noE']]
         for i in range(0, len(path0) - 1):
             source = path0[i]
-            target = path0[i+1]
+            target = path0[i + 1]
+            source = int(source)
+            target = int(target)
+            # if not nx.has_path(G, source, target):
+            #     print(f"No path exists between {source} and {target}")
             path = nx.shortest_path(G, source = source, target = target)
             distance = nx.shortest_path_length(G, source = source, target = target, weight = None)  
             distances.append(distance)
@@ -100,8 +104,9 @@ class PSOProblem:
         print("The opimal path coordinates: ")
         for x, y in zip(xpath, ypath):
             print("({}, {})".format(x, y))
-        plt.plot(xpath, ypath,'-', color = 'red')
+        plt.plot(xpath, ypath, '-', color = 'red')
         plt.plot([xpath[-1], self.dataE[0]], [ypath[-1], self.dataE[1]], '-', color = 'red')
+        
         plt.show()
 
 class PSO:
@@ -115,15 +120,15 @@ class PSO:
         self.MaxIT = MaxIT
         self.fobj = fobj
         self.best = bm.zeros(self.MaxIT)
-        self.gbest = bm.zeros((1,self.dim))
+        self.gbest = bm.zeros((1, self.dim))
         self.gbest_f = 0
 
     def initialize(self):
         #种群
         a = bm.random.rand(self.N, self.dim) * (self.ub - self.lb) + self.lb 
-        fit = bm.zeros((self.N,1))
+        fit = bm.zeros((self.N, 1))
         for i in range(0, self.N):
-            fit[i,0], _ = self.fobj(a[i,:])
+            fit[i, 0], _ = self.fobj(a[i, :])
         #个体最优
         pbest = bm.copy(a)
         pbest_f = bm.copy(fit)
@@ -135,7 +140,7 @@ class PSO:
     
     def updatePGbest(self, fit, x, pbest_f, pbest):
         pbest_f, pbest = (fit, x) if fit < pbest_f else (pbest_f, pbest)
-        gbest_f,gbest = (pbest_f, pbest) if pbest_f < self.gbest_f else (self.gbest_f, self.gbest)
+        gbest_f, gbest = (pbest_f, pbest) if pbest_f < self.gbest_f else (self.gbest_f, self.gbest)
         return pbest_f, pbest, gbest_f, gbest
 
     def cal(self):
@@ -173,5 +178,5 @@ class QPSO(PSO):
             a = a + (self.lb - a) * (a < self.lb) + (self.ub - a) * (a > self.ub)
             for i in range(0,self.N):
                 fit[i, 0], _ = self.fobj(a[i, :])
-                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], a[i,:], pbest_f[i, 0], pbest[i, :])    
+                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i, 0], a[i, :], pbest_f[i, 0], pbest[i, :])  
             
