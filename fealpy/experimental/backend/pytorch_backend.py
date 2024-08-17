@@ -34,6 +34,25 @@ def _dims_to_axes(func):
         return func(*args, dims=axes, **kwargs)
     return wrapper
 
+def _axis_keepdims_dispatch(func, **defaults):
+    if len(defaults) > 0:
+        def wrapper(*args, **kwargs):
+            if 'axis' in kwargs:
+                kwargs['dim'] = kwargs.pop('axis')
+            if 'keepdims' in kwargs:
+                kwargs['keepdim'] = kwargs.pop('keepdims')
+            defaults.update(kwargs)
+            kwargs = defaults
+            return func(*args, **kwargs)
+    else:
+        def wrapper(*args, **kwargs):
+            if 'axis' in kwargs:
+                kwargs['dim'] = kwargs.pop('axis')
+            if 'keepdims' in kwargs:
+                kwargs['keepdim'] = kwargs.pop('keepdims')
+            return func(*args, **kwargs)
+    return wrapper
+
 
 class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
@@ -56,7 +75,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def to_numpy(tensor_like: Tensor, /) -> Any:
         return tensor_like.detach().cpu().numpy()
 
-    from_numpy = torch.from_numpy
+    from_numpy = staticmethod(torch.from_numpy)
+
+    @staticmethod
+    def tolist(tensor: Tensor, /): return tensor.tolist()
 
     ### Creation Functions ###
     # python array API standard v2023.12
@@ -149,13 +171,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ### Searching Functions ###
     # python array API standard v2023.12
-    @staticmethod
-    def argmax(x, /, *, axis=None, keepdims=False):
-        return torch.argmax(x, dim=axis, keepdim=keepdims)
-
-    @staticmethod
-    def argmin(x, /, *, axis=None, keepdims=False):
-        return torch.argmin(x, dim=axis, keepdim=keepdims)
+    argmax = staticmethod(_axis_keepdims_dispatch(torch.argmax))
+    argmin = staticmethod(_axis_keepdims_dispatch(torch.argmin))
 
     @staticmethod
     def nonzero(x, /):
@@ -239,9 +256,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             return torch.max(x)
         return torch.max(x, axis, keepdim=keepdims)[0]
 
-    @staticmethod
-    def mean(x, /, *, axis=None, keepdims=False):
-        return torch.mean(x, axis, keepdim=keepdims)
+    mean = staticmethod(_axis_keepdims_dispatch(torch.mean))
 
     @staticmethod
     def min(x, /, *, axis=None, keepdims=False):
@@ -249,23 +264,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             return torch.min(x)
         return torch.min(x, axis, keepdim=keepdims)[0]
 
-    @staticmethod
-    def prod(x, /, *, axis=None, dtype=None, keepdims=False, initial=None):
-        result = torch.prod(x, dim=axis, keepdim=keepdims, dtype=dtype)
-        return result if (initial is None) else result * initial
-
-    @staticmethod
-    def std(x, /, *, axis=None, correction=0, keepdims=False):
-        return torch.std(x, dim=axis, keepdim=keepdims, correction=correction)
-
-    @staticmethod
-    def sum(x, /, *, axis=None, dtype=None, keepdims=False, initial=None):
-        result = torch.sum(x, dim=axis, keepdim=keepdims, dtype=dtype)
-        return result if (initial is None) else result + initial
-
-    @staticmethod
-    def var(x, /, *, axis=None, correction=0, keepdims=False):
-        return torch.var(x, dim=axis, keepdim=keepdims, correction=correction)
+    prod = staticmethod(_axis_keepdims_dispatch(torch.prod))
+    std = staticmethod(_axis_keepdims_dispatch(torch.std, correction=0.))
+    sum = staticmethod(_axis_keepdims_dispatch(torch.sum))
+    var = staticmethod(_axis_keepdims_dispatch(torch.var, correction=0.))
 
     # non-standard
     cumsum = staticmethod(_dim_to_axis(torch.cumsum))
@@ -273,17 +275,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ### Utility Functions ###
     # python array API standard v2023.12
-    @staticmethod
-    def all(x, /, *, axis=None, keepdims=False):
-        if axis is None:
-            return torch.all(x)
-        return torch.all(x, dim=axis, keepdim=keepdims)
-
-    @staticmethod
-    def any(x, /, *, axis=None, keepdims=False):
-        if axis is None:
-            return torch.any(x)
-        return torch.any(x, dim=axis, keepdim=keepdims)
+    all = staticmethod(_axis_keepdims_dispatch(torch.all))
+    any = staticmethod(_axis_keepdims_dispatch(torch.any))
 
     # non-standard
     @staticmethod

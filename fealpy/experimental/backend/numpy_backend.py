@@ -39,6 +39,9 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     def from_numpy(ndarray: NDArray, /) -> NDArray:
         return ndarray
 
+    @staticmethod
+    def tolist(tensor: NDArray, /): return tensor.tolist()
+
     ### Tensor creation methods ###
     # NOTE: all copied
 

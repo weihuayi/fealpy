@@ -42,11 +42,13 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     @staticmethod
     def from_numpy(numpy_array: np.ndarray, /) -> Any:
         """
-        
         TODO:
             1. add support to `device` agument
         """
         return jax.device_put(numpy_array)
+
+    @staticmethod
+    def tolist(tensor: Array, /): return tensor.tolist()
 
     ### Tensor creation methods ###
     # NOTE: all copied
