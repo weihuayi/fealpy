@@ -396,9 +396,6 @@ class HomogeneousMesh(Mesh):
             else:
                 u = u(ps)
 
-        import ipdb
-        ipdb.set_trace()
-
         if callable(v):
             if getattr(v, 'coordtype', None) == 'barycentric':
                 v = v(bcs)

@@ -32,8 +32,8 @@ from fealpy.tools.show import showmultirate, show_error_table
 # solver
 from fealpy.experimental.solver import cg
 
-from fealpy.pde.MaxwellPDE_2d import SinData as PDE2d
-from fealpy.pde.MaxwellPDE_3d import SinData as PDE3d
+from fealpy.experimental.pde.maxwell_2d import SinData as PDE2d
+from fealpy.pde.MaxwellPDE_3d import SinData as PDE3d 
 
 def Solve(A, b):
     from mumps import DMumpsContext
@@ -131,13 +131,11 @@ for j, p in enumerate(ps):
         A, F = bc.apply(A, F)
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-        Eh[:] = Solve(A, F)
-        print(Eh)
+        Eh[:] = bm.tensor(Solve(A, F))
         # 计算误差
 
         errorMatrix[j, i] = mesh.error(pde.solution, Eh.value)
-        #errorMatrix[j+3, i] = space.curl_error(pde.curl_solution, Eh)
-        print(errorMatrix)
+        errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
 
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)

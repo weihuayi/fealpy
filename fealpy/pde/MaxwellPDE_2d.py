@@ -27,6 +27,7 @@ class MaxwellPDE2d():
         cf = curl(f)
         cfz = cf.dot(C.k).subs({C.x:x, C.y:y})
         self.curlF = sym.lambdify(('x', 'y'), cfz, "numpy")
+        print('cfz:', cfz)
 
         # 构造 curl(curl(f))
         ccf = curl(cf)
@@ -34,6 +35,8 @@ class MaxwellPDE2d():
         ccfy = ccf.dot(C.j).subs({C.x:x, C.y:y})
         self.curlcurlFx = sym.lambdify(('x', 'y'), ccfx, "numpy")
         self.curlcurlFy = sym.lambdify(('x', 'y'), ccfy, "numpy")
+        print('ccfx:', ccfx)
+        print('ccfy:', ccfy)
 
         self.eps = eps
         self.k = k
