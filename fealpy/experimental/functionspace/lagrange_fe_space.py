@@ -144,7 +144,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell_to_dof(index=index)
         val = bm.einsum('cilm, cl->cim', gphi, uh[cell2dof])
-        return val[None, ...]
+        return val[...]
 
 
 

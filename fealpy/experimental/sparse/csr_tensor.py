@@ -6,7 +6,7 @@ from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
 from .sparse_tensor import SparseTensor
 from .utils import (
-    _flatten_indices,
+    flatten_indices,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_csr
@@ -207,7 +207,7 @@ class CSRTensor(SparseTensor):
                 indices1[0,self._crow[x]:self._crow[x+1]] = x
             indices1[1,:] = self._col
 
-            flattened = _flatten_indices(indices1, self._spshape)[0]
+            flattened = flatten_indices(indices1, self._spshape)[0]
 
             if self._values is None:
                 src = bm.ones((1,) * (self.dense_ndim + 1), **context)

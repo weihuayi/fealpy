@@ -125,7 +125,6 @@ for i in range(maxit):
     u0 = space.function()
     du = space.function()
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
-    # isDDof = space.is_boundary_dof(pde.dirichlet, u0)
     isIDof = ~isDDof
 
     D = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient, q=p+2)
@@ -141,7 +140,6 @@ for i in range(maxit):
         du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
         u0 += du
         err = np.max(np.abs(du))
-
         if err < tol:
             break
 
@@ -166,4 +164,4 @@ fig, axes = plt.subplots(1, 2)
 mesh.add_plot(axes[0], cellcolor=uI, linewidths=0)
 mesh.add_plot(axes[1], cellcolor=uh, linewidths=0) 
 
-# plt.show()
+plt.show()
