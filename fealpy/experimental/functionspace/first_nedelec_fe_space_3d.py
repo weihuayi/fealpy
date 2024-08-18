@@ -103,7 +103,7 @@ class FirstNedelecDof3d():
         face = self.mesh.entity('face')
         cell = self.mesh.entity('cell')
 
-        c2d = bm.zeros((NC, ldof), dtype=self.itype)
+        c2d = bm.zeros((NC, ldof), dtype=bm.int64)
         c2d[:, :eldof*6] = e2dof[c2e].reshape(NC, eldof*6)
         s = [0, 0, 0, 1, 1, 2]
         for i in range(6):
@@ -249,212 +249,211 @@ class FirstNedelecFiniteElementSpace3d():
 
         return val
 
-#     @barycentric
-#     def curl_basis(self, bc):
+    @barycentric
+    def curl_basis(self, bcs):
 
-#         p = self.p
-#         mesh = self.mesh
-#         NC = mesh.number_of_cells()
-#         GD = mesh.geo_dimension()
-#         ldof = self.dof.number_of_local_dofs()
-#         cldof = self.dof.number_of_local_dofs("cell")
-#         fldof = self.dof.number_of_local_dofs("face")
-#         eldof = self.dof.number_of_local_dofs("edge")
-#         gdof = self.dof.number_of_global_dofs()
-#         glambda = mesh.grad_lambda()
-#         ledge = mesh.localEdge
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        GD = mesh.geo_dimension()
+        ldof = self.dof.number_of_local_dofs()
+        cldof = self.dof.number_of_local_dofs("cell")
+        fldof = self.dof.number_of_local_dofs("face")
+        eldof = self.dof.number_of_local_dofs("edge")
+        gdof = self.dof.number_of_global_dofs()
+        glambda = mesh.grad_lambda()
+        ledge = mesh.localEdge
 
-#         c2esign = mesh.cell_to_edge_sign() #(NC, 6, 2)
+        c2esign = mesh.cell_to_edge_sign() #(NC, 6, 2)
 
-#         l = bm.zeros((4, )+bc[:,None, 0,None, None].shape, dtype=self.ftype)
-#         l[0] = bc[None,:, 0,None, None]
-#         l[1] = bc[None,:, 1,None, None]
-#         l[2] = bc[None,:, 2,None, None]
-#         l[3] = bc[None,:, 3,None, None] #(NQ, NC, ldof, 2)
+        l = bm.zeros((4, )+bcs[None,:, 0,None, None].shape, dtype=self.ftype)
+        l[0] = bcs[None,:, 0,None, None]
+        l[1] = bcs[None,:, 1,None, None]
+        l[2] = bcs[None,:, 2,None, None]
+        l[3] = bcs[None,:, 3,None, None]
 
-#         #l = np.tile(l, (1, NC, 1, 1))
+        #l = np.tile(l, (1, NC, 1, 1))
 
-#         phi = self.bspace.basis(bc, p=p)
-#         gphi = self.bspace.grad_basis(bc, p=p)
-#         multiIndex = self.mesh.multi_index_matrix(p, 3)
-#         val = bm.zeros((NC,)+bc.shape[:-1]+(ldof, 3), dtype=self.ftype)
+        phi = self.bspace.basis(bcs, p=p)
+        gphi = self.bspace.grad_basis(bcs, p=p)
+        multiIndex = self.mesh.multi_index_matrix(p, 3)
+        val = bm.zeros((NC,)+bcs.shape[:-1]+(ldof, 3), dtype=self.ftype)
 
-#         # edge basis
-#         locEdgeDual = bm.tensor([[2, 3], [1, 3], [1, 2], [0, 3], [0, 2], [0, 1]])
-#         for i in range(6):
-#             flag = bm.all(multiIndex[:, locEdgeDual[i]]==0, axis=1)
-#             phie = phi[..., flag] #(NQ, NC, eldof)
-#             gphie = gphi[..., flag, :] #(NQ, NC, eldof, 2)
-#             c2esi = c2esign[:, i] #(NC, )
-#             v = l[ledge[i, 0]]*glambda[:, ledge[i, 1], None] - l[ledge[i, 1]]*glambda[:, ledge[i, 0], None]
-#             v[..., ~c2esi, :, :] *= -1 #(NQ, NC, eldof, 2)
-#             cv = 2*bm.cross(glambda[:, ledge[i, 0]], glambda[:, ledge[i, 1]]) #(NC, )
-#             cv[~c2esi] *= -1
-#             val[..., eldof*i:eldof*(i+1), :] = phie[..., None]*cv[:, None] + np.cross(gphie, v)
+        # edge basis
+        locEdgeDual = bm.tensor([[2, 3], [1, 3], [1, 2], [0, 3], [0, 2], [0, 1]])
+        for i in range(6):
+            flag = bm.all(multiIndex[:, locEdgeDual[i]]==0, axis=1)
+            phie = phi[..., flag]
+            gphie = gphi[..., flag, :]
+            c2esi = c2esign[:, i]
+            v = l[ledge[i, 0]]*glambda[:,None, ledge[i, 1], None,:] - l[ledge[i, 1]]*glambda[:,None, ledge[i, 0], None,:]
+            v[~c2esi,:, :, :] *= -1 
+            cv = 2*bm.linalg.cross(glambda[:,None, ledge[i, 0],None,:], glambda[:,None, ledge[i, 1],None,:]) #(NC, )
+            cv[~c2esi] *= -1
+            val[..., eldof*i:eldof*(i+1), :] = phie[..., None]*cv + bm.linalg.cross(gphie, v)
 
-#         # face basis
-#         if(p > 0):
-#             phi = self.bspace.basis(bc, p=p-1) #(NQ, NC, cldof)
-#             gphi = self.bspace.grad_basis(bc, p=p-1)
-#             multiIndex = self.mesh.multi_index_matrix(p-1, 3)
-#             permcf = self.mesh.ds.cell_to_face_permutation()
-#             localFace = self.mesh.ds.localFace
-#             for i in range(4):
+        # face basis
+        if(p > 0):
+            phi = self.bspace.basis(bcs, p=p-1) #(NQ, NC, cldof)
+            gphi = self.bspace.grad_basis(bcs, p=p-1)
+            multiIndex = self.mesh.multi_index_matrix(p-1, 3)
+            permcf = self.mesh.cell_to_face_permutation()
+            localFace = self.mesh.localFace
+            for i in range(4):
 
-#                 flag = multiIndex[:, i]==0
-#                 phif = phi[..., flag] #(NQ, NC, fldof//2)
-#                 gphif = gphi[..., flag, :] #(NQ, NC, fldof//2, 2)
+                flag = multiIndex[:, i]==0
+                phif = phi[..., flag]
+                gphif = gphi[..., flag, :]
 
-#                 permci = localFace[i, permcf[:, i]] #(NC, 3)
-#                 #l0 = l[permci[:, 0], ..., np.arange(NC), :, :].swapaxes(0, 1)
-#                 #l1 = l[permci[:, 1], ..., np.arange(NC), :, :].swapaxes(0, 1)
-#                 #l2 = l[permci[:, 2], ..., np.arange(NC), :, :].swapaxes(0, 1)
+                permci = localFace[i, permcf[:, i]] #(NC, 3)
+                #l0 = l[permci[:, 0], ..., np.arange(NC), :, :].swapaxes(0, 1)
+                #l1 = l[permci[:, 1], ..., np.arange(NC), :, :].swapaxes(0, 1)
+                #l2 = l[permci[:, 2], ..., np.arange(NC), :, :].swapaxes(0, 1)
 
-#                 l0 = l[permci[:, 0], ..., 0, :, :].swapaxes(0, 1)
-#                 l1 = l[permci[:, 1], ..., 0, :, :].swapaxes(0, 1)
-#                 l2 = l[permci[:, 2], ..., 0, :, :].swapaxes(0, 1)
+                l0 = l[permci[:, 0], 0, :, :, :]
+                l1 = l[permci[:, 1], 0, :, :, :]
+                l2 = l[permci[:, 2], 0, :, :, :]
 
-#                 g0 = glambda[np.arange(NC), permci[:, 0], None]
-#                 g1 = glambda[np.arange(NC), permci[:, 1], None]
-#                 g2 = glambda[np.arange(NC), permci[:, 2], None]
+                g0 = glambda[bm.arange(NC),None, permci[:, 0], None]
+                g1 = glambda[bm.arange(NC),None, permci[:, 1], None]
+                g2 = glambda[bm.arange(NC),None, permci[:, 2], None]
 
-#                 v0 = l2*(l0*g1 - l1*g0) #(NQ, NC, fldof//2, 2)
-#                 v1 = l0*(l1*g2 - l2*g1)
+                v0 = l2*(l0*g1 - l1*g0) #(NQ, NC, fldof//2, 2)
+                v1 = l0*(l1*g2 - l2*g1)
 
-#                 cv0 = np.cross(g2, (l0*g1 - l1*g0)) + 2*l2*np.cross(g0, g1)
-#                 cv1 = np.cross(g0, (l1*g2 - l2*g1)) + 2*l0*np.cross(g1, g2)
+                cv0 = bm.linalg.cross(g2, (l0*g1 - l1*g0)) + 2*l2*bm.linalg.cross(g0, g1)
+                cv1 = bm.linalg.cross(g0, (l1*g2 - l2*g1)) + 2*l0*bm.linalg.cross(g1, g2)
 
-#                 N = eldof*6+fldof*i
-#                 val[..., N:N+fldof//2, :] = -np.cross(v0, gphif)+phif[..., None]*cv0
-#                 val[..., N+fldof//2:N+fldof, :] = -np.cross(v1, gphif)+phif[..., None]*cv1 
+                N = eldof*6+fldof*i
+                val[..., N:N+fldof//2, :] = -bm.linalg.cross(v0, gphif)+phif[..., None]*cv0
+                val[..., N+fldof//2:N+fldof, :] = -bm.linalg.cross(v1, gphif)+phif[..., None]*cv1 
 
-#         # cell basis
-#         if(p > 1):
-#             phi = self.bspace.basis(bc, p=p-2) #(NQ, NC, cldof)
-#             gphi = self.bspace.grad_basis(bc, p=p-2) #(NQ, NC, cldof)
+        # cell basis
+        if(p > 1):
+            phi = self.bspace.basis(bcs, p=p-2)
+            gphi = self.bspace.grad_basis(bcs, p=p-2)
 
-#             g0 = glambda[:, 0, None]
-#             g1 = glambda[:, 1, None]
-#             g2 = glambda[:, 2, None]
-#             g3 = glambda[:, 3, None]
+            g0 = glambda[:,None, 0, None,:]
+            g1 = glambda[:,None, 1, None,:]
+            g2 = glambda[:,None, 2, None,:]
+            g3 = glambda[:,None, 3, None,:]
 
-#             v0 = l[2]*l[3]*(l[0]*g1 - l[1]*g0) #(NQ, NC, ldof, 2)
-#             v1 = l[0]*l[3]*(l[1]*g2 - l[2]*g1) #(NQ, NC, ldof, 2)
-#             v2 = l[0]*l[1]*(l[2]*g3 - l[3]*g2) #(NQ, NC, ldof, 2)
-#             cv0 = np.cross(l[2]*g3+l[3]*g2, l[0]*g1-l[1]*g0) + 2*l[2]*l[3]*np.cross(g0, g1)
-#             cv1 = np.cross(l[0]*g3+l[3]*g0, l[1]*g2-l[2]*g1) + 2*l[0]*l[3]*np.cross(g1, g2)
-#             cv2 = np.cross(l[0]*g1+l[1]*g0, l[2]*g3-l[3]*g2) + 2*l[0]*l[1]*np.cross(g2, g3)
+            v0 = l[2]*l[3]*(l[0]*g1 - l[1]*g0)
+            v1 = l[0]*l[3]*(l[1]*g2 - l[2]*g1)
+            v2 = l[0]*l[1]*(l[2]*g3 - l[3]*g2)
+            cv0 = bm.linalg.cross(l[2]*g3+l[3]*g2, l[0]*g1-l[1]*g0) + 2*l[2]*l[3]*bm.linalg.cross(g0, g1)
+            cv1 = bm.linalg.cross(l[0]*g3+l[3]*g0, l[1]*g2-l[2]*g1) + 2*l[0]*l[3]*bm.linalg.cross(g1, g2)
+            cv2 = bm.linalg.cross(l[0]*g1+l[1]*g0, l[2]*g3-l[3]*g2) + 2*l[0]*l[1]*bm.linalg.cross(g2, g3)
 
-#             N = eldof*6+fldof*4
-#             val[..., N:N+cldof//3, :] = np.cross(gphi, v0) + phi[..., None]*cv0 
-#             val[..., N+cldof//3:N+2*cldof//3, :] = np.cross(gphi, v1) + phi[...,
-#                     None]*cv1  
-#             val[..., N+2*cldof//3:N+cldof, :] = np.cross(gphi, v2) + phi[...,
-#                     None]*cv2  
-#         return val
+            N = eldof*6+fldof*4
+            val[..., N:N+cldof//3, :] = bm.linalg.cross(gphi, v0) + phi[..., None]*cv0 
+            val[..., N+cldof//3:N+2*cldof//3, :] = bm.linalg.cross(gphi, v1) + phi[...,
+                    None]*cv1  
+            val[..., N+2*cldof//3:N+cldof, :] = bm.linalg.cross(gphi, v2) + phi[...,
+                    None]*cv2  
+        return val
 
-#     def cell_to_dof(self):
-#         return self.dof.cell2dof
+    def cell_to_dof(self):
+        return self.dof.cell2dof
 
-#     def number_of_global_dofs(self):
-#         return self.dof.number_of_global_dofs()
+    def number_of_global_dofs(self):
+        return self.dof.number_of_global_dofs()
 
-#     def number_of_local_dofs(self, doftype='all'):
-#         return self.dof.number_of_local_dofs(doftype)
+    def number_of_local_dofs(self, doftype='all'):
+        return self.dof.number_of_local_dofs(doftype)
 
-#     @barycentric
-#     def value(self, uh, bc, index=np.s_[:]):
-#         '''@
-#         @brief 计算一个有限元函数在每个单元的 bc 处的值
-#         @param bc : (..., GD+1)
-#         @return val : (..., NC, GD)
-#         '''
-#         phi = self.basis(bc)
-#         c2d = self.dof.cell_to_dof()
-#         # uh[c2d].shape = (NC, ldof); phi.shape = (..., NC, ldof, GD)
-#         val = np.einsum("cl, ...clk->...ck", uh[c2d], phi)
-#         return val
+    @barycentric
+    def value(self, uh, bcs, index=_S):
+        '''@
+        @param bc : (..., GD+1)
+        @return val : (..., NC, GD)
+        '''
+        phi = self.basis(bcs)
+        c2d = self.dof.cell_to_dof()
+        val = bm.einsum("cl, cqlk->cqk", uh[c2d], phi)
+        return val
 
-#     @barycentric
-#     def curl_value(self, uh, bc, index=np.s_[:]):
-#         '''@
-#         @brief 计算一个有限元函数在每个单元的 bc 处的值
-#         @param bc : (..., GD+1)
-#         @return val : (..., NC, GD)
-#         '''
-#         cphi = self.curl_basis(bc)
-#         c2d = self.dof.cell_to_dof()
-#         # uh[c2d].shape = (NC, ldof); phi.shape = (..., NC, ldof, GD)
-#         val = np.einsum("cl, ...cli->...ci", uh[c2d], cphi)
-#         return val
+    @barycentric
+    def curl_value(self, uh, bcs, index=_S):
+        cphi = self.curl_basis(bcs)
+        c2d = self.dof.cell_to_dof()
+        val = bm.einsum("cl, cqli->cqi", uh[c2d], cphi)
+        return val
 
-#     @barycentric
-#     def div_value(self, uh, bc, index=np.s_[:]):
-#         pass
+    @barycentric
+    def div_value(self, uh, bc, index=_S):
+        pass
 
-#     @barycentric
-#     def grad_value(self, uh, bc, index=np.s_[:]):
-#         pass
+    @barycentric
+    def grad_value(self, uh, bc, index=_S):
+        pass
 
-#     @barycentric
-#     def edge_value(self, uh, bc, index=np.s_[:]):
-#         pass
+    @barycentric
+    def edge_value(self, uh, bc, index=_S):
+        pass
 
-#     @barycentric
-#     def face_value(self, uh, bc, index=np.s_[:]):
-#         pass
+    @barycentric
+    def face_value(self, uh, bc, index=_S):
+        pass
 
-#     def mass_matrix(self):
-#         mesh = self.mesh
-#         NC = mesh.number_of_cells()
-#         ldof = self.dof.number_of_local_dofs()
-#         gdof = self.dof.number_of_global_dofs()
-#         cm = self.cellmeasure
-#         c2d = self.dof.cell_to_dof() #(NC, ldof)
+    def mass_matrix(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        ldof = self.dof.number_of_local_dofs()
+        gdof = self.dof.number_of_global_dofs()
+        cm = self.cellmeasure
+        c2d = self.dof.cell_to_dof() #(NC, ldof)
 
-#         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-#         phi = self.basis(bcs) #(NQ, NC, ldof, GD)
-#         mass = np.einsum("qclg, qcdg, c, q->cld", phi, phi, cm, ws)
+        bcs, ws = self.qf.get_quadrature_points_and_weights()
+        phi = self.basis(bcs) #(NQ, NC, ldof, GD)
+        mass = bm.einsum("cqlg, cqdg, c, q->cld", phi, phi, cm, ws)
 
-#         I = np.broadcast_to(c2d[:, :, None], shape=mass.shape)
-#         J = np.broadcast_to(c2d[:, None, :], shape=mass.shape)
-#         M = csr_matrix((mass.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-#         return M 
+        I = bm.broadcast_to(c2d[:, :, None], mass.shape).reshape(-1)
+        J = bm.broadcast_to(c2d[:, None, :], mass.shape).reshape(-1)
+        I = bm.to_numpy(I)
+        J = bm.to_numpy(J)
+        mass = bm.to_numpy(mass).reshape(-1)
+        M = csr_matrix((mass, (I, J)), shape=(gdof, gdof))
+        return M 
 
-#     def curl_matrix(self):
-#         mesh = self.mesh
-#         NC = mesh.number_of_cells()
-#         ldof = self.dof.number_of_local_dofs()
-#         gdof = self.dof.number_of_global_dofs()
-#         cm = self.cellmeasure
+    def curl_matrix(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        ldof = self.dof.number_of_local_dofs()
+        gdof = self.dof.number_of_global_dofs()
+        cm = self.cellmeasure
 
-#         c2d = self.dof.cell_to_dof() #(NC, ldof)
-#         bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        c2d = self.dof.cell_to_dof()
+        bcs, ws = self.qf.get_quadrature_points_and_weights()
 
-#         cphi = self.curl_basis(bcs) #(NQ, NC, ldof)
-#         A = np.einsum("qcl, qcd, c, q->cld", cphi, cphi, cm, ws) #(NC, ldof, ldof)
+        cphi = self.curl_basis(bcs) 
+        A = bm.einsum("cqlg, cqdg, c, q->cld", cphi, cphi, cm, ws)
 
-#         I = np.broadcast_to(c2d[:, :, None], shape=A.shape)
-#         J = np.broadcast_to(c2d[:, None, :], shape=A.shape)
-#         B = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-#         return B
+        I = bm.broadcast_to(c2d[:, :, None], A.shape).reshape(-1)
+        J = bm.broadcast_to(c2d[:, None, :], A.shape).reshape(-1)
+        I = bm.to_numpy(I)
+        J = bm.to_numpy(J)
+        A = bm.to_numpy(A).reshape(-1)
+        B = csr_matrix((A, (I, J)), shape=(gdof, gdof))
+        return B
 
-#     def source_vector(self, f):
-#         mesh = self.mesh
-#         cm = self.cellmeasure
-#         ldof = self.dof.number_of_local_dofs()
-#         gdof = self.dof.number_of_global_dofs()
-#         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-#         c2d = self.dof.cell_to_dof() #(NC, ldof)
+    def source_vector(self, f):
+        mesh = self.mesh
+        cm = self.cellmeasure
+        ldof = self.dof.number_of_local_dofs()
+        gdof = self.dof.number_of_global_dofs()
+        bcs, ws = self.qf.get_quadrature_points_and_weights()
+        c2d = self.dof.cell_to_dof()
 
-#         p = mesh.bc_to_point(bcs) #(NQ, NC, GD)
-#         fval = f(p) #(NQ, NC, GD)
+        p = mesh.bc_to_point(bcs) 
+        fval = f(p) 
 
-#         phi = self.basis(bcs) #(NQ, NC, ldof, GD)
-#         val = np.einsum("qcg, qclg, q, c->cl", fval, phi, ws, cm)# (NC, ldof)
-#         vec = np.zeros(gdof, dtype=np.float_)
-#         np.add.at(vec, c2d, val)
-#         return vec
+        phi = self.basis(bcs) 
+        val = bm.einsum("cqg, cqlg, q, c->cl", fval, phi, ws, cm)# (NC, ldof)
+        vec = bm.zeros(gdof, dtype=self.ftype)
+        print(c2d.dtype)
+        bm.scatter_add(vec, c2d.reshape(-1), val.reshape(-1))
+        return vec
 
 #     def projection(self, f, method="L2"):
 #         M = self.mass_matrix()
