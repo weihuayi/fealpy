@@ -1,7 +1,7 @@
 
 from typing import Union, Callable, Optional, Any, TypeVar, Tuple, Dict
 
-from ..typing import TensorLike
+from ..typing import TensorLike, CoefLike
 from ..functionspace.space import FunctionSpace as _FS
 
 __all__ = [
@@ -15,7 +15,6 @@ __all__ = [
     'FaceSourceIntegrator'
 ]
 
-CoefLike = Union[float, int, TensorLike, Callable[..., TensorLike]]
 _Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
 

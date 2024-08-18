@@ -14,8 +14,9 @@ from matplotlib import pyplot as plt
 from fealpy.utils import timer
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
-
 from fealpy.experimental.backend import backend_manager as bm
+
+
 from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
@@ -68,22 +69,27 @@ next(tmr)
 if meshtype == 'int':
     from fealpy.experimental.pde.poisson_1d import CosData 
     from fealpy.experimental.mesh import IntervalMesh
+    pde = CosData()
     mesh = IntervalMesh.from_interval_domain([0,1], n)
 elif meshtype == 'tri':
     from fealpy.experimental.pde.poisson_2d import CosCosData 
     from fealpy.experimental.mesh import TriangleMesh
+    pde = CosCosData()
     mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 elif meshtype == 'quad':
     from fealpy.experimental.pde.poisson_2d import CosCosData 
     from fealpy.experimental.mesh import QuadrangleMesh
+    pde = CosCosData()
     mesh = QuadrangleMesh.from_box([0,1,0,1], n, n)
 elif meshtype == 'tet':
     from fealpy.experimental.pde.poisson_3d import CosCosCosData 
     from fealpy.experimental.mesh import TetrahedronMesh
+    pde = CosCosCosData()
     mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], n, n, n)
 elif meshtype == 'hex':
     from fealpy.experimental.pde.poisson_3d import CosCosCosData 
     from fealpy.experimental.mesh import HexahedronMesh
+    pde = CosCosCosData()
     mesh = HexahedronMesh.from_box([0,1,0,1,0,1], n, n, n)
 else: 
     raise ValueError(f"Unsupported : {meshtype} mesh")

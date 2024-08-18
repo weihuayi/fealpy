@@ -37,7 +37,9 @@ class Function(Generic[_FS]):
         if item.endswith('value') and hasattr(self.space, item):
             attr = getattr(self.space, item)
             if callable(attr):
-                return partial(attr, self.array)
+                func = partial(attr, self.array)
+                func.coordtype = attr.coordtype
+                return func 
             else:
                 return attr
 
