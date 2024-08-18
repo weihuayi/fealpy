@@ -7,7 +7,7 @@ logger.setLevel('WARNING')
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.functionspace import CmConformingFESpace2d 
 from fealpy.experimental.fem import BilinearForm 
-from fealpy.experimental.fem.grad_m_integrator import gradmIntegrator
+from fealpy.experimental.fem.mthlaplace_integrator import MthLaplaceIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
 from fealpy.experimental.backend import backend_manager as bm
@@ -85,7 +85,7 @@ for i in range(maxit):
 
     bform = BilinearForm(space)
     coef = 1
-    integrator = gradmIntegrator(m=2, coef=1, q=p+4)
+    integrator = MthLaplaceIntegrator(m=2, coef=1, q=p+4)
     bform.add_integrator(integrator)
     lform = LinearForm(space)
     lform.add_integrator(ScalarSourceIntegrator(pde.source, q=p+4))
