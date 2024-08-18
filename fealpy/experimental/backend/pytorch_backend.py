@@ -120,6 +120,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return x.to(dtype=dtype, device=device, copy=copy)
 
     ### Element-wise Functions ###
+    @staticmethod # NOTE: PyTorch's build-in equal is actually `all(equal(x1, x2))`
+    def equal(x1, x2, /): return x1 == x2
 
     ### Indexing Functions ###
 
