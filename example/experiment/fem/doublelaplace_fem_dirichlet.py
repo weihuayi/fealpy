@@ -16,6 +16,7 @@ from fealpy.experimental.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, 
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix
 from fealpy.experimental import logger
 logger.setLevel('INFO')
 ## 参数解析
@@ -62,6 +63,7 @@ u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
 ulist = get_flist(u)[:3]
 mesh = TriangleMesh.from_box([0,1,0,1], n, n)
+NDof = bm.zeros(maxit, dtype=bm.float64)
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',
@@ -95,19 +97,14 @@ for i in range(maxit):
 
 
     gdof = space.number_of_global_dofs()
+    NDof[i] = 1/4/2**i
     bc1 = DirichletBC(space, gd = ulist)
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
-    #uh[:] = bm.linalg.solve(A, F)
-    #A = A.toarray()
-    #print(bm.linalg.cond(A))
-    #import ipdb
-    #ipdb.set_trace()
-    #import scipy.sparse
-    #A = scipy.sparse.csr_matrix(A)
-    #uh[:] = spsolve(A, F)
+    A = csr_matrix((A.values(), A.indices()),A.shape)
+    uh[:] = bm.tensor(spsolve(A, F))
     
-    uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)
+    #uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
 
     @barycentric
@@ -123,10 +120,10 @@ for i in range(maxit):
     if i < maxit-1:
         mesh.uniform_refine(n=1)
     tmr.send(f'第{i}次误差计算及网格加密时间')
+
 next(tmr)
 print("最终误差",errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 print("order : ", bm.log2(errorMatrix[1,:-1]/errorMatrix[1,1:]))
 print("order : ", bm.log2(errorMatrix[2,:-1]/errorMatrix[2,1:]))
-
 
