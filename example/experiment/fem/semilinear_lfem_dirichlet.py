@@ -1,10 +1,11 @@
 
-import ipdb
 import argparse
+
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import spsolve
 
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
-
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.functionspace import LagrangeFESpace
@@ -12,10 +13,8 @@ from fealpy.experimental.fem import SemilinearForm
 from fealpy.experimental.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
 from fealpy.experimental.fem import ScalarSourceIntegrator
 from fealpy.experimental.pde.semilinear_2d import SemilinearData
-# from fealpy.experimental.solver import cg
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
 from fealpy.utils import timer
+from fealpy.decorator import barycentric
 
 
 ## 参数解析
@@ -63,10 +62,11 @@ pde = SemilinearData(domain)
 mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
 
 p = 1
-maxit = 1
+maxit = 6
 tol = 1e-8
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
+tmr.send('网格和pde生成时间')
 errorType = ['$|| u - u_h||_{\Omega, 0}$', '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']
 def func(u):
     return u**3
@@ -87,6 +87,7 @@ reaction_coef.grad_func = grad_func
 for i in range(maxit):
 
     space = LagrangeFESpace(mesh, p=p)
+    tmr.send(f'第{i}次空间时间')
     NDof[i] = space.number_of_global_dofs()
 
     u0 = space.function()
@@ -96,28 +97,35 @@ for i in range(maxit):
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
     isIDof = ~isDDof
 
-    D = ScalarDiffusionIntegrator(diffusion_coef, q=p+2, method='semilinear')
-    M = ScalarMassIntegrator(reaction_coef, q=p+2, method='semilinear')
-    f = ScalarSourceIntegrator(pde.source, q=p+2)
     while True:
         n = SemilinearForm(space)
-        n.add_integrator([M, D])
-        n.add_integrator(f)
+        n.add_integrator([
+                          ScalarDiffusionIntegrator(diffusion_coef, q=p+2, method='semilinear'),
+                          ScalarMassIntegrator(reaction_coef, q=p+2, method='semilinear'),
+                          ])
+        n.add_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
         A, F = n.assembly()
+        tmr.send(f'第{i}次矩组装时间') 
 
-        data = A.values()
-        indices = A.indices()
-        shape = A.shape
-        A = csr_matrix((data, indices), shape=shape)
+        A = csr_matrix((A.values(), A.indices()), A.shape)
         du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
+        tmr.send(f'第{i}次求解器时间')
+        
         u0 += du
-        print(du)
         err = bm.max(bm.abs(du))
-
         if err < tol:
             break
 
+    @barycentric
+    def ugval(p):
+        return space.grad_value(u0, p)
+
+    errorMatrix[0, i] = mesh.error(pde.solution, u0, q=p+2)
+    errorMatrix[1, i] = mesh.error(pde.gradient, ugval, q=p+2)
     if i < maxit-1:
         mesh.uniform_refine()
+    tmr.send(f'第{i}次误差计算及网格加密时间')
 
-
+next(tmr)
+print(errorMatrix)
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])

@@ -1,18 +1,17 @@
 
 from typing import Optional
-from ..typing import TensorLike, Index, _S
-from ..backend import backend_manager as bm
 
+from ..typing import TensorLike, Index, _S, SourceLike
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral
-from .integrator import CellSourceIntegrator, CoefLike, enable_cache
+from .integrator import CellSourceIntegrator, enable_cache
 
 
 class ScalarSourceIntegrator(CellSourceIntegrator):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, source: Optional[SourceLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()

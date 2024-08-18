@@ -6,7 +6,7 @@ from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
 from .sparse_tensor import SparseTensor
 from .utils import (
-    _flatten_indices,
+    flatten_indices, tril_coo,
     check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_coo
@@ -101,7 +101,7 @@ class COOTensor(SparseTensor):
             context = self.values_context()
 
         dense_tensor = bm.zeros(self.dense_shape + (prod(self._spshape),), **context)
-        flattened = _flatten_indices(self._indices, self._spshape)[0]
+        flattened = flatten_indices(self._indices, self._spshape)[0]
 
         if self._values is None:
             src = bm.full((1,) * (self.dense_ndim + 1), fill_value, **context)
@@ -168,7 +168,7 @@ class COOTensor(SparseTensor):
             COOTensor: A flatten COO tensor, shaped (*dense_shape, nnz).
         """
         spshape = self.sparse_shape
-        new_indices = _flatten_indices(self._indices, spshape)
+        new_indices = flatten_indices(self._indices, spshape)
         return COOTensor(new_indices, self._values, (prod(spshape),))
 
     def flatten(self):
@@ -178,15 +178,35 @@ class COOTensor(SparseTensor):
             COOTensor: A flatten COO tensor, shaped (*dense_shape, nnz).
         """
         spshape = self.sparse_shape
-        new_indices = _flatten_indices(self._indices, spshape)
+        new_indices = flatten_indices(self._indices, spshape)
         if self._values is None:
             values = None
         else:
             values = bm.copy(self._values)
         return COOTensor(new_indices, values, (prod(spshape),))
 
+    @property
+    def T(self):
+        _indices = self._indices
+        _spshape = self._spshape
+
+        if self.sparse_ndim == 2:
+            new_indices = bm.stack([_indices[1], _indices[0]], axis=0)
+            shape = tuple(reversed(_spshape))
+        elif self.sparse_ndim >= 3:
+            new_indices = bm.concat([_indices[:-2], _indices[-1:], _indices[-2:-1]], axis=0)
+            shape = _spshape[:-2] + (_spshape[-1], _spshape[-2])
+        else:
+            raise ValueError("sparse ndim must be 2 or greater to be transposed, "
+                             f"but got {self.sparse_ndim}")
+        return COOTensor(new_indices, self._values, shape)
+
+    def tril(self, k: int=0) -> 'COOTensor':
+        indices, values = tril_coo(self._indices, self._values, k)
+        return COOTensor(indices, values, self._spshape)
+
     def copy(self):
-        return COOTensor(bm.copy(self._indices), bm.copy(self._values), self.sparse_shape)
+        return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
 
     def neg(self) -> 'COOTensor':
         """Negation of the COO tensor. Returns self if values is None."""
@@ -204,7 +224,7 @@ class COOTensor(SparseTensor):
 
         Parameters:
             other (Number | COOTensor | Tensor): The tensor or scalar to be added.\n
-            alpha (float, optional): The scaling factor for the other tensor. Defaults to 1.0.
+            alpha (int | float, optional): The scaling factor for the other tensor. Defaults to 1.
 
         Raises:
             TypeError: If the type of `other` is not supported for addition.\n
@@ -235,7 +255,7 @@ class COOTensor(SparseTensor):
             output = other * alpha
             context = bm.context(output)
             output = output.reshape(self.dense_shape + (prod(self._spshape),))
-            flattened = _flatten_indices(self._indices, self._spshape)[0]
+            flattened = flatten_indices(self._indices, self._spshape)[0]
 
             if self._values is None:
                 src = bm.ones((1,) * (self.dense_ndim + 1), **context)

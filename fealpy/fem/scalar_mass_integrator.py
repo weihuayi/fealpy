@@ -63,7 +63,6 @@ class ScalarMassIntegrator:
                 val1 = grad_uh_func(uh(bcs))
                 # coef = coef * grad_uh_func(uh(bcs))
             if np.isscalar(coef):
-                print("s")
                 M += coef*np.einsum('q, qc, qci, qcj, c->cij', ws, val1, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ):
