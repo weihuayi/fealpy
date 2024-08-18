@@ -1,3 +1,5 @@
+"""The FEM Module"""
+
 ### Forms and bases
 from .integrator import *
 from .bilinear_form import BilinearForm
@@ -17,6 +19,11 @@ from .curl_integrator import CurlIntegrator
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
+
+### Face Operator
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+
+### Face Source
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC

@@ -139,6 +139,56 @@ def test_ravel(backend):
     assert raveled_coo_tensor.indices().shape[0] == 1
 
 
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_T_2d(backend):
+    bm.set_backend(backend)
+    # 创建一个 2 稀疏维度的 COOTensor 实例
+    indices = bm.tensor([[0, 1], [1, 2]])
+    values = bm.tensor([[1, 2]], dtype=bm.float64)
+    spshape = (3, 4)
+    coo_tensor = COOTensor(indices, values, spshape)
+    trans_tensor = coo_tensor.T
+
+    # 验证结果是否正确
+    expected_indices = bm.tensor([[1, 2], [0, 1]])
+    assert bm.all(bm.equal(trans_tensor._indices, expected_indices))
+    assert trans_tensor._values is values
+    assert trans_tensor._spshape == (4, 3)
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_T_3d(backend):
+    bm.set_backend(backend)
+    # 创建一个 3 稀疏维度的 COOTensor 实例
+    indices = bm.tensor([[0, 1], [1, 2], [2, 0]])
+    values = bm.tensor([1, 2], dtype=bm.float32)
+    spshape = (5, 4, 3)
+    coo_tensor = COOTensor(indices, values, spshape)
+    trans_tensor = coo_tensor.T
+
+    # 验证结果是否正确
+    expected_indices = bm.tensor([[0, 1], [2, 0], [1, 2]])
+    assert bm.all(bm.equal(trans_tensor._indices, expected_indices))
+    assert trans_tensor._values is values
+    assert trans_tensor._spshape == (5, 3, 4)
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_tril(backend):
+    bm.set_backend(backend)
+    indices = bm.tensor([[0, 1, 0, 1], [2, 3, 1, 1], [3, 2, 2, 1]])
+    values = bm.tensor([1, 2, 3, 4], dtype=bm.float32)
+    spshape = (5, 4, 4)
+    coo_tensor = COOTensor(indices, values, spshape)
+    tril_tensor = coo_tensor.tril(k=0)
+
+    expected_indices = bm.tensor([[1, 1], [3, 1], [2, 1]])
+    expected_values = bm.tensor([2, 4], dtype=bm.float32)
+
+    assert bm.all(bm.equal(tril_tensor._indices, expected_indices))
+    assert bm.allclose(tril_tensor._values, expected_values)
+
+
 def create_coo_tensor(indices, values, shape):
     return COOTensor(indices=indices, values=values, spshape=shape)
 
