@@ -63,6 +63,10 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     # NOTE: all copied
 
     @staticmethod
+    def set_at(x: tensor, indices: Tensor, val: Tensor, /):
+        return x.at[indices].set(val)
+
+    @staticmethod
     def scatter(x, indices, val):
         """
         TODO:

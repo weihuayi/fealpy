@@ -289,6 +289,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             return x.size(axis)
 
     ### Other Functions ###
+    @staticmethod
+    def set_at(a: tensor, indices: Tensor, src: Tensor, /):
+        a[indices] = src
+        return a
 
     @staticmethod
     def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
