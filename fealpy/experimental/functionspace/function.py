@@ -50,7 +50,7 @@ class Function(Generic[_FS]):
         return self.__class__(self.space, -self.array)
 
     def __add__(self, other: Union[TensorLike, Number]):
-        return self.__class__(self.space, self.array + other)
+        return self.__class__(self.space, self.array + other, self.coordtype)
     __radd__ = __add__
 
     def __iadd__(self, other: Union[TensorLike, Number]):
