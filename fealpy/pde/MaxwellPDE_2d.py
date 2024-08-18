@@ -133,4 +133,7 @@ class SinData(MaxwellPDE2d):
         mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         return mesh
 
+    def domain(self):
+        return [0, 1, 0, 1]
+
 

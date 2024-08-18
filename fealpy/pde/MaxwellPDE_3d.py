@@ -165,10 +165,13 @@ class SinData(MaxwellPDE):
         super(SinData, self).__init__(f, beta, k)
 
     def init_mesh(self, n=1):
-        box = [0, 1/2, 0, 1/2, 0, 1/2]
-        #box = [0, 1, 0, 1, 0, 1]
+        box = [0, 1, 0, 1, 0, 1]
         mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
+
+    def domain(self):
+        box = [0, 1, 0, 1, 0, 1]
+        return box 
 
 class BubbleData(MaxwellPDE):
     def __init__(self):
@@ -340,3 +343,7 @@ class Bubble3dData():
 
     def dirichlet(self, p):
         return self.solution(p)
+
+    def domain(self):
+        box = [0, 1, 0, 1, 0, 1]
+        return box 

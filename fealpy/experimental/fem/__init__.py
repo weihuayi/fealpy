@@ -10,6 +10,9 @@ from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elasticity_integrator import LinearElasticityIntegrator
 from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator1
+from .vector_mass_integrator import VectorMassIntegrator
+from .curl_integrator import CurlIntegrator
+
 
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
