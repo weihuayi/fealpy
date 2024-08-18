@@ -53,14 +53,14 @@ else:
     dim = textMAP.data["landmark"].shape[0]
     
     # 调用算法
-    test1 = PSO(N,dim,ub,lb,MaxIT,fobj)
+    test1 = QPSO(N,dim,ub,lb,MaxIT,fobj)
     test1.cal()
     
-    _, result = fobj(test1.gbest)
+    result = textMAP.calresult(test1.gbest)
     
     # 输出
     result["path"] = [x for x, y in zip(result["path"], result["path"][1:] + [None]) if x != y]
-    print('The optimal path distance: ', test1.gbest_f[0])
+    print('The optimal path distance: ', test1.gbest_f)
     print("The optimal path: ", result["path"])
     end_time = time.perf_counter()
     running_time = end_time - start_time

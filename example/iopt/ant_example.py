@@ -2,6 +2,7 @@ import time
 from fealpy.experimental.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 import random
+from fealpy.iopt.ANT_TSP import calD
 # bm.set_backend('pytorch')
 
 # 导入数据(34个城市)
@@ -42,15 +43,8 @@ citys = bm.array([
     [108.3300, 22.8400]
 ])
 
-# 计算城市间相互距离
-n = citys.shape[0]
-D = bm.zeros((n, n))
-for i in range(n):
-    for j in range(n):
-        if i != j:
-            D[i, j] = bm.sqrt(bm.sum((citys[i] - citys[j])**2))
-        else:
-            D[i, j] = 1e-4  # 如果是0会导致矩阵对角线都是0，导致启发函数无穷大，因此取一个很小的值
+# 距离矩阵
+D = calD(citys)
 
 # 初始化参数
 m = 10  # 蚂蚁数量
@@ -59,19 +53,22 @@ beta = 5  # 启发函数重要程度因子
 rho = 0.5  # 信息素挥发因子
 Q = 1  # 常系数
 Eta = 1 / D  # 启发函数
+iter_max = 100  # 最大迭代次数
+
+n = D.shape[0]
 Tau = bm.ones((n, n), dtype=bm.float64)
 
 Table = bm.zeros((m, n), dtype=int)  # 路径记录表，每一行代表一个蚂蚁走过的路径
-iter_max = 100  # 最大迭代次数
+
 Route_best = bm.zeros((iter_max, n), dtype=int)  # 各代最佳路径
 Length_best = bm.zeros(iter_max)  # 各代最佳路径的长度
 
 # 设置循环次数
-l = 5 # 假设循环10次
+l = 1 
 
-# 存储每次迭代的结果
-shortest_lengths = []  # 存储每次迭代的最短距离
-shortest_routes = []  # 存储每次迭代的最短路径
+# 存储每次循环的结果
+shortest_lengths = []  
+shortest_routes = []  
 
 # 循环迭代寻找最佳路径
 start_time = time.time()  # 记录开始时间
