@@ -1,8 +1,7 @@
 import time
 from fealpy.experimental.backend import backend_manager as bm
 import matplotlib.pyplot as plt
-import random
-from fealpy.iopt.ANT_TSP import calD
+from fealpy.iopt.ANT_TSP import calD, Ant_TSP
 # bm.set_backend('pytorch')
 
 # 导入数据(34个城市)
@@ -55,11 +54,12 @@ Q = 1  # 常系数
 Eta = 1 / D  # 启发函数
 iter_max = 100  # 最大迭代次数
 
+
+text1 = Ant_TSP(m, alpha, beta, rho, Q, Eta, D, iter_max)
+
 n = D.shape[0]
 Tau = bm.ones((n, n), dtype=bm.float64)
-
 Table = bm.zeros((m, n), dtype=int)  # 路径记录表，每一行代表一个蚂蚁走过的路径
-
 Route_best = bm.zeros((iter_max, n), dtype=int)  # 各代最佳路径
 Length_best = bm.zeros(iter_max)  # 各代最佳路径的长度
 
@@ -75,62 +75,8 @@ start_time = time.time()  # 记录开始时间
 
 for _ in range(l):
     # 迭代寻找最佳路径
-    for iter in range(iter_max):
-        # 随机产生各个蚂蚁的起点城市
-        start = list([random.randint(0, n - 1)for _ in range(m)])
-        # start = bm.random.choice(n, m)
-        Table[:, 0] = bm.array(start)
-        citys_index = bm.arange(n)
-        
-        # 逐个蚂蚁路径选择
-        for i in range(m):
-            # 逐个城市路径选择
-            for j in range(1, n):
-                tabu = Table[i, :j]  # 已访问的城市集合
+    Length_best, Route_best = text1.cal(n, Tau, Table, Route_best, Length_best)
 
-                allow_index = list(set(citys_index).difference(tabu))
-                allow = citys_index[allow_index]  # 待访问的城市集合
-                P = bm.zeros(len(allow))
-
-                # 计算城市间转移概率
-                for k, city in enumerate(allow):
-                    P[k] = (Tau[tabu[-1], city]**alpha) * (Eta[tabu[-1], city]**beta)
-                P = P / bm.sum(bm.array(P))
-
-                # 轮盘赌法选择下一个访问城市
-                Pc = bm.cumsum(P , axis=0)
-                target_index = bm.where(Pc >= bm.random.rand(1))[0]
-                target = allow[target_index[0]]
-                Table[i, j] = target
-
-        # 计算各个蚂蚁的路径距离
-        Length = bm.zeros(m)
-        for i in range(m):
-            Route = Table[i]
-            for j in range(n - 1):
-                Length[i] += D[Route[j], Route[j + 1]]
-            Length[i] += D[Route[-1], Route[0]]
-
-        # 计算最短路径距离及平均距离
-        if iter == 0:
-            min_index = bm.argmin(Length)
-            Length_best[iter] = Length[min_index]
-            Route_best[iter] = Table[min_index]
-        else:
-            min_index = bm.argmin(Length)
-            Length_best[iter] = min(Length_best[iter - 1], Length[min_index])
-            if Length_best[iter] == Length[min_index]:
-                Route_best[iter] = Table[min_index]
-            else:
-                Route_best[iter] = Route_best[iter - 1]
-
-        # 更新信息素
-        Delta_Tau = bm.zeros((n, n))
-        for j in range(n - 1):
-            Delta_Tau[Table[:, j], Table[:, j + 1]] += Q / Length[:]
-            Delta_Tau[Table[i, -1], Table[i, 0]] += Q / Length[i]
-        Tau = (1 - rho) * Tau + Delta_Tau
-        
     # 结果显示
     Shortest_Length = bm.min(Length_best, keepdims = True)
     index = bm.argmin(Length_best)
