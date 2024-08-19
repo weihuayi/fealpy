@@ -15,7 +15,7 @@ from .integrator import (
     CoefLike
 )
 
-class gradmIntegrator(CellOperatorIntegrator):
+class MthLaplaceIntegrator(CellOperatorIntegrator):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
     def __init__(self, m: int=2,coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
