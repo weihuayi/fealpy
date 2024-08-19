@@ -43,11 +43,24 @@ class PSOProblem:
         self.data['numLM0'] = 1
         return self.data
     
-    def fitness(self,X):
+    def fitness(self, X):
+        sorted_numbers = bm.argsort(X)
+        G = nx.DiGraph(self.data["net"])
+        sorted_numbers_flat = sorted_numbers[:, :self.data['numLM0']]
+        noS = bm.full((X.shape[0],), self.data['noS']).reshape(-1, 1)
+        noE = bm.full((X.shape[0],), self.data['noE']).reshape(-1, 1)
+        path0 = bm.concatenate((noS, sorted_numbers_flat, noE), axis=1)
+        distances = bm.zeros((X.shape[0], path0.shape[1] - 1))
+        for j in range(0, X.shape[0]):   
+            distance = [nx.shortest_path_length(G, source=int(path0[j][i]), target=int(path0[j][i + 1]), weight=None) for i in range(path0.shape[1] - 1)]
+            distances[j, :] = bm.tensor(distance)
+        fit = bm.sum(distances, axis=1)
+        return fit
+    
+    def calresult(self, X):
         result = {}
         sorted_numbers = bm.argsort(X)
         G = nx.DiGraph(self.data["net"])
-        # 初始化距离列表和路径列表
         distances = []
         paths = []
         sorted_numbers_flat = sorted_numbers[0:self.data['numLM0']]
@@ -58,8 +71,6 @@ class PSOProblem:
             target = path0[i + 1]
             source = int(source)
             target = int(target)
-            # if not nx.has_path(G, source, target):
-            #     print(f"No path exists between {source} and {target}")
             path = nx.shortest_path(G, source = source, target = target)
             distance = nx.shortest_path_length(G, source = source, target = target, weight = None)  
             distances.append(distance)
@@ -70,8 +81,9 @@ class PSOProblem:
             combined_list.extend(sublist)
         result["fit"] = fit
         result["path"] = combined_list
-        return fit, result
-    
+        return result
+
+
     def printMAP(self, result, time):
         b = self.MAP.shape
         self.MAP = 1 - self.MAP
@@ -98,7 +110,7 @@ class PSOProblem:
 
         plt.xticks([])
         plt.yticks([])
-        plt.title(f'( {round(time, 2)} s) The optimal path from QPSO : ')
+        plt.title(f'( {round(time, 4)} s) The optimal path from QPSO : ')
         xpath = self.data["node"][result["path"], 0]
         ypath = self.data["node"][result["path"], 1]
         print("The opimal path coordinates: ")
@@ -126,9 +138,8 @@ class PSO:
     def initialize(self):
         #种群
         a = bm.random.rand(self.N, self.dim) * (self.ub - self.lb) + self.lb 
-        fit = bm.zeros((self.N, 1))
-        for i in range(0, self.N):
-            fit[i, 0], _ = self.fobj(a[i, :])
+        fit = bm.zeros((self.N))
+        fit = self.fobj(a)
         #个体最优
         pbest = bm.copy(a)
         pbest_f = bm.copy(fit)
@@ -157,7 +168,7 @@ class PSO:
             x = x + v
             x = x + (self.lb - x) * (x < self.lb) + (self.ub - x) * (x > self.ub)
             for i in range(0, self.N):
-                fit[i,0], _ = self.fobj(x[i, :])
+                fit[i,0] = self.fobj(x[i, :])
                 pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], x[i,:], pbest_f[i, 0], pbest[i, :])  
 
 class QPSO(PSO):
@@ -167,7 +178,7 @@ class QPSO(PSO):
         self.gbest = pbest[gbest_index]
         self.gbest_f = pbest_f[gbest_index]
         #主循环
-        for it in range(0,self.MaxIT):
+        for it in range(0, self.MaxIT):
             alpha = 1 - (it + 1) / (2 * self.MaxIT)
             mbest = sum(pbest) / self.N
             phi = bm.random.rand(self.N, self.dim)
@@ -176,7 +187,8 @@ class QPSO(PSO):
             rand = bm.random.rand(self.N, 1)
             a = p + alpha * bm.abs(mbest - a) * bm.log(1 / u) * (1 - 2 * (rand >= 0.5))
             a = a + (self.lb - a) * (a < self.lb) + (self.ub - a) * (a > self.ub)
-            for i in range(0,self.N):
-                fit[i, 0], _ = self.fobj(a[i, :])
-                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i, 0], a[i, :], pbest_f[i, 0], pbest[i, :])  
-            
+            fit = self.fobj(a)
+            mask = fit < pbest_f
+            pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(mask, fit, pbest_f)
+            gbest_idx = bm.argmin(pbest_f)
+            (self.gbest_f, self.gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < self.gbest_f else (self.gbest_f, self.gbest)
