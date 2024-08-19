@@ -1,5 +1,5 @@
 from fealpy.experimental.backend import backend_manager as bm
-
+import random
 
 
 def calD(citys):
@@ -23,14 +23,45 @@ class Ant_TSP:
         self.D = D
         self.iter_max = iter_max
 
-    def cal(self):
-        n = self.D.shape[0]
-        Tau = bm.ones((n, n), dtype = bm.float64)
-        Table = bm.zeros((m, n), dtype = int)  # 路径记录表，每一行代表一个蚂蚁走过的路径
-        Route_best = bm.zeros((iter_max, n), dtype = int)  # 各代最佳路径
-        Length_best = bm.zeros(iter_max)  # 各代最佳路径的长度
-        for iter in range(self.iter_max):
+    def cal(self, n, Tau, Table, Route_best, Length_best):
+        for iter in range(0, self.iter_max):
             # 随机产生各个蚂蚁的起点城市
-            start = list([random.randint(0, n - 1)for _ in range(m)])
+            start = list([random.randint(0, n - 1)for _ in range(self.m)])
             Table[:, 0] = bm.array(start)
             citys_index = bm.arange(n)
+            P = bm.zeros((self.m, n-1))
+            for j in range(1, n):
+                tabu = Table[:, :j] # 已访问的城市集合 
+                allow = bm.array([list(set(citys_index).difference(tabu[i])) for i in range(self.m)]) # 待访问的城市集合
+                P = (Tau[tabu[:, -1].reshape(-1, 1), allow] ** self.alpha) * (self.Eta[tabu[:, -1].reshape(-1, 1), allow] ** self.beta)
+                P /= P.sum(axis=1, keepdims=True)
+                Pc = bm.cumsum(P, axis=1)
+                rand_vals = bm.random.rand(self.m, 1)
+                target_indices = bm.argmax(Pc >= rand_vals, axis=1)
+                Table[:, j] = allow[bm.arange(self.m), target_indices]
+            # 计算各个蚂蚁的路径距离
+            route_indices = bm.arange(n - 1)
+            Length = bm.zeros(self.m)
+            Length += bm.sum(self.D[Table[:, route_indices], Table[:, route_indices + 1]], axis=1)
+            Length += self.D[Table[:, -1], Table[:, 0]]
+            # 计算最短路径距离及平均距离
+            min_index = bm.argmin(Length)
+            if iter == 0:
+                Length_best[iter] = Length[min_index]
+                Route_best[iter] = Table[min_index]
+            else:
+                min_index = bm.argmin(Length)
+                Length_best[iter] = min(Length_best[iter - 1], Length[min_index])
+                if Length_best[iter] == Length[min_index]:
+                    Route_best[iter] = Table[min_index]
+                else:
+                    Route_best[iter] = Route_best[iter - 1]
+            # 更新信息素
+            Delta_Tau = bm.zeros((n, n))
+            Delta_Tau[Table[:, :-1], Table[:, 1:]] += (self.Q / Length).reshape(-1, 1)
+            Delta_Tau[Table[:, -1], Table[:, 0]] += self.Q / Length
+            Tau = (1 - self.rho) * Tau + Delta_Tau
+
+        return Length_best, Route_best
+
+
