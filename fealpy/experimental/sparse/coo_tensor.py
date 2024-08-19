@@ -108,7 +108,7 @@ class COOTensor(SparseTensor):
             src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
         else:
             src = self._values
-        bm.index_add_(dense_tensor, -1, flattened, src)
+        bm.index_add(dense_tensor, -1, flattened, src)
 
         return dense_tensor.reshape(self.shape)
 
@@ -135,7 +135,7 @@ class COOTensor(SparseTensor):
         if self._values is not None:
             value_shape = self.dense_shape + (unique_indices.shape[-1], )
             new_values = bm.zeros(value_shape, **self.values_context())
-            new_values = bm.index_add_(new_values, -1, inverse_indices, self._values)
+            new_values = bm.index_add(new_values, -1, inverse_indices, self._values)
 
             return COOTensor(
                 unique_indices, new_values, self.sparse_shape, is_coalesced=True
@@ -146,7 +146,7 @@ class COOTensor(SparseTensor):
                 kwargs = bm.context(self._indices)
                 ones = bm.ones((self.nnz, ), **kwargs)
                 new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-                new_values = bm.index_add_(new_values, -1, inverse_indices, ones)
+                new_values = bm.index_add(new_values, -1, inverse_indices, ones)
             else:
                 new_values = None
 
@@ -262,7 +262,7 @@ class COOTensor(SparseTensor):
                 src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
                 src = self._values
-            bm.index_add_(output, -1, flattened, src)
+            bm.index_add(output, -1, flattened, src)
 
             return output.reshape(self.shape)
 

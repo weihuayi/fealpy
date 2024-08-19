@@ -187,7 +187,7 @@ class CSRTensor(SparseTensor):
                     value1 = self._values[self._crow[i]:self._crow[i+1]]
                     value2 = other._values[other._crow[i]:other._crow[i+1]]
                     values = bm.zeros(col.shape[0],dtype=value2.dtype)
-                    values = bm.index_add_(values, -1, inverse_indices, bm.concat((value1,alpha*value2)))
+                    values = bm.index_add(values, -1, inverse_indices, bm.concat((value1,alpha*value2)))
                     new_values = bm.concat((new_values,values))
                 new_crow = bm.concat((new_crow,bm.tensor([len(col)+new_crow[-1]])))
                 new_col = bm.concat((new_col,col))
@@ -214,7 +214,7 @@ class CSRTensor(SparseTensor):
                 src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
                 src = self._values
-            bm.index_add_(output, -1, flattened, src)
+            bm.index_add(output, -1, flattened, src)
 
             return output.reshape(self.shape)
         elif isinstance(other, (int, float)):
