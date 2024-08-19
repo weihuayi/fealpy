@@ -105,7 +105,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         if callable(gD):
             gD = gD(ipoints[isDDof])
 
-        uh[...,isDDof] = gD
+        uh[..., isDDof] = gD
         return isDDof
 
     set_dirichlet_bc = boundary_interpolate
