@@ -6,7 +6,9 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 from ..quadrature import Quadrature
 from .mesh_data_structure import MeshDS
-from .utils import estr2dim
+from .utils import (
+    estr2dim, simplex_gdof, simplex_ldof, tensor_gdof, tensor_ldof
+)
 
 
 ##################################################
@@ -432,11 +434,11 @@ class SimplexMesh(HomogeneousMesh):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return bm.simplex_ldof(p, iptype)
+        return simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
-        return bm.simplex_gdof(p, nums)
+        return simplex_gdof(p, nums)
 
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
@@ -473,11 +475,11 @@ class TensorMesh(HomogeneousMesh):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return bm.tensor_ldof(p, iptype)
+        return tensor_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int) -> int:
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
-        return bm.tensor_gdof(p, nums)
+        return tensor_gdof(p, nums)
 
     def bc_to_point(self, bc, index=None):
         """
