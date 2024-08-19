@@ -36,7 +36,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
+        default='pytorch', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--meshtype',
@@ -62,7 +62,7 @@ pde = SemilinearData(domain)
 mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
 
 p = 1
-maxit = 6
+maxit = 8
 tol = 1e-8
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
@@ -83,12 +83,11 @@ def reaction_coef(p):
 reaction_coef.func = func
 reaction_coef.grad_func = grad_func
     
-#非线性迭代
 for i in range(maxit):
-
+    #定义函数空间
     space = LagrangeFESpace(mesh, p=p)
-    tmr.send(f'第{i}次空间时间')
     NDof[i] = space.number_of_global_dofs()
+    tmr.send(f'第{i}次空间时间')
 
     u0 = space.function()
     du = space.function()
@@ -97,22 +96,31 @@ for i in range(maxit):
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
     isIDof = ~isDDof
 
-    while True:
-        n = SemilinearForm(space)
-        n.add_integrator([
-                          ScalarDiffusionIntegrator(diffusion_coef, q=p+2, method='semilinear'),
-                          ScalarMassIntegrator(reaction_coef, q=p+2, method='semilinear'),
-                          ])
-        n.add_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
-        A, F = n.assembly()
-        tmr.send(f'第{i}次矩组装时间') 
+    #定义积分子
+    D = ScalarDiffusionIntegrator(diffusion_coef, q=p+2, method='semilinear')
+    M = ScalarMassIntegrator(reaction_coef, q=p+2, method='semilinear')
+    f = ScalarSourceIntegrator(pde.source, q=p+2)
 
-        A = csr_matrix((A.values(), A.indices()), A.shape)
-        du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
-        tmr.send(f'第{i}次求解器时间')
+    while True:
+        #矩阵组装
+        n = SemilinearForm(space)
+        n.add_integrator([D, M])
+        n.add_integrator(f)
+        A, F = n.assembly()
+        tmr.send(f'第{i}次矩组装时间')
         
+        #求解增量
+        A = csr_matrix((A.values(), A.indices()), A.shape)
+        du[isIDof] = bm.tensor(spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1), dtype=du[isIDof].dtype)
         u0 += du
-        err = bm.max(bm.abs(du))
+        tmr.send(f'第{i}次求解器时间')
+
+        #清除积分子缓存
+        D.clear()
+        M.clear()
+
+        #计算误差
+        err = bm.max(bm.abs(du.array))
         if err < tol:
             break
 
@@ -127,5 +135,6 @@ for i in range(maxit):
     tmr.send(f'第{i}次误差计算及网格加密时间')
 
 next(tmr)
+print(NDof)
 print(errorMatrix)
 print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
