@@ -15,6 +15,7 @@ except ImportError:
                       'the PyTorch backend in fealpy. '
                       'See https://pytorch.org/ for installation.')
 
+from .. import logger
 from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 
 Tensor = torch.Tensor
@@ -289,27 +290,33 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             return x.size(axis)
 
     ### Other Functions ###
+
     @staticmethod
-    def set_at(a: tensor, indices: Tensor, src: Tensor, /):
+    def set_at(a: Tensor, indices, src, /):
         a[indices] = src
         return a
 
     @staticmethod
-    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
-        a.index_add_(indices.ravel(), src.ravel())
+    def add_at(a: Tensor, indices, src, /):
+        logger.info("When indices are not unique, the behavior is non-deterministic "
+                    "for the PyTorch backend "
+                    "(one of the values from src will be picked arbitrarily). "
+                    "Use index_add instead for deterministic behavior.")
+        a[indices] += src
+        return a
 
     @staticmethod
-    def index_add_(a: Tensor, /, dim, index, src, *, alpha=1):
-        return a.index_add_(dim, index, src, alpha=alpha)
+    def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
+        return a.index_add_(dim=axis, index=index, src=src, alpha=alpha)
 
     @staticmethod
-    def scatter(x, indices, val):
-        x.scatter_(0, indices, val)
+    def scatter(x: Tensor, index, src, /, *, axis: int=0):
+        x.scatter_(dim=axis, index=index, src=src)
         return x
 
     @staticmethod
-    def scatter_add(x, indices, val):
-        x.scatter_add_(0, indices, val)
+    def scatter_add(x: Tensor, index, src, /, *, axis: int=0):
+        x.scatter_add_(dim=axis, index=index, src=src)
         return x
 
     ### Functional programming ###

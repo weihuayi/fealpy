@@ -53,36 +53,33 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     ### Binary methods ###
 
-    add_at = staticmethod(np.add.at)
+    ### Other methods ###
 
     @staticmethod
-    def index_add_(a: NDArray, /, dim, index, src, *, alpha=1):
+    def set_at(a: NDArray, indices, src, /) -> NDArray:
+        a[indices] = src
+        return a
+
+    @staticmethod
+    def add_at(a: NDArray, indices, src, /) -> NDArray:
+        np.add.at(a, indices, src)
+        return a
+
+    @staticmethod
+    def index_add(a: NDArray, index, src, /, *, axis=0, alpha=1):
         assert index.ndim == 1
         indexing = [slice(None)] * a.ndim
-        indexing[dim] = index
+        indexing[axis] = index
         np.add.at(a, tuple(indexing), alpha*src)
         return a
 
-    ### Other methods ###
-
-    @classmethod
-    def nonzero(cls, a, /, as_tuple=True):
-        cls.show_unsupported(not as_tuple, 'nonzero', 'as_tuple')
-        return np.nonzero(a)
+    @staticmethod
+    def scatter(x, indices, val, /, *, axis=0):
+        raise NotImplementedError
 
     @staticmethod
-    def scatter(x, indices, val):
-        """
-        """
-        x[indices] = val
-        return x
-
-    @staticmethod
-    def scatter_add(x, indices, val):
-        """
-        """
-        np.add.at(x, indices, val)
-        return x
+    def scatter_add(x, indices, val, /, *, axis=0):
+        raise NotImplementedError
 
     @staticmethod
     def unique_all_(a, axis=None, **kwargs):
