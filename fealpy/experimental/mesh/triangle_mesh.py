@@ -4,6 +4,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 
+from .utils import simplex_gdof, simplex_ldof
 from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
 
@@ -116,14 +117,14 @@ class TriangleMesh(SimplexMesh, Plotable):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return bm.simplex_ldof(p, iptype)
+        return simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
         num = (NN, NE, NC)
-        return bm.simplex_gdof(p, num)
+        return simplex_gdof(p, num)
     
     def interpolation_points(self, p: int, index: Index=_S):
         """Fetch all p-order interpolation points on the triangle mesh."""
