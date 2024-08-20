@@ -9,8 +9,6 @@ from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
 from .plot import Plotable
-from .plot import Plotable
-
 
 class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
