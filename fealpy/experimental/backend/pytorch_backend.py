@@ -307,7 +307,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
-        return a.index_add_(dim=axis, index=index, src=src, alpha=alpha)
+        return a.index_add_(axis, index, src, alpha=alpha)
 
     @staticmethod
     def scatter(x: Tensor, index, src, /, *, axis: int=0):
