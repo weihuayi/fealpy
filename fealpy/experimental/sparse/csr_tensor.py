@@ -71,7 +71,7 @@ class CSRTensor(SparseTensor):
 
     @property
     def nnz(self): return self._col.shape[1]
-    
+
     @property
     def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
         nonzero_row = bm.zeros(len(self._values),dtype=bm.int64)
@@ -187,7 +187,7 @@ class CSRTensor(SparseTensor):
                     value1 = self._values[self._crow[i]:self._crow[i+1]]
                     value2 = other._values[other._crow[i]:other._crow[i+1]]
                     values = bm.zeros(col.shape[0],dtype=value2.dtype)
-                    values = bm.index_add(values, -1, inverse_indices, bm.concat((value1,alpha*value2)))
+                    values = bm.index_add(values, inverse_indices, bm.concat((value1,alpha*value2)), axis=-1)
                     new_values = bm.concat((new_values,values))
                 new_crow = bm.concat((new_crow,bm.tensor([len(col)+new_crow[-1]])))
                 new_col = bm.concat((new_col,col))
