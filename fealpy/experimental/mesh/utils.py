@@ -1,5 +1,6 @@
 
 from typing import Dict, Callable, TypeVar, Tuple, Any
+from math import comb
 
 from .. import logger
 
@@ -87,3 +88,36 @@ def entitymethod(top_dim: int):
         meth.__entity__ = top_dim
         return meth
     return decorator
+
+
+def simplex_ldof(p: int, iptype: int) -> int:
+    """Number of local dofs in a simplex entity."""
+    if iptype == 0:
+        return 1
+    return comb(p + iptype, iptype)
+
+
+def simplex_gdof(p: int, nums: Tuple[int, ...]) -> int:
+    """Number of global dofs in a simplex mesh."""
+    coef = 1
+    count = nums[0]
+
+    for i in range(1, len(nums)):
+        coef = (coef * (p-i)) // i
+        count += coef * nums[i]
+    return count
+
+
+def tensor_ldof(p: int, iptype: int) -> int:
+    """Number of local dofs in a tensor-product entity."""
+    return (p + 1) ** iptype
+
+
+def tensor_gdof(p: int, nums: Tuple[int, ...]) -> int:
+    """Number of global dofs in a tensor-product mesh."""
+    coef = 1
+    count = nums[0]
+    for i in range(1, len(nums)):
+        coef *= (p-1)
+        count += coef * nums[i]
+    return count

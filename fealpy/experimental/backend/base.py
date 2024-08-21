@@ -1,10 +1,8 @@
 
 from abc import ABCMeta
 from typing import(
-    Union, Optional, Dict, Iterable, Tuple, List, Any, Type, Generic, TypeVar,
-    Hashable, OrderedDict, overload
+    Union, Optional, Dict, Tuple, Any, Type, Generic, TypeVar, overload
 )
-from math import comb
 
 from .. import logger
 
@@ -264,46 +262,5 @@ class Backend(Generic[_DT]):
     def is_tensor(cls, obj: Any, /) -> bool:
         return isinstance(obj, cls.DATA_CLASS)
 
-    ### FEALPy functionals ###
-
-    @staticmethod
-    def simplex_ldof(p: int, iptype: int) -> int:
-        if iptype == 0:
-            return 1
-        return comb(p + iptype, iptype)
-
-    @staticmethod
-    def simplex_gdof(p: int, nums: Tuple[int, ...]) -> int:
-        coef = 1
-        count = nums[0]
-
-        for i in range(1, len(nums)):
-            coef = (coef * (p-i)) // i
-            count += coef * nums[i]
-        return count
-
-    @staticmethod
-    def tensor_ldof(p: int, iptype: int) -> int:
-        return (p + 1) ** iptype
-
-    @staticmethod
-    def tensor_gdof(p: int, nums: Tuple[int, ...]) -> int:
-        coef = 1
-        count = nums[0]
-        for i in range(1, len(nums)):
-            coef *= (p-1)
-            count += coef * nums[i]
-        return count
-
-    @staticmethod
-    def occurrence(iterable: Iterable[Hashable], /) -> Tuple[List[Hashable], List[int], List[int]]:
-        # TODO: Implement a C version for higher performance.
-        first = OrderedDict()
-        last = OrderedDict()
-
-        for i, item in enumerate(iterable):
-            if item not in first:
-                first[item] = i
-            last[item] = i
-
-        return list(first.keys()), list(first.values()), list(last.values())
+    # NOTE: Backend is the base class is for the backend system.
+    # Do not implement any utils here.

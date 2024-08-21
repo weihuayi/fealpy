@@ -5,8 +5,8 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.functionspace import CmConformingFESpace2d 
 from fealpy.experimental.fem import BilinearForm 
-from fealpy.experimental.fem.grad_m_integrator import gradmIntegrator
-from fealpy.experimental.tests.fem.grad_m_integrator_data import *
+from fealpy.experimental.fem.mthlaplace_integrator import MthLaplaceIntegrator
+from fealpy.experimental.tests.fem.mthlaplace_integrator_data import *
 class TestgradmIntegrator:
     @pytest.mark.parametrize("backend", ['numpy','pytorch'])
     @pytest.mark.parametrize("data", grad_m)
@@ -22,7 +22,7 @@ class TestgradmIntegrator:
         p = data['p']
         space = CmConformingFESpace2d(mesh, p, data["spacem"], isCornerNode)
         bform = BilinearForm(space)
-        integrator = gradmIntegrator(m=data["equationm"], coef=1, q=p+4)
+        integrator = MthLaplaceIntegrator(m=data["equationm"], coef=1, q=p+4)
         FM = integrator.assembly(space)
         bform.add_integrator(integrator)
 
