@@ -3335,7 +3335,7 @@ class HalfEdgeMesh2dDataStructure():
         NC = self.NC 
         NHE = self.NHE 
         halfedge2cellnum = np.zeros(NHE, dtype=np.int_) # 每条半边所在单元的编号
-        hcell = self.hcell[:]
+        hcell = self.hcell[:].copy()
         isNotOK = np.ones(NC, dtype=np.bool_)
         i = 0
         while np.any(isNotOK):

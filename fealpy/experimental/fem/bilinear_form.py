@@ -56,6 +56,7 @@ class BilinearForm(Form):
             spshape = sparse_shape
         )
 
+
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
             ue2dof = e2dofs[0]
