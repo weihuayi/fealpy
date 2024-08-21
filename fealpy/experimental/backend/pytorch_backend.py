@@ -69,8 +69,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         torch.set_default_device(device)
 
     @staticmethod
-    def get_device(tensor_like: Tensor, /):
-        return tensor_like.device
+    def device_type(tensor_like: Tensor, /): return tensor_like.device.type
+
+    @staticmethod
+    def device_index(tensor_like: Tensor, /): return tensor_like.device.index
 
     @staticmethod
     def to_numpy(tensor_like: Tensor, /) -> Any:
@@ -337,6 +339,39 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if axis==0:
             x = torch.transpose(x)
         return vmap(func1d)(x)
+
+    ### Sparse Functions ###
+
+    @staticmethod
+    def coo_spmm(indices, values, shape, other):
+        if values.ndim == 1:
+            mat = torch.sparse_coo_tensor(indices, values, size=shape)
+            return PyTorchBackend._spmm(mat, other)
+        else:
+            raise NotImplementedError("Batch sparse matrix multiplication has "
+                                      "not been supported yet.")
+
+    @staticmethod
+    def csr_spmm(crow, col, values, shape, other):
+        if values.ndim == 1:
+            mat = torch.sparse_csr_tensor(crow, col, values, size=shape)
+            return PyTorchBackend._spmm(mat, other)
+        else:
+            raise NotImplementedError("Batch sparse matrix multiplication has "
+                                      "not been supported yet.")
+
+    @staticmethod
+    def _spmm(mat, other):
+        if other.ndim == 1:
+            return torch.sparse.mm(mat, other[:, None])[:, 0]
+        else:
+            return torch.sparse.mm(mat, other)
+
+    @staticmethod
+    def coo_tocsr(indices, values, shape):
+        mat = torch.sparse_coo_tensor(indices, values, size=shape)
+        mat = mat.to_sparse_csr()
+        return mat.crow_indices(), mat.col_indices(), mat.values()
 
     ### FEALPy functionals ###
 

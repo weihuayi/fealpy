@@ -331,6 +331,11 @@ class CSRTensor(SparseTensor):
         elif isinstance(other, TensorLike):
             if self.values() is None:
                 raise ValueError()
+            try:
+                return bm.csr_spmm(self._crow, self._col, self._values, self._spshape, other)
+            except (AttributeError, NotImplementedError):
+                pass
+
             return spmm_csr(self._crow, self._col,self._values,self.sparse_shape, other)
 
         else:
