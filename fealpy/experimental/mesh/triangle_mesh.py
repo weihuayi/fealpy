@@ -34,6 +34,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         self.celldata = {}
         self.meshdata = {}
 
+    face_unit_normal = SimplexMesh.edge_unit_normal
 
     # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
@@ -241,26 +242,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
         length = bm.sqrt(bm.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
-
-    
-    def edge_normal(self, index: Index=_S):
-        """
-        @brief 计算二维网格中每条边上单位法线
-        """
-        assert self.geo_dimension() == 2
-        v = self.edge_tangent(index=index)
-        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
-        return v@w
-    def edge_unit_normal(self, index: Index=_S):
-        """
-        @brief 计算二维网格中每条边上单位法线
-        """
-        assert self.geo_dimension() == 2
-        v = self.edge_unit_tangent(index=index)
-        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
-        return v@w
-
-
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """

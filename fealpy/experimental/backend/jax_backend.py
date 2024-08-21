@@ -19,11 +19,11 @@ except ImportError:
 
 from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 
-Array = jax.Array 
+Array = jax.Array
 _device = jax.Device
 
 class JAXBackend(Backend[Array], backend_name='jax'):
-    DATA_CLASS = Array 
+    DATA_CLASS = Array
     linalg = jnp.linalg
     random = jax.random
 
@@ -33,8 +33,14 @@ class JAXBackend(Backend[Array], backend_name='jax'):
 
     @staticmethod
     def set_default_device(device: Union[str, _device]) -> None:
-        jax.default_device = device 
-    
+        jax.default_device = device
+
+    @staticmethod
+    def device_type(array: Array, /): return array.device.platform.lower()
+
+    @staticmethod
+    def device_index(array: Array, /): return array.device.id
+
     @staticmethod
     def to_numpy(jax_array: Array, /) -> Any:
         return np.array(jax_array) 

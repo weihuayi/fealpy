@@ -3,7 +3,6 @@ from typing import Optional, Protocol
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
-from ..sparse import COOTensor
 
 from .. import logger
 
@@ -81,16 +80,18 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxit
     p = r               # (dof, batch)
     n_iter = 0
     b_norm = bm.linalg.norm(b)
+    sum_func = bm.sum
+    sqrt_func = bm.sqrt
 
     # iterate
     while True:
         Ap = A @ p      # (dof, batch)
-        rTr = bm.sum(r**2, axis=0)
-        alpha = rTr / bm.sum(p*Ap, axis=0)  # r @ r / (p @ Ap) # (batch,)
+        rTr = sum_func(r**2, axis=0)
+        alpha = rTr / sum_func(p*Ap, axis=0)  # r @ r / (p @ Ap) # (batch,)
         x = x + alpha[None, ...] * p  # (dof, batch)
         r_new = r - alpha[None, ...] * Ap
-        rTr_new = bm.sum(r_new**2, axis=0)  # (batch,)
-        r_norm_new = bm.sqrt(bm.sum(rTr_new))
+        rTr_new = sum_func(r_new**2, axis=0)  # (batch,)
+        r_norm_new = sqrt_func(sum_func(rTr_new))
 
         n_iter += 1
 
@@ -99,7 +100,7 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxit
                         "stopped by absolute tolerance.")
             break
 
-        if r_norm_new / b_norm < rtol:
+        if r_norm_new < rtol * b_norm:
             logger.info(f"SparseCG: converged in {n_iter} iterations, "
                         "stopped by relative tolerance.")
             break
