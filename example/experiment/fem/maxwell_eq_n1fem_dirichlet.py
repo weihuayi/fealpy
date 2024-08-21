@@ -33,7 +33,9 @@ from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.experimental.solver import cg
 
 from fealpy.experimental.pde.maxwell_2d import SinData as PDE2d
-from fealpy.pde.MaxwellPDE_3d import SinData as PDE3d 
+from fealpy.experimental.pde.maxwell_3d import Bubble3dData as PDE3d
+
+from fealpy.utils import timer
 
 def Solve(A, b):
     from mumps import DMumpsContext
@@ -75,7 +77,7 @@ parser.add_argument('--dim',
         help='默认维数为2')
 
 parser.add_argument('--maxit',
-        default=4, type=int,
+        default=1, type=int,
         help='默认最大迭代次数为4')
 
 args = parser.parse_args()
@@ -99,7 +101,11 @@ errorType = ['$|| E - E_h||_0$ with k=2',
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float_)
 NDof = np.zeros(maxit, dtype=np.float_)
 
+tmr = timer()
+next(tmr)
+
 ps = [2, 3, 4]
+ps = [4]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
@@ -110,6 +116,7 @@ for j, p in enumerate(ps):
         else:
             mesh = TetrahedronMesh.from_box(pde.domain(), nx=2**i, ny=2**i, nz=2**i)
             space = FirstNedelecFiniteElementSpace3d(mesh, p=p)
+        tmr.send(f'第{i}次网格和pde生成时间')
 
         gdof = space.dof.number_of_global_dofs()
         NDof[i] = 1/2**i 
@@ -118,25 +125,29 @@ for j, p in enumerate(ps):
         bform.add_integrator(VectorMassIntegrator(coef=-1, q=p+3))
         bform.add_integrator(CurlIntegrator(coef=1, q=p+3))
         A = bform.assembly()
+        tmr.send(f'第{i}次矩组装时间')
 
         lform = LinearForm(space)
         lform.add_integrator(VectorSourceIntegrator(pde.source, q=p+3))
         F = lform.assembly()
+        tmr.send(f'第{i}次向量组装时间')
 
-        AAA = coo_matrix((A.values(), (A.indices()[0], A.indices()[1])), shape=(gdof,
-                                                             gdof))
         # Dirichlet 边界条件
         Eh = space.function()
         bc = DirichletBC(space, pde.dirichlet)
         A, F = bc.apply(A, F)
+        tmr.send(f'第{i}次边界处理时间')
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
         Eh[:] = bm.tensor(Solve(A, F))
+        tmr.send(f'第{i}次求解器时间')
+
         # 计算误差
-
         errorMatrix[j, i] = mesh.error(pde.solution, Eh.value)
-        errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
+        #errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
+        tmr.send(f'第{i}次误差计算及网格加密时间')
 
+next(tmr)
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
 plt.show()

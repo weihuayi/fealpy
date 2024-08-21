@@ -84,11 +84,19 @@ class VectorMassIntegrator(CellOperatorIntegrator):
         NQ = len(ws)
 
         phi0 = space.basis(bcs) # (NQ, NC, ldof, GD)
+        print(phi0.shape)
 
+        import time
+
+        start = time.time()
         if coef is None:
             D += bm.einsum('q, cqli, cqmi, c->clm', ws, phi0, phi0, cellmeasure)
         elif isinstance(coef, (int, float)):
-            D += coef*bm.einsum('q, cqli, cqmi, c->clm', ws, phi0, phi0, cellmeasure)
+            D += coef*bm.einsum('q, cqli, cqmi, c->clm', ws, phi0, phi0,
+                                #cellmeasure, optimize=True)
+                                cellmeasure)
+        end = time.time()
+        print(f"Time: {end-start}")
 
         if out is None:
             return D
