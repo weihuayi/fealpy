@@ -169,13 +169,13 @@ class BernsteinFESpace:
         p = self.p
         gdof = self.dof.number_of_global_dofs()
         cell2dof = self.dof.cell_to_dof()
-        print('111',cell2dof.shape)
+        
         integrator = self.integrator
         bcs, ws = integrator.get_quadrature_points_and_weights()#p=5 order=9 NQ=19
 
         cm = self.mesh.entity_measure("cell")
         phi = self.basis(bcs)
-        print('222',phi.shape)
+        
         M = np.einsum('qcl, qcm, q, c->clm', phi, phi, ws, cm, optimize=True)
 
         I = np.broadcast_to(cell2dof[:, :, None], M.shape) 

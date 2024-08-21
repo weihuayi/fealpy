@@ -233,6 +233,7 @@ class ScaledMonomialSpace2d():
 
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=self.ftype)  # (..., M, ldof)
+
         phi[..., 1:3] = (point - self.cellbarycenter[index])/h[index].reshape(-1, 1)
         if p > 1:
             start = 3

@@ -49,7 +49,7 @@ class CosCosData:
         pi = bm.pi
         val = bm.stack((
             -pi*bm.sin(pi*x)*bm.cos(pi*y),
-            -pi*bm.cos(pi*x)*bm.sin(pi*y)), axis=1)
+            -pi*bm.cos(pi*x)*bm.sin(pi*y)), axis=-1)
         return val # val.shape == p.shape
 
     @cartesian
@@ -79,8 +79,10 @@ class CosCosData:
         """ 
         @brief Neumann 边界条件
         """
-        grad = self.gradient(p) # (NQ, NE, 2)
-        val = bm.sum(grad*n, axis=-1) # (NQ, NE)
+        grad = self.gradient(p) # (NF, NQ, 2)
+        if n.ndim == 2:
+            n = bm.expand_dims(n, axis=1)
+        val = bm.einsum('fqd, fqd -> fq', grad, n) # (NF, NQ)
         return val
 
     @cartesian

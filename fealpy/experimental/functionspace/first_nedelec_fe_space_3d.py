@@ -141,7 +141,10 @@ class FirstNedelecDof3d():
         return self.cell_to_dof()
 
     def boundary_dof(self):
-        eidx = self.mesh.boundary_edge_index()
+        edge = self.mesh.entity('edge')
+        bdnflag = self.mesh.boundary_node_flag()
+        bdeflag = bm.all(bdnflag[edge], axis=1)
+        eidx = bm.nonzero(bdeflag)[0] 
         e2d = self.edge_to_dof(index=eidx)
         return e2d.reshape(-1)
 
@@ -154,7 +157,7 @@ class FirstNedelecDof3d():
         flag[bddof] = True
         return flag
 
-class FirstNedelecFiniteElementSpace3d():
+class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
@@ -167,10 +170,17 @@ class FirstNedelecFiniteElementSpace3d():
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
+    def cross(self, a, b):
+        if bm.backend_name == 'numpy':
+            return bm.cross(a, b)
+        elif bm.backend_name == 'pytorch':
+            return bm.linalg.cross(a, b)
 
     @barycentric
-    def basis(self, bcs):
+    def basis(self, bcs, index=_S):
 
+        import time
+        t = time.time()
         p = self.p
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -246,6 +256,8 @@ class FirstNedelecFiniteElementSpace3d():
             val[..., N:N+cldof//3, :] = v0*phi[..., None] 
             val[..., N+cldof//3:N+2*cldof//3, :] = v1*phi[..., None] 
             val[..., N+2*cldof//3:N+cldof, :] = v2*phi[..., None] 
+        s = time.time()
+        print("tt : ", s-t)
 
         return val
 
@@ -288,9 +300,9 @@ class FirstNedelecFiniteElementSpace3d():
             c2esi = c2esign[:, i]
             v = l[ledge[i, 0]]*glambda[:,None, ledge[i, 1], None,:] - l[ledge[i, 1]]*glambda[:,None, ledge[i, 0], None,:]
             v[~c2esi,:, :, :] *= -1 
-            cv = 2*bm.linalg.cross(glambda[:,None, ledge[i, 0],None,:], glambda[:,None, ledge[i, 1],None,:]) #(NC, )
+            cv = 2*self.cross(glambda[:,None, ledge[i, 0],None,:], glambda[:,None, ledge[i, 1],None,:]) #(NC, )
             cv[~c2esi] *= -1
-            val[..., eldof*i:eldof*(i+1), :] = phie[..., None]*cv + bm.linalg.cross(gphie, v)
+            val[..., eldof*i:eldof*(i+1), :] = phie[..., None]*cv + self.cross(gphie, v)
 
         # face basis
         if(p > 0):
@@ -321,12 +333,12 @@ class FirstNedelecFiniteElementSpace3d():
                 v0 = l2*(l0*g1 - l1*g0) #(NQ, NC, fldof//2, 2)
                 v1 = l0*(l1*g2 - l2*g1)
 
-                cv0 = bm.linalg.cross(g2, (l0*g1 - l1*g0)) + 2*l2*bm.linalg.cross(g0, g1)
-                cv1 = bm.linalg.cross(g0, (l1*g2 - l2*g1)) + 2*l0*bm.linalg.cross(g1, g2)
+                cv0 = self.cross(g2, (l0*g1 - l1*g0)) + 2*l2*self.cross(g0, g1)
+                cv1 = self.cross(g0, (l1*g2 - l2*g1)) + 2*l0*self.cross(g1, g2)
 
                 N = eldof*6+fldof*i
-                val[..., N:N+fldof//2, :] = -bm.linalg.cross(v0, gphif)+phif[..., None]*cv0
-                val[..., N+fldof//2:N+fldof, :] = -bm.linalg.cross(v1, gphif)+phif[..., None]*cv1 
+                val[..., N:N+fldof//2, :] = -self.cross(v0, gphif)+phif[..., None]*cv0
+                val[..., N+fldof//2:N+fldof, :] = -self.cross(v1, gphif)+phif[..., None]*cv1 
 
         # cell basis
         if(p > 1):
@@ -341,17 +353,20 @@ class FirstNedelecFiniteElementSpace3d():
             v0 = l[2]*l[3]*(l[0]*g1 - l[1]*g0)
             v1 = l[0]*l[3]*(l[1]*g2 - l[2]*g1)
             v2 = l[0]*l[1]*(l[2]*g3 - l[3]*g2)
-            cv0 = bm.linalg.cross(l[2]*g3+l[3]*g2, l[0]*g1-l[1]*g0) + 2*l[2]*l[3]*bm.linalg.cross(g0, g1)
-            cv1 = bm.linalg.cross(l[0]*g3+l[3]*g0, l[1]*g2-l[2]*g1) + 2*l[0]*l[3]*bm.linalg.cross(g1, g2)
-            cv2 = bm.linalg.cross(l[0]*g1+l[1]*g0, l[2]*g3-l[3]*g2) + 2*l[0]*l[1]*bm.linalg.cross(g2, g3)
+            cv0 = self.cross(l[2]*g3+l[3]*g2, l[0]*g1-l[1]*g0) + 2*l[2]*l[3]*self.cross(g0, g1)
+            cv1 = self.cross(l[0]*g3+l[3]*g0, l[1]*g2-l[2]*g1) + 2*l[0]*l[3]*self.cross(g1, g2)
+            cv2 = self.cross(l[0]*g1+l[1]*g0, l[2]*g3-l[3]*g2) + 2*l[0]*l[1]*self.cross(g2, g3)
 
             N = eldof*6+fldof*4
-            val[..., N:N+cldof//3, :] = bm.linalg.cross(gphi, v0) + phi[..., None]*cv0 
-            val[..., N+cldof//3:N+2*cldof//3, :] = bm.linalg.cross(gphi, v1) + phi[...,
+            val[..., N:N+cldof//3, :] = self.cross(gphi, v0) + phi[..., None]*cv0 
+            val[..., N+cldof//3:N+2*cldof//3, :] = self.cross(gphi, v1) + phi[...,
                     None]*cv1  
-            val[..., N+2*cldof//3:N+cldof, :] = bm.linalg.cross(gphi, v2) + phi[...,
+            val[..., N+2*cldof//3:N+cldof, :] = self.cross(gphi, v2) + phi[...,
                     None]*cv2  
         return val
+
+    def is_boundary_dof(self, threshold=None):
+        return self.dof.is_boundary_dof()
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -478,7 +493,31 @@ class FirstNedelecFiniteElementSpace3d():
 #         val[1::2] = np.sum(f1*e2n, axis=1)
 #         return self.function(array=val)
 
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+        p = self.p
+        mesh = self.mesh
+        ldof = p+1
+        gdof = self.number_of_global_dofs()
+       
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        index = self.mesh.boundary_face_index()
+        face2dof = self.dof.face_to_internal_dof()[index]
+        uh[face2dof] = 0 
+        isDDof[face2dof] = True
 
+        edge = self.mesh.entity('edge')
+        bdnflag = self.mesh.boundary_node_flag()
+        bdeflag = bm.all(bdnflag[edge], axis=1)
+        index = bm.nonzero(bdeflag)[0] 
+
+        edge2dof = self.dof.edge_to_dof()[index]
+        uh[edge2dof] = 0 
+        isDDof[edge2dof] = True
+
+
+        return isDDof
+
+    boundary_interpolate = set_dirichlet_bc
 
 
 
