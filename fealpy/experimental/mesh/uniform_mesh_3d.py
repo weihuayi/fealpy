@@ -91,7 +91,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.nz = self.extent[5] - self.extent[4]
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
         self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \
-                (self.nx + 1) * (self.ny + 1) * self.nz + \
+                (self.nx + 1) * self.ny * (self.nz + 1) + \
                 self.nx * (self.ny + 1) * (self.nz + 1)
         self.NF = self.nx * self.ny * (self.nz + 1) + \
                 self.nx * (self.ny + 1) * self.nz + \
@@ -112,7 +112,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         self.cell2edge = self.cell_to_edge()
         self.cell2face = self.cell_to_face()
-        self.face2edge = self.face_to_edge()
+        # self.face2edge = self.face_to_edge()
         self.face2cell = self.face_to_cell()
 
         self.localEdge = bm.array([
@@ -312,24 +312,41 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         """
         @brief Generate the cells in a structured mesh.
         """
+        NN = self.NN
+        NC = self.NC
         nx, ny, nz = self.nx, self.ny, self.nz
 
-        idx = bm.arange((nx + 1) * (ny + 1) * (nz + 1)).reshape(nx + 1, ny + 1, nz + 1)
-        cell = bm.zeros((self.NC, 8), dtype=self.itype)
+        idx = bm.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
         c = idx[:-1, :-1, :-1]
-        cell_0 = c.reshape(-1)
-        cell_1 = cell_0 + 1
-        cell_2 = cell_0 + ny + 1
-        cell_3 = cell_2 + 1
-        cell_4 = cell_0 + (ny + 1) * (nz + 1)
-        cell_5 = cell_1 + (ny + 1) * (nz + 1)
-        cell_6 = cell_2 + (ny + 1) * (nz + 1)
-        cell_7 = cell_3 + (ny + 1) * (nz + 1)
-        cell = bm.concatenate([cell_0[:, None], cell_1[:, None], cell_2[:, None], 
-                               cell_3[:, None], cell_4[:, None], cell_5[:, None], 
-                               cell_6[:, None], cell_7[:, None]], axis=-1)
 
-        return cell    
+        cell = bm.zeros((NC, 8), dtype=self.itype)
+        nyz = (ny + 1) * (nz + 1)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            cell[:, 0] = c.flatten()
+            cell[:, 1] = cell[:, 0] + 1
+            cell[:, 2] = cell[:, 0] + nz + 1
+            cell[:, 3] = cell[:, 2] + 1
+            cell[:, 4] = cell[:, 0] + nyz
+            cell[:, 5] = cell[:, 4] + 1
+            cell[:, 6] = cell[:, 2] + nyz
+            cell[:, 7] = cell[:, 6] + 1
+
+            return cell
+        elif bm.backend_name == 'jax':
+            cell = cell.at[:, 0].set(c.flatten())
+            cell = cell.at[:, 1].set(cell[:, 0] + 1)
+            cell = cell.at[:, 2].set(cell[:, 0] + nz + 1)
+            cell = cell.at[:, 3].set(cell[:, 2] + 1)
+            cell = cell.at[:, 4].set(cell[:, 0] + nyz)
+            cell = cell.at[:, 5].set(cell[:, 4] + 1)
+            cell = cell.at[:, 6].set(cell[:, 2] + nyz)
+            cell = cell.at[:, 7].set(cell[:, 6] + 1)
+
+            return cell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
     
     
     # 实体拓扑
@@ -476,10 +493,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             NE0 = 0
             NE1 = (nx + 1) * ny * nz
             idx0 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
-            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
-            
             face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
             face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+
+            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
             face2edge[NE0:NE1, 2] = idx1[:, :-1, :].flatten()
             face2edge[NE0:NE1, 3] = idx1[:, 1:, :].flatten()
 
@@ -1061,12 +1078,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         TD = len(bcs)
         node = self.entity('node')
-        entity = self.entity(TD, index=index)
+        cell = self.entity('cell')
         gphi = self.grad_shape_function(bcs, p=1, variables='u')
-        if TD == 3:
-            J = bm.einsum( 'cim, qin -> qcmn', node[entity[:]], gphi)
-        elif TD == 2:
-            J = bm.einsum( 'cim, qin -> qcmn', node[entity[:]], gphi)
+        J = bm.einsum( 'cim, qin -> qcmn', node[cell[:]], gphi)
+
         return J
     
 

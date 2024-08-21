@@ -33,47 +33,78 @@ def material_model_SIMP_derivative(rho: TensorLike, penal: float, E0: float,
         dE = -penal * rho ** (penal - 1) * (E0 - Emin)
     return dE
 
-# TODO 可以使用稀疏矩阵存储
-def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
-    H = bm.zeros((NC, NC), dtype=bm.float64)
+def check(rmin, rho, dce):
+    dcn = bm.zeros((nx, ny), dtype=bm.float64).T
+    rho = rho.reshape(nx, ny).T
+    dce = dce.reshape(nx, ny).T
+    # 计算过滤器半径
+    r = int(rmin)
 
-    # 确定哪些单元在滤波器半径范围内
-    for i1 in range(nx):
-        for j1 in range(ny):
-            e1 = (i1) * ny + j1
-            # 确定滤波器半径 rmin 的整数边界
-            imin = max(i1 - (bm.ceil(rmin) - 1), 0.)
-            imax = min(i1 + (bm.ceil(rmin)), nx)
-            for i2 in range(int(imin), int(imax)):
-                jmin = max(j1 - (bm.ceil(rmin) - 1), 0.)
-                jmax = min(j1 + (bm.ceil(rmin)), ny)
-                for j2 in range(int(jmin), int(jmax)):
-                    e2 = i2 * ny + j2
-                    H[e1, e2] = max(0., rmin - bm.sqrt((i1-i2)**2 + (j1-j2)**2))
+    for i in range(nx):
+        for j in range(ny):
+            sum_val = 0.0
+            # 确定邻域的范围
+            min_x = max(i - r, 0)
+            max_x = min(i + r + 1, nx)
+            min_y = max(j - r, 0)
+            max_y = min(j + r + 1, ny)
 
-    Hs = bm.sum(H, 1)
+            for k in range(min_x, max_x):
+                for l in range(min_y, max_y):
 
-    return H, Hs
+                    # Calculate convolution operator value for the element (k,l) with respect to (i,j)
+                    fac = rmin - bm.sqrt((i - k)**2 + (j - l)**2)
+
+                    # Accumulate the convolution sum
+                    sum_val += max(0, fac)
+
+                    # 基于 convolution 算子的值修改单元的灵敏度
+                    dcn[j, i] += max(0, fac) * rho[l, k] * dce[l, k]
+
+            # Normalize the modified sensitivity for element (i,j)
+            dcn[j, i] /= (rho[j, i] * sum_val)
+
+    return dcn.reshape(-1)
 
 # Optimality criterion
-def oc(rho, dce, dve):
-    l1 = 0
-    l2 = 1e4
-    move = 0.2
-    # reshape to perform vector operations
-    rho_new = bm.zeros(NC, dtype=bm.float64)
-    while (l2 - l1)  > 1e-4:
-        lmid = 0.5 * (l2 + l1)
-        rho_new[:] = bm.maximum(0.0, bm.maximum(rho-move, 
-                                           bm.minimum(1.0, 
-                                                    bm.minimum(rho+move, rho*bm.sqrt(-dce/dve/lmid)))))
-        # 检查当前设计是否满足体积约束
-        if bm.sum(rho_new) - volfrac * nx * ny > 0:
-            l1 = lmid
-        else:
-            l2 = lmid
+def oc(volfrac, rho, dce, dve, passive=None):
+        # 初始化 Lagrange 乘子
+        l1, l2 = 0, 1e5
 
-    return rho_new
+        # 定义设计变量中允许的最大变化
+        move = 0.2
+
+        rho_new = bm.copy(rho)
+
+        # 二分法以找到满足体积约束的 Lagrange 乘子
+        while (l2 - l1) > 1e-4:
+            # 计算当前 Lagrange 乘子区间的中点
+            lmid = 0.5 * (l2 + l1)
+            # Lower limit move restriction
+            tmp0 = rho - move
+            # Upper limit move restriction
+            tmp1 = rho + move
+
+            # Design variable update (intermediate step) using OC update scheme
+            be = -dce / dve / lmid
+            tmp2 = rho * bm.sqrt(be)
+            tmp3 = bm.minimum(tmp1, tmp2)
+            tmp4 = bm.minimum(1, tmp3) 
+            tmp5 = bm.maximum(tmp0, tmp4)
+
+            rho_new = bm.maximum(0.001, tmp5)
+
+            # 寻找 Passive 单元，并将其密度设置为最小密度
+            if passive is not None:
+                rho_new[passive == 1] = 0.001
+
+            # 检查当前设计是否满足体积约束
+            if bm.sum(rho_new) - volfrac * nx * ny > 0:
+                l1 = lmid
+            else:
+                l2 = lmid
+
+        return rho_new
 
 
 def source(points: TensorLike) -> TensorLike:
@@ -88,7 +119,9 @@ def dirichlet(points: TensorLike) -> TensorLike:
     return bm.zeros(points.shape, dtype=points.dtype)
 
 def is_dirichlet_boundary(points):
-
+    print("points: ", points.shape, "\n", points)
+    print("points[..., 0]: ", points[..., 0].shape, "\n", points[..., 0])
+    print("test:", (points[..., 0] == 0).shape, "\n", (points[..., 0] == 0))
     return points[:, 0] == 0.0
 
 
@@ -98,13 +131,17 @@ ny = 2
 volfrac = 0.5
 penal = 3.0
 rmin = 1.5
-ft = 0 # ft==0 -> sens, ft==1 -> dens
-
 
 extent = [0, nx, 0, ny]
 h = [1, 1]
 origin = [0, 0]
 mesh = UniformMesh2d(extent, h, origin)
+import matplotlib.pyplot as plt
+fig = plt.figure()
+axes = fig.add_subplot(111)
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True, color='r', fontsize=20)
+plt.show()
 NC = mesh.number_of_cells()
 p = 1
 space = LagrangeFESpace(mesh, p=p, ctype='C')
@@ -112,17 +149,11 @@ tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
 
 # Allocate design variables, initialize and allocate sens.
 rho = volfrac * bm.ones(NC, dtype=bm.float64)
-rho_old = rho.copy()
-rho_Phys = rho.copy()
-# g = 0 # must be initialized to use the NGuyen/Paulino OC approach
 
 # element stiffness matrix
 integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
                                         elasticity_type='stress', coef=None, q=5)
 KE = integrator_bi.assembly(space=tensor_space)
-
-# Filter
-H, Hs = compute_filter(rmin)
 
 # Set loop counter and gradient vectors
 loop = 0
@@ -133,9 +164,11 @@ ce = bm.ones(NC, dtype=bm.float64)
 while change > 0.01 and loop < 2000:
     loop += 1
 
+    rho_old = bm.copy(rho)
+
     # Setup and solve FE problem
     uh = tensor_space.function()
-    E = material_model_SIMP(rho=rho_Phys, penal=penal, E0=1.0, Emin=1e-9)
+    E = material_model_SIMP(rho=rho, penal=penal, E0=1.0, Emin=1e-9)
     integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
                                             elasticity_type='stress', coef=E, q=5)
     KK = integrator_bi.assembly(space=tensor_space)
@@ -147,6 +180,9 @@ while change > 0.01 and loop < 2000:
     
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
     isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
+    print("isDDof: ", isDDof.shape, "\n", isDDof)
+    isDDofs = tensor_space.is_boundary_dof(threshold=None)
+    print("isDDofs: ", isDDofs.shape, "\n", isDDofs)
 
     F = dbc.check_vector(F)
     uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary)
@@ -177,31 +213,18 @@ while change > 0.01 and loop < 2000:
     ce[:] = bm.einsum('ci, cik, ck -> c', uhe, KE, uhe)
     c += bm.einsum('c, c -> ', E, ce)
 
-    dE = material_model_SIMP_derivative(rho=rho_Phys, penal=penal, E0=1.0, Emin=1e-9)
+    dE = material_model_SIMP_derivative(rho=rho, penal=penal, E0=1.0, Emin=None)
     dce[:] = bm.einsum('c, c -> c', dE, ce)
 
     dve[:] = bm.ones(NC, dtype=bm.float64)
 
-    # Sensitivity filtering
-    # asarray 函数的作用是将输入数据转换为一个数组,它的一个重要特性是: 
-    # 如果输入已经是一个数组, 它不会复制数据, 而是返回输入的原始数组.
-    # 这种行为可以节省内存和提高效率, 特别是在处理大数据时.
-    if ft == 0:
-        dce[:] = bm.asarray(H * (rho * dce)[bm.newaxis].T / Hs)[:, 0] / bm.maximum(0.001, rho)
-    elif ft == 1:
-        dce[:] = bm.asarray(H * (dce[bm.newaxis].T / Hs))[:, 0]
-        dve[:] = bm.asarray(H * (dve[bm.newaxis].T / Hs))[:, 0]
+    # 灵敏度过滤
+    dce = check(rmin=rmin, rho=rho, dce=dce)
 
     # Optimality criteria
     # TODO 更新后的设计变量不对
-    rho_old[:] = rho
-    rho = oc(rho=rho, dce=dce, dve=dve)
 
-    # Filter design variables
-    if ft == 0:
-        rho_Phys[:] = rho
-    elif ft == 1:
-        rho_Phys[:] = bm.asarray(H * rho[bm.newaxis].T / Hs)[:, 0]
+    rho = oc(volfrac=volfrac, rho=rho, dce=dce, dve=dve)
 
     # Compute the change by the inf. norm
     change = bm.linalg.norm(rho.reshape(NC, 1) - rho_old.reshape(NC, 1), bm.inf)
