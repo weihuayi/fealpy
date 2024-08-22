@@ -14,6 +14,9 @@ from ..fem import DirichletBC
 from ..fem import LinearRecoveryAlg
 from ..mesh.adaptive_tools import mark
 
+from ..mesh.halfedge_mesh import HalfEdgeMesh2d
+from ..mesh import TriangleMesh
+
 from scipy.sparse.linalg import spsolve, lgmres, cg
 from scipy.sparse import csr_matrix, coo_matrix
 
@@ -51,6 +54,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
         self.recovery = LinearRecoveryAlg()
 
         self.tmr = timer()
+        next(self.tmr)
 
     def newton_raphson(self, 
             disp, 
@@ -59,12 +63,12 @@ class AFEMPhaseFieldCrackHybridMixModel():
             maxit=100,
             theta=0.2,
             atype='fast',
-            solve='lgmres'):
+            solve='lgmres',
+            adaptive_refinement=True):
         """
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
         tmr = self.tmr
-        next(tmr)
         GD = self.GD
         D0 = self.D0
         k = 0
@@ -200,32 +204,34 @@ class AFEMPhaseFieldCrackHybridMixModel():
             self.uh = uh
             self.d = d
             self.H = H
-
-            # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
-            eta = self.recovery.recovery_estimate(self.d)
+            
+            if adaptive_refinement:            
+                # 恢复型后验误差估计子 TODO：是否也应考虑位移的奇性
+                eta = self.recovery.recovery_estimate(d)
+                    
+                isMarkedCell = mark(eta, theta = theta) # TODO：
                 
-            isMarkedCell = mark(eta, theta = theta) # TODO：
-            
-            tmr.send('Markcell')
-            
-            cm = mesh.entity_measure('cell')
-            if GD == 3:
-                hmin = model.l0**3/200
-            else:
-                hmin = (model.l0/8)**2
-            isMarkedCell = np.logical_and(isMarkedCell, cm > hmin)
-            if np.any(isMarkedCell):
-                if GD == 2:
-                    if refine == 'nvp':
-                        self.bisect_refine_2d(isMarkedCell)
-                    elif refine == 'rg':
-                        self.redgreen_refine_2d(isMarkedCell)
-                elif GD == 3:
-                        self.bisect_refine_3d(isMarkedCell)
+                tmr.send('Markcell')
+                
+                cm = mesh.entity_measure('cell')
+                if GD == 3:
+                    hmin = model.l0**3/200
                 else:
-                    print("GD is not 2 or 3, it is incorrect")
-                        
-            tmr.send('refine')
+                    hmin = (model.l0/8)**2
+                isMarkedCell = np.logical_and(isMarkedCell, cm > hmin)
+                if np.any(isMarkedCell):
+                    if GD == 2:
+                        if refine == 'nvp':
+                            self.bisect_refine_2d(isMarkedCell)
+                        elif refine == 'rg':
+                            self.redgreen_refine_2d(isMarkedCell)
+                    elif GD == 3:
+                            self.bisect_refine_3d(isMarkedCell)
+                    else:
+                        print("GD is not 2 or 3, it is incorrect")
+                            
+                tmr.send('refine')
+            
             
             # 计算残量误差
             if k == 0:
@@ -292,8 +298,47 @@ class AFEMPhaseFieldCrackHybridMixModel():
         """
         @brief 红绿加密策略
         """
-        self.mesh.celldata['H'] = self.H
-        mesho = copy.deepcopy(self.mesh)
+        mesh0 = HalfEdgeMesh2d.from_mesh(self.mesh, NV=3) 
+
+        mesh0.celldata['H'] = self.H
+        mesho = copy.deepcopy(mesh0)
+        spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
+
+        uh0 = spaceo.function()
+        uh1 = spaceo.function()
+        d0 = spaceo.function()
+        uh0[:] = self.uh[:, 0]
+        uh1[:] = self.uh[:, 1]
+        d0[:] = self.d[:]
+
+        mesh0.refine_triangle_rg(isMarkedCell)
+        print('mesh refine')
+
+        node = mesh0.entity(etype='node')
+        cell = mesh0.entity(etype='cell')
+        mesh = TriangleMesh(node[:], cell[:])
+        self.mesh = mesh
+       
+        # 更新加密后的空间
+        self.space = LagrangeFESpace(self.mesh, p=1, doforder='vdims')
+
+        space0 = LagrangeFESpace(mesh0, p=1, doforder='vdims')
+
+        NC = self.mesh.number_of_cells()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.space.function()
+        self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
+        
+        self.uh[:, 0] = space0.interpolation_fe_function(uh0)
+        self.uh[:, 1] = space0.interpolation_fe_function(uh1)
+        
+        self.d[:] = space0.interpolation_fe_function(d0)
+        self.H[:] = mesh0.interpolation_cell_data(mesho, datakey=['H'])
+        print('interpolation cell data:', NC)      
+        
+        '''
+        mesh0.interpolation_cell_data(mesho, datakey=['H'])
+        print('interpolation cell data:', NC)      
         spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
         uh0 = spaceo.function()
         uh1 = spaceo.function()
@@ -319,13 +364,14 @@ class AFEMPhaseFieldCrackHybridMixModel():
         
         self.mesh.interpolation_cell_data(mesho, datakey=['H'])
         print('interpolation cell data:', NC)      
-    
+        '''
+
     def energy_degradation_function(self, d):
         eps = 1e-10
         gd = np.zeros_like(d)
-        qf = self.mesh.integrator(1, 'cell')
+        qf = self.mesh.integrator(self.p+1, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
-        gd = (1 - d(bc[-1])) ** 2 + eps
+        gd = (1 - d(bc)) ** 2 + eps
         return gd
 
     def strain(self, uh):
@@ -419,7 +465,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
         qf = self.mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
 
-        c0 = (1 - phi(bc[-1])) ** 2 + eps
+        c0 = (1 - phi(bc)) ** 2 + eps
         D = np.einsum('i, jk -> ijk', c0, D0)
 #        c0 = (1 - phi(bc)) ** 2 + eps
 #        D0 = np.array([[2*mu+lam, lam, 0], [lam, 2*mu+lam, 0], [0, 0, mu]],
@@ -470,10 +516,10 @@ class AFEMPhaseFieldCrackHybridMixModel():
         qf = mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
         cm = mesh.entity_measure('cell')
-        g = d.grad_value(bc[-1])
+        g = d.grad_value(bc)
 
         val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=-1))
-        dissipated = np.dot(val, cm)
+        dissipated = np.einsum('q, qc, c->', ws, val, cm)
         return dissipated
 
     
@@ -483,9 +529,27 @@ class AFEMPhaseFieldCrackHybridMixModel():
 
         qf = mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
-        c0 = (1 - d(bc[-1])) ** 2 + eps
+        c0 = (1 - d(bc)) ** 2 + eps
         cm = mesh.entity_measure('cell')
         val = c0*psi_s
-        stored = np.dot(val, cm)
+        stored = np.einsum('q, qc, c->', ws, val, cm)
         return stored
 
+    def stress(self):
+        '''
+        @brief 计算每个单元的应力张量
+        '''
+        uh = self.uh
+        gd = self.energy_degradation_function(self.d)
+        lam = self.model.lam
+        mu = self.model.mu
+        strains = self.strain(uh)
+        trace_e = np.trace(strains, axis1=1, axis2=2)
+
+        # 构造单位张量数组
+        eye = np.eye(strains.shape[1])
+
+        # 计算每个单元的应力张量
+        stresses = lam * trace_e[:, None, None] * eye + 2 * mu * strains
+        stresses = gd[:, None, None]*stresses
+        return stresses

@@ -188,7 +188,7 @@ q = 11
 
 x = sp.symbols("x")
 y = sp.symbols("y")
-u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**2
+u = (sp.sin(sp.pi*y)*sp.sin(sp.pi**2*x))**2
 pde = DoubleLaplacePDE(u)
 
 vertice = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float_)
@@ -214,7 +214,7 @@ GD = mesh.geo_dimension()
 Rhu = np.zeros((maxit, len(node0), GD, GD), dtype=np.float_)
 gx0 = np.zeros((len(node0), GD), dtype=np.float_)
 hx0 = np.zeros((len(node0), GD, GD), dtype=np.float_)
-
+Rhu00 = np.zeros(maxit, dtype=np.float_)
 #Rhu = np.zeros((maxit, len(points0), GD, GD), dtype=np.float_)
 #gx0 = np.zeros((len(points0), GD), dtype=np.float_)
 #hx0 = np.zeros((len(points0), GD, GD), dtype=np.float_)
@@ -248,7 +248,7 @@ for i in range(maxit):
 
     uh = space.function()
     uh[:] = spsolve(A, f)
-    #uh[:], tol = cg(A, f, atol=1e-15)
+    #uh[:], tol = lgmres(A, f, atol=1e-13)
     #print("AAAA : ", np.max(A0.data))
     #print("AAA : ", np.max(A.data))
     #print("AAA : ", np.max(P.data))
@@ -257,7 +257,7 @@ for i in range(maxit):
     errorMatrix[0, i] = mesh.error(uh, pde.solution)
     errorMatrix[1, i] = mesh.error(uh.grad_value, pde.gradient) 
     errorMatrix[2, i] = mesh.error(uh.hessian_value, pde.hessian) 
-    print(errorMatrix)
+    print('errorMatrix', errorMatrix)
     
     # 计算某点处的误差情况
     node = mesh.entity('node')
@@ -306,14 +306,36 @@ for i in range(maxit):
     
     
     # 计算R^k的误差
-    if p > 2:
+    if p == 2:
+        Rerror[0, i] = error[1, i]
+    elif p == 3:
         k = 2**p/2.0
         Rhu[i] -= hx0/(k-1)
         if i > 0:
             Rhu[i-1] += k*hx0/(k-1)
             Rerror[0, i-1] = np.max(np.abs(Rhu[i-1]-hx))
-    else:
-        Rerror[0, i] = error[1, i]
+    elif p == 4:
+        k = 2**p
+        Rhu[i] -= hx0/(k-1)
+        if i > 0:
+            Rhu[i-1] += k*hx0/(k-1)
+            Rerror[0, i-1] = np.max(np.abs(Rhu[i-1]-hx))
+    elif p == 5:
+        a0 = 1.05820106e-03
+        a1 = -8.46560847e-02
+        a2 = 1.08359788e+00
+        Rhu00[i] = 0
+        Rhu00[i] = np.max(np.abs(hx0-hx))*a0
+        if i > 0:
+            Rhu00[i-1] += a1*np.max(np.abs(hx0-hx))
+            print('dddddddddd:', i)
+        if i > 1:
+            print('ddddd:', i)
+            Rhu00[i-2] += a2*np.max(np.abs(hx0-hx))
+            print('rrr:', Rhu00[i-2])
+            Rerror[0, i-2] = np.abs(Rhu00[i-2])
+    else: 
+        print('error!')
 #    node = mesh.entity('node')
 #    cell = mesh.entity('cell')
 #    cell = np.array(cell)
@@ -327,6 +349,7 @@ for i in range(maxit):
 #    meshv1 = TriangleMesh(node1, cell)
 #    meshv0.to_vtk(fname='aaa.vtu')
 #    meshv1.to_vtk(fname='bbb.vtu')
+    print('Rerror', Rerror)
 
     if i < maxit-1:
         nx = nx*2
