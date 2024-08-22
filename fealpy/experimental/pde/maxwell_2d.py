@@ -54,8 +54,7 @@ class SinData():
     @cartesian
     def dirichlet(self, p, t):
         val = self.solution(p)
-        #return np.einsum('...ed, ed->...e', val, t)
-        return val
+        return bm.einsum('eqd, ed->eq', val, t)
 
     @cartesian
     def neumann(self, p, n):
@@ -86,10 +85,10 @@ class SinData():
         return bd
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):
-        box = [0, 1, 0, 1]
+        box = [0, 1/2, 0, 1/2]
         mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         return mesh
 
     def domain(self):
-        return [0, 1, 0, 1]
+        return [0, 1/2, 0, 1/2]
 
