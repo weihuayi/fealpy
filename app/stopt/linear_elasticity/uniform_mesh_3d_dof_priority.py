@@ -1,4 +1,4 @@
-from fealpy.experimental.mesh import UniformMesh3d
+from fealpy.experimental.mesh import UniformMesh3d, HexahedronMesh
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, \
                                     BilinearForm, LinearForm, \
@@ -49,30 +49,67 @@ extent = [0, 1, 0, 1, 0, 1]
 h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
+# ip = mesh.interpolation_points(p=1)
+# print("ip:", ip.shape, "\n", ip)
+# ip2 = mesh.interpolation_points(p=2)
+# print("ip2:", ip2.shape, "\n", ip2)
 
+# mesh_text = HexahedronMesh.from_box(extent, nx=1, ny=1, nz=1)
+# ip_text = mesh_text.interpolation_points(p=1)
+# print("ip_text:", ip_text.shape, "\n", ip_text)
 
-edge2ipoint = mesh.edge_to_ipoint(p=1)
-print("edge2ipoint:", edge2ipoint.shape, "\n", edge2ipoint)
-face2cell = mesh.face_to_cell()
-print("face2cell:", face2cell.shape, "\n", face2cell)
-face2edge = mesh.face_to_edge()
-print("face2edge:", face2edge.shape, "\n", face2edge)
-face2ipoint = mesh.face_to_ipoint(p=1)
-print("face2ipoint:", face2ipoint.shape, "\n", face2ipoint)
-# face2ipoint_test = mesh.face_to_ipoint_test(p=1)
-# print("face2ipoint_test:", face2ipoint_test.shape, "\n", face2ipoint_test)
 # import matplotlib.pyplot as plt
 
 # fig = plt.figure()
 # axes = fig.add_subplot(111, projection='3d')
 # mesh.add_plot(axes)
+# mesh.find_node(axes, node=ip2, showindex=True)
+# # mesh.find_edge(axes, showindex=True)
+# # mesh.find_face(axes, showindex=True)
+# # mesh.find_cell(axes, showindex=True)
+# plt.show()
+# asd
+
+
+
+edge2ipoint = mesh.edge_to_ipoint(p=2)
+print("edge2ipoint:", edge2ipoint.shape, "\n", edge2ipoint)
+# face2cell = mesh.face_to_cell()
+# print("face2cell:", face2cell.shape, "\n", face2cell)
+# face2edge = mesh.face_to_edge()
+# print("face2edge:", face2edge.shape, "\n", face2edge)
+# print("node:", mesh.entity('node'))
+# print("face:", mesh.entity('face'))
+# print("cell:", mesh.entity('cell'))
+# print("face2cell:", mesh.face_to_cell().shape, "\n", mesh.face_to_cell())
+face2ipoint = mesh.face_to_ipoint(p=2)
+print("face2ipoint:", face2ipoint.shape, "\n", face2ipoint)
+cell2ipoint = mesh.cell_to_ipoint(p=2)
+print("cell2ipoint:", cell2ipoint.shape, "\n", cell2ipoint)
+print("node_hex:", mesh_text.entity('node'))
+print("face_hex:", mesh_text.entity('face'))
+print("cell_hex:", mesh_text.entity('cell'))
+face2ipoint_hex = mesh_text.face_to_ipoint(p=2)
+print("face2ipoint_hex:", face2ipoint_hex.shape, "\n", face2ipoint_hex)
+cell2ipoint_hex = mesh_text.cell_to_ipoint(p=2)
+print("cell2ipoint_hex:", cell2ipoint_hex.shape, "\n", cell2ipoint_hex)
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+# mesh.add_plot(axes)
 # mesh.find_node(axes, showindex=True)
 # mesh.find_edge(axes, showindex=True)
 # mesh.find_face(axes, showindex=True)
 # mesh.find_cell(axes, showindex=True)
+mesh_text.add_plot(axes)
+mesh_text.find_node(axes, showindex=True)
+mesh_text.find_edge(axes, showindex=True)
+mesh_text.find_face(axes, showindex=True)
+mesh_text.find_cell(axes, showindex=True)
 
-# plt.show()
-
+plt.show()
+asd
 maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 import numpy as np
@@ -100,7 +137,7 @@ for i in range(maxit):
     bform_dependent = BilinearForm(tensor_space)
     bform_dependent.add_integrator(integrator_bi_dependent)
     K_dependent = bform_dependent.assembly()
-    asd
+
     
     integrator_li = VectorSourceIntegrator(source=source, q=5)
     integrator_li_old = VectorSourceIntegrator_old(f=source, q=5)

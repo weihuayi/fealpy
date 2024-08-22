@@ -56,6 +56,7 @@ class BilinearForm(Form):
             spshape = sparse_shape
         )
 
+
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
             ue2dof = e2dofs[0]
@@ -133,6 +134,6 @@ class BilinearForm(Form):
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
             gu = u[..., ue2dof] # (..., NC, uldof)
             gv = bm.einsum(f'{gt_subs}, {gu_subs} -> {out_subs}', group_tensor, gu)
-            v = bm.index_add_(v, -1, ve2dof.reshape(-1), gv.reshape(gv_reshape))
+            v = bm.index_add(v, -1, ve2dof.reshape(-1), gv.reshape(gv_reshape))
 
         return v

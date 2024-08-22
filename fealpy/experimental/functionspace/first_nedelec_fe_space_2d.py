@@ -4,8 +4,8 @@ from typing import Union, TypeVar, Generic, Callable,Optional
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from .space import FunctionSpace
-from ..functionspace import BernsteinFESpace  
-
+from .bernstein_fe_space import BernsteinFESpace  
+from .function import Function
 
 from scipy.sparse import csr_matrix
 from ..mesh.mesh_base import Mesh
@@ -76,7 +76,7 @@ class FirstNedelecDof2d():
         return self.cell_to_dof()
 
     def boundary_dof(self):
-        eidx = self.mesh.boundary_edge_index()
+        eidx = self.mesh.boundary_face_index()
         e2d = self.edge_to_dof(index=eidx)
         return e2d.reshape(-1)
 
@@ -90,7 +90,7 @@ class FirstNedelecDof2d():
         return flag
 
 
-class FirstNedelecFiniteElementSpace2d():
+class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
@@ -103,7 +103,7 @@ class FirstNedelecFiniteElementSpace2d():
         self.itype = mesh.itype
 
     @barycentric
-    def basis(self, bcs):
+    def basis(self, bcs, index=_S):
         p = self.p
         mesh = self.mesh
         NC = mesh.number_of_cells()    
@@ -140,7 +140,7 @@ class FirstNedelecFiniteElementSpace2d():
             v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None])
             val[..., eldof*3:eldof*3+cldof//2, :] = v0*phi[..., None] 
             val[..., eldof*3+cldof//2:, :] = v1*phi[..., None] 
-        return val
+        return val[index]
 
     def cross2d(self,a,b):
         return a[...,0]*b[...,1] - a[...,1]*b[...,0]
@@ -200,7 +200,8 @@ class FirstNedelecFiniteElementSpace2d():
             val[..., eldof*3+cldof//2:] = self.cross2d(gphi, v1) + phi*cv1 
         return val
 
-
+    def is_boundary_dof(self, threshold=None):
+        return self.dof.is_boundary_dof()
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -310,6 +311,23 @@ class FirstNedelecFiniteElementSpace2d():
         vec = bm.zeros(gdof, dtype=self.ftype)
         bm.scatter_add(vec, c2d.reshape(-1), val.reshape(-1))
         return vec
+
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+        p = self.p
+        mesh = self.mesh
+        ldof = p+1
+        gdof = self.number_of_global_dofs()
+
+        index = self.mesh.boundary_face_index()
+
+        edge2dof = self.dof.edge_to_dof()[index]
+        uh[edge2dof] = 0
+
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        isDDof[edge2dof] = True
+        return isDDof
+
+    boundary_interpolate = set_dirichlet_bc
     
     # def projection(self, f, method="L2"):
     #     M = self.mass_matrix()

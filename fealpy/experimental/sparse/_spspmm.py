@@ -21,7 +21,6 @@ def spspmm_coo(indices1: _DT, values1: _DT, spshape1: _Size,
                indices2: _DT, values2: _DT, spshape2: _Size) -> Tuple[_DT, _DT, _Size]:
     _shape_check(spshape1, spshape2)
 
-
     structure = values1.shape[:-1]
     if values2.shape[:-1] != structure:
         raise ValueError(f"the dense shape of matrix2 ({values2.shape[:-1]}) "
@@ -41,6 +40,7 @@ def spspmm_coo(indices1: _DT, values1: _DT, spshape1: _Size,
 
         if not bm.any(right_row_flag, axis=0):
             continue
+
         row = indices1[0, left_col_flag]
         col = indices2[1, right_row_flag]
         nnz = col.shape[0] * row.shape[0]
@@ -103,7 +103,7 @@ def spspmm_csr(crow1: _DT, col1: _DT, values1: _DT, spshape1: _Size,
 
     unique_indices, inverse_indices = bm.unique(indices, return_inverse=True, axis=1)
     new_values = bm.zeros(unique_indices.shape[1])
-    new_values = bm.index_add_(new_values, -1, inverse_indices,values)
+    new_values = bm.index_add(new_values, inverse_indices, values, axis=-1)
 
     for x in unique_indices[0,:]:
         new_crow[x+1]+=1

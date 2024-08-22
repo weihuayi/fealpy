@@ -22,8 +22,8 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh: _MT, p, q=None, spacetype='C'):
         self.mesh = mesh
         self.p = p
-        self.cellmeasure = mesh.entity_measure('cell')
-        self.dof = mesh.lagrange_dof(p, spacetype=spacetype)
+        self.cellmeasure = mesh.cell_area()
+        self.dof = LinearMeshCFEDof(mesh, p)
         self.multi_index_matrix = mesh.multi_index_matrix
 
         self.GD = mesh.geo_dimension()
@@ -117,7 +117,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         return val
 
     @barycentric
-    def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S):
+    def grad_value(self, uh: TensorLike, bc: TensorLike, index:Index=_S):
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1

@@ -429,7 +429,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             bcs0 = bcs[0].reshape(-1, 2)
             bcs1 = bcs[1].reshape(-1, 2)
             bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
-            temp = node[cell[:]]
             p = bm.einsum('qj, cjk -> cqk', bcs, node[cell[:]])
         else:
             edge = self.entity('edge', index=index)

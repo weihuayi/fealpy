@@ -15,6 +15,7 @@ except ImportError:
                       'the PyTorch backend in fealpy. '
                       'See https://pytorch.org/ for installation.')
 
+from .. import logger
 from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 
 Tensor = torch.Tensor
@@ -34,6 +35,25 @@ def _dims_to_axes(func):
         return func(*args, dims=axes, **kwargs)
     return wrapper
 
+def _axis_keepdims_dispatch(func, **defaults):
+    if len(defaults) > 0:
+        def wrapper(*args, **kwargs):
+            if 'axis' in kwargs:
+                kwargs['dim'] = kwargs.pop('axis')
+            if 'keepdims' in kwargs:
+                kwargs['keepdim'] = kwargs.pop('keepdims')
+            defaults.update(kwargs)
+            kwargs = defaults
+            return func(*args, **kwargs)
+    else:
+        def wrapper(*args, **kwargs):
+            if 'axis' in kwargs:
+                kwargs['dim'] = kwargs.pop('axis')
+            if 'keepdims' in kwargs:
+                kwargs['keepdim'] = kwargs.pop('keepdims')
+            return func(*args, **kwargs)
+    return wrapper
+
 
 class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
@@ -49,14 +69,19 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         torch.set_default_device(device)
 
     @staticmethod
-    def get_device(tensor_like: Tensor, /):
-        return tensor_like.device
+    def device_type(tensor_like: Tensor, /): return tensor_like.device.type
+
+    @staticmethod
+    def device_index(tensor_like: Tensor, /): return tensor_like.device.index
 
     @staticmethod
     def to_numpy(tensor_like: Tensor, /) -> Any:
         return tensor_like.detach().cpu().numpy()
 
-    from_numpy = torch.from_numpy
+    from_numpy = staticmethod(torch.from_numpy)
+
+    @staticmethod
+    def tolist(tensor: Tensor, /): return tensor.tolist()
 
     ### Creation Functions ###
     # python array API standard v2023.12
@@ -98,6 +123,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return x.to(dtype=dtype, device=device, copy=copy)
 
     ### Element-wise Functions ###
+    @staticmethod # NOTE: PyTorch's build-in equal is actually `all(equal(x1, x2))`
+    def equal(x1, x2, /): return x1 == x2
 
     ### Indexing Functions ###
 
@@ -149,13 +176,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ### Searching Functions ###
     # python array API standard v2023.12
-    @staticmethod
-    def argmax(x, /, *, axis=None, keepdims=False):
-        return torch.argmax(x, dim=axis, keepdim=keepdims)
-
-    @staticmethod
-    def argmin(x, /, *, axis=None, keepdims=False):
-        return torch.argmin(x, dim=axis, keepdim=keepdims)
+    argmax = staticmethod(_axis_keepdims_dispatch(torch.argmax))
+    argmin = staticmethod(_axis_keepdims_dispatch(torch.argmin))
 
     @staticmethod
     def nonzero(x, /):
@@ -239,9 +261,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             return torch.max(x)
         return torch.max(x, axis, keepdim=keepdims)[0]
 
-    @staticmethod
-    def mean(x, /, *, axis=None, keepdims=False):
-        return torch.mean(x, axis, keepdim=keepdims)
+    mean = staticmethod(_axis_keepdims_dispatch(torch.mean))
 
     @staticmethod
     def min(x, /, *, axis=None, keepdims=False):
@@ -249,23 +269,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             return torch.min(x)
         return torch.min(x, axis, keepdim=keepdims)[0]
 
-    @staticmethod
-    def prod(x, /, *, axis=None, dtype=None, keepdims=False, initial=None):
-        result = torch.prod(x, dim=axis, keepdim=keepdims, dtype=dtype)
-        return result if (initial is None) else result * initial
-
-    @staticmethod
-    def std(x, /, *, axis=None, correction=0, keepdims=False):
-        return torch.std(x, dim=axis, keepdim=keepdims, correction=correction)
-
-    @staticmethod
-    def sum(x, /, *, axis=None, dtype=None, keepdims=False, initial=None):
-        result = torch.sum(x, dim=axis, keepdim=keepdims, dtype=dtype)
-        return result if (initial is None) else result + initial
-
-    @staticmethod
-    def var(x, /, *, axis=None, correction=0, keepdims=False):
-        return torch.var(x, dim=axis, keepdim=keepdims, correction=correction)
+    prod = staticmethod(_axis_keepdims_dispatch(torch.prod))
+    std = staticmethod(_axis_keepdims_dispatch(torch.std, correction=0.))
+    sum = staticmethod(_axis_keepdims_dispatch(torch.sum))
+    var = staticmethod(_axis_keepdims_dispatch(torch.var, correction=0.))
 
     # non-standard
     cumsum = staticmethod(_dim_to_axis(torch.cumsum))
@@ -273,17 +280,8 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     ### Utility Functions ###
     # python array API standard v2023.12
-    @staticmethod
-    def all(x, /, *, axis=None, keepdims=False):
-        if axis is None:
-            return torch.all(x)
-        return torch.all(x, dim=axis, keepdim=keepdims)
-
-    @staticmethod
-    def any(x, /, *, axis=None, keepdims=False):
-        if axis is None:
-            return torch.any(x)
-        return torch.any(x, dim=axis, keepdim=keepdims)
+    all = staticmethod(_axis_keepdims_dispatch(torch.all))
+    any = staticmethod(_axis_keepdims_dispatch(torch.any))
 
     # non-standard
     @staticmethod
@@ -296,21 +294,31 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     ### Other Functions ###
 
     @staticmethod
-    def add_at(a: Tensor, indices: Tensor, src: Tensor, /):
-        a.index_add_(indices.ravel(), src.ravel())
+    def set_at(a: Tensor, indices, src, /):
+        a[indices] = src
+        return a
 
     @staticmethod
-    def index_add_(a: Tensor, /, dim, index, src, *, alpha=1):
-        return a.index_add_(dim, index, src, alpha=alpha)
+    def add_at(a: Tensor, indices, src, /):
+        logger.info("When indices are not unique, the behavior is non-deterministic "
+                    "for the PyTorch backend "
+                    "(one of the values from src will be picked arbitrarily). "
+                    "Use index_add instead for deterministic behavior.")
+        a[indices] += src
+        return a
 
     @staticmethod
-    def scatter(x, indices, val):
-        x.scatter_(0, indices, val)
+    def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
+        return a.index_add_(axis, index, src, alpha=alpha)
+
+    @staticmethod
+    def scatter(x: Tensor, index, src, /, *, axis: int=0):
+        x.scatter_(dim=axis, index=index, src=src)
         return x
 
     @staticmethod
-    def scatter_add(x, indices, val):
-        x.scatter_add_(0, indices, val)
+    def scatter_add(x: Tensor, index, src, /, *, axis: int=0):
+        x.scatter_add_(dim=axis, index=index, src=src)
         return x
 
     ### Functional programming ###
@@ -331,6 +339,39 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if axis==0:
             x = torch.transpose(x)
         return vmap(func1d)(x)
+
+    ### Sparse Functions ###
+
+    @staticmethod
+    def coo_spmm(indices, values, shape, other):
+        if values.ndim == 1:
+            mat = torch.sparse_coo_tensor(indices, values, size=shape)
+            return PyTorchBackend._spmm(mat, other)
+        else:
+            raise NotImplementedError("Batch sparse matrix multiplication has "
+                                      "not been supported yet.")
+
+    @staticmethod
+    def csr_spmm(crow, col, values, shape, other):
+        if values.ndim == 1:
+            mat = torch.sparse_csr_tensor(crow, col, values, size=shape)
+            return PyTorchBackend._spmm(mat, other)
+        else:
+            raise NotImplementedError("Batch sparse matrix multiplication has "
+                                      "not been supported yet.")
+
+    @staticmethod
+    def _spmm(mat, other):
+        if other.ndim == 1:
+            return torch.sparse.mm(mat, other[:, None])[:, 0]
+        else:
+            return torch.sparse.mm(mat, other)
+
+    @staticmethod
+    def coo_tocsr(indices, values, shape):
+        mat = torch.sparse_coo_tensor(indices, values, size=shape)
+        mat = mat.to_sparse_csr()
+        return mat.crow_indices(), mat.col_indices(), mat.values()
 
     ### FEALPy functionals ###
 

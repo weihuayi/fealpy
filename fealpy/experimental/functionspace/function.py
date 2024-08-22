@@ -1,5 +1,6 @@
 
 from typing import Generic, Union, TypeVar
+from functools import partial
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike, Number
@@ -9,7 +10,7 @@ _FS = TypeVar('_FS')
 
 
 class Function(Generic[_FS]):
-    def __init__(self, space: _FS, array: TensorLike, coordtype) -> None:
+    def __init__(self, space: _FS, array: TensorLike, coordtype: str) -> None:
         self.space = space
         self.array = array
         self.coordtype = coordtype
@@ -30,12 +31,17 @@ class Function(Generic[_FS]):
             self.array[index] = value
 
     def __getattr__(self, item: str):
-        if item in {'space', 'array'}:
+        if item in {'space', 'array', 'coordtype'}:
             return object.__getattribute__(self, item)
 
-        if item.endswith('value'):
-            if hasattr(self.space, item):
-                return getattr(self.space, item)
+        if item.endswith('value') and hasattr(self.space, item):
+            attr = getattr(self.space, item)
+            if callable(attr):
+                func = partial(attr, self.array)
+                func.coordtype = attr.coordtype
+                return func 
+            else:
+                return attr
 
         return getattr(self.array, item)
 
@@ -46,7 +52,7 @@ class Function(Generic[_FS]):
         return self.__class__(self.space, -self.array)
 
     def __add__(self, other: Union[TensorLike, Number]):
-        return self.__class__(self.space, self.array + other)
+        return self.__class__(self.space, self.array + other, self.coordtype)
     __radd__ = __add__
 
     def __iadd__(self, other: Union[TensorLike, Number]):

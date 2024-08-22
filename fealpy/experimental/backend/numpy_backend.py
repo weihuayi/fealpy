@@ -7,6 +7,7 @@ from itertools import combinations_with_replacement
 import numpy as np
 from numpy.typing import NDArray
 from numpy.linalg import det
+from scipy.sparse._sparsetools import coo_matvec, csr_matvec, csr_matvecs, coo_tocsr
 
 from .base import (
     Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
@@ -28,8 +29,10 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         raise NotImplementedError("`set_default_device` is not supported by NumPyBackend")
 
     @staticmethod
-    def get_device(tensor_like, /):
-        return 'cpu'
+    def device_type(tensor_like, /): return 'cpu'
+
+    @staticmethod
+    def device_index(tensor_like, /): return 0
 
     @staticmethod
     def to_numpy(tensor_like: NDArray, /) -> NDArray:
@@ -39,47 +42,54 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     def from_numpy(ndarray: NDArray, /) -> NDArray:
         return ndarray
 
+    @staticmethod
+    def tolist(tensor: NDArray, /): return tensor.tolist()
+
     ### Tensor creation methods ###
     # NOTE: all copied
 
     ### Reduction methods ###
     # NOTE: all copied
+    @staticmethod
+    def sum(x, /, *, axis=None, dtype=None, keepdims=False):
+        return np.add.reduce(x, axis=axis, dtype=dtype, keepdims=keepdims)
 
     ### Unary methods ###
     # NOTE: all copied
 
     ### Binary methods ###
 
-    add_at = staticmethod(np.add.at)
+    ### Other methods ###
 
     @staticmethod
-    def index_add_(a: NDArray, /, dim, index, src, *, alpha=1):
+    def einsum(*args, **kwargs):
+        return np.einsum(*args, **kwargs, optimize=True)
+
+    @staticmethod
+    def set_at(a: NDArray, indices, src, /) -> NDArray:
+        a[indices] = src
+        return a
+
+    @staticmethod
+    def add_at(a: NDArray, indices, src, /) -> NDArray:
+        np.add.at(a, indices, src)
+        return a
+
+    @staticmethod
+    def index_add(a: NDArray, index, src, /, *, axis=0, alpha=1):
         assert index.ndim == 1
         indexing = [slice(None)] * a.ndim
-        indexing[dim] = index
+        indexing[axis] = index
         np.add.at(a, tuple(indexing), alpha*src)
         return a
 
-    ### Other methods ###
-
-    @classmethod
-    def nonzero(cls, a, /, as_tuple=True):
-        cls.show_unsupported(not as_tuple, 'nonzero', 'as_tuple')
-        return np.nonzero(a)
+    @staticmethod
+    def scatter(x, indices, val, /, *, axis=0):
+        raise NotImplementedError
 
     @staticmethod
-    def scatter(x, indices, val):
-        """
-        """
-        x[indices] = val
-        return x
-
-    @staticmethod
-    def scatter_add(x, indices, val):
-        """
-        """
-        np.add.at(x, indices, val)
-        return x
+    def scatter_add(x, indices, val, /, *, axis=0):
+        raise NotImplementedError
 
     @staticmethod
     def unique_all_(a, axis=None, **kwargs):
@@ -93,6 +103,66 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         indices1 = np.zeros_like(indices0)
         indices1[inverse] = range(inverse.shape[0]);
         return b, indices0, indices1, inverse, counts
+
+    ### Sparse Functions ###
+
+    @staticmethod
+    def coo_spmm(indices, value, shape, other):
+        nnz = value.shape[-1]
+        row = indices[0]
+        col = indices[1]
+
+        if value.ndim == 1:
+            if other.ndim == 1:
+                result = np.zeros((shape[0],), dtype=other.dtype)
+                coo_matvec(nnz, row, col, value, other, result)
+                return result
+            elif other.ndim == 2:
+                new_shape = (shape[0], other.shape[-1])
+                result = np.zeros(new_shape, dtype=other.dtype)
+                rT = result.T
+                for i, acol in enumerate(other.T):
+                    coo_matvec(nnz, row, col, value, acol, rT[i])
+                return result
+            else:
+                raise ValueError("`other` must be a 1-D or 2-D array.")
+        else:
+            raise NotImplementedError("Batch sparse matrix multiplication has "
+                                      "not been supported yet.")
+
+    @staticmethod
+    def csr_spmm(crow, col, value, shape, other):
+        M, N = shape
+
+        if value.ndim == 1:
+            if other.ndim == 1:
+                result = np.zeros((shape[0],), dtype=other.dtype)
+                csr_matvec(M, N, crow, col, value, other, result)
+                return result
+            elif other.ndim == 2:
+                n_vecs = other.shape[-1]
+                new_shape = (shape[0], other.shape[-1])
+                result = np.zeros(new_shape, dtype=other.dtype)
+                csr_matvecs(M, N, n_vecs, crow, col, value, other.ravel(), result.ravel())
+                return result
+            else:
+                raise ValueError("`other` must be a 1-D or 2-D array.")
+        else:
+            raise NotImplementedError("Batch sparse matrix multiplication has "
+                                      "not been supported yet.")
+
+    @staticmethod
+    def coo_tocsr(indices, values, shape):
+        M, N = shape
+        idx_dtype = indices.dtype
+        major, minor = indices
+        nnz = len(values)
+        crow = np.empty(M+1, dtype=idx_dtype)
+        col = np.empty_like(minor, dtype=idx_dtype)
+        data = np.empty_like(values, dtype=values.dtype)
+        coo_tocsr(M, N, nnz, major, minor, values, crow, col, data)
+
+        return crow, col, data
 
     ### FEALPy methods ###
 

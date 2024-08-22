@@ -4,6 +4,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 
+from .utils import simplex_gdof, simplex_ldof
 from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
 
@@ -33,6 +34,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         self.celldata = {}
         self.meshdata = {}
 
+    face_unit_normal = SimplexMesh.edge_unit_normal
 
     # entity
     def entity_measure(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
@@ -116,14 +118,14 @@ class TriangleMesh(SimplexMesh, Plotable):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return bm.simplex_ldof(p, iptype)
+        return simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
         num = (NN, NE, NC)
-        return bm.simplex_gdof(p, num)
+        return simplex_gdof(p, num)
     
     def interpolation_points(self, p: int, index: Index=_S):
         """Fetch all p-order interpolation points on the triangle mesh."""
@@ -240,26 +242,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         v = node[edge[:, 1], :] - node[edge[:, 0], :]
         length = bm.sqrt(bm.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
-
-    
-    def edge_normal(self, index: Index=_S):
-        """
-        @brief 计算二维网格中每条边上单位法线
-        """
-        assert self.geo_dimension() == 2
-        v = self.edge_tangent(index=index)
-        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
-        return v@w
-    def edge_unit_normal(self, index: Index=_S):
-        """
-        @brief 计算二维网格中每条边上单位法线
-        """
-        assert self.geo_dimension() == 2
-        v = self.edge_unit_tangent(index=index)
-        w = bm.array([[0, -1], [1, 0]], dtype=self.ftype)
-        return v@w
-
-
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """

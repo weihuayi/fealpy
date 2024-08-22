@@ -9,8 +9,6 @@ from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
 from .plot import Plotable
-from .plot import Plotable
-
 
 class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
@@ -61,11 +59,11 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
      |  /   4  |  /
      | /       | /
       --------- 
-    * Face 0: (1, 0, 3, 2)
+    * Face 0: (0, 1, 2, 3)
     * Face 1: (4, 5, 6, 7)
     * Face 2: (0, 1, 4, 5)
-    * Face 3: (3, 2, 7, 6)
-    * Face 4: (2, 0, 6, 4)
+    * Face 3: (2, 3, 6, 7)
+    * Face 4: (0, 2, 4, 6)
     * Face 5: (1, 3, 5, 7)
 
     The ordering of entities in the entire mesh is as follows:
@@ -113,11 +111,22 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
         self.cell2edge = self.cell_to_edge()
+        self.cell2face = self.cell_to_face()
+        self.face2edge = self.face_to_edge()
         self.face2cell = self.face_to_cell()
+
+        self.localEdge = bm.array([
+        (0, 4), (1, 5), (2, 6), (3, 7),
+        (0, 2), (1, 3), (4, 6), (5, 7),
+        (0, 1), (2, 3), (4, 5), (6, 7)], dtype=self.itype)
+        self.localFace = bm.array([
+        (0, 1, 2, 3), (4, 5, 6, 7),  # left and right faces
+        (0, 1, 4, 5), (2, 3, 6, 7),  # front and back faces
+        (0, 2, 4, 6), (1, 3, 5, 7)], dtype=self.itype)  # bottom and top faces
         self.localFace2edge = bm.array([
         (4, 5, 8, 9), (6, 7, 10, 11),
         (0, 1, 8, 10), (2, 3, 9, 11),
-        (0, 2, 4, 6), (1, 3, 5, 7)])
+        (0, 2, 4, 6), (1, 3, 5, 7)], dtype=self.itype)
 
 
     # 实体生成方法
@@ -215,6 +224,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # TODO: Provide a unified implementation that is not backend-specific
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # TODO 为什么要将 face 转一个方向？
             NF0 = 0
             NF1 = (nx + 1) * ny * nz
             c = idx[:, :-1, :-1]
@@ -222,7 +232,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
             face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
             face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
-            face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
+            # face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
 
             NF0 = NF1
             NF1 += nx * (ny + 1) * nz
@@ -237,7 +247,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx1 = bm.arange(NF2, NF2 + nz)
             idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx1 = idx1.flatten()
-            face[idx1] = face[idx1][:, [1, 0, 3, 2]]
+            # face[idx1] = face[idx1][:, [1, 0, 3, 2]]
 
             NF0 = NF1
             NF1 += nx * ny * (nz + 1)
@@ -251,7 +261,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
             idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx2 = idx2.flatten()
-            face[idx2] = face[idx2][:, [1, 0, 3, 2]]
+            # face[idx2] = face[idx2][:, [1, 0, 3, 2]]
 
             return face
         elif bm.backend_name == 'jax':
@@ -262,7 +272,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face = face.at[NF0:NF1, 1].set(face[NF0:NF1, 0] + 1)
             face = face.at[NF0:NF1, 2].set(face[NF0:NF1, 0] + nz + 1)
             face = face.at[NF0:NF1, 3].set(face[NF0:NF1, 2] + 1)
-            face = face.at[NF0:NF0 + ny * nz, :].set(face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
+            # face = face.at[NF0:NF0 + ny * nz, :].set(face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
 
             NF0 = NF1
             NF1 += nx * (ny + 1) * nz
@@ -277,7 +287,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx1 = bm.arange(NF2, NF2 + nz)
             idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx1 = idx1.flatten()
-            face = face.at[idx1].set(face[idx1][:, [1, 0, 3, 2]])
+            # face = face.at[idx1].set(face[idx1][:, [1, 0, 3, 2]])
 
             NF0 = NF1
             NF1 += nx * ny * (nz + 1)
@@ -291,7 +301,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
             idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx2 = idx2.flatten()
-            face = face.at[idx2].set(face[idx2][:, [1, 0, 3, 2]])
+            # face = face.at[idx2].set(face[idx2][:, [1, 0, 3, 2]])
 
             return face
         else:
@@ -337,7 +347,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         @brief 单元和边的邻接关系, 储存每个单元相邻的 12 条边的编号
         """
         NC = self.NC
-        NE = self.NE
 
         nx = self.nx
         ny = self.ny
@@ -390,6 +399,61 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             cell2edge = cell2edge.at[:, 11].set((NE1 + idx2[1:, 1:, :]).flatten())
 
             return cell2edge
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
+    def cell_to_face(self):
+        """
+        @brief 单元和面的邻接关系, 储存每个单元相邻的六个面的编号
+        """
+        NC = self.NC
+        NF = self.NF
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+
+        cell2face = bm.zeros((NC, 6), dtype=self.itype)
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            # x direction
+            idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
+            cell2face[:, 0] = idx0[:-1, :, :].flatten()
+            cell2face[:, 1] = idx0[1:, :, :].flatten()
+
+            # y direction
+            NE0 = (nx + 1) * ny * nz
+            idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
+            cell2face[:, 2] = (NE0 + idx1[:, :-1, :]).flatten()
+            cell2face[:, 3] = (NE0 + idx1[:, 1:, :]).flatten()
+
+            # z direction
+            NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
+            idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
+            cell2face[:, 4] = (NE1 + idx2[:, :, :-1]).flatten()
+            cell2face[:, 5] = (NE1 + idx2[:, :, 1:]).flatten()
+
+            return cell2face
+        elif bm.backend_name == 'jax':
+            # x direction
+            idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
+            cell2face = cell2face.at[:, 0].set(idx0[:-1, :, :].flatten())
+            cell2face = cell2face.at[:, 1].set(idx0[1:, :, :].flatten())
+
+            # y direction
+            NE0 = (nx + 1) * ny * nz
+            idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
+            cell2face = cell2face.at[:, 2].set((NE0 + idx1[:, :-1, :]).flatten())
+            cell2face = cell2face.at[:, 3].set((NE0 + idx1[:, 1:, :]).flatten())
+
+            # z direction
+            NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
+            idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
+            cell2face = cell2face.at[:, 4].set((NE1 + idx2[:, :, :-1]).flatten())
+            cell2face = cell2face.at[:, 5].set((NE1 + idx2[:, :, 1:]).flatten())
+
+            return cell2face
         else:
             raise NotImplementedError("Backend is not yet implemented.")
         
@@ -483,6 +547,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     def face_to_cell(self) -> TensorLike:
         """
         @brief 面和单元的邻接关系, 储存每个面相邻的 2 个单元的编号
+        Notes:
+        - The first and second columns store the indices of the left and right cells adjacent to each face. 
+        When the two indices are the same, it indicates that the face is a boundary face.
+        - The third and fourth columns store the local indices of the face in the left and right cells, respectively.
         """
         nx = self.nx
         ny = self.ny
@@ -594,7 +662,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> Union[Tuple, int]:
         """
         @brief Get the measure of the entities of the specified type.
-        TODO:按照 2D 的情况修改
         """
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
@@ -785,7 +852,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         to Cartesian coordinates on the actual mesh entities.
 
         Returns
-            TensorLike: (NQ, NC, GD) or (NQ, NE, GD)
+            TensorLike: (NC, NQ, GD), (NF, NQ, GD) or (NE, NQ, GD)
         """
         node = self.entity('node')
         if isinstance(bcs, tuple) and len(bcs) == 3:
@@ -796,7 +863,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             bcs2 = bcs[2].reshape(-1, 2)
             bcs = bm.einsum('im, jn, ko -> ijkmno', bcs0, bcs1, bcs2).reshape(-1, 8)
 
-            p = bm.einsum('...j, cjk -> ...ck', bcs, node[cell[:]])
+            p = bm.einsum('qj, cjk -> cqk', bcs, node[cell[:]])
         elif isinstance(bcs, tuple) and len(bcs) == 2:
             face = self.entity('face', index)
 
@@ -804,41 +871,38 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             bcs1 = bcs[1].reshape(-1, 2)
             bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
 
-            p = bm.einsum('...j, cjk -> ...ck', bcs, node[face[:]])
+            p = bm.einsum('qj, fjk -> fqk', bcs, node[face[:]])
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('...j, ejk -> ...ek', bcs, node[edge]) 
+            p = bm.einsum('qj, ejk -> eqk', bcs, node[edge]) 
 
         return p 
     
         
     # 插值点
-    def interpolation_points(self, p):
-        cell = self.cell
-        face = self.face
-        edge = self.edge
-        node = self.entity('node')
+    def interpolation_points(self, p: int, index: Index=_S):
+        """
+        @brief Generate all interpolation points of the mesh
+        TODO Provide an efficient implementation that is distinct from unstructured meshes
+        """
+        c2ip = self.cell_to_ipoint(p)
+        gp = self.number_of_global_ipoints(p)
+        ipoint = bm.zeros([gp, 3], dtype=self.ftype)
 
-        GD = self.geo_dimension()
-        if p <= 0:
-            raise ValueError("p must be an integer larger than 0.")
-        if p == 1:
-            return node.reshape(-1, GD)
+        line = (bm.linspace(0, 1, p+1, endpoint=True, dtype=self.ftype)).reshape(-1, 1)
+        line = bm.concatenate([1-line, line], axis=1)
+        bcs = (line, line, line)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name in ['numpy', 'pytorch']:
-            pass
-        elif bm.backend_name == 'jax':
-            pass
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-        # TODO: Implement the interpolation points for p > 1
-        raise NotImplementedError("Interpolation points for p > 1 are not yet implemented for 3D structured meshes.")
+        cip = self.bc_to_point(bcs)
+        ipoint[c2ip] = cip
+
+        return ipoint
 
     def face_to_ipoint(self, p, index=None):
         """
-        @brief 生成每个面上的插值点全局编号
-        TODO wrong!!!
+        @brief 生成每个面上的插值点的全局编号
+        TODO Provide an efficient implementation that is distinct from 
+            unstructured meshes
         """
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -855,24 +919,132 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         dofidx = [0 for i in range(4)] 
         dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
-        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
-        dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
-        dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
+        dofidx[1], = bm.nonzero(multiIndex[:, 1]==p)
+        dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
+        dofidx[3], = bm.nonzero(multiIndex[:, 0]==p)
 
         face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
-        # localEdge = bm.array([[0, 1], [1, 2], [2, 3], [0, 3]], dtype=self.itype)
         localEdge = bm.array([[0, 2], [1, 3], [0, 1], [2, 3]], dtype=self.itype)
-        for i in range(4): #边上的自由度
-            ge = face2edge[:, i]
-            idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            for i in range(4): #边上的自由度
+                ge = face2edge[:, i]
+                idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
 
-            face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
-            face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
+                face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
+                face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
 
-        indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
-        face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
-                NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
-        return face2ipoint
+            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+            face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
+                    NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
+            
+            return face2ipoint
+        elif bm.backend_name == 'jax':
+            for i in range(4):
+                ge = face2edge[:, i]
+                idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+
+                face2ipoint = face2ipoint.at[:, dofidx[i]].set(edge2ipoint[ge])
+                face2ipoint = face2ipoint.at[idx[:, None], dofidx[i]].set(bm.flip(edge2ipoint[ge[idx]], axis=1))
+
+            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+            face2ipoint = face2ipoint.at[:, indof].set(bm.arange(NN+NE*(p-1),
+                    NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1))
+            
+            return face2ipoint
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+    
+    def cell_to_ipoint(self, p, index=_S):
+        """
+        @brief 生成每个单元上的插值点的全局编号
+        TODO Provide an efficient implementation that is distinct from 
+            unstructured meshes
+        """
+
+        cell = self.entity('cell', index=index)
+        if p == 1:
+            return cell[:]
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        cell2face = self.cell_to_face()
+        face2edge = self.face_to_edge()
+        cell2edge = self.cell_to_edge()
+
+        face2ipoint = self.face_to_ipoint(p)
+
+        shape = (p+1, p+1, p+1)
+        mi    = bm.arange(p+1)
+        multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
+        multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
+        multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
+
+        multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
+
+        dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
+
+        dofidx[4], = bm.nonzero(multiIndex[:, 2]==0)
+        dofidx[5], = bm.nonzero(multiIndex[:, 2]==p)
+        dofidx[0], = bm.nonzero(multiIndex[:, 0]==0)
+        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
+        dofidx[2], = bm.nonzero(multiIndex[:, 1]==0)
+        dofidx[3], = bm.nonzero(multiIndex[:, 1]==p)
+
+
+        cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
+        lf2e = bm.array([[4, 9, 5, 8], [6, 11, 7, 10],
+                         [0, 10, 1, 8], [2, 11, 3, 9],
+                         [0, 6, 2, 4], [1, 7, 3, 5]], dtype=self.itype)
+
+        multiIndex2d = multiIndex[:(p+1)**2, 1:]
+        multiIndex2d = bm.concatenate([multiIndex2d, p-multiIndex2d], axis=-1)
+
+        lf2e = lf2e[:, [3, 0, 1, 2]]
+        face2edge = face2edge[:, [2, 0, 3, 1]]
+
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            for i in range(6): #面上的自由度
+                gfe = face2edge[cell2face[:, i]]
+                lfe = cell2edge[:, lf2e[i]]
+                idx0 = bm.argsort(gfe, axis=-1)
+                idx1 = bm.argsort(lfe, axis=-1)
+                idx1 = bm.argsort(idx1, axis=-1)
+                idx0 = idx0[bm.arange(NC)[:, None], idx1] #(NC, 4)
+                idx = multiIndex2d[:, idx0].swapaxes(0, 1) #(NC, NQ, 4)
+
+                idx = idx[..., 0]*(p+1)+idx[..., 1]
+                cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
+
+            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+            cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
+                    NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+            
+            return cell2ipoint[index]
+        elif bm.backend_name == 'jax':
+            for i in range(6):
+                gfe = face2edge[cell2face[:, i]]
+                lfe = cell2edge[:, lf2e[i]]
+                idx0 = bm.argsort(gfe, axis=-1)
+                idx1 = bm.argsort(lfe, axis=-1)
+                idx1 = bm.argsort(idx1, axis=-1)
+                idx0 = idx0[bm.arange(NC)[:, None], idx1]
+                idx = multiIndex2d[:, idx0].swapaxes(0, 1)
+
+                idx = idx[..., 0]*(p+1)+idx[..., 1]
+                cell2ipoint = cell2ipoint.at[:, dofidx[i]].set(face2ipoint[cell2face[:, i, None], idx])
+
+            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+            cell2ipoint = cell2ipoint.at[:, indof].set(bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
+                    NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1))
+            
+            return cell2ipoint[index]
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
          
 
     # 形函数
@@ -942,6 +1114,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                     (self.nx + 1) * self.ny * self.nz
             self.NC = self.nx * self.ny * self.nz
 
+            self.cell2edge = self.cell_to_edge()
+            self.cell2face = self.cell_to_face()
+            self.face2edge = self.face_to_edge()
             self.face2cell = self.face_to_cell()
 
         self.clear()

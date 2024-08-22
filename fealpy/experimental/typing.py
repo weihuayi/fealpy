@@ -14,6 +14,8 @@ EntityName = Literal['cell', 'face', 'edge', 'node']
 _int_func = Callable[..., builtins.int]
 Barycenters = Union[Tuple[TensorLike, ...], TensorLike]
 CoefLike = Union[Number, TensorLike, Callable[..., TensorLike]]
+SourceLike = CoefLike
+Threshold = Union[TensorLike, Callable[..., TensorLike]]
 
 
 ### Constants

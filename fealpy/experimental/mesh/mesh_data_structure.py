@@ -79,8 +79,8 @@ class MeshDS(metaclass=MeshMeta):
             logger.info(f'count: entity {etype} is not found and 0 is returned.')
             return 0
 
-        if hasattr(entity, 'location'):
-            return entity.location.shape[0] - 1
+        if isinstance(entity, tuple):
+            return entity[1].shape[0] - 1
         else:
             return entity.shape[0]
 

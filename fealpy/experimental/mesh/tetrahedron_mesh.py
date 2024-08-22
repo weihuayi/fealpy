@@ -124,11 +124,12 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
         v01 = node[face[index, 1], :] - node[face[index, 0], :]
         v02 = node[face[index, 2], :] - node[face[index, 0], :]
-        nv = bm.cross(v01, v02)
+        nv = bm.cross(v01, v02, axis=1)
         length = bm.sqrt(bm.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def quadrature_formula(self, q:int, etype:Union[int, str]='cell'):
+    def quadrature_formula(self, q:int, etype:Union[int, str]='cell',
+                           qtype: str='legendre'):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
