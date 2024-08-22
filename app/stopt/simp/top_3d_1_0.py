@@ -51,7 +51,7 @@ def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
                     e2 = i2 * ny + j2
                     H[e1, e2] = max(0., rmin - bm.sqrt((i1-i2)**2 + (j1-j2)**2))
 
-    Hs = bm.sum(H, 1)
+    Hs = bm.sum(H)
 
     return H, Hs
 
@@ -80,7 +80,7 @@ def oc(rho, dce, dve, g):
 def source(points: TensorLike) -> TensorLike:
     
     val = bm.zeros(points.shape, dtype=points.dtype)
-    val[nx*ny*(nz+1), 1] = -1
+    val[nx*(ny+1)*(nz+1)+(nz+1):, 1] = -1
     
     return val
 
@@ -89,9 +89,6 @@ def dirichlet(points: TensorLike) -> TensorLike:
     return bm.zeros(points.shape, dtype=points.dtype)
 
 def is_dirichlet_boundary(points: TensorLike) -> TensorLike:
-    print("points: ", points.shape, "\n", points)
-    print("points[..., 0]: ", points[..., 0].shape, "\n", points[..., 0])
-    print("test:", (points[..., 0] == 0).shape, "\n", (points[..., 0] == 0))
 
     return points[..., 0] == 0
 
@@ -119,7 +116,7 @@ axes = fig.add_subplot(111, projection='3d')
 mesh.add_plot(axes)
 mesh.find_node(axes, showindex=True, color='r', fontsize=20)
 # mesh.find_edge(axes, showindex=True, color='g', fontsize=25)
-# mesh.find_face(axes, showindex=True, color='r', fontsize=20)
+mesh.find_face(axes, showindex=True, color='r', fontsize=20)
 mesh.find_cell(axes, showindex=True, color='b', fontsize=15)
 plt.show()
 
@@ -163,8 +160,7 @@ while change > 0.01 and loop < 2000:
     
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
     isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
-    print("isDDof: ", isDDof.shape, "\n", isDDof)   
-    asd
+    face2cell = mesh.face_to_cell()
 
     F = dbc.check_vector(F)
     uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary)

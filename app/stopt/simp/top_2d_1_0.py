@@ -119,9 +119,6 @@ def dirichlet(points: TensorLike) -> TensorLike:
     return bm.zeros(points.shape, dtype=points.dtype)
 
 def is_dirichlet_boundary(points):
-    print("points: ", points.shape, "\n", points)
-    print("points[..., 0]: ", points[..., 0].shape, "\n", points[..., 0])
-    print("test:", (points[..., 0] == 0).shape, "\n", (points[..., 0] == 0))
     return points[:, 0] == 0.0
 
 
@@ -180,9 +177,7 @@ while change > 0.01 and loop < 2000:
     
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
     isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
-    print("isDDof: ", isDDof.shape, "\n", isDDof)
     isDDofs = tensor_space.is_boundary_dof(threshold=None)
-    print("isDDofs: ", isDDofs.shape, "\n", isDDofs)
 
     F = dbc.check_vector(F)
     uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary)

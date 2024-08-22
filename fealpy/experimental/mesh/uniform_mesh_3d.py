@@ -673,7 +673,70 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         
         else:
             raise NotImplementedError("Backend is not yet implemented.")
+        
+    def boundary_node_flag(self):
+        """
+        @brief Determine if a point is a boundary point.
+        """
+        NN = self.NN
+        face = self.face
+        isBdFace = self.boundary_face_flag()
+        isBdPoint = bm.zeros((NN,), dtype=bool)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdPoint[face[isBdFace, :]] = True
+            return isBdPoint
+        elif bm.backend_name == 'jax':
+            isBdPoint = isBdPoint.at[face[isBdFace, :]].set(True)   
+            return isBdPoint
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
+    def boundary_edge_flag(self):
+        """
+        @brief Determine if an edge is a boundary edge.
+        """
+        NE = self.NE
+        face2edge = self.face_to_edge()
+        isBdFace = self.boundary_face_flag()
+        isBdEdge = bm.zeros((NE,), dtype=bool)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdEdge[face2edge[isBdFace, :]] = True
+            return isBdEdge
+        elif bm.backend_name == 'jax':
+            isBdEdge = isBdEdge.at[face2edge[isBdFace, :]].set(True)
+            return isBdEdge
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
+    def boundary_face_flag(self):
+        """
+        @brief Determine if a face is a boundary face.
+        """
+        face2cell = self.face_to_cell()
 
+        return face2cell[:, 0] == face2cell[:, 1]
+
+    def boundary_cell_flag(self):
+        """
+        @brief Determine if a cell is a boundary cell.
+        """
+        NC = self.NC
+
+        face2cell = self.face_to_cell()
+        isBdFace = self.boundary_face_flag()
+        isBdCell = bm.zeros((NC,), dtype=bool)
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            isBdCell[face2cell[isBdFace, 0]] = True
+            return isBdCell
+        elif bm.backend_name == 'jax':
+            isBdCell = isBdCell.at[face2cell[isBdFace, 0]].set(True)
+            return isBdCell
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
 
     # 实体几何
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> Union[Tuple, int]:
@@ -913,9 +976,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         cip = self.bc_to_point(bcs)
         ipoint[c2ip] = cip
 
-        return ipoint
+        return ipoint[index]
 
-    def face_to_ipoint(self, p, index=None):
+    def face_to_ipoint(self, p, index: Index=_S):
         """
         @brief 生成每个面上的插值点的全局编号
         TODO Provide an efficient implementation that is distinct from 
@@ -926,6 +989,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         NF = self.number_of_faces()
         edge = self.entity('edge')
         face = self.entity('face')
+        # edge = self.entity('edge', index=index)
+        # face = self.entity('face', index=index)
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
 
@@ -955,7 +1020,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
                     NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
             
-            return face2ipoint
+            return face2ipoint[index]
         elif bm.backend_name == 'jax':
             for i in range(4):
                 ge = face2edge[:, i]
@@ -968,20 +1033,18 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face2ipoint = face2ipoint.at[:, indof].set(bm.arange(NN+NE*(p-1),
                     NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1))
             
-            return face2ipoint
+            return face2ipoint[index]
         else:
             raise NotImplementedError("Backend is not yet implemented.")
     
-    def cell_to_ipoint(self, p, index=_S):
+    def cell_to_ipoint(self, p, index: Index=_S):
         """
         @brief 生成每个单元上的插值点的全局编号
         TODO Provide an efficient implementation that is distinct from 
             unstructured meshes
         """
-
-        cell = self.entity('cell', index=index)
         if p == 1:
-            return cell[:]
+            return self.entity('cell', index=index)
 
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -1010,7 +1073,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
         dofidx[2], = bm.nonzero(multiIndex[:, 1]==0)
         dofidx[3], = bm.nonzero(multiIndex[:, 1]==p)
-
 
         cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
         lf2e = bm.array([[4, 9, 5, 8], [6, 11, 7, 10],
@@ -1076,9 +1138,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         """
         assert isinstance(bcs, tuple)
 
-        TD = len(bcs)
         node = self.entity('node')
-        cell = self.entity('cell')
+        cell = self.entity('cell', index=index)
         gphi = self.grad_shape_function(bcs, p=1, variables='u')
         J = bm.einsum( 'cim, qin -> qcmn', node[cell[:]], gphi)
 
