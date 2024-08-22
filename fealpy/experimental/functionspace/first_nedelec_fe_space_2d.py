@@ -313,16 +313,32 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         return vec
 
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+        """
+        @brief 设置狄利克雷边界条件，使用边界上的 L2 投影
+        """
         p = self.p
         mesh = self.mesh
-        ldof = p+1
+        bspace = self.bspace
+        isbdFace = mesh.boundary_face_flag()
+        edge2dof = self.dof.edge_to_dof()[isbdFace]
+        fm = mesh.entity_measure('face')[isbdFace]
         gdof = self.number_of_global_dofs()
+        t = mesh.edge_unit_tangent()[isbdFace]
 
-        index = self.mesh.boundary_face_index()
+        # Bernstein 空间的单位质量矩阵
+        qf = self.mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bphi = bspace.basis(bcs, p=p)
+        M = bm.einsum("cql, cqm, q->lm", bphi, bphi, ws)
+        Minv = bm.linalg.inv(M)
 
-        edge2dof = self.dof.edge_to_dof()[index]
-        uh[edge2dof] = 0
+        points = mesh.bc_to_point(bcs)[isbdFace]
+        gDval = gD(points, t) 
 
+        g = bm.einsum('cql, cq->cl', bphi, gDval)
+        uh[edge2dof] = bm.einsum('cl, lm->cm', g, Minv) # (NC, ldof)
+
+        # 边界自由度
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
         return isDDof

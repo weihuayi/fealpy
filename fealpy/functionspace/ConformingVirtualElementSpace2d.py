@@ -44,9 +44,9 @@ class CVEMDof2d():
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
-        #cell, cellLocation = mesh.entity('cell')
-        cell = mesh.ds._cell
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
+        #cell = mesh.ds._cell
+        #cellLocation = mesh.ds.cellLocation
 
         if p == 1:
             return cell, cellLocation
@@ -663,9 +663,9 @@ class ConformingVirtualElementSpace2d():
         node = mesh.entity('node')
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
-        #cell, cellLocation = mesh.entity('cell')
-        cell = mesh.ds._cell
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
+        #cell = mesh.ds._cell
+        #cellLocation = mesh.ds.cellLocation
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         cell2dof, cell2dofLocation = self.cell_to_dof()

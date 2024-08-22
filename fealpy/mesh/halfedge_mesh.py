@@ -1317,6 +1317,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         hlevel   = self.halfedgedata['level']
         halfedge = self.entity('halfedge')
         isMainHEdge = self.ds.main_halfedge_flag()
+        NC = self.number_of_cells()
 
         isMarkedCell = np.ones(NC, dtype=np.bool_) if isMarkedCell is None else isMarkedCell
         isMarkedHEdge = self.mark_halfedge(isMarkedCell, method='poly')
