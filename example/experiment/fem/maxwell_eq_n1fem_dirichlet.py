@@ -77,7 +77,7 @@ parser.add_argument('--dim',
         help='默认维数为2')
 
 parser.add_argument('--maxit',
-        default=1, type=int,
+        default=4, type=int,
         help='默认最大迭代次数为4')
 
 args = parser.parse_args()
@@ -105,7 +105,7 @@ tmr = timer()
 next(tmr)
 
 ps = [2, 3, 4]
-ps = [4]
+#ps = [4]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
@@ -144,7 +144,7 @@ for j, p in enumerate(ps):
 
         # 计算误差
         errorMatrix[j, i] = mesh.error(pde.solution, Eh.value)
-        #errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
+        errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
         tmr.send(f'第{i}次误差计算及网格加密时间')
 
 next(tmr)
