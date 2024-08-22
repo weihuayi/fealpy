@@ -1,3 +1,4 @@
+import ipdb
 import numpy as np
 from ..quadrature import GaussLegendreQuadrature
 from ..functionspace import ScaledMonomialSpace2d, ScaledMonomialSpace3d

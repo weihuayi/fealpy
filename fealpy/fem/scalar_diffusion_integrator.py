@@ -75,7 +75,7 @@ class ScalarDiffusionIntegrator:
                     raise ValueError(f"coef with shape {coef.shape}! Now we just support shape: (NC, ), (NQ, NC), (GD, GD), (NC, GD, GD) or NQ, NC, GD, GD)")
             else:
                 raise ValueError("coef 不支持该类型")
-
+        # print(D.ravel())
         if out is None:
             return D
 
@@ -121,7 +121,7 @@ class ScalarDiffusionIntegrator:
                 coef = coef(ps)
         else:
             coef = coef
-        val = uh.grad_value(bcs)
+        val = -uh.grad_value(bcs)
         if isinstance(val, (int, float)):
             bb += coef*np.einsum('q, qcd, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
         else:
@@ -133,7 +133,7 @@ class ScalarDiffusionIntegrator:
                 bb += np.einsum('q, qc, qcd, qcid, c->ci', ws, coef, val, phi, cellmeasure, optimize=True)
         if out is None:
             return bb 
-        
+
 
     def assembly_cell_matrix_quickly(self, space, index=np.s_[:], cellmeasure=None, out=None):
         """

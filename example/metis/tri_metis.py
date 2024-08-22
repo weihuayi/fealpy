@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 
-import argparse
+import argparse # 参数解析
 import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.mesh import TriangleMesh 
@@ -20,17 +20,23 @@ parser.add_argument('--n',
         default=4, type=int,
         help='网格分割块数.')
 
+parser.add_argument('--etype',
+        default='node', type=str,
+        help='网格分割类型.')
+
+
 
 args = parser.parse_args()
 
 h = args.h
 n = args.n
+etype = args.etype
 
 vertices = np.array([ (0,0), (1,0), (1,1), (0,1)], dtype=np.float64)
 mesh = TriangleMesh.from_polygon_gmsh(vertices, h)
 
 # Partition the mesh cells into n parts 
-edgecuts, parts = metis.part_mesh(mesh, nparts=n, entity='node')
+edgecuts, parts = metis.part_mesh(mesh, nparts=n, entity=etype)
 
 node = mesh.entity('node')
 edge = mesh.entity('edge')
@@ -39,6 +45,9 @@ cell = mesh.entity('cell')
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes, cellcolor='w')
-mesh.find_node(axes, color=parts, markersize=20)
+if etype == 'node':
+    mesh.find_node(axes, color=parts, markersize=20)
+elif etype == 'cell':
+    mesh.find_cell(axes, color=parts, markersize=20)
 fig.savefig('test.pdf')
 plt.show()

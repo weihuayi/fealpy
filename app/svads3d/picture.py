@@ -23,7 +23,7 @@ class Picture():
     camera = None
     mesh = None
 
-    def __init__(self, data_path, fname, mark_board):
+    def __init__(self, data_path, fname, feature_point):
         """
         初始化图片信息，处理特征点等特征信息。
         1. 读取图片
@@ -32,6 +32,7 @@ class Picture():
         """
         self.data_path = data_path
         self.fname = data_path+"camera_inputs/"+fname
+        #self.fname = data_path+fname
         # 读取图像
         image = cv2.imread(self.fname, cv2.IMREAD_GRAYSCALE)
         if image is None:
@@ -39,12 +40,10 @@ class Picture():
         else:
             self.image = image
         self.height, self.width = self.image.shape
-        self.mark_board = np.array(mark_board).reshape((2, -1, 2))
-        #self.mark_board[..., 1] = self.height - self.mark_board[..., 1] 
-        #self.mark_board[..., 0] = self.width - self.mark_board[..., 0]
 
-        self.feature_point = mark_board
+        self.feature_point = feature_point
         self.center, self.radius = self.get_center_and_radius()
+        self.rho2theta = None
 
 
     def add_feature_point(self, feature_point: Union[list[np.ndarray], np.ndarray, list]):
@@ -83,6 +82,7 @@ class Picture():
             fy = self.camera.K[1, 1]
             u0 = self.camera.K[0, 2]
             v0 = self.camera.K[1, 2]
+            u0, v0 = self.center
             node = np.zeros((NN, 3), dtype=np.float64)
 
             node[:, 0] = point[:, 0] - u0
@@ -98,6 +98,7 @@ class Picture():
 
             if args[1] == 'L':
                 theta = rho
+                theta = np.array([self.rho2theta(r) for r in rho])
 
             node[:, 0] = np.sin(theta) * np.cos(phi)
             node[:, 1] = np.sin(theta) * np.sin(phi)

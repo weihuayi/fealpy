@@ -6,6 +6,7 @@ from .fem_dofs import *
 from .Function import Function
 from ..common.tensor import *
 
+from fealpy.quadrature.TetrahedronQuadrature import TetrahedronQuadrature
 from scipy.special import factorial, comb
 from scipy.sparse import csc_matrix, csr_matrix
 
@@ -56,6 +57,7 @@ class BernsteinFESpace:
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
+        #self.integrator = TetrahedronQuadrature(p+4)
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
@@ -89,7 +91,7 @@ class BernsteinFESpace:
         ldof = multiIndex.shape[0]
 
         B = bc
-        B = np.ones((NQ, p+1, TD+1), dtype=np.float_)
+        B = np.ones((NQ, p+1, TD+1), dtype=np.float64)
         B[:, 1:] = bc[:, None, :]
         B = np.cumprod(B, axis=1)
 
@@ -160,6 +162,48 @@ class BernsteinFESpace:
         Dlambda = self.mesh.grad_lambda()
         gphi = P[0, -1, 0]*np.einsum("qlm, cmd->qcld", R, Dlambda, optimize=True)
         return gphi[:, index]
+    def mass_matrix(self):
+        # TODO 优化效率, Bernstein 基的质量矩阵每个单元是相同的
+        import ipdb
+        ipdb.set_trace()
+        p = self.p
+        gdof = self.dof.number_of_global_dofs()
+        cell2dof = self.dof.cell_to_dof()
+        
+        integrator = self.integrator
+        bcs, ws = integrator.get_quadrature_points_and_weights()#p=5 order=9 NQ=19
+
+        cm = self.mesh.entity_measure("cell")
+        phi = self.basis(bcs)
+        
+        M = np.einsum('qcl, qcm, q, c->clm', phi, phi, ws, cm, optimize=True)
+
+        I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
+        J = np.broadcast_to(cell2dof[:, None, :], M.shape) 
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof), dtype=np.float_)
+        return M
+
+    def grad_m_matrix(self, m):
+        p = self.p
+        gdof = self.dof.number_of_global_dofs()
+        cell2dof = self.dof.cell_to_dof()
+        integrator = self.integrator #p+4
+        bcs, ws = integrator.get_quadrature_points_and_weights()#p=5 order=9 NQ=19
+
+        GD = self.mesh.geo_dimension()
+        idx = self.mesh.multi_index_matrix(m, GD-1)
+        num = factorial(m)/np.prod(factorial(idx), axis=1)
+        #|m|/m！m是相加为m的多重数组,两个 T_1^m
+
+        cm = self.mesh.entity_measure("cell")
+        gmphi = self.grad_m_basis(bcs, m)
+        M = np.einsum('qclg, qcmg, g, q, c->clm', gmphi, gmphi, num, ws, cm, optimize=True)
+
+        I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
+        J = np.broadcast_to(cell2dof[:, None, :], M.shape) 
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof), dtype=np.float_)
+        return M
+
 
     def partial_matrix_dense(self):
         """
@@ -319,12 +363,7 @@ class BernsteinFESpace:
         glambda = mesh.grad_lambda()
 
         ## 获得张量对称部分的索引
-        f = lambda x: np.array([int(ss) for ss in '0'*(m-len(np.base_repr(x,
-            GD)))+np.base_repr(x, GD) ], dtype=np.int_)
-        idx = np.array(list(map(f, np.arange(GD**m))))
-        flag = np.ones(len(idx), dtype=np.bool_)
-        for i in range(m-1):
-            flag = flag & (idx[:, i]>=idx[:, i+1])
+        symidx = symmetry_index(GD, m)
 
         ## 计算多重指标编号
         if GD==2:
@@ -337,15 +376,15 @@ class BernsteinFESpace:
         midxp_0 = mesh.multi_index_matrix(p, GD) # p   次多重指标
         midxp_1 = mesh.multi_index_matrix(m, GD) # m   次多重指标
 
-        N, N1 = flag.sum(), midxp_1.shape[0]
-        B = np.zeros((N1, NQ, ldof), dtype=np.float_)
-        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float_)
-        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float_)
+        N, N1 = len(symidx), midxp_1.shape[0]
+        B = np.zeros((N1, NQ, ldof), dtype=np.float64)
+        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float64)
+        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float64)
         for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
             midxp_0 -= beta[None, :]
             idx = np.where(np.all(midxp_0>-1, axis=1))[0]
             num = midx2num(midxp_0[idx]) 
-            symi[:] = symmetry_span_array(glambda, beta).reshape(NC, -1)[:, flag] #(NC, N)
+            symi[:] = symmetry_span_array(glambda, beta).reshape(NC, -1)[:, symidx] #(NC, N)
             c = (factorial(m)**2)*comb(p, m)/np.prod(factorial(beta)) # 数
             Bi[:, idx] = c*phi[:, num] #(NQ, ldof)
             midxp_0 += beta[None, :]
@@ -353,6 +392,8 @@ class BernsteinFESpace:
         return gmphi
 
     def hess_basis(self, bcs, index=np.s_[:]):
+        if self.p<2:
+            return np.zeros([1, 1, 1, 1], dtype=np.float_)
         g2phi = self.grad_m_basis(bcs, 2, index=index)
         TD = self.mesh.top_dimension()
         shape = g2phi.shape[:-1] + (TD, TD)
@@ -462,6 +503,13 @@ class BernsteinFESpace:
         else:
             raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
 
+        return val
+
+    @barycentric
+    def grad_m_value(self, uh, bcs, m):
+        gmphi = self.grad_m_basis(bcs, m) # (NQ, 1, ldof)
+        cell2dof = self.dof.cell_to_dof()
+        val = np.einsum('qclg, cl->qcg', gmphi, uh[cell2dof])
         return val
 
     @barycentric

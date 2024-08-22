@@ -322,6 +322,24 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             if len(badHEdge)==0:
                 break
 
+    def edge_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_tangent(index=index)
+        w = np.array([(0, -1), (1, 0)])
+        return v @ w
+
+    def edge_unit_normal(self, index=np.s_[:]):
+        """
+        @brief 计算二维网格中每条边上单位法线
+        """
+        assert self.geo_dimension() == 2
+        v = self.edge_unit_tangent(index=index)
+        w = np.array([(0, -1), (1, 0)])
+        return v @ w
+
     def location(self, points):
         halfedge = self.entity('halfedge')
         node = self.entity('node')
@@ -505,8 +523,8 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         cell = self.entity('cell')
         if isinstance(cell, tuple):
             cell, cellLocation = cell
-            idx1 = np.zeros(cell.shape[0], dtype=np.int)
-            idx2 = np.zeros(cell.shape[0], dtype=np.int)
+            idx1 = np.zeros(cell.shape[0], dtype=np.int_)
+            idx2 = np.zeros(cell.shape[0], dtype=np.int_)
 
             idx1[0:-1] = cell[1:]
             idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
@@ -582,7 +600,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             NC = self.number_of_all_cells()
             e0 = halfedge[halfedge[:, 3], 0]
             e1 = halfedge[:, 0]
-            w = np.array([[0, -1], [1, 0]], dtype=np.int)
+            w = np.array([[0, -1], [1, 0]], dtype=np.int_)
             v= (node[e1] - node[e0])@w
             val = np.sum(v*node[e0], axis=1)
             ec = val.reshape(-1, 1)*(node[e1]+node[e0])/2
@@ -600,7 +618,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             cstart = self.ds.cellstart
             e0 = halfedge[halfedge[hflag, 3], 0]
             e1 = halfedge[hflag, 0]
-            w = np.array([[0, -1], [1, 0]], dtype=np.int)
+            w = np.array([[0, -1], [1, 0]], dtype=np.int_)
             v= (node[e1] - node[e0])@w
             val = np.sum(v*node[e0], axis=1)
             ec = val.reshape(-1, 1)*(node[e1]+node[e0])/2
@@ -915,7 +933,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 NHB0 = flag0.sum()
                 NHE = len(halfedge)
                 NHB = NHB0 + NHE
-                HB = np.zeros((NHB, 2), dtype=np.int)
+                HB = np.zeros((NHB, 2), dtype=np.int_)
                 HB[:, 0] = range(NHB)
                 HB[0:NHB0, 1] = np.arange(len(flag0))[flag0]
                 HB[NHB0:,  1] = cellidx - cellstart
@@ -1337,7 +1355,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             halfedge[:, 1] = cidxmap0[halfedge[:, 1]]
 
             if ('HB' in options) and (options['HB'] is not None):
-                HB = np.zeros((NC-cstart, 2), dtype=np.int)
+                HB = np.zeros((NC-cstart, 2), dtype=np.int_)
                 HB[:, 0] = np.arange(NC-cstart)
                 HB[:, 1] = cidxmap0[cidxmap[cstart:]]-cstart
                 options['HB'] = HB

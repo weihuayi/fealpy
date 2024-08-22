@@ -11,9 +11,11 @@ import argparse
 import torch
 from torch import Tensor, tensordot, rand
 import numpy as np
+from numpy.typing import NDArray
 import yaml
 from tqdm import tqdm
 
+from fealpy.mesh import TriangleMesh as TMD
 from fealpy.torch.mesh import TriangleMesh
 from fealpy.torch import logger
 from fealpy.cem import EITDataGenerator
@@ -32,6 +34,17 @@ def levelset(p: Tensor, centers: Tensor, radius: Tensor):
     p = p.reshape(-1, p.shape[-1])
     dis = torch.norm(p[:, None, :] - centers[None, :, :], dim=-1) # (N, NCir)
     ret, _ = torch.min(dis - radius[None, :], dim=-1) # (N, )
+    return ret.reshape(struct)
+
+
+def levelset_np(p: NDArray, centers: NDArray, radius: NDArray):
+    """
+    Calculate level set function value.
+    """
+    struct = p.shape[:-1]
+    p = p.reshape(-1, p.shape[-1])
+    dis = np.linalg.norm(p[:, None, :] - centers[None, :, :], axis=-1) # (N, NCir)
+    ret = np.min(dis - radius[None, :], axis=-1) # (N, )
     return ret.reshape(struct)
 
 
@@ -73,6 +86,7 @@ def neumann(points: Tensor):
 
 def main(sigma_iterable: Sequence[int], seed=0, index=0):
     torch.manual_seed(seed)
+    np.random.seed(seed)
     mesh = TriangleMesh.from_box((-1, 1, -1, 1), EXT, EXT, ftype=DTYPE, device=DEVICE)
     generator = EITDataGenerator(mesh=mesh, p=P, q=Q)
     gn = generator.set_boundary(neumann, batch_size=len(FREQ))
@@ -85,12 +99,31 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
                           dynamic_ncols=True,
                           unit='sample',
                           position=index):
-        ctrs = rand(NUM_CIR, 2, **kwargs) * 1.6 - 0.8 # (NCir, GD)
-        b, _ = torch.min(0.9-torch.abs(ctrs), axis=-1) # (NCir, )
-        rads = rand(NUM_CIR, **kwargs) * (b-0.1) + 0.1 # (NCir, )
+        # ctrs = rand(NUM_CIR, 2, **kwargs) * 1.6 - 0.8 # (NCir, GD)
+        # b, _ = torch.min(0.9-torch.abs(ctrs), axis=-1) # (NCir, )
+        # rads = rand(NUM_CIR, **kwargs) * (b-0.1) + 0.1 # (NCir, )
+
+        ctrs_ = np.random.rand(NUM_CIR, 2) * 1.6 - 0.8 # (NCir, GD)
+        b = np.min(0.9-np.abs(ctrs_), axis=-1) # (NCir, )
+        rads_ = np.random.rand(NUM_CIR) * (b-0.1) + 0.1 # (NCir, )
+        ctrs = torch.from_numpy(ctrs_).to(**kwargs)
+        rads = torch.from_numpy(rads_).to(**kwargs)
+
+        ls_fn_np = lambda p: levelset_np(p, ctrs_, rads_)
         ls_fn = lambda p: levelset(p, ctrs, rads)
 
-        label = generator.set_levelset(SIGMA, ls_fn)
+        interface_mesh = TMD.interfacemesh_generator([-1, 1, -1, 1], EXT, EXT, ls_fn_np)
+        interface_mesh = TriangleMesh.from_numpy(interface_mesh)
+        interface_mesh.to(device=DEVICE)
+
+        generator = EITDataGenerator(mesh=interface_mesh, p=P, q=Q)
+        generator.set_boundary(neumann, batch_size=len(FREQ))
+        generator.set_levelset(SIGMA, ls_fn)
+
+        # use the uniform triangle mesh nodes to generate labels
+        node = mesh.entity('node')
+        label = levelset(node, ctrs, rads) < 0.
+
         gd = generator.run()
 
         np.save(
@@ -161,26 +194,27 @@ if __name__ == "__main__":
         os.makedirs(output_folder)
 
     from multiprocessing import Pool
-    from fealpy.ml import timer
+    from fealpy.utils import timer
 
     pool = Pool(process_num)
     tmr = timer()
-    tmr.send(None)
+    next(tmr)
 
     NUM = tuple(range(config['head'], config['tail']))
 
     PART = 4
-    TM = int(time())
+    seed = config.get('seed', int(time()))
     # main(NUM, 999, 0)
 
-    pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
-    pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
-    pool.apply_async(main, (NUM[2::PART], 122 + TM, 2))
-    pool.apply_async(main, (NUM[3::PART], 222 + TM, 3))
+    pool.apply_async(main, (NUM[0::PART], 621 + seed, 0))
+    pool.apply_async(main, (NUM[1::PART], 928 + seed, 1))
+    pool.apply_async(main, (NUM[2::PART], 122 + seed, 2))
+    pool.apply_async(main, (NUM[3::PART], 222 + seed, 3))
 
     pool.close()
     pool.join()
 
     tmr.send('stop')
+    next(tmr)
 
     print("Done.")

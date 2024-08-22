@@ -2,7 +2,7 @@ import numpy as np
 from jax import grad, jit
 from jax import lax
 from jax import random
-import jax
+
 import jax.numpy as jnp
 from jax.config import config
 

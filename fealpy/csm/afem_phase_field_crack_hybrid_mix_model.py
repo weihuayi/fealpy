@@ -229,9 +229,8 @@ class AFEMPhaseFieldCrackHybridMixModel():
                             self.bisect_refine_3d(isMarkedCell)
                     else:
                         print("GD is not 2 or 3, it is incorrect")
-                            
-                tmr.send('refine')
-            
+                        
+            tmr.send('refine')
             
             # 计算残量误差
             if k == 0:
