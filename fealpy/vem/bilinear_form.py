@@ -79,6 +79,7 @@ class BilinearForm:
         J = np.concatenate(list(map(f3, cell2dof)))
         val = np.concatenate(list(map(f4, K)))
         gdof = space.number_of_global_dofs()
+        print(val.shape, I.shape, J.shape)
         self._M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float64)
         return self._M
 
