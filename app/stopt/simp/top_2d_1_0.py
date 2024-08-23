@@ -33,41 +33,81 @@ def material_model_SIMP_derivative(rho: TensorLike, penal: float, E0: float,
         dE = -penal * rho ** (penal - 1) * (E0 - Emin)
     return dE
 
-def check(rmin, rho, dce):
-    dcn = bm.zeros((nx, ny), dtype=bm.float64).T
-    rho = rho.reshape(nx, ny).T
-    dce = dce.reshape(nx, ny).T
-    # 计算过滤器半径
-    r = int(rmin)
+# TODO 可以使用稀疏矩阵存储
+def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
+    H = bm.zeros((NC, NC), dtype=bm.float64)
 
-    for i in range(nx):
-        for j in range(ny):
-            sum_val = 0.0
-            # 确定邻域的范围
-            min_x = max(i - r, 0)
-            max_x = min(i + r + 1, nx)
-            min_y = max(j - r, 0)
-            max_y = min(j + r + 1, ny)
+    # 确定哪些单元在滤波器半径范围内
+    for i1 in range(nx):
+        for j1 in range(ny):
+            e1 = (i1) * ny + j1
+            # 确定滤波器半径 rmin 的整数边界
+            imin = max(i1 - (bm.ceil(rmin) - 1), 0.)
+            imax = min(i1 + (bm.ceil(rmin)), nx)
+            for i2 in range(int(imin), int(imax)):
+                jmin = max(j1 - (bm.ceil(rmin) - 1), 0.)
+                jmax = min(j1 + (bm.ceil(rmin)), ny)
+                for j2 in range(int(jmin), int(jmax)):
+                    e2 = i2 * ny + j2
+                    H[e1, e2] = max(0., rmin - bm.sqrt((i1-i2)**2 + (j1-j2)**2))
 
-            for k in range(min_x, max_x):
-                for l in range(min_y, max_y):
+    Hs = bm.sum(H, axis=1)
 
-                    # Calculate convolution operator value for the element (k,l) with respect to (i,j)
-                    fac = rmin - bm.sqrt((i - k)**2 + (j - l)**2)
+    return H, Hs
 
-                    # Accumulate the convolution sum
-                    sum_val += max(0, fac)
+def apply_filter(ft, H, Hs, rho, dc, dv):
 
-                    # 基于 convolution 算子的值修改单元的灵敏度
-                    dcn[j, i] += max(0, fac) * rho[l, k] * dce[l, k]
+    if ft == 0:
+        dc = bm.matmul(H, bm.multiply(rho, dc) / Hs / bm.maximum(1e-3, rho))
+        dv = dv
+    elif ft == 1:
+        dc = bm.matmul(H, (dc / Hs))
+        dv = bm.matmul(H, (dv / Hs))
+    
+    return dc, dv
 
-            # Normalize the modified sensitivity for element (i,j)
-            dcn[j, i] /= (rho[j, i] * sum_val)
 
-    return dcn.reshape(-1)
+# def check(nx, ny, rmin, rho, dc):
+
+#     dcn_e = bm.zeros((nx, ny), dtype=bm.float64)
+
+#     dc_e = bm.reshape(dc, (nx, ny))
+#     rho_e = bm.reshape(rho, (nx, ny))
+
+#     # 计算过滤器半径
+#     r = int(rmin)
+
+#     for i in range(nx):
+#         for j in range(ny):
+#             sum_val = 0.0
+#             # 确定邻域的范围
+#             min_x = max(i - r, 0)
+#             max_x = min(i + r + 1, nx)
+#             min_y = max(j - r, 0)
+#             max_y = min(j + r + 1, ny)
+
+#             for k in range(min_x, max_x):
+#                 for l in range(min_y, max_y):
+
+#                     # Calculate convolution operator value for the element (k,l) with respect to (i,j)
+#                     fac = rmin - bm.sqrt((i - k)**2 + (j - l)**2)
+
+#                     # Accumulate the convolution sum
+#                     sum_val += max(0, fac)
+
+#                     # 基于 convolution 算子的值修改单元的灵敏度
+#                     dcn_e[j, i] += max(0, fac) * rho_e[l, k] * dc_e[l, k]
+
+#             # Normalize the modified sensitivity for element (i, j)
+#             dcn_e[j, i] /= (rho_e[j, i] * sum_val)
+    
+#     dcn = bm.reshape(bm.flip(dcn_e, axis=0), (nx, ny)).T.reshape(-1)
+
+#     return dcn
+
 
 # Optimality criterion
-def oc(volfrac, rho, dce, dve, passive=None):
+def oc(volfrac, nx, ny, rho, dc, dv, passive=None):
         # 初始化 Lagrange 乘子
         l1, l2 = 0, 1e5
 
@@ -86,7 +126,7 @@ def oc(volfrac, rho, dce, dve, passive=None):
             tmp1 = rho + move
 
             # Design variable update (intermediate step) using OC update scheme
-            be = -dce / dve / lmid
+            be = -dc / dv / lmid
             tmp2 = rho * bm.sqrt(be)
             tmp3 = bm.minimum(tmp1, tmp2)
             tmp4 = bm.minimum(1, tmp3) 
@@ -123,8 +163,8 @@ def is_dirichlet_boundary(points):
 
 
 # Default input parameters
-nx = 3
-ny = 2
+nx = 32
+ny = 20
 volfrac = 0.5
 penal = 3.0
 rmin = 1.5
@@ -133,12 +173,13 @@ extent = [0, nx, 0, ny]
 h = [1, 1]
 origin = [0, 0]
 mesh = UniformMesh2d(extent, h, origin)
-import matplotlib.pyplot as plt
-fig = plt.figure()
-axes = fig.add_subplot(111)
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True, color='r', fontsize=20)
-plt.show()
+# import matplotlib.pyplot as plt
+# fig = plt.figure()
+# axes = fig.add_subplot(111)
+# mesh.add_plot(axes)
+# mesh.find_node(axes, showindex=True)
+# mesh.find_cell(axes, showindex=True)
+# plt.show()
 NC = mesh.number_of_cells()
 p = 1
 space = LagrangeFESpace(mesh, p=p, ctype='C')
@@ -152,12 +193,21 @@ integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3,
                                         elasticity_type='stress', coef=None, q=5)
 KE = integrator_bi.assembly(space=tensor_space)
 
+# Filter
+H, Hs = compute_filter(rmin)
+
+import matplotlib.pyplot as plt
+plt.ion()
+fig, ax = plt.subplots()
+image = ax.imshow(-rho.reshape(nx, ny).T, cmap='gray', vmin=-1, vmax=0)
+ax.axis('off')
+
 # Set loop counter and gradient vectors
 loop = 0
 change = 1
-dve = bm.zeros(NC, dtype=bm.float64)
-dce = bm.ones(NC, dtype=bm.float64)
-ce = bm.ones(NC, dtype=bm.float64)
+dv = bm.zeros(NC, dtype=bm.float64)
+dc = bm.ones(NC, dtype=bm.float64)
+c = bm.ones(NC, dtype=bm.float64)
 while change > 0.01 and loop < 2000:
     loop += 1
 
@@ -165,7 +215,7 @@ while change > 0.01 and loop < 2000:
 
     # Setup and solve FE problem
     uh = tensor_space.function()
-    E = material_model_SIMP(rho=rho, penal=penal, E0=1.0, Emin=1e-9)
+    E = material_model_SIMP(rho=rho, penal=penal, E0=1.0, Emin=None)
     integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
                                             elasticity_type='stress', coef=E, q=5)
     KK = integrator_bi.assembly(space=tensor_space)
@@ -202,28 +252,31 @@ while change > 0.01 and loop < 2000:
     uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
 
     # Objective and sensitivity
-    c = 0
+    obj = 0
     cell2ldof = tensor_space.cell_to_dof()
     uhe = uh[cell2ldof]
-    ce[:] = bm.einsum('ci, cik, ck -> c', uhe, KE, uhe)
-    c += bm.einsum('c, c -> ', E, ce)
+    c[:] = bm.einsum('ci, cik, ck -> c', uhe, KE, uhe)
+    obj += bm.einsum('c, c -> ', E, c)
 
     dE = material_model_SIMP_derivative(rho=rho, penal=penal, E0=1.0, Emin=None)
-    dce[:] = bm.einsum('c, c -> c', dE, ce)
+    dc[:] = bm.einsum('c, c -> c', dE, c)
 
-    dve[:] = bm.ones(NC, dtype=bm.float64)
+    dv[:] = bm.ones(NC, dtype=bm.float64)
 
     # 灵敏度过滤
-    dce = check(rmin=rmin, rho=rho, dce=dce)
+    dcn, dvn = apply_filter(ft=0, H=H, Hs=Hs, rho=rho, dc=dc, dv=dv)
 
     # Optimality criteria
-    # TODO 更新后的设计变量不对
-
-    rho = oc(volfrac=volfrac, rho=rho, dce=dce, dve=dve)
+    rho = oc(volfrac=volfrac, nx=nx, ny=ny, rho=rho, dc=dc, dv=dv)
 
     # Compute the change by the inf. norm
     change = bm.linalg.norm(rho.reshape(NC, 1) - rho_old.reshape(NC, 1), bm.inf)
     
     # Write iteration history to screen
-    print("it.: {0} , c.: {1:.3f} Vol.: {2:.3f}, ch.: {3:.3f}".format(
-        loop, c, bm.sum(rho) / NC, change))
+    print("iter.: {0} , object.: {1:.3f} Volfrac.: {2:.3f}, change.: {3:.3f}".format(
+        loop, obj, bm.sum(rho) / NC, change))
+
+    # Plot
+    image.set_data(-rho.reshape(nx, ny).T)
+    plt.draw()
+    plt.pause(1e-5)
