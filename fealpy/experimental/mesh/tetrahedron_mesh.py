@@ -3,7 +3,8 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
 from .plot import Plotable
-
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import spdiags, eye, tril, triu, bmat
 
 class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
@@ -472,24 +473,277 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
             #self.ds.reinit(NN+NE, newCell)
     def circumcenter(self, index=_S, returnradius=False):
-            """
-            @brief 计算外接圆圆心和半径
-            """
-            node = self.node
-            cell = self.cell
-            v = [ node[cell[index, 0]] - node[cell[index, i]] for i in range(1,4)]
-            l = [ bm.sum(vi**2, axis=1, keepdims=True) for vi in v]
-            d = l[2]*bm.cross(v[0], v[1]) + l[0]*bm.cross(v[1], v[2]) + l[1]*bm.cross(v[2],v[0])
-            volume = self.cell_volume(index)
-            d /=12*volume[:, None]
-            c = node[cell[index,0]] + d
-            R = bm.sqrt(bm.sum(d**2, axis=1))
-            if returnradius:
-                return c, R
+        """
+        @brief 计算外接圆圆心和半径
+        """
+        node = self.node
+        cell = self.cell
+        v = [ node[cell[index, 0]] - node[cell[index, i]] for i in range(1,4)]
+        l = [ bm.sum(vi**2, axis=1, keepdims=True) for vi in v]
+        d = l[2]*bm.cross(v[0], v[1]) + l[0]*bm.cross(v[1], v[2]) + l[1]*bm.cross(v[2],v[0])
+        volume = self.cell_volume(index)
+        d /=12*volume[:, None]
+        c = node[cell[index,0]] + d
+        R = bm.sqrt(bm.sum(d**2, axis=1))
+        if returnradius:
+            return c, R
+        else:
+            return c
+        
+    def label(self, node=None, cell=None, cellidx=None):
+        """
+        @brief 单元顶点的重新排列，使得cell[:, :2] 存储了单元的最长边
+
+        """
+
+        rflag = False
+        if node is None:
+            node = self.entity('node')
+
+        if cell is None:
+            cell = self.entity('cell')
+            rflag = True
+
+        if cellidx is None:
+            cellidx = bm.arange(len(cell))
+
+        NC = cellidx.shape[0]
+        localEdge = self.localEdge
+        totalEdge = cell[cellidx][:, localEdge].reshape(
+                -1, localEdge.shape[1])
+        NE = totalEdge.shape[0]
+        length = bm.sum(
+                (node[totalEdge[:, 1]] - node[totalEdge[:, 0]])**2,
+                axis = -1)
+        #length += 0.1*bm.random.rand(NE)*length
+        cellEdgeLength = length.reshape(NC, 6)
+        lidx = bm.argmax(cellEdgeLength, axis=-1)
+
+        flag = (lidx == 1)
+        if  sum(flag) > 0:
+            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [2, 0, 1, 3]])
+
+        flag = (lidx == 2)
+        if sum(flag) > 0:
+            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [0, 3, 1, 2]])
+
+        flag = (lidx == 3)
+        if sum(flag) > 0:
+            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [1, 2, 0, 3]])
+
+        flag = (lidx == 4)
+        if sum(flag) > 0:
+            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [1, 3, 2, 0]])
+
+        flag = (lidx == 5)
+        if sum(flag) > 0:
+            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [3, 2, 1, 0]])
+
+        if rflag == True:
+            self.construct()
+
+    def uniform_bisect(self, n=1):
+        for i in range(n):
+            self.bisect()
+
+    def bisect_options(self, HB = None, data=None, disp=None):
+        options = {'HB' : HB, 'data': data, 'disp': disp}
+        return options
+           
+    def bisect(self, isMarkedCell=None, data=None, returnim=False, options={'disp': True}):
+
+        if options['disp']:
+            print('Bisection begining.......')
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
+
+        if options['disp']:
+            print('Current number of nodes:', NN)
+            print('Current number of edges:', NE)
+            print('Current number of cells:', NC)
+
+        if ('data' in options) and (options['data'] is not None):
+            oldnode = self.entity('node')
+            oldcell = self.entity('cell')
+        
+        if("HB" in options) & (options["HB"] is not None):
+            HB = bm.tile(bm.arange(NC*4)[:, None], (1, 2))
+            options["HB"] = HB
+   
+        if isMarkedCell is None: # 加密所有的单元
+            markedCell = bm.arange(NC, dtype=self.itype)
+        else:
+            markedCell, = bm.nonzero(isMarkedCell)
+
+        # allocate new memory for node and cell
+        node = bm.zeros((9*NN, 3), dtype=self.ftype)
+        cell = bm.zeros((4*NC, 4), dtype=self.itype)
+
+        bm.set_at(node, slice(NN), self.entity('node'))
+        bm.set_at(cell, slice(NC), self.entity('cell'))
+
+        for key in self.celldata:
+            data = bm.zeros(4*NC, dtype=self.ftype)
+            bm.set_at(data, slice(NC), self.celldata[key])
+            bm.set_at(self.celldata , key, data.copy())
+
+        # 用于存储网格节点的代数，初始所有节点都为第 0 代
+        generation = bm.zeros(NN + 6*NC, dtype=bm.uint8)
+
+        # 用于记录被二分的边及其中点编号
+        cutEdge = bm.zeros((8*NN, 3), dtype=self.itype)
+
+        # 当前的二分边的数目
+        nCut = 0
+
+        # 非协调边的标记数组
+        nonConforming = bm.ones(8*NN, dtype=bm.bool)
+        IM = eye(NN)
+        while len(markedCell) != 0:
+            # 标记最长边
+            self.label(node, cell, markedCell)
+
+            # 获取标记单元的四个顶点编号
+            p0 = cell[markedCell, 0]
+            p1 = cell[markedCell, 1]
+            p2 = cell[markedCell, 2]
+            p3 = cell[markedCell, 3]
+
+            # 找到新的二分边和新的中点
+            nMarked = len(markedCell)
+            p4 = bm.zeros(nMarked, dtype=self.itype)
+
+            if nCut == 0: # 如果是第一次循环
+                idx = bm.arange(nMarked) # cells introduce new cut edges
             else:
-                return c
+                # all non-conforming edges
+                ncEdge = bm.nonzero(nonConforming[:nCut])
+                NE = len(ncEdge)
+                I = cutEdge[ncEdge][:, [2, 2]].reshape(-1)
+                J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
+                val = bm.ones(len(I), dtype=bm.bool)
+                nv2v = csr_matrix(
+                        (val, (I, J)),
+                        shape=(NN, NN))
+                i, j =  bm.nonzero(nv2v[:, p0].multiply(nv2v[:, p1]))
+                bm.set_at(p4, j, i)
+                idx, = bm.nonzero(p4 == 0)
+
+            if len(idx) != 0:
+                # 把需要二分的边唯一化
+                NE = len(idx)
+                cellCutEdge = bm.array([p0[idx], p1[idx]])
+                cellCutEdge = bm.sort(cellCutEdge,axis=0)
+                s = csr_matrix(
+                    (
+                        bm.ones(NE, dtype=bm.bool),
+                        (
+                            cellCutEdge[0, ...],
+                            cellCutEdge[1, ...]
+                        )
+                    ), shape=(NN, NN), dtype=bm.bool)
+                # 获得唯一的边
+                i, j = s.nonzero()
+                nNew = len(i)
+                newCutEdge = bm.arange(nCut, nCut+nNew)
+                bm.set_at(cutEdge, (newCutEdge,0), i)
+                bm.set_at(cutEdge, (newCutEdge,1), j)
+                bm.set_at(cutEdge, (newCutEdge,2), range(NN, NN+nNew))
+                bm.set_at(node, slice(NN, NN+nNew), (node[i, :] + node[j, :])/2.0)
+
+                if returnim is True:
+                    val = bm.full(nNew, 0.5)
+                    I = coo_matrix(
+                            (val, (range(nNew), i)), shape=(nNew, NN),
+                            dtype=self.ftype)
+                    I += coo_matrix(
+                            (val, (range(nNew), j)), shape=(nNew, NN),
+                            dtype=self.ftype)
+                    I = bmat([[eye(NN)], [I]], format='csr')
+                    IM = I@IM
+
+                nCut += nNew
+                NN += nNew
+
+                # 新点和旧点的邻接矩阵
+                I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
+                J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
+                val = bm.ones(len(I), dtype=bm.bool)
+                nv2v = csr_matrix(
+                        (val, (I, J)),
+                        shape=(NN, NN))
+                i, j =  bm.nonzero(nv2v[:, p0].multiply(nv2v[:, p1]))
+                bm.set_at(p4, j, i)
+
+            # 如果新点的代数仍然为 0
+            idx = (generation[p4] == 0)
+            cellGeneration = bm.max(
+                    generation[cell[markedCell[idx]]],
+                    axis=-1)
+            # 第几代点
+            bm.set_at(generation, p4[idx], cellGeneration + 1)
+            bm.set_at(cell, (markedCell,0), p3)
+            bm.set_at(cell, (markedCell,1), p0)
+            bm.set_at(cell, (markedCell,2), p2)
+            bm.set_at(cell, (markedCell,3), p4)
+            bm.set_at(cell, (slice(NC, NC+nMarked),0), p2)
+            bm.set_at(cell, (slice(NC, NC+nMarked),1), p1)
+            bm.set_at(cell, (slice(NC, NC+nMarked),2), p3)
+            bm.set_at(cell, (slice(NC, NC+nMarked),3), p4)
+
+            for key in self.celldata:
+                data = self.celldata[key]
+                bm.set_at(data, slice(NC, NC+nMarked), data[markedCell])
+
+            if("HB" in options) and (options["HB"] is not None):
+                HB = options['HB']
+                bm.set_at(HB, (slice(NC, NC+nMarked),1), HB[markedCell,1])
+            
+            NC = NC + nMarked
+            del cellGeneration, p0, p1, p2, p3, p4
+
+            # 找到非协调的单元
+            checkEdge, = bm.nonzero(nonConforming[:nCut])
+            isCheckNode = bm.zeros(NN, dtype=bm.bool)
+            bm.set_at(isCheckNode, cutEdge[checkEdge], True)
+            isCheckCell = bm.sum(
+                    isCheckNode[cell[:NC]],
+                    axis= -1) > 0
+            # 找到所有包含检查节点的单元编号
+            checkCell, = bm.nonzero(isCheckCell)
+            I = bm.repeat(checkCell, 4)
+            J = cell[checkCell].reshape(-1)
+            val = bm.ones(len(I), dtype=bm.bool)
+            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
+            i, j = bm.nonzero(
+                    cell2node[:, cutEdge[checkEdge, 0]].multiply(
+                        cell2node[:, cutEdge[checkEdge, 1]]
+                        ))
+            markedCell = bm.unique(i)
+            bm.set_at(nonConforming, checkEdge, False)
+            bm.set_at(nonConforming, checkEdge[j], True)
 
 
+        self.node = node[:NN]
+        self.cell = cell[:NC]
+        self.construct()
+        
+
+        for key in self.celldata:
+            bm.set_at(self.celldata, key, self.celldata[key][:NC])
+            
+
+        if("HB" in options) & (options["HB"] is not None):
+            options['HB'] = options['HB'][:NC]
+
+        if ('data' in options) and (options['data'] is not None):
+            options['data'] = self.interpolation_with_HB(oldnode, oldcell, options['HB'], options['data'])
+            
+
+        if returnim is True:
+            return IM
 
 
 
