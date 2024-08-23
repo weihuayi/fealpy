@@ -322,22 +322,23 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         isbdFace = mesh.boundary_face_flag()
         edge2dof = self.dof.edge_to_dof()[isbdFace]
         fm = mesh.entity_measure('face')[isbdFace]
+        fm1 = 1 / fm
         gdof = self.number_of_global_dofs()
         t = mesh.edge_unit_tangent()[isbdFace]
-
         # Bernstein 空间的单位质量矩阵
         qf = self.mesh.quadrature_formula(p+3, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         bphi = bspace.basis(bcs, p=p)
         M = bm.einsum("cql, cqm, q->lm", bphi, bphi, ws)
         Minv = bm.linalg.inv(M)
+        Minv = Minv*fm[:,None,None]
 
         points = mesh.bc_to_point(bcs)[isbdFace]
         gDval = gD(points, t) 
-
-        g = bm.einsum('cql, cq->cl', bphi, gDval)
-        uh[edge2dof] = bm.einsum('cl, lm->cm', g, Minv) # (NC, ldof)
-
+        g = bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
+        
+        uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
+        print(M)
         # 边界自由度
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
