@@ -227,10 +227,10 @@ class IntervalMesh(SimplexMesh,Plotable):
             self.node = bm.concatenate((node,bc),axis=0) #将新的节点添加到总的节点中去，得到的node
 
             newCell = bm.zeros((NC+N, 2), dtype=self.itype)
-            bm.set_at(newCell, slice(NC), cell)
-            bm.set_at(newCell[:NC], (isMarkedCell,1), bm.arange(NN, NN+N))
-            bm.set_at(newCell, (slice(NC, None),0), bm.arange(NN, NN+N))
-            bm.set_at(newCell, (slice(NC, None),1), cell[isMarkedCell, 1])
+            newCell = bm.set_at(newCell, slice(NC), cell)
+            newCell = bm.set_at(newCell[:NC], (isMarkedCell,1), bm.arange(NN, NN+N))
+            newCell = bm.set_at(newCell, (slice(NC, None),0), bm.arange(NN, NN+N))
+            newCell = bm.set_at(newCell, (slice(NC, None),1), cell[isMarkedCell, 1])
             self.cell = newCell
             self.construct()
                         
