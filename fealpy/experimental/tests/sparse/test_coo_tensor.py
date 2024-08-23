@@ -273,3 +273,78 @@ class TestCOOTensorAdd:
         # 尝试添加不支持的类型，期望抛出 TypeError
         with pytest.raises(TypeError):
             coo.add("a string", alpha=1.0)
+
+
+class TestCOOTensorConcat:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_empty_sequence(self, backend):
+        bm.set_backend(backend)
+        with pytest.raises(ValueError):
+            COOTensor.concat([])
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_single_tensor(self, backend):
+        bm.set_backend(backend)
+        # 创建一个 COOTensor 实例
+        indices = bm.tensor([[0, 1], [1, 2]])
+        values = bm.tensor([1, 2])
+        shape = [3, 4]
+        coo_tensor = COOTensor(indices, values, shape)
+        # 调用 concat 方法，传入单个 COOTensor
+        result = COOTensor.concat([coo_tensor])
+        # 验证结果是否为原实例
+        assert result is coo_tensor
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_multiple_tensors(self, backend):
+        bm.set_backend(backend)
+        # 创建多个 COOTensor 实例
+        indices1 = bm.tensor([[0, 1], [1, 2]])
+        values1 = bm.tensor([1, 2])
+        shape1 = [3, 4]
+
+        indices2 = bm.tensor([[0, 1], [2, 3]])
+        values2 = bm.tensor([3, 4])
+        shape2 = [3, 4]
+
+        coo_tensor1 = COOTensor(indices1, values1, shape1)
+        coo_tensor2 = COOTensor(indices2, values2, shape2)
+
+        # 调用 concat 方法，传入多个 COOTensor
+        result = COOTensor.concat([coo_tensor1, coo_tensor2], axis=0)
+
+        # 验证结果
+        expected_indices = [[0, 1, 3, 4], [1, 2, 2, 3]]
+        expected_values = [1, 2, 3, 4]
+        expected_shape = (6, 4)
+
+        assert bm.tolist(result.indices()) == expected_indices
+        assert bm.tolist(result.values()) == expected_values
+        assert result.sparse_shape == expected_shape
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_axis(self, backend):
+        bm.set_backend(backend)
+        # 创建多个 COOTensor 实例
+        indices1 = bm.tensor([[0, 0], [1, 2]])
+        values1 = bm.tensor([1, 2])
+        shape1 = [2, 3]
+
+        indices2 = bm.tensor([[0, 0], [2, 3]])
+        values2 = bm.tensor([3, 4])
+        shape2 = [2, 4]
+
+        coo_tensor1 = COOTensor(indices1, values1, shape1)
+        coo_tensor2 = COOTensor(indices2, values2, shape2)
+
+        # 沿着 axis=1 进行 concat
+        result = COOTensor.concat([coo_tensor1, coo_tensor2], axis=1)
+
+        # 验证结果
+        expected_indices = [[0, 0, 0, 0], [1, 2, 5, 6]]
+        expected_values = [1, 2, 3, 4]
+        expected_shape = (2, 7)
+
+        assert bm.tolist(result.indices()) == expected_indices
+        assert bm.tolist(result.values()) == expected_values
+        assert result.sparse_shape == expected_shape

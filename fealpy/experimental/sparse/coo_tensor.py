@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, List, Tuple
+from typing import Optional, Union, overload, List, Tuple, Sequence
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -231,6 +231,35 @@ class COOTensor(SparseTensor):
     def copy(self):
         return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
 
+    @classmethod
+    def concat(cls, coo_tensors: Sequence['COOTensor'], /, *, axis: int=0) -> 'COOTensor':
+        if len(coo_tensors) == 0:
+            raise ValueError("coo_tensors cannot be empty")
+
+        elif len(coo_tensors) == 1:
+            return coo_tensors[0]
+
+        fcoo = coo_tensors[0]
+        total_nnz = sum(coo.nnz for coo in coo_tensors)
+        new_indices = bm.empty((fcoo.sparse_ndim, total_nnz), **bm.context(fcoo.indices()))
+        new_indices[:, :fcoo.nnz] = fcoo.indices()
+        nnz_cursor = fcoo.nnz
+        size_cursor = fcoo.sparse_shape[axis]
+        values_list = [fcoo.values()]
+
+        for coo in coo_tensors[1:]:
+            slicing = slice(nnz_cursor, nnz_cursor + coo.nnz)
+            new_indices[:, slicing] = coo.indices()
+            new_indices[axis, slicing] += size_cursor
+            values_list.append(coo.values())
+            nnz_cursor += coo.nnz
+            size_cursor += coo.sparse_shape[axis]
+
+        spshape = list(fcoo.sparse_shape)
+        spshape[axis] = size_cursor
+
+        return cls(new_indices, bm.concat(values_list, axis=-1), spshape)
+
     def neg(self) -> 'COOTensor':
         """Negation of the COO tensor. Returns self if values is None."""
         if self._values is None:
@@ -360,9 +389,6 @@ class COOTensor(SparseTensor):
 
         else:
             raise TypeError(f'Unsupported type {type(other).__name__} in power')
-
-    def inner(self, other: TensorLike, dims: List[int]) -> 'COOTensor':
-        pass
 
     @overload
     def matmul(self, other: 'COOTensor') -> 'COOTensor': ...
