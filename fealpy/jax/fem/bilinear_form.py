@@ -1,63 +1,80 @@
 
-import numpy as np
-from scipy.sparse import csr_matrix
+from typing import TypeVar, Optional
 
-import jax 
 import jax.numpy as jnp
+from jax.experimental.sparse import BCOO
 
 from .. import logger
-
-class BilinearForm:
-    """
-    @brief 试探函数和测试函数空间相同的双线性型
-    """
-    def __init__(self, space, atype=None):
-        """
-        @brief 
-        """
-        self.space = space
-        self.dintegrators = [] # 区域积分子
-        self.bintegrators = [] # 边界积分子
-
-        self._M = None # 需要组装的矩阵 
-
-    def add_domain_integrator(self, I) -> None:
-        """
-        @brief 增加一个或多个区域积分对象
-        """
-        if isinstance(I, list):
-            self.dintegrators.extend(I)
-        else:
-            self.dintegrators.append(I)
+from ..functionspace.space import FunctionSpace
+from ..mesh.utils import Array
+from .form import Form
 
 
-    def add_boundary_integrator(self, I):
-        """
-        @brief 增加一个或多个边界积分对象
-        """
-        if isinstance(I, list):
-            self.bintegrators.extend(I)
-        else:
-            self.bintegrators.append(I)
+_FS = TypeVar('_FS', bound=FunctionSpace)
+
+
+class BilinearForm(Form[_FS]):
+    def check_local_shape(self, entity_to_global: Array, local_tensor: Array):
+        if entity_to_global.ndim != 2:
+            raise ValueError("entity-to-global relationship should be a 2D tensor, "
+                             f"but got shape {tuple(entity_to_global.shape)}.")
+        if entity_to_global.shape[0] != local_tensor.shape[0]:
+            raise ValueError(f"entity_to_global.shape[0] != local_tensor.shape[0]")
+        if local_tensor.ndim not in (3, 4):
+            raise ValueError("Output of operator integrators should be 3D "
+                             "(or 4D with batch in the first dimension), "
+                             f"but got shape {tuple(local_tensor.shape)}.")
 
     def assembly(self):
         """
         @brief 数值积分组装
+
+        @note space 可能是以下的情形
+            * 标量空间
+            * 由标量空间组成的向量空间
+            * 由标量空间组成的张量空间
+            * 向量空间（基函数是向量型的）
+            * 张量空间（基函数是张量型的
         """
+        if isinstance(self.space, tuple) and not isinstance(self.space[0], tuple):
+            # 由标量函数空间组成的向量函数空间
+            return self.assembly_for_vspace_with_scalar_basis()
+        else:
+            # 标量函数空间或基是向量函数的向量函数空间
+            return self.assembly_for_sspace_and_vspace_with_vector_basis(retain_ints=False)
+    
+    def assembly_for_sspace_and_vspace_with_vector_basis(self, retain_ints: bool) ->BCOO:
+        
         space = self.space
-        ldof = space.number_of_local_dofs()
         gdof = space.number_of_global_dofs()
+        global_mat_shape = (gdof, gdof)
+        
+        M = BCOO._empty(shape=global_mat_shape, dtype=space.ftype, index_dtype=space.itype)
+        
+        for group in self.integrators.keys():
+            group_tensor, e2dof = self._assembly_group(group, retain_ints)
+            # Broadcast and flatten indices I and J
+            I = jnp.broadcast_to(e2dof[:, :, None], shape=group_tensor.shape)
+            J = jnp.broadcast_to(e2dof[:, None, :], shape=group_tensor.shape)
+            I = I.ravel()
+            J = J.ravel()
+            indices = jnp.stack([I, J], axis=0).T
+            M += BCOO((group_tensor.ravel(), indices), shape=global_mat_shape)
+        self.M = M
+        
+        return self.M
+    
+    def assembly_for_vspace_with_scalar_basis(self, retain_ints: bool) -> BCOO:
+        pass
 
-        mesh = space.mesh
-        NC = mesh.number_of_cells()
-        CM = self.dintegrators[0].assembly_cell_matrix(space) 
-        for di in self.dintegrators[1:]:
-            CM = CM + di.assembly_cell_matrix(space)
+    def mult(self, x: Array, out: Optional[Array]=None) -> Array:
+        """Maxtrix vector multiplication.
 
-        cell2dof = space.cell_to_dof()
-        I = jnp.broadcast_to(cell2dof[:, :, None], shape=CM.shape)
-        J = jnp.broadcast_to(cell2dof[:, None, :], shape=CM.shape)
-        self._M = csr_matrix((CM.ravel(), (I.ravel(), J.ravel())), shape=(gdof, gdof))
+        Args:
+            x (Tensor): Vector, accepts batch on the first dimension.
+            out (Tensor, optional): Output vector. Defaults to None.
 
-        logger.info(f"Finished construct bilinear from matrix with shape {self._M.shape}.")
-        return self._M
+        Returns:
+            Tensor: self @ x
+        """
+        raise NotImplementedError

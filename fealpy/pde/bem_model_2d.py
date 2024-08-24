@@ -239,7 +239,7 @@ class PoissonModelConstantDirichletBC2d:
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        val = -2 * pi * pi * np.sin(pi * x) * np.sin(pi * y)
+        val = 2 * pi * pi * np.sin(pi * x) * np.sin(pi * y)
         return val
 
     def gradient(self, p):

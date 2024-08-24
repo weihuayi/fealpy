@@ -1,5 +1,5 @@
 
-from typing import Dict, Optional, Union
+from typing import Tuple, Optional, Union
 
 import torch
 
@@ -10,69 +10,40 @@ _device = torch.device
 
 class Quadrature():
     r"""Base class for quadrature generators."""
-    def __init__(self, in_memory: bool=True,
+    def __init__(self, index: Optional[int]=None, *,
                  dtype: Optional[_dtype]=None,
                  device: Union[_device, str, None]=None) -> None:
-        self._cache: Optional[Dict[int, Tensor]] = {} if in_memory else None
-        self._latest_order = -1
         self.dtype = dtype
         self.device = device
+        self.quadpts, self.weights = self.make(index)
 
     def __len__(self) -> int:
         return self.number_of_quadrature_points()
 
-    def _get_latest_order(self, order: Optional[int]=None) -> int:
-        if order is not None:
-            if (not isinstance(order, int)) or (order <= 0):
-                raise ValueError("The order must be a positive integer.")
-            self._latest_order = order
-            return order
-        if self._latest_order == -1:
-            raise ValueError("The order has not been specified yet.")
-        return self._latest_order
+    def __getitem__(self, i: int) -> Tensor:
+        return self.get_quadrature_point_and_weight(i)
 
-    def __getitem__(self, order: int) -> Tensor:
-        return self.get(order)
-
-    def __getattr__(self, name: str):
-        if name not in {'quadpts', 'weights'}:
-            return super().__getattr__(name)
-        else:
-            if name == 'quadpts':
-                return self.get_quadrature_points_and_weights()[0]
-            else:
-                return self.get_quadrature_points_and_weights()[1]
-
-    def get(self, order: int, *, refresh: bool=False) -> Tensor:
-        self._latest_order = order
-        if self._cache is not None:
-            if (order in self._cache) and (not refresh):
-                return self._cache[order]
-            else:
-                result = self.make(order)
-                self._cache[order] = result
-                return result
-        else:
-            return self.make(order)
-
-    def clear(self) -> None:
-        self._cache.clear()
-
-    def make(self, order: int) -> Tensor:
+    def make(self, index: int) -> Tensor:
         raise NotImplementedError
 
-    def number_of_quadrature_points(self, order: Optional[int]=None) -> int:
-        if order is None:
-            order = self._get_latest_order(order)
-        qw = self.get(order)
-        return qw.shape[0]
+    def number_of_quadrature_points(self) -> int:
+        return self.weights.shape[0]
 
-    def get_quadrature_points_and_weights(self, order: Optional[int]=None) -> Tensor:
-        if order is None:
-            order = self._get_latest_order(order)
-        return self[order][:, :-1], self[order][:, -1]
+    def get_quadrature_points_and_weights(self) -> Tuple[Tensor, Tensor]:
+        """Get all quadrature points and weights in the formula.
 
-    def get_quadrature_point_and_weight(self, i: int, order: Optional[int]=None) -> Tensor:
-        if order is None:
-            order = self._get_latest_order(order)
-        return self[order][i, :-1], self[order][i, -1]
+        Returns:
+            (Tensor, Tensor): Quadrature points and weights.
+        """
+        return self.quadpts, self.weights
+
+    def get_quadrature_point_and_weight(self, i: int) -> Tuple[Tensor, Tensor]:
+        """Get the i-th quadrature point and weight.
+
+        Parameters:
+            i (int): _description_
+
+        Returns:
+            (Tensor, Tensor): A quadrature point and weight.
+        """
+        return self.quadpts[i, :], self.weights[i]

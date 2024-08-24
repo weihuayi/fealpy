@@ -65,7 +65,7 @@ class UniformMesh3d(Mesh, Plotable):
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
 
         # Data structure for finite element computation
-        self.ds: StructureMesh2dDataStructure = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype=itype)
+        self.ds: StructureMesh3dDataStructure = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype=itype)
 
 
     ## @ingroup GeneralInterface

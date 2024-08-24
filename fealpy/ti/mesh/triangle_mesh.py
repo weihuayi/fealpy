@@ -1,57 +1,48 @@
 from typing import Union
+
 import numpy as np
 import taichi as ti
 
-from ..utils import to_taichi_field
+from .. import logger
+from .. import numpy as tnp  # the numpy-like interface in taichi 
+
+from .utils import EntityName, Entity
+from .quadrature import TriangleQuadrature, GaussLegendreQuadrature
+from .mesh_base import SimplexMesh 
 
 @ti.data_oriented
-class TriangleMeshDataStructure:
-    def __init__(self, NN, cell):
-        # 使用 NumPy 数组初始化字段
-        self.NN = NN
+class TriangleMesh(SimplexMesh):
+    def __init__(self, node: Entity, cell: Entity):
+
+        TD = 2 # the topology dimension
+        super().__init__(node.shape[0], TD)
+        self.node = node 
         self.cell = cell
-        self.localEdge = to_taichi_field(np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int32))
-        self.localFace = to_taichi_field(np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int32))
-        self.ccw = to_taichi_field(np.array([0, 1, 2], dtype=np.int32))
-        self.localCell = to_taichi_field(np.array([
+        kwargs = {'dtype': cell.dtype}
+        self.localEdge = tnp.field([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localFace = tnp.field([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.ccw = tnp.field([0, 1, 2], **kwargs)
+        self.localCell = tnp.field([
             (0, 1, 2),
             (1, 2, 0),
-            (2, 0, 1)], dtype=np.int32))
+            (2, 0, 1)], **kwargs)
+        self.construct()
 
-
-    # 访问或操作数据的示例方法
-    @ti.kernel
-    def print_data(self):
-        for i in range(3):
-            print(f'ccw[{i}] = {self.ccw[i]}')
-            for j in range(2):
-                print(f'localEdge[{i}, {j}] = {self.localEdge[i, j]}')
-                print(f'localFace[{i}, {j}] = {self.localFace[i, j]}')
-            for j in range(3):
-                print(f'localCell[{i}, {j}] = {self.localCell[i, j]}')
-
-@ti.data_oriented
-class TriangleMesh():
-    def __init__(self, node: ti.types.field, cell: ti.types.field):
-        self.node = node 
-        NN = node.shape[0]
-        self.ds = TriangleMeshDataStructure(NN, cell) 
-
-        self.ftype = self.node.dtype
-        self.itype = self.ds.cell.dtype
         self.p = 1  # 平面三角形
-
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
 
-    def top_dimension(self):
-        return 2
+    def quadrature_formula(self, index: int, etype='cell'):
+        if etype in ('cell', 2):
+            return TriangleQuadrature(index)
+        elif etype in ('face', 'edge', 1):
+            return GaussLegendreQuadrature(index) 
 
-    def geo_dimension(self):
-        return self.node.shape[1]
+    quadrature_rule = quadrature_formula
+
 
     def view(self, name='Window Title', res=(640, 360), fps_limit=200, pos = (150, 150)): 
         GD = self.geo_dimension()
@@ -71,8 +62,8 @@ class TriangleMesh():
 
     @classmethod
     def from_numpy_mesh(cls, mesh): 
-        node = to_taichi_field(mesh.entity('node'))
-        cell = to_taichi_field(mesh.entity('cell'))
+        node = tnp.array(mesh.entity('node'))
+        cell = tnp.array(mesh.entity('cell'))
         return cls(node, cell)
 
 

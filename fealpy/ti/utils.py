@@ -1,4 +1,5 @@
 from typing import Union
+
 import numpy as np
 import taichi as ti
 
@@ -18,22 +19,10 @@ def numpy_to_taichi_dtype(np_dtype):
     else:
         raise ValueError(f"Unsupported dtype: {np_dtype}")
 
-def to_taichi_ndarray(arr: Union[np.ndarray, ti.types.ndarray]):
-    if isinstance(arr, np.ndarray):
-        tarr = ti.ndarray(dtype=dtype_map[arr.dtype], shape=arr.shape)
-        tarr.from_numpy(arr)
-        return tarr
-    elif isinstance(arr, ti.types.ndarray):
-        return arr
-    else:
-        raise ValueError(f"Unsupported array: {arr.dtype}")
-
-def to_taichi_field(arr: Union[np.ndarray, ti.types.template]):
+def to_taichi_field(arr):
     if isinstance(arr, np.ndarray):
         tarr = ti.field(dtype=dtype_map[arr.dtype], shape=arr.shape)
         tarr.from_numpy(arr)
         return tarr
-    elif isinstance(arr, ti.types.template):
-        return arr
     else:
-        raise ValueError(f"Unsupported array: {arr.dtype}")
+        return arr

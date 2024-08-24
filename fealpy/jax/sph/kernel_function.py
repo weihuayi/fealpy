@@ -1,10 +1,10 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import jax.numpy as jnp
 from jax import grad
 
 
-class KernelFunctionBase():
+class KernelFunctionBase(ABC):
     def __init__(self, h: float):
         self.h_derivative = 1.0/h
 
@@ -32,7 +32,7 @@ class QuinticKernel(KernelFunctionBase):
         elif dim == 3:
             self.alpha = 3.0/359.0/jnp.pi * self.h_derivative**3
 
-    def value(self,r):
+    def value(self, r):
         q = r * self.h_derivative
         q0 = jnp.maximum(0.0,1.0-q)
         q1 = jnp.maximum(0.0,2.0-q)

@@ -1,6 +1,6 @@
 import numpy as np
 
-class RB_IGCT_doping():
+class RB_IGCT_Doping():
     '''
     对应于 RB_IGCT 网格的掺杂函数
     '''
@@ -8,9 +8,9 @@ class RB_IGCT_doping():
         pass
     
     def __call__(self,p):
-        return TotalDoping(p)
+        return self.TotalDoping(p)
 
-    def Erfc(x):
+    def Erfc(self,x):
         a = [-1.26551223,1.00002368,0.37409196,0.09678418,-0.18628806,0.27886807,
             -1.13520398,1.48851587,-0.82215223,0.17087277]
         v = np.ones(len(x))
@@ -25,13 +25,13 @@ class RB_IGCT_doping():
         v[x<0]=2.0-v[x<0]
         return v
 
-    def Erf(x):
-        return 1.0 - Erfc(x)
+    def Erf(self,x):
+        return 1.0 - self.Erfc(x)
 
-    def Gaussian(x):
+    def Gaussian(self,x):
         return np.exp(-x*x)
 
-    def TotalDoping(node):
+    def TotalDoping(self,node):
         # 传入空间坐标，传出总掺杂浓度
         # 逐步工艺叠加，分别计算 Nd 和 Na，最后相减得到总掺杂浓度
         base = 1.0
@@ -71,10 +71,10 @@ class RB_IGCT_doping():
 
         # 在扩散 baseline 的正下方
         distance_to_baseline = node[down_baseline_flag,1]
-        Nd[down_baseline_flag] += peak_n_emitter/2.0*(1.0+Erf((n_emitter_symmetric_position-distance_to_baseline)/n_emitter_erf_length))
+        Nd[down_baseline_flag] += peak_n_emitter/2.0*(1.0+self.Erf((n_emitter_symmetric_position-distance_to_baseline)/n_emitter_erf_length))
         # 若在扩散 baseline 的右侧, 横向使用 error function分布
         distance_to_baseline = node[right_baseline_flag,1]
-        doping_vertical = peak_n_emitter/2.0*(1.0+Erf((n_emitter_symmetric_position-distance_to_baseline) / n_emitter_erf_length))
+        doping_vertical = peak_n_emitter/2.0*(1.0+self.Erf((n_emitter_symmetric_position-distance_to_baseline) / n_emitter_erf_length))
         std_dev_y = n_emitter_erf_length/np.sqrt(2.0)
         std_dev_x = lateral_factor*std_dev_y;
         Nd[right_baseline_flag] +=doping_vertical*np.exp(-0.5*(node[right_baseline_flag,0]-L_n_emitter_baseline)*(node[right_baseline_flag,0]-L_n_emitter_baseline)/std_dev_x/std_dev_x);
@@ -82,19 +82,19 @@ class RB_IGCT_doping():
         # 顶部的 p+ base，通过 gaussian function 添加
         p_plus_base_length = 23.0 / base;
         distance_to_baseline = node[:,1];
-        Na += peak_p_plus_base*Gaussian(distance_to_baseline/p_plus_base_length)
+        Na += peak_p_plus_base*self.Gaussian(distance_to_baseline/p_plus_base_length)
 
         # 底部的 p base，通过 gaussian function 添加
         p_base_length = 69.0/base
         distance_to_baseline = H_total - y
-        Na += peak_p_base_anode*Gaussian(distance_to_baseline/p_base_length)
+        Na += peak_p_base_anode*self.Gaussian(distance_to_baseline/p_base_length)
 
 
         # 底部的 p emitter，通过 gaussian function 添加
         p_emitter_length = 6.1/base
         distance_to_baseline = H_total - y;
-        Na += peak_p_emitter*Gaussian(distance_to_baseline/p_emitter_length);
-        return (Nd-Na)/1e20
+        Na += peak_p_emitter*self.Gaussian(distance_to_baseline/p_emitter_length);
+        return np.abs(Nd-Na)/1e20
 
 class BJT_doping():
     '''
@@ -190,5 +190,5 @@ class BJT_doping():
         p_emitter_length = 35.0
         distance_to_baseline = H_total - node[:,1];
         Nd += peak_n_emitter*Gaussian(distance_to_baseline/n_collector_length);
-        return (Nd-Na)/1e20
+        return np.abs(Nd-Na)/1e20
 

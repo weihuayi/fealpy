@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
@@ -11,17 +10,14 @@ from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 
 #区域积分子
-from fealpy.fem import ScalarDiffusionIntegrator, NonlinearScalarMassIntegrator
+from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
 from fealpy.fem import ScalarSourceIntegrator
 
 #界面积分子
 from fealpy.fem import ScalarInterfaceIntegrator 
 
 #双线性形
-from fealpy.fem import BilinearForm
-
-#线性形
-from fealpy.fem import LinearForm
+from fealpy.fem import NonlinearForm
 
 import numpy as np
 from fealpy.decorator import cartesian
@@ -37,9 +33,9 @@ class LineInterfaceData():
         self.b1 = b[1]
         self.domain = domain
     def interface_position(self, p):
-        
+
         return p[..., 1] - 1
-    
+
     def is_interface(self, p):
 
         y = p[..., 1]
@@ -65,7 +61,7 @@ class LineInterfaceData():
     #反应项系数
     @cartesian
     def reaction_coefficient(self, p):
- 
+
         flag = self.subdomain(p)
         B_coe = np.zeros(p.shape[:-1], dtype = np.float64)
         B_coe[flag[0]] = self.b0
@@ -140,7 +136,7 @@ class LineInterfaceData():
     def dirichlet(self,p):
 
         return self.solution(p)
-    
+
     @cartesian
     def interfaceFun(self, p):
 
@@ -169,7 +165,7 @@ class LineInterfaceData():
 
 #寻找界面边索引
 def interface_edge_index(mesh, pde):
-    
+
     node = mesh.entity("node")
     edge = mesh.entity("edge")
     interface = pde.interface_position
@@ -178,7 +174,16 @@ def interface_edge_index(mesh, pde):
     InterfaceEdgeIdx = np.nonzero(isInterfaceEdge)
     InterfaceEdgeIdx = InterfaceEdgeIdx[0]
     return InterfaceEdgeIdx
+#非线性项函数以及导函数形式
+def nonlinear_func(u):
 
+    val = u**3
+    return val
+
+def nonlinear_gradient_func(u):
+
+    val = 3*u**2
+    return val
 
 domain = [0, 1, 0, 2]
 a = [10, 1]
@@ -206,34 +211,25 @@ for i in range(maxit):
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
     isIDof = ~isDDof
 
-    D = ScalarDiffusionIntegrator(c=pde.diffusion_coefficient, q=p+2)
-    M = NonlinearScalarMassIntegrator(uh=u0, uh_c=[3,2], c=pde.reaction_coefficient, q=p+2)
+    D = ScalarDiffusionIntegrator(uh=u0, c=pde.diffusion_coefficient, q=p+2)
+    M = ScalarMassIntegrator(uh=u0, uh_func=nonlinear_func, grad_uh_func=nonlinear_gradient_func, c=pde.reaction_coefficient, q=p+2)
 
     f = ScalarSourceIntegrator(pde.source, q=p+2)
     I = ScalarInterfaceIntegrator(gI=pde.interfaceFun,  threshold=interface_edge_index(mesh, pde) , q=p+2)
 
     while True:
-        b = BilinearForm(space)
-        b_0 = BilinearForm(space)
-        b_1 = BilinearForm(space)
-        b.add_domain_integrator([D, M])
-        b_0.add_domain_integrator([D])
-        b_1.add_domain_integrator([M])
-
-        l = LinearForm(space)
-        l.add_domain_integrator([f])
-        l.add_boundary_integrator([I])
-
-        A = b.assembly() 
-        F = l.assembly() - b_0.assembly() @ u0 - 1/3 * b_1.assembly() @ u0
+        n = NonlinearForm(space)
+        n.add_domain_integrator([D, M, f])
+        n.add_boundary_integrator([I])
+        A, F = n.assembly()
 
         du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
         u0 += du
         err = np.max(np.abs(du))
-    
+
         if err < tol:
             break
-    
+
     uI = space.interpolate(pde.solution)
     errorMatrix[0, i] = mesh.error(pde.solution, u0, q=p+2)
     errorMatrix[1, i] = mesh.error(pde.gradient, u0.grad_value, q=p+2)

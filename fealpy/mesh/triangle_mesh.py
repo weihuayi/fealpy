@@ -92,7 +92,7 @@ class TriangleMesh(Mesh, Plotable):
         R = self._grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index)
-            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda, optimize=True)
+            gphi = np.einsum('...ij, kjm-> ...kim', R, Dlambda, optimize=True)
             return gphi  # (NQ, NC, ldof, GD)
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
@@ -242,6 +242,8 @@ class TriangleMesh(Mesh, Plotable):
         """
         """
         cell = self.entity('cell')
+        if p == 0:
+            return np.arange(len(cell)).reshape((-1, 1))[index]
         if p == 1:
             return cell[index]
 
@@ -1146,6 +1148,90 @@ class TriangleMesh(Mesh, Plotable):
 
         if rflag == True:
             self.ds.construct()
+    
+    def delete_degree_4(self):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        edge = self.entity('edge')
+        
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        isBdNode = self.ds.boundary_node_flag()
+        isFreeNode = ~isBdNode
+
+        node2node = self.ds.node_to_node()
+        node2cell = self.ds.node_to_cell()
+
+        degree = np.array(np.sum(node2cell > 0, axis=1)).reshape(-1)
+        degree4flag = isFreeNode & (degree == 4)
+        nodemap = np.arange(NN)
+        degree4node = nodemap[degree4flag] # 得到度为4的节点编号
+        
+        degree4 = node2node[degree4node]
+        nonzero_indices = degree4.nonzero()
+        d4node = np.vstack(nonzero_indices).T # 度为4节点的相邻节点编号
+        d4node[:,0] = np.repeat(d4node[::4,1],4)
+        connect = node2node[d4node[:,0],d4node[:,1]]
+        connect = connect.reshape(-1,4) # 找到度为4节点相邻节点的对点
+
+        cdegree = degree[d4node[:,1]]
+        cdegree = cdegree.reshape(-1,4) # 度为4相邻节点的度数
+        cnode = d4node[:,1].reshape(-1,4) # 度为4相邻节点的编号
+
+        mindegree = np.argmin(cdegree,axis=1) # 找到相邻节点中度最小的节点
+        mindegreeflag = np.array(connect[np.arange(len(mindegree)),mindegree]).reshape(-1)
+
+        degree4cell = node2cell[degree4node] # 找到度为4节点所在的单元编号
+        nonzero_indices = degree4cell.nonzero()
+        d4cell = np.vstack(nonzero_indices).T
+
+        maskcell = np.ones(NC,dtype=np.bool_)
+        maskcell[d4cell[:,1]] = False
+        newcell0 = cell[maskcell] # 去除度为4节点所在的单元
+        
+        newcell1 = np.zeros((cdegree.shape[0],3),dtype=np.int_)
+        newcell2 = np.zeros((cdegree.shape[0],3),dtype=np.int_)
+
+        # 确定度为4节点相邻节点中度最小节点的对点
+        true_idx = np.argwhere(connect)
+        false_idx = np.argwhere(connect==False)
+        true_idx = cnode[true_idx[:,0],true_idx[:,1]]
+        false_idx = cnode[false_idx[:,0],false_idx[:,1]]
+        true_idx = true_idx.reshape(-1,2)
+        false_idx = false_idx.reshape(-1,2)
+        
+        # 连接度最小的节点和其对点，生成两个三角形
+        newcell1[mindegreeflag,:2] = true_idx[mindegreeflag]
+        newcell2[mindegreeflag,:2] = true_idx[mindegreeflag]
+        newcell1[~mindegreeflag,:2] = false_idx[~mindegreeflag]
+        newcell2[~mindegreeflag,:2] = false_idx[~mindegreeflag]
+        newcell1[mindegreeflag,2] = false_idx[mindegreeflag,0]
+        newcell2[mindegreeflag,2] = false_idx[mindegreeflag,1]
+        newcell1[~mindegreeflag,2] = true_idx[~mindegreeflag,0]
+        newcell2[~mindegreeflag,2] = true_idx[~mindegreeflag,1]
+        newcell = np.r_[newcell1,newcell2]
+        
+        # 调整单元节点编号顺序
+        newcell = np.r_[newcell1,newcell2]
+        v1 = node[newcell[:,1]]-node[newcell[:,0]]
+        v2 = node[newcell[:,2]]-node[newcell[:,0]]
+        flag = np.cross(v1,v2)
+        newcell[flag<0,0],newcell[flag<0,1] = newcell[flag<0,1],newcell[flag<0,0]
+        
+        newcell = np.r_[newcell0,newcell]# 新的单元
+
+        masknode = np.ones(NN,dtype=np.bool_)
+        masknode[degree4node] = False
+        newnode = node[masknode] # 删除度为4的节点
+
+        node_map = np.full(NN,-1)
+        node_map[masknode] = np.arange(len(newnode))
+        newcell = node_map[newcell] # 根据新的节点编号调整单元节点编号
+
+        self.node = newnode
+        NN = newnode.shape[0]
+        self.ds.reinit(NN,newcell)
 
     @staticmethod
     def adaptive_options(
@@ -1713,6 +1799,12 @@ class TriangleMesh(Mesh, Plotable):
             uh, triangles=cell, cmap=cmap, lw=0.0)
         axes.figure.colorbar(cax, ax=axes)
         return axes
+
+    @classmethod
+    def show_multi_index(cls, p=1):
+        """
+        """
+        pass
 
     @classmethod
     def show_lattice(cls, p=1, showmultiindex=False):

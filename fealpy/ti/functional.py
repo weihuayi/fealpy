@@ -1,6 +1,4 @@
-import taichi as ti
-import numpy as np
-import re
+
 
 def einsum(equation, *operands):
     """

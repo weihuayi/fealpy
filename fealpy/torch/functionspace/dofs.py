@@ -29,7 +29,7 @@ class LinearMeshCFEDof(Generic[_MT]):
             if (index.dtype == torch.bool) and (len(index) == gdof):
                 return index
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index = self.mesh.boundary_face_index()
             if callable(threshold):
                 bc = self.mesh.entity_barycenter(TD-1, index=index)
                 flag = threshold(bc)

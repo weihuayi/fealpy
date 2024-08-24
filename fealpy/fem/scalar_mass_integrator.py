@@ -1,5 +1,4 @@
 import numpy as np
-from pyamg import test
 from fealpy.fem.precomp_data import data
 
 class ScalarMassIntegrator:
@@ -7,7 +6,10 @@ class ScalarMassIntegrator:
     @note (c u, v)
     """    
 
-    def __init__(self, c=None, q=None):
+    def __init__(self, uh=None, uh_func=None, grad_uh_func=None, c=None, q=None):
+        self.uh = uh
+        self.uh_func = uh_func
+        self.grad_uh_func = grad_uh_func
         self.coef = c
         self.q = q
         self.type = 'BL3'
@@ -20,9 +22,11 @@ class ScalarMassIntegrator:
 
         q = self.q if self.q is not None else space.p+1
         coef = self.coef
-        
+        uh = self.uh
+        grad_uh_func = self.grad_uh_func
+
         mesh = space.mesh
- 
+
         if cellmeasure is None:
             if mesh.meshtype == 'UniformMesh2d':
                  NC = mesh.number_of_cells()
@@ -55,9 +59,11 @@ class ScalarMassIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
-
+            if grad_uh_func is not None:
+                val1 = grad_uh_func(uh(bcs))
+                # coef = coef * grad_uh_func(uh(bcs))
             if np.isscalar(coef):
-                M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+                M += coef*np.einsum('q, qc, qci, qcj, c->cij', ws, val1, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ):
                     M += np.einsum('q, c, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
@@ -69,6 +75,63 @@ class ScalarMassIntegrator:
         if out is None:
             return M
 
+    def assembly_cell_vector(self, space, index=np.s_[:], cellmeasure=None, out=None):
+        """
+        @brief 组装单元向量
+
+        @param[in] space 一个标量的函数空间
+
+        """
+        coef = self.coef
+        p = space.p
+        q = self.q
+        uh = self.uh
+        uh_func = self.uh_func
+
+        q = p+3 if q is None else q
+
+        mesh = space.mesh
+        if cellmeasure is None:
+            cellmeasure = mesh.entity_measure('cell', index=index)
+
+        NC = len(cellmeasure)
+        ldof = space.dof.number_of_local_dofs() 
+        if out is None:
+            bb = np.zeros((NC, ldof), dtype=space.ftype)
+        else:
+            bb = out
+
+        qf = mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        phi = space.basis(bcs, index=index) #TODO: 考虑非重心坐标的情形
+
+        if callable(coef):
+            if hasattr(coef, 'coordtype'):
+                if coef.coordtype == 'barycentric':
+                    coef = coef(bcs, index=index)
+                elif coef.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    coef = coef(ps)
+            else: # 默认是笛卡尔
+                ps = mesh.bc_to_point(bcs, index=index)
+                coef = coef(ps)
+        else:
+            coef = coef
+        val = -coef * uh_func(uh(bcs))
+
+        if isinstance(val, (int, float)):
+            bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
+        else:
+            if val.shape == (NC, ): 
+                bb += np.einsum('q, c, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
+            else:
+                if val.shape[-1] == 1:
+                    val = val[..., 0]
+                bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
+        if out is None:
+            return bb 
+
     def assembly_cell_matrix_quickly(self, space, index=np.s_[:], cellmeasure=None,
             out=None):
         """
@@ -77,9 +140,9 @@ class ScalarMassIntegrator:
 
         q = self.q if self.q is not None else space.p+1
         coef = self.coef
-        
+
         mesh = space.mesh
- 
+
         if cellmeasure is None:
             if mesh.meshtype == 'UniformMesh2d':
                  NC = mesh.number_of_cells()
@@ -168,7 +231,7 @@ class ScalarMassIntegrator:
                  cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
             else:
                  cellmeasure = mesh.entity_measure('cell', index=index)
-        
+
         NC = len(cellmeasure)
 
         if out is None:
@@ -196,7 +259,7 @@ class ScalarMassIntegrator:
 
         if out is None:
             return M
-        
+
     def assembly_cell_matrix_ref(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         @note 基于参考单元的矩阵组装

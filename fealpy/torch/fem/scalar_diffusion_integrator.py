@@ -8,7 +8,12 @@ from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import CellOperatorIntegrator, _S, Index, CoefLike, enable_cache
+from .integrator import (
+    CellOperatorIntegrator,
+    enable_cache,
+    assemblymethod,
+    _S, Index, CoefLike
+)
 
 
 class ScalarDiffusionIntegrator(CellOperatorIntegrator):
@@ -29,7 +34,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         return space.cell_to_dof()[self.index]
 
     @enable_cache
-    def fetch(self, space: _FS) -> Tensor:
+    def fetch(self, space: _FS):
         q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
@@ -40,7 +45,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.integrator(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index
@@ -53,6 +58,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
 
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
 
+    @assemblymethod('fast')
     def fast_assembly(self, space: _FS) -> Tensor:
         """
         限制：常系数、单纯形网格
@@ -63,7 +69,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
 
         cm = mesh.entity_measure('cell', index=index)
-        qf = mesh.integrator(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='u')
 

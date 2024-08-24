@@ -113,7 +113,6 @@ class NeumannBC():
         gN = self.gN
         threshold = self.threshold if threshold is None else threshold
         F = space.set_neumann_bc(gN, F=F, threshold=threshold, q=q)
-        print("F:", F.shape)
 
         if A is not None: # pure Neumann condtion
             c = space.integral_basis()

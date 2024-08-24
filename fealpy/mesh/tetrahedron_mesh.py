@@ -35,6 +35,9 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
         return face2edgeSign
 
     def cell_to_face_permutation(self, locFace = None):
+        """
+        局部面到全局面的映射
+        """
         if locFace is None:
             locFace = self.localFace
 
@@ -352,6 +355,7 @@ class TetrahedronMesh(Mesh, Plotable):
         edgeIdx = np.zeros((2, p+1), dtype=np.int_)
         edgeIdx[0, :] = range(p+1)
         edgeIdx[1, :] = edgeIdx[0, -1::-1]
+
 
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -1056,6 +1060,9 @@ class TetrahedronMesh(Mesh, Plotable):
             newCell[7*NC:, 1] = p[range(NC), T[:, 0]]
             newCell[7*NC:, 2] = p[range(NC), T[:, 4]]
             newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
+            import ipdb
+            ipdb.set_trace()
+            print(newCell)
 
             self.ds.reinit(NN+NE, newCell)
 
