@@ -107,7 +107,7 @@ tmr = timer()
 next(tmr)
 
 # ps = [2, 3, 4]
-ps = [4]
+ps = [2]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
