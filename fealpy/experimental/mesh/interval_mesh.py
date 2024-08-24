@@ -276,6 +276,45 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         return cls(node, cell)
     
+    def vtk_cell_type(self):
+        VTK_LINE = 3
+        return VTK_LINE
+    
+
+    def to_vtk(self, fname=None, etype='edge', index:Index=_S):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from fealpy.mesh.vtk_extent import  write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 3-GD), dtype=bm.float64)), axis=1)
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment
+        print(node.shape, cell.shape, cellType, cell.flatten())
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+    
 
 
 '''''
