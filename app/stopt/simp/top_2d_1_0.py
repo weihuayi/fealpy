@@ -147,6 +147,7 @@ def oc(volfrac, nx, ny, rho, dc, dv, passive=None):
         return rho_new
 
 
+# Short Cantilever
 def source(points: TensorLike) -> TensorLike:
     
     val = bm.zeros(points.shape, dtype=points.dtype)
@@ -158,13 +159,26 @@ def dirichlet(points: TensorLike) -> TensorLike:
 
     return bm.zeros(points.shape, dtype=points.dtype)
 
-def is_dirichlet_boundary(points):
-    return points[:, 0] == 0.0
+def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
+    """
+    Determine which boundary edges satisfy the given property.
+
+    Args:
+        points (TensorLike): The coordinates of the points defining the edges.
+
+    Returns:
+        TensorLike: A boolean array indicating which boundary edges satisfy the property. 
+        The length of the array is NBE, which represents the number of boundary edges.
+    """
+
+    temp = (points[:, 0] == 0.0)
+
+    return temp
 
 
 # Default input parameters
-nx = 32
-ny = 20
+nx = 3
+ny = 2
 volfrac = 0.5
 penal = 3.0
 rmin = 1.5
@@ -226,11 +240,10 @@ while change > 0.01 and loop < 2000:
     F = tensor_space.interpolate(source)
     
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
-    isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
-    isDDofs = tensor_space.is_boundary_dof(threshold=None)
+    isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary_edge)
 
     F = dbc.check_vector(F)
-    uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary)
+    uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary_edge)
     F = F - K.matmul(uh[:])
     F[isDDof] = uh[isDDof]
     

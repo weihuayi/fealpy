@@ -9,11 +9,6 @@ logger.setLevel('WARNING')
 from fealpy.experimental.backend import backend_manager as bm
 
 
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.solver import cg
 
 
 
@@ -48,9 +43,14 @@ parser.add_argument('--meshtype',
                     )
 
 args = parser.parse_args()
-
-
 bm.set_backend(args.backend)
+
+from fealpy.experimental.functionspace import LagrangeFESpace
+from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
+from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.experimental.fem import DirichletBCOperator
+from fealpy.experimental.solver import cg
+
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -102,9 +102,10 @@ for i in range(maxit):
     lform = LinearForm(space)
     lform.add_integrator(ScalarSourceIntegrator(pde.source))
 
-    A = bform.assembly()
     F = lform.assembly()
     tmr.send(f'第{i}次矩组装时间')
+
+    bcop = DirichletBCOperator(bform, gd=pde.dirichlet)
 
     gdof = space.number_of_global_dofs()
     A, F = DirichletBC(space, gd = pde.solution).apply(A, F)

@@ -1,29 +1,22 @@
+from fealpy.experimental.backend import backend_manager as bm
+# bm.set_backend('numpy')
+bm.set_backend('pytorch')
+# bm.set_backend('jax')
+
 from fealpy.experimental.mesh import TriangleMesh
-from fealpy.mesh import TriangleMesh as TriangleMesh_old
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, \
                                     BilinearForm, LinearForm, \
                                     VectorSourceIntegrator
 
-from fealpy.fem import LinearElasticityOperatorIntegrator as LinearElasticityIntegrator_old
-from fealpy.fem import VectorSourceIntegrator as VectorSourceIntegrator_old
-from fealpy.fem import BilinearForm as BilinearForm_old
-from fealpy.fem import LinearForm as LinearForm_old
-from fealpy.fem import DirichletBC as DirichletBC_old
-
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.functionspace import LagrangeFESpace as LagrangeFESpace_old
 
 from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.backend import backend_manager as bm
+
 from fealpy.experimental.solver import cg
 from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 
-
-# bm.set_backend('numpy')
-bm.set_backend('pytorch')
-# bm.set_backend('jax')
 
 # 平面应变问题定义
 def source(points: TensorLike) -> TensorLike:
