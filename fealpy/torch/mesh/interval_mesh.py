@@ -129,3 +129,38 @@ class IntervalMesh(SimplexMesh):
         face2bdnode = I[face]
 
         return cls(node=node, cell=face2bdnode)
+    
+    def to_vtk(self, etype='edge', index=np.s_[:], fname=None):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = np.c_[node, np.zeros((node.shape[0], 3-GD))]
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = np.c_[np.zeros((NC, 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment
+
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+

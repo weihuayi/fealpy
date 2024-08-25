@@ -386,18 +386,9 @@ class QuadrangleMesh(TensorMesh, Plotable):
             VTK_LINE = 3
             return VTK_LINE
 
-    def to_vtk(self, etype='cell', index: Index = _S, fname=None):
-        """
-        Parameters
-        ----------
-
-        Notes
-        -----
-        把网格转化为 VTK 的格式
-        """
-        raise NotImplementedError
-
-        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+    def to_vtk(self, fname=None, etype='cell', index: Index=_S):
+        
+        from fealpy.mesh.vtk_extent import  write_to_vtu
 
         node = self.entity('node')
         GD = self.GD
@@ -408,7 +399,8 @@ class QuadrangleMesh(TensorMesh, Plotable):
         cellType = self.vtk_cell_type(etype)
         NV = cell.shape[-1]
 
-        cell = bm.concatenate([NV, cell], axis=1)
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
 
         NC = len(cell)
         if fname is None:

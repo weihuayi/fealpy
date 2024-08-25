@@ -10,8 +10,6 @@ from fealpy.experimental.backend import backend_manager as bm
 
 
 
-
-
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -24,7 +22,7 @@ parser.add_argument('--degree',
 
 parser.add_argument('--n',
         default=4, type=int,
-        help='初始网格剖分段数.')
+        help='初始网格剖分段数，默认每个方向剖分 4 段')
 
 parser.add_argument('--maxit',
         default=4, type=int,
@@ -105,13 +103,13 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send(f'第{i}次矩组装时间')
 
+    ipdb.set_trace()
     bcop = DirichletBCOperator(bform, gd=pde.dirichlet)
-
-    gdof = space.number_of_global_dofs()
-    A, F = DirichletBC(space, gd = pde.solution).apply(A, F)
+    u0 = bcop.init_solution()
+    F = bcop.apply(F, u0)
     tmr.send(f'第{i}次边界处理时间')
 
-    uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh[:] = cg(bcop, F, x0=u0, maxiter=5000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)

@@ -33,6 +33,27 @@ industrial applications.
 
 # Installation
 
+## Miniconda
+
+```bash
+mkdir -p ~/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+rm -rf ~/miniconda3/miniconda.sh
+~/miniconda3/bin/conda init bash
+```
+
+```bash
+conda create -n gpufealpy310 python=3.10
+conda activate gpufealpy310
+conda install numpy=2.0.1 -c conda-forge #2.0.1
+conda install ipython notebook -c conda-forge
+conda install jaxlib=*=*cuda* jax cuda-nvcc -c conda-forge -c nvidia # 0.4.31
+conda install cupy -c conda-forge  -c nvidia
+conda install pytorch=2.3.1 -c conda-forge -c nvidia
+
+```
+
 ## From Source (Recommanded)
 
 First, clone the FEALPy repository from GitHub
