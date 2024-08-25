@@ -6,10 +6,10 @@ from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral
-from .integrator import CellSourceIntegrator, enable_cache
+from .integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
-class ScalarSourceIntegrator(CellSourceIntegrator):
+class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
     def __init__(self, source: Optional[SourceLike]=None, q: int=3, *,
                  index: Index=_S,

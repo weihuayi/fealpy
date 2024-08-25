@@ -9,13 +9,13 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class VectorMassIntegrator(CellOperatorIntegrator):
+class VectorMassIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c u, v)
     """    
