@@ -1,14 +1,15 @@
 
 from typing import Optional
 
+from .. import logger
 from ..typing import TensorLike
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor
 from .form import Form
-from .. import logger
+from .integrator import SemilinearInt
 
 
-class SemilinearForm(Form):
+class SemilinearForm(Form[SemilinearInt]):
     _M: Optional[COOTensor] = None
     _V: Optional[COOTensor] = None
 
@@ -55,7 +56,7 @@ class SemilinearForm(Form):
                 self.memory[group] = ((ct_A, etg), (ct_F, etg))
 
             return (ct_A, etg), (ct_F, etg)
-            
+
         else:
             for int_ in INTS[1:]:
                 new_ct = int_(self.space)
@@ -106,7 +107,7 @@ class SemilinearForm(Form):
                 M = M.add(COOTensor(indices, group_tensor, sparse_shape))
 
         return M
-    
+
     def _scalar_assembly_F(self, retain_ints: bool, batch_size: int):
 
         space = self._spaces[0]
@@ -134,7 +135,7 @@ class SemilinearForm(Form):
             M = M.add(COOTensor(indices, group_tensor, sparse_shape))
 
         return M
-    
+
     def assembly(self, *, return_dense=True, coalesce=True, retain_ints: bool=False) -> COOTensor:
         """Assembly the bilinear form matrix.
 
@@ -156,4 +157,3 @@ class SemilinearForm(Form):
             return self._M, self._V.to_dense()
 
         return self._M, self._V
-    
