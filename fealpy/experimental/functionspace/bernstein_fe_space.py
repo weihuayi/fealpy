@@ -86,10 +86,11 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
         B = bcs
         B = bm.ones((NQ, p+1, TD+1), dtype=self.ftype)
-        B[:, 1:] = bcs[:, None, :]
+        # B[:, 1:] = bcs[:, None, :]
+        B = bm.set_at(B,(slice(None),slice(1,None)),bcs[:,None,:])
         B = bm.cumprod(B, axis=1)
         P = bm.arange(p+1)
-        P[0] = 1
+        P = bm.set_at(P,(0),1)
         P = bm.cumprod(P,axis=0).reshape(1, -1, 1)
         B = B/P
 
@@ -132,26 +133,27 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
         B = bcs
         B = bm.ones((NQ, p+1, TD+1), dtype=self.ftype)
-        B[:, 1:] = bcs[:, None, :]
+        # B[:, 1:] = bcs[:, None, :]
+        B = bm.set_at(B,(slice(None),slice(1,None)),bcs[:,None,:])
         B = bm.cumprod(B, axis=1)
 
         P = bm.arange(p+1)
-        P[0] = 1
+        # P[0] = 1
+        P = bm.set_at(P,(0),1)
         P = bm.cumprod(P,axis=0).reshape(1, -1, 1)
         B = B/P
 
         F = bm.zeros(B.shape, dtype=self.ftype)
-        F[:, 1:] = B[:, :-1]
-
+        # F[:, 1:] = B[:, :-1]
+        F = bm.set_at(F,(slice(None),slice(1,None)),B[:,:-1])
         shape = bcs.shape[:-1]+(ldof, TD+1)
         R = bm.zeros(shape, dtype=self.ftype)
         for i in range(TD+1):
             idx = list(range(TD+1))
             idx.remove(i)
             idx = bm.array(idx, dtype=self.itype)
-            R[..., i] = bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],
-                    axis=-1)*F[..., multiIndex[:, i], [i]]
-
+            # R[..., i] = bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]]
+            R = bm.set_at(R,(...,i),bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]])
         Dlambda = self.mesh.grad_lambda()
         gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->cqld", R, Dlambda)# TODO: optimize
         return gphi[:, index]
@@ -166,10 +168,10 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         TD = self.mesh.top_dimension()
         shape = g2phi.shape[:-1] + (TD, TD)
         hval  = bm.zeros(shape, dtype=self.ftype)
-        hval[..., 0, 0] = g2phi[..., 0]
-        hval[..., 0, 1] = g2phi[..., 1]
-        hval[..., 1, 0] = g2phi[..., 1]
-        hval[..., 1, 1] = g2phi[..., 2]
+        hval = bm.set_at(hval,(...,0,0),g2phi[..., 0])
+        hval = bm.set_at(hval,(...,0,1),g2phi[..., 1])
+        hval = bm.set_at(hval,(...,1,0),g2phi[..., 1])
+        hval = bm.set_at(hval,(...,1,1),g2phi[..., 2])
         return hval
 
     @barycentric
@@ -227,9 +229,9 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             idx = bm.where(bm.all(midxp_0>-1, axis=1))[0]
             num = midx2num(midxp_0[idx]) 
             fbeta = bm.tensor(factorial(beta))
-            symi[:] = symmetry_span_array(glambda, beta).reshape(NC, -1)[:, symidx] #(NC, N)
+            symi = bm.set_at(symi,(slice(None)),symmetry_span_array(glambda, beta).reshape(NC, -1)[:, symidx])
             c = (factorial(m)**2)*comb(p, m)/bm.prod(fbeta,axis=0,dtype=self.itype) # 数
-            Bi[:, idx] = c*phi[:, num] #(NQ, ldof)
+            Bi = bm.set_at(Bi,(slice(None),idx),c*phi[:, num])
             midxp_0 += beta[None, :]
         gmphi = bm.einsum('iql, icn->cqln', B, symLambdaBeta[:, index])
         return gmphi
@@ -320,7 +322,8 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
         l2b = self.bernstein_to_lagrange(self.p, self.TD)
         c2d = self.cell_to_dof()
-        uI[c2d] = bm.einsum('ij, cj->ci', l2b, uI[c2d])
+        #uI[c2d] = bm.einsum('ij, cj->ci', l2b, uI[c2d])
+        uI = bm.set_at(uI,(c2d),bm.einsum('ij, cj->ci', l2b, uI[c2d]))
         return uI
 
     def boundary_interpolate(self, gD: Union[Callable, int, float],
@@ -334,16 +337,17 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         f2d  = self.face_to_dof()[isbdface]
 
         isDDof = bm.zeros(gdof, dtype=bm.bool)
-        isDDof[f2d] = True
-
+        # isDDof[f2d] = True
+        isDDof = bm.set_at(isDDof,(f2d),True)
         if callable(gD):
             ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
             gD = gD(ipoints[isDDof])
 
-        uh[isDDof] = gD
-
+        # uh[isDDof] = gD
+        uh = bm.set_at(uh,(isDDof),gD)
         l2b = self.bernstein_to_lagrange(self.p, self.TD - 1) 
-        uh[f2d] = bm.einsum('ij, fj->fi', l2b, uh[f2d]) 
+        # uh[f2d] = bm.einsum('ij, fj->fi', l2b, uh[f2d])
+        uh = bm.set_at(uh,(f2d),bm.einsum('ij, fj->fi', l2b, uh[f2d])) 
         return isDDof
 
     set_dirichlet_bc = boundary_interpolate
