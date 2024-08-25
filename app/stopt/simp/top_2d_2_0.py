@@ -13,8 +13,11 @@ from fealpy.experimental.solver import cg
 
 from fealpy.experimental.backend import backend_manager as bm
 
+from math import ceil, sqrt
+
+
 # bm.set_backend('numpy')
-# bm.set_backend('pytorch')
+bm.set_backend('pytorch')
 # bm.set_backend('jax')
 
 def material_model_SIMP(rho: TensorLike, penal: float, E0: float, 
@@ -33,68 +36,108 @@ def material_model_SIMP_derivative(rho: TensorLike, penal: float, E0: float,
         dE = -penal * rho ** (penal - 1) * (E0 - Emin)
     return dE
 
-# TODO 可以使用稀疏矩阵存储
 def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
-    H = bm.zeros((NC, NC), dtype=bm.float64)
-
-    # 确定哪些单元在滤波器半径范围内
-    for i1 in range(nx):
-        for j1 in range(ny):
-            e1 = (i1) * ny + j1
-            # 确定滤波器半径 rmin 的整数边界
-            imin = max(i1 - (bm.ceil(rmin) - 1), 0.)
-            imax = min(i1 + (bm.ceil(rmin)), nx)
-            for i2 in range(int(imin), int(imax)):
-                jmin = max(j1 - (bm.ceil(rmin) - 1), 0.)
-                jmax = min(j1 + (bm.ceil(rmin)), ny)
-                for j2 in range(int(jmin), int(jmax)):
-                    e2 = i2 * ny + j2
-                    H[e1, e2] = max(0., rmin - bm.sqrt((i1-i2)**2 + (j1-j2)**2))
-
-    Hs = bm.sum(H, 1)
+    nfilter = int(nx * ny * ((2 * (ceil(rmin) - 1) + 1) ** 2))
+    iH = bm.zeros(nfilter)
+    jH = bm.zeros(nfilter)
+    sH = bm.zeros(nfilter)
+    cc = 0
+    for i in range(nx):
+        for j in range(ny):
+            row = i * ny + j
+            kk1 = int(max(i - (ceil(rmin) - 1), 0))
+            kk2 = int(min(i + ceil(rmin), nx))
+            ll1 = int(max(j - (ceil(rmin) - 1), 0))
+            ll2 = int(min(j + ceil(rmin), ny))
+            for k in range(kk1, kk2):
+                for l in range(ll1, ll2):
+                    col = k * ny + l
+                    fac = rmin - sqrt(((i-k) * (i-k) + (j-l) * (j-l)))
+                    iH[cc] = row
+                    jH[cc] = col
+                    sH[cc] = max(0.0, fac)
+                    cc = cc + 1
+    # Finalize assembly and convert to csc format
+    H = COOTensor(indices=bm.stack((iH, jH), axis=0), values=sH, spshape=(nx*ny, nx*ny)).tocsr()
+    Hs = H @ bm.ones(H.shape[1])
+    # TODO 目前 COOTensor 没有实现 sum 方法
+    # Hs = bm.sum(H, axis=1)
 
     return H, Hs
 
 # Optimality criterion
-def oc(rho, dce, dve):
-    l1 = 0
-    l2 = 1e4
-    move = 0.2
-    # reshape to perform vector operations
-    rho_new = bm.zeros(NC, dtype=bm.float64)
-    while (l2 - l1)  > 1e-4:
-        lmid = 0.5 * (l2 + l1)
-        rho_new[:] = bm.maximum(0.0, bm.maximum(rho-move, 
+def oc(rho, dce, dve, g):
+	l1 = 0
+	l2 = 1e9
+	move = 0.2
+	# reshape to perform vector operations
+	rho_new = bm.zeros(NC, dtype=bm.float64)
+	while (l2 - l1) / (l2 + l1)> 1e-3:
+		lmid = 0.5 * (l2 + l1)
+		rho_new[:] = bm.maximum(0.0, bm.maximum(rho-move, 
                                            bm.minimum(1.0, 
                                                     bm.minimum(rho+move, rho*bm.sqrt(-dce/dve/lmid)))))
         # 检查当前设计是否满足体积约束
-        if bm.sum(rho_new) - volfrac * nx * ny > 0:
-            l1 = lmid
-        else:
-            l2 = lmid
+		gt = g + bm.sum((dve * (rho_new - rho)))
+		if gt > 0 :
+			l1 = lmid
+		else:
+			l2 = lmid
+               
+	return rho_new, gt
 
-    return rho_new
 
-
+# Half-MBB 
 def source(points: TensorLike) -> TensorLike:
     
     val = bm.zeros(points.shape, dtype=points.dtype)
-    val[nx*(ny+1), 1] = -1
+    val[ny, 1] = -1
     
     return val
 
 def dirichlet(points: TensorLike) -> TensorLike:
 
-    return bm.zeros(points.shape, dtype=points.dtype)
+    # return bm.zeros(points.shape, dtype=points.dtype)
+    return bm.ones(points.shape, dtype=points.dtype)
 
-def is_dirichlet_boundary(points):
+# def is_dirichlet_boundary(points: TensorLike) -> TensorLike:
+#     """
+#     Determine which boundary edges satisfy the given property.
 
-    return points[:, 0] == 0.0
+#     Args:
+#         points (TensorLike): The coordinates of the points defining the edges.
+
+#     Returns:
+#         TensorLike: A boolean array indicating which boundary edges satisfy the property. 
+#         The length of the array is NBE, which represents the number of boundary edges.
+#     """
+#     temp1 = (points[:, 0] == 0.0)
+#     temp2 = (bm.arange(len(points)) % 2 == 0)
+#     temp = temp1 & temp2
+
+#     return temp
+
+def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
+    """
+    Determine which boundary edges satisfy the given property.
+
+    Args:
+        points (TensorLike): The coordinates of the points defining the edges.
+
+    Returns:
+        TensorLike: A boolean array indicating which boundary edges satisfy the property. 
+        The length of the array is NBE, which represents the number of boundary edges.
+    """
+    temp = (points[:, 0] == 0.0)
+    # temp2 = (bm.arange(len(points)) % 2 == 0)
+    # temp = temp1 & temp2
+
+    return temp
 
 
 # Default input parameters
-nx = 3
-ny = 2
+nx = 4
+ny = 3
 volfrac = 0.5
 penal = 3.0
 rmin = 1.5
@@ -112,9 +155,9 @@ tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
 
 # Allocate design variables, initialize and allocate sens.
 rho = volfrac * bm.ones(NC, dtype=bm.float64)
-rho_old = rho.copy()
-rho_Phys = rho.copy()
-# g = 0 # must be initialized to use the NGuyen/Paulino OC approach
+rho_old = bm.copy(rho)
+rho_Phys = bm.copy(rho_old)
+g = 0 # must be initialized to use the NGuyen/Paulino OC approach
 
 # element stiffness matrix
 integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
@@ -146,10 +189,13 @@ while change > 0.01 and loop < 2000:
     F = tensor_space.interpolate(source)
     
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
-    isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
+    isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary_edge)
+    isDDof[1::2] = False
 
     F = dbc.check_vector(F)
-    uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary)
+    uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, 
+                                           threshold=is_dirichlet_boundary_edge)
+    uh[1::2] = 0
     F = F - K.matmul(uh[:])
     F[isDDof] = uh[isDDof]
     
@@ -193,9 +239,8 @@ while change > 0.01 and loop < 2000:
         dve[:] = bm.asarray(H * (dve[bm.newaxis].T / Hs))[:, 0]
 
     # Optimality criteria
-    # TODO 更新后的设计变量不对
     rho_old[:] = rho
-    rho = oc(rho=rho, dce=dce, dve=dve)
+    rho, g = oc(rho=rho, dce=dce, dve=dve, g=g)
 
     # Filter design variables
     if ft == 0:
@@ -208,4 +253,4 @@ while change > 0.01 and loop < 2000:
     
     # Write iteration history to screen
     print("it.: {0} , c.: {1:.3f} Vol.: {2:.3f}, ch.: {3:.3f}".format(
-        loop, c, bm.sum(rho) / NC, change))
+        loop, c, (g + volfrac * NC) / NC, change))

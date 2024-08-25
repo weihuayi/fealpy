@@ -105,6 +105,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.edge2cell = self.edge_to_cell()
         self.face2cell = self.edge2cell
 
+        self.localEdge = bm.array([(0, 2), (1, 3), 
+                                   (0, 1), (2, 3)], dtype=self.itype)   
+
 
     # 实体生成方法
     @entitymethod(0)
@@ -455,11 +458,11 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         Ordering of 2nd order interpolation points:
         2 --11--- 5 --14----8
         |         |         |
-        16        18        20
+        16  22    18  24    20
         |         |         |
         1 --10--- 4 --13----7
         |         |         |
-        15        17        19
+        15  21    17  23    19
         |         |         |
         0 ---9--- 3 --12--- 6
         '''
@@ -471,7 +474,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         if p <= 0:
             raise ValueError("p must be a integer larger than 0.")
         if p == 1:
-            return node
+            return self.entity('node', index=index)
 
         # TODO: Provide a unified implementation that is not backend-specific
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
@@ -489,7 +492,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             ipoints[NN + (p-1) * NE:, :] = bm.einsum('ij, kj... -> ki...', w,
                     node[cell[:]]).reshape(-1, GD)
 
-            return ipoints
+            return ipoints[index]
         elif bm.backend_name == 'jax':
             NN = self.number_of_nodes()
             gdof = self.number_of_global_ipoints(p)
@@ -506,7 +509,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             ipoints = ipoints.at[NN + (p-1) * NE:, :].set(
                 bm.einsum('ij, kj... -> ki...', w, node[cell[:]]).reshape(-1, GD))
             
-            return ipoints
+            return ipoints[index]
         else:
             raise NotImplementedError("Backend is not yet implemented.")
         
@@ -536,10 +539,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         0 ---9--- 3 ---12-- 6
         """
         # TODO: Provide an efficient implementation that is distinct from unstructured meshes
-        cell = self.entity('cell')
-
         if p == 1:
-            return cell[index]
+            return self.entity('cell', index=index)
 
         edge2cell = self.edge_to_cell()
         NN = self.number_of_nodes()

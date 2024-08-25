@@ -1,4 +1,4 @@
-from fealpy.experimental.mesh import UniformMesh2d
+from fealpy.experimental.mesh import UniformMesh3d
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, BilinearForm
@@ -51,7 +51,7 @@ def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
                     e2 = i2 * ny + j2
                     H[e1, e2] = max(0., rmin - bm.sqrt((i1-i2)**2 + (j1-j2)**2))
 
-    Hs = bm.sum(H, 1)
+    Hs = bm.sum(H)
 
     return H, Hs
 
@@ -80,7 +80,7 @@ def oc(rho, dce, dve, g):
 def source(points: TensorLike) -> TensorLike:
     
     val = bm.zeros(points.shape, dtype=points.dtype)
-    val[nx*(ny+1), 1] = -1
+    val[nx*(ny+1)*(nz+1)+(nz+1):, 1] = -1
     
     return val
 
@@ -88,28 +88,42 @@ def dirichlet(points: TensorLike) -> TensorLike:
 
     return bm.zeros(points.shape, dtype=points.dtype)
 
-def is_dirichlet_boundary(points):
+def is_dirichlet_boundary(points: TensorLike) -> TensorLike:
 
-    return points[:, 0] == 0.0
+    return points[..., 0] == 0
 
 
 # Default input parameters
-nx = 32
-ny = 20
-volfrac = 0.5
+# nx = 60
+# ny = 20
+# nz = 4
+nx = 4
+ny = 1
+nz = 2
+volfrac = 0.3
 penal = 3.0
 rmin = 1.5
 ft = 0 # ft==0 -> sens, ft==1 -> dens
 
+extent = [0, nx, 0, ny, 0, nz]
+h = [1, 1, 1]
+origin = [0, 0, 0]
+mesh = UniformMesh3d(extent, h, origin)
 
-extent = [0, nx, 0, ny]
-h = [1, 1]
-origin = [0, 0]
-mesh = UniformMesh2d(extent, h, origin)
+import matplotlib.pyplot as plt
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True, color='r', fontsize=20)
+# mesh.find_edge(axes, showindex=True, color='g', fontsize=25)
+mesh.find_face(axes, showindex=True, color='r', fontsize=20)
+mesh.find_cell(axes, showindex=True, color='b', fontsize=15)
+plt.show()
+
 NC = mesh.number_of_cells()
 p = 1
 space = LagrangeFESpace(mesh, p=p, ctype='C')
-tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
 
 # Allocate design variables, initialize and allocate sens.
 rho = volfrac * bm.ones(NC, dtype=bm.float64)
@@ -118,8 +132,7 @@ rho_Phys = rho.copy()
 g = 0 # must be initialized to use the NGuyen/Paulino OC approach
 
 # element stiffness matrix
-integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-                                        elasticity_type='stress', coef=None, q=5)
+integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, coef=None, q=5)
 KE = integrator_bi.assembly(space=tensor_space)
 
 # Filter
@@ -137,8 +150,7 @@ while change > 0.01 and loop < 2000:
     # Setup and solve FE problem
     uh = tensor_space.function()
     E = material_model_SIMP(rho=rho_Phys, penal=penal, E0=1.0, Emin=1e-9)
-    integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, 
-                                            elasticity_type='stress', coef=E, q=5)
+    integrator_bi = LinearElasticityIntegrator(E=1.0, nu=0.3, coef=E, q=5)
     KK = integrator_bi.assembly(space=tensor_space)
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_bi)
@@ -148,6 +160,7 @@ while change > 0.01 and loop < 2000:
     
     dbc = DBC(space=tensor_space, gd=dirichlet, left=False)
     isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
+    face2cell = mesh.face_to_cell()
 
     F = dbc.check_vector(F)
     uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, threshold=is_dirichlet_boundary)

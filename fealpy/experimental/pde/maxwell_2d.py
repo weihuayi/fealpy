@@ -20,6 +20,8 @@ class SinData():
         y = p[..., 1, None]
         Fx = x*y*(1 - x)*(1 - y)
         Fy = bm.sin(bm.pi*x)*bm.sin(bm.pi*y)
+        #Fx=2*x+y
+        #Fy=5*x+3 
         f = bm.concatenate([Fx, Fy], axis=-1) 
         return f 
 
@@ -32,6 +34,7 @@ class SinData():
         cos = bm.cos
 
         curlF = -x*y*(x - 1) - x*(1 - x)*(1 - y) + pi*sin(pi*y)*cos(pi*x)
+        # curlF = 4
         return curlF
 
     @cartesian
@@ -44,6 +47,8 @@ class SinData():
 
         ccFx = 2*x*(1 - x) + pi**2*cos(pi*x)*cos(pi*y)
         ccFy = x*y - x*(1 - y) - y*(1 - x) - (1 - y)*(x - 1) + pi**2*sin(pi*x)*sin(pi*y)
+        # ccFx=0*x
+        # ccFy=0*y
         ccf = bm.concatenate([ccFx, ccFy] , axis=-1)
         return ccf
 
@@ -85,7 +90,7 @@ class SinData():
         return bd
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):
-        box = [0, 1/2, 0, 1/2]
+        box = [0, 1, 0, 1]
         mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         return mesh
 

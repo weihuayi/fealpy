@@ -2,7 +2,7 @@ import time
 from fealpy.experimental.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from fealpy.iopt.ANT_TSP import calD, Ant_TSP
-# bm.set_backend('pytorch')
+bm.set_backend('pytorch')
 
 # 导入数据(34个城市)
 citys = bm.array([
@@ -107,6 +107,7 @@ print(f"运行时间: {elapsed_time}秒")
 print('Shortest distance:', Best_length)
 print('Shortest path:', Best_path)
 
+'''
 # 绘图
 plt.figure(1)
 x_values = bm.concatenate((citys[Best_path, 0], [citys[Best_path[0], 0]]))
@@ -128,3 +129,5 @@ plt.ylabel('distance')
 plt.title('changes of iterations')
 
 plt.show()
+
+'''

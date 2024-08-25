@@ -556,7 +556,6 @@ class HexahedronMesh(TensorMesh, Plotable):
         print(f"Number of cells: {cell.shape[0]}")
 
         return cls(node,cell)
-
-
-
+    
+    
 HexahedronMesh.set_ploter('3d')

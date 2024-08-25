@@ -11,13 +11,14 @@ from ..functionspace.utils import flatten_indices
 from ..mesh import HomogeneousMesh, SimplexMesh, StructuredMesh
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class LinearElasticityIntegrator(CellOperatorIntegrator):
+
+class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
     """
     The linear elasticity integrator for function spaces based on homogeneous meshes.
     """
