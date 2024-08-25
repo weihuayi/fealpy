@@ -25,11 +25,11 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
         self.coef = coef
         if hasattr(coef, 'uh'):
             self.uh = coef.uh
-            self.func = coef.func
+            self.func = coef.kernel_func
             if bm.backend_name in {'jax', 'torch'}:
                 pass
             else:
-                self.grad_func = coef.grad_func
+                self.grad_func = coef.grad_kernel_func
         self.q = q
         self.index = index
         self.batched = batched
@@ -60,8 +60,8 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        val_A = coef.grad_func(uh(bcs))  #(C, Q)
-        val_F = -coef.func(uh(bcs))      #(C, Q)
+        val_A = coef.grad_kernel_func(uh(bcs))  #(C, Q)
+        val_F = -coef.kernel_func(uh(bcs))      #(C, Q)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         coef_A = get_semilinear_coef(val_A, coef)
         coef_F = get_semilinear_coef(val_F, coef)

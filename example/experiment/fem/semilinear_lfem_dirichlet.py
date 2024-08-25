@@ -64,10 +64,10 @@ tol = 1e-8
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
-def func(u):
+def kernel_func(u):
     return u**3
 
-def grad_func(u):
+def grad_kernel_func(u):
     return 3*u**2
 
 def diffusion_coef(p):
@@ -76,8 +76,8 @@ def diffusion_coef(p):
 def reaction_coef(p):
     return pde.reaction_coefficient(p)
 
-reaction_coef.func = func
-reaction_coef.grad_func = grad_func
+reaction_coef.kernel_func = kernel_func
+reaction_coef.grad_kernel_func = grad_kernel_func
     
 for i in range(maxit):
     #定义函数空间
