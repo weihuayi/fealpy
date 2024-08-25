@@ -23,7 +23,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
         x0 (TensorLike): Initial guess for the solution, a 1D or 2D tensor.\
         Must have the same shape as b when reshaped appropriately.
         batch_first (bool, optional): Whether the batch dimension of `b` and `x0`\
-        is the first dimension. Default is False.
+        is the first dimension. Ignored if `b` is an 1-d tensor. Default is False.
         atol (float, optional): Absolute tolerance for convergence. Default is 1e-12.
         rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
         maxiter (int, optional): Maximum number of iterations allowed. Default is 10000.\
@@ -39,23 +39,17 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
         This implementation assumes that A is a symmetric positive-definite matrix,
         which is a common requirement for the Conjugate Gradient method to work correctly.
     """
-    assert isinstance(b, TensorLike), "b must be a Tensor of current backend"
+    assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
         assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
-    single_vector = False
+    single_vector = b.ndim == 1
 
-    if b.ndim in {1, 2}:
-        if b.ndim == 1:
-            b = b[:, None]
-            single_vector = True
-    else:
+    if b.ndim not in {1, 2}:
         raise ValueError("b must be a 1D or 2D dense tensor")
 
     if x0 is None:
         x0 = bm.zeros_like(b)
     else:
-        if x0.ndim == 1:
-            x0 = x0[:, None]
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
 
@@ -65,9 +59,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
 
     sol = _cg_impl(A, b, x0, atol, rtol, maxiter)
 
-    if single_vector:
-        sol = sol[:, 0]
-    elif batch_first:
+    if batch_first:
         sol = bm.swapaxes(sol, 0, 1)
 
     return sol
