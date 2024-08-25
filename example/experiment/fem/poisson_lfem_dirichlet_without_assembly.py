@@ -103,6 +103,7 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send(f'第{i}次矩组装时间')
 
+    ipdb.set_trace()
     bcop = DirichletBCOperator(bform, gd=pde.dirichlet)
     u0 = bcop.init_solution()
     F = bcop.apply(F, u0)

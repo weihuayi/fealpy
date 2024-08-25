@@ -22,7 +22,7 @@ class DirichletBCOperator():
         self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.shape = form.shape 
 
-    def init_solution(self, *kwargs):
+    def init_solution(self):
         """
         Generate the init solution with correct Dirichlet boundary
         condition.
