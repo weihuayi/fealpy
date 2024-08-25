@@ -1,15 +1,16 @@
-from typing import Sequence, overload, List, Dict, Tuple, Optional
 
-from ..backend import backend_manager as bm
+from typing import Sequence, overload, List, Dict, Tuple, Optional, TypeVar, Generic
+
 from ..typing import TensorLike, Size
-
-from .integrator import Integrator as _I
 from ..functionspace import FunctionSpace as _FS
+from .integrator import Integrator
 
 from .. import logger
 
+_I = TypeVar('_IT', bound=Integrator)
 
-class Form():
+
+class Form(Generic[_I]):
     _spaces: Tuple[_FS, ...]
     integrators: Dict[str, Tuple[_I, ...]]
     memory: Dict[str, Tuple[TensorLike, List[TensorLike]]]

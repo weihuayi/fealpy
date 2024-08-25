@@ -21,44 +21,14 @@ from fealpy.experimental.sparse import COOTensor
 
 bm.set_backend('numpy')
 
-# 平面应变问题定义
-def source(points: TensorLike) -> TensorLike:
-    x = points[..., 0]
-    y = points[..., 1]
-    
-    val = bm.zeros(points.shape, dtype=points.dtype)
-    val[..., 0] = 35/13 * y - 35/13 * y**2 + 10/13 * x - 10/13 * x**2
-    val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
-    
-    return val
-def solution(points: TensorLike) -> TensorLike:
-    x = points[..., 0]
-    y = points[..., 1]
-    
-    val = bm.zeros(points.shape, dtype=points.dtype)
-    val[..., 0] = x * (1 - x) * y * (1 - y)
-    val[..., 1] = 0
-    
-    return val
-def dirichlet(points: TensorLike) -> TensorLike:
 
-    return solution(points)
 
 extent = [0, 1, 0, 1, 0, 1]
-# extent = [0, 2, 0, 2, 0, 2]
 h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
-# ip = mesh.interpolation_points(p=1)
-# print("ip:", ip.shape, "\n", ip)
-# ip2 = mesh.interpolation_points(p=2)
-# print("ip2:", ip2.shape, "\n", ip2)
 
-# mesh_text = HexahedronMesh.from_box(extent, nx=1, ny=1, nz=1)
-# ip_text = mesh_text.interpolation_points(p=1)
-# print("ip_text:", ip_text.shape, "\n", ip_text)
-
-# import matplotlib.pyplot as plt
+face = mesh.entity('face')
 
 # fig = plt.figure()
 # axes = fig.add_subplot(111, projection='3d')

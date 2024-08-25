@@ -199,6 +199,20 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             val[..., eldof*3:eldof*3+cldof//2] = self.cross2d(gphi, v0) + phi*cv0 
             val[..., eldof*3+cldof//2:] = self.cross2d(gphi, v1) + phi*cv1 
         return val
+    
+    def edge_basis(self,bcs,index=_S):
+        p = self.p
+        mesh = self.mesh
+        bspace = self.bspace
+        fm = mesh.entity_measure('face')[index]  #(NE,)
+        fm1 = 1/fm
+        t = mesh.edge_unit_tangent()[index]      #(NE,2)
+        bphi = bspace.basis(bcs, p=p)  #(NE,NQ,ldof)
+        val = fm1[:,None,None]*bphi
+        val = val[:,:,:,None]*t[:,None,None,:]
+        return val
+        
+
 
     def is_boundary_dof(self, threshold=None):
         return self.dof.is_boundary_dof()
@@ -225,7 +239,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         val = bm.einsum("cl, cqlk->cqk", uh[c2d], phi)
         return val
 
-    @barycentric
+    @barycentric 
     def curl_value(self, uh, bcs, index=_S):
         '''@
         @brief 计算一个有限元函数在每个单元的 bc 处的值
@@ -324,26 +338,45 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         fm = mesh.entity_measure('face')[isbdFace]
         gdof = self.number_of_global_dofs()
         t = mesh.edge_unit_tangent()[isbdFace]
-
         # Bernstein 空间的单位质量矩阵
         qf = self.mesh.quadrature_formula(p+3, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         bphi = bspace.basis(bcs, p=p)
         M = bm.einsum("cql, cqm, q->lm", bphi, bphi, ws)
         Minv = bm.linalg.inv(M)
+        Minv = Minv*fm[:,None,None]
 
         points = mesh.bc_to_point(bcs)[isbdFace]
         gDval = gD(points, t) 
-
-        g = bm.einsum('cql, cq->cl', bphi, gDval)
-        uh[edge2dof] = bm.einsum('cl, lm->cm', g, Minv) # (NC, ldof)
-
+        g = bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
+        
+        uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
         # 边界自由度
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
         return isDDof
 
     boundary_interpolate = set_dirichlet_bc
+
+    def set_neumann_bc(self,h):
+        p = self.p
+        mesh = self.mesh
+        isbdFace = mesh.boundary_face_flag()
+        edge2dof = self.dof.edge_to_dof()[isbdFace]
+        fm = mesh.entity_measure('face')[isbdFace]
+        gdof = self.number_of_global_dofs()
+
+        # Bernstein 空间的单位质量矩阵
+        qf = self.mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bphi = self.edge_basis(bcs,index=isbdFace)
+        points = mesh.bc_to_point(bcs)[isbdFace]
+        hval = h(points)
+        vec = bm.zeros(gdof, dtype=self.ftype)
+        vec[edge2dof] = bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm) # (NE, ldof)
+        return vec
+ 
+
     
     # def projection(self, f, method="L2"):
     #     M = self.mass_matrix()
@@ -370,4 +403,3 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     #     val[0::2] = bm.sum(f0*e2n, axis=1)
     #     val[1::2] = bm.sum(f1*e2n, axis=1)
     #     return function(array=val)
-

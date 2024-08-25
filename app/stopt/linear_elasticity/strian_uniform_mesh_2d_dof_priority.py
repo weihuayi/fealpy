@@ -21,9 +21,9 @@ from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 
 
-bm.set_backend('numpy')
+# bm.set_backend('numpy')
 # bm.set_backend('pytorch')
-# bm.set_backend('jax')
+bm.set_backend('jax')
 
 # 平面应变问题定义
 def source(points: TensorLike) -> TensorLike:
@@ -53,16 +53,6 @@ extent = [0, 2, 0, 2]
 h = [1, 1]
 origin = [0, 0]
 mesh = UniformMesh2d(extent, h, origin)
-
-# import matplotlib.pyplot as plt
-# fig = plt.figure()
-# axes = fig.gca()
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_edge(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()
-# mesh_old = UniformMesh2d_old(extent, h, origin)
 
 maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)

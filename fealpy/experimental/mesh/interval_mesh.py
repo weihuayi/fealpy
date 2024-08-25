@@ -133,9 +133,9 @@ class IntervalMesh(SimplexMesh,Plotable):
         e2p0 = self.cell_to_ipoint(p0)
         shape = (NE, ) + phi.shape
 
-        I = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
-        J = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
-        V = bm.broadcast_to( phi[None, :, :], shape=shape).flat
+        I = bm.broadcast_to(e2p1[:, :, None], shape).flatten()
+        J = bm.broadcast_to(e2p0[:, None, :], shape).flatten()
+        V = bm.broadcast_to( phi[None, :, :], shape).flatten()
 
         P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
@@ -190,7 +190,7 @@ class IntervalMesh(SimplexMesh,Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.cell_tangent(index=index)
-        w = bm.tensor([(0, -1),(1, 0)])
+        w = bm.tensor([(0, -1),(1, 0)],dtype=bm.float64)
         return v@w
     
     def uniform_refine(self, n=1, options={}):
@@ -216,8 +216,6 @@ class IntervalMesh(SimplexMesh,Plotable):
         """
         @brief 自适应加密网格
         """
-        if bm.backend_name == 'jax':
-            raise NameError("refine currently does not support JAX ")
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells()
@@ -229,10 +227,10 @@ class IntervalMesh(SimplexMesh,Plotable):
             self.node = bm.concatenate((node,bc),axis=0) #将新的节点添加到总的节点中去，得到的node
 
             newCell = bm.zeros((NC+N, 2), dtype=self.itype)
-            newCell[:NC] = cell
-            newCell[:NC][isMarkedCell, 1] = range(NN, NN+N)
-            newCell[NC:, 0] = bm.arange(NN, NN+N)
-            newCell[NC:, 1] = cell[isMarkedCell, 1]
+            newCell = bm.set_at(newCell, slice(NC), cell)
+            newCell = bm.set_at(newCell[:NC], (isMarkedCell,1), bm.arange(NN, NN+N))
+            newCell = bm.set_at(newCell, (slice(NC, None),0), bm.arange(NN, NN+N))
+            newCell = bm.set_at(newCell, (slice(NC, None),1), cell[isMarkedCell, 1])
             self.cell = newCell
             self.construct()
                         
@@ -246,8 +244,6 @@ class IntervalMesh(SimplexMesh,Plotable):
     
     @classmethod
     def from_mesh_boundary(cls, mesh):
-        if bm.backend_name == 'jax':
-            raise NameError("refine currently does not support JAX ")
         assert mesh.top_dimension() == 2
         itype = mesh.itype
         is_bd_node = mesh.boundary_node_flag()
@@ -258,23 +254,62 @@ class IntervalMesh(SimplexMesh,Plotable):
         NN_bd = node.shape[0]
 
         I = bm.zeros((NN, ), dtype=itype)
-        I[is_bd_node] = bm.arange(NN_bd, dtype=itype)
+        bm.set_at(I, is_bd_node, bm.arange(NN_bd, dtype=itype))
         face2bdnode = I[face]
         return cls(node=node, cell=face2bdnode)
 
     @classmethod
     def from_circle_boundary(cls, center=(0, 0), radius=1.0, n=10):
         dt = 2*bm.pi/n
-        theta  = bm.arange(0, 2*bm.pi, dt)
+        theta  = bm.arange(0, 2*bm.pi, dt , dtype=bm.float64)
 
         n0 = radius*bm.cos(theta) + center[0]
         n1 = radius*bm.sin(theta) + center[1]
         node = bm.stack([n0,n1] , axis=1)
         c0 = bm.arange(n)
-        c1 = bm.concatenate((bm.arange(1,n),[0]))
+        c1 = bm.concatenate((bm.arange(1,n),bm.array([0])))
         cell = bm.stack([c0,c1] , axis = 1)
 
         return cls(node, cell)
+    
+    def vtk_cell_type(self):
+        VTK_LINE = 3
+        return VTK_LINE
+    
+
+    def to_vtk(self, fname=None, etype='edge', index:Index=_S):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from fealpy.mesh.vtk_extent import  write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 3-GD), dtype=bm.float64)), axis=1)
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment
+        print(node.shape, cell.shape, cellType, cell.flatten())
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
     
 
 

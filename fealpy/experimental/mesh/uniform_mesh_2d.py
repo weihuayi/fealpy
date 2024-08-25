@@ -105,6 +105,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.edge2cell = self.edge_to_cell()
         self.face2cell = self.edge2cell
 
+        self.localEdge = bm.array([(0, 2), (1, 3), 
+                                   (0, 1), (2, 3)], dtype=self.itype)   
+
 
     # 实体生成方法
     @entitymethod(0)
@@ -455,11 +458,11 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         Ordering of 2nd order interpolation points:
         2 --11--- 5 --14----8
         |         |         |
-        16        18        20
+        16  22    18  24    20
         |         |         |
         1 --10--- 4 --13----7
         |         |         |
-        15        17        19
+        15  21    17  23    19
         |         |         |
         0 ---9--- 3 --12--- 6
         '''

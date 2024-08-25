@@ -8,14 +8,14 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
 
-class ScalarMassIntegrator(CellOperatorIntegrator):
+class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -62,7 +62,7 @@ class ScalarMassIntegrator(CellOperatorIntegrator):
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
 
         return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
-    
+
     @assemblymethod('semilinear')
     def semilinear_assembly(self, space: _FS) -> TensorLike:
         uh = self.uh

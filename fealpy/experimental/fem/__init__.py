@@ -27,3 +27,4 @@ from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC
+from .dirichlet_bc_operator import DirichletBCOperator
