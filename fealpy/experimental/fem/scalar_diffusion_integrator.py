@@ -8,14 +8,14 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
 
-class ScalarDiffusionIntegrator(CellOperatorIntegrator):
+class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
     def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
@@ -56,7 +56,7 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        
+
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
 
     @assemblymethod('fast')
@@ -90,6 +90,3 @@ class ScalarDiffusionIntegrator(CellOperatorIntegrator):
         coef_F = get_semilinear_coef(val_F, coef)
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched),\
                linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
-
-
-        

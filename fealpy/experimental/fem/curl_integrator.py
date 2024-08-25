@@ -10,13 +10,14 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class CurlIntegrator(CellOperatorIntegrator):
+
+class CurlIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c curl u, curl v)
     """    
@@ -50,6 +51,3 @@ class CurlIntegrator(CellOperatorIntegrator):
             return A
         else:
             out += A
-
-        
-    
