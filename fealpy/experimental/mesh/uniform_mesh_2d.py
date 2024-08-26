@@ -1,12 +1,9 @@
 from ..backend import backend_manager as bm  
 
 from typing import Union, Optional, Sequence, Tuple, Any
+from ..typing import TensorLike, Index, _S, Union, Tuple
 
 from .utils import entitymethod, estr2dim
-
-
-from ..typing import TensorLike, Index, _S, Union, Tuple
-from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
 from .plot import Plotable
@@ -309,19 +306,11 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
+        isBdPoint = bm.zeros((NN,), dtype=bool)
+        # isBdPoint[edge[isBdEdge, :]] = True
         isBdPoint = bm.set_at(isBdPoint, edge[isBdEdge, :], True)
         
         return isBdPoint
-    
-        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        #     isBdPoint[edge[isBdEdge, :]] = True
-        #     return isBdPoint
-        # elif bm.backend_name == 'jax':
-        #     isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)   
-        #     return isBdPoint
-        # else:
-        #     raise NotImplementedError("Backend is not yet implemented.")
 
     
     def boundary_edge_flag(self):
@@ -342,21 +331,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         edge2cell = self.edge_to_cell()
         isBdCell = bm.zeros((NC,), dtype=bool)
         isBdEdge = self.boundary_edge_flag()
+        # isBdCell[edge2cell[isBdEdge, 0]] = True
         isBdCell = bm.set_at(isBdCell, edge2cell[isBdEdge, 0], True)
 
         return isBdCell
 
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdCell[edge2cell[isBdEdge, 0]] = True
-            return isBdCell
-        elif bm.backend_name == 'jax':
-            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
-            return isBdCell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
     
-    
-    # 实体几何
+#################################### 实体几何 #############################################
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> TensorLike:
         """
         @brief Get the measure of the entities of the specified type.
@@ -490,7 +471,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     
         return bm.edge_normal(edge, self.node, unit=unit, out=out)
         
-    
     def edge_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
         """Calculate the unit normal of the edges.
         Equivalent to `edge_normal(index=index, unit=True)`.
@@ -498,7 +478,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         return self.edge_normal(index=index, unit=True, out=out)
     
 
-    # 插值点
+#################################### 插值点 #############################################
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
         '''
         @brief Generate all interpolation points of the 2D mesh

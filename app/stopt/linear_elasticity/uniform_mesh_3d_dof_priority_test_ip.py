@@ -7,11 +7,11 @@ bm.set_backend('numpy')
 from fealpy.experimental.mesh import UniformMesh3d
 
 
-# extent = [0, 2, 0, 2, 0, 2]
-# h = [1.5, 1, 2]
-
 extent = [0, 2, 0, 2, 0, 2]
-h = [1, 1, 1]
+h = [1.5, 1, 2]
+
+# extent = [0, 2, 0, 2, 0, 2]
+# h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
 # mesh.ipoints_ordering = 'zyx'
@@ -21,7 +21,7 @@ edge = mesh.entity('edge')
 face = mesh.entity('face')
 cell = mesh.entity('cell')
 
-facenorm = mesh.face_normal()
+# facenorm = mesh.face_normal()
 p = 3
 ip2 = mesh.interpolation_points(p=p)
 isBdNode = mesh.boundary_node_flag()
