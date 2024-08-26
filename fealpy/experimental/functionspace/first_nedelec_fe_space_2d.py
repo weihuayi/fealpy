@@ -63,12 +63,12 @@ class FirstNedelecDof2d():
         cell = self.mesh.entity('cell')
 
         c2d = bm.zeros((NC, ldof), dtype=self.itype)
-        c2d[:, :eldof*3] = e2dof[c2e].reshape(NC, eldof*3)
+        c2d = bm.set_at(c2d,(slice(None),slice(None,eldof*3)),e2dof[c2e].reshape(NC, eldof*3))
         s = [1, 0, 0]
         for i in range(3):
             flag = cell[:, s[i]] == edge[c2e[:, i], 1]   
-            c2d[flag, eldof*i:eldof*(i+1)] = bm.flip(c2d[flag, eldof*i:eldof*(i+1)],axis=-1)
-        c2d[:, eldof*3:] = bm.arange(NE*eldof, gdof).reshape(NC, -1)
+            c2d = bm.set_at(c2d,(flag,slice(eldof*i,eldof*(i+1))),bm.flip(c2d[flag, eldof*i:eldof*(i+1)],axis=-1))
+        c2d = bm.set_at(c2d,(slice(None),slice(eldof*3,None)),bm.arange(NE*eldof, gdof).reshape(NC, -1))
         return c2d
     
     @property
@@ -86,7 +86,7 @@ class FirstNedelecDof2d():
         gdof = self.number_of_global_dofs()
         flag = bm.zeros(gdof, dtype=bm.bool)
 
-        flag[bddof] = True
+        flag = bm.set_at(flag,(bddof),True)
         return flag
 
 
@@ -118,10 +118,9 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         c2esign = mesh.cell_to_edge_sign() 
 
         l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
-        l[0] = bcs[None, :,0,  None, None]
-        l[1] = bcs[None, :,1,  None, None]
-        l[2] = bcs[None, :,2,  None, None] 
-                                           
+        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
+        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
+        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])                                           
         # edge basis
         phi = self.bspace.basis(bcs, p=p)
         multiIndex = self.mesh.multi_index_matrix(p, 2)
@@ -130,16 +129,15 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             phie = phi[:, :, multiIndex[:, i]==0] 
             c2esi = c2esign[:, i]
             v = l[ledge[i, 0]]*glambda[:,None, ledge[i, 1], None,:] - l[ledge[i, 1]]*glambda[:,None, ledge[i, 0], None,:]   
-            v[~c2esi, :,  :, :] *= -1 
-            val[..., eldof*i:eldof*(i+1), :] = phie[..., None]*v
-
+            v = bm.set_at(v,(~c2esi,slice(None),slice(None),slice(None)),-v[~c2esi, :,  :, :])
+            val = bm.set_at(val,(...,slice(eldof*i,eldof*(i+1)),slice(None)),phie[..., None]*v)
         # cell basis
         if(p > 0):
             phi = self.bspace.basis(bcs, p=p-1) 
             v0 = l[2]*(l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None]) 
-            v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None])
-            val[..., eldof*3:eldof*3+cldof//2, :] = v0*phi[..., None] 
-            val[..., eldof*3+cldof//2:, :] = v1*phi[..., None] 
+            v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None]) 
+            val = bm.set_at(val,(...,slice(eldof*3,eldof*3+cldof//2),slice(None)),v0*phi[..., None])
+            val = bm.set_at(val,(...,slice(eldof*3+cldof//2,None),slice(None)),v1*phi[..., None] )
         return val[index]
 
     def cross2d(self,a,b):
@@ -161,9 +159,9 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         c2esign = mesh.cell_to_edge_sign() 
 
         l = bm.zeros((3, )+bcs[None,:, 0, None, None].shape, dtype=self.ftype)
-        l[0] = bcs[None, :,0, None, None]
-        l[1] = bcs[None,:, 1, None, None]
-        l[2] = bcs[None,:, 2, None, None]
+        l = bm.set_at(l,(0),bcs[None, :,0, None, None])
+        l = bm.set_at(l,(1),bcs[None, :,1, None, None])
+        l = bm.set_at(l,(2),bcs[None, :,2, None, None])
 
         # edge basis
         phi = self.bspace.basis(bcs, p=p)
@@ -175,11 +173,10 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             gphie = gphi[..., multiIndex[:, i]==0, :]
             c2esi = c2esign[:, i]
             v = l[ledge[i, 0]]*glambda[:,None, ledge[i, 1], None] - l[ledge[i, 1]]*glambda[:,None, ledge[i, 0], None]
-            v[~c2esi,:, :, :] *= -1 
+            v = bm.set_at(v,(~c2esi,slice(None),slice(None),slice(None)),-v[~c2esi,:, :, :]) 
             cv = 2*self.cross2d(glambda[:,None, ledge[i, 0],None], glambda[:,None, ledge[i, 1],None])
-            cv[~c2esi] *= -1
-            val[..., eldof*i:eldof*(i+1)] = phie*cv + self.cross2d(gphie, v)
-
+            cv = bm.set_at(cv,(~c2esi),-cv[~c2esi]) 
+            val = bm.set_at(val,(...,slice(eldof*i,eldof*(i+1))),phie*cv + self.cross2d(gphie, v))
         # cell basis
         if(p > 0):
             phi = self.bspace.basis(bcs, p=p-1)
@@ -196,8 +193,8 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             cv0 = self.cross2d(glambda[:,None, 2, None], w0) + l[2, ..., 0]*cw0 #(NQ, NC, ldof)
             cv1 = self.cross2d(glambda[:,None,0, None], w1) + l[0, ..., 0]*cw1
 
-            val[..., eldof*3:eldof*3+cldof//2] = self.cross2d(gphi, v0) + phi*cv0 
-            val[..., eldof*3+cldof//2:] = self.cross2d(gphi, v1) + phi*cv1 
+            val = bm.set_at(val,(...,slice(eldof*3,eldof*3+cldof//2)),self.cross2d(gphi, v0) + phi*cv0)
+            val = bm.set_at(val,(...,slice(eldof*3+cldof//2,None)),self.cross2d(gphi, v1) + phi*cv1 )
         return val
     
     def edge_basis(self,bcs,index=_S):
@@ -350,7 +347,8 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         gDval = gD(points, t) 
         g = bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
         
-        uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
+        #uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
+        uh = bm.set_at(uh,(edge2dof),bm.einsum('cl, clm->cm', g, Minv))
         # 边界自由度
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
@@ -373,7 +371,8 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         points = mesh.bc_to_point(bcs)[isbdFace]
         hval = h(points)
         vec = bm.zeros(gdof, dtype=self.ftype)
-        vec[edge2dof] = bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm) # (NE, ldof)
+        #vec[edge2dof] = bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm) # (NE, ldof)
+        vec = bm.set_at(vec,(edge2dof),bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm))
         return vec
  
 
