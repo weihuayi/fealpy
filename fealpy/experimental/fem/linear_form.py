@@ -1,14 +1,15 @@
 
 from typing import overload, Literal, Optional
 
+from .. import logger
 from ..typing import TensorLike
 from ..backend import backend_manager as bm 
 from ..sparse import COOTensor
 from .form import Form
-from .. import logger
+from .integrator import LinearInt
 
 
-class LinearForm(Form):
+class LinearForm(Form[LinearInt]):
     _V: Optional[COOTensor] = None
 
     def _get_sparse_shape(self):

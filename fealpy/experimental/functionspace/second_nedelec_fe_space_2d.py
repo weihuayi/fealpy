@@ -395,6 +395,9 @@ class SecondNedelecFiniteElementSpace2d():
         return bm.sqrt(val)
 
     def set_neumann_bc(self, g: Callable):
+        """
+        @brief 设置Neumann边界条件
+        """
         bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()
 
         edof = self.dof.number_of_local_dofs('edge')
@@ -419,6 +422,9 @@ class SecondNedelecFiniteElementSpace2d():
         return val
 
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+        """
+        @brief 设置Dirichlet边界条件, 本质上是将边界自由度的值设置为精确解的值
+        """
         p = self.p
         mesh = self.mesh
         ldof = p+1

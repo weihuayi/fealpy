@@ -3,7 +3,6 @@ from typing import Optional, Protocol
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
-from ..sparse import COOTensor
 
 from .. import logger
 
@@ -24,7 +23,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
         x0 (TensorLike): Initial guess for the solution, a 1D or 2D tensor.\
         Must have the same shape as b when reshaped appropriately.
         batch_first (bool, optional): Whether the batch dimension of `b` and `x0`\
-        is the first dimension. Default is False.
+        is the first dimension. Ignored if `b` is an 1-d tensor. Default is False.
         atol (float, optional): Absolute tolerance for convergence. Default is 1e-12.
         rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
         maxiter (int, optional): Maximum number of iterations allowed. Default is 10000.\
@@ -40,23 +39,17 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
         This implementation assumes that A is a symmetric positive-definite matrix,
         which is a common requirement for the Conjugate Gradient method to work correctly.
     """
-    assert isinstance(b, TensorLike), "b must be a Tensor of current backend"
+    assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
         assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
-    single_vector = False
+    single_vector = b.ndim == 1
 
-    if b.ndim in {1, 2}:
-        if b.ndim == 1:
-            b = b[:, None]
-            single_vector = True
-    else:
+    if b.ndim not in {1, 2}:
         raise ValueError("b must be a 1D or 2D dense tensor")
 
     if x0 is None:
         x0 = bm.zeros_like(b)
     else:
-        if x0.ndim == 1:
-            x0 = x0[:, None]
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
 
@@ -66,9 +59,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
 
     sol = _cg_impl(A, b, x0, atol, rtol, maxiter)
 
-    if single_vector:
-        sol = sol[:, 0]
-    elif batch_first:
+    if batch_first:
         sol = bm.swapaxes(sol, 0, 1)
 
     return sol
@@ -81,16 +72,18 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxit
     p = r               # (dof, batch)
     n_iter = 0
     b_norm = bm.linalg.norm(b)
+    sum_func = bm.sum
+    sqrt_func = bm.sqrt
 
     # iterate
     while True:
         Ap = A @ p      # (dof, batch)
-        rTr = bm.sum(r**2, axis=0)
-        alpha = rTr / bm.sum(p*Ap, axis=0)  # r @ r / (p @ Ap) # (batch,)
+        rTr = sum_func(r**2, axis=0)
+        alpha = rTr / sum_func(p*Ap, axis=0)  # r @ r / (p @ Ap) # (batch,)
         x = x + alpha[None, ...] * p  # (dof, batch)
         r_new = r - alpha[None, ...] * Ap
-        rTr_new = bm.sum(r_new**2, axis=0)  # (batch,)
-        r_norm_new = bm.sqrt(bm.sum(rTr_new))
+        rTr_new = sum_func(r_new**2, axis=0)  # (batch,)
+        r_norm_new = sqrt_func(sum_func(rTr_new))
 
         n_iter += 1
 
@@ -99,7 +92,7 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxit
                         "stopped by absolute tolerance.")
             break
 
-        if r_norm_new / b_norm < rtol:
+        if r_norm_new < rtol * b_norm:
             logger.info(f"SparseCG: converged in {n_iter} iterations, "
                         "stopped by relative tolerance.")
             break

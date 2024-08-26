@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, List, Tuple
+from typing import Optional, Union, overload, List, Tuple, Sequence
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -108,7 +108,7 @@ class COOTensor(SparseTensor):
             src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
         else:
             src = self._values
-        bm.index_add_(dense_tensor, -1, flattened, src)
+        bm.index_add(dense_tensor, flattened, src, axis=-1)
 
         return dense_tensor.reshape(self.shape)
 
@@ -128,6 +128,29 @@ class COOTensor(SparseTensor):
         if self.is_coalesced:
             return self
 
+        if bm.device_type(self._indices) == 'cpu':
+            import numpy as np
+
+            if self._values is not None:
+                index_context = bm.context(self._indices)
+                indices_np = bm.to_numpy(self._indices)
+                order = np.lexsort(indices_np)
+                new_indices_np = indices_np[:, order]
+                unique_mask_np = np.r_[[True], np.diff(new_indices_np, axis=1).any(axis=0)]
+                add_index = bm.tensor(np.cumsum(unique_mask_np) - 1, **index_context)
+
+                full_values = bm.copy(self._values[..., order])
+                new_values = bm.zeros_like(full_values[..., unique_mask_np])
+                bm.index_add(new_values, add_index, self._values[..., order], axis=-1)
+                del full_values
+
+                new_indices = bm.tensor(new_indices_np[..., unique_mask_np], **index_context)
+
+                return COOTensor(new_indices, new_values, self.sparse_shape, is_coalesced=True)
+
+            else:
+                pass # TODO
+
         unique_indices, inverse_indices = bm.unique(
             self._indices, return_inverse=True, axis=1
         )
@@ -135,7 +158,7 @@ class COOTensor(SparseTensor):
         if self._values is not None:
             value_shape = self.dense_shape + (unique_indices.shape[-1], )
             new_values = bm.zeros(value_shape, **self.values_context())
-            new_values = bm.index_add_(new_values, -1, inverse_indices, self._values)
+            new_values = bm.index_add(new_values, inverse_indices, self._values, axis=-1)
 
             return COOTensor(
                 unique_indices, new_values, self.sparse_shape, is_coalesced=True
@@ -146,7 +169,7 @@ class COOTensor(SparseTensor):
                 kwargs = bm.context(self._indices)
                 ones = bm.ones((self.nnz, ), **kwargs)
                 new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-                new_values = bm.index_add_(new_values, -1, inverse_indices, ones)
+                new_values = bm.index_add(new_values, inverse_indices, ones, axis=-1)
             else:
                 new_values = None
 
@@ -208,6 +231,35 @@ class COOTensor(SparseTensor):
     def copy(self):
         return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
 
+    @classmethod
+    def concat(cls, coo_tensors: Sequence['COOTensor'], /, *, axis: int=0) -> 'COOTensor':
+        if len(coo_tensors) == 0:
+            raise ValueError("coo_tensors cannot be empty")
+
+        elif len(coo_tensors) == 1:
+            return coo_tensors[0]
+
+        fcoo = coo_tensors[0]
+        total_nnz = sum(coo.nnz for coo in coo_tensors)
+        new_indices = bm.empty((fcoo.sparse_ndim, total_nnz), **bm.context(fcoo.indices()))
+        new_indices[:, :fcoo.nnz] = fcoo.indices()
+        nnz_cursor = fcoo.nnz
+        size_cursor = fcoo.sparse_shape[axis]
+        values_list = [fcoo.values()]
+
+        for coo in coo_tensors[1:]:
+            slicing = slice(nnz_cursor, nnz_cursor + coo.nnz)
+            new_indices[:, slicing] = coo.indices()
+            new_indices[axis, slicing] += size_cursor
+            values_list.append(coo.values())
+            nnz_cursor += coo.nnz
+            size_cursor += coo.sparse_shape[axis]
+
+        spshape = list(fcoo.sparse_shape)
+        spshape[axis] = size_cursor
+
+        return cls(new_indices, bm.concat(values_list, axis=-1), spshape)
+
     def neg(self) -> 'COOTensor':
         """Negation of the COO tensor. Returns self if values is None."""
         if self._values is None:
@@ -262,7 +314,7 @@ class COOTensor(SparseTensor):
                 src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
                 src = self._values
-            bm.index_add_(output, -1, flattened, src)
+            bm.index_add(output, flattened, src, axis=-1)
 
             return output.reshape(self.shape)
 
@@ -338,9 +390,6 @@ class COOTensor(SparseTensor):
         else:
             raise TypeError(f'Unsupported type {type(other).__name__} in power')
 
-    def inner(self, other: TensorLike, dims: List[int]) -> 'COOTensor':
-        pass
-
     @overload
     def matmul(self, other: 'COOTensor') -> 'COOTensor': ...
     @overload
@@ -374,7 +423,17 @@ class COOTensor(SparseTensor):
         elif isinstance(other, TensorLike):
             if self.values() is None:
                 raise ValueError()
+            try:
+                return bm.coo_spmm(self._indices, self._values, self._spshape, other)
+            except (AttributeError, NotImplementedError):
+                pass
+
             return spmm_coo(self.indices(), self.values(), self.sparse_shape, other)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
+
+    def tocsr(self):
+        from .csr_tensor import CSRTensor
+        crow, col, values = bm.coo_tocsr(self.indices(), self.values(), self.sparse_shape)
+        return CSRTensor(crow, col, values, spshape=self._spshape)

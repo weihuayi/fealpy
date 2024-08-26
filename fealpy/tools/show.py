@@ -110,7 +110,7 @@ def showrate(axes, k, N, error, option, label=None, lw=1, ms=4, computerate=True
 
     if isinstance(N[0], np.int_):
         axes.set_xlim(left=N[0]/2, right=N[-1]*2)
-    elif isinstance(N[0], np.float_):
+    elif isinstance(N[0], np.float64):
         from matplotlib.ticker import LogLocator, NullFormatter
         axes.set_xlim(left=N[-1]/1.2, right=N[0]*1.2)
         axes.set_xscale("log", base=2) 

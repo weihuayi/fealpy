@@ -10,7 +10,7 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import TriangleMesh
 from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.fem import SemilinearForm
-from fealpy.experimental.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
+from fealpy.experimental.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
 from fealpy.experimental.fem import ScalarSourceIntegrator
 from fealpy.experimental.pde.semilinear_2d import SemilinearData
 from fealpy.utils import timer
@@ -45,7 +45,6 @@ parser.add_argument('--meshtype',
 
 args = parser.parse_args()
 
-
 bm.set_backend(args.backend)
 p = args.degree
 n = args.n
@@ -61,17 +60,14 @@ ny = 4
 pde = SemilinearData(domain)
 mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
 
-p = 1
-maxit = 6
 tol = 1e-8
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
-errorType = ['$|| u - u_h||_{\Omega, 0}$', '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$']
-def func(u):
+def kernel_func(u):
     return u**3
 
-def grad_func(u):
+def grad_kernel_func(u):
     return 3*u**2
 
 def diffusion_coef(p):
@@ -80,39 +76,47 @@ def diffusion_coef(p):
 def reaction_coef(p):
     return pde.reaction_coefficient(p)
 
-reaction_coef.func = func
-reaction_coef.grad_func = grad_func
+reaction_coef.kernel_func = kernel_func
+reaction_coef.grad_kernel_func = grad_kernel_func
     
-#非线性迭代
 for i in range(maxit):
-
+    #定义函数空间
     space = LagrangeFESpace(mesh, p=p)
-    tmr.send(f'第{i}次空间时间')
     NDof[i] = space.number_of_global_dofs()
+    tmr.send(f'第{i}次空间时间')
 
     u0 = space.function()
     du = space.function()
     diffusion_coef.uh = u0
     reaction_coef.uh = u0
-    isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
+    isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)[-1]
     isIDof = ~isDDof
 
-    while True:
-        n = SemilinearForm(space)
-        n.add_integrator([
-                          ScalarDiffusionIntegrator(diffusion_coef, q=p+2, method='semilinear'),
-                          ScalarMassIntegrator(reaction_coef, q=p+2, method='semilinear'),
-                          ])
-        n.add_integrator(ScalarSourceIntegrator(pde.source, q=p+2))
-        A, F = n.assembly()
-        tmr.send(f'第{i}次矩组装时间') 
+    #定义积分子
+    D = ScalarSemilinearDiffusionIntegrator(diffusion_coef, q=p+2)
+    M = ScalarSemilinearMassIntegrator(reaction_coef, q=p+2)
+    f = ScalarSourceIntegrator(pde.source, q=p+2)
 
-        A = csr_matrix((A.values(), A.indices()), A.shape)
-        du[isIDof] = spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
-        tmr.send(f'第{i}次求解器时间')
+    while True:
+        #矩阵组装
+        sform = SemilinearForm(space)
+        sform.add_integrator([D, M])
+        sform.add_integrator(f)
+        A, F = sform.assembly()
+        tmr.send(f'第{i}次矩组装时间')
         
+        #求解增量
+        A = csr_matrix((A.values(), A.indices()), A.shape)
+        du[isIDof] = bm.tensor(spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1), dtype=du[isIDof].dtype)
         u0 += du
-        err = bm.max(bm.abs(du))
+        tmr.send(f'第{i}次求解器时间')
+
+        #清除积分子缓存
+        D.clear()
+        M.clear()
+
+        #计算误差
+        err = bm.max(bm.abs(du.array))
         if err < tol:
             break
 

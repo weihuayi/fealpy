@@ -120,7 +120,6 @@ class TestFirstNedelecFiniteElementSpace2d:
         def fun(k):
             x=k[...,0]
             y=k[...,1]
-            d = k.shape[:-1]
             E1 = 2*x+y
             E2 = 5*x+3
             array =bm.zeros_like(k)
@@ -137,10 +136,10 @@ if __name__ == "__main__":
     # test = TestFirstNedelecDof2d()
     # test.test_cell_to_dof(init_data[0],'numpy')
     test = TestFirstNedelecFiniteElementSpace2d()
-    # test.test_basis(init_data[0],"pytorch")
+    # test.test_basis(init_data[0],"numpy")
     # test.test_curl_basis(init_data[0],"numpy")
     # test.test_value(init_data[0],"pytorch")
-    test.test_curl_value(init_data[0],"pytorch")
+    # test.test_curl_value(init_data[0],"pytorch")
     # test.test_mass_matrix(init_data[0],"numpy")
     # test.test_curl_matrix(init_data[0],"pytorch")
     # test.test_source_vector(init_data[0],"pytorch")

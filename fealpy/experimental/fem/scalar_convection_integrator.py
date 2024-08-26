@@ -9,13 +9,13 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class ScalarConvectionIntegrator(CellOperatorIntegrator):
+class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
     r"""The convection integrator for function spaces based on homogeneous meshes."""
     def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,

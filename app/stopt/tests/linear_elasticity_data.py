@@ -2,6 +2,8 @@ import numpy as np
 
 stress_element_stiffness_matrix_uniform_mesh_2d_p1_data= [
     {   
+        "E": 1.0,
+        "nu": 0.3,
         # 6 7-------4 6
         #  |         |
         #  |         |

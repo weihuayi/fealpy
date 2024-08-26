@@ -141,8 +141,8 @@ class TensorFunctionSpace(FunctionSpace):
         
         isTensorBDof = self.is_boundary_dof(threshold=threshold)
         if self.dof_priority:
-            uh[isTensorBDof] = gD.T.reshape(-1)
+            uh = bm.set_at(uh, isTensorBDof, gD.T.reshape(-1))
         else:
-            uh[isTensorBDof] = gD.reshape(-1)
+            uh = bm.set_at(uh, isTensorBDof, gD.reshape(-1))
 
         return uh   

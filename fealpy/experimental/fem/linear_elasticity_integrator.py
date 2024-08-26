@@ -11,13 +11,14 @@ from ..functionspace.utils import flatten_indices
 from ..mesh import HomogeneousMesh, SimplexMesh, StructuredMesh
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import (
-    CellOperatorIntegrator,
+    LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class LinearElasticityIntegrator(CellOperatorIntegrator):
+
+class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
     """
     The linear elasticity integrator for function spaces based on homogeneous meshes.
     """
@@ -27,7 +28,6 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
                  elasticity_type: Optional[str]=None,
                  coef: Optional[CoefLike]=None, q: int=5, *,
                  index: Index=_S,
-                 batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
@@ -47,7 +47,6 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         self.coef = coef
         self.q = q
         self.index = index
-        self.batched = batched
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -130,8 +129,13 @@ class LinearElasticityIntegrator(CellOperatorIntegrator):
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         D = self.elasticity_matrix(space)
         B = self.strain_matrix(space)
-
-        KK = bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
+        if coef is None:
+            KK = bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
+        elif is_scalar(coef):
+            KK = coef * bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
+        elif is_tensor(coef):
+            # TODO coef 现在只能为一阶张量
+            KK = bm.einsum('q, c, cqki, kl, cqlj, c -> cij', ws, cm, B, D, B, coef)
         
         return KK
 

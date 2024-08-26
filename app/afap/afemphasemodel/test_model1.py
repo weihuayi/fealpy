@@ -6,6 +6,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.geometry import SquareWithCircleHoleDomain
 
 from fealpy.csm import AFEMPhaseFieldCrackHybridMixModel
+#from fealpy.ml import timer
 
 class Brittle_Facture_model():
     def __init__(self):
@@ -93,6 +94,7 @@ def adaptive_mesh(mesh, d0=0.49, d1=1.01, h=0.005):
     return isMarkedCell
 
 start = time.time()
+#tmr = timer()
 
 model = Brittle_Facture_model()
 mesh = model.init_mesh(n=4)
@@ -109,7 +111,7 @@ disp = model.is_boundary_disp()
 stored_energy = np.zeros_like(disp)
 dissipated_energy = np.zeros_like(disp)
 force = np.zeros_like(disp)
-
+#next(tmr)
 for i in range(len(disp)-1):
     print('i:', i)
     simulation.newton_raphson(disp[i+1], theta=0.2, solve='gpu')
@@ -123,6 +125,7 @@ for i in range(len(disp)-1):
     mesh.celldata['H'] = simulation.H
     fname = 'test' + str(i).zfill(10)  + '.vtu'
     mesh.to_vtk(fname=fname)
+#tmr.send('stop')
 
 end = time.time()
 print('time:', end-start)

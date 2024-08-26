@@ -22,8 +22,8 @@ from fealpy.experimental.sparse import COOTensor
 
 
 # bm.set_backend('numpy')
-bm.set_backend('pytorch')
-# bm.set_backend('jax')
+# bm.set_backend('pytorch')
+bm.set_backend('jax')
 
 # 平面应变问题定义
 def source(points: TensorLike) -> TensorLike:
@@ -35,6 +35,7 @@ def source(points: TensorLike) -> TensorLike:
     val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
     
     return val
+
 def solution(points: TensorLike) -> TensorLike:
     x = points[..., 0]
     y = points[..., 1]
@@ -52,22 +53,6 @@ extent = [0, 2, 0, 2]
 h = [1, 1]
 origin = [0, 0]
 mesh = UniformMesh2d(extent, h, origin)
-edge2ipoint = mesh.edge_to_ipoint(p=2)
-print("edge2ipoint:\n", edge2ipoint)
-cell2ipoint = mesh.cell_to_ipoint(p=2)
-print("cell2ipoint:\n", cell2ipoint)
-asd
-
-import matplotlib.pyplot as plt
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_edge(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
-plt.show()
-asd
-# mesh_old = UniformMesh2d_old(extent, h, origin)
 
 maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)

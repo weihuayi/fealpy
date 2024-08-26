@@ -1,12 +1,4 @@
 #!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: possion.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: Wed 07 Aug 2024 10:14:18 AM CST
-	@bref 
-	@ref 
-'''  
 import ipdb
 import argparse
 from matplotlib import pyplot as plt

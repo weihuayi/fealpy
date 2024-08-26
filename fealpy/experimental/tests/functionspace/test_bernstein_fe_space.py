@@ -10,7 +10,7 @@ from fealpy.experimental.functionspace.bernstein_fe_space import BernsteinFESpac
 
 
 class TestBernsteinFESpace:
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", init_data)
     def test_init_(self,meshdata,backend):
         bm.set_backend(backend)
@@ -32,7 +32,7 @@ class TestBernsteinFESpace:
         np.testing.assert_array_equal(bm.to_numpy(f2d), meshdata["f2d"])
         np.testing.assert_array_equal(bm.to_numpy(bdof), meshdata["bdof"])
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", init_data)
     def test_basis(self,meshdata,backend):
         bm.set_backend(backend)
@@ -174,7 +174,6 @@ class TestBernsteinFESpace:
 
 
 if __name__ == "__main__":
-    #test = TestBernsteinFESpace()
-    #test.test_value(init_data[0],'numpy')
-    pytest.main()
-
+    test = TestBernsteinFESpace()
+    test.test_basis(init_data[0],'numpy')
+    # pytest.main()
