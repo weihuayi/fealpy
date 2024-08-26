@@ -444,7 +444,6 @@ class Graph:
             if myAstar.run() == 1:
                 routelist = myAstar.get_minroute()
                 print(routelist)
-                #showresult(mapsize, pos_snode, pos_enode, self.block, routelist)
             else:
                print('路径规划失败！')
             route.append(routelist)
@@ -474,16 +473,11 @@ class Graph:
                 elif pos_cnode[1] - pos_enode[1] > esp:
                     pos_cnode = (pos_cnode[0] , pos_cnode[1] - 1)
                     routelist.append(pos_cnode)
-                #print(routelist)
-
                 if abs(pos_cnode[0] - pos_enode[0]) < esp and abs(pos_cnode[1] - pos_enode[1]) < esp:
                     break
-            #print(routelist)
-            #showresult(mapsize, pos_snode, pos_enode, blocklist, routelist)
             route.append(routelist)
         return route
         
-    
     def check_collision_index(self, result_path, t):
 
         #传入某个时间点的不同点所在坐标数组
@@ -495,7 +489,6 @@ class Graph:
             result = paths_index[:,t]
             for i in range(self.n):
                 for j in range(i + 1, self.n):
-                    
                     #冲突点在节点的情况
                     if abs(result[i] - result[j]) < esp :
                         print("时间为",t,"时",i, "与", j, "相撞","坐标为",self.calc_xyindex(result[j]))
@@ -511,20 +504,19 @@ class Graph:
                 
                         if abs(a_previous - b_next) < esp and abs(b_previous - a_next) < esp :
                     
-                            print("相向冲突:",i,j)
+                            print("相向冲突:", i, j)
                             collision[-1] = 1
        
                         else:
-                            print("节点冲突:",i,j)
+                            print("节点冲突:", i, j)
                 
                         collision = collision.reshape(1, -1)
                         collision_message = bm.concatenate((collision_message, collision), axis=0)
                         
                       #冲突点不在节点的情况
-                    if abs(result[i] - paths_index[j][t+1]) < esp and abs(result[j] - paths_index[i][t+1]) < esp:
+                    if abs(result[i] - paths_index[j][t + 1]) < esp and abs(result[j] - paths_index[i][t + 1]) < esp:
                         print("时间为",t,"时",i, "与", j, "相撞","坐标为",self.calc_xyindex(result[i]),self.calc_xyindex(result[j]) )
                         print("相向冲突:",i,j)
-                        
                         self.grid_map.set_value_from_xy_index(self.calc_xyindex(result[j])[0],self.calc_xyindex(result[j])[1], 7.0)
                         self.grid_map.set_value_from_xy_index(self.calc_xyindex(result[i])[0],self.calc_xyindex(result[i])[1], 7.0)
                         collision = bm.array([int(t), int(i), int(j), result[i], result[j],0])
@@ -541,9 +533,9 @@ class Graph:
         turn = bm.zeros((1,self.n))
         paths_index = self.cal_result_path_index(result_path, t + 2)
         for i in range(self.n):
-            for j in range(1,t):
-                x_previous, y_previous = self.calc_xyindex(paths_index[i][j - 1])
-                x_next, y_next = self.calc_xyindex(paths_index[i][j + 1])
+            for j in range(1, t):
+                x_previous, y_previous = self.calc_xyindex(paths_index[i][j - 1].tolist())
+                x_next, y_next = self.calc_xyindex(paths_index[i][j + 1].tolist())
                 if x_previous != x_next and y_previous != y_next :
                     turn[:,i] = turn[:,i] + 1
         return turn
@@ -555,7 +547,6 @@ class Graph:
                 ind = self.calc_grid_index(result_path[i][j][0], result_path[i][j][1])
                 result_path_index[i][j] = ind
         #print("路径编号",result_path_index)
-        
         return  result_path_index
 
     def paths_avoid_collisions(self, arr_start_index, arr_end_index, k):
@@ -570,7 +561,7 @@ class Graph:
         fixed_block = []
         flat = 1
         for i in range(self.n):
-
+            print("$$$$$$$$$$$$$$$$$$$$$$$$", i)
             #转为二维坐标
             pos_snode = tuple(self.calc_xyindex(arr_start_index[i]))
             pos_enode = tuple(self.calc_xyindex(arr_end_index[i]))
@@ -633,11 +624,9 @@ class Graph:
 
                 elif value == 1:#暂时被占用，等待或重新规划
                     if len(result_path[j]) > 0 and grid_map_collisions.get_value_from_xy_index(result_path[j][-1][0],result_path[j][-1][1]) == 0 and j not in replan2 :#可以等待
-
                         print("等待")
                         grid_map_collisions.set_value_from_xy_index(result_path[j][-1][0],result_path[j][-1][1], 1)
                         result_path[j].append(result_path[j][-1])
-
                         #避免交换位置的相向冲突
                         for k in range(j + 1, self.n):
                             if len(path[j]) > 1 and len(path[k]) > 1:
@@ -652,15 +641,11 @@ class Graph:
                         blocklist2 = []
                         for a in self.arrivelist:
                             blocklist2.append(elist[a])
-                        
                         if len(replan) > 0:
                             blocklist2.append(path[j][0])
-                           
                         if len(replan2) > 0 :
                             blocklist2.append(path[j][0])
-
                         while True:
-
                             mapsize = (self.width, self.height)
                             if len(result_path[j]) > 0:
                                 pos_cnode = result_path[j][-1]
@@ -719,75 +704,52 @@ class Graph:
                                 if path[j][0] == result_path[k][-1] and path[k][0] == result_path[j][-2]:
                                     replan2.append(k)
                                     grid_map_collisions.set_value_from_xy_index(result_path[j][-2][0],result_path[j][-2][1], 1)  
-
                 elif value == 2:#有到达终点的点，重新规划路径
                     print("重新规划")
-
                     while True:
-
                         mapsize = (self.width, self.height)
                         pos_cnode = result_path[j][-1]
                         pos_enode = elist[j]
                         myAstar = AStar(mapsize, pos_cnode, pos_enode)
                         blocklist = blocklist + fixed_block
                         myAstar.setBlock(blocklist)
-                          
                         routelist = [] #记录搜索到的最优路径
                         if myAstar.run() == 1:
                             routelist = myAstar.get_minroute()
                             #print("重新规划的路径：",routelist)
-
                             #相向冲突检测
                             #和前面对比
-
                             for f in range(0, j):
                                 if len(result_path[f]) > 1:
-                                    
                                     #print("result_path[f][-2]",result_path[f][-2])
                                     #print("result_path[f][-1]",result_path[f][-1])
-                       
- 
                                     if result_path[f][-2] == routelist[1] and result_path[f][-1] == routelist[0]:#发生相向冲突
-                                      
-                    
                                         grid_map_collisions.set_value_from_xy_index(routelist[1][0],routelist[1][1], 1)
- 
                             for f in range(j + 1, self.n):
                                 #print("result_path[f][-1]",result_path[f][-1])
                                 #print("path[f][0]",path[f][0])
                                 if len(result_path[f]) >= 1 and len(path[f]) > 0:
-                                    
                                     #print("result_path[f][-1]",result_path[f][-1])
                                     #print("path[f][0]",path[f][0])
-                       
- 
                                     if result_path[f][-1] == routelist[1] and path[f][0] == routelist[0]:#发生相向冲突
-                    
                                         grid_map_collisions.set_value_from_xy_index(routelist[1][0],routelist[1][1], 1)
-
                             for f in range(j+1, self.n):
                                 if len(result_path[f]) > 1:                                   
                                     #print("result_path[f][-2]",result_path[f][-2])
                                     #print("result_path[f][-1]",result_path[f][-1])
                                     if result_path[f][-2] == routelist[1] and result_path[f][-1] == routelist[0]:#发生相向冲突
-                    
                                         grid_map_collisions.set_value_from_xy_index(routelist[1][0],routelist[1][1], 1)
-
-
                             if grid_map_collisions.get_value_from_xy_index(routelist[1][0], routelist[1][1]) == 0:#按重新规划的走
                                 result_path[j].append(routelist[1])
                                 path[j] = routelist[2:]
                                 grid_map_collisions.set_value_from_xy_index(routelist[1][0],routelist[1][1], 1)
                                 break
-
                             else:
                                 blocklist.append(routelist[1])
-
                         else:
                             print('路径规划失败！')
                             flat = 0
                             break
-
                         #避免交换位置的相向冲突
                         for k in range(j + 1, self.n):
                             if len(path[j]) > 1 and len(path[k]) > 1:
@@ -798,10 +760,8 @@ class Graph:
                                 if path[j][0] == result_path[k][-1] and path[k][0] == result_path[j][-1]:
                                     replan2.append(k)
                                     grid_map_collisions.set_value_from_xy_index(result_path[j][-1][0],result_path[j][-1][1], 1)
-         
                 #print("重新规划路径的点",replan)
                 #print("重新规划路径的点2",replan2)
-
             t = t + 1
             #print("t",t)
             if flat < 1:
