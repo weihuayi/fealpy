@@ -60,6 +60,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         self.recovery = LinearRecoveryAlg()
         
         self.tmr = timer()
+        next(self.tmr)
+
     def newton_raphson(self, 
             disp, 
             dirichlet_phase=False, 
@@ -72,7 +74,6 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         @brief 给定位移条件，用 Newton Raphson 方法求解
         """
         tmr = self.tmr
-        next(tmr)
         model = self.model
         GD = self.GD
         D0 = self.D0
@@ -133,7 +134,7 @@ class IPFEMPhaseFieldCrackHybridMixModel():
             if solve == 'spsolve':
                 du.flat[:] = spsolve(A0, R0)
             elif solve == 'lgmres':
-                du.flat[:],_ = lgmres(A0, R0, atol=1e-18)
+                du.fBerrorlat[:],_ = lgmres(A0, R0, atol=1e-18)
             elif solve == 'cg':
                 du.flat[:],_ = cg(A0, R0, atol=1e-18)
             elif solve == 'gpu':
@@ -294,7 +295,7 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         """
         mesh0 = HalfEdgeMesh2d.from_mesh(self.mesh, NV=3) 
 
-        mesh0.celldata['H'] = self.H
+#        mesh0.celldata['H'] = self.H
         mesho = copy.deepcopy(mesh0)
         spaceo = LagrangeFESpace(mesho, p=1, doforder='vdims')
         dspaceo = LagrangeFESpace(mesho, p=self.p0)
@@ -311,9 +312,6 @@ class IPFEMPhaseFieldCrackHybridMixModel():
 
         node = mesh0.entity(etype='node')
         cell = mesh0.entity(etype='cell')
-        cell0 = np.zeros_like(cell,dtype=np.int_)
-        cell0[:]=cell[:]
-        print(type(node), cell.shape)
         mesh = TriangleMesh(node[:], cell[:])
         self.mesh = mesh
        
@@ -326,8 +324,8 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         dspace0 = LagrangeFESpace(mesh0, p=self.p0)
 
         NC = self.mesh.number_of_cells()
-        self.uh = space0.function(dim=self.GD)
-        self.d = dspace0.function()
+        self.uh = self.space.function(dim=self.GD)
+        self.d = self.dspace.function()
         self.H = np.zeros(NC, dtype=np.float64)  # 分片常数
         
         self.uh[:, 0] = space0.interpolation_fe_function(uh0)
@@ -335,15 +333,15 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         
         self.d[:] = dspace0.interpolation_fe_function(d0)
         
-        mesh0.interpolation_cell_data(mesho, datakey=['H'])
+        self.H[:] = mesh0.interpolation_cell_data(mesho, datakey=['H'])
         print('interpolation cell data:', NC)      
         
     def energy_degradation_function(self, d):
         eps = 1e-10
         gd = np.zeros_like(d)
-        qf = self.mesh.integrator(1, 'cell')
+        qf = self.mesh.integrator(self.p+1, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
-        gd = (1 - d(bc[-1])) ** 2 + eps
+        gd = (1 - d(bc)) ** 2 + eps
         return gd
 
     def strain(self, uh):
@@ -434,10 +432,10 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         lam = self.model.lam # 拉梅第一参数
         mu = self.model.mu # 拉梅第二参数
         
-        qf = self.mesh.integrator(self.p, 'cell')
+        qf = self.mesh.integrator(self.p+1, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
 
-        c0 = (1 - phi(bc[-1])) ** 2 + eps
+        c0 = (1 - phi(bc)) ** 2 + eps
         D = np.einsum('i, jk -> ijk', c0, D0)
 #        c0 = (1 - phi(bc)) ** 2 + eps
 #        D0 = np.array([[2*mu+lam, lam, 0], [lam, 2*mu+lam, 0], [0, 0, mu]],
@@ -488,10 +486,10 @@ class IPFEMPhaseFieldCrackHybridMixModel():
         qf = mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
         cm = mesh.entity_measure('cell')
-        g = d.grad_value(bc[-1])
+        g = d.grad_value(bc)
 
         val = model.Gc/2/model.l0*(d(bc)**2+model.l0**2*np.sum(g*g, axis=-1))
-        dissipated = np.dot(val, cm)
+        dissipated = np.einsum('q, qc, c->', ws, val, cm)
         return dissipated
 
     
@@ -501,9 +499,29 @@ class IPFEMPhaseFieldCrackHybridMixModel():
 
         qf = mesh.integrator(self.p, 'cell')
         bc, ws = qf.get_quadrature_points_and_weights()
-        c0 = (1 - d(bc[-1])) ** 2 + eps
+        c0 = (1 - d(bc)) ** 2 + eps
         cm = mesh.entity_measure('cell')
         val = c0*psi_s
-        stored = np.dot(val, cm)
+        stored = np.einsum('q, qc, c->', ws, val, cm)
         return stored
+
+    def stress(self):
+        '''
+        @brief 计算每个单元的应力张量
+        '''
+        uh = self.uh
+        gd = self.energy_degradation_function(self.d)
+        lam = self.model.lam
+        mu = self.model.mu
+        strains = self.strain(uh)
+        trace_e = np.trace(strains, axis1=1, axis2=2)
+
+        # 构造单位张量数组
+        eye = np.eye(strains.shape[1])
+
+        # 计算每个单元的应力张量
+        stresses = lam * trace_e[:, None, None] * eye + 2 * mu * strains
+        stresses = gd[:, None, None]*stresses
+        return stresses
+
 

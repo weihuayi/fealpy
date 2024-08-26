@@ -59,7 +59,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
      |  /   4  |  /
      | /       | /
       --------- 
-    * Face 0: (0, 1, 2, 3)
+    * Face 0: (1, 0, 3, 2)
     * Face 1: (4, 5, 6, 7)
     * Face 2: (0, 1, 4, 5)
     * Face 3: (2, 3, 6, 7)
@@ -72,8 +72,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     * Edge numbering rule: first in the z direction, then in the y direction, and then in the x direction
     * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
     """
-    def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), 
-                origin=(0.0, 0.0, 0.0), itype=None, ftype=None):
+    def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), 
+                ipoints_ordering='zyx', itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -106,6 +106,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.meshdata = {}
 
         self.meshtype = 'UniformMesh3d'
+
+        # Interpolation points
+        self.ipoints_ordering = ipoints_ordering
 
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
@@ -163,49 +166,69 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1, nz + 1)
         edge = bm.zeros((NE, 2), dtype=self.itype)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            NE0 = 0
-            NE1 = nx * (ny + 1) * (nz + 1)
-            c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
-            edge[NE0:NE1, 0] = c.flatten()
-            edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + (ny + 1) * (nz + 1)
+        NE0 = 0
+        NE1 = nx * (ny + 1) * (nz + 1)
+        c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
+        
+        NE0 = NE1
+        NE1 += (nx + 1) * ny * (nz + 1)
+        c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (nz + 1))
 
-            NE0 = NE1
-            NE1 += (nx + 1) * ny * (nz + 1)
-            c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
-            edge[NE0:NE1, 0] = c.flatten()
-            edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + (nz + 1)
+        NE0 = NE1
+        NE1 += (nx + 1) * (ny + 1) * nz
+        c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + 1)
 
-            NE0 = NE1
-            NE1 += (nx + 1) * (ny + 1) * nz
-            c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
-            edge[NE0:NE1, 0] = c.flatten()
-            edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + 1
+        return edge
 
-            return edge
-        elif bm.backend_name == 'jax':
-            NE0 = 0
-            NE1 = nx * (ny + 1) * (nz + 1)
-            c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
-            edge = edge.at[NE0:NE1, 0].set(c.flatten())
-            edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     NE0 = 0
+        #     NE1 = nx * (ny + 1) * (nz + 1)
+        #     c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
+        #     edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        #     edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
+            
 
-            NE0 = NE1
-            NE1 += (nx + 1) * ny * (nz + 1)
-            c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
-            edge = edge.at[NE0:NE1, 0].set(c.flatten())
-            edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + (nz + 1))
+        #     NE0 = NE1
+        #     NE1 += (nx + 1) * ny * (nz + 1)
+        #     c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
+        #     edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        #     edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (nz + 1))
 
-            NE0 = NE1
-            NE1 += (nx + 1) * (ny + 1) * nz
-            c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
-            edge = edge.at[NE0:NE1, 0].set(c.flatten())
-            edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + 1)
+        #     NE0 = NE1
+        #     NE1 += (nx + 1) * (ny + 1) * nz
+        #     c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
+        #     edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        #     edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + 1)
 
-            return edge
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        #     return edge
+        # elif bm.backend_name == 'jax':
+        #     NE0 = 0
+        #     NE1 = nx * (ny + 1) * (nz + 1)
+        #     c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
+        #     edge = edge.at[NE0:NE1, 0].set(c.flatten())
+        #     edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
+
+        #     NE0 = NE1
+        #     NE1 += (nx + 1) * ny * (nz + 1)
+        #     c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
+        #     edge = edge.at[NE0:NE1, 0].set(c.flatten())
+        #     edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + (nz + 1))
+
+        #     NE0 = NE1
+        #     NE1 += (nx + 1) * (ny + 1) * nz
+        #     c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
+        #     edge = edge.at[NE0:NE1, 0].set(c.flatten())
+        #     edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + 1)
+
+        #     return edge
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
 
 
     @entitymethod(2)
@@ -215,16 +238,67 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         """
         NN = self.NN
         NF = self.NF
-
         nx = self.nx
         ny = self.ny
         nz = self.nz
         idx = bm.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
         face = bm.zeros((NF, 4), dtype=self.itype)
 
-        # TODO: Provide a unified implementation that is not backend-specific
+        NF0 = 0
+        NF1 = (nx + 1) * ny * nz
+        c = idx[:, :-1, :-1]
+        face[NF0:NF1, 0] = c.flatten()
+        face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
+        face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + nz + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
+        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
+        # face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
+        # face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
+        # face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
+
+        NF0 = NF1
+        NF1 += nx * (ny + 1) * nz
+        c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
+        face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
+        face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
+        face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
+        # face[NF0:NF1, 0] = c.flatten()
+        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
+        # face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
+        # face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
+
+        NF2 = NF0 + ny * nz
+        N = nz * (ny + 1)
+        idx1 = bm.zeros((nx, nz), dtype=self.itype)
+        idx1 = bm.arange(NF2, NF2 + nz)
+        idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+        # face[idx1] = face[idx1][:, [1, 0, 3, 2]]
+
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
+        face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
+        face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + nz + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
+        face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + nz + 1)
+        # face[NF0:NF1, 0] = c.flatten()
+        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + nz + 1
+        # face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
+        # face[NF0:NF1, 3] = face[NF0:NF1, 2] + nz + 1
+
+        N = ny * (nz + 1)
+        idx2 = bm.zeros((nx, ny), dtype=self.itype)
+        idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
+        idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+        # face[idx2] = face[idx2][:, [1, 0, 3, 2]]
+
+        return face
+
         if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            # TODO 为什么要将 face 转一个方向？
             NF0 = 0
             NF1 = (nx + 1) * ny * nz
             c = idx[:, :-1, :-1]
@@ -232,7 +306,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
             face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
             face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
-            # face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
+            face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
 
             NF0 = NF1
             NF1 += nx * (ny + 1) * nz
@@ -247,7 +321,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx1 = bm.arange(NF2, NF2 + nz)
             idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx1 = idx1.flatten()
-            # face[idx1] = face[idx1][:, [1, 0, 3, 2]]
+            face[idx1] = face[idx1][:, [1, 0, 3, 2]]
 
             NF0 = NF1
             NF1 += nx * ny * (nz + 1)
@@ -261,7 +335,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
             idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx2 = idx2.flatten()
-            # face[idx2] = face[idx2][:, [1, 0, 3, 2]]
+            face[idx2] = face[idx2][:, [1, 0, 3, 2]]
 
             return face
         elif bm.backend_name == 'jax':
@@ -272,7 +346,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face = face.at[NF0:NF1, 1].set(face[NF0:NF1, 0] + 1)
             face = face.at[NF0:NF1, 2].set(face[NF0:NF1, 0] + nz + 1)
             face = face.at[NF0:NF1, 3].set(face[NF0:NF1, 2] + 1)
-            # face = face.at[NF0:NF0 + ny * nz, :].set(face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
+            face = face.at[NF0:NF0 + ny * nz, :].set(face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
 
             NF0 = NF1
             NF1 += nx * (ny + 1) * nz
@@ -287,7 +361,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx1 = bm.arange(NF2, NF2 + nz)
             idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx1 = idx1.flatten()
-            # face = face.at[idx1].set(face[idx1][:, [1, 0, 3, 2]])
+            face = face.at[idx1].set(face[idx1][:, [1, 0, 3, 2]])
 
             NF0 = NF1
             NF1 += nx * ny * (nz + 1)
@@ -301,7 +375,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
             idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
             idx2 = idx2.flatten()
-            # face = face.at[idx2].set(face[idx2][:, [1, 0, 3, 2]])
+            face = face.at[idx2].set(face[idx2][:, [1, 0, 3, 2]])
 
             return face
         else:
@@ -682,15 +756,20 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face = self.face
         isBdFace = self.boundary_face_flag()
         isBdPoint = bm.zeros((NN,), dtype=bool)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdPoint[face[isBdFace, :]] = True
-            return isBdPoint
-        elif bm.backend_name == 'jax':
-            isBdPoint = isBdPoint.at[face[isBdFace, :]].set(True)   
-            return isBdPoint
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        isBdPoint = bm.set_at(isBdPoint, face[isBdFace, :], True)
+        
+        return isBdPoint
+
+        # # TODO: Provide a unified implementation that is not backend-specific
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     # isBdPoint[face[isBdFace, :]] = True
+        #     isBdPoint = bm.set_at(isBdPoint, face[isBdFace, :], True)
+        #     return isBdPoint
+        # elif bm.backend_name == 'jax':
+        #     isBdPoint = isBdPoint.at[face[isBdFace, :]].set(True)   
+        #     return isBdPoint
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
         
     def boundary_edge_flag(self):
         """
@@ -700,15 +779,20 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2edge = self.face_to_edge()
         isBdFace = self.boundary_face_flag()
         isBdEdge = bm.zeros((NE,), dtype=bool)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdEdge[face2edge[isBdFace, :]] = True
-            return isBdEdge
-        elif bm.backend_name == 'jax':
-            isBdEdge = isBdEdge.at[face2edge[isBdFace, :]].set(True)
-            return isBdEdge
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        isBdEdge = bm.set_at(isBdEdge, face2edge[isBdFace, :], True)
+        
+        return isBdEdge
+    
+        # # TODO: Provide a unified implementation that is not backend-specific
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     isBdEdge = bm.set_at(isBdEdge, face2edge[isBdFace, :], True)
+        #     # isBdEdge[face2edge[isBdFace, :]] = True
+        #     return isBdEdge
+        # elif bm.backend_name == 'jax':
+        #     isBdEdge = isBdEdge.at[face2edge[isBdFace, :]].set(True)
+        #     return isBdEdge
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
         
     def boundary_face_flag(self):
         """
@@ -958,25 +1042,136 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         return p 
     
-        
+
     # 插值点
-    def interpolation_points(self, p: int, index: Index=_S):
-        """
-        @brief Generate all interpolation points of the mesh
-        TODO Provide an efficient implementation that is distinct from unstructured meshes
-        """
-        c2ip = self.cell_to_ipoint(p)
-        gp = self.number_of_global_ipoints(p)
-        ipoint = bm.zeros([gp, 3], dtype=self.ftype)
+    def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Generate all interpolation points of the 3D mesh
 
-        line = (bm.linspace(0, 1, p+1, endpoint=True, dtype=self.ftype)).reshape(-1, 1)
-        line = bm.concatenate([1-line, line], axis=1)
-        bcs = (line, line, line)
+        Ordering of interpolation points follows the sequence:
+        - Z direction first, then Y direction, and finally X direction.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+        if p == 1:
+            return self.entity('node', index=index)
+        
+        ordering = self.ipoints_ordering
+        
+        if ordering == 'zyx':
+            nx = self.nx
+            ny = self.ny
+            nz = self.nz
+            hx = self.h[0]
+            hy = self.h[1]
+            hz = self.h[2]
 
-        cip = self.bc_to_point(bcs)
-        ipoint[c2ip] = cip
+            nix = nx + 1 + nx * (p - 1)
+            niy = ny + 1 + ny * (p - 1)
+            niz = nz + 1 + nz * (p - 1)
+            
+            length_x = nx * hx
+            length_y = ny * hy
+            length_z = nz * hz
 
-        return ipoint[index]
+            ix = bm.linspace(0, length_x, nix)
+            iy = bm.linspace(0, length_y, niy)
+            iz = bm.linspace(0, length_z, niz)
+
+            x, y, z = bm.meshgrid(ix, iy, iz, indexing='ij')
+            ipoints = bm.stack([x.flatten(), y.flatten(), z.flatten()], axis=-1)
+        elif ordering == 'nefc':
+            c2ip = self.cell_to_ipoint(p)
+            gp = self.number_of_global_ipoints(p)
+            ipoints = bm.zeros([gp, 3], dtype=self.ftype)
+
+            line = (bm.linspace(0, 1, p+1, endpoint=True, dtype=self.ftype)).reshape(-1, 1)
+            line = bm.concatenate([1-line, line], axis=1)
+            bcs = (line, line, line)
+
+            cip = self.bc_to_point(bcs)
+            ipoints[c2ip] = cip
+        else:
+            raise ValueError("Invalid ordering type. \
+                    Choose 'yxz' for y-direction first, then x-direction, and finally z-direction ordering, "\
+                    "or 'nec' for node first, then edge, thean face, and finally cell ordering.")
+        
+        return ipoints[index]
+    
+    
+    def node_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each node in a 3D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific node interpolation points.
+
+        @return: A 1D array of size (NN,) containing the indices of interpolation points at each node.
+        '''
+        ordering = self.ipoints_ordering
+        
+        if ordering == 'zyx':
+            nx = self.nx
+            ny = self.ny
+            nz = self.nz
+            nix = nx + 1 + nx * (p - 1)
+            niy = ny + 1 + ny * (p - 1)
+            niz = nz + 1 + nz * (p - 1)
+            
+            node_x_indices = bm.arange(0, nix, p)
+            node_y_indices = bm.arange(0, niy, p)
+            node_z_indices = bm.arange(0, niz, p)
+            
+            node_z_grid, node_y_grid, node_x_grid = bm.meshgrid(node_z_indices, node_y_indices, node_x_indices, indexing='ij')
+            
+            node2ipoint = (node_z_grid * (nix * niy) + node_y_grid * nix + node_x_grid).flatten()
+        
+        elif ordering == 'nefc':
+            NN = self.NN
+            node2ipoint = bm.arange(0, NN)
+        
+        else:
+            raise ValueError("Invalid ordering type. Choose 'zyx' or 'nefc'.")
+        
+        return node2ipoint[index]
+    
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each edge in a 3D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+
+        @return: A 2D array of size (NE, p+1) containing the indices of interpolation points at each edge.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+        
+        ordering = self.ipoints_ordering
+        edges = self.edge[index]
+        
+        if ordering == 'zyx':
+            node_to_ipoint = self.node_to_ipoint(p)
+            
+            start_indices = node_to_ipoint[edges[:, 0]]
+            end_indices = node_to_ipoint[edges[:, 1]]
+            
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
+                          end_indices[:, None] * linspace_indices
+        elif ordering == 'nefc':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            
+            indices = bm.arange(NE, dtype=self.itype)[index]
+            edge2ipoint =  bm.concatenate([
+                edges[:, 0].reshape(-1, 1),
+                (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, dtype=self.itype) + NN,
+                edges[:, 1].reshape(-1, 1),
+            ], axis=-1)
+        else:
+            raise ValueError("Invalid ordering type. Choose 'zyx' or 'nefc'.")
+        return edge2ipoint
+
 
     def face_to_ipoint(self, p, index: Index=_S):
         """

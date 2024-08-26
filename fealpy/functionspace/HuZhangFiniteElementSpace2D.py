@@ -31,11 +31,6 @@ class HuZhangFiniteElementSpace():
         self.integralalg = self.space.integralalg
         self.integrator = self.integralalg.integrator
 
-
-
-
-
-
     def init_orth_matrices(self):
         """
         Initialize the othogonal symetric matrix basis.
