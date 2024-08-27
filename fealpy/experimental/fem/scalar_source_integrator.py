@@ -11,7 +11,7 @@ from .integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, source: Optional[SourceLike]=None, q: int=3, *,
+    def __init__(self, source: Optional[SourceLike]=None, q: int=None, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()
@@ -36,6 +36,7 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index)

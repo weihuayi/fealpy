@@ -21,7 +21,7 @@ class CurlIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c curl u, curl v)
     """    
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3) -> None:
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None) -> None:
         super().__init__()
         self.coef = coef
         self.q = q
@@ -39,8 +39,8 @@ class CurlIntegrator(LinearInt, OpInt, CellInt):
         ldof = space.dof.number_of_local_dofs()
         gdof = space.dof.number_of_global_dofs()
         cm = space.cellmeasure if cellmeasure is None else cellmeasure
-
-        qf = mesh.quadrature_formula(self.q, 'cell')
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         cphi = space.curl_basis(bcs) #(NQ, NC, ldof)

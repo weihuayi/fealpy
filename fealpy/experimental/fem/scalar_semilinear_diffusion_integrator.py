@@ -17,7 +17,7 @@ from .integrator import (
 
 class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
@@ -36,7 +36,6 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
-        q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
 
@@ -46,6 +45,7 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')

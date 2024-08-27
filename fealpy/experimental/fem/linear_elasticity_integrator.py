@@ -26,7 +26,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
                  lam: Optional[float]=None, mu: Optional[float]=None,
                  E: Optional[float]=None, nu: Optional[float]=None, 
                  elasticity_type: Optional[str]=None,
-                 coef: Optional[CoefLike]=None, q: int=5, *,
+                 coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
@@ -54,7 +54,6 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
-        q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
     
@@ -64,6 +63,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
@@ -141,7 +141,6 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
 
     @assemblymethod('fast_strain')
     def fast_assembly_strain_constant(self, space: _FS) -> TensorLike:
-        q = self.q
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -152,6 +151,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
 
         GD = mesh.geo_dimension()
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
@@ -205,7 +205,6 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
 
     @assemblymethod('fast_stress')
     def fast_assembly_stress_constant(self, space: _FS) -> TensorLike:
-        q = self.q
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -216,6 +215,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         
         GD = mesh.geo_dimension()
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
@@ -259,7 +259,6 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
     
     @assemblymethod('fast_3d')
     def fast_assembly_constant(self, space: _FS) -> TensorLike:
-        q = self.q
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -270,6 +269,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         
         GD = mesh.geo_dimension()
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
