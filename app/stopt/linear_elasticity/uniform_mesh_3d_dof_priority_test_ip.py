@@ -32,9 +32,8 @@ edge2ipoint = mesh.edge_to_ipoint(p=p, index=isBdEdge)
 face2ipoint = mesh.face_to_ipoint(p=p, index=isBdFace)
 cell2ipoint = mesh.cell_to_ipoint(p=p)
 
-# edgenorm = mesh.edge_normal()
-# edgeunitnorrm = mesh.edge_unit_normal()
-# facenorm = mesh.face_normal()
+facenorm = mesh.face_normal()
+faceunitnorm = mesh.face_unit_normal()
 # faceunitnorrm = mesh.face_unit_normal()
 # cellnorm = mesh.cell_normal()
 
