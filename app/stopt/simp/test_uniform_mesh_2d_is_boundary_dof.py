@@ -54,11 +54,8 @@ def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
 
 
 # Default input parameters
-nx = 4
-ny = 3
-volfrac = 0.5
-penal = 3.0
-rmin = 1.5
+nx = 2
+ny = 2
 
 extent = [0, nx, 0, ny]
 h = [1, 1]
