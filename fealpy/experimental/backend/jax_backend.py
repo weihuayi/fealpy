@@ -69,7 +69,6 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     # NOTE: all copied
 
     @staticmethod
-    @jit
     def set_at(x: Array, indices, val, /):
         return x.at[indices].set(val)
 

@@ -287,7 +287,7 @@ class IntervalMesh(SimplexMesh,Plotable):
         -----
         把网格转化为 VTK 的格式
         """
-        from fealpy.mesh.vtk_extent import  write_to_vtu
+        from fealpy.experimental.mesh.vtk_extent import  write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()
@@ -302,7 +302,6 @@ class IntervalMesh(SimplexMesh,Plotable):
         cell[:, 0] = NV
 
         cellType = self.vtk_cell_type()  # segment
-        print(node.shape, cell.shape, cellType, cell.flatten())
         if fname is None:
             return node, cell.flatten(), cellType, NC
         else:
