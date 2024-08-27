@@ -9,10 +9,11 @@ Authors
 Huayi Wei, weihuayi@xtu.edu.cn
 """
 
-import torch
+
 import numpy as np
 import vtk
 import vtk.util.numpy_support as vnp
+from fealpy.experimental.backend import backend_manager as bm
 
 from .vtkCellTypes import *
 
@@ -22,9 +23,11 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     Notes
     -----
     """
+    
+        
     points = vtk.vtkPoints()
-    node = node.cpu().numpy()
-    cell = cell.cpu().numpy()
+    node = bm.to_numpy(node)
+    cell = bm.to_numpy(cell)
     points.SetData(vnp.numpy_to_vtk(node))
 
     cells = vtk.vtkCellArray()

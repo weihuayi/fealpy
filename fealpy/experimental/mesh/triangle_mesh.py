@@ -1254,7 +1254,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @brief 把网格转化为 vtk 的数据格式
         """
-        from fealpy.mesh.vtk_extent import  write_to_vtu
+        from fealpy.experimental.mesh.vtk_extent import  write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()
@@ -1277,7 +1277,6 @@ class TriangleMesh(SimplexMesh, Plotable):
                          nodedata=self.nodedata,
                          celldata=self.celldata)
             
-    @classmethod
     def from_meshio(cls, file, show=False):
         import meshio
         data = meshio.read(file)
