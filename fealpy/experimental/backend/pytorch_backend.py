@@ -229,7 +229,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if any_return:
             result = (b, )
         else:
-            retult = b
+            result = b
 
         if return_index:
             kwargs = {'dtype': inverse.dtype, 'device': inverse.device}

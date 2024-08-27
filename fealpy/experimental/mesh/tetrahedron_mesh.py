@@ -521,23 +521,23 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
         flag = (lidx == 1)
         if  sum(flag) > 0:
-            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [2, 0, 1, 3]])
+            cell = bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [2, 0, 1, 3]])
 
         flag = (lidx == 2)
         if sum(flag) > 0:
-            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [0, 3, 1, 2]])
+            cell = bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [0, 3, 1, 2]])
 
         flag = (lidx == 3)
         if sum(flag) > 0:
-            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [1, 2, 0, 3]])
+            cell = bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [1, 2, 0, 3]])
 
         flag = (lidx == 4)
         if sum(flag) > 0:
-            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [1, 3, 2, 0]])
+            cell = bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [1, 3, 2, 0]])
 
         flag = (lidx == 5)
         if sum(flag) > 0:
-            bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [3, 2, 1, 0]])
+            cell = bm.set_at(cell, cellidx[flag], cell[cellidx[flag]][:, [3, 2, 1, 0]])
 
         if rflag == True:
             self.construct()
@@ -581,13 +581,13 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         node = bm.zeros((9*NN, 3), dtype=self.ftype)
         cell = bm.zeros((4*NC, 4), dtype=self.itype)
 
-        bm.set_at(node, slice(NN), self.entity('node'))
-        bm.set_at(cell, slice(NC), self.entity('cell'))
+        node = bm.set_at(node, slice(NN), self.entity('node'))
+        cell = bm.set_at(cell, slice(NC), self.entity('cell'))
 
         for key in self.celldata:
             data = bm.zeros(4*NC, dtype=self.ftype)
-            bm.set_at(data, slice(NC), self.celldata[key])
-            bm.set_at(self.celldata , key, data.copy())
+            data = bm.set_at(data, slice(NC), self.celldata[key])
+            data = bm.set_at(self.celldata , key, data.copy())
 
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
         generation = bm.zeros(NN + 6*NC, dtype=bm.uint8)
@@ -627,14 +627,14 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
-                i, j =  bm.nonzero(nv2v[:, p0].multiply(nv2v[:, p1]))
-                bm.set_at(p4, j, i)
+                i, j =  (nv2v[:, p0].multiply(nv2v[:, p1])).nonzero()
+                p4 = bm.set_at(p4, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
                 idx, = bm.nonzero(p4 == 0)
 
             if len(idx) != 0:
                 # 把需要二分的边唯一化
                 NE = len(idx)
-                cellCutEdge = bm.array([p0[idx], p1[idx]])
+                cellCutEdge = bm.stack([p0[idx], p1[idx]])
                 cellCutEdge = bm.sort(cellCutEdge,axis=0)
                 s = csr_matrix(
                     (
@@ -643,15 +643,17 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                             cellCutEdge[0, ...],
                             cellCutEdge[1, ...]
                         )
-                    ), shape=(NN, NN), dtype=bm.bool)
+                    ), shape=(NN, NN))
                 # 获得唯一的边
                 i, j = s.nonzero()
+                i = bm.tensor(i,dtype=self.itype)
+                j = bm.tensor(j,dtype=self.itype)
                 nNew = len(i)
                 newCutEdge = bm.arange(nCut, nCut+nNew)
-                bm.set_at(cutEdge, (newCutEdge,0), i)
-                bm.set_at(cutEdge, (newCutEdge,1), j)
-                bm.set_at(cutEdge, (newCutEdge,2), range(NN, NN+nNew))
-                bm.set_at(node, slice(NN, NN+nNew), (node[i, :] + node[j, :])/2.0)
+                cutEdge = bm.set_at(cutEdge, (newCutEdge,0), i)
+                cutEdge = bm.set_at(cutEdge, (newCutEdge,1), j)
+                cutEdge = bm.set_at(cutEdge, (newCutEdge,2), bm.arange(NN, NN+nNew,dtype=self.itype))
+                node = bm.set_at(node, slice(NN, NN+nNew), (node[i, :] + node[j, :])/2.0)
 
                 if returnim is True:
                     val = bm.full(nNew, 0.5)
@@ -674,8 +676,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
-                i, j =  bm.nonzero(nv2v[:, p0].multiply(nv2v[:, p1]))
-                bm.set_at(p4, j, i)
+                i, j =  (nv2v[:, p0].multiply(nv2v[:, p1])).nonzero()
+                p4 = bm.set_at(p4, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
 
             # 如果新点的代数仍然为 0
             idx = (generation[p4] == 0)
@@ -683,23 +685,23 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                     generation[cell[markedCell[idx]]],
                     axis=-1)
             # 第几代点
-            bm.set_at(generation, p4[idx], cellGeneration + 1)
-            bm.set_at(cell, (markedCell,0), p3)
-            bm.set_at(cell, (markedCell,1), p0)
-            bm.set_at(cell, (markedCell,2), p2)
-            bm.set_at(cell, (markedCell,3), p4)
-            bm.set_at(cell, (slice(NC, NC+nMarked),0), p2)
-            bm.set_at(cell, (slice(NC, NC+nMarked),1), p1)
-            bm.set_at(cell, (slice(NC, NC+nMarked),2), p3)
-            bm.set_at(cell, (slice(NC, NC+nMarked),3), p4)
+            generation = bm.set_at(generation, p4[idx], cellGeneration + 1)
+            cell = bm.set_at(cell, (markedCell,0), p3)
+            cell = bm.set_at(cell, (markedCell,1), p0)
+            cell = bm.set_at(cell, (markedCell,2), p2)
+            cell = bm.set_at(cell, (markedCell,3), p4)
+            cell = bm.set_at(cell, (slice(NC, NC+nMarked),0), p2)
+            cell = bm.set_at(cell, (slice(NC, NC+nMarked),1), p1)
+            cell = bm.set_at(cell, (slice(NC, NC+nMarked),2), p3)
+            cell = bm.set_at(cell, (slice(NC, NC+nMarked),3), p4)
 
             for key in self.celldata:
                 data = self.celldata[key]
-                bm.set_at(data, slice(NC, NC+nMarked), data[markedCell])
+                data = bm.set_at(data, slice(NC, NC+nMarked), data[markedCell])
 
             if("HB" in options) and (options["HB"] is not None):
                 HB = options['HB']
-                bm.set_at(HB, (slice(NC, NC+nMarked),1), HB[markedCell,1])
+                HB = bm.set_at(HB, (slice(NC, NC+nMarked),1), HB[markedCell,1])
             
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3, p4
@@ -707,7 +709,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             # 找到非协调的单元
             checkEdge, = bm.nonzero(nonConforming[:nCut])
             isCheckNode = bm.zeros(NN, dtype=bm.bool)
-            bm.set_at(isCheckNode, cutEdge[checkEdge], True)
+            isCheckNode = bm.set_at(isCheckNode, cutEdge[checkEdge], True)
             isCheckCell = bm.sum(
                     isCheckNode[cell[:NC]],
                     axis= -1) > 0
@@ -717,13 +719,12 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             J = cell[checkCell].reshape(-1)
             val = bm.ones(len(I), dtype=bm.bool)
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
-            i, j = bm.nonzero(
-                    cell2node[:, cutEdge[checkEdge, 0]].multiply(
+            i, j =  (cell2node[:, cutEdge[checkEdge, 0]].multiply(
                         cell2node[:, cutEdge[checkEdge, 1]]
-                        ))
-            markedCell = bm.unique(i)
-            bm.set_at(nonConforming, checkEdge, False)
-            bm.set_at(nonConforming, checkEdge[j], True)
+                        )).nonzero()
+            markedCell = bm.unique(bm.array(i))
+            nonConforming = bm.set_at(nonConforming, checkEdge, False)
+            nonConforming = bm.set_at(nonConforming, checkEdge[j], True)
 
 
         self.node = node[:NN]
@@ -732,7 +733,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         
 
         for key in self.celldata:
-            bm.set_at(self.celldata, key, self.celldata[key][:NC])
+            self.celldata = bm.set_at(self.celldata, key, self.celldata[key][:NC])
             
 
         if("HB" in options) & (options["HB"] is not None):

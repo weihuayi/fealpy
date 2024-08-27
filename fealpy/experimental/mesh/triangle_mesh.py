@@ -400,7 +400,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         markedCell, = bm.nonzero(isMarkedCell)
         while len(markedCell) > 0:
-            bm.set_at(isCutEdge, cell2edge[markedCell, 0], True)
+            isCutEdge = bm.set_at(isCutEdge, cell2edge[markedCell, 0], True)
             refineNeighbor = cell2cell[markedCell, 0]
             markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor, 0]]]
 
@@ -408,7 +408,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             print('The number of markedg edges: ', isCutEdge.sum())
 
         edge2newNode = bm.zeros((NE,), dtype=self.itype)
-        bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum()))
+        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum()))
 
         node = self.node
         newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
@@ -460,53 +460,53 @@ class TriangleMesh(SimplexMesh, Plotable):
                 for key, value in options['data'].items():
                     if value.shape == (NC,):  # 分片常数
                         value = bm.concatenate((value[:], value[idx]))
-                        bm.set_at(options['data'] , key, value)
+                        options['data'] = bm.set_at(options['data'] , key, value)
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
                             value = bm.concatenate((value, bm.zeros((nn,), dtype=self.ftype)))
-                            bm.set_at(value , slice(NN, None), 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]]))
-                            bm.set_at(options['data'] , key, value)
+                            value = bm.set_at(value , slice(NN, None), 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]]))
+                            options['data'] = bm.set_at(options['data'] , key, value)
                     else:
                         ldof = value.shape[-1]
                         p = int((bm.sqrt(1 + 8 * ldof) - 3) // 2)
                         bc = self.multi_index_matrix(p, etype=2) / p
 
                         bcl = bm.zeros_like(bc)
-                        bm.set_at(bcl , (slice(None), 0), bc[:, 1])
-                        bm.set_at(bcl , (slice(None), 1), 0.5 * bc[:, 0] + bc[:, 2])
-                        bm.set_at(bcl , (slice(None), 2), 0.5 * bc[:, 0])
+                        bcl = bm.set_at(bcl , (slice(None), 0), bc[:, 1])
+                        bcl = bm.set_at(bcl , (slice(None), 1), 0.5 * bc[:, 0] + bc[:, 2])
+                        bcl = bm.set_at(bcl , (slice(None), 2), 0.5 * bc[:, 0])
 
                         bcr = bm.zeros_like(bc)
-                        bm.set_at(bcr , (slice(None), 0), bc[:, 2])
-                        bm.set_at(bcr , (slice(None), 1), 0.5 * bc[:, 0])
-                        bm.set_at(bcr , (slice(None), 2), 0.5 * bc[:, 0] + bc[:, 1])
+                        bcr = bm.set_at(bcr , (slice(None), 0), bc[:, 2])
+                        bcr = bm.set_at(bcr , (slice(None), 1), 0.5 * bc[:, 0])
+                        bcr = bm.set_at(bcr , (slice(None), 2), 0.5 * bc[:, 0] + bc[:, 1])
 
                         value = bm.concatenate((value, bm.zeros((nc, ldof), dtype=self.ftype)))
 
                         phi = self.shape_function(bcr, p=p)
-                        bm.set_at(value , slice(NC , None), bm.einsum('cj,kj->ck', value[idx], phi))
+                        value = bm.set_at(value , slice(NC , None), bm.einsum('cj,kj->ck', value[idx], phi))
 
                         phi = self.shape_function(bcl, p=p)
-                        bm.set_at(value , (idx,slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
+                        value = bm.set_at(value , (idx,slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
 
-                        bm.set_at(options['data'] , key, value)
+                        options['data'] = bm.set_at(options['data'] , key, value)
 
             p0 = cell[idx, 0]
             p1 = cell[idx, 1]
             p2 = cell[idx, 2]
             p3 = edge2newNode[cell2edge0[idx]]
             cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
-            bm.set_at(cell , (L, 0), p3)
-            bm.set_at(cell , (L, 1), p0)
-            bm.set_at(cell , (L, 2), p1)
-            bm.set_at(cell , (R, 0), p3)
-            bm.set_at(cell , (R, 1), p2)
-            bm.set_at(cell , (R, 2), p0)
+            cell = bm.set_at(cell , (L, 0), p3)
+            cell = bm.set_at(cell , (L, 1), p0)
+            cell = bm.set_at(cell , (L, 2), p1)
+            cell = bm.set_at(cell , (R, 0), p3)
+            cell = bm.set_at(cell , (R, 1), p2)
+            cell = bm.set_at(cell , (R, 2), p0)
             if k == 0:
                 cell2edge0 = bm.zeros((NC + nc,), dtype=self.itype)
-                bm.set_at(cell2edge0 , slice(NC) , cell2edge[:, 0])
-                bm.set_at(cell2edge0 , L , cell2edge[idx, 2])
-                bm.set_at(cell2edge0 , R , cell2edge[idx, 1])
+                cell2edge0 = bm.set_at(cell2edge0 , slice(NC) , cell2edge[:, 0])
+                cell2edge0 = bm.set_at(cell2edge0 , L , cell2edge[idx, 2])
+                cell2edge0 = bm.set_at(cell2edge0 , R , cell2edge[idx, 1])
             NC = NC + nc
 
         self.NN = self.node.shape[0]
@@ -545,8 +545,8 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
         iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
-        bm.set_at(nodeStar , ix & (~iy) ,nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]])
-        bm.set_at(nodeStar , (~ix) & iy ,nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]])
+        nodeStar = bm.set_at(nodeStar , ix & (~iy) ,nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]])
+        nodeStar = bm.set_at(nodeStar , (~ix) & iy ,nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]])
 
         t0 = nodeStar[:, 0]
         t1 = nodeStar[:, 1]
@@ -558,20 +558,20 @@ class TriangleMesh(SimplexMesh, Plotable):
         p3 = cell[t0, 1]
         p4 = cell[t2, 1]
 
-        bm.set_at(cell , (t0, 0) , p3)
-        bm.set_at(cell , (t0, 1) , p1)
-        bm.set_at(cell , (t0, 2) , p2)
-        bm.set_at(cell , (t1, 0) , -1)
-        
-        bm.set_at(cell , (t2, 0) , p4)
-        bm.set_at(cell , (t2, 1) , p2)
-        bm.set_at(cell , (t2, 2) , p1)
-        bm.set_at(cell , (t3, 0) , -1)
+        cell = bm.set_at(cell , (t0, 0) , p3)
+        cell = bm.set_at(cell , (t0, 1) , p1)
+        cell = bm.set_at(cell , (t0, 2) , p2)
+        cell = bm.set_at(cell , (t1, 0) , -1)
+
+        cell = bm.set_at(cell , (t2, 0) , p4)
+        cell = bm.set_at(cell , (t2, 1) , p2)
+        cell = bm.set_at(cell , (t2, 2) , p1)
+        cell = bm.set_at(cell , (t3, 0) , -1)
 
         I, J = bm.nonzero(node2cell[isBGoodNode, :])
         nodeStar = J.reshape(-1, 2)
         idx = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 1], 1])
-        bm.set_at(nodeStar , idx , nodeStar[idx, :][:, [0, 1]])
+        nodeStar = bm.set_at(nodeStar , idx , nodeStar[idx, :][:, [0, 1]])
 
         t4 = nodeStar[:, 0]
         t5 = nodeStar[:, 1]
@@ -579,10 +579,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         p1 = cell[t4, 2]
         p2 = cell[t5, 1]
         p3 = cell[t4, 1]
-        bm.set_at(cell , (t4, 0) , p3)
-        bm.set_at(cell , (t4, 1) , p1)
-        bm.set_at(cell , (t4, 2) , p2)
-        bm.set_at(cell , (t5, 0) , -1)
+        cell = bm.set_at(cell , (t4, 0) , p3)
+        cell = bm.set_at(cell , (t4, 1) , p1)
+        cell = bm.set_at(cell , (t4, 2) , p2)
+        cell = bm.set_at(cell , (t5, 0) , -1)
 
         isKeepCell = cell[:, 0] > -1
         if ('data' in options) and (options['data'] is not None):
@@ -594,23 +594,23 @@ class TriangleMesh(SimplexMesh, Plotable):
                 p = int((bm.sqrt(8 * ldof + 1) - 3) / 2)
                 bc = self.multi_index_matrix(p=p, etype=2) / p
                 bcl = bm.zeros_like(bc)
-                bm.set_at(bcl , (slice(None), 0) , 2 * bc[:, 2])
-                bm.set_at(bcl , (slice(None), 1) , bc[:, 0])
-                bm.set_at(bcl , (slice(None), 2) , bc[:, 1] - bc[:, 2])
+                bcl = bm.set_at(bcl , (slice(None), 0) , 2 * bc[:, 2])
+                bcl = bm.set_at(bcl , (slice(None), 1) , bc[:, 0])
+                bcl = bm.set_at(bcl , (slice(None), 2) , bc[:, 1] - bc[:, 2])
  
                 bcr = bm.zeros_like(bc)
-                bm.set_at(bcr , (slice(None), 0) , 2 * bc[:, 1])
-                bm.set_at(bcr , (slice(None), 1) , bc[:, 2] - bc[:, 1])
-                bm.set_at(bcr , (slice(None), 2) , bc[:, 0])
+                bar = bm.set_at(bcr , (slice(None), 0) , 2 * bc[:, 1])
+                bar = bm.set_at(bcr , (slice(None), 1) , bc[:, 2] - bc[:, 1])
+                bar = bm.set_at(bcr , (slice(None), 2) , bc[:, 0])
 
                 phi = self.shape_function(bcl, p=p)  # (NQ, ldof)
-                bm.set_at(value , lidx , bm.einsum('ci, qi->cq', value[lidx, :], phi))
+                value = bm.set_at(value , lidx , bm.einsum('ci, qi->cq', value[lidx, :], phi))
 
                 phi = self.shape_function(bcr, p=p)  # (NQ, ldof)
 
-                bm.add_at(value , lidx , bm.einsum('ci, qi->cq', value[ridx, :], phi))
-                bm.set_at(value , lidx , 0.5 * value[lidx])
-                bm.set_at(options['data'],key , value[isKeepCell])
+                value = bm.add_at(value , lidx , bm.einsum('ci, qi->cq', value[ridx, :], phi))
+                value = bm.set_at(value , lidx , 0.5 * value[lidx])
+                options['data'] = bm.set_at(options['data'],key , value[isKeepCell])
 
         cell = cell[isKeepCell]
         isGoodNode = (isIGoodNode | isBGoodNode)
@@ -619,7 +619,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         self.node = node[~isGoodNode]
 
         NN = self.node.shape[0]
-        bm.set_at(idxMap , ~isGoodNode , bm.arange(NN))
+        idxMap = bm.set_at(idxMap , ~isGoodNode , bm.arange(NN))
         cell = idxMap[cell]
 
         self.cell = cell
@@ -667,11 +667,11 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         flag = (lidx == 1)
         if sum(flag) > 0:
-            bm.set_at(cell , cellidx[flag] , cell[cellidx[flag]][:, [0, 1, 2]])
+            cell = bm.set_at(cell , cellidx[flag] , cell[cellidx[flag]][:, [0, 1, 2]])
 
         flag = (lidx == 2)
         if sum(flag) > 0:
-            bm.set_at(cell , cellidx[flag] , cell[cellidx[flag]][:, [2, 0, 1]])
+            cell = bm.set_at(cell , cellidx[flag] , cell[cellidx[flag]][:, [2, 0, 1]])
 
         if rflag == True:
             self.construct()
@@ -778,8 +778,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         if ('numrefine' in options) and (options['numrefine'] is not None):
             options['numrefine'] = bm.concatenate((options['numrefine'], bm.zeros(2 * NC)))
 
-        bm.set_at(node , slice(NN), self.entity('node'))
-        bm.set_at(cell , slice(NC), self.entity('cell'))
+        node = bm.set_at(node , slice(NN), self.entity('node'))
+        cell = bm.set_at(cell , slice(NC), self.entity('cell'))
 
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
         generation = bm.zeros(NN + 2 * NC, dtype=bm.uint8)
@@ -817,7 +817,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                     (val, (I, J)),
                     shape=(NN, NN))
                 i, j = (nv2v[:, p1].multiply(nv2v[:, p2])).nonzero()
-                bm.set_at(p3, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
+                p3 = bm.set_at(p3, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
                 idx, = bm.nonzero(p3 == 0)
 
             if len(idx) != 0:
@@ -839,10 +839,10 @@ class TriangleMesh(SimplexMesh, Plotable):
                 j = bm.tensor(j,dtype=self.itype)
                 nNew = len(i)
                 newCutEdge = bm.arange(nCut, nCut + nNew)
-                bm.set_at(cutEdge , (newCutEdge, 0) , i)
-                bm.set_at(cutEdge , (newCutEdge, 1) , j)
-                bm.set_at(cutEdge , (newCutEdge, 2) , bm.arange(NN, NN + nNew))
-                bm.set_at(node, slice(NN, NN + nNew), 0.5 * (node[i, :] + node[j, :]))
+                cutEdge = bm.set_at(cutEdge , (newCutEdge, 0) , i)
+                cutEdge = bm.set_at(cutEdge , (newCutEdge, 1) , j)
+                cutEdge = bm.set_at(cutEdge , (newCutEdge, 2) , bm.arange(NN, NN + nNew))
+                node = bm.set_at(node, slice(NN, NN + nNew), 0.5 * (node[i, :] + node[j, :]))
                 nCut += nNew
                 NN += nNew
 
@@ -854,7 +854,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                     (val, (I, J)),
                     shape=(NN, NN))
                 i, j = (nv2v[:, p1].multiply(nv2v[:, p2])).nonzero()
-                bm.set_at(p3, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
+                p3 = bm.set_at(p3, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
 
             # 如果新点的代数仍然为 0
             idx = (generation[p3] == 0)
@@ -862,17 +862,18 @@ class TriangleMesh(SimplexMesh, Plotable):
                 generation[cell[markedCell[idx]]],
                 axis=-1)
             # 第几代点
-            bm.set_at(generation , p3[idx] , cellGeneration + 1)
-            bm.set_at(cell ,(markedCell,0) , p3)
-            bm.set_at(cell ,(markedCell,1) , p0)
-            bm.set_at(cell ,(markedCell,2) , p1)
-            bm.set_at(cell ,(slice(NC,NC+nMarked),0) , p3)
-            bm.set_at(cell ,(slice(NC,NC+nMarked),1) , p2)
-            bm.set_at(cell ,(slice(NC,NC+nMarked),2) , p0)
+            generation = bm.set_at(generation , p3[idx] , cellGeneration + 1)
+            cell = bm.set_at(cell ,(markedCell,0) , p3)
+            cell = bm.set_at(cell ,(markedCell,1) , p0)
+            cell = bm.set_at(cell ,(markedCell,2) , p1)
+            cell = bm.set_at(cell ,(slice(NC,NC+nMarked),0) , p3)
+            cell = bm.set_at(cell ,(slice(NC,NC+nMarked),1) , p2)
+            cell = bm.set_at(cell ,(slice(NC,NC+nMarked),2) , p0)
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
                 bm.add_at(options['numrefine'], markedCell, -1)
-                bm.set_at(options['numrefine'], slice(NC, NC + nMarked), options['numrefine'][markedCell])
+                options['numrefine'] = bm.set_at(options['numrefine'], slice(NC, NC + nMarked), 
+                                                 options['numrefine'][markedCell])
 
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3
@@ -880,7 +881,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             # 找到非协调的单元
             checkEdge, = bm.nonzero(nonConforming[:nCut])
             isCheckNode = bm.zeros(NN, dtype=bm.bool)
-            bm.set_at(isCheckNode, cutEdge[checkEdge], True)
+            isCheckNode = bm.set_at(isCheckNode, cutEdge[checkEdge], True)
             isCheckCell = bm.sum(
                 isCheckNode[cell[:NC]],
                 axis=-1) > 0
@@ -894,9 +895,9 @@ class TriangleMesh(SimplexMesh, Plotable):
                     cell2node[:, cutEdge[checkEdge, 1]]
                 )).nonzero()
               
-            markedCell = bm.unique(bm.array(i),return_index=True)[0] # unique 拼写有误，无法返回单个数组
-            bm.set_at(nonConforming , checkEdge , False)
-            bm.set_at(nonConforming , checkEdge[j] , True)
+            markedCell = bm.unique(bm.array(i))
+            nonConforming = bm.set_at(nonConforming , checkEdge , False)
+            nonConforming = bm.set_at(nonConforming , checkEdge[j] , True)
 
         if ('imatrix' in options) and (options['imatrix'] is True):
             nn = NN - NN0
@@ -921,14 +922,14 @@ class TriangleMesh(SimplexMesh, Plotable):
                 j = cutEdge[nidx, 1]
                 ic = bm.zeros((N, 2), dtype=self.ftype)
                 jc = bm.zeros((N, 2), dtype=self.ftype)
-                bm.set_at(ic, (i < NN0,0), 1.0)
-                bm.set_at(jc, (j < NN0,1), 1.0)
-                bm.set_at(ic, i >= NN0, val[i[i >= NN0] - NN0])
-                bm.set_at(jc, j >= NN0, val[j[j >= NN0] - NN0])
+                ic = bm.set_at(ic, (i < NN0,0), 1.0)
+                jc = bm.set_at(jc, (j < NN0,1), 1.0)
+                ic = bm.set_at(ic, i >= NN0, val[i[i >= NN0] - NN0])
+                jc = bm.set_at(jc, j >= NN0, val[j[j >= NN0] - NN0])
 
-                bm.set_at(val , markedNode - NN0 , 0.5 * (ic + jc))
-                bm.set_at(cutEdge , (nidx[i >= NN0],0) , cutEdge[i[i >= NN0] - NN0,0])
-                bm.set_at(cutEdge , (nidx[j >= NN0],1) , cutEdge[j[j >= NN0] - NN0,1])
+                val = bm.set_at(val , markedNode - NN0 , 0.5 * (ic + jc))
+                cutEdge = bm.set_at(cutEdge , (nidx[i >= NN0],0) , cutEdge[i[i >= NN0] - NN0,0])
+                cutEdge = bm.set_at(cutEdge , (nidx[j >= NN0],1) , cutEdge[j[j >= NN0] - NN0,1])
                 g += 1
                 markedNode, = bm.nonzero(generation == g)
                 N = len(markedNode)
