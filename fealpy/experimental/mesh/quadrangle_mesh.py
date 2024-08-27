@@ -6,9 +6,10 @@ from .. import logger
 from .utils import estr2dim
 
 from .mesh_base import TensorMesh
+from .plot import Plotable
 
 
-class QuadrangleMesh(TensorMesh):
+class QuadrangleMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
         """
         """
@@ -40,6 +41,8 @@ class QuadrangleMesh(TensorMesh):
         self.face_normal = self.edge_normal
         self.face_unit_normal = self.edge_unit_normal
 
+        self.face_to_ipoint = self.edge_to_ipoint
+
     def ref_cell_measure(self):
         return 1.0
 
@@ -48,28 +51,26 @@ class QuadrangleMesh(TensorMesh):
 
     def cell_area(self, index: Index = _S) -> TensorLike:
         """
-        @brief 根据散度定理计算多边形的面积
-        @note 请注意下面的计算方式不方便实现部分单元面积的计算
+        @brief 计算多边形的面积
         """
         GD = self.GD
         if GD == 2:
-            NC = self.number_of_cells()
             node = self.entity('node')
-            edge = self.entity('edge')
-            edge2cell = self.edge2cell
+            cell = self.entity('cell')[index]
 
-            t = self.edge_tangent()
-            val = t[:, 1] * node[edge[:, 0], 0] - t[:, 0] * node[edge[:, 0], 1]
+            v0 = node[cell[:, 1]] - node[cell[:, 0]]
+            v1 = node[cell[:, 2]] - node[cell[:, 0]]
+            v2 = node[cell[:, 3]] - node[cell[:, 0]]
 
-            a = bm.zeros(NC, dtype=self.ftype)
-            bm.add.at(a, edge2cell[:, 0], val)
+            # Compute the 2D cross product manually (for z-component)
+            cross_01 = v0[:, 0] * v1[:, 1] - v0[:, 1] * v1[:, 0]
+            cross_12 = v1[:, 0] * v2[:, 1] - v1[:, 1] * v2[:, 0]
 
-            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-            bm.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+            s1 = 0.5 * bm.abs(cross_01)
+            s2 = 0.5 * bm.abs(cross_12)
+            s = s1 + s2
 
-            a /= 2.0
-
-            return a[index]
+            return s
         elif GD == 3:
             node = self.entity('node')
             cell = self.entity('cell')[index]
@@ -110,7 +111,7 @@ class QuadrangleMesh(TensorMesh):
             return qf
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
-
+    """
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int = 1, *, index: Index = _S,
                             variables: str = 'u', mi: Optional[TensorLike] = None) -> TensorLike:
         assert isinstance(bcs, tuple)
@@ -134,6 +135,7 @@ class QuadrangleMesh(TensorMesh):
             G = bm.linalg.inv(G)
             gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
         return gphi
+    """
 
     def jacobi_matrix(self, bc, index: Index = _S) -> TensorLike:
         """
@@ -178,7 +180,7 @@ class QuadrangleMesh(TensorMesh):
         """
         assert self.GD == 2
         t = self.edge_unit_tangent(index=index)
-        w = bm.tensor([(0, -1), (1, 0)])
+        w = bm.tensor([(0, -1), (1, 0)], dtype=t.dtype)
         n = t @ w
         return n, t
 
@@ -200,7 +202,7 @@ class QuadrangleMesh(TensorMesh):
 
         edge = self.entity('edge')
 
-        multiIndex = self.multi_index_matrix(p, 1)
+        multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
         w = multiIndex[1:-1, :] / p
         ipoints0 = bm.einsum('ij, ...jm->...im', w, node[edge, :]).reshape(-1, GD)
 
@@ -240,15 +242,15 @@ class QuadrangleMesh(TensorMesh):
             flag = edge2cell[:, 2] == 1
             c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
             flag = edge2cell[:, 2] == 2
-            c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 0], :, -1] = bm.flip(e2p[flag], axis=-1)
             flag = edge2cell[:, 2] == 3
-            c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 0], 0, :] = bm.flip(e2p[flag], axis=-1)
 
             iflag = edge2cell[:, 0] != edge2cell[:, 1]
             flag = iflag & (edge2cell[:, 3] == 0)
-            c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 1], :, 0] = bm.flip(e2p[flag], axis=-1)
             flag = iflag & (edge2cell[:, 3] == 1)
-            c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
+            c2p[edge2cell[flag, 1], -1, :] = bm.flip(e2p[flag], axis=-1)
             flag = iflag & (edge2cell[:, 3] == 2)
             c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
             flag = iflag & (edge2cell[:, 3] == 3)
@@ -257,33 +259,27 @@ class QuadrangleMesh(TensorMesh):
             c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
         elif bm.backend_name == "jax":
             flag = edge2cell[:, 2] == 0
-            # c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
-            c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
+            c2p = c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
             flag = edge2cell[:, 2] == 1
-            # c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
-            c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
+            c2p = c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
             flag = edge2cell[:, 2] == 2
-            # c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
-            c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
+            c2p = c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
             flag = edge2cell[:, 2] == 3
-            # c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
-            c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
+            c2p = c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
 
             iflag = edge2cell[:, 0] != edge2cell[:, 1]
             flag = iflag & (edge2cell[:, 3] == 0)
-            # c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
-            c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
+            c2p = c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
             flag = iflag & (edge2cell[:, 3] == 1)
-            # c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
-            c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
+            c2p = c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
             flag = iflag & (edge2cell[:, 3] == 2)
-            # c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
-            c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
+            c2p = c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
             flag = iflag & (edge2cell[:, 3] == 3)
-            # c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
-            c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
+            c2p = c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
 
-            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
+            c2p = c2p.at[:, 1:-1, 1:-1].set(NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
+
+            cell2ipoint = c2p.reshape((NC, (p + 1) * (p + 1)))
         else:
             raise ValueError("Unsupported backend")
         return cell2ipoint[index]
@@ -390,18 +386,9 @@ class QuadrangleMesh(TensorMesh):
             VTK_LINE = 3
             return VTK_LINE
 
-    def to_vtk(self, etype='cell', index: Index = _S, fname=None):
-        """
-        Parameters
-        ----------
-
-        Notes
-        -----
-        把网格转化为 VTK 的格式
-        """
-        raise NotImplementedError
-
-        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+    def to_vtk(self, fname=None, etype='cell', index: Index=_S):
+        
+        from fealpy.mesh.vtk_extent import  write_to_vtu
 
         node = self.entity('node')
         GD = self.GD
@@ -412,7 +399,8 @@ class QuadrangleMesh(TensorMesh):
         cellType = self.vtk_cell_type(etype)
         NV = cell.shape[-1]
 
-        cell = bm.concatenate([NV, cell], axis=1)
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
 
         NC = len(cell)
         if fname is None:
@@ -459,8 +447,8 @@ class QuadrangleMesh(TensorMesh):
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
         node = bm.zeros((NN, 2))
-        x = bm.linspace(box[0], box[1], nx + 1)
-        y = bm.linspace(box[2], box[3], ny + 1)
+        x = bm.linspace(box[0], box[1], nx + 1,dtype=bm.float64)
+        y = bm.linspace(box[2], box[3], ny + 1,dtype=bm.float64)
         X, Y = bm.meshgrid(x, y, indexing='ij')
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
@@ -479,7 +467,8 @@ class QuadrangleMesh(TensorMesh):
                 isValidNode[cell] = True
                 node = node[isValidNode]
                 idxMap = bm.zeros(NN, dtype=cell.dtype)
-                idxMap[isValidNode] = range(isValidNode.sum())
+                t = bm.arange(isValidNode.sum())
+                idxMap[isValidNode] = bm.arange(isValidNode.sum())
                 cell = idxMap[cell]
             elif bm.backend_name == "jax":
                 bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
@@ -489,7 +478,7 @@ class QuadrangleMesh(TensorMesh):
                 isValidNode = isValidNode.at[cell].set(True)
                 node = node[isValidNode]
                 idxMap = bm.zeros(NN, dtype=cell.dtype)
-                idxMap.at[isValidNode].set(bm.arange(isValidNode.sum()))
+                idxMap = idxMap.at[isValidNode].set(bm.tensor(bm.arange(isValidNode.sum())))
                 cell = idxMap[cell]
             else:
                 raise ValueError("Unsupported backend")
@@ -553,7 +542,7 @@ class QuadrangleMesh(TensorMesh):
 
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = bm.tensor(node_coords, dtype=bm.float64).reshape(-1, 3)[:, 0:2].copy()
+        node = bm.tensor(node_coords, dtype=bm.float64).reshape(-1, 3)[:, 0:2]
 
         # 获取四边形单元信息
         quadrilateral_type = 3  # 四边形单元的类型编号为 3
@@ -572,13 +561,13 @@ class QuadrangleMesh(TensorMesh):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = range(isValidNode.sum())
+            idxMap[isValidNode] = bm.arange(isValidNode.sum())
         elif bm.backend_name == "jax":
             isValidNode = bm.zeros(NN, dtype=bm.bool)
-            isValidNode.at[cell].set(True)
+            isValidNode = isValidNode.at[cell].set(True)
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap.at[isValidNode].set(bm.arange(isValidNode.sum()))
+            idxMap = idxMap.at[isValidNode].set(bm.arange(isValidNode.sum()))
         else:
             raise ValueError("Unsupported backend")
         cell = idxMap[cell]
@@ -610,11 +599,12 @@ class QuadrangleMesh(TensorMesh):
                 [2.0, 1.0],
                 [0.0, 1.0]], dtype=bm.float64)
         elif meshtype in {'rhombus'}:
+            import math
             node = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [1.5, bm.sqrt(3) / 2],
-                [0.5, bm.sqrt(3) / 2]], dtype=bm.float64)
+                [1.5, math.sqrt(3) / 2],
+                [0.5, math.sqrt(3) / 2]], dtype=bm.float64)
         cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int64)
         return cls(node, cell)
 
@@ -673,3 +663,6 @@ class QuadrangleMesh(TensorMesh):
         @return: None 或网格列表
         """
         raise NotImplementedError
+
+
+QuadrangleMesh.set_ploter('2d')

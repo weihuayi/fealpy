@@ -35,6 +35,9 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
         return face2edgeSign
 
     def cell_to_face_permutation(self, locFace = None):
+        """
+        局部面到全局面的映射
+        """
         if locFace is None:
             locFace = self.localFace
 

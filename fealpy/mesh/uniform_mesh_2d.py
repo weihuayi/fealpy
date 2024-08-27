@@ -113,7 +113,8 @@ class UniformMesh2d(Mesh, Plotable):
         """
         @brief 返回单元的面积，注意这里只返回一个值（因为所有单元面积相同）
         """
-        return self.h[0] * self.h[1]
+        #return self.h[0] * self.h[1]
+        return np.full(self.NC, self.h[0] * self.h[1])
 
     ## @ingroup GeneralInterface
     def edge_length(self, index=np.s_[:]):

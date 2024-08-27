@@ -5,20 +5,25 @@ from .. import logger
 from scipy.sparse import coo_matrix
 from .mesh_data_structure import MeshDS
 from .utils import estr2dim
+from .plot import Plotable
+from .mesh_base import SimplexMesh
+
 
 class IntervalMeshDataStructure(MeshDS):
     def total_face(self):
         return self.cell.reshape(-1, 1)
 
-class IntervalMesh():
+class IntervalMesh(SimplexMesh,Plotable):
     def __init__(self, node: TensorLike ,cell:TensorLike):
+        super().__init__(TD=1, itype=cell.dtype, ftype=node.dtype)
+        
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
         else:
             self.node = node
         self.cell = cell
         self.edge = self.cell
-        self.face = bm.arange(self.node.shape[0]).reshape(-1,1)
+        #self.face = bm.arange(self.node.shape[0]).reshape(-1,1)
 
         self.TD = 1
 
@@ -34,12 +39,15 @@ class IntervalMesh():
         self.cell_tangent = self.edge_tangent
 
         self.cell_to_ipoint = self.edge_to_ipoint
-        self.localEdge = bm.tensor([0,1],dtype=bm.int_)
-        self.localFace = bm.tensor([[0],[1]],dtype=bm.int_)
+        self.localEdge = bm.tensor([0,1],dtype=bm.int32)
+        self.localFace = bm.tensor([[0],[1]],dtype=bm.int32)
 
         self.itype = self.cell.dtype
-        self.ftype = self.ftype()
-        self.device = self.cell.device
+        self.ftype = self.node.dtype
+
+        self.construct()
+        self.face2cell = self.face_to_cell()
+
 
 
 
@@ -65,6 +73,20 @@ class IntervalMesh():
             return bm.tensor([0.0], dtype=self.ftype)
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
+
+    def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
+                           qtype: str='legendre'):
+        from ..quadrature import GaussLegendreQuadrature
+
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        kwargs = {'dtype': self.ftype}
+        if etype == 1:
+            quad = GaussLegendreQuadrature(q, **kwargs)
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+
+        return quad
 
     def grad_lambda(self, index:Index=_S):
         """
@@ -111,9 +133,9 @@ class IntervalMesh():
         e2p0 = self.cell_to_ipoint(p0)
         shape = (NE, ) + phi.shape
 
-        I = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
-        J = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
-        V = bm.broadcast_to( phi[None, :, :], shape=shape).flat
+        I = bm.broadcast_to(e2p1[:, :, None], shape).flatten()
+        J = bm.broadcast_to(e2p0[:, None, :], shape).flatten()
+        V = bm.broadcast_to( phi[None, :, :], shape).flatten()
 
         P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))
 
@@ -148,7 +170,14 @@ class IntervalMesh():
                     node[cell]).reshape(-1, GD)
 
             return ipoint
-        
+    
+    def cell_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        return self.edge_to_ipoint(p, index)
+
+    def face_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        NN = self.number_of_nodes()
+        return bm.arange(NN, dtype=self.itype)
+    
     def face_unit_normal(self, index: Index = _S, node=None):
         """
         @brief
@@ -161,7 +190,7 @@ class IntervalMesh():
         """
         assert self.geo_dimension() == 2
         v = self.cell_tangent(index=index)
-        w = bm.tensor([(0, -1),(1, 0)])
+        w = bm.tensor([(0, -1),(1, 0)],dtype=bm.float64)
         return v@w
     
     def uniform_refine(self, n=1, options={}):
@@ -176,8 +205,8 @@ class IntervalMesh():
             newNode = (node[cell[:, 0]] + self.node[cell[:, 1]])/2
             self.node = bm.concatenate((node, newNode),axis=0)
             
-            part1 = bm.concatenate((cell[:,0],range(NN,NN+NC)),axis = 0)
-            part2 = bm.concatenate((range(NN, NN+NC),cell[:, 1]),axis = 0)
+            part1 = bm.concatenate((cell[:,0],bm.arange(NN,NN+NC)),axis = 0)
+            part2 = bm.concatenate((bm.arange(NN, NN+NC),cell[:, 1]),axis = 0)
             self.cell = bm.stack((part1,part2),axis=1)
             self.construct()
 
@@ -187,8 +216,6 @@ class IntervalMesh():
         """
         @brief 自适应加密网格
         """
-        if bm.backend_name == 'jax':
-            raise NameError("refine currently does not support JAX ")
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells()
@@ -200,10 +227,10 @@ class IntervalMesh():
             self.node = bm.concatenate((node,bc),axis=0) #将新的节点添加到总的节点中去，得到的node
 
             newCell = bm.zeros((NC+N, 2), dtype=self.itype)
-            newCell[:NC] = cell
-            newCell[:NC][isMarkedCell, 1] = range(NN, NN+N)
-            newCell[NC:, 0] = range(NN, NN+N)
-            newCell[NC:, 1] = cell[isMarkedCell, 1]
+            newCell = bm.set_at(newCell, slice(NC), cell)
+            newCell = bm.set_at(newCell[:NC], (isMarkedCell,1), bm.arange(NN, NN+N))
+            newCell = bm.set_at(newCell, (slice(NC, None),0), bm.arange(NN, NN+N))
+            newCell = bm.set_at(newCell, (slice(NC, None),1), cell[isMarkedCell, 1])
             self.cell = newCell
             self.construct()
                         
@@ -217,8 +244,6 @@ class IntervalMesh():
     
     @classmethod
     def from_mesh_boundary(cls, mesh):
-        if bm.backend_name == 'jax':
-            raise NameError("refine currently does not support JAX ")
         assert mesh.top_dimension() == 2
         itype = mesh.itype
         is_bd_node = mesh.boundary_node_flag()
@@ -229,27 +254,66 @@ class IntervalMesh():
         NN_bd = node.shape[0]
 
         I = bm.zeros((NN, ), dtype=itype)
-        I[is_bd_node] = bm.arange(NN_bd, dtype=itype)
+        bm.set_at(I, is_bd_node, bm.arange(NN_bd, dtype=itype))
         face2bdnode = I[face]
         return cls(node=node, cell=face2bdnode)
 
     @classmethod
     def from_circle_boundary(cls, center=(0, 0), radius=1.0, n=10):
         dt = 2*bm.pi/n
-        theta  = bm.arange(0, 2*bm.pi, dt)
+        theta  = bm.arange(0, 2*bm.pi, dt , dtype=bm.float64)
 
         n0 = radius*bm.cos(theta) + center[0]
         n1 = radius*bm.sin(theta) + center[1]
         node = bm.stack([n0,n1] , axis=1)
         c0 = bm.arange(n)
-        c1 = bm.concatenate((bm.arange(1,n),[0]))
+        c1 = bm.concatenate((bm.arange(1,n),bm.array([0])))
         cell = bm.stack([c0,c1] , axis = 1)
 
         return cls(node, cell)
     
-
-
+    def vtk_cell_type(self):
+        VTK_LINE = 3
+        return VTK_LINE
     
+
+    def to_vtk(self, fname=None, etype='edge', index:Index=_S):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from fealpy.mesh.vtk_extent import  write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 3-GD), dtype=bm.float64)), axis=1)
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment
+        print(node.shape, cell.shape, cellType, cell.flatten())
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+    
+
+
+'''''
     def entity(self, etype: Union[int, str], index:Index = _S) -> TensorLike:
         """
         @brief Get entities.
@@ -271,12 +335,6 @@ class IntervalMesh():
             return self.face[index]
         raise ValueError(f"Invalid etype '{etype}'.")
 
-    def ftype(self) -> Any:
-        node = self.entity("node")
-        if node is None:
-            raise RuntimeError('Can not get the float type as the node '
-                               'has not been assigned.')
-        return node.dtype
 
     def geo_dimension(self) -> int:
         node = self.node
@@ -308,7 +366,7 @@ class IntervalMesh():
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.edge[index]
-        kwargs = {'dtype': edges.dtype, 'device': self.device}
+        kwargs = {'dtype': edges.dtype}
         indices = bm.arange(NE, **kwargs)[index]
         return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
@@ -412,7 +470,7 @@ class IntervalMesh():
         node = self.entity('node')
         entity = self.entity(etype, index)
         order = getattr(entity, 'bc_order', None)
-        return bm.bc_to_points(bcs, node, entity, order)
+        return bm.bc_to_points(bcs, node, entity)
     
 
     # 1D data_structure
@@ -551,3 +609,7 @@ class IntervalMesh():
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
+
+
+IntervalMesh.set_ploter('1d')
+'''

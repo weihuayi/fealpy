@@ -1,33 +1,33 @@
-import numpy as np
+import jax.numpy as jnp
 
-def compute_filter(mesh, rmin):
-    nelx, nely = mesh.nx, mesh.ny
-    NC = mesh.number_of_cells()
-    H = np.zeros((NC, NC))
+class Mesher:
+    def getMeshStructure(self, mesh):
+        edofMat = jnp.zeros((mesh['nelx']*mesh['nely'], 8), dtype=int)
+        for elx in range(mesh['nelx']):
+            for ely in range(mesh['nely']):
+                el = ely + elx * mesh['nely']
+                n1 = (mesh['nely'] + 1) * elx + ely
+                n2 = (mesh['nely'] + 1) * (elx + 1) + ely
+                edofMat = edofMat.at[el, :].set(jnp.array([2*n1+2, 2*n1+3, 2*n2+2,
+                                                           2*n2+3, 2*n2, 2*n2+1, 2*n1, 2*n1+1]))
+        iK = tuple(jnp.kron(edofMat, jnp.ones((8, 1))).flatten().astype(int))
+        jK = tuple(jnp.kron(edofMat, jnp.ones((1, 8))).flatten().astype(int))
+        idx = (iK, jK)
+        return edofMat, idx
 
-    for i1 in range(nelx):
-        for j1 in range(nely):
-            e1 = (i1) * nely + j1
-            imin = max(i1 - (np.ceil(rmin) - 1), 0.)
-            imax = min(i1 + (np.ceil(rmin)), nelx)
-            for i2 in range(int(imin), int(imax)):
-                jmin = max(j1 - (np.ceil(rmin) - 1), 0.)
-                jmax = min(j1 + (np.ceil(rmin)), nely)
-                for j2 in range(int(jmin), int(jmax)):
-                    e2 = i2 * nely + j2
-                    H[e1, e2] = max(0., rmin - \
-                                    np.sqrt((i1 - i2)**2 + (j1-j2)**2))
+    def getK0(self, matProp):
+        E = 1.
+        nu = matProp['nu']
+        k = jnp.array([1/2-nu/6, 1/8+nu/8, -1/4-nu/12, -1/8+3*nu/8, \
+                    -1/4+nu/12, -1/8-nu/8, nu/6, 1/8-3*nu/8])
+        KE = E / (1-nu**2) *\
+        jnp.array([ [k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7]],
+                    [k[1], k[0], k[7], k[6], k[5], k[4], k[3], k[2]],
+                    [k[2], k[7], k[0], k[5], k[6], k[3], k[4], k[1]],
+                    [k[3], k[6], k[5], k[0], k[7], k[2], k[1], k[4]],
+                    [k[4], k[5], k[6], k[7], k[0], k[1], k[2], k[3]],
+                    [k[5], k[4], k[3], k[2], k[1], k[0], k[7], k[6]],
+                    [k[6], k[3], k[4], k[1], k[2], k[7], k[0], k[5]],
+                    [k[7], k[2], k[1], k[4], k[3], k[6], k[5], k[0]] ])
 
-    Hs = np.sum(H, 1)
-    return H, Hs
-
-
-def sensitivity_filter(ft, rho, dc, dv):
-
-    if (ft['type'] == 1):
-        dc = np.matmul(ft['H'], \
-                       np.multiply(rho, dc) / ft['Hs'] / np.maximum(1e-3, rho))
-    elif (ft['type'] == 2):
-        dc = np.matmul(ft['H'], (dc / ft['Hs']))
-        dv = np.matmul(ft['H'], (dv / ft['Hs']))
-    return dc, dv
+        return KE

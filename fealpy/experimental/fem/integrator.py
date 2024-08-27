@@ -1,21 +1,20 @@
 
 from typing import Union, Callable, Optional, Any, TypeVar, Tuple, Dict
 
-from ..typing import TensorLike
+from ..typing import TensorLike, CoefLike
 from ..functionspace.space import FunctionSpace as _FS
 
 __all__ = [
     'Integrator',
-    'OperatorIntegrator',
-    'SourceIntegrator',
-
-    'CellOperatorIntegrator',
-    'FaceOperatorIntegrator',
-    'CellSourceIntegrator',
-    'FaceSourceIntegrator'
+    'NonlinearInt',
+    'SemilinearInt',
+    'LinearInt',
+    'OpInt',
+    'SrcInt',
+    'CellInt',
+    'FaceInt',
 ]
 
-CoefLike = Union[float, int, TensorLike, Callable[..., TensorLike]]
 _Meth = TypeVar('_Meth', bound=Callable[..., Any])
 
 
@@ -137,46 +136,45 @@ class Integrator(metaclass=IntegratorMeta):
                 self._cache.clear()
 
 
-class OperatorIntegrator(Integrator):
-    coef: Optional[CoefLike]
-
-    def set_coef(self, coef: Optional[CoefLike]=None, /) -> None:
-        """Set a new coefficient of the equation to the integrator.
-        This will clear the cached result.
-
-        Parameters:
-            coef (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
-        """
-        self.coef = coef
-        self.clear()
-
-
-class SourceIntegrator(Integrator):
-    source: Optional[CoefLike]
-
-    def set_source(self, source: Optional[CoefLike]=None, /) -> None:
-        """Set a new source term of the equation to the integrator.
-        This will clear the cached result.
-
-        Parameters:
-            source (CoefLike | None, optional): Tensor function or Tensor. Defaults to None.
-        """
-        self.source = source
-        self.clear()
-
-
 # These Integrator classes are for type checking
 
-class CellOperatorIntegrator(OperatorIntegrator):
-    pass
-
-class CellSourceIntegrator(SourceIntegrator):
-    pass
-
-class FaceOperatorIntegrator(OperatorIntegrator):
-    pass
-
-class FaceSourceIntegrator(SourceIntegrator):
+class NonlinearInt(Integrator):
+    """### Nonlinear Integrator
+    Base class for integrators without linearity requirement."""
     pass
 
 
+class SemilinearInt(NonlinearInt):
+    """### Semilinear Integrator
+    Base class for integrators generating integration linear to test functions `v`."""
+    pass
+
+
+class LinearInt(SemilinearInt):
+    """### Linear Integrator
+    Base class for integrators generating integration linear to both `u` and `v`."""
+    pass
+
+
+class OpInt(Integrator):
+    """### Operator Integrator
+    Base class for integrators involving both the trail function `u` and test function `v`."""
+    pass
+
+
+class SrcInt(Integrator):
+    """### Source Integrator
+    Base class for integrators involving the test function `v` only."""
+    pass
+
+
+class CellInt(Integrator):
+    """### Cell Integrator
+    Base class for integrators that integrate over mesh cells."""
+    pass
+
+
+class FaceInt(Integrator):
+    """### Face Integrator
+    Base class for integrators that integrate over mesh faces."""
+    pass

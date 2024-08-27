@@ -137,7 +137,8 @@ def symmetry_index(d, r):
     #print(midx0-midx)
     #midx = midx0
 
-    P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)], axis=0)
+    P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)],
+                       axis=0, dtype=bm.int32)
     num = P[r]/bm.prod(P[midx], axis=1)
     return symidx, num
 

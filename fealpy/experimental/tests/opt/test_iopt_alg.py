@@ -29,8 +29,7 @@ class TestIOptInterfaces:
         x0 = lb + bm.random.rand(NP, data['ndim'])*(ub - lb)
         option = opt_alg_options( x0, data['objective'], data['domain'] , NP)
         optimizer = HoneybadgerOptAlg(option)
-        gbest,gbest_f = optimizer.run()
-        # assert abs(gbest_f - data["optimal"]) < 5
+        gbest, gbest_f = optimizer.run()
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", iopt_data)
@@ -41,7 +40,7 @@ class TestIOptInterfaces:
         x0 = lb + bm.random.rand(NP, data['ndim'])*(ub - lb)
         option = opt_alg_options( x0, data['objective'], data['domain'] , NP)
         optimizer = QuantumParticleSwarmOptAlg(option)
-        gbest,gbest_f = optimizer.run()
+        gbest, gbest_f = optimizer.run()
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", iopt_data)
@@ -52,7 +51,7 @@ class TestIOptInterfaces:
         x0 = lb + bm.random.rand(NP, data['ndim'])*(ub - lb)
         option = opt_alg_options( x0, data['objective'], data['domain'] , NP)
         optimizer = SnowmeltOptAlg(option)
-        gbest,gbest_f = optimizer.run()
+        gbest, gbest_f = optimizer.run()
     
 if __name__ == "__main__":
     pytest.main(["./test_iopt_alg.py", "-k", "test_honeybadger_opt_alg"])

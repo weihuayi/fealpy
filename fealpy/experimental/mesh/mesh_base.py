@@ -6,7 +6,9 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 from ..quadrature import Quadrature
 from .mesh_data_structure import MeshDS
-from .utils import estr2dim
+from .utils import (
+    estr2dim, simplex_gdof, simplex_ldof, tensor_gdof, tensor_ldof
+)
 
 
 ##################################################
@@ -177,99 +179,6 @@ class Mesh(MeshDS):
     def hess_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         raise NotImplementedError(f"hess shape function is not supported by {self.__class__.__name__}")
-
-    def integral(self, f, q=3, celltype=False):
-        """
-        
-        """
-        GD = self.geo_dimension()
-        qf = self.quadrature_formula(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = self.bc_to_point(bcs)
-
-        if callable(f):
-            if not hasattr(f, 'coordtype'):
-                f = f(ps)
-            else:
-                if f.coordtype == 'cartesian':
-                    f = f(ps)
-                elif f.coordtype == 'barycentric':
-                    f = f(bcs)
-        cm = self.entity_measure('cell')
-
-        if isinstance(f, (int, float)): #  u 为标量常函数
-            e = f*cm
-        elif isinstance(f, np.ndarray):
-            if f.shape == (GD, ): # 常向量函数
-                e = cm[:, None]*f
-            elif f.shape == (GD, GD):
-                e = cm[:, None, None]*f
-            else:
-                e = bm.einsum('q, cq..., c->c...', ws, f, cm)
-        else:
-            raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
-
-        if celltype:
-            return e
-        else:
-            return bm.sum(e)
-
-    def error(self, u, v, q=3, power=2, celltype=False):
-        """
-        @brief Calculate the error between two functions.
-        """
-        GD = self.geo_dimension()
-
-        qf = self.quadrature_formula(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = self.bc_to_point(bcs)
-
-        if callable(u):
-            if not hasattr(u, 'coordtype'):
-                u = u(ps)
-            else:
-                if u.coordtype == 'cartesian':
-                    u = u(ps)
-                elif u.coordtype == 'barycentric':
-                    u = u(bcs)
-
-        if callable(v):
-            if not hasattr(v, 'coordtype'):
-                v = v(ps)
-            else:
-                if v.coordtype == 'cartesian':
-                    v = v(ps)
-                elif v.coordtype == 'barycentric':
-                    v = v(bcs)
-
-        if u.shape[-1] == 1:
-           u = u[..., 0]
-
-        if v.shape[-1] == 1:
-           v = v[..., 0]
-
-        cm = self.entity_measure('cell')
-
-        NC = self.number_of_cells()
-        f = bm.power(bm.abs(u - v), power)
-        if len(f.shape) == 1: 
-            f = f[:, None]
-
-        if isinstance(f, (int, float)): # f为标量常函数
-            e = f*cm
-        elif isinstance(f, np.ndarray):
-            if f.shape == (GD, ): # 常向量函数
-                e = cm[:, None]*f
-            elif f.shape == (GD, GD):
-                e = cm[:, None, None]*f
-            else:
-                e = bm.einsum('q, qc..., c->c...', ws, f, cm)
-
-        if celltype is False:
-            e = bm.power(bm.sum(e), 1/power)
-        else:
-            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
-        return e # float or (NC, )
 
     # tools
     def paraview(self, file_name = "temp.vtu",
@@ -473,13 +382,13 @@ class HomogeneousMesh(Mesh):
         else:
             return bm.sum(e)
 
-    def error(self, u, v, q=3, power=2, celltype=False, integrator=None) -> TensorLike:
+    def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
         """
         @brief Calculate the error between two functions.
         """
         GD = self.geo_dimension()
 
-        qf = self.integrator(q, etype='cell') if integrator is None else integrator
+        qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
 
@@ -495,16 +404,10 @@ class HomogeneousMesh(Mesh):
             else:
                 v = v(ps)
 
-        if u.shape[-1] == 1:
-           u = u[..., 0]
-
-        if v.shape[-1] == 1:
-           v = v[..., 0]
 
         cm = self.entity_measure('cell')
-        #if v.shape[-1] == NC:
-        #    v = np.swapaxes(v, 1, -1)
-        f = bm.power(bm.abs(u - v), power)
+        #f = bm.power(bm.abs(u - v), power)
+        f = bm.abs(u - v)**power
         if len(f.shape) == 1:
             f = f[:, None]
 
@@ -516,10 +419,11 @@ class HomogeneousMesh(Mesh):
             elif f.shape == (GD, GD):
                 e = cm[:, None, None]*f
             else:
-                e = bm.einsum('q, qc..., c -> c...', ws, f, cm)
+                e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
 
         if celltype is False:
-            e = bm.power(bm.sum(e), 1/power)
+            #e = bm.power(bm.sum(e), 1/power)
+            e = bm.sum(e)**(1/power)
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
@@ -530,29 +434,23 @@ class SimplexMesh(HomogeneousMesh):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return bm.simplex_ldof(p, iptype)
+        return simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
-        return bm.simplex_gdof(p, nums)
+        return simplex_gdof(p, nums)
 
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
         raise NotImplementedError
 
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
-                       variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+                       mi: Optional[TensorLike]=None) -> TensorLike:
         TD = bcs.shape[-1] - 1
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         phi = bm.simplex_shape_function(bcs, p, mi)
-        if variables == 'u':
-            return phi
-        elif variables == 'x':
-            return phi[None, ...]
-        else:
-            raise ValueError("Variables type is expected to be 'u' or 'x', "
-                             f"but got '{variables}'.")
+        return phi
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -577,11 +475,11 @@ class TensorMesh(HomogeneousMesh):
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
-        return bm.tensor_ldof(p, iptype)
+        return tensor_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int) -> int:
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
-        return bm.tensor_gdof(p, nums)
+        return tensor_gdof(p, nums)
 
     def bc_to_point(self, bc, index=None):
         """
@@ -598,7 +496,7 @@ class TensorMesh(HomogeneousMesh):
 
             # node[cell].shape == (NC, 8, 3)
             # bc.shape == (NQ, 8)
-            p = bm.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NQ, NC, 3)
+            p = bm.einsum('qj, cjk->cqk', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NC, NQ, 3)
 
         elif isinstance(bc, tuple) and len(bc) == 2:
             face = self.entity(2, index=index)
@@ -609,10 +507,10 @@ class TensorMesh(HomogeneousMesh):
 
             # node[cell].shape == (NC, 4, 2)
             # bc.shape == (NQ, 4)
-            p = bm.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+            p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+            p = bm.einsum('qj, ejk->eqk', bc, node[edge]) # (NE, NQ, 2)
         return p
 
     edge_bc_to_point = bc_to_point
@@ -664,17 +562,19 @@ class TensorMesh(HomogeneousMesh):
                 J = self.jacobi_matrix(bcs, index=index)
                 J = bm.linalg.inv(J)
                 # J^{-T}\nabla_u phi
-                gphi = bm.einsum('qcmn, qlm->qcln', J, gphi)
+                # gphi = bm.einsum('qcmn, qlm -> qcln', J, gphi)
+                gphi = bm.einsum('qcmn, qlm -> cqln', J, gphi)
                 return gphi
         elif TD == 2:
-            gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
-            gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
+            gphi0 = bm.einsum('im, jn -> ijmn', dphi, phi).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn -> ijmn', phi, dphi).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1), axis=-1)
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 G = self.first_fundamental_form(J)
                 G = bm.linalg.inv(G)
-                gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
+                # gphi = bm.einsum('qikm, qimn, qln -> qilk', J, G, gphi)
+                gphi = bm.einsum('qikm, qimn, qln -> iqlk', J, G, gphi)
                 return gphi
         return gphi
 

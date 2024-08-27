@@ -1,15 +1,16 @@
-from typing import Sequence, overload, List, Dict, Tuple, Optional
 
-from ..backend import backend_manager as bm
-from ..typing import TensorLike
+from typing import Sequence, overload, List, Dict, Tuple, Optional, TypeVar, Generic
 
-from .integrator import Integrator as _I
+from ..typing import TensorLike, Size
 from ..functionspace import FunctionSpace as _FS
+from .integrator import Integrator
 
 from .. import logger
 
+_I = TypeVar('_IT', bound=Integrator)
 
-class Form():
+
+class Form(Generic[_I]):
     _spaces: Tuple[_FS, ...]
     integrators: Dict[str, Tuple[_I, ...]]
     memory: Dict[str, Tuple[TensorLike, List[TensorLike]]]
@@ -31,7 +32,6 @@ class Form():
         self.integrators = {}
         self._cursor = 0
         self.memory = {}
-        self._M: Optional[TensorLike] = None
         self.batch_size = batch_size
 
         self._values_ravel_shape = (-1,) if self.batch_size == 0 else (self.batch_size, -1)
@@ -46,6 +46,12 @@ class Form():
     def _get_sparse_shape(self) -> Tuple[int, ...]:
         raise NotImplementedError('Please implement the _get_sparse_shape method '
                                   'to generate the shape of the form.')
+
+    @property
+    def shape(self) -> Size:
+        if self.batch_size == 0:
+            return self.sparse_shape
+        return (self.batch_size,) + self.sparse_shape
 
     @property
     def space(self):

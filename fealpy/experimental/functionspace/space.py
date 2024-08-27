@@ -1,6 +1,7 @@
 
 from typing import Union, Callable, Optional, Any
 
+from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, Number, _S, Size
 from .function import Function
 from .utils import zero_dofs
@@ -33,31 +34,42 @@ class FunctionSpace():
                     uh: TensorLike, dim: Optional[int]=None, index: Index=_S) -> TensorLike:
         raise NotImplementedError
 
-    # function
-    def array(self, dim: Union[Size, int, None]=None) -> TensorLike:
+    def array(self, batch: Union[int, Size, None]=None, *, dtype=None):
         """Initialize a Tensor filled with zeros as values of DoFs.
 
         Parameters:
-            dim (Tuple[int, ...] | int | None, optional): Shape of DoFs. Defaults to None.
+            batch (int | Size | None, optional): shape of the batch.
 
         Returns:
-            Tensor: Values of DoFs shaped (GDOF, *dim).
+            Tensor: Values of DoFs shaped (batch, GDOF).
         """
         GDOF = self.number_of_global_dofs()
-        return zero_dofs(GDOF, dim, dtype=self.ftype)
+        if (batch is None) or (batch == 0):
+            batch = tuple()
 
-    def function(self, data: Optional[TensorLike]=None, /, dim: Union[Size, int, None]=None):
+        elif isinstance(batch, int):
+            batch = (batch, )
+
+        shape = batch + (GDOF, )
+
+        if dtype is None:
+            dtype = bm.float64
+
+        return bm.zeros(shape, dtype=dtype)
+
+    def function(self, array: Optional[TensorLike]=None,
+                 batch: Union[int, Size, None]=None, *,
+                 coordtype='barycentric', dtype=None):
         """Initialize a Function in the space.
 
         Parameters:
-            data (TensorLike): Values of DoFs shaped (GDOF, *dim). Defaults to None.\n
-            dim (Tuple[int, ...] | int | None, optional): Shape of DoFs.
-                None or 0 for scalar dofs, int for vector dofs, and int tuple for tensor dofs.
-                Defaults to None.
 
         Returns:
             Function: A Function object.
         """
-        if data is None:
-            data = self.array(dim=dim)
-        return Function(self, data)
+        if array is None:
+            if dtype is None:
+                dtype = bm.float64
+            array = self.array(batch=batch, dtype=dtype)
+
+        return Function(self, array, coordtype)

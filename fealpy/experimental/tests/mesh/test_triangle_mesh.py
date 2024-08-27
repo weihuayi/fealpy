@@ -1,11 +1,16 @@
-import ipdb
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
 from fealpy.experimental.tests.mesh.triangle_mesh_data import *
-
+from fealpy.experimental.functionspace import LagrangeFESpace
+from scipy.sparse.linalg import spsolve
+from fealpy.experimental.fem import (BilinearForm,
+                                     LinearForm,
+                                     ScalarDiffusionIntegrator,
+                                     ScalarSourceIntegrator,
+                                     DirichletBC)
 
 class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
@@ -178,8 +183,91 @@ class TestTriangleMeshInterfaces:
         cell =  mesh.entity('cell')
         np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", bisect_1_data)
+    def test_bisect_1(self,data,backend):
+        bm.set_backend(backend)
+        nx = data['nx']
+        ny = data['ny']
+        mesh = TriangleMesh.from_box(nx=nx, ny=ny)
+        isMarkedCell = data['isMarkedCell']
+        if isMarkedCell is None:
+            mesh.bisect_1(isMarkedCell)
+        else:
+            isMarkedCell = bm.array(data['isMarkedCell'])
+            mesh.bisect_1(isMarkedCell)
+        assert mesh.number_of_nodes() == data["NN"]
+        assert mesh.number_of_cells() == data["NC"]
+        assert mesh.number_of_edges() == data["NE"]
+
+        node = mesh.entity('node')
+        print(node)
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"])
+        cell = mesh.entity('cell')
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+        
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", adaptive_data)
+    def test_adaptive(self,data,backend):
+        bm.set_backend(backend)
+        nx = data['nx']
+        ny = data['ny']
+        maxit = data['maxit']
+        p = data['p']
+        q = data['q']
+        options = data['options']
+        mesh = TriangleMesh.from_box(nx = nx, ny = ny)
+        def solution(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            pi = bm.pi
+            val = bm.cos(pi*x)*bm.cos(pi*y)
+            return val
+        def source(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            pi = bm.pi
+            val = 2*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)
+            return val
+        def dirichlet(p):
+            return solution(p)
+        for i in range(maxit):
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            space = LagrangeFESpace(mesh, p=p)
+            bform = BilinearForm(space)
+            bform.add_integrator(ScalarDiffusionIntegrator(q=q))
+            A = bform.assembly()
+            lform = LinearForm(space)
+            lform.add_integrator(ScalarSourceIntegrator(source, q=q))
+            F = lform.assembly()
+            bc = DirichletBC(space=space, gd=dirichlet)
+            uh = bm.zeros(space.number_of_global_dofs(), dtype=space.ftype)
+            A, F = bc.apply(A, F ,uh)
+            if backend == 'numpy':
+                uh[:] = spsolve(A.toarray(), F)
+            else:
+                uh_numpy = spsolve(A.toarray(), F)
+                uh[:] = bm.array(uh_numpy)
+            cm = mesh.entity_measure('cell')
+            eta = bm.sum(bm.abs(uh[cell]- solution(node)[cell]),axis=-1)
+            eta = cm * eta
+            mesh.adaptive(eta ,options)
+        
+        assert mesh.number_of_nodes() == data["NN"]
+        assert mesh.number_of_cells() == data["NC"]
+        assert mesh.number_of_edges() == data["NE"]
+
+        node = mesh.entity('node')
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"])
+        cell = mesh.entity('cell')
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
-    #a.test_grad_shape_function(grad_shape_function_data[0], 'numpy')
-    pytest.main(["./test_triangle_mesh.py"])
+    #a.test_from_box(from_box[0], 'pytorch')
+    pytest.main(["./test_triangle_mesh.py",'-k' ,"test_adaptive"])

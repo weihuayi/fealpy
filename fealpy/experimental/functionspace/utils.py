@@ -1,9 +1,9 @@
 
 from typing import Optional, Tuple, Union
+from math import prod
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike
-from ..typing import Size
+from ..typing import TensorLike, Size
 
 
 def zero_dofs(gdofs: int, dims: Union[Size, int, None]=None, *, dtype=None):
@@ -29,8 +29,8 @@ def flatten_indices(shape: Size, permute: Size) -> TensorLike:
     Returns:
         Tensor: Indices of elements in the flattened tensor.
     """
-    permuted_shape = Size([shape[d] for d in permute])
-    numel = permuted_shape.numel()
+    permuted_shape = [shape[d] for d in permute]
+    numel = prod(permuted_shape)
     permuted_indices = bm.arange(numel, dtype=bm.int32).reshape(permuted_shape)
     inv_permute = [None, ] * len(permute)
     for d in range(len(permute)):
@@ -42,31 +42,31 @@ def to_tensor_dof(to_dof: TensorLike, dof_numel: int, gdof: int, dof_priority: b
     """Expand the relationship between entity and scalar dof to the tensor dof.
 
     Parameters:
-        to_dof (Tensor): Entity to the scalar dof.\n
+        to_dof (Tensor): Entity to the scalar dofs.\n
         dof_numel (int): Number of dof elements.\n
-        gdof (int): total number of dofs.\n
+        gdof (int): total number of scalar dofs.\n
         dof_priority (bool, optional): If True, the degrees of freedom are arranged\
         prior to their components. Defaults to True.
 
     Returns:
         Tensor: Global indices of tensor dofs in each entity.
     """
-    kwargs = {'dtype': to_dof.dtype}
-    if hasattr(to_dof, 'device'):
-        kwargs['device'] = to_dof.device
-
+    context = bm.context(to_dof)
+    indices = bm.arange(gdof*dof_numel, **context)
     num_entity = to_dof.shape[0]
-    indices = bm.arange(gdof*dof_numel, **kwargs)
 
     if dof_priority:
-        indices = indices.reshape(dof_numel, gdof).T
+        indices = indices.reshape(dof_numel, gdof)
+        indices = indices[:, to_dof] # (dof_numel, entity, ldof)
+        indices = bm.swapaxes(indices, 0, 1) # (entity, dof_numel, ldof)
     else:
         indices = indices.reshape(gdof, dof_numel)
+        indices = indices[to_dof, :] # (entity, ldof, dof_numel)
 
-    return indices[to_dof].reshape(num_entity, -1)
+    return indices.reshape(num_entity, -1)
 
 
-def tensor_basis(shape: Tuple[int, ...], *, dtype=None) -> TensorLike:
+def tensor_basis(shape: Size, *, dtype=None) -> TensorLike:
     """Generate tensor basis with 0-1 elements.
 
     Parameters:
@@ -75,8 +75,7 @@ def tensor_basis(shape: Tuple[int, ...], *, dtype=None) -> TensorLike:
     Returns:
         Tensor: Tensor basis shaped (numel, *shape).
     """
-    shape = Size(shape)
-    numel = shape.numel()
+    numel = prod(shape)
     return bm.eye(numel, dtype=dtype).reshape((numel,) + shape)
 
 

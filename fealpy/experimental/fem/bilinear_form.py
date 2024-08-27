@@ -1,14 +1,17 @@
 
 from typing import Optional
 
+from .. import logger
 from ..typing import TensorLike
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor
 from .form import Form
-from .. import logger
+from .integrator import LinearInt
 
 
-class BilinearForm(Form):
+class BilinearForm(Form[LinearInt]):
+    _M: Optional[COOTensor] = None
+
     def _get_sparse_shape(self):
         spaces = self._spaces
         ugdof = spaces[0].number_of_global_dofs()
@@ -33,7 +36,7 @@ class BilinearForm(Form):
                              f"but got {len(self._spaces)} spaces.")
         if len(self._spaces) == 2:
             s0, s1 = self._spaces
-            if s0.device != s1.device:
+            if s0.mesh.device != s1.mesh.device:
                 raise ValueError("Spaces should have the same device, "
                                 f"but got {s0.device} and {s1.device}.")
             if s0.ftype != s1.ftype:
@@ -53,6 +56,7 @@ class BilinearForm(Form):
             values = bm.empty(init_value_shape, dtype=space[0].ftype),
             spshape = sparse_shape
         )
+
 
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
@@ -101,27 +105,36 @@ class BilinearForm(Form):
         raise NotImplementedError
 
     def __matmul__(self, u: TensorLike):
-        """
-
-        TODO:
-            1. for batch cases
-        """
-        space = self._spaces
-        n = space[0].number_of_global_dofs()
-        m = space[1].number_of_global_dofs() if (len(space) > 1) else n 
         if self._M is not None:
-            return self._M @ u 
-        kargs = bm.context(u)
-        v = bm.zeros(m, **kargs) 
+            return self._M @ u
+
+        nrow = self.shape[-2]
+        kwargs = bm.context(u)
+
+        if self.batch_size > 0:
+            shape = (self.batch_size, nrow)
+            out_subs = 'bci'
+            gv_reshape = (self.batch_size, -1)
+        else:
+            if u.ndim >= 2:
+                shape = (u.shape[0], nrow)
+                out_subs = 'bci'
+                gv_reshape = (u.shape[0], -1)
+            else:
+                shape = (nrow,)
+                out_subs = 'ci'
+                gv_reshape = (-1,)
+
+        v = bm.zeros(shape, **kwargs)
+        gt_subs = 'bcij' if (self.batch_size > 0) else 'cij'
+        gu_subs = 'bcj' if (u.ndim >= 2) else 'cj'
+
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, True)
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
-            local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
-            gu = u[..., ue2dof] 
-            # group_tensor.shape == (..., NC, vldof, uldof)
-            # gu.shape == (..., NC, uldof) 
-            # gv.shape == (..., NC, vlodf)
-            gv = bm.einsum('cij, cj->ci', group_tensor, gu) 
-            v = bm.scatter_add(v, ve2dof.reshape(-1), gv.reshape(-1))
+            gu = u[..., ue2dof] # (..., NC, uldof)
+            gv = bm.einsum(f'{gt_subs}, {gu_subs} -> {out_subs}', group_tensor, gu)
+            v = bm.index_add(v, ve2dof.reshape(-1), gv.reshape(gv_reshape))
+
         return v

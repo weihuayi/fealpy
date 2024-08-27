@@ -36,9 +36,14 @@ class ConformingVEMScalarSourceIntegrator2d():
             def u(x, index):
                 return np.einsum('ij, ijm->ijm', f(x, index), phi(x, index=index))
         bb = space.mesh.integral(u, q=q, celltype=True)
-        g = lambda x: x[0].T@x[1]
-        bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
-        return self.coef*bb
+        if isinstance(self.coef, (int, float)):
+            g = lambda x: x[0].T@x[1]
+            bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
+            return self.coef*bb
+        elif isinstance(self.coef, np.ndarray):
+            g = lambda x: (x[0].T@x[1])*x[2]
+            bb = np.concatenate(list(map(g, zip(self.PI0, bb, self.coef))))
+        return bb
 
 class NonConformingVEMScalarSourceIntegrator2d():
     def __init__(self, f: Union[Callable, int, float, NDArray], PI0):

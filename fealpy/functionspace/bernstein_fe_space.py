@@ -91,7 +91,7 @@ class BernsteinFESpace:
         ldof = multiIndex.shape[0]
 
         B = bc
-        B = np.ones((NQ, p+1, TD+1), dtype=np.float_)
+        B = np.ones((NQ, p+1, TD+1), dtype=np.float64)
         B[:, 1:] = bc[:, None, :]
         B = np.cumprod(B, axis=1)
 
@@ -169,13 +169,13 @@ class BernsteinFESpace:
         p = self.p
         gdof = self.dof.number_of_global_dofs()
         cell2dof = self.dof.cell_to_dof()
-        print('111',cell2dof.shape)
+        
         integrator = self.integrator
         bcs, ws = integrator.get_quadrature_points_and_weights()#p=5 order=9 NQ=19
 
         cm = self.mesh.entity_measure("cell")
         phi = self.basis(bcs)
-        print('222',phi.shape)
+        
         M = np.einsum('qcl, qcm, q, c->clm', phi, phi, ws, cm, optimize=True)
 
         I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
@@ -377,9 +377,9 @@ class BernsteinFESpace:
         midxp_1 = mesh.multi_index_matrix(m, GD) # m   次多重指标
 
         N, N1 = len(symidx), midxp_1.shape[0]
-        B = np.zeros((N1, NQ, ldof), dtype=np.float_)
-        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float_)
-        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float_)
+        B = np.zeros((N1, NQ, ldof), dtype=np.float64)
+        symLambdaBeta = np.zeros((N1, NC, N), dtype=np.float64)
+        gmphi = np.zeros((NQ, ldof, NC, N), dtype=np.float64)
         for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
             midxp_0 -= beta[None, :]
             idx = np.where(np.all(midxp_0>-1, axis=1))[0]

@@ -49,7 +49,7 @@ dist
 *.cpython-38.pyc
 .vscode
 *.pickle
-
+codetest/*
 docs/_site
 docs/.sass-cache
 docs/.jekyll-cache

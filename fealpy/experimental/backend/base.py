@@ -1,10 +1,8 @@
 
 from abc import ABCMeta
 from typing import(
-    Union, Optional, Dict, Iterable, Tuple, List, Any, Type, Generic, TypeVar,
-    Hashable, OrderedDict, overload
+    Union, Optional, Dict, Tuple, Any, Type, Generic, TypeVar, overload
 )
-from math import comb
 
 from .. import logger
 
@@ -13,13 +11,15 @@ Size = Tuple[int, ...]
 
 class TensorLike(metaclass=ABCMeta):
     @property
-    def shape(self) -> Tuple[int, ...]: raise NotImplementedError
-    @property
     def dtype(self) -> Any: raise NotImplementedError
     @property
     def device(self) -> Any: raise NotImplementedError
     @property
+    def mT(self) -> 'TensorLike': raise NotImplementedError
+    @property
     def ndim(self) -> int: raise NotImplementedError
+    @property
+    def shape(self) -> Tuple[int, ...]: raise NotImplementedError
     @property
     def size(self) -> int: raise NotImplementedError
     @property
@@ -98,38 +98,115 @@ ATTRIBUTE_MAPPING = _make_default_mapping(
 FUNCTION_MAPPING = _make_default_mapping(
 
     ### Creation Functions ###
-    'array', 'tensor', 
+    # python array API standard v2023.12
+    'array',
     'asarray',
     'arange', 'linspace',
-    'empty', 'zeros', 'ones', 'full', 
+    'empty', 'zeros', 'ones', 'full',
     'empty_like', 'zeros_like', 'ones_like', 'full_like',
     'eye', 'meshgrid',
-    'tril', 'tiu',
+    'tril', 'triu',
 
-    ### Mathematical functions ###
+    # non-standard
+    'tensor',
 
-    # Reductions
-    'all', 'any', 'sum', 'prod', 'mean', 'max', 'min', 'argmin', 'argmax', 'allclose',
+    ### Data Type Functions ###
+    # python array API standard v2023.12
+    'astype', 'can_cast',
+    'finfo', 'iinfo',
+    'isdtype', 'result_type',
 
-    'abs', 'sign', 'sqrt', 'square', 'exp', 'log', 'log10', 'log2', 'sin', 'cos', 'tan',
+    ### Element-wise Functions ###
+    # python array API standard v2023.12
+    'abs', 'acos', 'acosh', 'add', 'asin', 'asinh', 'atan', 'atan2', 'atanh',
+    'bitwise_and', 'bitwise_left_shift', 'bitwise_invert', 'bitwise_or',
+    'bitwise_right_shift', 'bitwise_xor',
+    'ceil', 'clip', 'conj', 'copysign', 'cos', 'cosh',
+    'divide',
+    'equal', 'exp', 'expm1',
+    'floor', 'floor_divide',
+    'greater', 'greater_equal',
+    'hypot', 
+    'imag', 'isfinite', 'isinf', 'isnan',
+    'less', 'less_equal', 'log', 'log1p', 'log2', 'log10', 'logaddexp', 'logical_and',
+    'logical_not', 'logical_or', 'logical_xor',
+    'maximum', 'minimum', 'multiply',
+    'negative', 'not_equal',
+    'positive', 'pow',
+    'real', 'remainder', 'round',
+    'sign', 'signbit', 'sin', 'sinh', 'square', 'sqrt', 'subtract',
+    'tan', 'tanh', 'trunc',
+
+    # non-standard
     'arcsin', 'arccos', 'arctan', 'arctan2', 'arcsinh', 'arccosh', 'arctanh',
-    'sinh', 'cosh', 'tanh', 'clip', 'floor', 'ceil', 'round',
+    'power',
 
-    # Arithmetic operations
-    'add', 'subtract', 'multiply', 'divide', 'power', 'matmul', 'dot', 'cross', 'tensordot',
+    ### Indexing Functions ###
+    # python array API standard v2023.12
+    'take',
 
-    ### Array manipulation routines ###
-    'copy', 'reshape', 'broadcast_to', 'unique', 'sort', 'argsort', 'nonzero',
-    'cumsum', 'cumprod', 'cat', 'concatenate', 'stack', 'repeat', 'transpose', 'swapaxes',
-    'flip', 'where', 'tile', 'size',
+    ### Inspection ###
+    # python array API standard v2023.12
+    # non-standard
 
-    ### Linear algebra ###
-    'einsum',
+    ### Linear Algebra Functions ###
+    # python array API standard v2023.12
+    'matmul', 'matrix_transpose', 'tensordot',
+    'vecdot',
+    # non-standard
+    'cross', 'cumsum', 'cumprod',
+    'dot', 'einsum',
 
-    # Functional programming
-    'apply_along_axis',
+    ### Manipulation Functions ###
+    # python array API standard v2023.12
+    'broadcast_arrays', 'broadcast_to',
+    'concat',
+    'expand_dims',
+    'flip',
+    'moveaxis',
+    'permute_dims',
+    'repeat', 'reshape', 'roll',
+    'squeeze', 'stack',
+    'tile',
+    'unstack',
+    # non-standard
+    'concatenate', 'swapaxes', 'transpose',
 
+    ### Searching Functions ###
+    # python array API standard v2023.12
+    'argmax', 'argmin', 'nonzero', 'searchsorted', 'where',
+
+    ### Set Functions ###
+    # python array API standard v2023.12
+    'unique_all', 'unique_counts', 'unique_inverse', 'unique_values',
+
+    # non-standard
     'setdiff1d',
+    'unique',
+
+    ### Sorting Functions ###
+    # python array API standard v2023.12
+    'argsort', 'sort',
+
+    ### Statistical Functions ###
+    # python array API standard v2023.12
+    'cumulative_sum',
+    'max', 'mean', 'min',
+    'prod',
+    'std', 'sum',
+    'var',
+    # non-standard
+
+    ### Utility Functions ###
+    # python array API standard v2023.12
+    'all', 'any',
+    # non-standard
+    'allclose',
+    'copy',
+    'size',
+
+    ### Functional programming ###
+    'apply_along_axis',
 )
 
 
@@ -165,14 +242,14 @@ class Backend(Generic[_DT]):
                 continue
             if hasattr(cls, target_key):
                 # Methods will not be copied from source if implemented manually.
-                logger.debug(f"{target_key} is already defined. "
+                logger.debug(f"`{target_key}` already defined. "
                              f"Skip the copy from {source.__name__}.")
                 continue
             if hasattr(source, source_key):
                 setattr(cls, target_key, staticmethod(getattr(source, source_key)))
             else:
-                logger.debug(f"{source_key} is not found in {source.__name__}. "
-                             f"Method {target_key} remains unimplemented.")
+                logger.warning(f"`{source_key}` not found in {source.__name__}. "
+                               f"Method `{target_key}` remains unimplemented.")
 
     @classmethod
     def show_unsupported(cls, signal: bool, function_name: str, arg_name: str) -> None:
@@ -185,46 +262,5 @@ class Backend(Generic[_DT]):
     def is_tensor(cls, obj: Any, /) -> bool:
         return isinstance(obj, cls.DATA_CLASS)
 
-    ### FEALPy functionals ###
-
-    @staticmethod
-    def simplex_ldof(p: int, iptype: int) -> int:
-        if iptype == 0:
-            return 1
-        return comb(p + iptype, iptype)
-
-    @staticmethod
-    def simplex_gdof(p: int, nums: Tuple[int, ...]) -> int:
-        coef = 1
-        count = nums[0]
-
-        for i in range(1, len(nums)):
-            coef = (coef * (p-i)) // i
-            count += coef * nums[i]
-        return count
-
-    @staticmethod
-    def tensor_ldof(p: int, iptype: int) -> int:
-        return (p + 1) ** iptype
-
-    @staticmethod
-    def tensor_gdof(p: int, nums: Tuple[int, ...]) -> int:
-        coef = 1
-        count = nums[0]
-        for i in range(1, len(nums)):
-            coef *= (p-1)
-            count += coef * nums[i]
-        return count
-
-    @staticmethod
-    def occurrence(iterable: Iterable[Hashable], /) -> Tuple[List[Hashable], List[int], List[int]]:
-        # TODO: Implement a C version for higher performance.
-        first = OrderedDict()
-        last = OrderedDict()
-
-        for i, item in enumerate(iterable):
-            if item not in first:
-                first[item] = i
-            last[item] = i
-
-        return list(first.keys()), list(first.values()), list(last.values())
+    # NOTE: Backend is the base class is for the backend system.
+    # Do not implement any utils here.

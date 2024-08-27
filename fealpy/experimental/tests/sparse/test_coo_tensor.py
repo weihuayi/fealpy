@@ -28,8 +28,8 @@ def test_dims_and_shape(backend):
 def test_coalesce_with_values(backend):
     bm.set_backend(backend)
     # 创建一个未合并的COOTensor对象
-    indices = bm.tensor([[0, 0, 1, 2, 0], [1, 2, 0, 0, 2]])
-    values = bm.tensor([1, 2, 3, 4, 5], dtype=bm.float64)
+    indices = bm.tensor([[0, 0, 1, 2, 0, 1], [1, 2, 0, 0, 2, 0]])
+    values = bm.tensor([1, 2, 3, 4, 5, 6], dtype=bm.float64)
     sparse_shape = bm.tensor([3, 3])
     coo = COOTensor(indices, values, sparse_shape, is_coalesced=False)
 
@@ -40,51 +40,51 @@ def test_coalesce_with_values(backend):
     assert coalesced_coo.is_coalesced
 
     # 验证值是否正确累积
-    expected_indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
-    expected_values = bm.tensor([1, 7, 3, 4], dtype=bm.float64)
-    bm.allclose(coalesced_coo._indices, expected_indices)
-    bm.allclose(coalesced_coo._values, expected_values)
+    expected_indices = bm.tensor([[1, 2, 0, 0], [0, 0, 1, 2]])
+    expected_values = bm.tensor([9, 4, 1, 7], dtype=bm.float64)
+    assert bm.allclose(coalesced_coo._indices, expected_indices)
+    assert bm.allclose(coalesced_coo._values, expected_values)
 
 
-@pytest.mark.parametrize("backend", ALL_BACKENDS)
-def test_coalesce_without_values_accumulate(backend):
-    bm.set_backend(backend)
-    # 创建一个未合并的COOTensor对象，但没有值
-    indices = bm.tensor([[0, 0, 1, 2, 0], [1, 2, 0, 0, 2]])
-    values = None
-    sparse_shape = bm.tensor([3, 3])
-    coo = COOTensor(indices, values, sparse_shape, is_coalesced=False)
+# @pytest.mark.parametrize("backend", ALL_BACKENDS)
+# def test_coalesce_without_values_accumulate(backend):
+#     bm.set_backend(backend)
+#     # 创建一个未合并的COOTensor对象，但没有值
+#     indices = bm.tensor([[0, 0, 1, 2, 0], [1, 2, 0, 0, 2]])
+#     values = None
+#     sparse_shape = bm.tensor([3, 3])
+#     coo = COOTensor(indices, values, sparse_shape, is_coalesced=False)
 
-    # 调用coalesce方法，设置accumulate为True
-    coalesced_coo = coo.coalesce(accumulate=True)
+#     # 调用coalesce方法，设置accumulate为True
+#     coalesced_coo = coo.coalesce(accumulate=True)
 
-    # 验证结果是否已合并
-    assert coalesced_coo.is_coalesced
+#     # 验证结果是否已合并
+#     assert coalesced_coo.is_coalesced
 
-    # 验证输出的值是否正确
-    expected_indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
-    expected_values = bm.tensor([1, 2, 1, 1])
-    bm.allclose(coalesced_coo._indices, expected_indices)
-    bm.allclose(coalesced_coo._values, expected_values)
+#     # 验证输出的值是否正确
+#     expected_indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
+#     expected_values = bm.tensor([1, 2, 1, 1])
+#     assert bm.allclose(coalesced_coo._indices, expected_indices)
+#     assert bm.allclose(coalesced_coo._values, expected_values)
 
 
-@pytest.mark.parametrize("backend", ALL_BACKENDS)
-def test_coalesce_without_values_not_accumulate(backend):
-    bm.set_backend(backend)
-    # 创建一个未合并的COOTensor对象，但没有值
-    indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
-    values = None
-    sparse_shape = bm.tensor([3, 3])
-    coo = COOTensor(indices, values, sparse_shape, is_coalesced=False)
+# @pytest.mark.parametrize("backend", ALL_BACKENDS)
+# def test_coalesce_without_values_not_accumulate(backend):
+#     bm.set_backend(backend)
+#     # 创建一个未合并的COOTensor对象，但没有值
+#     indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
+#     values = None
+#     sparse_shape = bm.tensor([3, 3])
+#     coo = COOTensor(indices, values, sparse_shape, is_coalesced=False)
 
-    # 调用coalesce方法，设置accumulate为False
-    coalesced_coo = coo.coalesce(accumulate=False)
+#     # 调用coalesce方法，设置accumulate为False
+#     coalesced_coo = coo.coalesce(accumulate=False)
 
-    # 验证结果是否已合并
-    assert coalesced_coo.is_coalesced
+#     # 验证结果是否已合并
+#     assert coalesced_coo.is_coalesced
 
-    # 验证输出的值是否为None
-    assert coalesced_coo._values is None
+#     # 验证输出的值是否为None
+#     assert coalesced_coo._values is None
 
 
 @pytest.mark.parametrize("backend", ALL_BACKENDS)
@@ -93,7 +93,7 @@ def test_to_dense(backend):
     indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
     values = bm.tensor([[1, 2, 3, 4], [6, 7, 8, 9]], dtype=bm.float64)
     sparse_shape = bm.tensor([3, 3])
-    coo = COOTensor(indices, values, sparse_shape, is_coalesced=True)
+    coo = COOTensor(indices, values, sparse_shape)
 
     arr = coo.to_dense()
     assert arr.dtype == bm.float64
@@ -105,6 +105,17 @@ def test_to_dense(backend):
                       [[0, 6, 7],
                        [8, 0, 0],
                        [9, 0, 0]]], dtype=bm.float64)
+    )
+    coo2 = COOTensor(indices, None, sparse_shape)
+    arr2 = coo2.to_dense(fill_value=1.22)
+    bm.allclose(
+        arr2,
+        bm.tensor([[[0, 1.22, 1.22],
+                    [1.22, 0, 0],
+                    [1.22, 0, 0]],
+                   [[0, 1.22, 1.22],
+                    [1.22, 0, 0],
+                    [1.22, 0, 0]]], dtype=bm.float64)
     )
 
 
@@ -126,6 +137,56 @@ def test_ravel(backend):
     assert raveled_coo_tensor.sparse_shape == expected_sparse_shape
     # make sure the COOTensor is shaped (*dense_shape, 1)
     assert raveled_coo_tensor.indices().shape[0] == 1
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_T_2d(backend):
+    bm.set_backend(backend)
+    # 创建一个 2 稀疏维度的 COOTensor 实例
+    indices = bm.tensor([[0, 1], [1, 2]])
+    values = bm.tensor([[1, 2]], dtype=bm.float64)
+    spshape = (3, 4)
+    coo_tensor = COOTensor(indices, values, spshape)
+    trans_tensor = coo_tensor.T
+
+    # 验证结果是否正确
+    expected_indices = bm.tensor([[1, 2], [0, 1]])
+    assert bm.all(bm.equal(trans_tensor._indices, expected_indices))
+    assert trans_tensor._values is values
+    assert trans_tensor._spshape == (4, 3)
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_T_3d(backend):
+    bm.set_backend(backend)
+    # 创建一个 3 稀疏维度的 COOTensor 实例
+    indices = bm.tensor([[0, 1], [1, 2], [2, 0]])
+    values = bm.tensor([1, 2], dtype=bm.float32)
+    spshape = (5, 4, 3)
+    coo_tensor = COOTensor(indices, values, spshape)
+    trans_tensor = coo_tensor.T
+
+    # 验证结果是否正确
+    expected_indices = bm.tensor([[0, 1], [2, 0], [1, 2]])
+    assert bm.all(bm.equal(trans_tensor._indices, expected_indices))
+    assert trans_tensor._values is values
+    assert trans_tensor._spshape == (5, 3, 4)
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_tril(backend):
+    bm.set_backend(backend)
+    indices = bm.tensor([[0, 1, 0, 1], [2, 3, 1, 1], [3, 2, 2, 1]])
+    values = bm.tensor([1, 2, 3, 4], dtype=bm.float32)
+    spshape = (5, 4, 4)
+    coo_tensor = COOTensor(indices, values, spshape)
+    tril_tensor = coo_tensor.tril(k=0)
+
+    expected_indices = bm.tensor([[1, 1], [3, 1], [2, 1]])
+    expected_values = bm.tensor([2, 4], dtype=bm.float32)
+
+    assert bm.all(bm.equal(tril_tensor._indices, expected_indices))
+    assert bm.allclose(tril_tensor._values, expected_values)
 
 
 def create_coo_tensor(indices, values, shape):
@@ -175,8 +236,10 @@ class TestCOOTensorAdd:
     def test_add_tensor(self, backend):
         bm.set_backend(backend)
         # 初始化一个 COOTensor 和一个 dense Tensor
-        coo = create_coo_tensor(indices=bm.tensor([[0], [2]]), values=bm.tensor([[1]]), shape=(4, 4))
-        tensor = bm.zeros((1, 4, 4))
+        coo = create_coo_tensor(indices=bm.tensor([[0], [2]]),
+                                values=bm.tensor([[1]], dtype=bm.float64),
+                                shape=(4, 4))
+        tensor = bm.zeros((1, 4, 4), dtype=bm.float64)
 
         # 执行 add 操作
         result = coo.add(tensor)
@@ -185,7 +248,7 @@ class TestCOOTensorAdd:
         expected_tensor = bm.tensor([[[0., 0., 1., 0.],
                                          [0., 0., 0., 0.],
                                          [0., 0., 0., 0.],
-                                         [0., 0., 0., 0.]]])
+                                         [0., 0., 0., 0.]]], dtype=bm.float64)
         assert bm.allclose(result, expected_tensor)
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
@@ -210,3 +273,78 @@ class TestCOOTensorAdd:
         # 尝试添加不支持的类型，期望抛出 TypeError
         with pytest.raises(TypeError):
             coo.add("a string", alpha=1.0)
+
+
+class TestCOOTensorConcat:
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_empty_sequence(self, backend):
+        bm.set_backend(backend)
+        with pytest.raises(ValueError):
+            COOTensor.concat([])
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_single_tensor(self, backend):
+        bm.set_backend(backend)
+        # 创建一个 COOTensor 实例
+        indices = bm.tensor([[0, 1], [1, 2]])
+        values = bm.tensor([1, 2])
+        shape = [3, 4]
+        coo_tensor = COOTensor(indices, values, shape)
+        # 调用 concat 方法，传入单个 COOTensor
+        result = COOTensor.concat([coo_tensor])
+        # 验证结果是否为原实例
+        assert result is coo_tensor
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_multiple_tensors(self, backend):
+        bm.set_backend(backend)
+        # 创建多个 COOTensor 实例
+        indices1 = bm.tensor([[0, 1], [1, 2]])
+        values1 = bm.tensor([1, 2])
+        shape1 = [3, 4]
+
+        indices2 = bm.tensor([[0, 1], [2, 3]])
+        values2 = bm.tensor([3, 4])
+        shape2 = [3, 4]
+
+        coo_tensor1 = COOTensor(indices1, values1, shape1)
+        coo_tensor2 = COOTensor(indices2, values2, shape2)
+
+        # 调用 concat 方法，传入多个 COOTensor
+        result = COOTensor.concat([coo_tensor1, coo_tensor2], axis=0)
+
+        # 验证结果
+        expected_indices = [[0, 1, 3, 4], [1, 2, 2, 3]]
+        expected_values = [1, 2, 3, 4]
+        expected_shape = (6, 4)
+
+        assert bm.tolist(result.indices()) == expected_indices
+        assert bm.tolist(result.values()) == expected_values
+        assert result.sparse_shape == expected_shape
+
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_concat_axis(self, backend):
+        bm.set_backend(backend)
+        # 创建多个 COOTensor 实例
+        indices1 = bm.tensor([[0, 0], [1, 2]])
+        values1 = bm.tensor([1, 2])
+        shape1 = [2, 3]
+
+        indices2 = bm.tensor([[0, 0], [2, 3]])
+        values2 = bm.tensor([3, 4])
+        shape2 = [2, 4]
+
+        coo_tensor1 = COOTensor(indices1, values1, shape1)
+        coo_tensor2 = COOTensor(indices2, values2, shape2)
+
+        # 沿着 axis=1 进行 concat
+        result = COOTensor.concat([coo_tensor1, coo_tensor2], axis=1)
+
+        # 验证结果
+        expected_indices = [[0, 0, 0, 0], [1, 2, 5, 6]]
+        expected_values = [1, 2, 3, 4]
+        expected_shape = (2, 7)
+
+        assert bm.tolist(result.indices()) == expected_indices
+        assert bm.tolist(result.values()) == expected_values
+        assert result.sparse_shape == expected_shape

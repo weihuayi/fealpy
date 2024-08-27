@@ -79,8 +79,8 @@ class MeshDS(metaclass=MeshMeta):
             logger.info(f'count: entity {etype} is not found and 0 is returned.')
             return 0
 
-        if hasattr(entity, 'location'):
-            return entity.location.shape[0] - 1
+        if isinstance(entity, tuple):
+            return entity[1].shape[0] - 1
         else:
             return entity.shape[0]
 
@@ -183,7 +183,10 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = bm.context(bd_face_flag)
         bd_face2node = self.entity('face', index=bd_face_flag)
         bd_node_flag = bm.zeros((NN,), **kwargs)
-        bd_node_flag[bd_face2node.ravel()] = True
+        if bm.backend_name == "jax":
+            bd_node_flag = bd_node_flag.at[bd_face2node.ravel()].set(True)
+        else:
+                bd_node_flag[bd_face2node.ravel()] = True
         return bd_node_flag
 
     def boundary_face_flag(self) -> TensorLike:
@@ -205,17 +208,20 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = {'dtype': bd_face_flag.dtype}
         bd_face2cell = self.face2cell[bd_face_flag, 0]
         bd_cell_flag = bm.zeros((NC,), **kwargs)
-        bd_cell_flag[bd_face2cell.ravel()] = True
+        if bm.backend_name == "jax":
+            bd_cell_flag = bd_cell_flag.at[bd_face2cell.ravel()].set(True)
+        else:
+            bd_cell_flag[bd_face2cell.ravel()] = True
         return bd_cell_flag
 
     def boundary_node_index(self):
-        return bm.nonzero(self.boundary_node_flag(), as_tuple=True)[0]
+        return bm.nonzero(self.boundary_node_flag())[0]
     # TODO: finish this:
     # def boundary_edge_index(self):
     def boundary_face_index(self):
-        return bm.nonzero(self.boundary_face_flag(), as_tuple=True)[0]
+        return bm.nonzero(self.boundary_face_flag())[0]
     def boundary_cell_index(self):
-        return bm.nonzero(self.boundary_cell_flag(), as_tuple=True)[0]
+        return bm.nonzero(self.boundary_cell_flag())[0]
 
     ### Homogeneous Mesh ###
     def is_homogeneous(self, etype: Union[int, str]='cell') -> bool:
@@ -247,26 +253,15 @@ class MeshDS(metaclass=MeshMeta):
         if not self.is_homogeneous():
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
-        NN = self.number_of_nodes()
+        totalFace = self.total_face()
+        _, i0, i1, j, _ = bm.unique_all_(bm.sort(totalFace, axis=1), axis=0)
+
+        if self.TD > 1: # Do not add faces for interval mesh
+            self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
+
         NC = self.number_of_cells()
         NFC = self.number_of_faces_of_cells()
-
-        totalFace = self.total_face()
-        _, i0, j = bm.unique(
-            bm.sort(totalFace, axis=1),
-            return_index=True,
-            return_inverse=True,
-            axis=0
-        )
-        self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
-        NF = i0.shape[0]
-
-        i1 = bm.zeros(NF, dtype=i0.dtype)
-        b = bm.arange(0, NFC*NC, dtype=i0.dtype)
-        i1 = bm.scatter(i1, j, b)
-
         self.cell2face = j.reshape(NC, NFC)
-
         self.face2cell = bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1)
 
         if self.TD == 3:
@@ -286,6 +281,8 @@ class MeshDS(metaclass=MeshMeta):
             self.edge2cell = self.face2cell
             self.cell2edge = self.cell2face
 
+        NN = self.number_of_nodes()
+        NF = i0.shape[0]
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
