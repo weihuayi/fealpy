@@ -110,6 +110,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         # Interpolation points
         self.ipoints_ordering = ipoints_ordering
 
+        # Initialize face adjustment mask
+        self.adjusted_face_mask = self.get_adjusted_face_mask()
+
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
@@ -830,35 +833,26 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             edge = self.entity('edge', index=index)
             p = bm.einsum('qj, ejk -> eqk', bcs, node[edge]) 
 
-        return p 
-    
-    def face_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
-        """
-        Calculate the normal vectors of the faces.
+        return p
 
-        Parameters:
-            index (Index, optional): Index to select specific faces. Defaults to _S (all faces).
-            unit (bool, optional): If True, returns unit normal vectors. Defaults to False.
-            out (TensorLike, optional): Optional output array to store the result. Defaults to None.
+    def get_adjusted_face_mask(self) -> TensorLike:
+        """
+        Determine which faces need to have their direction adjusted to ensure normals point outward.
 
         Returns:
-            TensorLike[NF, GD]: Normal vectors of the faces.
+            TensorLike[NF]: A boolean array where True indicates that the face's direction should be adjusted.
         """
         nx, ny, nz = self.nx, self.ny, self.nz
-        face = self.entity('face', index=index)
+        NF = self.NF
+        adjusted_face = bm.zeros((NF,), dtype=bool)
 
-        # 创建边的副本，避免对原始边数据的累积修改
-        # TODO 优化：避免创建副本
-        face = bm.copy(face)
-        
-        # xy-plane faces (parallel to z-axis)
+        # Adjust faces in xy-plane
         NF0 = 0
         NF1 = (nx + 1) * ny * nz
-        flip_indices_xy = slice(NF0, NF0 + ny * nz)
-        face = bm.set_at(face, (flip_indices_xy, slice(None)),
-                        face[flip_indices_xy][:, [1, 0, 3, 2]])
+        flip_indices_xy = bm.arange(NF0, NF0 + ny * nz)
+        adjusted_face = bm.set_at(adjusted_face, flip_indices_xy, True)
 
-        # yz-plane faces (parallel to x-axis)
+        # Adjust faces in yz-plane
         NF0 = NF1
         NF1 += nx * (ny + 1) * nz
         NF2 = NF0 + ny * nz
@@ -866,24 +860,56 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         idx1 = bm.arange(NF2, NF2 + nz)
         idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
         idx1 = idx1.flatten()
-        face = bm.set_at(face, (idx1, slice(None)),
-                        face[idx1][:, [1, 0, 3, 2]])
+        adjusted_face = bm.set_at(adjusted_face, idx1, True)
 
-        # xz-plane faces (parallel to y-axis)
+        # Adjust faces in xz-plane
         NF0 = NF1
         NF1 += nx * ny * (nz + 1)
         N = ny * (nz + 1)
         idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
         idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
         idx2 = idx2.flatten()
-        face = bm.set_at(face, (idx2, slice(None)),
-                        face[idx2][:, [1, 0, 3, 2]])
+        adjusted_face = bm.set_at(adjusted_face, idx2, True)
 
+        return adjusted_face
+
+    def face_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
+        """
+        Calculate the normal vectors of the faces.
+
+        Parameters:
+            index (Index, optional): Index to select specific faces. 
+                                        Defaults to _S (all faces).
+            unit (bool, optional): If True, returns unit normal vectors. 
+                                        Defaults to False.
+            out (TensorLike, optional): Optional output array to store the result. 
+                                        Defaults to None.
+
+        Returns:
+            TensorLike[NF, GD]: Normal vectors of the faces.
+        
+        法向量方向的定义如下：
+            1 ---←--- 3
+            |         |
+            ↑         |
+            |         |
+            0 ------- 2
+        """
+        face = self.entity('face', index=index)
         node = self.entity('node')
+        
+        # Calculate vectors v1 and v2 for the normal calculation
         v1 = node[face[:, 1]] - node[face[:, 0]]
         v2 = node[face[:, 1]] - node[face[:, 3]]
         normals = bm.cross(v1, v2)
 
+        adjusted_face_mask = self.get_adjusted_face_mask() 
+
+        # Use the adjusted face mask to flip the normals if necessary
+        normals = bm.set_at(normals, (adjusted_face_mask, slice(None)), 
+                                -normals[adjusted_face_mask])
+
+        # Normalize the normals if unit is True
         if unit:
             norm = bm.linalg.norm(normals, axis=1, keepdims=True)
             normals = normals / norm
@@ -892,7 +918,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             out[...] = normals
             return out
 
-        return normals
+        return normals 
     
     def face_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
         """
@@ -906,7 +932,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             TensorLike[NF, GD]: Unit normal vectors of the faces.
         """
         return self.face_normal(index=index, unit=True, out=out)
-
 
 
 #################################### 插值点 #############################################
