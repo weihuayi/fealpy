@@ -352,7 +352,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         # 边界自由度
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
-        return isDDof
+        return uh,isDDof
 
     boundary_interpolate = set_dirichlet_bc
 
