@@ -515,7 +515,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         isDDof[edge2dof] = True
 
 
-        return isDDof
+        return uh, isDDof
 
     boundary_interpolate = set_dirichlet_bc
 
