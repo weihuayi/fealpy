@@ -847,7 +847,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         nx, ny, nz = self.nx, self.ny, self.nz
         face = self.entity('face', index=index)
 
-        # TODO 创建面的副本，避免对原始面数据的累积修改
+        # 创建边的副本，避免对原始边数据的累积修改
+        # TODO 优化：避免创建副本
         face = bm.copy(face)
         
         # xy-plane faces (parallel to z-axis)
@@ -880,7 +881,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         node = self.entity('node')
         v1 = node[face[:, 1]] - node[face[:, 0]]
-        v2 = node[face[:, 3]] - node[face[:, 0]]
+        v2 = node[face[:, 1]] - node[face[:, 3]]
         normals = bm.cross(v1, v2)
 
         if unit:
