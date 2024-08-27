@@ -14,8 +14,8 @@ h = [1.5, 1, 2]
 # h = [1, 1, 1]
 origin = [0, 0, 0]
 mesh = UniformMesh3d(extent, h, origin)
-# mesh.ipoints_ordering = 'zyx'
-mesh.ipoints_ordering = 'nefc'
+mesh.ipoints_ordering = 'zyx'
+# mesh.ipoints_ordering = 'nefc'
 
 edge = mesh.entity('edge')
 face = mesh.entity('face')
@@ -27,10 +27,12 @@ ip2 = mesh.interpolation_points(p=p)
 isBdNode = mesh.boundary_node_flag()
 isBdEdge = mesh.boundary_edge_flag()
 isBdFace = mesh.boundary_face_flag()
+isBdCell = mesh.boundary_cell_flag()
+cell2face = mesh.cell_to_face(index=isBdCell)
 node2ipoint = mesh.node_to_ipoint(p=p, index=isBdNode)
 edge2ipoint = mesh.edge_to_ipoint(p=p, index=isBdEdge)
 face2ipoint = mesh.face_to_ipoint(p=p, index=isBdFace)
-cell2ipoint = mesh.cell_to_ipoint(p=p)
+cell2ipoint = mesh.cell_to_ipoint(p=p, index=isBdCell)
 
 facenorm = mesh.face_normal()
 faceunitnorm = mesh.face_unit_normal()
