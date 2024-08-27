@@ -251,9 +251,48 @@ class TestTetrahedronMeshInterfaces:
         qf = mesh.quadrature_formula(5, "cell")
         bcs , ws = qf.get_quadrature_points_and_weights()
 
+    @pytest.mark.benchmark(group="bisect")
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", bisect_data)
+    def test_bisect(self, benchmark,data,backend):
+        bm.set_backend(backend)
+        data1 = data['data']
+        nx = data['nx']
+        ny = data['ny']
+        nz = data['nz']
+        mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=nx,ny=ny,nz=nz)
+        if data['arm_cell_idx'] is None:
+            isMarkedCell = None
+            mesh.bisect(isMarkedCell=isMarkedCell,data = data1,options=data['options'])
+        else:
+            for i in range(data['iter']):
+                isMarkedCell = bm.zeros(mesh.entity('cell').shape[0],dtype=bm.bool)
+                isMarkedCell[data['arm_cell_idx']] = True
+                mesh.bisect(isMarkedCell=isMarkedCell,data = data1,options=data['options'])
+        
+        assert mesh.number_of_nodes() == data["NN"]
+        assert mesh.number_of_edges() == data["NE"]
+        assert mesh.number_of_faces() == data["NF"]
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
 
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-14)
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
 
+        face2cell = mesh.face_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
 
+        # 性能测试
+        performance_test = "open"
+        if performance_test is "open":
+            # 整体进行二分加密
+            def bisect():
+                mesh = TetrahedronMesh.from_box(box=[0,1,0,1,0,1], nx=nx,ny=ny,nz=nz)
+                times = 7
+                for i in range(times):
+                    mesh.bisect(isMarkedCell=None,data = data1,options=data['options'])
+                return mesh
+            result = benchmark(bisect)
 
 
 if __name__ == "__main__":
@@ -265,4 +304,5 @@ if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_face_unit_norm"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_box"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_entity_measure"])
-    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_grad_lambda"])
+    #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_grad_lambda"])
+    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_bisect"])
