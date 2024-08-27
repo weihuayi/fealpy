@@ -309,7 +309,28 @@ class Mesh(MeshDS):
         # 开始交互
         renderWindow.Render()
         renderWindowInteractor.Start()
+        
+        #自适应标记工具 
+    def mark(eta, theta, method='L2'):
+        isMarked = bm.zeros(len(eta), dtype=bm.bool)
+        if method == 'MAX':
+            # isMarked[eta > theta*bm.max(eta)] = True
+            isMarked = bm.set_at(isMarked,(eta > theta*bm.max(eta)),True)
+        elif method == 'COARSEN':
+            # isMarked[eta < theta*bm.max(eta)] = True
+            isMarked = bm.set_at(isMarked,(eta < theta*bm.max(eta)),True)
+        elif method == 'L2':
+            eta = eta**2
+            idx = bm.argsort(eta)[-1::-1]
+            x = bm.cumsum(eta[idx])
+            # isMarked[idx[x < theta*x[-1]]] = True
+            # isMarked[idx[0]] = True
+            isMarked = bm.set_at(isMarked,(idx[x < theta*x[-1]]),True)
+            isMarked = bm.set_at(isMarked,(idx[0]),True)
 
+        else:
+            raise ValueError("I have not code the method")
+        return isMarked 
 
 class HomogeneousMesh(Mesh):
     # entity
@@ -468,7 +489,7 @@ class SimplexMesh(HomogeneousMesh):
         else:
             raise ValueError("Variables type is expected to be 'u' or 'x', "
                              f"but got '{variables}'.")
-
+    
 
 class TensorMesh(HomogeneousMesh):
     # ipoints
@@ -615,7 +636,7 @@ class TensorMesh(HomogeneousMesh):
         face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
                 NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
         return face2ipoint
-
+    
 
 class StructuredMesh(HomogeneousMesh):
     # ### counters
