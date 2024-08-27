@@ -1,3 +1,9 @@
+from fealpy.experimental.backend import backend_manager as bm
+
+bm.set_backend('numpy')
+# bm.set_backend('pytorch')
+# bm.set_backend('jax')
+
 from fealpy.experimental.mesh import TriangleMesh
 
 from fealpy.experimental.fem import LinearElasticityIntegrator, \
@@ -7,7 +13,7 @@ from fealpy.experimental.fem import LinearElasticityIntegrator, \
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.backend import backend_manager as bm
+
 from fealpy.experimental.solver import cg
 from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
@@ -17,10 +23,6 @@ from scipy.sparse.linalg import spsolve
 
 from fealpy.utils import timer
 
-
-bm.set_backend('numpy')
-# bm.set_backend('pytorch')
-# bm.set_backend('jax')
 
 # 平面应变问题定义
 def source(points: TensorLike) -> TensorLike:
@@ -109,6 +111,8 @@ for i in range(maxit):
 
     temp1 = csr_matrix((K.values(), K.indices()), shape=K.shape)
     temp2 = bm.to_numpy(F)
+    tmr.send(f'第 {i} 次转换类型时间')
+    
     uh_spsolve[:] = spsolve(temp1, temp2)
     tmr.send(f'第 {i} 次的 spsolve 时间')
     next(tmr)

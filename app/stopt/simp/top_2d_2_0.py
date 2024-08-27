@@ -97,8 +97,7 @@ def source(points: TensorLike) -> TensorLike:
 
 def dirichlet(points: TensorLike) -> TensorLike:
 
-    # return bm.zeros(points.shape, dtype=points.dtype)
-    return bm.ones(points.shape, dtype=points.dtype)
+    return bm.zeros(points.shape, dtype=points.dtype)
 
 # def is_dirichlet_boundary(points: TensorLike) -> TensorLike:
 #     """
@@ -129,8 +128,6 @@ def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
         The length of the array is NBE, which represents the number of boundary edges.
     """
     temp = (points[:, 0] == 0.0)
-    # temp2 = (bm.arange(len(points)) % 2 == 0)
-    # temp = temp1 & temp2
 
     return temp
 

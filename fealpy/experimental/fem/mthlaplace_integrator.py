@@ -18,7 +18,8 @@ from .integrator import (
 
 class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, m: int=2,coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, m: int=2,coef: Optional[CoefLike]=None, q:
+            Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
@@ -36,7 +37,6 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
-        q = self.q
         m = self.m
         index = self.index
         mesh = getattr(space, 'mesh', None)
@@ -47,6 +47,7 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         gmphi = space.grad_m_basis(bcs, m=m)

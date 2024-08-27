@@ -9,7 +9,7 @@ from .integrator import LinearInt, SrcInt, FaceInt, enable_cache, assemblymethod
 
 
 class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
-    def __init__(self, gn: SourceLike, q=3, *,
+    def __init__(self, gn: SourceLike, q:Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
         super().__init__()
@@ -51,7 +51,8 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
         n = mesh.face_unit_normal(index=index)
         facemeasure = mesh.entity_measure('face', index=index)
 
-        qf = mesh.quadrature_formula(self.q, 'face')
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs)
 
