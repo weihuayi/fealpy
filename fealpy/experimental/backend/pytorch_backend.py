@@ -229,7 +229,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if any_return:
             result = (b, )
         else:
-            retult = b
+            result = b
 
         if return_index:
             kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
@@ -457,7 +457,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             mi = cls.multi_index_matrix(p, TD, dtype=torch.int)
 
         c = torch.arange(1, p+1, dtype=itype, device=device)
-        P = 1.0 / torch.cumprod(c, dim=0)
+        P = 1.0 / torch.cumprod(c, dim=0, dtype=bc.dtype, device=device)
         t = torch.arange(0, p, dtype=itype, device=device)
         Ap = p*bc.unsqueeze(-2) - t.reshape(-1, 1)
         Ap = torch.cumprod(Ap, dim=-2).clone()

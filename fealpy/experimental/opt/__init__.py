@@ -4,3 +4,4 @@ from .crayfish_opt_alg import CrayfishOptAlg
 from .honeybadger_opt_alg import HoneybadgerOptAlg
 from .quantumparticleswarm_opt_alg import QuantumParticleSwarmOptAlg 
 from .snowmelt_opt_alg import SnowmeltOptAlg 
+from .grey_wolf_optimizer import GreyWolfOptimizer

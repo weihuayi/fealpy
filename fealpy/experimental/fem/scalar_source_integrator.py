@@ -40,7 +40,7 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index)
-
+        
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:
