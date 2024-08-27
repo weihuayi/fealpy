@@ -183,9 +183,10 @@ class TestTriangleMeshInterfaces:
         cell =  mesh.entity('cell')
         np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
 
+    @pytest.mark.benchmark(group="bisect_1")
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", bisect_1_data)
-    def test_bisect_1(self,data,backend):
+    def test_bisect_1(self,benchmark,data,backend):
         bm.set_backend(backend)
         nx = data['nx']
         ny = data['ny']
@@ -201,16 +202,27 @@ class TestTriangleMeshInterfaces:
         assert mesh.number_of_edges() == data["NE"]
 
         node = mesh.entity('node')
-        print(node)
         np.testing.assert_allclose(bm.to_numpy(node), data["node"])
         cell = mesh.entity('cell')
         np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
-        
+        # 性能测试
+        performance_test = "open"
+        if performance_test is "open":
+            # 整体进行二分加密
+            def bisect():
+                mesh = TriangleMesh.from_box(nx=nx,ny=ny)
+                times = 10
+                for i in range(times):
+                    mesh.bisect_1(isMarkedCell=None)
+                return mesh
+            result = benchmark(bisect)
+
+    @pytest.mark.benchmark(group="adaptive")
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", adaptive_data)
-    def test_adaptive(self,data,backend):
+    def test_adaptive(self,benchmark,data,backend):
         bm.set_backend(backend)
         nx = data['nx']
         ny = data['ny']
@@ -233,29 +245,32 @@ class TestTriangleMeshInterfaces:
             return val
         def dirichlet(p):
             return solution(p)
-        for i in range(maxit):
-            node = mesh.entity('node')
-            cell = mesh.entity('cell')
-            space = LagrangeFESpace(mesh, p=p)
-            bform = BilinearForm(space)
-            bform.add_integrator(ScalarDiffusionIntegrator(q=q))
-            A = bform.assembly()
-            lform = LinearForm(space)
-            lform.add_integrator(ScalarSourceIntegrator(source, q=q))
-            F = lform.assembly()
-            bc = DirichletBC(space=space, gd=dirichlet)
-            uh = bm.zeros(space.number_of_global_dofs(), dtype=space.ftype)
-            A, F = bc.apply(A, F ,uh)
-            if backend == 'numpy':
-                uh[:] = spsolve(A.toarray(), F)
-            else:
-                uh_numpy = spsolve(A.toarray(), F)
-                uh[:] = bm.array(uh_numpy)
-            cm = mesh.entity_measure('cell')
-            eta = bm.sum(bm.abs(uh[cell]- solution(node)[cell]),axis=-1)
-            eta = cm * eta
-            mesh.adaptive(eta ,options)
         
+        def adaptive():
+            for i in range(maxit):
+                node = mesh.entity('node')
+                cell = mesh.entity('cell')
+                space = LagrangeFESpace(mesh, p=p)
+                bform = BilinearForm(space)
+                bform.add_integrator(ScalarDiffusionIntegrator(q=q))
+                A = bform.assembly()
+                lform = LinearForm(space)
+                lform.add_integrator(ScalarSourceIntegrator(source, q=q))
+                F = lform.assembly()
+                bc = DirichletBC(space=space, gd=dirichlet)
+                uh = bm.zeros(space.number_of_global_dofs(), dtype=space.ftype)
+                A, F = bc.apply(A, F ,uh)
+                if backend == 'numpy':
+                    uh[:] = spsolve(A.toarray(), F)
+                else:
+                    uh_numpy = spsolve(A.toarray(), F)
+                    uh[:] = bm.array(uh_numpy)
+                cm = mesh.entity_measure('cell')
+                eta = bm.sum(bm.abs(uh[cell]- solution(node)[cell]),axis=-1)
+                eta = cm * eta
+                mesh.adaptive(eta ,options)
+        result = benchmark(adaptive)
+
         assert mesh.number_of_nodes() == data["NN"]
         assert mesh.number_of_cells() == data["NC"]
         assert mesh.number_of_edges() == data["NE"]

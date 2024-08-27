@@ -18,7 +18,7 @@ from ..typing import TensorLike, Index, _S
 
 
 class PressWorkIntegrator(LinearInt, OpInt, CellInt):
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()
@@ -36,7 +36,6 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         space0 = space[0]
         space1 = space[1]
         index = self.index
-        q = self.q
         mesh = getattr(space[0], 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
@@ -45,6 +44,7 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
@@ -63,7 +63,7 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
 
 
 class PressWorkIntegrator1(LinearInt, OpInt, CellInt):
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()
@@ -81,7 +81,6 @@ class PressWorkIntegrator1(LinearInt, OpInt, CellInt):
         space0 = space[0]
         space1 = space[1]
         index = self.index
-        q = self.q
         mesh = getattr(space[0], 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
@@ -90,6 +89,7 @@ class PressWorkIntegrator1(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
