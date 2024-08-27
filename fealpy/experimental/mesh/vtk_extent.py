@@ -42,7 +42,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
 
     if nodedata is not None:
         for key, val in nodedata.items():
-            val = val.cpu().numpy()
+            val = bm.to_numpy(val) 
             if val is not None:
                 if len(val.shape) == 2 and val.shape[1] == 2:
                     shape = (val.shape[0], 3)
@@ -61,7 +61,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     if celldata is not None:
         cdata = mesh.GetCellData()
         for key, val in celldata.items():
-            val = val.cpu().numpy()
+            val = bm.to_numpy(val) 
             if val is not None:
                 if len(val.shape) == 2 and val.shape[1] == 2:
                     shape = (val.shape[0], 3)
