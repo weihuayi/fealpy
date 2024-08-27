@@ -144,9 +144,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         ipoint_list.append(node) # ipoints[:NN, :]
 
         edge = self.entity('edge')
-        w = bm.zeros((p - 1, 2), dtype=bm.float64)
-        w[:, 0] = bm.arange(p - 1, 0, -1, dtype=bm.float64) / p
-        w[:, 1] = bm.flip(w[:, 0], axis=0) 
+        w = bm.multi_index_matrix(p, 1, dtype=self.ftype)
+        w = w[1:-1]/p
         ipoints_from_edge = bm.einsum('ij, ...jm->...im', w,
                                          node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]
         ipoint_list.append(ipoints_from_edge)
@@ -168,15 +167,19 @@ class TriangleMesh(SimplexMesh, Plotable):
         return bm.concatenate(ipoint_list, axis=0)  # (gdof, GD)
 
     def cell_to_ipoint(self, p: int, index: Index=_S):
+        """
+        Get the map from local index to global index for interpolation points.
+        """
         cell = self.cell
+
         if p == 1:
             return cell[index]
 
-        mi = self.multi_index_matrix(p, 2)
+        TD = self.top_dimension()
+        mi = self.multi_index_matrix(p, TD)
         idx0, = bm.nonzero(mi[:, 0] == 0)
         idx1, = bm.nonzero(mi[:, 1] == 0)
         idx2, = bm.nonzero(mi[:, 2] == 0)
-        kwargs = {'dtype': self.itype}
 
         face2cell = self.face_to_cell()
         NN = self.number_of_nodes()
@@ -185,45 +188,51 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoints(p, 'cell')
+
+        kwargs = bm.context(cell)
         c2p = bm.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
-        c2p[face2cell[flag, 0][:, None], idx0] = e2p[flag]
+        c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])
 
         flag = face2cell[:, 2] == 1
         idx1_ = bm.flip(idx1, axis=0)
-        c2p[face2cell[flag, 0][:, None], idx1_] = e2p[flag]
+        c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx1_), e2p[flag])
 
         flag = face2cell[:, 2] == 2
-        c2p[face2cell[flag, 0][:, None], idx2] = e2p[flag]
+        c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx2), e2p[flag])
 
         iflag = face2cell[:, 0] != face2cell[:, 1]
-
         flag = iflag & (face2cell[:, 3] == 0)
         idx0_ = bm.flip(idx0, axis=0)
-        c2p[face2cell[flag, 1][:, None], idx0_] = e2p[flag]
+        c2p = bm.set_at(c2p, (face2cell[flag, 1][:, None], idx0_), e2p[flag])
 
         flag = iflag & (face2cell[:, 3] == 1)
-        c2p[face2cell[flag, 1][:, None], idx1] = e2p[flag]
+        c2p = bm.set_at(c2p, (face2cell[flag, 1][:, None], idx1), e2p[flag])
 
         flag = iflag & (face2cell[:, 3] == 2)
         idx2_ = bm.flip(idx2, axis=0)
-        c2p[face2cell[flag, 1][:, None], idx2_] = e2p[flag]
+        c2p = bm.set_at(c2p, (face2cell[flag, 1][:, None], idx2_),  e2p[flag])
 
         cdof = (p-1)*(p-2)//2
         flag = bm.sum(mi > 0, axis=1) == 3
-        c2p[:, flag] = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
+        val = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
+        c2p = bm.set_at(c2p, (..., flag), val)
         return c2p[index]
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
-    def cell_to_edge_sign(self):
+
+    def cell_to_face_sign(self):
+        """
+        """
         NC = self.number_of_cells()
         NEC = self.number_of_edges_of_cells()
-        edge2cell = self.face_to_cell() #TODO：ds没有edge_to_cell
-        cell2edgeSign = bm.zeros((NC, NEC), dtype=bm.bool)
-        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]]=True
-        return cell2edgeSign
+        face2cell = self.face_to_cell() 
+        cell2faceSign = bm.zeros((NC, NEC), dtype=bm.bool)
+        cell2faceSign = bm.set_at(cell2faceSign, (face2cell[:, 0], face2cell[:, 2]), True)
+        return cell2faceSign
+
     def prolongation_matrix(self, po: int, p1: int):
         """
         @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
@@ -266,7 +275,6 @@ class TriangleMesh(SimplexMesh, Plotable):
             self.cell = bm.concatenate(
                     (p[:,[0,5,4]], p[:,[5,1,3]], p[:,[4,3,2]], p[:,[3,4,5]]),
                     axis=0)
-            #TODO: call self.clear() 清理暂存的数据
             self.construct()
 
     def is_crossed_cell(self, point, segment):
