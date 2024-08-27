@@ -21,17 +21,14 @@ class GreyWolfOptimizer(Optimizer):
 
         #一阶狼
         X_alpha_fit = fit[X_fit_sort[0]]
-        # rr1 = bm.argwhere(fit == X_alpha_fit)
         X_alpha = X[X_fit_sort[0]]
 
         #二阶狼
         X_beta_fit = fit[X_fit_sort[1]]
-        # rr2 = bm.argwhere(fit == X_beta_fit)
         X_beta = X[X_fit_sort[1]]
 
         #三阶狼
         X_delta_fit = fit[X_fit_sort[2]]
-        # rr3 = bm.argwhere(fit == X_delta_fit)
         X_delta = X[X_fit_sort[2]]
 
         #空列表
@@ -63,27 +60,17 @@ class GreyWolfOptimizer(Optimizer):
             fit = self.fun(X)
 
             sort_index = bm.argsort(fit)
+            X_sort = X[sort_index[:3]]
+            fit_sort = fit[sort_index[:3]]
             
-            X_sort1 = X[sort_index[0]]
-            fit_sort1 = fit[sort_index[0]]
-            
-            X_sort2 = X[sort_index[1]]
-            fit_sort2 = fit[sort_index[1]]
-            
-            X_sort3 = X[sort_index[2]]
-            fit_sort3 = fit[sort_index[2]]
+            if fit_sort[0] < X_alpha_fit:
+                X_alpha, X_alpha_fit = X_sort[0], fit_sort[0]
 
-            if fit_sort1 < X_alpha_fit:
-                X_alpha_fit = fit_sort1
-                X_alpha = X_sort1
-
-            if fit_sort2 > X_alpha_fit and fit_sort2 < X_beta_fit:
-                X_beta_fit = fit_sort2
-                X_beta = X_sort2
-
-            if fit_sort3 > X_beta_fit and fit_sort3 < X_delta_fit:
-                X_delta_fit = fit_sort3
-                X_delta = X_sort3
+            if X_alpha_fit < fit_sort[1] < X_beta_fit:
+                X_beta, X_beta_fit = X_sort[1], fit_sort[1]
+                
+            if X_beta_fit < fit_sort[2] < X_delta_fit:
+                X_delta, X_delta_fit = X_sort[2], fit_sort[2]
 
             gbest = X_alpha
             gbest_f = X_alpha_fit

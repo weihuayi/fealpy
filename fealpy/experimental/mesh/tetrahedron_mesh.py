@@ -926,7 +926,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
 
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
-        from fealpy.experimental.mesh.vtk_extent import  write_to_vtu
+        from .vtk_extent import  write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()
