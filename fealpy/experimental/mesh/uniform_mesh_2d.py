@@ -1,11 +1,9 @@
-import numpy as np 
+from ..backend import backend_manager as bm  
+
 from typing import Union, Optional, Sequence, Tuple, Any
+from ..typing import TensorLike, Index, _S, Union, Tuple
 
 from .utils import entitymethod, estr2dim
-
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S, Union, Tuple
-from .. import logger
 
 from .mesh_base import StructuredMesh, TensorMesh
 from .plot import Plotable
@@ -70,7 +68,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
 
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
-                itype=None, ftype=None):
+                ipoints_ordering='yx', itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -99,11 +97,15 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         self.meshtype = 'UniformMesh2d'
 
+        # Interpolation points
+        self.ipoints_ordering = ipoints_ordering
+
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
         self.edge2cell = self.edge_to_cell()
         self.face2cell = self.edge2cell
+        self.cell2edge = self.cell_to_edge()
 
         self.localEdge = bm.array([(0, 2), (1, 3), 
                                    (0, 1), (2, 3)], dtype=self.itype)   
@@ -140,37 +142,19 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
         edge = bm.zeros((NE, 2), dtype=self.itype)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            NE0 = 0
-            NE1 = nx * (ny + 1)
-            edge[NE0:NE1, 0] = idx[:-1, :].reshape(-1)
-            edge[NE0:NE1, 1] = idx[1:, :].reshape(-1)
-            edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
+        NE0 = 0
+        NE1 = nx * (ny + 1)
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), idx[:-1, :].reshape(-1))
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), idx[1:, :].reshape(-1))
+        # edge[NE0 + ny:NE1:ny + 1, :] = bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=[1])
 
-            NE0 = NE1
-            NE1 += ny * (nx + 1)
-            edge[NE0:NE1, 0] = idx[:, :-1].reshape(-1)
-            edge[NE0:NE1, 1] = idx[:, 1:].reshape(-1)
-            edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
+        NE0 = NE1
+        NE1 += ny * (nx + 1)
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), idx[:, :-1].reshape(-1))
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), idx[:, 1:].reshape(-1))
+        # edge[NE0:NE0 + ny, :] = bm.flip(edge[NE0:NE0 + ny], axis=[1])
 
-            return edge
-        elif bm.backend_name == 'jax':
-            NE0 = 0
-            NE1 = nx * (ny + 1)
-            edge = edge.at[NE0:NE1, 0].set(idx[:-1, :].reshape(-1))
-            edge = edge.at[NE0:NE1, 1].set(idx[1:, :].reshape(-1))
-            edge = edge.at[NE0 + ny:NE1:ny + 1, :].set(bm.flip(edge[NE0 + ny:NE1:ny + 1], axis=1))
-
-            NE0 = NE1
-            NE1 += ny * (nx + 1)
-            edge = edge.at[NE0:NE1, 0].set(idx[:, :-1].reshape(-1))
-            edge = edge.at[NE0:NE1, 1].set(idx[:, 1:].reshape(-1))
-            edge = edge.at[NE0:NE0 + ny, :].set(bm.flip(edge[NE0:NE0 + ny], axis=1))
-
-            return edge
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        return edge
     
     @entitymethod(2)
     def _get_cell(self) -> TensorLike:
@@ -204,7 +188,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     def number_of_faces_of_cells(self):
         return 4
     
-    def edge_to_cell(self) -> TensorLike:
+    def edge_to_cell(self, index: Index=_S) -> TensorLike:
         """
         @brief Adjacency relationship between edges and cells, 
         storing information about the two cells adjacent to each edge.
@@ -229,62 +213,73 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         idx1 = bm.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
         NE0 = nx * (ny + 1)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            # left element
-            edge2cell[idx0[:-1], 0] = idx
-            edge2cell[idx0[:-1], 2] = 0
-            edge2cell[idx0[-1], 0] = idx[-1]
-            edge2cell[idx0[-1], 2] = 1
+        # left element
+        edge2cell = bm.set_at(edge2cell, (idx0[:-1], 0), idx)
+        edge2cell = bm.set_at(edge2cell, (idx0[:-1], 2), 0)
+        edge2cell = bm.set_at(edge2cell, (idx0[-1], 0), idx[-1])
+        edge2cell = bm.set_at(edge2cell, (idx0[-1], 2), 1)
+        # edge2cell[idx0[:-1], 0] = idx
+        # edge2cell[idx0[:-1], 2] = 0
+        # edge2cell[idx0[-1], 0] = idx[-1]
+        # edge2cell[idx0[-1], 2] = 1
 
-            # right element
-            edge2cell[idx0[1:], 1] = idx
-            edge2cell[idx0[1:], 3] = 1
-            edge2cell[idx0[0], 1] = idx[0]
-            edge2cell[idx0[0], 3] = 0
+        # right element
+        edge2cell = bm.set_at(edge2cell, (idx0[1:], 1), idx)
+        edge2cell = bm.set_at(edge2cell, (idx0[1:], 3), 1)
+        edge2cell = bm.set_at(edge2cell, (idx0[0], 1), idx[0])
+        edge2cell = bm.set_at(edge2cell, (idx0[0], 3), 0)
+        # edge2cell[idx0[1:], 1] = idx
+        # edge2cell[idx0[1:], 3] = 1
+        # edge2cell[idx0[0], 1] = idx[0]
+        # edge2cell[idx0[0], 3] = 0
 
-            # left element
-            edge2cell[NE0 + idx1[:, 1:], 0] = idx
-            edge2cell[NE0 + idx1[:, 1:], 2] = 3
-            edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
-            edge2cell[NE0 + idx1[:, 0], 2] = 2
+        # left element
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, 1:], 0), idx)
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, 1:], 2), 3)
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, 0], 0), idx[:, 0])
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, 0], 2), 2)
+        # edge2cell[NE0 + idx1[:, 1:], 0] = idx
+        # edge2cell[NE0 + idx1[:, 1:], 2] = 3
+        # edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+        # edge2cell[NE0 + idx1[:, 0], 2] = 2
 
-            # right element
-            edge2cell[NE0 + idx1[:, :-1], 1] = idx
-            edge2cell[NE0 + idx1[:, :-1], 3] = 2
-            edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
-            edge2cell[NE0 + idx1[:, -1], 3] = 3
+        # right element
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, :-1], 1), idx)
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, :-1], 3), 2)
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, -1], 1), idx[:, -1])
+        edge2cell = bm.set_at(edge2cell, (NE0 + idx1[:, -1], 3), 3)
+        # edge2cell[NE0 + idx1[:, :-1], 1] = idx
+        # edge2cell[NE0 + idx1[:, :-1], 3] = 2
+        # edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+        # edge2cell[NE0 + idx1[:, -1], 3] = 3
 
-            return edge2cell
-        elif bm.backend_name == 'jax':
-            # left element
-            edge2cell = edge2cell.at[idx0[:-1], 0].set(idx)
-            edge2cell = edge2cell.at[idx0[:-1], 2].set(0)
-            edge2cell = edge2cell.at[idx0[-1], 0].set(idx[-1])
-            edge2cell = edge2cell.at[idx0[-1], 2].set(1)
+        return edge2cell[index]
+    
+    def cell_to_edge(self, index: Index=_S) -> TensorLike:
+        """
+        @brief 单元和边的邻接关系，储存每个单元相邻的边的编号
+        """
+        NC = self.NC
+        NE = self.NE
 
-            # right element
-            edge2cell = edge2cell.at[idx0[1:], 1].set(idx)
-            edge2cell = edge2cell.at[idx0[1:], 3].set(1)
-            edge2cell = edge2cell.at[idx0[0], 1].set(idx[0])
-            edge2cell = edge2cell.at[idx0[0], 3].set(0)
+        nx = self.nx
+        ny = self.ny
 
-            # left element
-            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 0].set(idx)
-            edge2cell = edge2cell.at[NE0 + idx1[:, 1:], 2].set(3)
-            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 0].set(idx[:, 0])
-            edge2cell = edge2cell.at[NE0 + idx1[:, 0], 2].set(2)
+        cell2edge = bm.zeros((NC, 4), dtype=self.itype)
 
-            # right element
-            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 1].set(idx)
-            edge2cell = edge2cell.at[NE0 + idx1[:, :-1], 3].set(2)
-            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 1].set(idx[:, -1])
-            edge2cell = edge2cell.at[NE0 + idx1[:, -1], 3].set(3)
+        idx0 = bm.arange(nx * (ny + 1)).reshape(nx, ny + 1)
+        cell2edge = bm.set_at(cell2edge, (slice(None), 0), idx0[:, :-1].flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 1), idx0[:, 1:].flatten())
+        # cell2edge[:, 0] = idx0[:, :-1].flatten()
+        # cell2edge[:, 1] = idx0[:, 1:].flatten()
 
-            return edge2cell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        idx1 = bm.arange(nx * (ny + 1), NE).reshape(nx + 1, ny)
+        cell2edge = bm.set_at(cell2edge, (slice(None), 2), idx1[:-1, :].flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 3), idx1[1:, :].flatten())
+        # cell2edge[:, 2] = idx1[:-1, :].flatten()
+        # cell2edge[:, 3] = idx1[1:, :].flatten()
 
+        return cell2edge[index]
         
     def boundary_node_flag(self):
         """
@@ -293,17 +288,11 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = bm.zeros((NN,), dtype=bm.bool)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdPoint[edge[isBdEdge, :]] = True
-            return isBdPoint
-        elif bm.backend_name == 'jax':
-            isBdPoint = isBdPoint.at[edge[isBdEdge, :]].set(True)   
-            return isBdPoint
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-
+        isBdPoint = bm.zeros((NN,), dtype=bool)
+        # isBdPoint[edge[isBdEdge, :]] = True
+        isBdPoint = bm.set_at(isBdPoint, edge[isBdEdge, :], True)
+        
+        return isBdPoint
     
     def boundary_edge_flag(self):
         """
@@ -312,7 +301,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         edge2cell = self.edge_to_cell()
         isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
         return isBdEdge
-    
     
     def boundary_cell_flag(self):
         """
@@ -323,19 +311,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         edge2cell = self.edge_to_cell()
         isBdCell = bm.zeros((NC,), dtype=bool)
         isBdEdge = self.boundary_edge_flag()
+        # isBdCell[edge2cell[isBdEdge, 0]] = True
+        isBdCell = bm.set_at(isBdCell, edge2cell[isBdEdge, 0], True)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdCell[edge2cell[isBdEdge, 0]] = True
-            return isBdCell
-        elif bm.backend_name == 'jax':
-            isBdCell = isBdCell.at[edge2cell[isBdEdge, 0]].set(True)
-            return isBdCell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        return isBdCell
+
     
-    
-    # 实体几何
+#################################### 实体几何 #############################################
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> TensorLike:
         """
         @brief Get the measure of the entities of the specified type.
@@ -439,142 +421,241 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         return p    
     
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
+        """Calculate the tangent of the edges.
 
-    # 插值点
+        Parameters:
+            index (Index, optional): _description_. Defaults to _S.\n
+            unit (bool, optional): _description_. Defaults to False.\n
+            out (TensorLike, optional): _description_. Defaults to None.
+
+        Returns:
+            TensorLike[NE, GD]: _description_
+        """
+        nx, ny = self.nx, self.ny
+        edge = self.entity('edge', index=index)
+
+        # 创建边的副本，避免对原始边数据的累积修改
+        # TODO 优化：避免创建副本
+        edge = bm.copy(edge)
+
+        NE0 = 0
+        NE1 = nx * (ny + 1)
+        flip_indices_horiz = slice(NE0 + ny, NE1, ny + 1)
+        edge = bm.set_at(edge, (flip_indices_horiz, slice(None)), 
+                        bm.flip(edge[flip_indices_horiz], axis=[1]))
+        NE0 = nx * (ny + 1)
+        flip_indices_vert = slice(NE0, NE0 + ny)
+        edge = bm.set_at(edge, (flip_indices_vert, slice(None)), 
+                            bm.flip(edge[flip_indices_vert], axis=[1]))
+    
+        return bm.edge_normal(edge, self.node, unit=unit, out=out)
+        
+    def edge_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
+        """Calculate the unit normal of the edges.
+        Equivalent to `edge_normal(index=index, unit=True)`.
+        """
+        return self.edge_normal(index=index, unit=True, out=out)
+    
+
+#################################### 插值点 #############################################
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
         '''
-        @brief Generate all interpolation points of the mesh
+        @brief Generate all interpolation points of the 2D mesh
 
-        Ordering of 1st order interpolation points:
-        2 ------- 5 ------- 8
-        |         |         |
-        |         |         |
-        |         |         |
-        1 ------- 4 ------- 7
-        |         |         |
-        |         |         |
-        |         |         |
-        0 ------- 3 ------- 6
-        Ordering of 2nd order interpolation points:
-        2 --11--- 5 --14----8
-        |         |         |
-        16  22    18  24    20
-        |         |         |
-        1 --10--- 4 --13----7
-        |         |         |
-        15  21    17  23    19
-        |         |         |
-        0 ---9--- 3 --12--- 6
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific interpolation points.
+        @param ordering: Specify the ordering of interpolation points. 
+        Options are:
+        - 'yx': Interpolation points are ordered first by the y direction, then by the x direction.
+        - 'nec': Interpolation points are ordered with nodes first, then edges, and finally cells.
         '''
-        cell = self.entity('cell')
-        edge = self.entity('edge')
-        node = self.entity('node')
 
-        GD = self.geo_dimension()
         if p <= 0:
             raise ValueError("p must be a integer larger than 0.")
         if p == 1:
             return self.entity('node', index=index)
+        
+        ordering = self.ipoints_ordering
+        
+        if ordering == 'yx':
+            nx = self.nx
+            ny = self.ny
+            hx = self.h[0]
+            hy = self.h[1]
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            nix = nx + 1 + nx * (p - 1)
+            niy = ny + 1 + ny * (p - 1)
+            
+            length_x = nx * hx
+            length_y = ny * hy
+
+            ix = bm.linspace(0, length_x, nix)
+            iy = bm.linspace(0, length_y, niy)
+
+            x, y = bm.meshgrid(ix, iy, indexing='ij')
+            ipoints = bm.stack([x.flatten(), y.flatten()], axis=-1)
+        elif ordering == 'nec':
+            GD = self.geo_dimension()
             NN = self.number_of_nodes()
             gdof = self.number_of_global_ipoints(p)
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
             ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
             ipoints[:NN, :] = node
 
             NE = self.number_of_edges()
             multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
             w = multiIndex[1:-1, :] / p
-            ipoints[NN:NN + (p-1) * NE, :] = bm.einsum('ij, ...jm -> ...im', w,
-                    node[edge,:]).reshape(-1, GD)
-            w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
-            ipoints[NN + (p-1) * NE:, :] = bm.einsum('ij, kj... -> ki...', w,
-                    node[cell[:]]).reshape(-1, GD)
 
-            return ipoints[index]
-        elif bm.backend_name == 'jax':
-            NN = self.number_of_nodes()
-            gdof = self.number_of_global_ipoints(p)
-            ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
-            ipoints = ipoints.at[:NN, :].set(node)
-
-            NE = self.number_of_edges()
-            multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
-            w = multiIndex[1:-1, :] / p
-            ipoints = ipoints.at[NN:NN + (p-1) * NE, :].set(
-                bm.einsum('ij, ...jm -> ...im', w, node[edge, :]).reshape(-1, GD))
+            ipoints = bm.set_at(ipoints, (slice(NN, NN + (p-1) * NE), slice(None)), 
+                    bm.einsum('ij, ...jm -> ...im', w, node[edge, :]).reshape(-1, GD))
 
             w = bm.einsum('im, jn -> ijmn', w, w).reshape(-1, 4)
-            ipoints = ipoints.at[NN + (p-1) * NE:, :].set(
-                bm.einsum('ij, kj... -> ki...', w, node[cell[:]]).reshape(-1, GD))
-            
-            return ipoints[index]
+
+            ipoints = bm.set_at(ipoints, (slice(NN + (p-1) * NE, None), slice(None)), 
+                    bm.einsum('ij, kj... -> ki...', w, node[cell[:]]).reshape(-1, GD))
         else:
-            raise NotImplementedError("Backend is not yet implemented.")
+            raise ValueError("Invalid ordering type. \
+                                Choose 'yx' for y-direction first then x-direction, "
+                                "or 'nec' for node first, then edge, and finally cell ordering.")
+        
+        return ipoints[index]
+    
+    def node_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each node in a 2D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific node interpolation points.
+
+        @return: A 1D array of size (NN,) containing the indices of interpolation points at each node.
+        '''
+        ordering = self.ipoints_ordering
+        
+        if ordering == 'yx':
+            nx = self.nx
+            ny = self.ny        
+            nix = nx + 1 + nx * (p - 1)
+            niy = ny + 1 + ny * (p - 1)
+            
+            node_x_indices = bm.arange(0, nix, p)
+            node_y_indices = bm.arange(0, niy, p)
+            
+            node_y_grid, node_x_grid = bm.meshgrid(node_y_indices, node_x_indices, indexing='ij')
+            
+            node2ipoint = (node_y_grid * nix + node_x_grid).flatten()
+        elif ordering == 'nec':
+            NN = self.NN
+            node2ipoint = bm.arange(0, NN)
+        else:
+            raise ValueError("Invalid ordering type. Choose 'yx' or 'nec'.")
+        
+        return node2ipoint[index]
+    
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each edge in a 2D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+
+        @return: A 2D array of size (NN, p+1) containing the indices of interpolation points at each edge.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+        
+        ordering = self.ipoints_ordering
+        edges = self.edge[index]
+        
+        if ordering == 'yx':
+            node_to_ipoint = self.node_to_ipoint(p)
+            
+            start_indices = node_to_ipoint[edges[:, 0]]
+            end_indices = node_to_ipoint[edges[:, 1]]
+            
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
+                          end_indices[:, None] * linspace_indices
+        elif ordering == 'nec':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            
+            indices = bm.arange(NE, dtype=self.itype)[index]
+            edge2ipoint =  bm.concatenate([
+                edges[:, 0].reshape(-1, 1),
+                (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, dtype=self.itype) + NN,
+                edges[:, 1].reshape(-1, 1),
+            ], axis=-1)
+        else:
+            raise ValueError("Invalid ordering type. Choose 'yx' or 'nec'.")
+        return edge2ipoint
+
         
     def cell_to_ipoint(self, p: int, index: Index=_S):
         """
         @brief Get the correspondence between mesh cells and interpolation points.
 
-        The correspondence between cells and first-order interpolation points is as follows:
-        2 ------- 5 ------- 8
-        |         |         |
-        |         |         |
-        |         |         |
-        1 ------- 4 ------- 7
-        |         |         |
-        |         |         |
-        |         |         |
-        0 ------- 3 ------- 6
-        The correspondence between cells and second-order interpolation points is as follows:
-        2 ---11-- 5 ---14-- 8
-        |         |         |
-        16   22   18   24   20
-        |         |         |
-        1 ---10-- 4 ---13-- 7
-        |         |         |
-        15   21   17   23   19
-        |         |         |
-        0 ---9--- 3 ---12-- 6
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific cells. Defaults to _S (all cells).
+
+        @return: A 2D array of size (NC, (p+1)**2) containing the indices of interpolation points at each cell.
         """
-        # TODO: Provide an efficient implementation that is distinct from unstructured meshes
         if p == 1:
             return self.entity('cell', index=index)
+        
+        ordering = self.ipoints_ordering
 
-        edge2cell = self.edge_to_cell()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
+        if ordering == 'yx':
+            edge_to_ipoint = self.edge_to_ipoint(p)
+            cell2edge = self.cell_to_edge(index=index)
 
-        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
-        c2p= cell2ipoint.reshape((NC, p + 1, p + 1))
+            start_indices = edge_to_ipoint[cell2edge[:, 0]]
+            end_indices = edge_to_ipoint[cell2edge[:, 1]]
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+
+            cell_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
+                                        end_indices[:, :, None] * linspace_indices
+
+            cell2ipoint = cell_ipoints_interpolated.reshape(-1, (p+1)**2)
+        elif ordering == 'nec':
+            edge2cell = self.edge_to_cell()
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+
+            cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
+            c2p= cell2ipoint.reshape((NC, p + 1, p + 1))
             e2p = self.edge_to_ipoint(p)
 
             # 确定哪些边在它的左边单元内是局部的第 0 号边
             flag = edge2cell[:, 2] == 0
-            # 将这些边放在每个单元的第 0 列上
-            c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+            c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), 0), e2p[flag])
+            # c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
 
             # 确定哪些边在它的左边单元内是局部的第 1 号边
             flag = edge2cell[:, 2] == 1
-            # 将这些边放在每个单元的最后 1 列上，注意此时是逆序
-            #c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
-            c2p[edge2cell[flag, 0], :, -1] = bm.flip(e2p[flag], axis=[1])
+            c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), -1), e2p[flag])
+            # 逆序
+            # c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), -1), 
+            #                 bm.flip(e2p[flag], axis=[1]))
+            # c2p[edge2cell[flag, 0], :, -1] = e2p[flag, -1::-1]
 
             # 确定哪些边在它的左边单元内是局部的第 2 号边
             flag = edge2cell[:, 2] == 2
-            # 将这些边放在每个单元的第 0 行上
-            #c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
-            c2p[edge2cell[flag, 0], 0, :] = bm.flip(e2p[flag], axis=[1])
+            c2p = bm.set_at(c2p, (edge2cell[flag, 0], 0, slice(None)), e2p[flag])
+            # 逆序
+            # c2p = bm.set_at(c2p, (edge2cell[flag, 0], 0, slice(None)), 
+            #                 bm.flip(e2p[flag], axis=[1]))
+            # c2p[edge2cell[flag, 0], 0, :] = e2p[flag, -1::-1]
 
             # 确定哪些边在它的左边单元内是局部的第 3 号边
             flag = edge2cell[:, 2] == 3
-            # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
-            c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+            c2p = bm.set_at(c2p, (edge2cell[flag, 0], -1, slice(None)), e2p[flag])
+            # 逆序
+            # c2p = bm.set_at(c2p, (edge2cell[flag, 0], -1, slice(None)), e2p[flag])
+            # c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
 
             # 确定哪些边是内部边
             iflag = edge2cell[:, 0] != edge2cell[:, 1]
@@ -582,61 +663,42 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             # 确定哪些边在它的右边单元内是局部的第 0 号边
             rflag = edge2cell[:, 3] == 0
             flag = iflag & rflag
-            # 将这些边放在每个单元的第 1 列上，注意此时是逆序
-            #c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
-            c2p[edge2cell[flag, 1], :, 0] = bm.flip(e2p[flag], axis=[1])
+            c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), 0), e2p[flag])
+            # # 逆序
+            # c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), 0), 
+            #                 bm.flip(e2p[flag], axis=[1]))
+            # c2p[edge2cell[flag, 1], :, 0] = e2p[flag, -1::-1]
 
             # 确定哪些边在它的右边单元内是局部的第 1 号边
             rflag = edge2cell[:, 3] == 1
             flag = iflag & rflag
-            # 将这些边放在每个单元的最后 1 列上 
-            c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+            c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), -1), e2p[flag])
+            # c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
 
             # 确定哪些边在它的右边单元内是局部的第 2 号边
             rflag = edge2cell[:, 3] == 2
             flag = iflag & rflag
-            # 将这些边放在每个单元的第 1 行上
-            c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+            c2p = bm.set_at(c2p, (edge2cell[flag, 1], 0, slice(None)), e2p[flag])
+            # c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
 
             # 确定哪些边在它的右边单元内是局部的第 3 号边
             rflag = edge2cell[:, 3] == 3
             flag = iflag & rflag
-            # 将这些边放在每个单元的最后 1 行上，注意此时是逆序
-            #c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
-            c2p[edge2cell[flag, 1], -1, :] = bm.flip(e2p[flag], axis=[1])
+            c2p = bm.set_at(c2p, (edge2cell[flag, 0], -1, slice(None)), e2p[flag])
+            # # 逆序
+            # c2p = bm.set_at(c2p, (edge2cell[flag, 1], -1, slice(None)), 
+            #                 bm.flip(e2p[flag], axis=[1]))
+            # c2p[edge2cell[flag, 1], -1, :] = e2p[flag, -1::-1]
 
-            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + \
-                bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1)
+            c2p = bm.set_at(c2p, (slice(None), slice(1, -1), slice(1, -1)), 
+                        NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
+            # c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + \
+            #     bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1)
             
-            return cell2ipoint[index]
-        elif bm.backend_name == 'jax':
-            e2p = self.edge_to_ipoint(p)
-            flag = edge2cell[:, 2] == 0
-            c2p = c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
-            flag = edge2cell[:, 2] == 1
-            c2p = c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
-            flag = edge2cell[:, 2] == 2
-            c2p = c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
-            flag = edge2cell[:, 2] == 3
-            c2p = c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
-
-            iflag = edge2cell[:, 0] != edge2cell[:, 1]
-            flag = iflag & (edge2cell[:, 3] == 0)
-            c2p = c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
-            flag = iflag & (edge2cell[:, 3] == 1)
-            c2p = c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
-            flag = iflag & (edge2cell[:, 3] == 2)
-            c2p = c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
-            flag = iflag & (edge2cell[:, 3] == 3)
-            c2p = c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
-
-            c2p = c2p.at[:, 1:-1, 1:-1].set(NN + NE * (p - 1) + \
-                bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p-1, p-1))
+            cell2ipoint = cell2ipoint[index]
             
-            return cell2ipoint[index]
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
-        
+        return cell2ipoint
+
     face_to_ipoint = StructuredMesh.edge_to_ipoint
     
     
@@ -723,6 +785,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             self.NN = (self.nx + 1) * (self.ny + 1)
 
             self.edge2cell = self.edge_to_cell()
+            self.cell2edge = self.cell_to_edge()
             self.face2cell = self.edge2cell
 
         self.clear() 

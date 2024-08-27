@@ -196,6 +196,7 @@ q = 11
 
 x = sp.symbols("x")
 y = sp.symbols("y")
+#u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))/(4*sp.pi**4)
 u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**2
 pde = DoubleLaplacePDE(u)
 
@@ -249,6 +250,7 @@ for i in range(maxit):
 
     uh = space.function()
     uh[:] = spsolve(A, f)
+#    uh[:] = lgmres(A, f, atol=1e-18)[0]
 
     errorMatrix[0, i] = mesh.error(uh, pde.solution)
     errorMatrix[1, i] = mesh.error(uh.grad_value, pde.gradient) 
