@@ -557,5 +557,39 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         return cls(node,cell)
     
+    def to_vtk(self, fname=None, etype='cell', index:Index=_S):
+        from .vtk_extent import  write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+
+        cell = self.entity(etype)[index]
+        NC = len(cell)
+        NV = cell.shape[-1]
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
+
+        if etype == 'cell':
+            cellType = 10  # 四面体
+            celldata = self.celldata
+        elif etype == 'cell':
+            cellType = 12  # 六面体
+            celldata = self.celldata
+        elif etype == 'face':
+            cellType = 5  # 三角形
+            celldata = self.facedata
+        elif etype == 'edge':
+            cellType = 3  # segment
+            celldata = self.edgedata
+
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=celldata)
+    
     
 HexahedronMesh.set_ploter('3d')
