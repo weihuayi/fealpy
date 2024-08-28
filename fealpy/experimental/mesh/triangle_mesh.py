@@ -392,7 +392,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         cell2edge = self.cell_to_edge()
         cell2cell = self.cell_to_cell()
-        cell2ipoint = self.cell_to_ipoint(self.p)
+        #cell2ipoint = self.cell_to_ipoint(self.p)
         isCutEdge = bm.zeros((NE,), dtype=bm.bool)
 
         if options['disp']:
@@ -421,8 +421,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         if 'IM' in options:
             nn = len(newNode)
             IM = coo_matrix((bm.ones(NN), (bm.arange(NN), bm.arange(NN))),
-                            shape=(NN + nn, NN), dtype=self.ftype)
-            val = bm.full(nn, 0.5)
+                            shape=(NN + nn, NN))
+            val = bm.full((nn,), 0.5)
             IM += coo_matrix(
                 (
                     val,
@@ -430,7 +430,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         NN + bm.arange(nn),
                         edge[isCutEdge, 0]
                     )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
+                ), shape=(NN + nn, NN))
             IM += coo_matrix(
                 (
                     val,
@@ -438,7 +438,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         NN + bm.arange(nn),
                         edge[isCutEdge, 1]
                     )
-                ), shape=(NN + nn, NN), dtype=self.ftype)
+                ), shape=(NN + nn, NN))
             options['IM'] = IM.tocsr()
 
         if 'HB' in options:
@@ -460,23 +460,23 @@ class TriangleMesh(SimplexMesh, Plotable):
                 for key, value in options['data'].items():
                     if value.shape == (NC,):  # 分片常数
                         value = bm.concatenate((value[:], value[idx]))
-                        options['data'] = bm.set_at(options['data'] , key, value)
+                        options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
                             value = bm.concatenate((value, bm.zeros((nn,), dtype=self.ftype)))
                             value = bm.set_at(value , slice(NN, None), 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]]))
-                            options['data'] = bm.set_at(options['data'] , key, value)
+                            options['data'][key] = value
                     else:
                         ldof = value.shape[-1]
-                        p = int((bm.sqrt(1 + 8 * ldof) - 3) // 2)
+                        p = int((bm.sqrt(1 + 8 * bm.array(ldof)) - 3) // 2)
                         bc = self.multi_index_matrix(p, etype=2) / p
 
-                        bcl = bm.zeros_like(bc)
+                        bcl = bm.zeros_like(bc,dtype=self.ftype)
                         bcl = bm.set_at(bcl , (slice(None), 0), bc[:, 1])
                         bcl = bm.set_at(bcl , (slice(None), 1), 0.5 * bc[:, 0] + bc[:, 2])
                         bcl = bm.set_at(bcl , (slice(None), 2), 0.5 * bc[:, 0])
 
-                        bcr = bm.zeros_like(bc)
+                        bcr = bm.zeros_like(bc,dtype=self.ftype)
                         bcr = bm.set_at(bcr , (slice(None), 0), bc[:, 2])
                         bcr = bm.set_at(bcr , (slice(None), 1), 0.5 * bc[:, 0])
                         bcr = bm.set_at(bcr , (slice(None), 2), 0.5 * bc[:, 0] + bc[:, 1])
@@ -489,7 +489,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         phi = self.shape_function(bcl, p=p)
                         value = bm.set_at(value , (idx,slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
 
-                        options['data'] = bm.set_at(options['data'] , key, value)
+                        options['data'][key] = value
 
             p0 = cell[idx, 0]
             p1 = cell[idx, 1]
