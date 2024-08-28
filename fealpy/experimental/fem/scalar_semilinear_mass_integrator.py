@@ -1,4 +1,5 @@
 from typing import Optional
+from functools import partial
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
@@ -16,7 +17,7 @@ from .integrator import (
 
 
 class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
-    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
@@ -26,10 +27,11 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
         if hasattr(coef, 'uh'):
             self.uh = coef.uh
             self.func = coef.kernel_func
-            if bm.backend_name in {'jax', 'torch'}:
-                pass
+            if not hasattr(coef, 'grad_kernel_func'):
+                assert bm.backend_name != "numpy", "In the numpy backend, you must provide a 'grad_kernel_func' method for the coefficient."
+                self.grad_kernel_func = None
             else:
-                self.grad_func = coef.grad_kernel_func
+                self.grad_kernel_func = coef.grad_kernel_func
         self.q = q
         self.index = index
         self.batched = batched
@@ -40,6 +42,7 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
+        q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
 
@@ -49,7 +52,6 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
-        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index)
@@ -57,14 +59,35 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
     
     def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
-        coef = self.coef
+        coef = self.coef 
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        val_A = coef.grad_kernel_func(uh(bcs))  #(C, Q)
-        val_F = -coef.kernel_func(uh(bcs))      #(C, Q)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        coef_A = get_semilinear_coef(val_A, coef)
+        
+        if self.grad_kernel_func is not None:
+            val_A = self.grad_kernel_func(uh(bcs))      #(NC, NQ)
+            coef_A = get_semilinear_coef(val_A, coef)
+            A = bilinear_integral(phi, phi, ws, cm, coef_A, batched=self.batched)
+        else:
+            uh_ = self.uh[space.cell_to_dof()]          #(NC, ldof)
+            A = self.grad_kernel_function(space, uh_)   #(NC, ldof, ldof)
+        
+        val_F = -self.func(uh(bcs))                     #(NC, NQ)
         coef_F = get_semilinear_coef(val_F, coef)
-
-        return bilinear_integral(phi, phi, ws, cm, coef_A, batched=self.batched), \
-               linear_integral(phi, ws, cm, coef_F, batched=self.batched)
+        F = linear_integral(phi, ws, cm, coef_F, batched=self.batched)
+        return A, F
+        
+    def kernel_function(self, space:_FS, u) -> TensorLike:
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, _, index = self.fetch(space)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        coef_A = get_semilinear_coef(u, coef)
+        return bm.einsum(f'q, qi, qj, ...j -> ...i', ws, phi[0], phi[0], coef_A)     #(ldof, )
+    
+    def grad_kernel_function(self, space, u) -> TensorLike:
+        fn = bm.vmap(bm.jacfwd(                         
+            partial(self.kernel_function, space)        #(ldof, ldof)
+            ))
+        _, _, _, cm, _ = self.fetch(space)
+        return bm.einsum('...cij, c -> ...cij', fn(u), cm)
