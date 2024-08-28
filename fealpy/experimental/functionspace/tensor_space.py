@@ -150,9 +150,10 @@ class TensorFunctionSpace(FunctionSpace):
 
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
-        scalar_space = self.scalar_space
-        scalar_val = scalar_space.value(uh, bc, index=index) # (NC, NQ)
-
-        val = scalar_val
-        
-        return val   
+        phi = self.basis(bc, index=index)
+        c2dof = self.cell_to_dof()[index]
+        if self.dof_priority:
+            val = bm.einsum('cql..., cl... -> cq...', phi, uh[c2dof, ...])
+        else:
+            val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., c2dof])
+        return val

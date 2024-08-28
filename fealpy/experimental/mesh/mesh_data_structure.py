@@ -66,7 +66,7 @@ class MeshDS(metaclass=MeshMeta):
     ### properties
     def top_dimension(self) -> int: return self.TD
     @property
-    def device(self) -> Any: return self.cell.device
+    def device(self) -> Any: return bm.device_type(self.cell)
     def storage(self) -> Dict[int, TensorLike]:
         return self._entity_storage
 

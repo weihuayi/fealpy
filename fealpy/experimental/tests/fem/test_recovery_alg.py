@@ -24,15 +24,23 @@ class TestRecoveryAlg:
         eta3 = recovery.recovery_estimate(uh, method='distance')
         eta4 = recovery.recovery_estimate(uh, method='distance_harmonic')
 
-        print(eta)
+        print('eta0:', eta0)
+        print('eta1:', eta1)
+        print('eta2:', eta2)
+        print('eta3:', eta3)
+        print('eta4:', eta4)
         
 
     def fun(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        return x+y
+        f = x*y
+#        f[bm.abs(x-0.5) < 1e-6] = 1
+        return f
 
 
 if __name__ == "__main__":
-    pytest.main(['test_recovery_alg.py', "-q"])   
+    TestRecoveryAlg().test_recovery_alg('numpy')
+    TestRecoveryAlg().test_recovery_alg('pytorch')
+#    pytest.main(['test_recovery_alg.py', "-q"])   
 

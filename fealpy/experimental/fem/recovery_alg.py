@@ -34,7 +34,6 @@ class RecoveryAlg():
         GD = space.geo_dimension()
         gdof = space.number_of_global_dofs()
         cell2dof = space.cell_to_dof()
-        
         bc = bm.array([[1/3]*(TD+1)], dtype=space.ftype)
 
         guh = uh.grad_value(bc) # (NC, 1, GD)
@@ -50,31 +49,33 @@ class RecoveryAlg():
         elif method == 'area_harmonic':
             val = 1.0/space.mesh.entity_measure('cell')
             bm.add_at(deg, cell2dof, val[:, None])
-            guh *= val[:, None] 
+            guh *= val[:, None, None] 
             bm.add_at(gval, cell2dof, guh)
         elif method == 'area':
             val = space.mesh.entity_measure('cell')
             bm.add_at(deg, cell2dof, val[:, None])
-            guh *= val[:, None]
-            bm.add_at(rguh, cell2dof, guh)
+            guh *= val[:, None, None] 
+            bm.add_at(gval, cell2dof, guh)
         elif method == 'distance':
             ipoints = space.interpolation_points()
             bp = space.mesh.entity_barycenter('cell')
-            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            v = bp[:, None, :] - ipoints[cell2dof, :]
             d = bm.sqrt(bm.sum(v**2, axis=-1))
-            guh = bm.einsum('ij,ijk->ik', guh, d)
+            guh = bm.einsum('ij...,ij->ij...', guh, d)
 
             bm.add_at(deg, cell2dof, d)
-            bm.add_at(rguh, cell2dof, guh)
-        elif method == 'distance_hamonic':
+            bm.add_at(gval, cell2dof, guh)
+        elif method == 'distance_harmonic':
             ipoints = space.interpolation_points()
             bp = space.mesh.entity_barycenter('cell')
-            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            v = bp[:, None, :] - ipoints[cell2dof, :]
             d = 1/bm.sqrt(bm.sum(v**2, axis=-1))
-            guh = bm.einsum('ij,ijk->ik', guh, d)
+            guh = bm.einsum('ij...,ij->ij...', guh, d)
 
             bm.add_at(deg, cell2dof, d)
-            bm.add_at(rguh, cell2dof, guh)
+            bm.add_at(gval, cell2dof, guh)
+        else:
+            raise ValueError('Unsupported method: %s' % method)
 
         gval /= deg[:, None]
         rguh[:] = gval.flatten()
