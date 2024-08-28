@@ -45,6 +45,7 @@ parser.add_argument('--meshtype',
 
 args = parser.parse_args()
 
+args.backend = 'pytorch'
 bm.set_backend(args.backend)
 p = args.degree
 n = args.n
