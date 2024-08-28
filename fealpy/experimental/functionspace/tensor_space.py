@@ -7,6 +7,7 @@ from ..typing import TensorLike, Size, _S
 from .functional import generate_tensor_basis, generate_tensor_grad_basis
 from .space import FunctionSpace, _S, Index
 from .utils import to_tensor_dof
+from fealpy.decorator import barycentric, cartesian
 
 
 class TensorFunctionSpace(FunctionSpace):
@@ -145,4 +146,13 @@ class TensorFunctionSpace(FunctionSpace):
         else:
             uh = bm.set_at(uh, isTensorBDof, gD.reshape(-1))
 
-        return uh   
+        return uh
+
+    @barycentric
+    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        scalar_space = self.scalar_space
+        scalar_val = scalar_space.value(uh, bc, index=index) # (NC, NQ)
+
+        val = scalar_val
+        
+        return val   

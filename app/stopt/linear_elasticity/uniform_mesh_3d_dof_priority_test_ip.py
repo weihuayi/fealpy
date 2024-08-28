@@ -22,7 +22,7 @@ face = mesh.entity('face')
 cell = mesh.entity('cell')
 
 # facenorm = mesh.face_normal()
-p = 3
+p = 2
 ip2 = mesh.interpolation_points(p=p)
 isBdNode = mesh.boundary_node_flag()
 isBdEdge = mesh.boundary_edge_flag()
