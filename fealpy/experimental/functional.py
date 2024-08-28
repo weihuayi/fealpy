@@ -102,8 +102,7 @@ def bilinear_integral(basis1: TensorLike, basis2: TensorLike, weights: TensorLik
         raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
 
 def get_semilinear_coef(value:TensorLike, coef: Optional[CoefLike]=None, batched: bool=False):
-    # print(value.shape)
-    # print(coef.shape)
+
     if coef is None:
         return coef * value
 
