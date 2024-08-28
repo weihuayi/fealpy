@@ -35,7 +35,7 @@ class TestRecoveryAlg:
         x = p[..., 0]
         y = p[..., 1]
         f = x*y
-#        f[bm.abs(x-0.5) < 1e-6] = 1
+        f[1] = 10
         return f
 
 
