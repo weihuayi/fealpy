@@ -282,7 +282,7 @@ class TestTriangleMeshInterfaces:
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
     # 分片常数
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("data", bisect0_data)
     def test_bisect0(self,data,backend):
         bm.set_backend(backend)
@@ -294,7 +294,7 @@ class TestTriangleMeshInterfaces:
             x = p[..., 0]
             y = p[..., 1]
             val = bm.zeros(len(x), dtype=bm.float64)
-            val[bm.abs(y-0.5)<1e-5] = 1
+            val = bm.set_at(val , bm.abs(y-0.5)<1e-5 , 1)
             return val
         p = 1
         space = LagrangeFESpace(mesh, p=p)
@@ -344,7 +344,7 @@ class TestTriangleMeshInterfaces:
             x = p[..., 0]
             y = p[..., 1]
             val = bm.zeros(len(x), dtype=bm.float64)
-            val[bm.abs(y-0.5)<1e-5] = 1
+            val = bm.set_at(val , bm.abs(y-0.5)<1e-5 , 1)
             return val
         
         p = 2
@@ -374,4 +374,4 @@ class TestTriangleMeshInterfaces:
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
     #a.test_from_box(from_box[0], 'pytorch')
-    pytest.main(["./test_triangle_mesh.py",'-k' ,"test_bisect1"])
+    pytest.main(["./test_triangle_mesh.py",'-k' ,"test_bisect0"])

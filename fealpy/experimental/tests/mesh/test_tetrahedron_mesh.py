@@ -6,7 +6,7 @@ import pytest
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.tetrahedron_mesh import TetrahedronMesh 
 from fealpy.experimental.tests.mesh.tetrahedron_mesh_data import *
-
+from fealpy.experimental.functionspace import LagrangeFESpace
 
 class TestTetrahedronMeshInterfaces:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
@@ -168,7 +168,7 @@ class TestTetrahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(fn), data["fn"], atol=1e-14)
 
 
-    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch","jax"])
     @pytest.mark.parametrize("data", uniform_refine)
     def test_unifrom_refine(self, data, backend):
         bm.set_backend(backend)
@@ -294,6 +294,34 @@ class TestTetrahedronMeshInterfaces:
                 return mesh
             result = benchmark(bisect)
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", interplation_with_HB_data)
+    def test_interplation_with_HB(self,data,backend):
+        bm.set_backend(backend)
+        def dis(p):
+            x = p[...,0]
+            y = p[...,1]
+            z = p[...,2]
+            val = bm.sin(x)*bm.sin(y)*bm.sin(z)
+            return val
+        nx = data['nx']
+        ny = data['ny']
+        nz = data['nz']
+        mesh = TetrahedronMesh.from_unit_cube(nx=nx ,ny=ny , nz=nz)
+        p=1
+        space = LagrangeFESpace(mesh , p=p)
+        NC = mesh.number_of_cells()
+        u0 = space.interpolate(dis)
+        H = bm.zeros(NC,dtype=bm.float64)
+        cell2dof = mesh.cell_to_ipoint(p=1)
+        isMarkedCell = bm.abs(bm.sum(u0[cell2dof],axis=-1))>1
+        data1 = {'nodedata': [u0] , 'celldata':[H]}
+        options = mesh.bisect_options(data=data1 , HB = True)
+        mesh.bisect(isMarkedCell , options=options)
+
+        data1 = options['data']
+        u = bm.array(data1['nodedata'][0],dtype=bm.float64)
+        np.testing.assert_allclose(bm.to_numpy(u), data["u"],atol= 1e-6)
 
 if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
@@ -305,4 +333,4 @@ if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_box"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_entity_measure"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_grad_lambda"])
-    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_bisect"])
+    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_interplation_with_HB"])
