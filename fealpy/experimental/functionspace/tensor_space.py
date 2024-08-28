@@ -7,6 +7,7 @@ from ..typing import TensorLike, Size, _S
 from .functional import generate_tensor_basis, generate_tensor_grad_basis
 from .space import FunctionSpace, _S, Index
 from .utils import to_tensor_dof
+from fealpy.decorator import barycentric, cartesian
 
 
 class TensorFunctionSpace(FunctionSpace):
@@ -108,8 +109,17 @@ class TensorFunctionSpace(FunctionSpace):
 
         return uI.reshape(-1)
 
-    def is_boundary_dof(self, threshold=None) -> TensorLike:
+    def is_boundary_dof(self, threshold=None, direction=None) -> TensorLike:
         """Return bools indicating boundary dofs.
+
+        Parameters:
+        threshold (callable or None, optional): A function used to determine boundary edges based on their 
+            positions. This function should return a boolean array indicating which edges are on the boundary.
+
+        direction (callable or TensorLike, optional): A function or a boolean array specifying which directions 
+            to apply the boundary condition. If a function, it should return a boolean array indicating the 
+            directions (e.g., [True, False] to apply only to the first component). If None, all directions are 
+            considered.
 
         Returns:
             TensorLike: shaped (scalar_gdof * dof_numel,)
@@ -118,12 +128,24 @@ class TensorFunctionSpace(FunctionSpace):
         scalar_is_bd_dof = self.scalar_space.is_boundary_dof(threshold)
 
         if self.dof_priority:
-            is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,)*self.dof_ndim + (scalar_gdof,))
+            is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
             is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
-
         else:
-            is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,)*self.dof_ndim)
+            is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
             is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
+
+        if direction is not None:
+            if callable(direction):
+                direction_flags = direction()
+            else:
+                direction_flags = bm.array(direction)
+            if self.dof_priority:
+                direction_flags_broadcast = bm.reshape(direction_flags, (-1, 1))
+                direction_flags_broadcast = bm.broadcast_to(direction_flags_broadcast, is_bd_dof.shape)
+            else:
+                direction_flags_broadcast = bm.broadcast_to(direction_flags, is_bd_dof.shape)
+
+            is_bd_dof = is_bd_dof & direction_flags_broadcast
 
         return is_bd_dof.reshape(-1)
     
@@ -145,4 +167,14 @@ class TensorFunctionSpace(FunctionSpace):
         else:
             uh = bm.set_at(uh, isTensorBDof, gD.reshape(-1))
 
-        return uh   
+        return uh
+
+    @barycentric
+    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        phi = self.basis(bc, index=index)
+        c2dof = self.cell_to_dof()[index]
+        if self.dof_priority:
+            val = bm.einsum('cql..., cl... -> cq...', phi, uh[c2dof, ...])
+        else:
+            val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., c2dof])
+        return val

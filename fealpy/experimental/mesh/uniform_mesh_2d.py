@@ -100,6 +100,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         # Interpolation points
         self.ipoints_ordering = ipoints_ordering
 
+        # Initialize edge adjustment mask
+        self.adjusted_edge_mask = self.get_adjusted_edge_mask()
+
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
@@ -419,37 +422,57 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             edge = self.entity('edge', index=index)
             p = bm.einsum('qj, ejk -> eqk', bcs, node[edge]) 
 
-        return p    
-    
-    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
-        """Calculate the tangent of the edges.
+        return p
 
-        Parameters:
-            index (Index, optional): _description_. Defaults to _S.\n
-            unit (bool, optional): _description_. Defaults to False.\n
-            out (TensorLike, optional): _description_. Defaults to None.
+    def get_adjusted_edge_mask(self) -> TensorLike:
+        """
+        Determine which edges need to have their direction adjusted to ensure normals point outward.
 
         Returns:
-            TensorLike[NE, GD]: _description_
+            TensorLike[NE]: A boolean array where True indicates that the edge's direction should be adjusted.
         """
         nx, ny = self.nx, self.ny
-        edge = self.entity('edge', index=index)
+        NE = self.number_of_edges()
+        adjusted_edge = bm.zeros((NE,), dtype=bool)
 
-        # 创建边的副本，避免对原始边数据的累积修改
-        # TODO 优化：避免创建副本
-        edge = bm.copy(edge)
-
+        # 水平边调整条件：每行最后一条边 (每个 ny+1 组中的最后一条)
         NE0 = 0
         NE1 = nx * (ny + 1)
-        flip_indices_horiz = slice(NE0 + ny, NE1, ny + 1)
-        edge = bm.set_at(edge, (flip_indices_horiz, slice(None)), 
-                        bm.flip(edge[flip_indices_horiz], axis=[1]))
+        flip_indices_horiz = bm.arange(NE0 + ny, NE1, ny + 1)
+        adjusted_edge = bm.set_at(adjusted_edge, flip_indices_horiz, True)
+
+        # 垂直边调整条件：第一列的所有边
         NE0 = nx * (ny + 1)
-        flip_indices_vert = slice(NE0, NE0 + ny)
-        edge = bm.set_at(edge, (flip_indices_vert, slice(None)), 
-                            bm.flip(edge[flip_indices_vert], axis=[1]))
+        flip_indices_vert = bm.arange(NE0, NE0 + ny)
+        adjusted_edge = bm.set_at(adjusted_edge, flip_indices_vert, True)
+
+        return adjusted_edge
     
-        return bm.edge_normal(edge, self.node, unit=unit, out=out)
+    def edge_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
+        """
+        Calculate the normal of the edges.
+
+        Parameters:
+            index (Index, optional): The indices of the edges to calculate normals for. 
+                                        Defaults to _S (all edges).
+            unit (bool, optional): Whether to return unit normals. 
+                                        Defaults to False.
+            out (TensorLike, optional): Optional output array to store the result. 
+                                        Defaults to None.
+
+        Returns:
+            TensorLike[NE, GD]: Normal vectors of the edges.
+        """
+        edge = self.entity('edge', index=index)
+        normals = bm.edge_normal(edge, self.node, unit=unit, out=out)
+
+        adjusted_edge_mask = self.get_adjusted_edge_mask()
+
+        normals = bm.set_at(normals, (adjusted_edge_mask, slice(None)),
+                            -normals[adjusted_edge_mask])
+
+        return normals
+
         
     def edge_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
         """Calculate the unit normal of the edges.
