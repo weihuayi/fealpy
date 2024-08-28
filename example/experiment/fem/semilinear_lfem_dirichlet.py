@@ -60,7 +60,7 @@ ny = 4
 pde = SemilinearData(domain)
 mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
 
-tol = 1e-8
+tol = 1e-14
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
@@ -77,7 +77,9 @@ def reaction_coef(p):
     return pde.reaction_coefficient(p)
 
 reaction_coef.kernel_func = kernel_func
-reaction_coef.grad_kernel_func = grad_kernel_func
+
+if bm.backend_name == 'numpy':
+    reaction_coef.grad_kernel_func = grad_kernel_func
     
 for i in range(maxit):
     #定义函数空间
