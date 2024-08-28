@@ -10,7 +10,6 @@ from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     SemilinearInt, OpInt, CellInt,
     enable_cache,
-    assemblymethod,
     CoefLike
 )
 

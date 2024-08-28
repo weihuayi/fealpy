@@ -60,6 +60,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     linalg = torch.linalg
     random = torch.random
 
+    #TODO
+    #bm.vmap, bm.jacfwd
+    jacfwd = staticmethod(torch.func.jacfwd)
+    vmap = staticmethod(torch.vmap)
+
     @staticmethod
     def context(tensor: Tensor, /):
         return {"dtype": tensor.dtype, "device": tensor.device}
