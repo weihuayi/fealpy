@@ -571,9 +571,6 @@ class HexahedronMesh(TensorMesh, Plotable):
         cell[:, 0] = NV
 
         if etype == 'cell':
-            cellType = 10  # 四面体
-            celldata = self.celldata
-        elif etype == 'cell':
             cellType = 12  # 六面体
             celldata = self.celldata
         elif etype == 'face':
