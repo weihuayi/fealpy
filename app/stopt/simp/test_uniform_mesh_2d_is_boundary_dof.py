@@ -31,7 +31,7 @@ def is_dirichlet_boundary(points: TensorLike) -> TensorLike:
         TensorLike: A boolean array indicating which boundary edges satisfy the property. 
         The length of the array is NBE, which represents the number of boundary edges.
     """
-    temp1 = (points[:, 0] == 0.0)
+    temp1 = bm.abs(points[:, 0]) < 1e-12
     temp2 = (bm.arange(len(points)) % 2 == 0)
     temp = temp1 & temp2
 
@@ -48,7 +48,12 @@ def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
         TensorLike: A boolean array indicating which boundary edges satisfy the property. 
         The length of the array is NBE, which represents the number of boundary edges.
     """
-    temp = (points[:, 0] == 0.0)
+    temp = bm.abs(points[:, 0]) < 1e-12
+
+    return temp
+
+def is_dirichlet_direction() -> TensorLike:
+    temp = bm.tensor([True, False])
 
     return temp
 
@@ -64,10 +69,11 @@ mesh = UniformMesh2d(extent, h, origin)
 NC = mesh.number_of_cells()
 p = 1
 space = LagrangeFESpace(mesh, p=p, ctype='C')
-tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+# tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+tensor_space = TensorFunctionSpace(space, shape=(2, -1))
 
 F = tensor_space.interpolate(source)
-isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary_edge)
+isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary_edge, direction=is_dirichlet_direction)
 isDDof[1::2] = False
 isDDof_test = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
 uh = tensor_space.function()
