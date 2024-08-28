@@ -16,7 +16,7 @@ from .integrator import (
 
 
 class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
