@@ -16,11 +16,6 @@ from fealpy.experimental.typing import TensorLike, _S, Index
 
 from fealpy.decorator import barycentric
 
-@barycentric
-def gd(bcs: TensorLike, index: Index=_S) -> TensorLike:
-    val = (1 - bcs) ** 2
-    return val
-
 nx = 4
 ny = 4
 mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
@@ -40,7 +35,7 @@ for i in range(maxit):
     KK_dependent_none_0 = KK_dependent_none[0]
 
     # 与单元有关的组装方法
-    uh = tensor_space.function() # (tgdof, )
+    uh = space.function() # (gdof, )
     @barycentric
     def gd(bcs: TensorLike, index: Index=_S) -> TensorLike:
         val = (0.5 - uh(bcs)) ** 2
