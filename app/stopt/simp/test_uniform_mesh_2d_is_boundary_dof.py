@@ -82,7 +82,6 @@ F = tensor_space.interpolate(source)
 isDDof_0 = tensor_space.is_boundary_dof(threshold=(is_dirichlet_boundary_edge, is_dirichlet_direction_0))
 isDDof_1 = tensor_space.is_boundary_dof(threshold=(is_dirichlet_boundary_edge, is_dirichlet_direction_1))
 
-isDDof[1::2] = False
 isDDof_test = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
 uh = tensor_space.function()
 uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, 
