@@ -22,16 +22,3 @@ class MaterialBase:
             return json.dumps(self.properties)
         # 其他格式处理略
 
-class ElasticMaterial(Material):
-    def __init__(self, name):
-        super().__init__(name)
-        self.set_property('elastic_modulus', 0)
-        self.set_property('poisson_ratio', 0)
-
-# 示例使用
-steel = ElasticMaterial('Steel')
-steel.set_property('elastic_modulus', 210e9)
-steel.set_property('poisson_ratio', 0.3)
-print(steel.get_property('elastic_modulus'))
-print(steel.calculate_property('elastic_modulus * (1 - poisson_ratio)'))
-

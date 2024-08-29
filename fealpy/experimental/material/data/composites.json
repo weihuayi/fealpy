@@ -1,0 +1,17 @@
+{
+  "Carbon Fiber Reinforced Polymer (CFRP)": {
+    "elastic_modulus": 70000000000.0,
+    "poisson_ratio": 0.3,
+    "density": 1600,
+    "thermal_conductivity": 5,
+    "yield_strength": 500000000
+  },
+  "Glass Fiber Reinforced Polymer (GFRP)": {
+    "elastic_modulus": 50000000000.0,
+    "poisson_ratio": 0.25,
+    "density": 2000,
+    "thermal_conductivity": 0.3,
+    "yield_strength": 300000000
+  }
+}
+
