@@ -115,7 +115,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         glambda = mesh.grad_lambda()    
         ledge = mesh.localEdge       
 
-        c2esign = mesh.cell_to_edge_sign() 
+        c2esign = mesh.cell_to_face_sign() 
 
         l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
         l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
@@ -156,7 +156,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         glambda = mesh.grad_lambda()
         ledge = mesh.localEdge
 
-        c2esign = mesh.cell_to_edge_sign() 
+        c2esign = mesh.cell_to_face_sign() 
 
         l = bm.zeros((3, )+bcs[None,:, 0, None, None].shape, dtype=self.ftype)
         l = bm.set_at(l,(0),bcs[None, :,0, None, None])

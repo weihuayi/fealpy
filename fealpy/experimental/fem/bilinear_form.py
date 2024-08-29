@@ -1,16 +1,16 @@
 
-from typing import Optional
+from typing import Optional, Literal, overload
 
 from .. import logger
 from ..typing import TensorLike
 from ..backend import backend_manager as bm
-from ..sparse import COOTensor
+from ..sparse import COOTensor, CSRTensor
 from .form import Form
 from .integrator import LinearInt
 
 
 class BilinearForm(Form[LinearInt]):
-    _M: Optional[COOTensor] = None
+    _M = None
 
     def _get_sparse_shape(self):
         spaces = self._spaces
@@ -57,7 +57,6 @@ class BilinearForm(Form[LinearInt]):
             spshape = sparse_shape
         )
 
-
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
             ue2dof = e2dofs[0]
@@ -75,19 +74,31 @@ class BilinearForm(Form[LinearInt]):
 
         return M
 
-    def assembly(self, *, coalesce=True, retain_ints: bool=False) -> COOTensor:
+    @overload
+    def assembly(self, *, retain_ints: bool=False) -> COOTensor: ...
+    @overload
+    def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
+    @overload
+    def assembly(self, *, format: Literal['csr'], retain_ints: bool=False) -> CSRTensor: ...
+    def assembly(self, *, format='coo', retain_ints: bool=False):
         """Assembly the bilinear form matrix.
 
         Parameters:
-            coalesce (bool, optional): Whether to coalesce the sparse tensor.\n
+            format (str, optional): Layout of the output ('csr' | 'coo'). Defaults to 'coo'.
+                The default format will change to 'csr' in the future.\n
             retain_ints (bool, optional): Whether to retain the integrator cache.
 
         Returns:
-            global_matrix (COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
+            global_matrix (CSRTensor | COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
         """
         M = self._scalar_assembly(retain_ints, self.batch_size)
 
-        self._M = M.coalesce() if coalesce else M
+        if format == 'csr':
+            self._M = M.coalesce().tocsr()
+        elif format == 'coo':
+            self._M = M.coalesce()
+        else:
+            raise ValueError(f"Unknown format {format}.")
         logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
 
         return self._M

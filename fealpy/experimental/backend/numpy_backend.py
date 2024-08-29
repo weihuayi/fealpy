@@ -72,6 +72,8 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def add_at(a: NDArray, indices, src, /) -> NDArray:
+        """
+        """
         np.add.at(a, indices, src)
         return a
 

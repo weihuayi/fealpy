@@ -27,9 +27,11 @@ class TestTensorFunctionSpace:
         tld = space_tri.number_of_local_dofs()
         tcell2dof = tensor_space.cell_to_dof()
         tface2dof = tensor_space.face_to_dof() 
-        tphi = tensor_space.basis(bcs, index=_S, variable='x')
+        tphi = tensor_space.basis(bcs, index=_S)
         tgrad_phi = tensor_space.grad_basis(bcs, index=_S, variable='x')
-        
+
+
+
         np.testing.assert_array_equal(tdofnumel, data["tdofnumel"], 
                                      err_msg=f" `tdofnumel` function is not equal to real result in backend {backend}")
         np.testing.assert_array_equal(tGD, data["GD"], 
