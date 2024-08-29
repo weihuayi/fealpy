@@ -12,7 +12,7 @@ from .integrator import LinearInt, SrcInt, CellInt, CoefLike, enable_cache
 
 class VectorSourceIntegrator(LinearInt, SrcInt, CellInt):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, source: Optional[CoefLike]=None, q: int=3, *,
+    def __init__(self, source: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
         super().__init__()
@@ -27,7 +27,6 @@ class VectorSourceIntegrator(LinearInt, SrcInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
-        q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
 
@@ -37,6 +36,7 @@ class VectorSourceIntegrator(LinearInt, SrcInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index)
@@ -44,24 +44,6 @@ class VectorSourceIntegrator(LinearInt, SrcInt, CellInt):
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:
-        # f = self.source
-        # mesh = getattr(space, 'mesh', None)
-        # bcs, ws, phi, cm, index = self.fetch(space)
-        # # val-(NC, NQ, GD)
-        # val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        # coef = val
-        # measure = cm
-        # weights = ws
-        # inputs = phi
-
-        # if coef is None:
-        #     return bm.einsum('c, q, cqid -> cid', measure, weights, inputs)
-
-        # if is_tensor(coef):
-        #     return bm.einsum('c, q, cqid, cqd -> ci', measure, weights, inputs, coef)
-        # else:
-        #     raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
-        
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)

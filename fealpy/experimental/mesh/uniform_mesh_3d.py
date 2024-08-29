@@ -59,7 +59,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
      |  /   4  |  /
      | /       | /
       --------- 
-    * Face 0: (1, 0, 3, 2)
+    * Face 0: (0, 1, 2, 3)
     * Face 1: (4, 5, 6, 7)
     * Face 2: (0, 1, 4, 5)
     * Face 3: (2, 3, 6, 7)
@@ -110,12 +110,15 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         # Interpolation points
         self.ipoints_ordering = ipoints_ordering
 
+        # Initialize face adjustment mask
+        self.adjusted_face_mask = self.get_adjusted_face_mask()
+
         # Specify the counterclockwise drawing
         self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
         self.cell2edge = self.cell_to_edge()
         self.cell2face = self.cell_to_face()
-        # self.face2edge = self.face_to_edge()
+        self.face2edge = self.face_to_edge()
         self.face2cell = self.face_to_cell()
 
         self.localEdge = bm.array([
@@ -186,51 +189,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         return edge
 
-        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        #     NE0 = 0
-        #     NE1 = nx * (ny + 1) * (nz + 1)
-        #     c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
-        #     edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
-        #     edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
-            
-
-        #     NE0 = NE1
-        #     NE1 += (nx + 1) * ny * (nz + 1)
-        #     c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
-        #     edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
-        #     edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (nz + 1))
-
-        #     NE0 = NE1
-        #     NE1 += (nx + 1) * (ny + 1) * nz
-        #     c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
-        #     edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
-        #     edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + 1)
-
-        #     return edge
-        # elif bm.backend_name == 'jax':
-        #     NE0 = 0
-        #     NE1 = nx * (ny + 1) * (nz + 1)
-        #     c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
-        #     edge = edge.at[NE0:NE1, 0].set(c.flatten())
-        #     edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
-
-        #     NE0 = NE1
-        #     NE1 += (nx + 1) * ny * (nz + 1)
-        #     c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
-        #     edge = edge.at[NE0:NE1, 0].set(c.flatten())
-        #     edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + (nz + 1))
-
-        #     NE0 = NE1
-        #     NE1 += (nx + 1) * (ny + 1) * nz
-        #     c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
-        #     edge = edge.at[NE0:NE1, 0].set(c.flatten())
-        #     edge = edge.at[NE0:NE1, 1].set(edge[NE0:NE1, 0] + 1)
-
-        #     return edge
-        # else:
-        #     raise NotImplementedError("Backend is not yet implemented.")
-
-
     @entitymethod(2)
     def _get_face(self) -> TensorLike:
         """
@@ -252,10 +210,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + nz + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
-        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
-        # face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
-        # face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
-        # face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
+        # face = bm.set_at(face, (slice(NF0, NF0 + ny * nz), slice(None)), 
+        #              face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
 
         NF0 = NF1
         NF1 += nx * (ny + 1) * nz
@@ -264,18 +220,13 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
         face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
-        # face[NF0:NF1, 0] = c.flatten()
-        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
-        # face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-        # face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
-
         NF2 = NF0 + ny * nz
         N = nz * (ny + 1)
         idx1 = bm.zeros((nx, nz), dtype=self.itype)
         idx1 = bm.arange(NF2, NF2 + nz)
         idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
         idx1 = idx1.flatten()
-        # face[idx1] = face[idx1][:, [1, 0, 3, 2]]
+        # face = bm.set_at(face, (idx1, slice(None)), face[idx1][:, [1, 0, 3, 2]])
 
         NF0 = NF1
         NF1 += nx * ny * (nz + 1)
@@ -284,102 +235,14 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + nz + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
         face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + nz + 1)
-        # face[NF0:NF1, 0] = c.flatten()
-        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + nz + 1
-        # face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-        # face[NF0:NF1, 3] = face[NF0:NF1, 2] + nz + 1
-
         N = ny * (nz + 1)
         idx2 = bm.zeros((nx, ny), dtype=self.itype)
         idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
         idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
         idx2 = idx2.flatten()
-        # face[idx2] = face[idx2][:, [1, 0, 3, 2]]
+        # face = bm.set_at(face, (idx2, slice(None)), face[idx2][:, [1, 0, 3, 2]])
 
         return face
-
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            NF0 = 0
-            NF1 = (nx + 1) * ny * nz
-            c = idx[:, :-1, :-1]
-            face[NF0:NF1, 0] = c.flatten()
-            face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
-            face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
-            face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
-            face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
-
-            NF0 = NF1
-            NF1 += nx * (ny + 1) * nz
-            c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
-            face[NF0:NF1, 0] = c.flatten()
-            face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
-            face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-            face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
-            NF2 = NF0 + ny * nz
-            N = nz * (ny + 1)
-            idx1 = bm.zeros((nx, nz), dtype=self.itype)
-            idx1 = bm.arange(NF2, NF2 + nz)
-            idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
-            idx1 = idx1.flatten()
-            face[idx1] = face[idx1][:, [1, 0, 3, 2]]
-
-            NF0 = NF1
-            NF1 += nx * ny * (nz + 1)
-            c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
-            face[NF0:NF1, 0] = c.flatten()
-            face[NF0:NF1, 1] = face[NF0:NF1, 0] + nz + 1
-            face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-            face[NF0:NF1, 3] = face[NF0:NF1, 2] + nz + 1
-            N = ny * (nz + 1)
-            idx2 = bm.zeros((nx, ny), dtype=self.itype)
-            idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
-            idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
-            idx2 = idx2.flatten()
-            face[idx2] = face[idx2][:, [1, 0, 3, 2]]
-
-            return face
-        elif bm.backend_name == 'jax':
-            NF0 = 0
-            NF1 = (nx + 1) * ny * nz
-            c = idx[:, :-1, :-1]
-            face = face.at[NF0:NF1, 0].set(c.flatten())
-            face = face.at[NF0:NF1, 1].set(face[NF0:NF1, 0] + 1)
-            face = face.at[NF0:NF1, 2].set(face[NF0:NF1, 0] + nz + 1)
-            face = face.at[NF0:NF1, 3].set(face[NF0:NF1, 2] + 1)
-            face = face.at[NF0:NF0 + ny * nz, :].set(face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
-
-            NF0 = NF1
-            NF1 += nx * (ny + 1) * nz
-            c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
-            face = face.at[NF0:NF1, 0].set(c.flatten())
-            face = face.at[NF0:NF1, 1].set(face[NF0:NF1, 0] + 1)
-            face = face.at[NF0:NF1, 2].set(face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
-            face = face.at[NF0:NF1, 3].set(face[NF0:NF1, 2] + 1)
-            NF2 = NF0 + ny * nz
-            N = nz * (ny + 1)
-            idx1 = bm.zeros((nx, nz), dtype=self.itype)
-            idx1 = bm.arange(NF2, NF2 + nz)
-            idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
-            idx1 = idx1.flatten()
-            face = face.at[idx1].set(face[idx1][:, [1, 0, 3, 2]])
-
-            NF0 = NF1
-            NF1 += nx * ny * (nz + 1)
-            c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
-            face = face.at[NF0:NF1, 0].set(c.flatten())
-            face = face.at[NF0:NF1, 1].set(face[NF0:NF1, 0] + nz + 1)
-            face = face.at[NF0:NF1, 2].set(face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
-            face = face.at[NF0:NF1, 3].set(face[NF0:NF1, 2] + nz + 1)
-            N = ny * (nz + 1)
-            idx2 = bm.zeros((nx, ny), dtype=self.itype)
-            idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
-            idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
-            idx2 = idx2.flatten()
-            face = face.at[idx2].set(face[idx2][:, [1, 0, 3, 2]])
-
-            return face
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
 
     @entitymethod(3)
     def _get_cell(self) -> TensorLike:
@@ -493,147 +356,102 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         else:
             raise NotImplementedError("Backend is not yet implemented.")
         
-    def cell_to_face(self):
+    def cell_to_face(self, index: Index=_S) -> TensorLike:
         """
         @brief 单元和面的邻接关系, 储存每个单元相邻的六个面的编号
         """
         NC = self.NC
-        NF = self.NF
-
         nx = self.nx
         ny = self.ny
         nz = self.nz
 
         cell2face = bm.zeros((NC, 6), dtype=self.itype)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            # x direction
-            idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
-            cell2face[:, 0] = idx0[:-1, :, :].flatten()
-            cell2face[:, 1] = idx0[1:, :, :].flatten()
+        # x direction
+        idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
+        cell2face = bm.set_at(cell2face, (slice(None), 0), idx0[:-1, :, :].flatten())
+        cell2face = bm.set_at(cell2face, (slice(None), 1), idx0[1:, :, :].flatten())    
+        # cell2face[:, 0] = idx0[:-1, :, :].flatten()
+        # cell2face[:, 1] = idx0[1:, :, :].flatten()
 
-            # y direction
-            NE0 = (nx + 1) * ny * nz
-            idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
-            cell2face[:, 2] = (NE0 + idx1[:, :-1, :]).flatten()
-            cell2face[:, 3] = (NE0 + idx1[:, 1:, :]).flatten()
+        # y direction
+        NE0 = (nx + 1) * ny * nz
+        idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
+        # cell2face[:, 2] = (NE0 + idx1[:, :-1, :]).flatten()
+        # cell2face[:, 3] = (NE0 + idx1[:, 1:, :]).flatten()
+        cell2face = bm.set_at(cell2face, (slice(None), 2), (NE0 + idx1[:, :-1, :]).flatten())
+        cell2face = bm.set_at(cell2face, (slice(None), 3), (NE0 + idx1[:, 1:, :]).flatten())
 
-            # z direction
-            NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
-            idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
-            cell2face[:, 4] = (NE1 + idx2[:, :, :-1]).flatten()
-            cell2face[:, 5] = (NE1 + idx2[:, :, 1:]).flatten()
-
-            return cell2face
-        elif bm.backend_name == 'jax':
-            # x direction
-            idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
-            cell2face = cell2face.at[:, 0].set(idx0[:-1, :, :].flatten())
-            cell2face = cell2face.at[:, 1].set(idx0[1:, :, :].flatten())
-
-            # y direction
-            NE0 = (nx + 1) * ny * nz
-            idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
-            cell2face = cell2face.at[:, 2].set((NE0 + idx1[:, :-1, :]).flatten())
-            cell2face = cell2face.at[:, 3].set((NE0 + idx1[:, 1:, :]).flatten())
-
-            # z direction
-            NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
-            idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
-            cell2face = cell2face.at[:, 4].set((NE1 + idx2[:, :, :-1]).flatten())
-            cell2face = cell2face.at[:, 5].set((NE1 + idx2[:, :, 1:]).flatten())
-
-            return cell2face
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        # z direction
+        NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
+        idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
+        cell2face = bm.set_at(cell2face, (slice(None), 4), (NE1 + idx2[:, :, :-1]).flatten())
+        cell2face = bm.set_at(cell2face, (slice(None), 5), (NE1 + idx2[:, :, 1:]).flatten())
+        # cell2face[:, 4] = (NE1 + idx2[:, :, :-1]).flatten()
+        # cell2face[:, 5] = (NE1 + idx2[:, :, 1:]).flatten()
         
-    def face_to_edge(self):
+        return cell2face[index]
+        
+    def face_to_edge(self, index: Index=_S):
         """
         @brief 面和边的邻接关系, 储存每个面相邻的 4 条边的编号
         """
 
         NE = self.NE
         NF = self.NF
-
         nx = self.nx
         ny = self.ny
         nz = self.nz
         face2edge = bm.zeros((NF, 4), dtype=self.itype)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            # x direction
-            NE0 = 0
-            NE1 = (nx + 1) * ny * nz
-            idx0 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
-            face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
-            face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+        # x direction
+        NE0 = 0
+        NE1 = (nx + 1) * ny * nz
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1), 
+                         NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :, :-1].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 1), idx0[:, :, 1:].flatten())
+        # face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+        # face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
 
-            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
-            face2edge[NE0:NE1, 2] = idx1[:, :-1, :].flatten()
-            face2edge[NE0:NE1, 3] = idx1[:, 1:, :].flatten()
+        idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 2), idx1[:, :-1, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 3), idx1[:, 1:, :].flatten())
+        # face2edge[NE0:NE1, 2] = idx1[:, :-1, :].flatten()
+        # face2edge[NE0:NE1, 3] = idx1[:, 1:, :].flatten()
 
-            # y direction
-            NE0 = NE1
-            NE1 += nx * (ny + 1) * nz
-            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
-            face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
-            face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+        # y direction
+        NE0 = NE1
+        NE1 += nx * (ny + 1) * nz
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :, :-1].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 1), idx0[:, :, 1:].flatten())
+        # face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+        # face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
 
-            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
-            face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
-            face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+        idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 2), idx1[:-1, :, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 3), idx1[1:, :, :].flatten())
+        # face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+        # face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
 
-            # z direction
-            NE0 = NE1
-            NE1 += nx * ny * (nz + 1)
-            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
-            face2edge[NE0:NE1, 0] = idx0[:, :-1, :].flatten()
-            face2edge[NE0:NE1, 1] = idx0[:, 1:, :].flatten()
+        # z direction
+        NE0 = NE1
+        NE1 += nx * ny * (nz + 1)
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :-1, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 1), idx0[:, 1:, :].flatten())
+        # face2edge[NE0:NE1, 0] = idx0[:, :-1, :].flatten()
+        # face2edge[NE0:NE1, 1] = idx0[:, 1:, :].flatten()
 
-            idx1 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
-            face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
-            face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+        idx1 = np.arange(nx * (ny + 1) * (nz + 1), 
+                         NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 2), idx1[:-1, :, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 3), idx1[1:, :, :].flatten())
+        # face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+        # face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
 
-            return face2edge
-        elif bm.backend_name == 'jax':
-            # x direction
-            NE0 = 0
-            NE1 = (nx + 1) * ny * nz
-            idx0 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
-            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
-            
-            face2edge = face2edge.at[NE0:NE1, 0].set(idx0[:, :, :-1].flatten())
-            face2edge = face2edge.at[NE0:NE1, 1].set(idx0[:, :, 1:].flatten())
-            face2edge = face2edge.at[NE0:NE1, 2].set(idx1[:, :-1, :].flatten())
-            face2edge = face2edge.at[NE0:NE1, 3].set(idx1[:, 1:, :].flatten())
-
-            # y direction
-            NE0 = NE1
-            NE1 += nx * (ny + 1) * nz
-            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
-            face2edge = face2edge.at[NE0:NE1, 0].set(idx0[:, :, :-1].flatten())
-            face2edge = face2edge.at[NE0:NE1, 1].set(idx0[:, :, 1:].flatten())
-
-            idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
-            face2edge = face2edge.at[NE0:NE1, 2].set(idx1[:-1, :, :].flatten())
-            face2edge = face2edge.at[NE0:NE1, 3].set(idx1[1:, :, :].flatten())
-
-            # z direction
-            NE0 = NE1
-            NE1 += nx * ny * (nz + 1)
-            idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
-            face2edge = face2edge.at[NE0:NE1, 0].set(idx0[:, :-1, :].flatten())
-            face2edge = face2edge.at[NE0:NE1, 1].set(idx0[:, 1:, :].flatten())
-
-            idx1 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
-            face2edge = face2edge.at[NE0:NE1, 2].set(idx1[:-1, :, :].flatten())
-            face2edge = face2edge.at[NE0:NE1, 3].set(idx1[1:, :, :].flatten())
-
-            return face2edge
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        return face2edge[index]
 
     def face_to_cell(self) -> TensorLike:
         """
@@ -756,20 +574,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face = self.face
         isBdFace = self.boundary_face_flag()
         isBdPoint = bm.zeros((NN,), dtype=bool)
+        # isBdPoint[face[isBdFace, :]] = True
         isBdPoint = bm.set_at(isBdPoint, face[isBdFace, :], True)
         
         return isBdPoint
-
-        # # TODO: Provide a unified implementation that is not backend-specific
-        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        #     # isBdPoint[face[isBdFace, :]] = True
-        #     isBdPoint = bm.set_at(isBdPoint, face[isBdFace, :], True)
-        #     return isBdPoint
-        # elif bm.backend_name == 'jax':
-        #     isBdPoint = isBdPoint.at[face[isBdFace, :]].set(True)   
-        #     return isBdPoint
-        # else:
-        #     raise NotImplementedError("Backend is not yet implemented.")
         
     def boundary_edge_flag(self):
         """
@@ -779,20 +587,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2edge = self.face_to_edge()
         isBdFace = self.boundary_face_flag()
         isBdEdge = bm.zeros((NE,), dtype=bool)
+        # isBdEdge[face2edge[isBdFace, :]] = True
         isBdEdge = bm.set_at(isBdEdge, face2edge[isBdFace, :], True)
         
         return isBdEdge
-    
-        # # TODO: Provide a unified implementation that is not backend-specific
-        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        #     isBdEdge = bm.set_at(isBdEdge, face2edge[isBdFace, :], True)
-        #     # isBdEdge[face2edge[isBdFace, :]] = True
-        #     return isBdEdge
-        # elif bm.backend_name == 'jax':
-        #     isBdEdge = isBdEdge.at[face2edge[isBdFace, :]].set(True)
-        #     return isBdEdge
-        # else:
-        #     raise NotImplementedError("Backend is not yet implemented.")
         
     def boundary_face_flag(self):
         """
@@ -811,18 +609,13 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2cell = self.face_to_cell()
         isBdFace = self.boundary_face_flag()
         isBdCell = bm.zeros((NC,), dtype=bool)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            isBdCell[face2cell[isBdFace, 0]] = True
-            return isBdCell
-        elif bm.backend_name == 'jax':
-            isBdCell = isBdCell.at[face2cell[isBdFace, 0]].set(True)
-            return isBdCell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        isBdCell = bm.set_at(isBdCell, face2cell[isBdFace, 0], True)
+        # isBdCell[face2cell[isBdFace, 0]] = True
+
+        return isBdCell
         
 
-    # 实体几何
+#################################### 实体几何 #############################################
     def entity_measure(self, etype: Union[int, str], index: Index = _S) -> Union[Tuple, int]:
         """
         @brief Get the measure of the entities of the specified type.
@@ -1040,10 +833,108 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             edge = self.entity('edge', index=index)
             p = bm.einsum('qj, ejk -> eqk', bcs, node[edge]) 
 
-        return p 
-    
+        return p
 
-    # 插值点
+    def get_adjusted_face_mask(self) -> TensorLike:
+        """
+        Determine which faces need to have their direction adjusted to ensure normals point outward.
+
+        Returns:
+            TensorLike[NF]: A boolean array where True indicates that the face's direction should be adjusted.
+        """
+        nx, ny, nz = self.nx, self.ny, self.nz
+        NF = self.NF
+        adjusted_face = bm.zeros((NF,), dtype=bool)
+
+        # Adjust faces in xy-plane
+        NF0 = 0
+        NF1 = (nx + 1) * ny * nz
+        flip_indices_xy = bm.arange(NF0, NF0 + ny * nz)
+        adjusted_face = bm.set_at(adjusted_face, flip_indices_xy, True)
+
+        # Adjust faces in yz-plane
+        NF0 = NF1
+        NF1 += nx * (ny + 1) * nz
+        NF2 = NF0 + ny * nz
+        N = nz * (ny + 1)
+        idx1 = bm.arange(NF2, NF2 + nz)
+        idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+        adjusted_face = bm.set_at(adjusted_face, idx1, True)
+
+        # Adjust faces in xz-plane
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        N = ny * (nz + 1)
+        idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
+        idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+        adjusted_face = bm.set_at(adjusted_face, idx2, True)
+
+        return adjusted_face
+
+    def face_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
+        """
+        Calculate the normal vectors of the faces.
+
+        Parameters:
+            index (Index, optional): Index to select specific faces. 
+                                        Defaults to _S (all faces).
+            unit (bool, optional): If True, returns unit normal vectors. 
+                                        Defaults to False.
+            out (TensorLike, optional): Optional output array to store the result. 
+                                        Defaults to None.
+
+        Returns:
+            TensorLike[NF, GD]: Normal vectors of the faces.
+        
+        法向量方向的定义如下：
+            1 ---←--- 3
+            |         |
+            ↑         |
+            |         |
+            0 ------- 2
+        """
+        face = self.entity('face', index=index)
+        node = self.entity('node')
+        
+        # Calculate vectors v1 and v2 for the normal calculation
+        v1 = node[face[:, 1]] - node[face[:, 0]]
+        v2 = node[face[:, 1]] - node[face[:, 3]]
+        normals = bm.cross(v1, v2)
+
+        adjusted_face_mask = self.get_adjusted_face_mask() 
+
+        # Use the adjusted face mask to flip the normals if necessary
+        normals = bm.set_at(normals, (adjusted_face_mask, slice(None)), 
+                                -normals[adjusted_face_mask])
+
+        # Normalize the normals if unit is True
+        if unit:
+            norm = bm.linalg.norm(normals, axis=1, keepdims=True)
+            normals = normals / norm
+
+        if out is not None:
+            out[...] = normals
+            return out
+
+        return normals 
+    
+    def face_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
+        """
+        Calculate the unit normal vectors of the faces.
+
+        Parameters:
+            index (Index, optional): Index to select specific faces. Defaults to _S (all faces).
+            out (TensorLike, optional): Optional output array to store the result. Defaults to None.
+
+        Returns:
+            TensorLike[NF, GD]: Unit normal vectors of the faces.
+        """
+        return self.face_normal(index=index, unit=True, out=out)
+
+
+#################################### 插值点 #############################################
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
         '''
         @brief Generate all interpolation points of the 3D mesh
@@ -1171,154 +1062,157 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         else:
             raise ValueError("Invalid ordering type. Choose 'zyx' or 'nefc'.")
         return edge2ipoint
+    
+    def face_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each face in a 3D mesh.
 
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific face interpolation points.
 
-    def face_to_ipoint(self, p, index: Index=_S):
-        """
-        @brief 生成每个面上的插值点的全局编号
-        TODO Provide an efficient implementation that is distinct from 
-            unstructured meshes
-        """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NF = self.number_of_faces()
-        edge = self.entity('edge')
-        face = self.entity('face')
-        # edge = self.entity('edge', index=index)
-        # face = self.entity('face', index=index)
-        face2edge = self.face_to_edge()
-        edge2ipoint = self.edge_to_ipoint(p)
+        @return: A 2D array of size (NF, (p+1)**2) containing the indices of interpolation points at each face.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
 
-        mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
-        multiIndex0 = mi.flatten().reshape(-1, 1);
-        multiIndex1 = mi.T.flatten().reshape(-1, 1);
-        multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
+        ordering = self.ipoints_ordering
 
-        dofidx = [0 for i in range(4)] 
-        dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
-        dofidx[1], = bm.nonzero(multiIndex[:, 1]==p)
-        dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
-        dofidx[3], = bm.nonzero(multiIndex[:, 0]==p)
+        if ordering == 'zyx':
+            edge_to_ipoint = self.edge_to_ipoint(p)
+            face2edge = self.face_to_edge(index=index)
 
-        face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
-        localEdge = bm.array([[0, 2], [1, 3], [0, 1], [2, 3]], dtype=self.itype)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            for i in range(4): #边上的自由度
-                ge = face2edge[:, i]
-                idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+            start_indices = edge_to_ipoint[face2edge[:, 0]]
+            end_indices = edge_to_ipoint[face2edge[:, 1]]  
 
-                face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼容
-                face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            face_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
+                                        end_indices[:, :, None] * linspace_indices
 
-            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
-            face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
-                    NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1) # TODO jax 不兼容
-            
-            return face2ipoint[index]
-        elif bm.backend_name == 'jax':
+            face2ipoint = face_ipoints_interpolated.reshape(-1, (p+1)**2)
+        elif ordering == 'nefc':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NF = self.number_of_faces()
+            edge = self.entity('edge')
+            face = self.entity('face')
+            face2edge = self.face_to_edge()
+            edge2ipoint = self.edge_to_ipoint(p)
+
+            mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
+            multiIndex0 = mi.flatten().reshape(-1, 1);
+            multiIndex1 = mi.T.flatten().reshape(-1, 1);
+            multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
+
+            dofidx = [0 for i in range(4)] 
+            dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
+            dofidx[1], = bm.nonzero(multiIndex[:, 1]==p)
+            dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
+            dofidx[3], = bm.nonzero(multiIndex[:, 0]==p)
+
+            face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
+            localEdge = bm.array([[0, 2], [1, 3], [0, 1], [2, 3]], dtype=self.itype)
+
             for i in range(4):
                 ge = face2edge[:, i]
                 idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
 
-                face2ipoint = face2ipoint.at[:, dofidx[i]].set(edge2ipoint[ge])
-                face2ipoint = face2ipoint.at[idx[:, None], dofidx[i]].set(bm.flip(edge2ipoint[ge[idx]], axis=1))
+                face2ipoint[:, dofidx[i]] = edge2ipoint[ge]
+                face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1)
 
             indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
-            face2ipoint = face2ipoint.at[:, indof].set(bm.arange(NN+NE*(p-1),
-                    NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1))
+            face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
+                    NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1)
+            face2ipoint = face2ipoint[index]
             
-            return face2ipoint[index]
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        return face2ipoint
     
     def cell_to_ipoint(self, p, index: Index=_S):
         """
-        @brief 生成每个单元上的插值点的全局编号
-        TODO Provide an efficient implementation that is distinct from 
-            unstructured meshes
+        @brief Returns the interpolation point indices corresponding to each cell in a 3D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific cell interpolation points.
+
+        @return: A 2D array of size (NC, (p+1)**3) containing the indices of interpolation points at each cell.
         """
         if p == 1:
             return self.entity('cell', index=index)
+        
+        ordering = self.ipoints_ordering
 
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NF = self.number_of_faces()
-        NC = self.number_of_cells()
+        if ordering == 'zyx':
+            face_to_ipoint = self.face_to_ipoint(p)
+            cell2face = self.cell_to_face(index=index)
 
-        cell2face = self.cell_to_face()
-        face2edge = self.face_to_edge()
-        cell2edge = self.cell_to_edge()
+            start_indices = face_to_ipoint[cell2face[:, 0]]
+            end_indices = face_to_ipoint[cell2face[:, 1]]
 
-        face2ipoint = self.face_to_ipoint(p)
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            cell_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
+                                        end_indices[:, :, None] * linspace_indices
+            
+            # 首先，转换形状以便重新排列为列优先
+            reshaped = cell_ipoints_interpolated.reshape(-1, (p+1)**2, p+1)
+            # 然后，转置最后两个维度，这样插值点会按照 z, y, x 的顺序排列
+            transposed = reshaped.transpose(0, 2, 1)
+            # 最后，reshape 到最终的形状，确保插值点是列优先排序
+            cell2ipoint = transposed.reshape(-1, (p+1)**3)
+        elif ordering == 'nefc':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NF = self.number_of_faces()
+            NC = self.number_of_cells()
 
-        shape = (p+1, p+1, p+1)
-        mi    = bm.arange(p+1)
-        multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
-        multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
-        multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
+            cell2face = self.cell_to_face()
+            face2edge = self.face_to_edge()
+            cell2edge = self.cell_to_edge()
 
-        multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
+            face2ipoint = self.face_to_ipoint(p)
 
-        dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
+            shape = (p+1, p+1, p+1)
+            mi    = bm.arange(p+1)
+            multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
+            multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
+            multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
 
-        dofidx[4], = bm.nonzero(multiIndex[:, 2]==0)
-        dofidx[5], = bm.nonzero(multiIndex[:, 2]==p)
-        dofidx[0], = bm.nonzero(multiIndex[:, 0]==0)
-        dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
-        dofidx[2], = bm.nonzero(multiIndex[:, 1]==0)
-        dofidx[3], = bm.nonzero(multiIndex[:, 1]==p)
+            multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
 
-        cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
-        lf2e = bm.array([[4, 9, 5, 8], [6, 11, 7, 10],
-                         [0, 10, 1, 8], [2, 11, 3, 9],
-                         [0, 6, 2, 4], [1, 7, 3, 5]], dtype=self.itype)
+            dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
 
-        multiIndex2d = multiIndex[:(p+1)**2, 1:]
-        multiIndex2d = bm.concatenate([multiIndex2d, p-multiIndex2d], axis=-1)
+            dofidx[4], = bm.nonzero(multiIndex[:, 2]==0)
+            dofidx[5], = bm.nonzero(multiIndex[:, 2]==p)
+            dofidx[0], = bm.nonzero(multiIndex[:, 0]==0)
+            dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
+            dofidx[2], = bm.nonzero(multiIndex[:, 1]==0)
+            dofidx[3], = bm.nonzero(multiIndex[:, 1]==p)
 
-        lf2e = lf2e[:, [3, 0, 1, 2]]
-        face2edge = face2edge[:, [2, 0, 3, 1]]
+            cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
+            lf2e = bm.array([[4, 9, 5, 8], [6, 11, 7, 10],
+                            [0, 10, 1, 8], [2, 11, 3, 9],
+                            [0, 6, 2, 4], [1, 7, 3, 5]], dtype=self.itype)
+            multiIndex2d = multiIndex[:(p+1)**2, 1:]
+            multiIndex2d = bm.concatenate([multiIndex2d, p-multiIndex2d], axis=-1)
+            lf2e = lf2e[:, [3, 0, 1, 2]]
+            face2edge = face2edge[:, [2, 0, 3, 1]]
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            for i in range(6): #面上的自由度
-                gfe = face2edge[cell2face[:, i]]
-                lfe = cell2edge[:, lf2e[i]]
-                idx0 = bm.argsort(gfe, axis=-1)
-                idx1 = bm.argsort(lfe, axis=-1)
-                idx1 = bm.argsort(idx1, axis=-1)
-                idx0 = idx0[bm.arange(NC)[:, None], idx1] #(NC, 4)
-                idx = multiIndex2d[:, idx0].swapaxes(0, 1) #(NC, NQ, 4)
+            for i in range(6):
+                    gfe = face2edge[cell2face[:, i]]
+                    lfe = cell2edge[:, lf2e[i]]
+                    idx0 = bm.argsort(gfe, axis=-1)
+                    idx1 = bm.argsort(lfe, axis=-1)
+                    idx1 = bm.argsort(idx1, axis=-1)
+                    idx0 = idx0[bm.arange(NC)[:, None], idx1]
+                    idx = multiIndex2d[:, idx0].swapaxes(0, 1)
 
-                idx = idx[..., 0]*(p+1)+idx[..., 1]
-                cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
+                    idx = idx[..., 0]*(p+1)+idx[..., 1]
+                    cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
 
             indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
             cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
                     NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+            cell2ipoint = cell2ipoint[index]
             
-            return cell2ipoint[index]
-        elif bm.backend_name == 'jax':
-            for i in range(6):
-                gfe = face2edge[cell2face[:, i]]
-                lfe = cell2edge[:, lf2e[i]]
-                idx0 = bm.argsort(gfe, axis=-1)
-                idx1 = bm.argsort(lfe, axis=-1)
-                idx1 = bm.argsort(idx1, axis=-1)
-                idx0 = idx0[bm.arange(NC)[:, None], idx1]
-                idx = multiIndex2d[:, idx0].swapaxes(0, 1)
-
-                idx = idx[..., 0]*(p+1)+idx[..., 1]
-                cell2ipoint = cell2ipoint.at[:, dofidx[i]].set(face2ipoint[cell2face[:, i, None], idx])
-
-            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
-            cell2ipoint = cell2ipoint.at[:, indof].set(bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
-                    NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1))
-            
-            return cell2ipoint[index]
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        return cell2ipoint
          
 
     # 形函数

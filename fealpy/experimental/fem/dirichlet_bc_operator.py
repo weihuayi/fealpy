@@ -29,8 +29,10 @@ class DirichletBCOperator():
 
         Returns:
             u (TensorLike): the init solution.
+        TODO:
+            1. deal with device
         """
-        uh = bm.zeros(self.shape[1], *kwargs)
+        uh = bm.zeros(self.shape[1], dtype=self.form._spaces[0].ftype)
         self.form._spaces[0].boundary_interpolate(self.gd, uh,
                 self.is_boundary_dof)
         return uh

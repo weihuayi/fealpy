@@ -26,7 +26,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
                  lam: Optional[float]=None, mu: Optional[float]=None,
                  E: Optional[float]=None, nu: Optional[float]=None, 
                  elasticity_type: Optional[str]=None,
-                 coef: Optional[CoefLike]=None, q: int=5, *,
+                 coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
@@ -54,7 +54,6 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
-        q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
     
@@ -64,6 +63,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
@@ -85,8 +85,8 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
             elif elasticity_type == 'strain':
                 mu, lam = self.mu, self.lam
                 D = bm.tensor([[2 * mu + lam, lam, 0],
-                                  [lam, 2 * mu + lam, 0],
-                                  [0, 0, mu]], dtype=bm.float64)
+                                [lam, 2 * mu + lam, 0],
+                                [0, 0, mu]], dtype=bm.float64)
             else:
                 raise ValueError("Unknown type.")
         elif GD == 3:
@@ -134,14 +134,19 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         elif is_scalar(coef):
             KK = coef * bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
         elif is_tensor(coef):
-            # TODO coef 现在只能为一阶张量
-            KK = bm.einsum('q, c, cqki, kl, cqlj, c -> cij', ws, cm, B, D, B, coef)
+            if coef.ndim == 1:
+                KK = bm.einsum('q, c, cqki, kl, cqlj, c -> cij', ws, cm, B, D, B, coef)
+            elif coef.ndim == 2:
+                KK = bm.einsum('q, c, cqki, kl, cqlj, cq -> cij', ws, cm, B, D, B, coef)
+            elif coef.ndim == 3:
+                pass
+            else:
+                raise ValueError("Invalid coef.")
         
         return KK
 
     @assemblymethod('fast_strain')
     def fast_assembly_strain_constant(self, space: _FS) -> TensorLike:
-        q = self.q
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -152,6 +157,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
 
         GD = mesh.geo_dimension()
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
@@ -193,19 +199,24 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
             KK[:, GD-1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = lam * A_yx + mu * A_xy
 
         if coef is None:
-            return KK
-        
-        if is_scalar(coef):
+            KK[:] = KK
+        elif is_scalar(coef):
             KK[:] = KK * coef
-            return KK
         elif is_tensor(coef):
-            KK[:] = bm.einsum('cij, c -> cij', KK, coef)
-            return KK
+            if coef.ndim == 1:
+                KK[:] = bm.einsum('cij, c -> cij', KK, coef)
+            elif coef.ndim == 2:
+                raise ValueError("Invalid coef shape: \
+                        Fast assembly expects coef to be of shape (NC, NQ).")
+            elif coef.ndim == 3:
+                pass
+            else:
+                raise ValueError("Invalid coef.")
         
+        return KK
 
     @assemblymethod('fast_stress')
     def fast_assembly_stress_constant(self, space: _FS) -> TensorLike:
-        q = self.q
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -216,6 +227,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         
         GD = mesh.geo_dimension()
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
@@ -248,18 +260,24 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         KK *= E / (1 - nu**2)
 
         if coef is None:
-            return KK
-        
-        if is_scalar(coef):
+            KK[:] = KK
+        elif is_scalar(coef):
             KK[:] = KK * coef
-            return KK
         elif is_tensor(coef):
-            KK[:] = bm.einsum('cij, c -> cij', KK, coef)
-            return KK
+            if coef.ndim == 1:
+                KK[:] = bm.einsum('cij, c -> cij', KK, coef)
+            elif coef.ndim == 2:
+                raise ValueError("Invalid coef shape: \
+                        Fast assembly expects coef to be of shape (NC, NQ).")
+            elif coef.ndim == 3:
+                pass
+            else:
+                raise ValueError("Invalid coef.")
+        
+        return KK
     
     @assemblymethod('fast_3d')
     def fast_assembly_constant(self, space: _FS) -> TensorLike:
-        q = self.q
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -270,6 +288,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         
         GD = mesh.geo_dimension()
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
 
@@ -311,14 +330,21 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         KK[:, 2*ldof:, ldof:2*ldof] = lam * A_zy + mu * A_yz
 
         if coef is None:
-            return KK
-        
-        if is_scalar(coef):
+            KK[:] = KK
+        elif is_scalar(coef):
             KK[:] = KK * coef
-            return KK
         elif is_tensor(coef):
-            KK[:] = bm.einsum('cij, c -> cij', KK, coef)
-            return KK
+            if coef.ndim == 1:
+                KK[:] = bm.einsum('cij, c -> cij', KK, coef)
+            elif coef.ndim == 2:
+                raise ValueError("Invalid coef shape: \
+                        Fast assembly expects coef to be of shape (NC, NQ).")
+            elif coef.ndim == 3:
+                pass
+            else:
+                raise ValueError("Invalid coef.")
+        
+        return KK
 
 
 class LinearElasticityCoefficient():

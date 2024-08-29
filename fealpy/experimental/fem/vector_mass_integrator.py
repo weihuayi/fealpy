@@ -19,7 +19,7 @@ class VectorMassIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c u, v)
     """    
-    def __init__(self, coef: Optional[CoefLike]=None, q: int=3) -> None:
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None) -> None:
         super().__init__()
         self.coef = coef
         self.q = q
@@ -40,6 +40,7 @@ class VectorMassIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index)
@@ -62,8 +63,7 @@ class VectorMassIntegrator(LinearInt, OpInt, CellInt):
         """
         @brief 空间基函数是向量型
         """
-        p = space.p
-        q = self.q if self.q is not None else p+1 
+        q = space.p+3 if self.q is None else self.q
 
         coef = self.coef
         mesh = space.mesh
