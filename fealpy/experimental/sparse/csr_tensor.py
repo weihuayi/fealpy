@@ -214,7 +214,7 @@ class CSRTensor(SparseTensor):
                 src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
                 src = self._values
-            bm.index_add(output, -1, flattened, src)
+            output = bm.index_add(output, -1, flattened, src)
 
             return output.reshape(self.shape)
         elif isinstance(other, (int, float)):
