@@ -79,7 +79,7 @@ class FirstNedelecDof3d():
         f2d = bm.set_at(f2d,(slice(None),slice(eldof*3)),e2dof[f2e].reshape(NF, eldof*3))
         s = [1, 0, 0]
         for i in range(3):
-            flag = face[:, s[i]] == edge[f2e[:, i], 0]
+            flag = face[:, s[i]] == edge[f2e[:, i], 1]
             #f2d[flag, eldof*i:eldof*(i+1)] = f2d[flag, eldof*i:eldof*(i+1)][:, ::-1]
             f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),f2d[flag, eldof*i:eldof*(i+1)][:, ::-1])
         #f2d[:, eldof*3:] = self.face_to_internal_dof() 
@@ -111,7 +111,7 @@ class FirstNedelecDof3d():
         c2d = bm.set_at(c2d,(slice(None),slice(eldof*6)),e2dof[c2e].reshape(NC, eldof*6))
         s = [0, 0, 0, 1, 1, 2]
         for i in range(6):
-            flag = cell[:, s[i]] == edge[c2e[:, i], 0]
+            flag = cell[:, s[i]] == edge[c2e[:, i], 1]
             # c2d[flag, eldof*i:eldof*(i+1)] = bm.flip(c2d[flag, eldof*i:eldof*(i+1)],axis=-1)
             c2d = bm.set_at(c2d,(flag,slice(eldof*i,eldof*(i+1))),bm.flip(c2d[flag, eldof*i:eldof*(i+1)],axis=-1))
         if fldof > 0:
@@ -364,9 +364,12 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             cv2 = self.cross(l[0]*g1+l[1]*g0, l[2]*g3-l[3]*g2) + 2*l[0]*l[1]*self.cross(g2, g3)
 
             N = eldof*6+fldof*4
-            val = bm.set_at(val,(...,slice(N,N+cldof//3),slice(None)),-self.cross(gphi, v0)+phif[..., None]*cv0)
-            val = bm.set_at(val,(...,slice(N+cldof//3,N+2*cldof//3),slice(None)),-self.cross(gphi, v1)+phif[..., None]*cv1)
-            val = bm.set_at(val,(...,slice(N+2*cldof//3,N+cldof),slice(None)),-self.cross(gphi, v2)+phif[..., None]*cv2)
+            # val[..., N:N+cldof//3, :] = self.cross(gphi, v0) + phi[..., None]*cv0 
+            # val[..., N+cldof//3:N+2*cldof//3, :] = self.cross(gphi, v1) + phi[...,None]*cv1  
+            # val[..., N+2*cldof//3:N+cldof, :] = self.cross(gphi, v2) + phi[...,None]*cv2  
+            val = bm.set_at(val,(...,slice(N,N+cldof//3),slice(None)),self.cross(gphi, v0)+phi[..., None]*cv0)
+            val = bm.set_at(val,(...,slice(N+cldof//3,N+2*cldof//3),slice(None)),self.cross(gphi, v1)+phi[..., None]*cv1)
+            val = bm.set_at(val,(...,slice(N+2*cldof//3,N+cldof),slice(None)),self.cross(gphi, v2)+phi[..., None]*cv2)
         return val
 
     def is_boundary_dof(self, threshold=None):
@@ -505,10 +508,8 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         index = self.mesh.boundary_face_index()
         face2dof = self.dof.face_to_internal_dof()[index]
-        # uh[face2dof] = 0
-        uh = bm.set_at(uh, (face2dof), 0)
-        # isDDof[face2dof] = True
-        isDDof = bm.set_at(isDDof, (face2dof), True)
+        uh[face2dof] = 0 
+        isDDof[face2dof] = True
 
         edge = self.mesh.entity('edge')
         bdnflag = self.mesh.boundary_node_flag()
@@ -516,10 +517,8 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         index = bm.nonzero(bdeflag)[0] 
 
         edge2dof = self.dof.edge_to_dof()[index]
-        # uh[edge2dof] = 0
-        uh = bm.set_at(uh, (edge2dof), 0)
-        # isDDof[edge2dof] = True
-        isDDof = bm.set_at(isDDof, (edge2dof), True)
+        uh[edge2dof] = 0 
+        isDDof[edge2dof] = True
 
 
         return uh,isDDof
