@@ -28,8 +28,6 @@ class QuantumParticleSwarmOptAlg(Optimizer):
             alpha = 1 - (it + 1) / (2 * MaxIT)
             mbest = sum(pbest) / N
             phi = bm.random.rand(N, dim)
-            u = bm.random.rand(N, dim)
-            rand = bm.random.rand(N)
             p = phi * pbest + (1 - phi) * gbest
             u = bm.random.rand(N, dim)
             rand = bm.random.rand(N, 1)
