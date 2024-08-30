@@ -334,9 +334,15 @@ class PolygonMesh(Mesh, Plotable):
         bc = self.entity_barycenter('cell')
         tri = bm.zeros((3,NE,2),dtype=self.ftype)
         
-        tri[0] = bc[edge2cell[:, 0]] 
-        tri[1] = node[edge[:, 0]]
-        tri[2] = node[edge[:, 1]]
+        #tri[0] = bc[edge2cell[:, 0]] 
+        #tri = tri.at[0].set(bc[edge2cell[:,0]])
+        tri = bm.set_at(tri,(0),bc[edge2cell[:,0]])
+        tri = bm.set_at(tri,(1),node[edge[:,0]])
+        tri = bm.set_at(tri,(2),node[edge[:,1]])
+        #tri = tri.at[1].set(node[edge[:,0]])
+        #tri = tri.at[2].set(node[edge[:,1]])
+        #tri[1] = node[edge[:, 0]]
+        #tri[2] = node[edge[:, 1]]
         
         v1 = node[edge[:, 0]] - bc[edge2cell[:, 0]]
         v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
@@ -349,7 +355,7 @@ class PolygonMesh(Mesh, Plotable):
         e = bm.zeros(shape, dtype=self.ftype)
 
         ee = bm.einsum('i, ij..., j->j...', ws, val, a)
-        bm.index_add(e, edge2cell[:, 0], ee)
+        e = bm.index_add(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if bm.sum(isInEdge) > 0:
@@ -361,9 +367,15 @@ class PolygonMesh(Mesh, Plotable):
                     node[edge[isInEdge, 0]]
                     ]
             '''
-            tri[0] = bc[edge2cell[isInEdge, 1]]
-            tri[1] = node[edge[isInEdge, 1]]
-            tri[2] = node[edge[isInEdge, 0]]
+            #tri[0] = bc[edge2cell[isInEdge, 1]]
+            #tri = tri.at[0].set(bc[edge2cell[isInEdge,1]])
+            tri = bm.set_at(tri,(0),bc[edge2cell[isInEdge,1]])
+            tri = bm.set_at(tri,(1),node[edge[isInEdge,1]])
+            tri = bm.set_at(tri,(2),node[edge[isInEdge,0]])
+            #tri = tri.at[1].set(node[edge[isInEdge,1]])
+            #tri = tri.at[2].set(node[edge[isInEdge,0]])
+            #tri[1] = node[edge[isInEdge, 1]]
+            #tri[2] = node[edge[isInEdge, 0]]
 
             v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 1]]
             v2 = node[edge[isInEdge, 0]] - bc[edge2cell[isInEdge, 1]]
@@ -373,8 +385,8 @@ class PolygonMesh(Mesh, Plotable):
             pp = bm.einsum('ij, jkm->ikm', bcs, tri)
             val = u(pp, edge2cell[isInEdge, 1])
             ee = bm.einsum('i, ij..., j->j...', ws, val, a)
-            bm.index_add(e, edge2cell[isInEdge, 1], ee)
-
+            e = bm.index_add(e, edge2cell[isInEdge, 1], ee)
+            
         if celltype is True:
             return e
         else:

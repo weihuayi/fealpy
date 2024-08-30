@@ -128,6 +128,6 @@ if __name__ == "__main__":
     #pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
     
     #test = TestPolygonMeshInterfaces()
-    #test.test_extend_data(extend_data[0], "pytorch")
+    #test.test_extend_data(extend_data[0], "jax")
     #test.test_geo_data(geo_data[1], "pytorch")
     
