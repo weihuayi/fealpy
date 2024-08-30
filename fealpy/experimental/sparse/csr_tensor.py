@@ -340,3 +340,36 @@ class CSRTensor(SparseTensor):
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
+
+    def to_scipy(self):
+        from scipy.sparse import csr_matrix
+
+        if self.dense_ndim != 0:
+            raise ValueError("Only CSRTensor with 0 dense dimension "
+                             "can be converted to scipy sparse matrix")
+
+        return csr_matrix(
+            (bm.to_numpy(self._values), bm.to_numpy(self._col), bm.to_numpy(self._crow)),
+            shape = self._spshape
+        )
+
+    @classmethod
+    def from_scipy(cls, mat, /):
+        crow = bm.from_numpy(mat.indptr)
+        col = bm.from_numpy(mat.indices)
+        values = bm.from_numpy(mat.data)
+        return cls(crow, col, values, mat.shape)
+
+    def device_put(self, device=None, /):
+        return CSRTensor(bm.device_put(self._crow, device),
+                         bm.device_put(self._col, device),
+                         bm.device_put(self._values, device),
+                         self._spshape)
+
+    def astype(self, dtype=None, /, *, copy=True):
+        if self._values is None:
+            values = bm.ones(self.nnz, dtype=dtype)
+        else:
+            values = bm.astype(self._values, dtype, copy=copy)
+
+        return CSRTensor(self._crow, self._col, values, self._spshape)
