@@ -66,12 +66,12 @@ def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
     return H, Hs
 
 # Optimality criterion
-def oc(rho, dce, dve, g):
+def oc(nx, ny, rho, dce, dve, g):
 	l1 = 0
 	l2 = 1e9
 	move = 0.2
 	# reshape to perform vector operations
-	rho_new = bm.zeros(NC, dtype=bm.float64)
+	rho_new = bm.zeros(nx*ny, dtype=bm.float64)
 	while (l2 - l1) / (l2 + l1)> 1e-3:
 		lmid = 0.5 * (l2 + l1)
 		rho_new[:] = bm.maximum(0.0, bm.maximum(rho-move, 
@@ -133,8 +133,8 @@ def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
 
 
 # Default input parameters
-nx = 4
-ny = 3
+nx = 160
+ny = 80
 volfrac = 0.5
 penal = 3.0
 rmin = 1.5

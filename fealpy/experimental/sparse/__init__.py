@@ -1,22 +1,11 @@
 
-from abc import ABCMeta
 from typing import overload, Optional, Tuple
 
-from .. import logger
 from ..backend import TensorLike as _DT
 from ..backend import Size
+from .sparse_tensor import SparseTensor
 from .coo_tensor import COOTensor
 from .csr_tensor import CSRTensor
-
-
-# For type checking
-class SparseTensor(metaclass=ABCMeta):
-    pass
-
-SparseTensor.register(COOTensor)
-SparseTensor.register(CSRTensor)
-
-logger.warning('fealpy.torch.sparse module is still in progress.')
 
 
 @overload
