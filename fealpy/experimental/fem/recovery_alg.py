@@ -44,8 +44,9 @@ class RecoveryAlg():
         deg = bm.zeros(gdof, dtype=space.ftype)
 
         if method == 'simple':
-            bm.add_at(deg, cell2dof, 1)
-            bm.add_at(gval, cell2dof, guh)
+            bm.index_at(deg, cell2dof, 1)
+            bm.index_at(gval, cell2dof, guh)
+            print(deg)
         elif method == 'area_harmonic':
             val = 1.0/space.mesh.entity_measure('cell')
             bm.add_at(deg, cell2dof, val[:, None])
