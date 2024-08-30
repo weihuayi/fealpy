@@ -1,6 +1,6 @@
 from builtins import float, tuple, str
 
-class RegionProperties:
+class GeometryProperties:
     def __init__(self, x_min: float, x_max: float, y_min: float, y_max: float):
         """
         Initialize the region properties.
@@ -16,17 +16,6 @@ class RegionProperties:
         self.y_min = y_min
         self.y_max = y_max
 
-    def __repr__(self) -> str:
-        """
-        Return a string representation of the region properties, 
-        which includes the minimum and maximum values in x and y directions.
-
-        Returns:
-            str: A string showing the region properties.
-        """
-        return (f"RegionProperties(x_min={self.x_min}, x_max={self.x_max}, "
-                f"y_min={self.y_min}, y_max={self.y_max})")
-
     def get_dimensions(self) -> tuple:
         """
         Calculate and return the width and height of the region.
@@ -38,4 +27,14 @@ class RegionProperties:
         height = self.y_max - self.y_min
 
         return width, height
+    
+    def __repr__(self) -> str:
+        """
+        Return a string representation of the region properties, 
+        which includes the minimum and maximum values in x and y directions.
 
+        Returns:
+            str: A string showing the region properties.
+        """
+        return (f"GeometryProperties(x_min={self.x_min}, x_max={self.x_max}, "
+                f"y_min={self.y_min}, y_max={self.y_max})")
