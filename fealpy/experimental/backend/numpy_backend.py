@@ -72,8 +72,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def add_at(a: NDArray, indices, src, /) -> NDArray:
-        """
-        """
         np.add.at(a, indices, src)
         return a
 
@@ -95,8 +93,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def unique_all_(a, axis=None, **kwargs):
-        """
-        """
         b, indices0, inverse, counts = np.unique(a, 
                                                  return_index=True,
                                                  return_inverse=True,
@@ -105,6 +101,10 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         indices1 = np.zeros_like(indices0)
         indices1[inverse] = range(inverse.shape[0]);
         return b, indices0, indices1, inverse, counts
+
+    @staticmethod
+    def unstack(x, /, *, axis: int=0):
+        return np.split(x, x.shape[axis], axis=axis)
 
     ### Sparse Functions ###
 
@@ -373,7 +373,11 @@ function_mapping.update(tensor='array')
 
 if int(np.__version__[:1]) < 2:
     attribute_mapping.update(bool='bool_')
-    function_mapping.update(concat='concatenate')
+    function_mapping.update(
+        concat='concatenate', bitwise_invert='bitwise_not', permute_dims='transpose',
+        pow='power', acos='arccos', asin='arcsin', acosh='arccosh', asinh='arcsinh',
+        atan='arctan', atanh='arctanh', atan2='arctan2'
+    )
 
 NumPyBackend.attach_attributes(attribute_mapping, np)
 NumPyBackend.attach_methods(function_mapping, np)

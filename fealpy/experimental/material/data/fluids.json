@@ -1,0 +1,15 @@
+{
+  "Water": {
+    "density": 1000,
+    "dynamic_viscosity": 0.001,
+    "thermal_conductivity": 0.6,
+    "specific_heat": 4184
+  },
+  "Engine Oil": {
+    "density": 870,
+    "dynamic_viscosity": 0.25,
+    "thermal_conductivity": 0.14,
+    "specific_heat": 2100
+  }
+}
+
