@@ -7,7 +7,7 @@ import inspect
 from ..common import ranges
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import MeshDataStructure, ArrRedirector
+from .mesh_data_structure import Mesh2dDataStructure, ArrRedirector
 
 
 class PolygonMesh(Mesh, Plotable):
@@ -896,7 +896,7 @@ class PolygonMesh(Mesh, Plotable):
 PolygonMesh.set_ploter('polygon2d')
 
 
-class PolygonMeshDataStructure(MeshDataStructure):
+class PolygonMeshDataStructure(Mesh2dDataStructure):
     # Variables
     face = ArrRedirector('edge')
     edge2cell: NDArray
