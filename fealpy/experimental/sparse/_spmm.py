@@ -36,14 +36,14 @@ def spmm_coo(indices: _DT, values: _DT, spshape: _Size, x: _DT) -> _DT:
         new_vals = values * x[col]
         shape = new_vals.shape[:-1] + (spshape[0], )
         result = bm.zeros(shape, dtype=x.dtype)
-        bm.index_add(result, row, new_vals, axis=-1)
+        result = bm.index_add(result, row, new_vals, axis=-1)
         return result
 
     else: # x.ndim >= 2
         new_vals = values[..., None] * x[..., col, :] # (*batch, nnz, x_col)
         shape = new_vals.shape[:-2] + (spshape[0], x.shape[-1])
         result = bm.zeros(shape, dtype=x.dtype)
-        bm.index_add(result, row, new_vals, axis=-2)
+        result = bm.index_add(result, row, new_vals, axis=-2)
         return result
 
 

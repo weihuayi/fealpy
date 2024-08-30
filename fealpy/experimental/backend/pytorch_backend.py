@@ -179,6 +179,23 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             arrays = [a.to(dtype) for a in arrays]
         return torch.cat(arrays, dim=axis, out=out)
 
+    @staticmethod
+    def split(x, indices_or_sections, /, *, axis=0):
+        if isinstance(indices_or_sections, int):
+            chunk_size = x.shape[axis] // indices_or_sections
+        elif isinstance(indices_or_sections, Tensor):
+            if indices_or_sections.ndim != 1:
+                raise ValueError("indices_or_sections must be 1-dimensional")
+            kwargs = {'dtype': indices_or_sections.dtype, 'device': indices_or_sections.device}
+            HEAD = torch.tensor([0], **kwargs)
+            TAIL = torch.tensor([x.shape[axis]], **kwargs)
+            indices_or_sections = torch.cat([HEAD, indices_or_sections, TAIL])
+            chunk_size = (indices_or_sections[1:] - indices_or_sections[:-1]).tolist()
+        else:
+            raise ValueError("indices_or_sections must be a scalar or 1D Tensor")
+
+        return torch.split(x, chunk_size, dim=axis)
+
     ### Searching Functions ###
     # python array API standard v2023.12
     argmax = staticmethod(_axis_keepdims_dispatch(torch.argmax))

@@ -1,0 +1,17 @@
+{
+  "Polyethylene": {
+    "elastic_modulus": 1000000000.0,
+    "poisson_ratio": 0.42,
+    "density": 950,
+    "thermal_conductivity": 0.42,
+    "yield_strength": 20000000
+  },
+  "Polypropylene": {
+    "elastic_modulus": 1500000000.0,
+    "poisson_ratio": 0.41,
+    "density": 900,
+    "thermal_conductivity": 0.22,
+    "yield_strength": 25000000
+  }
+}
+
