@@ -1,0 +1,17 @@
+{
+  "Alumina": {
+    "elastic_modulus": 350000000000.0,
+    "poisson_ratio": 0.22,
+    "density": 3950,
+    "thermal_conductivity": 30,
+    "yield_strength": null
+  },
+  "Zirconia": {
+    "elastic_modulus": 200000000000.0,
+    "poisson_ratio": 0.3,
+    "density": 6050,
+    "thermal_conductivity": 2,
+    "yield_strength": null
+  }
+}
+
