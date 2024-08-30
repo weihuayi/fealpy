@@ -20,7 +20,7 @@ from fealpy.decorator import barycentric
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        任意次有限元方法求解possion方程
+        任意次有限元方法求解半线性方程
         """)
 
 parser.add_argument('--degree',
@@ -56,10 +56,8 @@ tmr = timer()
 next(tmr)
 
 domain = [0, 1, 0, 2]
-nx = 4
-ny = 4
 pde = SemilinearData(domain)
-mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
+mesh = TriangleMesh.from_box(domain, nx=n, ny=n)
 
 tol = 1e-14
 NDof = bm.zeros(maxit, dtype=bm.int64)
