@@ -108,7 +108,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
     def strain_matrix(self, space: _FS) -> TensorLike:
         '''
         GD = 2: (NC, NQ, 3, tldof)
-        GD = 2: (NC, NQ, 6, tldof)
+        GD = 3: (NC, NQ, 6, tldof)
         '''
         scalar_space = space.scalar_space
         _, _, gphi, _, _, _ = self.fetch(scalar_space)
