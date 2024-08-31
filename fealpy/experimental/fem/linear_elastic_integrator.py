@@ -24,7 +24,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     The linear elastic integrator for function spaces based on homogeneous meshes.
     """
     def __init__(self, 
-                 material: MaterialLike=LinearElasticMaterial,
+                 material: MaterialLike,
                  elastic_type: Optional[str]=None,
                  coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
