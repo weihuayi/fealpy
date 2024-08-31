@@ -142,8 +142,8 @@ class JAXBackend(Backend[Array], backend_name='jax'):
                 return_counts=True,
                 axis=axis, **kwargs)
         indices1 = jnp.zeros_like(indices0)
-        idx = jnp.arange(inverse.shape[0]-1, -1, -1, dtype=indices0.dtype) 
-        indices1 = indices1.at[inverse[-1::-1]].set(idx)
+        idx = jnp.arange(inverse.shape[0], dtype=indices0.dtype)
+        indices1 = indices1.at[inverse].set(idx)
         return b, indices0, indices1, inverse, counts
 
     ### FEALPy functionals ###
