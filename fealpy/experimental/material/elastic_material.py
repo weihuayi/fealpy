@@ -73,7 +73,7 @@ class LinearElasticMaterial(ElasticMaterial):
         """
         Calculate the elastic matrix D based on the defined hypothesis (3D, plane stress, or plane strain).
 
-        Retu1rns:
+        Returns:
             TensorLike: The elastic matrix D.
                 - For 2D problems (GD=2): (1, 1, 3, 3)
                 - For 3D problems (GD=3): (1, 1, 6, 6)
