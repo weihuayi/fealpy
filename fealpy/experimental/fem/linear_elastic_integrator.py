@@ -32,7 +32,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
-        self.material = material
+        self.material = material  
         self.elastic_type = elastic_type
         self.coef = coef
         self.q = q
