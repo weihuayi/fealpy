@@ -1,5 +1,5 @@
 from typing import Union, Optional, Sequence, Tuple, Any
-from math import sqrt
+from math import sqrt,cos,sin,pi
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
@@ -270,7 +270,8 @@ class PolygonMesh(Mesh, Plotable):
             bcs = self.multi_index_matrix(p-2, 2)/(p-2)
             ipoint[start:] = bm.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
             return ipoint
-    
+    '''  
+    #需要功能 hsplit
     def cell_to_ipoint(self, p: int, index=_S):
         """
         @brief
@@ -305,6 +306,7 @@ class PolygonMesh(Mesh, Plotable):
             cell2ipoint[idx] = NN + NE*(p-1) + bm.arange(NC*cdof).reshape(NC, cdof)
             #print(location[1:-1])
             return bm.unstack(cell2ipoint, location[1:-1])[index]
+    '''
 
     def shape_function(self, bcs: TensorLike, p: int,index: Index = _S) -> TensorLike:
         raise NotImplementedError
@@ -334,20 +336,14 @@ class PolygonMesh(Mesh, Plotable):
         bc = self.entity_barycenter('cell')
         tri = bm.zeros((3,NE,2),dtype=self.ftype)
         
-        #tri[0] = bc[edge2cell[:, 0]] 
-        #tri = tri.at[0].set(bc[edge2cell[:,0]])
         tri = bm.set_at(tri,(0),bc[edge2cell[:,0]])
         tri = bm.set_at(tri,(1),node[edge[:,0]])
         tri = bm.set_at(tri,(2),node[edge[:,1]])
-        #tri = tri.at[1].set(node[edge[:,0]])
-        #tri = tri.at[2].set(node[edge[:,1]])
-        #tri[1] = node[edge[:, 0]]
-        #tri[2] = node[edge[:, 1]]
         
         v1 = node[edge[:, 0]] - bc[edge2cell[:, 0]]
         v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
         a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
-        #a = bm.cross(v1, v2)/2.0
+    
         pp = bm.einsum('ij, jkm->ikm', bcs, tri)
         val = u(pp, edge2cell[:, 0])
 
@@ -360,26 +356,13 @@ class PolygonMesh(Mesh, Plotable):
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if bm.sum(isInEdge) > 0:
             tri = bm.zeros((3,bm.sum(isInEdge),2),dtype=self.ftype)
-            '''
-            tri = [
-                    bc[edge2cell[isInEdge, 1]],
-                    node[edge[isInEdge, 1]],
-                    node[edge[isInEdge, 0]]
-                    ]
-            '''
-            #tri[0] = bc[edge2cell[isInEdge, 1]]
-            #tri = tri.at[0].set(bc[edge2cell[isInEdge,1]])
             tri = bm.set_at(tri,(0),bc[edge2cell[isInEdge,1]])
             tri = bm.set_at(tri,(1),node[edge[isInEdge,1]])
             tri = bm.set_at(tri,(2),node[edge[isInEdge,0]])
-            #tri = tri.at[1].set(node[edge[isInEdge,1]])
-            #tri = tri.at[2].set(node[edge[isInEdge,0]])
-            #tri[1] = node[edge[isInEdge, 1]]
-            #tri[2] = node[edge[isInEdge, 0]]
 
             v1 = node[edge[isInEdge, 1]] - bc[edge2cell[isInEdge, 1]]
             v2 = node[edge[isInEdge, 0]] - bc[edge2cell[isInEdge, 1]]
-            #a = bm.cross(v1, v2)/2.0
+            
             a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
 
             pp = bm.einsum('ij, jkm->ikm', bcs, tri)
@@ -391,6 +374,8 @@ class PolygonMesh(Mesh, Plotable):
             return e
         else:
             return e.sum(axis=0)
+    def edge_to_cell(self):
+        return self.edge2cell
 
     def cell_to_node(self,return_sparse=False):
         if return_sparse:
@@ -414,8 +399,61 @@ class PolygonMesh(Mesh, Plotable):
         else:
             return self.cell
 
-    
+    @classmethod
+    def from_one_triangle(cls,meshtype='iso'):    
+        if meshtype == 'equ':
+            node = bm.tensor([
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.5, sqrt(3)/2]], dtype=bm.float64)
+        elif meshtype =='iso':
+            node = bm.tensor([
+                    [0.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0]], dtype=bm.float64)
+        cell = (bm.tensor([[0, 1, 2]],dtype=bm.int64),None)
+        return cls(node, cell)
 
+    @classmethod
+    def from_one_square(cls):
+        node = bm.tensor([
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 1.0]],dtype=bm.float64)
+        cell = (bm.tensor([[0, 1, 2, 3]], dtype=bm.int64),None)
+        return cls(node, cell)
 
+    @classmethod
+    def from_one_pentagon(cls):
+        node = bm.tensor([
+            (0.0, 0.0),
+            (cos(2/5*pi), -sin(2/5*pi)),
+            (cos(2/5*pi)+1, -sin(2/5*pi)),
+            ( 2*cos(1/5*pi), 0.0),
+            (cos(1/5*pi), sin(1/5*pi))],dtype=bm.float64)
+        cell = (bm.tensor([0, 1, 2, 3, 4], dtype=bm.int64),bm.tensor([0,5],dtype=bm.int64))
+        return cls(node, cell)
+
+    @classmethod
+    def from_one_hexagon(cls):
+        node = bm.tensor([
+            [0.0, 0.0],
+            [1/2, -sqrt(3)/2],
+            [3/2, -sqrt(3)/2],
+            [2.0, 0.0],
+            [3/2, sqrt(3)/2],
+            [1/2, sqrt(3)/2]], dtype=bm.float64)
+        cell = (bm.tensor([0, 1, 2, 3, 4, 5], dtype=bm.int64),bm.tensor([0, 6], dtype=bm.int64))
+        return cls(node, cell)
+
+    @classmethod
+    def from_mesh(cls, mesh: Mesh):
+        """
+        @brief 把一个由同一类型单元组成网格转化为多边形网格的格式
+        """
+        node = mesh.entity('node')
+        cell = (mesh.entity('cell'),None)
+        return cls(node, cell)
 
 PolygonMesh.set_ploter('polygon2d')

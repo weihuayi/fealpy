@@ -136,3 +136,18 @@ geo_data = [
                               [1.0,0.0],[1.0,0.0]],dtype=np.float64)
      }
         ]
+mesh_example_data = [
+        {"one_triangle_edge": np.array([[0,1],[2,0],[1,2]],dtype=np.int64),
+         "one_triangle_edge2cell":np.array([[0,0,0,0],[0,0,2,2],[0,0,1,1]],dtype=np.int64),
+         "one_square_edge": np.array([[0,1],[3,0],[1,2],[2,3]],dtype=np.int64),
+         "one_square_edge2cell":np.array([[0,0,0,0],[0,0,3,3],[0,0,1,1],[0,0,2,2]],dtype=np.int64),
+         "one_pentagon_edge": np.array([[0,1],[4,0],[1,2],[2,3],[3,4]],dtype=np.int64),
+         "one_pentagon_edge2cell":np.array([[0,0,0,0],[0,0,4,4],[0,0,1,1],[0,0,2,2],[0,0,3,3]],dtype=np.int64),
+         "one_hexagon_edge": np.array([[0,1],[5,0],[1,2],[2,3],[3,4],[4,5]],dtype=np.int64),
+         "one_hexagon_edge2cell":np.array([[0,0,0,0],[0,0,5,5],[0,0,1,1],[0,0,2,2],[0,0,3,3],[0,0,4,4]],dtype=np.int64),
+         "triangle_node": np.array([[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0]],dtype=np.float64),
+         "triangle_cell": np.array([[1,2,0],[3,0,2]],dtype=np.int64),
+         "pmesh_edge": np.array([[0,1],[2,0],[3,0],[1,2],[2,3]],dtype=np.int64),
+         "pmesh_edge2cell": np.array([[0,0,2,2],[0,1,1,1],[1,1,0,0],[0,0,0,0],[1,1,2,2]],dtype=np.int64),
+         }
+        ]

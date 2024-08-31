@@ -4,6 +4,7 @@ import pytest
 
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.polygon_mesh import PolygonMesh
+from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
 from fealpy.experimental.tests.mesh.polygon_mesh_data import *
 
 class TestPolygonMeshInterfaces:
@@ -119,15 +120,44 @@ class TestPolygonMeshInterfaces:
         edge_normal = mesh.edge_normal()
         edge_unit_normal = mesh.edge_unit_normal()
 
-
+    @pytest.mark.parametrize("backend", ["numpy","pytorch","jax"])
+    @pytest.mark.parametrize("meshdata",mesh_example_data)
+    def test_mesh_example(self,meshdata,backend):
+        bm.set_backend(backend)
+        mesh1 = PolygonMesh.from_one_triangle()
+        edge1 = mesh1.entity('edge')
+        edge2cell1 = mesh1.edge_to_cell()
+        mesh2 = PolygonMesh.from_one_square()
+        edge2 = mesh2.entity('edge')
+        edge2cell2 = mesh2.edge_to_cell()
+        mesh3 = PolygonMesh.from_one_pentagon()
+        edge3 = mesh3.entity('edge')
+        edge2cell3 = mesh3.edge_to_cell()
+        mesh4 = PolygonMesh.from_one_hexagon()
+        edge4 = mesh4.entity('edge')
+        edge2cell4 = mesh4.edge_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(edge1),meshdata["one_triangle_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell1),meshdata["one_triangle_edge2cell"])
+        np.testing.assert_array_equal(bm.to_numpy(edge2),meshdata["one_square_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell2),meshdata["one_square_edge2cell"])
+        np.testing.assert_array_equal(bm.to_numpy(edge3),meshdata["one_pentagon_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell3),meshdata["one_pentagon_edge2cell"])
+        np.testing.assert_array_equal(bm.to_numpy(edge4),meshdata["one_hexagon_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell4),meshdata["one_hexagon_edge2cell"])
+        node = bm.from_numpy(meshdata['triangle_node'])
+        cell = bm.from_numpy(meshdata['triangle_cell'])
+        mesh = TriangleMesh(node, cell)
+        pmesh = PolygonMesh.from_mesh(mesh)
+        pedge = pmesh.entity('edge')
+        pedge2cell = pmesh.edge_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(pedge),meshdata["pmesh_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(pedge2cell),meshdata["pmesh_edge2cell"])
 
 if __name__ == "__main__":
-    #pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
-    #pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])
     pytest.main(["./test_polygon_mesh.py", "-k", "test_extend_data"])
-    #pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_mesh_example"])
     
-    #test = TestPolygonMeshInterfaces()
-    #test.test_extend_data(extend_data[0], "jax")
-    #test.test_geo_data(geo_data[1], "pytorch")
     
