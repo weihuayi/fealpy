@@ -3,9 +3,7 @@ from typing import Optional
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S, MaterialLike
 
-from .utils import shear_strain, normal_strain
 from ..utils import process_coef_func, is_scalar, is_tensor
-from ..functionspace.utils import flatten_indices
 
 from ..mesh import HomogeneousMesh, SimplexMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -16,25 +14,20 @@ from .integrator import (
     CoefLike
 )
 
-from ..material.elastic_material import LinearElasticMaterial
-
-
 class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     """
     The linear elastic integrator for function spaces based on homogeneous meshes.
     """
     def __init__(self, 
                  material: MaterialLike,
-                 elastic_type: Optional[str]=None,
                  coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
-        self.material = material  
-        self.elastic_type = elastic_type
-        self.coef = coef
+        self.material = material
+        self.coef = coef  
         self.q = q
         self.index = index
 
@@ -59,67 +52,14 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index, q
     
-    def elastic_matrix(self, space: _FS):
-        elastic_type = self.elastic_type
-        scalar_space = space.scalar_space
-        _, _, gphi, _, _, _ = self.fetch(scalar_space)
-        _, GD = gphi.shape[-2:]
-
-        if GD == 2:
-            if elastic_type == 'stress':
-                D = self.material.plane_stress_elastic_matrix()
-            elif elastic_type == 'strain':
-                D = self.material.plane_strain_elastic_matrix()
-            else:
-                raise ValueError("Unknown elastic type for 2D. Use 'stress' or 'strain'.")
-        elif GD == 3:
-            if elastic_type is None:
-                D = self.material.elastic_matrix()
-            else:
-                raise ValueError("For 3D elastic matrix, 'elastic_type' should not be specified.")
-        else:
-            raise ValueError("Invalid GD dimension.")
-        
-        return D
-    
-    def strain_matrix(self, space: _FS) -> TensorLike:
-        '''
-        GD = 2: (NC, NQ, 3, tldof)
-        GD = 3: (NC, NQ, 6, tldof)
-        '''
-        scalar_space = space.scalar_space
-        _, _, gphi, _, _, _ = self.fetch(scalar_space)
-        ldof, GD = gphi.shape[-2:]
-        if space.dof_priority:
-            indices = flatten_indices((ldof, GD), (1, 0))
-        else:
-            indices = flatten_indices((ldof, GD), (0, 1))
-        B = bm.concat([normal_strain(gphi, indices),
-                       shear_strain(gphi, indices)], axis=-2)
-        return B
-    
     def assembly(self, space: _FS) -> TensorLike:
-        coef = self.coef
         scalar_space = space.scalar_space
-        mesh = getattr(scalar_space, 'mesh', None)
-        bcs, ws, _, cm, index, _ = self.fetch(scalar_space)
-        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        bcs, ws, gphi, cm, index, q = self.fetch(scalar_space)
         
-        D = self.elastic_matrix(space)
-        B = self.strain_matrix(space)
-        if coef is None:
-            KK = bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
-        elif is_scalar(coef):
-            KK = coef * bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
-        elif is_tensor(coef):
-            if coef.ndim == 1:
-                KK = bm.einsum('q, c, cqki, kl, cqlj, c -> cij', ws, cm, B, D, B, coef)
-            elif coef.ndim == 2:
-                KK = bm.einsum('q, c, cqki, kl, cqlj, cq -> cij', ws, cm, B, D, B, coef)
-            elif coef.ndim == 3:
-                pass
-            else:
-                raise ValueError("Invalid coef.")
+        D = self.material.elastic_matrix()
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, gphi=gphi)
+
+        KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
         
         return KK
 
