@@ -13,9 +13,7 @@ class SemilinearData():
     @cartesian
     def diffusion_coefficient(self, p):
 
-        A_coe = bm.zeros(p.shape[:-1], dtype = bm.float64)
-        A_coe[:] = 10 
-        return A_coe
+        return 10
 
     @cartesian
     def diffusion_coefficient_right(self, p):
@@ -26,9 +24,7 @@ class SemilinearData():
     @cartesian
     def reaction_coefficient(self, p):
 
-        B_coe = bm.zeros(p.shape[:-1], dtype = bm.float64)
-        B_coe = 1
-        return B_coe
+        return 1
 
     @cartesian
     def reaction_coefficient_right(self, p):
