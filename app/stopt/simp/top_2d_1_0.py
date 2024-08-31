@@ -55,7 +55,7 @@ def compute_filter(rmin: int) -> Tuple[TensorLike, TensorLike]:
 
     return H, Hs
 
-def apply_filter(ft, H, Hs, rho, dc, dv):
+def apply_filter(ft, rho, dc, dv):
 
     if ft == 0:
         dc = bm.matmul(H, bm.multiply(rho, dc) / Hs / bm.maximum(1e-3, rho))

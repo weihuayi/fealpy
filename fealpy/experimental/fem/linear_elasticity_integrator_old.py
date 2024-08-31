@@ -7,7 +7,6 @@ from .utils import shear_strain, normal_strain
 from ..utils import process_coef_func, is_scalar, is_tensor
 from ..functionspace.utils import flatten_indices
 
-
 from ..mesh import HomogeneousMesh, SimplexMesh, StructuredMesh
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import (
@@ -16,6 +15,8 @@ from .integrator import (
     assemblymethod,
     CoefLike
 )
+
+from ..material.elastic_material import ElasticMaterial, LinearElasticMaterial
 
 
 class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):

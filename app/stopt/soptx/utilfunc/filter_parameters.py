@@ -57,3 +57,28 @@ def compute_filter(nx: int, ny: int, rmin: float) -> Tuple[TensorLike, TensorLik
     Hs = H @ bm.ones(H.shape[1], dtype=bm.float64)
 
     return H, Hs
+
+def apply_filter(ft: int, rho: TensorLike, dc: TensorLike, dv: TensorLike, 
+                H: TensorLike, Hs: TensorLike) -> Tuple[TensorLike, TensorLike]:
+    """
+    Apply the filter to the sensitivities.
+
+    Args:
+        ft (int): Filter type, 0 for sensitivity filter, 1 for density filter.
+        rho (TensorLike): The density distribution of the material.
+        dc (TensorLike): The sensitivity of the objective function.
+        dv (TensorLike): The sensitivity of the volume constraint.
+        H (TensorLike): The filter matrix.
+        Hs (TensorLike): The scaling vector for the filter.
+
+    Returns:
+        tuple: Filtered sensitivity of the objective function and volume constraint.
+    """
+    if ft == 0:
+        dc = bm.matmul(H, bm.multiply(rho, dc) / Hs / bm.maximum(1e-3, rho))
+        dv = dv
+    elif ft == 1:
+        dc = bm.matmul(H, (dc / Hs))
+        dv = bm.matmul(H, (dv / Hs))
+    
+    return dc, dv
