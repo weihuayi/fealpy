@@ -1,14 +1,13 @@
 from typing import Optional
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, MaterialLike
 
 from .utils import shear_strain, normal_strain
 from ..utils import process_coef_func, is_scalar, is_tensor
 from ..functionspace.utils import flatten_indices
 
-
-from ..mesh import HomogeneousMesh, SimplexMesh, StructuredMesh
+from ..mesh import HomogeneousMesh, SimplexMesh
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import (
     LinearInt, OpInt, CellInt,
@@ -17,33 +16,24 @@ from .integrator import (
     CoefLike
 )
 
+from ..material.elastic_material import LinearElasticMaterial
 
-class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
+
+class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     """
-    The linear elasticity integrator for function spaces based on homogeneous meshes.
+    The linear elastic integrator for function spaces based on homogeneous meshes.
     """
     def __init__(self, 
-                 lam: Optional[float]=None, mu: Optional[float]=None,
-                 E: Optional[float]=None, nu: Optional[float]=None, 
-                 elasticity_type: Optional[str]=None,
+                 material: MaterialLike=LinearElasticMaterial,
+                 elastic_type: Optional[str]=None,
                  coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
-        if lam is not None and mu is not None:
-            self.E = mu * (3*lam + 2*mu) / (lam + mu)
-            self.nu = lam / (2 * (lam + mu))
-            self.lam = lam
-            self.mu = mu
-        elif E is not None and nu is not None:
-            self.lam = nu * E / ((1 + nu) * (1 - 2 * nu))
-            self.mu = E / (2 * (1 + nu))
-            self.E = E
-            self.nu = nu
-        else:
-            raise ValueError("Either (lam, mu) or (e, nu) should be provided.")
-        self.elasticity_type = elasticity_type
+
+        self.material = material
+        self.elastic_type = elastic_type
         self.coef = coef
         self.q = q
         self.index = index
@@ -58,7 +48,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         mesh = getattr(space, 'mesh', None)
     
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The LinearElasticityIntegrator only support spaces on"
+            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
     
@@ -69,37 +59,24 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index, q
     
-    def elasticity_matrix(self, space: _FS):
-        elasticity_type = self.elasticity_type
+    def elastic_matrix(self, space: _FS):
+        elastic_type = self.elastic_type
         scalar_space = space.scalar_space
         _, _, gphi, _, _, _ = self.fetch(scalar_space)
         _, GD = gphi.shape[-2:]
 
         if GD == 2:
-            if elasticity_type == 'stress':
-                E, nu = self.E, self.nu
-                D = E / (1 - nu**2) * \
-                    bm.tensor([[1, nu, 0],
-                                [nu, 1, 0],
-                                [0, 0, (1 - nu) / 2]], dtype=bm.float64)
-            elif elasticity_type == 'strain':
-                mu, lam = self.mu, self.lam
-                D = bm.tensor([[2 * mu + lam, lam, 0],
-                                [lam, 2 * mu + lam, 0],
-                                [0, 0, mu]], dtype=bm.float64)
+            if elastic_type == 'stress':
+                D = self.material.plane_stress_elastic_matrix()
+            elif elastic_type == 'strain':
+                D = self.material.plane_strain_elastic_matrix()
             else:
-                raise ValueError("Unknown type.")
+                raise ValueError("Unknown elastic type for 2D. Use 'stress' or 'strain'.")
         elif GD == 3:
-            if elasticity_type is None:
-                mu, lam = self.mu, self.lam
-                D = bm.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],
-                                  [lam, 2 * mu + lam, lam, 0, 0, 0],
-                                  [lam, lam, 2 * mu + lam, 0, 0, 0],
-                                  [0, 0, 0, mu, 0, 0],
-                                  [0, 0, 0, 0, mu, 0],
-                                  [0, 0, 0, 0, 0, mu]], dtype=bm.float64)
+            if elastic_type is None:
+                D = self.material.elastic_matrix()
             else:
-                raise ValueError("Unnecessary Input.")
+                raise ValueError("For 3D elastic matrix, 'elastic_type' should not be specified.")
         else:
             raise ValueError("Invalid GD dimension.")
         
@@ -127,7 +104,8 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         mesh = getattr(scalar_space, 'mesh', None)
         bcs, ws, _, cm, index, _ = self.fetch(scalar_space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        D = self.elasticity_matrix(space)
+        
+        D = self.elastic_matrix(space)
         B = self.strain_matrix(space)
         if coef is None:
             KK = bm.einsum('q, c, cqki, kl, cqlj -> cij', ws, cm, B, D, B)
@@ -146,7 +124,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         return KK
 
     @assemblymethod('fast_strain')
-    def fast_assembly_strain_constant(self, space: _FS) -> TensorLike:
+    def fast_assembly_strain(self, space: _FS) -> TensorLike:
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -179,7 +157,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         tldof = space.number_of_local_dofs()
         KK = bm.zeros((NC, tldof, tldof), dtype=bm.float64)
 
-        mu, lam = self.mu, self.lam
+        mu, lam = self.material.calculate_shear_modulus(), self.material.calculate_lame_lambda()
         
         if space.dof_priority:
             # Fill the diagonal part
@@ -216,7 +194,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         return KK
 
     @assemblymethod('fast_stress')
-    def fast_assembly_stress_constant(self, space: _FS) -> TensorLike:
+    def fast_assembly_stress(self, space: _FS) -> TensorLike:
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -248,7 +226,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         ldof = scalar_space.number_of_local_dofs()
         KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
 
-        E, nu = self.E, self.nu
+        E, nu = self.material.get_property('elastic_modulus'), self.material.get_property('poisson_ratio')
         # Fill the diagonal part
         KK[:, :ldof, :ldof] = A_xx + (1 - nu) / 2 * A_yy
         KK[:, ldof:, ldof:] = A_yy + (1 - nu) / 2 * A_xx
@@ -277,7 +255,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         return KK
     
     @assemblymethod('fast_3d')
-    def fast_assembly_constant(self, space: _FS) -> TensorLike:
+    def fast_assembly(self, space: _FS) -> TensorLike:
         index = self.index
         coef = self.coef
         scalar_space = space.scalar_space
@@ -315,7 +293,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
         ldof = scalar_space.number_of_local_dofs()
         KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
 
-        mu, lam = self.mu, self.lam
+        mu, lam = self.material.calculate_shear_modulus(), self.material.calculate_lame_lambda()
         # Fill the diagonal part
         KK[:, :ldof, :ldof] = (2 * mu + lam) * A_xx + mu * (A_yy + A_zz)
         KK[:, ldof:2*ldof, ldof:2*ldof] = (2 * mu + lam) * A_yy + mu * (A_xx + A_zz)
@@ -345,69 +323,3 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
                 raise ValueError("Invalid coef.")
         
         return KK
-
-
-class LinearElasticityCoefficient():
-    def __init__(self, lam: Optional[float]=None, mu: Optional[float]=None,
-                 E: Optional[float]=None, nu: Optional[float]=None, 
-                 elasticity_type: Optional[str]=None) -> None:
-        if lam is not None and mu is not None:
-            self.E = mu * (3*lam + 2*mu) / (lam + mu)
-            self.nu = lam / (2 * (lam + mu))
-            self.lam = lam
-            self.mu = mu
-        elif E is not None and nu is not None:
-            self.lam = nu * E / ((1 + nu) * (1 - 2 * nu))
-            self.mu = E / (2 * (1 + nu))
-            self.E = E
-            self.nu = nu
-        else:
-            raise ValueError("Either (lam, mu) or (e, nu) should be provided.")
-        self.elasticity_type = elasticity_type
-
-    def elasticity_matrix(self, space: _FS):
-        elasticity_type = self.elasticity_type
-        scalar_space = space.scalar_space
-        _, _, gphi, _, _, _ = self.fetch(scalar_space)
-        _, GD = gphi.shape[-2:]
-
-        if GD == 2:
-            if elasticity_type == 'stress':
-                E, nu = self.E, self.nu
-                D = E / (1 - nu**2) *\
-                    bm.tensor([[1, nu, 0],
-                                  [nu, 1, 0],
-                                  [0, 0, (1 - nu) / 2]], device=self.device, dtype=bm.float64)
-            elif elasticity_type == 'strain':
-                mu, lam = self.mu, self.lam
-                D = bm.tensor([[2 * mu + lam, lam, 0],
-                                  [lam, 2 * mu + lam, 0],
-                                  [0, 0, mu]], device=self.device, dtype=bm.float64)
-            else:
-                raise ValueError("Unknown type.")
-        elif GD == 3:
-            if elasticity_type is None:
-                D = bm.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],
-                                  [lam, 2 * mu + lam, lam, 0, 0, 0],
-                                  [lam, lam, 2 * mu + lam, 0, 0, 0],
-                                  [0, 0, 0, mu, 0, 0],
-                                  [0, 0, 0, 0, mu, 0],
-                                  [0, 0, 0, 0, 0, mu]], dtype=bm.float64)
-            else:
-                raise ValueError("Unnecessary Input.")
-        else:
-            raise ValueError("Invalid GD dimension.")
-        
-        return D
-    
-    def strain_matrix(self, space: _FS):
-        scalar_space = space.scalar_space
-        _, _, gphi, _, _, _ = self.fetch(scalar_space)
-        ldof, GD = gphi.shape[-2:]
-        if space.dof_priority:
-            indices = flatten_indices((ldof, GD), (1, 0))
-        else:
-            indices = flatten_indices((ldof, GD), (0, 1))
-        B = bm.cat([normal_strain(gphi, indices),
-                       shear_strain(gphi, indices)], dim=-2)
-        return B

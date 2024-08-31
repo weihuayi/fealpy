@@ -1,6 +1,6 @@
 import numpy as np
 
-stress_element_stiffness_matrix_uniform_mesh_2d_p1_data= [
+stress_KE_uniform_mesh_2d_p1_data= [
     {   
         "extent": (0, 2, 0, 2),
         "h": (1.0, 1.0),

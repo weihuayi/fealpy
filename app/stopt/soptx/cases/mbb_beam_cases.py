@@ -23,6 +23,8 @@ class MBBBeamCase:
         self.constraint_conditions = None
         self.boundary_conditions = None
         self.termination_criterias = None
+        self.nx = None
+        self.ny = None
         self.initialize_case_parameters()
 
     def initialize_case_parameters(self):
@@ -30,13 +32,13 @@ class MBBBeamCase:
         Initialize parameters and variables based on the case name.
         """
         if self.case_name == "top88":
-            nx, ny = 60, 20
+            self.nx, self.ny = 60, 20
             rmin, ft = 1.5, 0
 
             self.material_properties = MaterialProperties(E0=1.0, Emin=1e-9, nu=0.3, penal=3.0)
-            self.geometry_properties = GeometryProperties(x_min=0.0, x_max=float(nx), 
-                                                        y_min=0.0, y_max=float(ny))
-            self.filter_properties = FilterProperties(nx=nx, ny=ny, rmin=rmin, ft=ft)
+            self.geometry_properties = GeometryProperties(x_min=0.0, x_max=float(self.nx), 
+                                                        y_min=0.0, y_max=float(self.ny))
+            self.filter_properties = FilterProperties(nx=self.nx, ny=self.ny, rmin=rmin, ft=ft)
 
             self.constraint_conditions = ConstraintConditions()
             self.constraint_conditions.set_volume_constraint(is_on=True, vf=0.5)
