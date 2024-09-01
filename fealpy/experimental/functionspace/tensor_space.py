@@ -186,8 +186,12 @@ class TensorFunctionSpace(FunctionSpace):
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
         phi = self.basis(bc, index=index)
         c2dof = self.cell_to_dof()[index]
-        if self.dof_priority:
-            val = bm.einsum('cql..., cl... -> cq...', phi, uh[c2dof, ...])
-        else:
-            val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., c2dof])
+        val = bm.einsum('cql..., cl... -> cq...', phi, uh[c2dof, ...])
         return val
+    
+    @barycentric
+    def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        gphi = self.grad_basis(bc, index=index)
+        cell2dof = self.cell_to_dof()[index]
+        val = bm.einsum('cqlmn..., cl... -> cqmn', gphi, uh[cell2dof, ...])
+        return val[...]
