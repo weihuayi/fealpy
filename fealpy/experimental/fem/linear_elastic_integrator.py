@@ -3,15 +3,12 @@ from typing import Optional
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S, MaterialLike
 
-from ..utils import process_coef_func, is_scalar, is_tensor
-
 from ..mesh import HomogeneousMesh, SimplexMesh
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
-    assemblymethod,
-    CoefLike
+    assemblymethod
 )
 
 class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
@@ -105,20 +102,28 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         
         if space.dof_priority:
             # Fill the diagonal part
-            KK[:, 0:ldof:1, 0:ldof:1] = D00 * A_xx + D22 * A_yy
-            KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof, 1), slice(0, ldof, 1)), D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1], 1), slice(ldof, KK.shape[1], 1)), D00 * A_yy + D22 * A_xx)
+            # KK[:, 0:ldof:1, 0:ldof:1] = D00 * A_xx + D22 * A_yy
+            # KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
-            KK[:, 0:ldof:1, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
-            KK[:, ldof:KK.shape[1]:1, 0:ldof:1] = D01 * A_yx + D22 * A_xy
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof, 1), slice(ldof, KK.shape[1], 1)), D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1], 1), slice(0, ldof, 1)), D01 * A_yx + D22 * A_xy)
+            # KK[:, 0:ldof:1, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
+            # KK[:, ldof:KK.shape[1]:1, 0:ldof:1] = D01 * A_yx + D22 * A_xy
         else:
             # Fill the diagonal part
-            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
-            KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D00 * A_yy + D22 * A_xx)
+            # KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
+            # KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
-            KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
-            KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D22 * A_xy
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D01 * A_yx + D22 * A_xy)
+            # KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
+            # KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D22 * A_xy
         
         return KK
 
@@ -165,20 +170,28 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         if space.dof_priority:
             # Fill the diagonal part
-            KK[:, 0:ldof, 0:ldof] = D00 * A_xx + D22 * A_yy
-            KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), D00 * A_yy + D22 * A_xx)
+            # KK[:, 0:ldof, 0:ldof] = D00 * A_xx + D22 * A_yy
+            # KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
-            KK[:, 0:ldof, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
-            KK[:, ldof:KK.shape[1]:1, 0:ldof] = D22 * A_yx + D01 * A_xy
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), D22 * A_yx + D01 * A_xy)
+            # KK[:, 0:ldof, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
+            # KK[:, ldof:KK.shape[1]:1, 0:ldof] = D22 * A_yx + D01 * A_xy
         else:
             # Fill the diagonal part
-            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
-            KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D00 * A_yy + D22 * A_xx)
+            # KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
+            # KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
-            KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
-            KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D22 * A_yx + D01 * A_xy
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D22 * A_yx + D01 * A_xy)
+            # KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
+            # KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D22 * A_yx + D01 * A_xy
         
         return KK
     
@@ -232,30 +245,48 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         if space.dof_priority:
             # Fill the diagonal part
-            KK[:, :ldof, :ldof] = D00 * A_xx + D55 * A_yy + D55 * A_zz
-            KK[:, ldof:2*ldof, ldof:2*ldof] = D00 * A_yy + D55 * A_xx + D55 * A_zz
-            KK[:, 2*ldof:, 2*ldof:] = D00 * A_zz + D55 * A_xx + D55 * A_yy
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), D00 * A_xx + D55 * A_yy + D55 * A_zz)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, 2 * ldof), slice(ldof, 2 * ldof)), D00 * A_yy + D55 * A_xx + D55 * A_zz)
+            KK = bm.set_at(KK, (slice(None), slice(2 * ldof, None), slice(2 * ldof, None)), D00 * A_zz + D55 * A_xx + D55 * A_yy)
+            # KK[:, :ldof, :ldof] = D00 * A_xx + D55 * A_yy + D55 * A_zz
+            # KK[:, ldof:2*ldof, ldof:2*ldof] = D00 * A_yy + D55 * A_xx + D55 * A_zz
+            # KK[:, 2*ldof:, 2*ldof:] = D00 * A_zz + D55 * A_xx + D55 * A_yy
 
             # Fill the off-diagonal part
-            KK[:, :ldof, ldof:2*ldof] = D01 * A_xy + D55 * A_yx
-            KK[:, :ldof, 2*ldof:] = D01 * A_xz + D55 * A_zx
-            KK[:, ldof:2*ldof, :ldof] = D01 * A_yx + D55 * A_xy
-            KK[:, ldof:2*ldof, 2*ldof:] = D01 * A_yz + D55 * A_zy
-            KK[:, 2*ldof:, :ldof] = D01 * A_zx + D55 * A_xz
-            KK[:, 2*ldof:, ldof:2*ldof] = D01 * A_zy + D55 * A_yz
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, 2 * ldof)), D01 * A_xy + D55 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(2 * ldof, None)), D01 * A_xz + D55 * A_zx)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, 2 * ldof), slice(0, ldof)), D01 * A_yx + D55 * A_xy)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, 2 * ldof), slice(2 * ldof, None)), D01 * A_yz + D55 * A_zy)
+            KK = bm.set_at(KK, (slice(None), slice(2 * ldof, None), slice(0, ldof)), D01 * A_zx + D55 * A_xz)
+            KK = bm.set_at(KK, (slice(None), slice(2 * ldof, None), slice(ldof, 2 * ldof)), D01 * A_zy + D55 * A_yz)
+            # KK[:, :ldof, ldof:2*ldof] = D01 * A_xy + D55 * A_yx
+            # KK[:, :ldof, 2*ldof:] = D01 * A_xz + D55 * A_zx
+            # KK[:, ldof:2*ldof, :ldof] = D01 * A_yx + D55 * A_xy
+            # KK[:, ldof:2*ldof, 2*ldof:] = D01 * A_yz + D55 * A_zy
+            # KK[:, 2*ldof:, :ldof] = D01 * A_zx + D55 * A_xz
+            # KK[:, 2*ldof:, ldof:2*ldof] = D01 * A_zy + D55 * A_yz
 
         else:
             # Fill the diagonal part
-            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = (2 * D55 + D01) * A_xx + D55 * (A_yy + A_zz)
-            KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = (2 * D55 + D01) * A_yy + D55 * (A_xx + A_zz)
-            KK[:, 2:KK.shape[1]:GD, 2:KK.shape[2]:GD] = (2 * D55 + D01) * A_zz + D55 * (A_xx + A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), (2 * D55 + D01) * A_xx + D55 * (A_yy + A_zz))
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), (2 * D55 + D01) * A_yy + D55 * (A_xx + A_zz))
+            KK = bm.set_at(KK, (slice(None), slice(2, KK.shape[1], GD), slice(2, KK.shape[2], GD)), (2 * D55 + D01) * A_zz + D55 * (A_xx + A_yy))
+            # KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = (2 * D55 + D01) * A_xx + D55 * (A_yy + A_zz)
+            # KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = (2 * D55 + D01) * A_yy + D55 * (A_xx + A_zz)
+            # KK[:, 2:KK.shape[1]:GD, 2:KK.shape[2]:GD] = (2 * D55 + D01) * A_zz + D55 * (A_xx + A_yy)
 
             # Fill the off-diagonal
-            KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D55 * A_yx
-            KK[:, 0:KK.shape[1]:GD, 2:KK.shape[2]:GD] = D01 * A_xz + D55 * A_zx
-            KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D55 * A_xy
-            KK[:, 1:KK.shape[1]:GD, 2:KK.shape[2]:GD] = D01 * A_yz + D55 * A_zy
-            KK[:, 2:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_zx + D55 * A_xz
-            KK[:, 2:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_zy + D55 * A_yz
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_xy + D55 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(2, KK.shape[2], GD)), D01 * A_xz + D55 * A_zx)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D01 * A_yx + D55 * A_xy)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(2, KK.shape[2], GD)), D01 * A_yz + D55 * A_zy)
+            KK = bm.set_at(KK, (slice(None), slice(2, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D01 * A_zx + D55 * A_xz)
+            KK = bm.set_at(KK, (slice(None), slice(2, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_zy + D55 * A_yz)
+            # KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D55 * A_yx
+            # KK[:, 0:KK.shape[1]:GD, 2:KK.shape[2]:GD] = D01 * A_xz + D55 * A_zx
+            # KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D55 * A_xy
+            # KK[:, 1:KK.shape[1]:GD, 2:KK.shape[2]:GD] = D01 * A_yz + D55 * A_zy
+            # KK[:, 2:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_zx + D55 * A_xz
+            # KK[:, 2:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_zy + D55 * A_yz
 
         return KK
