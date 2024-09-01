@@ -7,7 +7,7 @@ import inspect
 from ..common import ranges
 
 from .mesh_base import Mesh, Plotable
-from .mesh_data_structure import MeshDataStructure, ArrRedirector
+from .mesh_data_structure import Mesh2dDataStructure, ArrRedirector
 
 
 class PolygonMesh(Mesh, Plotable):
@@ -559,13 +559,13 @@ class PolygonMesh(Mesh, Plotable):
             node = np.array([
                     [0.0, 0.0],
                     [1.0, 0.0],
-                    [0.5, np.sqrt(3)/2]], dtype=np.float_)
+                    [0.5, np.sqrt(3)/2]], dtype=np.float64)
         elif meshtype =='iso':
             node = np.array([
                     [0.0, 0.0],
                     [1.0, 0.0],
-                    [0.0, 1.0]], dtype=np.float_)
-        cell = np.array([[0, 1, 2]],dtype=np.int_)
+                    [0.0, 1.0]], dtype=np.float64)
+        cell = np.array([[0, 1, 2]],dtype=np.int64)
         return cls(node, cell)
 
     @classmethod
@@ -574,8 +574,8 @@ class PolygonMesh(Mesh, Plotable):
             [0.0, 0.0],
             [1.0, 0.0],
             [1.0, 1.0],
-            [0.0, 1.0]],dtype=np.float_)
-        cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+            [0.0, 1.0]],dtype=np.float64)
+        cell = np.array([[0, 1, 2, 3]], dtype=np.int64)
         return cls(node, cell)
 
     @classmethod
@@ -600,9 +600,9 @@ class PolygonMesh(Mesh, Plotable):
             (np.cos(2/5*pi), -np.sin(2/5*pi)),
             (np.cos(2/5*pi)+1, -np.sin(2/5*pi)),
             ( 2*np.cos(1/5*pi), 0.0),
-            (np.cos(1/5*pi), np.sin(1/5*pi))],dtype=np.float_)
-        cell = np.array([0, 1, 2, 3, 4], dtype=np.int_)
-        cellLocation = np.array([0, 5], dtype=np.int_)
+            (np.cos(1/5*pi), np.sin(1/5*pi))],dtype=np.float64)
+        cell = np.array([0, 1, 2, 3, 4], dtype=np.int64)
+        cellLocation = np.array([0, 5], dtype=np.int64)
         return cls(node, cell, cellLocation)
 
     @classmethod
@@ -613,9 +613,9 @@ class PolygonMesh(Mesh, Plotable):
             [3/2, -np.sqrt(3)/2],
             [2.0, 0.0],
             [3/2, np.sqrt(3)/2],
-            [1/2, np.sqrt(3)/2]], dtype=np.float_)
-        cell = np.array([0, 1, 2, 3, 4, 5], dtype=np.int_)
-        cellLocation = np.array([0, 6], dtype=np.int_)
+            [1/2, np.sqrt(3)/2]], dtype=np.float64)
+        cell = np.array([0, 1, 2, 3, 4, 5], dtype=np.int64)
+        cellLocation = np.array([0, 6], dtype=np.int64)
         return cls(node, cell ,cellLocation)
 
     @classmethod
@@ -896,7 +896,7 @@ class PolygonMesh(Mesh, Plotable):
 PolygonMesh.set_ploter('polygon2d')
 
 
-class PolygonMeshDataStructure(MeshDataStructure):
+class PolygonMeshDataStructure(Mesh2dDataStructure):
     # Variables
     face = ArrRedirector('edge')
     edge2cell: NDArray

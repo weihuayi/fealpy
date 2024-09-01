@@ -20,21 +20,27 @@ qf = mesh.quadrature_formula(q, 'cell')
 cm = mesh.entity_measure('cell')
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs) #(1, NQ, ldof)
+coef = 1
 
-def kernel_fdunc(u):
-    return u**3
+def kernel_func(u):
+    return u**3 + u + 1
 
-def cell_integral(ws, phi, val):
-    return bm.einsum(f'q, qi, qj, ...j -> ...i', ws, phi[0], phi[0], val) * cm[0]
+def cell_integral(u, cm, phi, ws, coef):
+    val = kernel_func(bm.einsum('i, qi -> q', u, phi[0]))
+    return bm.einsum('q, qi, q -> i', ws, phi[0], val) * cm * coef
 
-def auto_grad(ws, phi, val):
-    fn = bm.vmap(bm.jacfwd(
-          partial(cell_integral, ws, phi)
-          ))
-    return fn(val)
+def auto_grad(uh_, cm, coef, ws, phi):
+    fn_A = bm.vmap(bm.jacfwd(                         
+        partial(cell_integral, coef=coef, ws=ws, phi=phi)
+        ))
+    fn_F = bm.vmap(
+        partial(cell_integral, coef=coef, ws=ws, phi=phi)
+    )
+    return  fn_A(uh_, cm), -fn_F(uh_, cm)
 
 def test():
-    print(auto_grad(ws, phi, kernel_fdunc(uh_)))
+    print(auto_grad(uh_, cm, coef, ws, phi)[0],\
+          auto_grad(uh_, cm, coef, ws, phi)[1])
     
 if __name__ == "__main__":
     test()
