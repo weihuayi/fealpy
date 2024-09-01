@@ -57,4 +57,12 @@ class ScalarSemilinearConvectionIntegrator(SemilinearInt, OpInt, CellInt):
         phi = space.basis(bcs, index=index)
         return bcs, ws, phi, cm, index
     
+    def assembly(self, space: _FS) -> TensorLike:
+        pass
+
+    def cell_integral(self, u, phi, gphi, cm, ws, coef, batched) -> TensorLike:
+        pass
+
+    def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
+        pass
     
