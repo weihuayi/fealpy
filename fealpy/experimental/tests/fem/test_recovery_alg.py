@@ -42,5 +42,6 @@ class TestRecoveryAlg:
 if __name__ == "__main__":
     TestRecoveryAlg().test_recovery_alg('numpy')
     TestRecoveryAlg().test_recovery_alg('pytorch')
+    TestRecoveryAlg().test_recovery_alg('jax')
 #    pytest.main(['test_recovery_alg.py', "-q"])   
 
