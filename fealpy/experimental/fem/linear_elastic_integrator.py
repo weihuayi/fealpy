@@ -20,14 +20,13 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     """
     def __init__(self, 
                  material: MaterialLike,
-                 coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+                 q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
         self.material = material
-        self.coef = coef  
         self.q = q
         self.index = index
 
@@ -66,7 +65,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('fast_strain')
     def fast_assembly_strain(self, space: _FS) -> TensorLike:
         index = self.index
-        coef = self.coef
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
 
@@ -97,46 +95,36 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         tldof = space.number_of_local_dofs()
         KK = bm.zeros((NC, tldof, tldof), dtype=bm.float64)
 
-        mu, lam = self.material.calculate_shear_modulus(), self.material.calculate_lame_lambda()
+        # TODO 只能处理 (NC, 1, 3, 3) 和 (1, 1, 3, 3) 的情况 
+        D = self.material.elastic_matrix()
+        if D.shape[0] != 1:
+            raise ValueError("Elastic matrix D must have shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
+        D00 = D[..., 0, 0, None]
+        D01 = D[..., 0, 1, None]
+        D22 = D[..., 2, 2, None]
         
         if space.dof_priority:
             # Fill the diagonal part
-            KK[:, 0:ldof:1, 0:ldof:1] = (2 * mu + lam) * A_xx + mu * A_yy
-            KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = (2 * mu + lam) * A_yy + mu * A_xx
+            KK[:, 0:ldof:1, 0:ldof:1] = D00 * A_xx + D22 * A_yy
+            KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
-            KK[:, 0:ldof:1, ldof:KK.shape[1]:1] = lam * A_xy + mu * A_yx
-            KK[:, ldof:KK.shape[1]:1, 0:ldof:1] = lam * A_yx + mu * A_xy
+            KK[:, 0:ldof:1, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
+            KK[:, ldof:KK.shape[1]:1, 0:ldof:1] = D01 * A_yx + D22 * A_xy
         else:
             # Fill the diagonal part
-            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = (2 * mu + lam) * A_xx + mu * A_yy
-            KK[:, GD-1:KK.shape[1]:GD, GD-1:KK.shape[2]:GD] = (2 * mu + lam) * A_yy + mu * A_xx
+            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
+            KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
-            KK[:, 0:KK.shape[1]:GD, GD-1:KK.shape[2]:GD] = lam * A_xy + mu * A_yx
-            KK[:, GD-1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = lam * A_yx + mu * A_xy
-
-        if coef is None:
-            KK[:] = KK
-        elif is_scalar(coef):
-            KK[:] = KK * coef
-        elif is_tensor(coef):
-            if coef.ndim == 1:
-                KK[:] = bm.einsum('cij, c -> cij', KK, coef)
-            elif coef.ndim == 2:
-                raise ValueError("Invalid coef shape: \
-                        Fast assembly expects coef to be of shape (NC, NQ).")
-            elif coef.ndim == 3:
-                pass
-            else:
-                raise ValueError("Invalid coef.")
+            KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
+            KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D22 * A_xy
         
         return KK
 
     @assemblymethod('fast_stress')
     def fast_assembly_stress(self, space: _FS) -> TensorLike:
         index = self.index
-        coef = self.coef
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
 
@@ -166,38 +154,38 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         ldof = scalar_space.number_of_local_dofs()
         KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
 
-        E, nu = self.material.get_property('elastic_modulus'), self.material.get_property('poisson_ratio')
-        # Fill the diagonal part
-        KK[:, :ldof, :ldof] = A_xx + (1 - nu) / 2 * A_yy
-        KK[:, ldof:, ldof:] = A_yy + (1 - nu) / 2 * A_xx
+        # TODO 只能处理 (NC, 1, 3, 3) 和 (1, 1, 3, 3) 的情况 
+        D = self.material.elastic_matrix()
+        if D.shape[1] != 1:
+            raise ValueError("fast_assembly_stress currently only supports elastic matrices "
+                            "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
+        D00 = D[..., 0, 0, None]
+        D01 = D[..., 0, 1, None]
+        D22 = D[..., 2, 2, None]
 
-        # Fill the off-diagonal part
-        KK[:, :ldof, ldof:] = nu * A_xy + (1 - nu) / 2 * A_yx
-        KK[:, ldof:, :ldof] = (1 - nu) / 2 * A_yx + nu * A_xy
+        if space.dof_priority:
+            # Fill the diagonal part
+            KK[:, 0:ldof, 0:ldof] = D00 * A_xx + D22 * A_yy
+            KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
 
-        KK *= E / (1 - nu**2)
+            # Fill the off-diagonal part
+            KK[:, 0:ldof, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
+            KK[:, ldof:KK.shape[1]:1, 0:ldof] = D22 * A_yx + D01 * A_xy
+        else:
+            # Fill the diagonal part
+            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
+            KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
 
-        if coef is None:
-            KK[:] = KK
-        elif is_scalar(coef):
-            KK[:] = KK * coef
-        elif is_tensor(coef):
-            if coef.ndim == 1:
-                KK[:] = bm.einsum('cij, c -> cij', KK, coef)
-            elif coef.ndim == 2:
-                raise ValueError("Invalid coef shape: \
-                        Fast assembly expects coef to be of shape (NC, NQ).")
-            elif coef.ndim == 3:
-                pass
-            else:
-                raise ValueError("Invalid coef.")
+            # Fill the off-diagonal part
+            KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
+            KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D22 * A_yx + D01 * A_xy
         
         return KK
     
     @assemblymethod('fast_3d')
     def fast_assembly(self, space: _FS) -> TensorLike:
         index = self.index
-        coef = self.coef
+        # coef = self.coef
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
 
@@ -233,33 +221,41 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         ldof = scalar_space.number_of_local_dofs()
         KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
 
-        mu, lam = self.material.calculate_shear_modulus(), self.material.calculate_lame_lambda()
-        # Fill the diagonal part
-        KK[:, :ldof, :ldof] = (2 * mu + lam) * A_xx + mu * (A_yy + A_zz)
-        KK[:, ldof:2*ldof, ldof:2*ldof] = (2 * mu + lam) * A_yy + mu * (A_xx + A_zz)
-        KK[:, 2*ldof:, 2*ldof:] = (2 * mu + lam) * A_zz + mu * (A_xx + A_yy)
-
-        # Fill the off-diagonal part
-        KK[:, :ldof, ldof:2*ldof] = lam * A_xy + mu * A_yx
-        KK[:, :ldof, 2*ldof:] = lam * A_xz + mu * A_zx
-        KK[:, ldof:2*ldof, :ldof] = lam * A_yx + mu * A_xy
-        KK[:, ldof:2*ldof, 2*ldof:] = lam * A_yz + mu * A_zy
-        KK[:, 2*ldof:, :ldof] = lam * A_zx + mu * A_xz
-        KK[:, 2*ldof:, ldof:2*ldof] = lam * A_zy + mu * A_yz
-
-        if coef is None:
-            KK[:] = KK
-        elif is_scalar(coef):
-            KK[:] = KK * coef
-        elif is_tensor(coef):
-            if coef.ndim == 1:
-                KK[:] = bm.einsum('cij, c -> cij', KK, coef)
-            elif coef.ndim == 2:
-                raise ValueError("Invalid coef shape: \
-                        Fast assembly expects coef to be of shape (NC, NQ).")
-            elif coef.ndim == 3:
-                pass
-            else:
-                raise ValueError("Invalid coef.")
+        D = self.material.elastic_matrix()
+        if D.shape[1] != 1:
+            raise ValueError("fast_assembly currently only supports elastic matrices "
+                            "with shape (NC, 1, 6, 6) or (1, 1, 6, 6).")
         
+        D00 = D[..., 0, 0, None]
+        D01 = D[..., 0, 1, None]
+        D55 = D[..., 5, 5, None]
+
+        if space.dof_priority:
+            # Fill the diagonal part
+            KK[:, :ldof, :ldof] = D00 * A_xx + D55 * A_yy + D55 * A_zz
+            KK[:, ldof:2*ldof, ldof:2*ldof] = D00 * A_yy + D55 * A_xx + D55 * A_zz
+            KK[:, 2*ldof:, 2*ldof:] = D00 * A_zz + D55 * A_xx + D55 * A_yy
+
+            # Fill the off-diagonal part
+            KK[:, :ldof, ldof:2*ldof] = D01 * A_xy + D55 * A_yx
+            KK[:, :ldof, 2*ldof:] = D01 * A_xz + D55 * A_zx
+            KK[:, ldof:2*ldof, :ldof] = D01 * A_yx + D55 * A_xy
+            KK[:, ldof:2*ldof, 2*ldof:] = D01 * A_yz + D55 * A_zy
+            KK[:, 2*ldof:, :ldof] = D01 * A_zx + D55 * A_xz
+            KK[:, 2*ldof:, ldof:2*ldof] = D01 * A_zy + D55 * A_yz
+
+        else:
+            # Fill the diagonal part
+            KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = (2 * D55 + D01) * A_xx + D55 * (A_yy + A_zz)
+            KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = (2 * D55 + D01) * A_yy + D55 * (A_xx + A_zz)
+            KK[:, 2:KK.shape[1]:GD, 2:KK.shape[2]:GD] = (2 * D55 + D01) * A_zz + D55 * (A_xx + A_yy)
+
+            # Fill the off-diagonal
+            KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D55 * A_yx
+            KK[:, 0:KK.shape[1]:GD, 2:KK.shape[2]:GD] = D01 * A_xz + D55 * A_zx
+            KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D55 * A_xy
+            KK[:, 1:KK.shape[1]:GD, 2:KK.shape[2]:GD] = D01 * A_yz + D55 * A_zy
+            KK[:, 2:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_zx + D55 * A_xz
+            KK[:, 2:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_zy + D55 * A_yz
+
         return KK
