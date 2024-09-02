@@ -403,6 +403,27 @@ class ExternalGear(Gear):
 
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+            # 中间齿
+            for i in range(2, z - 1):
+                rot_matrix = np.array(
+                    [[np.cos(rot_phi[i]), -np.sin(rot_phi[i])], [np.sin(rot_phi[i]), np.cos(rot_phi[i])]])
+                new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
+                # 处理重复顶点
+                trans_matrix[0] = trans_matrix[11]
+                trans_matrix[1] = trans_matrix[4]
+                # 处理重复边上节点
+                trans_matrix[len(key_points):len(key_points) + n3 - 1] = trans_matrix[len(key_points) + 2 * (
+                        n3 + n1 + n2 - 3):len(key_points) + 2 * (
+                        n3 + n1 + n2 - 3) + n3 - 1]
+                # 其他节点
+                trans_matrix[0:12] += single_node_num
+                trans_matrix[14:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))] += single_node_num
+                trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1)):] += single_node_num
+                # 新单元映射与拼接
+                new_cell = trans_matrix[origin_cell]
+                tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+                tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+
             t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
         else:
             # 计算边内部点数
