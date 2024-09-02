@@ -43,6 +43,7 @@ class Gear(ABC):
         self.na = na
         self.nf = nf
         self.chamfer_dia = chamfer_dia
+        self.mesh = None
 
         # 端面变位系数
         self.x_t = self.x_n/cos(self.beta)
@@ -54,8 +55,8 @@ class Gear(ABC):
         self.d = self.m_t*self.z
         self.r = self.d/2
         # 基圆（base circle）直径与半径
-        self.d_b = self.d*self.alpha_t
-        self.r_b = self.d_b/2
+        self.d_f = self.d * self.alpha_t
+        self.r_f = self.d_f / 2
 
     @abstractmethod
     def get_involute_points(self):
@@ -80,6 +81,17 @@ class Gear(ABC):
     @abstractmethod
     def optimize_parameters(self):
         pass
+
+    def show_mesh(self, save_path=None):
+        if self.mesh is None:
+            raise AssertionError('The mesh is not yet created.')
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(38, 20))
+        self.mesh.add_plot(ax, linewidth=0.1)
+        if save_path is not None:
+            plt.savefig('./image/全齿网格生成_实际齿顶圆_24_8_30.png', dpi=600, bbox_inches='tight')
+        plt.show()
 
 
 class ExternalGear(Gear):
@@ -111,10 +123,11 @@ class ExternalGear(Gear):
         self.r_a = self.d_a/2
         # 齿根圆直径与半径
         hf = self.m_n*(self.hac+self.cc-self.x_t)
-        self.d_b = self.d-2*hf
-        self.r_b = self.d_b/2
+        self.d_f = self.d - 2 * hf
+        self.r_f = self.d_f / 2
         # 有效齿顶圆
         self.effective_da = self.d_a-self.chamfer_dia
+        self.effective_ra = self.effective_da/2
         # 刀具齿顶高与刀尖圆弧半径
         self.ha_cutter = (self.hac + self.cc) * self.m_n
         self.r_cutter = self.m_n * self.rco
@@ -220,16 +233,381 @@ class ExternalGear(Gear):
             points[i, 1] = yt1[i]
             points[i, 2] = 0
 
-        return points, t2
+        return points
 
     def generate_mesh(self):
-        pass
+        n1 = self.n1
+        n2 = self.n2
+        n3 = self.n3
+        nf = self.nf
+        na = self.na
+        rf = self.r_f
+        ra = self.effective_ra
+        # 获取齿廓与过渡曲线点列
+        points = self.get_profile_points()
+        # 齿顶弧线，逆时针，角度参数 t_aa > t_a
+        t_a = arctan2(points[-1, 1], points[-1, 0])
+        t_aa = pi - t_a
+
+        # 齿根部分
+        t_ff = arctan2(points[0, 1], points[0, 0])
+        t_f = pi - t_ff
+        r_inner = self.inner_diam / 2
+        theta = np.linspace(t_f, t_ff, 100)
+        x_f = r_inner * cos(theta)
+        y_f = r_inner * sin(theta)
+        
+        # 构造关键点
+        kp_1 = points[n1 + n2 + 1]
+        kp_4 = points[0]
+
+        kp_2 = points[2 * n1 + n2 + 1]
+        kp_5 = points[n1]
+
+        kp_3 = points[-1]
+        kp_6 = points[n1 + n2]
+
+        kp_0 = np.array([x_f[0], y_f[0], 0])
+        kp_11 = np.array([x_f[-1], y_f[-1], 0])
+
+        kp_10 = np.array([0, r_inner, 0])
+        kp_9 = np.array([0, ra, 0])
+
+        # 单侧弧长与点数，计算中轴上点参数
+        distance = np.sqrt(np.sum(np.diff(points[:n1 + n2 + 1], axis=0) ** 2, axis=1))
+        length2 = np.sum(distance[:n1])
+        length3 = np.sum(distance[n1:n1 + n2])
+        length1 = np.sqrt(np.sum((kp_4 - kp_11) ** 2))
+
+        n_total = n1 * 1.236 + n2 * 0.618 + n3
+        length2_n = length2 * (n1 * 1.236 / n_total)
+        length3_n = length3 * (n2 * 0.618 / n_total)
+        length1_n = length1 * (n3 / n_total)
+        length_total_n = length1_n + length2_n + length3_n
+
+        t_2 = length2_n / length_total_n
+        t_1 = length1_n / length_total_n
+
+        kp_7 = np.array([0, r_inner + (ra - r_inner) * t_1, 0])
+        kp_8 = np.array([0, r_inner + (ra - r_inner) * (t_1 + t_2), 0])
+
+        # 旋转角
+        rot_phi = np.linspace(0, 2 * np.pi, z, endpoint=False)
+
+        # 齿根圆弧上点计算
+        rot_kp_1 = np.zeros(2)
+        rot_kp_1[0] = np.cos(rot_phi[1]) * kp_1[0] - np.sin(rot_phi[1]) * kp_1[1]
+        rot_kp_1[1] = np.sin(rot_phi[1]) * kp_1[0] + np.cos(rot_phi[1]) * kp_1[1]
+        angle0 = np.arctan2(kp_1[1], kp_1[0])
+        angle1 = np.arctan2(rot_kp_1[1], rot_kp_1[0])
+        angle2 = np.arctan2(kp_4[1], kp_4[0])
+        delta_angle = abs(angle1 - angle2)
+
+        # TODO: 改用齿根圆角是否超过最大圆角进行判断与分类
+        # 两侧过渡曲线之间相连，齿槽底面为一条直线，宽度为 0
+        if delta_angle < 1e-12:
+            key_points = np.array([kp_0, kp_1, kp_2, kp_3, kp_4, kp_5, kp_6, kp_7, kp_8, kp_9, kp_10, kp_11])
+
+            edge = np.array([[0, 1],
+                             [1, 2],
+                             [2, 3],
+                             [10, 7],
+                             [7, 8],
+                             [8, 9],
+                             [11, 4],
+                             [4, 5],
+                             [5, 6],
+                             [10, 0],
+                             [7, 1],
+                             [8, 2],
+                             [9, 3],
+                             [11, 10],
+                             [4, 7],
+                             [5, 8],
+                             [6, 9]])
+
+            # 构建子区域半边数据结构
+            half_edge = np.zeros((len(edge) * 2, 5), dtype=np.int64)
+            half_edge[::2, 0] = edge[:, 1]
+            half_edge[1::2, 0] = edge[:, 0]
+            half_edge[::2, 4] = 2 * np.arange(len(edge)) + 1
+            half_edge[1::2, 4] = 2 * np.arange(len(edge))
+            half_edge[np.array([0, 1, 2]) * 2, 1] = np.array([0, 1, 2])
+            half_edge[np.array([0, 1, 2]) * 2 + 1, 1] = -1
+            half_edge[np.array([3, 4, 5]) * 2, 1] = np.array([3, 4, 5])
+            half_edge[np.array([3, 4, 5]) * 2 + 1, 1] = np.array([0, 1, 2])
+            half_edge[np.array([6, 7, 8]) * 2, 1] = -1
+            half_edge[np.array([6, 7, 8]) * 2 + 1, 1] = np.array([3, 4, 5])
+            half_edge[np.array([10, 11, 14, 15]) * 2, 1] = np.array([1, 2, 4, 5])
+            half_edge[np.array([10, 11, 14, 15]) * 2 + 1, 1] = np.array([0, 1, 3, 4])
+            half_edge[np.array([9, 13]) * 2, 1] = np.array([0, 3])
+            half_edge[np.array([9, 13]) * 2 + 1, 1] = -1
+            half_edge[np.array([12, 16]) * 2, 1] = -1
+            half_edge[np.array([12, 16]) * 2 + 1, 1] = np.array([2, 5])
+
+            half_edge[::2, 2] = np.array([21, 23, 25, 29, 31, 33, 14, 16, 32, 0, 2, 4, 5, 6, 8, 10, 24])
+            half_edge[1::2, 2] = np.array([19, 1, 3, 18, 20, 22, 26, 28, 30, 27, 7, 9, 11, 12, 13, 15, 17])
+
+            half_edge[::2, 3] = np.array([18, 20, 22, 26, 28, 30, 27, 12, 14, 7, 9, 11, 32, 13, 15, 17, 16])
+            half_edge[1::2, 3] = np.array([3, 5, 24, 21, 23, 25, 29, 31, 33, 1, 0, 2, 4, 19, 6, 8, 10])
+
+            theta_f = np.linspace(np.pi / 2, t_f, na + 1)
+            theta_ff = np.linspace(t_ff, np.pi / 2, na + 1)
+            theta_a = np.linspace(np.pi / 2, t_a, na + 1)
+            theta_aa = np.linspace(t_aa, np.pi / 2, na + 1)
+            line = [
+                np.linspace(kp_0[..., :-1], kp_1[..., :-1], n3 + 1),
+                points[n1 + n2 + 1:2 * n1 + n2 + 2, :-1],
+                points[2 * n1 + n2 + 1:2 * n1 + 2 * n2 + 2,
+                :-1],
+                np.linspace(kp_10[..., :-1], kp_7[..., :-1], n3 + 1),
+                np.linspace(kp_7[..., :-1], kp_8[..., :-1], n1 + 1),
+                np.linspace(kp_8[..., :-1], kp_9[..., :-1], n2 + 1),
+                np.linspace(kp_11[..., :-1], kp_4[..., :-1], n3 + 1),
+                points[:n1 + 1, :-1],
+                points[n1:n1 + n2 + 1, :-1],
+                np.concatenate([r_inner * np.cos(theta_f)[:, None], r_inner * np.sin(theta_f)[:, None]], axis=1),
+                np.linspace(kp_7[..., :-1], kp_1[..., :-1], na + 1),
+                np.linspace(kp_8[..., :-1], kp_2[..., :-1], na + 1),
+                np.concatenate([ra * np.cos(theta_a)[:, None], ra * np.sin(theta_a)[:, None]], axis=1),
+                np.concatenate([r_inner * np.cos(theta_ff)[:, None], r_inner * np.sin(theta_ff)[:, None]], axis=1),
+                np.linspace(kp_4[..., :-1], kp_7[..., :-1], na + 1),
+                np.linspace(kp_5[..., :-1], kp_8[..., :-1], na + 1),
+                np.concatenate([ra * np.cos(theta_aa)[:, None], ra * np.sin(theta_aa)[:, None]], axis=1)
+            ]
+
+            quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points[:, :-1], line)
+            tooth_node = quad_mesh.node
+            tooth_cell = quad_mesh.cell
+
+            single_node_num = len(tooth_node) - (n3 + 1)
+            single_cell_num = len(tooth_cell)
+            temp_node = np.concatenate([tooth_node[2:len(key_points)], tooth_node[(len(key_points) + (n3 - 1)):]],
+                                       axis=0)
+            # 左侧齿
+            trans_matrix = np.arange(len(tooth_node))
+            # 处理重复顶点
+            trans_matrix[0] = trans_matrix[11]
+            trans_matrix[1] = trans_matrix[4]
+            # 处理重复边上节点
+            trans_matrix[len(key_points):len(key_points) + n3 - 1] = trans_matrix[len(key_points) + 2 * (
+                    n3 + n1 + n2 - 3):len(key_points) + 2 * (
+                    n3 + n1 + n2 - 3) + n3 - 1]
+            # 其他节点
+            trans_matrix[2:len(key_points)] += single_node_num + n3 - 1
+            trans_matrix[len(key_points) + n3 - 1:] += single_node_num
+
+            rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
+            new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
+            new_cell = trans_matrix[tooth_cell]
+
+            tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+            t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
+        else:
+            # 计算边内部点数
+            edge_node_num = (na - 1) * 8 + (n2 - 1) * 3 + (n1 - 1) * 3 + (n3 - 1) * 5 + (
+                    nf - 1) * 4
+            # 构造剩余关键点
+            kp_12_angle = angle0 - delta_angle / 2
+            kp_14_angle = angle2 + delta_angle / 2
+            kp_12 = np.array([r_inner * np.cos(kp_12_angle), r_inner * np.sin(kp_12_angle), 0])
+            kp_13 = np.array([rf * np.cos(kp_12_angle), rf * np.sin(kp_12_angle), 0])
+            kp_14 = np.array([r_inner * np.cos(kp_14_angle), r_inner * np.sin(kp_14_angle), 0])
+            kp_15 = np.array([rf * np.cos(kp_14_angle), rf * np.sin(kp_14_angle), 0])
+            key_points = np.array(
+                [kp_0, kp_1, kp_2, kp_3, kp_4, kp_5, kp_6, kp_7, kp_8, kp_9, kp_10, kp_11, kp_12, kp_13, kp_14, kp_15])
+            # 构造半边数据结构所用分区边
+            edge = np.array([[0, 1],
+                             [1, 2],
+                             [2, 3],
+                             [10, 7],
+                             [7, 8],
+                             [8, 9],
+                             [11, 4],
+                             [4, 5],
+                             [5, 6],
+                             [10, 0],
+                             [7, 1],
+                             [8, 2],
+                             [9, 3],
+                             [11, 10],
+                             [4, 7],
+                             [5, 8],
+                             [6, 9],
+                             [12, 13],
+                             [14, 15],
+                             [0, 12],
+                             [1, 13],
+                             [14, 11],
+                             [15, 4]])
+            # 构建子区域半边数据结构
+            half_edge = np.zeros((len(edge) * 2, 5), dtype=np.int64)
+            half_edge[::2, 0] = edge[:, 1]
+            half_edge[1::2, 0] = edge[:, 0]
+
+            half_edge[::2, 4] = 2 * np.arange(len(edge)) + 1
+            half_edge[1::2, 4] = 2 * np.arange(len(edge))
+
+            half_edge[np.array([0, 1, 2]) * 2, 1] = np.array([0, 1, 2])
+            half_edge[np.array([1, 2]) * 2 + 1, 1] = -1
+            half_edge[0 * 2 + 1, 1] = 6
+            half_edge[np.array([3, 4, 5]) * 2, 1] = np.array([3, 4, 5])
+            half_edge[np.array([3, 4, 5]) * 2 + 1, 1] = np.array([0, 1, 2])
+            half_edge[np.array([7, 8]) * 2, 1] = -1
+            half_edge[6 * 2, 1] = 7
+            half_edge[np.array([6, 7, 8]) * 2 + 1, 1] = np.array([3, 4, 5])
+            half_edge[np.array([10, 11, 14, 15]) * 2, 1] = np.array([1, 2, 4, 5])
+            half_edge[np.array([10, 11, 14, 15]) * 2 + 1, 1] = np.array([0, 1, 3, 4])
+            half_edge[np.array([9, 13]) * 2, 1] = np.array([0, 3])
+            half_edge[np.array([9, 13]) * 2 + 1, 1] = -1
+            half_edge[np.array([12, 16]) * 2, 1] = -1
+            half_edge[np.array([12, 16]) * 2 + 1, 1] = np.array([2, 5])
+            half_edge[17 * 2, 1] = 6
+            half_edge[17 * 2 + 1, 1] = -1
+            half_edge[18 * 2, 1] = -1
+            half_edge[18 * 2 + 1, 1] = 7
+            half_edge[np.array([19, 21]) * 2, 1] = np.array([6, 7])
+            half_edge[np.array([19, 21]) * 2 + 1, 1] = -1
+            half_edge[np.array([20, 22]) * 2, 1] = -1
+            half_edge[np.array([20, 22]) * 2 + 1, 1] = np.array([6, 7])
+
+            half_edge[::2, 2] = np.array(
+                [21, 23, 25, 29, 31, 33, 45, 16, 32, 0, 2, 4, 5, 6, 8, 10, 24, 41, 44, 34, 35, 12, 14])
+            half_edge[1::2, 2] = np.array(
+                [38, 40, 3, 18, 20, 22, 26, 28, 30, 27, 7, 9, 11, 43, 13, 15, 17, 39, 42, 19, 1, 36, 37])
+
+            half_edge[::2, 3] = np.array(
+                [18, 20, 22, 26, 28, 30, 42, 44, 14, 7, 9, 11, 32, 13, 15, 17, 16, 38, 43, 1, 3, 37, 36])
+            half_edge[1::2, 3] = np.array(
+                [41, 5, 24, 21, 23, 25, 29, 31, 33, 39, 0, 2, 4, 19, 6, 8, 10, 40, 45, 35, 34, 27, 12])
+            # 构建半边数据结构所用边（由点列构成的边）
+            theta_f = np.linspace(np.pi / 2, t_f, na + 1)
+            theta_ff = np.linspace(t_ff, np.pi / 2, na + 1)
+            theta_a = np.linspace(np.pi / 2, t_a, na + 1)
+            theta_aa = np.linspace(t_aa, np.pi / 2, na + 1)
+            theta_b1 = np.linspace(kp_12_angle, t_f, nf + 1)
+            theta_b2 = np.linspace(t_ff, kp_14_angle, nf + 1)
+            line = [
+                np.linspace(kp_0[..., :-1], kp_1[..., :-1], n3 + 1),
+                points[n1 + n2 + 1:2 * n1 + n2 + 2, :-1],
+                points[2 * n1 + n2 + 1:2 * n1 + 2 * n2 + 2,
+                :-1],
+                np.linspace(kp_10[..., :-1], kp_7[..., :-1], n3 + 1),
+                np.linspace(kp_7[..., :-1], kp_8[..., :-1], n1 + 1),
+                np.linspace(kp_8[..., :-1], kp_9[..., :-1], n2 + 1),
+                np.linspace(kp_11[..., :-1], kp_4[..., :-1], n3 + 1),
+                points[:n1 + 1, :-1],
+                points[n1:n1 + n2 + 1, :-1],
+                np.concatenate([r_inner * np.cos(theta_f)[:, None], r_inner * np.sin(theta_f)[:, None]], axis=1),
+                np.linspace(kp_7[..., :-1], kp_1[..., :-1], na + 1),
+                np.linspace(kp_8[..., :-1], kp_2[..., :-1], na + 1),
+                np.concatenate([ra * np.cos(theta_a)[:, None], ra * np.sin(theta_a)[:, None]], axis=1),
+                np.concatenate([r_inner * np.cos(theta_ff)[:, None], r_inner * np.sin(theta_ff)[:, None]], axis=1),
+                np.linspace(kp_4[..., :-1], kp_7[..., :-1], na + 1),
+                np.linspace(kp_5[..., :-1], kp_8[..., :-1], na + 1),
+                np.concatenate([ra * np.cos(theta_aa)[:, None], ra * np.sin(theta_aa)[:, None]], axis=1),
+                np.linspace(kp_12[..., :-1], kp_13[..., :-1], n3 + 1),
+                np.linspace(kp_14[..., :-1], kp_15[..., :-1], n3 + 1),
+                np.concatenate([r_inner * np.cos(theta_b1)[:, None], r_inner * np.sin(theta_b1)[:, None]], axis=1),
+                np.concatenate([rf * np.cos(theta_b1)[:, None], rf * np.sin(theta_b1)[:, None]], axis=1),
+                np.concatenate([r_inner * np.cos(theta_b2)[:, None], r_inner * np.sin(theta_b2)[:, None]], axis=1),
+                np.concatenate([rf * np.cos(theta_b2)[:, None], rf * np.sin(theta_b2)[:, None]], axis=1)
+            ]
+            # 单齿网格及其节点与单元
+            quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points[:, :-1], line)
+            tooth_node = quad_mesh.node
+            tooth_cell = quad_mesh.cell
+            origin_cell = quad_mesh.cell
+            # 旋转构建剩余点与单元，并依次拼接
+            single_node_num = len(tooth_node) - (n3 + 1)
+            temp_node = np.concatenate(
+                [tooth_node[:12], tooth_node[14:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))],
+                 tooth_node[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1)):]], axis=0)
+            # 最后一个齿的节点，需要特殊处理
+            temp_node_last = np.concatenate(
+                [tooth_node[:12], tooth_node[16:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))],
+                 tooth_node[len(key_points) + edge_node_num - (4 * (nf - 1)):]], axis=0)
+            # 辅助所用的节点映射，将新节点编号按照初始单元节点排列
+            origin_trans_matrix = np.arange(len(tooth_node))
+            trans_matrix = np.arange(len(tooth_node))
+            # 左侧齿
+            # 处理重复顶点
+            trans_matrix[12] = trans_matrix[14]
+            trans_matrix[13] = trans_matrix[15]
+            # 处理重复边上节点
+            trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))
+                         :len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))] \
+                = trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))
+                               :len(key_points) + edge_node_num - (4 * (nf - 1))]
+            # 其他节点
+            trans_matrix[0:12] += single_node_num + (n3 - 1) + 2
+            trans_matrix[14:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))] += single_node_num + (
+                        n3 - 1)
+            trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1)):] += single_node_num
+            # 计算新节点与单元
+            rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
+            new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
+            new_cell = trans_matrix[origin_cell]
+            # 拼接
+            tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+            # 中间齿
+            for i in range(2, z - 1):
+                rot_matrix = np.array(
+                    [[np.cos(rot_phi[i]), -np.sin(rot_phi[i])], [np.sin(rot_phi[i]), np.cos(rot_phi[i])]])
+                new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
+                # 处理重复顶点
+                trans_matrix[12] = trans_matrix[14]
+                trans_matrix[13] = trans_matrix[15]
+                # 处理重复边上节点
+                trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))
+                             :len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))] \
+                    = trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))
+                                   :len(key_points) + edge_node_num - (4 * (nf - 1))]
+                # 其他节点
+                trans_matrix[0:12] += single_node_num
+                trans_matrix[14:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))] += single_node_num
+                trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1)):] += single_node_num
+                # 新单元映射与拼接
+                new_cell = trans_matrix[origin_cell]
+                tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+                tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+            # 右侧齿
+            rot_matrix = np.array(
+                [[np.cos(rot_phi[-1]), -np.sin(rot_phi[-1])], [np.sin(rot_phi[-1]), np.cos(rot_phi[-1])]])
+            new_node = np.einsum('ij,jn->in', rot_matrix, temp_node_last.T).T
+            # 处理重复顶点
+            trans_matrix[12] = trans_matrix[14]
+            trans_matrix[13] = trans_matrix[15]
+            trans_matrix[14] = origin_trans_matrix[12]
+            trans_matrix[15] = origin_trans_matrix[13]
+            # 处理重复边上节点
+            trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))
+                         :len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))] \
+                = trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))
+                               :len(key_points) + edge_node_num - (4 * (nf - 1))]
+            trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))
+                         :len(key_points) + edge_node_num - (4 * (nf - 1))] \
+                = origin_trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))
+                                      :len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1))]
+            # 其他节点
+            trans_matrix[0:12] += single_node_num
+            trans_matrix[16:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))] += single_node_num - 2
+            trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1)):] += single_node_num - (n3 - 1) - 2
+            # 新单元映射与拼接
+            new_cell = trans_matrix[origin_cell]
+            tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+            # 最终网格
+            t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
+
+        self.mesh = t_mesh
+        return t_mesh
+
 
     def optimize_parameters(self):
         pass
-
-
-
 
 
 
@@ -258,5 +636,6 @@ if __name__ == '__main__':
     chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
 
     external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rco, jn, n1, n2, n3, na, nf, chamfer_dia, inner_diam)
+    quad_mesh = external_gear.generate_mesh()
+    external_gear.show_mesh()
 
-    print(-1)
