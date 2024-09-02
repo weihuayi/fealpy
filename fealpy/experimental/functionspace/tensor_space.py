@@ -128,13 +128,20 @@ class TensorFunctionSpace(FunctionSpace):
             TensorLike: shaped (scalar_gdof * dof_numel,)
         """
         if isinstance(threshold, tuple):
-            edge_threshold, direction_threshold = threshold
+            edge_threshold = threshold[0]
+            node_threshold = threshold[1] if len(threshold) > 1 else None
+            direction_threshold = threshold[2] if len(threshold) > 2 else None
         else:
             edge_threshold = threshold
+            node_threshold = None
             direction_threshold = None
 
         scalar_gdof = self.scalar_space.number_of_global_dofs()
         scalar_is_bd_dof = self.scalar_space.is_boundary_dof(edge_threshold)
+
+        if node_threshold is not None:
+            node_flags = node_threshold()
+            scalar_is_bd_dof = scalar_is_bd_dof & node_flags
 
         if self.dof_priority:
             is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
@@ -149,16 +156,20 @@ class TensorFunctionSpace(FunctionSpace):
             else:
                 direction_flags = bm.array(direction_threshold)
 
-            if direction_flags.dtype != bool:
-                direction_flags = direction_flags != 0
-
-            if self.dof_priority:
-                direction_flags_broadcast = bm.reshape(direction_flags, (-1, 1))
-                direction_flags_broadcast = bm.broadcast_to(direction_flags_broadcast, is_bd_dof.shape)
-            else:
+            if direction_flags.shape[0] == scalar_gdof:
                 direction_flags_broadcast = bm.broadcast_to(direction_flags, is_bd_dof.shape)
+                is_bd_dof = is_bd_dof & direction_flags_broadcast
+            else:
+                if direction_flags.dtype != bool:
+                    direction_flags = direction_flags != 0
 
-            is_bd_dof = is_bd_dof & direction_flags_broadcast
+                if self.dof_priority:
+                    direction_flags_broadcast = bm.reshape(direction_flags, (-1, 1))
+                    direction_flags_broadcast = bm.broadcast_to(direction_flags_broadcast, is_bd_dof.shape)
+                else:
+                    direction_flags_broadcast = bm.broadcast_to(direction_flags, is_bd_dof.shape)
+
+                is_bd_dof = is_bd_dof & direction_flags_broadcast
 
         return is_bd_dof.reshape(-1)
     

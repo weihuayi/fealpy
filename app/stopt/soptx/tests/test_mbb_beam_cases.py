@@ -20,6 +20,7 @@ class TestMBBBeamCase:
         force = mbb_case.boundary_conditions.force
         dirichlet = mbb_case.boundary_conditions.dirichlet
         is_dirichlet_boundary_edge = mbb_case.boundary_conditions.is_dirichlet_boundary_edge
+        is_dirichlet_node = mbb_case.boundary_conditions.is_dirichlet_node
         is_dirichlet_direction = mbb_case.boundary_conditions.is_dirichlet_direction
 
         assert mbb_case.material_properties is not None, \
@@ -40,9 +41,13 @@ class TestMBBBeamCase:
         origin = [0, 0]
         mesh = UniformMesh2d(extent, h, origin)
         NC = mesh.number_of_cells()
+
         p = 1
         space = LagrangeFESpace(mesh, p=p, ctype='C')
         tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
 
         F = tensor_space.interpolate(force)
-        isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary_edge, direction=is_dirichlet_direction)
+        isDDof = tensor_space.is_boundary_dof(threshold=(is_dirichlet_boundary_edge, 
+                                                        is_dirichlet_node,
+                                                        is_dirichlet_direction))
+        print("-------------")

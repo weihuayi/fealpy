@@ -23,8 +23,6 @@ class MBBBeamCase:
         self.constraint_conditions = None
         self.boundary_conditions = None
         self.termination_criterias = None
-        self.nx = None
-        self.ny = None
         self.initialize_case_parameters()
 
     def initialize_case_parameters(self):
@@ -32,21 +30,30 @@ class MBBBeamCase:
         Initialize parameters and variables based on the case name.
         """
         if self.case_name == "top88":
-            self.nx, self.ny = 60, 20
-            rmin, ft = 1.5, 0
-
-            self.material_properties = MaterialProperties(E0=1.0, Emin=1e-9, nu=0.3, penal=3.0)
-            self.geometry_properties = GeometryProperties(x_min=0.0, x_max=float(self.nx), 
-                                                        y_min=0.0, y_max=float(self.ny))
-            self.filter_properties = FilterProperties(nx=self.nx, ny=self.ny, rmin=rmin, ft=ft)
+            self.geometry_properties = GeometryProperties(x_min=0.0, x_max=6.0, 
+                                                          y_min=0.0, y_max=2.0)
+            
+            self.nx = int(self.geometry_properties.get_dimensions()[0])
+            self.ny = int(self.geometry_properties.get_dimensions()[1])
 
             self.constraint_conditions = ConstraintConditions()
             self.constraint_conditions.set_volume_constraint(is_on=True, vf=0.5)
 
+            volfrac = self.constraint_conditions.get_constraints()['volume']['vf']
+            self.rho = volfrac * bm.ones(self.nx * self.ny, dtype=bm.float64)
+
+            self.material_properties = MaterialProperties(
+                        E0=1.0, Emin=1e-9, nu=0.3, penal=3.0, 
+                        hypo="plane_stress", rho=self.rho)
+
+            self.filter_properties = FilterProperties(nx=self.nx, ny=self.ny, 
+                                                    rmin=1.5, ft=0)
+
+
             def force(points: TensorLike) -> TensorLike:
     
                 val = bm.zeros(points.shape, dtype=points.dtype)
-                val[ny, 1] = -1
+                val[0, 1] = -1
     
                 return val
             
@@ -54,22 +61,41 @@ class MBBBeamCase:
 
                 return bm.zeros(points.shape, dtype=points.dtype)
             
-            def is_dirichlet_boundary_edge(points: TensorLike) -> TensorLike:
+            def is_dirichlet_boundary_edge(edge_centers: TensorLike) -> TensorLike:
 
-                temp = (points[:, 0] == 0.0)
+                left_edge = (edge_centers[:, 0] == 0.0)
+                specific_edge = (edge_centers[:, 0] == self.nx) & (edge_centers[:, 1] == 0.5)
+                
+                result = left_edge | specific_edge
 
-                return temp
+                return result
+            
+            def is_dirichlet_node() -> TensorLike:
+                
+                dirichlet_nodes = bm.zeros((self.nx+1)*(self.ny+1), dtype=bool)
+
+                dirichlet_nodes[0:self.ny + 1] = True
+                dirichlet_nodes[(self.ny + 1) * self.nx] = True
+
+                return dirichlet_nodes
             
             def is_dirichlet_direction() -> TensorLike:
+                
+                direction_flags = bm.zeros(((self.nx + 1) * (self.ny + 1), 2), dtype=bool)
 
-                temp = bm.tensor([True, False])
+                direction_flags[0, 0] = True
+                direction_flags[1, 0] = True
+                direction_flags[2, 0] = True 
+                direction_flags[(self.ny + 1) * self.nx, 1] = True
+                # temp = bm.tensor([True, False])
 
-                return temp
+                return direction_flags
             
             self.boundary_conditions = BoundaryConditions(
                 force_func=force, 
                 dirichlet_func=dirichlet,
                 is_dirichlet_boundary_edge_func=is_dirichlet_boundary_edge,
+                is_dirichlet_node_func=is_dirichlet_node,
                 is_dirichlet_direction_func=is_dirichlet_direction
             )
 
@@ -93,6 +119,7 @@ class MBBBeamCase:
             f"  filter_properties = {self.filter_properties},\n"
             f"  boundary_conditions = {self.boundary_conditions},\n"
             f"  termination_criterias = {self.termination_criterias}\n"
+            f"  initial_density = {self.rho}\n"
             f")")
 
 # Example usage
