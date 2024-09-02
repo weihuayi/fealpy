@@ -110,22 +110,27 @@ class TensorFunctionSpace(FunctionSpace):
         return uI.reshape(-1)
     
     def is_boundary_dof(self, threshold=None) -> TensorLike:
-        """Return bools indicating boundary dofs.
+        """
+        Return boolean values indicating boundary degrees of freedom (dofs).
 
         Parameters:
         threshold (callable, tuple of callables, or None, optional): 
             A function or a tuple used to determine boundary conditions. 
-            If a function, it should return a boolean array indicating which edges are on the boundary. 
-            If a tuple, the first element should be a function that returns a boolean array for boundary edges, 
-            and the second element should be a function or array that returns direction flags. 
-            The direction flags can be either:
-            - A boolean array (e.g., [True, False]) to specify which directions to apply the boundary condition 
-              (True for applying the condition, False for not applying).
-            - An integer array (e.g., [1, 0]) where non-zero values specify the directions to apply the boundary 
-              condition (1 for applying, 0 for not applying).
+            - If a function, it should return a boolean array indicating which edges are on the boundary. 
+            - If a tuple, the first element should be a function that returns a boolean array for boundary edges, 
+            the second element should be a function or array that specifies nodes, and the third element should be a 
+            function or array that returns direction flags.
+            - The direction flags can be either:
+                - A boolean array (e.g., [True, False]) specifying which directions to apply the boundary condition 
+                (True for applying the condition, False for not applying).
+                - An integer array (e.g., [1, 0]) where non-zero values specify the directions to apply the boundary 
+                condition (1 for applying, 0 for not applying).
+            - If `direction_flags` is provided and its shape matches `(scalar_gdof,)`, it specifies conditions 
+            for specific degrees of freedom at certain nodes.
 
         Returns:
-            TensorLike: shaped (scalar_gdof * dof_numel,)
+            TensorLike: A flattened boolean array indicating which global degrees of freedom are boundary dofs.
+                        Shape is (scalar_gdof * dof_numel,).
         """
         if isinstance(threshold, tuple):
             edge_threshold = threshold[0]
