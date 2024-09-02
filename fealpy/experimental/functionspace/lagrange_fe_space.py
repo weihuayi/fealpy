@@ -6,7 +6,7 @@ from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
-from .dofs import LinearMeshCFEDof
+from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
 from .function import Function
 from fealpy.decorator import barycentric, cartesian
 
@@ -24,6 +24,10 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         if ctype == 'C':
             self.dof = LinearMeshCFEDof(mesh, p)
+        elif ctype == 'D':
+            self.dof = LinearMeshDFEDof(mesh, p)
+        else:
+            raise ValueError(f"Unknown type: {ctype}")
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
@@ -35,8 +39,16 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def __str__(self):
         return "Lagrange finite element space on linear mesh!"
 
+    # def number_of_local_dofs(self, doftype='cell') -> int:
+    #     return self.dof.number_of_local_dofs(doftype=doftype)
+    
     def number_of_local_dofs(self, doftype='cell') -> int:
-        return self.dof.number_of_local_dofs(doftype=doftype)
+        if self.ctype == 'C':
+            return self.dof.number_of_local_dofs(doftype=doftype)
+        elif self.ctype == 'D':
+            return self.dof.number_of_local_dofs()
+        else:
+            raise ValueError(f"Unknown type: {self.ctype}")
 
     def number_of_global_dofs(self) -> int:
         return self.dof.number_of_global_dofs()

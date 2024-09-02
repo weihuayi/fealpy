@@ -67,3 +67,59 @@ class LinearMeshCFEDof(Generic[_MT]):
 
     def number_of_local_dofs(self, doftype='cell') -> int:
         return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)
+    
+class LinearMeshDFEDof(Generic[_MT]):
+    def __init__(self, mesh: _MT, p: int):
+        TD = mesh.top_dimension()
+        self.mesh = mesh
+        self.p = p
+        if p > 0:
+            self.multiIndex = mesh.multi_index_matrix(p, TD)
+        else:
+            TD = mesh.top_dimension()
+            self.multiIndex = bm.array((TD+1)*(0,), dtype=mesh.itype)
+        self.cell2dof = self.cell_to_dof()
+
+
+    def cell_to_dof(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs()
+        cell2dof = bm.arange(NC*ldof).reshape(NC, ldof)
+
+        return cell2dof
+
+    def number_of_global_dofs(self):
+        NC = self.mesh.number_of_cells()
+        ldof = self.number_of_local_dofs()
+        gdof = ldof*NC
+        
+        return gdof
+
+    def number_of_local_dofs(self):
+        from functools import reduce
+        import operator as op
+        p = self.p
+        TD = self.mesh.top_dimension()
+        numer = reduce(op.mul, range(p + TD, p, -1))
+        denom = reduce(op.mul, range(1, TD + 1))
+        
+        return numer//denom
+
+    def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+        GD = mesh.geo_dimension()
+
+        if p == 0:
+            return mesh.entity_barycenter('cell')
+
+        if p == 1:
+            return node[cell].reshape(-1, GD)
+
+        w = self.multiIndex/p
+        ipoint = bm.einsum('ij, kj...->ki...', w, node[cell]).reshape(-1, GD)
+        
+        return ipoint
