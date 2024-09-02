@@ -88,7 +88,7 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
         
         if is_tensor(coef):
             coef = fill_axis(coef, 3 if batched else 2)
-            return bm.einsum(f'q, qid, qd, ...qd -> ...i', ws, gphi, val, coef)
+            return bm.einsum(f'q, qid, qd, ...qd -> ...i', ws, gphi, val, coef) * cm
 
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, gphi, cm, _ = self.fetch(space)
