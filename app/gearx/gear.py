@@ -7,7 +7,7 @@ from fealpy.experimental.mesh.quadrangle_mesh import QuadrangleMesh
 
 
 class Gear(ABC):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rco, jn, n1, n2, n3, na, nf, chamfer_dia):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rco, jn, n1, n2, n3, na, nf, chamfer_dia, material=None):
         """
 
         @param m_n: 法向模数
@@ -25,13 +25,14 @@ class Gear(ABC):
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
         @param chamfer_dia: 倒角高度（直径方向）
+        @param material: 齿轮材料
         """
         if not isinstance(z, int) or (isinstance(z, float) and not z.is_integer()):
             raise TypeError(f'The provided value {z} is not an integer or cannot be safely converted to an integer.')
         self.m_n = m_n
         self.z = z
-        self.alpha_n = alpha_n if alpha_n < 2*pi else radians(alpha_n)
-        self.beta = beta if beta < 2*pi else radians(beta)
+        self.alpha_n = alpha_n if alpha_n < 2 * pi else radians(alpha_n)
+        self.beta = beta if beta < 2 * pi else radians(beta)
         self.x_n = x_n
         self.hac = hac
         self.cc = cc
@@ -44,16 +45,17 @@ class Gear(ABC):
         self.nf = nf
         self.chamfer_dia = chamfer_dia
         self.mesh = None
+        self._material = material
 
         # 端面变位系数
-        self.x_t = self.x_n/cos(self.beta)
+        self.x_t = self.x_n / cos(self.beta)
         # 端面压力角
-        self.alpha_t = arctan(tan(self.alpha_n)/cos(self.beta))
+        self.alpha_t = arctan(tan(self.alpha_n) / cos(self.beta))
         # 端面模数
-        self.m_t = self.m_n/cos(self.beta)
+        self.m_t = self.m_n / cos(self.beta)
         # 分度圆直径与半径
-        self.d = self.m_t*self.z
-        self.r = self.d/2
+        self.d = self.m_t * self.z
+        self.r = self.d / 2
         # 基圆（base circle）直径与半径
         self.d_f = self.d * self.alpha_t
         self.r_f = self.d_f / 2
@@ -69,7 +71,7 @@ class Gear(ABC):
     @abstractmethod
     def get_transition_points(self):
         pass
-    
+
     @abstractmethod
     def get_profile_points(self):
         pass
@@ -90,8 +92,17 @@ class Gear(ABC):
         fig, ax = plt.subplots(figsize=(38, 20))
         self.mesh.add_plot(ax, linewidth=0.1)
         if save_path is not None:
-            plt.savefig('./image/全齿网格生成_实际齿顶圆_24_8_30.png', dpi=600, bbox_inches='tight')
+            plt.savefig(save_path, dpi=600, bbox_inches='tight')
         plt.show()
+
+    @property
+    def material(self):
+        return self._material
+
+    @material.setter
+    def value(self, new_material):
+        self._material = new_material
+        pass
 
 
 class ExternalGear(Gear):
@@ -118,16 +129,16 @@ class ExternalGear(Gear):
         super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rco, jn, n1, n2, n3, na, nf, chamfer_dia)
         self.inner_diam = inner_diam
         # 齿顶圆直径与半径
-        ha = self.m_n*(self.hac+self.x_t)  # 齿顶高
-        self.d_a = self.d+2*ha
-        self.r_a = self.d_a/2
+        ha = self.m_n * (self.hac + self.x_t)  # 齿顶高
+        self.d_a = self.d + 2 * ha
+        self.r_a = self.d_a / 2
         # 齿根圆直径与半径
-        hf = self.m_n*(self.hac+self.cc-self.x_t)
+        hf = self.m_n * (self.hac + self.cc - self.x_t)
         self.d_f = self.d - 2 * hf
         self.r_f = self.d_f / 2
         # 有效齿顶圆
-        self.effective_da = self.d_a-self.chamfer_dia
-        self.effective_ra = self.effective_da/2
+        self.effective_da = self.d_a - self.chamfer_dia
+        self.effective_ra = self.effective_da / 2
         # 刀具齿顶高与刀尖圆弧半径
         self.ha_cutter = (self.hac + self.cc) * self.m_n
         self.r_cutter = self.m_n * self.rco
@@ -145,18 +156,19 @@ class ExternalGear(Gear):
 
         xt = (r * np.sin(phi) - phi * r * np.cos(phi) +
               t * np.sin(phi) * np.sin(np.pi / 2 - alpha_t) +
-              (np.cos(phi) * (k + t * np.cos(np.pi / 2 - alpha_t))) / np.cos(beta))
+              (np.cos(phi) * (k + t * np.cos(np.pi / 2 - alpha_t))) / np.cos(beta)).reshape(-1, 1)
 
         yt = (r * np.cos(phi) + phi * r * np.sin(phi) +
               t * np.cos(phi) * np.sin(np.pi / 2 - alpha_t) -
-              (np.sin(phi) * (k + t * np.cos(np.pi / 2 - alpha_t))) / np.cos(beta))
+              (np.sin(phi) * (k + t * np.cos(np.pi / 2 - alpha_t))) / np.cos(beta)).reshape(-1, 1)
 
-        return xt, yt
+        points = np.concatenate([xt, yt], axis=-1)
+        return points
 
     def get_tip_intersection_points(self, t):
 
-        xt, yt = self.get_involute_points(t)
-        return np.sqrt(xt ** 2 + yt ** 2)
+        points = self.get_involute_points(t)
+        return np.sqrt(points[..., 0] ** 2 + points[..., 1] ** 2)
 
     def get_transition_points(self, t):
         r = self.r
@@ -166,21 +178,24 @@ class ExternalGear(Gear):
         beta = self.beta
 
         # 刀尖圆弧 y 坐标
-        x0 = -np.pi * self.m_n / 2 + (np.pi * self.m_n / 4 - ha_cutter * np.tan(alpha_t) - r_cutter * np.tan(0.25 * np.pi - 0.5 * alpha_t))
+        x0 = -np.pi * self.m_n / 2 + (np.pi * self.m_n / 4 - ha_cutter * np.tan(alpha_t) - r_cutter * np.tan(
+            0.25 * np.pi - 0.5 * alpha_t))
         # 刀尖圆弧 y 坐标
         y0 = -(ha_cutter - r_cutter) + self.m_n * self.x_t
 
-        phi = (x0 * np.sin(t) + r_cutter * np.cos(t) * np.sin(t) - y0 * np.cos(beta) ** 2 * np.cos(t) - r_cutter * np.cos(
+        phi = (x0 * np.sin(t) + r_cutter * np.cos(t) * np.sin(t) - y0 * np.cos(beta) ** 2 * np.cos(
+            t) - r_cutter * np.cos(
             beta) ** 2 * np.cos(t) * np.sin(t)) / (r * np.cos(beta) * np.sin(t))
 
         xt = (r * np.sin(phi) + np.sin(phi) * (y0 + r_cutter * np.sin(t)) - phi * r * np.cos(phi) +
-              (np.cos(phi) * (x0 + r_cutter * np.cos(t))) / np.cos(beta))
+              (np.cos(phi) * (x0 + r_cutter * np.cos(t))) / np.cos(beta)).reshape(-1, 1)
 
         yt = (r * np.cos(phi) + np.cos(phi) * (y0 + r_cutter * np.sin(t)) + phi * r * np.sin(phi) -
-              (np.sin(phi) * (x0 + r_cutter * np.cos(t))) / np.cos(beta))
+              (np.sin(phi) * (x0 + r_cutter * np.cos(t))) / np.cos(beta)).reshape(-1, 1)
 
-        return xt, yt
-    
+        points = np.concatenate([xt, yt], axis=-1)
+        return points
+
     def get_profile_points(self):
         n1 = self.n1
         n2 = self.n2
@@ -189,17 +204,11 @@ class ExternalGear(Gear):
         beta = self.beta
         z = self.z
         x = self.x_t
-
-        xt1 = np.zeros((n1 + n2 + 1) * 2)
-        yt1 = np.zeros((n1 + n2 + 1) * 2)
-        points = np.zeros(((n1 + n2 + 1) * 2, 3))
-
-        mt = self.m_t
-
-        d = self.d
         effective_da = self.effective_da
         ha_cutter = self.ha_cutter  # 刀具齿顶高
         r_cutter = self.r_cutter  # 刀尖圆弧半径
+
+        points = np.zeros(((n1 + n2 + 1) * 2, 3))
 
         t1 = (mn * x - (ha_cutter - r_cutter + r_cutter * sin(alpha_t))) / cos(alpha_t)
 
@@ -211,27 +220,16 @@ class ExternalGear(Gear):
         t3 = 2 * np.pi - alpha_t
         t4 = 1.5 * np.pi
         width2 = t3 - t4
-        t = t4 - width2 / n2
-
-        for i in range(n2 + 1):
-            t += width2 / n2
-            xt1[i], yt1[i] = self.get_transition_points(t)
+        t = np.linspace(t4, t3, n2+1)
+        points[0:n2+1, 0:-1] = self.get_transition_points(t)
 
         width1 = t2 - t1
-        t = t1
+        t = np.linspace(t1+width1 / n1, t2, n1)
+        points[n2+1:n2+n1+1, 0:-1] = self.get_involute_points(t)
 
-        for i in range(n2 + 1, n1 + n2 + 1):
-            t += width1 / n1
-            xt1[i], yt1[i] = self.get_involute_points(t)
-
-        for i in range(n1 + n2 + 1):
-            xt1[n1 + n2 + 1 + i] = -xt1[i]
-            yt1[n1 + n2 + 1 + i] = yt1[i]
-
-        for i in range((n1 + n2 + 1) * 2):
-            points[i, 0] = xt1[i]
-            points[i, 1] = yt1[i]
-            points[i, 2] = 0
+        # 构建对称点
+        points[n2+n1+1:, 0] = -points[0:n2+n1+1, 0]
+        points[n2+n1+1:, 1] = points[0:n2+n1+1, 1]
 
         return points
 
@@ -256,7 +254,7 @@ class ExternalGear(Gear):
         theta = np.linspace(t_f, t_ff, 100)
         x_f = r_inner * cos(theta)
         y_f = r_inner * sin(theta)
-        
+
         # 构造关键点
         kp_1 = points[n1 + n2 + 1]
         kp_4 = points[0]
@@ -358,8 +356,7 @@ class ExternalGear(Gear):
             line = [
                 np.linspace(kp_0[..., :-1], kp_1[..., :-1], n3 + 1),
                 points[n1 + n2 + 1:2 * n1 + n2 + 2, :-1],
-                points[2 * n1 + n2 + 1:2 * n1 + 2 * n2 + 2,
-                :-1],
+                points[2 * n1 + n2 + 1:2 * n1 + 2 * n2 + 2, :-1],
                 np.linspace(kp_10[..., :-1], kp_7[..., :-1], n3 + 1),
                 np.linspace(kp_7[..., :-1], kp_8[..., :-1], n1 + 1),
                 np.linspace(kp_8[..., :-1], kp_9[..., :-1], n2 + 1),
@@ -379,13 +376,18 @@ class ExternalGear(Gear):
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points[:, :-1], line)
             tooth_node = quad_mesh.node
             tooth_cell = quad_mesh.cell
+            origin_cell = quad_mesh.cell
 
             single_node_num = len(tooth_node) - (n3 + 1)
-            single_cell_num = len(tooth_cell)
             temp_node = np.concatenate([tooth_node[2:len(key_points)], tooth_node[(len(key_points) + (n3 - 1)):]],
                                        axis=0)
+            temp_node_last = np.concatenate([tooth_node[2:4],
+                                             tooth_node[5:11],
+                                             tooth_node[(len(key_points)+(n3-1)):(len(key_points)+2*(n1+n2+n3-3))],
+                                             tooth_node[(len(key_points)+2*(n1+n2+n3-3)+n3-1):]], axis=0)
             # 左侧齿
             trans_matrix = np.arange(len(tooth_node))
+            origin_trans_matrix = np.arange(len(tooth_node))
             # 处理重复顶点
             trans_matrix[0] = trans_matrix[11]
             trans_matrix[1] = trans_matrix[4]
@@ -416,13 +418,35 @@ class ExternalGear(Gear):
                         n3 + n1 + n2 - 3):len(key_points) + 2 * (
                         n3 + n1 + n2 - 3) + n3 - 1]
                 # 其他节点
-                trans_matrix[0:12] += single_node_num
-                trans_matrix[14:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))] += single_node_num
-                trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1)):] += single_node_num
+                trans_matrix[2:len(key_points)] += single_node_num
+                trans_matrix[len(key_points) + n3 - 1:] += single_node_num
                 # 新单元映射与拼接
                 new_cell = trans_matrix[origin_cell]
                 tooth_node = np.concatenate([tooth_node, new_node], axis=0)
                 tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
+            # 右侧齿
+            rot_matrix = np.array(
+                [[np.cos(rot_phi[-1]), -np.sin(rot_phi[-1])], [np.sin(rot_phi[-1]), np.cos(rot_phi[-1])]])
+            new_node = np.einsum('ij,jn->in', rot_matrix, temp_node_last.T).T
+            # 处理重复顶点
+            trans_matrix[0] = trans_matrix[11]
+            trans_matrix[1] = trans_matrix[4]
+            trans_matrix[11] = origin_trans_matrix[0]
+            trans_matrix[4] = origin_trans_matrix[1]
+            # 处理重复边上节点
+            trans_matrix[len(key_points):len(key_points)+n3-1] \
+                = trans_matrix[len(key_points)+2*(n3+n1+n2-3):len(key_points)+2*(n3+n1+n2-3)+n3-1]
+            trans_matrix[len(key_points)+2*(n3+n1+n2-3):len(key_points)+2*(n3+n1+n2-3)+n3-1] \
+                = origin_trans_matrix[len(key_points):len(key_points) + n3 - 1]
+            # 其他节点
+            trans_matrix[2:4] += single_node_num
+            trans_matrix[5:11] += single_node_num - 1
+            trans_matrix[(len(key_points) + (n3 - 1)):(len(key_points) + 2 * (n1 + n2 + n3 - 3))] += single_node_num - 2
+            trans_matrix[(len(key_points) + 2 * (n1 + n2 + n3 - 3) + n3 - 1):] += single_node_num - 2 - (n3 - 1)
+            # 新单元映射与拼接
+            new_cell = trans_matrix[origin_cell]
+            tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
             t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
         else:
@@ -564,7 +588,7 @@ class ExternalGear(Gear):
             # 其他节点
             trans_matrix[0:12] += single_node_num + (n3 - 1) + 2
             trans_matrix[14:len(key_points) + edge_node_num - (4 * (nf - 1) + 2 * (n3 - 1))] += single_node_num + (
-                        n3 - 1)
+                    n3 - 1)
             trans_matrix[len(key_points) + edge_node_num - (4 * (nf - 1) + (n3 - 1)):] += single_node_num
             # 计算新节点与单元
             rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
@@ -626,10 +650,8 @@ class ExternalGear(Gear):
         self.mesh = t_mesh
         return t_mesh
 
-
     def optimize_parameters(self):
         pass
-
 
 
 if __name__ == '__main__':
@@ -656,7 +678,7 @@ if __name__ == '__main__':
     inner_diam = data['inner_diam']  # 轮缘内径
     chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
 
-    external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rco, jn, n1, n2, n3, na, nf, chamfer_dia, inner_diam)
+    external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rco, jn, n1, n2, n3, na, nf, chamfer_dia,
+                                 inner_diam)
     quad_mesh = external_gear.generate_mesh()
     external_gear.show_mesh()
-
