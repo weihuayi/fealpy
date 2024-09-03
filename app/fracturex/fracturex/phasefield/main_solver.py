@@ -2,8 +2,10 @@ from typing import Optional
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
+from energy_degradation_function import EnergyDegradationFunction
+from constitutive_model import ConstitutiveModelFactory
 
-class PhaseFractureSolver:
+class MainSolver:
     def __init__(self, mesh, space, material_properties, q=None, method='HybridModel'):
         """
         Parameters
@@ -22,9 +24,16 @@ class PhaseFractureSolver:
         self.q = q if q is not None else q = space.p+2
         self.method = method
 
+        energy_degradation = EnergyDegradationFunction()
+        self.model = ConstitutiveModelFactory.create_model(method,
+                                                           material_properties, energy_degradation)
         self.get_material()
 
     def solve(self):
+        """
+        Solve the phase field fracture problem.
+        """
+
         pass
 
     def update(self):
