@@ -5,24 +5,63 @@ from typing import Optional
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.material.elastic_material import LinearElasticMaterial
 
-class MaterialProperties(LinearElasticMaterial):
-    def __init__(self, E0: float, Emin: float, nu: float, penal: int, hypo: str, 
-                rho: Optional[TensorLike] = None):
+from abc import ABC, abstractmethod
+
+class MaterialInterpolation(ABC):
+    @abstractmethod
+    def calculate_modulus(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
         """
-        Initialize the material properties.
+        Calculate the effective Young's modulus.
+
+        This is an abstract method to be implemented by subclasses. Different interpolation methods
+        like SIMP and RAMP will provide specific implementations.
 
         Args:
-            E0 (float): The Young's modulus for solid material.
-                (e.g., the modulus of elasticity in the solid phase)
-            Emin (float): The Young's modulus for void or empty space.
-                (a very small value representing near-zero stiffness)
-            nu (float): The Poisson's ratio.
-            penal (float): The penalization factor, often used in topology optimization to control material interpolation, 
-                typically in the SIMP method
-            hypo (str): The hypothesis for the material model, either 'plane_stress' or '3D'.
-            rho (Optional[TensorLike]): The density distribution of the material (default is None).
+            rho (TensorLike): Density distribution of the material.
+            E0 (float): Young's modulus of the solid material.
+            Emin (float): Young's modulus of the void or empty space.
+            penal (float): Penalization factor for the interpolation method.
 
+        Returns:
+            TensorLike: Calculated Young's modulus based on the density distribution.
+        """
+        pass
 
+    @abstractmethod
+    def calculate_modulus_derivative(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
+        """
+        Calculate the derivative of the Young's modulus.
+
+        This is an abstract method to be implemented by subclasses. This derivative is used for sensitivity analysis.
+
+        Args:
+            rho (TensorLike): Density distribution of the material.
+            E0 (float): Young's modulus of the solid material.
+            Emin (float): Young's modulus of the void or empty space.
+            penal (float): Penalization factor for the interpolation method.
+
+        Returns:
+            TensorLike: Derivative of Young's modulus with respect to density.
+        """
+        pass
+
+class MaterialProperties(LinearElasticMaterial):
+    def __init__(self, E0: float = 1.0, Emin: float = 1e-9, nu: float = 0.3, 
+                penal: int = 3, hypo: str = 'plane_stress', 
+                rho: Optional[TensorLike] = None, interpolation_model: MaterialInterpolation = None):
+        """
+        Initialize material properties.
+
+        This class inherits from LinearElasticMaterial and adds material interpolation models for topology optimization.
+
+        Args:
+            E0 (float): Young's modulus of the solid material.
+            Emin (float): Young's modulus of the void or empty space.
+            nu (float): Poisson's ratio.
+            penal (int): Penalization factor to control material interpolation.
+            hypo (str): Material model hypothesis, either 'plane_stress' or '3D'.
+            rho (Optional[TensorLike]): Density distribution of the material (default is None).
+            interpolation_model (MaterialInterpolation): Material interpolation model, default is SIMP interpolation.
         """
         if hypo not in ["plane_stress", "3D"]:
             raise ValueError("hypo should be either 'plane_stress' or '3D'")
@@ -32,51 +71,33 @@ class MaterialProperties(LinearElasticMaterial):
         self.Emin = Emin   
         self.penal = penal
         self.hypo = hypo   
-        self.rho = rho       
+        self.rho = rho
+        self.interpolation_model = interpolation_model if interpolation_model else SIMPInterpolation()
 
-    def material_model_SIMP(self) -> TensorLike:
+    def material_model(self) -> TensorLike:
         """
-        Calculate the effective Young's modulus using the SIMP approach.
-
-        This function calculates the Young's modulus based on the density distribution 
-        using the SIMP method.
+        Use the interpolation model to calculate Young's modulus.
 
         Returns:
-            TensorLike: The calculated Young's modulus based on the density distribution.
-                        Shape: (NC, ).
+            TensorLike: Young's modulus calculated using the specified interpolation model.
         """
-        Emin = self.Emin
-        penal = self.penal
-        rho = self.rho
-        E0 = self.get_property('elastic_modulus')
-        if Emin is None:
-            E = rho ** penal * E0
-        else:
-            E = Emin + rho ** penal * (E0 - Emin)
-        return E
+        return self.interpolation_model.calculate_modulus(
+            self.rho, 
+            self.get_property('elastic_modulus'), self.Emin, 
+            self.penal)
 
-    def material_model_SIMP_derivative(self) -> TensorLike:
+    def material_model_derivative(self) -> TensorLike:
         """
-        Derivative of the effective Young's modulus using the SIMP approach.
-
-        This function calculates the derivative of the Young's modulus with respect 
-        to the density distribution, which is useful for sensitivity analysis in 
-        topology optimization.
+        Use the interpolation model to calculate the derivative of Young's modulus.
 
         Returns:
-            TensorLike: The derivative of the Young's modulus with respect to density.
-                        Shape: (NC, ).
+            TensorLike: Derivative of Young's modulus calculated using the specified interpolation model.
         """
-        Emin = self.Emin
-        penal = self.penal
-        rho = self.rho
-        E0 = self.get_property('elastic_modulus')
-        if Emin is None:
-            dE = penal * rho ** (penal - 1) * E0
-        else:
-            dE = penal * rho ** (penal - 1) * (E0 - Emin)
-        return dE
-    
+        return self.interpolation_model.calculate_modulus_derivative(
+            self.rho, 
+            self.get_property('elastic_modulus'), self.Emin, 
+            self.penal)
+
     def elastic_matrix(self) -> TensorLike:
         """
         Calculate the elastic matrix D for each element based on the density distribution.
@@ -92,12 +113,11 @@ class MaterialProperties(LinearElasticMaterial):
         if self.rho is None:
             raise ValueError("Density rho must be set for MaterialProperties.")
         
-        E = self.material_model_SIMP()
-
+        E = self.material_model()
         base_D = super().elastic_matrix()
         D = E[:, None, None, None] * base_D
-
         return D
+
     
     def update_density(self, new_rho: TensorLike):
         """
@@ -114,23 +134,56 @@ class MaterialProperties(LinearElasticMaterial):
         """
         Return a string representation of the MaterialProperties object.
 
-        This representation includes both the basic material properties, 
-        the approach to calculating the elastic matrix using the SIMP method,
-        and indicates that different material models (e.g., SIMP) and their 
-        derivatives are defined and available for use.
+        This representation includes basic material properties, 
+        the method used for calculating the elastic matrix,
+        and the currently used material interpolation model.
 
         Returns:
-            str: A string showing the material properties, the approach to 
-                elastic matrix calculation, and the availability of different
-                material models and their derivatives.
+            str: A string showing the material properties.
         """
         elastic_modulus = self.get_property('elastic_modulus')
         poisson_ratio = self.get_property('poisson_ratio')
         rho_info = f"rho_shape={self.rho.shape}, rho_mean={bm.mean(self.rho):.4f}" if self.rho is not None else "rho=None"
+        interpolation_model_name = self.interpolation_model.__class__.__name__
 
         return (f"MaterialProperties(elastic_modulus={elastic_modulus}, "
                 f"Emin={self.Emin}, poisson_ratio={poisson_ratio}, "
                 f"penal={self.penal}, hypo={self.hypo}, "
                 f"{rho_info}, "
-                f"elastic_matrix='scaled using SIMP', "
-                f"available_models=['SIMP', 'SIMP_derivative'])")
+                f"elastic_matrix='scaled using {interpolation_model_name}', "
+                f"interpolation_model={interpolation_model_name})")
+    
+class SIMPInterpolation(MaterialInterpolation):
+    def calculate_modulus(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
+        """
+        Calculate the effective Young's modulus using the SIMP approach.
+
+        This function calculates the Young's modulus based on the density distribution 
+        using the SIMP method.
+
+        Returns:
+            TensorLike: The calculated Young's modulus based on the density distribution.
+                        Shape: (NC, ).
+        """
+        if Emin is None:
+            return rho ** penal * E0
+        else:
+            return Emin + rho ** penal * (E0 - Emin)
+
+    def calculate_modulus_derivative(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
+        """
+        Derivative of the effective Young's modulus using the SIMP approach.
+
+        This function calculates the derivative of the Young's modulus with respect 
+        to the density distribution, which is useful for sensitivity analysis in 
+        topology optimization.
+
+        Returns:
+            TensorLike: The derivative of the Young's modulus with respect to density.
+                        Shape: (NC, ).
+        """
+        if Emin is None:
+            return penal * rho ** (penal - 1) * E0
+        else:
+            return penal * rho ** (penal - 1) * (E0 - Emin)
+

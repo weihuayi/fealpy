@@ -1,7 +1,7 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike
 
-from app.stopt.soptx.cases.material_properties import MaterialProperties
+from app.stopt.soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
 from app.stopt.soptx.cases.geometry_properties import GeometryProperties
 from app.stopt.soptx.cases.filter_properties import FilterProperties
 from app.stopt.soptx.cases.constraint_conditions import ConstraintConditions
@@ -44,7 +44,8 @@ class MBBBeamCase:
 
             self.material_properties = MaterialProperties(
                         E0=1.0, Emin=1e-9, nu=0.3, penal=3.0, 
-                        hypo="plane_stress", rho=self.rho)
+                        hypo="plane_stress", rho=self.rho,
+                        interpolation_model=SIMPInterpolation())
 
             self.filter_properties = FilterProperties(nx=self.nx, ny=self.ny, 
                                                     rmin=1.5, ft=0)
