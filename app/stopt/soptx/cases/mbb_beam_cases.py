@@ -33,8 +33,10 @@ class MBBBeamCase:
             self.geometry_properties = GeometryProperties(x_min=0.0, x_max=6.0, 
                                                           y_min=0.0, y_max=2.0)
             
-            self.nx = int(self.geometry_properties.get_dimensions()[0])
-            self.ny = int(self.geometry_properties.get_dimensions()[1])
+            width, height = self.geometry_properties.get_dimensions()
+            self.nx = int(width)
+            self.ny = int(height)
+            self.h = [width / self.nx, height / self.ny]
 
             self.constraint_conditions = ConstraintConditions()
             self.constraint_conditions.set_volume_constraint(is_on=True, vf=0.5)
@@ -54,7 +56,7 @@ class MBBBeamCase:
             def force(points: TensorLike) -> TensorLike:
     
                 val = bm.zeros(points.shape, dtype=points.dtype)
-                val[0, 1] = -1
+                val[self.ny, 1] = -1
     
                 return val
             
@@ -112,16 +114,26 @@ class MBBBeamCase:
         Returns:
             str: A string showing the case name and initialized parameters.
         """
-        return (f"MBBBeamCase(\n"
-            f"  case_name = {self.case_name},\n"
-            f"  material_properties = {self.material_properties},\n"
-            f"  geometry_properties = {self.geometry_properties},\n"
-            f"  constraint_conditions = {self.constraint_conditions},\n"
-            f"  filter_properties = {self.filter_properties},\n"
-            f"  boundary_conditions = {self.boundary_conditions},\n"
-            f"  termination_criterias = {self.termination_criterias}\n"
-            f"  initial_density = {self.rho}\n"
-            f")")
+        repr_str = (f"MBBBeamCase(\n"
+                    f"  case_name = {self.case_name},\n"
+                    f"  material_properties = {self.material_properties},\n"
+                    f"  geometry_properties = {self.geometry_properties},\n"
+                    f"  constraint_conditions = {self.constraint_conditions},\n"
+                    f"  filter_properties = {self.filter_properties},\n"
+                    f"  boundary_conditions = {self.boundary_conditions},\n"
+                    f"  termination_criterias = {self.termination_criterias}\n")
+
+        if hasattr(self, 'nx') and hasattr(self, 'ny'):
+            repr_str += f"  nx = {self.nx}, ny = {self.ny},\n"
+
+        if hasattr(self, 'rho'):
+            repr_str += f"  initial_density = {self.rho},\n"
+
+        if hasattr(self, 'h'):
+            repr_str += f"  cell_sizes = {self.h}\n"
+
+        repr_str += ")"
+        return repr_str
 
 # Example usage
 if __name__ == "__main__":

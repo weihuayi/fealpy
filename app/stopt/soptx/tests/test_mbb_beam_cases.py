@@ -42,12 +42,14 @@ class TestMBBBeamCase:
         mesh = UniformMesh2d(extent, h, origin)
         NC = mesh.number_of_cells()
 
-        p = 1
-        space = LagrangeFESpace(mesh, p=p, ctype='C')
-        tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+        space_C = LagrangeFESpace(mesh, p=1, ctype='C')
+        tensor_space = TensorFunctionSpace(space_C, shape=(-1, 2))
+        uh = tensor_space.function()
 
         F = tensor_space.interpolate(force)
         isDDof = tensor_space.is_boundary_dof(threshold=(is_dirichlet_boundary_edge, 
                                                         is_dirichlet_node,
                                                         is_dirichlet_direction))
+        space_D = LagrangeFESpace(mesh, p=0, ctype='D')        
+        rho = space_D.function()
         print("-------------")
