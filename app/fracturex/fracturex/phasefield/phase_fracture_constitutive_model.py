@@ -66,36 +66,7 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
         gd = (1 - d(bc))**2 + eps
         return gd
 
-
-    def strain(self, u: TensorLike) -> TensorLike:
-        """
-        Compute the strain tensor.
-
-        Parameters
-        ----------
-        u : TensorLike
-            The displacement field.
-
-        Returns
-        -------
-        TensorLike
-            The strain tensor.
-        """
-        q = self.q
-        mesh = u.space.mesh
-        qf = mesh.quadrature_formula(q, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights() 
-        guh = u.grad_value(bc)
-
-        GD = guh.shape[-1]
-        strain = bm.zeros_like(guh)
-        for i in range(GD):
-            for j in range(GD):
-                strain[..., i, j] = 0.5 * (guh[..., i, j] + guh[..., j, i])
-        return strain
-
-
-    def effective_stress(self, u:TensorLike = None, strain = None) -> TensorLike:
+    def effective_stress(self, strain = None) -> TensorLike:
         """
         Compute the effective stress tensor, which is the stress tensor without the damage effect.
 
@@ -112,25 +83,23 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
         """
         lam = self.lam
         mu = self.mu
-        if strain is None:
-            strain = self.strain(u)
         trace_e = np.trace(strain, axis1=-2, axis2=-1)
         I = bm.eye(strain.shape[-1])
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
         return stress
        
-    def stress(self, u: TensorLike, d: TensorLike) -> TensorLike:
+    def stress(self, strain, d: TensorLike) -> TensorLike:
         """
         Compute the fracture stress tensor.
         """
         method = self.method
         gd = self.energy_degradation_function(d)
-        strain = self.strain(u)
         if method == 'hybrid':
             stress = self.effective_stress(strain=strain) * gd[..., None, None]
         else:
             raise ValueError("The method of stress computation is not supported.")
         return stress
+
 
     def tangent_stiffness(self, d: TensorLike) -> TensorLike:
         """
@@ -138,7 +107,6 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
         """
         method = self.method
         gd = self.energy_degradation_function(d)
-        strain = self.strain(u)
         if method == 'hybrid':
             base_D = super().elastic_matrix()
             D = base_D * gd[..., None, None]
