@@ -73,7 +73,6 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
             F = linear_integral(phi, ws, cm, coef_F, batched=self.batched)
         else:
             uh_ = self.uh[space.cell_to_dof()]
-
             A, F = self.auto_grad(space, uh_, coef, batched=self.batched)
 
         return A, F
@@ -89,7 +88,7 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
         
         if is_tensor(coef):
             coef = fill_axis(coef, 2 if batched else 1)
-            return bm.einsum(f'q, qi, q, ...q -> ...i', ws, phi[0], val, coef)
+            return bm.einsum(f'q, qi, q, ...q -> ...i', ws, phi[0], val, coef) * cm
 
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, phi, cm, _ = self.fetch(space)
