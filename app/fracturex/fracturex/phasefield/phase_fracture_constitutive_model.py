@@ -1,71 +1,23 @@
-import numpy as np
 from typing import Optional
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
+from fealpy.experimental.materials import ElasticMaterial
 
-#from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
-
-class PhaseFractureConstitutiveModel(LinearElasticMaterial):
-    """
-    The class of phase field fracture constitutive model.
-    """
-    def __init__(self, 
-                 E: Optional[float]=None,
-                 nu: Optional[float]=None,
-                 lam: Optional[float]=None,
-                 mu: Optional[float]=None,
-                 method: Optional[str]='hybrid',
-                 q: Optional[int]=None,
-                 hypo: Optional[str]='plane_strain',
-                 ) -> None:
-
-        if lam is not None and mu is not None:
-            self.E = mu * (3*lam + 2*mu) / (lam + mu)
-            self.nu = lam / (2 * (lam + mu))
-            self.lam = lam
-            self.mu = mu
-        elif E is not None and nu is not None:
-            self.lam = nu * E / ((1 + nu) * (1 - 2 * nu))
-            self.mu = E / (2 * (1 + nu))
-            self.E = E
-            self.nu = nu
-        else:
-            raise ValueError("Either (lam, mu) or (E, nu) should be provided.")
-        self.q = q if q is not None else 2
-        self.method = method
-        if hypo not in ["plane_strain", "3D"]:
-            raise ValueError("hypo should be either 'plane_strain' or '3D'")
-        
-        super().__init__(name="MaterialProperties", elastic_modulus=self.E,
-                         poisson_ratio=self.nu, hypo=hypo)
-
-        self.hypo = hypo   
-
-    def energy_degradation_function(self, d: TensorLike) -> TensorLike:
+class BasedConstitutiveModel(ElasticMaterial):
+    def __init__(self, material, energy_degradation_fun):
         """
-        Compute the energy degradation function.
-        Attention: The energy degradation function is a scalar function, and the input damage field is a scalar field.
-        TODO: The energy degradation function can have other forms.
         Parameters
         ----------
-        d : TensorLike
-            The damage field.
-
-        Returns
-        -------
-        TensorLike
-            The energy degradation function.
+        material : 材料参数
         """
-        q = self.q
-        mesh = d.space.mesh
-        qf = mesh.quadrature_formula(q, 'cell')
-        bc, ws = qf.get_quadrature_points_and_weights() 
-        eps = 1e-10
-        gd = (1 - d(bc))**2 + eps
-        return gd
-
+        self._gd = energy_degradation_fun # 能量退化函数
+        self.lam = material['lam']
+        self.mu = material['mu']
+        self.k = material['k']
+        self.E = material['E']
+        self.nu = material['nu']
+       
     def effective_stress(self, strain = None) -> TensorLike:
         """
         Compute the effective stress tensor, which is the stress tensor without the damage effect.
@@ -87,55 +39,81 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
         I = bm.eye(strain.shape[-1])
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
         return stress
-       
-    def stress(self, strain, d: TensorLike) -> TensorLike:
+
+    def compute_strain(self, uh, bc) -> TensorLike:
+        """
+        Compute the strain tensor.
+        """
+        guh = uh.grad_value(bc)
+        strain = 0.5 * (guh + guh.transpose(-2, -1))
+        return strain
+    
+    def linear_elastic_matrix(self, strain, bc) -> TensorLike:
+        GD = strain.shape[-1]
+        lam = self.lam
+        mu = self.mu
+        if GD == 2:
+            D0 = bm.tensor([[lam + 2 * mu, lam, 0],
+                          [lam, lam + 2 * mu, 0],
+                          [0, 0, mu]], dtype=bm.float64)
+        elif GD == 3:
+            D0 = bm.tensor([[lam + 2 * mu, lam, lam, 0, 0, 0],
+                            [lam, lam + 2 * mu, lam, 0, 0, 0],
+                            [lam, lam, lam + 2 * mu, 0, 0, 0],
+                            [0, 0, 0, mu, 0, 0],
+                            [0, 0, 0, 0, mu, 0],
+                            [0, 0, 0, 0, 0, mu]], dtype=bm.float64)
+        else:
+            raise NotImplementedError("This dim is not correct, we cannot give
+                                      the linear elastic matrix.")
+        return D0
+
+
+class IsotropicModel(BasedConstitutiveModel):
+    def compute_stress(self, strain, d: TensorLike, bc) -> TensorLike:
         """
         Compute the fracture stress tensor.
         """
-        method = self.method
-        gd = self.energy_degradation_function(d)
-        if method == 'hybrid':
-            stress = self.effective_stress(strain=strain) * gd[..., None, None]
-        else:
-            raise ValueError("The method of stress computation is not supported.")
+        gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
+        stress = self.effective_stress(strain=strain) * gd[..., None, None]
         return stress
 
-
-    def tangent_stiffness(self, d: TensorLike) -> TensorLike:
-        """
-        Compute the tangent stiffness tensor.
-        """
-        method = self.method
-        gd = self.energy_degradation_function(d)
-        if method == 'hybrid':
-            base_D = super().elastic_matrix()
-            D = base_D * gd[..., None, None]
-        else:
-            raise ValueError("The method of tangent stiffness computation is not supported.")
+    def elastic_matrix(self, strain, d, bc) -> TensorLike: 
+        gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
+        D0 = self.linear_elastic_matrix(strain, bc) # 线弹性矩阵
+        D = D0 * gd[..., None, None]
         return D
+       
 
-    def maximum_historical_strain_field(self, u: TensorLike, H) -> TensorLike:
-        """
-        Compute the maximum historical strain field.
-        """
-        strain = self.strain(u)
-        phip, _ = self.strain_energy_density_decomposition(strain)
-        H[:] = np.fmax(H, phip)
-        return H
+class AnisotropicModel(BasedConstitutiveModel):
+    def compute_stress(self, strain, d: TensorLike, bc) -> TensorLike:
+        # 计算各向异性模型下的应力
+        pass
+
+    def elastic_matrix(self, strain, d, bc) -> TensorLike: 
+        # 计算各向异性模型下的切线刚度矩阵
+        pass
+
+class DeviatoricModel(BasedConstitutiveModel):
+    def compute_stress(self, strain):
+        # 计算偏应力模型下的应力
+        pass
+
+    def elastic_matrix(self, strain, d, bc) -> TensorLike: 
+        # 计算偏应力模型下的切线刚度矩阵
+        pass
+
+
+class SpectralModel(BasedConstitutiveModel):
+    def compute_stress(self, strain):
+        # 计算谱分解模型下的应力
+        pass
+
+    def elastic_matrix(self, strain, d, bc) -> TensorLike: 
+        # 计算谱分解模型下的切线刚度矩阵
+        pass
 
     def strain_energy_density_decomposition(self, s: TensorLike):
-        """
-        @brief Choose diffient positive and negative decomposition of strain energy density
-        """
-        method = self.method
-        if method == 'spectral':
-            return self.spectral_decomposition(s)
-        elif method == 'hybrid':
-            return self.spectral_decomposition(s)
-        else:
-            raise ValueError("The method of strain energy density decomposition is not supported.")
-
-    def spectral_decomposition(self, s: TensorLike):
         """
         @brief Strain energy density decomposition from Miehe Spectral
         decomposition method.
@@ -156,9 +134,6 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm
         return phi_p, phi_m
 
-    def deviatoric_decomposition(self, s: TensorLike):
-        pass
-    
     def strain_pm_eig_decomposition(self, s: TensorLike):
         """
         @brief Decomposition of Positive and Negative Characteristics of Strain.
@@ -182,7 +157,6 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
 
             n1 = m[..., i, None] * n0
             sm += n1[..., None] * n0[..., None, :]
-
         return sp, sm
 
     
@@ -205,4 +179,65 @@ class PhaseFractureConstitutiveModel(LinearElasticMaterial):
         val[x < -1e-13] = 0
         return val
     
+    def maximum_historical_field(self, H, uh, bc):
+        """
+        @brief Maximum historical field
+        """
+        strain = self.compute_strain(uh, bc)
+        phip, _ = self.strain_energy_density_decomposition(strain)
+        H[:] = np.fmax(H, phip)
+        return H
+        
 
+class HybridModel(BasedConstitutiveModel):
+    def __init__(self, material, energy_degradation_fun):
+        """
+        Parameters
+        ----------
+        material : 材料参数
+        """
+        super().__init__(material, energy_degradation_fun)
+        self._isotropic_model = IsotropicModel(material, energy_degradation_fun)
+        self._spectral_model = SpectralModel(material, energy_degradation_fun)
+
+    def compute_stress(self, strain, d: TensorLike, bc) -> TensorLike:
+        """
+        Compute the fracture stress tensor.
+        """
+        return self._isotropic_model.compute_stress(strain, d, bc)
+
+    def elastic_matrix(self, strain, d, bc) -> TensorLike: 
+        return self._isotropic_model.elastic_matrix(strain, d, bc)
+
+    def maximum_historical_field(self, H, uh, bc):
+        """
+        @brief Maximum historical field
+        """
+        return self._spectral_model.maximum_historical_field(H, uh, bc)
+        
+
+class PhaseFractureConstitutiveModelFactory:
+    """
+    工厂类，用于创建不同的本构模型
+    """
+    @staticmethod
+    def create(model_type, material, energy_degradation_fun):
+        """
+        Parameters
+        ----------
+        model_type : str
+            本构模型类型
+        material : dict
+        """
+        if model_type == 'IsotropicModel':
+            return IsotropicModel(material, energy_degradation_fun)
+        elif model_type == 'AnisotropicModel':
+            return AnisotropicModel(material, energy_degradation_fun)
+        elif model_type == 'SpectralModel':
+            return SpectralModel(material, energy_degradation_fun) 
+        elif model_type == 'DeviatoricModel':
+            return DeviatoricModel(material, energy_degradation_fun)
+        elif model_type == 'HybridModel':
+            return HybridModel(material, energy_degradation_fun)
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")

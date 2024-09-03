@@ -1,1 +1,1 @@
-from .phase_fracture_constitutive_model import PhaseFractureConstitutiveModel
+from .phase_fracture_constitutive_model import PhaseFractureConstitutiveModelFactory
