@@ -177,6 +177,11 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
+        #TODO:JAX
+        self.device = mesh.device
+        self.TD = mesh.top_dimension()
+        self.GD = mesh.geo_dimension()
+
     def cross(self, a, b):
         if bm.backend_name == 'numpy':
             return bm.cross(a, b)
