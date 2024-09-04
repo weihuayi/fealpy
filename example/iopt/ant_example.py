@@ -2,7 +2,7 @@ import time
 from fealpy.experimental.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from fealpy.iopt.ANT_TSP import calD, Ant_TSP
-bm.set_backend('pytorch')
+# bm.set_backend('pytorch')
 
 # 导入数据(34个城市)
 citys = bm.array([
@@ -64,7 +64,7 @@ Route_best = bm.zeros((iter_max, n), dtype=int)  # 各代最佳路径
 Length_best = bm.zeros(iter_max)  # 各代最佳路径的长度
 
 # 设置循环次数
-l = 1 
+l = 10 
 
 # 存储每次循环的结果
 shortest_lengths = []  
@@ -73,7 +73,7 @@ shortest_routes = []
 # 循环迭代寻找最佳路径
 start_time = time.time()  # 记录开始时间
 
-for _ in range(l):
+for i in range(l):
     # 迭代寻找最佳路径
     Length_best, Route_best = text1.cal(n, Tau, Table, Route_best, Length_best)
 

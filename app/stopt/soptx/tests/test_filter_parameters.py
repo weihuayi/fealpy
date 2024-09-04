@@ -13,7 +13,7 @@ class TestFilter:
     def test_coomputer_filter(self, filterdata, backend):
         bm.set_backend(backend)
         nelx = 6
-        nely = 3
+        nely = 2
         rmin = 1.5
         nfilter = int(nelx * nely * ((2 * (np.ceil(rmin) - 1) + 1) ** 2))
         iH = np.zeros(nfilter)

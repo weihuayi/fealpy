@@ -35,6 +35,12 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     def device_index(tensor_like, /): return 0
 
     @staticmethod
+    def device_put(tensor_like, /, device=None):
+        if device not in {None, 'cpu'}:
+            raise NotImplementedError("only cpu device is supported by NumPyBackend ")
+        return tensor_like
+
+    @staticmethod
     def to_numpy(tensor_like: NDArray, /) -> NDArray:
         return tensor_like
 
@@ -93,8 +99,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def unique_all_(a, axis=None, **kwargs):
-        """
-        """
         b, indices0, inverse, counts = np.unique(a, 
                                                  return_index=True,
                                                  return_inverse=True,
@@ -103,6 +107,10 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         indices1 = np.zeros_like(indices0)
         indices1[inverse] = range(inverse.shape[0]);
         return b, indices0, indices1, inverse, counts
+
+    @staticmethod
+    def unstack(x, /, *, axis: int=0):
+        return np.split(x, x.shape[axis], axis=axis)
 
     ### Sparse Functions ###
 
@@ -371,7 +379,11 @@ function_mapping.update(tensor='array')
 
 if int(np.__version__[:1]) < 2:
     attribute_mapping.update(bool='bool_')
-    function_mapping.update(concat='concatenate')
+    function_mapping.update(
+        concat='concatenate', bitwise_invert='bitwise_not', permute_dims='transpose',
+        pow='power', acos='arccos', asin='arcsin', acosh='arccosh', asinh='arcsinh',
+        atan='arctan', atanh='arctanh', atan2='arctan2'
+    )
 
 NumPyBackend.attach_attributes(attribute_mapping, np)
 NumPyBackend.attach_methods(function_mapping, np)

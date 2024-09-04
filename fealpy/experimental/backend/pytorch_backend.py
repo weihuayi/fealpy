@@ -80,6 +80,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def device_index(tensor_like: Tensor, /): return tensor_like.device.index
 
     @staticmethod
+    def device_put(tensor_like: Tensor, /, device=None) -> Tensor:
+        return tensor_like.to(device=device)
+
+    @staticmethod
     def to_numpy(tensor_like: Tensor, /) -> Any:
         return tensor_like.detach().cpu().numpy()
 
@@ -178,6 +182,23 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if dtype is not None:
             arrays = [a.to(dtype) for a in arrays]
         return torch.cat(arrays, dim=axis, out=out)
+
+    @staticmethod
+    def split(x, indices_or_sections, /, *, axis=0):
+        if isinstance(indices_or_sections, int):
+            chunk_size = x.shape[axis] // indices_or_sections
+        elif isinstance(indices_or_sections, Tensor):
+            if indices_or_sections.ndim != 1:
+                raise ValueError("indices_or_sections must be 1-dimensional")
+            kwargs = {'dtype': indices_or_sections.dtype, 'device': indices_or_sections.device}
+            HEAD = torch.tensor([0], **kwargs)
+            TAIL = torch.tensor([x.shape[axis]], **kwargs)
+            indices_or_sections = torch.cat([HEAD, indices_or_sections, TAIL])
+            chunk_size = (indices_or_sections[1:] - indices_or_sections[:-1]).tolist()
+        else:
+            raise ValueError("indices_or_sections must be a scalar or 1D Tensor")
+
+        return torch.split(x, chunk_size, dim=axis)
 
     ### Searching Functions ###
     # python array API standard v2023.12

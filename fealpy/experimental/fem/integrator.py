@@ -144,13 +144,13 @@ class NonlinearInt(Integrator):
     pass
 
 
-class SemilinearInt(NonlinearInt):
+class SemilinearInt(Integrator):
     """### Semilinear Integrator
     Base class for integrators generating integration linear to test functions `v`."""
     pass
 
 
-class LinearInt(SemilinearInt):
+class LinearInt(Integrator):
     """### Linear Integrator
     Base class for integrators generating integration linear to both `u` and `v`."""
     pass

@@ -20,7 +20,7 @@ from fealpy.decorator import barycentric
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        任意次有限元方法求解possion方程
+        任意次有限元方法求解半线性方程
         """)
 
 parser.add_argument('--degree',
@@ -44,7 +44,6 @@ parser.add_argument('--meshtype',
         help='默认网格为三角形网格')
 
 args = parser.parse_args()
-
 args.backend = 'pytorch'
 bm.set_backend(args.backend)
 p = args.degree
@@ -56,20 +55,24 @@ tmr = timer()
 next(tmr)
 
 domain = [0, 1, 0, 2]
-nx = 4
-ny = 4
 pde = SemilinearData(domain)
-mesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
+mesh = TriangleMesh.from_box(domain, nx=n, ny=n)
 
 tol = 1e-14
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
-def kernel_func(u):
+def kernel_func_reaction(u):
     return u**3
 
-def grad_kernel_func(u):
+def grad_kernel_func_reaction(u):
     return 3*u**2
+
+def kernel_func_diffusion(u):
+    return u
+
+def grad_kernel_func_diffusion(u):
+    return bm.ones_like(u)
 
 def diffusion_coef(p):
     return pde.diffusion_coefficient(p)
@@ -77,10 +80,12 @@ def diffusion_coef(p):
 def reaction_coef(p):
     return pde.reaction_coefficient(p)
 
-reaction_coef.kernel_func = kernel_func
+reaction_coef.kernel_func = kernel_func_reaction
+diffusion_coef.kernel_func = kernel_func_diffusion
 
 if bm.backend_name == 'numpy':
-    reaction_coef.grad_kernel_func = grad_kernel_func
+    reaction_coef.grad_kernel_func = grad_kernel_func_reaction
+    diffusion_coef.grad_kernel_func = grad_kernel_func_diffusion
     
 for i in range(maxit):
     #定义函数空间

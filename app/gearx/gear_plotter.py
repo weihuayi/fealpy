@@ -17,10 +17,10 @@ with open('./external_gear_data.json', 'r') as file:
     data = json.load(file)
 center = data['center'][:-1]  # 中心坐标（只读取二维）
 x = data['x']  # 变位系数
-m = data['m']  # 模数
+m = data['mn']  # 模数
 z = data['z']  # 齿数
-alpha = data['alpha']/180*bm.pi  # 压力角
-haa = data['haa']  # 齿顶高系数
+alpha = data['alpha_n']/180*bm.pi  # 压力角
+haa = data['hac']  # 齿顶高系数
 cc = data['cc']  # 顶隙系数
 
 r_p = m*z/2  # 分度圆半径

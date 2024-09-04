@@ -71,23 +71,20 @@ extent = [0, nx, 0, ny]
 h = [1, 1]
 origin = [0, 0]
 mesh = UniformMesh2d(extent, h, origin)
+NN = mesh.number_of_nodes()
 NC = mesh.number_of_cells()
-p = 1
-space = LagrangeFESpace(mesh, p=p, ctype='C')
+
+space = LagrangeFESpace(mesh, p=2, ctype='C')
+ldof = space.number_of_local_dofs()
+gdof = space.number_of_global_dofs()
+
 tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
-# tensor_space = TensorFunctionSpace(space, shape=(2, -1))
-
-F = tensor_space.interpolate(source)
-# isDDof = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary_edge, direction=is_dirichlet_direction)
-isDDof_0 = tensor_space.is_boundary_dof(threshold=(is_dirichlet_boundary_edge, is_dirichlet_direction_0))
-isDDof_1 = tensor_space.is_boundary_dof(threshold=(is_dirichlet_boundary_edge, is_dirichlet_direction_1))
-
-isDDof_test = tensor_space.is_boundary_dof(threshold=is_dirichlet_boundary)
+tldof = tensor_space.number_of_local_dofs()
+tgdof = tensor_space.number_of_global_dofs()
 uh = tensor_space.function()
-uh = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh, 
-                                           threshold=is_dirichlet_boundary_edge)
-uh[1::2] = 0
-uh_test = tensor_space.function()
-uh_test = tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_test, 
-                                           threshold=is_dirichlet_boundary)
+
+space_d = LagrangeFESpace(mesh, p=2, ctype='D')
+ldof_d = space_d.number_of_local_dofs()
+gdof_d = space_d.number_of_global_dofs()
+rho = space_d.function()
 print("uh:", uh)

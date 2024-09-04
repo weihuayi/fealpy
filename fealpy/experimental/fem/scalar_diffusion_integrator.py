@@ -24,8 +24,6 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
         self.coef = coef
-        if hasattr(coef, 'uh'):
-            self.uh = coef.uh
         self.q = q
         self.index = index
         self.batched = batched

@@ -108,7 +108,7 @@ class COOTensor(SparseTensor):
             src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
         else:
             src = self._values
-        bm.index_add(dense_tensor, flattened, src, axis=-1)
+        dense_tensor = bm.index_add(dense_tensor, flattened, src, axis=-1)
 
         return dense_tensor.reshape(self.shape)
 
@@ -141,7 +141,7 @@ class COOTensor(SparseTensor):
 
                 full_values = bm.copy(self._values[..., order])
                 new_values = bm.zeros_like(full_values[..., unique_mask_np])
-                bm.index_add(new_values, add_index, self._values[..., order], axis=-1)
+                new_values = bm.index_add(new_values, add_index, self._values[..., order], axis=-1)
                 del full_values
 
                 new_indices = bm.tensor(new_indices_np[..., unique_mask_np], **index_context)
@@ -314,7 +314,7 @@ class COOTensor(SparseTensor):
                 src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
                 src = self._values
-            bm.index_add(output, flattened, src, axis=-1)
+            output = bm.index_add(output, flattened, src, axis=-1)
 
             return output.reshape(self.shape)
 
@@ -337,7 +337,7 @@ class COOTensor(SparseTensor):
             check_shape_match(self.shape, other.shape)
             new_values = bm.copy(other[self.nonzero_slice])
             if self._values is not None:
-                bm.multiply(self._values, new_values, out=new_values)
+                new_values = bm.multiply(self._values, new_values)
             return COOTensor(self._indices, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
@@ -360,7 +360,7 @@ class COOTensor(SparseTensor):
         if isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
             new_values = bm.copy(other[self.nonzero_slice])
-            bm.divide(self._values, new_values, out=new_values)
+            new_values = bm.divide(self._values, new_values)
             return COOTensor(self._indices, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
@@ -435,5 +435,44 @@ class COOTensor(SparseTensor):
 
     def tocsr(self):
         from .csr_tensor import CSRTensor
-        crow, col, values = bm.coo_tocsr(self.indices(), self.values(), self.sparse_shape)
-        return CSRTensor(crow, col, values, spshape=self._spshape)
+        try:
+            crow, col, values = bm.coo_tocsr(self.indices(), self.values(), self.sparse_shape)
+            return CSRTensor(crow, col, values, spshape=self._spshape)
+        except (AttributeError, NotImplementedError):
+            # TODO: implement this
+            raise NotImplementedError("CSR conversion is not implemented")
+
+    def to_scipy(self, format: str='coo'):
+        from importlib import import_module
+
+        if self.dense_ndim != 0:
+            raise ValueError("Only COOTensor with 0 dense dimension "
+                             "can be converted to scipy sparse matrix")
+
+        class_ = import_module(f'scipy.sparse.{format}_matrix')
+
+        return class_(
+            (bm.to_numpy(self.values()), bm.to_numpy(self.indices())),
+            shape = self.sparse_shape
+        )
+
+    @classmethod
+    def from_scipy(cls, mat, /):
+        indices = bm.stack([bm.from_numpy(mat.row), bm.from_numpy(mat.col)], axis=0)
+        values = bm.from_numpy(mat.data)
+        return cls(indices, values, mat.shape)
+
+    def device_put(self, device=None, /):
+        return COOTensor(bm.device_put(self._indices, device),
+                         bm.device_put(self._values, device),
+                         self._spshape,
+                         is_coalesced=self.is_coalesced)
+
+    def astype(self, dtype=None, /, *, copy=True):
+        if self._values is None:
+            values = bm.ones(self.nnz, dtype=dtype)
+        else:
+            values = bm.astype(self._values, dtype, copy=copy)
+
+        return COOTensor(self._indices, values, self._spshape,
+                         is_coalesced=self.is_coalesced)

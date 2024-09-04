@@ -25,9 +25,10 @@ class SemilinearForm(Form[SemilinearInt]):
         etg = [INTS[0].to_global_dof(s) for s in self._spaces]
 
         for ints_ in INTS:
-            if isinstance(ints_, SemilinearInt):
+            if isinstance(ints_, OpInt) and isinstance(ints_, SemilinearInt):
                 SEMILINEAR_INTS.append(ints_)
-        ct_F = SEMILINEAR_INTS[0](self.space)[1]
+        
+        ct_F = SEMILINEAR_INTS[0](self.space)[1] if len(SEMILINEAR_INTS) !=0 else None
         
         if isinstance(INTS[0], OpInt):
             ct_A = INTS[0](self.space)[0]

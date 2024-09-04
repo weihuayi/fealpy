@@ -10,7 +10,7 @@ from .integrator import LinearInt
 
 
 class LinearForm(Form[LinearInt]):
-    _V: Optional[COOTensor] = None
+    _V = None
 
     def _get_sparse_shape(self):
         spaces = self._spaces
@@ -59,15 +59,16 @@ class LinearForm(Form[LinearInt]):
         return M
 
     @overload
-    def assembly(self, *, return_dense: Literal[True]=True, coalesce=True, retain_ints: bool=False) -> TensorLike: ...
+    def assembly(self, *, retain_ints: bool=False) -> TensorLike: ...
     @overload
-    def assembly(self, *, return_dense: Literal[False], coalesce=True, retain_ints: bool=False) -> COOTensor: ...
-    def assembly(self, *, return_dense=True, coalesce=True, retain_ints: bool=False):
+    def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
+    @overload
+    def assembly(self, *, format: Literal['dense'], retain_ints: bool=False) -> TensorLike: ...
+    def assembly(self, *, format='dense', retain_ints: bool=False):
         """Assembly the linear form vector.
 
         Parameters:
-            return_dense (bool, optional): Whether to return dense tensor.\n
-            coalesce (bool, optional): Whether to coalesce the sparse tensor.\n
+            format (str, optional): Layout of the output ('dense', 'coo'). Defaults to 'dense'.\n
             retain_ints (bool, optional): Whether to retain the integrator cache.
 
         Returns:
@@ -75,10 +76,12 @@ class LinearForm(Form[LinearInt]):
         """
         V = self._scalar_assembly(retain_ints, self.batch_size)
 
-        self._V = V.coalesce() if coalesce else V
+        if format == 'dense':
+            self._V = V.to_dense()
+        elif format == 'coo':
+            self._V = V.coalesce()
+        else:
+            raise ValueError(f"Unknown format {format}.")
         logger.info(f"Linear form vector constructed, with shape {list(V.shape)}.")
-
-        if return_dense:
-            return self._V.to_dense()
 
         return self._V

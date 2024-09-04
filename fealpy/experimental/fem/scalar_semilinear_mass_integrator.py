@@ -1,3 +1,4 @@
+
 from typing import Optional
 from functools import partial
 
@@ -6,7 +7,7 @@ from ..typing import TensorLike, Index, _S
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
+from ..utils import process_coef_func, is_scalar, is_tensor, fill_axis
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     SemilinearInt, OpInt, CellInt,
@@ -72,28 +73,29 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
             F = linear_integral(phi, ws, cm, coef_F, batched=self.batched)
         else:
             uh_ = self.uh[space.cell_to_dof()]
-            val = self.kernel_func(uh_)
-            coef = get_semilinear_coef(val, coef)
-            A, F = self.auto_grad(space, coef) 
+            A, F = self.auto_grad(space, uh_, coef, batched=self.batched)
 
         return A, F
     
-    def cell_integral_A(self, ws, phi, u) -> TensorLike:
+    def cell_integral(self, u, cm, phi, ws, coef, batched) -> TensorLike:
+        val = self.kernel_func(bm.einsum('i, qi -> q', u, phi[0]))
+        
+        if coef is None:
+            return bm.einsum('q, qi, q -> i', ws, phi[0], val) * cm
+        
+        if is_scalar(coef):
+            return bm.einsum('q, qi, q -> i', ws, phi[0], val) * cm * coef
+        
+        if is_tensor(coef):
+            coef = fill_axis(coef, 2 if batched else 1)
+            return bm.einsum(f'q, qi, q, ...q -> ...i', ws, phi[0], val, coef) * cm
 
-        return bm.einsum(f'q, qi, qj, ...j -> ...i', ws, phi[0], phi[0], u)
-    
-    def cell_integral_F(self, ws, phi, u) -> TensorLike:
-
-        return bm.einsum(f'q, qi, ...i -> ...i', ws, phi[0], u)
-    
-    def auto_grad(self, space, val) -> TensorLike:
-
+    def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, phi, cm, _ = self.fetch(space)
         fn_A = bm.vmap(bm.jacfwd(                         
-            partial(self.cell_integral_A, ws, phi)
+            partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
             ))
         fn_F = bm.vmap(
-            partial(self.cell_integral_F, ws, phi)
+            partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
         )
-        return bm.einsum('...cij, c -> ...cij', fn_A(val), cm),\
-               -bm.einsum('...ci, c -> ...ci', fn_F(val), cm)
+        return  fn_A(uh_, cm), -fn_F(uh_, cm)
