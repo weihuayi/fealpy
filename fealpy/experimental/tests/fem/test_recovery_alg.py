@@ -35,12 +35,13 @@ class TestRecoveryAlg:
         x = p[..., 0]
         y = p[..., 1]
         f = x*y
-#        f[bm.abs(x-0.5) < 1e-6] = 1
+        f[1] = 10
         return f
 
 
 if __name__ == "__main__":
     TestRecoveryAlg().test_recovery_alg('numpy')
     TestRecoveryAlg().test_recovery_alg('pytorch')
+    TestRecoveryAlg().test_recovery_alg('jax')
 #    pytest.main(['test_recovery_alg.py', "-q"])   
 
