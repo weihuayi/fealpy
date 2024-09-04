@@ -26,8 +26,9 @@ class MainSolver:
 
         pass
 
-    def update(self):
-        pass
+    def update_matrix(self):
+        decomp_model = self.decomp_model
+        decomp_model.update_matrix()
 
     def solve_displacement(self):
         """
