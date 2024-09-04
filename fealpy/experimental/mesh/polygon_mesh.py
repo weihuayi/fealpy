@@ -236,6 +236,7 @@ class PolygonMesh(Mesh, Plotable):
             tri[:, 2, :] = bc + t[2]*h
 
             bcs = self.multi_index_matrix(p-2, 2)/(p-2)
+            bcs = bm.astype(bcs,self.ftype)
             ipoint[start:] = bm.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
             return ipoint
 
@@ -263,14 +264,14 @@ class PolygonMesh(Mesh, Plotable):
             t -= bm.tensor([0.5, sqrt(3)/6.0], dtype=self.ftype)
 
             tri = bm.zeros((NC, 3, GD), dtype=self.ftype)
-            tri[:, 0, :] = bc + t[0]*h
-            tri[:, 1, :] = bc + t[1]*h
-            tri[:, 2, :] = bc + t[2]*h
+            tri = tri.at[...,0,:].set(bc + t[0]*h)
+            tri = tri.at[...,1,:].set(bc + t[1]*h)
+            tri = tri.at[...,2,:].set(bc + t[2]*h)
 
             bcs = self.multi_index_matrix(p-2, 2)/(p-2)
-            ipoint[start:] = bm.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
+            ipoint = ipoint.at[start:].set(bm.einsum('ij, ...jm->...im', bcs,tri).reshape(-1, GD))
             return ipoint
-    '''  
+     
     #需要功能 hsplit
     def cell_to_ipoint(self, p: int, index=_S):
         """
@@ -280,33 +281,60 @@ class PolygonMesh(Mesh, Plotable):
         if p == 1:
             return cell[index]
         else:
-            NC = self.number_of_cells()
-            ldof = self.number_of_local_ipoints(p, iptype='all')
+            if bm.backend_name in ["numpy","pytorch"]:
+                NC = self.number_of_cells()
+                ldof = self.number_of_local_ipoints(p, iptype='all')
 
-            location = bm.zeros(NC+1, dtype=self.itype)
-            location[1:] = bm.cumsum(ldof)
+                location = bm.zeros(NC+1, dtype=self.itype)
+                location[1:] = bm.cumsum(ldof,axis=0)
 
-            cell2ipoint = bm.zeros(location[-1], dtype=self.itype)
+                cell2ipoint = bm.zeros(location[-1], dtype=self.itype)
 
-            edge2ipoint = self.edge_to_ipoint(p)
-            edge2cell = self.edge2cell
+                edge2ipoint = self.edge_to_ipoint(p)
+                edge2cell = self.edge2cell
 
-            idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + bm.arange(p)
-            cell2ipoint[idx] = edge2ipoint[:, 0:p]
+                idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + bm.arange(p)
+                cell2ipoint[idx] = edge2ipoint[:, 0:p]
 
-            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-            idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1,1) + bm.arange(p)
-            cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
+                isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+                idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1,1) + bm.arange(p)
+                selected_elements = edge2ipoint[isInEdge, 1:p+1]
+                reversed_elements = bm.flip(selected_elements, axis=1)
+                cell2ipoint[idx] = reversed_elements
 
-            NN = self.number_of_nodes()
-            NV = self.number_of_vertices_of_cells()
-            NE = self.number_of_edges()
-            cdof = self.number_of_local_ipoints(p, iptype='cell')
-            idx = (location[:-1] + NV*p).reshape(-1, 1) + bm.arange(cdof)
-            cell2ipoint[idx] = NN + NE*(p-1) + bm.arange(NC*cdof).reshape(NC, cdof)
-            #print(location[1:-1])
-            return bm.unstack(cell2ipoint, location[1:-1])[index]
-    '''
+                NN = self.number_of_nodes()
+                NV = self.number_of_vertices_of_cells()
+                NE = self.number_of_edges()
+                cdof = self.number_of_local_ipoints(p, iptype='cell')
+                idx = (location[:-1] + NV*p).reshape(-1, 1) + bm.arange(cdof)
+                cell2ipoint[idx] = NN + NE*(p-1) + bm.arange(NC*cdof).reshape(NC, cdof)
+                return bm.split(cell2ipoint, location[1:-1])[index]
+            elif bm.backend_name == "jax": 
+                NC = self.number_of_cells()
+                ldof = self.number_of_local_ipoints(p, iptype='all')
+
+                location = bm.zeros(NC+1, dtype=self.itype)
+                location = location.at[1:].set(bm.cumsum(ldof,axis=0))
+
+                cell2ipoint = bm.zeros(location[-1], dtype=self.itype)
+
+                edge2ipoint = self.edge_to_ipoint(p)
+                edge2cell = self.edge2cell
+
+                idx = location[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + bm.arange(p)
+                cell2ipoint = cell2ipoint.at[idx].set(edge2ipoint[:, 0:p])
+
+                isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+                idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1,1) + bm.arange(p)
+                cell2ipoint = cell2ipoint.at[idx].set(edge2ipoint[isInEdge, p:0:-1])
+
+                NN = self.number_of_nodes()
+                NV = self.number_of_vertices_of_cells()
+                NE = self.number_of_edges()
+                cdof = self.number_of_local_ipoints(p, iptype='cell')
+                idx = (location[:-1] + NV*p).reshape(-1, 1) + bm.arange(cdof)
+                cell2ipoint = cell2ipoint.at[idx].set(NN + NE*(p-1) + bm.arange(NC*cdof).reshape(NC,cdof))
+                return bm.split(cell2ipoint, location[1:-1])[index]
 
     def shape_function(self, bcs: TensorLike, p: int,index: Index = _S) -> TensorLike:
         raise NotImplementedError
