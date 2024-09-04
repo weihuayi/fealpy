@@ -2,9 +2,9 @@ from typing import Optional
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.materials import ElasticMaterial
+from fealpy.experimental.material.elastic_material import LinearElasticMaterial
 
-class BasedConstitutiveModel(ElasticMaterial):
+class BasedConstitutiveModel(LinearElasticMaterial):
     def __init__(self, material, energy_degradation_fun):
         """
         Parameters
@@ -12,11 +12,17 @@ class BasedConstitutiveModel(ElasticMaterial):
         material : 材料参数
         """
         self._gd = energy_degradation_fun # 能量退化函数
+        '''
         self.lam = self.material.get_material['lam']
         self.mu = self.material.get_material['mu']
         self.k = self.material.get_material['k']
         self.E = self.material.get_material['E']
         self.nu = self.material.get_material['nu']
+        '''
+        self.E = 200
+        self.nu = 0.3
+        self.lam = self.E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu))
+        self.mu = self.E / (2 * (1 + self.nu))
 
         self._uh = None
         self._d = None
@@ -62,7 +68,7 @@ class BasedConstitutiveModel(ElasticMaterial):
         strain = 0.5 * (guh + guh.transpose(-2, -1))
         return strain
     
-    def linear_elastic_matrix(self, uh=None, strain=None, bc) -> TensorLike:
+    def linear_elastic_matrix(self, uh=None, strain=None, bc=None) -> TensorLike:
         """
         Compute the linear elastic matrix.
         """
@@ -70,6 +76,7 @@ class BasedConstitutiveModel(ElasticMaterial):
             strain = self.strain_value(uh, bc)
 
         GD = strain.shape[-1]
+        print('fff:', GD)
         lam = self.lam
         mu = self.mu
         if GD == 2:
@@ -84,8 +91,7 @@ class BasedConstitutiveModel(ElasticMaterial):
                             [0, 0, 0, 0, mu, 0],
                             [0, 0, 0, 0, 0, mu]], dtype=bm.float64)
         else:
-            raise NotImplementedError("This dim is not correct, we cannot give
-                                      the linear elastic matrix.")
+            raise NotImplementedError("This dim is not correct, we cannot give the linear elastic matrix.")
         return D0
 
 
@@ -109,8 +115,7 @@ class IsotropicModel(BasedConstitutiveModel):
         uh = self._uh
         d = self._d
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
-        if strain is None:
-            strain = self.compute_strain(uh, bc)
+        strain = self.compute_strain(uh, bc)
         D0 = self.linear_elastic_matrix(strain=strain, bc=bc) # 线弹性矩阵
         D = D0 * gd[..., None, None]
         return D

@@ -17,18 +17,18 @@ class MainSolver:
         """
 #        self.q = q if q is not None else q = space.p+2
 
-        self.decomp_model = PFCMF.create_model(method, material_properties, EDFunc())
+        self.decomp_model = PFCMF.create(method, material_properties, EDFunc())
 
     def solve(self):
         """
         Solve the phase field fracture problem.
         """
+        decomp_model = self.decomp_model
 
+        decomp_model.update_disp(uh)
+        
         pass
 
-    def update_matrix(self):
-        decomp_model = self.decomp_model
-        decomp_model.update_matrix()
 
     def solve_displacement(self):
         """
