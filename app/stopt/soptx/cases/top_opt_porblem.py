@@ -43,7 +43,7 @@ class ComplianceMinimization(TopOptProblem):
 
         Args:
             uhe (TensorLike): Displacement field values for each element.
-            KE (TensorLike): Element stiffness matrix.
+            KE (TensorLike): Element stiffness matrix for E = 1.
             E (TensorLike): Young's modulus for each element.
 
         Returns:
@@ -59,7 +59,7 @@ class ComplianceMinimization(TopOptProblem):
 
         Args:
             uhe (TensorLike): Displacement field values for each element.
-            KE (TensorLike): Element stiffness matrix.
+            KE (TensorLike): Element stiffness matrix for E = 1.
 
         Returns:
             TensorLike: Element-wise compliance values.

@@ -68,7 +68,9 @@ class MaterialProperties(LinearElasticMaterial):
         
         super().__init__(name="MaterialProperties", elastic_modulus=E0, poisson_ratio=nu, hypo=hypo)
 
+        self.E0 = E0
         self.Emin = Emin   
+        self.nu = nu
         self.penal = penal
         self.hypo = hypo   
         self.rho = rho
@@ -117,7 +119,6 @@ class MaterialProperties(LinearElasticMaterial):
         base_D = super().elastic_matrix()
         D = E[:, None, None, None] * base_D
         return D
-
     
     def update_density(self, new_rho: TensorLike):
         """

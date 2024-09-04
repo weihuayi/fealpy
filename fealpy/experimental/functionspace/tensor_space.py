@@ -34,6 +34,8 @@ class TensorFunctionSpace(FunctionSpace):
             self.dof_priority = True
         else:
             raise ValueError('`-1` is required as the first or last element')
+        
+        self.p = self.scalar_space.p
 
     @property
     def mesh(self):

@@ -57,11 +57,14 @@ objective_function = ComplianceMinimization()
 # 创建滤波器参数（如果需要）
 filter_properties = mbb_case.filter_properties
 
+constraint_conditions = mbb_case.constraint_conditions
+
 # 创建 OC 优化器
 optimizer = OCOptimizer(displacement_solver=fem_solver, 
                         objective_function=objective_function,
                         sensitivity_function=manual_objective_sensitivity,
                         termination_criteria=termination_criteria,
+                        constraint_conditions=constraint_conditions,
                         filter_parameters=filter_properties)
 
 
