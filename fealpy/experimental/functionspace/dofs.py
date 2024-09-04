@@ -95,16 +95,9 @@ class LinearMeshDFEDof(Generic[_MT]):
         gdof = ldof*NC
         
         return gdof
-
-    def number_of_local_dofs(self):
-        from functools import reduce
-        import operator as op
-        p = self.p
-        TD = self.mesh.top_dimension()
-        numer = reduce(op.mul, range(p + TD, p, -1))
-        denom = reduce(op.mul, range(1, TD + 1))
-        
-        return numer//denom
+    
+    def number_of_local_dofs(self, doftype='cell') -> int:
+        return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)
 
     def interpolation_points(self):
         p = self.p

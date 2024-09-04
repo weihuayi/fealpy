@@ -10,11 +10,8 @@ class ConstraintConditions:
 
         Attributes:
             constraints (dict): A dictionary holding the state and values of different constraints.
-                                By default, the volume constraint is turned on with a volume fraction (vf) of 0.5.
         """
-        self.constraints: dict = {
-            'volume': {'isOn': True, 'vf': 0.5}
-        }
+        self.constraints: dict = {}
 
     def set_volume_constraint(self, is_on: bool, vf: float):
         """

@@ -52,7 +52,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         scalar_space = space.scalar_space
         bcs, ws, gphi, cm, index, q = self.fetch(scalar_space)
         
-        D = self.material.elastic_matrix()
+        D = self.material.elastic_matrix(bcs)
         B = self.material.strain_matrix(dof_priority=space.dof_priority, gphi=gphi)
 
         KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
