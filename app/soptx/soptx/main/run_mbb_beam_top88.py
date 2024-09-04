@@ -2,12 +2,12 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import UniformMesh2d
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
 
-from app.stopt.soptx.cases.mbb_beam_cases import MBBBeamCase
-from app.stopt.soptx.utilfunc.fem_solver import FEMSolver
-from app.stopt.soptx.optalg.oc_optimizer import OCOptimizer
-from app.stopt.soptx.cases.termination_criterias import TerminationCriteria
-from app.stopt.soptx.cases.top_opt_porblem import ComplianceMinimization
-from app.stopt.soptx.utilfunc.sensitivity_calculations import manual_objective_sensitivity
+from ...soptx.cases.mbb_beam_cases import MBBBeamCase
+from ...soptx.utilfunc.fem_solver import FEMSolver
+from ...soptx.optalg.oc_optimizer import OCOptimizer
+from ...soptx.cases.termination_criterias import TerminationCriteria
+from ...soptx.cases.top_opt_porblem import ComplianceMinimization
+from ...soptx.utilfunc.sensitivity_calculations import manual_objective_sensitivity
 
 
 
