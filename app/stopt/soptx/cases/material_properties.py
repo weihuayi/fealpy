@@ -100,7 +100,7 @@ class MaterialProperties(LinearElasticMaterial):
             self.get_property('elastic_modulus'), self.Emin, 
             self.penal)
 
-    def elastic_matrix(self) -> TensorLike:
+    def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
         """
         Calculate the elastic matrix D for each element based on the density distribution.
 

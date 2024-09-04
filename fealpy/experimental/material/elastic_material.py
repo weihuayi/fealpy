@@ -112,7 +112,7 @@ class LinearElasticMaterial(ElasticMaterial):
         else:
             raise NotImplementedError("Only 3D, plane_stress, and plane_strain are supported.")
 
-    def elastic_matrix(self) -> TensorLike:
+    def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
         """
         Calculate the elastic matrix D based on the defined hypothesis (3D, plane stress, or plane strain).
 
