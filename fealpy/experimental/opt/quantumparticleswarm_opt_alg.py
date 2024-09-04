@@ -38,4 +38,5 @@ class QuantumParticleSwarmOptAlg(Optimizer):
             pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
             gbest_idx = bm.argmin(pbest_f)
             (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
+            print("QPSO: The optimum at iteration", it + 1, "is", gbest_f)
         return gbest, gbest_f

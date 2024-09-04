@@ -39,16 +39,8 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def __str__(self):
         return "Lagrange finite element space on linear mesh!"
 
-    # def number_of_local_dofs(self, doftype='cell') -> int:
-    #     return self.dof.number_of_local_dofs(doftype=doftype)
-    
     def number_of_local_dofs(self, doftype='cell') -> int:
-        if self.ctype == 'C':
-            return self.dof.number_of_local_dofs(doftype=doftype)
-        elif self.ctype == 'D':
-            return self.dof.number_of_local_dofs()
-        else:
-            raise ValueError(f"Unknown type: {self.ctype}")
+        return self.dof.number_of_local_dofs(doftype=doftype)
 
     def number_of_global_dofs(self) -> int:
         return self.dof.number_of_global_dofs()

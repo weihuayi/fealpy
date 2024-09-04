@@ -84,7 +84,8 @@ class TestPolygonMeshInterfaces:
         bm.set_backend(backend)
         node = bm.from_numpy(meshdata['node'])
         cell0 = bm.from_numpy(meshdata['cell'][0])
-        p = meshdata['p']
+        p1 = meshdata['p1']
+        p2 = meshdata['p2']
         if meshdata['cell'][1] is None:
             cell1 = None
         else:
@@ -92,8 +93,13 @@ class TestPolygonMeshInterfaces:
         cell = (cell0, cell1)
         mesh = PolygonMesh(node, cell)
 
-        ipoints = mesh.interpolation_points(p=p)
+        ipoints = mesh.interpolation_points(p=p1)
+        ipoints2 = mesh.interpolation_points(p=p2)
         np.testing.assert_allclose(bm.to_numpy(ipoints), meshdata["ipoints"],atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(ipoints2), meshdata["ipoints2"],atol=1e-7)
+        cell2ipoint = mesh.cell_to_ipoint(p=p1)
+        for i in range(len(cell2ipoint)):
+            np.testing.assert_array_equal(cell2ipoint[i],meshdata["cell2ipoint"][i])
         def f(p,index):
             x = p[...,0]
             y = p[...,1]

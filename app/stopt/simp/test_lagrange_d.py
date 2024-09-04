@@ -74,14 +74,16 @@ mesh = UniformMesh2d(extent, h, origin)
 NN = mesh.number_of_nodes()
 NC = mesh.number_of_cells()
 
-p = 1
-space = LagrangeFESpace(mesh, p=p, ctype='C')
+space = LagrangeFESpace(mesh, p=2, ctype='C')
+ldof = space.number_of_local_dofs()
+gdof = space.number_of_global_dofs()
 
 tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
-tldof = tensor_space.number_of_global_dofs()
+tldof = tensor_space.number_of_local_dofs()
+tgdof = tensor_space.number_of_global_dofs()
 uh = tensor_space.function()
 
-space_d = LagrangeFESpace(mesh, p=p, ctype='D')
+space_d = LagrangeFESpace(mesh, p=2, ctype='D')
 ldof_d = space_d.number_of_local_dofs()
 gdof_d = space_d.number_of_global_dofs()
 rho = space_d.function()

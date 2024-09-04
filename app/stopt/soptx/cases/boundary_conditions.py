@@ -5,6 +5,7 @@ class BoundaryConditions:
                  force_func: callable, 
                  dirichlet_func: callable, 
                  is_dirichlet_boundary_edge_func: callable, 
+                 is_dirichlet_node_func: callable,  # 新增的参数
                  is_dirichlet_direction_func: callable):
         """
         Initialize boundary conditions properties.
@@ -14,12 +15,15 @@ class BoundaryConditions:
             dirichlet_func (callable): A function defining the Dirichlet boundary conditions.
             is_dirichlet_boundary_edge_func (callable): A function that determines which boundary edges 
                 satisfy the Dirichlet condition.
+            is_dirichlet_node_func (callable): A function that determines which nodes on the boundary edge 
+                satisfy the Dirichlet condition.
             is_dirichlet_direction_func (callable): A function that determines which component of the degrees of 
                 freedom is fixed.
         """
         self.force_func = force_func
         self.dirichlet_func = dirichlet_func
         self.is_dirichlet_boundary_edge_func = is_dirichlet_boundary_edge_func
+        self.is_dirichlet_node_func = is_dirichlet_node_func  # 新增的属性
         self.is_dirichlet_direction_func = is_dirichlet_direction_func
 
     def force(self, points):
@@ -58,6 +62,15 @@ class BoundaryConditions:
         """
         return self.is_dirichlet_boundary_edge_func(points)
     
+    def is_dirichlet_node(self):
+        """
+        Determine if the nodes on the boundary edge satisfy the Dirichlet condition.
+
+        Returns:
+            Boolean values indicating if the nodes satisfy the Dirichlet condition.
+        """
+        return self.is_dirichlet_node_func()
+
     def is_dirichlet_direction(self):
         """
         Determine which component of the degrees of freedom is fixed.
@@ -75,4 +88,5 @@ class BoundaryConditions:
             str: A string showing the functions defining the boundary conditions.
         """
         return ("BoundaryConditions(force_func, dirichlet_func, "
-                "is_dirichlet_boundary_edge_func, is_dirichlet_direction_func)")
+                "is_dirichlet_boundary_edge_func, is_dirichlet_node_func, "
+                "is_dirichlet_direction_func)")
