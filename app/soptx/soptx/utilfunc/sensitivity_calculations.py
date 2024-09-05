@@ -15,7 +15,7 @@ def manual_objective_sensitivity(ce: TensorLike, dE: TensorLike) -> TensorLike:
     NC = ce.shape[0]  # Number of elements
     dce = bm.zeros(NC, dtype=bm.float64)
 
-    dce[:] = bm.einsum('c, c -> c', dE, ce)  # Element-wise multiplication of dE and ce
+    dce[:] = -bm.einsum('c, c -> c', dE, ce)  # Element-wise multiplication of dE and ce
 
     return dce
 

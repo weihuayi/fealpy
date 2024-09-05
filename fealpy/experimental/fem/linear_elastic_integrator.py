@@ -1,7 +1,7 @@
 from typing import Optional
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, MaterialLike
+from ..typing import TensorLike, Index, _S
 
 from ..mesh import HomogeneousMesh, SimplexMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -16,7 +16,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     The linear elastic integrator for function spaces based on homogeneous meshes.
     """
     def __init__(self, 
-                 material: MaterialLike,
+                 material,
                  q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:

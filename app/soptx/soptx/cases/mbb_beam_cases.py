@@ -1,12 +1,12 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike
 
-from app.stopt.soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
-from app.stopt.soptx.cases.geometry_properties import GeometryProperties
-from app.stopt.soptx.cases.filter_properties import FilterProperties
-from app.stopt.soptx.cases.constraint_conditions import ConstraintConditions
-from app.stopt.soptx.cases.boundary_conditions import BoundaryConditions    
-from app.stopt.soptx.cases.termination_criterias import TerminationCriteria
+from ...soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
+from ...soptx.cases.geometry_properties import GeometryProperties
+from ...soptx.cases.filter_properties import FilterProperties
+from ...soptx.cases.constraint_conditions import ConstraintConditions
+from ...soptx.cases.boundary_conditions import BoundaryConditions    
+from ...soptx.cases.termination_criterias import TerminationCriteria
 
 class MBBBeamCase:
     def __init__(self, case_name: str):

@@ -51,26 +51,42 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     @staticmethod
     def tolist(tensor: NDArray, /): return tensor.tolist()
 
-    ### Tensor creation methods ###
-    # NOTE: all copied
+    ### Creation functions ###
 
-    ### Reduction methods ###
-    # NOTE: all copied
-    @staticmethod
-    def sum(x, /, *, axis=None, dtype=None, keepdims=False):
-        return np.add.reduce(x, axis=axis, dtype=dtype, keepdims=keepdims)
+    ### Data Type Functions ###
 
-    ### Unary methods ###
-    # NOTE: all copied
+    ### Element-wise Functions ###
 
-    ### Binary methods ###
+    ### Indexing Functions ###
 
-    ### Other methods ###
-
+    ### Linear Algebra Functions ###
+    # non-standard
     @staticmethod
     def einsum(*args, **kwargs):
         return np.einsum(*args, **kwargs, optimize=True)
 
+    ### Manipulation Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def unstack(x, /, *, axis: int=0):
+        return np.split(x, x.shape[axis], axis=axis)
+
+    ### Searching Functions ###
+
+    ### Set Functions ###
+    # non-standard
+
+    ### Sorting Functions ###
+
+    ### Statistical Functions ###
+    # python array API standard v2023.12
+    @staticmethod
+    def sum(x, /, *, axis=None, dtype=None, keepdims=False):
+        return np.add.reduce(x, axis=axis, dtype=dtype, keepdims=keepdims)
+
+    ### Utility Functions ###
+
+    ### Other Functions ### (non-standard)
     @staticmethod
     def set_at(a: NDArray, indices, src, /) -> NDArray:
         a[indices] = src
@@ -108,12 +124,8 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         indices1[inverse] = range(inverse.shape[0]);
         return b, indices0, indices1, inverse, counts
 
-    @staticmethod
-    def unstack(x, /, *, axis: int=0):
-        return np.split(x, x.shape[axis], axis=axis)
 
     ### Sparse Functions ###
-
     @staticmethod
     def coo_spmm(indices, value, shape, other):
         nnz = value.shape[-1]
@@ -172,7 +184,7 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
         return crow, col, data
 
-    ### FEALPy methods ###
+    ### FEALPy Functions ###
 
     @staticmethod
     def multi_index_matrix(p: int, dim: int, *, dtype=np.int32) -> NDArray:
@@ -296,7 +308,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return R # (..., ldof, bc)
-    
 
     @staticmethod
     def simplex_hess_shape_function(bc: NDArray, p: int, mi=None) -> NDArray:
