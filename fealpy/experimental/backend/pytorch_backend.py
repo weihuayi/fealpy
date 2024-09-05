@@ -279,6 +279,22 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def sort(x, /, *, axis=-1, descending=False, stable=True):
         return torch.sort(x, dim=axis, descending=descending, stable=stable)[0]
 
+    # non-standard
+    @staticmethod
+    def lexsort(keys: Tuple[Tensor, ...], /, *, axis: int = -1):
+        if keys[0].ndim < 1:
+            raise ValueError("keys must be at least 2 dimensional, but got "
+                             f"shape {keys.shape}.")
+        if len(keys) == 0:
+            raise ValueError(f"Must have at least 1 key.")
+
+        idx = keys[0].argsort(dim=axis, stable=True)
+
+        for k in keys[1:]:
+            idx = idx.gather(axis, k.gather(axis, idx).argsort(dim=axis, stable=True))
+
+        return idx
+
     ### Statistical Functions ###
     # python array API standard v2023.12
     @staticmethod
