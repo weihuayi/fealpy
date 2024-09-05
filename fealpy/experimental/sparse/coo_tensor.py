@@ -128,54 +128,58 @@ class COOTensor(SparseTensor):
         if self.is_coalesced:
             return self
 
-        if bm.device_type(self._indices) == 'cpu':
-            import numpy as np
-
-            if self._values is not None:
-                index_context = bm.context(self._indices)
-                indices_np = bm.to_numpy(self._indices)
-                order = np.lexsort(indices_np)
-                new_indices_np = indices_np[:, order]
-                unique_mask_np = np.r_[[True], np.diff(new_indices_np, axis=1).any(axis=0)]
-                add_index = bm.tensor(np.cumsum(unique_mask_np) - 1, **index_context)
-
-                full_values = bm.copy(self._values[..., order])
-                new_values = bm.zeros_like(full_values[..., unique_mask_np])
-                new_values = bm.index_add(new_values, add_index, self._values[..., order], axis=-1)
-                del full_values
-
-                new_indices = bm.tensor(new_indices_np[..., unique_mask_np], **index_context)
-
-                return COOTensor(new_indices, new_values, self.sparse_shape, is_coalesced=True)
-
-            else:
-                pass # TODO
-
-        unique_indices, inverse_indices = bm.unique(
-            self._indices, return_inverse=True, axis=1
-        )
+        order = bm.lexsort(tuple(reversed(self._indices)))
+        sorted_indices = self._indices[:, order]
+        unique_mask = bm.concat([
+            bm.ones((1, ), dtype=bm.bool),
+            bm.any(sorted_indices[:, 1:] - sorted_indices[:, :-1], axis=0)
+        ], axis=0)
+        new_indices = bm.copy(sorted_indices[..., unique_mask])
 
         if self._values is not None:
-            value_shape = self.dense_shape + (unique_indices.shape[-1], )
-            new_values = bm.zeros(value_shape, **self.values_context())
-            new_values = bm.index_add(new_values, inverse_indices, self._values, axis=-1)
-
-            return COOTensor(
-                unique_indices, new_values, self.sparse_shape, is_coalesced=True
-            )
+            add_index = bm.cumsum(unique_mask, axis=0) - 1
+            sorted_values = self._values[..., order]
+            new_values = bm.zeros_like(sorted_values[..., unique_mask])
+            new_values = bm.index_add(new_values, add_index, sorted_values, axis=-1)
 
         else:
             if accumulate:
-                kwargs = bm.context(self._indices)
-                ones = bm.ones((self.nnz, ), **kwargs)
-                new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-                new_values = bm.index_add(new_values, inverse_indices, ones, axis=-1)
+                unique_location = bm.concat([
+                    bm.nonzero(unique_mask)[0],
+                    bm.tensor([len(unique_mask)], **bm.context(self._indices))
+                ], axis=0)
+                new_values = unique_location[1:] - unique_location[:-1]
+
             else:
                 new_values = None
 
-            return COOTensor(
-                unique_indices, new_values, self.sparse_shape, is_coalesced=True
-            )
+        return COOTensor(new_indices, new_values, self.sparse_shape, is_coalesced=True)
+
+        # unique_indices, inverse_indices = bm.unique(
+        #     self._indices, return_inverse=True, axis=1
+        # )
+
+        # if self._values is not None:
+        #     value_shape = self.dense_shape + (unique_indices.shape[-1], )
+        #     new_values = bm.zeros(value_shape, **self.values_context())
+        #     new_values = bm.index_add(new_values, inverse_indices, self._values, axis=-1)
+
+        #     return COOTensor(
+        #         unique_indices, new_values, self.sparse_shape, is_coalesced=True
+        #     )
+
+        # else:
+        #     if accumulate:
+        #         kwargs = bm.context(self._indices)
+        #         ones = bm.ones((self.nnz, ), **kwargs)
+        #         new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
+        #         new_values = bm.index_add(new_values, inverse_indices, ones, axis=-1)
+        #     else:
+        #         new_values = None
+
+        #     return COOTensor(
+        #         unique_indices, new_values, self.sparse_shape, is_coalesced=True
+        #     )
 
     @overload
     def reshape(self, shape: Size, /) -> 'COOTensor': ...
