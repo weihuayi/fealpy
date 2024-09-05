@@ -77,6 +77,8 @@ class MainSolver:
 
 #        A, R = ubc.apply(A, R)
 #        du.flat[:] = lgmres(A, R, tol=1e-14)[0]
+#        uh.flat[:] += du.flat[:]
+#        self.pfcm.update_disp(uh)
         
 
     def solve_phase_field(self):
@@ -95,11 +97,11 @@ class MainSolver:
         dbfrom = BilinearForm(self.space)
         dbfrom.add_integrator(ScalarDiffusionIntegrator(Gc*l0, q=self.q))
         dbfrom.add_integrator(ScalarMassIntegrator(Gc/l0, q=self.q))
-        dbfrom.add_integrator(ScalarMassIntegrator(lambda x, idx : coef(x, idx), q=self.q))
+        dbfrom.add_integrator(ScalarMassIntegrator(coef, q=self.q))
         A = dbfrom.assembly()
 
         dlfrom = LinearForm(self.space)
-        dlfrom.add_integrator(ScalarSourceIntegrator(lambda x : coef(x), q=self.q))
+        dlfrom.add_integrator(ScalarSourceIntegrator(coef, q=self.q))
         R = dlfrom.assembly()
         R -= A@d[:]
 

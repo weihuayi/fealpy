@@ -277,7 +277,7 @@ class HybridModel(BasedPhaseFractureMaterial):
         self._spectral_model._uh = self._uh
         self._spectral_model._d = self._d
         self._spectral_model._H = self._H
-        print('bc', bc.shape)
+        
         return self._spectral_model.maximum_historical_field(bc)
         
 
