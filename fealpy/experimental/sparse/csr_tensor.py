@@ -97,6 +97,28 @@ class CSRTensor(SparseTensor):
         """Return the non-zero elements"""
         return self._values
 
+    # def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
+    #     """Convert the CSRTensor to a dense tensor and return as a new object.
+
+    #     Parameters:
+    #         fill_value (int | float, optional): The value to fill the dense tensor with
+    #             when `self.values()` is None.
+
+    #     Returns:
+    #         Tensor: The dense tensor.
+    #     """
+    #     context = self.values_context()
+    #     context.update(kwargs)
+    #     dense_tensor = bm.zeros(self.shape, **context)
+
+    #     for i in range(1, self._crow.shape[0]):
+    #         start = self._crow[i - 1]
+    #         end = self._crow[i]
+    #         val = fill_value if (self._values is None) else self._values[..., start:end]
+    #         dense_tensor[..., i - 1, self._col[start:end]] = val
+
+    #     return dense_tensor
+    
     def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
         """Convert the CSRTensor to a dense tensor and return as a new object.
 
@@ -114,10 +136,15 @@ class CSRTensor(SparseTensor):
         for i in range(1, self._crow.shape[0]):
             start = self._crow[i - 1]
             end = self._crow[i]
+            col_indices = self._col[start:end]
             val = fill_value if (self._values is None) else self._values[..., start:end]
-            dense_tensor[..., i - 1, self._col[start:end]] = val
 
-        return dense_tensor
+            row_indices = bm.full_like(col_indices, i - 1)
+            linear_indices = row_indices * self.shape[1] + col_indices
+
+            dense_tensor = bm.index_add(dense_tensor.flatten(), linear_indices, val)
+
+        return dense_tensor.reshape(self.shape)
 
     @overload
     def reshape(self, shape: Size, /) -> 'CSRTensor': ...
