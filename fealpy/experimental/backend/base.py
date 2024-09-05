@@ -170,7 +170,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     'tile',
     'unstack',
     # non-standard
-    'concatenate', 'swapaxes', 'transpose',
+    'concatenate', 'swapaxes', 'transpose', 'split',
 
     ### Searching Functions ###
     # python array API standard v2023.12
@@ -187,6 +187,8 @@ FUNCTION_MAPPING = _make_default_mapping(
     ### Sorting Functions ###
     # python array API standard v2023.12
     'argsort', 'sort',
+    # non-standard
+    'lexsort',
 
     ### Statistical Functions ###
     # python array API standard v2023.12
@@ -248,8 +250,8 @@ class Backend(Generic[_DT]):
             if hasattr(source, source_key):
                 setattr(cls, target_key, staticmethod(getattr(source, source_key)))
             else:
-                logger.warning(f"`{source_key}` not found in {source.__name__}. "
-                               f"Method `{target_key}` remains unimplemented.")
+                logger.info(f"`{source_key}` not found in {source.__name__}. "
+                            f"Method `{target_key}` remains unimplemented.")
 
     @classmethod
     def show_unsupported(cls, signal: bool, function_name: str, arg_name: str) -> None:

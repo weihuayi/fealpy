@@ -111,31 +111,6 @@ class QuadrangleMesh(TensorMesh, Plotable):
             return qf
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
-    """
-    def grad_shape_function(self, bcs: Tuple[TensorLike], p: int = 1, *, index: Index = _S,
-                            variables: str = 'u', mi: Optional[TensorLike] = None) -> TensorLike:
-        assert isinstance(bcs, tuple)
-        TD = len(bcs)
-        Dlambda = bm.array([-1, 1], dtype=self.ftype)
-        phi = bm.simplex_shape_function(bcs[0], p=p)
-        R = bm.simplex_grad_shape_function(bcs[0], p=p)
-        dphi = bm.einsum('...ij, j->...i', R, Dlambda)  # (..., ldof)
-
-        n = phi.shape[0] ** TD
-        ldof = phi.shape[-1] ** TD
-        shape = (n, ldof, TD)
-        gphi = bm.zeros(shape, dtype=self.ftype)
-
-        gphi0 = bm.einsum('im, jn->ijmn', dphi, phi).reshape(-1, ldof, 1)
-        gphi1 = bm.einsum('im, jn->ijmn', phi, dphi).reshape(-1, ldof, 1)
-        gphi = bm.concatenate((gphi0, gphi1), axis=-1)
-        if variables == 'x':
-            J = self.jacobi_matrix(bcs, index=index)
-            G = self.first_fundamental_form(J)
-            G = bm.linalg.inv(G)
-            gphi = bm.einsum('qikm, qimn, qln->qilk', J, G, gphi)
-        return gphi
-    """
 
     def jacobi_matrix(self, bc, index: Index = _S) -> TensorLike:
         """
@@ -644,7 +619,6 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return cls(node, cell)
 
 
-
     @classmethod
     def polygon_domain_generator(cls, num_vertices=20, radius=1.0, center=[0.0, 0.0]):
         raise NotImplementedError
@@ -663,6 +637,109 @@ class QuadrangleMesh(TensorMesh, Plotable):
         @return: None 或网格列表
         """
         raise NotImplementedError
+
+    @classmethod
+    def sub_domain_mesh_generator(cls, half_edge, origin_node, separator_streamlines):
+        """
+        分块四边形网格生成器
+        TODO: 考虑是否需要兼容非 numpy 后端
+        @param half_edge: 半边数据结构，用于描述分区
+        @param origin_node: 各分区节点
+        @param separator_streamlines: 各分区边（由边上的点列组成），相对边点数量需一致
+        @return: 分块四边形网格
+        """
+        import numpy as np
+        from fealpy.experimental.geometry.coons_patch import coons_patch
+
+        # 计算各条边上的点数量，包括两端点
+        edge_segments_num = np.array([len(l) for l in separator_streamlines])
+
+        # 构造 cell_to_edge 映射
+        cell_num = np.max(half_edge[:, 1]) + 1
+        cell_start_edge = np.flip(np.min(np.flip(np.argsort(half_edge[:, 1]))[0:4 * cell_num].reshape((-1, 4)), axis=1))
+        cell_to_edge = np.zeros((cell_num, 4), dtype=np.int_)
+        for i in range(cell_num):
+            next_edge = cell_start_edge[i]
+            for j in range(4):
+                cell_to_edge[i, j] = next_edge
+                next_edge = half_edge[next_edge, 2]
+
+        origin_node_num = len(origin_node)
+        node_num = origin_node_num
+        # 遍历边界，计算边界内部节点数量，不包括两端点
+        edge_node_num = edge_segments_num - 2
+        node_num += sum(edge_node_num)
+        # 遍历单元，计算单元内部节点数量
+        cell_node_num = []
+        cell_cell_num = []
+        for i in range(cell_num):
+            cell_node_num.append(
+                (edge_segments_num[cell_to_edge[i, 0] // 2] - 2) * (edge_segments_num[cell_to_edge[i, 1] // 2] - 2))
+            cell_cell_num.append(
+                (edge_segments_num[cell_to_edge[i, 0] // 2] - 1) * (edge_segments_num[cell_to_edge[i, 1] // 2] - 1))
+        node_num += sum(cell_node_num)
+        cell_num = sum(cell_cell_num)
+        # 初始化单元与节点
+        node = np.zeros((node_num, 2))
+        cell = np.zeros((cell_num, 4), dtype=np.int_)
+        node[0:origin_node_num] = origin_node
+        # 离散边界节点
+        edge_node_list = separator_streamlines
+        for idx, b_line in enumerate(separator_streamlines):
+            node[origin_node_num + sum(edge_node_num[:idx]):origin_node_num + sum(edge_node_num[:idx + 1])] = b_line[
+                                                                                                              1:-1]
+
+        for i in range(len(cell_to_edge)):
+            edge0 = edge_node_list[cell_to_edge[i, 0] // 2][::((-1) ** (cell_to_edge[i, 0] % 2))]
+            edge1 = edge_node_list[cell_to_edge[i, 1] // 2][::((-1) ** (cell_to_edge[i, 1] % 2))]
+            edge2 = edge_node_list[cell_to_edge[i, 2] // 2][::((-1) ** (cell_to_edge[i, 2] % 2))]
+            edge3 = edge_node_list[cell_to_edge[i, 3] // 2][::((-1) ** (cell_to_edge[i, 3] % 2))]
+            n1 = edge_segments_num[cell_to_edge[i, 0] // 2]
+            n2 = edge_segments_num[cell_to_edge[i, 1] // 2]
+            grid = coons_patch(edge0, edge1, edge2, edge3, n1, n2)
+            temp_node = grid[1:-1, 1:-1, :].reshape((-1, 2))
+            node[
+            origin_node_num + sum(edge_node_num) + sum(cell_node_num[:i]):origin_node_num + sum(edge_node_num) + sum(
+                cell_node_num[:i + 1])] = temp_node
+            # 子区域单元节点索引构造
+            cell_node_idx = np.zeros((n2, n1), dtype=np.int_)
+            # 角点
+            cell_node_idx[0, 0] = half_edge[cell_to_edge[i, 3], 0]
+            cell_node_idx[0, n1 - 1] = half_edge[cell_to_edge[i, 0], 0]
+            cell_node_idx[n2 - 1, n1 - 1] = half_edge[cell_to_edge[i, 1], 0]
+            cell_node_idx[n2 - 1, 0] = half_edge[cell_to_edge[i, 2], 0]
+            # 边
+            edge0_idx = cell_to_edge[i, 0] // 2
+            edge0_node_idx = np.arange(origin_node_num + sum(edge_node_num[:edge0_idx]),
+                                       origin_node_num + sum(edge_node_num[:edge0_idx + 1]))
+            cell_node_idx[0, 1:n1 - 1] = edge0_node_idx[::((-1) ** (cell_to_edge[i, 0] % 2))]
+
+            edge1_idx = cell_to_edge[i, 1] // 2
+            edge1_node_idx = np.arange(origin_node_num + sum(edge_node_num[:edge1_idx]),
+                                       origin_node_num + sum(edge_node_num[:edge1_idx + 1]))
+            cell_node_idx[1:n2 - 1, n1 - 1] = edge1_node_idx[::((-1) ** (cell_to_edge[i, 1] % 2))]
+
+            edge2_idx = cell_to_edge[i, 2] // 2
+            edge2_node_idx = np.arange(origin_node_num + sum(edge_node_num[:edge2_idx]),
+                                       origin_node_num + sum(edge_node_num[:edge2_idx + 1]))
+            cell_node_idx[n2 - 1, 1:n1 - 1] = edge2_node_idx[::((-1) ** (cell_to_edge[i, 2] % 2))][::-1]
+
+            edge3_idx = cell_to_edge[i, 3] // 2
+            edge3_node_idx = np.arange(origin_node_num + sum(edge_node_num[:edge3_idx]),
+                                       origin_node_num + sum(edge_node_num[:edge3_idx + 1]))
+            cell_node_idx[1:n2 - 1, 0] = edge3_node_idx[::((-1) ** (cell_to_edge[i, 3] % 2))][::-1]
+            # 内部
+            cell_node_idx[1:n2 - 1, 1:n1 - 1] = np.arange(origin_node_num + sum(edge_node_num) + sum(cell_node_num[:i]),
+                                                          origin_node_num + sum(edge_node_num) + sum(
+                                                              cell_node_num[:i + 1])).reshape((n2 - 2, n1 - 2))
+            cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 0] = cell_node_idx[0:-1, 0:-1].flatten()
+            cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 1] = cell_node_idx[0:-1, 1:].flatten()
+            cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 2] = cell_node_idx[1:, 1:].flatten()
+            cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 3] = cell_node_idx[1:, 0:-1].flatten()
+
+            quad_mesh = cls(node, cell)
+
+        return quad_mesh
 
 
 QuadrangleMesh.set_ploter('2d')

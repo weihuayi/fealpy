@@ -1,12 +1,13 @@
 
-from typing import Optional, Tuple, Callable, Union
+from typing import Optional, Tuple, Callable, Union, TypeVar
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike
-from ..sparse import COOTensor
+from ..sparse import SparseTensor, COOTensor, CSRTensor
 from ..functionspace.space import FunctionSpace
 
 CoefLike = Union[float, int, TensorLike, Callable[..., TensorLike]]
+_ST = TypeVar('_ST', bound=SparseTensor)
 
 
 class DirichletBC():
@@ -25,7 +26,7 @@ class DirichletBC():
         self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.gdof = space.number_of_global_dofs()
 
-    def check_matrix(self, matrix: COOTensor, /) -> COOTensor:
+    def check_matrix(self, matrix: SparseTensor, /) -> SparseTensor:
         """Check if the input matrix is available for Dirichlet boundary condition.
 
         Parameters:
@@ -41,8 +42,8 @@ class DirichletBC():
         Returns:
             Tensor: The input matrix object.
         """
-        if not isinstance(matrix, COOTensor):
-            raise ValueError('The type of matrix must be COOTensor.')
+        if not isinstance(matrix, (COOTensor, CSRTensor)):
+            raise ValueError('The type of matrix must be COOTensor or CSRTensor.')
         if not matrix.is_coalesced:
             raise RuntimeError('The matrix must be coalesced.')
         if len(matrix.shape) != 2:
@@ -80,13 +81,13 @@ class DirichletBC():
                 raise ValueError('The vector size must match the gdof of the space.')
         return vector
 
-    def apply(self, A: COOTensor, f: TensorLike, uh: Optional[TensorLike]=None,
+    def apply(self, A: SparseTensor, f: TensorLike, uh: Optional[TensorLike]=None,
               gd: Optional[CoefLike]=None, *,
               check=True) -> Tuple[TensorLike, TensorLike]:
         """Apply Dirichlet boundary conditions.
 
         Parameters:
-            A (Tensor): Left-hand-size COO sparse matrix
+            A (COOTensor): Left-hand-size COO sparse matrix
             f (Tensor): Right-hand-size vector
             uh (Tensor | None, optional): The solution uh Tensor. Boundary interpolation\
                 will be done on `uh` if given, which is an **in-place** operation.\
@@ -102,7 +103,7 @@ class DirichletBC():
         A = self.apply_matrix(A, check=check)
         return A, f
 
-    def apply_matrix(self, matrix: COOTensor, *, check=True) -> COOTensor:
+    def apply_matrix(self, matrix: _ST, *, check=True) -> _ST:
         """Apply Dirichlet boundary condition to left-hand-size matrix only.
 
         Parameters:
@@ -125,28 +126,37 @@ class DirichletBC():
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
-        indices = A.indices()
-        new_values = bm.copy(A.values())
-        IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
-        new_values = bm.set_at(new_values, IDX, 0)
-        A = COOTensor(indices, new_values, A.sparse_shape)
 
-        index, = bm.nonzero(isDDof)
-        shape = new_values.shape[:-1] + (len(index), )
-        one_values = bm.ones(shape, **kwargs)
-        one_indices = bm.stack([index, index], axis=0)
-        A1 = COOTensor(one_indices, one_values, A.sparse_shape)
-        A = A.add(A1).coalesce()
+        if isinstance(A, COOTensor):
+            indices = A.indices()
+            remove_flag = bm.logical_or(
+                isDDof[indices[0, :]], isDDof[indices[1, :]]
+            )
+            retain_flag = bm.logical_not(remove_flag)
+            new_indices = indices[:, retain_flag]
+            new_values = A.values()[..., retain_flag]
+            A = COOTensor(new_indices, new_values, A.sparse_shape)
+
+            index = bm.nonzero(isDDof)[0]
+            shape = new_values.shape[:-1] + (len(index), )
+            one_values = bm.ones(shape, **kwargs)
+            one_indices = bm.stack([index, index], axis=0)
+            A1 = COOTensor(one_indices, one_values, A.sparse_shape)
+            A = A.add(A1).coalesce()
+
+        elif isinstance(A, CSRTensor):
+            raise NotImplementedError('The CSRTensor version has not been implemented.')
 
         return A
 
-    def apply_vector(self, vector: TensorLike, matrix: COOTensor, uh: Optional[TensorLike]=None,
+    def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
+                     uh: Optional[TensorLike]=None,
                      gd: Optional[CoefLike]=None, *, check=True) -> TensorLike:
         """Appy Dirichlet boundary contition to right-hand-size vector only.
 
         Parameters:
             vector (TensorLike): The original right-hand-size vector.
-            matrix (COOTensor): The original COO sparse matrix.
+            matrix (COOTensor): The original COO/CSR sparse matrix.
             uh (TensorLike | None, optional): The solution uh Tensor. Defuault to None.\
                 See `DirichletBC.apply()` for more details.
             gd (CoefLike | None, optional): The Dirichlet boundary condition.\
@@ -162,10 +172,10 @@ class DirichletBC():
         A = matrix
         f = self.check_vector(vector) if check else vector
         gd = self.gd if gd is None else gd
+
         if gd is None:
             raise RuntimeError("The boundary condition is None.")
         bd_idx = self.boundary_dof_index
-        DIM = -1 if self.left else 0
 
         if uh is None:
             uh = bm.zeros_like(f)

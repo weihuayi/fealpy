@@ -42,6 +42,10 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     def device_index(array: Array, /): return array.device.id
 
     @staticmethod
+    def device_put(tensor_like: Array, /, device=None) -> Array:
+        return jax.device_put(tensor_like, device)
+
+    @staticmethod
     def to_numpy(jax_array: Array, /) -> Any:
         return np.array(jax_array) 
 
@@ -138,8 +142,8 @@ class JAXBackend(Backend[Array], backend_name='jax'):
                 return_counts=True,
                 axis=axis, **kwargs)
         indices1 = jnp.zeros_like(indices0)
-        idx = jnp.arange(inverse.shape[0]-1, -1, -1, dtype=indices0.dtype) 
-        indices1 = indices1.at[inverse[-1::-1]].set(idx)
+        idx = jnp.arange(inverse.shape[0], dtype=indices0.dtype)
+        indices1 = indices1.at[inverse].set(idx)
         return b, indices0, indices1, inverse, counts
 
     ### FEALPy functionals ###
