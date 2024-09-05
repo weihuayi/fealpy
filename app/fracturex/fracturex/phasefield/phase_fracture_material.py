@@ -1,10 +1,13 @@
+import numpy as np
 from typing import Optional
 
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.material.elastic_material import LinearElasticMaterial
 
-class BasedConstitutiveModel(LinearElasticMaterial):
+from fealpy.experimental.decorator import barycentric
+
+class BasedPhaseFractureMaterial(LinearElasticMaterial):
     def __init__(self, material, energy_degradation_fun):
         """
         Parameters
@@ -12,19 +15,21 @@ class BasedConstitutiveModel(LinearElasticMaterial):
         material : 材料参数
         """
         self._gd = energy_degradation_fun # 能量退化函数
-        '''
-        self.lam = self.material.get_material['lam']
-        self.mu = self.material.get_material['mu']
-        self.k = self.material.get_material['k']
-        self.E = self.material.get_material['E']
-        self.nu = self.material.get_material['nu']
-        '''
-        self.E = 200
-        self.nu = 0.3
-        self.lam = self.E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu))
-        self.mu = self.E / (2 * (1 + self.nu))
+        if 'lam' in material and 'mu' in material:
+            self.lam = material['lam']
+            self.mu = material['mu']
+        elif 'E' in material and 'nu' in material:
+            self.E = material['E']
+            self.nu = material['nu']
+
+            self.lam = self.E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu))
+            self.mu = self.E / (2 * (1 + self.nu))
+        else:
+            raise ValueError("The material parameters are not correct.")
+
 
         self._uh = None
+       
         self._d = None
         self._H = None # 谱分解模型下的最大历史场
 
@@ -34,8 +39,8 @@ class BasedConstitutiveModel(LinearElasticMaterial):
     def update_phase(self, d):
         self._d = d
 
-       
-    def effective_stress(self, uh=None, strain = None, bc=None) -> TensorLike:
+    @ barycentric
+    def effective_stress(self, bc=None) -> TensorLike:
         """
         Compute the effective stress tensor, which is the stress tensor without the damage effect.
 
@@ -50,8 +55,7 @@ class BasedConstitutiveModel(LinearElasticMaterial):
         TensorLike
             The effective stress tensor.
         """
-        if strain is None:
-            strain = self.strain_value(uh, bc)
+        strain = self.strain_value(bc)
 
         lam = self.lam
         mu = self.mu
@@ -60,23 +64,28 @@ class BasedConstitutiveModel(LinearElasticMaterial):
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
         return stress
 
-    def strain_value(self, uh, bc) -> TensorLike:
+    @ barycentric
+    def strain_value(self, bc=None) -> TensorLike:
         """
         Compute the strain tensor.
-        """
+        """ 
+#        if bc is None:
+#            bc = bm.array([1/3, 1/3, 1/3], dtype=bm.float64)
+        uh = self._uh
         guh = uh.grad_value(bc)
-        strain = 0.5 * (guh + guh.transpose(-2, -1))
+        
+        strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
         return strain
     
-    def linear_elastic_matrix(self, uh=None, strain=None, bc=None) -> TensorLike:
+    @ barycentric
+    def linear_elastic_matrix(self, bc=None) -> TensorLike:
         """
         Compute the linear elastic matrix.
         """
-        if strain is None:
-            strain = self.strain_value(uh, bc)
+        strain = self.strain_value(bc)
 
         GD = strain.shape[-1]
-        print('fff:', GD)
+       
         lam = self.lam
         mu = self.mu
         if GD == 2:
@@ -95,19 +104,19 @@ class BasedConstitutiveModel(LinearElasticMaterial):
         return D0
 
 
-class IsotropicModel(BasedConstitutiveModel):
+class IsotropicModel(BasedPhaseFractureMaterial):
+    @ barycentric
     def stress_value(self, bc) -> TensorLike:
         """
         Compute the fracture stress tensor.
         """
-        uh = self._uh
         d = self._d
-        if strain is None:
-            strain = self.compute_strain(uh, bc)
+
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
-        stress = self.effective_stress(strain=strain) * gd[..., None, None]
+        stress = self.effective_stress(bc) * gd[..., None, None]
         return stress
 
+    @ barycentric
     def elastic_matrix(self, bc) -> TensorLike: 
         """
         Compute the tangent matrix.
@@ -115,13 +124,13 @@ class IsotropicModel(BasedConstitutiveModel):
         uh = self._uh
         d = self._d
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
-        strain = self.compute_strain(uh, bc)
-        D0 = self.linear_elastic_matrix(strain=strain, bc=bc) # 线弹性矩阵
+        D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵
         D = D0 * gd[..., None, None]
         return D
+    
        
 
-class AnisotropicModel(BasedConstitutiveModel):
+class AnisotropicModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算各向异性模型下的应力
         pass
@@ -130,7 +139,7 @@ class AnisotropicModel(BasedConstitutiveModel):
         # 计算各向异性模型下的切线刚度矩阵
         pass
 
-class DeviatoricModel(BasedConstitutiveModel):
+class DeviatoricModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算偏应力模型下的应力
         pass
@@ -140,7 +149,7 @@ class DeviatoricModel(BasedConstitutiveModel):
         pass
 
 
-class SpectralModel(BasedConstitutiveModel):
+class SpectralModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算谱分解模型下的应力
         pass
@@ -216,13 +225,14 @@ class SpectralModel(BasedConstitutiveModel):
         val[x < -1e-13] = 0
         return val
     
+    @ barycentric
     def maximum_historical_field(self, bc):
 
         """
         @brief Maximum historical field
         """
         uh = self._uh
-        strain = self.strain_value(uh, bc)
+        strain = self.strain_value(bc)
         phip, _ = self.strain_energy_density_decomposition(strain)
         if self._H is None:
             self._H = phip[:]
@@ -231,34 +241,47 @@ class SpectralModel(BasedConstitutiveModel):
         return self._H
         
 
-class HybridModel(BasedConstitutiveModel):
+class HybridModel(BasedPhaseFractureMaterial):
     def __init__(self, material, energy_degradation_fun):
         """
         Parameters
         ----------
         material : 材料参数
         """
-        super().__init__(material, energy_degradation_fun)
+        
         self._isotropic_model = IsotropicModel(material, energy_degradation_fun)
         self._spectral_model = SpectralModel(material, energy_degradation_fun)
+        super().__init__(material, energy_degradation_fun)
 
+    @ barycentric
     def stress_value(self, bc) -> TensorLike:
         """
         Compute the fracture stress tensor.
         """
-        return self._isotropic_model.compute_stress(bc=bc)
+        self._isotropic_model._uh = self._uh
+        self._isotropic_model._d = self._d
+        return self._isotropic_model.stress_value(bc=bc)
 
+    @ barycentric
     def elastic_matrix(self, bc) -> TensorLike: 
+        self._isotropic_model._uh = self._uh
+        self._isotropic_model._d = self._d
+        
         return self._isotropic_model.elastic_matrix(bc=bc)
 
+    @ barycentric
     def maximum_historical_field(self, bc):
         """
         @brief Maximum historical field
         """
+        self._spectral_model._uh = self._uh
+        self._spectral_model._d = self._d
+        self._spectral_model._H = self._H
+        print('bc', bc.shape)
         return self._spectral_model.maximum_historical_field(bc)
         
 
-class PhaseFractureConstitutiveModelFactory:
+class PhaseFractureMaterialFactory:
     """
     工厂类，用于创建不同的本构模型
     """

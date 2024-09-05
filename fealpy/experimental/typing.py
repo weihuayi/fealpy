@@ -5,7 +5,7 @@ from math import prod
 
 from .backend import TensorLike
 
-from.material.material_base import MaterialBase
+from .material.material_base import MaterialBase
 
 
 ### Types
