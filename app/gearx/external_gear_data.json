@@ -1,9 +1,20 @@
 {
   "center": [0.0, 0.0, 0.0],
-  "m": 5,
-  "z": 22,
-  "alpha": 20,
-  "haa": 0.8,
-  "cc": 0.4,
-  "x": 0
+  "mn": 5,
+  "z": 19,
+  "alpha_n": 20,
+  "beta": 15,
+  "x": 0.2,
+  "hac": 1,
+  "cc": 0.25,
+  "rco": 0.38,
+  "jn": 0.1,
+  "involute_section": 30,
+  "transition_section": 20,
+  "n3": 15,
+  "na": 5,
+  "nf": 1,
+  "inner_diam": 60,
+  "chamfer_dia": 2,
+  "chamfer_angle": 45
 }

@@ -97,6 +97,28 @@ class CSRTensor(SparseTensor):
         """Return the non-zero elements"""
         return self._values
 
+    # def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
+    #     """Convert the CSRTensor to a dense tensor and return as a new object.
+
+    #     Parameters:
+    #         fill_value (int | float, optional): The value to fill the dense tensor with
+    #             when `self.values()` is None.
+
+    #     Returns:
+    #         Tensor: The dense tensor.
+    #     """
+    #     context = self.values_context()
+    #     context.update(kwargs)
+    #     dense_tensor = bm.zeros(self.shape, **context)
+
+    #     for i in range(1, self._crow.shape[0]):
+    #         start = self._crow[i - 1]
+    #         end = self._crow[i]
+    #         val = fill_value if (self._values is None) else self._values[..., start:end]
+    #         dense_tensor[..., i - 1, self._col[start:end]] = val
+
+    #     return dense_tensor
+    
     def to_dense(self, *, fill_value: Number=1.0, **kwargs) -> TensorLike:
         """Convert the CSRTensor to a dense tensor and return as a new object.
 
@@ -114,10 +136,15 @@ class CSRTensor(SparseTensor):
         for i in range(1, self._crow.shape[0]):
             start = self._crow[i - 1]
             end = self._crow[i]
+            col_indices = self._col[start:end]
             val = fill_value if (self._values is None) else self._values[..., start:end]
-            dense_tensor[..., i - 1, self._col[start:end]] = val
 
-        return dense_tensor
+            row_indices = bm.full_like(col_indices, i - 1)
+            linear_indices = row_indices * self.shape[1] + col_indices
+
+            dense_tensor = bm.index_add(dense_tensor.flatten(), linear_indices, val)
+
+        return dense_tensor.reshape(self.shape)
 
     @overload
     def reshape(self, shape: Size, /) -> 'CSRTensor': ...
@@ -214,7 +241,7 @@ class CSRTensor(SparseTensor):
                 src = bm.broadcast_to(src, self.dense_ndim + (self.nnz,))
             else:
                 src = self._values
-            bm.index_add(output, -1, flattened, src)
+            output = bm.index_add(output, -1, flattened, src)
 
             return output.reshape(self.shape)
         elif isinstance(other, (int, float)):
@@ -340,3 +367,36 @@ class CSRTensor(SparseTensor):
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
+
+    def to_scipy(self):
+        from scipy.sparse import csr_matrix
+
+        if self.dense_ndim != 0:
+            raise ValueError("Only CSRTensor with 0 dense dimension "
+                             "can be converted to scipy sparse matrix")
+
+        return csr_matrix(
+            (bm.to_numpy(self._values), bm.to_numpy(self._col), bm.to_numpy(self._crow)),
+            shape = self._spshape
+        )
+
+    @classmethod
+    def from_scipy(cls, mat, /):
+        crow = bm.from_numpy(mat.indptr)
+        col = bm.from_numpy(mat.indices)
+        values = bm.from_numpy(mat.data)
+        return cls(crow, col, values, mat.shape)
+
+    def device_put(self, device=None, /):
+        return CSRTensor(bm.device_put(self._crow, device),
+                         bm.device_put(self._col, device),
+                         bm.device_put(self._values, device),
+                         self._spshape)
+
+    def astype(self, dtype=None, /, *, copy=True):
+        if self._values is None:
+            values = bm.ones(self.nnz, dtype=dtype)
+        else:
+            values = bm.astype(self._values, dtype, copy=copy)
+
+        return CSRTensor(self._crow, self._col, values, self._spshape)

@@ -23,13 +23,6 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
         self.coef = coef
-        if hasattr(coef, 'uh'):
-            self.uh = coef.uh
-            self.func = coef.func
-            if bm.backend_name in {'jax', 'torch'}:
-                pass
-            else:
-                self.grad_func = coef.grad_func
         self.q = q
         self.index = index
         self.batched = batched

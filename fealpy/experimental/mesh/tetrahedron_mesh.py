@@ -429,17 +429,17 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             p = edge2newNode[cell2edge]
             newCell = bm.zeros((8*NC, 4), dtype=self.itype)
 
-            newCell[0:4*NC, 3] = cell.T.flatten()
-            newCell[0:NC, 0:3] = p[:, [0, 2, 1]]
-            newCell[NC:2*NC, 0:3] = p[:, [0, 3, 4]]
-            newCell[2*NC:3*NC, 0:3] = p[:, [1, 5, 3]]
-            newCell[3*NC:4*NC, 0:3] = p[:, [2, 4, 5]]
+            newCell = bm.set_at(newCell , (slice(4*NC),3) , cell.T.flatten())
+            newCell = bm.set_at(newCell , (slice(NC),slice(3)) , p[:,[0,2,1]])
+            newCell = bm.set_at(newCell , (slice(NC,2*NC),slice(3)) , p[:, [0, 3, 4]])
+            newCell = bm.set_at(newCell , (slice(2*NC , 3*NC),slice(3)) , p[:, [1, 5, 3]])
+            newCell = bm.set_at(newCell , (slice(3*NC , 4*NC),slice(3)) , p[:, [2, 4, 5]])
 
             l = bm.zeros((NC, 3), dtype=self.ftype)
             node = self.node
-            l[:, 0] = bm.sum((node[p[:, 0]] - node[p[:, 5]])**2, axis=1)
-            l[:, 1] = bm.sum((node[p[:, 1]] - node[p[:, 4]])**2, axis=1)
-            l[:, 2] = bm.sum((node[p[:, 2]] - node[p[:, 3]])**2, axis=1)
+            l = bm.set_at(l , (slice(None) , 0) , bm.sum((node[p[:, 0]] - node[p[:, 5]])**2, axis=1))
+            l = bm.set_at(l , (slice(None) , 1) , bm.sum((node[p[:, 1]] - node[p[:, 4]])**2, axis=1))
+            l = bm.set_at(l , (slice(None) , 2) , bm.sum((node[p[:, 2]] - node[p[:, 3]])**2, axis=1))
 
             # Here one should connect the shortest edge
             # idx = bm.argmax(l, axis=1)
@@ -449,25 +449,25 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 (0, 2, 5, 3, 4, 1),
                 (0, 4, 5, 1, 3, 2)
                 ])[idx]
-            newCell[4*NC:5*NC, 0] = p[bm.arange(NC), T[:, 0]]
-            newCell[4*NC:5*NC, 1] = p[bm.arange(NC), T[:, 1]]
-            newCell[4*NC:5*NC, 2] = p[bm.arange(NC), T[:, 4]]
-            newCell[4*NC:5*NC, 3] = p[bm.arange(NC), T[:, 5]]
+            newCell = bm.set_at(newCell , (slice(4*NC , 5*NC),0) , p[bm.arange(NC), T[:, 0]])
+            newCell = bm.set_at(newCell , (slice(4*NC , 5*NC),1) , p[bm.arange(NC), T[:, 1]])
+            newCell = bm.set_at(newCell , (slice(4*NC , 5*NC),2) , p[bm.arange(NC), T[:, 4]])
+            newCell = bm.set_at(newCell , (slice(4*NC , 5*NC),3) , p[bm.arange(NC), T[:, 5]])
 
-            newCell[5*NC:6*NC, 0] = p[bm.arange(NC), T[:, 1]]
-            newCell[5*NC:6*NC, 1] = p[bm.arange(NC), T[:, 2]]
-            newCell[5*NC:6*NC, 2] = p[bm.arange(NC), T[:, 4]]
-            newCell[5*NC:6*NC, 3] = p[bm.arange(NC), T[:, 5]]
+            newCell = bm.set_at(newCell , (slice(5*NC , 6*NC),0) , p[bm.arange(NC), T[:, 1]])
+            newCell = bm.set_at(newCell , (slice(5*NC , 6*NC),1) , p[bm.arange(NC), T[:, 2]])
+            newCell = bm.set_at(newCell , (slice(5*NC , 6*NC),2) , p[bm.arange(NC), T[:, 4]])
+            newCell = bm.set_at(newCell , (slice(5*NC , 6*NC),3) , p[bm.arange(NC), T[:, 5]])
+            
+            newCell = bm.set_at(newCell , (slice(6*NC , 7*NC),0) , p[bm.arange(NC), T[:, 2]])
+            newCell = bm.set_at(newCell , (slice(6*NC , 7*NC),1) , p[bm.arange(NC), T[:, 3]])
+            newCell = bm.set_at(newCell , (slice(6*NC , 7*NC),2) , p[bm.arange(NC), T[:, 4]])
+            newCell = bm.set_at(newCell , (slice(6*NC , 7*NC),3) , p[bm.arange(NC), T[:, 5]])
 
-            newCell[6*NC:7*NC, 0] = p[bm.arange(NC), T[:, 2]]
-            newCell[6*NC:7*NC, 1] = p[bm.arange(NC), T[:, 3]]
-            newCell[6*NC:7*NC, 2] = p[bm.arange(NC), T[:, 4]]
-            newCell[6*NC:7*NC, 3] = p[bm.arange(NC), T[:, 5]]
-
-            newCell[7*NC:, 0] = p[bm.arange(NC), T[:, 3]]
-            newCell[7*NC:, 1] = p[bm.arange(NC), T[:, 0]]
-            newCell[7*NC:, 2] = p[bm.arange(NC), T[:, 4]]
-            newCell[7*NC:, 3] = p[bm.arange(NC), T[:, 5]]
+            newCell = bm.set_at(newCell , (slice(7*NC , 8*NC),0) , p[bm.arange(NC), T[:, 3]])
+            newCell = bm.set_at(newCell , (slice(7*NC , 8*NC),1) , p[bm.arange(NC), T[:, 0]])
+            newCell = bm.set_at(newCell , (slice(7*NC , 8*NC),2) , p[bm.arange(NC), T[:, 4]])
+            newCell = bm.set_at(newCell , (slice(7*NC , 8*NC),3) , p[bm.arange(NC), T[:, 5]])
             self.cell = newCell
             self.construct()
 
@@ -746,7 +746,48 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         if returnim is True:
             return IM
 
+    def interpolation_with_HB(self, oldnode, oldcell, HB, data={}):
 
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        v01 = oldnode[oldcell[..., 1]] - oldnode[oldcell[..., 0]]
+        v02 = oldnode[oldcell[..., 2]] - oldnode[oldcell[..., 0]]
+        v03 = oldnode[oldcell[..., 3]] - oldnode[oldcell[..., 0]]
+        volume = bm.sum(v03*bm.cross(v01, v02), axis=1,dtype=bm.float64)/6.0
+        
+        idx = HB[..., 1]
+        ret = {"nodedata": [], "celldata": []}
+
+        for u0 in data['celldata']: 
+            fval = u0[idx]
+            ret["celldata"].append(fval)
+
+        if 'nodedata' in data:
+            lambdai = bm.zeros((NC, 4, 4), dtype=bm.float64)
+
+            # 计算所有单元的第 j 个点的第 i 个重心坐标分量
+            for j in range(4):
+                flag = node[cell[:, j]]
+                localface = bm.array([[2, 1, 3], [2, 3, 0], [1, 0, 3], [0, 1, 2]])
+                for i in range(4):
+                    v1 = oldnode[oldcell[idx, localface[i, 0]]] - flag
+                    v2 = oldnode[oldcell[idx, localface[i, 1]]] - flag
+                    v3 = oldnode[oldcell[idx, localface[i, 2]]] - flag
+                    volume1 = bm.sum(bm.cross(v2, v1)*v3, axis=-1,dtype=bm.float64)/6
+                    lambdai = bm.set_at(lambdai , (slice(None),j ,i), volume1/volume[idx])
+
+            fval0 = bm.zeros((NC, 4), dtype=bm.float64)
+            for u0 in data['nodedata']: 
+                fval = bm.zeros((NN), dtype=bm.float64)
+                for i in range(4):
+                    w = lambdai[:, i, :]
+                    fval0 = bm.set_at(fval0 , (slice(None) , i) , bm.sum(w*u0[oldcell[idx]], axis=1))
+                fval = bm.set_at(fval , cell , fval0)
+                ret["nodedata"].append(fval)
+        return ret
 
 
    
