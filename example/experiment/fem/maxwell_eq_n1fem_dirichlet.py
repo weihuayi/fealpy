@@ -148,7 +148,7 @@ for j, p in enumerate(ps):
 
         # 计算误差
         errorMatrix[j, i] = mesh.error(pde.solution, Eh.value)
-        #errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
+        errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
         tmr.send(f'第{i}次误差计算及网格加密时间')
         print(errorMatrix)
 
