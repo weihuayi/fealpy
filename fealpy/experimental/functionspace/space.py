@@ -11,6 +11,7 @@ class FunctionSpace():
     r"""The base class of function spaces"""
     ftype: Any
     itype: Any
+    device: Any
 
     # basis
     def basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike: raise NotImplementedError

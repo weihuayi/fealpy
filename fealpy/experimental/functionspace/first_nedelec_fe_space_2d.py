@@ -25,6 +25,7 @@ class FirstNedelecDof2d():
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
+
     def number_of_local_dofs(self,doftype ='all'):
         p = self.p
         if doftype == 'all':
@@ -101,6 +102,11 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         self.qf = self.mesh.quadrature_formula(p+3)
         self.ftype = mesh.ftype
         self.itype = mesh.itype
+
+        #TODO:JAX
+        self.device = mesh.device
+        self.TD = mesh.top_dimension()
+        self.GD = mesh.geo_dimension()
 
     @barycentric
     def basis(self, bcs, index=_S):
