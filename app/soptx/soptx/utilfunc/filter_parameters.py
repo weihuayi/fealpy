@@ -51,14 +51,15 @@ def compute_filter(nx: int, ny: int, rmin: float) -> Tuple[TensorLike, TensorLik
                     jH[cc] = col
                     sH[cc] = max(0.0, fac)
                     cc += 1
-
-    H = COOTensor(indices=bm.astype(bm.stack((iH, jH), axis=0), bm.int32), values=sH, 
-                                    spshape=(nx * ny, nx * ny)).tocsr()
+    # TODO 需要支持 numpy 后端下正确从 to_csr 方法
+    H = COOTensor(indices=bm.astype(bm.stack((iH, jH), axis=0), bm.int32), 
+                values=sH, 
+                spshape=(nx * ny, nx * ny))
     Hs = H @ bm.ones(H.shape[1], dtype=bm.float64)
 
     return H, Hs
 
-def apply_filter(ft: int, rho: TensorLike, dc: TensorLike, dv: TensorLike, 
+def apply_filter(ft: int, rho: TensorLike, dce: TensorLike, dve: TensorLike, 
                 H: TensorLike, Hs: TensorLike) -> Tuple[TensorLike, TensorLike]:
     """
     Apply the filter to the sensitivities.
@@ -74,11 +75,14 @@ def apply_filter(ft: int, rho: TensorLike, dc: TensorLike, dv: TensorLike,
     Returns:
         tuple: Filtered sensitivity of the objective function and volume constraint.
     """
+
     if ft == 0:
-        dc = bm.matmul(H, bm.multiply(rho, dc) / Hs / bm.maximum(1e-3, rho))
-        dv = dv
+        rho_dce = bm.multiply(rho, dce)
+        filtered_dce = H.matmul(rho_dce)
+        # filtered_dce = bm.matmul(H.to_dense(), rho_dce)
+        dce[:] = filtered_dce / Hs / bm.maximum(0.001, rho)
     elif ft == 1:
-        dc = bm.matmul(H, (dc / Hs))
-        dv = bm.matmul(H, (dv / Hs))
+        dce[:] = H.to_dense() * (dce / Hs)
+        dve[:] = H.to_dense() * (dve / Hs)
     
-    return dc, dv
+    return dce, dve

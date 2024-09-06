@@ -2,8 +2,8 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike, Tuple
 
 from builtins import float
-from app.stopt.soptx.utilfunc.filter_parameters import apply_filter
-from app.stopt.soptx.utilfunc.calculate_KE import calculate_KE
+from ...soptx.utilfunc.filter_parameters import apply_filter
+from ...soptx.utilfunc.calculate_KE import calculate_KE
 
 class OCOptimizer:
     def __init__(self, displacement_solver, 
@@ -64,7 +64,9 @@ class OCOptimizer:
             if ft == 0:
                 rho_phys = rho_new
             elif ft == 1:
-                rho_phys = bm.asarray(H @ rho_new[bm.newaxis].T / Hs)[:, 0]
+                rho_phys = H.matual(rho_new) / Hs
+                # rho_phys = bm.matual(H.to_dense(), rho_new) / Hs
+
             if bm.sum(rho_phys) - volfrac * NC > 0:
                 l1 = lmid
             else:
@@ -112,8 +114,8 @@ class OCOptimizer:
                 dce, dve = apply_filter(
                     ft=self.filter_parameters.ft, 
                     rho=rho, 
-                    dc=dce, 
-                    dv=dve, 
+                    dce=dce, 
+                    dve=dve, 
                     H=self.filter_parameters.H, 
                     Hs=self.filter_parameters.Hs
                 )

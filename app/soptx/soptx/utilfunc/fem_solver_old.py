@@ -9,9 +9,8 @@ from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
 from fealpy.experimental.solver import cg
 
-
-from app.stopt.soptx.cases.mbb_beam_cases import MBBBeamCase
-from app.stopt.soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
+from app.soptx.soptx.cases.mbb_beam_cases import MBBBeamCase
+from app.soptx.soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
 
 
 mbb_case = MBBBeamCase(case_name="top88")

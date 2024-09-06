@@ -5,8 +5,6 @@ from math import prod
 
 from .backend import TensorLike
 
-from.material.material_base import MaterialBase
-
 
 ### Types
 
@@ -18,7 +16,6 @@ Barycenters = Union[Tuple[TensorLike, ...], TensorLike]
 CoefLike = Union[Number, TensorLike, Callable[..., TensorLike]]
 SourceLike = CoefLike
 Threshold = Union[TensorLike, Callable[..., TensorLike]]
-MaterialLike = MaterialBase
 
 
 ### Constants

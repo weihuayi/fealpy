@@ -187,6 +187,8 @@ FUNCTION_MAPPING = _make_default_mapping(
     ### Sorting Functions ###
     # python array API standard v2023.12
     'argsort', 'sort',
+    # non-standard
+    'lexsort',
 
     ### Statistical Functions ###
     # python array API standard v2023.12
