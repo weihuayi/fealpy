@@ -16,8 +16,18 @@ class Bubble3dData():
         z = p[..., 2, None]
         f = (x**2-x)**2*(y**2-y)**2*(z**2-z)**2
         return bm.concatenate([f, bm.sin(x)*f, bm.sin(y)*f], axis=-1)
-
-    def mu(self, p):
+    
+    @cartesian
+    def curl_solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        f1 = bm.cos(y)*(x**2 - x)**2 * (y**2 - y)**2*(z**2 - z)**2 + bm.sin(x)*(x**2 - x)**2*(y**2 - y)*2*(2*y-1)*(z**2 - z)**2 - bm.sin(x)*(x**2 - x)**2*(y**2 - y)**2*(z**2 - z)* 2 * (2*z-1)
+        f2 = (x**2 - x)**2 * (y**2 - y)**2 * (z**2 - z) * 2 * (2*z-1) - bm.sin(y)*(x**2 - x)**2*(y**2 - y) * 2 * (2*y-1)*(z**2 - z)**2
+        f3 =  bm.cos(x)*(x**2 - x)**2 *(y**2 - y)**2 *(z**2 - z)**2 + bm.sin(x)*(x**2 - x)*2*(2*x-1)*(y**2 - y)**2 *(z**2 - z)**2 - (x**2 - x)**2 *(y**2 - y)* 2 *(2*y-1)*(z**2 - z)**2
+        return bm.concatenate([f1, f2, f3], axis=-1)
+    
+    def k(self,p):    
         return 1
 
     def epsilon(self, p):

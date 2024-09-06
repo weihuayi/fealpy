@@ -153,7 +153,7 @@ if __name__ == "__main__":
     # test.test_face_to_dof(init_data[0],"numpy")
     test = TestFirstNedelecFiniteElementSpace3d()
     # test.test_basis(init_data[0],"numpy")
-    # test.test_curl_basis(init_data[0],"numpy")
+    test.test_curl_basis(init_data[0],"numpy")
     # test.test_value(init_data[0],"pytorch")
     # test.test_curl_value(init_data[0],"pytorch")
     # test.test_mass_matrix(init_data[0],"numpy")
