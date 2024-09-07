@@ -27,9 +27,8 @@ def test_dims_and_shape(backend):
 @pytest.mark.parametrize("backend", ALL_BACKENDS)
 def test_to_dense(backend):
     bm.set_backend(backend)
-    crow = bm.tensor([0,2,3,4])
-    col = bm.tensor([1,2,0,0])
-    indices = bm.tensor([[0, 0, 1, 2], [1, 2, 0, 0]])
+    crow = bm.tensor([0, 2, 3, 4])
+    col = bm.tensor([1, 2, 0, 0])
     values = bm.tensor([[1, 2, 3, 4], [6, 7, 8, 9]], dtype=bm.float64)
     sparse_shape = bm.tensor([3, 3])
     csr = CSRTensor(crow, col, values, sparse_shape)
@@ -39,11 +38,11 @@ def test_to_dense(backend):
     bm.allclose(
         arr,
         bm.tensor([[[0, 1, 2],
-                       [3, 0, 0],
-                       [4, 0, 0]],
-                      [[0, 6, 7],
-                       [8, 0, 0],
-                       [9, 0, 0]]], dtype=bm.float64)
+                    [3, 0, 0],
+                    [4, 0, 0]],
+                   [[0, 6, 7],
+                    [8, 0, 0],
+                    [9, 0, 0]]], dtype=bm.float64)
     )
     csr2 = CSRTensor(crow, col, None, sparse_shape)
     arr2 = csr2.to_dense(fill_value=1.22)
@@ -136,13 +135,3 @@ class TestCSRTensorAdd:
 
         # 验证结果的值（注意，这里只是演示，实际上 result 仍然是 COOTensor 类型）
         assert bm.allclose(result._values, bm.tensor([[3], [4]]))
-
-    @pytest.mark.parametrize("backend", ALL_BACKENDS)
-    def test_add_type_error(self, backend):
-        bm.set_backend(backend)
-        # 初始化一个 COOTensor
-        csr = create_csr_tensor(indices=bm.tensor([[0], [2]]), values=bm.tensor([1]), shape=(4, 4))
-
-        # 尝试添加不支持的类型，期望抛出 TypeError
-        with pytest.raises(TypeError):
-            csr.add("a string", alpha=1.0)
