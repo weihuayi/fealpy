@@ -25,6 +25,7 @@ class FirstNedelecDof2d():
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
+
     def number_of_local_dofs(self,doftype ='all'):
         p = self.p
         if doftype == 'all':
@@ -102,6 +103,11 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
+        #TODO:JAX
+        self.device = mesh.device
+        self.TD = mesh.top_dimension()
+        self.GD = mesh.geo_dimension()
+
     @barycentric
     def basis(self, bcs, index=_S):
         p = self.p
@@ -115,7 +121,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         glambda = mesh.grad_lambda()    
         ledge = mesh.localEdge       
 
-        c2esign = mesh.cell_to_edge_sign() 
+        c2esign = mesh.cell_to_face_sign() 
 
         l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
         l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
@@ -156,7 +162,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         glambda = mesh.grad_lambda()
         ledge = mesh.localEdge
 
-        c2esign = mesh.cell_to_edge_sign() 
+        c2esign = mesh.cell_to_face_sign() 
 
         l = bm.zeros((3, )+bcs[None,:, 0, None, None].shape, dtype=self.ftype)
         l = bm.set_at(l,(0),bcs[None, :,0, None, None])

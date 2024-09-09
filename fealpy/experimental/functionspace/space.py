@@ -11,6 +11,7 @@ class FunctionSpace():
     r"""The base class of function spaces"""
     ftype: Any
     itype: Any
+    device: Any
 
     # basis
     def basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike: raise NotImplementedError
@@ -42,6 +43,8 @@ class FunctionSpace():
 
         Returns:
             Tensor: Values of DoFs shaped (batch, GDOF).
+        TODO:
+            1. device
         """
         GDOF = self.number_of_global_dofs()
         if (batch is None) or (batch == 0):
@@ -53,9 +56,9 @@ class FunctionSpace():
         shape = batch + (GDOF, )
 
         if dtype is None:
-            dtype = bm.float64
+            dtype = self.ftype 
 
-        return bm.zeros(shape, dtype=dtype)
+        return bm.zeros(shape, dtype=dtype, device=self.device)
 
     def function(self, array: Optional[TensorLike]=None,
                  batch: Union[int, Size, None]=None, *,
@@ -69,7 +72,7 @@ class FunctionSpace():
         """
         if array is None:
             if dtype is None:
-                dtype = bm.float64
+                dtype = self.ftype 
             array = self.array(batch=batch, dtype=dtype)
 
         return Function(self, array, coordtype)

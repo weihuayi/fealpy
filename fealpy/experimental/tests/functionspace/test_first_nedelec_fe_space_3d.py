@@ -30,6 +30,17 @@ class TestFirstNedelecDof3d:
         cell2dof = a.cell2dof
         np.testing.assert_array_equal(bm.to_numpy(cell2dof), meshdata["cell2dof"])
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_data)
+    def test_face_to_dof(self,meshdata,backend):
+        bm.set_backend(backend)
+
+        mesh = TetrahedronMesh.from_box(nx = 1,ny =1,nz=1)
+        p =  1
+        a = FirstNedelecDof3d(mesh,p)
+        
+        face2dof = a.face_to_dof()
+        np.testing.assert_array_equal(bm.to_numpy(face2dof), meshdata["face2dof"])
 
 class TestFirstNedelecFiniteElementSpace3d:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
@@ -139,13 +150,14 @@ class TestFirstNedelecFiniteElementSpace3d:
 if __name__ == "__main__":
     # test = TestFirstNedelecDof3d()
     # test.test_cell_to_dof(init_data[0],'pytorch')
+    # test.test_face_to_dof(init_data[0],"numpy")
     test = TestFirstNedelecFiniteElementSpace3d()
     # test.test_basis(init_data[0],"numpy")
-    # test.test_curl_basis(init_data[0],"pytorch")
+    test.test_curl_basis(init_data[0],"numpy")
     # test.test_value(init_data[0],"pytorch")
     # test.test_curl_value(init_data[0],"pytorch")
     # test.test_mass_matrix(init_data[0],"numpy")
     # test.test_curl_matrix(init_data[0],"numpy")
-    test.test_vector(init_data[0],"pytorch")
+    # test.test_vector(init_data[0],"pytorch")
 
 

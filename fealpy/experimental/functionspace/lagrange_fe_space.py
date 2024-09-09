@@ -6,7 +6,7 @@ from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
-from .dofs import LinearMeshCFEDof
+from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
 from .function import Function
 from fealpy.decorator import barycentric, cartesian
 
@@ -24,11 +24,15 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         if ctype == 'C':
             self.dof = LinearMeshCFEDof(mesh, p)
+        elif ctype == 'D':
+            self.dof = LinearMeshDFEDof(mesh, p)
+        else:
+            raise ValueError(f"Unknown type: {ctype}")
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         #TODO:JAX
-        #self.device = mesh.device
+        self.device = mesh.device
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 

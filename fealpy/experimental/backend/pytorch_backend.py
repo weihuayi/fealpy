@@ -60,6 +60,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     linalg = torch.linalg
     random = torch.random
 
+    #TODO
+    #bm.vmap, bm.jacfwd
+    jacfwd = staticmethod(torch.func.jacfwd)
+    vmap = staticmethod(torch.vmap)
+
     @staticmethod
     def context(tensor: Tensor, /):
         return {"dtype": tensor.dtype, "device": tensor.device}
@@ -73,6 +78,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def device_index(tensor_like: Tensor, /): return tensor_like.device.index
+
+    @staticmethod
+    def device_put(tensor_like: Tensor, /, device=None) -> Tensor:
+        return tensor_like.to(device=device)
 
     @staticmethod
     def to_numpy(tensor_like: Tensor, /) -> Any:
@@ -174,6 +183,23 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             arrays = [a.to(dtype) for a in arrays]
         return torch.cat(arrays, dim=axis, out=out)
 
+    @staticmethod
+    def split(x, indices_or_sections, /, *, axis=0):
+        if isinstance(indices_or_sections, int):
+            chunk_size = x.shape[axis] // indices_or_sections
+        elif isinstance(indices_or_sections, Tensor):
+            if indices_or_sections.ndim != 1:
+                raise ValueError("indices_or_sections must be 1-dimensional")
+            kwargs = {'dtype': indices_or_sections.dtype, 'device': indices_or_sections.device}
+            HEAD = torch.tensor([0], **kwargs)
+            TAIL = torch.tensor([x.shape[axis]], **kwargs)
+            indices_or_sections = torch.cat([HEAD, indices_or_sections, TAIL])
+            chunk_size = (indices_or_sections[1:] - indices_or_sections[:-1]).tolist()
+        else:
+            raise ValueError("indices_or_sections must be a scalar or 1D Tensor")
+
+        return torch.split(x, chunk_size, dim=axis)
+
     ### Searching Functions ###
     # python array API standard v2023.12
     argmax = staticmethod(_axis_keepdims_dispatch(torch.argmax))
@@ -229,7 +255,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if any_return:
             result = (b, )
         else:
-            retult = b
+            result = b
 
         if return_index:
             kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
@@ -252,6 +278,22 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def sort(x, /, *, axis=-1, descending=False, stable=True):
         return torch.sort(x, dim=axis, descending=descending, stable=stable)[0]
+
+    # non-standard
+    @staticmethod
+    def lexsort(keys: Tuple[Tensor, ...], /, *, axis: int = -1):
+        if keys[0].ndim < 1:
+            raise ValueError("keys must be at least 2 dimensional, but got "
+                             f"shape {keys.shape}.")
+        if len(keys) == 0:
+            raise ValueError(f"Must have at least 1 key.")
+
+        idx = keys[0].argsort(dim=axis, stable=True)
+
+        for k in keys[1:]:
+            idx = idx.gather(axis, k.gather(axis, idx).argsort(dim=axis, stable=True))
+
+        return idx
 
     ### Statistical Functions ###
     # python array API standard v2023.12
@@ -457,7 +499,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             mi = cls.multi_index_matrix(p, TD, dtype=torch.int)
 
         c = torch.arange(1, p+1, dtype=itype, device=device)
-        P = 1.0 / torch.cumprod(c, dim=0)
+        P = 1.0 / torch.cumprod(c, dim=0, dtype=bc.dtype)
         t = torch.arange(0, p, dtype=itype, device=device)
         Ap = p*bc.unsqueeze(-2) - t.reshape(-1, 1)
         Ap = torch.cumprod(Ap, dim=-2).clone()

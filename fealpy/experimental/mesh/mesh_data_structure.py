@@ -66,7 +66,7 @@ class MeshDS(metaclass=MeshMeta):
     ### properties
     def top_dimension(self) -> int: return self.TD
     @property
-    def device(self) -> Any: return self.cell.device
+    def device(self) -> Any: return bm.device_type(self.cell)
     def storage(self) -> Dict[int, TensorLike]:
         return self._entity_storage
 
@@ -91,8 +91,8 @@ class MeshDS(metaclass=MeshMeta):
 
     def _nv_entity(self, etype: Union[int, str]) -> TensorLike:
         entity = self.entity(etype)
-        if hasattr(entity, 'location'):
-            loc = entity.location
+        if isinstance(entity, tuple):
+            loc = entity[1]
             return loc[1:] - loc[:-1]
         else:
             return bm.tensor((entity.shape[-1],), dtype=self.itype)

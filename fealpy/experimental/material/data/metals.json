@@ -1,0 +1,24 @@
+{
+  "Steel": {
+    "elastic_modulus": 210000000000.0,
+    "poisson_ratio": 0.3,
+    "density": 7850,
+    "thermal_conductivity": 50,
+    "yield_strength": 250000000
+  },
+  "Aluminum": {
+    "elastic_modulus": 70000000000.0,
+    "poisson_ratio": 0.33,
+    "density": 2700,
+    "thermal_conductivity": 235,
+    "yield_strength": 95000000
+  },
+  "Copper": {
+    "elastic_modulus": 110000000000.0,
+    "poisson_ratio": 0.34,
+    "density": 8960,
+    "thermal_conductivity": 400,
+    "yield_strength": 210000000
+  }
+}
+

@@ -1,22 +1,11 @@
 
-from abc import ABCMeta
 from typing import overload, Optional, Tuple
 
-from .. import logger
 from ..backend import TensorLike as _DT
 from ..backend import Size
+from .sparse_tensor import SparseTensor
 from .coo_tensor import COOTensor
 from .csr_tensor import CSRTensor
-
-
-# For type checking
-class SparseTensor(metaclass=ABCMeta):
-    pass
-
-SparseTensor.register(COOTensor)
-SparseTensor.register(CSRTensor)
-
-logger.warning('fealpy.torch.sparse module is still in progress.')
 
 
 @overload
@@ -116,3 +105,33 @@ def csr_matrix(arg1, shape: Size, *,
         CSRTensor: _description_
     """
     raise NotImplementedError
+
+
+
+# NOTE: APIs for Sparse Tensors
+
+# 1. Data Fetching:
+# itype, ftype, nnz,
+# shape, dense_shape, sparse_shape,
+# ndim, dense_ndim, sparse_ndim,
+# size,
+# values_context,
+# (COO) indices, values,
+# (CSR) crow, col, values
+
+# 2. Data Type & Device Management:
+# astype, device_put
+
+# 3. Format Conversion:
+# to_dense (=toarray), tocsr, tocoo
+
+# 4. Object Conversion:
+# to_scipy, from_scipy,
+
+# 5. Manipulation:
+# copy, coalesce, reshape, flatten, ravel,
+# tril, triu,
+# concat
+
+# 6. Arithmetic Operations:
+# add, sub, mul, div, pow, neg, matmul
