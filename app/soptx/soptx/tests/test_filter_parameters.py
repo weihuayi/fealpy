@@ -3,54 +3,63 @@ import numpy as np
 from fealpy.experimental.backend import backend_manager as bm
 
 from fealpy.experimental.sparse import COOTensor
-from ..utilfunc.filter_parameters import compute_filter
-from .filter_parameters_data import filter_data
+from ..utilfunc.filter_parameters import compute_filter, compute_filter_3d, apply_filter
+from .filter_parameters_data import *
 
 from math import ceil, sqrt
 
 class TestFilter:
-    @pytest.mark.parametrize("filterdata", filter_data)
+    @pytest.mark.parametrize("filterdata", filter_data_2d)
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     def test_computer_filter(self, filterdata, backend):
         bm.set_backend(backend)
         nx = filterdata["nx"]
         ny = filterdata["ny"]
         rmin = filterdata["rmin"]
-        nfilter = int(nx * ny * ((2 * (ceil(rmin) - 1) + 1) ** 2))
-        iH = bm.zeros(nfilter, dtype=bm.int32)
-        jH = bm.zeros(nfilter, dtype=bm.int32)
-        sH = bm.zeros(nfilter, dtype=bm.float64)
-        cc = 0
 
-        for i in range(nx):
-            for j in range(ny):
-                row = i * ny + j
-                kk1 = int(max(i - (ceil(rmin) - 1), 0))
-                kk2 = int(min(i + ceil(rmin), nx))
-                ll1 = int(max(j - (ceil(rmin) - 1), 0))
-                ll2 = int(min(j + ceil(rmin), ny))
-                for k in range(kk1, kk2):
-                    for l in range(ll1, ll2):
-                        col = k * ny + l
-                        fac = rmin - sqrt((i - k) ** 2 + (j - l) ** 2)
-                        iH[cc] = row
-                        jH[cc] = col
-                        sH[cc] = max(0.0, fac)
-                        cc += 1
-        indices = bm.astype(bm.stack((iH, jH), axis=0), bm.int32)
-        H_coo = COOTensor(indices=bm.astype(bm.stack((iH, jH), axis=0), bm.int32), 
-                    values=sH, 
-                    spshape=(nx * ny, nx * ny))
-        H_csr = COOTensor(indices=bm.astype(bm.stack((iH, jH), axis=0), bm.int32), 
-                    values=sH, 
-                    spshape=(nx * ny, nx * ny)).tocsr()
-        H_coo_dense = H_coo.to_dense()
-        H_csr_dense = H_csr.to_dense()
+        H, Hs = compute_filter(nx=nx, ny=ny, rmin=rmin)
 
-        H, Hs = compute_filter(nx=nelx, ny=nely, rmin=rmin)
+        Hs_true = filterdata["Hs"]
 
-        Hs_88_m = filterdata["Hs"]
+        np.testing.assert_almost_equal(bm.to_numpy(Hs), Hs_true, decimal=4)
 
-        np.testing.assert_almost_equal(bm.to_numpy(Hs), Hs_88_p, decimal=4)
-        np.testing.assert_almost_equal(bm.to_numpy(Hs), Hs_88_m, decimal=4)
+    @pytest.mark.parametrize("filterdata", filter_data_2d)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    def test_apply_filter(self, filterdata, backend):
+        bm.set_backend(backend)
+
+        dce = bm.copy(bm.from_numpy(filterdata["dce"]))
+        dve = bm.copy(bm.from_numpy(filterdata["dve"]))
+        rho = bm.from_numpy(filterdata["rho"])
+        nx = filterdata["nx"]
+        ny = filterdata["ny"]
+        rmin = filterdata["rmin"]
+
+        H, Hs = compute_filter(nx=nx, ny=ny, rmin=rmin)
+        dce_sens_updated, _ = apply_filter(
+            ft=0, rho=rho,
+            dce=dce, dve=dve,
+            H=H, Hs=Hs)
+        dce_sens_updated_true = filterdata['dce_sens_updated']
+
+        np.testing.assert_almost_equal(bm.to_numpy(dce_sens_updated),
+                                       dce_sens_updated_true, decimal=4)
+
+    # @pytest.mark.parametrize("filterdata", filter_data_3d)
+    # @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    # def test_computer_filter(self, filterdata, backend):
+    #     bm.set_backend(backend)
+    #     nx = filterdata["nx"]
+    #     ny = filterdata["ny"]
+    #     nz = filterdata["nz"]
+    #     rmin = filterdata["rmin"]
+
+    #     H, Hs = compute_filter_3d(nx=nx, ny=ny, nz=nz, rmin=rmin)
+
+    #     Hs_true = filterdata["Hs"]
+
+    #     np.testing.assert_almost_equal(bm.to_numpy(Hs), Hs_true, decimal=4)
+    
+
+
 

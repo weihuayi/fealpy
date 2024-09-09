@@ -24,15 +24,16 @@ def process_coef_func(
             raise RuntimeError('The bcs should be provided for coef functions.')
         if etype is None:
             raise RuntimeError('The etype should be provided for coef functions.')
-        if getattr(coef, 'coordtype', 'cartesian') == 'cartesian':
+        if getattr(coef, 'coordtype', 'barycentric') == 'barycentric':
             if (mesh is None) or (not isinstance(mesh, HomogeneousMesh)):
                 raise RuntimeError('The mesh should be provided for cartesian coef functions.'
                                    'Note that only homogeneous meshes are supported here.')
 
+            coef_val = coef(bcs, index=index)
+        else:
             ps = mesh.bc_to_point(bcs, index=index)
             coef_val = coef(ps)
-        else:
-            coef_val = coef(bcs, index=index)
+
     else:
         coef_val = coef
     return coef_val
