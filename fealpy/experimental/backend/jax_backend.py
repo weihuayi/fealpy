@@ -82,7 +82,6 @@ class JAXBackend(Backend[Array], backend_name='jax'):
 
     @staticmethod
     def index_add(x: Array, index, src, /, *, axis=0, alpha=1):
-        assert index.ndim == 1
         indexing = [slice(None)] * x.ndim
         indexing[axis] = index
         return x.at[tuple(indexing)].add(alpha*src)
