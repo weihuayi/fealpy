@@ -49,9 +49,9 @@ class MBBBeamCase:
                         hypo="plane_stress", rho=self.rho,
                         interpolation_model=SIMPInterpolation())
 
-            self.filter_properties = FilterProperties(nx=self.nx, ny=self.ny, 
-                                                    rmin=1.5, ft=0)
-
+            self.filter_properties = FilterProperties(
+                                        nx=self.nx, ny=self.ny, 
+                                        rmin=1.5, ft=0)
 
             def force(points: TensorLike) -> TensorLike:
     

@@ -342,15 +342,20 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def add_at(a: Tensor, indices, src, /):
-        logger.info("When indices are not unique, the behavior is non-deterministic "
-                    "for the PyTorch backend "
-                    "(one of the values from src will be picked arbitrarily). "
-                    "Use index_add instead for deterministic behavior.")
+        logger.warning("When indices are not unique, the behavior is non-deterministic "
+                       "for the PyTorch backend "
+                       "(one of the values from src will be picked arbitrarily). "
+                       "Use index_add instead for deterministic behavior.")
         a[indices] += src
         return a
 
     @staticmethod
     def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
+        if index.ndim > 1:
+            src_shape = a.shape[:axis] + index.shape + a.shape[axis+1:]
+            src_flat_shape = a.shape[:axis] + (index.numel(), ) + a.shape[axis+1:]
+            src = torch.broadcast_to(src, src_shape).reshape(src_flat_shape)
+            index = index.ravel()
         return a.index_add_(axis, index, src, alpha=alpha)
 
     @staticmethod
@@ -554,7 +559,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
         shape = tri.shape[:-1] + (3, 2)
-        result = torch.zeros(shape, dtype=node.dtype) 
+        result = torch.zeros(shape, dtype=node.dtype)
 
         result[..., 0, :] = node[tri[..., 2]] - node[tri[..., 1]]
         result[..., 1, :] = node[tri[..., 0]] - node[tri[..., 2]]

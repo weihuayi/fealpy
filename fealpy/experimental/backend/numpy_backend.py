@@ -99,7 +99,6 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def index_add(a: NDArray, index, src, /, *, axis=0, alpha=1):
-        assert index.ndim == 1
         indexing = [slice(None)] * a.ndim
         indexing[axis] = index
         np.add.at(a, tuple(indexing), alpha*src)
@@ -115,7 +114,7 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
 
     @staticmethod
     def unique_all_(a, axis=None, **kwargs):
-        b, indices0, inverse, counts = np.unique(a, 
+        b, indices0, inverse, counts = np.unique(a,
                                                  return_index=True,
                                                  return_inverse=True,
                                                  return_counts=True,
