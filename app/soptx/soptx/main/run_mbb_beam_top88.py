@@ -2,17 +2,17 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh import UniformMesh2d
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
 
-from ...soptx.cases.mbb_beam_cases import MBBBeamCase
-from ...soptx.utilfunc.fem_solver import FEMSolver
-from ...soptx.optalg.oc_optimizer import OCOptimizer
-from ...soptx.cases.termination_criterias import TerminationCriteria
-from ...soptx.cases.top_opt_porblem import ComplianceMinimization
-from ...soptx.utilfunc.sensitivity_calculations import manual_objective_sensitivity
+from app.soptx.soptx.cases.mbb_beam_cases import MBBBeamCase
+from app.soptx.soptx.utilfunc.fem_solver import FEMSolver
+from app.soptx.soptx.optalg.oc_optimizer import OCOptimizer
+from app.soptx.soptx.cases.termination_criterias import TerminationCriteria
+from app.soptx.soptx.cases.top_opt_porblem import ComplianceMinimization
+from app.soptx.soptx.utilfunc.sensitivity_calculations import manual_objective_sensitivity
 
 
 
 # 设置计算后端，如 'numpy', 'pytorch' 等
-backend = 'numpy'
+backend = 'pytorch'
 bm.set_backend(backend)
 
 # 初始化 MBB 梁算例
