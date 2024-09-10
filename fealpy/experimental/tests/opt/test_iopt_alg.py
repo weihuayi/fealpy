@@ -66,17 +66,10 @@ class TestIOptInterfaces:
         gbest, gbest_f = optimizer.run()
     
 if __name__ == "__main__":
-    # pytest.main(["./test_iopt_alg.py", "-k", "test_honeybadger_opt_alg"])
-    # pytest.main(["./test_iopt_alg.py", "-k", "test_crayfish_opt_alg"])
-    # pytest.main(["./test_iopt_alg.py", "-k", "test_quantumparticleswarm_opt_alg"])
-    # pytest.main(["./test_iopt_alg.py", "-k", "test_grey_wolf_optimizer"])
-    # pytest.main(["./test_iopt_alg.py", "-k", "test_snowmelt_opt_alg"])
-    lb, ub = iopt_data[1]['domain']
-    NP = 100
-    x0 = lb + bm.random.rand(NP, iopt_data[1]['ndim'])*(ub - lb)
-    option = opt_alg_options( x0, iopt_data[1]['objective'], iopt_data[1]['domain'] , NP)
-    Optimizer = QuantumParticleSwarmOptAlg(option)
-    gbest, gbest_f = Optimizer.run()
-    # option = opt_alg_options( x0, iopt_data['objective'], iopt_data['domain'] , NP)
-    # optimizer = QuantumParticleSwarmOptAlg(option)
-    # gbest, gbest_f = optimizer.run()
+    pytest.main(["./test_iopt_alg.py", "-k", "test_honeybadger_opt_alg"])
+    pytest.main(["./test_iopt_alg.py", "-k", "test_crayfish_opt_alg"])
+    pytest.main(["./test_iopt_alg.py", "-k", "test_quantumparticleswarm_opt_alg"])
+    pytest.main(["./test_iopt_alg.py", "-k", "test_grey_wolf_optimizer"])
+    pytest.main(["./test_iopt_alg.py", "-k", "test_snowmelt_opt_alg"])
+
+    

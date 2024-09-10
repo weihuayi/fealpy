@@ -53,7 +53,7 @@ else:
     dim = textMAP.data["landmark"].shape[0]
     
     # 调用算法
-    test1 = QPSO(N,dim,ub,lb,MaxIT,fobj)
+    test1 = QPSO(N, dim, ub, lb, MaxIT, fobj)
     test1.cal()
     
     result = textMAP.calresult(test1.gbest)
