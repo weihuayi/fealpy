@@ -45,21 +45,21 @@ def Solve(A, b):
     from scipy.sparse.linalg import minres, gmres
 
     A = coo_matrix((A.values(), (A.indices()[0], A.indices()[1])), shape=(gdof, gdof))
-#     NN = len(b)
-#     # ctx = DMumpsContext()
-#     # ctx.set_silent()
-#     # ctx.set_centralized_sparse(A)
+    NN = len(b)
+    ctx = DMumpsContext()
+    ctx.set_silent()
+    ctx.set_centralized_sparse(A)
 
-#     # x = np.array(b)
+    x = np.array(b)
 
-#     # ctx.set_rhs(x)
-#     # ctx.run(job=6)
-#     # ctx.destroy() # Cleanup
-#     '''
-#     #x, _ = minres(A, b, x0=b, tol=1e-10)
-#     x, _ = gmres(A, b, tol=1e-10)
-#     '''
-    x = spsolve(A,b)
+    ctx.set_rhs(x)
+    ctx.run(job=6)
+    ctx.destroy() # Cleanup
+    '''
+    #x, _ = minres(A, b, x0=b, tol=1e-10)
+    x, _ = gmres(A, b, tol=1e-10)
+    '''
+    #x = spsolve(A,b)
     return x
 
 ## 参数解析
@@ -88,8 +88,8 @@ args = parser.parse_args()
 p = args.degree
 maxit = args.maxit
 dim = args.dim
-dim = 2
-maxit= 3
+#dim = 2
+#maxit= 3
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -109,8 +109,8 @@ NDof = np.zeros(maxit, dtype=bm.float64)
 tmr = timer()
 next(tmr)
 
-ps = [2, 3, 4]
-# ps = [2,3]
+#ps = [2, 3, 4]
+ps = [0]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
