@@ -289,6 +289,8 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     
     def face_internal_basis(self, bcs, index=_S):
         p = self.p
+        assert(p>0)
+
         mesh = self.mesh
         NF = mesh.number_of_faces()
         GD = mesh.geo_dimension()
@@ -309,7 +311,6 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # val[..., fdof//2:, :] = v1*phi[..., None]
         val = bm.set_at(val,(...,slice(0,fdof//2),slice(None)),v0*phi[..., None])
         val = bm.set_at(val,(...,slice(fdof//2,fdof),slice(None)),v1*phi[..., None])
-
         return val
 
 
@@ -554,26 +555,29 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
 
         # 边界内部的点
         index1 = self.mesh.boundary_face_index()
-        face2dof = self.dof.face_to_internal_dof()[index1]
-        qf = mesh.quadrature_formula(p+2,"face")
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        bphi = self.bspace.basis(bcs,p-1)
-        fbasis = self.face_internal_basis(bcs)[index1] # (NF,NQ,ldof,GD)
-        fm = mesh.entity_measure('face')[index1]
-        M = bm.einsum("cqlg, cqmg, q, c->clm", fbasis, fbasis, ws, fm)
-        Minv = bm.linalg.inv(M)
+        if p>0:
+            face2dof = self.dof.face_to_internal_dof()[index1]
 
-        points = mesh.bc_to_point(bcs)[index1]
-        n = mesh.face_unit_normal()[index1]
-        n = n[:,None,:]
-        h2 = gD(points)
-        g = bm.cross(n,h2)
-        g = bm.cross(g,n)
+            qf = mesh.quadrature_formula(p+2,"face")
+            bcs, ws = qf.get_quadrature_points_and_weights()
 
-        g = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
+            fbasis = self.face_internal_basis(bcs)[index1] # (NF,NQ,ldof,GD)
+            fm = mesh.entity_measure('face')[index1]
+            M = bm.einsum("cqlg, cqmg, q, c->clm", fbasis, fbasis, ws, fm)
+            Minv = bm.linalg.inv(M)
 
-        uh[face2dof] = bm.einsum("cq, cqm->cm", g, Minv)
-        isDDof[face2dof] = True
+            points = mesh.bc_to_point(bcs)[index1]
+            n = mesh.face_unit_normal()[index1]
+            n = n[:,None,:]
+
+            h2 = gD(points)
+            g = bm.cross(n,h2)
+            g = bm.cross(g,n)
+
+            g = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
+
+            uh[face2dof] = bm.einsum("cq, cqm->cm", g, Minv)
+            isDDof[face2dof] = True
 
         # 边界边界的点
         NE = mesh.number_of_edges()
@@ -601,7 +605,6 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         isDDof[edge2dof] = True
 
         # uh[isDDof] = 0
-
         return uh,isDDof
 
     boundary_interpolate = set_dirichlet_bc
