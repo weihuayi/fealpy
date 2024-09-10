@@ -155,14 +155,29 @@ class FirstNedelecDof3d():
         return e2d.reshape(-1)
 
     def is_boundary_dof(self):
-        bddof = self.boundary_dof()
-
+        p = self.p
+        mesh = self.mesh
+        ldof = p+1
         gdof = self.number_of_global_dofs()
-        flag = bm.zeros(gdof, dtype=bm.bool)
+       
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        index = self.mesh.boundary_face_index()
+        face2dof = self.face_to_internal_dof()[index]
+        isDDof[face2dof] = True
 
-        # flag[bddof] = True
-        flag = bm.set_at(flag,(bddof),True)
-        return flag
+        # edge = self.mesh.entity('edge')
+        # bdnflag = self.mesh.boundary_node_flag()
+        # bdeflag = bm.all(bdnflag[edge], axis=1)
+        NE = mesh.number_of_edges()
+        f2e = mesh.face_to_edge()[index]
+        bdeflag = bm.zeros(NE, dtype=bm.bool)
+        bdeflag[f2e] = True
+        index = bm.nonzero(bdeflag)[0]
+
+        edge2dof = self.edge_to_dof()[index]
+        isDDof[edge2dof] = True
+
+        return isDDof
 
 class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
@@ -271,6 +286,32 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         print("tt : ", s-t)
 
         return val
+    
+    def face_internal_basis(self, bcs, index=_S):
+        p = self.p
+        mesh = self.mesh
+        NF = mesh.number_of_faces()
+        GD = mesh.geo_dimension()
+        
+        fdof = self.dof.number_of_local_dofs("face")
+        glambda = mesh.grad_face_lambda()
+        val = bm.zeros((NF,) + bcs.shape[:-1]+(fdof, 3), dtype=self.ftype)
+        
+        l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
+        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
+        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
+        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])
+
+        phi = self.bspace.basis(bcs, p=p-1)
+        v0 = l[2]*(l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None]) 
+        v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None]) 
+        # val[..., :fdof//2, :] = v0*phi[..., None]
+        # val[..., fdof//2:, :] = v1*phi[..., None]
+        val = bm.set_at(val,(...,slice(0,fdof//2),slice(None)),v0*phi[..., None])
+        val = bm.set_at(val,(...,slice(fdof//2,fdof),slice(None)),v1*phi[..., None])
+
+        return val
+
 
     @barycentric
     def curl_basis(self, bcs):
@@ -508,23 +549,58 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         p = self.p
         mesh = self.mesh
         ldof = p+1
-        gdof = self.number_of_global_dofs()
-       
+        gdof = self.number_of_global_dofs()       
         isDDof = bm.zeros(gdof, dtype=bm.bool)
-        index = self.mesh.boundary_face_index()
-        face2dof = self.dof.face_to_internal_dof()[index]
-        uh[face2dof] = 0 
+
+        # 边界内部的点
+        index1 = self.mesh.boundary_face_index()
+        face2dof = self.dof.face_to_internal_dof()[index1]
+        qf = mesh.quadrature_formula(p+2,"face")
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bphi = self.bspace.basis(bcs,p-1)
+        fbasis = self.face_internal_basis(bcs)[index1] # (NF,NQ,ldof,GD)
+        fm = mesh.entity_measure('face')[index1]
+        M = bm.einsum("cqlg, cqmg, q, c->clm", fbasis, fbasis, ws, fm)
+        Minv = bm.linalg.inv(M)
+
+        points = mesh.bc_to_point(bcs)[index1]
+        n = mesh.face_unit_normal()[index1]
+        n = n[:,None,:]
+        h2 = gD(points)
+        g = bm.cross(n,h2)
+        g = bm.cross(g,n)
+
+        g = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
+
+        uh[face2dof] = bm.einsum("cq, cqm->cm", g, Minv)
         isDDof[face2dof] = True
 
-        edge = self.mesh.entity('edge')
-        bdnflag = self.mesh.boundary_node_flag()
-        bdeflag = bm.all(bdnflag[edge], axis=1)
-        index = bm.nonzero(bdeflag)[0] 
+        # 边界边界的点
+        NE = mesh.number_of_edges()
+        f2e = mesh.face_to_edge()[index1]
+        bdeflag = bm.zeros(NE, dtype=bm.bool)
+        bdeflag[f2e] = True
+        index2 = bm.nonzero(bdeflag)[0]
+        edge2dof = self.dof.edge_to_dof()[index2]
+        
+        qf = mesh.quadrature_formula(p+2,"edge")
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        points1 = mesh.bc_to_point(bcs)[index2]
+        t = mesh.edge_tangent()[index2]
+        h1 = gD(points1)
+        b = bm.einsum('eqd, ed->eq', h1, t)  
+        em = mesh.entity_measure('edge')[index2]
+        bspace = BernsteinFESpace(mesh, p)
+        bphi = bspace.basis(bcs,p) 
+        M = bm.einsum("eql, eqm, q->lm", bphi, bphi, ws)
+        Minv = bm.linalg.inv(M)
+        Minv = Minv*em[:,None,None]
+        g2 = bm.einsum('eql, eq,q->el', bphi, b,ws)
 
-        edge2dof = self.dof.edge_to_dof()[index]
-        uh[edge2dof] = 0 
+        uh[edge2dof] = bm.einsum('el, elm->em', g2, Minv)
         isDDof[edge2dof] = True
 
+        # uh[isDDof] = 0
 
         return uh,isDDof
 
