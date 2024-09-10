@@ -80,6 +80,9 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     def device_index(tensor_like: Tensor, /): return tensor_like.device.index
 
     @staticmethod
+    def get_device(tensor_like: Tensor, /): return tensor_like.device
+
+    @staticmethod
     def device_put(tensor_like: Tensor, /, device=None) -> Tensor:
         return tensor_like.to(device=device)
 

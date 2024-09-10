@@ -35,6 +35,9 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     def device_index(tensor_like, /): return 0
 
     @staticmethod
+    def get_device(tensor_like: NDArray, /): return 'cpu'
+
+    @staticmethod
     def device_put(tensor_like, /, device=None):
         if device not in {None, 'cpu'}:
             raise NotImplementedError("only cpu device is supported by NumPyBackend ")

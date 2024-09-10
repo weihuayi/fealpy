@@ -42,6 +42,9 @@ class JAXBackend(Backend[Array], backend_name='jax'):
     def device_index(array: Array, /): return array.device.id
 
     @staticmethod
+    def get_device(tensor_like: Array, /): return tensor_like.device
+
+    @staticmethod
     def device_put(tensor_like: Array, /, device=None) -> Array:
         return jax.device_put(tensor_like, device)
 
