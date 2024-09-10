@@ -16,7 +16,7 @@ except ImportError:
                       'See https://pytorch.org/ for installation.')
 
 from .. import logger
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
 
 Tensor = torch.Tensor
 _device = torch.device
@@ -59,11 +59,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
     linalg = torch.linalg
     random = torch.random
-
-    #TODO
-    #bm.vmap, bm.jacfwd
-    jacfwd = staticmethod(torch.func.jacfwd)
-    vmap = staticmethod(torch.vmap)
 
     @staticmethod
     def context(tensor: Tensor, /):
@@ -390,6 +385,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             x = torch.transpose(x)
         return vmap(func1d)(x)
 
+    @staticmethod
+    def vmap(func, /, in_axes=0, out_axes=0, **kwargs):
+        return torch.vmap(func, in_dims=in_axes, out_dims=out_axes, **kwargs)
+
     ### Sparse Functions ###
 
     @staticmethod
@@ -606,8 +605,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return Dlambda
 
 
-attribute_mapping = ATTRIBUTE_MAPPING.copy()
-PyTorchBackend.attach_attributes(attribute_mapping, torch)
+PyTorchBackend.attach_attributes(ATTRIBUTE_MAPPING, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
@@ -619,6 +617,7 @@ function_mapping.update(
     compile='compile'
 )
 PyTorchBackend.attach_methods(function_mapping, torch)
+PyTorchBackend.attach_methods(TRANSFORMS_MAPPING, torch.func)
 
 PyTorchBackend.random.rand = torch.rand
 PyTorchBackend.random.rand_like = torch.rand_like

@@ -1,7 +1,6 @@
 from typing import Optional, Union, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
-from math import factorial
 import numpy as np
 
 try:
@@ -17,7 +16,7 @@ except ImportError:
                       'the JAX backend in FEALPy. '
                       'See https://github.com/google/jax for installation.')
 
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
 
 Array = jax.Array
 _device = jax.Device
@@ -395,3 +394,4 @@ function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(tensor='array')
 JAXBackend.attach_methods(function_mapping, jnp)
 JAXBackend.attach_methods({'compile': 'jit'}, jax)
+JAXBackend.attach_methods(TRANSFORMS_MAPPING, jax)
