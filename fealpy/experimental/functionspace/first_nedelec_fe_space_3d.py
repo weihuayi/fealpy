@@ -550,7 +550,6 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         p = self.p
         mesh = self.mesh
-        ldof = p+1
         gdof = self.number_of_global_dofs()       
         isDDof = bm.zeros(gdof, dtype=bm.bool)
 
@@ -570,14 +569,13 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             points = mesh.bc_to_point(bcs)[index1]
             n = mesh.face_unit_normal()[index1]
             n = n[:,None,:]
-
             h2 = gD(points)
-            g = bm.cross(n,h2)
-            g = bm.cross(g,n)
+            g = bm.cross(n, h2) 
+            # g = bm.cross(g,n)
 
-            g = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
+            g1 = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
 
-            uh[face2dof] = bm.einsum("cq, cqm->cm", g, Minv)
+            uh[face2dof] = bm.einsum("cl, clm->cm", g1, Minv)
             isDDof[face2dof] = True
 
         # 边界边界的点
@@ -587,19 +585,23 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         bdeflag[f2e] = True
         index2 = bm.nonzero(bdeflag)[0]
         edge2dof = self.dof.edge_to_dof()[index2]
-        
-        qf = mesh.quadrature_formula(p+2,"edge")
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        points1 = mesh.bc_to_point(bcs)[index2]
-        t = mesh.edge_tangent()[index2]
-        h1 = gD(points1)
-        b = bm.einsum('eqd, ed->eq', h1, t)  
         em = mesh.entity_measure('edge')[index2]
-        bspace = BernsteinFESpace(mesh, p)
-        bphi = bspace.basis(bcs,p) 
+        em1 = 1 / em
+        t = mesh.edge_tangent()[index2]
+        t = em1[:,None]*t
+        
+        # 右端矩阵组装
+        qf = mesh.quadrature_formula(p+2,"edge")
+        bcs, ws = qf.get_quadrature_points_and_weights()        
+        bphi = self.bspace.basis(bcs, p=p)
         M = bm.einsum("eql, eqm, q->lm", bphi, bphi, ws)
         Minv = bm.linalg.inv(M)
         Minv = Minv*em[:,None,None]
+        
+        points1 = mesh.bc_to_point(bcs)[index2]
+        h1 = gD(points1)
+        b = bm.einsum('eqd, ed->eq', h1, t) 
+        
         g2 = bm.einsum('eql, eq,q->el', bphi, b,ws)
 
         uh[edge2dof] = bm.einsum('el, elm->em', g2, Minv)
