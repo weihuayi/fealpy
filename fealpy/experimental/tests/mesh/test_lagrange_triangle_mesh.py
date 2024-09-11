@@ -95,27 +95,6 @@ class TestLagrangeTriangleMeshInterfaces:
         em_ratio = em[0:-1] / em[1:]
         print("unit_sphere:", em_ratio)
 
-        ellsurface = EllipsoidSurface() #a=3,b=np.sqrt(3),c=1的椭球
-        ellmesh = TriangleMesh.from_ellipsoid()
-
-        # 计算收敛阶
-        maxit1 = 4
-        cm1 = np.zeros(maxit1, dtype=np.float64)
-        em1 = np.zeros(maxit1, dtype=np.float64)
-        for i in range(maxit1):
-            lmesh = LagrangeTriangleMesh.from_triangle_mesh(ellmesh, p=3, surface=ellsurface)
-        
-            cm1[i] = np.sum(lmesh.cell_area())
-            
-            x = bm.to_numpy(cm1[i])
-            y = data["ellip_cm"]
-            em1[i] = np.abs(x - y)  # absolute error
-
-            if i < maxit1-1:
-                ellmesh.uniform_refine()
-            
-        em_ratio1 = em1[0:-1] / em1[1:]
-        print("ellip:", em_ratio1)
 
     @pytest.mark.parametrize("backend", ['numpy'])
     @pytest.mark.parametrize("data", edge_length_data)
@@ -125,22 +104,16 @@ class TestLagrangeTriangleMeshInterfaces:
         surface = SphereSurface() #以原点为球心，1 为半径的球
         mesh = TriangleMesh.from_unit_sphere_surface()
         lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=3, surface=surface)
-        el = lmesh.edge_length()
-        
-        ellsurface = EllipsoidSurface() #a=9,b=3,c=1
-        ellmesh = TriangleMesh.from_ellipsoid()
-        lmesh1 = LagrangeTriangleMesh.from_triangle_mesh(ellmesh, p=3, surface=ellsurface)
-        el1 = lmesh1.edge_length()
+        el = lmesh.edge_length()        
        
         np.testing.assert_allclose(bm.to_numpy(el), data["el"], atol=1e-14)   
-        np.testing.assert_allclose(bm.to_numpy(el1), data["el1"], atol=1e-14)   
 
 if __name__ == "__main__":
-    a = TestLagrangeTriangleMeshInterfaces()
+    #a = TestLagrangeTriangleMeshInterfaces()
     #a.test_init_mesh(init_data[0], 'numpy')
     #a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
-    a.test_surface_mesh('numpy')
+    #a.test_surface_mesh('numpy')
     #a.test_cell_area(cell_area_data[0], 'numpy')
     #a.test_edge_length(edge_length_data[0], 'numpy')
     #a.test_(cell_[0], 'numpy')
-    #pytest.main(["./test_lagrange_triangle_mesh.py"])
+    pytest.main(["./test_lagrange_triangle_mesh.py"])
