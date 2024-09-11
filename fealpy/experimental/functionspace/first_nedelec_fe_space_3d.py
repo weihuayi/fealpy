@@ -247,6 +247,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             phi = self.bspace.basis(bcs, p=p-1)
             multiIndex = self.mesh.multi_index_matrix(p-1, 3)
             permcf = self.mesh.cell_to_face_permutation()
+            permcf = bm.argsort(permcf, axis=1)
             localFace = self.mesh.localFace
             for i in range(4):
 
