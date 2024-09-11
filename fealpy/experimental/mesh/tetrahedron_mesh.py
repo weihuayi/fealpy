@@ -195,6 +195,26 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             vjm = node[cell[index, m],:] - node[cell[index, j],:]
             Dlambda[:, i, :] = bm.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
+    
+    def grad_face_lambda(self, index=_S):
+
+        node = self.entity('node')
+        face = self.entity('face', index=index)
+        NF = face.shape[0]
+        v0 = node[face[..., 2]] - node[face[..., 1]]
+        v1 = node[face[..., 0]] - node[face[..., 2]]
+        v2 = node[face[..., 1]] - node[face[..., 0]]
+        GD = self.geo_dimension()
+        nv = bm.cross(v1, v2)
+        Dlambda = bm.zeros((NF, 3, GD), dtype=self.ftype)
+
+        length = bm.linalg.norm(nv, axis=-1, keepdims=True)
+        n = nv / length
+        Dlambda[:, 0] = bm.cross(n, v0) / length
+        Dlambda[:, 1] = bm.cross(n, v1) / length
+        Dlambda[:, 2] = bm.cross(n, v2) / length
+        return Dlambda
+
     """
     def grad_shape_function(self, bc, p=1, index=_S, variables='x'):
         R = bm.simplex_grad_shape_function(bc, p=p)

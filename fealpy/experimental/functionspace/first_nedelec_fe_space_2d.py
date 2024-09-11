@@ -89,6 +89,7 @@ class FirstNedelecDof2d():
 
         flag = bm.set_at(flag,(bddof),True)
         return flag
+    
 
 
 class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
