@@ -17,11 +17,11 @@ class Gear(ABC):
         @param x_n: 法向变位系数
         @param hac: 齿顶高系数
         @param cc: 顶隙系数
-        @param rcc: 刀尖圆弧半径系数系数
+        @param rcc: 刀尖圆弧半径系数
         @param jn: 法向侧隙
         @param n1: 渐开线分段数
         @param n2: 过渡曲线分段数
-        @param n3: 齿轮内部分段书
+        @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
         @param material: 齿轮材料
@@ -100,7 +100,7 @@ class Gear(ABC):
 
 
 class ExternalGear(Gear):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, chamfer_dia, inner_diam):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, chamfer_dia, inner_diam, material=None):
         """
 
         @param m_n: 法向模数
@@ -119,8 +119,9 @@ class ExternalGear(Gear):
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
         @param chamfer_dia: 倒角高度（直径方向）
         @param inner_diam: 轮缘内径
+        @param material: 齿轮材料
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, material)
         self.inner_diam = inner_diam
         self.chamfer_dia = chamfer_dia
         # 齿顶圆直径与半径
@@ -647,7 +648,7 @@ class ExternalGear(Gear):
 
 
 class InternalGear(Gear):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, outer_diam, z_cutter, xn_cutter):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, outer_diam, z_cutter, xn_cutter, material=None):
         """
 
         @param m_n: 法向模数
@@ -667,8 +668,9 @@ class InternalGear(Gear):
         @param outter_diam: 轮缘外径
         @param z_cutter: 刀具齿数
         @param xn_cutter: 刀具变位系数
+        @param material: 齿轮材料
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, material)
         self.outer_diam = outer_diam
         self.z_cutter = z_cutter
         self.xn_cutter = xn_cutter
