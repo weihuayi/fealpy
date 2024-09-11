@@ -170,7 +170,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     'tile',
     'unstack',
     # non-standard
-    'concatenate', 'swapaxes', 'transpose', 'split',
+    'concatenate', 'swapaxes', 'split', 'transpose',
 
     ### Searching Functions ###
     # python array API standard v2023.12
@@ -211,6 +211,10 @@ FUNCTION_MAPPING = _make_default_mapping(
     'apply_along_axis',
 )
 
+TRANSFORMS_MAPPING = _make_default_mapping(
+    'grad', 'hessian', 'jvp', 'vjp', 'jacfwd', 'jacrev', 'vmap'
+)
+
 
 class Backend(Generic[_DT]):
     """
@@ -230,7 +234,7 @@ class Backend(Generic[_DT]):
             raise ValueError("Backend name cannot be empty.")
 
     @classmethod
-    def attach_attributes(cls, mapping: Dict[str, str], source: Any):
+    def attach_attributes(cls, mapping: Dict[str, str], source: Any, /):
         for target_key, source_key in mapping.items():
             if (source_key is None) or (source_key == ''):
                 continue
@@ -238,7 +242,7 @@ class Backend(Generic[_DT]):
                 setattr(cls, target_key, getattr(source, source_key))
 
     @classmethod
-    def attach_methods(cls, mapping: Dict[str, str], source: Any):
+    def attach_methods(cls, mapping: Dict[str, str], source: Any, /):
         for target_key, source_key in mapping.items():
             if (source_key is None) or (source_key == ''):
                 continue
