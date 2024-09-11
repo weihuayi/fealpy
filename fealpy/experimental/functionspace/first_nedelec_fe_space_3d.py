@@ -247,7 +247,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             phi = self.bspace.basis(bcs, p=p-1)
             multiIndex = self.mesh.multi_index_matrix(p-1, 3)
             permcf = self.mesh.cell_to_face_permutation()
-            permcf = bm.argsort(permcf, axis=1)
+            #permcf = bm.argsort(permcf, axis=-1)
             localFace = self.mesh.localFace
             for i in range(4):
 
@@ -313,6 +313,44 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         val = bm.set_at(val,(...,slice(0,fdof//2),slice(None)),v0*phi[..., None])
         val = bm.set_at(val,(...,slice(fdof//2,fdof),slice(None)),v1*phi[..., None])
         return val
+
+    @barycentric
+    def face_basis(self, bcs, index=_S):
+        p = self.p
+        mesh = self.mesh
+        NF = mesh.number_of_faces()
+        GD = mesh.geo_dimension()
+        fldof = self.dof.number_of_local_dofs("face")
+        eldof = self.dof.number_of_local_dofs("edge")
+        ldof = 3*eldof + fldof
+        gdof = self.dof.number_of_global_dofs()
+        glambda = mesh.grad_face_lambda()
+        ledge = bm.array([[1, 2],
+                         [2, 0],
+                         [0, 1]])
+        c2esign = mesh.face_to_edge_sign()
+        l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
+        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
+        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
+        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])
+        # edge basis
+        phi = self.bspace.basis(bcs, p=p)
+        multiIndex = self.mesh.multi_index_matrix(p, 2)
+        val = bm.zeros((NF,) + bcs.shape[:-1]+(ldof, 3), dtype=self.ftype)
+        for i in range(3):
+            phie = phi[:, :, multiIndex[:, i]==0]
+            c2esi = c2esign[:, i]
+            v = l[ledge[i, 0]]*glambda[:,None, ledge[i, 1], None,:] - l[ledge[i, 1]]*glambda[:,None, ledge[i, 0], None,:]
+            v = bm.set_at(v,(~c2esi,slice(None),slice(None),slice(None)),-v[~c2esi, :,  :, :])
+            val = bm.set_at(val,(...,slice(eldof*i,eldof*(i+1)),slice(None)),phie[..., None]*v)
+        # cell basis
+        if(p > 0):
+            phi = self.bspace.basis(bcs, p=p-1)
+            v0 = l[2]*(l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None])
+            v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None])
+            val = bm.set_at(val,(...,slice(eldof*3,eldof*3+fldof//2),slice(None)),v0*phi[..., None])
+            val = bm.set_at(val,(...,slice(eldof*3+fldof//2,None),slice(None)),v1*phi[..., None] )
+        return val[index]
 
 
     @barycentric
@@ -463,8 +501,11 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         pass
 
     @barycentric
-    def face_value(self, uh, bc, index=_S):
-        pass
+    def face_value(self, uh, bcs, index=_S):
+        phi = self.face_basis(bcs)[index]
+        f2d = self.dof.face_to_dof()[index]
+        val = bm.einsum("cl, cqlk->cqk", uh[f2d], phi)
+        return val
 
     def mass_matrix(self):
         mesh = self.mesh
@@ -571,7 +612,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             n = n[:,None,:]
             h2 = gD(points)
             g = bm.cross(n, h2) 
-            # g = bm.cross(g,n)
+            g = bm.cross(g,n)
 
             g1 = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
 
@@ -586,9 +627,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         index2 = bm.nonzero(bdeflag)[0]
         edge2dof = self.dof.edge_to_dof()[index2]
         em = mesh.entity_measure('edge')[index2]
-        em1 = 1 / em
-        t = mesh.edge_tangent()[index2]
-        t = em1[:,None]*t
+        t = mesh.edge_tangent()[index2]/em[:, None]
         
         # 右端矩阵组装
         qf = mesh.quadrature_formula(p+2,"edge")
