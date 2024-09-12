@@ -177,7 +177,7 @@ class BubbleData(MaxwellPDE):
         return mesh
     
     def domain(self):
-        #box = [0, 1/2, 0, 1/2, 0, 1/2]
-        box = [0, 1, 0, 1, 0, 1]
+        box = [0, 1/2, 0, 1/2, 0, 1/2]
+        #box = [0, 1, 0, 1, 0, 1]
         return box
      
