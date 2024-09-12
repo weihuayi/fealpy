@@ -90,7 +90,7 @@ p = args.degree
 maxit = args.maxit
 dim = args.dim
 dim = 3
-maxit= 3
+maxit= 3 
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -110,8 +110,8 @@ NDof = np.zeros(maxit, dtype=bm.float64)
 tmr = timer()
 next(tmr)
 
-#ps = [2, 3, 4]
-ps = [0]
+ps = [2, 3, 4]
+#ps = [1]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
