@@ -167,8 +167,8 @@ class BubbleData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
         f = (C.x**2-C.x)*(C.y**2-C.y)*(C.z**2-C.z)
-        #u = f*C.i + sym.sin(np.pi*C.x)*f*C.j + sym.sin(np.pi*C.y)*f*C.k
-        u =  1*C.i
+        u = f*C.i + sym.sin(np.pi*C.x)*f*C.j + sym.sin(np.pi*C.y)*f*C.k
+        # u =  2*C.i
         super(BubbleData, self).__init__(u)
 
     def init_mesh(self, n=1):
@@ -178,6 +178,6 @@ class BubbleData(MaxwellPDE):
     
     def domain(self):
         box = [0, 1/2, 0, 1/2, 0, 1/2]
-        # box = [0, 1, 0, 1, 0, 1]
+        #box = [0, 1, 0, 1, 0, 1]
         return box
      
