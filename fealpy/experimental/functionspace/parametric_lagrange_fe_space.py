@@ -38,8 +38,8 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         self.itype = mesh.itype
         self.ftype = mesh.ftype
      
-     def __str__(self):
-        return "Parametric Lagrange finite element space!"
+    def __str__(self):
+         return "Parametric Lagrange finite element space!"
 
     def number_of_local_dofs(self, doftype='cell') -> int:
         return self.dof.number_of_local_dofs(doftype=doftype)
