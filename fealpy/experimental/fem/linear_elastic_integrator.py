@@ -5,6 +5,7 @@ from ..typing import TensorLike, Index, _S
 
 from ..mesh import HomogeneousMesh, SimplexMesh
 from ..functionspace.space import FunctionSpace as _FS
+from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace as _TS
 from .integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
@@ -48,7 +49,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index, q
     
-    def assembly(self, space: _FS) -> TensorLike:
+    def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         bcs, ws, gphi, cm, index, q = self.fetch(scalar_space)
         
@@ -60,7 +61,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return KK
 
     @assemblymethod('fast_strain')
-    def fast_assembly_strain(self, space: _FS) -> TensorLike:
+    def fast_assembly_strain(self, space: _TS) -> TensorLike:
         index = self.index
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
@@ -128,7 +129,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return KK
 
     @assemblymethod('fast_stress')
-    def fast_assembly_stress(self, space: _FS) -> TensorLike:
+    def fast_assembly_stress(self, space: _TS) -> TensorLike:
         index = self.index
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
@@ -196,7 +197,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return KK
     
     @assemblymethod('fast_3d')
-    def fast_assembly(self, space: _FS) -> TensorLike:
+    def fast_assembly(self, space: _TS) -> TensorLike:
         index = self.index
         # coef = self.coef
         scalar_space = space.scalar_space
