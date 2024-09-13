@@ -164,13 +164,14 @@ class MaxwellPDE():
         return val
     
     @cartesian
-    def neumann(self, p, n):
+    def neumann(self, p,n):
         """
         @note p : (NF, NQ, 3)
               n : (NF, 3)
               self.curl_solution(p) : (NF, NQ, 3)
-        """
-        return  bm.cross(n[:, None], self.curl_solution(p))
+        """     
+        return  bm.cross(n[:, None,:], self.curl_solution(p))
+
 
 class BubbleData(MaxwellPDE):
     def __init__(self):

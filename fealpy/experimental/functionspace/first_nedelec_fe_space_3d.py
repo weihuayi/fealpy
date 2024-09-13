@@ -661,15 +661,19 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         gdof = self.dof.number_of_global_dofs()
 
         # Bernstein 空间的单位质量矩阵
-        qf = self.mesh.quadrature_formula(p+2, 'face')
+        qf = self.mesh.quadrature_formula(p+3, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         bphi = self.face_basis(bcs)[isbdFace]
         points = mesh.bc_to_point(bcs)[isbdFace]
         n = mesh.face_unit_normal()[isbdFace]
         hval = gD(points,n)
         vec = bm.zeros(gdof, dtype=self.ftype)
-        vec[face2dof] = bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm) # (NE, ldof)
-        return vec
+        k = bm.einsum('fqg, fqlg,q,f->fl', hval, bphi,ws,fm) # (NF, ldof)
+        bm.add.at(vec,face2dof,k)
+        #bm.scatter_add(vec,face2dof,k)
+        
+        return -vec
+    
 
 
 

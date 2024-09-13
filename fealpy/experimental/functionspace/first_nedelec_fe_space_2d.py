@@ -379,8 +379,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         t = mesh.edge_unit_tangent()[isbdFace]
         hval = gD(points,t)
         vec = bm.zeros(gdof, dtype=self.ftype)
-        #vec[edge2dof] = bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm) # (NE, ldof)
-        vec = bm.set_at(vec,(edge2dof),bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm))
+        vec[edge2dof] = bm.einsum('eqg, eqlg,q,e->el', hval, bphi,ws,fm) # (NE, ldof)
         return vec
  
 
