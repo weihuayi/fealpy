@@ -37,6 +37,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         self.celldata = {}
         self.meshdata = {}
 
+    def reference_cell_measure(self):
+        return 0.5
+
     def generate_local_lagrange_edges(self, p: int) -> TensorLike:
         """
         Generate the local edges for Lagrange elements of order p.

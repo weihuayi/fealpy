@@ -80,4 +80,10 @@ A = bfrom.assembly()
 F = lfrom.assembly()
 #tmr.send(f'第{i}次矩阵组装时间')
 
-gdof = space.number_of_global_dofs()
+C = space.integral_basis()
+A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
+F = bm.r_[F, 0]
+
+uh = space.function()
+x = spsolve(A, F).reshape(-1)
+uh[:] = x[:-1]

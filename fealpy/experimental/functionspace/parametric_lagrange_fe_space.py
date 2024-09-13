@@ -28,13 +28,10 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         self.GD = mesh.geo_dimension()
         self.TD = mesh.top_dimension()
-
+        
         q = q if q is not None else p+3 
-        self.integralalg = FEMeshIntegralAlg(
-                self.mesh, q,
-                cellmeasure=self.cellmeasure)
-        self.integrator = self.integralalg.integrator
-
+        self.quadrature_formula = self.mesh.quadrature_formula(q, etype='cell')
+        
         self.itype = mesh.itype
         self.ftype = mesh.ftype
      
@@ -125,4 +122,18 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         val = bm.einsum(s1, gphi, uh[cell2dof])
         return val
+
+    def integral_basis(self, q=None):
+        cell2dof = self.cell_to_dof()
+        qf = self.quadrature_formula if q is None else self.mesh.quadrature_formula(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        rm = self.mesh.reference_cell_measure()
+        G = self.mesh.first_fundamental_form(bcs)
+        d = bm.sqrt(bm.linalg.det(G))
+        phi = self.basis(bcs)
+        cc = bm.einsum('q, qci, qc->ci', ws*rm, phi, d)
+        gdof = self.number_of_global_dofs()
+        c = bm.zeros(gdof, dtype=self.ftype)
+        bm.add.at(c, cell2dof, cc)
+        return c
 
