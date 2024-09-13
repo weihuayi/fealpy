@@ -88,9 +88,9 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 p = args.degree
 maxit = args.maxit
-maxit = 3
 dim = args.dim
 dim = 3
+maxit= 3 
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -138,11 +138,9 @@ for j, p in enumerate(ps):
         F = lform.assembly()
         tmr.send(f'第{i}次向量组装时间')
 
-        # Dirichlet 边界条件
+        # Neumann 边界条件
         Eh = space.function()
-        bc = DirichletBC(space, pde.dirichlet)
-        A, F = bc.apply(A, F)
-        tmr.send(f'第{i}次边界处理时间')
+        F = F + space.set_neumann_bc(pde.neumann)
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
         Eh[:] = bm.tensor(Solve(A, F))
@@ -158,4 +156,3 @@ next(tmr)
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
 plt.show()
-
