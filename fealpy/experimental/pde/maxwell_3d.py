@@ -163,6 +163,15 @@ class MaxwellPDE():
         val = self.solution(p)
         return val
     
+    @cartesian
+    def neumann(self, p, n):
+        """
+        @note p : (NF, NQ, 3)
+              n : (NF, 3)
+              self.curl_solution(p) : (NF, NQ, 3)
+        """
+        return  bm.cross(n[:, None], self.curl_solution(p))
+
 class BubbleData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
@@ -178,6 +187,6 @@ class BubbleData(MaxwellPDE):
     
     def domain(self):
         box = [0, 1/2, 0, 1/2, 0, 1/2]
-        #box = [0, 1, 0, 1, 0, 1]
+        # box = [0, 1, 0, 1, 0, 1]
         return box
      

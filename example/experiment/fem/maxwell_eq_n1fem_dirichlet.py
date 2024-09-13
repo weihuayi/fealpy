@@ -110,8 +110,8 @@ NDof = np.zeros(maxit, dtype=bm.float64)
 tmr = timer()
 next(tmr)
 
-#ps = [2, 3, 4]
-ps = [1]
+ps = [2, 3, 4]
+#ps = [1]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
@@ -138,11 +138,15 @@ for j, p in enumerate(ps):
         F = lform.assembly()
         tmr.send(f'第{i}次向量组装时间')
 
-        # Dirichlet 边界条件
+        # # Dirichlet 边界条件
+        # Eh = space.function()
+        # bc = DirichletBC(space, pde.dirichlet)
+        # A, F = bc.apply(A, F)
+        # tmr.send(f'第{i}次边界处理时间')
+
+        # Neumann 边界条件
         Eh = space.function()
-        bc = DirichletBC(space, pde.dirichlet)
-        A, F = bc.apply(A, F)
-        tmr.send(f'第{i}次边界处理时间')
+        F = F + space.set_neumann_bc(pde.neumann)
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
         Eh[:] = bm.tensor(Solve(A, F))
