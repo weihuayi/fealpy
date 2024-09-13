@@ -19,10 +19,11 @@ class CSRTensor(SparseTensor):
         """Initializes CSR format sparse tensor.
 
         Parameters:
-            crow (Tensor): _description_
-            col (Tensor): _description_
-            values (Tensor | None): _description_
-            spshape (Size | None, optional): _description_
+            crow (Tensor): compressed row pointers.
+            col (Tensor): column indices of non-zero elements, shaped (nnz,).
+                Where nnz is the number of non-zeros.
+            values (Tensor | None): non-zero elements, shaped (..., nnz).
+            spshape (Size | None, optional): shape in the sparse dimensions.
         """
         self._crow = crow
         self._col = col
