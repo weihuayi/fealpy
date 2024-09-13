@@ -7,20 +7,18 @@ from fealpy.experimental.sparse import COOTensor
 from fealpy.experimental.solver import cg
 
 class FEMSolver:
-    def __init__(self, material_properties, tensor_space, rho, boundary_conditions):
+    def __init__(self, material_properties, tensor_space, boundary_conditions):
         """
         Initialize the FEMSolver with the provided parameters.
 
         Args:
             material_properties: MaterialProperties object defining material behavior.
             tensor_space: TensorFunctionSpace object for the computational space.
-            rho: TensorLike, the initial density distribution.
             boundary_conditions: BoundaryConditions object defining boundary conditions.
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
         self.uh = tensor_space.function()
-        self.rho = rho
         self.KE = None
         self.K = None
         self.F = None

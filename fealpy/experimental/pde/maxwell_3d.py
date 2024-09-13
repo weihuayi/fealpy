@@ -113,11 +113,11 @@ class MaxwellPDE():
         Fy = self.Fy(x, y, z)
         Fz = self.Fz(x, y, z)
         if type(Fx) is not np.ndarray:
-            Fx = np.ones(x.shape, dtype=np.float_)*Fx
+            Fx = np.ones(x.shape, dtype=np.float64)*Fx
         if type(Fy) is not np.ndarray:
-            Fy = np.ones(x.shape, dtype=np.float_)*Fy
+            Fy = np.ones(x.shape, dtype=np.float64)*Fy
         if type(Fz) is not np.ndarray:
-            Fz = np.ones(x.shape, dtype=np.float_)*Fz
+            Fz = np.ones(x.shape, dtype=np.float64)*Fz
         f = np.c_[Fx, Fy, Fz] 
         return f 
 
@@ -133,11 +133,11 @@ class MaxwellPDE():
         cFy = self.curlFy(x, y, z)
         cFz = self.curlFz(x, y, z)
         if type(cFx) is not np.ndarray:
-            cFx = np.ones(x.shape, dtype=np.float_)*cFx
+            cFx = np.ones(x.shape, dtype=np.float64)*cFx
         if type(cFy) is not np.ndarray:
-            cFy = np.ones(x.shape, dtype=np.float_)*cFy
+            cFy = np.ones(x.shape, dtype=np.float64)*cFy
         if type(cFz) is not np.ndarray:
-            cFz = np.ones(x.shape, dtype=np.float_)*cFz
+            cFz = np.ones(x.shape, dtype=np.float64)*cFz
         cf = np.c_[cFx, cFy, cFz] #(..., NC, ldof, 3)
         return cf 
 
@@ -150,11 +150,11 @@ class MaxwellPDE():
         ccFy = self.curlcurlFy(x, y, z)
         ccFz = self.curlcurlFz(x, y, z)
         if type(ccFx) is not np.ndarray:
-            ccFx = np.ones(x.shape, dtype=np.float_)*ccFx
+            ccFx = np.ones(x.shape, dtype=np.float64)*ccFx
         if type(ccFy) is not np.ndarray:
-            ccFy = np.ones(x.shape, dtype=np.float_)*ccFy
+            ccFy = np.ones(x.shape, dtype=np.float64)*ccFy
         if type(ccFz) is not np.ndarray:
-            ccFz = np.ones(x.shape, dtype=np.float_)*ccFz
+            ccFz = np.ones(x.shape, dtype=np.float64)*ccFz
         ccf = np.c_[ccFx, ccFy, ccFz] 
         return ccf - self.beta*self.solution(p)
 
@@ -168,6 +168,7 @@ class BubbleData(MaxwellPDE):
         C = CoordSys3D('C')
         f = (C.x**2-C.x)*(C.y**2-C.y)*(C.z**2-C.z)
         u = f*C.i + sym.sin(np.pi*C.x)*f*C.j + sym.sin(np.pi*C.y)*f*C.k
+        # u =  2*C.i
         super(BubbleData, self).__init__(u)
 
     def init_mesh(self, n=1):
@@ -177,6 +178,6 @@ class BubbleData(MaxwellPDE):
     
     def domain(self):
         box = [0, 1/2, 0, 1/2, 0, 1/2]
-        # box = [0, 1, 0, 1, 0, 1]
+        #box = [0, 1, 0, 1, 0, 1]
         return box
      
