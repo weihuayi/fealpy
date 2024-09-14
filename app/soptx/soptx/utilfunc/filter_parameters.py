@@ -133,9 +133,10 @@ def apply_filter(ft: int, rho: TensorLike, dce: TensorLike, dve: TensorLike,
     """
 
     if ft == 0:
-        rho_dce = bm.multiply(rho[:], dce)
+        rho_dce = bm.multiply(rho, dce)
         filtered_dce = H.matmul(rho_dce)
-        dce[:] = filtered_dce / Hs / bm.maximum(bm.array(0.001), rho[:])
+        dce[:] = filtered_dce / Hs / bm.maximum(bm.array(0.001), rho)
+        # dce[:] = filtered_dce / Hs / bm.set_at(rho[:], rho[:] < 0.001, 0.001)
     elif ft == 1:
         dce[:] = H.to_dense() * (dce / Hs)
         dve[:] = H.to_dense() * (dve / Hs)
