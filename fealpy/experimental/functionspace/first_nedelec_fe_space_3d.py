@@ -155,14 +155,29 @@ class FirstNedelecDof3d():
         return e2d.reshape(-1)
 
     def is_boundary_dof(self):
-        bddof = self.boundary_dof()
-
+        p = self.p
+        mesh = self.mesh
+        ldof = p+1
         gdof = self.number_of_global_dofs()
-        flag = bm.zeros(gdof, dtype=bm.bool)
+       
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        index = self.mesh.boundary_face_index()
+        face2dof = self.face_to_internal_dof()[index]
+        isDDof[face2dof] = True
 
-        # flag[bddof] = True
-        flag = bm.set_at(flag,(bddof),True)
-        return flag
+        # edge = self.mesh.entity('edge')
+        # bdnflag = self.mesh.boundary_node_flag()
+        # bdeflag = bm.all(bdnflag[edge], axis=1)
+        NE = mesh.number_of_edges()
+        f2e = mesh.face_to_edge()[index]
+        bdeflag = bm.zeros(NE, dtype=bm.bool)
+        bdeflag[f2e] = True
+        index = bm.nonzero(bdeflag)[0]
+
+        edge2dof = self.edge_to_dof()[index]
+        isDDof[edge2dof] = True
+
+        return isDDof
 
 class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
@@ -232,6 +247,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             phi = self.bspace.basis(bcs, p=p-1)
             multiIndex = self.mesh.multi_index_matrix(p-1, 3)
             permcf = self.mesh.cell_to_face_permutation()
+            #permcf = bm.argsort(permcf, axis=-1)
             localFace = self.mesh.localFace
             for i in range(4):
 
@@ -271,6 +287,71 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         print("tt : ", s-t)
 
         return val
+    
+    def face_internal_basis(self, bcs, index=_S):
+        p = self.p
+        assert(p>0)
+
+        mesh = self.mesh
+        NF = mesh.number_of_faces()
+        GD = mesh.geo_dimension()
+        
+        fdof = self.dof.number_of_local_dofs("face")
+        glambda = mesh.grad_face_lambda()
+        val = bm.zeros((NF,) + bcs.shape[:-1]+(fdof, 3), dtype=self.ftype)
+        
+        l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
+        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
+        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
+        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])
+
+        phi = self.bspace.basis(bcs, p=p-1)
+        v0 = l[2]*(l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None]) 
+        v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None]) 
+        # val[..., :fdof//2, :] = v0*phi[..., None]
+        # val[..., fdof//2:, :] = v1*phi[..., None]
+        val = bm.set_at(val,(...,slice(0,fdof//2),slice(None)),v0*phi[..., None])
+        val = bm.set_at(val,(...,slice(fdof//2,fdof),slice(None)),v1*phi[..., None])
+        return val
+
+    @barycentric
+    def face_basis(self, bcs, index=_S):
+        p = self.p
+        mesh = self.mesh
+        NF = mesh.number_of_faces()
+        GD = mesh.geo_dimension()
+        fldof = self.dof.number_of_local_dofs("face")
+        eldof = self.dof.number_of_local_dofs("edge")
+        ldof = 3*eldof + fldof
+        gdof = self.dof.number_of_global_dofs()
+        glambda = mesh.grad_face_lambda()
+        ledge = bm.array([[1, 2],
+                         [2, 0],
+                         [0, 1]])
+        c2esign = mesh.face_to_edge_sign()
+        l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
+        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
+        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
+        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])
+        # edge basis
+        phi = self.bspace.basis(bcs, p=p)
+        multiIndex = self.mesh.multi_index_matrix(p, 2)
+        val = bm.zeros((NF,) + bcs.shape[:-1]+(ldof, 3), dtype=self.ftype)
+        for i in range(3):
+            phie = phi[:, :, multiIndex[:, i]==0]
+            c2esi = c2esign[:, i]
+            v = l[ledge[i, 0]]*glambda[:,None, ledge[i, 1], None,:] - l[ledge[i, 1]]*glambda[:,None, ledge[i, 0], None,:]
+            v = bm.set_at(v,(~c2esi,slice(None),slice(None),slice(None)),-v[~c2esi, :,  :, :])
+            val = bm.set_at(val,(...,slice(eldof*i,eldof*(i+1)),slice(None)),phie[..., None]*v)
+        # cell basis
+        if(p > 0):
+            phi = self.bspace.basis(bcs, p=p-1)
+            v0 = l[2]*(l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None])
+            v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None])
+            val = bm.set_at(val,(...,slice(eldof*3,eldof*3+fldof//2),slice(None)),v0*phi[..., None])
+            val = bm.set_at(val,(...,slice(eldof*3+fldof//2,None),slice(None)),v1*phi[..., None] )
+        return val[index]
+
 
     @barycentric
     def curl_basis(self, bcs):
@@ -420,8 +501,11 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         pass
 
     @barycentric
-    def face_value(self, uh, bc, index=_S):
-        pass
+    def face_value(self, uh, bcs, index=_S):
+        phi = self.face_basis(bcs)[index]
+        f2d = self.dof.face_to_dof()[index]
+        val = bm.einsum("cl, cqlk->cqk", uh[f2d], phi)
+        return val
 
     def mass_matrix(self):
         mesh = self.mesh
@@ -480,55 +564,118 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         vec = bm.zeros(gdof, dtype=self.ftype)
         bm.scatter_add(vec, c2d.reshape(-1), val.reshape(-1))
         return vec
+    
+    # def projection(self, f, method="L2"):
+    #     M = self.mass_matrix()
+    #     b = self.source_vector(f)
+    #     x = spsolve(M, b)
+    #     return self.function(array=x)
 
-#     def projection(self, f, method="L2"):
-#         M = self.mass_matrix()
-#         b = self.source_vector(f)
-#         x = spsolve(M, b)
-#         return self.function(array=x)
+    # def interplation(self, f):
+    #     mesh = self.mesh
+    #     node = mesh.entity("node")
+    #     edge = mesh.entity("edge")
 
+    #     gdof = self.dof.number_of_global_dofs()
+    #     e2n = mesh.edge_unit_normal()
+    #     val = np.zeros(gdof, dtype=np.float_)
 
-#     def interplation(self, f):
-#         mesh = self.mesh
-#         node = mesh.entity("node")
-#         edge = mesh.entity("edge")
+    #     f0 = f(node[edge[:, 0]]) 
+    #     f1 = f(node[edge[:, 1]])
 
-#         gdof = self.dof.number_of_global_dofs()
-#         e2n = mesh.edge_unit_normal()
-#         val = np.zeros(gdof, dtype=np.float_)
+    #     val[0::2] = np.sum(f0*e2n, axis=1)
+    #     val[1::2] = np.sum(f1*e2n, axis=1)
+    #     return self.function(array=val)
 
-#         f0 = f(node[edge[:, 0]]) 
-#         f1 = f(node[edge[:, 1]])
-
-#         val[0::2] = np.sum(f0*e2n, axis=1)
-#         val[1::2] = np.sum(f1*e2n, axis=1)
-#         return self.function(array=val)
-
+    # dirichlet边界条件
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         p = self.p
         mesh = self.mesh
-        ldof = p+1
-        gdof = self.number_of_global_dofs()
-       
+        gdof = self.number_of_global_dofs()       
         isDDof = bm.zeros(gdof, dtype=bm.bool)
-        index = self.mesh.boundary_face_index()
-        face2dof = self.dof.face_to_internal_dof()[index]
-        uh[face2dof] = 0 
-        isDDof[face2dof] = True
 
-        edge = self.mesh.entity('edge')
-        bdnflag = self.mesh.boundary_node_flag()
-        bdeflag = bm.all(bdnflag[edge], axis=1)
-        index = bm.nonzero(bdeflag)[0] 
+    
+        index1 = self.mesh.boundary_face_index()
+        # 边界面的点
+        if p>0:
+            face2dof = self.dof.face_to_dof()[index1]
 
-        edge2dof = self.dof.edge_to_dof()[index]
-        uh[edge2dof] = 0 
+            qf = mesh.quadrature_formula(p+2,"face")
+            bcs, ws = qf.get_quadrature_points_and_weights()
+
+            fbasis = self.face_basis(bcs)[index1] # (NF,NQ,ldof,GD)
+            fm = mesh.entity_measure('face')[index1]
+            M = bm.einsum("cqlg, cqmg, q, c->clm", fbasis, fbasis, ws, fm)
+            Minv = bm.linalg.inv(M)
+
+            points = mesh.bc_to_point(bcs)[index1]
+            n = mesh.face_unit_normal()[index1]
+            n = n[:,None,:]
+            h2 = gD(points)
+            g = bm.cross(n, h2) 
+            g = bm.cross(g,n)
+
+            g1 = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
+
+            uh[face2dof] = bm.einsum("cl, clm->cm", g1, Minv)
+            isDDof[face2dof] = True
+
+        # 边界边界的点
+        NE = mesh.number_of_edges()
+        f2e = mesh.face_to_edge()[index1]
+        bdeflag = bm.zeros(NE, dtype=bm.bool)
+        bdeflag[f2e] = True
+        index2 = bm.nonzero(bdeflag)[0]
+        edge2dof = self.dof.edge_to_dof()[index2]
+        em = mesh.entity_measure('edge')[index2]
+        t = mesh.edge_tangent()[index2]/em[:, None]
+        
+        # 右端矩阵组装
+        qf = mesh.quadrature_formula(p+2,"edge")
+        bcs, ws = qf.get_quadrature_points_and_weights()        
+        bphi = self.bspace.basis(bcs, p=p)
+        M = bm.einsum("eql, eqm, q->lm", bphi, bphi, ws)
+        Minv = bm.linalg.inv(M)
+        Minv = Minv*em[:,None,None]
+        
+        points1 = mesh.bc_to_point(bcs)[index2]
+        h1 = gD(points1)
+        b = bm.einsum('eqd, ed->eq', h1, t) 
+        
+        g2 = bm.einsum('eql, eq,q->el', bphi, b,ws)
+
+        uh[edge2dof] = bm.einsum('el, elm->em', g2, Minv)
         isDDof[edge2dof] = True
-
-
         return uh,isDDof
 
+
     boundary_interpolate = set_dirichlet_bc
+
+    # Neumann边界条件
+    def set_neumann_bc(self,gD):
+        p = self.p
+        mesh = self.mesh
+        isbdFace = mesh.boundary_face_flag()
+        face2dof = self.dof.face_to_dof()[isbdFace]
+        fm = mesh.entity_measure('face')[isbdFace]
+        gdof = self.dof.number_of_global_dofs()
+
+        # Bernstein 空间的单位质量矩阵
+        qf = self.mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bphi = self.face_basis(bcs)[isbdFace]
+        points = mesh.bc_to_point(bcs)[isbdFace]
+        n = mesh.face_unit_normal()[isbdFace]
+        hval = gD(points,n)
+        vec = bm.zeros(gdof, dtype=self.ftype)
+        k = bm.einsum('fqg, fqlg,q,f->fl', hval, bphi,ws,fm) # (NF, ldof)
+        bm.add.at(vec,face2dof,k)
+        #bm.scatter_add(vec,face2dof,k)
+        
+        return -vec
+    
+
+
 
 
 

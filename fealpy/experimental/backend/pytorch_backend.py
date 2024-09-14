@@ -16,7 +16,7 @@ except ImportError:
                       'See https://pytorch.org/ for installation.')
 
 from .. import logger
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
 
 Tensor = torch.Tensor
 _device = torch.device
@@ -60,11 +60,6 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     linalg = torch.linalg
     random = torch.random
 
-    #TODO
-    #bm.vmap, bm.jacfwd
-    jacfwd = staticmethod(torch.func.jacfwd)
-    vmap = staticmethod(torch.vmap)
-
     @staticmethod
     def context(tensor: Tensor, /):
         return {"dtype": tensor.dtype, "device": tensor.device}
@@ -78,6 +73,9 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def device_index(tensor_like: Tensor, /): return tensor_like.device.index
+
+    @staticmethod
+    def get_device(tensor_like: Tensor, /): return tensor_like.device
 
     @staticmethod
     def device_put(tensor_like: Tensor, /, device=None) -> Tensor:
@@ -342,15 +340,20 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
 
     @staticmethod
     def add_at(a: Tensor, indices, src, /):
-        logger.info("When indices are not unique, the behavior is non-deterministic "
-                    "for the PyTorch backend "
-                    "(one of the values from src will be picked arbitrarily). "
-                    "Use index_add instead for deterministic behavior.")
+        logger.warning("When indices are not unique, the behavior is non-deterministic "
+                       "for the PyTorch backend "
+                       "(one of the values from src will be picked arbitrarily). "
+                       "Use index_add instead for deterministic behavior.")
         a[indices] += src
         return a
 
     @staticmethod
     def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
+        if index.ndim > 1:
+            src_shape = a.shape[:axis] + index.shape + a.shape[axis+1:]
+            src_flat_shape = a.shape[:axis] + (index.numel(), ) + a.shape[axis+1:]
+            src = torch.broadcast_to(src, src_shape).reshape(src_flat_shape)
+            index = index.ravel()
         return a.index_add_(axis, index, src, alpha=alpha)
 
     @staticmethod
@@ -381,6 +384,10 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         if axis==0:
             x = torch.transpose(x)
         return vmap(func1d)(x)
+
+    @staticmethod
+    def vmap(func, /, in_axes=0, out_axes=0, **kwargs):
+        return torch.vmap(func, in_dims=in_axes, out_dims=out_axes, **kwargs)
 
     ### Sparse Functions ###
 
@@ -554,7 +561,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
         shape = tri.shape[:-1] + (3, 2)
-        result = torch.zeros(shape, dtype=node.dtype) 
+        result = torch.zeros(shape, dtype=node.dtype)
 
         result[..., 0, :] = node[tri[..., 2]] - node[tri[..., 1]]
         result[..., 1, :] = node[tri[..., 0]] - node[tri[..., 2]]
@@ -598,8 +605,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
         return Dlambda
 
 
-attribute_mapping = ATTRIBUTE_MAPPING.copy()
-PyTorchBackend.attach_attributes(attribute_mapping, torch)
+PyTorchBackend.attach_attributes(ATTRIBUTE_MAPPING, torch)
 function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
@@ -611,6 +617,7 @@ function_mapping.update(
     compile='compile'
 )
 PyTorchBackend.attach_methods(function_mapping, torch)
+PyTorchBackend.attach_methods(TRANSFORMS_MAPPING, torch.func)
 
 PyTorchBackend.random.rand = torch.rand
 PyTorchBackend.random.rand_like = torch.rand_like
