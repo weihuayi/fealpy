@@ -666,6 +666,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         fbasis2 = fbasis[:,:,6:8,:]
         fbasis1 = self.face_internal_basis(bcs)[index1] # (NF,NQ,ldof,GD)
         print(f"kkkkkkk{fbasis2 - fbasis1}")
+
         fm = mesh.entity_measure('face')[index1]
         M = bm.einsum("cqlg, cqmg, q, c->clm", fbasis, fbasis, ws, fm)
         Minv = bm.linalg.inv(M)
