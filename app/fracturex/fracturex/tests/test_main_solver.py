@@ -22,20 +22,11 @@ class TestMainSolver:
 
         ms = MainSolver(mesh=mesh, material_params=params, p=1, method='HybridModel')
         
-        ipoints = mesh.interpolation_points(p=1)
-
-        fixed_ubd = self.fun(ipoints)
-        print('fixed_ubd', fixed_ubd)
-
-        force_ubd = self.fun1(ipoints)
-        print('force_ubd', force_ubd)
 
         ms.add_boundary_condition('force', 'Dirichlet', self.fun1, [0.1, 0.2, 0.3], 'y')
         ms.add_boundary_condition('displacement', 'Dirichlet', self.fun, 0)
-  
-        ms.solve()
-        ms.solve_displacement()
-        ms.solve_phase_field()
+        ms.solve(vtkname='test')
+        
 
 
     

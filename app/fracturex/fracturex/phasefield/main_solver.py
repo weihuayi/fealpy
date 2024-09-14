@@ -1,4 +1,7 @@
 from typing import Optional
+import numpy as np
+from fealpy.utils import timer
+
 from scipy.sparse import spdiags
 from fealpy.experimental.sparse import SparseTensor, COOTensor, CSRTensor
 
@@ -12,12 +15,15 @@ from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpa
 from fealpy.experimental.fem import LinearElasticIntegrator
 from fealpy.experimental.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator
 from fealpy.experimental.fem import ScalarSourceIntegrator
+from fealpy.experimental.fem import DirichletBC
+
 from fealpy.experimental.solver import cg
+
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
 
-
+#import matplotlib.pyplot as plt
 
 
 class MainSolver:
@@ -37,24 +43,29 @@ class MainSolver:
         self.pfcm = PhaseFractureMaterialFactory.create('HybridModel', material_params, self.EDFunc)
         
         self.set_lfe_space()
+        self.pfcm.update_disp(self.uh)
+        self.pfcm.update_phase(self.d)
+
         self.Gc = material_params['Gc']
         self.l0 = material_params['l0']
         
         self.bc_dict = {}
+        self.tmr = timer()
+        next(self.tmr)
 
-    def solve(self):
+    def solve(self, maxit=30, vtkname=None):
         """
         
         Solve the phase field fracture problem.
 
         parameters
         ----------
-        disp_increment_boundary : function
-            A function that returns the displacement increment boundary condition of the displacement field.
-
-        inc_value : float
-            The value of the displacement increment.
+        maxit : int
+            The maximum number of iterations.
+        vtkname : str
+            The name of the vtk file.
         """
+        tmr = self.tmr
         force_type = self.get_boundary_conditions('force')['type']
         force_dof = self.get_boundary_conditions('force')['bcdof']
         force_value = self.get_boundary_conditions('force')['value']
@@ -62,63 +73,113 @@ class MainSolver:
         self.force_dof = force_dof
         self.force_direction = force_direction
 
-        if force_type is not 'Dirichlet':
+        if force_type != 'Dirichlet':
             raise ValueError('Unsupported boundary condition type')
         
-        fbc = DirichletBC(self.tspace, gd=0, threshold=force_dof, direction=force_direction)
+        self.Rforce = bm.zeros_like(force_value)
+        tmr.send('init')
+        for i in range(2):
+            print('i', i)
+            fbc = VectorDirichletBC(self.tspace, gd=force_value[i+1], threshold=force_dof, direction=force_direction)
 
-        for i in range(len(force_value)):
-            self.uh, self.force_index = fbc.apply_value(self.uh)
+            self.uh, force_index = fbc.apply_value(self.uh) # Apply the displacement condition
+            self.pfcm.update_disp(self.uh)
             print('uh', self.uh)
-            #self.solve_displacement(force)
-            #self.solve_phase_field()
-        
+            
+            self.newton_raphson(maxit) # Newton-Raphson iteration
+            tmr.send('solve')
+
+            if vtkname is None:
+                fname = 'test' + str(i).zfill(10)  + '.vtu'
+            fname = vtkname + str(i).zfill(10)  + '.vtu'
+            self.save_vtkfile(fname=fname)
+            
+            bm.set_at(self.Rforce, i+1, bm.sum(self.Ru[force_index])) # Calculate the size of the residual force
+        tmr.send('stop')
+        next(tmr)
+        #self.draw_force_displacement_curve(force_value, Rforce)
         
 
-    def newton_raphson(self):
+    def newton_raphson(self, maxit=30):
         """
         Newton-Raphson iteration
         """
-        pass
+        tmr = self.tmr
+        k = 0
+        while k < maxit:
+            er0 = self.solve_displacement()
+            self.pfcm.update_disp(self.uh)
+            tmr.send('solve_displacement')
+            print('uh', self.uh)
 
+            er1 = self.solve_phase_field()
+            self.pfcm.update_phase(self.d)
+            tmr.send('solve_phase_field')
+            print('d', self.d)
+
+            self.H = self.pfcm._H
+            print('H', self.H)
+
+            if k == 0:
+                e0 = er0
+                e1 = er1
+            error = max(er0/e0, er1/e1)
+            print('k:', k, 'error:', error)
+            if error < 1e-5:
+                break
+            k += 1
+            tmr.send('stop')
+            next(tmr)
 
     def solve_displacement(self):
         """
         Solve the displacement field.
         """
+        tmr = self.tmr
         uh = self.uh
         ubform = BilinearForm(self.tspace)
         ubform.add_integrator(LinearElasticIntegrator(self.pfcm, q=self.q))
         A = ubform.assembly()
-        R = A@uh[:]
-
-        self.force = bm.sum(-R[self.force_index]) # 计算残余力的大小
+        R = -A@uh[:]
+        self.Ru = R[:]
         
-        if self.bc_dict['displacement'] or self.bc_dict['both'] is not None:
-            bc_type= self.get_boundary_conditions('displacement')['type']
-            disp_bc_dof = self.get_boundary_conditions('displacement')['bcdof']
-            disp_bc_value = self.get_boundary_conditions('displacement')['value']
-            direction = self.get_boundary_conditions('displacement')['direction']
+        tmr.send('disp_assembly')
+
+        if self.bc_dict.get('displacement') is not None or self.bc_dict.get('both') is not None:
+            bc_key = 'displacement' if self.bc_dict.get('displacement') is not None else 'both'
+    
+            # Extract the boundary condition details using the appropriate key
+            bc_data = self.get_boundary_conditions(bc_key)
+            bc_type= bc_data['type']
+            disp_bc_dof = bc_data['bcdof']
+            disp_bc_value = bc_data['value']
+            direction = bc_data['direction']
             
             if bc_type == 'Dirichlet':
-                 ubc = DirichletBC(self.tspace, gd=disp_bc_value, threshold=disp_bc_dof, direction=direction)
+                 ubc = VectorDirichletBC(self.tspace, gd=disp_bc_value, threshold=disp_bc_dof, direction=direction)
                  A, R = ubc.apply(A, R)
             else:
                 raise ValueError('Unsupported boundary condition type')
         
-        ubc = DirichletBC(self.tspace, 0, threshold=self.force_dof, direction=self.force_direction)  
+        ubc = VectorDirichletBC(self.tspace, 0, threshold=self.force_dof, direction=self.force_direction)  
         A, R = ubc.apply(A, R)
-        du = cg(A, R, atol=1e-14)[0]
-        uh += du.flat[:]
+        tmr.send('disp_bc')
 
-        self.pfcm.update_disp(uh)
+        du = cg(A, R, atol=1e-14)
+
+        uh[:] += du.flat[:]
+
+        tmr.send('disp_solve')
+        self.uh = uh
+        
+        return np.linalg.norm(R)
         
 
     def solve_phase_field(self):
         """
         Solve the phase field.
         """
-    
+        tmr = self.tmr
         @barycentric
         def coef(bc, index):
             return 2*self.pfcm.maximum_historical_field(bc)
@@ -132,12 +193,38 @@ class MainSolver:
         dbfrom.add_integrator(ScalarMassIntegrator(Gc/l0, q=self.q))
         dbfrom.add_integrator(ScalarMassIntegrator(coef, q=self.q))
         A = dbfrom.assembly()
+        tmr.send('phase_martix_assembly')
 
         dlfrom = LinearForm(self.space)
         dlfrom.add_integrator(ScalarSourceIntegrator(coef, q=self.q))
         R = dlfrom.assembly()
         R -= A@d[:]
+        tmr.send('phase_source_assembly')
 
+        if self.bc_dict.get('phase') is not None or self.bc_dict.get('both') is not None:
+            bc_key = 'phase' if self.bc_dict.get('phase') is not None else 'both'
+    
+            # Extract the boundary condition details using the appropriate key
+            bc_data = self.get_boundary_conditions(bc_key)
+            bc_type= bc_data['type']
+            phase_bc_dof = bc_data['bcdof']
+            phase_bc_value = bc_data['value']
+
+            
+            if bc_type == 'Dirichlet':
+                 dbc = DirichletBC(self.space, gd=phase_bc_value, threshold=phase_bc_dof)
+                 A, R = dbc.apply(A, R)
+            else:
+                raise ValueError('Unsupported boundary condition type')
+        tmr.send('phase_bc')
+        dd = cg(A, R, atol=1e-14)
+
+        d += dd.flat[:]
+        tmr.send('phase_solve')
+        
+        self.d = d
+        
+        return np.linalg.norm(R)
 
     def set_lfe_space(self):
         """
@@ -149,14 +236,36 @@ class MainSolver:
         self.d = self.space.function()
         self.uh = self.tspace.function()
 
-        self.pfcm.update_disp(self.uh)
-        self.pfcm.update_phase(self.d)
+
         
     
-    def vtkfile(self):
-        pass
+    def save_vtkfile(self, fname):
+        """
+        Save the solution to a vtk file.
+        """
 
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
 
+        mesh.nodedata['damage'] = self.d
+        mesh.nodedata['uh'] = self.uh.reshape(GD, -1).T
+        
+        mesh.to_vtk(fname=fname)
+
+    '''
+    def draw_force_displacement_curve(self, disp, force):
+        """
+        Draw the force-displacement curve.
+        """
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.plot(disp, force, label='Force')
+        plt.xlabel('disp')
+        plt.ylabel('Force')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('force.png', dpi=300)
+    '''
     def add_boundary_condition(self, field_type: str, bc_type: str, boundary_dof: Optional[TensorLike], value: Optional[TensorLike], direction: Optional[str] = None):
         """
         Add boundary condition for a specific field and boundary.
@@ -188,7 +297,7 @@ class MainSolver:
         """
         return self.bc_dict.get(field_type, {})
 
-class DirichletBC:
+class VectorDirichletBC:
     def __init__(self, space, gd, threshold, direction = None):
         self.space = space
         self.gd = gd
@@ -211,11 +320,11 @@ class DirichletBC:
         direction_map = {'x': 0, 'y': 1, 'z': 2}
 
         if direction is None:
-            index[:] = is_bd_dof  # Apply to all directions
+            bm.set_at(index, slice(None), is_bd_dof)  # Apply to all directions
         else:
             idx = direction_map.get(direction)
             if idx is not None and idx < GD:
-                index[idx] = is_bd_dof  # Apply only to the specified direction
+                bm.set_at(index, idx, is_bd_dof)  # Apply only to the specified direction
             else:
                 raise ValueError(f"Invalid direction '{direction}' for GD={GD}. Use 'x', 'y', 'z', or None.")
     
@@ -224,8 +333,7 @@ class DirichletBC:
 
     def apply_value(self, u):
         index = self.set_boundary_dof()
-        u[index] = self.gd
-
+        bm.set_at(u, index, self.gd) 
         return u, index   
 
     def apply(self, A, f, u=None):
@@ -246,20 +354,20 @@ class DirichletBC:
         f : TensorLike
             The new right-hand-side vector.
         """
-        index = self.set_boundary_dof()
+        isDDof = self.set_boundary_dof()
         kwargs = A.values_context()
 
         if isinstance(A, COOTensor):
             indices = A.indices()
             remove_flag = bm.logical_or(
-                index[indices[0, :]], index[indices[1, :]]
+                isDDof[indices[0, :]], isDDof[indices[1, :]]
             )
             retain_flag = bm.logical_not(remove_flag)
             new_indices = indices[:, retain_flag]
             new_values = A.values()[..., retain_flag]
             A = COOTensor(new_indices, new_values, A.sparse_shape)
 
-            index = bm.nonzero(index)[0]
+            index = bm.nonzero(isDDof)[0]
             shape = new_values.shape[:-1] + (len(index), )
             one_values = bm.ones(shape, **kwargs)
             one_indices = bm.stack([index, index], axis=0)
@@ -268,6 +376,8 @@ class DirichletBC:
 
         elif isinstance(A, CSRTensor):
             raise NotImplementedError('The CSRTensor version has not been implemented.')
+
+        bm.set_at(f, isDDof, self.gd) 
         return A, f
 
 
