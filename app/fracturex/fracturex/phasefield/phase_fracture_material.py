@@ -231,6 +231,7 @@ class SpectralModel(BasedPhaseFractureMaterial):
         @brief Maximum historical field
         """
         strain = self.strain_value(bc)
+       
         phip, _ = self.strain_energy_density_decomposition(strain)
         
         if self._H is None:

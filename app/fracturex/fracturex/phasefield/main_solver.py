@@ -27,7 +27,7 @@ from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFrac
 
 
 class MainSolver:
-    def __init__(self, mesh, material_params, p=1, q=None, method='HybridModel'):
+    def __init__(self, mesh, material_params: Dict, p: int = 1, q: Optional[int] = None, method: str = 'HybridModel'):
         """
         Parameters
         ----------
@@ -78,13 +78,12 @@ class MainSolver:
         
         self.Rforce = bm.zeros_like(force_value)
         tmr.send('init')
-        for i in range(2):
+        for i in range(len(force_value)-1):
             print('i', i)
             fbc = VectorDirichletBC(self.tspace, gd=force_value[i+1], threshold=force_dof, direction=force_direction)
 
             self.uh, force_index = fbc.apply_value(self.uh) # Apply the displacement condition
             self.pfcm.update_disp(self.uh)
-            print('uh', self.uh)
             
             self.newton_raphson(maxit) # Newton-Raphson iteration
             tmr.send('solve')
@@ -110,15 +109,12 @@ class MainSolver:
             er0 = self.solve_displacement()
             self.pfcm.update_disp(self.uh)
             tmr.send('solve_displacement')
-            print('uh', self.uh)
 
             er1 = self.solve_phase_field()
             self.pfcm.update_phase(self.d)
             tmr.send('solve_phase_field')
-            print('d', self.d)
 
             self.H = self.pfcm._H
-            print('H', self.H)
 
             if k == 0:
                 e0 = er0
@@ -235,8 +231,6 @@ class MainSolver:
 
         self.d = self.space.function()
         self.uh = self.tspace.function()
-
-
         
     
     def save_vtkfile(self, fname):
