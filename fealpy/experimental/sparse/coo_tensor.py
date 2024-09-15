@@ -21,10 +21,10 @@ class COOTensor(SparseTensor):
         Initialize COO format sparse tensor.
 
         Parameters:
-            indices (Tensor): indices of non-zero elements, shaped (D, N).
-                Where D is the number of sparse dimension, and N is the number
-                of non-zeros (nnz).
-            values (Tensor | None): non-zero elements, shaped (..., N).
+            indices (Tensor): indices of non-zero elements, shaped (D, nnz).
+                Where D is the number of sparse dimension, and nnz is the number
+                of non-zeros.
+            values (Tensor | None): non-zero elements, shaped (..., nnz).
             spshape (Size | None, optional): shape in the sparse dimensions.
         """
         self._indices = indices
@@ -137,9 +137,12 @@ class COOTensor(SparseTensor):
         order = bm.argsort(self._indices[0], stable=True)
         new_row = self._indices[0, order]
         crow, = bm.nonzero((bm.not_equal(new_row, bm.roll(new_row, 1))))
-        new_values = self._values[..., order]
-        new_values = bm.copy(new_values) if copy else new_values
         new_col = bm.copy(self._indices[1:, order])
+        if self.values() is None:
+            new_values = None
+        else:
+            new_values = self.values()[..., order]
+            new_values = bm.copy(new_values) if copy else new_values
         return CSRTensor(crow, new_col, new_values, spshape=self._spshape)
 
     ### 4. Object Conversion ###
@@ -168,7 +171,7 @@ class COOTensor(SparseTensor):
         return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
 
     def coalesce(self, accumulate: bool=True) -> 'COOTensor':
-        if self.is_coalesced:
+        if self.is_coalesced or self.nnz == 0:
             return self
 
         order = bm.lexsort(tuple(reversed(self._indices)))

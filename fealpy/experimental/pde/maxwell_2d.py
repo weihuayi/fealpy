@@ -62,12 +62,13 @@ class SinData():
         return bm.einsum('eqd, ed->eq', val, t)
 
     @cartesian
-    def neumann(self, p, n):
+    def neumann(self, p, t):
         """!
         @param p: (..., N, ldof, 3)
-        @param n: (N, 3)
+        @param t: (N, 3)
         """
-        pass
+        t = t[:, None, :]
+        return t*self.curl_solution(p)[..., None]
 
     def robin(self, p, n):
         """!
