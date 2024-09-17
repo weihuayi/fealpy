@@ -1,7 +1,8 @@
-from ..utilfunc.filter_parameters import compute_filter
+from ..utilfunc.filter_parameters import compute_filter_2d, compute_filter_3d
+from builtins import int, float
 
 class FilterProperties:
-    def __init__(self, nx: int, ny: int, rmin: float, ft: int):
+    def __init__(self, nx: int, ny: int, rmin: float, ft: int, nz: int=None):
         """
         Initialize the filter properties.
 
@@ -10,9 +11,14 @@ class FilterProperties:
             ny (int): The number of elements in the y-direction of the mesh.
             rmin (float): The filter radius, which controls the minimum feature size.
             ft (int): The filter type, 0 for sensitivity filter, 1 for density filter.
+            nz (int, optional): The number of elements in the z-direction of the mesh. 
+                                If provided, a 3D filter is used.
         """
         self.ft = ft
-        self.H, self.Hs = compute_filter(nx, ny, rmin)
+        if nz is not None:
+            self.H, self.Hs = compute_filter_3d(nx, ny, nz, rmin)
+        else:
+            self.H, self.Hs = compute_filter_2d(nx, ny, rmin)
 
     def __repr__(self):
         """
