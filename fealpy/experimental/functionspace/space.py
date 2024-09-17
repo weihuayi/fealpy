@@ -58,7 +58,7 @@ class FunctionSpace():
         if dtype is None:
             dtype = self.ftype 
 
-        return bm.zeros(shape, dtype=dtype, device=self.device)
+        return bm.zeros(shape, dtype=dtype)
 
     def function(self, array: Optional[TensorLike]=None,
                  batch: Union[int, Size, None]=None, *,
