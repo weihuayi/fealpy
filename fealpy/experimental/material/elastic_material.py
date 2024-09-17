@@ -89,10 +89,15 @@ class LinearElasticMaterial(ElasticMaterial):
             self.set_property('lame_lambda', calculated_lam)
             self.set_property('shear_modulus', calculated_mu)
 
-        E = self.get_property('elastic_modulus')
-        nu = self.get_property('poisson_ratio')
-        lam = self.get_property('lame_lambda')
-        mu = self.get_property('shear_modulus')
+        self.E = self.get_property('elastic_modulus')
+        self.nu = self.get_property('poisson_ratio')
+        self.lam = self.get_property('lame_lambda')
+        self.mu = self.get_property('shear_modulus')
+
+        E = self.E
+        nu = self.nu
+        lam = self.lam
+        mu = self.mu
 
         if hypo == "3D":
             self.D = bm.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],

@@ -41,8 +41,8 @@ class MBBBeamCase:
             self.constraint_conditions = ConstraintConditions()
             self.constraint_conditions.set_volume_constraint(is_on=True, vf=0.5)
 
-            volfrac = self.constraint_conditions.get_constraints()['volume']['vf']
-            self.rho = volfrac * bm.ones(self.nx * self.ny, dtype=bm.float64)
+            self.volfrac = self.constraint_conditions.get_constraints()['volume']['vf']
+            self.rho = self.volfrac * bm.ones(self.nx * self.ny, dtype=bm.float64)
 
             self.material_properties = MaterialProperties(
                         E0=1.0, Emin=1e-9, nu=0.3, penal=3.0, 
