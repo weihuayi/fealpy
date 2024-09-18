@@ -71,7 +71,8 @@ class OCAlg(Optimizer):
             change = bm.linalg.norm(rho_new.reshape(-1, 1) - rho.reshape(-1, 1), bm.inf)
 
             # Print the results for this iteration
-            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, Volume: {v+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
+            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, 
+                Volume: {v+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
 
             # Check for convergence
             if change <= tol_change:

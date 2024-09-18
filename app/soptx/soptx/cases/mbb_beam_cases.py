@@ -51,7 +51,7 @@ class MBBBeamCase:
 
             self.filter_properties = FilterProperties(
                                         nx=self.nx, ny=self.ny, 
-                                        rmin=1.5, ft=0)
+                                        rmin=1.5, ft=1)
 
             def force(points: TensorLike) -> TensorLike:
     
