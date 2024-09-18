@@ -9,6 +9,7 @@ from fealpy.experimental.fem import (BilinearForm
                                      ,ScalarSourceIntegrator
                                      ,DirichletBC)
 from scipy.sparse.linalg import spsolve
+from scipy.integrate import solve_ivp
 from scipy.sparse import csr_matrix,spdiags,hstack,block_diag,bmat,diags
 from sympy import *
 
@@ -34,7 +35,7 @@ class LogicMesh():
 
     def __call__(self) :
         if self.is_convex():
-            logic_mesh = self.mesh
+            logic_mesh = TriangleMesh(self.node.copy(),self.cell) # 更新
         else:
             logic_node = self.get_logic_node()
             logic_cell = self.cell
@@ -193,6 +194,7 @@ class Harmap_MMPDE():
     def __init__(self, 
                  mesh:TriangleMesh , 
                  uh:TensorLike,
+                 pde ,
                  beta :float ,
                  alpha = 0.9, 
                  mol_times = 1 , 
@@ -200,6 +202,7 @@ class Harmap_MMPDE():
         """
         mesh : 初始物理网格
         uh : 物理网格上的解
+        pde : 微分方程基本信息
         beta : 控制函数的参数
         alpha : 移动步长控制参数
         mol_times : 磨光次数
@@ -481,3 +484,104 @@ class Harmap_MMPDE():
             logic_node = bm.set_at(logic_node , side_node_idx_bar[1:-1] , logic_side_node[1:-1])
 
         return logic_node
+    
+    # 更新插值
+    def interplate(self,N,move_node):
+        """
+        @breif 将解插值到新网格上
+        """
+        node =self.node
+        K = bm.arange(N+1)
+        # 定义常微分方程
+        def ODEs(tau , uh):
+            node_homotopy = node + tau * (move_node - node)
+            mesh0 = TriangleMesh(node_homotopy,self.cell)
+            space = LagrangeFESpace(mesh0, p=1)
+            qf = mesh0.integrator(3,'cell')
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            cm = mesh0.entity_measure('cell')
+            phi = space.basis(bcs)
+            H = bm.einsum('q , qci ,qcj, c -> cij ',ws, phi ,phi , cm)
+            
+            gphi = space.grad_basis(bcs)
+            delta_x = node - move_node
+            G = bm.einsum('q , qcid , cid , qcj ,c -> cij' , ws , gphi,  delta_x[self.cell], phi, cm)
+
+            GDOF = space.number_of_global_dofs()
+            I = bm.broadcast_to(space.cell_to_dof()[:, :, None], shape=G.shape)
+            J = bm.broadcast_to(space.cell_to_dof()[:, None, :], shape=G.shape)
+            H = csr_matrix((H.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
+            G = csr_matrix((G.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
+            f = spsolve(H , G@uh)
+            return f
+        # 初值条件  
+        uh0 = self.uh
+        # 范围
+        tau_span = [0,1]
+        # 求解
+        sol = solve_ivp(ODEs,tau_span,uh0,t_eval=K/N,method='RK23')
+        return sol.y[:,-1]
+    
+    def construct(self,new_mesh):
+        """
+        @breif 重构信息
+        @param new_mesh 新的网格
+        """
+        self.mesh = new_mesh
+
+        space = LagrangeFESpace(self.mesh, p=1)
+        bform = BilinearForm(space)
+        bform.add_domain_integrator(ScalarDiffusionIntegrator(q=3))
+        A = bform.assembly()
+        lform = LinearForm(space)
+        lform.add_domain_integrator(ScalarSourceIntegrator(f = self.pde.source, q=3))
+        F = lform.assembly()
+        bc = DirichletBC(space = space, gD = self.pde.dirichlet) # 创建 Dirichlet 边界条件处理对象
+        uh = space.function() # 创建有限元函数对象
+        A, F = bc.apply(A, F, uh)
+        uh[:] = spsolve(A, F)
+
+        self.node = new_mesh.entity('node')
+        self.cm = new_mesh.entity_measure('cell')
+        uh = self.interplate(10,self.node)
+        self.uh = uh
+        LM = LogicMesh(new_mesh)
+        self.logic_mesh = LM()
+        self.logic_node = self.logic_mesh.entity('node')
+
+        self.star_measure = self.get_star_measure(self.mesh)
+        self.G = self.get_control_function(self.beta,self.mol_times)
+
+    def solve_elliptic_Equ(self,tol = 5e-2):
+        """
+        @breif 求解椭圆方程
+        @param pde PDEData
+        @param tol 容许误差
+        """
+        em = self.logic_mesh.entity('edge').copy()
+        if tol is None:
+            tol = bm.min(em)* 0.1
+        i = 0
+        while True:
+            i += 1
+            init_logic_node = self.logic_node.copy()
+            logic_node,vector_field = self.solve()
+            L_infty_error = bm.max(bm.linalg.norm(init_logic_node - logic_node,axis=1))
+            print(f'第{i}次迭代的差值为{L_infty_error}')
+            if L_infty_error < tol:
+                if self.isconvex:
+                    mesh0 = TriangleMesh(logic_node,self.cell)
+                else:
+                    node = self.get_physical_node(vector_field,logic_node)
+                    mesh0 = TriangleMesh(node,self.cell)
+                print(f'迭代总次数:{i}次')
+                return mesh0
+            else:
+                if self.isconvex:
+                    mesh0 = TriangleMesh(logic_node,self.cell)
+                    self.construct(mesh0)
+
+                else:
+                    node = self.get_physical_node(vector_field,logic_node)
+                    mesh0 = TriangleMesh(node,self.cell)
+                    self.construct(mesh0)

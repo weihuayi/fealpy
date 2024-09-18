@@ -6,7 +6,7 @@ from fealpy.experimental.sparse import COOTensor
 from builtins import int, float
 from math import ceil, sqrt
 
-def compute_filter(nx: int, ny: int, rmin: float) -> Tuple[TensorLike, TensorLike]:
+def compute_filter_2d(nx: int, ny: int, rmin: float) -> Tuple[TensorLike, TensorLike]:
     """
     Compute the filter matrix for the topology optimization.
 
