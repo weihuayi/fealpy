@@ -77,7 +77,7 @@ tmr = timer()
 next(tmr)
 model = square_with_circular_notch()
 
-mesh = model.init_mesh(n=5)
+mesh = model.init_mesh(n=0s)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 

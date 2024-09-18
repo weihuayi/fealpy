@@ -2,7 +2,7 @@ from typing import Optional, Dict
 import numpy as np
 from fealpy.utils import timer
 from scipy.sparse import spdiags
-from fealpy.experimental.sparse import SparseTensor, COOTensor, CSRTensor
+
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.decorator import barycentric, cartesian
@@ -11,14 +11,23 @@ from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpa
 from fealpy.experimental.fem import LinearElasticIntegrator, ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator
 from fealpy.experimental.fem import DirichletBC
 from fealpy.experimental.solver import cg
+
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
+from app.fracturex.fracturex.phasefield.adaptive_refinement import AdaptiveRefinement
+from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichletBC
 
 
 class MainSolver:
-    def __init__(self, mesh, material_params: Dict, p: int = 1, q: Optional[int] = None, method: str = 'HybridModel'):
+    def __init__(self, mesh, material_params: Dict, 
+                 p: int = 1, q: Optional[int] = None, 
+                 method: str = 'HybridModel',
+                 enable_refinement: bool = False, 
+                 marking_strategy: str = 'recovery', 
+                 refine_method: str = 'nvp', 
+                 theta: float = 0.2):
         """
-        Initialize the MainSolver class.
+        Initialize the MainSolver class with more customization options.
 
         Parameters
         ----------
@@ -32,6 +41,14 @@ class MainSolver:
             Quadrature degree, by default p + 2.
         method : str, optional
             Stress decomposition method, by default 'HybridModel'.
+        enable_refinement : bool, optional
+            Whether to enable adaptive refinement, by default False.
+        marking_strategy : str, optional
+            The marking strategy for refinement, by default 'recovery'.
+        refine_method : str, optional
+            The refinement method, by default 'nvp'.
+        theta : float, optional
+            Refinement threshold parameter, by default 0.2.
         """
         self.mesh = mesh
         self.p = p
@@ -52,8 +69,15 @@ class MainSolver:
         self.l0 = material_params['l0']
         
         self.bc_dict = {}
+
+        # Adaptive refinement settings
+        self.enable_refinement = enable_refinement
+        self.adaptive = AdaptiveRefinement(marking_strategy=marking_strategy, refine_method=refine_method, theta=theta)
+
+        # Initialize the timer
         self.tmr = timer()
         next(self.tmr)
+
 
     def solve(self, maxit: int = 30, vtkname: Optional[str] = None):
         """
@@ -76,7 +100,7 @@ class MainSolver:
 
             # Run Newton-Raphson iteration
             self.newton_raphson(maxit)
-            self.H = self.pfcm._H
+            
             
             if vtkname is None:
                 fname = f'test{i:010d}.vtu'
@@ -96,21 +120,28 @@ class MainSolver:
             Maximum number of iterations, by default 30.
         """
         for k in range(maxit):
-            print('uh', self.uh)
+            print(f"Newton-Raphson Iteration {k + 1}/{maxit}:")
+            
             er0 = self.solve_displacement()
             self.pfcm.update_disp(self.uh)
-            print('uh', self.uh)
+            print(f"Displacement error after iteration {k + 1}: {er0}")
 
             er1 = self.solve_phase_field()
             self.pfcm.update_phase(self.d)
-            print('d', self.d)
+            print(f"Phase field error after iteration {k + 1}: {er1}")
 
-            error = max(er0, er1) if k == 0 else max(er0/self.e0, er1/self.e1)
+            self.H = self.pfcm._H
+            if self.enable_refinement:
+                self.adaptive.perform_refinement(self.mesh, self.d)
+                
             if k == 0:
-                self.e0, self.e1 = er0, er1
+                e0, e1 = er0, er1
+            
+            error = max(er0/e0, er1/e1)
 
             print(f'Iteration {k}, Error: {error}')
             if error < 1e-5:
+                print(f"Convergence achieved after {k + 1} iterations.")
                 break
 
     def solve_displacement(self) -> float:
@@ -271,88 +302,4 @@ class MainSolver:
                 else:
                     raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
         return A, R
-
-class VectorDirichletBC:
-    def __init__(self, space, gd, threshold, direction = None):
-        self.space = space
-        self.gd = gd
-        self.threshold = threshold
-        self.direction = direction
-
-    def set_boundary_dof(self):
-        threshold = self.threshold  # Boundary detection function
-        direction = self.direction   # Direction for applying boundary condition
-        space = self.space
-        mesh = space.mesh
-        ipoints = mesh.interpolation_points(p=space.p)  # Interpolation points
-        is_bd_dof = threshold(ipoints)  # Boolean mask for boundary DOFs
-        GD = mesh.geo_dimension()  # Geometric dimension (2D or 3D)
-
-        # Prepare an index array with shape (GD, npoints)
-        index = bm.zeros((GD, ipoints.shape[0]), dtype=bool)
-
-        # Map direction to axis: 'x' -> 0, 'y' -> 1, 'z' -> 2 (for GD = 3)
-        direction_map = {'x': 0, 'y': 1, 'z': 2}
-
-        if direction is None:
-            bm.set_at(index, slice(None), is_bd_dof)  # Apply to all directions
-        else:
-            idx = direction_map.get(direction)
-            if idx is not None and idx < GD:
-                bm.set_at(index, idx, is_bd_dof)  # Apply only to the specified direction
-            else:
-                raise ValueError(f"Invalid direction '{direction}' for GD={GD}. Use 'x', 'y', 'z', or None.")
-    
-        # Flatten the index to return as a 1D array
-        return index.ravel()
-
-    def apply_value(self, u):
-        index = self.set_boundary_dof()
-        bm.set_at(u, index, self.gd) 
-        return u, index   
-
-    def apply(self, A, f, u=None):
-        """
-        Apply Dirichlet boundary condition to the linear system.
-
-        Parameters
-        ----------
-        A : SparseTensor
-            The coefficient matrix.
-        f : TensorLike
-            The right-hand-side vector.
-
-        Returns
-        -------
-        A : SparseTensor
-            The new coefficient matrix.
-        f : TensorLike
-            The new right-hand-side vector.
-        """
-        isDDof = self.set_boundary_dof()
-        kwargs = A.values_context()
-
-        if isinstance(A, COOTensor):
-            indices = A.indices()
-            remove_flag = bm.logical_or(
-                isDDof[indices[0, :]], isDDof[indices[1, :]]
-            )
-            retain_flag = bm.logical_not(remove_flag)
-            new_indices = indices[:, retain_flag]
-            new_values = A.values()[..., retain_flag]
-            A = COOTensor(new_indices, new_values, A.sparse_shape)
-
-            index = bm.nonzero(isDDof)[0]
-            shape = new_values.shape[:-1] + (len(index), )
-            one_values = bm.ones(shape, **kwargs)
-            one_indices = bm.stack([index, index], axis=0)
-            A1 = COOTensor(one_indices, one_values, A.sparse_shape)
-            A = A.add(A1).coalesce()
-
-        elif isinstance(A, CSRTensor):
-            raise NotImplementedError('The CSRTensor version has not been implemented.')
-
-        bm.set_at(f, isDDof, self.gd) 
-        return A, f
-
 
