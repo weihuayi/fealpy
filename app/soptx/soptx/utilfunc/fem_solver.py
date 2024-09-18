@@ -18,12 +18,15 @@ class FEMSolver:
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
+        self.boundary_conditions = boundary_conditions
+
         self.uh = tensor_space.function()
         self.KE = None
         self.K = None
         self.F = None
-        self.boundary_conditions = boundary_conditions
-
+        
+        self.solved = False 
+        
         self.assemble_stiffness_matrix()
         self.apply_boundary_conditions()
 
@@ -84,6 +87,7 @@ class FEMSolver:
         if self.K is None or self.F is None:
             raise ValueError("Stiffness matrix K or force vector F has not been assembled.")
         self.uh[:] = cg(self.K, self.F, maxiter=5000, atol=1e-14, rtol=1e-14)
+
         return self.uh
     
     def get_element_stiffness_matrix(self) -> TensorLike:
@@ -102,8 +106,11 @@ class FEMSolver:
         Returns:
             TensorLike: The displacement vector for each element (uhe).
         """
+        if not self.solved:
+            self.solve()
         cell2ldof = self.tensor_space.cell_to_dof()
         uhe = self.uh[cell2ldof]
+
         return uhe
     
     def get_global_stiffness_matrix(self) -> TensorLike:
