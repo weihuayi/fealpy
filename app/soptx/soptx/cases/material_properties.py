@@ -88,7 +88,7 @@ class MaterialProperties(LinearElasticMaterial):
             self.get_property('elastic_modulus'), self.Emin, 
             self.penal)
 
-    def material_model_derivative(self, rho) -> TensorLike:
+    def material_model_derivative(self) -> TensorLike:
         """
         Use the interpolation model to calculate the derivative of Young's modulus.
 
@@ -167,9 +167,9 @@ class SIMPInterpolation(MaterialInterpolation):
                         Shape: (NC, ).
         """
         if Emin is None:
-            return rho ** penal * E0
+            return rho[:] ** penal * E0
         else:
-            return Emin + rho ** penal * (E0 - Emin)
+            return Emin + rho[:] ** penal * (E0 - Emin)
 
     def calculate_modulus_derivative(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
         """
@@ -184,7 +184,7 @@ class SIMPInterpolation(MaterialInterpolation):
                         Shape: (NC, ).
         """
         if Emin is None:
-            return penal * rho ** (penal - 1) * E0
+            return penal * rho[:] ** (penal - 1) * E0
         else:
-            return penal * rho ** (penal - 1) * (E0 - Emin)
+            return penal * rho[:] ** (penal - 1) * (E0 - Emin)
 

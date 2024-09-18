@@ -3,7 +3,7 @@ from fealpy.experimental.typing import TensorLike, Tuple
 
 from builtins import float
 from ...soptx.utilfunc.filter_parameters import apply_filter
-from ...soptx.utilfunc.calculate_KE import calculate_KE
+from ..utilfunc.calculate_ke0 import calculate_ke0
 
 class OCOptimizer:
     def __init__(self, displacement_solver, 
@@ -95,7 +95,7 @@ class OCOptimizer:
             uh = self.displacement_solver.solve()
 
             # Step 2: Compute objective function and sensitivities
-            KE = calculate_KE(material_properties=self.displacement_solver.material_properties, 
+            KE = calculate_ke0(material_properties=self.displacement_solver.material_properties, 
                             tensor_space=self.displacement_solver.tensor_space)
             uhe = self.displacement_solver.get_element_displacement()
             E = self.displacement_solver.material_properties.material_model()
