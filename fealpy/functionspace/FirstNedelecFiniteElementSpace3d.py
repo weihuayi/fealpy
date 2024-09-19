@@ -176,6 +176,33 @@ class FirstNedelecFiniteElementSpace3d:
             return cphi
         else:
             pass
+    def face_internal_basis(self, bcs, index=np.s_[:]):
+        p = self.p
+
+        mesh = self.mesh
+        NF = mesh.number_of_faces()
+        GD = mesh.geo_dimension()
+        
+        fdof = self.dof.number_of_local_dofs("face")
+        glambda = mesh.grad_face_lambda()
+        val = np.zeros((NF,) + bcs.shape[:-1]+(fdof, 3), dtype=self.ftype)
+        
+        l = np.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
+        # l = np.set_at(l,(0),bcs[None, :,0,  None, None])
+        # l = np.set_at(l,(1),bcs[None, :,1,  None, None])
+        # l = np.set_at(l,(2),bcs[None, :,2,  None, None])
+        l[0] = bcs[None, :,0,  None, None]
+        l[1] = bcs[None, :,1,  None, None]
+        l[2] = bcs[None, :,2,  None, None]
+
+        phi = self.bspace.basis(bcs, p=p-1)
+        v0 = l[2]*(l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None]) 
+        v1 = l[0]*(l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None]) 
+        val[..., :fdof//2, :] = v0*phi[..., None]
+        val[..., fdof//2:, :] = v1*phi[..., None]
+        # val = np.set_at(val,(...,slice(0,fdof//2),slice(None)),v0*phi[..., None])
+        # val = np.set_at(val,(...,slice(fdof//2,fdof),slice(None)),v1*phi[..., None])
+        return val
 
     @barycentric
     def grad_basis(self, bc, index=np.s_[:]):
@@ -319,42 +346,101 @@ class FirstNedelecFiniteElementSpace3d:
         np.add.at(F, cell2dof, val)
         return F
 
+    # def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+    #     """
+    #     """
+    #     mesh = self.mesh
+    #     node = mesh.entity("node")
+    #     edge = mesh.entity("edge")
+    #     face = mesh.entity("face")
+
+    #     if type(threshold) is np.ndarray:
+    #         index = threshold
+    #     else:
+    #         index = self.mesh.ds.boundary_face_index()
+
+    #     face2edge = mesh.ds.face_to_edge()[index]
+    #     isBdEdge = np.full(mesh.ds.edge.shape[0],False)
+    #     isBdEdge[face2edge] = True
+
+    #     if 0: #节点型自由度
+    #         locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
+    #         point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
+    #         vec = mesh.edge_tangent()[face2edge]
+    #         gval = gD(point, vec) #(NF, 3)
+
+    #         face2dof = self.dof.face_to_dof()[index]
+    #         uh[face2dof] = np.linalg.norm(gval,axis=2) 
+    #     else: #积分型自由度
+    #         bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
+    #         ps = mesh.bc_to_point(bcs)[:, isBdEdge]
+
+    #         vec = mesh.edge_tangent()[isBdEdge]
+    #         l = np.linalg.norm(vec, axis=-1)
+    #         gval = gD(ps, vec)
+
+    #         uh[isBdEdge] = np.einsum("qed, ed, q->e", gval, vec, ws) 
+
+    #     return isBdEdge
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
-        """
-        """
+        p = self.p
         mesh = self.mesh
-        node = mesh.entity("node")
-        edge = mesh.entity("edge")
-        face = mesh.entity("face")
+        gdof = self.number_of_global_dofs()       
+        isDDof = np.zeros(gdof, dtype=np.bool)
 
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_face_index()
+        # 边界内部的点
+        index1 = self.mesh.boundary_face_index()
+        if p>0:
+            face2dof = self.dof.face_to_internal_dof()[index1]
 
-        face2edge = mesh.ds.face_to_edge()[index]
-        isBdEdge = np.full(mesh.ds.edge.shape[0],False)
-        isBdEdge[face2edge] = True
+            qf = mesh.quadrature_formula(p+2,"face")
+            bcs, ws = qf.get_quadrature_points_and_weights()
+ 
+            fbasis = self.face_internal_basis(bcs)[index1] # (NF,NQ,ldof,GD)
+            fm = mesh.entity_measure('face')[index1]
+            M = np.einsum("cqlg, cqmg, q, c->clm", fbasis, fbasis, ws, fm)
+            #print(M)
+            Minv = np.linalg.inv(M)
 
-        if 0: #节点型自由度
-            locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
-            point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
-            vec = mesh.edge_tangent()[face2edge]
-            gval = gD(point, vec) #(NF, 3)
+            points = mesh.bc_to_point(bcs)[index1]
+            n = mesh.face_unit_normal()[index1]
+            n = n[:,None,:]
+            h2 = gD(points)
+            g = np.cross(n, h2) 
+            g = np.cross(g,n)
+            g1 = np.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
+            print(g1)
+            uh[face2dof] = np.einsum("cl, clm->cm", g1, Minv)
+            isDDof[face2dof] = True
 
-            face2dof = self.dof.face_to_dof()[index]
-            uh[face2dof] = np.linalg.norm(gval,axis=2) 
-        else: #积分型自由度
-            bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
-            ps = mesh.bc_to_point(bcs)[:, isBdEdge]
+        # 边界边界的点
+        NE = mesh.number_of_edges()
+        f2e = mesh.face_to_edge()[index1]
+        bdeflag = np.zeros(NE, dtype=np.bool)
+        bdeflag[f2e] = True
+        index2 = np.nonzero(bdeflag)[0]
+        edge2dof = self.dof.edge_to_dof()[index2]
+        em = mesh.entity_measure('edge')[index2]
+        t = mesh.edge_tangent()[index2]/em[:, None]
+        
+        # 右端矩阵组装
+        qf = mesh.quadrature_formula(p+2,"edge")
+        bcs, ws = qf.get_quadrature_points_and_weights()        
+        bphi = self.bspace.basis(bcs, p=p)
+        M = np.einsum("eql, eqm, q->lm", bphi, bphi, ws)
+        Minv = np.linalg.inv(M)
+        Minv = Minv*em[:,None,None]
+        
+        points1 = mesh.bc_to_point(bcs)[index2]
+        h1 = gD(points1)
+        b = np.einsum('eqd, ed->eq', h1, t) 
+        
+        g2 = np.einsum('eql, eq,q->el', bphi, b,ws)
 
-            vec = mesh.edge_tangent()[isBdEdge]
-            l = np.linalg.norm(vec, axis=-1)
-            gval = gD(ps, vec)
+        uh[edge2dof] = np.einsum('el, elm->em', g2, Minv)
+        isDDof[edge2dof] = True
+        return isDDof
 
-            uh[isBdEdge] = np.einsum("qed, ed, q->e", gval, vec, ws) 
-
-        return isBdEdge
 
     boundary_interpolate = set_dirichlet_bc
 

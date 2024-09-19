@@ -105,3 +105,33 @@ def csr_matrix(arg1, shape: Size, *,
         CSRTensor: _description_
     """
     raise NotImplementedError
+
+
+
+# NOTE: APIs for Sparse Tensors
+
+# 1. Data Fetching:
+# itype, ftype, nnz,
+# shape, dense_shape, sparse_shape,
+# ndim, dense_ndim, sparse_ndim,
+# size,
+# values_context,
+# (COO) indices, values,
+# (CSR) crow, col, values
+
+# 2. Data Type & Device Management:
+# astype, device_put
+
+# 3. Format Conversion:
+# to_dense (=toarray), tocsr, tocoo
+
+# 4. Object Conversion:
+# to_scipy, from_scipy,
+
+# 5. Manipulation:
+# copy, coalesce, reshape, flatten, ravel,
+# tril, triu,
+# concat
+
+# 6. Arithmetic Operations:
+# add, sub, mul, div, pow, neg, matmul

@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, List, Tuple, Sequence
+from typing import Optional, Union, overload, Tuple, Sequence
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -21,10 +21,10 @@ class COOTensor(SparseTensor):
         Initialize COO format sparse tensor.
 
         Parameters:
-            indices (Tensor): indices of non-zero elements, shaped (D, N).
-                Where D is the number of sparse dimension, and N is the number
-                of non-zeros (nnz).
-            values (Tensor | None): non-zero elements, shaped (..., N).
+            indices (Tensor): indices of non-zero elements, shaped (D, nnz).
+                Where D is the number of sparse dimension, and nnz is the number
+                of non-zeros.
+            values (Tensor | None): non-zero elements, shaped (..., nnz).
             spshape (Size | None, optional): shape in the sparse dimensions.
         """
         self._indices = indices
@@ -66,6 +66,7 @@ class COOTensor(SparseTensor):
     def __repr__(self) -> str:
         return f"COOTensor(indices={self._indices}, values={self._values}, shape={self.shape})"
 
+    ### 1. Data Fetching ###
     @property
     def itype(self): return self._indices.dtype
 
@@ -85,16 +86,24 @@ class COOTensor(SparseTensor):
         """Return the non-zero elements."""
         return self._values
 
+    ### 2. Data Type & Device Management ###
+    def astype(self, dtype=None, /, *, copy=True):
+        if self._values is None:
+            values = bm.ones(self.nnz, dtype=dtype)
+        else:
+            values = bm.astype(self._values, dtype, copy=copy)
+
+        return COOTensor(self._indices, values, self._spshape,
+                         is_coalesced=self.is_coalesced)
+
+    def device_put(self, device=None, /):
+        return COOTensor(bm.device_put(self._indices, device),
+                         bm.device_put(self._values, device),
+                         self._spshape,
+                         is_coalesced=self.is_coalesced)
+
+    ### 3. Format Conversion ###
     def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
-        """Convert the COO tensor to a dense tensor and return as a new object.
-
-        Parameters:
-            fill_value (int | float, optional): The value to fill the dense tensor with
-                when `self.values()` is None.
-
-        Returns:
-            Tensor: dense tensor.
-        """
         if self._values is None:
             context = dict(dtype=bm.float64)
         else:
@@ -112,70 +121,111 @@ class COOTensor(SparseTensor):
 
         return dense_tensor.reshape(self.shape)
 
-    toarray = to_dense
+    def tocoo(self, *, copy=False):
+        if copy:
+            return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
+        return self
 
-    def coalesce(self, accumulate: bool=True) -> 'COOTensor':
-        """Merge duplicate indices and return as a new COOTensor object.
-        Returns self if the indices are already coalesced.
+    def tocsr(self, *, copy=False):
+        from .csr_tensor import CSRTensor
+        try:
+            crow, col, values = bm.coo_tocsr(self.indices(), self.values(), self.sparse_shape)
+            return CSRTensor(crow, col, values, spshape=self._spshape)
+        except (AttributeError, NotImplementedError):
+            pass
 
-        Parameters:
-            accumulate (bool, optional): Whether to count the occurrences of indices\
-            as new values when `self.values` is None. Defaults to True.
+        order = bm.argsort(self._indices[0], stable=True)
+        new_row = self._indices[0, order]
+        crow, = bm.nonzero((bm.not_equal(new_row, bm.roll(new_row, 1))))
+        new_col = bm.copy(self._indices[1:, order])
+        if self.values() is None:
+            new_values = None
+        else:
+            new_values = self.values()[..., order]
+            new_values = bm.copy(new_values) if copy else new_values
+        return CSRTensor(crow, new_col, new_values, spshape=self._spshape)
 
-        Returns:
-            COOTensor: coalesced COO tensor.
-        """
-        if self.is_coalesced:
-            return self
+    ### 4. Object Conversion ###
+    def to_scipy(self, format: str='coo'):
+        from importlib import import_module
 
-        if bm.device_type(self._indices) == 'cpu':
-            import numpy as np
+        if self.dense_ndim != 0:
+            raise ValueError("Only COOTensor with 0 dense dimension "
+                             "can be converted to scipy sparse matrix")
 
-            if self._values is not None:
-                index_context = bm.context(self._indices)
-                indices_np = bm.to_numpy(self._indices)
-                order = np.lexsort(indices_np)
-                new_indices_np = indices_np[:, order]
-                unique_mask_np = np.r_[[True], np.diff(new_indices_np, axis=1).any(axis=0)]
-                add_index = bm.tensor(np.cumsum(unique_mask_np) - 1, **index_context)
+        class_ = import_module(f'scipy.sparse.{format}_matrix')
 
-                full_values = bm.copy(self._values[..., order])
-                new_values = bm.zeros_like(full_values[..., unique_mask_np])
-                new_values = bm.index_add(new_values, add_index, self._values[..., order], axis=-1)
-                del full_values
-
-                new_indices = bm.tensor(new_indices_np[..., unique_mask_np], **index_context)
-
-                return COOTensor(new_indices, new_values, self.sparse_shape, is_coalesced=True)
-
-            else:
-                pass # TODO
-
-        unique_indices, inverse_indices = bm.unique(
-            self._indices, return_inverse=True, axis=1
+        return class_(
+            (bm.to_numpy(self.values()), bm.to_numpy(self.indices())),
+            shape = self.sparse_shape
         )
 
-        if self._values is not None:
-            value_shape = self.dense_shape + (unique_indices.shape[-1], )
-            new_values = bm.zeros(value_shape, **self.values_context())
-            new_values = bm.index_add(new_values, inverse_indices, self._values, axis=-1)
+    @classmethod
+    def from_scipy(cls, mat, /):
+        indices = bm.stack([bm.from_numpy(mat.row), bm.from_numpy(mat.col)], axis=0)
+        values = bm.from_numpy(mat.data)
+        return cls(indices, values, mat.shape)
 
-            return COOTensor(
-                unique_indices, new_values, self.sparse_shape, is_coalesced=True
-            )
+    ### 5. Manipulation ###
+    def copy(self):
+        return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
+
+    def coalesce(self, accumulate: bool=True) -> 'COOTensor':
+        if self.is_coalesced or self.nnz == 0:
+            return self
+
+        order = bm.lexsort(tuple(reversed(self._indices)))
+        sorted_indices = self._indices[:, order]
+        unique_mask = bm.concat([
+            bm.ones((1, ), dtype=bm.bool),
+            bm.any(sorted_indices[:, 1:] - sorted_indices[:, :-1], axis=0)
+        ], axis=0)
+        new_indices = bm.copy(sorted_indices[..., unique_mask])
+
+        if self._values is not None:
+            add_index = bm.cumsum(unique_mask, axis=0) - 1
+            sorted_values = self._values[..., order]
+            new_values = bm.zeros_like(sorted_values[..., unique_mask])
+            new_values = bm.index_add(new_values, add_index, sorted_values, axis=-1)
 
         else:
             if accumulate:
-                kwargs = bm.context(self._indices)
-                ones = bm.ones((self.nnz, ), **kwargs)
-                new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-                new_values = bm.index_add(new_values, inverse_indices, ones, axis=-1)
+                unique_location = bm.concat([
+                    bm.nonzero(unique_mask)[0],
+                    bm.tensor([len(unique_mask)], **bm.context(self._indices))
+                ], axis=0)
+                new_values = unique_location[1:] - unique_location[:-1]
+
             else:
                 new_values = None
 
-            return COOTensor(
-                unique_indices, new_values, self.sparse_shape, is_coalesced=True
-            )
+        return COOTensor(new_indices, new_values, self.sparse_shape, is_coalesced=True)
+
+        # unique_indices, inverse_indices = bm.unique(
+        #     self._indices, return_inverse=True, axis=1
+        # )
+
+        # if self._values is not None:
+        #     value_shape = self.dense_shape + (unique_indices.shape[-1], )
+        #     new_values = bm.zeros(value_shape, **self.values_context())
+        #     new_values = bm.index_add(new_values, inverse_indices, self._values, axis=-1)
+
+        #     return COOTensor(
+        #         unique_indices, new_values, self.sparse_shape, is_coalesced=True
+        #     )
+
+        # else:
+        #     if accumulate:
+        #         kwargs = bm.context(self._indices)
+        #         ones = bm.ones((self.nnz, ), **kwargs)
+        #         new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
+        #         new_values = bm.index_add(new_values, inverse_indices, ones, axis=-1)
+        #     else:
+        #         new_values = None
+
+        #     return COOTensor(
+        #         unique_indices, new_values, self.sparse_shape, is_coalesced=True
+        #     )
 
     @overload
     def reshape(self, shape: Size, /) -> 'COOTensor': ...
@@ -185,21 +235,11 @@ class COOTensor(SparseTensor):
         pass
 
     def ravel(self):
-        """Return a view with flatten indices on sparse dimensions.
-
-        Returns:
-            COOTensor: A flatten COO tensor, shaped (*dense_shape, nnz).
-        """
         spshape = self.sparse_shape
         new_indices = flatten_indices(self._indices, spshape)
         return COOTensor(new_indices, self._values, (prod(spshape),))
 
     def flatten(self):
-        """Return a copy with flatten indices on sparse dimensions.
-
-        Returns:
-            COOTensor: A flatten COO tensor, shaped (*dense_shape, nnz).
-        """
         spshape = self.sparse_shape
         new_indices = flatten_indices(self._indices, spshape)
         if self._values is None:
@@ -227,9 +267,6 @@ class COOTensor(SparseTensor):
     def tril(self, k: int=0) -> 'COOTensor':
         indices, values = tril_coo(self._indices, self._values, k)
         return COOTensor(indices, values, self._spshape)
-
-    def copy(self):
-        return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
 
     @classmethod
     def concat(cls, coo_tensors: Sequence['COOTensor'], /, *, axis: int=0) -> 'COOTensor':
@@ -260,6 +297,7 @@ class COOTensor(SparseTensor):
 
         return cls(new_indices, bm.concat(values_list, axis=-1), spshape)
 
+    ### 6. Arithmetic Operations ###
     def neg(self) -> 'COOTensor':
         """Negation of the COO tensor. Returns self if values is None."""
         if self._values is None:
@@ -432,47 +470,3 @@ class COOTensor(SparseTensor):
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
-
-    def tocsr(self):
-        from .csr_tensor import CSRTensor
-        try:
-            crow, col, values = bm.coo_tocsr(self.indices(), self.values(), self.sparse_shape)
-            return CSRTensor(crow, col, values, spshape=self._spshape)
-        except (AttributeError, NotImplementedError):
-            # TODO: implement this
-            raise NotImplementedError("CSR conversion is not implemented")
-
-    def to_scipy(self, format: str='coo'):
-        from importlib import import_module
-
-        if self.dense_ndim != 0:
-            raise ValueError("Only COOTensor with 0 dense dimension "
-                             "can be converted to scipy sparse matrix")
-
-        class_ = import_module(f'scipy.sparse.{format}_matrix')
-
-        return class_(
-            (bm.to_numpy(self.values()), bm.to_numpy(self.indices())),
-            shape = self.sparse_shape
-        )
-
-    @classmethod
-    def from_scipy(cls, mat, /):
-        indices = bm.stack([bm.from_numpy(mat.row), bm.from_numpy(mat.col)], axis=0)
-        values = bm.from_numpy(mat.data)
-        return cls(indices, values, mat.shape)
-
-    def device_put(self, device=None, /):
-        return COOTensor(bm.device_put(self._indices, device),
-                         bm.device_put(self._values, device),
-                         self._spshape,
-                         is_coalesced=self.is_coalesced)
-
-    def astype(self, dtype=None, /, *, copy=True):
-        if self._values is None:
-            values = bm.ones(self.nnz, dtype=dtype)
-        else:
-            values = bm.astype(self._values, dtype, copy=copy)
-
-        return COOTensor(self._indices, values, self._spshape,
-                         is_coalesced=self.is_coalesced)

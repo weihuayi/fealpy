@@ -12,6 +12,8 @@ from scipy.sparse.linalg import spsolve
 from fealpy.experimental.mesh import TriangleMesh, TetrahedronMesh
 from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace2d
 from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace3d
+from fealpy.experimental import logger
+logger.setLevel('WARNING')
 
 from fealpy.experimental.backend import backend_manager as bm
 
@@ -34,16 +36,17 @@ from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.experimental.solver import cg
 
 from fealpy.experimental.pde.maxwell_2d import SinData as PDE2d
-from fealpy.experimental.pde.maxwell_3d import Bubble3dData as PDE3d
-
+from fealpy.experimental.pde.maxwell_3d import BubbleData as PDE3d
 from fealpy.utils import timer
 
+
 def Solve(A, b):
+    
     # from mumps import DMumpsContext
-    from scipy.sparse.linalg import minres, gmres
+    # from scipy.sparse.linalg import minres, gmres
 
     A = coo_matrix((A.values(), (A.indices()[0], A.indices()[1])), shape=(gdof, gdof))
-    NN = len(b)
+    # NN = len(b)
     # ctx = DMumpsContext()
     # ctx.set_silent()
     # ctx.set_centralized_sparse(A)
@@ -60,7 +63,7 @@ def Solve(A, b):
     x = spsolve(A,b)
     return x
 
-## 参数解析
+# 参数解析
 parser = argparse.ArgumentParser(description=
         """
         任意次有限元方法求解possion方程
@@ -85,9 +88,10 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 p = args.degree
 maxit = args.maxit
+maxit = 3
 dim = args.dim
+dim = 3
 backend = args.backend
-
 bm.set_backend(backend)
 if dim == 2:
     pde = PDE2d()
@@ -106,8 +110,8 @@ NDof = np.zeros(maxit, dtype=bm.float64)
 tmr = timer()
 next(tmr)
 
-# ps = [2, 3, 4]
-ps = [2]
+ps = [2, 3, 4]
+#ps = [1]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
@@ -148,12 +152,10 @@ for j, p in enumerate(ps):
         errorMatrix[j, i] = mesh.error(pde.solution, Eh.value)
         errorMatrix[j+3, i] = mesh.error(pde.curl_solution, Eh.curl_value)
         tmr.send(f'第{i}次误差计算及网格加密时间')
+        print(errorMatrix)
 
 next(tmr)
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
 plt.show()
-
-
-
 

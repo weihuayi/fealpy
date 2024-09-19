@@ -1,7 +1,6 @@
 from typing import Optional, Union, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
-from math import factorial
 import numpy as np
 
 try:
@@ -17,7 +16,7 @@ except ImportError:
                       'the JAX backend in FEALPy. '
                       'See https://github.com/google/jax for installation.')
 
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
 
 Array = jax.Array
 _device = jax.Device
@@ -40,6 +39,9 @@ class JAXBackend(Backend[Array], backend_name='jax'):
 
     @staticmethod
     def device_index(array: Array, /): return array.device.id
+
+    @staticmethod
+    def get_device(tensor_like: Array, /): return tensor_like.device
 
     @staticmethod
     def device_put(tensor_like: Array, /, device=None) -> Array:
@@ -82,7 +84,6 @@ class JAXBackend(Backend[Array], backend_name='jax'):
 
     @staticmethod
     def index_add(x: Array, index, src, /, *, axis=0, alpha=1):
-        assert index.ndim == 1
         indexing = [slice(None)] * x.ndim
         indexing[axis] = index
         return x.at[tuple(indexing)].add(alpha*src)
@@ -393,3 +394,4 @@ function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(tensor='array')
 JAXBackend.attach_methods(function_mapping, jnp)
 JAXBackend.attach_methods({'compile': 'jit'}, jax)
+JAXBackend.attach_methods(TRANSFORMS_MAPPING, jax)

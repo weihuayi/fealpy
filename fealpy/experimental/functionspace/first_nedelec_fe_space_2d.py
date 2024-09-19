@@ -25,6 +25,7 @@ class FirstNedelecDof2d():
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
+
     def number_of_local_dofs(self,doftype ='all'):
         p = self.p
         if doftype == 'all':
@@ -88,6 +89,7 @@ class FirstNedelecDof2d():
 
         flag = bm.set_at(flag,(bddof),True)
         return flag
+    
 
 
 class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
@@ -101,6 +103,11 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         self.qf = self.mesh.quadrature_formula(p+3)
         self.ftype = mesh.ftype
         self.itype = mesh.itype
+
+        #TODO:JAX
+        self.device = mesh.device
+        self.TD = mesh.top_dimension()
+        self.GD = mesh.geo_dimension()
 
     @barycentric
     def basis(self, bcs, index=_S):
@@ -356,7 +363,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
     boundary_interpolate = set_dirichlet_bc
 
-    def set_neumann_bc(self,h):
+    def set_neumann_bc(self,gD):
         p = self.p
         mesh = self.mesh
         isbdFace = mesh.boundary_face_flag()
@@ -369,10 +376,10 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         bcs, ws = qf.get_quadrature_points_and_weights()
         bphi = self.edge_basis(bcs,index=isbdFace)
         points = mesh.bc_to_point(bcs)[isbdFace]
-        hval = h(points)
+        t = mesh.edge_unit_tangent()[isbdFace]
+        hval = gD(points,t)
         vec = bm.zeros(gdof, dtype=self.ftype)
-        #vec[edge2dof] = bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm) # (NE, ldof)
-        vec = bm.set_at(vec,(edge2dof),bm.einsum('cqg, cqlg,q,c->cl', hval, bphi,ws,fm))
+        vec[edge2dof] = bm.einsum('eqg, eqlg,q,e->el', hval, bphi,ws,fm) # (NE, ldof)
         return vec
  
 

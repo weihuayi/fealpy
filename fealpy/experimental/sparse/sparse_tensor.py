@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, overload, Dict, Any, TypeVar
+from typing import Optional, Union, overload, Dict, Sequence, Any, TypeVar, Type
 from math import prod
 
 from ..backend import TensorLike, Number, Size
@@ -13,6 +13,7 @@ class SparseTensor():
     _values: Optional[TensorLike]
     _spshape: Size
 
+    ### 1. Data Fetching ###
     # NOTE: These properties should be supported by the indices system
     # in all subclasses.
     @property
@@ -49,6 +50,93 @@ class SparseTensor():
         else:
             return self.shape[dim]
 
+    ### 2. Data Type & Device Management ###
+    def astype(self: _Self, dtype=None, /, *, copy=True) -> _Self:
+        raise NotImplementedError
+
+    def device_put(self: _Self, device=None, /) -> _Self:
+        raise NotImplementedError
+
+    ### 3. Format Conversion ###
+    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
+        """Convert to a dense tensor and return as a new object.
+
+        Parameters:
+            fill_value (int | float, optional): The value to fill the dense tensor with
+                when `self.values()` is None.
+
+        Returns:
+            Tensor: The dense tensor.
+        """
+        raise NotImplementedError
+
+    def toarray(self, *, fill_value: Number=1.0) -> TensorLike:
+        return self.to_dense(fill_value=fill_value)
+
+    def tocoo(self, *, copy=False):
+        raise NotImplementedError
+
+    def tocsr(self, *, copy=False):
+        raise NotImplementedError
+
+    ### 4. Object Conversion ###
+    def to_scipy(self):
+        raise NotImplementedError
+
+    def from_scipy(cls, mat, /):
+        raise NotImplementedError
+
+    ### 5. Manipulation ###
+    def copy(self: _Self) -> _Self:
+        raise NotImplementedError
+
+    def coalesce(self: _Self, accumulate: bool=True) -> _Self:
+        """Sum the duplicated indices and return as a new sparse tensor.
+        Returns self if the indices are already coalesced.
+
+        Parameters:
+            accumulate (bool, optional): Whether to count the occurrences of indices\
+            as new values when `self.values` is None. Defaults to True.
+
+        Returns:
+            SparseTensor: coalesced sparse tensor.
+        """
+        raise NotImplementedError
+
+    def reshape(self: _Self, *shape) -> _Self:
+        raise NotImplementedError
+
+    def ravel(self: _Self) -> _Self:
+        """Return a view with flatten indices on sparse dimensions.
+
+        Returns:
+            SparseTensor: A flatten tensor, shaped (*dense_shape, -1).
+        """
+        return self.reshape(-1)
+
+    def flatten(self: _Self) -> _Self:
+        """Return a copy with flatten indices on sparse dimensions.
+
+        Returns:
+            SparseTensor: A flatten tensor, shaped (*dense_shape, -1).
+        """
+        raise NotImplementedError
+
+    @property
+    def T(self: _Self) -> _Self:
+        raise NotImplementedError
+
+    def tril(self, k: int=0) -> _Self:
+        raise NotImplementedError
+
+    def triu(self, k: int=0) -> _Self:
+        raise NotImplementedError
+
+    @classmethod
+    def concat(cls: Type[_Self], tensors: Sequence[_Self], /, *, axis: int=0) -> _Self:
+        raise NotImplementedError
+
+    ### 6. Arithmetic Operations ###
     def neg(self: _Self) -> _Self:
         raise NotImplementedError
 

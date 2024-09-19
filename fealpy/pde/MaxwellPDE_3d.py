@@ -184,6 +184,9 @@ class BubbleData(MaxwellPDE):
         box = [0, 1, 0, 1, 0, 1]
         mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
         return mesh
+    def domain(self):
+        box = [0, 1, 0, 1, 0, 1]
+        return box 
 
 class XXX3dData():
     def __init__(self, n=2):
@@ -334,7 +337,17 @@ class Bubble3dData():
         X = ((4*x - 2)*(x**2 - x)*(4*y - 2)*(y**2 - y)*(z**2 - z)**2*np.sin(x) + (4*x - 2)*(x**2 - x)*(y**2 - y)**2*(4*z - 2)*(z**2 - z)*np.sin(y) - (x**2 - x)**2*(2*y - 1)*(4*y - 2)*(z**2 - z)**2 + (x**2 - x)**2*(4*y - 2)*(y**2 - y)*(z**2 - z)**2*np.cos(x) - (x**2 - x)**2*(y**2 - y)**2*(2*z - 1)*(4*z - 2) - 4*(x**2 - x)**2*(y**2 - y)**2*(z**2 - z) - 4*(x**2 - x)**2*(y**2 - y)*(z**2 - z)**2)
         Y = (-(2*x - 1)*(4*x - 2)*(y**2 - y)**2*(z**2 - z)**2*np.sin(x) + (4*x - 2)*(x**2 - x)*(4*y - 2)*(y**2 - y)*(z**2 - z)**2 - 2*(4*x - 2)*(x**2 - x)*(y**2 - y)**2*(z**2 - z)**2*np.cos(x) + (x**2 - x)**2*(4*y - 2)*(y**2 - y)*(4*z - 2)*(z**2 - z)*np.sin(y) - (x**2 - x)**2*(y**2 - y)**2*(2*z - 1)*(4*z - 2)*np.sin(x) + (x**2 - x)**2*(y**2 - y)**2*(4*z - 2)*(z**2 - z)*np.cos(y) + (x**2 - x)**2*(y**2 - y)**2*(z**2 - z)**2*np.sin(x) - 4*(x**2 - x)**2*(y**2 - y)**2*(z**2 - z)*np.sin(x) - 4*(x**2 - x)*(y**2 - y)**2*(z**2 - z)**2*np.sin(x))
         Z = -(2*x - 1)*(4*x - 2)*(y**2 - y)**2*(z**2 - z)**2*np.sin(y) + (4*x - 2)*(x**2 - x)*(y**2 - y)**2*(4*z - 2)*(z**2 - z) - (x**2 - x)**2*(2*y - 1)*(4*y - 2)*(z**2 - z)**2*np.sin(y) + (x**2 - x)**2*(4*y - 2)*(y**2 - y)*(4*z - 2)*(z**2 - z)*np.sin(x) - 2*(x**2 - x)**2*(4*y - 2)*(y**2 - y)*(z**2 - z)**2*np.cos(y) + (x**2 - x)**2*(y**2 - y)**2*(z**2 - z)**2*np.sin(y) - 4*(x**2 - x)**2*(y**2 - y)*(z**2 - z)**2*np.sin(y) - 4*(x**2 - x)*(y**2 - y)**2*(z**2 - z)**2*np.sin(y)
-        return np.c_[X, Y, Z]-self.solution(p)
+        return np.concatenate([X, Y, Z], axis=-1)-self.solution(p)
+    
+    @cartesian
+    def curl_solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        f1 = np.cos(y)*(x**2 - x)**2 * (y**2 - y)**2*(z**2 - z)**2 + np.sin(y)*(x**2 - x)**2*(y**2 - y)*2*(2*y-1)*(z**2 - z)**2 - np.sin(x)*(x**2 - x)**2*(y**2 - y)**2*(z**2 - z)* 2 * (2*z-1)
+        f2 = (x**2 - x)**2 * (y**2 - y)**2 * (z**2 - z) * 2 * (2*z-1) - np.sin(y)*2*(x**2 - x)*(2*x-1)*(y**2 - y) ** 2 *(z**2 - z)**2
+        f3 =  np.cos(x)*(x**2 - x)**2 *(y**2 - y)**2 *(z**2 - z)**2 + np.sin(x)*(x**2 - x)*2*(2*x-1)*(y**2 - y)**2 *(z**2 - z)**2 - (x**2 - x)**2 *(y**2 - y)* 2 *(2*y-1)*(z**2 - z)**2
+        return np.concatenate([f1, f2, f3], axis=-1)
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
@@ -347,3 +360,5 @@ class Bubble3dData():
     def domain(self):
         box = [0, 1, 0, 1, 0, 1]
         return box 
+
+

@@ -41,17 +41,17 @@ class MBBBeamCase:
             self.constraint_conditions = ConstraintConditions()
             self.constraint_conditions.set_volume_constraint(is_on=True, vf=0.5)
 
-            volfrac = self.constraint_conditions.get_constraints()['volume']['vf']
-            self.rho = volfrac * bm.ones(self.nx * self.ny, dtype=bm.float64)
+            self.volfrac = self.constraint_conditions.get_constraints()['volume']['vf']
+            self.rho = self.volfrac * bm.ones(self.nx * self.ny, dtype=bm.float64)
 
             self.material_properties = MaterialProperties(
                         E0=1.0, Emin=1e-9, nu=0.3, penal=3.0, 
                         hypo="plane_stress", rho=self.rho,
                         interpolation_model=SIMPInterpolation())
 
-            self.filter_properties = FilterProperties(nx=self.nx, ny=self.ny, 
-                                                    rmin=1.5, ft=0)
-
+            self.filter_properties = FilterProperties(
+                                        nx=self.nx, ny=self.ny, 
+                                        rmin=1.5, ft=1)
 
             def force(points: TensorLike) -> TensorLike:
     
