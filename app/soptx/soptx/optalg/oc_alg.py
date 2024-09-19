@@ -54,7 +54,7 @@ class OCAlg(Optimizer):
         options = self.options
         rho = options['x0']
         max_iters = options['MaxIters']
-        tol_change = options.get('tol_change', 0.01)  # Default tolerance if not provided
+        tol_change = options.get('tol_change', 0.01)
         volume_constraint = options['volume_constraint']
 
         for loop in range(max_iters):
