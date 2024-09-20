@@ -1,13 +1,22 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.backend import TensorLike as _DT
+
+from fealpy.experimental.typing import Union
+
 from fealpy.experimental.opt.objective import Objective
+
 from fealpy.experimental.mesh.mesh_base import Mesh
+
+from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
 
 from app.soptx.soptx.utilfunc.fem_solver import FEMSolver
 from app.soptx.soptx.utilfunc.calculate_ke0 import calculate_ke0
-from app.soptx.soptx.cases.material_properties import MaterialProperties
-from app.soptx.soptx.cases.filter_properties import FilterProperties
+
+from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
+from app.soptx.soptx.cases.boundary_conditions import BoundaryConditions
+
+from app.soptx.soptx.filter.filter_properties import FilterProperties
 
 
 class ComplianceObjective(Objective):
@@ -20,22 +29,99 @@ class ComplianceObjective(Objective):
     
     def __init__(self,
                 mesh: Mesh,
-                space: TensorFunctionSpace,
-                material_properties: MaterialProperties,
-                filter_properties: FilterProperties,
-                displacement_solver: FEMSolver) -> None:
+                space_degree: int,
+                dof_per_node: int,
+                dof_ordering: str,
+                material_properties: ElasticMaterialProperties,
+                filter_type: Union[int, str],
+                filter_rmin: float,
+                boundary_conditions: BoundaryConditions,
+                solver_method: str) -> None:
         """
         Initialize the compliance objective function.
         """
         super().__init__()
         self.mesh = mesh
-        self.space = space
+        self.space_degree = space_degree
+        self.dof_per_node = dof_per_node
+        self.dof_ordering = dof_ordering
         self.material_properties = material_properties
-        self.filter_properties = filter_properties
-        self.displacement_solver = displacement_solver
+        self.filter_type = filter_type
+        self.filter_rmin = filter_rmin
+        self.boundary_conditions = boundary_conditions
+        self.solver_method = solver_method
+
+        self.space = self._create_function_space(self.space_degree, 
+                                                self.dof_per_node, self.dof_ordering)
+        self.filter_properties = self._create_filter_properties(self.filter_type, 
+                                                            self.filter_rmin)
+        self.displacement_solver = self._create_displacement_solver(self.solver_method)
 
         self.ke0 = calculate_ke0(material_properties=self.material_properties, 
                                 tensor_space=self.space)
+
+
+    def _create_function_space(self, degree: int, 
+                            dof_per_node: int, dof_ordering: str) -> TensorFunctionSpace:
+        """
+        Create a TensorFunctionSpace instance based on the given degree, 
+            DOF per node, and DOF ordering.
+
+        Args:
+            degree (int): Degree of the function space.
+            dof_per_node (int): Number of degrees of freedom per node.
+            dof_ordering (str): DOF ordering, either 'dof-priority' or 'gd-priority'.
+
+        Returns:
+            TensorFunctionSpace: An instance of TensorFunctionSpace.
+        """
+        space_C = LagrangeFESpace(mesh=self.mesh, p=degree, ctype='C')
+
+        if dof_ordering == 'gd-priority':
+            shape = (-1, dof_per_node)
+        elif dof_ordering == 'dof-priority':
+            shape = (dof_per_node, -1)
+        else:
+            raise ValueError("Invalid DOF ordering. Use 'gd-priority' or 'dof-priority'.")
+
+        return TensorFunctionSpace(space=space_C, shape=shape)
+
+    def _create_filter_properties(self, filter_type: Union[int, str], 
+                                filter_rmin: float) -> FilterProperties:
+        """
+        Create a FilterProperties instance based on the given filter type and radius.
+
+        Args:
+            filter_type (Union[int, str]): Type of the filter 
+                (either 'density', 'sensitivity', 0, or 1).
+            rmin (float): Filter radius.
+
+        Returns:
+            FilterProperties: An instance of FilterProperties.
+        """
+        if filter_type == 'density' or filter_type == 0:
+            ft = 0
+        elif filter_type == 'sensitivity' or filter_type == 1:
+            ft = 1
+        else:
+            raise ValueError("Invalid filter type. Use 'density', 'sensitivity', 0, or 1.")
+
+        return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
+
+    def _create_displacement_solver(self, solver_method: str) -> FEMSolver:
+        """
+        Create a FEMSolver instance based on the given solver method.
+
+        Args:
+            solver_method (str): The method used to solve the system (e.g., 'mumps' for direct or 'cg' for iterative).
+
+        Returns:
+            FEMSolver: An instance of FEMSolver with the specified solving method.
+        """
+        return FEMSolver(material_properties=self.material_properties,
+                        tensor_space=self.space,
+                        boundary_conditions=self.boundary_conditions,
+                        solver_method=solver_method)
 
     def _compute_uhe_and_ce(self, rho: _DT):
         """
