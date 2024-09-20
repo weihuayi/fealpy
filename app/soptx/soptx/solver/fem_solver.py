@@ -7,18 +7,23 @@ from fealpy.experimental.sparse import COOTensor
 from fealpy.experimental.solver import cg
 
 class FEMSolver:
-    def __init__(self, material_properties, tensor_space, boundary_conditions):
+    def __init__(self, material_properties, 
+                tensor_space, pde, solver_method):
         """
         Initialize the FEMSolver with the provided parameters.
 
         Args:
             material_properties: MaterialProperties object defining material behavior.
             tensor_space: TensorFunctionSpace object for the computational space.
-            boundary_conditions: BoundaryConditions object defining boundary conditions.
+            pde: PDEData object defining boundary conditions and forces.
+            solver_method (str): The method used to solve the system 
+                (e.g., 'mumps' for direct or 'cg' for iterative).
+
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
-        self.boundary_conditions = boundary_conditions
+        self.pde = pde
+        self.solver_method = solver_method
 
         self.uh = tensor_space.function()
         self.KE = None
@@ -34,7 +39,8 @@ class FEMSolver:
         """
         Assemble the global stiffness matrix using the material properties and integrator.
         """
-        integrator = LinearElasticIntegrator(material=self.material_properties, q=self.tensor_space.p+3)
+        integrator = LinearElasticIntegrator(material=self.material_properties, 
+                                            q=self.tensor_space.p+3)
         self.KE = integrator.assembly(space=self.tensor_space)
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
@@ -44,11 +50,11 @@ class FEMSolver:
         """
         Apply boundary conditions to the stiffness matrix and force vector.
         """
-        force = self.boundary_conditions.force
-        dirichlet = self.boundary_conditions.dirichlet
-        is_dirichlet_boundary_edge = self.boundary_conditions.is_dirichlet_boundary_edge
-        is_dirichlet_node = self.boundary_conditions.is_dirichlet_node
-        is_dirichlet_direction = self.boundary_conditions.is_dirichlet_direction
+        force = self.pde.force
+        dirichlet = self.pde.dirichlet
+        is_dirichlet_boundary_edge = self.pde.is_dirichlet_boundary_edge
+        is_dirichlet_node = self.pde.is_dirichlet_node
+        is_dirichlet_direction = self.pde.is_dirichlet_direction
 
         self.F = self.tensor_space.interpolate(force)
 
@@ -86,7 +92,13 @@ class FEMSolver:
         """
         if self.K is None or self.F is None:
             raise ValueError("Stiffness matrix K or force vector F has not been assembled.")
-        self.uh[:] = cg(self.K, self.F, maxiter=5000, atol=1e-14, rtol=1e-14)
+        
+        if self.solver_method == 'cg':
+            self.uh[:] = cg(self.K, self.F, maxiter=5000, atol=1e-14, rtol=1e-14)
+        elif self.solver_method == 'mumps':
+            raise NotImplementedError("Direct solver using MUMPS is not implemented.")
+        else:
+            raise ValueError(f"Unsupported solver method: {self.solver_method}")
 
         return self.uh
     

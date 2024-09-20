@@ -1,6 +1,8 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.backend import TensorLike as _DT
 
+from builtins import int, str, float, object
+
 from fealpy.experimental.typing import Union
 
 from fealpy.experimental.opt.objective import Objective
@@ -10,7 +12,8 @@ from fealpy.experimental.mesh.mesh_base import Mesh
 from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
 
-from app.soptx.soptx.utilfunc.fem_solver import FEMSolver
+from app.soptx.soptx.solver.fem_solver import FEMSolver
+
 from app.soptx.soptx.utilfunc.calculate_ke0 import calculate_ke0
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
@@ -18,6 +21,7 @@ from app.soptx.soptx.cases.boundary_conditions import BoundaryConditions
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 
+from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 
 class ComplianceObjective(Objective):
     """
@@ -35,8 +39,9 @@ class ComplianceObjective(Objective):
                 material_properties: ElasticMaterialProperties,
                 filter_type: Union[int, str],
                 filter_rmin: float,
-                boundary_conditions: BoundaryConditions,
-                solver_method: str) -> None:
+                pde: object,
+                solver_method: str,
+                volume_constraint: VolumeConstraint) -> None:
         """
         Initialize the compliance objective function.
         """
@@ -48,8 +53,9 @@ class ComplianceObjective(Objective):
         self.material_properties = material_properties
         self.filter_type = filter_type
         self.filter_rmin = filter_rmin
-        self.boundary_conditions = boundary_conditions
+        self.pde = pde
         self.solver_method = solver_method
+        self.volume_constraint = volume_constraint
 
         self.space = self._create_function_space(self.space_degree, 
                                                 self.dof_per_node, self.dof_ordering)
@@ -84,7 +90,7 @@ class ComplianceObjective(Objective):
         else:
             raise ValueError("Invalid DOF ordering. Use 'gd-priority' or 'dof-priority'.")
 
-        return TensorFunctionSpace(space=space_C, shape=shape)
+        return TensorFunctionSpace(scalar_space=space_C, shape=shape)
 
     def _create_filter_properties(self, filter_type: Union[int, str], 
                                 filter_rmin: float) -> FilterProperties:
@@ -120,7 +126,7 @@ class ComplianceObjective(Objective):
         """
         return FEMSolver(material_properties=self.material_properties,
                         tensor_space=self.space,
-                        boundary_conditions=self.boundary_conditions,
+                        pde=self.pde,
                         solver_method=solver_method)
 
     def _compute_uhe_and_ce(self, rho: _DT):

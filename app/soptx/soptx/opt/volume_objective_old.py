@@ -1,55 +1,31 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.backend import TensorLike as _DT
 
-from fealpy.experimental.typing import Union
-
 from fealpy.experimental.opt.objective import Constraint
 from fealpy.experimental.mesh.mesh_base import Mesh
 
-from app.soptx.soptx.filter.filter_properties import FilterProperties
+from app.soptx.soptx.cases.filter_properties import FilterProperties
 
 
 class VolumeConstraint(Constraint):
     def __init__(self, 
-                 mesh: Mesh,
-                 volfrac: float,
-                 filter_type: Union[int, str],
-                 filter_rmin: float) -> None:
+                mesh: Mesh,
+                volfrac: float,
+                filter_properties: FilterProperties) -> None:
         """
         Initialize the volume constraint for topology optimization.
 
         Parameters:
             mesh (Mesh): The mesh object containing information about the finite element mesh.
             volfrac (float): The desired volume fraction of the structure.
-            filter_type (Union[int, str]): The filter type, either 'density', 'sensitivity', 0, or 1.
-            filter_rmin (float): The filter radius, which controls the minimum feature size.
+            filter_properties (FilterProperties): The filter properties containing H, Hs, 
+                and the filter type (ft), which determines the use of density or sensitivity filter.
         """
         self.mesh = mesh
         self.volfrac = volfrac
-
-        self.filter_properties = self._create_filter_properties(filter_type, filter_rmin)
+        self.filter_properties = filter_properties
 
         super().__init__(self.fun, self.jac, type='ineq')
-
-    def _create_filter_properties(self, filter_type: Union[int, str], filter_rmin: float) -> FilterProperties:
-        """
-        Create a FilterProperties instance based on the given filter type and radius.
-
-        Args:
-            filter_type (Union[int, str]): Type of the filter (either 'density', 'sensitivity', 0, or 1).
-            filter_rmin (float): Filter radius.
-
-        Returns:
-            FilterProperties: An instance of FilterProperties.
-        """
-        if filter_type == 'density' or filter_type == 0:
-            ft = 0
-        elif filter_type == 'sensitivity' or filter_type == 1:
-            ft = 1
-        else:
-            raise ValueError("Invalid filter type. Use 'density', 'sensitivity', 0, or 1.")
-
-        return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 
     def fun(self, rho: _DT) -> float:
         """
@@ -80,12 +56,17 @@ class VolumeConstraint(Constraint):
             rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
             # rho_phys = H.matmul(rho) / Hs
 
+        # 假设所以单元面积相等（均匀网格）
+        # NC = self.mesh.number_of_cells()
+        # cneq = bm.sum(rho_phys[:]) - self.volfrac * NC
+
+        # 单元面积不等（非均匀网格）
         volfrac_true = bm.einsum('c, c -> ', cell_measure, rho_phys[:]) / bm.sum(cell_measure)
         gneq = volfrac_true - self.volfrac
         
         return gneq
 
-    def jac(self) -> _DT:
+    def jac(self, rho: _DT) -> _DT:
         """
         Compute the gradient of the volume constraint function.
 

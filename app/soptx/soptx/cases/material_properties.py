@@ -17,42 +17,13 @@ class MaterialInterpolation(ABC):
         self.name = name
 
     @abstractmethod
-    def calculate_modulus(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
-        """
-        Calculate the effective Young's modulus.
-
-        This is an abstract method to be implemented by subclasses. Different interpolation methods
-        like SIMP and RAMP will provide specific implementations.
-
-        Args:
-            rho (TensorLike): Density distribution of the material.
-            E0 (float): Young's modulus of the solid material.
-            Emin (float): Young's modulus of the void or empty space.
-            penal (float): Penalization factor for the interpolation method.
-
-        Returns:
-            TensorLike: Calculated Young's modulus based on the density distribution.
-        """
+    def calculate_property(self, rho: TensorLike, 
+                        P0: float, Pmin: float, penal: float) -> TensorLike:
         pass
 
     @abstractmethod
-    def calculate_modulus_derivative(self, rho: TensorLike, 
-                                    E0: float, Emin: float, penal: float) -> TensorLike:
-        """
-        Calculate the derivative of the Young's modulus.
-
-        This is an abstract method to be implemented by subclasses. 
-        This derivative is used for sensitivity analysis.
-
-        Args:
-            rho (TensorLike): Density distribution of the material.
-            E0 (float): Young's modulus of the solid material.
-            Emin (float): Young's modulus of the void or empty space.
-            penal (float): Penalization factor for the interpolation method.
-
-        Returns:
-            TensorLike: Derivative of Young's modulus with respect to density.
-        """
+    def calculate_property_derivative(self, rho: TensorLike, 
+                                    P0: float, Pmin: float, penal: float) -> TensorLike:
         pass
 
 class ElasticMaterialProperties(LinearElasticMaterial):
