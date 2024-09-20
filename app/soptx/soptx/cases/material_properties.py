@@ -1,13 +1,21 @@
 from fealpy.experimental.backend import backend_manager as bm
-
-from builtins import float, int, str
-from typing import Optional
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.material.elastic_material import LinearElasticMaterial
 
+from builtins import float, int, str
+from typing import Optional
 from abc import ABC, abstractmethod
 
 class MaterialInterpolation(ABC):
+    def __init__(self, name: str):
+        """
+        Initialize the material interpolation model.
+
+        Args:
+            name (str): Name of the interpolation model.
+        """
+        self.name = name
+
     @abstractmethod
     def calculate_modulus(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
         """
@@ -155,6 +163,9 @@ class MaterialProperties(LinearElasticMaterial):
                 f"interpolation_model={interpolation_model_name})")
     
 class SIMPInterpolation(MaterialInterpolation):
+    def __init__(self):
+        super().__init__(name="SIMP")
+        
     def calculate_modulus(self, rho: TensorLike, E0: float, Emin: float, penal: float) -> TensorLike:
         """
         Calculate the effective Young's modulus using the SIMP approach.

@@ -11,7 +11,7 @@ from app.soptx.soptx.cases.top_opt_porblem import ComplianceMinimization
 from app.soptx.soptx.utilfunc.sensitivity_calculations import manual_objective_sensitivity
 from app.soptx.soptx.optalg.compliance_objective import ComplianceObjective
 from app.soptx.soptx.optalg.volume_objective import VolumeConstraint
-from app.soptx.soptx.optalg.oc_alg import OCAlg
+# from app.soptx.soptx.optalg.oc_alg import OCAlg
 
 backend = 'pytorch'
 bm.set_backend(backend)
@@ -73,24 +73,6 @@ compliance_constraint = VolumeConstraint(mesh=mesh, volfrac=volfrac,
 cneq = compliance_constraint.fun(rho=material_properties.rho)
 
 gradc = compliance_constraint.jac()
-
-
-from scipy.optimize import minimize
-
-result = minimize(
-    fun=objective_function,
-    x0=rho0,
-    method='trust-constr',
-    jac=True,
-    hess=hessian_function,
-    constraints=constraints,
-    options={'maxiter': 100, 'disp': True}
-)
-
-# 拉格朗日乘子
-lambda_ = result.v
-lambda_ineq = lambda_['ineq']  # 不等式约束
-lambda_eq = lambda_['eq']      # 等式约束
 
 
 
