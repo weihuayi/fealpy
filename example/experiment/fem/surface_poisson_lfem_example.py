@@ -19,9 +19,9 @@ from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
+from scipy.sparse import bmat
 from fealpy.experimental.solver import cg
 #from scipy.sparse.linalg import spsolve
-#from scipy.sparse import bmat
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -68,11 +68,11 @@ mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
 
 space = ParametricLagrangeFESpace(mesh, p=sdegree)
 #tmr.send(f'第{i}次空间时间')
-
+uI = space.interpolate(pde.solution)
 uh = space.function()
 
-bform = BilinearForm(space)
-bform.add_integrator(ScalarDiffusionIntegrator())
+bfrom = BilinearForm(space)
+bfrom.add_integrator(ScalarDiffusionIntegrator())
 lfrom = LinearForm(space)
 lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
 
@@ -84,6 +84,7 @@ C = space.integral_basis()
 A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
 F = bm.r_[F, 0]
 
-uh = space.function()
-x = spsolve(A, F).reshape(-1)
-uh[:] = x[:-1]
+uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+
+error = mesh.error(pde.solution, uh)
+print(error)
