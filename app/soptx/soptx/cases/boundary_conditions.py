@@ -23,7 +23,7 @@ class BoundaryConditions:
         self.force_func = force_func
         self.dirichlet_func = dirichlet_func
         self.is_dirichlet_boundary_edge_func = is_dirichlet_boundary_edge_func
-        self.is_dirichlet_node_func = is_dirichlet_node_func  # 新增的属性
+        self.is_dirichlet_node_func = is_dirichlet_node_func
         self.is_dirichlet_direction_func = is_dirichlet_direction_func
 
     def force(self, points):

@@ -1,7 +1,7 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike
 
-from ...soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
+# from ...soptx.cases.material_properties import MaterialProperties, SIMPInterpolation
 from ...soptx.cases.geometry_properties import GeometryProperties
 from ...soptx.cases.filter_properties import FilterProperties
 from ...soptx.cases.constraint_conditions import ConstraintConditions
@@ -51,7 +51,7 @@ class MBBBeamCase:
 
             self.filter_properties = FilterProperties(
                                         nx=self.nx, ny=self.ny, 
-                                        rmin=1.5, ft=0)
+                                        rmin=1.5, ft=1)
 
             def force(points: TensorLike) -> TensorLike:
     
