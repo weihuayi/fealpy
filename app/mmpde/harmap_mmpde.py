@@ -1,6 +1,7 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.mesh import TriangleMesh
+from fealpy.experimental.mesh import IntervalMesh
 from fealpy.mesh import TriangleMesh as TM
 from fealpy.experimental.functionspace import LagrangeFESpace
 from fealpy.experimental.fem import (BilinearForm 
@@ -196,7 +197,7 @@ class Harmap_MMPDE():
                  uh:TensorLike,
                  pde ,
                  beta :float ,
-                 alpha = 0.9, 
+                 alpha = 0.5, 
                  mol_times = 1 , 
                  redistribute = True) -> None:
         """
@@ -210,7 +211,10 @@ class Harmap_MMPDE():
         """
         self.mesh = mesh
         self.uh = uh
+        self.pde = pde
+        self.beta = beta
         self.alpha = alpha
+        self.mol_times = mol_times
         self.node = mesh.entity('node')
         self.cell = mesh.entity('cell')
 
@@ -231,17 +235,14 @@ class Harmap_MMPDE():
         self.bdtangent = LM.bdtangent
         self.isconvex = LM.is_convex()
 
-        self.star_measure = self.get_star_measure()
+        self.star_measure,self.i,self.j = self.get_star_measure()
         self.G = self.get_control_function(beta,mol_times)
         self.A , self.b = self.get_linear_constraint()
 
     def __call__(self):
         logic_node,vector_field = self.solve()
-        if self.isconvex:
-            mesh = TriangleMesh(logic_node,self.cell)
-        else:
-            node = self.get_physical_node(vector_field,logic_node)
-            mesh = TriangleMesh(node,self.cell)
+        node = self.get_physical_node(vector_field,logic_node)
+        mesh = TriangleMesh(node,self.cell)
         return mesh
     
 
@@ -252,7 +253,7 @@ class Harmap_MMPDE():
         star_measure = bm.zeros_like(self.node[:,0],dtype=bm.float64)
         i,j = bm.nonzero(self.node2cell)
         bm.add_at(star_measure , i , self.cm[j])
-        return star_measure
+        return star_measure,i,j
     
     def get_control_function(self,beta, mol_times):
         """
@@ -264,27 +265,19 @@ class Harmap_MMPDE():
         cell = self.cell
 
         cm = self.cm
-        uh = self.uh
-        node2cell = self.node2cell
-        i , j = bm.nonzero(node2cell)
-
-        bdvect_incell = node[cell][:,[2,0,1]] - node[cell][:,[1,2,0]]
-        gphi_incell = 0.5 / cm[:,None,None] * bdvect_incell @ self.W
-        guh_incell = bm.sum(uh[cell,None] * gphi_incell,axis=1)
+        gphi = self.mesh.grad_lambda()
+        guh_incell = bm.sum(self.uh[self.cell,None] * gphi,axis=1)
 
         M_incell = bm.sqrt(1  + beta *bm.sum( guh_incell**2,axis=1))
         M = bm.zeros(node.shape[0],dtype=bm.float64)
         if mol_times == 0:
-            bm.add_at(M , i , (cm *M_incell)[j])
+            bm.add_at(M , self.i , (cm *M_incell)[self.j])
         else:
             for k in range(mol_times):
-                bm.add_at(M , i , (cm *M_incell)[j])
+                bm.add_at(M , self.i , (cm *M_incell)[self.j])
                 M /= self.star_measure
                 M_incell = bm.mean(M[cell],axis=1)
-        if self.isconvex:
-            return M
-        else:
-            return 1/M
+        return 1/M_incell
         
     def get_stiff_matrix(self):
         """
@@ -299,10 +292,8 @@ class Harmap_MMPDE():
 
         cell2dof = space.cell_to_dof()
         GDOF = space.number_of_global_dofs()
-        # G = bm.sum(self.G[cell2dof][:,None,:,:,:] * 
-        #            bcs[:,:,None,None],axis=2)
-        G = bm.sum(self.G[cell2dof][:,None,:] * bcs , axis=2)
-        H = bm.einsum('q , cqid , cq ,cqjd, c -> cij ',ws, gphi ,G , gphi, self.cm)
+    
+        H = bm.einsum('q , cqid , c ,cqjd, c -> cij ',ws, gphi ,self.G , gphi, self.cm)
         I = bm.broadcast_to(cell2dof[:, :, None], shape=H.shape)
         J = bm.broadcast_to(cell2dof[:, None, :], shape=H.shape)
         H = csr_matrix((H.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
@@ -361,16 +352,18 @@ class Harmap_MMPDE():
 
         # 获得一个初始逻辑网格点的拷贝
         init_logic_node = logic_node.copy()
+        process_logic_node = logic_node.copy()
         if self.redistribute:
-            logic_node = self.redistribute_boundary()
+            process_logic_node = self.redistribute_boundary()
         # 移动逻辑网格点
-        f1 = -H12@logic_node[isBdNode,0]
-        f2 = -H12@logic_node[isBdNode,1]
+        f1 = -H12@process_logic_node[isBdNode,0]
+        f2 = -H12@process_logic_node[isBdNode,1]
         
         move_innerlogic_node_x = spsolve(H11, f1)
         move_innerlogic_node_y = spsolve(H11, f2)
-        logic_node = bm.set_at(logic_node , ~isBdNode, 
-                                bm.stack([move_innerlogic_node_x,move_innerlogic_node_y],axis=1))
+        process_logic_node = bm.set_at(process_logic_node , ~isBdNode, 
+                                bm.stack([move_innerlogic_node_x,
+                                          move_innerlogic_node_y],axis=1))
         
         f1 = -H21@move_innerlogic_node_x
         f2 = -H21@move_innerlogic_node_y
@@ -381,12 +374,13 @@ class Harmap_MMPDE():
         A0 = bmat([[A1,A.T],[A,zero_matrix]],format='csr')
 
         move_bdlogic_node = spsolve(A0,b0)[:2*H22.shape[0]]
-        logic_node = bm.set_at(logic_node , isBdNode,
+        process_logic_node = bm.set_at(process_logic_node , isBdNode,
                                 bm.stack((move_bdlogic_node[:H22.shape[0]],
                                         move_bdlogic_node[H22.shape[0]:]),axis=1))
 
-        logic_node = bm.set_at(logic_node , vertex_idx,init_logic_node[vertex_idx])
-        vector_field = init_logic_node - logic_node  
+        process_logic_node = bm.set_at(process_logic_node , 
+                                       vertex_idx,init_logic_node[vertex_idx])
+        vector_field = init_logic_node - process_logic_node  
         return logic_node,vector_field
 
     def get_physical_node(self,vector_field,logic_node_move):
@@ -400,7 +394,7 @@ class Harmap_MMPDE():
         A = (node[cell[:,1:]] - node[cell[:,0,None]]).transpose(0,2,1)
         B = (logic_node_move[cell[:,1:]] - logic_node_move[cell[:,0,None]]).transpose(0,2,1)
 
-        grad_x_incell = (bm.linalg.inv(B) @ A) * cm[:,None,None]
+        grad_x_incell = (A@bm.linalg.inv(B)) * cm[:,None,None]
 
         i,j = bm.nonzero(self.node2cell)
         grad_x = bm.zeros((node.shape[0],2,2),dtype=bm.float64)
@@ -418,8 +412,10 @@ class Harmap_MMPDE():
         a = C[:,0,0]*C[:,1,1] - C[:,0,1]*C[:,1,0]
         b = A[:,0,0]*C[:,1,1] - A[:,0,1]*C[:,1,0] + C[:,0,0]*A[:,1,1] - C[:,0,1]*A[:,1,0]
         c = A[:,0,0]*A[:,1,1] - A[:,0,1]*A[:,1,0]
-        x1 = (-b + bm.sqrt(b**2 - 4*a*c))/(2*a)
-        x2 = (-b - bm.sqrt(b**2 - 4*a*c))/(2*a)
+        discriminant = b**2 - 4*a*c
+        discriminant = bm.where(discriminant > 0, discriminant, 0)
+        x1 = (-b + bm.sqrt(discriminant))/(2*a)
+        x2 = (-b - bm.sqrt(discriminant))/(2*a)
         positive_x1 = bm.where(x1 > 0, x1, bm.inf)
         positive_x2 = bm.where(x2 > 0, x2, bm.inf)
         eta = bm.min([bm.min(positive_x1),bm.min(positive_x2),1])
@@ -435,11 +431,21 @@ class Harmap_MMPDE():
         logic_node = self.logic_node
         side_node_idx = self.side_node_idx
         vertex_idx = self.vertex_idx
+        isBdedge = self.mesh.boundary_edge_flag()
+        node2edge = self.mesh.node_to_edge()
+        edge2cell = self.mesh.edge_to_cell()
         # 每条边上做一维等分布,采用差分方式
         for i in range(len(side_node_idx)):
             side_node_idx_bar = bm.concatenate(([vertex_idx[i]],
                                             side_node_idx[f'side{i}'],
                                             [vertex_idx[(i+1)%len(side_node_idx)]]))
+            side_node2edge = node2edge[side_node_idx[f'side{i}']][:,isBdedge]
+            i,j = bm.nonzero(side_node2edge)
+            _,k = bm.unique(j,return_index=True)
+            j = j[bm.sort(k)]
+            side_cell_idx = edge2cell[isBdedge][j][:,0]
+            side_G = self.G[side_cell_idx]
+
             NN = side_node_idx_bar.shape[0]
             side_node = node[side_node_idx_bar]
             side_length = bm.linalg.norm(side_node[-1] - side_node[0])
@@ -451,34 +457,29 @@ class Harmap_MMPDE():
                             [bm.sin(-angle),bm.cos(-angle)]])
             rate =bm.linalg.norm(direction)/side_length
 
-            edge_length = bm.linalg.norm(side_node[1:] - side_node[:-1],axis=1)
-            uh_side = self.uh[side_node_idx_bar]
-            if self.isconvex:
-                val1 = bm.sqrt(1+ ((uh_side[1:] - uh_side[:-1])/edge_length)**2)
-            else:
-                val1 = 1/bm.sqrt(1+ ((uh_side[1:] - uh_side[:-1])/edge_length)**2)
-            val2 = bm.ones(NN,dtype=bm.float64)
-            val2 = bm.set_at(val2 , slice(1,NN-1),-val1[1:] - val1[:-1])
-            K = bm.arange(NN)
-            A = diags([val2] , [0] , shape = (NN,NN),format='csr')
-            I = K[1:]
-            J = K[:-1]
-            A += csr_matrix((val1.flatten() ,(I,J)) ,shape = (NN,NN))
-            A += csr_matrix((val1.flatten() ,(J,I)) ,shape = (NN,NN))
+            x = bm.linalg.norm(side_node - side_node[0],axis=1)
+            cell = bm.stack([bm.arange(NN-1),bm.arange(1,NN)],axis=1)
+            side_mesh = IntervalMesh(x , cell)
+            space = LagrangeFESpace(side_mesh, p=1)
+            qf = side_mesh.integrator(q=3)
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            gphi = space.grad_basis(bcs)
+            cell2dof = space.cell_to_dof()
+            GDOF = space.number_of_global_dofs()
+            H = bm.einsum('q , qcid , c ,qcjd, c -> cij ',ws, gphi ,side_G , gphi, side_mesh.entity_measure('cell'))
+            I = bm.broadcast_to(cell2dof[:, :, None], shape=H.shape)
+            J = bm.broadcast_to(cell2dof[:, None, :], shape=H.shape)
+            H = csr_matrix((H.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
+            lform = LinearForm(space)
+            lform.add_domain_integrator(ScalarSourceIntegrator(f=lambda x:0,q=3))
+            F = lform.assembly()
             bdIdx = bm.zeros(NN , dtype= bm.int32)
-            bdIdx = bm.set_at(bdIdx , [0,-1],1)
+            bdIdx[[0,-1]] = 1
             D0 = spdiags(1-bdIdx ,0, NN, NN)
             D1 = spdiags(bdIdx , 0 , NN, NN)
-            A = D0@A + D1
-            F = bm.zeros(NN,dtype=bm.float64)
-            F = bm.set_at(F , [0,-1],[0,side_length])
-            x = bm.linalg.norm(side_node - side_node[0],axis=1)
-            while True:
-                new_x = spsolve(A,F)
-                if bm.linalg.norm(x - new_x) < 1e-10:
-                    break
-                x = new_x
-            
+            H = D0@H + D1
+            F[[0,-1]] = x[[0,-1]]
+            x = spsolve(H,F)  
             logic_side_node = logic_side_node[0] + rate * \
                                 bm.stack([x,bm.zeros_like(x)],axis=1) @ rotate
             logic_node = bm.set_at(logic_node , side_node_idx_bar[1:-1] , logic_side_node[1:-1])
@@ -486,40 +487,34 @@ class Harmap_MMPDE():
         return logic_node
     
     # 更新插值
-    def interplate(self,N,move_node):
+    def interpolate(self,move_node):
         """
         @breif 将解插值到新网格上
         """
-        node =self.node
-        K = bm.arange(N+1)
-        # 定义常微分方程
-        def ODEs(tau , uh):
-            node_homotopy = node + tau * (move_node - node)
-            mesh0 = TriangleMesh(node_homotopy,self.cell)
-            space = LagrangeFESpace(mesh0, p=1)
-            qf = mesh0.integrator(3,'cell')
-            bcs, ws = qf.get_quadrature_points_and_weights()
-            cm = mesh0.entity_measure('cell')
-            phi = space.basis(bcs)
-            H = bm.einsum('q , qci ,qcj, c -> cij ',ws, phi ,phi , cm)
-            
-            gphi = space.grad_basis(bcs)
-            delta_x = node - move_node
-            G = bm.einsum('q , qcid , cid , qcj ,c -> cij' , ws , gphi,  delta_x[self.cell], phi, cm)
-
-            GDOF = space.number_of_global_dofs()
-            I = bm.broadcast_to(space.cell_to_dof()[:, :, None], shape=G.shape)
-            J = bm.broadcast_to(space.cell_to_dof()[:, None, :], shape=G.shape)
-            H = csr_matrix((H.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
-            G = csr_matrix((G.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
-            f = spsolve(H , G@uh)
+        delta_x = self.node - move_node
+        mesh0 = TriangleMesh(move_node,self.cell)
+        space = LagrangeFESpace(mesh0, p=1)
+        qf = mesh0.integrator(3,'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cm = mesh0.entity_measure('cell')
+        phi = space.basis(bcs)
+        H = bm.einsum('q , qci ,qcj, c -> cij ',ws, phi ,phi , cm)   
+        gphi = space.grad_basis(bcs)
+        G = bm.einsum('q , qcid , cid , qcj ,c -> cij' , ws , gphi,  delta_x[self.cell], phi, cm)
+        GDOF = space.number_of_global_dofs()
+        I = bm.broadcast_to(space.cell_to_dof()[:, :, None], shape=G.shape)
+        J = bm.broadcast_to(space.cell_to_dof()[:, None, :], shape=G.shape)
+        H = csr_matrix((H.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
+        G = csr_matrix((G.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
+        def ODEs(t,y):
+            f = spsolve(H,G@y)
             return f
         # 初值条件  
         uh0 = self.uh
         # 范围
         tau_span = [0,1]
         # 求解
-        sol = solve_ivp(ODEs,tau_span,uh0,t_eval=K/N,method='RK23')
+        sol = solve_ivp(ODEs,tau_span,uh0,method='RK23')
         return sol.y[:,-1]
     
     def construct(self,new_mesh):
@@ -528,60 +523,44 @@ class Harmap_MMPDE():
         @param new_mesh 新的网格
         """
         self.mesh = new_mesh
-
-        space = LagrangeFESpace(self.mesh, p=1)
-        bform = BilinearForm(space)
-        bform.add_domain_integrator(ScalarDiffusionIntegrator(q=3))
-        A = bform.assembly()
-        lform = LinearForm(space)
-        lform.add_domain_integrator(ScalarSourceIntegrator(f = self.pde.source, q=3))
-        F = lform.assembly()
-        bc = DirichletBC(space = space, gD = self.pde.dirichlet) # 创建 Dirichlet 边界条件处理对象
-        uh = space.function() # 创建有限元函数对象
-        A, F = bc.apply(A, F, uh)
-        uh[:] = spsolve(A, F)
-
+        # node 更新之前完成插值
+        self.uh = self.interpolate(self.node)
         self.node = new_mesh.entity('node')
         self.cm = new_mesh.entity_measure('cell')
-        uh = self.interplate(10,self.node)
-        self.uh = uh
-        LM = LogicMesh(new_mesh)
-        self.logic_mesh = LM()
-        self.logic_node = self.logic_mesh.entity('node')
 
-        self.star_measure = self.get_star_measure(self.mesh)
+        self.star_measure = self.get_star_measure(self.mesh)[0]
+
         self.G = self.get_control_function(self.beta,self.mol_times)
 
-    def solve_elliptic_Equ(self,tol = 5e-2):
+    def solve_elliptic_Equ(self,tol = None , maxit = 100):
         """
         @breif 求解椭圆方程
         @param pde PDEData
         @param tol 容许误差
+        @param maxit 最大迭代次数
         """
-        em = self.logic_mesh.entity('edge').copy()
+         # 计算容许误差
+        em = self.logic_mesh.entity_measure('edge')
         if tol is None:
             tol = bm.min(em)* 0.1
-        i = 0
-        while True:
-            i += 1
-            init_logic_node = self.logic_node.copy()
+            print(f'容许误差为{tol}')
+
+        init_logic_node = self.logic_node.copy()
+
+        for i in range(maxit):
             logic_node,vector_field = self.solve()
             L_infty_error = bm.max(bm.linalg.norm(init_logic_node - logic_node,axis=1))
-            print(f'第{i}次迭代的差值为{L_infty_error}')
+            print(f'第{i+1}次迭代的差值为{L_infty_error}')
             if L_infty_error < tol:
-                if self.isconvex:
-                    mesh0 = TriangleMesh(logic_node,self.cell)
-                else:
-                    node = self.get_physical_node(vector_field,logic_node)
-                    mesh0 = TriangleMesh(node,self.cell)
-                print(f'迭代总次数:{i}次')
+                node = self.get_physical_node(vector_field,logic_node)
+                mesh0 = TriangleMesh(node,self.cell)
+                print(f'迭代总次数:{i+1}次')
                 return mesh0
+            elif i == maxit - 1:
+                print('超出最大迭代次数')
+                break
             else:
-                if self.isconvex:
-                    mesh0 = TriangleMesh(logic_node,self.cell)
-                    self.construct(mesh0)
-
-                else:
-                    node = self.get_physical_node(vector_field,logic_node)
-                    mesh0 = TriangleMesh(node,self.cell)
-                    self.construct(mesh0)
+                node = self.get_physical_node(vector_field,logic_node)
+                mesh0 = TriangleMesh(node,self.cell)
+                self.construct(mesh0)
+                init_logic_node = logic_node.copy()
