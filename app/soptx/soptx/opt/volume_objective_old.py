@@ -9,9 +9,9 @@ from app.soptx.soptx.cases.filter_properties import FilterProperties
 
 class VolumeConstraint(Constraint):
     def __init__(self, 
-                 mesh: Mesh,
-                 volfrac: float,
-                 filter_properties: FilterProperties) -> None:
+                mesh: Mesh,
+                volfrac: float,
+                filter_properties: FilterProperties) -> None:
         """
         Initialize the volume constraint for topology optimization.
 
@@ -62,11 +62,11 @@ class VolumeConstraint(Constraint):
 
         # 单元面积不等（非均匀网格）
         volfrac_true = bm.einsum('c, c -> ', cell_measure, rho_phys[:]) / bm.sum(cell_measure)
-        cneq = volfrac_true - self.volfrac
+        gneq = volfrac_true - self.volfrac
         
-        return cneq
+        return gneq
 
-    def jac(self) -> _DT:
+    def jac(self, rho: _DT) -> _DT:
         """
         Compute the gradient of the volume constraint function.
 
@@ -78,6 +78,6 @@ class VolumeConstraint(Constraint):
             _DT: The gradient of the volume constraint, representing the sensitivity 
                 of the constraint to changes in the design variables.
         """
-        gradc = self.mesh.entity_measure('cell')
+        gradg = self.mesh.entity_measure('cell')
 
-        return gradc
+        return gradg
