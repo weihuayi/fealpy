@@ -29,8 +29,8 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
 
 
         self._uh = None
-       
         self._d = None
+
         self._H = None # 谱分解模型下的最大历史场
 
     def update_disp(self, uh):
@@ -121,7 +121,6 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         """
         Compute the tangent matrix.
         """
-        uh = self._uh
         d = self._d
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
         D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵
@@ -231,9 +230,10 @@ class SpectralModel(BasedPhaseFractureMaterial):
         """
         @brief Maximum historical field
         """
-        uh = self._uh
         strain = self.strain_value(bc)
+       
         phip, _ = self.strain_energy_density_decomposition(strain)
+        
         if self._H is None:
             self._H = phip[:]
         else:
@@ -278,7 +278,8 @@ class HybridModel(BasedPhaseFractureMaterial):
         self._spectral_model._d = self._d
         self._spectral_model._H = self._H
         
-        return self._spectral_model.maximum_historical_field(bc)
+        self._H = self._spectral_model.maximum_historical_field(bc)
+        return self._H
         
 
 class PhaseFractureMaterialFactory:

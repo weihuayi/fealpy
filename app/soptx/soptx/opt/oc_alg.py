@@ -54,7 +54,7 @@ class OCAlg(Optimizer):
         options = self.options
         rho = options['x0']
         max_iters = options['MaxIters']
-        tol_change = options.get('tol_change', 0.01)  # Default tolerance if not provided
+        tol_change = options.get('tol_change', 0.01)
         volume_constraint = options['volume_constraint']
 
         for loop in range(max_iters):
@@ -71,7 +71,8 @@ class OCAlg(Optimizer):
             change = bm.linalg.norm(rho_new.reshape(-1, 1) - rho.reshape(-1, 1), bm.inf)
 
             # Print the results for this iteration
-            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, Volume: {v+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
+            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, 
+                Volume: {v+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
 
             # Check for convergence
             if change <= tol_change:
