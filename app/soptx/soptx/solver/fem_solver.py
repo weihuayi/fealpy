@@ -57,6 +57,7 @@ class FEMSolver:
         is_dirichlet_direction = self.pde.is_dirichlet_direction
 
         self.F = self.tensor_space.interpolate(force)
+        FullK = self.K.to_dense()
 
         dbc = DBC(space=self.tensor_space, gd=dirichlet, left=False)
         self.F = dbc.check_vector(self.F)
@@ -82,6 +83,7 @@ class FEMSolver:
         one_indices = bm.stack([index, index], axis=0)
         K1 = COOTensor(one_indices, one_values, self.K.sparse_shape)
         self.K = self.K.add(K1).coalesce()
+        FullK = self.K.to_dense()
 
     def solve(self) -> TensorLike:
         """

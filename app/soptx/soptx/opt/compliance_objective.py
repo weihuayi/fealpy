@@ -146,11 +146,10 @@ class ComplianceObjective(Objective):
         cell_measure = self.mesh.entity_measure('cell')
 
         if ft == 0:
-            rho_phys = rho
-        elif ft == 1:
             rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
             # rho_phys = H.matmul(rho[:]) / Hs
-            
+        elif ft == 1:
+            rho_phys = rho
         
         material_properties = self.material_properties
         displacement_solver = self.displacement_solver
@@ -158,7 +157,13 @@ class ComplianceObjective(Objective):
 
         material_properties.rho = rho_phys
 
-        uhe = displacement_solver.get_element_displacement()
+        # K = displacement_solver.get_global_stiffness_matrix().to_dense()
+
+        uh = displacement_solver.solve()
+        cell2ldof = self.space.cell_to_dof()
+        uhe = uh[cell2ldof]
+
+        # uhe = displacement_solver.get_element_displacement()
         E = material_properties.material_model()
 
         ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
@@ -204,12 +209,12 @@ class ComplianceObjective(Objective):
         cell_measure = self.mesh.entity_measure('cell')
 
         if ft == 0:
+            # 先归一化再乘权重因子
+            dce[:] = H.matmul(dce * cell_measure / H.matmul(cell_measure))
+        elif ft == 1:
             rho_dce = bm.einsum('c, c -> c', rho[:], dce)
             filtered_dce = H.matmul(rho_dce)
             dce[:] = filtered_dce / Hs / bm.maximum(bm.array(0.001), rho[:])
-        elif ft == 1:
-            dce[:] = H.matmul(dce * cell_measure) / H.matmul(cell_measure)
-            # dce[:] = H.matmul(dce) / Hs
 
         return dce
 

@@ -7,7 +7,7 @@ class OCAlg(Optimizer):
     def __init__(self, options) -> None:
         super().__init__(options)
 
-    def update(self, rho: _DT, dce: _DT, volume_constraint) -> _DT:
+    def update(self, rho: _DT, dce: _DT, dge: _DT, volume_constraint) -> _DT:
         """
         Update the design variables using the OC method.
 
@@ -23,20 +23,16 @@ class OCAlg(Optimizer):
         l1 = 0.0
         l2 = 1e9
         move = 0.2
-
-        dve = volume_constraint.jac()
         
         while (l2 - l1) / (l2 + l1) > 1e-3:
             lmid = 0.5 * (l2 + l1)
-            # Update design variable using OC formula
             rho_new = bm.maximum(
                 0.0, bm.maximum(rho - move, 
-                bm.minimum(1.0, bm.minimum(rho + move, rho * bm.sqrt(-dce / dve / lmid))))
+                bm.minimum(1.0, bm.minimum(rho + move, rho * bm.sqrt(-dce / dge / lmid))))
             )
 
             v_new = volume_constraint.fun(rho_new)
 
-            # Check volume constraint to update l1 and l2
             if v_new > 0:
                 l1 = lmid
             else:
@@ -52,27 +48,30 @@ class OCAlg(Optimizer):
         under the given constraints.
         """
         options = self.options
+        objective = options['objective']
         rho = options['x0']
         max_iters = options['MaxIters']
-        tol_change = options.get('tol_change', 0.01)
-        volume_constraint = options['volume_constraint']
+        tol_change = options['FunValDiff']
+
+        volume_constraint = objective.volume_constraint
 
         for loop in range(max_iters):
             # Evaluate objective function and its gradient
-            c = self.fun(rho)
-            dce = self.options['objective'].jac(rho)
+            c = objective.fun(rho)
+            dce = objective.jac(rho)
 
-            v = volume_constraint.fun(rho)
+            g = volume_constraint.fun(rho)
+            dge = volume_constraint.jac(rho)
 
             # Update design variables using OC method
-            rho_new = self.update(rho, dce, volume_constraint)
+            rho_new = self.update(rho, dce, dge, volume_constraint)
 
             # Compute change in design variables
             change = bm.linalg.norm(rho_new.reshape(-1, 1) - rho.reshape(-1, 1), bm.inf)
 
             # Print the results for this iteration
-            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, 
-                Volume: {v+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
+            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, \
+                Volume: {g+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
 
             # Check for convergence
             if change <= tol_change:

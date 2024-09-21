@@ -4,12 +4,15 @@ from fealpy.experimental.backend import backend_manager as bm
 
 from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
 
+from fealpy.experimental.opt import opt_alg_options
+
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
 from app.soptx.soptx.pde.mbb_beam import MBBBeamOneData
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
+from app.soptx.soptx.opt.oc_alg import OCAlg
 
 
 parser = argparse.ArgumentParser(description="MBB 梁上的柔顺度最小化.")
@@ -23,11 +26,11 @@ parser.add_argument('--degree',
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
 parser.add_argument('--nx', 
-                    default=60, type=int, 
+                    default=4, type=int, 
                     help='x 方向的初始网格单元数, 默认为 60.')
 
 parser.add_argument('--ny',
-                    default=20, type=int,
+                    default=3, type=int,
                     help='y 方向的初始网格单元数, 默认为 20.')
 
 parser.add_argument('--filter_type', 
@@ -80,4 +83,13 @@ compliance_objective = ComplianceObjective(
     solver_method='cg', 
     volume_constraint=volume_constraint
 )
-print("------------------")
+
+options = opt_alg_options(
+    x0=material_properties.rho,
+    objective=compliance_objective,
+    MaxIters=200,
+    FunValDiff=0.01
+)
+
+oc_optimizer = OCAlg(options)
+oc_optimizer.run()
