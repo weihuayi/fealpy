@@ -60,6 +60,8 @@ mesh = UniformMesh2d(extent=extent, h=h, origin=origin)
 
 volfrac = args.volfrac
 rho = volfrac * bm.ones(nx * ny, dtype=bm.float64)
+rho[0] = 0.8
+rho[-1] = 1.5
 
 material_properties = ElasticMaterialProperties(
             E0=1.0, Emin=1e-9, nu=0.3, penal=3.0, 

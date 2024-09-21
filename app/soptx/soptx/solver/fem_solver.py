@@ -31,9 +31,6 @@ class FEMSolver:
         self.F = None
         
         self.solved = False 
-        
-        self.assemble_stiffness_matrix()
-        self.apply_boundary_conditions()
 
     def assemble_stiffness_matrix(self):
         """
@@ -57,7 +54,6 @@ class FEMSolver:
         is_dirichlet_direction = self.pde.is_dirichlet_direction
 
         self.F = self.tensor_space.interpolate(force)
-        FullK = self.K.to_dense()
 
         dbc = DBC(space=self.tensor_space, gd=dirichlet, left=False)
         self.F = dbc.check_vector(self.F)
@@ -83,7 +79,6 @@ class FEMSolver:
         one_indices = bm.stack([index, index], axis=0)
         K1 = COOTensor(one_indices, one_values, self.K.sparse_shape)
         self.K = self.K.add(K1).coalesce()
-        FullK = self.K.to_dense()
 
     def solve(self) -> TensorLike:
         """
@@ -92,9 +87,15 @@ class FEMSolver:
         Returns:
             TensorLike: The displacement vector.
         """
+        self.K = None 
+        self.F = None
+
+        self.assemble_stiffness_matrix()
+        self.apply_boundary_conditions()
+
+        
         if self.K is None or self.F is None:
             raise ValueError("Stiffness matrix K or force vector F has not been assembled.")
-        
         if self.solver_method == 'cg':
             self.uh[:] = cg(self.K, self.F, maxiter=5000, atol=1e-14, rtol=1e-14)
         elif self.solver_method == 'mumps':

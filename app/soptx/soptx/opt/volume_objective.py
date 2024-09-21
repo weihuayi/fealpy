@@ -72,21 +72,17 @@ class VolumeConstraint(Constraint):
         Hs = self.filter_properties.Hs
         ft = self.filter_properties.ft
 
+        NC = self.mesh.number_of_cells()
         cell_measure = self.mesh.entity_measure('cell')
 
-        # if ft == 0:
-        #     rho_phys = rho
-        # elif ft == 1:
-        #     rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-        #     # rho_phys = H.matmul(rho) / Hs
-        if ft == 0:
-            rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-            # rho_phys = H.matmul(rho[:]) / Hs
-        elif ft == 1:
-            rho_phys = rho
+        volfrac_true = bm.einsum('c, c -> ', cell_measure, rho[:]) / bm.sum(cell_measure)
+        gneq = (volfrac_true - self.volfrac) * NC
+        # gneq = bm.sum(rho_phys[:]) - self.volfrac * NC
 
-        volfrac_true = bm.einsum('c, c -> ', cell_measure, rho_phys[:]) / bm.sum(cell_measure)
-        gneq = volfrac_true - self.volfrac
+        # if ft == 0:
+        #     rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
+        # elif ft == 1:
+        #     rho_phys = rho
         
         return gneq
 
