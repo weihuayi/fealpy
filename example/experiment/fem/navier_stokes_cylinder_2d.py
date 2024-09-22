@@ -142,12 +142,10 @@ for i in range(1):
         A = A.coalesce()
     
     if backend == 'pytorch':
-        '''
         A0 = bm.concatenate([M+S+C, zeros_0, -APX], axis=1)
         A1 = bm.concatenate([zeros_0, M+S+C, -APY], axis=1)
         A2 = bm.concatenate([-APX.T, -APY.T ,zeros_1], axis=1)
         A = bm.concatenate((A0,A1,A2),axis=0)
-        '''
 
     b0 = M@u0[:,0] 
     b1 = M@u0[:,1]
