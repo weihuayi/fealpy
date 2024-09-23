@@ -187,18 +187,44 @@ class TensorFunctionSpace(FunctionSpace):
 
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
-        isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold)
+        # isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold)
+
+        if isinstance(threshold, tuple):
+            edge_threshold = threshold[0]
+            node_threshold = threshold[1] if len(threshold) > 1 else None
+            direction_threshold = threshold[2] if len(threshold) > 2 else None
+        else:
+            edge_threshold = threshold
+            node_threshold = None
+            direction_threshold = None
+
+        isScalarBDof = scalar_space.is_boundary_dof(threshold=edge_threshold)
+        if node_threshold is not None:
+            node_flags = node_threshold()
+            isScalarBDof = isScalarBDof & node_flags
 
         if callable(gD):
-            gD = gD(ipoints[isScalarBDof])
-        
-        isTensorBDof = self.is_boundary_dof(threshold=threshold)
-        if self.dof_priority:
-            uh = bm.set_at(uh, isTensorBDof, gD.T.reshape(-1))
+            gD_scalar = gD(ipoints[isScalarBDof])
         else:
-            uh = bm.set_at(uh, isTensorBDof, gD.reshape(-1))
+            gD_scalar = gD
 
-        return uh
+        if direction_threshold is not None:
+            direction_flags = direction_threshold()
+            node_direction_flags = direction_flags[node_flags] 
+
+        gD_vector = gD_scalar[node_direction_flags] 
+
+        # isTensorBDof = self.is_boundary_dof(threshold=threshold)
+        isTensorBDof = self.is_boundary_dof(threshold=(edge_threshold, 
+                                                       node_threshold, 
+                                                       direction_threshold))
+
+        if self.dof_priority:
+            uh = bm.set_at(uh, isTensorBDof, gD_vector.T.reshape(-1))
+        else:
+            uh = bm.set_at(uh, isTensorBDof, gD_vector.reshape(-1))
+
+        return uh, isTensorBDof
 
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:

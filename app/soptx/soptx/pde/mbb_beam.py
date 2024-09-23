@@ -4,18 +4,27 @@ from fealpy.experimental.typing import TensorLike
 
 class MBBBeamOneData:
     def __init__(self, nx: int, ny: int):
+        """
+        flip_direction = True
+        0 ------- 3 ------- 6 
+        |    0    |    2    |
+        1 ------- 4 ------- 7 
+        |    1    |    3    |
+        2 ------- 5 ------- 8 
+        """
         self.nx = nx
         self.ny = ny
 
     def domain(self):
-        xmin, xmax = 0, 4
-        ymin, ymax = 0, 3
+        xmin, xmax = 0, 3
+        ymin, ymax = 0, 2
         return [xmin, xmax, ymin, ymax]
     
     def force(self, points: TensorLike) -> TensorLike:
 
         val = bm.zeros(points.shape, dtype=points.dtype)
-        val[self.ny, 1] = -1
+        # val[self.ny, 1] = -1
+        val[0, 1] = -1
 
         return val
     
@@ -37,7 +46,8 @@ class MBBBeamOneData:
         dirichlet_nodes = bm.zeros((self.nx+1)*(self.ny+1), dtype=bool)
 
         dirichlet_nodes[0:self.ny + 1] = True
-        dirichlet_nodes[(self.ny + 1) * self.nx] = True
+        # dirichlet_nodes[(self.ny + 1) * self.nx] = True
+        dirichlet_nodes[-1] = True
 
         return dirichlet_nodes
     
@@ -46,10 +56,7 @@ class MBBBeamOneData:
         direction_flags = bm.zeros(((self.nx + 1) * (self.ny + 1), 2), dtype=bool)
 
         direction_flags[0:self.ny+1, 0] = True
-        # direction_flags[1, 0] = True
-        # direction_flags[2, 0] = True
-        # direction_flags[3, 0] = True  
-        direction_flags[(self.ny + 1) * self.nx, 1] = True
-        # temp = bm.tensor([True, False])
+        # direction_flags[(self.ny + 1) * self.nx, 1] = True
+        direction_flags[-1, 1] = True
 
         return direction_flags
