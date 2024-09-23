@@ -7,6 +7,7 @@ from fealpy.experimental.mesh import TriangleMesh
 
 from app.fracturex.fracturex.phasefield.main_solver import MainSolver
 from fealpy.utils import timer
+import time
 
 class square_with_circular_notch():
     def __init__(self):
@@ -16,7 +17,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.05
+        l0 = 0.0133
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
 
@@ -75,16 +76,19 @@ class square_with_circular_notch():
 
 tmr = timer()
 next(tmr)
+start = time.time()
 model = square_with_circular_notch()
 
-mesh = model.init_mesh(n=0s)
+mesh = model.init_mesh(n=4)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=1, method='HybridModel')
+ms = MainSolver(mesh=mesh, material_params=model.params, p=1, method='HybridModel', enable_refinement=True)
 tmr.send('init')
 
 ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 ms.solve(vtkname='test')
 tmr.send('stop')
+end = time.time()
+print(f"Time: {end - start}")

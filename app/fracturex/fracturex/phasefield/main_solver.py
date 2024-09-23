@@ -24,7 +24,7 @@ class MainSolver:
                  method: str = 'HybridModel',
                  enable_refinement: bool = False, 
                  marking_strategy: str = 'recovery', 
-                 refine_method: str = 'nvp', 
+                 refine_method: str = 'bisect', 
                  theta: float = 0.2):
         """
         Initialize the MainSolver class with more customization options.
@@ -79,7 +79,7 @@ class MainSolver:
         next(self.tmr)
 
 
-    def solve(self, maxit: int = 30, vtkname: Optional[str] = None):
+    def solve(self, maxit: int = 50, save_vtkfile : bool = True, vtkname: Optional[str] = None):
         """
         Solve the phase-field fracture problem.
 
@@ -93,24 +93,22 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(1):
-            fbc = VectorDirichletBC(self.tspace, self.force_value[i+1], self.force_dof, direction=self.force_direction)
-            self.uh, force_index = fbc.apply_value(self.uh)
-            self.pfcm.update_disp(self.uh)
-
+        for i in range(len(self.force_value) - 1):
+            self._currt_force_value = self.force_value[i+1]
             # Run Newton-Raphson iteration
             self.newton_raphson(maxit)
             
+            if save_vtkfile:
+                if vtkname is None:
+                    fname = f'test{i:010d}.vtu'
+                else:
+                    fname = f'{vtkname}{i:010d}.vtu'
+                self.save_vtkfile(fname=fname)
+            print('ddd', bm.max(self.d), bm.min(self.d))
+            bm.set_at(self.Rforce, i+1, self.Rfu)
             
-            if vtkname is None:
-                fname = f'test{i:010d}.vtu'
-            else:
-                fname = f'{vtkname}{i:010d}.vtu'
-            self.save_vtkfile(fname=fname)
 
-            bm.set_at(self.Rforce, i+1, bm.sum(self.Ru[force_index]))
-
-    def newton_raphson(self, maxit: int = 30):
+    def newton_raphson(self, maxit: int = 50):
         """
         Perform the Newton-Raphson iteration for solving the problem.
 
@@ -118,21 +116,28 @@ class MainSolver:
         ----------
         maxit : int, optional
             Maximum number of iterations, by default 30.
+        force_value : TensorLike
+            Value of the force boundary condition.
         """
         for k in range(maxit):
             print(f"Newton-Raphson Iteration {k + 1}/{maxit}:")
-            
+
             er0 = self.solve_displacement()
             self.pfcm.update_disp(self.uh)
+            
             print(f"Displacement error after iteration {k + 1}: {er0}")
 
             er1 = self.solve_phase_field()
             self.pfcm.update_phase(self.d)
             print(f"Phase field error after iteration {k + 1}: {er1}")
 
-            self.H = self.pfcm._H
+            self.H = self.pfcm.H
             if self.enable_refinement:
-                self.adaptive.perform_refinement(self.mesh, self.d)
+                data = self.set_interpolation_data()
+                self.mesh, new_data = self.adaptive.perform_refinement(self.mesh, self.d, data, self.l0)
+                if new_data:
+                    self.set_lfe_space()
+                    self.update_interpolation_data(new_data)
                 
             if k == 0:
                 e0, e1 = er0, er1
@@ -154,11 +159,16 @@ class MainSolver:
             The norm of the residual.
         """
         uh = self.uh
+
+        fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self.force_dof, direction=self.force_direction)
+        uh, force_index = fbc.apply_value(uh)
+        self.pfcm.update_disp(uh)
+
         ubform = BilinearForm(self.tspace)
         ubform.add_integrator(LinearElasticIntegrator(self.pfcm, q=self.q))
         A = ubform.assembly()
         R = -A @ uh[:]
-        self.Ru = R[:]
+        self.Rfu = bm.sum(-R[force_index])
 
         # Apply force boundary conditions
         ubc = VectorDirichletBC(self.tspace, 0, threshold=self.force_dof, direction=self.force_direction)  
@@ -167,7 +177,7 @@ class MainSolver:
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         du = cg(A, R, atol=1e-14)
-        uh[:] += du.flat[:]
+        uh += du.flat[:]
         self.uh = uh
         
         return np.linalg.norm(R)
@@ -212,6 +222,43 @@ class MainSolver:
         self.tspace = TensorFunctionSpace(self.space, (self.mesh.geo_dimension(), -1))
         self.d = self.space.function()
         self.uh = self.tspace.function()
+
+    def set_interpolation_data(self):
+        """
+        Set the interpolation data to refine.
+        """
+        GD = self.mesh.geo_dimension()
+        #NQ = self.H.shape[-1] if len(self.H) > 1 else 1
+        if GD == 2:
+            dcell2dof = self.space.cell_to_dof()
+            ucell2dof = self.tspace.cell_to_dof()
+            data = {'uh': self.uh[ucell2dof], 'd': self.d[dcell2dof], 'H': self.H}
+        elif GD == 3:
+            data = {'nodedata':[self.uh, self.d], 'celldata':self.H}
+        return data
+
+    def update_interpolation_data(self, data):
+        """
+        Update the data after refinement
+        """
+        GD = self.mesh.geo_dimension()
+        if GD == 2:
+            dcell2dof = self.space.cell_to_dof()
+            ucell2dof = self.tspace.cell_to_dof()
+            self.uh[ucell2dof.reshape(-1)] = data['uh']
+            self.d[dcell2dof.reshape(-1)] = data['d']
+            H = data['H']
+        elif GD == 3:
+            assert self.p == 1
+            self.uh = data['uh']
+            self.d = data['d']
+
+            H = data['H']
+        self.H = H
+        self.pfcm.update_historical_field(self.H)
+        self.pfcm.update_disp(self.uh)
+        self.pfcm.update_phase(self.d)
+
 
     def save_vtkfile(self, fname: str):
         """

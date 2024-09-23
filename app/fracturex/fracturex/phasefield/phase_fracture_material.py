@@ -31,13 +31,16 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
         self._uh = None
         self._d = None
 
-        self._H = None # 谱分解模型下的最大历史场
+        self.H = None # 谱分解模型下的最大历史场
 
     def update_disp(self, uh):
         self._uh = uh
 
     def update_phase(self, d):
         self._d = d
+
+    def update_historical_field(self, H):
+        self.H = H
 
     @ barycentric
     def effective_stress(self, bc=None) -> TensorLike:
@@ -234,11 +237,11 @@ class SpectralModel(BasedPhaseFractureMaterial):
        
         phip, _ = self.strain_energy_density_decomposition(strain)
         
-        if self._H is None:
-            self._H = phip[:]
+        if self.H is None:
+            self.H = phip[:]
         else:
-            self._H = np.fmax(self._H, phip)
-        return self._H
+            self.H = np.fmax(self.H, phip)
+        return self.H
         
 
 class HybridModel(BasedPhaseFractureMaterial):
@@ -276,10 +279,10 @@ class HybridModel(BasedPhaseFractureMaterial):
         """
         self._spectral_model._uh = self._uh
         self._spectral_model._d = self._d
-        self._spectral_model._H = self._H
+        self._spectral_model.H = self.H
         
-        self._H = self._spectral_model.maximum_historical_field(bc)
-        return self._H
+        self.H = self._spectral_model.maximum_historical_field(bc)
+        return self.H
         
 
 class PhaseFractureMaterialFactory:

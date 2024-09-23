@@ -171,6 +171,15 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell[index]
         return face2cell
 
+    def cell_to_cell(self):
+        NC = self.number_of_cells()
+        face2cell = self.face2cell
+        NFC = self.number_of_faces_of_cells()
+        cell2cell = bm.zeros((NC, NFC), dtype=self.itype)
+        cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
+        cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
+        return cell2cell
+
     ### boundary
     def boundary_node_flag(self) -> TensorLike:
         """Return a boolean tensor indicating the boundary nodes.
