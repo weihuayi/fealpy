@@ -8,8 +8,8 @@ class MBBBeamOneData:
         self.ny = ny
 
     def domain(self):
-        xmin, xmax = 0, 60
-        ymin, ymax = 0, 20
+        xmin, xmax = 0, 4
+        ymin, ymax = 0, 3
         return [xmin, xmax, ymin, ymax]
     
     def force(self, points: TensorLike) -> TensorLike:
@@ -45,9 +45,10 @@ class MBBBeamOneData:
         
         direction_flags = bm.zeros(((self.nx + 1) * (self.ny + 1), 2), dtype=bool)
 
-        direction_flags[0, 0] = True
-        direction_flags[1, 0] = True
-        direction_flags[2, 0] = True 
+        direction_flags[0:self.ny+1, 0] = True
+        # direction_flags[1, 0] = True
+        # direction_flags[2, 0] = True
+        # direction_flags[3, 0] = True  
         direction_flags[(self.ny + 1) * self.nx, 1] = True
         # temp = bm.tensor([True, False])
 

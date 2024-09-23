@@ -31,9 +31,6 @@ class FEMSolver:
         self.F = None
         
         self.solved = False 
-        
-        self.assemble_stiffness_matrix()
-        self.apply_boundary_conditions()
 
     def assemble_stiffness_matrix(self):
         """
@@ -90,9 +87,15 @@ class FEMSolver:
         Returns:
             TensorLike: The displacement vector.
         """
+        self.K = None 
+        self.F = None
+
+        self.assemble_stiffness_matrix()
+        self.apply_boundary_conditions()
+
+        
         if self.K is None or self.F is None:
             raise ValueError("Stiffness matrix K or force vector F has not been assembled.")
-        
         if self.solver_method == 'cg':
             self.uh[:] = cg(self.K, self.F, maxiter=5000, atol=1e-14, rtol=1e-14)
         elif self.solver_method == 'mumps':
