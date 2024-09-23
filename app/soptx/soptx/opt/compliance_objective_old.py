@@ -6,7 +6,7 @@ from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
 
 from app.soptx.soptx.utilfunc.fem_solver import FEMSolver
 from app.soptx.soptx.utilfunc.calculate_ke0 import calculate_ke0
-from app.soptx.soptx.cases.material_properties import MaterialProperties
+from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
 from app.soptx.soptx.cases.filter_properties import FilterProperties
 
 
@@ -21,7 +21,7 @@ class ComplianceObjective(Objective):
     def __init__(self,
                 mesh: Mesh,
                 space: TensorFunctionSpace,
-                material_properties: MaterialProperties,
+                material_properties: ElasticMaterialProperties,
                 filter_properties: FilterProperties,
                 displacement_solver: FEMSolver) -> None:
         """
