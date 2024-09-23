@@ -53,7 +53,7 @@ class PDEData():
 
 def test_harmap_mmpde(beta , mol_times , redistribute):
     mesh = mesh_data['from_box']
-    pde = PDEData(function_data['u0'] , x='x',y='y' , D = [0,1,0,1])
+    pde = PDEData(function_data['u4'] , x='x',y='y' , D = [0,1,0,1])
     print('Number of points:', mesh.number_of_nodes())
     print('Number of cells:', mesh.number_of_cells())
 
@@ -61,22 +61,22 @@ def test_harmap_mmpde(beta , mol_times , redistribute):
     space = LagrangeFESpace(mesh, p=p)
     uh0 = space.interpolate(pde.solution)
 
-    HMP = Harmap_MMPDE(mesh,uh0 ,beta = beta , mol_times= mol_times , redistribute=redistribute)
+    HMP = Harmap_MMPDE(mesh,uh0, pde=pde ,beta = beta , mol_times= mol_times , redistribute=redistribute)
     mesh0 = HMP.solve_elliptic_Equ()
     node= mesh0.node
     cell = mesh0.cell
     space = LagrangeFESpace(mesh0, p=p)
     uh = space.interpolate(pde.solution)
-    error0 = mesh.error(uh0 ,pde.solution)
-    error1 = mesh0.error(uh ,pde.solution)
+    error0 = mesh.error(space.function(array = uh0) ,pde.solution)
+    error1 = mesh0.error(space.function(array = uh) ,pde.solution)
     
     print('旧网格插值误差:',error0)
     print('新网格插值误差:',error1)
     
     mesh1 = TM(node,cell)# 新网格
     mesh2 = TM(mesh.node,mesh.cell)# 旧网格
-    error0_color = mesh2.error(uh0 ,pde.solution,celltype=True)
-    error1_color = mesh1.error(uh ,pde.solution,celltype=True)
+    error0_color = mesh.error(space.function(array = uh0) ,pde.solution,celltype=True)
+    error1_color = mesh0.error(space.function(array = uh) ,pde.solution,celltype=True)
 
     mesh1.show_function(plt,pde.solution(node))
     
@@ -89,7 +89,7 @@ def test_harmap_mmpde(beta , mol_times , redistribute):
     plt.show()
     
 if __name__ == '__main__':
-    beta_ = 1
+    beta_ = 0.1
     mol_times = 1
     redistribute = True
     test_harmap_mmpde(beta_ , mol_times , redistribute)

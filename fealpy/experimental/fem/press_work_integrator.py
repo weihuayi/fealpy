@@ -16,7 +16,9 @@ from ..functional import bilinear_integral
 from .integrator import LinearInt, OpInt, CellInt, CoefLike, enable_cache
 from ..typing import TensorLike, Index, _S
 
-
+'''
+(p, \nabla v)
+'''
 class PressWorkIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
