@@ -4,6 +4,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 
+from .utils import simplex_gdof, simplex_ldof 
 from .mesh_base import HomogeneousMesh, estr2dim
 from .triangle_mesh import TriangleMesh
 
@@ -36,6 +37,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         self.edgedata = {}
         self.celldata = {}
         self.meshdata = {}
+
+    def reference_cell_measure(self):
+        return 0.5
 
     def generate_local_lagrange_edges(self, p: int) -> TensorLike:
         """
@@ -88,21 +92,19 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         node = self.node
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index=index) # 
-        phi = self.shape_function(bc) # (NQ, 1, ldof)
-        p = np.einsum('ijk, jkn->ijn', phi, node[entity])
+        phi = self.shape_function(bc) # (NC, NQ, ldof)
+        p = bm.einsum('cqn, cni -> cqi', phi, node[entity])
         return p
     
     # shape function
     def shape_function(self, bc: TensorLike, p=None):
         p = self.p if p is None else p
         phi = bm.simplex_shape_function(bc, p=p)
-        return phi[..., None, :]
+        return phi[None, :, :]
 
-    def grad_shape_function(self, bc: TensorLike, p=None, index: Index=_S, variables='u'):
+    def grad_shape_function(self, bc: TensorLike, p=None, index: Index=_S, variables='x'):
         """
-        Notes
-        -----
-        计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
+        @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
 
         lambda_0 = 1 - xi - eta
         lambda_1 = xi
@@ -116,16 +118,142 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         else:
             Dlambda = bm.array([[-1], [1]], dtype=bm.float64)
         R = bm.simplex_grad_shape_function(bc, p=p) # (..., ldof, TD+1)
-        gphi = bm.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
-
+        gphi = bm.einsum('...ij, jn -> ...in', R, Dlambda) # (..., ldof, TD)
+        
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD)
         elif variables == 'x':
             G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
             G = bm.linalg.inv(G)
-            gphi = bm.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
+            gphi = bm.einsum('q...km, q...mn, ...ln -> q...lk', J, G, gphi) 
             return gphi
 
+    # ipoint --> copy TriangleMesh
+    def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
+        """
+        @berif 每个ltri单元上插值点的个数
+        """
+        if isinstance(iptype, str):
+            iptype = estr2dim(self, iptype)
+        return simplex_ldof(p, iptype)
+
+    def number_of_global_ipoints(self, p:int):
+        """
+        @berif ltri网格上插值点总数
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        num = (NN, NE, NC)
+        return simplex_gdof(p, num)
+
+    def interpolation_points(self, p:int, index:Index=_S):
+        """
+        @berif 获取ltri网格上全部插值点
+        """
+        node = self.entity('node')
+        if p == 1:
+            return node
+        if p <= 0:
+            raise ValueError("p must be a integer larger than 0.")
+
+        ipoint_list = []
+        kwargs = {'dtype': self.ftype}
+
+        GD = self.geo_dimension()
+        ipoint_list.append(node) # ipoints[:NN, :]
+
+        edge = self.entity('edge')
+        w = bm.multi_index_matrix(p, 1, dtype=self.ftype)
+        w = w[1:-1]/p
+        ipoints_from_edge = bm.einsum('ij, ...jm->...im', w,
+                                         node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]
+        ipoint_list.append(ipoints_from_edge)
+
+        if p >= 3:
+            TD = self.top_dimension()
+            cell = self.entity('cell')
+            multiIndex = bm.multi_index_matrix(p, TD, dtype=self.ftype)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
+                                isEdgeIPoints[:, 2])
+            multiIndex = multiIndex[isInCellIPoints, :]
+            w = multiIndex / p
+            
+            ipoints_from_cell = bm.einsum('ij, kj...->ki...', w,
+                                          node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
+            ipoint_list.append(ipoints_from_cell)
+
+        return bm.concatenate(ipoint_list, axis=0)  # (gdof, GD)
+
+    def cell_to_ipoint(self, p:int, index:Index=_S):
+        """
+        @berif 获取单元与插值点的对应关系
+        """
+        sp = self.p
+        cell = self.cell[:, [0, -sp-1, 1]]  # 取角点
+
+        if p == 1:
+            return cell[index]
+
+        TD = self.top_dimension()
+        mi = self.multi_index_matrix(p, TD)
+        idx0, = bm.nonzero(mi[:, 0] == 0)
+        idx1, = bm.nonzero(mi[:, 1] == 0)
+        idx2, = bm.nonzero(mi[:, 2] == 0)
+
+        face2cell = self.face_to_cell()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        e2p = self.edge_to_ipoint(p)
+        ldof = self.number_of_local_ipoints(p, 'cell')
+
+        kwargs = bm.context(cell)
+        c2p = bm.zeros((NC, ldof), **kwargs)
+
+        flag = face2cell[:, 2] == 0
+        c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])
+
+        flag = face2cell[:, 2] == 1
+        idx1_ = bm.flip(idx1, axis=0)
+        c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx1_), e2p[flag])
+
+        flag = face2cell[:, 2] == 2
+        c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx2), e2p[flag])
+
+        iflag = face2cell[:, 0] != face2cell[:, 1]
+        flag = iflag & (face2cell[:, 3] == 0)
+        idx0_ = bm.flip(idx0, axis=0)
+        c2p = bm.set_at(c2p, (face2cell[flag, 1][:, None], idx0_), e2p[flag])
+
+        flag = iflag & (face2cell[:, 3] == 1)
+        c2p = bm.set_at(c2p, (face2cell[flag, 1][:, None], idx1), e2p[flag])
+
+        flag = iflag & (face2cell[:, 3] == 2)
+        idx2_ = bm.flip(idx2, axis=0)
+        c2p = bm.set_at(c2p, (face2cell[flag, 1][:, None], idx2_),  e2p[flag])
+
+        cdof = (p-1)*(p-2)//2
+        flag = bm.sum(mi > 0, axis=1) == 3
+        val = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
+        c2p = bm.set_at(c2p, (..., flag), val)
+        return c2p[index]
+
+    def face_to_ipoint(self, p: int, index: Index=_S):
+        return self.edge_to_ipoint(p, index)
+ 
+    def entity_measure(self, etype=2, index:Index=_S):
+        if etype in {'cell', 2}:
+            return self.cell_area(index=index)
+        elif etype in {'edge', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return bm.zeros(1, dtype=bm.float64)
+        else:
+            raise ValueError(f"entity type:{etype} is erong!")
+        
     def cell_area(self, q=None, index: Index=_S):
         """
         Calculate the area of a cell.
@@ -139,8 +267,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         J = self.jacobi_matrix(bcs, index=index)
         n = bm.cross(J[..., 0], J[..., 1], axis=-1)
         if GD == 3:
-            n = bm.sqrt(bm.sum(n**2, axis=-1))
-        a = bm.einsum('i, ij->j', ws, n)/2.0
+            n = bm.sqrt(bm.sum(n**2, axis=-1)) # (NC, NQ)
+        a = bm.einsum('i, ji -> j', ws, n)/2.0
         return a
 
     def edge_length(self, q=None, index: Index=_S):
@@ -170,21 +298,19 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     def jacobi_matrix(self, bc: TensorLike, p=None, index: Index=_S, return_grad=False):
         """
-        Notes
-        -----
-        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
+        @berif 计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
 
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc, p=p)
+        gphi = self.grad_shape_function(bc, p=p, variables='u')
         J = bm.einsum(
-                'cin, ...cim->...cnm',
-                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)
+                'cin, ...cim -> c...nm',
+                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
         if return_grad is False:
-            return J #(NQ,NC,GD,TD)
+            return J #(NC,NQ,GD,TD)
         else:
             return J, gphi
 
@@ -208,9 +334,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
         for i in range(TD):
-            G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
+            G[..., i, i] = bm.sum(J[..., i]**2, axis=-1)
             for j in range(i+1, TD):
-                G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
+                G[..., i, j] = bm.sum(J[..., i]*J[..., j], axis=-1)
                 G[..., j, i] = G[..., i, j]
         if (return_jacobi is False) & (return_grad is False):
             return G
