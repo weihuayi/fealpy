@@ -381,7 +381,7 @@ class Harmap_MMPDE():
         process_logic_node = bm.set_at(process_logic_node , 
                                        vertex_idx,init_logic_node[vertex_idx])
         vector_field = init_logic_node - process_logic_node  
-        return logic_node,vector_field
+        return process_logic_node,vector_field
 
     def get_physical_node(self,vector_field,logic_node_move):
         """
@@ -396,9 +396,9 @@ class Harmap_MMPDE():
 
         grad_x_incell = (A@bm.linalg.inv(B)) * cm[:,None,None]
 
-        i,j = bm.nonzero(self.node2cell)
+
         grad_x = bm.zeros((node.shape[0],2,2),dtype=bm.float64)
-        bm.add_at(grad_x , i , grad_x_incell[j])
+        bm.add_at(grad_x , self.i , grad_x_incell[self.j])
         grad_x /= self.star_measure[:,None,None]
 
         delta_x = (grad_x @ vector_field[:,:,None]  ).reshape(-1,2)
@@ -428,13 +428,12 @@ class Harmap_MMPDE():
         预处理边界节点
         """
         node = self.node
-        logic_node = self.logic_node
+        logic_node = self.logic_node.copy()
         side_node_idx = self.side_node_idx
         vertex_idx = self.vertex_idx
-        isBdedge = self.mesh.boundary_edge_flag()
-        node2edge = self.mesh.node_to_edge()
-        edge2cell = self.mesh.edge_to_cell()
-        # 每条边上做一维等分布,采用差分方式
+        isBdedge = self.mesh.boundary_face_flag()
+        node2edge = TM(self.node, self.cell).ds.node_to_edge()
+        edge2cell = self.mesh.face_to_cell()
         for i in range(len(side_node_idx)):
             side_node_idx_bar = bm.concatenate(([vertex_idx[i]],
                                             side_node_idx[f'side{i}'],
@@ -466,12 +465,12 @@ class Harmap_MMPDE():
             gphi = space.grad_basis(bcs)
             cell2dof = space.cell_to_dof()
             GDOF = space.number_of_global_dofs()
-            H = bm.einsum('q , qcid , c ,qcjd, c -> cij ',ws, gphi ,side_G , gphi, side_mesh.entity_measure('cell'))
+            H = bm.einsum('q , cqid , c ,cqjd, c -> cij ',ws, gphi ,side_G , gphi, side_mesh.entity_measure('cell'))
             I = bm.broadcast_to(cell2dof[:, :, None], shape=H.shape)
             J = bm.broadcast_to(cell2dof[:, None, :], shape=H.shape)
             H = csr_matrix((H.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
             lform = LinearForm(space)
-            lform.add_domain_integrator(ScalarSourceIntegrator(f=lambda x:0,q=3))
+            lform.add_integrator(ScalarSourceIntegrator(source=0,q=3))
             F = lform.assembly()
             bdIdx = bm.zeros(NN , dtype= bm.int32)
             bdIdx[[0,-1]] = 1
@@ -498,9 +497,9 @@ class Harmap_MMPDE():
         bcs, ws = qf.get_quadrature_points_and_weights()
         cm = mesh0.entity_measure('cell')
         phi = space.basis(bcs)
-        H = bm.einsum('q , qci ,qcj, c -> cij ',ws, phi ,phi , cm)   
+        H = bm.einsum('q , cqi ,cqj, c -> cij ',ws, phi ,phi , cm)   
         gphi = space.grad_basis(bcs)
-        G = bm.einsum('q , qcid , cid , qcj ,c -> cij' , ws , gphi,  delta_x[self.cell], phi, cm)
+        G = bm.einsum('q , cqid , cid ,cqj ,c -> cij' , ws , gphi,  delta_x[self.cell], phi, cm)
         GDOF = space.number_of_global_dofs()
         I = bm.broadcast_to(space.cell_to_dof()[:, :, None], shape=G.shape)
         J = bm.broadcast_to(space.cell_to_dof()[:, None, :], shape=G.shape)
@@ -524,11 +523,11 @@ class Harmap_MMPDE():
         """
         self.mesh = new_mesh
         # node 更新之前完成插值
-        self.uh = self.interpolate(self.node)
+        self.uh = self.interpolate(new_mesh.entity('node'))
         self.node = new_mesh.entity('node')
         self.cm = new_mesh.entity_measure('cell')
 
-        self.star_measure = self.get_star_measure(self.mesh)[0]
+        self.star_measure = self.get_star_measure()[0]
 
         self.G = self.get_control_function(self.beta,self.mol_times)
 
@@ -550,17 +549,16 @@ class Harmap_MMPDE():
         for i in range(maxit):
             logic_node,vector_field = self.solve()
             L_infty_error = bm.max(bm.linalg.norm(init_logic_node - logic_node,axis=1))
+            node = self.get_physical_node(vector_field,logic_node)
+            mesh0 = TriangleMesh(node,self.cell)
             print(f'第{i+1}次迭代的差值为{L_infty_error}')
             if L_infty_error < tol:
-                node = self.get_physical_node(vector_field,logic_node)
-                mesh0 = TriangleMesh(node,self.cell)
+                self.construct(mesh0)
                 print(f'迭代总次数:{i+1}次')
                 return mesh0
             elif i == maxit - 1:
                 print('超出最大迭代次数')
                 break
             else:
-                node = self.get_physical_node(vector_field,logic_node)
-                mesh0 = TriangleMesh(node,self.cell)
                 self.construct(mesh0)
                 init_logic_node = logic_node.copy()
