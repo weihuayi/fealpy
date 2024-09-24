@@ -26,11 +26,11 @@ parser.add_argument('--degree',
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
 parser.add_argument('--nx', 
-                    default=4, type=int, 
+                    default=60, type=int, 
                     help='x 方向的初始网格单元数, 默认为 60.')
 
 parser.add_argument('--ny',
-                    default=3, type=int,
+                    default=20, type=int,
                     help='y 方向的初始网格单元数, 默认为 20.')
 
 parser.add_argument('--filter_type', 
@@ -56,12 +56,12 @@ extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
 origin = [extent[0], extent[2]]
 
-mesh = UniformMesh2d(extent=extent, h=h, origin=origin)
+mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction=True)
 
 volfrac = args.volfrac
 rho = volfrac * bm.ones(nx * ny, dtype=bm.float64)
-rho[0] = 0.8
-rho[-1] = 1.5
+# rho[0] = 0.8
+# rho[-1] = 1.5
 
 material_properties = ElasticMaterialProperties(
             E0=1.0, Emin=1e-9, nu=0.3, penal=3.0, 

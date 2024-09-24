@@ -61,7 +61,7 @@ class ComplianceObjective(Objective):
                                                 self.dof_per_node, self.dof_ordering)
         self.filter_properties = self._create_filter_properties(self.filter_type, 
                                                             self.filter_rmin)
-        self.displacement_solver = self._create_displacement_solver(self.solver_method)
+        self.displacement_solver = self._create_displacement_solver()
 
         self.ke0 = calculate_ke0(material_properties=self.material_properties, 
                                 tensor_space=self.space)
@@ -113,7 +113,7 @@ class ComplianceObjective(Objective):
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 
-    def _create_displacement_solver(self, solver_method: str) -> FEMSolver:
+    def _create_displacement_solver(self) -> FEMSolver:
         """
         Create a FEMSolver instance based on the given solver method.
 
@@ -125,8 +125,7 @@ class ComplianceObjective(Objective):
         """
         return FEMSolver(material_properties=self.material_properties,
                         tensor_space=self.space,
-                        pde=self.pde,
-                        solver_method=solver_method)
+                        pde=self.pde)
 
     # def _compute_uhe_and_ce(self, rho: _DT):
     #     """
@@ -194,7 +193,7 @@ class ComplianceObjective(Objective):
 
         material_properties.rho = rho
 
-        uh = displacement_solver.solve()
+        uh = displacement_solver.solve(solver_method='cg')
         cell2ldof = self.space.cell_to_dof()
         uhe = uh[cell2ldof]
 

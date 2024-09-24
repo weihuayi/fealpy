@@ -16,8 +16,8 @@ class MBBBeamOneData:
         self.ny = ny
 
     def domain(self):
-        xmin, xmax = 0, 3
-        ymin, ymax = 0, 2
+        xmin, xmax = 0, 60
+        ymin, ymax = 0, 20
         return [xmin, xmax, ymin, ymax]
     
     def force(self, points: TensorLike) -> TensorLike:
