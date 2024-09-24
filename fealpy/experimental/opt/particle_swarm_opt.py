@@ -34,9 +34,9 @@ class ParticleSwarmOptAlg(Optimizer):
             r1 = bm.random.rand(N, 1)
             r2 = bm.random.rand(N, 1)
             v = w * v + c1 * r1 * (pbest - a) + c2 * r2 * (gbest - a)
-            v = v + (v - vlb) * (v > vlb) + (ulb - v) * (v < ulb)
+            v = v + (vlb - v) * (v < vlb) + (ulb - v) * (v > ulb)
             a = a + v
-            a = a + (a - lb) * (a < lb) + (ub - a) * (a > ub)
+            a = a + (lb - a) * (a < lb) + (ub - a) * (a > ub)
             fit = self.fun(a)
             mask = fit < pbest_f
             pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
