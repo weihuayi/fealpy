@@ -16,8 +16,10 @@ sao_optimizer = SnowmeltOptAlg
 
 num = 0
 citys = TSPdata[num]['citys']()
-D = calD(citys)
-test = TravellingSalesmanProblem(citys, D)
+test = TravellingSalesmanProblem(citys)
+test.calD()
+# D = calD(citys)
+# test = TravellingSalesmanProblem(citys, D)
 fobj = lambda x: test.fitness(x)
 NP = 100
 lb, ub = (0, 1)
