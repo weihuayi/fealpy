@@ -388,6 +388,20 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell2ipoint[:, isInCellIPoint] = base + bm.arange(NC*idof,dtype=self.itype).reshape(NC, idof)
 
         return cell2ipoint
+    def direction(self,i):
+        """
+        Compute the direction on every node of 0 <= i < 4
+        """
+        node = self.node
+        cell = self.cell
+        index = self.localCell
+        v10 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 1]]]
+        v20 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 2]]]
+        v30 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 3]]]
+        l1 = bm.sum(v10**2, axis=1, keepdims=True)
+        l2 = bm.sum(v20**2, axis=1, keepdims=True)
+        l3 = bm.sum(v30**2, axis=1, keepdims=True)
+        return l1*bm.cross(v20, v30) + l2*bm.cross(v30, v10) + l3*bm.cross(v10, v20)
 
     def face_normal(self, index=_S):
         face = self.face
