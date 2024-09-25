@@ -113,26 +113,30 @@ class TensorFunctionSpace(FunctionSpace):
     
     def is_boundary_dof(self, threshold=None) -> TensorLike:
         """
-        Return boolean values indicating boundary degrees of freedom (dofs).
+        Returns boolean values indicating which degrees of freedom (DOFs) are on the boundary.
 
         Parameters:
-        threshold (callable, tuple of callables, or None, optional): 
-            A function or a tuple used to determine boundary conditions. 
-            - If a function, it should return a boolean array indicating which edges are on the boundary. 
-            - If a tuple, the first element should be a function that returns a boolean array for boundary edges, 
-            the second element should be a function or array that specifies nodes, and the third element should be a 
-            function or array that returns direction flags.
-            - The direction flags can be either:
-                - A boolean array (e.g., [True, False]) specifying which directions to apply the boundary condition 
-                (True for applying the condition, False for not applying).
-                - An integer array (e.g., [1, 0]) where non-zero values specify the directions to apply the boundary 
-                condition (1 for applying, 0 for not applying).
-            - If `direction_flags` is provided and its shape matches `(scalar_gdof,)`, it specifies conditions 
-            for specific degrees of freedom at certain nodes.
+        ----------
+        threshold : Union[Callable, tuple of Callables, None], optional
+            A function, tuple, or None used to determine boundary DOFs. Can be:
+            - A function that returns a boolean array indicating which edges are on the boundary.
+            - A tuple where:
+                - The first element is a function that returns a boolean array for boundary edges.
+                - The second element (optional) is a function or array specifying boundary nodes.
+                - The third element (optional) is a function or array specifying boundary direction flags.
+            - The direction flags can be:
+                - A boolean array (e.g., [True, False]) indicating which directions should apply the boundary condition 
+                (True = apply, False = do not apply).
+                - An integer array (e.g., [1, 0]) where non-zero values specify the directions to apply the boundary condition 
+                (1 = apply, 0 = do not apply).
+            - If the shape of `direction_flags` matches `(scalar_gdof,)`, it specifies conditions for specific DOFs at 
+            certain nodes.
 
         Returns:
-            TensorLike: A flattened boolean array indicating which global degrees of freedom are boundary dofs.
-                        Shape is (scalar_gdof * dof_numel,).
+        ----------
+        TensorLike
+            A flattened boolean array of shape `(scalar_gdof * dof_numel,)`, 
+            indicating which global degrees of freedom are boundary DOFs.
         """
         if isinstance(threshold, tuple):
             edge_threshold = threshold[0]
@@ -184,10 +188,36 @@ class TensorFunctionSpace(FunctionSpace):
         gD: Union[Callable, int, float, TensorLike],
         uh: TensorLike,
         threshold: Union[Callable, TensorLike, None]=None) -> TensorLike:
+        """
+        Interpolates the given boundary condition `gD` onto the solution vector `uh`.
+
+        Parameters:
+        ----------
+        gD : Union[Callable, int, float, TensorLike]
+            Boundary condition, can be a constant, function, or tensor. 
+            If callable, it means the boundary condition is a function of spatial coordinates.
+        uh : TensorLike
+            The solution vector to be updated with the boundary condition values.
+        threshold : Union[Callable, TensorLike, None], Optional
+            A threshold function or tensor used to determine boundary degrees of freedom (DOFs).
+            Can be a tuple (edge_threshold, node_threshold, direction_threshold), 
+            where:
+            - edge_threshold : Threshold for determining edge boundary DOFs.
+            - node_threshold : Threshold for determining if nodes are on the boundary (Optional).
+            - direction_threshold : Threshold for determining the direction of boundary DOFs (Optional).
+            If not a tuple, the value is treated as the edge threshold.
+        返回：
+        ----------
+        Returns:
+        ----------
+        uh : TensorLike
+            The updated solution vector with applied boundary conditions.
+        isTensorBDof : TensorLike
+            Boolean array indicating which DOFs are on the boundary.
+        """
 
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
-        # isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold)
 
         if isinstance(threshold, tuple):
             edge_threshold = threshold[0]
@@ -211,10 +241,10 @@ class TensorFunctionSpace(FunctionSpace):
         if direction_threshold is not None:
             direction_flags = direction_threshold()
             node_direction_flags = direction_flags[node_flags] 
+            gD_vector = gD_scalar[node_direction_flags] 
+        else:
+            gD_vector = gD_scalar
 
-        gD_vector = gD_scalar[node_direction_flags] 
-
-        # isTensorBDof = self.is_boundary_dof(threshold=threshold)
         isTensorBDof = self.is_boundary_dof(threshold=(edge_threshold, 
                                                        node_threshold, 
                                                        direction_threshold))
