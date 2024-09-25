@@ -182,7 +182,7 @@ class DirichletBC():
         uh, isDDof = self.space.boundary_interpolate(gd, uh, self.threshold)
 
         if uh.ndim == 1:
-            f = f - A.matmul(uh)
+            f = f - A.matmul(uh[:])
             f = bm.set_at(f, bd_idx, uh[bd_idx])
 
         elif uh.ndim == 2:
