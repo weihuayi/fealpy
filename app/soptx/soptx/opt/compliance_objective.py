@@ -17,7 +17,6 @@ from app.soptx.soptx.solver.fem_solver import FEMSolver
 from app.soptx.soptx.utilfunc.calculate_ke0 import calculate_ke0
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
-from app.soptx.soptx.cases.boundary_conditions import BoundaryConditions
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 
@@ -127,45 +126,6 @@ class ComplianceObjective(Objective):
                         tensor_space=self.space,
                         pde=self.pde)
 
-    # def _compute_uhe_and_ce(self, rho: _DT):
-    #     """
-    #     Compute the element displacement and compliance energy for the given density.
-
-    #     Parameters:
-    #         rho (_DT): Design variable (density distribution).
-        
-    #     Returns:
-    #         Tuple[_DT, _DT]: Element displacement (uhe) and compliance energy (ce).
-    #     """
-    #     ft = self.filter_properties.ft
-    #     H = self.filter_properties.H
-    #     Hs = self.filter_properties.Hs
-
-    #     cell_measure = self.mesh.entity_measure('cell')
-
-    #     if ft == 0:
-    #         rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-    #     elif ft == 1:
-    #         rho_phys = rho
-        
-    #     material_properties = self.material_properties
-    #     displacement_solver = self.displacement_solver
-    #     ke0 = self.ke0
-
-    #     material_properties.rho = rho_phys
-
-    #     uh = displacement_solver.solve()
-    #     cell2ldof = self.space.cell_to_dof()
-    #     uhe = uh[cell2ldof]
-
-    #     # uhe = displacement_solver.get_element_displacement()
-    #     # E = material_properties.material_model()
-
-    #     ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
-
-    #     return ce
-    #     # return uhe, ce, E
-
     def fun(self, rho: _DT) -> float:
         """
         Compute the compliance based on the density.
@@ -176,16 +136,6 @@ class ComplianceObjective(Objective):
         Returns:
             float: Compliance value.
         """
-        # ft = self.filter_properties.ft
-        # H = self.filter_properties.H
-        # Hs = self.filter_properties.Hs
-
-        # cell_measure = self.mesh.entity_measure('cell')
-
-        # if ft == 0:
-        #     rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-        # elif ft == 1:
-        #     rho_phys = rho
         
         material_properties = self.material_properties
         displacement_solver = self.displacement_solver

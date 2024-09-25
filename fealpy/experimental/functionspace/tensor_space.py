@@ -202,9 +202,9 @@ class TensorFunctionSpace(FunctionSpace):
             A threshold function or tensor used to determine boundary degrees of freedom (DOFs).
             Can be a tuple (edge_threshold, node_threshold, direction_threshold), 
             where:
-            - edge_threshold：Threshold for determining edge boundary DOFs.
-            - node_threshold：Threshold for determining if nodes are on the boundary (Optional).
-            - direction_threshold：Threshold for determining the direction of boundary DOFs (Optional).
+            - edge_threshold : Threshold for determining edge boundary DOFs.
+            - node_threshold : Threshold for determining if nodes are on the boundary (Optional).
+            - direction_threshold : Threshold for determining the direction of boundary DOFs (Optional).
             If not a tuple, the value is treated as the edge threshold.
         返回：
         ----------
