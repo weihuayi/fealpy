@@ -89,8 +89,6 @@ args = parser.parse_args()
 p = args.degree
 maxit = args.maxit
 dim = args.dim
-dim = 3
-maxit= 3 
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -141,6 +139,7 @@ for j, p in enumerate(ps):
         # Neumann 边界条件
         Eh = space.function()
         F = F + space.set_neumann_bc(pde.neumann)
+        tmr.send(f'第{i}次边界条件处理时间')
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
         Eh[:] = bm.tensor(Solve(A, F))
