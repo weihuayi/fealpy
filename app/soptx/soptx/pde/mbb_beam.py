@@ -2,7 +2,7 @@ from fealpy.experimental.backend import backend_manager as bm
 
 from fealpy.experimental.typing import TensorLike
 
-class MBBOneData:
+class MBBBeamOneData:
     def __init__(self, nx: int, ny: int):
         """
         flip_direction = True

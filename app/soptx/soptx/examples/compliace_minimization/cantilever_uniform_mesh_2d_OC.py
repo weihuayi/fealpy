@@ -8,7 +8,7 @@ from fealpy.experimental.opt import opt_alg_options
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
-from app.soptx.soptx.pde.cantilever import CantileverOneData
+from app.soptx.soptx.pde.short_cantilever import ShortCantileverOneData
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
@@ -50,7 +50,7 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 nx, ny = args.nx, args.ny
-pde = CantileverOneData(nx=nx, ny=ny)
+pde = ShortCantileverOneData(nx=nx, ny=ny)
 
 extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]

@@ -8,7 +8,7 @@ from fealpy.experimental.opt import opt_alg_options
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
-from app.soptx.soptx.pde.mbb import MBBOneData
+from app.soptx.soptx.pde.mbb_beam import MBBBeamOneData
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
@@ -56,7 +56,7 @@ bm.set_backend(args.backend)
 args_group = parameter_groups[args.group]
 
 nx, ny = args_group['nx'], args_group['ny']
-pde = MBBOneData(nx=nx, ny=ny)
+pde = MBBBeamOneData(nx=nx, ny=ny)
 
 extent = [0, nx, 0, ny]
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
