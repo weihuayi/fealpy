@@ -404,17 +404,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         l2 = bm.sum(v20**2, axis=1, keepdims=True)
         l3 = bm.sum(v30**2, axis=1, keepdims=True)
 
-        c1 = bm.cross(v20, v30)
-        c2 = bm.cross(v30, v10)
-        c3 = bm.cross(v10, v20)
-        c1 = bm.astype(c1, self.ftype)
-        c2 = bm.astype(c2, self.ftype)
-        c3 = bm.astype(c3, self.ftype)
-        l1 = bm.astype(l1, self.ftype)
-        l2 = bm.astype(l2, self.ftype)
-        l3 = bm.astype(l3, self.ftype)
-        #return l1*bm.cross(v20, v30) + l2*bm.cross(v30, v10) + l3*bm.cross(v10, v20)
-        return l1*c1 + l2*c2 + l3*c3
+        return l1*bm.cross(v20, v30) + l2*bm.cross(v30, v10) + l3*bm.cross(v10, v20)
 
     def face_normal(self, index=_S):
         face = self.face
