@@ -8,19 +8,14 @@ from fealpy.experimental.opt import opt_alg_options
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
-from app.soptx.soptx.pde.mbb_beam import MBBBeamOneData
+from app.soptx.soptx.pde.short_cantilever_2d import ShortCantilever2dOneData
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
 from app.soptx.soptx.opt.oc_alg import OCAlg
 
-parameter_groups = {
-    'group1': {'nx': 60, 'ny': 20, 'filter_rmin': 2.4},
-    'group2': {'nx': 150, 'ny': 50, 'filter_rmin': 6.0},
-    'group3': {'nx': 300, 'ny': 100, 'filter_rmin': 16.0},
-}
 
-parser = argparse.ArgumentParser(description="MBB 梁上的柔顺度最小化.")
+parser = argparse.ArgumentParser(description="短悬臂梁上的柔顺度最小化.")
 
 parser.add_argument('--backend', 
                     default='numpy', type=str,
@@ -30,47 +25,38 @@ parser.add_argument('--degree',
                     default=1, type=int,
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
+parser.add_argument('--nx', 
+                    default=160, type=int, 
+                    help='x 方向的初始网格单元数, 默认为 160.')
+
+parser.add_argument('--ny',
+                    default=100, type=int,
+                    help='y 方向的初始网格单元数, 默认为 100.')
+
 parser.add_argument('--filter_type', 
-                    default='density', type=str, 
-                    help='滤波器类型, 默认为密度滤波器.')
+                    default='sensitivity', type=str, 
+                    help='滤波器类型, 默认为灵敏度滤波器.')
+
+parser.add_argument('--filter_rmin', 
+                    default=6, type=float, 
+                    help='滤波器半径, 默认为 6.')
 
 parser.add_argument('--volfrac', 
-                    default=0.5, type=float, 
-                    help='体积分数, 默认为 0.5.')
-
-parser.add_argument('--group', 
-                    choices=parameter_groups.keys(), 
-                    default='group1',
-                    help=(
-                        '选择参数组 (例如 group1, group2, group3 等).\n'
-                        '每个参数组定义如下:\n'
-                        'nx: x 方向的单元数\n'
-                        'ny: y 方向的单元数\n'
-                        'filter_rmin: 滤波器的半径\n'
-                    ))
+                    default=0.4, type=float, 
+                    help='体积分数, 默认为 0.4.')
 
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
 
-args_group = parameter_groups[args.group]
+nx, ny = args.nx, args.ny
+pde = ShortCantilever2dOneData(nx=nx, ny=ny)
 
-nx, ny = args_group['nx'], args_group['ny']
-pde = MBBBeamOneData(nx=nx, ny=ny)
-
-extent = [0, nx, 0, ny]
+extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
 origin = [extent[0], extent[2]]
 
 mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction=True)
-# import matplotlib.pyplot as plt
-# fig = plt.figure()
-# axes = fig.add_subplot(111)
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_edge(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()
 
 volfrac = args.volfrac
 rho = volfrac * bm.ones(nx * ny, dtype=bm.float64)
@@ -83,7 +69,7 @@ material_properties = ElasticMaterialProperties(
 volume_constraint = VolumeConstraint(mesh=mesh,
                                     volfrac=args.volfrac,
                                     filter_type=args.filter_type,
-                                    filter_rmin=args_group['filter_rmin'])
+                                    filter_rmin=args.filter_rmin)
 
 compliance_objective = ComplianceObjective(
     mesh=mesh,
@@ -92,7 +78,7 @@ compliance_objective = ComplianceObjective(
     dof_ordering='gd-priority', 
     material_properties=material_properties,
     filter_type=args.filter_type,
-    filter_rmin=args_group['filter_rmin'],
+    filter_rmin=args.filter_rmin,
     pde=pde,
     solver_method='cg', 
     volume_constraint=volume_constraint

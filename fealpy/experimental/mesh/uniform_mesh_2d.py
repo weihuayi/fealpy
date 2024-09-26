@@ -132,6 +132,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
         y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
+
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
 
         if self.flip_direction:

@@ -42,41 +42,33 @@ class FEMSolver:
         """
         force = self.pde.force
         dirichlet = self.pde.dirichlet
-        is_dirichlet_boundary_edge = self.pde.is_dirichlet_boundary_edge
-        # is_dirichlet_node = self.pde.is_dirichlet_node
-        # is_dirichlet_direction = self.pde.is_dirichlet_direction
-        is_dirichlet_node = getattr(self.pde, 'is_dirichlet_node', None)
-        is_dirichlet_direction = getattr(self.pde, 'is_dirichlet_direction', None)
+        is_dirichlet_boundary_face = getattr(self.pde, 'is_dirichlet_boundary_face', None)
+        is_dirichlet_boundary_edge = getattr(self.pde, 'is_dirichlet_boundary_edge', None)
+        is_dirichlet_boundary_node = getattr(self.pde, 'is_dirichlet_boundary_node', None)
+        is_dirichlet_boundary_dof = getattr(self.pde, 'is_dirichlet_boundary_dof', None)
         
         K = self.assemble_stiffness_matrix()
         F = self.tensor_space.interpolate(force)
 
-        dbc = DBC(space=self.tensor_space, gd=dirichlet, left=False)
-        F = dbc.check_vector(F)
+        uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), dtype=bm.float64)
 
-        uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), dtype=F.dtype)
+        thresholds = []
+        if is_dirichlet_boundary_face is not None:
+            thresholds.append(is_dirichlet_boundary_face)
+        if is_dirichlet_boundary_edge is not None:
+            thresholds.append(is_dirichlet_boundary_edge)
+        if is_dirichlet_boundary_node is not None:
+            thresholds.append(is_dirichlet_boundary_node)
+        if is_dirichlet_boundary_dof is not None:
+            thresholds.append(is_dirichlet_boundary_dof)
 
-        # if is_dirichlet_node is not None and is_dirichlet_direction is not None:
-        #     threshold = (is_dirichlet_boundary_edge, is_dirichlet_node, is_dirichlet_direction)
-        # elif is_dirichlet_node is not None:
-        #     threshold = (is_dirichlet_boundary_edge, is_dirichlet_node)
-        # elif is_dirichlet_direction is not None:
-        #     threshold = (is_dirichlet_boundary_edge, is_dirichlet_direction)
-        # else:
-        #     threshold = is_dirichlet_boundary_edge
-    
-        # uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_bd, threshold=threshold)
-
-
-        uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_bd,
-                                                    threshold=(is_dirichlet_boundary_edge, 
-                                                               is_dirichlet_node, 
-                                                               is_dirichlet_direction))
+        if thresholds:
+            uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_bd,
+                                                                    threshold=tuple(thresholds))
 
         F = F - K.matmul(uh_bd)
         F[isDDof] = uh_bd[isDDof]
 
-        K = dbc.check_matrix(K)
         indices = K.indices()
         new_values = bm.copy(K.values())
         IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
