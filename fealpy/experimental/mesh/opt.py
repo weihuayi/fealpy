@@ -72,4 +72,11 @@ class SumObjective(Objective, Generic[_QT]):
         Returns:
             TensorLike: Gradient of cell quality in the shape of (NN, GD).
         """
-        pass
+        cell = self.mesh_quality.mesh.entity('cell')
+        NN = self.mesh_quality.mesh.number_of_nodes()
+        TD = self.mesh_quality.mesh.TD
+        grad = self.mesh_quality.jac(x)
+        jacobi = bm.zeros((NN,TD))
+        for i in range(TD):
+            bm.index_add(jacobi[:,i],cell.flatten(),grad[:,:,i].flatten())
+        return jacobi 
