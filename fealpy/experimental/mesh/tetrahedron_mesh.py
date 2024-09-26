@@ -1,4 +1,5 @@
 from typing import Union, Optional
+from math import sqrt
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
@@ -78,8 +79,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             node = bm.tensor([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
-                [0.5, bm.sqrt(bm.tensor(3))/2, 0.0],
-                [0.5, bm.sqrt(bm.tensor(3))/6, bm.sqrt(bm.tensor(2/3))]], dtype=bm.float64)
+                [0.5, sqrt(3)/2, 0.0],
+                [0.5, sqrt(3)/6, sqrt(2/3)]], dtype=bm.float64)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0, 0.0],
@@ -388,6 +389,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell2ipoint[:, isInCellIPoint] = base + bm.arange(NC*idof,dtype=self.itype).reshape(NC, idof)
 
         return cell2ipoint
+
     def direction(self,i):
         """
         Compute the direction on every node of 0 <= i < 4
@@ -401,7 +403,18 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         l1 = bm.sum(v10**2, axis=1, keepdims=True)
         l2 = bm.sum(v20**2, axis=1, keepdims=True)
         l3 = bm.sum(v30**2, axis=1, keepdims=True)
-        return l1*bm.cross(v20, v30) + l2*bm.cross(v30, v10) + l3*bm.cross(v10, v20)
+
+        c1 = bm.cross(v20, v30)
+        c2 = bm.cross(v30, v10)
+        c3 = bm.cross(v10, v20)
+        c1 = bm.astype(c1, self.ftype)
+        c2 = bm.astype(c2, self.ftype)
+        c3 = bm.astype(c3, self.ftype)
+        l1 = bm.astype(l1, self.ftype)
+        l2 = bm.astype(l2, self.ftype)
+        l3 = bm.astype(l3, self.ftype)
+        #return l1*bm.cross(v20, v30) + l2*bm.cross(v30, v10) + l3*bm.cross(v10, v20)
+        return l1*c1 + l2*c2 + l3*c3
 
     def face_normal(self, index=_S):
         face = self.face
