@@ -77,7 +77,6 @@ class OCAlg(Optimizer):
             rho_new, rho_phys[:] = self.update(rho, dce, dge, volume_constraint, filter_properties, mesh)
 
             # Compute change in design variables
-            # change = bm.linalg.norm(rho_new.reshape(-1, 1) - rho.reshape(-1, 1), bm.inf)
             change = bm.max(bm.abs(rho_new - rho))
 
             # Print the results for this iteration
