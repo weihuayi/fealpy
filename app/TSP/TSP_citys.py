@@ -80,9 +80,9 @@ def printroute(route_citys, citys, alg_name):
     plt.show()
 
 class TravellingSalesmanProblem:
-    def __init__(self, citys, D) -> None:
+    def __init__(self, citys) -> None:
         self.citys = citys
-        self.D = D
+        self.D = bm.zeros((citys.shape[0], citys.shape[0]))
     
     def fitness(self, x):
         index = bm.argsort(x, axis=-1)
@@ -91,6 +91,13 @@ class TravellingSalesmanProblem:
             dis = self.D[index[:, i], index[:, i + 1]]
             distance = distance + dis
         return distance
+
+    def calD(self):
+        n = self.citys.shape[0] 
+        diff = self.citys[:, None, :] - self.citys[None, :, :]
+        self.D = bm.sqrt(bm.sum(diff ** 2, axis = -1))
+        self.D[bm.arange(n), bm.arange(n)] = 2.2204e-16
+        
 
 
 
