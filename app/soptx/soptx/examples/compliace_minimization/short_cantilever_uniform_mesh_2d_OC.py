@@ -8,14 +8,14 @@ from fealpy.experimental.opt import opt_alg_options
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
-from app.soptx.soptx.pde.cantilever import CantileverOneData
+from app.soptx.soptx.pde.short_cantilever_2d import ShortCantilever2dOneData
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
 from app.soptx.soptx.opt.oc_alg import OCAlg
 
 
-parser = argparse.ArgumentParser(description="MBB 梁上的柔顺度最小化.")
+parser = argparse.ArgumentParser(description="短悬臂梁上的柔顺度最小化.")
 
 parser.add_argument('--backend', 
                     default='numpy', type=str,
@@ -50,7 +50,7 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 nx, ny = args.nx, args.ny
-pde = CantileverOneData(nx=nx, ny=ny)
+pde = ShortCantilever2dOneData(nx=nx, ny=ny)
 
 extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
