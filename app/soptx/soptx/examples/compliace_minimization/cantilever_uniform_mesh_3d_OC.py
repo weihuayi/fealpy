@@ -26,15 +26,15 @@ parser.add_argument('--degree',
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
 parser.add_argument('--nx', 
-                    default=60, type=int, 
+                    default=2, type=int, 
                     help='x 方向的初始网格单元数, 默认为 60.')
 
 parser.add_argument('--ny',
-                    default=20, type=int,
+                    default=1, type=int,
                     help='y 方向的初始网格单元数, 默认为 20.')
 
 parser.add_argument('--nz',
-                    default=4, type=int,
+                    default=2, type=int,
                     help='z 方向的初始网格单元数, 默认为 4.')
 
 parser.add_argument('--filter_type', 
