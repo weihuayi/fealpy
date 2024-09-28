@@ -17,7 +17,6 @@ from app.soptx.soptx.solver.fem_solver import FEMSolver
 from app.soptx.soptx.utilfunc.calculate_ke0 import calculate_ke0
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
-from app.soptx.soptx.cases.boundary_conditions import BoundaryConditions
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 
@@ -61,7 +60,7 @@ class ComplianceObjective(Objective):
                                                 self.dof_per_node, self.dof_ordering)
         self.filter_properties = self._create_filter_properties(self.filter_type, 
                                                             self.filter_rmin)
-        self.displacement_solver = self._create_displacement_solver(self.solver_method)
+        self.displacement_solver = self._create_displacement_solver()
 
         self.ke0 = calculate_ke0(material_properties=self.material_properties, 
                                 tensor_space=self.space)
@@ -113,7 +112,7 @@ class ComplianceObjective(Objective):
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 
-    def _create_displacement_solver(self, solver_method: str) -> FEMSolver:
+    def _create_displacement_solver(self) -> FEMSolver:
         """
         Create a FEMSolver instance based on the given solver method.
 
@@ -125,47 +124,7 @@ class ComplianceObjective(Objective):
         """
         return FEMSolver(material_properties=self.material_properties,
                         tensor_space=self.space,
-                        pde=self.pde,
-                        solver_method=solver_method)
-
-    # def _compute_uhe_and_ce(self, rho: _DT):
-    #     """
-    #     Compute the element displacement and compliance energy for the given density.
-
-    #     Parameters:
-    #         rho (_DT): Design variable (density distribution).
-        
-    #     Returns:
-    #         Tuple[_DT, _DT]: Element displacement (uhe) and compliance energy (ce).
-    #     """
-    #     ft = self.filter_properties.ft
-    #     H = self.filter_properties.H
-    #     Hs = self.filter_properties.Hs
-
-    #     cell_measure = self.mesh.entity_measure('cell')
-
-    #     if ft == 0:
-    #         rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-    #     elif ft == 1:
-    #         rho_phys = rho
-        
-    #     material_properties = self.material_properties
-    #     displacement_solver = self.displacement_solver
-    #     ke0 = self.ke0
-
-    #     material_properties.rho = rho_phys
-
-    #     uh = displacement_solver.solve()
-    #     cell2ldof = self.space.cell_to_dof()
-    #     uhe = uh[cell2ldof]
-
-    #     # uhe = displacement_solver.get_element_displacement()
-    #     # E = material_properties.material_model()
-
-    #     ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
-
-    #     return ce
-    #     # return uhe, ce, E
+                        pde=self.pde)
 
     def fun(self, rho: _DT) -> float:
         """
@@ -177,16 +136,6 @@ class ComplianceObjective(Objective):
         Returns:
             float: Compliance value.
         """
-        # ft = self.filter_properties.ft
-        # H = self.filter_properties.H
-        # Hs = self.filter_properties.Hs
-
-        # cell_measure = self.mesh.entity_measure('cell')
-
-        # if ft == 0:
-        #     rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-        # elif ft == 1:
-        #     rho_phys = rho
         
         material_properties = self.material_properties
         displacement_solver = self.displacement_solver
@@ -194,7 +143,7 @@ class ComplianceObjective(Objective):
 
         material_properties.rho = rho
 
-        uh = displacement_solver.solve()
+        uh = displacement_solver.solve(solver_method='cg')
         cell2ldof = self.space.cell_to_dof()
         uhe = uh[cell2ldof]
 

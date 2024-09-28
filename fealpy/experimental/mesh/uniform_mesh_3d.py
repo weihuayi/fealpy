@@ -73,7 +73,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
     """
     def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), 
-                ipoints_ordering='zyx', itype=None, ftype=None):
+                ipoints_ordering='zyx', flip_direction=False, 
+                itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -109,6 +110,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # Interpolation points
         self.ipoints_ordering = ipoints_ordering
+
+        # 是否翻转
+        self.flip_direction = flip_direction
 
         # Initialize face adjustment mask
         self.adjusted_face_mask = self.get_adjusted_face_mask()
@@ -152,6 +156,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         z = bm.linspace(box[4], box[5], nz + 1, dtype=self.ftype)
         xx, yy, zz = bm.meshgrid(x, y, z, indexing='ij')
         node = bm.concatenate((xx[..., None], yy[..., None], zz[..., None]), axis=-1)
+
+        if self.flip_direction:
+            node = bm.flip(node.reshape(nx + 1, ny + 1, nz + 1, GD), axis=1).reshape(-1, GD)
 
         return node.reshape(-1, GD)
     
@@ -259,31 +266,42 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         cell = bm.zeros((NC, 8), dtype=self.itype)
         nyz = (ny + 1) * (nz + 1)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            cell[:, 0] = c.flatten()
-            cell[:, 1] = cell[:, 0] + 1
-            cell[:, 2] = cell[:, 0] + nz + 1
-            cell[:, 3] = cell[:, 2] + 1
-            cell[:, 4] = cell[:, 0] + nyz
-            cell[:, 5] = cell[:, 4] + 1
-            cell[:, 6] = cell[:, 2] + nyz
-            cell[:, 7] = cell[:, 6] + 1
+        cell = bm.set_at(cell, (slice(None), 0), c.flatten())
+        cell = bm.set_at(cell, (slice(None), 1), cell[:, 0] + 1)
+        cell = bm.set_at(cell, (slice(None), 2), cell[:, 0] + nz + 1)
+        cell = bm.set_at(cell, (slice(None), 3), cell[:, 2] + 1)
+        cell = bm.set_at(cell, (slice(None), 4), cell[:, 0] + nyz)
+        cell = bm.set_at(cell, (slice(None), 5), cell[:, 4] + 1)
+        cell = bm.set_at(cell, (slice(None), 6), cell[:, 2] + nyz)
+        cell = bm.set_at(cell, (slice(None), 7), cell[:, 6] + 1)
 
-            return cell
-        elif bm.backend_name == 'jax':
-            cell = cell.at[:, 0].set(c.flatten())
-            cell = cell.at[:, 1].set(cell[:, 0] + 1)
-            cell = cell.at[:, 2].set(cell[:, 0] + nz + 1)
-            cell = cell.at[:, 3].set(cell[:, 2] + 1)
-            cell = cell.at[:, 4].set(cell[:, 0] + nyz)
-            cell = cell.at[:, 5].set(cell[:, 4] + 1)
-            cell = cell.at[:, 6].set(cell[:, 2] + nyz)
-            cell = cell.at[:, 7].set(cell[:, 6] + 1)
+        return cell
 
-            return cell
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        # # TODO: Provide a unified implementation that is not backend-specific
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     cell[:, 0] = c.flatten()
+        #     cell[:, 1] = cell[:, 0] + 1
+        #     cell[:, 2] = cell[:, 0] + nz + 1
+        #     cell[:, 3] = cell[:, 2] + 1
+        #     cell[:, 4] = cell[:, 0] + nyz
+        #     cell[:, 5] = cell[:, 4] + 1
+        #     cell[:, 6] = cell[:, 2] + nyz
+        #     cell[:, 7] = cell[:, 6] + 1
+
+        #     return cell
+        # elif bm.backend_name == 'jax':
+        #     cell = cell.at[:, 0].set(c.flatten())
+        #     cell = cell.at[:, 1].set(cell[:, 0] + 1)
+        #     cell = cell.at[:, 2].set(cell[:, 0] + nz + 1)
+        #     cell = cell.at[:, 3].set(cell[:, 2] + 1)
+        #     cell = cell.at[:, 4].set(cell[:, 0] + nyz)
+        #     cell = cell.at[:, 5].set(cell[:, 4] + 1)
+        #     cell = cell.at[:, 6].set(cell[:, 2] + nyz)
+        #     cell = cell.at[:, 7].set(cell[:, 6] + 1)
+
+        #     return cell
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
     
     
     # 实体拓扑
@@ -1064,7 +1082,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             face_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
                                         end_indices[:, :, None] * linspace_indices
 
-            face2ipoint = face_ipoints_interpolated.reshape(-1, (p+1)**2)
+            face2ipoint = face_ipoints_interpolated.reshape(-1, (p+1)**2).astype(self.itype)
         elif ordering == 'nefc':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()

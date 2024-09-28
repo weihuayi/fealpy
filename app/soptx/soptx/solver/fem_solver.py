@@ -7,8 +7,7 @@ from fealpy.experimental.sparse import COOTensor
 from fealpy.experimental.solver import cg
 
 class FEMSolver:
-    def __init__(self, material_properties, 
-                tensor_space, pde, solver_method):
+    def __init__(self, material_properties, tensor_space, pde):
         """
         Initialize the FEMSolver with the provided parameters.
 
@@ -23,14 +22,6 @@ class FEMSolver:
         self.material_properties = material_properties
         self.tensor_space = tensor_space
         self.pde = pde
-        self.solver_method = solver_method
-
-        self.uh = tensor_space.function()
-        self.KE = None
-        self.K = None
-        self.F = None
-        
-        self.solved = False 
 
     def assemble_stiffness_matrix(self):
         """
@@ -38,10 +29,12 @@ class FEMSolver:
         """
         integrator = LinearElasticIntegrator(material=self.material_properties, 
                                             q=self.tensor_space.p+3)
-        self.KE = integrator.assembly(space=self.tensor_space)
+        KE = integrator.assembly(space=self.tensor_space)
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
-        self.K = bform.assembly()
+        K = bform.assembly()
+
+        return K
 
     def apply_boundary_conditions(self):
         """
@@ -49,103 +42,65 @@ class FEMSolver:
         """
         force = self.pde.force
         dirichlet = self.pde.dirichlet
-        is_dirichlet_boundary_edge = self.pde.is_dirichlet_boundary_edge
-        is_dirichlet_node = self.pde.is_dirichlet_node
-        is_dirichlet_direction = self.pde.is_dirichlet_direction
+        is_dirichlet_boundary_face = getattr(self.pde, 'is_dirichlet_boundary_face', None)
+        is_dirichlet_boundary_edge = getattr(self.pde, 'is_dirichlet_boundary_edge', None)
+        is_dirichlet_boundary_node = getattr(self.pde, 'is_dirichlet_boundary_node', None)
+        is_dirichlet_boundary_dof = getattr(self.pde, 'is_dirichlet_boundary_dof', None)
+        
+        K = self.assemble_stiffness_matrix()
+        F = self.tensor_space.interpolate(force)
 
-        self.F = self.tensor_space.interpolate(force)
+        uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), dtype=bm.float64)
 
-        dbc = DBC(space=self.tensor_space, gd=dirichlet, left=False)
-        self.F = dbc.check_vector(self.F)
+        thresholds = []
+        if is_dirichlet_boundary_face is not None:
+            thresholds.append(is_dirichlet_boundary_face)
+        if is_dirichlet_boundary_edge is not None:
+            thresholds.append(is_dirichlet_boundary_edge)
+        if is_dirichlet_boundary_node is not None:
+            thresholds.append(is_dirichlet_boundary_node)
+        if is_dirichlet_boundary_dof is not None:
+            thresholds.append(is_dirichlet_boundary_dof)
 
-        isDDof = self.tensor_space.is_boundary_dof(threshold=(
-            is_dirichlet_boundary_edge, is_dirichlet_node, is_dirichlet_direction))
+        if thresholds:
+            uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_bd,
+                                                                    threshold=tuple(thresholds))
 
-        self.uh = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=self.uh,
-                                                        threshold=is_dirichlet_boundary_edge)
+        F = F - K.matmul(uh_bd)
+        F[isDDof] = uh_bd[isDDof]
 
-        self.F = self.F - self.K.matmul(self.uh[:])
-        self.F[isDDof] = self.uh[isDDof]
-
-        self.K = dbc.check_matrix(self.K)
-        indices = self.K.indices()
-        new_values = bm.copy(self.K.values())
+        indices = K.indices()
+        new_values = bm.copy(K.values())
         IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
         new_values[IDX] = 0
 
-        self.K = COOTensor(indices, new_values, self.K.sparse_shape)
+        K = COOTensor(indices, new_values, K.sparse_shape)
         index, = bm.nonzero(isDDof)
-        one_values = bm.ones(len(index), **self.K.values_context())
+        one_values = bm.ones(len(index), **K.values_context())
         one_indices = bm.stack([index, index], axis=0)
-        K1 = COOTensor(one_indices, one_values, self.K.sparse_shape)
-        self.K = self.K.add(K1).coalesce()
+        K1 = COOTensor(one_indices, one_values, K.sparse_shape)
+        K = K.add(K1).coalesce()
 
-    def solve(self) -> TensorLike:
+        return K, F
+
+    def solve(self, solver_method) -> TensorLike:
         """
         Solve the displacement field.
 
         Returns:
             TensorLike: The displacement vector.
         """
-        self.K = None 
-        self.F = None
 
-        self.assemble_stiffness_matrix()
-        self.apply_boundary_conditions()
-
+        K, F = self.apply_boundary_conditions()
+        uh = self.tensor_space.function()
         
-        if self.K is None or self.F is None:
+        if K is None or F is None:
             raise ValueError("Stiffness matrix K or force vector F has not been assembled.")
-        if self.solver_method == 'cg':
-            self.uh[:] = cg(self.K, self.F, maxiter=5000, atol=1e-14, rtol=1e-14)
-        elif self.solver_method == 'mumps':
+        if solver_method == 'cg':
+            uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+        elif solver_method == 'mumps':
             raise NotImplementedError("Direct solver using MUMPS is not implemented.")
         else:
-            raise ValueError(f"Unsupported solver method: {self.solver_method}")
+            raise ValueError(f"Unsupported solver method: {solver_method}")
 
-        return self.uh
-    
-    def get_element_stiffness_matrix(self) -> TensorLike:
-        """
-        Get the element stiffness matrix.
-
-        Returns:
-            TensorLike: The element stiffness matrix KE.
-        """
-        return self.KE
-    
-    def get_element_displacement(self) -> TensorLike:
-        """
-        Get the displacement vector for each element.
-
-        Returns:
-            TensorLike: The displacement vector for each element (uhe).
-        """
-        if not self.solved:
-            self.solve()
-        cell2ldof = self.tensor_space.cell_to_dof()
-        uhe = self.uh[cell2ldof]
-
-        return uhe
-    
-    def get_global_stiffness_matrix(self) -> TensorLike:
-        """
-        Get the global stiffness matrix.
-
-        Returns:
-            TensorLike: The global stiffness matrix K.
-        """
-        if self.K is None:
-            self.assemble_stiffness_matrix()
-        return self.K
-
-    def get_global_source_vector(self) -> TensorLike:
-        """
-        Get the global force vector.
-
-        Returns:
-            TensorLike: The global force vector F.
-        """
-        if self.F is None:
-            self.apply_boundary_conditions()
-        return self.F
+        return uh
