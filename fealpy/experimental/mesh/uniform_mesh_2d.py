@@ -68,7 +68,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
 
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
-                ipoints_ordering='yx', flip_direction=False, itype=None, ftype=None):
+                ipoints_ordering='yx', flip_direction=None, itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -135,7 +135,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
 
-        if self.flip_direction:
+        if self.flip_direction == 'x':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, GD), axis=0).reshape(-1, GD)
+        elif self.flip_direction == 'y':
             node = bm.flip(node.reshape(nx + 1, ny + 1, GD), axis=1).reshape(-1, GD)
 
         return node.reshape(-1, GD)

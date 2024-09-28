@@ -49,6 +49,8 @@ class FEMSolver:
         
         K = self.assemble_stiffness_matrix()
         F = self.tensor_space.interpolate(force)
+        # index = bm.nonzero(F)
+        # KFULL = K.to_dense().round(4)
 
         uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), dtype=bm.float64)
 

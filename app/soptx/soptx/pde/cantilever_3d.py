@@ -4,19 +4,24 @@ from fealpy.experimental.typing import TensorLike
 
 class Cantilever3dOneData:
     def __init__(self, nx: int, ny: int, nz: int):
+        """
+        flip_direction = 'y'
+       1------- 5
+     / |       /|
+    3 ------- 7 |
+    |  |      | |
+    |  0------|-4
+    | /       |/
+    2 ------- 6
+        """
         self.nx = nx
         self.ny = ny
         self.nz = nz
     
-    def domain(self):
-        xmin, xmax = 0, 4
-        ymin, ymax = 0, 1
-        zmin, zmax = 0, 2
-        return [xmin, xmax, ymin, ymax, zmin, zmax]
-    
     def force(self, points: TensorLike) -> TensorLike:
 
         val = bm.zeros(points.shape, dtype=points.dtype)
+
         val[-(self.nz+1):, 1] = -1
 
         return val
@@ -30,3 +35,4 @@ class Cantilever3dOneData:
         left_face = (face_centers[:, 0] == 0.0)
 
         return left_face
+    
