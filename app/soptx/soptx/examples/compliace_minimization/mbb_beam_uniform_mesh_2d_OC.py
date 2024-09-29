@@ -15,7 +15,7 @@ from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
 from app.soptx.soptx.opt.oc_alg import OCAlg
 
 parameter_groups = {
-    'group1': {'nx': 60, 'ny': 20, 'filter_rmin': 2.4},
+    'group1': {'nx': 4, 'ny': 2, 'filter_rmin': 2.4},
     'group2': {'nx': 150, 'ny': 50, 'filter_rmin': 6.0},
     'group3': {'nx': 300, 'ny': 100, 'filter_rmin': 16.0},
 }
@@ -62,7 +62,7 @@ extent = [0, nx, 0, ny]
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
 origin = [extent[0], extent[2]]
 
-mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction=True)
+mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction='y')
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
 # axes = fig.add_subplot(111)

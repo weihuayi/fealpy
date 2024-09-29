@@ -73,7 +73,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
     """
     def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), 
-                ipoints_ordering='zyx', flip_direction=False, 
+                ipoints_ordering='zyx', flip_direction=None, 
                 itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
@@ -157,8 +157,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         xx, yy, zz = bm.meshgrid(x, y, z, indexing='ij')
         node = bm.concatenate((xx[..., None], yy[..., None], zz[..., None]), axis=-1)
 
-        if self.flip_direction:
+        if self.flip_direction == 'y':
             node = bm.flip(node.reshape(nx + 1, ny + 1, nz + 1, GD), axis=1).reshape(-1, GD)
+        elif self.flip_direction == 'z':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, nz + 1, GD), axis=2).reshape(-1, GD)
 
         return node.reshape(-1, GD)
     

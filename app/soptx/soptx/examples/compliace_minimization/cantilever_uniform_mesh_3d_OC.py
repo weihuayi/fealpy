@@ -26,7 +26,7 @@ parser.add_argument('--degree',
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
 parser.add_argument('--nx', 
-                    default=4, type=int, 
+                    default=2, type=int, 
                     help='x 方向的初始网格单元数, 默认为 60.')
 
 parser.add_argument('--ny',
@@ -56,14 +56,13 @@ bm.set_backend(args.backend)
 nx, ny, nz = args.nx, args.ny, args.nz
 pde = Cantilever3dOneData(nx=nx, ny=ny, nz=nz)
 
-extent = pde.domain()
+extent = [0, nx, 0, ny, 0, nz]
 h = [(extent[1] - extent[0]) / nx, 
      (extent[3] - extent[2]) / ny, 
      (extent[5] - extent[4]) / nz]
 origin = [extent[0], extent[2], extent[4]]
 
-mesh = UniformMesh3d(extent=extent, h=h, origin=origin, flip_direction=False)
-# node = mesh.entity('node')
+mesh = UniformMesh3d(extent=extent, h=h, origin=origin, flip_direction='y')
 
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
