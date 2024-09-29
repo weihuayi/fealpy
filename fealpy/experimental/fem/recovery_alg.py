@@ -1,4 +1,5 @@
 from typing import Optional
+import numpy as np
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
@@ -44,7 +45,7 @@ class RecoveryAlg:
         deg = bm.zeros(gdof, dtype=space.ftype)
 
         if method == 'simple':
-            bm.index_add(deg, cell2dof, 1)
+            bm.index_add(deg, cell2dof, bm.tensor(1, **bm.context(deg)))
             bm.index_add(gval, cell2dof, guh)
         elif method == 'area_harmonic':
             val = 1.0/space.mesh.entity_measure('cell')

@@ -8,6 +8,7 @@ from fealpy.experimental.mesh import TriangleMesh
 from app.fracturex.fracturex.phasefield.main_solver import MainSolver
 from fealpy.utils import timer
 import time
+import matplotlib.pyplot as plt
 
 class square_with_circular_notch():
     def __init__(self):
@@ -25,7 +26,7 @@ class square_with_circular_notch():
         """
         @brief 生成实始网格
         """
-        node = np.array([
+        node = bm.array([
             [0.0, 0.0],
             [0.0, 0.5],
             [0.0, 0.5],
@@ -35,9 +36,9 @@ class square_with_circular_notch():
             [0.5, 1.0],
             [1.0, 0.0],
             [1.0, 0.5],
-            [1.0, 1.0]], dtype=np.float64)
+            [1.0, 1.0]], dtype=bm.float64)
 
-        cell = np.array([
+        cell = bm.array([
             [1, 0, 5],
             [4, 5, 0],
             [2, 5, 3],
@@ -45,7 +46,7 @@ class square_with_circular_notch():
             [4, 7, 5],
             [8, 5, 7],
             [6, 5, 9],
-            [8, 9, 5]], dtype=np.int_)
+            [8, 9, 5]], dtype=bm.int32)
         mesh = TriangleMesh(node, cell)
         mesh.uniform_refine(n=n)
         return mesh
@@ -77,18 +78,32 @@ class square_with_circular_notch():
 tmr = timer()
 next(tmr)
 start = time.time()
+bm.set_backend('pytorch')
 model = square_with_circular_notch()
 
 mesh = model.init_mesh(n=4)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=1, method='HybridModel', enable_refinement=True)
+ms = MainSolver(mesh=mesh, material_params=model.params, p=2, method='HybridModel', enable_refinement=True)
 tmr.send('init')
 
 ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 ms.solve(vtkname='test')
+
+force = ms.Rforce
+with open('results_model1_ada.txt', 'w') as file:
+    file.write(f'force: {force}\n')
+fig, axs = plt.subplots(1, 2)
+plt.plot(disp, force, label='Force')
+plt.xlabel('Displacement Increment')
+plt.ylabel('Residual Force')
+plt.title('Changes in Residual Force')
+plt.grid(True)
+plt.legend()
+plt.savefig('model1_force.png', dpi=300)
+
 tmr.send('stop')
 end = time.time()
 print(f"Time: {end - start}")

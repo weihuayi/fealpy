@@ -19,10 +19,10 @@ class TestRecoveryAlg:
         uh[:] = self.fun(space.interpolation_points())
         recovery = RecoveryAlg()
         eta0 = recovery.recovery_estimate(uh, method='simple')
-#        eta1 = recovery.recovery_estimate(uh, method='area_harmonic')
-#        eta2 = recovery.recovery_estimate(uh, method='area')
-#        eta3 = recovery.recovery_estimate(uh, method='distance')
-#        eta4 = recovery.recovery_estimate(uh, method='distance_harmonic')
+        eta1 = recovery.recovery_estimate(uh, method='area_harmonic')
+        eta2 = recovery.recovery_estimate(uh, method='area')
+        eta3 = recovery.recovery_estimate(uh, method='distance')
+        eta4 = recovery.recovery_estimate(uh, method='distance_harmonic')
 
         print('eta0:', eta0)
         print('eta1:', eta1)
@@ -35,7 +35,8 @@ class TestRecoveryAlg:
         x = p[..., 0]
         y = p[..., 1]
         f = x*y
-        f[1] = 10
+        bm.set_at(f, 1, 10)
+        #f[1] = 10
         return f
 
 

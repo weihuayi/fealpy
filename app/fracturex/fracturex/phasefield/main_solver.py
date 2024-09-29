@@ -93,7 +93,8 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(len(self.force_value) - 1):
+        for i in range(len(self.force_value)-1):
+            print('i', i)
             self._currt_force_value = self.force_value[i+1]
             # Run Newton-Raphson iteration
             self.newton_raphson(maxit)
@@ -104,8 +105,9 @@ class MainSolver:
                 else:
                     fname = f'{vtkname}{i:010d}.vtu'
                 self.save_vtkfile(fname=fname)
-            print('ddd', bm.max(self.d), bm.min(self.d))
+            
             bm.set_at(self.Rforce, i+1, self.Rfu)
+            
             
 
     def newton_raphson(self, maxit: int = 50):
@@ -119,17 +121,21 @@ class MainSolver:
         force_value : TensorLike
             Value of the force boundary condition.
         """
+        tmr = self.tmr
         for k in range(maxit):
             print(f"Newton-Raphson Iteration {k + 1}/{maxit}:")
-
+            
+            tmr.send('start')
             er0 = self.solve_displacement()
             self.pfcm.update_disp(self.uh)
+            tmr.send('disp_solve')
             
             print(f"Displacement error after iteration {k + 1}: {er0}")
 
             er1 = self.solve_phase_field()
             self.pfcm.update_phase(self.d)
             print(f"Phase field error after iteration {k + 1}: {er1}")
+            tmr.send('phase_solve')
 
             self.H = self.pfcm.H
             if self.enable_refinement:
@@ -138,12 +144,14 @@ class MainSolver:
                 if new_data:
                     self.set_lfe_space()
                     self.update_interpolation_data(new_data)
-                
+                    print(f"Refinement after iteration {k + 1}")
+
+            tmr.send('refine')
             if k == 0:
                 e0, e1 = er0, er1
             
             error = max(er0/e0, er1/e1)
-
+            tmr.send('end')
             print(f'Iteration {k}, Error: {error}')
             if error < 1e-5:
                 print(f"Convergence achieved after {k + 1} iterations.")
@@ -159,6 +167,8 @@ class MainSolver:
             The norm of the residual.
         """
         uh = self.uh
+        tmr = self.tmr
+        tmr.send('start')
 
         fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self.force_dof, direction=self.force_direction)
         uh, force_index = fbc.apply_value(uh)
@@ -169,17 +179,21 @@ class MainSolver:
         A = ubform.assembly()
         R = -A @ uh[:]
         self.Rfu = bm.sum(-R[force_index])
+        tmr.send('disp_assemble')
 
         # Apply force boundary conditions
         ubc = VectorDirichletBC(self.tspace, 0, threshold=self.force_dof, direction=self.force_direction)  
         A, R = ubc.apply(A, R)
-        
+
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
+        tmr.send('apply_bc')
+
         du = cg(A, R, atol=1e-14)
-        uh += du.flat[:]
+        uh += du.flatten()[:]
         self.uh = uh
         
+        tmr.send('disp_solve')
         return np.linalg.norm(R)
 
     def solve_phase_field(self) -> float:
@@ -196,22 +210,30 @@ class MainSolver:
         def coef(bc, index):
             return 2 * self.pfcm.maximum_historical_field(bc)
 
+        tmr = self.tmr
+        tmr.send('start')
+
         dbform = BilinearForm(self.space)
         dbform.add_integrator(ScalarDiffusionIntegrator(Gc * l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef, q=self.q))
         A = dbform.assembly()
+        tmr.send('phase_matrix_assemble')
 
         dlform = LinearForm(self.space)
         dlform.add_integrator(ScalarSourceIntegrator(coef, q=self.q))
         R = dlform.assembly()
         R -= A @ d[:]
+        tmr.send('phase_R_assemble')
 
         A, R = self._apply_boundary_conditions(A, R, field='phase')
+        tmr.send('phase_apply_bc')
+
         dd = cg(A, R, atol=1e-14)
         d += dd.flat[:]
+
         self.d = d
-        
+        tmr.send('phase_solve')
         return np.linalg.norm(R)
 
     def set_lfe_space(self):

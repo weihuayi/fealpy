@@ -106,9 +106,10 @@ class AdaptiveRefinement:
         if GD == 3:
             hmin = self.l0**3/200
         else:
-            hmin = (self.l0/4)**2
+            hmin = (self.l0/8)**2
         
         isMarkedCell = bm.logical_and(isMarkedCell, cm > hmin)
+        
         if bm.any(isMarkedCell):
             if GD == 2:
                 if self.refine_method == 'bisect':
