@@ -57,18 +57,12 @@ def soler_tsp_with_algorithm(algorithm, fobj, lb, ub, NP, dim):
     gbest, gbest_f = optimizer.run()
     return gbest, gbest_f
 
-def calD(citys):
-    n = citys.shape[0]
-    D = bm.zeros((n, n)) 
-    diff = citys[:, None, :] - citys[None, :, :]
-    D = bm.sqrt(bm.sum(diff ** 2, axis = -1))
-    D[bm.arange(n), bm.arange(n)] = 2.2204e-16
-    return D
-
-def gbest2route(gbest, citys):
+def gbest2route(gbest, gbest_f, citys, alg_name):
     route = bm.argsort(gbest)
     route = bm.concatenate((route, route[0: 1]))
     route_citys = citys[route]
+    print(f"The best route obtained by {alg_name} is:", route)
+    print(f"The shortest distance found by {alg_name} is:", gbest_f)
     return route, route_citys
 
 def printroute(route_citys, citys, alg_name):
