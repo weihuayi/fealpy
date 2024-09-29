@@ -39,6 +39,8 @@ class TestTetrahedronMeshInterfaces:
         
         face2cell = mesh.face_to_cell()
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
+        direction = mesh.direction(0)
+        np.testing.assert_allclose(bm.to_numpy(direction), data["direction"])
 
     @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
     @pytest.mark.parametrize("data", face_to_edge_sign_data)
@@ -325,7 +327,7 @@ class TestTetrahedronMeshInterfaces:
 
 if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
-    #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
+    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_face_to_edge_sign"])
     #a = TestTetrahedronMeshInterfaces()
     #a.test_face_unit_norm(face_unit_norm[0], 'pytorch')
@@ -333,4 +335,4 @@ if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_box"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_entity_measure"])
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_grad_lambda"])
-    pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_interplation_with_HB"])
+    #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_interplation_with_HB"])

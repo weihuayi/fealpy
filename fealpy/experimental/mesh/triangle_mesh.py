@@ -1190,12 +1190,12 @@ class TriangleMesh(SimplexMesh, Plotable):
         @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
         生成相应带状区域的三角形网格
 
-        x = a \sin\theta \cos\phi
-        y = b \sin\theta \sin\phi
-        z = c \cos\theta
+        x = a \\sin\\theta \\cos\\phi
+        y = b \\sin\\theta \\sin\\phi
+        z = c \\cos\\theta
 
-        @param[in] ntheta \theta 方向的剖分段数
-        @param[in] nphi \phi 方向的剖分段数 
+        @param[in] ntheta \\theta 方向的剖分段数
+        @param[in] nphi \\phi 方向的剖分段数 
         """
         if theta is None:
             theta = (bm.pi / 4, 3 * bm.pi / 4)

@@ -68,7 +68,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
 
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
-                ipoints_ordering='yx', itype=None, ftype=None):
+                ipoints_ordering='yx', flip_direction=None, itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -100,6 +100,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         # Interpolation points
         self.ipoints_ordering = ipoints_ordering
 
+        # 是否翻转
+        self.flip_direction = flip_direction
+
         # Initialize edge adjustment mask
         self.adjusted_edge_mask = self.get_adjusted_edge_mask()
 
@@ -129,7 +132,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
         y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
+
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
+
+        if self.flip_direction == 'x':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, GD), axis=0).reshape(-1, GD)
+        elif self.flip_direction == 'y':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, GD), axis=1).reshape(-1, GD)
 
         return node.reshape(-1, GD)
     
@@ -144,6 +153,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         NE = self.NE
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
+
         edge = bm.zeros((NE, 2), dtype=self.itype)
         NE0 = 0
         NE1 = nx * (ny + 1)
@@ -169,8 +179,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         NN = self.NN
         NC = self.NC
-        cell = bm.zeros((NC, 4), dtype=self.itype)
+
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+
+        cell = bm.zeros((NC, 4), dtype=self.itype)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1

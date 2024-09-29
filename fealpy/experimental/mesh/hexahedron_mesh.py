@@ -365,6 +365,8 @@ class HexahedronMesh(TensorMesh, Plotable):
         """
         shape = (nx+1, ny+1, nz+1)
         X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=bm.float64)[:, None, None]
+        # X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=bm.float64)
+        # X = X[:, None, None]
         Y = bm.linspace(box[2], box[3], ny+1, endpoint=True, dtype=bm.float64)[None, :, None]
         Z = bm.linspace(box[4], box[5], nz+1, endpoint=True, dtype=bm.float64)[None, None, :]
         X = bm.broadcast_to(X, shape).reshape(-1, 1)

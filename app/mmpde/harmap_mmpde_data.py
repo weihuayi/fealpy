@@ -28,11 +28,8 @@ mesh_data = {
     'from_polygon_gmsh_Lshape':TriangleMesh(mesh2.node,mesh2.ds.cell),
 }
 function_data = {
-    'u0':'cos(pi*x)*cos(pi*y)',
     'u1':'(1-exp(4*(x-1))*sin(pi*y))',
-    'u2':'sin(pi *x)*sin(pi*y)',
-    'u3':'1/((x-0.5)**2 + (y-0.5)**2 + 0.1)',
-    'u4':'1/2 + 1/2 * tanh(50*(1/12 - (x-1/2)**2 -(y-1/2)**2))',
-    'u5':'exp(-100*((x-0.5)**2 + (y-0.5)**2))',
-    'u6':'1/(1+ exp(30*(x+y-1)))'
+    'u2':'1/2 + 1/2 * tanh(100*(1/12 - (x-1/2)**2 -(y-1/2)**2))',
+    'u3':'exp(-100*((x-0.5)**2 + (y-0.5)**2))',
+    'u4':'1/(1+ exp(100*(x+y-1)))'
 }

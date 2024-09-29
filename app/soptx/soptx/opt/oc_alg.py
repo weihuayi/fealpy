@@ -7,7 +7,7 @@ class OCAlg(Optimizer):
     def __init__(self, options) -> None:
         super().__init__(options)
 
-    def update(self, rho: _DT, dce: _DT, volume_constraint) -> _DT:
+    def update(self, rho: _DT, dce: _DT, dge: _DT, volume_constraint, filter_properties, mesh) -> _DT:
         """
         Update the design variables using the OC method.
 
@@ -23,26 +23,29 @@ class OCAlg(Optimizer):
         l1 = 0.0
         l2 = 1e9
         move = 0.2
-
-        dve = volume_constraint.jac()
         
         while (l2 - l1) / (l2 + l1) > 1e-3:
             lmid = 0.5 * (l2 + l1)
-            # Update design variable using OC formula
             rho_new = bm.maximum(
                 0.0, bm.maximum(rho - move, 
-                bm.minimum(1.0, bm.minimum(rho + move, rho * bm.sqrt(-dce / dve / lmid))))
+                bm.minimum(1.0, bm.minimum(rho + move, rho * bm.sqrt(-dce / dge / lmid))))
             )
 
-            v_new = volume_constraint.fun(rho_new)
+            ft, H = filter_properties.ft, filter_properties.H
+            cell_measure = mesh.entity_measure('cell')
+            if ft == 0:
+                rho_phys = H.matmul(rho_new[:] * cell_measure) / H.matmul(cell_measure)
+            elif ft == 1:
+                rho_phys = rho_new
 
-            # Check volume constraint to update l1 and l2
-            if v_new > 0:
+            g = volume_constraint.fun(rho_phys)
+
+            if g > 0:
                 l1 = lmid
             else:
                 l2 = lmid
 
-        return rho_new
+        return rho_new, rho_phys
 
     def run(self):
         """
@@ -52,27 +55,33 @@ class OCAlg(Optimizer):
         under the given constraints.
         """
         options = self.options
+        objective = options['objective']
         rho = options['x0']
+        rho_phys = bm.copy(rho)
         max_iters = options['MaxIters']
-        tol_change = options.get('tol_change', 0.01)
-        volume_constraint = options['volume_constraint']
+        tol_change = options['FunValDiff']
+
+        mesh = objective.mesh
+        volume_constraint = objective.volume_constraint
+        filter_properties = objective.filter_properties
 
         for loop in range(max_iters):
             # Evaluate objective function and its gradient
-            c = self.fun(rho)
-            dce = self.options['objective'].jac(rho)
+            c = objective.fun(rho_phys)
+            dce = objective.jac(rho)
 
-            v = volume_constraint.fun(rho)
+            g = volume_constraint.fun(rho_phys)
+            dge = volume_constraint.jac(rho)
 
             # Update design variables using OC method
-            rho_new = self.update(rho, dce, volume_constraint)
+            rho_new, rho_phys[:] = self.update(rho, dce, dge, volume_constraint, filter_properties, mesh)
 
             # Compute change in design variables
-            change = bm.linalg.norm(rho_new.reshape(-1, 1) - rho.reshape(-1, 1), bm.inf)
+            change = bm.max(bm.abs(rho_new - rho))
 
             # Print the results for this iteration
-            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, 
-                Volume: {v+volume_constraint.volfrac:.3f}, Change: {change:.3f}")
+            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, \
+                Volume: {bm.mean(rho_phys):.3f}, Change: {change:.3f}")
 
             # Check for convergence
             if change <= tol_change:
