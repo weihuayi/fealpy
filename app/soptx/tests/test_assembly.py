@@ -32,28 +32,30 @@ origin = [extent[0], extent[2]]
 
 mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction=True)
 
-import matplotlib.pyplot as plt
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_edge(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
-plt.show()
+# import matplotlib.pyplot as plt
+# fig = plt.figure()
+# axes = fig.gca()
+# mesh.add_plot(axes)
+# mesh.find_node(axes, showindex=True)
+# mesh.find_edge(axes, showindex=True)
+# mesh.find_cell(axes, showindex=True)
+# plt.show()
 p_C = 1
 space_C = LagrangeFESpace(mesh, p=p_C, ctype='C')
 tensor_space = TensorFunctionSpace(space_C, shape=(-1, 2))
+
+cell2tldof = tensor_space.cell_to_dof()
 
 uh = tensor_space.function()
 # uh[:] = bm.ones(uh.shape, dtype=uh.dtype)
 
 integrator = LinearElasticIntegrator(material=material_properties, 
                                     q=tensor_space.p+3)
-KE = integrator.assembly(space=tensor_space)
+KE = integrator.assembly(space=tensor_space).round(4)
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator)
 K = bform.assembly()
-KFull = K.to_dense()
+KFull = K.to_dense().round(4)
 
 
 F = tensor_space.interpolate(pde.force)
