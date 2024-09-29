@@ -37,7 +37,7 @@ parser.add_argument('--maxit',
 
 parser.add_argument('--backend',
         default='numpy', type=str,
-        help="默认后端为 numpy.")
+        help="默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等")
 
 parser.add_argument('--meshtype',
         default='tri', type=str,
