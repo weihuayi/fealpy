@@ -81,8 +81,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        self.nx = self.extent[1] - self.extent[0]
-        self.ny = self.extent[3] - self.extent[2]
+        self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+        self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
         self.NN = (self.nx + 1) * (self.ny + 1)
         self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
         self.NF = self.NE
@@ -654,6 +654,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
                                         end_indices[:, :, None] * linspace_indices
 
             cell2ipoint = cell_ipoints_interpolated.reshape(-1, (p+1)**2)
+            cell2ipoint = cell2ipoint.astype(self.itype)
+            
         elif ordering == 'nec':
             edge2cell = self.edge_to_cell()
             NN = self.number_of_nodes()
@@ -809,10 +811,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         Unstructured mesh do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
+            # self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
-            self.nx = self.extent[1] - self.extent[0]
-            self.ny = self.extent[3] - self.extent[2]
+            self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+            self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
 
             self.NC = self.nx * self.ny
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)

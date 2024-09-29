@@ -1,7 +1,7 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.decorator import cartesian
-from fealpy.experimental.mesh import HexahedronMesh
+from fealpy.experimental.mesh import UniformMesh2d, QuadrangleMesh
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.experimental.fem.vector_source_integrator import VectorSourceIntegrator
@@ -16,80 +16,39 @@ from fealpy.experimental.solver import cg
 
 import argparse
 
-class BoxDomainPolyUnloaded3d():
-    def __init__(self):
-        pass
-        
+# 平面应变问题
+class BoxDomainData2D():
+
     def domain(self):
-        return [0, 1, 0, 1, 0, 1]
-    
+        return [0, 1, 0, 1]
+
     @cartesian
-    def solution(self, points: TensorLike):
+    def source(self, points: TensorLike, index=None) -> TensorLike:
         x = points[..., 0]
         y = points[..., 1]
-        z = points[..., 2]
-        val = bm.zeros(points.shape, dtype=points.dtype)
         
-        val[..., 0] = 2*x**3 - 3*x*y**2 - 3*x*z**2
-        val[..., 1] = 2*y**3 - 3*y*x**2 - 3*y*z**2
-        val[..., 2] = 2*z**3 - 3*z*y**2 - 3*z*x**2
-        
-        return val
-
-    @cartesian
-    def source(self, points: TensorLike):
-
         val = bm.zeros(points.shape, dtype=points.dtype)
+        val[..., 0] = 35/13 * y - 35/13 * y**2 + 10/13 * x - 10/13 * x**2
+        val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
         
         return val
     
-    def dirichlet(self, points: TensorLike) -> TensorLike:
-
-        return self.solution(points)
-    
-class BoxDomainTrigonometric3d():
-    def __init__(self):
-        pass
-        
-    def domain(self):
-        return [0, 1, 0, 1, 0, 1]
-    
     @cartesian
-    def solution(self, points: TensorLike):
+    def solution(self, points: TensorLike) -> TensorLike:
         x = points[..., 0]
         y = points[..., 1]
-        z = points[..., 2]
-        val = bm.zeros(points.shape, dtype=points.dtype)
-        S = bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * bm.sin(bm.pi * z)
         
-        val[..., 0] = 10 * S
-        val[..., 1] = 10 * S
-        val[..., 2] = 10 * S
-
-        return val
-
-    @cartesian
-    def source(self, points: TensorLike):
-        x = points[..., 0]
-        y = points[..., 1]
-        z = points[..., 2]
         val = bm.zeros(points.shape, dtype=points.dtype)
-        S = bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * bm.sin(bm.pi * z)
-        lam = 1
-        mu = 1
-        pi = bm.pi
-        val[..., 0] = -10*pi**2 * ((lam+mu) * bm.cos(pi*x) * bm.sin(pi*y+pi*z) - (lam+4*mu)*S)
-        val[..., 1] = -10*pi**2 * ((lam+mu) * bm.sin(pi*y) * bm.cos(pi*x+pi*z) - (lam+4*mu)*S)
-        val[..., 2] = -10*pi**2 * ((lam+mu) * bm.sin(pi*z) * bm.cos(pi*x+pi*y) - (lam+4*mu)*S)
+        val[..., 0] = x * (1 - x) * y * (1 - y)
+        val[..., 1] = 0
         
         return val
-    
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return self.solution(points)
     
 
-parser = argparse.ArgumentParser(description="HexahedronMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
+parser = argparse.ArgumentParser(description="UniformMesh2d 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
 parser.add_argument('--backend', 
                     default='numpy', type=str,
                     help='指定计算的后端类型, 默认为 numpy.')
@@ -102,25 +61,28 @@ parser.add_argument('--nx',
 parser.add_argument('--ny',
                     default=2, type=int,
                     help='y 方向的初始网格单元数, 默认为 2.')
-parser.add_argument('--nz',
-                    default=2, type=int,
-                    help='z 方向的初始网格单元数, 默认为 2.')
 args = parser.parse_args()
 
-pde = BoxDomainPolyUnloaded3d()
+pde = BoxDomainData2D()
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
-nx, ny, nz = args.nx, args.ny, args.nz
-mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz)
+nx, ny = args.nx, args.ny
+extent = pde.domain()
+h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
+origin = [extent[0], extent[2]]
+mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, ipoints_ordering='nec')
 
+# mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
-# axes = fig.add_subplot(111, projection='3d')
+# axes = fig.add_subplot(111)
 # mesh.add_plot(axes)
 # mesh.find_node(axes, showindex=True)
+# mesh.find_edge(axes, showindex=True)
 # mesh.find_cell(axes, showindex=True)
 # plt.show()
+
 p = args.degree
 
 maxit = 4
@@ -128,19 +90,29 @@ errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$', 'boundary']
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
+    # import matplotlib.pyplot as plt
+    # fig = plt.figure()
+    # axes = fig.add_subplot(111)
+    # mesh.add_plot(axes)
+    # mesh.find_node(axes, showindex=True)
+    # mesh.find_edge(axes, showindex=True)
+    # mesh.find_cell(axes, showindex=True)
+    # plt.show()
 
     space = LagrangeFESpace(mesh, p=p, ctype='C')
-    tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
+    tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+    gdof = space.number_of_global_dofs()
     NDof[i] = tensor_space.number_of_global_dofs()
 
-    linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
-                                                lame_lambda=1, shear_modulus=1, 
-                                                hypo='3D')
-    integrator = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
-    KE = integrator.assembly(space=tensor_space)
+    linear_elastic_material = LinearElasticMaterial(name='E1nu0.3', 
+                                                elastic_modulus=1, poisson_ratio=0.3, 
+                                                hypo='plane_strain')
+    integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
+    KE = integrator_K.assembly(space=tensor_space)
     bform = BilinearForm(tensor_space)
-    bform.add_integrator(integrator)
+    bform.add_integrator(integrator_K)
     K = bform.assembly()
+    K_test = K.to_dense().round(4)
 
     integrator_F = VectorSourceIntegrator(source=pde.source, q=tensor_space.p+3)
     lform = LinearForm(tensor_space)    
@@ -151,6 +123,7 @@ for i in range(maxit):
 
     uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
 
+    F_test = F.round(4)
     F = F - K.matmul(uh_bd)
     F[isDDof] = uh_bd[isDDof]
 
@@ -169,13 +142,14 @@ for i in range(maxit):
     uh = tensor_space.function()
 
     uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh_test = uh.round(4)
 
     u_exact = tensor_space.interpolate(pde.solution)
+    u_exact_test = u_exact.round(4)
     errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh - u_exact)**2 * (1 / NDof[i])))
     errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
     errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
-
-    print("errorMatrix:", errorMatrix)
+    print("errorMatrix:\n", errorMatrix)
 
     if i < maxit-1:
         mesh.uniform_refine()
