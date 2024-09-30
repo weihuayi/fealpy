@@ -112,6 +112,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.meshtype = 'UniformMesh3d'
 
         # Interpolation points
+        if ipoints_ordering not in ['zyx', 'nefc']:
+            raise ValueError("The ipoints_ordering parameter must be either 'zyx' or 'nefc'")
         self.ipoints_ordering = ipoints_ordering
 
         # 是否翻转
@@ -1048,6 +1050,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
             edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
                           end_indices[:, None] * linspace_indices
+            edge2ipoint = edge2ipoint.astype(self.itype)
         elif ordering == 'nefc':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -1213,7 +1216,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             
         return cell2ipoint
          
-
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index :Index=_S) -> TensorLike:
         """

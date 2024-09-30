@@ -86,7 +86,7 @@ class BoxDomainTrigonometric3d():
     
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
-        return self.solution(points)
+        return bm.zeros(points.shape, dtype=points.dtype)
     
 
 parser = argparse.ArgumentParser(description="HexahedronMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
@@ -94,7 +94,7 @@ parser.add_argument('--backend',
                     default='numpy', type=str,
                     help='指定计算的后端类型, 默认为 numpy.')
 parser.add_argument('--degree', 
-                    default=2, type=int, 
+                    default=1, type=int, 
                     help='Lagrange 有限元空间的次数, 默认为 1 次.')
 parser.add_argument('--nx', 
                     default=2, type=int, 
@@ -107,7 +107,7 @@ parser.add_argument('--nz',
                     help='z 方向的初始网格单元数, 默认为 2.')
 args = parser.parse_args()
 
-pde = BoxDomainPolyUnloaded3d()
+pde = BoxDomainTrigonometric3d()
 args = parser.parse_args()
 
 bm.set_backend(args.backend)

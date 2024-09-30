@@ -71,7 +71,8 @@ nx, ny = args.nx, args.ny
 extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
 origin = [extent[0], extent[2]]
-mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, ipoints_ordering='nec')
+mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
+                    ipoints_ordering='nec')
 
 # mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
 # import matplotlib.pyplot as plt
@@ -90,14 +91,6 @@ errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$', 'boundary']
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
-    # import matplotlib.pyplot as plt
-    # fig = plt.figure()
-    # axes = fig.add_subplot(111)
-    # mesh.add_plot(axes)
-    # mesh.find_node(axes, showindex=True)
-    # mesh.find_edge(axes, showindex=True)
-    # mesh.find_cell(axes, showindex=True)
-    # plt.show()
 
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
