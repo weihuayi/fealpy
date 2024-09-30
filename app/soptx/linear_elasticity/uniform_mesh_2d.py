@@ -13,6 +13,7 @@ from fealpy.experimental.decorator import cartesian
 from fealpy.experimental.sparse import COOTensor
 from fealpy.experimental.solver import cg
 
+from fealpy.utils import timer
 
 import argparse
 
@@ -43,6 +44,7 @@ class BoxDomainData2D():
         val[..., 1] = 0
         
         return val
+    
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return self.solution(points)
@@ -86,6 +88,8 @@ mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin,
 
 p = args.degree
 
+tmr = timer()
+
 maxit = 4
 errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$', 'boundary']
@@ -101,19 +105,21 @@ for i in range(maxit):
                                                 elastic_modulus=1, poisson_ratio=0.3, 
                                                 hypo='plane_strain')
     integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
+    next(tmr)
     KE = integrator_K.assembly(space=tensor_space)
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_K)
-    K = bform.assembly()
-    K_test = K.to_dense().round(4)
-
+    
     integrator_F = VectorSourceIntegrator(source=pde.source, q=tensor_space.p+3)
     lform = LinearForm(tensor_space)    
     lform.add_integrator(integrator_F)
+    tmr.send('forms')
+
+    K = bform.assembly()
     F = lform.assembly()
+    tmr.send('assembly')
 
     uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64)
-
     uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
 
     F_test = F.round(4)
@@ -131,14 +137,14 @@ for i in range(maxit):
     one_indices = bm.stack([index, index], axis=0)
     K1 = COOTensor(one_indices, one_values, K.sparse_shape)
     K = K.add(K1).coalesce()
+    tmr.send('dirichlet')
 
     uh = tensor_space.function()
 
     uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-    uh_test = uh.round(4)
+    tmr.send('solve(cg)')
 
     u_exact = tensor_space.interpolate(pde.solution)
-    u_exact_test = u_exact.round(4)
     errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh - u_exact)**2 * (1 / NDof[i])))
     errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
     errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
@@ -148,16 +154,5 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
-print("order:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
-
-# import matplotlib.pyplot as plt
-
-
-# fig = plt.figure()
-# axes = fig.add_subplot(111, projection='3d')
-# mesh.add_plot(axes, cellcolor=uh, camp='jet')
-
-
-# from fealpy.tools.show import showmultirate
-# showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=40)
-# plt.show()
+print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
