@@ -307,7 +307,6 @@ class LagrangeFESpace():
         else:
             TD = bc.shape[-1] - 1
             cell2dof = self.dof.entity_to_dof(etype=TD, index=index)
-
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
         if self.doforder == 'sdofs':
@@ -342,7 +341,6 @@ class LagrangeFESpace():
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
-
         if dim == 0: # 如果
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (gdof, )

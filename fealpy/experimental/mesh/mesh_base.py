@@ -321,8 +321,11 @@ class Mesh(MeshDS):
             isMarked = bm.set_at(isMarked,(eta < theta*bm.max(eta)),True)
         elif method == 'L2':
             eta = eta**2
-            idx = bm.argsort(eta)[-1::-1]
-            x = bm.cumsum(eta[idx])
+            
+            idx = bm.flip(bm.argsort(eta))
+            # idx = bm.argsort(eta)[-1::-1]
+        
+            x = bm.cumsum(eta[idx], axis=0)
             # isMarked[idx[x < theta*x[-1]]] = True
             # isMarked[idx[0]] = True
             isMarked = bm.set_at(isMarked,(idx[x < theta*x[-1]]),True)
@@ -424,9 +427,10 @@ class HomogeneousMesh(Mesh):
                 v = v(bcs)
             else:
                 v = v(ps)
-
-
         cm = self.entity_measure('cell')
+        NC = self.number_of_cells()
+        if v.shape[-1] == NC:
+            v = bm.swapaxes(v, 0, -1)
         #f = bm.power(bm.abs(u - v), power)
         f = bm.abs(u - v)**power
         if len(f.shape) == 1:
