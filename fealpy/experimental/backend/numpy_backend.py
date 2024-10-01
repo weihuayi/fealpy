@@ -393,6 +393,7 @@ function_mapping.update(tensor='array')
 if int(np.__version__[:1]) < 2:
     attribute_mapping.update(bool='bool_')
     function_mapping.update(
+        astype='asarray',
         concat='concatenate', bitwise_invert='bitwise_not', permute_dims='transpose',
         pow='power', acos='arccos', asin='arcsin', acosh='arccosh', asinh='arcsinh',
         atan='arctan', atanh='arctanh', atan2='arctan2'

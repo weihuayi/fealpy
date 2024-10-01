@@ -270,8 +270,12 @@ class MeshDS(metaclass=MeshMeta):
 
         NC = self.number_of_cells()
         NFC = self.number_of_faces_of_cells()
-        self.cell2face = j.reshape(NC, NFC)
-        self.face2cell = bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1)
+        self.cell2face = bm.astype(j.reshape(NC, NFC), self.itype)
+        self.face2cell = bm.astype(
+            bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1),
+            self.itype
+        )
+        # NOTE: dtype must be specified here, as these tensors are the results of unique.
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
@@ -284,7 +288,7 @@ class MeshDS(metaclass=MeshMeta):
                 axis=0
             )
             self.edge = totalEdge[i2, :]
-            self.cell2edge = j.reshape(NC, NEC)
+            self.cell2edge = bm.astype(j.reshape(NC, NEC), self.itype)
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell
