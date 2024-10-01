@@ -1,21 +1,12 @@
 #!/usr/bin/python3
-import ipdb
 import argparse
 from matplotlib import pyplot as plt
 
 from fealpy.utils import timer
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
+
 from fealpy.experimental.backend import backend_manager as bm
-
-
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.solver import cg
-
-
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -37,7 +28,7 @@ parser.add_argument('--maxit',
 
 parser.add_argument('--backend',
         default='numpy', type=str,
-        help="默认后端为 numpy.")
+        help="默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等")
 
 parser.add_argument('--meshtype',
         default='tri', type=str,
@@ -48,9 +39,16 @@ parser.add_argument('--meshtype',
                     )
 
 args = parser.parse_args()
-
-
 bm.set_backend(args.backend)
+
+
+from fealpy.experimental.functionspace import LagrangeFESpace
+from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
+from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.experimental.fem import DirichletBC
+from fealpy.experimental.solver import cg
+
+
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -118,6 +116,7 @@ for i in range(maxit):
     if i < maxit-1:
         mesh.uniform_refine(n=1)
     tmr.send(f'第{i}次误差计算及网格加密时间')
+
 next(tmr)
 print("最终误差",errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
