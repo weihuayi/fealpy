@@ -81,12 +81,13 @@ start = time.time()
 bm.set_backend('pytorch')
 model = square_with_circular_notch()
 
-mesh = model.init_mesh(n=4)
+mesh = model.init_mesh(n=0)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=2, method='HybridModel', enable_refinement=True)
+ms = MainSolver(mesh=mesh, material_params=model.params, p=1, method='HybridModel')
 tmr.send('init')
+ms.set_adaptive_refinement()
 
 ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)

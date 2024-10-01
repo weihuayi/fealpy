@@ -321,8 +321,11 @@ class Mesh(MeshDS):
             isMarked = bm.set_at(isMarked,(eta < theta*bm.max(eta)),True)
         elif method == 'L2':
             eta = eta**2
-            idx = bm.argsort(eta)[-1::-1]
-            x = bm.cumsum(eta[idx])
+            
+            idx = bm.flip(bm.argsort(eta))
+            # idx = bm.argsort(eta)[-1::-1]
+        
+            x = bm.cumsum(eta[idx], axis=0)
             # isMarked[idx[x < theta*x[-1]]] = True
             # isMarked[idx[0]] = True
             isMarked = bm.set_at(isMarked,(idx[x < theta*x[-1]]),True)

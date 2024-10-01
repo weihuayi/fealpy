@@ -70,9 +70,7 @@ class MainSolver:
         
         self.bc_dict = {}
 
-        # Adaptive refinement settings
-        self.enable_refinement = enable_refinement
-        self.adaptive = AdaptiveRefinement(marking_strategy=marking_strategy, refine_method=refine_method, theta=theta)
+        self.enable_refinement = False
 
         # Initialize the timer
         self.tmr = timer()
@@ -230,7 +228,7 @@ class MainSolver:
         tmr.send('phase_apply_bc')
 
         dd = cg(A, R, atol=1e-14)
-        d += dd.flat[:]
+        d += dd.flatten()[:]
 
         self.d = d
         tmr.send('phase_solve')
@@ -244,6 +242,21 @@ class MainSolver:
         self.tspace = TensorFunctionSpace(self.space, (self.mesh.geo_dimension(), -1))
         self.d = self.space.function()
         self.uh = self.tspace.function()
+
+    def set_adaptive_refinement(self, marking_strategy: str = 'recovery', refine_method: str = 'bisect', theta: float = 0.2):
+        """
+        Set the adaptive refinement parameters.
+        ----------
+        marking_strategy : str, optional
+            The marking strategy for refinement, by default 'recovery'.
+        refine_method : str, optional
+            The refinement method, by default 'bisect'.
+        theta : float, optional
+            Mark threshold parameter, by default 0.2.        
+        """
+        # Adaptive refinement settings
+        self.enable_refinement = True
+        self.adaptive = AdaptiveRefinement(marking_strategy=marking_strategy, refine_method=refine_method, theta=theta)
 
     def set_interpolation_data(self):
         """

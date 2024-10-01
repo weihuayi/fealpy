@@ -173,10 +173,12 @@ class SpectralModel(BasedPhaseFractureMaterial):
         # 应变正负分解
         sp, sm = self.strain_pm_eig_decomposition(s)
 
-        ts = bm.trace(s, axis1=-2, axis2=-1)
+        _ts = np.trace(s, axis1=-2, axis2=-1)
+        ts = bm.array(_ts, dtype=bm.float64)
+
         tp, tm = self.macaulay_operation(ts)
-        tsp = bm.trace(sp**2, axis1=-2, axis2=-1)
-        tsm = bm.trace(sm**2, axis1=-2, axis2=-1)
+        tsp = np.trace(sp**2, axis1=-2, axis2=-1)
+        tsm = np.trace(sm**2, axis1=-2, axis2=-1)
 
         phi_p = lam * tp ** 2 / 2.0 + mu * tsp
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm

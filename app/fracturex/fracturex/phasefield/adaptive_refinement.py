@@ -71,9 +71,9 @@ class AdaptiveRefinement:
         if self.marking_strategy == 'recovery':
             # 使用恢复型误差估计进行标记
             error_indicator = RecoveryAlg().recovery_estimate(solution)
-
+            print('error_indicator:', error_indicator)
             # 2. 标记需要加密的单元
-            marked_cells = Mesh.mark(error_indicator, theta=self.theta)
+            marked_cells = Mesh.mark(eta=error_indicator, theta=self.theta)
         elif self.marking_strategy == 'residual':
             # 使用残差基误差估计进行标记
             # 实现残差基误差估计标记逻辑
