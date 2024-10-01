@@ -2,7 +2,7 @@ from fealpy.experimental.backend import backend_manager as bm
 
 from fealpy.experimental.typing import TensorLike
 
-class MBBOneData:
+class MBBBeamOneData:
     def __init__(self, nx: int, ny: int):
         """
         flip_direction = True
@@ -36,7 +36,7 @@ class MBBOneData:
 
         return result
     
-    def is_dirichlet_node(self) -> TensorLike:
+    def is_dirichlet_boundary_node(self) -> TensorLike:
         
         dirichlet_nodes = bm.zeros((self.nx+1)*(self.ny+1), dtype=bool)
 
@@ -46,7 +46,7 @@ class MBBOneData:
 
         return dirichlet_nodes
     
-    def is_dirichlet_direction(self) -> TensorLike:
+    def is_dirichlet_boundary_dof(self) -> TensorLike:
         
         direction_flags = bm.zeros(((self.nx + 1) * (self.ny + 1), 2), dtype=bool)
 

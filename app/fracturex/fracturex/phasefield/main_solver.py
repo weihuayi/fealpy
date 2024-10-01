@@ -24,7 +24,7 @@ class MainSolver:
                  method: str = 'HybridModel',
                  enable_refinement: bool = False, 
                  marking_strategy: str = 'recovery', 
-                 refine_method: str = 'nvp', 
+                 refine_method: str = 'bisect', 
                  theta: float = 0.2):
         """
         Initialize the MainSolver class with more customization options.
@@ -70,16 +70,14 @@ class MainSolver:
         
         self.bc_dict = {}
 
-        # Adaptive refinement settings
-        self.enable_refinement = enable_refinement
-        self.adaptive = AdaptiveRefinement(marking_strategy=marking_strategy, refine_method=refine_method, theta=theta)
+        self.enable_refinement = False
 
         # Initialize the timer
         self.tmr = timer()
         next(self.tmr)
 
 
-    def solve(self, maxit: int = 30, vtkname: Optional[str] = None):
+    def solve(self, maxit: int = 50, save_vtkfile : bool = True, vtkname: Optional[str] = None):
         """
         Solve the phase-field fracture problem.
 
@@ -93,24 +91,24 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(1):
-            fbc = VectorDirichletBC(self.tspace, self.force_value[i+1], self.force_dof, direction=self.force_direction)
-            self.uh, force_index = fbc.apply_value(self.uh)
-            self.pfcm.update_disp(self.uh)
-
+        for i in range(len(self.force_value)-1):
+            print('i', i)
+            self._currt_force_value = self.force_value[i+1]
             # Run Newton-Raphson iteration
             self.newton_raphson(maxit)
             
+            if save_vtkfile:
+                if vtkname is None:
+                    fname = f'test{i:010d}.vtu'
+                else:
+                    fname = f'{vtkname}{i:010d}.vtu'
+                self.save_vtkfile(fname=fname)
             
-            if vtkname is None:
-                fname = f'test{i:010d}.vtu'
-            else:
-                fname = f'{vtkname}{i:010d}.vtu'
-            self.save_vtkfile(fname=fname)
+            bm.set_at(self.Rforce, i+1, self.Rfu)
+            
+            
 
-            bm.set_at(self.Rforce, i+1, bm.sum(self.Ru[force_index]))
-
-    def newton_raphson(self, maxit: int = 30):
+    def newton_raphson(self, maxit: int = 50):
         """
         Perform the Newton-Raphson iteration for solving the problem.
 
@@ -118,27 +116,40 @@ class MainSolver:
         ----------
         maxit : int, optional
             Maximum number of iterations, by default 30.
+        force_value : TensorLike
+            Value of the force boundary condition.
         """
+        tmr = self.tmr
         for k in range(maxit):
             print(f"Newton-Raphson Iteration {k + 1}/{maxit}:")
             
+            tmr.send('start')
             er0 = self.solve_displacement()
             self.pfcm.update_disp(self.uh)
+            tmr.send('disp_solve')
+            
             print(f"Displacement error after iteration {k + 1}: {er0}")
 
             er1 = self.solve_phase_field()
             self.pfcm.update_phase(self.d)
             print(f"Phase field error after iteration {k + 1}: {er1}")
+            tmr.send('phase_solve')
 
-            self.H = self.pfcm._H
+            self.H = self.pfcm.H
             if self.enable_refinement:
-                self.adaptive.perform_refinement(self.mesh, self.d)
-                
+                data = self.set_interpolation_data()
+                self.mesh, new_data = self.adaptive.perform_refinement(self.mesh, self.d, data, self.l0)
+                if new_data:
+                    self.set_lfe_space()
+                    self.update_interpolation_data(new_data)
+                    print(f"Refinement after iteration {k + 1}")
+
+            tmr.send('refine')
             if k == 0:
                 e0, e1 = er0, er1
             
             error = max(er0/e0, er1/e1)
-
+            tmr.send('end')
             print(f'Iteration {k}, Error: {error}')
             if error < 1e-5:
                 print(f"Convergence achieved after {k + 1} iterations.")
@@ -154,22 +165,33 @@ class MainSolver:
             The norm of the residual.
         """
         uh = self.uh
+        tmr = self.tmr
+        tmr.send('start')
+
+        fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self.force_dof, direction=self.force_direction)
+        uh, force_index = fbc.apply_value(uh)
+        self.pfcm.update_disp(uh)
+
         ubform = BilinearForm(self.tspace)
         ubform.add_integrator(LinearElasticIntegrator(self.pfcm, q=self.q))
         A = ubform.assembly()
         R = -A @ uh[:]
-        self.Ru = R[:]
+        self.Rfu = bm.sum(-R[force_index])
+        tmr.send('disp_assemble')
 
         # Apply force boundary conditions
         ubc = VectorDirichletBC(self.tspace, 0, threshold=self.force_dof, direction=self.force_direction)  
         A, R = ubc.apply(A, R)
-        
+
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
+        tmr.send('apply_bc')
+
         du = cg(A, R, atol=1e-14)
-        uh[:] += du.flat[:]
+        uh += du.flatten()[:]
         self.uh = uh
         
+        tmr.send('disp_solve')
         return np.linalg.norm(R)
 
     def solve_phase_field(self) -> float:
@@ -186,22 +208,30 @@ class MainSolver:
         def coef(bc, index):
             return 2 * self.pfcm.maximum_historical_field(bc)
 
+        tmr = self.tmr
+        tmr.send('start')
+
         dbform = BilinearForm(self.space)
         dbform.add_integrator(ScalarDiffusionIntegrator(Gc * l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef, q=self.q))
         A = dbform.assembly()
+        tmr.send('phase_matrix_assemble')
 
         dlform = LinearForm(self.space)
         dlform.add_integrator(ScalarSourceIntegrator(coef, q=self.q))
         R = dlform.assembly()
         R -= A @ d[:]
+        tmr.send('phase_R_assemble')
 
         A, R = self._apply_boundary_conditions(A, R, field='phase')
+        tmr.send('phase_apply_bc')
+
         dd = cg(A, R, atol=1e-14)
-        d += dd.flat[:]
+        d += dd.flatten()[:]
+
         self.d = d
-        
+        tmr.send('phase_solve')
         return np.linalg.norm(R)
 
     def set_lfe_space(self):
@@ -212,6 +242,58 @@ class MainSolver:
         self.tspace = TensorFunctionSpace(self.space, (self.mesh.geo_dimension(), -1))
         self.d = self.space.function()
         self.uh = self.tspace.function()
+
+    def set_adaptive_refinement(self, marking_strategy: str = 'recovery', refine_method: str = 'bisect', theta: float = 0.2):
+        """
+        Set the adaptive refinement parameters.
+        ----------
+        marking_strategy : str, optional
+            The marking strategy for refinement, by default 'recovery'.
+        refine_method : str, optional
+            The refinement method, by default 'bisect'.
+        theta : float, optional
+            Mark threshold parameter, by default 0.2.        
+        """
+        # Adaptive refinement settings
+        self.enable_refinement = True
+        self.adaptive = AdaptiveRefinement(marking_strategy=marking_strategy, refine_method=refine_method, theta=theta)
+
+    def set_interpolation_data(self):
+        """
+        Set the interpolation data to refine.
+        """
+        GD = self.mesh.geo_dimension()
+        #NQ = self.H.shape[-1] if len(self.H) > 1 else 1
+        if GD == 2:
+            dcell2dof = self.space.cell_to_dof()
+            ucell2dof = self.tspace.cell_to_dof()
+            data = {'uh': self.uh[ucell2dof], 'd': self.d[dcell2dof], 'H': self.H}
+        elif GD == 3:
+            data = {'nodedata':[self.uh, self.d], 'celldata':self.H}
+        return data
+
+    def update_interpolation_data(self, data):
+        """
+        Update the data after refinement
+        """
+        GD = self.mesh.geo_dimension()
+        if GD == 2:
+            dcell2dof = self.space.cell_to_dof()
+            ucell2dof = self.tspace.cell_to_dof()
+            self.uh[ucell2dof.reshape(-1)] = data['uh']
+            self.d[dcell2dof.reshape(-1)] = data['d']
+            H = data['H']
+        elif GD == 3:
+            assert self.p == 1
+            self.uh = data['uh']
+            self.d = data['d']
+
+            H = data['H']
+        self.H = H
+        self.pfcm.update_historical_field(self.H)
+        self.pfcm.update_disp(self.uh)
+        self.pfcm.update_phase(self.d)
+
 
     def save_vtkfile(self, fname: str):
         """

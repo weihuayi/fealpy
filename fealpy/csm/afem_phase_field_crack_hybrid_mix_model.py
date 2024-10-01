@@ -478,7 +478,7 @@ class AFEMPhaseFieldCrackHybridMixModel():
         mesh = self.mesh
         GD = mesh.geo_dimension()
         n = GD*(GD+1)//2
-        D = np.zeros((n, n), dtype=np.float_)
+        D = np.zeros((n, n), dtype=np.float64)
         for i in range(n):
             D[i, i] += mu
         for i in range(GD):

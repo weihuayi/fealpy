@@ -552,7 +552,6 @@ class Mesh():
            v = v[..., 0]
 
         cm = self.entity_measure('cell')
-
         NC = self.number_of_cells()
         if v.shape[-1] == NC:
             v = np.swapaxes(v, 1, -1)
