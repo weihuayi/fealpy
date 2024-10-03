@@ -1,4 +1,5 @@
 import numpy as np
+import argparse
 
 import pytest
 from fealpy.experimental.backend import backend_manager as bm
@@ -59,7 +60,7 @@ class square_with_circular_notch():
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
         return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
-            6e-3, 1001)[1:]))
+            5.9e-3, 901)[1:]))
 
     def is_force_boundary(self, p):
         """
@@ -74,6 +75,49 @@ class square_with_circular_notch():
         """
         return bm.abs(p[..., 1]) < 1e-12
 
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        脆性断裂任意次自适应有限元
+        """)
+
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--method',
+        default='HybridModel', type=str,
+        help='有限元方法, 默认为 HybridModel.')
+
+parser.add_argument('--enable_adaptive',
+        default=True, type=bool,
+        help='是否启用自适应加密, 默认为 True.')
+
+parser.add_argument('--marking_strategy',
+        default='recovery', type=str,
+        help='标记策略, 默认为重构型后验误差估计.')
+
+parser.add_argument('--refine_method',
+        default='bisect', type=str,
+        help='网格加密方法, 默认为 bisect.')
+
+parser.add_argument('--n',
+        default=4, type=int,
+        help='初始网格加密次数, 默认为 4.')
+
+parser.add_argument('--vtkname',
+        default='test', type=str,
+        help='vtk 文件名, 默认为 test.')
+
+args = parser.parse_args()
+p= args.degree
+method = args.method
+enable_adaptive = args.enable_adaptive
+marking_strategy = args.marking_strategy
+refine_method = args.refine_method
+n = args.n
+vtkname = args.vtkname
+
 
 tmr = timer()
 next(tmr)
@@ -81,17 +125,18 @@ start = time.time()
 bm.set_backend('pytorch')
 model = square_with_circular_notch()
 
-mesh = model.init_mesh(n=4)
+mesh = model.init_mesh(n=n)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=1, method='HybridModel')
+ms = MainSolver(mesh=mesh, material_params=model.params, p=p, method=method)
 tmr.send('init')
-ms.set_adaptive_refinement()
+if enable_adaptive:
+    ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
 
 ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
-ms.solve(vtkname='test')
+ms.solve(vtkname=vtkname)
 
 force = ms.Rforce
 with open('results_model1_ada.txt', 'w') as file:
