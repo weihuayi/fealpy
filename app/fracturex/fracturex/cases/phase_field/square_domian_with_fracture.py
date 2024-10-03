@@ -81,7 +81,7 @@ start = time.time()
 bm.set_backend('pytorch')
 model = square_with_circular_notch()
 
-mesh = model.init_mesh(n=0)
+mesh = model.init_mesh(n=4)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 

@@ -267,7 +267,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge = self.entity('edge')
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
-            edge2newNode = bm.arange(NN, NN + NE)
+            edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
 
             self.node = bm.concatenate((node, newNode), axis=0)
@@ -416,7 +416,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             print('The number of markedg edges: ', isCutEdge.sum())
 
         edge2newNode = bm.zeros((NE,), dtype=self.itype)
-        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum()))
+        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum(), dtype=self.itype))
 
         node = self.node
         newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
@@ -508,6 +508,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             p2 = cell[idx, 2]
             p3 = edge2newNode[cell2edge0[idx]]
             cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
+            
             cell = bm.set_at(cell , (L, 0), p3)
             cell = bm.set_at(cell , (L, 1), p0)
             cell = bm.set_at(cell , (L, 2), p1)
