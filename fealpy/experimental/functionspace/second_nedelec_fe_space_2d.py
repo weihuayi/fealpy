@@ -16,7 +16,7 @@ Index = Union[int, slice, TensorLike]
 Number = Union[int, float]
 _S = slice(None)
 
-class NedelecDof(FunctionSpace, Generic[_MT]):
+class NedelecDof():
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
@@ -236,7 +236,7 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
         e = bm.arange(NE)[index]
         N = len(e)
-        e2dv = bm.zeros([N, p+1, GD], dtype=self.itype)
+        e2dv = bm.zeros([N, p+1, GD], dtype=self.ftype)
         #e2dv[:] = self.mesh.edge_unit_tangent(index=index)[:, None]
         e2dv = bm.set_at(e2dv,(slice(None)),self.mesh.edge_unit_tangent(index=index)[:, None])
         return e2dv
