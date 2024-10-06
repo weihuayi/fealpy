@@ -403,7 +403,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         fI[n2id[:, 0]] = flist[0](node) 
         k = 1; 
         for r in range(1, 2*m+1):
-            fI[n2id[:, k:k+r+1]] = flist[r](node) 
+            fI[n2id[:, k:k+r+1]] = flist[r](node) #这里不用乘标架吗? 
             k += r+1
 
         # 边上的自由度

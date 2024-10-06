@@ -286,7 +286,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             function.  Conversely, A converts Bernstein coefficients to Lagrange
             coefficients.
         '''
-        bcs = self.mesh.multi_index_matrix(p, TD)/p # p   次多重指标
+        bcs = self.mesh.multi_index_matrix(p, TD, dtype=self.ftype)/p # p   次多重指标
         return self.basis(bcs, p=p)[0]
 
 

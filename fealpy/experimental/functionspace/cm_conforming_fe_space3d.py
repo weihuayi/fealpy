@@ -12,6 +12,7 @@ from fealpy.experimental.functionspace.bernstein_fe_space import BernsteinFESpac
 from .functional import symmetry_span_array, symmetry_index, span_array
 from scipy.special import factorial, comb
 from fealpy.decorator import barycentric
+import ipdb
 
 _MT = TypeVar('_MT', bound=Mesh)
 Index = Union[int, slice, TensorLike]
@@ -24,7 +25,6 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.mesh = mesh
         self.p = p
         self.m = m
-        self.isCornerNode = isCornerNode
         self.bspace = BernsteinFESpace(mesh, p)
 
         self.ftype = mesh.ftype
@@ -34,11 +34,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
-        #self.coeff = self.coefficient_matrix()
         self.multiIndex = mesh.multi_index_matrix(p, 3)
         self.dof_index = {}
         self.get_dof_index()
-    
+ 
+        self.isCornerNode = isCornerNode
+        #self.isCornerNode, self.isCornerEdge = self.get_corner()
+        self.coeff = self.coefficient_matrix()
+   
     def get_dof_index(self):
         p = self.p
         m = self.m
@@ -57,9 +60,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
             node_dof_index.append(a)
 
         locEdge = bm.array([[0, 1],[0, 2],[0, 3],[1, 2],[1, 3],[2, 3]], dtype=
-                           bm.int32)
+                           self.itype)
         dualEdge = bm.array([[2, 3],[1, 3],[1, 2],[0, 3],[0, 2],[0, 1]],
-                            dtype=bm.int32)
+                            dtype=self.itype)
         edge_dof_index = []  
         for i in range(6):
             a = []
@@ -93,7 +96,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.dof_index["all"] = bm.concatenate((all_node_dof_index,
                                                all_edge_dof_index,
                                                all_face_dof_index,
-                                               self.dof_index["cell"]))
+                                               self.dof_index["cell"]),dtype=self.itype)
 
     def number_of_local_dofs(self, etype, p=None) -> int: #TODO:去掉etype 2d同样
         p = self.p if p is None else p
@@ -257,4 +260,452 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         ## cell
         c2dof[:, ldof-cidof:] = c2id
         return c2dof
+    def get_corner(self):
+        """
+        @brief 获取角点, 角边, 不太对啊
+        """
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        face = mesh.entity('face')
+        cell = mesh.entity('cell')
+
+        f2e = mesh.face_to_edge()
+        fn  = mesh.face_unit_normal()
+        NE  = mesh.number_of_edges()
+        NN  = mesh.number_of_nodes()
+
+        ## 角点
+        isBdNode = mesh.boundary_node_flag()
+        isBdFace = mesh.boundary_face_flag()
+
+        isCornerEdge = bm.zeros(NE, dtype=bm.bool)
+
+        en = bm.zeros((NE, 3), dtype=self.ftype)
+        en[f2e[isBdFace]] = fn[isBdFace, None]
+        #print(fn)
+        fn = bm.tile(fn[:, None], (1, 3, 1))
+        #print(fn)
+        #print(bm.cross(en[f2e], fn))
+        flag = bm.linalg.norm(bm.cross(en[f2e], fn), axis=-1)>1e-10
+        isCornerEdge[f2e[flag]] = True
+
+        isCornerNode = bm.zeros(NN, dtype=bm.bool)
+        isCornerNode[edge[isCornerEdge]] = True
+        return isCornerNode, isCornerEdge 
+
+
+
+    def get_frame(self):
+        """
+        @brief 获取每个点，每条边，每个面的全局坐标系
+        """
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        face = mesh.entity('face')
+        cell = mesh.entity('cell')
+
+        c2e = mesh.cell_to_edge()
+        c2f = mesh.cell_to_face()
+        f2e = mesh.face_to_edge()
+
+        fn = mesh.face_unit_normal()
+        et = mesh.edge_tangent(unit=True)
+
+        # node frame 
+        NN = mesh.number_of_nodes()
+        node_frame = bm.zeros((NN, 3, 3), dtype=self.ftype)
+        node_frame[:] = bm.eye(3, dtype=self.ftype)
+
+        # edge frame
+        NE = mesh.number_of_edges()
+        edge_frame = bm.zeros((NE, 3, 3), dtype=self.ftype)
+        edge_frame[:, 0] = et
+        edge_frame[f2e, 2] = fn[:, None] 
+
+        # face frame
+        NF = mesh.number_of_faces()
+        face_frame = bm.zeros((NF, 3, 3), dtype=self.ftype)
+        face_frame[:, 2] = fn
+        face_frame[:, 0] = et[f2e[:, 0]] 
+        face_frame[:, 1] = bm.cross(face_frame[:, 2], face_frame[:, 0])
+
+        # node frame boundary
+        isBdNode = mesh.boundary_node_flag()
+        isBdFace = mesh.boundary_face_flag()
+        node_frame[face[isBdFace]] = face_frame[isBdFace, None]
+
+        # edge frame at boundary
+        edge_frame[f2e[isBdFace], 2] = fn[isBdFace, None]
+        edge_frame[:, 1] = bm.cross(edge_frame[:, 2], edge_frame[:, 0])
+
+        # corner node frame
+        isCornerNode = self.isCornerNode # 原来的isCornerNode不对吧
+        node_frame[isCornerNode] = bm.eye(3, dtype=self.ftype)
+
+        return node_frame, edge_frame, face_frame
+
+
+
+
+
+
+
+
+        
+    def coefficient_matrix(self):
+        p = self.p
+        m = self.m
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        cell = mesh.entity('cell')
+
+        c2e = mesh.cell_to_edge()
+        c2f = mesh.cell_to_face()
+        f2e = mesh.face_to_edge() 
+
+        NC = mesh.number_of_cells()
+        NF = mesh.number_of_faces()
+        NE = mesh.number_of_edges()
+        ldof = self.number_of_local_dofs('cell')
+
+        tem = bm.eye(ldof, dtype=self.ftype)
+        coeff = bm.tile(tem, (NC, 1, 1)) 
+
+        all_dof_idx = self.dof_index["all"]
+        dof2num = bm.zeros(ldof, dtype=self.itype) 
+        dof2num[all_dof_idx] = bm.arange(ldof, dtype=self.itype)
+
+        multiIndex = self.multiIndex
+        S04m = self.dof_index["node"]
+        # node
+        for v in range(4):
+            flag = bm.ones(4, dtype=bm.bool)
+            flag[v] = False # v^*
+            S04mv = bm.concatenate(S04m[v])
+            for i in S04mv:
+                alpha = multiIndex[i][flag]
+                r = int(bm.sum(alpha))
+                for j in all_dof_idx:
+                    gamma = multiIndex[j]
+                    if bm.any(alpha-gamma[flag]<0):
+                        continue
+                    sign = (-1)**(gamma[v]-(p-r)) #\alpha_v = p-r
+                    I = dof2num[i]
+                    J = dof2num[j]
+                    coeff[:, I, J] = sign * factorial(r)*comb(p,r) * bm.prod(bm.array(comb(alpha, gamma[flag])))
+                    
+        # edge
+        glambda = mesh.grad_lambda() # (NC, 4, 3)
+        S12m = self.dof_index["edge"]
+        locEdge = bm.array([[0 ,1], [0, 2], [0, 3], 
+                            [1, 2], [1, 3], [2, 3]], dtype=self.itype)
+        dualEdge = bm.array([[2, 3], [1, 3], [1, 2], 
+                             [0, 3], [0, 2], [0, 1]], dtype=self.itype)
+        for e in range(6):
+            ii, jj = locEdge[e]
+            kk, ll = dualEdge[e]
+            # local normal frame
+            nlambdaktl = bm.cross(glambda[:, kk], glambda[:, ll]) # (NC, 3)
+            nlambdaktl_l = bm.linalg.norm(nlambdaktl, axis=1)[:, None]**2
+            Ni = bm.cross(glambda[:, ll], nlambdaktl)/nlambdaktl_l # (NC, 3)
+            Nj = bm.cross(nlambdaktl, glambda[:, kk])/nlambdaktl_l
+            S12me = bm.concatenate([bm.concatenate(item) for item in S12m[e]])
+            Eij = bm.zeros((NC, 4), dtype=self.ftype)
+            Eij[:, 0] = bm.sum(glambda[:, ii]*Ni, axis=1)
+            Eij[:, 1] = bm.sum(glambda[:, ii]*Nj, axis=1)
+            Eij[:, 2] = bm.sum(glambda[:, jj]*Ni, axis=1)
+            Eij[:, 3] = bm.sum(glambda[:, jj]*Nj, axis=1)
+            for i in S12me:
+                alpha = multiIndex[i]
+                alpha_ij = alpha[locEdge[e]]
+                alpha_kl = alpha[dualEdge[e]] # e^*
+                r = int(bm.sum(alpha_kl))
+                for j in all_dof_idx:
+                    gamma = multiIndex[j] 
+                    gamma_ij = gamma[locEdge[e]]
+                    gamma_kl = gamma[dualEdge[e]]
+                    if bm.any(alpha_kl-gamma_kl<0)|bm.any(gamma_ij-alpha_ij<0):
+                        continue
+                    c = factorial(r)*comb(p, r)
+                    c *= bm.prod(bm.array(comb(alpha_kl, gamma_kl)))
+                    I = dof2num[i]
+                    J = dof2num[j]
+                    coeff[:, I, J] = 0 #这个为什么
+                    sigmas = mesh.multi_index_matrix(gamma[ii]-alpha[ii], 1)
+                    for sig in sigmas:
+                        if bm.any(alpha_kl-sig-gamma_kl<0):
+                            continue
+                        cc = c*bm.prod(bm.array(comb(alpha_kl-gamma_kl, sig)))
+                        coeff[:, I, J] += cc*bm.prod(Eij**bm.concatenate([sig, alpha_kl-gamma_kl-sig]), axis=1)
+        # face
+        fn = mesh.face_unit_normal()
+        S2m = self.dof_index["face"]
+        locFace = bm.array([[1, 2, 3], [0, 2, 3], [0, 1, 3], [0, 1, 2]],
+                           dtype=self.itype)
+        for f in range(4):
+            ii, jj, kk = locFace[f] 
+            ni = fn[c2f[:, f]] # (NC, 3) 
+            Fki = bm.zeros((NC, 4), dtype=bm.float64)
+            Fki[:, 0] = bm.sum(glambda[:, 0]*ni, axis=-1)
+            Fki[:, 1] = bm.sum(glambda[:, 1]*ni, axis=-1)
+            Fki[:, 2] = bm.sum(glambda[:, 2]*ni, axis=-1)
+            Fki[:, 3] = bm.sum(glambda[:, 3]*ni, axis=-1)
+            S2mf = bm.concatenate(S2m[f])
+
+            for i in S2mf:
+                alpha = multiIndex[i]
+                g_jkl = alpha[locFace[f]]
+                r = int(alpha[f]) # |alpha_{f^*}|
+                for j in all_dof_idx:
+                    gamma = multiIndex[j]
+                    beta = gamma-alpha
+                    beta[f] += r
+                    if bm.any(beta<0):
+                        continue
+                    c = factorial(r)**2*comb(p, r)/bm.prod(bm.array(factorial(beta)))
+                    #flag = beta>0
+                    val = c*bm.prod(Fki**beta, axis=1)
+                    I = dof2num[i]
+                    J = dof2num[j]
+                    coeff[:, I, J] = val 
+        coeff = bm.linalg.inv(coeff)
+        coeff = bm.transpose(coeff, (0, 2, 1))  
+
+        nframe, eframe, _ = self.get_frame()
+        # 全局自由度矩阵
+        # node 
+        ndof = self.number_of_internal_dofs('node')
+        coeff1 = bm.zeros((NC, 4*ndof, 4*ndof), dtype=self.ftype)
+        for v in range(4):
+            j, k, l = locFace[v]
+            Nv = bm.zeros((NC, 3, 3), dtype=self.ftype) # N_v
+            Nv[:, 0] = node[cell[:, j]] - node[cell[:, v]]
+            Nv[:, 1] = node[cell[:, k]] - node[cell[:, v]]
+            Nv[:, 2] = node[cell[:, l]] - node[cell[:, v]]
+            nv = nframe[cell[:, v]] # (NC, 3, 3)
+            coeff1[:, ndof*v, ndof*v] = 1
+            kk = 1
+            for r in range(4*m+1)[1:]:
+                symidx, num = symmetry_index(3, r)
+                multiidx = mesh.multi_index_matrix(r, 2)
+
+                NSr2 = len(multiidx)
+                T = bm.zeros((NC, NSr2, NSr2), dtype=self.ftype)
+                for iii, alphaa in enumerate(multiidx): 
+                    Nv_sym = symmetry_span_array(Nv, alphaa).reshape(-1, 3**r)[:, symidx]
+                    for jjj, betaa in enumerate(multiidx):
+                        nv_sym = symmetry_span_array(nv, betaa).reshape(-1, 3**r)[:, symidx]
+                        T[:, iii, jjj] = bm.sum(Nv_sym*nv_sym*num[None, :], axis=1)
+                coeff1[:, ndof*v+kk:ndof*v+kk+NSr2, ndof*v+kk:ndof*v+kk+NSr2] = T
+                kk += NSr2
+        coeff[:, :4*ndof] = bm.einsum('cji, cjk->cik',coeff1, coeff[:, :4*ndof])
+
+        # edge
+        edof = self.number_of_internal_dofs('edge')
+        coeff2 = bm.zeros((NC, 6*edof, 6*edof), dtype=self.ftype)
+
+        fn = mesh.face_unit_normal()
+        et = mesh.edge_tangent(unit=True)
+        en = eframe[:, 1:]
+        for e in range(6):
+            ii, jj = locEdge[e]
+            kk, ll = dualEdge[e]
+            nlambdaktl = bm.cross(glambda[:, kk], glambda[:, ll]) # (NC, 3)
+            nlambdaktl_l = bm.linalg.norm(nlambdaktl, axis=1)[:, None]**2
+            Ni = bm.cross(glambda[:, ll], nlambdaktl)/nlambdaktl_l # (NC, 3)
+            Nj = bm.cross(nlambdaktl, glambda[:, kk])/nlambdaktl_l
+
+            Ncoef = bm.zeros((NC, 2, 2), dtype=self.ftype)
+            Ncoef[:, 0, 0] = bm.sum(Ni*en[c2e[:, e], 0], axis=1) 
+            Ncoef[:, 0, 1] = bm.sum(Ni*en[c2e[:, e], 1], axis=1)
+            Ncoef[:, 1, 0] = bm.sum(Nj*en[c2e[:, e], 0], axis=1)
+            Ncoef[:, 1, 1] = bm.sum(Nj*en[c2e[:, e], 1], axis=1)
+            edof_idx = self.dof_index["edge"][e]
+            if(len(edof_idx[0][0])>0):
+                idxidx = dof2num[edof_idx[0][0]]-ndof*4
+                coeff2[:, idxidx, idxidx] = 1.0
+            for r in range(2*m+1)[1:]:
+                symidx, num = symmetry_index(2, r)
+                multiidx = mesh.multi_index_matrix(r, 1)
+                edof_idxr = edof_idx[r]
+                for i in range(r+1):
+                    midx = multiidx[i]
+                    Ncoef_sym = symmetry_span_array(Ncoef, midx).reshape(-1,
+                                                                         2**r)
+                    for j in range(r+1):
+                        coeff2[:, dof2num[edof_idxr[i]]-ndof*4, dof2num[edof_idxr[j]]-ndof*4] = num[j] * Ncoef_sym[:, symidx[j], None] 
+        coeff[:, 4*ndof:4*ndof+6*edof] = bm.einsum('cji, cjk->cik',coeff2, coeff[:, 4*ndof:4*ndof+6*edof])
+        return coeff[:, : , dof2num]
+
+    def basis(self, bcs):
+        coeff = self.coeff
+        bphi = self.bspace.basis(bcs)
+        return bm.einsum('cil, cql -> cqi', coeff, bphi)
+
+    def grad_m_basis(self, bcs, m):
+        coeff = self.coeff
+        bgmphi = self.bspace.grad_m_basis(bcs, m)
+        return bm.einsum('cil, cqlg -> cqig', coeff, bgmphi)
+
+    @barycentric
+    def value(self, uh, bc, index=_S):
+        phi = self.basis(bc)
+        cell2dof = self.cell_to_dof()
+        val = bm.einsum('cql, cl->cq', phi, uh[cell2dof])
+        return val
+
+    @barycentric
+    def grad_m_value(self, uh, bc, m):
+        gmphi = self.grad_m_basis(bc, m)
+        cell2dof = self.cell_to_dof()
+        val = bm.einsum('cqlg, cl->cqg', gmphi, uh[cell2dof])
+        return val
+
+    def interpolation(self, flist):
+        """                                                                        
+        @breif 对函数进行插值，其中 flist 是一个长度为 4m+1 的列表，flist[k] 是 f 的 k
+            阶导组成的列表, 如 m = 1 时，flist =                                   
+            [                                                                      
+              [f],                                                                 
+              [fx, fy, fx],                                                        
+              [fxx, fxy, fxz, fyy, fyz, fzz],                                      
+              [fxxx, fxxy, fxxz, fxyy, fxyz, fxzz, fyyy, fyyz, fyzz, fzzz]         
+              [fxxxx, fxxxy, fxxxz, fxxyy, fxxyz, fxxzz, fxyyy, fxyyz, fxyzz, fxzzz, fyyyy, fyyyz, fyyzz, fyzzz, fzzzz]
+            ]                                                                      
+        """       
+        m = self.m
+        p = self.p
+        mesh = self.mesh
+        fI = self.function()
+        c2e = mesh.cell_to_edge()
+        c2f = mesh.cell_to_face()
+
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        face = mesh.entity('face')
+        cell = mesh.entity('cell')
+
+        NN   = mesh.number_of_nodes()
+        NE   = mesh.number_of_edges()
+        NF   = mesh.number_of_faces()
+        NC   = mesh.number_of_cells()
+
+        n2id = self.node_to_dof() # (NN, nndof)
+        e2id = self.edge_to_internal_dof()
+        f2id = self.face_to_internal_dof()
+        c2id = self.cell_to_internal_dof()
+        c2d = self.cell_to_dof()
+        nndof = self.number_of_internal_dofs('node')
+
+
+        nframe, eframe, _ = self.get_frame()
+
+
+        # node  
+        fI[n2id[:, 0]] = flist[0](node)
+        k = 1
+        for r in range(1, 4*m+1):
+            symidx, num = symmetry_index(3, r)
+            val = flist[r](node)
+            midx = mesh.multi_index_matrix(r, 2)
+            num = num**2 # 这里为什么要平方
+            for idx in midx:
+                nnn = symmetry_span_array(nframe, idx).reshape(-1, 3**r)[:, symidx]
+                fI[n2id[:, k]] = bm.sum(nnn*val*num, axis=1)
+                k += 1
+        # edge
+        locEdge = bm.array([[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]],
+                           dtype=self.itype)
+        dualEdge = bm.array([[2, 3], [1, 3], [1, 2], [0, 3], [0, 2], [0, 1]],
+                            dtype=self.itype)
+        S12m = self.dof_index["edge"]
+        en = eframe[:, 1:]
+
+        midx1d2num = lambda x: x[1]
+        N = nndof*4
+        for i in range(6):
+            c2ei = c2e[:, i]
+            e = locEdge[i]
+            es = dualEdge[i]
+            Se2m = bm.concatenate([a for b in S12m[i] for a in b])
+            for alpha in self.multiIndex[Se2m]:
+                alphae = alpha[e]
+                alphaes = alpha[es]
+                r = int(bm.sum(alphaes))
+
+                bcs = mesh.multi_index_matrix(p-r, 1, dtype=self.ftype)/(p-r) # (NQ, 2)
+                b2l = self.bspace.bernstein_to_lagrange(p-r, 1) #(p-r+1, p-r+1)
+
+                point = bm.einsum("qi, cid-> qcd", bcs, node[cell[:, e]])
+
+                ffval = bm.array(flist[r](point)) # (NQ, NC, l) :l 是分量个数 
+
+                if r==0:
+                    bcoeff = bm.einsum("qc, iq-> ci", ffval, b2l)
+                else:
+                    symidx, num = symmetry_index(3, r)
+                    nnn = symmetry_span_array(en[c2ei], alphaes).reshape(NC, -1)[:, symidx]
+                    bcoeff = bm.einsum("cl, qcl, l, iq-> ci", nnn, ffval, num, b2l) #(NC, l)
+
+                for ccc in range(NC):
+                    Ralpha = midx1d2num(alphae)
+                    fI[c2d[ccc, N]] = bcoeff[ccc, Ralpha] # 这里为什么不需要反过来
+                N += 1
+
+        # face
+        locFace = bm.array([[1, 2, 3], [0, 2, 3], [0, 1, 3], [0, 1, 2]],
+                           dtype=self.itype)
+        dualFace = bm.array([[0],[1],[2],[3]], dtype=self.itype)
+
+        S2m = self.dof_index["face"]
+        fn = mesh.face_unit_normal()
+        c2fperm = mesh.cell_to_face_permutation(locFace=locFace) # (NC, 4, 3)
+
+        midx2d2num = lambda a: (a[1]+a[2])*(1+a[1]+a[2])//2+a[2]
+
+        f2id = self.face_to_internal_dof()
+        for i in range(4):
+            c2fi = c2f[:, i]
+            f = locFace[i]
+            fs = dualFace[i]
+            Sfm = bm.concatenate(S2m[i])
+            for alpha in self.multiIndex[Sfm]:
+                alphaf = alpha[f]
+                alphafs = alpha[fs]
+                r = int(alphafs)
+
+                bcs = mesh.multi_index_matrix(p-r, 2, dtype=self.ftype)/(p-r) # (NQ, 3)
+                b2l = self.bspace.bernstein_to_lagrange(p-r, 2) # (NQ, NQ)
+
+                point = bm.einsum("qi, cid-> qcd", bcs, node[cell[:, f]]) # (NQ, NC, 3)
+                
+                ffval = bm.array(flist[r](point)) # (NQ, NC, l) :l 是分量个数
+                if r==0:
+                    bcoeff = bm.einsum("qc, iq-> ci", ffval, b2l)
+                else:
+                    symidx, num = symmetry_index(3, r)
+                    nnn = symmetry_span_array(fn[c2fi, None], alphafs).reshape(-1, 3**r)[:, symidx]
+                    bcoeff = bm.einsum("cl, qcl, l, iq-> ci", nnn, ffval, num,
+                                       b2l) #(NC, l)
+
+                for ccc in range(NC):
+                    Ralpha = midx2d2num(alphaf)
+                    fI[c2d[ccc, N]] = bcoeff[ccc, Ralpha]
+                N += 1
+
+        bcs = mesh.multi_index_matrix(p, 3, dtype=self.ftype)/p
+        b2l = self.bspace.bernstein_to_lagrange(p, 3)
+        point = mesh.bc_to_point(bcs) #(NC, NQ, 3) 
+        ffval = bm.array(flist[0](point)) # (NC, NQ, )
+        bcoeff = bm.einsum("cq, iq-> ci", ffval, b2l)
+
+        S3 = self.dof_index["cell"]
+        fI[c2id] = bcoeff[:, S3]
+        return fI
+    
+
+
 
