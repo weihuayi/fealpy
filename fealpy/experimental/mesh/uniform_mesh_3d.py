@@ -87,9 +87,12 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        self.nx = self.extent[1] - self.extent[0]
-        self.ny = self.extent[3] - self.extent[2]
-        self.nz = self.extent[5] - self.extent[4]
+        self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+        self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+        self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
+        # self.nx = self.extent[1] - self.extent[0]
+        # self.ny = self.extent[3] - self.extent[2]
+        # self.nz = self.extent[5] - self.extent[4]
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
         self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \
                 (self.nx + 1) * self.ny * (self.nz + 1) + \
@@ -109,6 +112,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.meshtype = 'UniformMesh3d'
 
         # Interpolation points
+        if ipoints_ordering not in ['zyx', 'nefc']:
+            raise ValueError("The ipoints_ordering parameter must be either 'zyx' or 'nefc'")
         self.ipoints_ordering = ipoints_ordering
 
         # 是否翻转
@@ -1045,6 +1050,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
             edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
                           end_indices[:, None] * linspace_indices
+            edge2ipoint = edge2ipoint.astype(self.itype)
         elif ordering == 'nefc':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -1152,7 +1158,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             # 然后，转置最后两个维度，这样插值点会按照 z, y, x 的顺序排列
             transposed = reshaped.transpose(0, 2, 1)
             # 最后，reshape 到最终的形状，确保插值点是列优先排序
-            cell2ipoint = transposed.reshape(-1, (p+1)**3)
+            cell2ipoint = transposed.reshape(-1, (p+1)**3).astype(self.itype)
         elif ordering == 'nefc':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -1210,7 +1216,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             
         return cell2ipoint
          
-
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index :Index=_S) -> TensorLike:
         """
@@ -1260,11 +1265,14 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         Unstructured mesh do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
+            # self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
-            self.nx = self.extent[1] - self.extent[0]
-            self.ny = self.extent[3] - self.extent[2]
-            self.nz = self.extent[5] - self.extent[4]
+            self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+            self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+            self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
+            # self.nx = self.extent[1] - self.extent[0]
+            # self.ny = self.extent[3] - self.extent[2]
+            # self.nz = self.extent[5] - self.extent[4]
 
             self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
             self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \

@@ -246,7 +246,6 @@ class TensorFunctionSpace(FunctionSpace):
 
             isTensorBDof = self.is_boundary_dof(threshold=threshold)
         else:
-
             if mesh.geo_dimension() == 2:
                 face_threshold = threshold[0]
                 edge_threshold = threshold[1] if len(threshold) > 2 else None

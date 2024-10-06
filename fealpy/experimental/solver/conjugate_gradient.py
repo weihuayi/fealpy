@@ -59,7 +59,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
 
     sol = _cg_impl(A, b, x0, atol, rtol, maxiter)
 
-    if batch_first:
+    if (not single_vector) and batch_first:
         sol = bm.swapaxes(sol, 0, 1)
 
     return sol
