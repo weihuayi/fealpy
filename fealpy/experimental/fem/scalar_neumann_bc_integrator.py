@@ -64,7 +64,7 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
         bcs, ws, phi, fm, n = self.fetch(space)
 
         if callable(gN):
-            if ~hasattr(gN, 'coordtype') or gN.coordtype == 'cartesian':
+            if (not hasattr(gN, 'coordtype')) or (gN.coordtype == 'cartesian'):
                 mesh = space.mesh
                 ps = mesh.bc_to_point(bcs, index=index)
                 # 在实际问题当中，法向 n  这个参数一般不需要
