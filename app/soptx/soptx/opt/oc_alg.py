@@ -3,6 +3,9 @@ from fealpy.experimental.backend import TensorLike as _DT
 
 from fealpy.experimental.opt.optimizer_base import Optimizer
 
+import time
+from fealpy.utils import timer
+
 class OCAlg(Optimizer):
     def __init__(self, options) -> None:
         super().__init__(options)
@@ -65,30 +68,38 @@ class OCAlg(Optimizer):
         volume_constraint = objective.volume_constraint
         filter_properties = objective.filter_properties
 
+        tmr = timer()
+
         for loop in range(max_iters):
-            # Evaluate objective function and its gradient
+            start_time = time.time()
+
+            next(tmr)
             c = objective.fun(rho_phys)
+            tmr.send('c')
             dce = objective.jac(rho)
+            tmr.send('dc')
 
             g = volume_constraint.fun(rho_phys)
+            tmr.send('g')
             dge = volume_constraint.jac(rho)
+            tmr.send('dg')
 
-            # Update design variables using OC method
             rho_new, rho_phys[:] = self.update(rho, dce, dge, volume_constraint, filter_properties, mesh)
+            tmr.send('OC')
+            next(tmr)
 
-            # Compute change in design variables
             change = bm.max(bm.abs(rho_new - rho))
 
-            # Print the results for this iteration
-            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, \
-                Volume: {bm.mean(rho_phys):.3f}, Change: {change:.3f}")
+            iter_time = time.time() - start_time
 
-            # Check for convergence
+            print(f"Iteration: {loop + 1}, Objective: {c:.3f}, "
+                  f"Volume: {bm.mean(rho_phys):.3f}, Change: {change:.3f}, "
+                  f"Time: {iter_time:.3f} sec")
+
             if change <= tol_change:
                 print(f"Converged at iteration {loop + 1} with change {change}")
                 break
 
-            # Update rho for the next iteration
             rho = rho_new
 
         return rho
