@@ -85,6 +85,10 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
+parser.add_argument('--backend',
+        default='numpy', type=str,
+        help='有限元计算后端, 默认为 numpy.')
+
 parser.add_argument('--method',
         default='HybridModel', type=str,
         help='有限元方法, 默认为 HybridModel.')
@@ -111,6 +115,7 @@ parser.add_argument('--vtkname',
 
 args = parser.parse_args()
 p= args.degree
+backend = args.backend
 method = args.method
 enable_adaptive = args.enable_adaptive
 marking_strategy = args.marking_strategy
@@ -122,7 +127,7 @@ vtkname = args.vtkname
 tmr = timer()
 next(tmr)
 start = time.time()
-bm.set_backend('pytorch')
+bm.set_backend(backend)
 model = square_with_circular_notch()
 
 mesh = model.init_mesh(n=n)
@@ -139,9 +144,10 @@ ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundar
 ms.solve(vtkname=vtkname)
 
 force = ms.Rforce
+disp = ms.force_value
 with open('results_model1_ada.txt', 'w') as file:
     file.write(f'force: {force}\n')
-fig, axs = plt.subplots(1, 2)
+fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
 plt.ylabel('Residual Force')
