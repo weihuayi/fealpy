@@ -649,6 +649,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         @return: 分块四边形网格
         """
         import numpy as np
+
         from fealpy.experimental.geometry.coons_patch import coons_patch
 
         # 计算各条边上的点数量，包括两端点
@@ -737,7 +738,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 2] = cell_node_idx[1:, 1:].flatten()
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 3] = cell_node_idx[1:, 0:-1].flatten()
 
-            quad_mesh = cls(node, cell)
+        quad_mesh = cls(node, cell)
 
         return quad_mesh
 

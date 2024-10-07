@@ -1,18 +1,17 @@
 
 from typing import Tuple, Callable, Union, Optional
 
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
-import torch
-from torch import Tensor, cat
-
-from fealpy.torch.mesh import Mesh
-from fealpy.torch.functionspace import LagrangeFESpace
-from fealpy.torch.fem import (
+from fealpy.experimental.backend import backend_manager as bm
+from fealpy.experimental.backend import TensorLike as Tensor
+from fealpy.experimental.mesh import Mesh
+from fealpy.experimental.functionspace import LagrangeFESpace
+from fealpy.experimental.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
-    ScalarBoundarySourceIntegrator
+    ScalarNeumannBCIntegrator
 )
+from fealpy.experimental.sparse import COOTensor
+from fealpy.experimental.solver import cg
 
 
 class EITDataGenerator():
@@ -30,7 +29,7 @@ class EITDataGenerator():
         q = p + 2 if q is None else q
 
         # setup function space
-        kwargs = dict(dtype=mesh.ftype, device=mesh.device)
+        kwargs = dict(dtype=mesh.itype, device=mesh.device)
         space = LagrangeFESpace(mesh, p=p) # FE space
         self.space = space
 
@@ -41,31 +40,17 @@ class EITDataGenerator():
         self._bd_node_index = bd_node_index
 
         # initialize integrators
-        self._bsi = ScalarBoundarySourceIntegrator(None, q=q, zero_integral=True)
+        self._bsi = ScalarNeumannBCIntegrator(None, q=q)
         self._di = ScalarDiffusionIntegrator(None, q=q)
 
         # prepare for the unique condition in the neumann case
-        bd_dof = space.is_boundary_dof().nonzero().ravel()
-        gdof = space.number_of_global_dofs()
-        zeros = torch.zeros_like(bd_dof, **kwargs)
+        self.gdof = space.number_of_global_dofs()
         lform_c = LinearForm(space)
-        lform_c.add_integrator(ScalarBoundarySourceIntegrator(1.))
-        cdata = lform_c.assembly(return_dense=False)
-        self.c = torch.sparse_coo_tensor(
-            torch.stack([cdata.indices()[0], zeros], dim=0),
-            cdata.values(),
-            size=(gdof, 1)
-        )
-        self.ct = torch.sparse_coo_tensor(
-            torch.stack([zeros, cdata.indices()[0]], dim=0),
-            cdata.values(),
-            size=(1, gdof)
-        )
-        self.ZERO = torch.sparse_coo_tensor(
-            torch.zeros((2, 1), dtype=mesh.itype, device=mesh.device),
-            torch.zeros((1,), **kwargs),
-            size=(1, 1)
-        )
+        lform_c.add_integrator(ScalarNeumannBCIntegrator(1.))
+        self.cdata = lform_c.assembly()
+        cdata_row = bm.arange(self.gdof, **kwargs)
+        cdata_col = bm.full((self.gdof,), self.gdof, **kwargs)
+        self.cdata_indices = bm.stack([cdata_row, cdata_col], axis=0)
 
     def set_levelset(self, sigma_vals: Tuple[float, float],
                      levelset: Callable[[Tensor], Tensor]) -> Tensor:
@@ -73,31 +58,33 @@ class EITDataGenerator():
 
         Args:
             sigma_vals (Tuple[float, float]): Sigma value of inclusion and background.
-            levelset (Callable): _description_.
+            levelset (Callable): level-set function indicating inclusion and background.
 
-        Retunrs:
+        Returns:
             Tensor: Label boolean Tensor with True for inclusion nodes and False\
                 for background nodes, shaped (nodes, ).
         """
         def _coef_func(p: Tensor):
             inclusion = levelset(p) < 0.
-            sigma = torch.empty(p.shape[:2], dtype=p.dtype, device=p.device) # (Q, C)
-            sigma[inclusion] = sigma_vals[0]
-            sigma[~inclusion] = sigma_vals[1]
+            sigma = bm.empty(p.shape[:2], dtype=p.dtype, device=p.device) # (Q, C)
+            sigma = bm.set_at(sigma, inclusion, sigma_vals[0])
+            sigma = bm.set_at(sigma, ~inclusion, sigma_vals[1])
             return sigma
+        _coef_func.coordtype = getattr(levelset, 'coordtype', 'cartesian')
 
         space = self.space
 
         bform = BilinearForm(space)
-        self._di.set_coef(_coef_func)
+        self._di.coef = _coef_func
+        self._di.clear() # clear the cached result as the coef has changed
         bform.add_integrator(self._di)
         self._A = bform.assembly()
-        A_n = cat([cat([self._A, self.c], dim=1),
-                   cat([self.ct, self.ZERO], dim=1)], dim=0).coalesce()
-        self._A_n_np = csr_matrix(
-            (A_n.values().cpu().numpy(), A_n.indices().cpu().numpy()),
-            shape=A_n.shape
-        )
+
+        cdata_indices = self.cdata_indices
+        cdataT_indices = bm.flip(cdata_indices, axis=0)
+        A_n_indices = bm.concat([self._A.indices(), cdata_indices, cdataT_indices], axis=1)
+        A_n_values = bm.concat([self._A.values(), self.cdata, self.cdata], axis=-1)
+        self.A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
 
         node = space.mesh.entity('node')
         return levelset(node) < 0.
@@ -107,7 +94,8 @@ class EITDataGenerator():
         """Set boundary current density.
 
         Args:
-            gn_source (Callable[[Tensor], Tensor] | Tensor): _description_
+            gn_source (Callable[[Tensor], Tensor] | Tensor): The current density\
+                function or Tensor on the boundary.
 
         Returns:
             Tensor: current value on boundary nodes, shaped (Boundary nodes, )\
@@ -120,20 +108,18 @@ class EITDataGenerator():
         # 'current density'. We assume the the current measured by the electric
         # node is the integral of the current density function.
         lform = LinearForm(self.space, batch_size=batch_size)
-        self._bsi.set_source(gn_source)
+        self._bsi.gn = gn_source
         self._bsi.batched = (batch_size > 0)
+        self._bsi.clear()
         lform.add_integrator(self._bsi)
         b_ = lform.assembly()
-        current = b_[:, self._bd_node_index]
-        self.unsqueezed = False
+        current = b_[..., self._bd_node_index]
 
         if b_.ndim == 1:
-            b_ = b_.unsqueeze(0)
-            self.unsqueezed = True
-
-        NUM = b_.size(0)
-        ZERO = torch.zeros((NUM, 1), dtype=b_.dtype, device=b_.device)
-        self.b_ = torch.cat([b_, ZERO], dim=-1).cpu().numpy()
+            ZERO = bm.zeros((1,), dtype=b_.dtype, device=b_.device)
+        else:
+            ZERO = bm.zeros((b_.shape[0], 1), dtype=b_.dtype, device=b_.device)
+        self.b_ = bm.concat([b_, ZERO], axis=-1)
 
         return current
 
@@ -144,21 +130,17 @@ class EITDataGenerator():
             return_full (bool, optional): Whether return all dofs. Defaults to False.
 
         Returns:
-            Tensor: gd Tensor on **CPU**, shaped (Boundary nodes, )\
+            Tensor: gd Tensor, shaped (Boundary nodes, )\
                 or (Batch, Boundary nodes).
         """
-        uh = spsolve(self._A_n_np, self.b_.T).T
-        uh = torch.from_numpy(uh) # cpu
-
-        if self.unsqueezed:
-            uh = uh.squeeze(0)
+        uh = cg(self.A_n, self.b_, batch_first=True, atol=1e-14, rtol=0.)
 
         if return_full:
-            return uh
+            return uh[:-1]
 
         # NOTE: interpolation points on nodes are arranged firstly,
         # therefore the value on the boundary nodes can be fetched like this:
-        return uh[..., self._bd_node_index.cpu()] # voltage
+        return uh[..., self._bd_node_index] # voltage
 
 # TODO: finish this
 class EITDataPreprocessor():
