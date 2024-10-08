@@ -137,7 +137,11 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         """
         if etype in {'cell', 3}:
             from ..quadrature import TetrahedronQuadrature
-            return TetrahedronQuadrature(q, dtype=self.ftype)
+            from ..quadrature.stroud_quadrature import StroudQuadrature
+            if q > 7:
+                return StroudQuadrature(3, q)
+            else:
+                return TetrahedronQuadrature(q, dtype=self.ftype)
         elif etype in {'face', 2}:
             from ..quadrature import TriangleQuadrature
             return TriangleQuadrature(q, dtype=self.ftype)

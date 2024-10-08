@@ -38,8 +38,8 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.dof_index = {}
         self.get_dof_index()
  
-        self.isCornerNode = isCornerNode
-        #self.isCornerNode, self.isCornerEdge = self.get_corner()
+        #self.isCornerNode = isCornerNode
+        self.isCornerNode, self.isCornerEdge = self.get_corner()
         self.coeff = self.coefficient_matrix()
    
     def get_dof_index(self):
