@@ -151,11 +151,14 @@ FUNCTION_MAPPING = _make_default_mapping(
 
     ### Linear Algebra Functions ###
     # python array API standard v2023.12
-    'matmul', 'matrix_transpose', 'tensordot',
+    'matmul', 'matrix_transpose',
+    'tensordot',
     'vecdot',
     # non-standard
-    'cross', 'cumsum', 'cumprod',
-    'dot', 'einsum',
+    'cross',
+    'dot',
+    'einsum',
+    'trace',
 
     ### Manipulation Functions ###
     # python array API standard v2023.12
@@ -198,6 +201,7 @@ FUNCTION_MAPPING = _make_default_mapping(
     'std', 'sum',
     'var',
     # non-standard
+    'cumsum', 'cumprod',
 
     ### Utility Functions ###
     # python array API standard v2023.12

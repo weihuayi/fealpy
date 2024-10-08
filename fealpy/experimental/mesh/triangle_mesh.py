@@ -267,7 +267,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge = self.entity('edge')
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
-            edge2newNode = bm.arange(NN, NN + NE)
+            edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
 
             self.node = bm.concatenate((node, newNode), axis=0)
@@ -416,7 +416,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             print('The number of markedg edges: ', isCutEdge.sum())
 
         edge2newNode = bm.zeros((NE,), dtype=self.itype)
-        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum()))
+        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum(), dtype=self.itype))
 
         node = self.node
         newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
@@ -467,7 +467,11 @@ class TriangleMesh(SimplexMesh, Plotable):
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
                     if value.shape == (NC,):  # 分片常数
+                        print('value', value.ndim)
                         value = bm.concatenate((value[:], value[idx]))
+                        options['data'][key] = value
+                    elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
+                        value = bm.concatenate((value, value[idx, :])) 
                         options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
@@ -504,6 +508,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             p2 = cell[idx, 2]
             p3 = edge2newNode[cell2edge0[idx]]
             cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
+            
             cell = bm.set_at(cell , (L, 0), p3)
             cell = bm.set_at(cell , (L, 1), p0)
             cell = bm.set_at(cell , (L, 2), p1)
@@ -1186,12 +1191,12 @@ class TriangleMesh(SimplexMesh, Plotable):
         @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
         生成相应带状区域的三角形网格
 
-        x = a \sin\theta \cos\phi
-        y = b \sin\theta \sin\phi
-        z = c \cos\theta
+        x = a \\sin\\theta \\cos\\phi
+        y = b \\sin\\theta \\sin\\phi
+        z = c \\cos\\theta
 
-        @param[in] ntheta \theta 方向的剖分段数
-        @param[in] nphi \phi 方向的剖分段数 
+        @param[in] ntheta \\theta 方向的剖分段数
+        @param[in] nphi \\phi 方向的剖分段数 
         """
         if theta is None:
             theta = (bm.pi / 4, 3 * bm.pi / 4)

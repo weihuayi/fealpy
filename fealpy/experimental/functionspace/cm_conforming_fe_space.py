@@ -26,6 +26,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
+        self.device = mesh.device
 
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
@@ -33,7 +34,6 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         self.coeff = self.coefficient_matrix()
 
     def number_of_local_dofs(self, etype) -> int: 
-        # TODO:这个用到过吗
         p = self.p
         m = self.m
         if etype=="cell":
@@ -120,7 +120,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         c2d[:, ldof-cidof:] = bm.arange(NN*ndof + NE*eidof,
                 NN*ndof+NE*eidof+NC*cidof,dtype=self.itype).reshape(NC, cidof)
         c2d[:, :ndof*3] = n2d[cell].reshape(NC,-1) 
-        c2eSign = mesh.cell_to_edge_sign()
+        c2eSign = mesh.cell_to_face_sign()
         for e in bm.arange(3):
             N = ndof*3+eidof*e
             flag = ~c2eSign[:, e]
@@ -380,7 +380,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         uI = self.interpolation(gD)
         isDDofidx = bm.where(isDDof)[0]
         #uh[isDDof] = uI[isDDof]
-        return isDDof
+        return uh, isDDof
 
     def interpolation(self, flist):
         """
@@ -403,7 +403,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         fI[n2id[:, 0]] = flist[0](node) 
         k = 1; 
         for r in range(1, 2*m+1):
-            fI[n2id[:, k:k+r+1]] = flist[r](node) 
+            fI[n2id[:, k:k+r+1]] = flist[r](node) #这里不用乘标架吗? 
             k += r+1
 
         # 边上的自由度

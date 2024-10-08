@@ -68,7 +68,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
 
     def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
-                ipoints_ordering='yx', itype=None, ftype=None):
+                ipoints_ordering='yx', flip_direction=None, itype=None, ftype=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -81,8 +81,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        self.nx = self.extent[1] - self.extent[0]
-        self.ny = self.extent[3] - self.extent[2]
+        self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+        self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
         self.NN = (self.nx + 1) * (self.ny + 1)
         self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
         self.NF = self.NE
@@ -98,7 +98,12 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.meshtype = 'UniformMesh2d'
 
         # Interpolation points
+        if ipoints_ordering not in ['yx', 'nec']:
+            raise ValueError("The ipoints_ordering parameter must be either 'yx' or 'nec'")
         self.ipoints_ordering = ipoints_ordering
+
+        # 是否翻转
+        self.flip_direction = flip_direction
 
         # Initialize edge adjustment mask
         self.adjusted_edge_mask = self.get_adjusted_edge_mask()
@@ -129,7 +134,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
         y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
+
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
+
+        if self.flip_direction == 'x':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, GD), axis=0).reshape(-1, GD)
+        elif self.flip_direction == 'y':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, GD), axis=1).reshape(-1, GD)
 
         return node.reshape(-1, GD)
     
@@ -144,6 +155,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         NE = self.NE
 
         idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
+
         edge = bm.zeros((NE, 2), dtype=self.itype)
         NE0 = 0
         NE1 = nx * (ny + 1)
@@ -169,8 +181,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         NN = self.NN
         NC = self.NC
-        cell = bm.zeros((NC, 4), dtype=self.itype)
+
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+
+        cell = bm.zeros((NC, 4), dtype=self.itype)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1
@@ -569,9 +583,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             node_y_grid, node_x_grid = bm.meshgrid(node_y_indices, node_x_indices, indexing='ij')
             
             node2ipoint = (node_y_grid * nix + node_x_grid).flatten()
+            node2ipoint = node2ipoint.astype(self.itype)
         elif ordering == 'nec':
             NN = self.NN
-            node2ipoint = bm.arange(0, NN)
+            node2ipoint = bm.arange(0, NN, dtype=self.itype)
         else:
             raise ValueError("Invalid ordering type. Choose 'yx' or 'nec'.")
         
@@ -600,6 +615,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
             edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
                           end_indices[:, None] * linspace_indices
+            edge2ipoint = edge2ipoint.astype(self.itype)
         elif ordering == 'nec':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -642,6 +658,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
                                         end_indices[:, :, None] * linspace_indices
 
             cell2ipoint = cell_ipoints_interpolated.reshape(-1, (p+1)**2)
+            cell2ipoint = cell2ipoint.astype(self.itype)
         elif ordering == 'nec':
             edge2cell = self.edge_to_cell()
             NN = self.number_of_nodes()
@@ -722,7 +739,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             
         return cell2ipoint
 
-    face_to_ipoint = StructuredMesh.edge_to_ipoint
+    face_to_ipoint = edge_to_ipoint
     
     
     # 形函数
@@ -797,10 +814,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         Unstructured mesh do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
+            # self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
-            self.nx = self.extent[1] - self.extent[0]
-            self.ny = self.extent[3] - self.extent[2]
+            self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+            self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
 
             self.NC = self.nx * self.ny
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)

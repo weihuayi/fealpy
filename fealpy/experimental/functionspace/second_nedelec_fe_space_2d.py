@@ -1,24 +1,33 @@
 
-
-from typing import Union, TypeVar, Generic, Callable, Optional
-from ..typing import TensorLike, Index, _S
+from typing import Union, TypeVar, Generic, Callable,Optional
 
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
-from ..mesh.mesh_base import Mesh
-from ...decorator import barycentric
 from .space import FunctionSpace
+from .lagrange_fe_space import LagrangeFESpace
+from .function import Function
 
-class NedelecDof(FunctionSpace, Generic[_MT]):
+from scipy.sparse import csr_matrix
+from ..mesh.mesh_base import Mesh
+from ...decorator import barycentric, cartesian
+
+_MT = TypeVar('_MT', bound=Mesh)    
+Index = Union[int, slice, TensorLike]
+Number = Union[int, float]
+_S = slice(None)
+
+class NedelecDof():
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
-        self.multiindex = bm.multi_index_matrix(p, 2) 
+        self.multiindex = mesh.multi_index_matrix(p, 2) 
+        self.ftype = mesh.ftype 
+        self.itype = mesh.itype
 
     def is_normal_dof(self):
         p = self.p
         ldof = self.number_of_local_dofs()
-        isndof = bm.zeros(ldof, dtype=bm.bool_)
+        isndof = bm.zeros(ldof, dtype=bm.bool)
 
         multiindex = self.multiindex
         dim = bm.sum(multiindex>0, axis=-1)-1
@@ -35,7 +44,7 @@ class NedelecDof(FunctionSpace, Generic[_MT]):
         ldof = self.number_of_local_dofs()
 
         eldof = self.number_of_local_dofs('edge')
-        e2ld = bm.zeros((3, eldof), dtype=bm.int_)
+        e2ld = bm.zeros((3, eldof), dtype=self.itype)
 
         e2ld[0], = bm.where(multiindex[:, 0]==0)
         e2ld[0][0] += ldof//2
@@ -65,7 +74,7 @@ class NedelecDof(FunctionSpace, Generic[_MT]):
         cdof = self.number_of_local_dofs(doftype='cell')
         return NE*edof + NC*cdof
 
-    def edge_to_dof(self, index=bm.s_[:]):
+    def edge_to_dof(self, index=_S):
         NE = self.mesh.number_of_edges()
         edof = self.number_of_local_dofs(doftype='edge')
         return bm.arange(NE*edof).reshape(NE, edof)[index]
@@ -82,15 +91,18 @@ class NedelecDof(FunctionSpace, Generic[_MT]):
 
         NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
-        c2e = self.mesh.ds.cell_to_edge()
-        c2esign = self.mesh.ds.cell_to_edge_sign()
+        c2e = self.mesh.cell_to_edge()
+        c2esign = self.mesh.cell_to_face_sign()
 
-        c2d = bm.zeros((NC, ldof), dtype=bm.int_)
+        c2d = bm.zeros((NC, ldof), dtype=self.itype)
         # c2d[:, e2ldof] : (NC, 3, p+1), e2dof[c2e] : (NC, 3, p+1)
         tmp = e2dof[c2e]
-        tmp[~c2esign] = tmp[~c2esign, ::-1]
-        c2d[:, e2ldof] = tmp 
-        c2d[:, ~isndof] = bm.arange(NE*edof, gdof).reshape(NC, -1)
+        # tmp[~c2esign] = tmp[~c2esign, ::-1]       
+        # c2d[:, e2ldof] = tmp
+        # c2d[:, ~isndof] = bm.arange(NE*edof, gdof).reshape(NC, -1)
+        tmp = bm.set_at(tmp,(~c2esign),tmp[~c2esign, ::-1])
+        c2d = bm.set_at(c2d,(slice(None), e2ldof),tmp)
+        c2d = bm.set_at(c2d,(slice(None), ~isndof),bm.arange(NE*edof, gdof).reshape(NC, -1))
         return c2d
 
     @property
@@ -98,7 +110,7 @@ class NedelecDof(FunctionSpace, Generic[_MT]):
         return self.cell_to_dof()
 
     def boundary_dof(self):
-        eidx = self.mesh.ds.boundary_edge_index()
+        eidx = self.mesh.boundary_face_index()
         e2d = self.edge_to_dof(index=eidx)
         return e2d.reshape(-1)
 
@@ -106,23 +118,30 @@ class NedelecDof(FunctionSpace, Generic[_MT]):
         bddof = self.boundary_dof()
 
         gdof = self.number_of_global_dofs()
-        flag = bm.zeros(gdof, dtype=bm.bool_)
+        flag = bm.zeros(gdof, dtype=bm.bool)
 
         flag[bddof] = True
         return flag
 
-class SecondNedelecFiniteElementSpace2d():
+class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh : Mesh, p: int):
         self.p = p
         self.mesh = mesh
         self.dof = NedelecDof(mesh, p)
 
-        self.lspace = LagrangeFiniteElementSpace(mesh, p)
+        self.lspace = LagrangeFESpace(mesh, p)
         self.cellmeasure = mesh.entity_measure('cell')
-        self.qf = mesh.quadrature_formula(p+3) 
+        self.qf = mesh.quadrature_formula(p+3)
+        self.ftype = mesh.ftype
+        self.itype = mesh.itype
+ 
+        #TODO:JAX
+        self.device = mesh.device
+        self.TD = mesh.top_dimension()
+        self.GD = mesh.geo_dimension()
 
     @barycentric
-    def basis(self, bc: TensorLike)-> TensorLike:
+    def basis(self, bcs: TensorLike,index=_S)-> TensorLike:
         mesh = self.mesh
         NC = mesh.number_of_cells()
         GD = mesh.geo_dimension()
@@ -131,14 +150,17 @@ class SecondNedelecFiniteElementSpace2d():
 
         c2v = self.basis_vector()#(NC, ldof, GD)
         
-        NQ = bc.shape[0]
-        val = bm.zeros((NC, NQ, ldof, GD), dtype=bm.float_)
+        NQ = bcs.shape[0]
+        val = bm.zeros((NC, NQ, ldof, GD), dtype=self.ftype)
 
-        bval = self.lspace.basis(bc) #(NC, NQ, ldof)
+        bval = self.lspace.basis(bcs) #(NC, NQ, ldof)
+        c2v = c2v[:,None,:,:]
         c2v = bm.broadcast_to(c2v, val.shape) #(NC, NQ, ldof, GD)
-        val[..., :ldof//2, :] = bval[..., None]*c2v[..., :ldof//2, :]
-        val[..., ldof//2:, :] = bval[..., None]*c2v[..., ldof//2:, :]
-        return val
+        #val[..., :ldof//2, :] = bval[..., None]*c2v[..., :ldof//2, :]       
+        #val[..., ldof//2:, :] = bval[..., None]*c2v[..., ldof//2:, :]
+        val = bm.set_at(val,(...,slice(None,ldof//2),slice(None)),bval[..., None]*c2v[..., :ldof//2, :])
+        val = bm.set_at(val,(...,slice(ldof//2,None),slice(None)),bval[..., None]*c2v[..., ldof//2:, :])
+        return val[index]
 
     def basis_vector(self)->TensorLike:
         mesh = self.mesh
@@ -151,32 +173,48 @@ class SecondNedelecFiniteElementSpace2d():
         edge = mesh.entity('edge')
         cell = mesh.entity('cell')
 
-        c2e = mesh.ds.cell_to_edge()
+        c2e = mesh.cell_to_edge()
         e2n = mesh.edge_unit_normal()
         e2t = mesh.edge_unit_tangent()
 
-        c2v = bm.zeros((NC, ldof, GD), dtype=bm.float_)
-        c2v[:, :ldof//2, 0] = 1
-        c2v[:, ldof//2:, 1] = 1
+        c2v = bm.zeros((NC, ldof, GD), dtype=self.ftype)
+        #c2v[:, :ldof//2, 0] = 1        
+        #c2v[:, ldof//2:, 1] = 1
+        # 给内部单元的单元向量赋值
+        c2v = bm.set_at(c2v,(slice(None),slice(None,ldof//2),0),1)
+        c2v = bm.set_at(c2v,(slice(None),slice(ldof//2,None),1),1)
 
         #c2v[:, e2ldof[:, 1:-1]] : (NC, 3, p-1, GD), e2t[c2e] : (NC, 3, GD)
-        c2v[:, e2ldof[:, 1:-1]] = e2t[c2e][:, :, None, :]
-        c2v[:, e2ldof[:, 1:-1]+ldof//2] = e2n[c2e][:, :, None, :]
+        #c2v[:, e2ldof[:, 1:-1]] = e2t[c2e][:, :, None, :]
+        #c2v[:, e2ldof[:, 1:-1]+ldof//2] = e2n[c2e][:, :, None, :]
+        # 给边界单元(不包含顶点)的单元向量赋值
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[:, 1:-1]),e2t[c2e][:, :, None, :])
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[:, 1:-1]+ldof//2),e2n[c2e][:, :, None, :])
+
 
         #c2v[:, e2ldof[0, 0]] : (NC, GD), c2e[e2t[0]] : (NC, GD)
         #注意: e2ldof[0, 0] 不是 0
-        c2v[:, e2ldof[0, 0]] = e2n[c2e[:, 2]]/(bm.sum(e2n[c2e[:, 2]]*e2t[c2e[:, 0]],
-            axis=-1)[:, None]) 
-        c2v[:, e2ldof[0, -1]] = e2n[c2e[:, 1]]/(bm.sum(e2n[c2e[:, 1]]*e2t[c2e[:, 0]],
-            axis=-1)[:, None]) 
-        c2v[:, e2ldof[1, 0]] = e2n[c2e[:, 0]]/(bm.sum(e2n[c2e[:, 0]]*e2t[c2e[:, 1]],
-            axis=-1)[:, None]) 
-        c2v[:, e2ldof[1, -1]] = e2n[c2e[:, 2]]/(bm.sum(e2n[c2e[:, 2]]*e2t[c2e[:, 1]],
-            axis=-1)[:, None]) 
-        c2v[:, e2ldof[2, 0]] = e2n[c2e[:, 1]]/(bm.sum(e2n[c2e[:, 1]]*e2t[c2e[:, 2]],
-            axis=-1)[:, None]) 
-        c2v[:, e2ldof[2, -1]] = e2n[c2e[:, 0]]/(bm.sum(e2n[c2e[:, 0]]*e2t[c2e[:, 2]],
-            axis=-1)[:, None]) 
+
+        # c2v[:, e2ldof[0, 0]] = e2n[c2e[:, 2]]/(bm.sum(e2n[c2e[:, 2]]*e2t[c2e[:, 0]],
+        #     axis=-1)[:, None]) 
+        # c2v[:, e2ldof[0, -1]] = e2n[c2e[:, 1]]/(bm.sum(e2n[c2e[:, 1]]*e2t[c2e[:, 0]],
+        #     axis=-1)[:, None]) 
+        # c2v[:, e2ldof[1, 0]] = e2n[c2e[:, 0]]/(bm.sum(e2n[c2e[:, 0]]*e2t[c2e[:, 1]],
+        #     axis=-1)[:, None]) 
+        # c2v[:, e2ldof[1, -1]] = e2n[c2e[:, 2]]/(bm.sum(e2n[c2e[:, 2]]*e2t[c2e[:, 1]],
+        #     axis=-1)[:, None]) 
+        # c2v[:, e2ldof[2, 0]] = e2n[c2e[:, 1]]/(bm.sum(e2n[c2e[:, 1]]*e2t[c2e[:, 2]],
+        #     axis=-1)[:, None]) 
+        # c2v[:, e2ldof[2, -1]] = e2n[c2e[:, 0]]/(bm.sum(e2n[c2e[:, 0]]*e2t[c2e[:, 2]],
+        #     axis=-1)[:, None])
+      # 给顶点单元的单元向量赋值
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[0, 0]),e2n[c2e[:, 2]]/(bm.sum(e2n[c2e[:, 2]]*e2t[c2e[:, 0]],axis=-1)[:, None]))
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[0, -1]),e2n[c2e[:, 1]]/(bm.sum(e2n[c2e[:, 1]]*e2t[c2e[:, 0]],axis=-1)[:, None]))
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[1, 0]),e2n[c2e[:, 0]]/(bm.sum(e2n[c2e[:, 0]]*e2t[c2e[:, 1]],axis=-1)[:, None]))
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[1, -1]),e2n[c2e[:, 2]]/(bm.sum(e2n[c2e[:, 2]]*e2t[c2e[:, 1]],axis=-1)[:, None]))
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[2, 0]),e2n[c2e[:, 1]]/(bm.sum(e2n[c2e[:, 1]]*e2t[c2e[:, 2]],axis=-1)[:, None]))
+        c2v = bm.set_at(c2v,(slice(None),e2ldof[2, -1]),e2n[c2e[:, 0]]/(bm.sum(e2n[c2e[:, 0]]*e2t[c2e[:, 2]],axis=-1)[:, None]))
+
         return c2v
 
     def dof_vector(self):
@@ -198,12 +236,13 @@ class SecondNedelecFiniteElementSpace2d():
 
         e = bm.arange(NE)[index]
         N = len(e)
-        e2dv = bm.zeros([N, p+1, GD], dtype=bm.int_)
-        e2dv[:] = self.mesh.edge_unit_tangent(index=index)[:, None]
+        e2dv = bm.zeros([N, p+1, GD], dtype=self.ftype)
+        #e2dv[:] = self.mesh.edge_unit_tangent(index=index)[:, None]
+        e2dv = bm.set_at(e2dv,(slice(None)),self.mesh.edge_unit_tangent(index=index)[:, None])
         return e2dv
 
     @barycentric
-    def edge_basis(self, bc: TensorLike, index : Index = _S)->TensorLike:
+    def edge_basis(self, bcs: TensorLike, index : Index = _S)->TensorLike:
         """
         @brief 计算每条边上每个重心坐标处的基函数值
         @param bc : (NQ, GD+1)
@@ -213,14 +252,14 @@ class SecondNedelecFiniteElementSpace2d():
         GD = mesh.geo_dimension()
         edof = self.dof.number_of_local_dofs('edge')
 
-        sphi = self.lspace.basis(bc, index=index) #(NE, NQ, edof)
+        sphi = self.lspace.basis(bcs, index=index) #(NE, NQ, edof)
         e2t = mesh.edge_unit_tangent() #(NE, GD)
 
         val = sphi[..., None]*e2t[index, None, None, :]
         return val
 
     @barycentric
-    def curl_basis(self, bc: TensorLike)->TensorLike:
+    def curl_basis(self, bcs: TensorLike)->TensorLike:
         mesh = self.mesh
         NC = mesh.number_of_cells()
         GD = mesh.geo_dimension()
@@ -232,15 +271,18 @@ class SecondNedelecFiniteElementSpace2d():
 
         c2d = self.dof.cell_to_dof()
         c2v = self.basis_vector()#(NC, ldof, GD)
-        c2e = mesh.ds.cell_to_edge()
+        c2e = mesh.cell_to_edge()
         e2n = mesh.edge_unit_normal()
         e2t = mesh.edge_unit_tangent()
         
-        sgval = self.lspace.grad_basis(bc) #(NC, NQ, ldof//2, GD)
-        val = bm.zeros(sgval.shape[:-2]+(ldof,), dtype=bm.float_)
+        sgval = self.lspace.grad_basis(bcs) #(NC, NQ, ldof//2, GD)
+        val = bm.zeros(sgval.shape[:-2]+(ldof,), dtype=self.ftype)
 
-        val[..., :ldof//2] = bm.cross(sgval, c2v[:, None, :ldof//2, :])
-        val[..., ldof//2:] = bm.cross(sgval, c2v[:, None, ldof//2:, :])
+        # val[..., :ldof//2] = bm.cross(sgval, c2v[:, None, :ldof//2, :])
+        # val[..., ldof//2:] = bm.cross(sgval, c2v[:, None, ldof//2:, :])
+        val = bm.set_at(val,(...,slice(None,ldof//2)),bm.cross(sgval, c2v[:, None, :ldof//2, :]))
+        val = bm.set_at(val,(...,slice(ldof//2,None)),bm.cross(sgval, c2v[:, None, ldof//2:, :]))
+
         return val
 
     def cell_to_dof(self):
@@ -251,28 +293,31 @@ class SecondNedelecFiniteElementSpace2d():
 
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype)
+    
+    def is_boundary_dof(self, threshold=None):
+        return self.dof.is_boundary_dof()
 
     @barycentric
-    def value(self, uh, bc: TensorLike, index: Index = _S)->TensorLike:
+    def value(self, uh, bcs: TensorLike, index: Index = _S)->TensorLike:
         '''@
         @brief 计算一个有限元函数在每个单元的 bc 处的值
         @param bc : (NQ, TD+1)
         @return val :  (NC, NQ, GD)
         '''
-        phi = self.basis(bc)
+        phi = self.basis(bcs)
         c2d = self.dof.cell_to_dof()
         # uh[c2d].shape = (NC, ldof); phi.shape = (NC, NQ, ldof, GD)
         val = bm.einsum("cl, cqlk->cqk", uh[c2d], phi)
         return val
 
     @barycentric
-    def curl_value(self, uh, bc: TensorLike, index: Index = _S)->TensorLike:
+    def curl_value(self, uh, bcs: TensorLike, index: Index = _S)->TensorLike:
         '''@
         @brief 计算一个有限元函数在每个单元的 bc 处的值
         @param bc : (..., GD+1)
         @return val : (..., NC, GD)
         '''
-        phi = self.curl_basis(bc)
+        phi = self.curl_basis(bcs)
         c2d = self.dof.cell_to_dof()
         # uh[c2d].shape = (NC, ldof); phi.shape = (..., NC, ldof, GD)
         val = bm.einsum("cl, cql->cq", uh[c2d], phi)
@@ -304,7 +349,6 @@ class SecondNedelecFiniteElementSpace2d():
 
         bcs, ws = self.qf.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, ldof, GD)
-
         if callable(c): 
             points = mesh.bc_to_point(bcs) #(NC, NQ, GD)
             cval = c(points)               #(NC, NQ)
@@ -325,7 +369,7 @@ class SecondNedelecFiniteElementSpace2d():
         cm = self.cellmeasure
 
         c2d = self.dof.cell_to_dof() #(NC, ldof)
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        bcs, ws = self.qf.get_quadrature_points_and_weights()
 
         cphi = self.curl_basis(bcs) #(NQ, NC, ldof)
 
@@ -346,7 +390,7 @@ class SecondNedelecFiniteElementSpace2d():
         cm = self.cellmeasure
         ldof = self.dof.number_of_local_dofs()
         gdof = self.dof.number_of_global_dofs()
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        bcs, ws = self.qf.get_quadrature_points_and_weights()
         c2d = self.dof.cell_to_dof() #(NC, ldof)
 
         p = mesh.bc_to_point(bcs) #(NQ, NC, GD)
@@ -354,15 +398,16 @@ class SecondNedelecFiniteElementSpace2d():
 
         phi = self.basis(bcs) #(NQ, NC, ldof, GD)
         val = bm.einsum("cqg, cqlg, q, c->cl", fval, phi, ws, cm)# (NC, ldof)
-        vec = bm.zeros(gdof, dtype=bm.float_)
-        bm.scatter_add(vec, c2d, val)
+        vec = bm.zeros(gdof, dtype=self.ftype)
+        #bm.scatter_add(vec, c2d, val)
+        bm.add_at(vec, c2d, val)
         return vec
 
-    def projection(self, f:Callable, method="L2"):
-        M = self.mass_matrix()
-        b = self.source_vector(f)
-        x = spsolve(M, b)
-        return x 
+    # def projection(self, f:Callable, method="L2"):
+    #     M = self.mass_matrix()
+    #     b = self.source_vector(f)
+    #     x = spsolve(M, b)
+    #     return x 
 
     def interplation(self, f: Callable):
         mesh = self.mesh
@@ -371,7 +416,7 @@ class SecondNedelecFiniteElementSpace2d():
 
         gdof = self.dof.number_of_global_dofs()
         e2n = mesh.edge_unit_normal()
-        val = bm.zeros(gdof, dtype=bm.float_)
+        val = bm.zeros(gdof, dtype=self.ftype)
 
         f0 = f(node[edge[:, 0]]) 
         f1 = f(node[edge[:, 1]])
@@ -386,7 +431,7 @@ class SecondNedelecFiniteElementSpace2d():
         '''
         mesh = self.mesh
         cm = self.cellmeasure
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        bcs, ws = self.qf.get_quadrature_points_and_weights()
         p = mesh.bc_to_point(bcs) #(NQ, NC, GD)
         uval = u(p) #(NQ, NC, GD)
         uhval = uh(bcs) #(NQ, NC, GD)
@@ -394,60 +439,48 @@ class SecondNedelecFiniteElementSpace2d():
         val = bm.einsum("cq, q, c->", errval, ws, cm)
         return bm.sqrt(val)
 
-    def set_neumann_bc(self, g: Callable):
-        """
-        @brief 设置Neumann边界条件
-        """
-        bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()
-
-        edof = self.dof.number_of_local_dofs('edge')
-        eidx = self.mesh.ds.boundary_edge_index()
-        phi = self.edge_basis(bcs, index=eidx) #(NQ, NE0, edof, GD)
-        e2n = self.mesh.edge_unit_normal(index=eidx)
-        phi = bm.einsum("eqlg, eg->eql", phi, e2n) #(NE0, NQ, edof)
-
-        point = self.mesh.edge_bc_to_point(bcs, index=eidx)
-        gval = g(point) #(NE0, NQ)
-
-        em = self.mesh.entity_measure("edge")[eidx]
-        integ = bm.einsum("eql, eq, e, q->el", phi, gval, em, ws)
-
-        e2d = bm.ones((len(eidx), edof), dtype=bm.int_)
-        e2d[:, 0] = edof*eidx
-        e2d = bm.cumsum(e2d, axis=-1)
-
-        gdof = self.dof.number_of_global_dofs()
-        val = bm.zeros(gdof, dtype=bm.float_)
-        bm.scatter_add(val, e2d, integ) #TODO : 有问题 scatter_add
-        return val
-
+    def set_neumann_bc(self,gD):
+        p = self.p
+        mesh = self.mesh
+        isbdFace = mesh.boundary_face_flag()
+        edge2dof = self.dof.edge_to_dof()[isbdFace]
+        fm = mesh.entity_measure('face')[isbdFace]
+        gdof = self.number_of_global_dofs()
+       
+        qf = self.mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bphi = self.edge_basis(bcs,index=isbdFace)
+        points = mesh.bc_to_point(bcs)[isbdFace]
+        t = mesh.edge_unit_tangent()[isbdFace]
+        hval = gD(points,t)
+        vec = bm.zeros(gdof, dtype=self.ftype)
+        vec[edge2dof] = bm.einsum('eqg, eqlg,q,e->el', hval, bphi,ws,fm) # (NE, ldof)
+        return vec
+    
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
-        """
-        @brief 设置Dirichlet边界条件, 本质上是将边界自由度的值设置为精确解的值
-        """
         p = self.p
         mesh = self.mesh
         ldof = p+1
         gdof = self.number_of_global_dofs()
        
-        if type(threshold) is bm.ndarray:
+        if type(threshold) is bm.array:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_edge_index()
+            index = self.mesh.boundary_face_index()
 
         edge2dof = self.dof.edge_to_dof()[index]
-        e2v = self.edge_dof_vector(index=index) #(NE, p+1, 2)
+        e2v = self.edge_dof_vector(index=index) #(NE, p+1, 3)
 
-        bcs = self.lspace.multi_index_matrix[1](p)/p
-        point = mesh.bc_to_point(bcs, index=index)#(NE, p+1, GD)
+        bcs = self.mesh.multi_index_matrix(p, 1)/p
+        point = mesh.bc_to_point(bcs, index=index)
+        gval = gD(point,e2v) #(NE, p+1, 3)
+        #uh[edge2dof] = bm.sum(gval*e2v, axis=-1)
+        uh[edge2dof] = gval
 
-        t = mesh.edge_unit_tangent(index=index)
-        gval = gD(point, t)[..., None]*t
-
-        uh[edge2dof] = bm.sum(gval.swapaxes(0, 1)*e2v, axis=-1)
-
-        isDDof = bm.zeros(gdof, dtype=bm.bool_)
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
-        return isDDof
+        return uh,isDDof
+
+    boundary_interpolate = set_dirichlet_bc
 
 

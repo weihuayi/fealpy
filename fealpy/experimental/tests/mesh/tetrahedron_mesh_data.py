@@ -1782,7 +1782,8 @@ from_one_tetrahedron_data  = [
         "NN": 4,
         "NE": 6,
         "NF": 4,
-        "NC": 1
+        "NC": 1,
+        "direction":np.array([[0.70710678,0.40824829,0.28867513]],dtype=np.float64)
     },
     {
         "meshtype": 'iso',
@@ -1803,7 +1804,8 @@ from_one_tetrahedron_data  = [
         "NN": 4,
         "NE": 6,
         "NF": 4,
-        "NC": 1
+        "NC": 1,
+        "direction":np.array([[1,1,1]],dtype=np.float64)
     },
 ]
 face_to_edge_sign_data = [
