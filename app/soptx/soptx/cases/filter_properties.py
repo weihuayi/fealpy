@@ -1,4 +1,4 @@
-from ..utilfunc.filter_parameters import compute_filter_2d, compute_filter_3d
+from ..utilfs.filter_parameters import compute_filter_2d, compute_filter_3d
 from builtins import int, float
 
 class FilterProperties:
