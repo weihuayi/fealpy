@@ -68,9 +68,9 @@ class OCAlg(Optimizer):
         volume_constraint = objective.volume_constraint
         filter_properties = objective.filter_properties
 
-        tmr = timer("OC Algorithm")
-        next(tmr)
-        # tmr = None
+        # tmr = timer("OC Algorithm")
+        # next(tmr)
+        tmr = None
 
         for loop in range(max_iters):
             start_time = time()

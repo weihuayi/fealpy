@@ -9,7 +9,7 @@ from fealpy.experimental.sparse import COOTensor
 
 from fealpy.experimental.solver import cg
 
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, cg
 from scipy.sparse import csr_matrix
 
 from app.soptx.soptx.utilfs.timer import timer
@@ -108,26 +108,35 @@ class FEMSolver:
             TensorLike: The displacement vector.
         """
 
-        tmr = timer("FEM Solver")
-        next(tmr)
+        # tmr = timer("FEM Solver")
+        # next(tmr)
+        tmr = None
 
         K0 = self.assemble_stiffness_matrix()
+
         if tmr:
             tmr.send('Assemble Stiffness Matrix')
 
         F0 = self.assemble_force_vector()
-        if tmr:
-            tmr.send('Assemble Force Vector')
+        # if tmr:
+        #     tmr.send('Assemble Force Vector')
         
         K, F = self.apply_boundary_conditions(K=K0, F=F0)
         if tmr:
             tmr.send('Apply Boundary Conditions')
+
+        K = K.tocsr()
+        # if tmr:
+        #     tmr.send('Convert to CSR') 
         
         uh = self.tensor_space.function()
-        if tmr:
-            tmr.send('Initialize Displacement Vector')
+        # if tmr:
+        #     tmr.send('Initialize Displacement Vector')
         
         if solver_method == 'cg':
+            # K = K.to_scipy()
+            # uh_values, info = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+            # uh[:] = uh_values
             uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
             if tmr:
                 tmr.send('Solve System with CG')
@@ -136,8 +145,11 @@ class FEMSolver:
             raise NotImplementedError("Direct solver using MUMPS is not implemented.")
         
         elif solver_method == 'spsolve':
-            pass
-        
+            K = K.to_scipy()
+            uh[:] = spsolve(K, F)
+            if tmr:
+                tmr.send('Solve System with spsolve')
+
         else:
             raise ValueError(f"Unsupported solver method: {solver_method}")
         

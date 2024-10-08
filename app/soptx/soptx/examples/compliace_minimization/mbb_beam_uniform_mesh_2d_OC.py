@@ -30,6 +30,10 @@ parser.add_argument('--degree',
                     default=1, type=int,
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
+parser.add_argument('--solver_method',
+                    default='spsolve', type=str,
+                    help='求解器类型, 默认为 cg.')
+
 parser.add_argument('--filter_type', 
                     default='sensitivity', type=str, 
                     help='滤波器类型, 默认为密度滤波器.')
@@ -83,7 +87,7 @@ material_properties = ElasticMaterialProperties(
 volume_constraint = VolumeConstraint(mesh=mesh,
                                     volfrac=args.volfrac,
                                     filter_type=args.filter_type,
-                                    filter_rmin=args_group['filter_rmin'])
+                                    filter_rmin=args_group['filter_rmin']) 
 
 compliance_objective = ComplianceObjective(
     mesh=mesh,
@@ -94,7 +98,7 @@ compliance_objective = ComplianceObjective(
     filter_type=args.filter_type,
     filter_rmin=args_group['filter_rmin'],
     pde=pde,
-    solver_method='spsolve', 
+    solver_method=args.solver_method, 
     volume_constraint=volume_constraint
 )
 

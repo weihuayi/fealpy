@@ -140,9 +140,9 @@ class ComplianceObjective(Objective):
         Returns:
             float: Compliance value.
         """
-        tmr = timer("Compliance Objective")
-        next(tmr)
-        # tmr = None
+        # tmr = timer("Compliance Objective")
+        # next(tmr)
+        tmr = None
 
         material_properties = self.material_properties
         displacement_solver = self.displacement_solver
