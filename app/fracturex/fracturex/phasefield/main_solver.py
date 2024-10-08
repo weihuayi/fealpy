@@ -187,7 +187,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
 
-        du = cg(A, R, atol=1e-14)
+        du = cg(A.tocsr(), R, atol=1e-14)
         uh += du.flatten()[:]
         self.uh = uh
         
@@ -212,7 +212,7 @@ class MainSolver:
         tmr.send('start')
 
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(Gc * l0, q=self.q))
+        dbform.add_integrator(ScalarDiffusionIntegrator(Gc * l0, q=self.q, method='fast'))
         dbform.add_integrator(ScalarMassIntegrator(Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef, q=self.q))
         A = dbform.assembly()
@@ -227,7 +227,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        dd = cg(A, R, atol=1e-14)
+        dd = cg(A.tocsr(), R, atol=1e-14)
         d += dd.flatten()[:]
 
         self.d = d
