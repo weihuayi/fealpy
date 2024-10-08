@@ -1,10 +1,19 @@
 from fealpy.experimental.backend import backend_manager as bm
+
 from fealpy.experimental.typing import TensorLike
+
 from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.experimental.fem.bilinear_form import BilinearForm
 from fealpy.experimental.fem import DirichletBC as DBC
 from fealpy.experimental.sparse import COOTensor
+
 from fealpy.experimental.solver import cg
+
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix
+
+from app.soptx.soptx.utilfs.timer import timer
+
 
 class FEMSolver:
     def __init__(self, material_properties, tensor_space, pde):
@@ -35,22 +44,29 @@ class FEMSolver:
         K = bform.assembly()
 
         return K
+    
+    def assemble_force_vector(self):
+        """
+        Assemble the global force vector using the force function.
+        """
+        force = self.pde.force
+        F = self.tensor_space.interpolate(force)
 
-    def apply_boundary_conditions(self):
+        return F
+
+    def apply_boundary_conditions(self, K: TensorLike, F: TensorLike) -> TensorLike:
         """
         Apply boundary conditions to the stiffness matrix and force vector.
         """
-        force = self.pde.force
+        # force = self.pde.force
         dirichlet = self.pde.dirichlet
         is_dirichlet_boundary_face = getattr(self.pde, 'is_dirichlet_boundary_face', None)
         is_dirichlet_boundary_edge = getattr(self.pde, 'is_dirichlet_boundary_edge', None)
         is_dirichlet_boundary_node = getattr(self.pde, 'is_dirichlet_boundary_node', None)
         is_dirichlet_boundary_dof = getattr(self.pde, 'is_dirichlet_boundary_dof', None)
         
-        K = self.assemble_stiffness_matrix()
-        F = self.tensor_space.interpolate(force)
-        # index = bm.nonzero(F)
-        # KFULL = K.to_dense().round(4)
+        # K = self.assemble_stiffness_matrix()
+        # F = self.tensor_space.interpolate(force)
 
         uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), dtype=bm.float64)
 
@@ -92,16 +108,40 @@ class FEMSolver:
             TensorLike: The displacement vector.
         """
 
-        K, F = self.apply_boundary_conditions()
-        uh = self.tensor_space.function()
+        tmr = timer("FEM Solver")
+        next(tmr)
+
+        K0 = self.assemble_stiffness_matrix()
+        if tmr:
+            tmr.send('Assemble Stiffness Matrix')
+
+        F0 = self.assemble_force_vector()
+        if tmr:
+            tmr.send('Assemble Force Vector')
         
-        if K is None or F is None:
-            raise ValueError("Stiffness matrix K or force vector F has not been assembled.")
+        K, F = self.apply_boundary_conditions(K=K0, F=F0)
+        if tmr:
+            tmr.send('Apply Boundary Conditions')
+        
+        uh = self.tensor_space.function()
+        if tmr:
+            tmr.send('Initialize Displacement Vector')
+        
         if solver_method == 'cg':
             uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+            if tmr:
+                tmr.send('Solve System with CG')
+
         elif solver_method == 'mumps':
             raise NotImplementedError("Direct solver using MUMPS is not implemented.")
+        
+        elif solver_method == 'spsolve':
+            pass
+        
         else:
             raise ValueError(f"Unsupported solver method: {solver_method}")
+        
+        if tmr:
+            tmr.send(None)
 
         return uh

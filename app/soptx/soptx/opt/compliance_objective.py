@@ -120,7 +120,8 @@ class ComplianceObjective(Objective):
         Create a FEMSolver instance based on the given solver method.
 
         Args:
-            solver_method (str): The method used to solve the system (e.g., 'mumps' for direct or 'cg' for iterative).
+            solver_method (str): The method used to solve the system
+              (e.g., 'mumps' for direct or 'cg' for iterative).
 
         Returns:
             FEMSolver: An instance of FEMSolver with the specified solving method.
@@ -151,7 +152,7 @@ class ComplianceObjective(Objective):
         if tmr:
             tmr.send('Assign Density')
 
-        uh = displacement_solver.solve(solver_method='cg')
+        uh = displacement_solver.solve(solver_method=self.solver_method)
         if tmr:
             tmr.send('Solve Displacement')
 

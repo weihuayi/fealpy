@@ -4,6 +4,7 @@ from fealpy.experimental.backend import TensorLike as _DT
 from fealpy.experimental.opt.optimizer_base import Optimizer
 
 from app.soptx.soptx.utilfs.timer import timer
+from time import time 
 
 class OCAlg(Optimizer):
     def __init__(self, options) -> None:
@@ -67,37 +68,42 @@ class OCAlg(Optimizer):
         volume_constraint = objective.volume_constraint
         filter_properties = objective.filter_properties
 
-        # tmr = timer("OC Algorithm")
-        # next(tmr)
-        tmr = None
+        tmr = timer("OC Algorithm")
+        next(tmr)
+        # tmr = None
 
         for loop in range(max_iters):
+            start_time = time()
 
             c = objective.fun(rho_phys)
             if tmr:
-                tmr.send('c')
+                tmr.send('compliance')
             dce = objective.jac(rho)
             if tmr:
-                tmr.send('dc')
+                tmr.send('compliance gradient')
 
             g = volume_constraint.fun(rho_phys)
             if tmr:
-                tmr.send('g')
+                tmr.send('volume constraint')
             dge = volume_constraint.jac(rho)
             if tmr:
-                tmr.send('dg')
+                tmr.send('volume constraint gradient')
 
             rho_new, rho_phys[:] = self.update(rho, dce, dge, volume_constraint, filter_properties, mesh)
             if tmr:
-                tmr.send('OC')
+                tmr.send('OC update')
 
             if tmr:
                 tmr.send(None)
             
+            end_time = time()
+            iteration_time = end_time - start_time
+            
             change = bm.max(bm.abs(rho_new - rho))
 
             print(f"Iteration: {loop + 1}, Objective: {c:.3f}, "
-                f"Volume: {bm.mean(rho_phys):.3f}, Change: {change:.3f}")
+                  f"Volume: {bm.mean(rho_phys):.3f}, Change: {change:.3f}, "
+                  f"Iteration Time: {iteration_time:.3f} sec")
 
             if change <= tol_change:
                 print(f"Converged at iteration {loop + 1} with change {change}")

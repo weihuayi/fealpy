@@ -117,13 +117,13 @@ bm.set_backend(args.backend)
 nx, ny, nz = args.nx, args.ny, args.nz
 mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz)
 
-# import matplotlib.pyplot as plt
-# fig = plt.figure()
-# axes = fig.add_subplot(111, projection='3d')
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()
+import matplotlib.pyplot as plt
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True)
+mesh.find_cell(axes, showindex=True)
+plt.show()
 p = args.degree
 
 tmr = timer()

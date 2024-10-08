@@ -31,7 +31,7 @@ parser.add_argument('--degree',
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
 parser.add_argument('--filter_type', 
-                    default='density', type=str, 
+                    default='sensitivity', type=str, 
                     help='滤波器类型, 默认为密度滤波器.')
 
 parser.add_argument('--volfrac', 
@@ -94,14 +94,14 @@ compliance_objective = ComplianceObjective(
     filter_type=args.filter_type,
     filter_rmin=args_group['filter_rmin'],
     pde=pde,
-    solver_method='cg', 
+    solver_method='spsolve', 
     volume_constraint=volume_constraint
 )
 
 options = opt_alg_options(
     x0=material_properties.rho,
     objective=compliance_objective,
-    MaxIters=200,
+    MaxIters=10,
     FunValDiff=0.01
 )
 
