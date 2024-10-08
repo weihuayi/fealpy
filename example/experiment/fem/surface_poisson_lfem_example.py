@@ -16,10 +16,10 @@ from fealpy.experimental.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 from fealpy.experimental.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.experimental.sparse import COOTensor
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
-from scipy.sparse import bmat
 from fealpy.experimental.solver import cg
 #from scipy.sparse.linalg import spsolve
 
@@ -81,7 +81,8 @@ F = lfrom.assembly()
 #tmr.send(f'第{i}次矩阵组装时间')
 
 C = space.integral_basis()
-A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
+A = COOTensor.concat()
+#A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
 F = bm.r_[F, 0]
 
 uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
