@@ -1,6 +1,6 @@
 from ..backend import backend_manager as bm  
 
-from typing import Union, Optional, Sequence, Tuple, Any
+from typing import Union, Optional, Callable, Tuple
 from ..typing import TensorLike, Index, _S, Union, Tuple
 
 from .utils import entitymethod, estr2dim
@@ -829,8 +829,53 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             self.face2cell = self.edge2cell
 
         self.clear() 
-        
+
+    # 界面网格
+    def is_cut_cell(self, phi: Callable, *, eps=1e-10) -> TensorLike:
+        """Return a bool tensor on cells indicating whether each cell is cut
+        by the given function."""
+        from ..geometry.functional import msign
+        cellSign = msign(phi, eps=eps)[self.entity('cell')]
+        dis = bm.max(cellSign, axis=1) - bm.min(cellSign, axis=1)
+        return dis > 2.0 - 1e-8
+
+    def find_interface_node(self, phi: Callable):
+        """Find vertices of cut cells, solve cut points on edges, and generate aux points on special cells.
+
+        Returns:
+            iCellNodeIndex, cutNode, auxNode, isInterfaceCell
+        """
+        from ..geometry.functional import find_cut_point
+
+        NN = self.number_of_nodes()
+        EPS = 0.1 * min(self.h)**2
+
+        node = self.entity('node')
+        cell = self.entity('cell')[:, [0, 2, 3, 1]]
+        phiValue = phi(node)
+        phiValue = bm.set_at(phiValue, bm.abs(phiValue) < EPS, 0.0)
+        phiSign = bm.sign(phiValue)
+
+        # 寻找 cut 点
+        edge = self.entity('edge')
+        cutEdgeIndex = bm.nonzero(phiSign[edge[:, 0]] * phiSign[edge[:, 1]] < 0)[0]
+        e0 = node[edge[cutEdgeIndex, 0]]
+        e1 = node[edge[cutEdgeIndex, 1]]
+        cutNode = find_cut_point(phi, e0, e1)
+        del e0, e1, cutEdgeIndex, edge
+
+        # 界面单元及其顶点
+        isInterfaceCell = self.is_cut_cell(phiValue)
+        isICellNode = bm.zeros(NN, dtype=bm.bool)
+        isICellNode = bm.set_at(isICellNode, cell[isInterfaceCell, :], True)
+        iCellNodeIndex = bm.nonzero(isICellNode)[0]
+
+        # 寻找特殊单元：界面经过两对顶点的单元；构建辅助点：单元重心
+        isSpecialCell = (bm.sum(bm.abs(phiSign[cell]), axis=1) == 2) \
+                        & (bm.sum(phiSign[cell], axis=1) == 0)
+        scell = cell[isSpecialCell, :]
+        auxNode = (node[scell[:, 0], :] + node[scell[:, 2], :]) / 2
+
+        return iCellNodeIndex, cutNode, auxNode, isInterfaceCell
+
 UniformMesh2d.set_ploter('2d')
-
-
-
