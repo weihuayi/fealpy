@@ -1,4 +1,4 @@
-from typing import Union, Optional, Sequence, Tuple, Any
+from typing import Union, Optional, Callable
 
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
@@ -1247,6 +1247,62 @@ class TriangleMesh(SimplexMesh, Plotable):
             return cls(node, cell), U.flatten(), V.flatten()
         else:
             return cls(node, cell)
+
+    ### 界面网格 ###
+    # NOTE: 均匀网格改成作为一个参数传入，避免循环内调用本函数时反复实例化。
+    # 利用网格实体的缓存机制，节约生成实体时的性能消耗。
+    @classmethod
+    def interfacemesh_generator(cls, uniform_mesh_2d, /, phi: Callable[[TensorLike], TensorLike]):
+        """Generate a triangle mesh fitting the interface.
+
+        Parameters:
+            uniform_mesh_2d (UniformMesh2d): A 2d uniform mesh as the background, constant.
+            phi (Callable): A level-set function of the interface.
+
+        Returns:
+            TriangleMesh: The triangle mesh fitting the interface.
+        """
+        from scipy.spatial import Delaunay
+        from .uniform_mesh_2d import UniformMesh2d
+
+        if not isinstance(uniform_mesh_2d, UniformMesh2d):
+            raise TypeError("Only UniformMesh2d is supported.")
+
+        concat = bm.concat
+        mesh = uniform_mesh_2d
+
+        iCellNodeIndex, cutNode, auxNode, isInterfaceCell = mesh.find_interface_node(phi)
+        nonInterfaceCellIndex = bm.nonzero(~isInterfaceCell)[0]
+
+        NN = mesh.number_of_nodes()
+        nonInterfaceCell = mesh.entity('cell')[nonInterfaceCellIndex, :]
+        node = mesh.entity('node')
+
+        interfaceNode = concat(
+            (node[iCellNodeIndex, :], cutNode, auxNode),
+            axis = 0
+        )
+        dt = Delaunay(bm.to_numpy(interfaceNode))
+        tri = bm.from_numpy(dt.simplices) # TODO: tri = bm.device_put(tri, mesh.device)
+        del dt, interfaceNode # 释放内存
+        # 如果 3 个顶点至少有一个是切点（不都在前 NI 个里），则纳入考虑
+        NI = iCellNodeIndex.shape[0]
+        isNecessaryCell = bm.sum(tri < NI, axis=1) != 3
+        tri = tri[isNecessaryCell, :]
+        # 把顶点在 Delaunay 内的编号，转换为整个三角形内的编号
+        interfaceNodeIdx = concat(
+            [bm.astype(iCellNodeIndex, dtype=mesh.itype),
+             NN + bm.arange(cutNode.shape[0] + auxNode.shape[0], dtype=mesh.itype)],
+            axis = 0
+        )
+        tri = interfaceNodeIdx[tri]
+
+        pnode = concat((node, cutNode, auxNode), axis=0)
+        pcell = concat(
+            [nonInterfaceCell[:, [2, 3, 0]], nonInterfaceCell[:, [1, 0, 3]], tri],
+            axis = 0
+        )
+        return cls(pnode, pcell)
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
