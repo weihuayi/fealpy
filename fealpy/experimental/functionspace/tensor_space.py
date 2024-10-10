@@ -119,6 +119,13 @@ class TensorFunctionSpace(FunctionSpace):
 
         if threshold is None:
             scalar_is_bd_dof = scalar_space.is_boundary_dof(threshold)
+
+            if self.dof_priority:
+                is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
+                is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
+            else:
+                is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
+                is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
         else:
             if mesh.geo_dimension() == 2:
                 edge_threshold = threshold[0]
@@ -126,6 +133,10 @@ class TensorFunctionSpace(FunctionSpace):
                 dof_threshold = threshold[2] if len(threshold) > 2 else None
 
                 scalar_is_bd_dof = scalar_space.is_boundary_dof(edge_threshold)
+
+                if edge_threshold is not None:
+                    edge_flags = edge_threshold()
+                    scalar_is_bd_dof = scalar_is_bd_dof & edge_flags
 
                 if node_threshold is not None:
                     node_flags = node_threshold()
@@ -173,68 +184,8 @@ class TensorFunctionSpace(FunctionSpace):
                     dof_flags = dof_threshold()
                     is_bd_dof = is_bd_dof & dof_flags
 
-        # if threshold is None:
-        #     scalar_gdof = scalar_space.number_of_global_dofs()
-        #     scalar_is_bd_dof = scalar_space.is_boundary_dof(threshold)
-
-        #     if self.dof_priority:
-        #         is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
-        #         is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
-        #     else:
-        #         is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
-        #         is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
-
-        # if mesh.geo_dimension() == 2:
-        #     edge_threshold = threshold[0]
-        #     node_threshold = threshold[1] if len(threshold) > 1 else None
-        #     dof_threshold = threshold[2] if len(threshold) > 2 else None
-
-        #     scalar_gdof = scalar_space.number_of_global_dofs()
-        #     scalar_is_bd_dof = scalar_space.is_boundary_dof(edge_threshold)
-
-        #     if node_threshold is not None:
-        #         node_flags = node_threshold()
-        #         scalar_is_bd_dof = scalar_is_bd_dof & node_flags
-
-        #     if self.dof_priority:
-        #         is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
-        #         is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
-        #     else:
-        #         is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
-        #         is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
-
-        #     if dof_threshold is not None:
-        #         dof_flags = dof_threshold()
-        #         is_bd_dof = is_bd_dof &  dof_flags
-        # elif mesh.geo_dimension() == 3:
-        #     face_threshold = threshold[0]
-        #     edge_threshold = threshold[1] if len(threshold) > 2 else None
-        #     node_threshold = threshold[2] if len(threshold) > 3 else None
-        #     dof_threshold = threshold[3] if len(threshold) > 4 else None
-
-        #     scalar_gdof = scalar_space.number_of_global_dofs()
-        #     scalar_is_bd_dof = scalar_space.is_boundary_dof(face_threshold)
-
-        #     if edge_threshold is not None:
-        #         edge_flags = edge_threshold()
-        #         scalar_is_bd_dof = scalar_is_bd_dof & edge_flags
-
-        #     if node_threshold is not None:
-        #         node_flags = node_threshold()
-        #         scalar_is_bd_dof = scalar_is_bd_dof & node_flags
-
-        #     if self.dof_priority:
-        #         is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
-        #         is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
-        #     else:
-        #         is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
-        #         is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
-
-        #     if dof_threshold is not None:
-        #         dof_flags = dof_threshold()
-        #         is_bd_dof = is_bd_dof &  dof_flags
-
         return is_bd_dof.reshape(-1)
+
     
     def boundary_interpolate(self,
         gD: Union[Callable, int, float, TensorLike],

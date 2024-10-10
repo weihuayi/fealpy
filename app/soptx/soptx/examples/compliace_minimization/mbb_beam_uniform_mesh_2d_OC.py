@@ -30,8 +30,12 @@ parser.add_argument('--degree',
                     default=1, type=int,
                     help='Lagrange 有限元空间的次数, 默认为 1.')
 
+parser.add_argument('--solver_method',
+                    default='spsolve', type=str,
+                    help='求解器类型, 默认为 cg.')
+
 parser.add_argument('--filter_type', 
-                    default='density', type=str, 
+                    default='sensitivity', type=str, 
                     help='滤波器类型, 默认为密度滤波器.')
 
 parser.add_argument('--volfrac', 
@@ -59,8 +63,8 @@ nx, ny = args_group['nx'], args_group['ny']
 pde = MBBBeam2dOneData(nx=nx, ny=ny)
 
 extent = [0, nx, 0, ny]
-h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
-origin = [extent[0], extent[2]]
+h = [1.0, 1.0]
+origin = [0.0, 0.0]
 
 mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction='y')
 # import matplotlib.pyplot as plt
@@ -83,7 +87,7 @@ material_properties = ElasticMaterialProperties(
 volume_constraint = VolumeConstraint(mesh=mesh,
                                     volfrac=args.volfrac,
                                     filter_type=args.filter_type,
-                                    filter_rmin=args_group['filter_rmin'])
+                                    filter_rmin=args_group['filter_rmin']) 
 
 compliance_objective = ComplianceObjective(
     mesh=mesh,
@@ -94,14 +98,14 @@ compliance_objective = ComplianceObjective(
     filter_type=args.filter_type,
     filter_rmin=args_group['filter_rmin'],
     pde=pde,
-    solver_method='cg', 
+    solver_method=args.solver_method, 
     volume_constraint=volume_constraint
 )
 
 options = opt_alg_options(
     x0=material_properties.rho,
     objective=compliance_objective,
-    MaxIters=200,
+    MaxIters=10,
     FunValDiff=0.01
 )
 
