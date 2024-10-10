@@ -31,10 +31,11 @@ class BlockForm(Form):
         return self.sparse_shape
 
     def assembly(self, format='coo'):
-        row_offset = bm.cumsum(bm.max(self.block_shape[...,0],axis = 1))
-        col_offset = bm.cumsum(bm.max(self.block_shape[...,1],axis = 0))
-        row_offset = bm.concatenate(([0],row_offset))
-        col_offset = bm.concatenate(([0],col_offset))
+        a = bm.max(self.block_shape[...,0], axis=1)
+        row_offset = bm.cumsum(bm.max(self.block_shape[...,0],axis = 1), axis=0)
+        col_offset = bm.cumsum(bm.max(self.block_shape[...,1],axis = 0), axis=0)
+        row_offset = bm.concatenate((bm.array([0]),row_offset))
+        col_offset = bm.concatenate((bm.array([0]),col_offset))
         
         # type类型处理
         indices = bm.empty((2, 0), dtype=bm.int32)
