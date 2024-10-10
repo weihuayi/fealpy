@@ -122,6 +122,10 @@ pde = BoxDomainPolyUnloaded3d()
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
+test = bm.array([1, 2, 3])
+a = bm.get_device(test)
+bm.device('cuda')
+b = bm.get_device(test)
 nx, ny, nz = args.nx, args.ny, args.nz
 mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz)
 
@@ -138,7 +142,7 @@ tmr = timer("FEM Solver")
 next(tmr)
 
 maxit = 4
-errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
+errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$', 'boundary']
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
@@ -190,15 +194,13 @@ for i in range(maxit):
     tmr.send(None)
 
     u_exact = tensor_space.interpolate(pde.solution)
-    # errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh - u_exact)**2 * (1 / NDof[i])))
+    errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh - u_exact)**2 * (1 / NDof[i])))
     errorMatrix[0, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
-    # errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
-
-    # print("errorMatrix:", errorMatrix)
+    errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
 
     if i < maxit-1:
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
-# print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
-print("order_L2:\n ", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))

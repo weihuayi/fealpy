@@ -74,7 +74,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
                 origin: tuple[float, float] = (0.0, 0.0), 
                 ipoints_ordering='yx', 
                 flip_direction=None, 
-                itype=None, ftype=None):
+                *, itype=None, ftype=None, device=None):
         """
         Initializes a 2D uniform structured mesh.
 
@@ -137,14 +137,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.adjusted_edge_mask = self.get_adjusted_edge_mask()
 
         # Specify the counterclockwise drawing
-        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype, device=device)
 
         self.edge2cell = self.edge_to_cell()
         self.face2cell = self.edge2cell
         self.cell2edge = self.cell_to_edge()
 
         self.localEdge = bm.array([(0, 2), (1, 3), 
-                                   (0, 1), (2, 3)], dtype=self.itype)   
+                                   (0, 1), (2, 3)], dtype=self.itype, device=device)   
 
 
     # 实体生成方法
@@ -153,14 +153,15 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the nodes in a structured mesh.
         """
+        device = self.device
         GD = 2
         nx = self.nx
         ny = self.ny
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
 
-        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
-        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype, device=device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype, device=device)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
 
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
@@ -177,14 +178,15 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the edges in a structured mesh.
         """
+        device = self.device
         nx = self.nx
         ny = self.ny
         NN = self.NN
         NE = self.NE
 
-        idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, dtype=self.itype, device=device).reshape(nx + 1, ny + 1)
 
-        edge = bm.zeros((NE, 2), dtype=self.itype)
+        edge = bm.zeros((NE, 2), dtype=self.itype, device=device)
         NE0 = 0
         NE1 = nx * (ny + 1)
         edge = bm.set_at(edge, (slice(NE0, NE1), 0), idx[:-1, :].reshape(-1))
@@ -204,22 +206,23 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the cells in a structured mesh.
         """
+        device = self.device
         nx = self.nx
         ny = self.ny
 
         NN = self.NN
         NC = self.NC
 
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
 
-        cell = bm.zeros((NC, 4), dtype=self.itype)
+        cell = bm.zeros((NC, 4), dtype=self.itype, device=device)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1
         cell_2 = cell_0 + ny + 1
         cell_3 = cell_2 + 1
-        cell = bm.concatenate([cell_0[:, None], cell_1[:, None], cell_2[:, None], 
-                            cell_3[:, None]], axis=-1)
+        cell = bm.concatenate([cell_0[:, None], cell_1[:, None], 
+                               cell_2[:, None], cell_3[:, None]], axis=-1)
 
         return cell
     
