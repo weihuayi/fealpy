@@ -20,10 +20,14 @@ A = sp.Matrix([[1 + x1**2, 0], [0, 1 + x2**2]])
 A_func = sp.lambdify((x1, x2), A, modules='numpy')
 a = 1
 # 假设输入点是一组 (NC, NQ, 2) 的 numpy 数组
-points = np.random.randn(3, 4, 2)  # 示例数据，假设 (NC, NQ, 2)
+points = np.random.randn(3, 4, 2)
 
 # 第四步：分离x1和x2的值
 x1_vals = points[..., 0]
 x2_vals = points[..., 1]
+
+## 第五步：计算A的值
+A_vals = A_func(x1_vals, x2_vals)
+print(A_vals)
 
 
