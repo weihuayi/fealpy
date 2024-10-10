@@ -14,7 +14,7 @@ class RadiusRatioQuality(MeshCellQuality):
         cell = self.mesh.entity('cell')
         NC = self.mesh.number_of_cells()
 
-        if self.mesh.TD == 2:
+        if self.mesh.top_dimension() == 2:
             localEdge = self.mesh.localEdge
             v = [node[cell[:,j],:] - node[cell[:,i],:] for i,j in localEdge]
             l2 = bm.zeros((NC, 3))
@@ -25,7 +25,7 @@ class RadiusRatioQuality(MeshCellQuality):
             q = l.prod(axis=1)
             area = bm.cross(v[2], -v[1])/2
             quality = p*q/(16*area**2)
-        elif self.mesh.TD == 3:
+        elif self.mesh.top_dimension() == 3:
             s = self.mesh.face_area()
             cell2face = self.mesh.cell_to_face()
             ss = bm.sum(s[cell2face], axis=1)
@@ -61,7 +61,7 @@ class RadiusRatioQuality(MeshCellQuality):
             l = bm.sqrt(l2)
             p = l.sum(axis=1, keepdims=True)
             q = l.prod(axis=1, keepdims=True)
-            mu = area*p*q/16
+            mu = p*q/(16*area**2)
 
             c = mu*(1/(p*l)+1/l2)
             cn = mu/area
@@ -266,7 +266,7 @@ class RadiusRatioQuality(MeshCellQuality):
             l = bm.sqrt(l2)
             p = l.sum(axis=1, keepdims=True)
             q = l.prod(axis=1, keepdims=True)
-            mu = area*p*q/16
+            mu = p*q/(16*area**2)
 
             c = mu*(1/(p*l)+1/l2)
             cn = mu/area
