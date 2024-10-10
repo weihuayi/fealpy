@@ -38,7 +38,7 @@ class FEMSolver:
         """
         integrator = LinearElasticIntegrator(material=self.material_properties, 
                                             q=self.tensor_space.p+3)
-        KE = integrator.assembly(space=self.tensor_space)
+        # KE = integrator.assembly(space=self.tensor_space)
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         K = bform.assembly()
@@ -54,7 +54,7 @@ class FEMSolver:
 
         return F
 
-    def apply_boundary_conditions(self, K: TensorLike, F: TensorLike) -> TensorLike:
+    def apply_boundary_conditions(self, K: COOTensor, F: TensorLike) -> TensorLike:
         """
         Apply boundary conditions to the stiffness matrix and force vector.
         """

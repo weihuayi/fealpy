@@ -107,8 +107,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-        # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
         self.nx = self.extent[1] - self.extent[0]
         self.ny = self.extent[3] - self.extent[2]
         self.NN = (self.nx + 1) * (self.ny + 1)
@@ -137,14 +135,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.adjusted_edge_mask = self.get_adjusted_edge_mask()
 
         # Specify the counterclockwise drawing
-        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype, device=device)
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
 
         self.edge2cell = self.edge_to_cell()
         self.face2cell = self.edge2cell
         self.cell2edge = self.cell_to_edge()
 
         self.localEdge = bm.array([(0, 2), (1, 3), 
-                                   (0, 1), (2, 3)], dtype=self.itype, device=device)   
+                                   (0, 1), (2, 3)], dtype=self.itype)   
 
 
     # 实体生成方法
@@ -206,16 +204,16 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the cells in a structured mesh.
         """
-        device = self.device
+        # device = self.device
         nx = self.nx
         ny = self.ny
 
         NN = self.NN
         NC = self.NC
 
-        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN).reshape(nx + 1, ny + 1)
 
-        cell = bm.zeros((NC, 4), dtype=self.itype, device=device)
+        cell = bm.zeros((NC, 4), dtype=self.itype)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1

@@ -34,20 +34,16 @@ class VolumeConstraint(Constraint):
     def _create_filter_properties(self, filter_type: Union[int, str], filter_rmin: float) -> FilterProperties:
         """
         Create a FilterProperties instance based on the given filter type and radius.
-
-        Args:
-            filter_type (Union[int, str]): Type of the filter (either 'density', 'sensitivity', 0, or 1).
-            filter_rmin (float): Filter radius.
-
-        Returns:
-            FilterProperties: An instance of FilterProperties.
         """
         if filter_type == 'density' or filter_type == 0:
             ft = 0
         elif filter_type == 'sensitivity' or filter_type == 1:
             ft = 1
+        elif filter_type == 'heaviside' or filter_type == 2:
+            ft = 2
         else:
-            raise ValueError("Invalid filter type. Use 'density', 'sensitivity', 0, or 1.")
+            raise ValueError("Invalid filter type. \
+                            Use 'density', 'sensitivity', 'heaviside', 0, 1, or 2.")
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 

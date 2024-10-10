@@ -157,7 +157,7 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send('source assembly')
 
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64)
+    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=mesh.device)
     uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
 
     F = F - K.matmul(uh_bd)

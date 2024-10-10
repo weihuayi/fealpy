@@ -35,8 +35,10 @@ parser.add_argument('--solver_method',
                     help='求解器类型, 默认为 cg.')
 
 parser.add_argument('--filter_type', 
-                    default='sensitivity', type=str, 
-                    help='滤波器类型, 默认为密度滤波器.')
+                    choices=['density', 'sensitivity', 'heaviside'], 
+                    default='heaviside', type=str, 
+                    help='Filter type, can choose sensitivity filter, density filter, \
+                        and Heaviside projection filter. Default is Heaviside filter.')
 
 parser.add_argument('--volfrac', 
                     default=0.5, type=float, 
@@ -105,7 +107,7 @@ compliance_objective = ComplianceObjective(
 options = opt_alg_options(
     x0=material_properties.rho,
     objective=compliance_objective,
-    MaxIters=10,
+    MaxIters=500,
     FunValDiff=0.01
 )
 
