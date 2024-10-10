@@ -14,6 +14,14 @@ from .base import (
 )
 
 
+def _remove_device(func):
+    def wrapper(*args, **kwargs):
+        if 'device' in kwargs:
+            kwargs.pop('device')
+        return func(*args, **kwargs)
+    return wrapper
+
+
 class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     DATA_CLASS = np.ndarray
 
@@ -55,6 +63,22 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
     def tolist(tensor: NDArray, /): return tensor.tolist()
 
     ### Creation functions ###
+    if np.__version__ < '2.0.0':
+        arange = staticmethod(_remove_device(np.arange))
+        asarray = staticmethod(_remove_device(np.asarray))
+        empty = staticmethod(_remove_device(np.empty))
+        empty_like = staticmethod(_remove_device(np.empty_like))
+        eye = staticmethod(_remove_device(np.eye))
+        full = staticmethod(_remove_device(np.full))
+        full_like = staticmethod(_remove_device(np.full_like))
+        linspace = staticmethod(_remove_device(np.linspace))
+        ones = staticmethod(_remove_device(np.ones))
+        ones_like = staticmethod(_remove_device(np.ones_like))
+        zeros = staticmethod(_remove_device(np.zeros))
+        zeros_like = staticmethod(_remove_device(np.zeros_like))
+
+        array = staticmethod(_remove_device(np.array))
+        tensor = staticmethod(_remove_device(np.array))
 
     ### Data Type Functions ###
 
