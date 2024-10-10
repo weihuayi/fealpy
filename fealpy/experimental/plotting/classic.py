@@ -67,6 +67,8 @@ class MeshPloter(Generic[_MT]):
             colorbar = False,             # show color bar if True
             colorbarshrink = 1.0,         # colorbarshrink
             cmap = 'jet',                 # color map
+            cmax = None,
+            cmin = None,
             shownode = True,              # show nodes in 1-d, 3-d mesh if True
             showedge = False,             # show edges in 3-d mesh if True
 

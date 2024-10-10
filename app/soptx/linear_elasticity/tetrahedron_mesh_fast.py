@@ -1,7 +1,7 @@
 from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.typing import TensorLike
 from fealpy.experimental.decorator import cartesian
-from fealpy.experimental.mesh import HexahedronMesh
+from fealpy.experimental.mesh import TetrahedronMesh
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.experimental.fem.vector_source_integrator import VectorSourceIntegrator
@@ -92,7 +92,7 @@ class BoxDomainPolyLoaded3d():
 
         return bm.zeros(points.shape, dtype=points.dtype)
 
-parser = argparse.ArgumentParser(description="HexahedronMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
+parser = argparse.ArgumentParser(description="TetrahedronMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
 parser.add_argument('--backend', 
                     default='numpy', type=str,
                     help='指定计算的后端类型, 默认为 numpy.')
@@ -115,7 +115,7 @@ args = parser.parse_args()
 
 bm.set_backend(args.backend)
 nx, ny, nz = args.nx, args.ny, args.nz
-mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz)
+mesh = TetrahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz)
 
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
@@ -141,9 +141,10 @@ for i in range(maxit):
     linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
                                                 lame_lambda=1, shear_modulus=1, 
                                                 hypo='3D')
-    integrator = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
+    integrator = LinearElasticIntegrator(material=linear_elastic_material, 
+                                        q=tensor_space.p+3, method='fast_3d')
     next(tmr)
-    KE = integrator.assembly(space=tensor_space)
+    KE = integrator.fast_assembly(space=tensor_space)
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator)
 

@@ -27,6 +27,14 @@ class TensorLike(metaclass=ABCMeta):
 
     def __len__(self) -> int: raise NotImplementedError
     def __getitem__(self, index: Any) -> 'TensorLike': raise NotImplementedError
+    def __eq__(self, other: Any) -> 'TensorLike': raise NotImplementedError
+    def __ne__(self, other: Any) -> 'TensorLike': raise NotImplementedError
+    def __add__(self, other: Any) -> 'TensorLike': raise NotImplementedError
+    def __sub__(self, other: Any) -> 'TensorLike': raise NotImplementedError
+    def __mul__(self, other: Any) -> 'TensorLike': raise NotImplementedError
+    def __truediv__(self, other: Any) -> 'TensorLike': raise NotImplementedError
+    def __matmul__(self, other: 'TensorLike') -> 'TensorLike': raise NotImplementedError
+    def __pow__(self, other: Any) -> 'TensorLike': raise NotImplementedError
     @overload
     def reshape(self, newshape: Size, /) -> 'TensorLike': raise NotImplementedError
     @overload

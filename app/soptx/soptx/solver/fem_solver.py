@@ -65,8 +65,7 @@ class FEMSolver:
             thresholds.append(is_dirichlet_boundary_dof)
 
         if thresholds:
-            uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_bd,
-                                                                    threshold=tuple(thresholds))
+            uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, uh=uh_bd, threshold=tuple(thresholds))
 
         F = F - K.matmul(uh_bd)
         F[isDDof] = uh_bd[isDDof]

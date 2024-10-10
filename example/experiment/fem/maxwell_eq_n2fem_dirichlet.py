@@ -10,8 +10,8 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 
 from fealpy.experimental.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace2d
-from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace3d
+from fealpy.experimental.functionspace import SecondNedelecFiniteElementSpace2d
+from fealpy.experimental.functionspace import SecondNedelecFiniteElementSpace3d
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
 
@@ -87,8 +87,10 @@ parser.add_argument('--maxit',
 
 args = parser.parse_args()
 p = args.degree
-maxit = args.maxit
-dim = args.dim
+#maxit = args.maxit
+maxit = 3
+#dim = args.dim
+dim = 3
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -109,17 +111,17 @@ tmr = timer()
 next(tmr)
 
 ps = [2, 3, 4]
-#ps = [1]
+#ps = [5]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
 
         if dim == 2:
             mesh = TriangleMesh.from_box(pde.domain(), nx=2**i, ny=2**i) 
-            space = FirstNedelecFiniteElementSpace2d(mesh, p=p)
+            space = SecondNedelecFiniteElementSpace2d(mesh, p=p)
         else:
             mesh = TetrahedronMesh.from_box(pde.domain(), nx=2**i, ny=2**i, nz=2**i)
-            space = FirstNedelecFiniteElementSpace3d(mesh, p=p)
+            space = SecondNedelecFiniteElementSpace3d(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
         gdof = space.dof.number_of_global_dofs()
@@ -136,10 +138,11 @@ for j, p in enumerate(ps):
         F = lform.assembly()
         tmr.send(f'第{i}次向量组装时间')
 
-        # Neumann 边界条件
+        # Dirichlet 边界条件
         Eh = space.function()
-        F = F + space.set_neumann_bc(pde.neumann)
-        tmr.send(f'第{i}次边界条件处理时间')
+        bc = DirichletBC(space, pde.dirichlet)
+        A, F = bc.apply(A, F)
+        tmr.send(f'第{i}次边界处理时间')
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
         Eh[:] = bm.tensor(Solve(A, F))
@@ -155,3 +158,4 @@ next(tmr)
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
 plt.show()
+

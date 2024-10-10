@@ -66,7 +66,7 @@ class MeshDS(metaclass=MeshMeta):
     ### properties
     def top_dimension(self) -> int: return self.TD
     @property
-    def device(self) -> Any: return bm.device_type(self.cell)
+    def device(self) -> Any: return bm.get_device(self.cell)
     def storage(self) -> Dict[int, TensorLike]:
         return self._entity_storage
 
@@ -171,6 +171,15 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell[index]
         return face2cell
 
+    def cell_to_cell(self):
+        NC = self.number_of_cells()
+        face2cell = self.face2cell
+        NFC = self.number_of_faces_of_cells()
+        cell2cell = bm.zeros((NC, NFC), dtype=self.itype)
+        cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
+        cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
+        return cell2cell
+
     ### boundary
     def boundary_node_flag(self) -> TensorLike:
         """Return a boolean tensor indicating the boundary nodes.
@@ -261,8 +270,12 @@ class MeshDS(metaclass=MeshMeta):
 
         NC = self.number_of_cells()
         NFC = self.number_of_faces_of_cells()
-        self.cell2face = j.reshape(NC, NFC)
-        self.face2cell = bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1)
+        self.cell2face = bm.astype(j.reshape(NC, NFC), self.itype)
+        self.face2cell = bm.astype(
+            bm.stack([i0//NFC, i1//NFC, i0%NFC, i1%NFC], axis=-1),
+            self.itype
+        )
+        # NOTE: dtype must be specified here, as these tensors are the results of unique.
 
         if self.TD == 3:
             NEC = self.number_of_edges_of_cells()
@@ -275,7 +288,7 @@ class MeshDS(metaclass=MeshMeta):
                 axis=0
             )
             self.edge = totalEdge[i2, :]
-            self.cell2edge = j.reshape(NC, NEC)
+            self.cell2edge = bm.astype(j.reshape(NC, NEC), self.itype)
 
         elif self.TD == 2:
             self.edge2cell = self.face2cell

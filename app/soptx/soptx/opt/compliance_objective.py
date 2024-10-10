@@ -14,13 +14,15 @@ from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
 
 from app.soptx.soptx.solver.fem_solver import FEMSolver
 
-from app.soptx.soptx.utilfunc.calculate_ke0 import calculate_ke0
+from app.soptx.soptx.utilfs.calculate_ke0 import calculate_ke0
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
+
+from app.soptx.soptx.utilfs.timer import timer
 
 class ComplianceObjective(Objective):
     """
@@ -64,6 +66,7 @@ class ComplianceObjective(Objective):
 
         self.ke0 = calculate_ke0(material_properties=self.material_properties, 
                                 tensor_space=self.space)
+        
 
     def _create_function_space(self, degree: int, 
                             dof_per_node: int, dof_ordering: str) -> TensorFunctionSpace:
@@ -136,24 +139,42 @@ class ComplianceObjective(Objective):
         Returns:
             float: Compliance value.
         """
-        
+        tmr = timer("Compliance Objective")
+        next(tmr)
+        # tmr = None
+
         material_properties = self.material_properties
         displacement_solver = self.displacement_solver
         ke0 = self.ke0
 
         material_properties.rho = rho
+        if tmr:
+            tmr.send('Assign Density')
 
         uh = displacement_solver.solve(solver_method='cg')
+        if tmr:
+            tmr.send('Solve Displacement')
+
         cell2ldof = self.space.cell_to_dof()
         uhe = uh[cell2ldof]
+        if tmr:
+            tmr.send('Extract Element Displacements')
 
         ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
-
         self.ce = ce
+        if tmr:
+            tmr.send('Compute Element Compliance')
 
         E = self.material_properties.material_model()
+        if tmr:
+            tmr.send('Compute Material Model')
 
         c = bm.einsum('c, c -> ', E, ce)
+        if tmr:
+            tmr.send('Compute Compliance Value')
+
+        if tmr:
+            tmr.send(None)
         
         return c
     
