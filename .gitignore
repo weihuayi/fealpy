@@ -64,3 +64,4 @@ __pycache__
 .mypy_cache/
 *.so
 tags
+.idea

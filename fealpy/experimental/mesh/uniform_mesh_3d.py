@@ -72,9 +72,31 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     * Edge numbering rule: first in the z direction, then in the y direction, and then in the x direction
     * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
     """
-    def __init__(self, extent=(0, 1, 0, 1, 0, 1), h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0), 
-                ipoints_ordering='zyx', flip_direction=None, 
-                itype=None, ftype=None):
+    def __init__(self, extent: tuple[int, int, int, int, int, int] = (0, 1, 0, 1, 0, 1), 
+             h: tuple[float, float, float] = (1.0, 1.0, 1.0), 
+             origin: tuple[float, float, float] = (0.0, 0.0, 0.0), 
+             ipoints_ordering='zyx', 
+             flip_direction=None, 
+             itype=None, ftype=None):
+        """
+        Initializes a 3D uniform structured mesh.
+
+        Parameters:
+        extent : tuple of int
+            Defines the number of cells in the mesh divisions.
+        h : tuple of float, optional
+            Defines the step size in the x, y, and z directions.
+        origin : tuple of float, optional
+            Specifies the coordinates of the origin of the mesh. 
+        ipoints_ordering : str, optional
+            Specifies the ordering of interpolation points in the mesh. 
+        flip_direction : str or None, optional
+            Specifies whether to flip the direction of node numbering.
+        itype : data type, optional
+            Data type for integer values used in the mesh. Default is None, which is assigned as bm.int32.
+        ftype : data type, optional
+            Data type for floating-point values used in the mesh. Default is None, which is assigned as bm.float64.
+        """
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -87,12 +109,12 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-        self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
-        self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
-        # self.nx = self.extent[1] - self.extent[0]
-        # self.ny = self.extent[3] - self.extent[2]
-        # self.nz = self.extent[5] - self.extent[4]
+        # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+        # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+        # self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
+        self.nx = self.extent[1] - self.extent[0]
+        self.ny = self.extent[3] - self.extent[2]
+        self.nz = self.extent[5] - self.extent[4]
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
         self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \
                 (self.nx + 1) * self.ny * (self.nz + 1) + \
@@ -116,7 +138,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             raise ValueError("The ipoints_ordering parameter must be either 'zyx' or 'nefc'")
         self.ipoints_ordering = ipoints_ordering
 
-        # 是否翻转
+        # Whether to flip
         self.flip_direction = flip_direction
 
         # Initialize face adjustment mask
@@ -1256,23 +1278,23 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
     def uniform_refine(self, n: int=1):
         """
-        @brief Uniformly refine the 3D structured mesh.
+        @brief Uniformly refine the 2D structured mesh.
 
         Note:
-        clear method is used at the end to clear the cache of entities. This is necessary because even after refinement, 
-        the entities remain the same as before refinement due to the caching mechanism.
-        Structured mesh have their own entity generation methods, so the cache needs to be manually cleared.
-        Unstructured mesh do not require this because they do not have entity generation methods.
+        The clear method is used at the end to clear the cache of entities. 
+        This is necessary because the entities remain the same as before refinement due to caching.
+        Structured meshes have their own entity generation methods, so the cache needs to be manually cleared.
+        Unstructured meshes do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            # self.extent = [i * 2 for i in self.extent]
+            self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
-            self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-            self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
-            self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
-            # self.nx = self.extent[1] - self.extent[0]
-            # self.ny = self.extent[3] - self.extent[2]
-            # self.nz = self.extent[5] - self.extent[4]
+            # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+            # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+            # self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+            self.nz = self.extent[5] - self.extent[4]
 
             self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
             self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \

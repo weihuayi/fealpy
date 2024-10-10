@@ -68,9 +68,6 @@ class VolumeConstraint(Constraint):
                 a feasible design, and a negative value indicates a violation of 
                 the volume constraint.
         """
-        H = self.filter_properties.H
-        Hs = self.filter_properties.Hs
-        ft = self.filter_properties.ft
 
         NC = self.mesh.number_of_cells()
         cell_measure = self.mesh.entity_measure('cell')
@@ -78,11 +75,6 @@ class VolumeConstraint(Constraint):
         volfrac_true = bm.einsum('c, c -> ', cell_measure, rho[:]) / bm.sum(cell_measure)
         gneq = (volfrac_true - self.volfrac) * NC
         # gneq = bm.sum(rho_phys[:]) - self.volfrac * NC
-
-        # if ft == 0:
-        #     rho_phys = H.matmul(rho[:] * cell_measure) / H.matmul(cell_measure)
-        # elif ft == 1:
-        #     rho_phys = rho
         
         return gneq
 
