@@ -63,8 +63,8 @@ nx, ny = args_group['nx'], args_group['ny']
 pde = MBBBeam2dOneData(nx=nx, ny=ny)
 
 extent = [0, nx, 0, ny]
-h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
-origin = [extent[0], extent[2]]
+h = [1.0, 1.0]
+origin = [0.0, 0.0]
 
 mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction='y')
 # import matplotlib.pyplot as plt

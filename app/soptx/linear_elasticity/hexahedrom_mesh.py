@@ -1,19 +1,27 @@
 from fealpy.experimental.backend import backend_manager as bm
+
 from fealpy.experimental.typing import TensorLike
+
 from fealpy.experimental.decorator import cartesian
+
 from fealpy.experimental.mesh import HexahedronMesh
+
 from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+
+from fealpy.experimental.material.elastic_material import LinearElasticMaterial
+
 from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.experimental.fem.vector_source_integrator import VectorSourceIntegrator
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
 from fealpy.experimental.fem.bilinear_form import BilinearForm
 from fealpy.experimental.fem.linear_form import LinearForm
+
 from fealpy.experimental.decorator import cartesian
 
 from fealpy.experimental.sparse import COOTensor
+
 from fealpy.experimental.solver import cg
 
-from fealpy.utils import timer
+from app.soptx.soptx.utilfs.timer import timer
 
 import argparse
 
@@ -97,7 +105,7 @@ parser.add_argument('--backend',
                     default='numpy', type=str,
                     help='指定计算的后端类型, 默认为 numpy.')
 parser.add_argument('--degree', 
-                    default=2, type=int, 
+                    default=1, type=int, 
                     help='Lagrange 有限元空间的次数, 默认为 1 次.')
 parser.add_argument('--nx', 
                     default=2, type=int, 
@@ -117,23 +125,23 @@ bm.set_backend(args.backend)
 nx, ny, nz = args.nx, args.ny, args.nz
 mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz)
 
-import matplotlib.pyplot as plt
-fig = plt.figure()
-axes = fig.add_subplot(111, projection='3d')
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
-plt.show()
+# import matplotlib.pyplot as plt
+# fig = plt.figure()
+# axes = fig.add_subplot(111, projection='3d')
+# mesh.add_plot(axes)
+# mesh.find_node(axes, showindex=True)
+# mesh.find_cell(axes, showindex=True)
+# plt.show()
 p = args.degree
 
-tmr = timer()
+tmr = timer("FEM Solver")
+next(tmr)
 
 maxit = 4
-errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
+errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$', 'boundary']
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
-
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
     NDof[i] = tensor_space.number_of_global_dofs()
@@ -141,20 +149,19 @@ for i in range(maxit):
     linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
                                                 lame_lambda=1, shear_modulus=1, 
                                                 hypo='3D')
-    integrator = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
-    next(tmr)
-    KE = integrator.assembly(space=tensor_space)
+    tmr.send('material')
+
+    integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
     bform = BilinearForm(tensor_space)
-    bform.add_integrator(integrator)
+    bform.add_integrator(integrator_K)
+    K = bform.assembly()
+    tmr.send('stiffness assembly')
 
     integrator_F = VectorSourceIntegrator(source=pde.source, q=tensor_space.p+3)
     lform = LinearForm(tensor_space)    
     lform.add_integrator(integrator_F)
-    tmr.send('forms')
-
-    K = bform.assembly()
     F = lform.assembly()
-    tmr.send('assembly')
+    tmr.send('source assembly')
 
     uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64)
     uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
@@ -173,23 +180,25 @@ for i in range(maxit):
     one_indices = bm.stack([index, index], axis=0)
     K1 = COOTensor(one_indices, one_values, K.sparse_shape)
     K = K.add(K1).coalesce()
-    tmr.send('dirichlet')
+    tmr.send('boundary')
 
     uh = tensor_space.function()
+    K = K.tocsr()
     uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
     tmr.send('solve(cg)')
-    next(tmr)
+    
+    tmr.send(None)
 
     u_exact = tensor_space.interpolate(pde.solution)
-    errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh - u_exact)**2 * (1 / NDof[i])))
-    errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
-    errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
+    # errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh - u_exact)**2 * (1 / NDof[i])))
+    errorMatrix[0, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
+    # errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
 
-    print("errorMatrix:", errorMatrix)
+    # print("errorMatrix:", errorMatrix)
 
     if i < maxit-1:
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
-print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
-print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
+# print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_L2:\n ", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
