@@ -6,11 +6,12 @@ from ..functionspace import FunctionSpace as _FS
 from .integrator import Integrator
 
 from .. import logger
+from abc import ABC
 
 _I = TypeVar('_IT', bound=Integrator)
 
 
-class Form(Generic[_I]):
+class Form(Generic[_I], ABC):
     _spaces: Tuple[_FS, ...]
     integrators: Dict[str, Tuple[_I, ...]]
     memory: Dict[str, Tuple[TensorLike, List[TensorLike]]]

@@ -22,7 +22,7 @@ logger.setLevel('ERROR') #积分子问题
 
 bm.set_backend("numpy")
 pde = example_1()
-n = 40
+n = 10
 q = 4
 T = 1
 nt = 30

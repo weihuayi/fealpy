@@ -63,3 +63,5 @@ __pycache__
 *.pkl
 .mypy_cache/
 *.so
+tags
+.idea
