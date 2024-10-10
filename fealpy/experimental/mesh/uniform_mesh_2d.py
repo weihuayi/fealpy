@@ -1,12 +1,14 @@
 from ..backend import backend_manager as bm  
 
-from typing import Union, Optional, Sequence, Tuple, Any
+from typing import Union, Optional, Callable, Tuple
 from ..typing import TensorLike, Index, _S, Union, Tuple
 
 from .utils import entitymethod, estr2dim
 
 from .mesh_base import StructuredMesh, TensorMesh
 from .plot import Plotable
+
+from builtins import tuple, int , float
 
 class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     """
@@ -67,8 +69,32 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     """
 
-    def __init__(self, extent = (0, 1, 0, 1), h = (1.0, 1.0), origin = (0.0, 0.0), 
-                ipoints_ordering='yx', flip_direction=None, itype=None, ftype=None):
+    def __init__(self, extent: tuple[int, int, int, int] = (0, 1, 0, 1), 
+                h: tuple[float, float] = (1.0, 1.0), 
+                origin: tuple[float, float] = (0.0, 0.0), 
+                ipoints_ordering='yx', 
+                flip_direction=None, 
+                itype=None, ftype=None):
+        """
+        Initializes a 2D uniform structured mesh.
+
+        Parameters:
+        extent : tuple of int
+            Defines the number of cells in the mesh divisions.
+        h : tuple of float, optional
+            Defines the step size in the x and y directions.
+        origin : tuple of float, optional
+            Specifies the coordinates of the origin of the mesh. 
+        ipoints_ordering : str, optional
+            Specifies the ordering of interpolation points in the mesh. 
+        flip_direction : str or None, optional
+            Specifies whether to flip the direction of node numbering.
+        itype : data type, optional
+            Data type for integer values used in the mesh. Default is None, which is assigned as bm.int32.
+        ftype : data type, optional
+            Data type for floating-point values used in the mesh. Default is None, which is assigned as bm.float64.
+        """
+            
         if itype is None:
             itype = bm.int32
         if ftype is None:
@@ -81,8 +107,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-        self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+        # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+        # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+        self.nx = self.extent[1] - self.extent[0]
+        self.ny = self.extent[3] - self.extent[2]
         self.NN = (self.nx + 1) * (self.ny + 1)
         self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
         self.NF = self.NE
@@ -102,7 +130,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             raise ValueError("The ipoints_ordering parameter must be either 'yx' or 'nec'")
         self.ipoints_ordering = ipoints_ordering
 
-        # 是否翻转
+        # Whether to flip
         self.flip_direction = flip_direction
 
         # Initialize edge adjustment mask
@@ -808,16 +836,18 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         @brief Uniformly refine the 2D structured mesh.
 
         Note:
-        clear method is used at the end to clear the cache of entities. This is necessary because even after refinement, 
-        the entities remain the same as before refinement due to the caching mechanism.
-        Structured mesh have their own entity generation methods, so the cache needs to be manually cleared.
-        Unstructured mesh do not require this because they do not have entity generation methods.
+        The clear method is used at the end to clear the cache of entities. 
+        This is necessary because the entities remain the same as before refinement due to caching.
+        Structured meshes have their own entity generation methods, so the cache needs to be manually cleared.
+        Unstructured meshes do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            # self.extent = [i * 2 for i in self.extent]
+            self.extent = [i * 2 for i in self.extent]
             self.h = [h / 2.0 for h in self.h]
-            self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-            self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+            # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+            # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
 
             self.NC = self.nx * self.ny
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)
@@ -829,8 +859,53 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             self.face2cell = self.edge2cell
 
         self.clear() 
-        
+
+    # 界面网格
+    def is_cut_cell(self, phi: Callable, *, eps=1e-10) -> TensorLike:
+        """Return a bool tensor on cells indicating whether each cell is cut
+        by the given function."""
+        from ..geometry.functional import msign
+        cellSign = msign(phi, eps=eps)[self.entity('cell')]
+        dis = bm.max(cellSign, axis=1) - bm.min(cellSign, axis=1)
+        return dis > 2.0 - 1e-8
+
+    def find_interface_node(self, phi: Callable):
+        """Find vertices of cut cells, solve cut points on edges, and generate aux points on special cells.
+
+        Returns:
+            iCellNodeIndex, cutNode, auxNode, isInterfaceCell
+        """
+        from ..geometry.functional import find_cut_point
+
+        NN = self.number_of_nodes()
+        EPS = 0.1 * min(self.h)**2
+
+        node = self.entity('node')
+        cell = self.entity('cell')[:, [0, 2, 3, 1]]
+        phiValue = phi(node)
+        phiValue = bm.set_at(phiValue, bm.abs(phiValue) < EPS, 0.0)
+        phiSign = bm.sign(phiValue)
+
+        # 寻找 cut 点
+        edge = self.entity('edge')
+        cutEdgeIndex = bm.nonzero(phiSign[edge[:, 0]] * phiSign[edge[:, 1]] < 0)[0]
+        e0 = node[edge[cutEdgeIndex, 0]]
+        e1 = node[edge[cutEdgeIndex, 1]]
+        cutNode = find_cut_point(phi, e0, e1)
+        del e0, e1, cutEdgeIndex, edge
+
+        # 界面单元及其顶点
+        isInterfaceCell = self.is_cut_cell(phiValue)
+        isICellNode = bm.zeros(NN, dtype=bm.bool)
+        isICellNode = bm.set_at(isICellNode, cell[isInterfaceCell, :], True)
+        iCellNodeIndex = bm.nonzero(isICellNode)[0]
+
+        # 寻找特殊单元：界面经过两对顶点的单元；构建辅助点：单元重心
+        isSpecialCell = (bm.sum(bm.abs(phiSign[cell]), axis=1) == 2) \
+                        & (bm.sum(phiSign[cell], axis=1) == 0)
+        scell = cell[isSpecialCell, :]
+        auxNode = (node[scell[:, 0], :] + node[scell[:, 2], :]) / 2
+
+        return iCellNodeIndex, cutNode, auxNode, isInterfaceCell
+
 UniformMesh2d.set_ploter('2d')
-
-
-
