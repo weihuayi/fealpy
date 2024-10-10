@@ -353,7 +353,8 @@ class HexahedronMesh(TensorMesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):
+    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, 
+                threshold=None, *, itype=None, ftype=None, device=None,):
         """
         Generate a hexahedral mesh for a box domain.
 
@@ -363,12 +364,15 @@ class HexahedronMesh(TensorMesh, Plotable):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return HexahedronMesh instance
         """
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
         shape = (nx+1, ny+1, nz+1)
-        X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=bm.float64)[:, None, None]
-        # X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=bm.float64)
-        # X = X[:, None, None]
-        Y = bm.linspace(box[2], box[3], ny+1, endpoint=True, dtype=bm.float64)[None, :, None]
-        Z = bm.linspace(box[4], box[5], nz+1, endpoint=True, dtype=bm.float64)[None, None, :]
+        X = bm.linspace(box[0], box[1], nx+1, endpoint=True, dtype=ftype, device=device)[:, None, None]
+        Y = bm.linspace(box[2], box[3], ny+1, endpoint=True, dtype=ftype, device=device)[None, :, None]
+        Z = bm.linspace(box[4], box[5], nz+1, endpoint=True, dtype=ftype, device=device)[None, None, :]
         X = bm.broadcast_to(X, shape).reshape(-1, 1)
         Y = bm.broadcast_to(Y, shape).reshape(-1, 1)
         Z = bm.broadcast_to(Z, shape).reshape(-1, 1)
@@ -376,7 +380,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         node = bm.concatenate([X, Y, Z], axis=-1)
 
         NN = (nx+1)*(ny+1)*(nz+1)
-        idx = bm.arange(0, NN).reshape(nx+1, ny+1, nz+1)
+        idx = bm.arange(0, NN, device=device).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
         nyz = (ny + 1)*(nz + 1)
@@ -395,11 +399,11 @@ class HexahedronMesh(TensorMesh, Plotable):
             bc = bm.sum(node[cell, :], axis=1)/cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode = bm.zeros(NN, dtype=bm.bool, device=device)
             isValidNode[cell] = True
             node = node[isValidNode]
-            idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = bm.arange(isValidNode.sum())
+            idxMap = bm.zeros(NN, dtype=cell.dtype, device=device)
+            idxMap[isValidNode] = bm.arange(isValidNode.sum(), device=device)
             cell = idxMap[cell]
 
         return cls(node, cell)
