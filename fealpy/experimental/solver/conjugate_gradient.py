@@ -59,7 +59,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
 
     sol = _cg_impl(A, b, x0, atol, rtol, maxiter)
 
-    if batch_first:
+    if (not single_vector) and batch_first:
         sol = bm.swapaxes(sol, 0, 1)
 
     return sol
@@ -88,17 +88,17 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxit
         n_iter += 1
 
         if r_norm_new < atol:
-            logger.info(f"SparseCG: converged in {n_iter} iterations, "
+            logger.info(f"CG: converged in {n_iter} iterations, "
                         "stopped by absolute tolerance.")
             break
 
         if r_norm_new < rtol * b_norm:
-            logger.info(f"SparseCG: converged in {n_iter} iterations, "
+            logger.info(f"CG: converged in {n_iter} iterations, "
                         "stopped by relative tolerance.")
             break
 
         if (maxiter is not None) and (n_iter >= maxiter):
-            logger.info(f"SparseCG: stopped by maxiter ({maxiter}).")
+            logger.info(f"CG: failed, stopped by maxiter ({maxiter}).")
             break
 
         beta = rTr_new / rTr # (batch,)

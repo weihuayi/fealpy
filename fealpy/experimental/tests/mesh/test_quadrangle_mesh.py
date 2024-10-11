@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pytest
 from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.quadrangle_mesh import QuadrangleMesh
+from fealpy.experimental.mesh import QuadrangleMesh
 from fealpy.experimental.tests.mesh.quadrangle_mesh_data import *
+from fealpy.experimental.geometry.utils import *
 
 
 class TestQuadrangleMeshInterfaces:
@@ -207,6 +208,32 @@ class TestQuadrangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(cell), meshdata["cell"], atol=1e-7)
         # face2cell = mesh.face2cell
         # np.testing.assert_allclose(bm.to_numpy(face2cell), meshdata["face2cell"], atol=1e-7)
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("meshdata", mesh_from_sub_domain_data)
+    def test_mesh_from_sub_domain(self, meshdata, backend):
+        bm.set_backend(backend)
+        domain_node = bm.from_numpy(meshdata['domain_node'])
+        domain_edge = bm.from_numpy(meshdata['domain_edge'])
+        domain_line = bm.from_numpy(meshdata['domain_line'])
+        domain_half_edge = bm.from_numpy(meshdata['domain_half_edge'])
+        mesh = QuadrangleMesh.sub_domain_mesh_generator(domain_half_edge, domain_node, domain_line)
+
+    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("meshdata", mesh_from_sub_domain_data)
+    def test_sub_domain_divider(self, meshdata, backend):
+        bm.set_backend(backend)
+        domain_node = bm.from_numpy(meshdata['domain_node'])
+        domain_edge = bm.from_numpy(meshdata['domain_edge'])
+        domain_line = bm.from_numpy(meshdata['domain_line'])
+        node_to_out_edge = bm.from_numpy(meshdata['node_to_out_edge'])
+
+        total_line = []
+        for l in domain_line:
+            total_line.append(l)
+            total_line.append(l[::-1])
+        ne = next_edge_searcher(0, 1, node_to_out_edge, total_line)
+
 
 
 if __name__ == "__main__":

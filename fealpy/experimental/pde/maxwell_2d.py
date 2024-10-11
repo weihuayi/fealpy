@@ -59,7 +59,12 @@ class SinData():
     @cartesian
     def dirichlet(self, p, t):
         val = self.solution(p)
-        return bm.einsum('eqd, ed->eq', val, t)
+        if t.ndim == 2:
+            return bm.einsum('eqd, ed->eq', val, t)
+        else:
+            return bm.einsum("eqd,eqd->eq", val, t)
+    
+
 
     @cartesian
     def neumann(self, p, t):
@@ -96,5 +101,5 @@ class SinData():
         return mesh
 
     def domain(self):
-        return [0, 1/2, 0, 1/2]
+        return [0, 1, 0, 1]
 

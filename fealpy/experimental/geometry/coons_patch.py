@@ -17,7 +17,6 @@ def coons_patch(edge_ab, edge_bc, edge_cd, edge_da, n, m):
     edge_cd_points = np.array(edge_cd)[::-1]
     edge_da_points = np.array(edge_da)[::-1]
     edge_bc_points = np.array(edge_bc)
-    tt = np.einsum('mn,mn,d->mnd', u, v, c)
 
     # 计算双线性混合
     bilinear_blend = (

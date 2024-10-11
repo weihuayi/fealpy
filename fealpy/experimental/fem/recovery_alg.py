@@ -1,10 +1,11 @@
 from typing import Optional
+import numpy as np
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from ..functionspace import TensorFunctionSpace
 
-class RecoveryAlg():
+class RecoveryAlg:
 
     def recovery_estimate(self, uh: TensorLike, method='simple'):
         """
@@ -44,18 +45,18 @@ class RecoveryAlg():
         deg = bm.zeros(gdof, dtype=space.ftype)
 
         if method == 'simple':
-            bm.add_at(deg, cell2dof, 1)
-            bm.add_at(gval, cell2dof, guh)
+            bm.index_add(deg, cell2dof, bm.tensor(1, **bm.context(deg)))
+            bm.index_add(gval, cell2dof, guh)
         elif method == 'area_harmonic':
             val = 1.0/space.mesh.entity_measure('cell')
-            bm.add_at(deg, cell2dof, val[:, None])
+            bm.index_add(deg, cell2dof, val[:, None])
             guh *= val[:, None, None] 
-            bm.add_at(gval, cell2dof, guh)
+            bm.index_add(gval, cell2dof, guh)
         elif method == 'area':
             val = space.mesh.entity_measure('cell')
-            bm.add_at(deg, cell2dof, val[:, None])
+            bm.index_add(deg, cell2dof, val[:, None])
             guh *= val[:, None, None] 
-            bm.add_at(gval, cell2dof, guh)
+            bm.index_add(gval, cell2dof, guh)
         elif method == 'distance':
             ipoints = space.interpolation_points()
             bp = space.mesh.entity_barycenter('cell')
@@ -63,8 +64,8 @@ class RecoveryAlg():
             d = bm.sqrt(bm.sum(v**2, axis=-1))
             guh = bm.einsum('ij...,ij->ij...', guh, d)
 
-            bm.add_at(deg, cell2dof, d)
-            bm.add_at(gval, cell2dof, guh)
+            bm.index_add(deg, cell2dof, d)
+            bm.index_add(gval, cell2dof, guh)
         elif method == 'distance_harmonic':
             ipoints = space.interpolation_points()
             bp = space.mesh.entity_barycenter('cell')
@@ -72,13 +73,13 @@ class RecoveryAlg():
             d = 1/bm.sqrt(bm.sum(v**2, axis=-1))
             guh = bm.einsum('ij...,ij->ij...', guh, d)
 
-            bm.add_at(deg, cell2dof, d)
-            bm.add_at(gval, cell2dof, guh)
+            bm.index_add(deg, cell2dof, d)
+            bm.index_add(gval, cell2dof, guh)
         else:
             raise ValueError('Unsupported method: %s' % method)
 
         gval /= deg[:, None]
-        rguh[:] = gval.flatten()
+        rguh[:] = gval.T.flatten()
         return rguh
 
 

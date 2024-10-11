@@ -29,15 +29,18 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
 
 
         self._uh = None
-       
         self._d = None
-        self._H = None # 谱分解模型下的最大历史场
+
+        self.H = None # 谱分解模型下的最大历史场
 
     def update_disp(self, uh):
         self._uh = uh
 
     def update_phase(self, d):
         self._d = d
+
+    def update_historical_field(self, H):
+        self.H = H
 
     @ barycentric
     def effective_stress(self, bc=None) -> TensorLike:
@@ -121,7 +124,6 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         """
         Compute the tangent matrix.
         """
-        uh = self._uh
         d = self._d
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
         D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵
@@ -171,7 +173,9 @@ class SpectralModel(BasedPhaseFractureMaterial):
         # 应变正负分解
         sp, sm = self.strain_pm_eig_decomposition(s)
 
-        ts = np.trace(s, axis1=-2, axis2=-1)
+        _ts = np.trace(s, axis1=-2, axis2=-1)
+        ts = bm.array(_ts, dtype=bm.float64)
+
         tp, tm = self.macaulay_operation(ts)
         tsp = np.trace(sp**2, axis1=-2, axis2=-1)
         tsm = np.trace(sm**2, axis1=-2, axis2=-1)
@@ -231,14 +235,15 @@ class SpectralModel(BasedPhaseFractureMaterial):
         """
         @brief Maximum historical field
         """
-        uh = self._uh
         strain = self.strain_value(bc)
+       
         phip, _ = self.strain_energy_density_decomposition(strain)
-        if self._H is None:
-            self._H = phip[:]
+        
+        if self.H is None:
+            self.H = phip[:]
         else:
-            self._H = np.fmax(self._H, phip)
-        return self._H
+            self.H = np.fmax(self.H, phip)
+        return self.H
         
 
 class HybridModel(BasedPhaseFractureMaterial):
@@ -276,9 +281,10 @@ class HybridModel(BasedPhaseFractureMaterial):
         """
         self._spectral_model._uh = self._uh
         self._spectral_model._d = self._d
-        self._spectral_model._H = self._H
+        self._spectral_model.H = self.H
         
-        return self._spectral_model.maximum_historical_field(bc)
+        self.H = self._spectral_model.maximum_historical_field(bc)
+        return self.H
         
 
 class PhaseFractureMaterialFactory:

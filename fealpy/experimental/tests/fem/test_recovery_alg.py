@@ -35,7 +35,8 @@ class TestRecoveryAlg:
         x = p[..., 0]
         y = p[..., 1]
         f = x*y
-        f[1] = 10
+        bm.set_at(f, 1, 10)
+        #f[1] = 10
         return f
 
 

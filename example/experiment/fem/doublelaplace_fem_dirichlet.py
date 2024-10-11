@@ -78,6 +78,8 @@ for i in range(maxit):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
 
 
+
+
     space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
     
 

@@ -58,41 +58,73 @@ class ElasticMaterial(MaterialBase):
 
 class LinearElasticMaterial(ElasticMaterial):
     def __init__(self, name: str, 
-            elastic_modulus: float = 1, 
-            poisson_ratio: float = 0.3, 
+            elastic_modulus: Optional[float] = None, 
+            poisson_ratio: Optional[float] = None, 
             lame_lambda: Optional[float] = None, 
             shear_modulus: Optional[float] = None,
             hypo: str = "3D" ):
         super().__init__(name)
         self.hypo = hypo
 
-        self.set_property('elastic_modulus', elastic_modulus)
-        self.set_property('poisson_ratio', poisson_ratio)
+        # self.set_property('elastic_modulus', elastic_modulus)
+        # self.set_property('poisson_ratio', poisson_ratio)
 
-        if lame_lambda is not None:
+        if elastic_modulus is not None and poisson_ratio is not None and lame_lambda is None and shear_modulus is None:
+            self.set_property('elastic_modulus', elastic_modulus)
+            self.set_property('poisson_ratio', poisson_ratio)
+            self.set_property('lame_lambda', self.calculate_lame_lambda())
+            self.set_property('shear_modulus', self.calculate_shear_modulus())
+
+        elif lame_lambda is not None and shear_modulus is not None and elastic_modulus is None and poisson_ratio is None:
             self.set_property('lame_lambda', lame_lambda)
-        if shear_modulus is not None:
             self.set_property('shear_modulus', shear_modulus)
+            self.set_property('elastic_modulus', self.calculate_elastic_modulus())
+            self.set_property('poisson_ratio', self.calculate_poisson_ratio())
 
-        if lame_lambda is not None and shear_modulus is not None:
+        elif lame_lambda is not None and shear_modulus is not None and elastic_modulus is not None and poisson_ratio is not None:
             calculated_E = self.calculate_elastic_modulus()
             calculated_nu = self.calculate_poisson_ratio()
             if abs(calculated_E - elastic_modulus) > 1e-5 or abs(calculated_nu - poisson_ratio) > 1e-5:
                 raise ValueError("The input elastic modulus and Poisson's ratio are inconsistent with "
                                  "the values calculated from the provided Lame's lambda and shear modulus.")
-            self.set_property('elastic_modulus', calculated_E)
-            self.set_property('poisson_ratio', calculated_nu)
-        
-        if lame_lambda is None or shear_modulus is None:
-            calculated_lam = self.calculate_lame_lambda()
-            calculated_mu = self.calculate_shear_modulus()
-            self.set_property('lame_lambda', calculated_lam)
-            self.set_property('shear_modulus', calculated_mu)
+            self.set_property('elastic_modulus', elastic_modulus)
+            self.set_property('poisson_ratio', poisson_ratio)
+            self.set_property('lame_lambda', lame_lambda)
+            self.set_property('shear_modulus', shear_modulus)
 
-        E = self.get_property('elastic_modulus')
-        nu = self.get_property('poisson_ratio')
-        lam = self.get_property('lame_lambda')
-        mu = self.get_property('shear_modulus')
+        else:
+            raise ValueError("You must provide either (elastic_modulus, poisson_ratio) or (lame_lambda, shear_modulus), or all four.")
+
+
+        # if lame_lambda is not None:
+        #     self.set_property('lame_lambda', lame_lambda)
+        # if shear_modulus is not None:
+        #     self.set_property('shear_modulus', shear_modulus)
+
+        # if lame_lambda is not None and shear_modulus is not None:
+        #     calculated_E = self.calculate_elastic_modulus()
+        #     calculated_nu = self.calculate_poisson_ratio()
+        #     if abs(calculated_E - elastic_modulus) > 1e-5 or abs(calculated_nu - poisson_ratio) > 1e-5:
+        #         raise ValueError("The input elastic modulus and Poisson's ratio are inconsistent with "
+        #                          "the values calculated from the provided Lame's lambda and shear modulus.")
+        #     self.set_property('elastic_modulus', calculated_E)
+        #     self.set_property('poisson_ratio', calculated_nu)
+        
+        # if lame_lambda is None or shear_modulus is None:
+        #     calculated_lam = self.calculate_lame_lambda()
+        #     calculated_mu = self.calculate_shear_modulus()
+        #     self.set_property('lame_lambda', calculated_lam)
+        #     self.set_property('shear_modulus', calculated_mu)
+
+        self.E = self.get_property('elastic_modulus')
+        self.nu = self.get_property('poisson_ratio')
+        self.lam = self.get_property('lame_lambda')
+        self.mu = self.get_property('shear_modulus')
+
+        E = self.E
+        nu = self.nu
+        lam = self.lam
+        mu = self.mu
 
         if hypo == "3D":
             self.D = bm.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],

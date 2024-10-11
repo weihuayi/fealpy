@@ -1,4 +1,5 @@
 from typing import Union, Optional
+from math import sqrt
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
@@ -78,8 +79,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             node = bm.tensor([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
-                [0.5, bm.sqrt(bm.tensor(3))/2, 0.0],
-                [0.5, bm.sqrt(bm.tensor(3))/6, bm.sqrt(bm.tensor(2/3))]], dtype=bm.float64)
+                [0.5, sqrt(3)/2, 0.0],
+                [0.5, sqrt(3)/6, sqrt(2/3)]], dtype=bm.float64)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0, 0.0],
@@ -136,7 +137,11 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         """
         if etype in {'cell', 3}:
             from ..quadrature import TetrahedronQuadrature
-            return TetrahedronQuadrature(q, dtype=self.ftype)
+            from ..quadrature.stroud_quadrature import StroudQuadrature
+            if q > 7:
+                return StroudQuadrature(3, q)
+            else:
+                return TetrahedronQuadrature(q, dtype=self.ftype)
         elif etype in {'face', 2}:
             from ..quadrature import TriangleQuadrature
             return TriangleQuadrature(q, dtype=self.ftype)
@@ -388,6 +393,22 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell2ipoint[:, isInCellIPoint] = base + bm.arange(NC*idof,dtype=self.itype).reshape(NC, idof)
 
         return cell2ipoint
+
+    def direction(self,i):
+        """
+        Compute the direction on every node of 0 <= i < 4
+        """
+        node = self.node
+        cell = self.cell
+        index = self.localCell
+        v10 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 1]]]
+        v20 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 2]]]
+        v30 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 3]]]
+        l1 = bm.sum(v10**2, axis=1, keepdims=True)
+        l2 = bm.sum(v20**2, axis=1, keepdims=True)
+        l3 = bm.sum(v30**2, axis=1, keepdims=True)
+
+        return l1*bm.cross(v20, v30) + l2*bm.cross(v30, v10) + l3*bm.cross(v10, v20)
 
     def face_normal(self, index=_S):
         face = self.face

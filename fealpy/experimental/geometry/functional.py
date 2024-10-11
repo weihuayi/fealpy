@@ -1,3 +1,8 @@
+
+from typing import Callable
+from math import sqrt
+
+from .. import logger
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
 
@@ -66,3 +71,50 @@ def apply_rotation(
 
         return rotated_points + centers[:, None, :]
 
+
+def msign(x: TensorLike, eps=1e-10) -> TensorLike:
+    flag = bm.sign(x)
+    return bm.set_at(flag, bm.abs(x) < eps, 0)
+
+
+def find_cut_point(phi: Callable, p0: TensorLike, p1: TensorLike) -> TensorLike:
+    """Find the zero-cross point of the curve on the line segment.
+    Assume that all the edges provided are cut by the curve."""
+    if bm.backend_name == "jax":
+        logger.warning("`find_cut_point` is tested to have low performance on JAX backend, "
+                       "Avoid to use it in the main loop if you encounter performance issue.")
+
+    set_at = bm.set_at
+    nonzero = bm.nonzero
+    NUM = p0.shape[0]
+    pl = bm.copy(p0)
+    pr = bm.copy(p1)
+    pc = bm.empty_like(p0) # point cut
+    phil = phi(p0)
+    phir = phi(p1)
+    phic = bm.empty_like(phil)
+
+    h = bm.linalg.norm(p1 - p0, axis=1)
+    EPS = bm.finfo(p0.dtype).eps
+    tol = sqrt(EPS) * h * h
+    flag = bm.arange(NUM, dtype=bm.int32) # 需要调整的边.
+
+    while flag.shape[0] > 0:
+        # evaluate the sign.
+        pc = set_at(pc, flag, (pl[flag] + pr[flag]) / 2.)
+        phic = set_at(phic, flag, phi(pc[flag]))
+        cphic = phic[flag]
+        left_idx = nonzero(phil[flag] * cphic > 0)[0]
+        right_idx = nonzero(phir[flag] * cphic > 0)[0]
+
+        # move the point.
+        pl = set_at(pl, left_idx, pc[left_idx])
+        pr = set_at(pr, right_idx, pc[right_idx])
+        phil = set_at(phil, left_idx, phic[left_idx])
+        phir = set_at(phir, right_idx, phic[right_idx])
+        h = set_at(h, slice(None), h/2.)
+
+        continue_signal = (h[flag] > tol[flag]) & (phic[flag] != 0)
+        flag = flag[continue_signal]
+
+    return pc
