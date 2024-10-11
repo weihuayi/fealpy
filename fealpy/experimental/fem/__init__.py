@@ -5,6 +5,7 @@ from .integrator import *
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
 from .semilinear_form import SemilinearForm
+from .block_form import BlockForm
 
 ### Cell Operator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
