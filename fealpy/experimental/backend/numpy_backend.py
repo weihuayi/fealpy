@@ -77,8 +77,8 @@ class NumPyBackend(Backend[NDArray], backend_name='numpy'):
         zeros = staticmethod(_remove_device(np.zeros))
         zeros_like = staticmethod(_remove_device(np.zeros_like))
 
-        array = staticmethod(_remove_device(np.array))
-        tensor = staticmethod(_remove_device(np.array))
+    array = staticmethod(_remove_device(np.array))
+    tensor = staticmethod(_remove_device(np.array))
 
     ### Data Type Functions ###
 

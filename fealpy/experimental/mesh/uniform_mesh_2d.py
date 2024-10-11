@@ -101,6 +101,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             ftype = bm.float64
         super().__init__(TD=2, itype=itype, ftype=ftype)
 
+        self.device = device
+
         # Mesh properties
         self.extent = [int(e) for e in extent]
         self.h = [float(val) for val in h]
@@ -135,14 +137,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.adjusted_edge_mask = self.get_adjusted_edge_mask()
 
         # Specify the counterclockwise drawing
-        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype, device=self.device)
 
         self.edge2cell = self.edge_to_cell()
         self.face2cell = self.edge2cell
         self.cell2edge = self.cell_to_edge()
 
         self.localEdge = bm.array([(0, 2), (1, 3), 
-                                   (0, 1), (2, 3)], dtype=self.itype)   
+                                   (0, 1), (2, 3)], dtype=self.itype, device=self.device)   
 
 
     # 实体生成方法
@@ -152,9 +154,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         @berif Generate the nodes in a structured mesh.
         """
         device = self.device
+
         GD = 2
-        nx = self.nx
-        ny = self.ny
+        nx, ny = self.nx, self.ny
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
 
@@ -177,8 +179,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         @berif Generate the edges in a structured mesh.
         """
         device = self.device
-        nx = self.nx
-        ny = self.ny
+
+        nx, ny = self.nx, self.ny
         NN = self.NN
         NE = self.NE
 
@@ -204,16 +206,15 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the cells in a structured mesh.
         """
-        # device = self.device
-        nx = self.nx
-        ny = self.ny
+        device = self.device
 
+        nx, ny = self.nx, self.ny
         NN = self.NN
         NC = self.NC
 
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
 
-        cell = bm.zeros((NC, 4), dtype=self.itype)
+        cell = bm.zeros((NC, 4), dtype=self.itype, device=device)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1
@@ -612,7 +613,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             node_y_grid, node_x_grid = bm.meshgrid(node_y_indices, node_x_indices, indexing='ij')
             
             node2ipoint = (node_y_grid * nix + node_x_grid).flatten()
-            node2ipoint = node2ipoint.astype(self.itype)
+            node2ipoint = bm.astype(node2ipoint, self.itype)
+            # node2ipoint = node2ipoint.astype(self.itype)
         elif ordering == 'nec':
             NN = self.NN
             node2ipoint = bm.arange(0, NN, dtype=self.itype)
@@ -644,7 +646,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
             edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
                           end_indices[:, None] * linspace_indices
-            edge2ipoint = edge2ipoint.astype(self.itype)
+            edge2ipoint = bm.astype(edge2ipoint, self.itype)
         elif ordering == 'nec':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()

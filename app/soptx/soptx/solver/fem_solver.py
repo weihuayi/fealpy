@@ -9,8 +9,8 @@ from fealpy.experimental.sparse import COOTensor
 
 from fealpy.experimental.solver import cg
 
-from scipy.sparse.linalg import spsolve, cg
-from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import spsolve
+# from scipy.sparse import csr_matrix
 
 from app.soptx.soptx.utilfs.timer import timer
 
@@ -19,14 +19,6 @@ class FEMSolver:
     def __init__(self, material_properties, tensor_space, pde):
         """
         Initialize the FEMSolver with the provided parameters.
-
-        Args:
-            material_properties: MaterialProperties object defining material behavior.
-            tensor_space: TensorFunctionSpace object for the computational space.
-            pde: PDEData object defining boundary conditions and forces.
-            solver_method (str): The method used to solve the system 
-                (e.g., 'mumps' for direct or 'cg' for iterative).
-
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
@@ -105,9 +97,6 @@ class FEMSolver:
     def solve(self, solver_method) -> TensorLike:
         """
         Solve the displacement field.
-
-        Returns:
-            TensorLike: The displacement vector.
         """
 
         # tmr = timer("FEM Solver")
@@ -128,12 +117,8 @@ class FEMSolver:
             tmr.send('Apply Boundary Conditions')
 
         K = K.tocsr()
-        # if tmr:
-        #     tmr.send('Convert to CSR') 
         
         uh = self.tensor_space.function()
-        # if tmr:
-        #     tmr.send('Initialize Displacement Vector')
         
         if solver_method == 'cg':
             # K = K.to_scipy()

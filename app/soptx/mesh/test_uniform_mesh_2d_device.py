@@ -8,13 +8,15 @@ extent = [0, nx, 0, ny]
 h = [1.0, 1.0]
 origin = [0.0, 0.0]
 
-mesh = UniformMesh2d(extent=extent, h=h, origin=origin, device='cpu')
+mesh = UniformMesh2d(extent=extent, h=h, origin=origin, 
+                    ipoints_ordering='yx', flip_direction='y',
+                    device='cpu')
 
 
 import matplotlib.pyplot as plt
 fig = plt.figure()
 axes = fig.add_subplot(111)
 mesh.add_plot(axes)
-mesh.find_node(axes, node=ip2, showindex=True)
+mesh.find_node(axes, showindex=True)
 plt.show()
 print("----------------")

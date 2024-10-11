@@ -37,7 +37,8 @@ class BoxDomainPolyUnloaded3d():
         x = points[..., 0]
         y = points[..., 1]
         z = points[..., 2]
-        val = bm.zeros(points.shape, dtype=points.dtype)
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=points.device)
         val[..., 0] = 2*x**3 - 3*x*y**2 - 3*x*z**2
         val[..., 1] = 2*y**3 - 3*y*x**2 - 3*y*z**2
         val[..., 2] = 2*z**3 - 3*z*y**2 - 3*z*x**2
@@ -46,7 +47,8 @@ class BoxDomainPolyUnloaded3d():
 
     @cartesian
     def source(self, points: TensorLike):
-        val = bm.zeros(points.shape, dtype=points.dtype)
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=points.device)
         
         return val
     
@@ -63,7 +65,8 @@ class BoxDomainPolyLoaded3d():
         x = points[..., 0]
         y = points[..., 1]
         z = points[..., 2]
-        val = bm.zeros(points.shape, dtype=bm.float64)
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=points.device)
         mu = 1
         factor1 = -400 * mu * (2 * y - 1) * (2 * z - 1)
         term1 = 3 * (x ** 2 - x) ** 2 * (y ** 2 - y + z ** 2 - z)
@@ -87,7 +90,8 @@ class BoxDomainPolyLoaded3d():
         x = points[..., 0]
         y = points[..., 1]
         z = points[..., 2]
-        val = bm.zeros(points.shape, dtype=bm.float64)
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=points.device)
 
         mu = 1
         val[..., 0] = 200*mu*(x-x**2)**2 * (2*y**3-3*y**2+y) * (2*z**3-3*z**2+z)
@@ -98,7 +102,8 @@ class BoxDomainPolyLoaded3d():
     
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
-        return bm.zeros(points.shape, dtype=points.dtype)
+        return bm.zeros(points.shape, 
+                        dtype=points.dtype, device=points.device)
 
 parser = argparse.ArgumentParser(description="HexahedronMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
 parser.add_argument('--backend', 
