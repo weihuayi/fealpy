@@ -226,13 +226,20 @@ class TestQuadrangleMeshInterfaces:
         domain_node = bm.from_numpy(meshdata['domain_node'])
         domain_edge = bm.from_numpy(meshdata['domain_edge'])
         domain_line = bm.from_numpy(meshdata['domain_line'])
-        node_to_out_edge = bm.from_numpy(meshdata['node_to_out_edge'])
+        node_to_out_edge = meshdata['node_to_out_edge']
+        domain_boundary = bm.from_numpy(meshdata['domain_boundary'])
+        domain_half_edge = bm.from_numpy(meshdata['domain_half_edge'])
 
-        total_line = []
-        for l in domain_line:
-            total_line.append(l)
-            total_line.append(l[::-1])
-        ne = next_edge_searcher(0, 1, node_to_out_edge, total_line)
+        # 测试下条边搜索算法
+        # total_line = []
+        # for l in domain_line:
+        #     total_line.append(l)
+        #     total_line.append(l[::-1])
+        # ne = next_edge_searcher(0, 1, node_to_out_edge, total_line)
+
+        test_half_edge = subdomain_divider(domain_line, domain_node, domain_edge, domain_boundary)
+        # 比较test_half_edge与domain_half_edge
+        np.testing.assert_array_equal(bm.to_numpy(test_half_edge), bm.to_numpy(domain_half_edge))
 
 
 

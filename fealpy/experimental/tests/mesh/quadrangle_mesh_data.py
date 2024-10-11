@@ -431,9 +431,10 @@ mesh_from_sub_domain_data = [{
     np.array([[0, 1], [0, 0.5], [0, 0]])
 ],
 "node_to_out_edge": [
-    np.array([0, 7]),
-    np.array([2, 1]),
-    np.array([4, 3]),
-    np.array([6, 5])
+    [0, 7],
+    [2, 1],
+    [4, 3],
+    [6, 5]
 ],
+    "domain_boundary": np.array([0, 1, 2, 3]),
 }]
