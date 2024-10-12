@@ -62,7 +62,7 @@ class BilinearForm(Form[LinearInt]):
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
             local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
-            
+
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
 
@@ -80,25 +80,26 @@ class BilinearForm(Form[LinearInt]):
     def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
     @overload
     def assembly(self, *, format: Literal['csr'], retain_ints: bool=False) -> CSRTensor: ...
-    def assembly(self, *, format='coo', retain_ints: bool=False):
+    def assembly(self, *, format='csr', retain_ints: bool=False):
         """Assembly the bilinear form matrix.
 
         Parameters:
-            format (str, optional): Layout of the output ('csr' | 'coo'). Defaults to 'coo'.
-                The default format will change to 'csr' in the future.\n
-            retain_ints (bool, optional): Whether to retain the integrator cache.
+            format (str, optional): Layout of the output ('csr' | 'coo'). Defaults to 'csr'.\n
+            retain_ints (bool, optional): Whether to retain the integrator cache.csr
 
         Returns:
             global_matrix (CSRTensor | COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
         """
         M = self._scalar_assembly(retain_ints, self.batch_size)
+        if getattr(self, '_transposed', False):
+            M = M.T
 
         if format == 'csr':
             self._M = M.coalesce().tocsr()
         elif format == 'coo':
             self._M = M.coalesce()
         else:
-            raise ValueError(f"Unknown format {format}.")
+            raise ValueError(f"Unsupported format {format}.")
         logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
 
         return self._M
@@ -114,6 +115,13 @@ class BilinearForm(Form[LinearInt]):
             TensorLike: self @ x
         """
         raise NotImplementedError
+
+    @property
+    def T(self):
+        transposed = self.copy()
+        transposed._transposed = True
+        transposed._M = self._M
+        return transposed
 
     def __matmul__(self, u: TensorLike):
         if self._M is not None:
@@ -149,3 +157,5 @@ class BilinearForm(Form[LinearInt]):
             v = bm.index_add(v, ve2dof.reshape(-1), gv.reshape(gv_reshape))
 
         return v
+
+

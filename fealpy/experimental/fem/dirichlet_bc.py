@@ -14,6 +14,7 @@ class DirichletBC():
     """Dirichlet boundary condition."""
     def __init__(self, space: FunctionSpace,
                  gd: Optional[CoefLike]=None,
+                 isDDof=None,
                  *, threshold: Optional[Callable]=None, left: bool=True):
         self.space = space
         self.gd = gd
@@ -21,8 +22,11 @@ class DirichletBC():
         self.left = left
         self.bctype = 'Dirichlet'
 
-        isDDof = space.is_boundary_dof(threshold=self.threshold) # on the same device as space
-        self.is_boundary_dof = isDDof
+        if isDDof is None:
+            isDDof = form._spaces[0].is_boundary_dof(threshold=threshold) # on the same device as space
+            self.is_boundary_dof = isDDof
+        else :
+            self.is_boundary_dof = isDDof
         self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.gdof = space.number_of_global_dofs()
 
@@ -44,8 +48,6 @@ class DirichletBC():
         """
         if not isinstance(matrix, (COOTensor, CSRTensor)):
             raise ValueError('The type of matrix must be COOTensor or CSRTensor.')
-        if not matrix.is_coalesced:
-            raise RuntimeError('The matrix must be coalesced.')
         if len(matrix.shape) != 2:
             raise ValueError('The matrix must be a 2-D sparse COO matrix.')
         if matrix.shape[0] != matrix.shape[1]:
@@ -87,8 +89,8 @@ class DirichletBC():
         """Apply Dirichlet boundary conditions.
 
         Parameters:
-            A (COOTensor): Left-hand-size COO sparse matrix
-            f (Tensor): Right-hand-size vector
+            A (SparseTensor): Left-hand-size sparse matrix.
+            f (Tensor): Right-hand-size vector.
             uh (Tensor | None, optional): The solution uh Tensor. Boundary interpolation\
                 will be done on `uh` if given, which is an **in-place** operation.\
                 Defaults to None.
@@ -97,7 +99,7 @@ class DirichletBC():
             check (bool, optional): _description_. Defaults to True.
 
         Returns:
-            out (Tensor, Tensor): New adjusted `A` and `f`.
+            out (SparseTensor, Tensor): New adjusted `A` and `f`.
         """
         f = self.apply_vector(f, A, uh, gd, check=check)
         A = self.apply_matrix(A, check=check)
@@ -107,12 +109,12 @@ class DirichletBC():
         """Apply Dirichlet boundary condition to left-hand-size matrix only.
 
         Parameters:
-            matrix (COOTensor): The original left-hand-size COO sparse matrix\
+            matrix (SparseTensor): The original left-hand-size sparse matrix\
                 of the linear system.
             check (bool, optional): Whether to check the matrix. Defaults to True.
 
         Returns:
-            COOTensor: New adjusted left-hand-size COO matrix.
+            SparseTensor: New adjusted left-hand-size matrix.
         """
         # NOTE: Code in the numpy version:
         # ```
@@ -145,14 +147,40 @@ class DirichletBC():
             A = A.add(A1).coalesce()
 
         elif isinstance(A, CSRTensor):
-            raise NotImplementedError('The CSRTensor version has not been implemented.')
+            isIDof = bm.logical_not(isDDof)
+            crow = A.crow()
+            col = A.col()
+            indices_context = bm.context(col)
+            ZERO = bm.array([0], **indices_context)
+
+            nnz_per_row = crow[1:] - crow[:-1]
+            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
+            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
+            nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
+
+            new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
+
+            NNZ = new_crow[-1]
+            non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
+            loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
+            non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
+
+            new_col = bm.empty((NNZ,), **indices_context)
+            new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], self.boundary_dof_index)
+            new_col = bm.set_at(new_col, non_diag, col[remain_flag])
+
+            new_values = bm.empty((NNZ,), **kwargs)
+            new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
+            new_values = bm.set_at(new_values, non_diag, A.values()[remain_flag])
+
+            A = CSRTensor(new_crow, new_col, new_values)
 
         return A
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,
                      gd: Optional[CoefLike]=None, *, check=True) -> TensorLike:
-        """Appy Dirichlet boundary contition to right-hand-size vector only.
+        """Apply Dirichlet boundary contition to right-hand-size vector only.
 
         Parameters:
             vector (TensorLike): The original right-hand-size vector.

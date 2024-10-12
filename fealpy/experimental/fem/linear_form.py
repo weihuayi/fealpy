@@ -81,7 +81,7 @@ class LinearForm(Form[LinearInt]):
         elif format == 'coo':
             self._V = V.coalesce()
         else:
-            raise ValueError(f"Unknown format {format}.")
+            raise ValueError(f"Unsupported format {format}.")
         logger.info(f"Linear form vector constructed, with shape {list(V.shape)}.")
 
         return self._V

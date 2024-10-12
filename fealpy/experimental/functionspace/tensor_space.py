@@ -134,10 +134,6 @@ class TensorFunctionSpace(FunctionSpace):
 
                 scalar_is_bd_dof = scalar_space.is_boundary_dof(edge_threshold)
 
-                if edge_threshold is not None:
-                    edge_flags = edge_threshold()
-                    scalar_is_bd_dof = scalar_is_bd_dof & edge_flags
-
                 if node_threshold is not None:
                     node_flags = node_threshold()
                     scalar_is_bd_dof = scalar_is_bd_dof & node_flags
@@ -160,10 +156,6 @@ class TensorFunctionSpace(FunctionSpace):
                 dof_threshold = threshold[3] if len(threshold) > 4 else None
 
                 scalar_is_bd_dof = scalar_space.is_boundary_dof(face_threshold)
-
-                if face_threshold is not None:
-                    face_flags = face_threshold()
-                    scalar_is_bd_dof = scalar_is_bd_dof & face_flags
                     
                 if edge_threshold is not None:
                     edge_flags = edge_threshold()

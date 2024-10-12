@@ -14,7 +14,7 @@ from fealpy.experimental.tests.fem.block_form_data import *
 
 class TestBlockForm:
     @pytest.mark.parametrize("backend", ['pytorch', 'numpy'])
-    @pytest.mark.parametrize("data", triangle_mesh_one_box)
+    @pytest.mark.parametrize("data", diag_diffusion)
     def test_diag_diffusion(self, backend, data): 
         bm.set_backend(backend)
         

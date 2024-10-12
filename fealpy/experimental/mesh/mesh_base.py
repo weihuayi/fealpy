@@ -645,42 +645,16 @@ class TensorMesh(HomogeneousMesh):
     
 
 class StructuredMesh(HomogeneousMesh):
-    # ### counters
-    # def count(self, etype: Union[int, str]) -> int:
-    #     """Return the number of entities of the given type."""
-    #     entity = self.entity(etype)
-
-    #     if entity is None:
-    #         logger.info(f'count: entity {etype} is not found and 0 is returned.')
-    #         return 0
-
-    #     if hasattr(entity, 'location'):
-    #         return entity.location.shape[0] - 1
-    #     else:
-    #         if etype == 'node':
-    #             return entity.shape[0] * entity.shape[1]
-    #         else:
-    #             return entity.shape[0]
 
     # shape function
     def grad_lambda(self, index: Index=_S) -> TensorLike:
         raise NotImplementedError
+    
+    @property
+    def device(self) -> Any:
+        return self._device
+    
+    @device.setter
+    def device(self, value: Any):
+        self._device = value
 
-    # NOTE: Here are some examples for entity factories:
-    # implement them in subclasses if necessary.
-
-    # @entitymethod
-    # def _node(self, index: Index=_S):
-    #     raise NotImplementedError
-
-    # @entitymethod
-    # def _edge(self, index: Index=_S):
-    #     raise NotImplementedError
-
-    # @entitymethod
-    # def _face(self, index: Index=_S):
-    #     raise NotImplementedError
-
-    # @entitymethod
-    # def _cell(self, index: Index=_S):
-    #     raise NotImplementedError

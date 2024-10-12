@@ -1,7 +1,7 @@
 import numpy as np
 from fealpy.decorator import cartesian
 from fealpy.experimental.backend import backend_manager as bm
-triangle_mesh_one_box = [
+diag_diffusion = [
     {
         ##input
         "args": ([0,1,0,1], 1, 1),

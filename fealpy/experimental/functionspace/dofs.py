@@ -36,7 +36,8 @@ class LinearMeshCFEDof(Generic[_MT]):
 
         face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
         isBdDof = bm.zeros(gdof, dtype=bm.bool)
-        isBdDof[face2dof] = True
+        isBdDof = bm.set_at(isBdDof, face2dof, True)
+
         return isBdDof
 
     def entity_to_dof(self, etype: int, index: Index=_S):
