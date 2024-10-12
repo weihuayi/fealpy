@@ -202,32 +202,6 @@ class COOTensor(SparseTensor):
 
         return COOTensor(new_indices, new_values, self.sparse_shape, is_coalesced=True)
 
-        # unique_indices, inverse_indices = bm.unique(
-        #     self._indices, return_inverse=True, axis=1
-        # )
-
-        # if self._values is not None:
-        #     value_shape = self.dense_shape + (unique_indices.shape[-1], )
-        #     new_values = bm.zeros(value_shape, **self.values_context())
-        #     new_values = bm.index_add(new_values, inverse_indices, self._values, axis=-1)
-
-        #     return COOTensor(
-        #         unique_indices, new_values, self.sparse_shape, is_coalesced=True
-        #     )
-
-        # else:
-        #     if accumulate:
-        #         kwargs = bm.context(self._indices)
-        #         ones = bm.ones((self.nnz, ), **kwargs)
-        #         new_values = bm.zeros((unique_indices.shape[-1], ), **kwargs)
-        #         new_values = bm.index_add(new_values, inverse_indices, ones, axis=-1)
-        #     else:
-        #         new_values = None
-
-        #     return COOTensor(
-        #         unique_indices, new_values, self.sparse_shape, is_coalesced=True
-        #     )
-
     @overload
     def reshape(self, shape: Size, /) -> 'COOTensor': ...
     @overload
@@ -265,9 +239,24 @@ class COOTensor(SparseTensor):
                              f"but got {self.sparse_ndim}")
         return COOTensor(new_indices, self._values, shape)
 
-    def tril(self, k: int=0) -> 'COOTensor':
-        indices, values = tril_coo(self._indices, self._values, k)
-        return COOTensor(indices, values, self._spshape)
+    def partial(self, index: Union[TensorLike, slice], /):
+        new_indices = bm.copy(self.indices()[:, index])
+        new_values = self.values()
+
+        if new_values is not None:
+            new_values = bm.copy(new_values[..., index])
+
+        return COOTensor(new_indices, new_values, self._spshape)
+
+    def tril(self, k: int = 0) -> 'COOTensor':
+        indices = self.indices()
+        tril_loc = (indices[-2] + k) >= indices[-1]
+        return self.partial(tril_loc)
+
+    def triu(self, k: int = 0) -> 'COOTensor':
+        indices = self.indices()
+        triu_loc = (indices[-1] - k) >= indices[-2]
+        return self.partial(triu_loc)
 
     @classmethod
     def concat(cls, coo_tensors: Sequence['COOTensor'], /, *, axis: int=0) -> 'COOTensor':

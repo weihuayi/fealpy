@@ -91,6 +91,15 @@ class CSRTensor(SparseTensor):
         """Return the row location of non-zero elements."""
         return self._crow
 
+    def row(self) -> TensorLike:
+        """Generate the row id of non-zero elements."""
+        crow = self.crow()
+        n_row = crow.shape[0] - 1
+        return bm.repeat(
+            bm.arange(n_row, dtype=crow.dtype, device=bm.get_device(crow)),
+            crow[1:] - crow[:-1]
+        )
+
     def col(self) -> TensorLike:
         """Return the column of non-zero elements."""
         return self._col
@@ -193,6 +202,35 @@ class CSRTensor(SparseTensor):
 
     def flatten(self) -> 'CSRTensor':
         pass
+
+    @property
+    def T(self):
+        raise NotImplementedError
+
+    def partial(self, index: Union[TensorLike, slice]):
+        crow = self.crow()
+        ZERO = bm.zeros([1], dtype=crow.dtype, device=bm.get_device(crow))
+        new_col = bm.copy(self.col()[..., index])
+        is_selected = bm.zeros((self.nnz,), dtype=bm.bool, device=bm.get_device(new_col))
+        is_selected = bm.set_at(is_selected, index, True)
+        selected_cum = bm.concat([ZERO, bm.cumsum(is_selected, axis=0)], axis=0)
+        new_nnz_per_row = selected_cum[crow[1:]] - selected_cum[crow[:-1]]
+        new_crow = bm.concat([ZERO, bm.cumsum(new_nnz_per_row, axis=0)], axis=0)
+
+        new_values = self.values()
+
+        if new_values is not None:
+            new_values = bm.copy(new_values[..., index])
+
+        return CSRTensor(new_crow, new_col, new_values, self._spshape)
+
+    def tril(self, k: int = 0) -> 'CSRTensor':
+        tril_loc = (self.row() + k) >= self.col()
+        return self.partial(tril_loc)
+
+    def triu(self, k: int = 0) -> 'CSRTensor':
+        tril_loc = (self.col() - k) >= self.row()
+        return self.partial(tril_loc)
 
     ### 6. Arithmetic Operations ###
     def neg(self) -> 'CSRTensor':
