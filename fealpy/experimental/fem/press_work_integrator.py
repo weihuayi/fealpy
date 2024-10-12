@@ -39,6 +39,8 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
     def fetch(self, space: _FS):
         space0 = space[0]
         space1 = space[1]
+        scalar_space = space[1].scalar_space
+         
         index = self.index
         mesh = getattr(space[0], 'mesh', None)
 
@@ -53,7 +55,12 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         phi = space0.basis(bcs, index=index)
-        gphi = space1.grad_basis(bcs, index=index)
+        gphi = scalar_space.grad_basis(bcs ,index=index)
+        if space1.dof_priority:
+            gphi = gphi.swapaxes(-1,-2)
+            gphi = gphi.reshape(*gphi.shape[:2], -1) 
+        else:
+            gphi = gphi.reshape(*gphi.shape[:2], -1)
         return phi, gphi, cm, bcs, ws, index
 
     def assembly(self, space: _FS) -> TensorLike:
@@ -62,13 +69,6 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         mesh = getattr(space[0], 'mesh', None)
         phi, gphi, cm, bcs, ws, index = self.fetch(space) 
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        '''
-        gphi0 = gphi[...,:6,0,0]
-        gphi1 = gphi[...,6:,1,1]
-        gphi = bm.concatenate((gphi0,gphi1),-1)
-        print(gphi.shape)
-        print(phi.shape)
-        '''
         result = bilinear_integral(gphi, phi, ws, cm, val, batched=self.batched)
         print(result.shape)
         return result

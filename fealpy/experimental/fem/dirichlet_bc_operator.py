@@ -15,15 +15,15 @@ class DirichletBCOperator():
     def __init__(self, form: Form,
                  gd: Optional[CoefLike]=None,
                  *, threshold: Optional[Callable]=None, 
-                 isbddof:Optional[TensorLike]=None,
+                 isDDof=None,
                  left:bool=True):
         self.form = form
         self.gd = gd
-        if isbddof is None:
+        if isDDof is None:
             isDDof = form._spaces[0].is_boundary_dof(threshold=threshold) # on the same device as space
             self.is_boundary_dof = isDDof
         else :
-            self.is_boundary_dof = isbddof
+            self.is_boundary_dof = isDDof
         self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.shape = form.shape 
 
