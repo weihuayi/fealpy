@@ -91,6 +91,8 @@ class BilinearForm(Form[LinearInt]):
             global_matrix (CSRTensor | COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
         """
         M = self._scalar_assembly(retain_ints, self.batch_size)
+        if getattr(self, '_transposed', False):
+            M = M.T
 
         if format == 'csr':
             self._M = M.coalesce().tocsr()
@@ -113,6 +115,13 @@ class BilinearForm(Form[LinearInt]):
             TensorLike: self @ x
         """
         raise NotImplementedError
+
+    @property
+    def T(self):
+        transposed = self.copy()
+        transposed._transposed = True
+        transposed._M = self._M
+        return transposed
 
     def __matmul__(self, u: TensorLike):
         if self._M is not None:
@@ -148,3 +157,5 @@ class BilinearForm(Form[LinearInt]):
             v = bm.index_add(v, ve2dof.reshape(-1), gv.reshape(gv_reshape))
 
         return v
+
+
