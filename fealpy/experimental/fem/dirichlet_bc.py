@@ -151,7 +151,7 @@ class DirichletBC():
 
             nnz_per_row = crow[1:] - crow[:-1]
             remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
-            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag)], axis=0) # 被保留的非零元素数量累积
+            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
             nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
 
             new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)

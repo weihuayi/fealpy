@@ -136,8 +136,9 @@ class COOTensor(SparseTensor):
 
         order = bm.argsort(self._indices[0], stable=True)
         new_row = self._indices[0, order]
-        crow, = bm.nonzero((bm.not_equal(new_row, bm.roll(new_row, 1))))
-        new_col = bm.copy(self._indices[1:, order])
+        crow = bm.nonzero((bm.not_equal(new_row, bm.roll(new_row, 1))))[0]
+        crow = bm.concat([crow, bm.tensor([self.nnz], **bm.context(crow))])
+        new_col = bm.copy(self._indices[-1, order])
         if self.values() is None:
             new_values = None
         else:
