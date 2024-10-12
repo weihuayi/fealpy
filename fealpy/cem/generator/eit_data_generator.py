@@ -66,7 +66,7 @@ class EITDataGenerator():
         """
         def _coef_func(p: Tensor):
             inclusion = levelset(p) < 0.
-            sigma = bm.empty(p.shape[:2], dtype=p.dtype, device=p.device) # (Q, C)
+            sigma = bm.empty(p.shape[:2], **bm.context(p)) # (Q, C)
             sigma = bm.set_at(sigma, inclusion, sigma_vals[0])
             sigma = bm.set_at(sigma, ~inclusion, sigma_vals[1])
             return sigma
@@ -85,17 +85,22 @@ class EITDataGenerator():
         A_n_indices = bm.concat([self._A.indices(), cdata_indices, cdataT_indices], axis=1)
         A_n_values = bm.concat([self._A.values(), self.cdata, self.cdata], axis=-1)
         self.A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
+        self.A_n = self.A_n.tocsr()
 
         node = space.mesh.entity('node')
         return levelset(node) < 0.
 
     def set_boundary(self, gn_source: Union[Callable[[Tensor], Tensor], Tensor],
-                     batch_size: int=0) -> Tensor:
+                     batch_size: int=0, *, zero_integral=False) -> Tensor:
         """Set boundary current density.
 
         Args:
             gn_source (Callable[[Tensor], Tensor] | Tensor): The current density\
                 function or Tensor on the boundary.
+            batch_size (int, optional): The batch size of the boundary current\
+                density function. Defaults to 0.
+            zero_integral (bool, optional): Whether zero the integral of the\
+                current density on the boundary. Defaults to False.
 
         Returns:
             Tensor: current value on boundary nodes, shaped (Boundary nodes, )\
@@ -113,12 +118,17 @@ class EITDataGenerator():
         self._bsi.clear()
         lform.add_integrator(self._bsi)
         b_ = lform.assembly()
+
+        if zero_integral:
+            b_ = b_ - bm.mean(b_, axis=0)
+
         current = b_[..., self._bd_node_index]
+        kwargs = bm.context(b_)
 
         if b_.ndim == 1:
-            ZERO = bm.zeros((1,), dtype=b_.dtype, device=b_.device)
+            ZERO = bm.zeros((1,), **kwargs)
         else:
-            ZERO = bm.zeros((b_.shape[0], 1), dtype=b_.dtype, device=b_.device)
+            ZERO = bm.zeros((b_.shape[0], 1), **kwargs)
         self.b_ = bm.concat([b_, ZERO], axis=-1)
 
         return current
@@ -133,7 +143,7 @@ class EITDataGenerator():
             Tensor: gd Tensor, shaped (Boundary nodes, )\
                 or (Batch, Boundary nodes).
         """
-        uh = cg(self.A_n, self.b_, batch_first=True, atol=1e-14, rtol=0.)
+        uh = cg(self.A_n, self.b_, batch_first=True, atol=1e-12, rtol=0.)
 
         if return_full:
             return uh[:-1]

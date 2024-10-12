@@ -151,7 +151,7 @@ class NSFEMSolver:
             A = self.M
         else:
             bform = BilinearForm((self.uspace,)*2)
-            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=q))
+            bform.add_domain_integrator(VectorMassIntegrator(c=rho, q=self.q))
             A = bform.assembly()         
         return A
     
@@ -417,7 +417,7 @@ class NSFEMSolver:
             print("还没开发")
         return result
 
-    def netwon_A(self, u0):
+    def netwon_A(self, un):
         M = self.M
         AP = self.AP
         rho = self.rho

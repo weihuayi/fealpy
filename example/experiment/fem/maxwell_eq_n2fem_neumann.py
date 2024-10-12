@@ -11,7 +11,7 @@ from scipy.sparse.linalg import spsolve
 
 from fealpy.experimental.mesh import TriangleMesh, TetrahedronMesh
 from fealpy.experimental.functionspace import SecondNedelecFiniteElementSpace2d
-from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace3d
+from fealpy.experimental.functionspace import SecondNedelecFiniteElementSpace3d
 from fealpy.experimental import logger
 logger.setLevel('WARNING')
 
@@ -87,8 +87,10 @@ parser.add_argument('--maxit',
 
 args = parser.parse_args()
 p = args.degree
-maxit = args.maxit
-dim = args.dim
+#maxit = args.maxit
+maxit = 3
+#dim = args.dim
+dim = 3
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -109,7 +111,7 @@ tmr = timer()
 next(tmr)
 
 ps = [2, 3, 4]
-#ps = [5]
+#ps = [2]
 for j, p in enumerate(ps):
     for i in range(maxit):
         print("The {}-th computation:".format(i))
@@ -119,7 +121,7 @@ for j, p in enumerate(ps):
             space = SecondNedelecFiniteElementSpace2d(mesh, p=p)
         else:
             mesh = TetrahedronMesh.from_box(pde.domain(), nx=2**i, ny=2**i, nz=2**i)
-            space = FirstNedelecFiniteElementSpace3d(mesh, p=p)
+            space = SecondNedelecFiniteElementSpace3d(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
         gdof = space.dof.number_of_global_dofs()

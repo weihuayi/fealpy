@@ -6,11 +6,12 @@ from ..functionspace import FunctionSpace as _FS
 from .integrator import Integrator
 
 from .. import logger
+from abc import ABC
 
 _I = TypeVar('_IT', bound=Integrator)
 
 
-class Form(Generic[_I]):
+class Form(Generic[_I], ABC):
     _spaces: Tuple[_FS, ...]
     integrators: Dict[str, Tuple[_I, ...]]
     memory: Dict[str, Tuple[TensorLike, List[TensorLike]]]
@@ -36,6 +37,14 @@ class Form(Generic[_I]):
 
         self._values_ravel_shape = (-1,) if self.batch_size == 0 else (self.batch_size, -1)
         self.sparse_shape = self._get_sparse_shape()
+
+    def copy(self):
+        new_obj = self.__class__(self._spaces, batch_size=self.batch_size)
+        new_obj.integrators.update(self.integrators)
+        new_obj.memory.update(self.memory)
+        new_obj._values_ravel_shape = self._values_ravel_shape
+        new_obj.sparse_shape = tuple(reversed(self.sparse_shape))
+        return new_obj
 
     def __len__(self) -> int:
         return len(self.integrators)

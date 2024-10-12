@@ -354,6 +354,9 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
             src_flat_shape = a.shape[:axis] + (index.numel(), ) + a.shape[axis+1:]
             src = torch.broadcast_to(src, src_shape).reshape(src_flat_shape)
             index = index.ravel()
+        if isinstance(src, (int, float)):
+            max_idx = torch.max(index)
+            src = torch.full(max_idx+1, src, dtype=a.dtype, device=a.device)
         return a.index_add_(axis, index, src, alpha=alpha)
 
     @staticmethod

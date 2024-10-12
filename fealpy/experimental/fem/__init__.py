@@ -5,6 +5,7 @@ from .integrator import *
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
 from .semilinear_form import SemilinearForm
+from .block_form import BlockForm
 
 ### Cell Operator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
@@ -13,7 +14,7 @@ from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_semilinear_mass_integrator import ScalarSemilinearMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elastic_integrator import LinearElasticIntegrator
-from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator1
+from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator0, PressWorkIntegrator1
 from .vector_mass_integrator import VectorMassIntegrator
 from .curl_integrator import CurlIntegrator
 

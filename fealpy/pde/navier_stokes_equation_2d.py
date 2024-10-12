@@ -7,6 +7,7 @@ from fealpy.decorator import cartesian
 #from fealpy.mesh import DistMesh2d
 from fealpy.geometry import dcircle,drectangle,ddiff,dmin
 from fealpy.geometry import huniform
+from fealpy.experimental.backend import backend_manager as bm
 class SinCosData:
     """
     [0, 1]^2
@@ -215,28 +216,28 @@ class FlowPastCylinder:
     
     @cartesian
     def is_outflow_boundary(self,p):
-        return np.abs(p[..., 0] - 2.2) < self.eps
+        return bm.abs(p[..., 0] - 2.2) < self.eps
     
     @cartesian
     def is_inflow_boundary(self,p):
-        return np.abs(p[..., 0]) < self.eps
+        return bm.abs(p[..., 0]) < self.eps
     
     @cartesian
     def is_circle_boundary(self,p):
         x = p[...,0]
         y = p[...,1]
-        return (np.sqrt(x**2 + y**2) - 0.05) < self.eps
+        return (bm.sqrt(x**2 + y**2) - 0.05) < self.eps
       
     @cartesian
     def is_wall_boundary(self,p):
-        return (np.abs(p[..., 1] -0.41) < self.eps) | \
-               (np.abs(p[..., 1] ) < self.eps)
+        return (bm.abs(p[..., 1] -0.41) < self.eps) | \
+               (bm.abs(p[..., 1] ) < self.eps)
 
     @cartesian
     def u_inflow_dirichlet(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = np.zeros(p.shape,dtype=np.float64)
+        value = bm.zeros(p.shape, dtype=p.dtype)
         value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
         value[...,1] = 0
         return value
