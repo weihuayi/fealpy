@@ -62,7 +62,7 @@ class BilinearForm(Form[LinearInt]):
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
             local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
-            
+
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
 
@@ -80,13 +80,12 @@ class BilinearForm(Form[LinearInt]):
     def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
     @overload
     def assembly(self, *, format: Literal['csr'], retain_ints: bool=False) -> CSRTensor: ...
-    def assembly(self, *, format='coo', retain_ints: bool=False):
+    def assembly(self, *, format='csr', retain_ints: bool=False):
         """Assembly the bilinear form matrix.
 
         Parameters:
-            format (str, optional): Layout of the output ('csr' | 'coo'). Defaults to 'coo'.
-                The default format will change to 'csr' in the future.\n
-            retain_ints (bool, optional): Whether to retain the integrator cache.
+            format (str, optional): Layout of the output ('csr' | 'coo'). Defaults to 'csr'.\n
+            retain_ints (bool, optional): Whether to retain the integrator cache.csr
 
         Returns:
             global_matrix (CSRTensor | COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
@@ -98,7 +97,7 @@ class BilinearForm(Form[LinearInt]):
         elif format == 'coo':
             self._M = M.coalesce()
         else:
-            raise ValueError(f"Unknown format {format}.")
+            raise ValueError(f"Unsupported format {format}.")
         logger.info(f"Bilinear form matrix constructed, with shape {list(self._M.shape)}.")
 
         return self._M
