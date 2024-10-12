@@ -6,7 +6,7 @@ from fealpy.experimental.backend import backend_manager as bm
 from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
 from fealpy.experimental.mesh.tetrahedron_mesh import TetrahedronMesh
 from fealpy.experimental.mesh.mesh_quality import RadiusRatioQuality
-from radius_ratio_objective import RadiusRatioSumObjective
+from .radius_ratio_objective import RadiusRatioSumObjective
 
 def show_mesh_quality(q1,ylim=1000):
     fig,axes= plt.subplots()
@@ -51,6 +51,31 @@ def show_mesh_quality(q1,ylim=1000):
             horizontalalignment='left', verticalalignment='top', fontsize=15)
     plt.show()
     return 0
+
+def show_angle(axes, angle):
+        """
+        @brief 显示网格角度的分布直方图
+        """
+        hist, bins = np.histogram(angle.flatten('F') * 180 / bm.pi, bins=50, range=(0, 180))
+        center = (bins[:-1] + bins[1:]) / 2
+        axes.bar(center, hist, align='center', width=180 / 50.0)
+        axes.set_xlim(0, 180)
+        mina = np.min(angle.flatten('F') * 180 / np.pi)
+        maxa = np.max(angle.flatten('F') * 180 / np.pi)
+        meana = np.mean(angle.flatten('F') * 180 / np.pi)
+        axes.annotate('Min angle: {:.4}'.format(mina), xy=(0.41, 0.5),
+                      xytext=(0.15,0.85),
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Max angle: {:.4}'.format(maxa), xy=(0.41, 0.45),
+                      xytext=(0.15,0.75),
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
+        axes.annotate('Average angle: {:.4}'.format(meana), xy=(0.41, 0.40),
+                      xytext=(0.15,0.7),
+                      textcoords='axes fraction',
+                      horizontalalignment='left', verticalalignment='top')
+        return mina, maxa, meana
 
 def BlockJacobi2d(node,A,B,isFreeNode):
     NN = node.shape[0] 
