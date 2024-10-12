@@ -18,45 +18,49 @@ parameter_groups = {
     'group1': {'nx': 60, 'ny': 20, 'filter_rmin': 2.4},
     'group2': {'nx': 150, 'ny': 50, 'filter_rmin': 6.0},
     'group3': {'nx': 300, 'ny': 100, 'filter_rmin': 16.0},
+    'group4': {'nx': 300, 'ny': 100, 'filter_rmin': 9},
 }
 
-parser = argparse.ArgumentParser(description="MBB 梁上的柔顺度最小化.")
+parser = argparse.ArgumentParser(description="Compliance minimization on MBB beam.")
 
 parser.add_argument('--backend', 
-                    default='numpy', type=str,
-                    help='指定计算的后端类型, 默认为 numpy.')
+                    default='pytorch', type=str,
+                    help='Specify the backend type for computation, default is numpy.')
 
 parser.add_argument('--degree',
                     default=1, type=int,
-                    help='Lagrange 有限元空间的次数, 默认为 1.')
+                    help='Degree of the Lagrange finite element space, default is 1.')
 
 parser.add_argument('--solver_method',
-                    default='spsolve', type=str,
-                    help='求解器类型, 默认为 cg.')
+                    choices=['cg', 'spsolve'],
+                    default='cg', type=str,
+                    help='Solver type, can choose iterative solver "cg" \
+                    or direct solver "spsolve", default is cg.')
 
 parser.add_argument('--filter_type', 
-                    default='sensitivity', type=str, 
-                    help='滤波器类型, 默认为密度滤波器.')
+                    choices=['sensitivity', 'density', 'heaviside', 'None'], 
+                    default='None', type=str, 
+                    help='Filter type, can choose sensitivity filter, density filter, \
+                    Heaviside projection filter, or no filter. \
+                    Default is density filter.')
 
 parser.add_argument('--volfrac', 
                     default=0.5, type=float, 
-                    help='体积分数, 默认为 0.5.')
+                    help='Volume fraction, default is 0.5.')
 
 parser.add_argument('--group', 
                     choices=parameter_groups.keys(), 
                     default='group1',
                     help=(
-                        '选择参数组 (例如 group1, group2, group3 等).\n'
-                        '每个参数组定义如下:\n'
-                        'nx: x 方向的单元数\n'
-                        'ny: y 方向的单元数\n'
-                        'filter_rmin: 滤波器的半径\n'
+                        'Select parameter group.\n'
+                        'Each parameter group is defined as follows:\n'
+                        'nx: Number of elements in the x direction\n'
+                        'ny: Number of elements in the y direction\n'
+                        'filter_rmin: Radius of the filter\n'
                     ))
 
 args = parser.parse_args()
-
 bm.set_backend(args.backend)
-
 args_group = parameter_groups[args.group]
 
 nx, ny = args_group['nx'], args_group['ny']
@@ -65,16 +69,9 @@ pde = MBBBeam2dOneData(nx=nx, ny=ny)
 extent = [0, nx, 0, ny]
 h = [1.0, 1.0]
 origin = [0.0, 0.0]
-
-mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction='y')
-# import matplotlib.pyplot as plt
-# fig = plt.figure()
-# axes = fig.add_subplot(111)
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_edge(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()
+mesh = UniformMesh2d(extent=extent, h=h, origin=origin, 
+                    ipoints_ordering='yx', flip_direction='y', 
+                    device='cpu')
 
 volfrac = args.volfrac
 rho = volfrac * bm.ones(nx * ny, dtype=bm.float64)
@@ -84,28 +81,31 @@ material_properties = ElasticMaterialProperties(
             hypo="plane_stress", rho=rho,
             interpolation_model=SIMPInterpolation())
 
-volume_constraint = VolumeConstraint(mesh=mesh,
-                                    volfrac=args.volfrac,
-                                    filter_type=args.filter_type,
-                                    filter_rmin=args_group['filter_rmin']) 
+filter_type = args.filter_type
+filter_rmin = args_group['filter_rmin'] if filter_type != 'None' else None
+volume_constraint = VolumeConstraint(mesh=mesh, volfrac=volfrac,
+                                    filter_type=filter_type,
+                                    filter_rmin=filter_rmin) 
 
+space_degree = args.degree
+solver_method = args.solver_method
 compliance_objective = ComplianceObjective(
     mesh=mesh,
-    space_degree=args.degree,
+    space_degree=space_degree,
     dof_per_node=2,
     dof_ordering='gd-priority', 
     material_properties=material_properties,
-    filter_type=args.filter_type,
-    filter_rmin=args_group['filter_rmin'],
+    filter_type=filter_type,
+    filter_rmin=filter_rmin,
     pde=pde,
-    solver_method=args.solver_method, 
+    solver_method=solver_method, 
     volume_constraint=volume_constraint
 )
 
 options = opt_alg_options(
     x0=material_properties.rho,
     objective=compliance_objective,
-    MaxIters=10,
+    MaxIters=500,
     FunValDiff=0.01
 )
 
