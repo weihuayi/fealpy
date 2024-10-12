@@ -428,51 +428,51 @@ class PolygonMesh(Mesh, Plotable):
             return self.cell
 
     @classmethod
-    def from_one_triangle(cls,meshtype='iso'):    
+    def from_one_triangle(cls,meshtype='iso',*,device=None): 
         if meshtype == 'equ':
             node = bm.tensor([
                     [0.0, 0.0],
                     [1.0, 0.0],
-                    [0.5, sqrt(3)/2]], dtype=bm.float64)
+                    [0.5, sqrt(3)/2]], dtype=bm.float64,device=device)
         elif meshtype =='iso':
             node = bm.tensor([
                     [0.0, 0.0],
                     [1.0, 0.0],
                     [0.0, 1.0]], dtype=bm.float64)
-        cell = (bm.tensor([[0, 1, 2]],dtype=bm.int64),None)
+        cell = (bm.tensor([[0, 1, 2]],dtype=bm.int64,device=device),None)
         return cls(node, cell)
 
     @classmethod
-    def from_one_square(cls):
+    def from_one_square(cls,*,device=None):
         node = bm.tensor([
             [0.0, 0.0],
             [1.0, 0.0],
             [1.0, 1.0],
-            [0.0, 1.0]],dtype=bm.float64)
-        cell = (bm.tensor([[0, 1, 2, 3]], dtype=bm.int64),None)
+            [0.0, 1.0]],dtype=bm.float64,device=device)
+        cell = (bm.tensor([[0, 1, 2, 3]], dtype=bm.int64,device=device),None)
         return cls(node, cell)
 
     @classmethod
-    def from_one_pentagon(cls):
+    def from_one_pentagon(cls,*,device=None):
         node = bm.tensor([
             (0.0, 0.0),
             (cos(2/5*pi), -sin(2/5*pi)),
             (cos(2/5*pi)+1, -sin(2/5*pi)),
             ( 2*cos(1/5*pi), 0.0),
-            (cos(1/5*pi), sin(1/5*pi))],dtype=bm.float64)
-        cell = (bm.tensor([0, 1, 2, 3, 4], dtype=bm.int64),bm.tensor([0,5],dtype=bm.int64))
+            (cos(1/5*pi), sin(1/5*pi))],dtype=bm.float64,device=device)
+        cell = (bm.tensor([0, 1, 2, 3, 4], dtype=bm.int64,device=device),bm.tensor([0,5],dtype=bm.int64))
         return cls(node, cell)
 
     @classmethod
-    def from_one_hexagon(cls):
+    def from_one_hexagon(cls,*,device=None):
         node = bm.tensor([
             [0.0, 0.0],
             [1/2, -sqrt(3)/2],
             [3/2, -sqrt(3)/2],
             [2.0, 0.0],
             [3/2, sqrt(3)/2],
-            [1/2, sqrt(3)/2]], dtype=bm.float64)
-        cell = (bm.tensor([0, 1, 2, 3, 4, 5], dtype=bm.int64),bm.tensor([0, 6], dtype=bm.int64))
+            [1/2, sqrt(3)/2]], dtype=bm.float64,device=device)
+        cell = (bm.tensor([0, 1, 2, 3, 4, 5], dtype=bm.int64,device=device),bm.tensor([0, 6], dtype=bm.int64))
         return cls(node, cell)
 
     @classmethod
