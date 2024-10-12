@@ -20,10 +20,10 @@ from .half_edge_mesh_2d import HalfEdgeMesh2d
 from .dart_mesh_3d import DartMesh3d
 
 from .uniform_mesh_1d import UniformMesh1d
-from .uniform_mesh_2d import UniformMesh2d
+#from .uniform_mesh_2d import UniformMesh2d
 from .uniform_mesh_3d import UniformMesh3d
 
-from .node_set import NodeSet
+#from .node_set import NodeSet
 
 from .ccg_mesh_reader import CCGMeshReader
 from .fab_file_reader import FABFileReader

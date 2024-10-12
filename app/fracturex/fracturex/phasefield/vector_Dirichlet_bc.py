@@ -21,6 +21,7 @@ class VectorDirichletBC:
 
         # Prepare an index array with shape (GD, npoints)
         index = bm.zeros((GD, ipoints.shape[0]), dtype=bool)
+        #index = bm.zeros((ipoints.shape[0], GD), dtype=bool)
 
         # Map direction to axis: 'x' -> 0, 'y' -> 1, 'z' -> 2 (for GD = 3)
         direction_map = {'x': 0, 'y': 1, 'z': 2}
@@ -61,6 +62,7 @@ class VectorDirichletBC:
             The new right-hand-side vector.
         """
         isDDof = self.set_boundary_dof()
+
         kwargs = A.values_context()
 
         if isinstance(A, COOTensor):
@@ -84,6 +86,7 @@ class VectorDirichletBC:
             raise NotImplementedError('The CSRTensor version has not been implemented.')
 
         bm.set_at(f, isDDof, self.gd) 
+        
         return A, f
 
 

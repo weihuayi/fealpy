@@ -70,7 +70,7 @@ class InteriorPenaltyBernsteinFESpace2d(BernsteinFESpace):
     def __init__(self, mesh, p=2):
         super(InteriorPenaltyBernsteinFESpace2d, self).__init__(mesh, p, 'C')
         self.dof = InteriorPenaltyBernsteinDof2d(mesh, p)
-        self.ftype = np.float_
+        self.ftype = np.float64
 
     def grad_normal_jump_basis(self, bcs, m=1):
         """

@@ -21,11 +21,8 @@ from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichl
 class MainSolver:
     def __init__(self, mesh, material_params: Dict, 
                  p: int = 1, q: Optional[int] = None, 
-                 method: str = 'HybridModel',
-                 enable_refinement: bool = False, 
-                 marking_strategy: str = 'recovery', 
-                 refine_method: str = 'bisect', 
-                 theta: float = 0.2):
+                 model_type: str = 'HybridModel',
+                 method: str = 'lfem'):
         """
         Initialize the MainSolver class with more customization options.
 
@@ -39,28 +36,27 @@ class MainSolver:
             Polynomial order for the function space, by default 1.
         q : int, optional
             Quadrature degree, by default p + 2.
+        model_type : str, optional
+            Stress decomposition model, by default 'HybridModel'.
         method : str, optional
-            Stress decomposition method, by default 'HybridModel'.
-        enable_refinement : bool, optional
-            Whether to enable adaptive refinement, by default False.
-        marking_strategy : str, optional
-            The marking strategy for refinement, by default 'recovery'.
-        refine_method : str, optional
-            The refinement method, by default 'nvp'.
-        theta : float, optional
-            Refinement threshold parameter, by default 0.2.
+            The method for solving the problem, by default 'lfem'.
         """
         self.mesh = mesh
         self.p = p
         self.q = self.p + 2 if q is None else q
-        self.method = method
+#        self.model = model
 
         # Material and energy degradation function
         self.EDFunc = EDFunc()
-        self.pfcm = PhaseFractureMaterialFactory.create(method, material_params, self.EDFunc)
+        self.pfcm = PhaseFractureMaterialFactory.create(model_type, material_params, self.EDFunc)
+
+        self.method = method
 
         # Initialize spaces
-        self.set_lfe_space()
+        if self.method == 'lfem':
+            self.set_lfe_space()
+        else:
+            raise ValueError(f"Unknown method: {self.method}")
         self.pfcm.update_disp(self.uh)
         self.pfcm.update_phase(self.d)
 
@@ -91,7 +87,8 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(len(self.force_value)-1):
+        for i in range(1):
+        #for i in range(len(self.force_value)-1):
             print('i', i)
             self._currt_force_value = self.force_value[i+1]
             # Run Newton-Raphson iteration
@@ -130,18 +127,26 @@ class MainSolver:
             
             print(f"Displacement error after iteration {k + 1}: {er0}")
 
-            er1 = self.solve_phase_field()
+            if self.method == 'lfem':
+                er1 = self.solve_phase_field()
+            else:
+                raise ValueError(f"Unknown method: {self.method}")
             self.pfcm.update_phase(self.d)
             print(f"Phase field error after iteration {k + 1}: {er1}")
             tmr.send('phase_solve')
 
             self.H = self.pfcm.H
+            
             if self.enable_refinement:
                 data = self.set_interpolation_data()
                 self.mesh, new_data = self.adaptive.perform_refinement(self.mesh, self.d, data, self.l0)
                 if new_data:
-                    self.set_lfe_space()
+                    if self.method == 'lfem':
+                        self.set_lfe_space()
+                    else:
+                        raise ValueError(f"Unknown method: {self.method}")
                     self.update_interpolation_data(new_data)
+                    self._initialize_force_boundary()
                     print(f"Refinement after iteration {k + 1}")
 
             tmr.send('refine')
@@ -212,7 +217,7 @@ class MainSolver:
         tmr.send('start')
 
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(Gc * l0, q=self.q, method='fast'))
+        dbform.add_integrator(ScalarDiffusionIntegrator(Gc * l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef, q=self.q))
         A = dbform.assembly()
@@ -327,8 +332,17 @@ class MainSolver:
         direction : str, optional
             Direction for vector fields ('x', 'y', 'z'), by default None.
         """
-        self.bc_dict[field_type] = {'type': bc_type, 'bcdof': boundary_dof, 'value': value, 'direction': direction}
+        if field_type not in self.bc_dict:
+            self.bc_dict[field_type] = []
+    
+        self.bc_dict[field_type].append({
+            'type': bc_type,
+            'bcdof': boundary_dof,
+            'value': value,
+            'direction': direction
+        })
 
+        
     def get_boundary_conditions(self, field_type: str):
         """
         Get the boundary conditions for a specific field.
@@ -340,16 +354,18 @@ class MainSolver:
 
         Returns
         -------
-        dict
-            Boundary condition data for the specified field.
+        list
+            A list of boundary condition data for the specified field.
         """
-        return self.bc_dict.get(field_type, {})
+        return self.bc_dict.get(field_type, [])
+
 
     def _initialize_force_boundary(self):
         """
         Initialize the force boundary conditions.
         """
         force_data = self.get_boundary_conditions('force')
+        force_data = force_data[0]
         self.force_type = force_data.get('type')
         self.force_dof = force_data.get('bcdof')
         self.force_value = force_data.get('value')
@@ -368,20 +384,21 @@ class MainSolver:
         field : str
             Field type: 'displacement' or 'phase'.
         """
-        bcdata = self.get_boundary_conditions(field)
-    
-        if bcdata:
-            if field == 'displacement':
-                if bcdata['type'] == 'Dirichlet':
-                    bc = VectorDirichletBC(self.tspace, bcdata['value'], bcdata['bcdof'], direction=bcdata['direction'])
-                    A, R = bc.apply(A, R)
-                else:
-                    raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
-            elif field == 'phase':
-                if bcdata['type'] == 'Dirichlet':
-                    bc = DirichletBC(self.space, bcdata['value'], bcdata['bcdof'])
-                    A, R = bc.apply(A, R)
-                else:
-                    raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
+        bc_list = self.get_boundary_conditions(field)
+
+        if bc_list:
+            for bcdata in bc_list:
+                if field == 'displacement':
+                    if bcdata['type'] == 'Dirichlet':
+                        bc = VectorDirichletBC(self.tspace, bcdata['value'], bcdata['bcdof'], direction=bcdata['direction'])
+                        A, R = bc.apply(A, R)
+                    else:
+                        raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
+                elif field == 'phase':
+                    if bcdata['type'] == 'Dirichlet':
+                        bc = DirichletBC(self.space, bcdata['value'], bcdata['bcdof'])
+                        A, R = bc.apply(A, R)
+                    else:
+                        raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
         return A, R
 
