@@ -56,6 +56,24 @@ def test_to_dense(backend):
                     [1.22, 0, 0]]], dtype=bm.float64)
     )
 
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_tril(backend):
+    bm.set_backend(backend)
+    crow = bm.tensor([0, 0, 2, 3, 4, 4])
+    col = bm.tensor([1, 2, 3, 2])
+    values = bm.tensor([4, 3, 1, 2], dtype=bm.float32)
+    spshape = (5, 4)
+    csr_tensor = CSRTensor(crow, col, values, spshape)
+    tril_tensor = csr_tensor.tril(k=0)
+
+    expected_crow = bm.tensor([0, 0, 1, 1, 2, 2])
+    expected_col = bm.tensor([1, 2])
+    expected_values = bm.tensor([4, 2], dtype=bm.float32)
+
+    assert bm.all(bm.equal(tril_tensor.crow(), expected_crow))
+    assert bm.all(bm.equal(tril_tensor.col(), expected_col))
+    assert bm.allclose(tril_tensor.values(), expected_values)
+
 def create_csr_tensor(crow, col, values, shape):
     return CSRTensor(crow=crow, col=col, values=values, spshape=shape)
 
