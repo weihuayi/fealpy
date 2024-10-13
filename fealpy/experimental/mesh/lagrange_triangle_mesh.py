@@ -314,9 +314,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         else:
             return J, gphi
 
-    def uniform_refine(self, n=1):
-        pass
-    
     # fundamental form
     def first_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
             index: Index=_S, return_jacobi=False, return_grad=False):
