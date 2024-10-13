@@ -1,7 +1,7 @@
 import ipdb
 import pytest
-from fealpy.experimental.mesh.node_mesh import NodeMesh
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.mesh.node_mesh import NodeMesh
+from fealpy.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 
 from jax import random

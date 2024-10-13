@@ -4,7 +4,7 @@ import pytest
 import jax
 import jax.numpy as jnp
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 #bm.set_backend('numpy')
 bm.set_backend('jax')

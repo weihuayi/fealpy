@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from fealpy.experimental.iopt import initialize
+from fealpy.iopt import initialize
 from ..backend import backend_manager as bm
 #bm.set_backend('pytorch')
 import math

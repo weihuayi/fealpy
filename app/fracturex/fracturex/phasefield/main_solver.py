@@ -3,14 +3,14 @@ import numpy as np
 from fealpy.utils import timer
 from scipy.sparse import spdiags
 
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.decorator import barycentric, cartesian
-from fealpy.experimental.fem import BilinearForm, LinearForm
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.experimental.fem import LinearElasticIntegrator, ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.solver import cg
+from fealpy.typing import TensorLike
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import barycentric, cartesian
+from fealpy.fem import BilinearForm, LinearForm
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.fem import LinearElasticIntegrator, ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+from fealpy.solver import cg
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory

@@ -1,8 +1,8 @@
 
-from fealpy.experimental.backend import backend_manager as bm 
-from fealpy.experimental.typing import TensorLike, Index, _S
-from fealpy.experimental import logger
-from fealpy.experimental.opt.optimizer_base import Optimizer
+from fealpy.backend import backend_manager as bm 
+from fealpy.typing import TensorLike, Index, _S
+from fealpy import logger
+from fealpy.opt.optimizer_base import Optimizer
 
 
 class HoneybadgerOptAlg(Optimizer):

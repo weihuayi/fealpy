@@ -1,8 +1,8 @@
 from typing import TypedDict, Callable, Tuple, Union, Optional
 
-from fealpy.experimental.backend import backend_manager as bm 
-from fealpy.experimental.typing import TensorLike, Index, _S
-from fealpy.experimental import logger
+from fealpy.backend import backend_manager as bm 
+from fealpy.typing import TensorLike, Index, _S
+from fealpy import logger
 
 def opt_alg_options(
     x0: TensorLike,

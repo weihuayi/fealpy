@@ -1,10 +1,10 @@
 import numpy as np
 from typing import Optional
 
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.typing import TensorLike
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
+from fealpy.material.elastic_material import LinearElasticMaterial
 
 
 def compute_strain(u: TensorLike, q=None) -> TensorLike:

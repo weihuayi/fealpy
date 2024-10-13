@@ -1,4 +1,4 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 class initialize:
     def __init__ (self, N, dim, ub, lb, MaxIT, fobj):

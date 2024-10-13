@@ -1,10 +1,10 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as _DT
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as _DT
 
-from fealpy.experimental.typing import Union
+from fealpy.typing import Union
 
-from fealpy.experimental.opt.objective import Constraint
-from fealpy.experimental.mesh.mesh_base import Mesh
+from fealpy.opt.objective import Constraint
+from fealpy.mesh.mesh_base import Mesh
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 

@@ -363,7 +363,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
     def to_vtk(self, fname=None, etype='cell', index: Index=_S):
         
-        from fealpy.experimental.mesh.vtk_extent import  write_to_vtu
+        from fealpy.mesh.vtk_extent import  write_to_vtu
 
         node = self.entity('node')
         GD = self.GD
@@ -650,7 +650,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         """
         import numpy as np
 
-        from fealpy.experimental.geometry.coons_patch import coons_patch
+        from fealpy.geometry.coons_patch import coons_patch
 
         # 计算各条边上的点数量，包括两端点
         edge_segments_num = np.array([len(l) for l in separator_streamlines])

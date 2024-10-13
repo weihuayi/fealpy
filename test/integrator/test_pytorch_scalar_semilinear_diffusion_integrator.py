@@ -1,8 +1,8 @@
  
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.pde.semilinear_2d import SemilinearData
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.mesh import TriangleMesh
+from fealpy.pde.semilinear_2d import SemilinearData
+from fealpy.backend import backend_manager as bm
 from functools import partial
 
 bm.set_backend('pytorch')

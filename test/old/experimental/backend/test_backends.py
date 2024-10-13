@@ -2,7 +2,7 @@
 import ipdb
 import numpy as np 
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 # 测试不同的后端
 backends = ['numpy', 'pytorch']

@@ -1,5 +1,5 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.quadrangle_mesh import QuadrangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.quadrangle_mesh import QuadrangleMesh
 
 
 # from fealpy.mesh import QuadrangleMesh

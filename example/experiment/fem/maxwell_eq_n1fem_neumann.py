@@ -9,34 +9,34 @@ import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 
-from fealpy.experimental.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace2d
-from fealpy.experimental.functionspace import FirstNedelecFiniteElementSpace3d
-from fealpy.experimental import logger
+from fealpy.mesh import TriangleMesh, TetrahedronMesh
+from fealpy.functionspace import FirstNedelecFiniteElementSpace2d
+from fealpy.functionspace import FirstNedelecFiniteElementSpace3d
+from fealpy import logger
 logger.setLevel('WARNING')
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 # 双线性型
-from fealpy.experimental.fem import BilinearForm
+from fealpy.fem import BilinearForm
 
 # 线性型
-from fealpy.experimental.fem import LinearForm
+from fealpy.fem import LinearForm
 
 # 积分子
-from fealpy.experimental.fem import VectorMassIntegrator
-from fealpy.experimental.fem import CurlIntegrator
-from fealpy.experimental.fem import VectorSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
+from fealpy.fem import VectorMassIntegrator
+from fealpy.fem import CurlIntegrator
+from fealpy.fem import VectorSourceIntegrator
+from fealpy.fem import DirichletBC
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
-from fealpy.experimental.solver import cg
+from fealpy.solver import cg
 
-from fealpy.experimental.pde.maxwell_2d import SinData as PDE2d
-from fealpy.experimental.pde.maxwell_3d import BubbleData as PDE3d
+from fealpy.pde.maxwell_2d import SinData as PDE2d
+from fealpy.pde.maxwell_3d import BubbleData as PDE3d
 from fealpy.utils import timer
 
 

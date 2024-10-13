@@ -7,7 +7,7 @@ from fealpy.decorator import cartesian
 #from fealpy.mesh import DistMesh2d
 from fealpy.geometry import dcircle,drectangle,ddiff,dmin
 from fealpy.geometry import huniform
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 class SinCosData:
     """
     [0, 1]^2

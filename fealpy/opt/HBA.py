@@ -2,8 +2,8 @@ import time
 import random
 import math
 import matplotlib.pyplot as plt  
-from fealpy.experimental.iopt import initialize
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.iopt import initialize
+from fealpy.backend import backend_manager as bm
 
 #bm.set_backend('pytorch')
 #bm.set_backend('jax')

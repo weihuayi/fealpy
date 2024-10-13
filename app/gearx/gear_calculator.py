@@ -1,4 +1,4 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import json

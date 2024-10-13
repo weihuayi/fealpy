@@ -1,5 +1,5 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.edge_mesh import EdgeMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.edge_mesh import EdgeMesh
 from fealpy.quadrature import GaussLegendreQuadrature
 import pytest
 

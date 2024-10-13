@@ -12,10 +12,10 @@ import numpy as np
 import yaml
 from tqdm import tqdm
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as Tensor
-from fealpy.experimental.mesh import TriangleMesh, UniformMesh2d
-from fealpy.experimental import logger
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as Tensor
+from fealpy.mesh import TriangleMesh, UniformMesh2d
+from fealpy import logger
 from fealpy.cem import EITDataGenerator
 
 

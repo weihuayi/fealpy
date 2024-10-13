@@ -4,15 +4,15 @@ import argparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('WARNING')
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import SemilinearForm
-from fealpy.experimental.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
-from fealpy.experimental.fem import ScalarSourceIntegrator
-from fealpy.experimental.pde.semilinear_2d import SemilinearData
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import SemilinearForm
+from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
+from fealpy.fem import ScalarSourceIntegrator
+from fealpy.pde.semilinear_2d import SemilinearData
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 

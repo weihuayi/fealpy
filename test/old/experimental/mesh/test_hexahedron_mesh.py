@@ -1,7 +1,7 @@
 import numpy as np
 from fealpy.mesh import HexahedronMesh as HexahedronMesh_old
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.hexahedron_mesh import HexahedronMesh
 
 #bm.set_backend('pytorch')
 

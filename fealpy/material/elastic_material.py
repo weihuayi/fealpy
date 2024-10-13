@@ -2,7 +2,7 @@ from ..backend import backend_manager as bm
 
 from builtins import float, str
 from .material_base import MaterialBase
-from fealpy.experimental.fem.utils import shear_strain, normal_strain
+from fealpy.fem.utils import shear_strain, normal_strain
 from ..functionspace.utils import flatten_indices
 
 from ..typing import TensorLike

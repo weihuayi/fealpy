@@ -1,4 +1,4 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 def F1(x):
     return bm.sum((x + 0.5) ** 2, axis=-1)

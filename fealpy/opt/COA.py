@@ -1,7 +1,7 @@
 import math
 import matplotlib.pyplot as plt
 import random
-from fealpy.experimental.iopt import initialize
+from fealpy.iopt import initialize
 from ..backend import backend_manager as bm
 
 class COA:

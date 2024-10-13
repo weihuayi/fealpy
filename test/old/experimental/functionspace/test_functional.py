@@ -1,12 +1,12 @@
 import numpy as np
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 from fealpy.common.tensor import symmetry_index as symmetry_index0
 from fealpy.common.tensor import symmetry_span_array as symmetry_span_array0
 
-from fealpy.experimental.functionspace.functional import  symmetry_index as symmetry_index1
-from fealpy.experimental.functionspace.functional import  symmetry_span_array as symmetry_span_array1
+from fealpy.functionspace.functional import  symmetry_index as symmetry_index1
+from fealpy.functionspace.functional import  symmetry_span_array as symmetry_span_array1
 
 from fealpy.mesh import TetrahedronMesh
 

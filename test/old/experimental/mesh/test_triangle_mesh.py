@@ -3,8 +3,8 @@ import pytest
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TMesh
 
 def test_triangle_mesh_init():

@@ -13,7 +13,7 @@ Huayi Wei, weihuayi@xtu.edu.cn
 import numpy as np
 import vtk
 import vtk.util.numpy_support as vnp
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 from .vtkCellTypes import *
 

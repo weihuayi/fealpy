@@ -4,7 +4,7 @@ import pytest
 import mindspore as ms
 import mindspore.numpy as mnp
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 bm.set_backend('mindspore')
 

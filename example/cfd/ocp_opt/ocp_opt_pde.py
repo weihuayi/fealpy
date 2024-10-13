@@ -7,8 +7,8 @@
 	@bref 
 	@ref 
 '''  
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.decorator import cartesian
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import cartesian
 import sympy as sp
 
 class example_1:

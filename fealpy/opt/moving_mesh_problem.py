@@ -1,9 +1,9 @@
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (BilinearForm,
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (BilinearForm,
                                      LinearForm,
                                      ScalarDiffusionIntegrator,
                                      ScalarSourceIntegrator,
