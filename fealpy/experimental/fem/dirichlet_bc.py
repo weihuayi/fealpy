@@ -23,7 +23,7 @@ class DirichletBC():
         self.bctype = 'Dirichlet'
 
         if isDDof is None:
-            isDDof = form._spaces[0].is_boundary_dof(threshold=threshold) # on the same device as space
+            isDDof = space.is_boundary_dof(threshold=threshold) # on the same device as space
             self.is_boundary_dof = isDDof
         else :
             self.is_boundary_dof = isDDof
