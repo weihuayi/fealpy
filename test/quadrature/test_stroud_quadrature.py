@@ -1,7 +1,11 @@
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.quadrature.stroud_quadrature import StroudQuadrature 
-from fealpy.experimental.tests.quadrature.stroud_quadrature_data import *
+
+from fealpy.backend import backend_manager as bm
+from fealpy.quadrature.stroud_quadrature import StroudQuadrature 
+
+from stroud_quadrature_data import *
+
+
 class TestStroudQuadrature:
     @pytest.mark.parametrize('backend',['numpy', 'pytorch'])
     @pytest.mark.parametrize('data', data)

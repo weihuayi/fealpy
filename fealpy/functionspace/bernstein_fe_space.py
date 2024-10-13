@@ -4,7 +4,7 @@ from typing import Union, TypeVar, Generic, Callable, Optional
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
-from ...decorator import barycentric
+from ..decorator import barycentric
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof
 from .functional import*

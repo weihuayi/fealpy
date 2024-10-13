@@ -3,7 +3,7 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
-from fealpy.experimental.functionspace.bernstein_fe_space import BernsteinFESpace
+from .bernstein_fe_space import BernsteinFESpace
 from .functional import symmetry_span_array, symmetry_index, span_array
 from scipy.special import factorial, comb
 from scipy.linalg import solve_triangular

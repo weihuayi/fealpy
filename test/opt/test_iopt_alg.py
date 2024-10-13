@@ -1,13 +1,16 @@
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.opt import CrayfishOptAlg 
-from fealpy.experimental.opt import HoneybadgerOptAlg 
-from fealpy.experimental.opt import QuantumParticleSwarmOptAlg 
-from fealpy.experimental.opt import SnowmeltOptAlg 
-from fealpy.experimental.opt import GreyWolfOptimizer
-from fealpy.experimental.opt import HippopotamusOptAlg
-from fealpy.experimental.tests.opt.iopt_data import iopt_data
-from fealpy.experimental.opt.optimizer_base import Optimizer, opt_alg_options
+
+from fealpy.backend import backend_manager as bm
+from fealpy.opt import CrayfishOptAlg 
+from fealpy.opt import HoneybadgerOptAlg 
+from fealpy.opt import QuantumParticleSwarmOptAlg 
+from fealpy.opt import SnowmeltOptAlg 
+from fealpy.opt import GreyWolfOptimizer
+from fealpy.opt import HippopotamusOptAlg
+from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
+
+from iopt_data import iopt_data
+
 
 class TestIOptInterfaces:
 

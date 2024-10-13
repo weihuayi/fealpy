@@ -1,8 +1,8 @@
 # test_coo_tensor.py
 import pytest
 
-from fealpy.experimental.sparse.coo_tensor import COOTensor
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.sparse.coo_tensor import COOTensor
+from fealpy.backend import backend_manager as bm
 
 ALL_BACKENDS = ['numpy', 'pytorch']
 

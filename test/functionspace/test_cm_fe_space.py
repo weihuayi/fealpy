@@ -1,9 +1,13 @@
-from fealpy.experimental.backend import backend_manager as bm
+
 import numpy as np
 import pytest
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.functionspace.cm_conforming_fe_space import CmConformingFESpace2d
-from fealpy.experimental.tests.functionspace.cm_fe_space_data import *
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace.cm_conforming_fe_space import CmConformingFESpace2d
+
+from cm_fe_space_data import *
+
 
 class TestCmfespace2d:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch"])

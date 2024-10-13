@@ -1,16 +1,20 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.tests.mesh.triangle_mesh_data import *
-from fealpy.experimental.functionspace import LagrangeFESpace
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
 from scipy.sparse.linalg import spsolve
-from fealpy.experimental.fem import (BilinearForm,
-                                     LinearForm,
-                                     ScalarDiffusionIntegrator,
-                                     ScalarSourceIntegrator,
-                                     DirichletBC)
+from fealpy.fem import (
+    BilinearForm,
+    LinearForm,
+    ScalarDiffusionIntegrator,
+    ScalarSourceIntegrator,
+    DirichletBC
+)
+
+from triangle_mesh_data import *
+
 
 class TestTriangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])

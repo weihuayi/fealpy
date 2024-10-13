@@ -1,8 +1,11 @@
 import numpy as np
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.experimental.tests.mesh.uniform_mesh_2d_data import *
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+
+from uniform_mesh_2d_data import *
+
 
 class TestUniformMesh2dInterfaces:
 

@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.functionspace.functional import *
+from fealpy.backend import backend_manager as bm
+from fealpy.functionspace.functional import *
 
-from fealpy.mesh import TetrahedronMesh
 from functional_data import *
+
 
 class TestFunctional:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])

@@ -1,12 +1,15 @@
 import ipdb
 import numpy as np
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import CmConformingFESpace2d 
-from fealpy.experimental.fem import BilinearForm 
-from fealpy.experimental.fem.mthlaplace_integrator import MthLaplaceIntegrator
-from fealpy.experimental.tests.fem.mthlaplace_integrator_data import *
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import CmConformingFESpace2d 
+from fealpy.fem import BilinearForm 
+from fealpy.fem.mthlaplace_integrator import MthLaplaceIntegrator
+
+from mthlaplace_integrator_data import *
+
 class TestgradmIntegrator:
     @pytest.mark.parametrize("backend", ['numpy','pytorch'])
     @pytest.mark.parametrize("data", grad_m)

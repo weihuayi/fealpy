@@ -1,15 +1,10 @@
-import ipdb
+
 import pytest
-
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.interval_mesh import IntervalMesh
-from fealpy.experimental.tests.mesh.interval_mesh_data import *  
-from fealpy.experimental.mesh import TriangleMesh
-
-from fealpy.mesh import IntervalMesh as IMesh
-from fealpy.mesh import TriangleMesh as TMesh
-import matplotlib.pyplot as plt
 import numpy as np
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.interval_mesh import IntervalMesh
+from interval_mesh_data import *
 
 
 class TestIntervalMeshInterfaces:

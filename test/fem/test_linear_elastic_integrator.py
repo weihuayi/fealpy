@@ -1,12 +1,13 @@
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.tests.fem.linear_elastic_integrator_data import *
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
+from fealpy.backend import backend_manager as bm
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.material.elastic_material import LinearElasticMaterial
 from app.stopt.soptx.cases.material_properties import MaterialProperties
-from fealpy.experimental.mesh import UniformMesh2d, TriangleMesh, UniformMesh3d, TetrahedronMesh
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.mesh import UniformMesh2d, TriangleMesh, UniformMesh3d, TetrahedronMesh
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
+
+from linear_elastic_integrator_data import *
 
 class TestLinearElasticIntegratorInterfaces:
 

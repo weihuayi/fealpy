@@ -1,10 +1,12 @@
+
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import QuadrangleMesh
-from fealpy.experimental.tests.mesh.quadrangle_mesh_data import *
-from fealpy.experimental.geometry.utils import *
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import QuadrangleMesh
+from fealpy.geometry.utils import *
+
+from quadrangle_mesh_data import *
 
 
 class TestQuadrangleMeshInterfaces:
@@ -192,7 +194,7 @@ class TestQuadrangleMeshInterfaces:
     @pytest.mark.parametrize("meshdata", mesh_from_triangle_data)
     def test_mesh_from_triangle(self, meshdata, backend):
         bm.set_backend(backend)
-        from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
+        from fealpy.mesh.triangle_mesh import TriangleMesh
         tri_node = bm.from_numpy(meshdata['tri_node'])
         tri_cell = bm.from_numpy(meshdata['tri_cell'])
         tri_mesh = TriangleMesh(tri_node, tri_cell)

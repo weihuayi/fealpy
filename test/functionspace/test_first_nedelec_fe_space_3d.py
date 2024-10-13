@@ -1,12 +1,12 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.tetrahedron_mesh import TetrahedronMesh
-from fealpy.experimental.tests.functionspace.first_nedelec_fe_space_3d_data import*
-from fealpy.experimental.functionspace.first_nedelec_fe_space_3d import FirstNedelecDof3d
-from fealpy.experimental.functionspace.first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
+from fealpy.functionspace.first_nedelec_fe_space_3d import FirstNedelecDof3d
+from fealpy.functionspace.first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
+
+from first_nedelec_fe_space_3d_data import *
 
 
 def assert_absolute_error(a,b,atol=1e-10):

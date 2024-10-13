@@ -1,11 +1,13 @@
 import ipdb
 import numpy as np
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.tests.fem.scalar_diffusion_integrator_data import *
-from fealpy.experimental.fem.scalar_diffusion_integrator import ScalarDiffusionIntegrator
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem.scalar_diffusion_integrator import ScalarDiffusionIntegrator
+
+from scalar_diffusion_integrator_data import *
 
 class TestScalarDiffusionIntegrator:
 

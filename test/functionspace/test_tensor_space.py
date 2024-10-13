@@ -1,11 +1,14 @@
-import ipdb
+
 import numpy as np
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace,TensorFunctionSpace
-from fealpy.experimental.tests.functionspace.tensor_space_data import *
-from fealpy.experimental.typing import TensorLike, Size, _S
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace,TensorFunctionSpace
+from fealpy.typing import TensorLike, Size, _S
+
+from tensor_space_data import *
+
 
 class TestTensorFunctionSpace:  
 

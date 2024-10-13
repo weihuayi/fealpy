@@ -1,12 +1,12 @@
+
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace.bernstein_fe_space import BernsteinFESpace
 
-from fealpy.experimental.tests.functionspace.bernstein_fe_space_data import*
-from fealpy.experimental.functionspace.bernstein_fe_space import BernsteinFESpace
+from bernstein_fe_space_data import *
 
 
 class TestBernsteinFESpace:

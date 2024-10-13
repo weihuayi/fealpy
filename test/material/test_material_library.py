@@ -1,8 +1,10 @@
 # fealpy/tests/material/test_material_library.py
-import pytest
 import os
-from fealpy.experimental.material.material_library import MaterialLibrary
-from fealpy.experimental.material.material_base import MaterialBase
+import pytest
+
+from fealpy.material.material_library import MaterialLibrary
+from fealpy.material.material_base import MaterialBase
+
 
 @pytest.fixture
 def setup_library():

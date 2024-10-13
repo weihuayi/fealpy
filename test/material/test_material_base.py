@@ -1,6 +1,7 @@
 # fealpy/tests/material/test_material_base.py
-import pytest
-from fealpy.experimental.material.material_base import MaterialBase
+
+from fealpy.material.material_base import MaterialBase
+
 
 def test_material_creation():
     # 测试材料创建

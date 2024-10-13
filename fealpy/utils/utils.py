@@ -2,11 +2,19 @@
 from typing import Optional, Union, Callable
 
 
-from .backend import backend_manager as bm
-from .typing import TensorLike, Index, Number, CoefLike, _S
+from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, Number, CoefLike, _S
 
-from .mesh import HomogeneousMesh, Mesh
+from ..mesh import HomogeneousMesh, Mesh
 
+__all__ = [
+    'process_coef_func',
+    'is_scalar',
+    'is_tensor',
+    'fill_axis',
+    'get_coef_subscripts',
+    'process_threshold'
+]
 
 
 def process_coef_func(

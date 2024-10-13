@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 import pytest
 
-from fealpy.experimental.fem.form import Form
-from fealpy.experimental.fem import BlockForm
-from fealpy.experimental.fem import BilinearForm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import ScalarDiffusionIntegrator
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.fem.form import Form
+from fealpy.fem import BlockForm
+from fealpy.fem import BilinearForm
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import ScalarDiffusionIntegrator
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.sparse import COOTensor, CSRTensor
-from fealpy.experimental.tests.fem.block_form_data import *
+from fealpy.sparse import COOTensor, CSRTensor
+from block_form_data import *
 
 class TestBlockForm:
     @pytest.mark.parametrize("backend", ['numpy','pytorch'])

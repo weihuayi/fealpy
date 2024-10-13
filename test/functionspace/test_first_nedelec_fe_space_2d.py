@@ -1,12 +1,14 @@
+
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.tests.functionspace.first_nedelec_fe_space_2d_data import*
-from fealpy.experimental.functionspace.first_nedelec_fe_space_2d import FirstNedelecDof2d
-from fealpy.experimental.functionspace.first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace.first_nedelec_fe_space_2d import FirstNedelecDof2d
+from fealpy.functionspace.first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
+
+from first_nedelec_fe_space_2d_data import *
+
 
 def assert_absolute_error(a,b,atol=1e-10):
     diff = np.abs(a-b)

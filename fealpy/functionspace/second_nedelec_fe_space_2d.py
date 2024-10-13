@@ -9,7 +9,7 @@ from .function import Function
 
 from scipy.sparse import csr_matrix
 from ..mesh.mesh_base import Mesh
-from ...decorator import barycentric, cartesian
+from ..decorator import barycentric, cartesian
 
 _MT = TypeVar('_MT', bound=Mesh)    
 Index = Union[int, slice, TensorLike]

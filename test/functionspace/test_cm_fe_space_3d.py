@@ -1,13 +1,17 @@
+
+import ipdb
+import sympy as sp
 import pytest
 import numpy as np
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.tetrahedron_mesh import TetrahedronMesh
-from fealpy.experimental.quadrature.stroud_quadrature import StroudQuadrature 
-from fealpy.experimental.functionspace.cm_conforming_fe_space3d import CmConformingFESpace3d
-from fealpy.experimental.tests.functionspace.cm_fe_space_3d_data import *
-from fealpy.experimental.pde.biharmonic_triharmonic_3d import get_flist
-import sympy as sp
-import ipdb
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
+from fealpy.quadrature.stroud_quadrature import StroudQuadrature 
+from fealpy.functionspace.cm_conforming_fe_space3d import CmConformingFESpace3d
+from fealpy.pde.biharmonic_triharmonic_3d import get_flist
+
+from cm_fe_space_3d_data import *
+
 
 class TestCmfespace3d:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch"])

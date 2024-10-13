@@ -5,7 +5,7 @@ from ..typing import TensorLike, Index, _S
 
 from ..mesh import HomogeneousMesh, SimplexMesh
 from ..functionspace.space import FunctionSpace as _FS
-from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace as _TS
+from ..functionspace.tensor_space import TensorFunctionSpace as _TS
 from .integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,

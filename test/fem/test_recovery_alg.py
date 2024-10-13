@@ -1,10 +1,11 @@
+
 import ipdb
-import numpy as np
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import RecoveryAlg
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import RecoveryAlg
 
 class TestRecoveryAlg:
 

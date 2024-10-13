@@ -1,12 +1,13 @@
-import ipdb
+
 import numpy as np
-import matplotlib.pyplot as plt
 
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.tetrahedron_mesh import TetrahedronMesh 
-from fealpy.experimental.tests.mesh.tetrahedron_mesh_data import *
-from fealpy.experimental.functionspace import LagrangeFESpace
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh 
+from fealpy.functionspace import LagrangeFESpace
+
+from tetrahedron_mesh_data import *
+
 
 class TestTetrahedronMeshInterfaces:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])

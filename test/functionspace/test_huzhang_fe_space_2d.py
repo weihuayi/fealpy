@@ -1,10 +1,12 @@
-import ipdb
-import numpy as np
+
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.functionspace import HuZhangFESpace2D
-from fealpy.experimental.tests.functionspace.huzhang_fe_space_2d_data import *
+
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace import HuZhangFESpace2D
+
+from huzhang_fe_space_data_2d import *
+
 
 class TestHuZhangFiniteElementSpace2D:
 

@@ -1,8 +1,8 @@
 
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.sparse._spmm import spmm_coo
+from fealpy.backend import backend_manager as bm
+from fealpy.sparse._spmm import spmm_coo
 
 ALL_BACKENDS = ['numpy', 'pytorch']
 

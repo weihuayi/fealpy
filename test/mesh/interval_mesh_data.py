@@ -1,8 +1,6 @@
+
 import numpy as np
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.mesh import IntervalMesh as IMesh
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.mesh import TriangleMesh as TMesh
+
 
 init_mesh_data = [
     {

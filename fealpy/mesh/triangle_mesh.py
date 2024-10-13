@@ -12,23 +12,22 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 
 class TriangleMesh(SimplexMesh, Plotable):
-    def __init__(self, node: TensorLike, cell: TensorLike, device=None) -> None:
+    def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
         """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
-        kwargs = bm.context(cell) 
-        self.device = device
+        kwargs = bm.context(cell)
 
         self.node = node
         self.cell = cell
-        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
-        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
-        self.ccw = bm.tensor([0, 1, 2], **kwargsi, device=self.device)
+        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.ccw = bm.tensor([0, 1, 2], **kwargs)
 
         self.localCell = bm.tensor([
             (0, 1, 2),
             (1, 2, 0),
-            (2, 0, 1)], **kwargs, device=self.device)
+            (2, 0, 1)], **kwargs)
 
         self.construct()
 
@@ -1099,7 +1098,8 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, *, threshold=None,
+                 dtype=None, device=None):
         """
         Generate a triangle mesh for a box domain .
 
@@ -1109,14 +1109,15 @@ class TriangleMesh(SimplexMesh, Plotable):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TriangleMesh instance
         """
-        device = self.device
-        
+        if dtype is None:
+            dtype = bm.int32
+
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
-        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64i, device=device)
-        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64, device=device)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=dtype, device=device)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=dtype, device=device)
         X, Y = bm.meshgrid(x, y, indexing='ij')
-    
+
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
         idx = bm.arange(NN).reshape(nx + 1, ny + 1)
@@ -1147,7 +1148,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_unit_sphere_surface(cls, refine=0):
+    def from_unit_sphere_surface(cls, refine=0, *, dtype=None, device=None):
         """
         @brief  Generate a triangular mesh on a unit sphere surface.
         @return the triangular mesh.
@@ -1175,7 +1176,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_ellipsoid(cls, radius=[9, 3, 1], refine=0):
+    def from_ellipsoid(cls, radius=[9, 3, 1], refine=0, *, dtype=None, device=None):
         """
         a: 椭球的长半轴
         b: 椭球的中半轴
@@ -1193,12 +1194,10 @@ class TriangleMesh(SimplexMesh, Plotable):
     
     ## @ingroup MeshGenerators
     @classmethod
-    def from_ellipsoid_surface(cls, ntheta=10, nphi=10,
-                               radius=(1, 1, 1),
-                               theta=None,
-                               phi=None,
-                               returnuv=False
-                               ):
+    def from_ellipsoid_surface(
+        cls, ntheta=10, nphi=10, radius=(1, 1, 1), theta=None, phi=None,
+        returnuv=False, *, dtype=None, device=None
+        ):
         """
         @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
         生成相应带状区域的三角形网格

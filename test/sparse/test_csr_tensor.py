@@ -1,8 +1,8 @@
 # test_csr_tensor.py
 import pytest
 
-from fealpy.experimental.sparse.csr_tensor import CSRTensor
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.sparse.csr_tensor import CSRTensor
+from fealpy.backend import backend_manager as bm
 
 ALL_BACKENDS = ['numpy', 'pytorch']
 

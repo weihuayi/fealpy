@@ -1,13 +1,14 @@
-import ipdb
+
 import numpy as np
-import matplotlib.pyplot as plt
+
 import pytest
 from fealpy.geometry import SphereSurface, EllipsoidSurface
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
-from fealpy.experimental.tests.mesh.lagrange_triangle_mesh_data import *
+from lagrange_triangle_mesh_data import *
+
 
 class TestLagrangeTriangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])

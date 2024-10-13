@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (
         BilinearForm, ScalarDiffusionIntegrator
     )
 
-from fealpy.experimental.tests.fem.bilinear_form_data import *
+from bilinear_form_data import *
 
 mesh_map = {
         "TriangleMesh": TriangleMesh,

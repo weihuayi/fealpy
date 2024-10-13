@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import pytest
 import numpy as np
 import jax.numpy as jnp
-from fealpy.experimental.mesh.node_mesh import NodeMesh
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.tests.mesh.node_mesh_data import *
+from fealpy.mesh.node_mesh import NodeMesh
+from fealpy.backend import backend_manager as bm
+from node_mesh_data import *
 
 class TestNodeMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])

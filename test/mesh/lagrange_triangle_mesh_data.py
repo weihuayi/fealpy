@@ -1,6 +1,6 @@
 import numpy as np
 from fealpy.geometry import SphereSurface
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh.triangle_mesh import TriangleMesh
 
 # 定义多个典型的 LagrangeTriangleMesh 对象
 surface = SphereSurface() #以原点为球心，1 为半径的球

@@ -1,9 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh.hexahedron_mesh import HexahedronMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.hexahedron_mesh import HexahedronMesh
 
 from hexahedron_mesh_data import *
 from edge_mesh_data import *

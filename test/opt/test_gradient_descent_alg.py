@@ -1,9 +1,13 @@
 import pytest
 import numpy as np
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.opt.gradient_descent_alg import GradientDescentAlg
-from fealpy.experimental.tests.opt.gradient_descent_alg_data import *
-from fealpy.experimental.opt.optimizer_base import opt_alg_options
+
+from fealpy.backend import backend_manager as bm
+from fealpy.opt.gradient_descent_alg import GradientDescentAlg
+from fealpy.opt.optimizer_base import opt_alg_options
+
+from gradient_descent_alg_data import *
+
+
 class TestGradientDescentInterfaces:
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])

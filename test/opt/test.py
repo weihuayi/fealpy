@@ -1,6 +1,7 @@
-import numpy as np
+
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
+
+from fealpy.backend import backend_manager as bm
 import test_iopt_alg
 
 class TestIOptInterfaces:

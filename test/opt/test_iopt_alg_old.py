@@ -1,13 +1,12 @@
 import time
-import matplotlib.pyplot as plt
-import os
+
 from Function import Function
 from Function_plot import Function_plot
-from fealpy.experimental.opt import COA
-from fealpy.experimental.opt import HBA
-from fealpy.experimental.opt import SAO
-from fealpy.experimental.opt import QPSO
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.opt import COA
+from fealpy.opt import HBA
+from fealpy.opt import SAO
+from fealpy.opt import QPSO
+from fealpy.backend import backend_manager as bm
 
 
 #运行
