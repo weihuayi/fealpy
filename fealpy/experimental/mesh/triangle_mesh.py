@@ -491,7 +491,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         p = int((bm.sqrt(1 + 8 * bm.array(ldof)) - 3) // 2)
                         bc = self.multi_index_matrix(p, etype=2) / p
 
-                        bcl = bm.zeros_like(bc,dtype=self.ftype)
+                        bcl = bm.zeros_like(bc, dtype=self.ftype)
                         bcl = bm.set_at(bcl , (slice(None), 0), bc[:, 1])
                         bcl = bm.set_at(bcl , (slice(None), 1), 0.5 * bc[:, 0] + bc[:, 2])
                         bcl = bm.set_at(bcl , (slice(None), 2), 0.5 * bc[:, 0])
@@ -507,7 +507,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         value = bm.set_at(value , slice(NC , None), bm.einsum('cj,kj->ck', value[idx], phi))
 
                         phi = self.shape_function(bcl, p=p)
-                        value = bm.set_at(value , (idx,slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
+                        value = bm.set_at(value , (idx, slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
 
                         options['data'][key] = value
 

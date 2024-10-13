@@ -161,7 +161,7 @@ ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.i
 
 # 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
-ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
+
 ms.solve(maxit=maxit, vtkname=vtkname)
 
 tmr.send('stop')

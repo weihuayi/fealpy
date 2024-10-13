@@ -87,8 +87,7 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(1):
-        #for i in range(len(self.force_value)-1):
+        for i in range(len(self.force_value)-1):
             print('i', i)
             self._currt_force_value = self.force_value[i+1]
             # Run Newton-Raphson iteration
@@ -398,7 +397,7 @@ class MainSolver:
                         raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
                 elif field == 'phase':
                     if bcdata['type'] == 'Dirichlet':
-                        bc = DirichletBC(self.space, bcdata['value'], bcdata['bcdof'])
+                        bc = DirichletBC(self.space, gd=bcdata['value'], threshold=bcdata['bcdof'])
                         A, R = bc.apply(A, R)
                     else:
                         raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
