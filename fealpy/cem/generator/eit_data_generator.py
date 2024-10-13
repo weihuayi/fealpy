@@ -1,17 +1,17 @@
 
 from typing import Tuple, Callable, Union, Optional
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as Tensor
-from fealpy.experimental.mesh import Mesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as Tensor
+from fealpy.mesh import Mesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
     ScalarNeumannBCIntegrator
 )
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.solver import cg
+from fealpy.sparse import COOTensor
+from fealpy.solver import cg
 
 
 class EITDataGenerator():

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.experimental.mesh.mesh_quality import RadiusRatioQuality
+from fealpy.mesh.mesh_quality import RadiusRatioQuality
 
 import MeshExample2d
 from optimizer import *

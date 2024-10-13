@@ -1,5 +1,5 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.opt.optimizer_base import opt_alg_options
+from fealpy.backend import backend_manager as bm
+from fealpy.opt.optimizer_base import opt_alg_options
 import matplotlib.pyplot as plt
 def ciyt0():
 

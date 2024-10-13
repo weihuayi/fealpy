@@ -1,7 +1,7 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
-from fealpy.experimental.functionspace.lagrange_fe_space import LagrangeFESpace
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
+from fealpy.backend import backend_manager as bm
+from fealpy.functionspace.tensor_space import TensorFunctionSpace
+from fealpy.functionspace.lagrange_fe_space import LagrangeFESpace
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 
 bm.set_backend('numpy')
 nx, ny = 1, 1

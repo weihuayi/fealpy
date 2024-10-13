@@ -1,7 +1,7 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.typing import TensorLike, Tuple
-from fealpy.experimental.sparse import COOTensor
+from fealpy.typing import TensorLike, Tuple
+from fealpy.sparse import COOTensor
 
 from builtins import int, float
 from math import ceil, sqrt

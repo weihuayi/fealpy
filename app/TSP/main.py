@@ -1,7 +1,7 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.opt import QuantumParticleSwarmOptAlg
-from fealpy.experimental.opt import SnowmeltOptAlg 
-from fealpy.experimental.opt import ParticleSwarmOptAlg
+from fealpy.backend import backend_manager as bm
+from fealpy.opt import QuantumParticleSwarmOptAlg
+from fealpy.opt import SnowmeltOptAlg 
+from fealpy.opt import ParticleSwarmOptAlg
 from app.TSP.TSP_data import TSPdata
 from app.TSP.TSP_citys import TravellingSalesmanProblem
 from app.TSP.TSP_citys import gbest2route, soler_tsp_with_algorithm, printroute

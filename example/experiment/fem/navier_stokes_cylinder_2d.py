@@ -7,30 +7,30 @@
 	@bref 
 	@ref 
 '''  
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('ERROR')
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.functionspace import TensorFunctionSpace
-from fealpy.experimental.fem import (
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.functionspace import TensorFunctionSpace
+from fealpy.fem import (
         BilinearForm, ScalarDiffusionIntegrator, 
         ScalarMassIntegrator, PressWorkIntegrator0, PressWorkIntegrator ,
         PressWorkIntegrator1, ScalarConvectionIntegrator)
 
 
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.fem import VectorSourceIntegrator
-from fealpy.experimental.fem import BlockForm
-from fealpy.experimental.solver import cg 
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+from fealpy.sparse import COOTensor
+from fealpy.fem import VectorSourceIntegrator
+from fealpy.fem import BlockForm
+from fealpy.solver import cg 
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.decorator import barycentric, cartesian
 from fealpy.timeintegratoralg import UniformTimeLine
-from fealpy.experimental.fem import DirichletBC
+from fealpy.fem import DirichletBC
 
 backend = 'pytorch'
 #backend = 'numpy'

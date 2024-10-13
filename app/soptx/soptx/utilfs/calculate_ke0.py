@@ -1,7 +1,7 @@
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
-from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
-from fealpy.experimental.typing import TensorLike
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.material.elastic_material import LinearElasticMaterial
+from fealpy.functionspace.tensor_space import TensorFunctionSpace
+from fealpy.typing import TensorLike
 
 def calculate_ke0(material_properties: LinearElasticMaterial, 
                 tensor_space: TensorFunctionSpace) -> TensorLike:

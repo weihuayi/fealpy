@@ -3,10 +3,10 @@ import argparse
 from matplotlib import pyplot as plt
 
 from fealpy.utils import timer
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('WARNING')
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -42,11 +42,11 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.solver import cg
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+from fealpy.solver import cg
 
 
 p = args.degree
@@ -57,28 +57,28 @@ maxit = args.maxit
 tmr = timer()
 next(tmr)
 if meshtype == 'int':
-    from fealpy.experimental.pde.poisson_1d import CosData 
-    from fealpy.experimental.mesh import IntervalMesh
+    from fealpy.pde.poisson_1d import CosData 
+    from fealpy.mesh import IntervalMesh
     pde = CosData()
     mesh = IntervalMesh.from_interval_domain([0,1], n)
 elif meshtype == 'tri':
-    from fealpy.experimental.pde.poisson_2d import CosCosData 
-    from fealpy.experimental.mesh import TriangleMesh
+    from fealpy.pde.poisson_2d import CosCosData 
+    from fealpy.mesh import TriangleMesh
     pde = CosCosData()
     mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 elif meshtype == 'quad':
-    from fealpy.experimental.pde.poisson_2d import CosCosData 
-    from fealpy.experimental.mesh import QuadrangleMesh
+    from fealpy.pde.poisson_2d import CosCosData 
+    from fealpy.mesh import QuadrangleMesh
     pde = CosCosData()
     mesh = QuadrangleMesh.from_box([0,1,0,1], n, n)
 elif meshtype == 'tet':
-    from fealpy.experimental.pde.poisson_3d import CosCosCosData 
-    from fealpy.experimental.mesh import TetrahedronMesh
+    from fealpy.pde.poisson_3d import CosCosCosData 
+    from fealpy.mesh import TetrahedronMesh
     pde = CosCosCosData()
     mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], n, n, n)
 elif meshtype == 'hex':
-    from fealpy.experimental.pde.poisson_3d import CosCosCosData 
-    from fealpy.experimental.mesh import HexahedronMesh
+    from fealpy.pde.poisson_3d import CosCosCosData 
+    from fealpy.mesh import HexahedronMesh
     pde = CosCosCosData()
     mesh = HexahedronMesh.from_box([0,1,0,1,0,1], n, n, n)
 else: 

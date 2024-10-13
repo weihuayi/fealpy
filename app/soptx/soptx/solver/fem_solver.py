@@ -1,13 +1,13 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.typing import TensorLike
+from fealpy.typing import TensorLike
 
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.fem.bilinear_form import BilinearForm
-from fealpy.experimental.fem import DirichletBC as DBC
-from fealpy.experimental.sparse import COOTensor
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem import DirichletBC as DBC
+from fealpy.sparse import COOTensor
 
-from fealpy.experimental.solver import cg
+from fealpy.solver import cg
 
 from scipy.sparse.linalg import spsolve
 # from scipy.sparse import csr_matrix

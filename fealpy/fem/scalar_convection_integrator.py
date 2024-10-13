@@ -1,76 +1,65 @@
-import numpy as np
+from typing import Optional
 
-class ScalarConvectionIntegrator:
-    """
-    @note ( c \\cdot \\nabla u, v)
-    """    
+from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, _S
+from ..utils import is_tensor
 
-    def __init__(self, c=None, q=3):
-        self.coef = c
+from ..mesh import HomogeneousMesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import bilinear_integral
+from .integrator import (
+    LinearInt, OpInt, CellInt,
+    enable_cache,
+    assemblymethod,
+    CoefLike
+)
+
+class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
+    r"""The convection integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+                 index: Index=_S,
+                 batched: bool=False,
+                 method: Optional[str]=None) -> None:
+        method = 'assembly' if (method is None) else method
+        super().__init__(method=method)
+        self.coef = coef
         self.q = q
+        self.index = index
+        self.batched = batched
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
-            out=None):
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> TensorLike:
+        return space.cell_to_dof()[self.index]
 
-        q = self.q
-        coef = self.coef
-        mesh = space.mesh
-        
-        GD = mesh.geo_dimension()
-        if cellmeasure is None:
-            if mesh.meshtype == 'UniformMesh2d':
-                 NC = mesh.number_of_cells()
-                 cellmeasure = np.broadcast_to(mesh.entity_measure('cell', index=index), (NC,))
-            else:
-                cellmeasure = mesh.entity_measure('cell', index=index)
+    @enable_cache
+    def fetch(self, space: _FS):
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
 
-        NC = len(cellmeasure)
-        ldof = space.number_of_local_dofs() 
-        
-        if out is None:
-            C = np.zeros((NC, ldof, ldof), dtype=space.ftype)
-        else:
-            C = out
-        
-        qf = mesh.integrator(q, 'cell')
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The ScalarConvectionIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        NQ = len(ws)
-        
-        gphi = space.grad_basis(bcs, index=index) 
-        phi = space.basis(bcs, index=index) 
-        
-        if callable(coef):
-            if hasattr(coef, 'coordtype'):
-                if coef.coordtype == 'barycentric':
-                    coef = coef(bcs, index)
-                elif coef.coordtype == 'cartesian':
-                    ps = mesh.bc_to_point(bcs, index=index)
-                    coef = coef(ps)
+        gphi = space.grad_basis(bcs, index=index)
+        phi = space.basis(bcs, index=index)
+        return bcs, ws, phi, gphi, cm, index
+
+    def assembly(self, space: _FS) -> TensorLike:
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, gphi, cm, index = self.fetch(space)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        if is_tensor(coef):
+            if self.batched:
+                result = bm.einsum('q, cqk, cqmd, bcqd, c->bckm', ws, phi, gphi, coef.squeeze(0), cm)
             else:
-                ps = mesh.bc_to_point(bcs, index=index)
-                coef = coef(ps)
-        if coef.shape == (GD, ):
-            C += np.einsum('q, qck, n, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        elif coef.shape == (NC, GD):
-            C += np.einsum('q, qck, cn, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        elif coef.shape == (NQ, NC, GD): 
-            C += np.einsum('q, qck, qcn, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
-        elif coef.shape == (NQ, GD, NC): 
-            C += np.einsum('q, qck, qnc, qcmn, c->ckm', ws, phi, coef, gphi, cellmeasure) 
+                result = bm.einsum('q, cqk, cqmd, cqd, c->ckm', ws, phi, gphi, coef, cm)
         else:
-            raise ValueError("coef 的维度超出了支持范围")
-
-        if out is None:
-            return C
-
-    def assembly_cell_matrix_fast(self, space, index=np.s_[:], cellmeasure=None):
-        """
-        """
-        mesh = space.mesh 
-        assert mesh.meshtype in ['tri', 'tet']
-
-    def assembly_cell_matrix_ref(self, space, index=np.s_[:], cellmeasure=None):
-        """
-        @note 基于参考单元的矩阵组装
-        """
-        pass
+            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+        return result

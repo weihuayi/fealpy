@@ -1,5 +1,5 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.opt.Levy import levy
+from fealpy.backend import backend_manager as bm
+from fealpy.opt.Levy import levy
 import time
 import matplotlib.pyplot as plt
 from matplotlib.markers import MarkerStyle

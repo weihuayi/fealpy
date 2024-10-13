@@ -1,7 +1,7 @@
 import numpy as np
 import gmsh
 
-#from fealpy.experimental.mesh import TriangleMesh
+#from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh
 
 class Mesh:

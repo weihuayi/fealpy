@@ -1,16 +1,16 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as _DT
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as _DT
 
 from builtins import int, str, float, object
 
-from fealpy.experimental.typing import Union
+from fealpy.typing import Union
 
-from fealpy.experimental.opt.objective import Objective
+from fealpy.opt.objective import Objective
 
-from fealpy.experimental.mesh.mesh_base import Mesh
+from fealpy.mesh.mesh_base import Mesh
 
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.functionspace.tensor_space import TensorFunctionSpace
 
 from app.soptx.soptx.solver.fem_solver import FEMSolver
 

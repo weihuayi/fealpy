@@ -1,10 +1,10 @@
 import argparse
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 
-from fealpy.experimental.opt import opt_alg_options
+from fealpy.opt import opt_alg_options
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
