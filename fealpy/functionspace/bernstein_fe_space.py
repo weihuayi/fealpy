@@ -147,7 +147,7 @@ class BernsteinFESpace:
         P = np.cumprod(P).reshape(1, -1, 1)
         B = B/P
 
-        F = np.zeros(B.shape, dtype=np.float_)
+        F = np.zeros(B.shape, dtype=np.float64)
         F[:, 1:] = B[:, :-1]
 
         shape = bc.shape[:-1]+(ldof, TD+1)
@@ -180,7 +180,8 @@ class BernsteinFESpace:
 
         I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
         J = np.broadcast_to(cell2dof[:, None, :], M.shape) 
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof), dtype=np.float_)
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof),
+                       dtype=np.float64)
         return M
 
     def grad_m_matrix(self, m):
@@ -201,7 +202,8 @@ class BernsteinFESpace:
 
         I = np.broadcast_to(cell2dof[:, :, None], M.shape) 
         J = np.broadcast_to(cell2dof[:, None, :], M.shape) 
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof), dtype=np.float_)
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof),
+                       dtype=np.floa64)
         return M
 
 
@@ -224,8 +226,8 @@ class BernsteinFESpace:
                 2]+a[:, 3])*(2+a[:, 1]+a[:, 2]+a[:, 3])//6 + (a[:, 2]+a[:,
                     3])*(a[:, 2]+a[:, 3]+1)//2 + a[:, 3]
 
-        P = np.zeros((NC, n0, n1, GD), dtype=np.float_)
-        involve = np.zeros((n1, n0), dtype=np.float_)
+        P = np.zeros((NC, n0, n1, GD), dtype=np.float64)
+        involve = np.zeros((n1, n0), dtype=np.float64)
         for i in range(GD+1):
             midxp_1[:, i] += 1
             idx = midx2num(midxp_1)
@@ -264,23 +266,23 @@ class BernsteinFESpace:
                 2]+a[:, 3])*(2+a[:, 1]+a[:, 2]+a[:, 3])//6 + (a[:, 2]+a[:,
                     3])*(a[:, 2]+a[:, 3]+1)//2 + a[:, 3]
 
-        P = np.zeros((NC, n0, n1, GD), dtype=np.float_)
+        P = np.zeros((NC, n0, n1, GD), dtype=np.float64)
         N = len(midxp_1)
         I = np.zeros((GD+1)*N, dtype=np.int_)
         J = np.zeros((GD+1)*N, dtype=np.int_)
-        data = np.zeros((GD+1)*N, dtype=np.float_)
+        data = np.zeros((GD+1)*N, dtype=np.float64)
         for i in range(GD+1):
             midxp_1[:, i] += 1
             I[i*N:(i+1)*N] = np.arange(n1)
             J[i*N:(i+1)*N] = midx2num(midxp_1) 
             data[i*N:(i+1)*N] = midxp_1[:, i] 
             midxp_1[:, i] -= 1
-        involve = csc_matrix((data, (I, J)), shape=(n1, n0), dtype=np.float_)
+        involve = csc_matrix((data, (I, J)), shape=(n1, n0), dtype=np.float64)
 
         glambda = self.mesh.grad_lambda() #(NC, 4, 3)
         I = [np.array([], dtype=np.int_) for i in range(GD)]
         J = [np.array([], dtype=np.int_) for i in range(GD)]
-        data = [np.array([], dtype=np.float_) for i in range(GD)]
+        data = [np.array([], dtype=np.float64) for i in range(GD)]
         for i in range(GD+1):
             midxp_0[:, i] -= 1
             flag = midxp_0[:, i] >= 0
@@ -293,11 +295,13 @@ class BernsteinFESpace:
 
         P = []
         for j in range(GD):
-            tem = csr_matrix((data[j], (I[j], J[j])), shape = (NC*n0, n1), dtype=np.float_)
+            tem = csr_matrix((data[j], (I[j], J[j])), shape = (NC*n0, n1),
+                             dtype=np.float64)
             tem = (tem@involve).tocoo()
             II, JJ, ddata = tem.row, tem.col, tem.data
             JJ = JJ + n0*(II//n0)
-            M = csr_matrix((ddata, (II, JJ)), shape=(NC*n0, NC*n0), dtype=np.float_)
+            M = csr_matrix((ddata, (II, JJ)), shape=(NC*n0, NC*n0),
+                           dtype=np.float64)
             P.append(M)
         return P
 
@@ -333,7 +337,8 @@ class BernsteinFESpace:
             M = M.tocoo()
             I, J, data = M.row, M.col, M.data
             J = J - ldof*(I//ldof)
-            M = csr_matrix((data, (I, J)), shape=(NC*ldof, ldof), dtype=np.float_)
+            M = csr_matrix((data, (I, J)), shape=(NC*ldof, ldof),
+                           dtype=np.float64)
             #gmphi[..., i] = M.dot(phi.T).reshape(NC, ldof, -1)
             for q in range(phi.shape[0]):
                 gmphi[q, ..., i] = (M@phi[q]).reshape(NC, -1)
@@ -348,7 +353,7 @@ class BernsteinFESpace:
         p = self.p
         p0 = p-m
         if p0<0:
-            return np.zeros([1, 1, 1, 1], dtype=np.float_)
+            return np.zeros([1, 1, 1, 1], dtype=np.float64)
 
         phi = self.basis(bcs, p=p0)
         NQ = bcs.shape[0]
@@ -393,11 +398,11 @@ class BernsteinFESpace:
 
     def hess_basis(self, bcs, index=np.s_[:]):
         if self.p<2:
-            return np.zeros([1, 1, 1, 1], dtype=np.float_)
+            return np.zeros([1, 1, 1, 1], dtype=np.float64)
         g2phi = self.grad_m_basis(bcs, 2, index=index)
         TD = self.mesh.top_dimension()
         shape = g2phi.shape[:-1] + (TD, TD)
-        hval  = np.zeros(shape, dtype=np.float_)
+        hval  = np.zeros(shape, dtype=np.float64)
         hval[..., 0, 0] = g2phi[..., 0]
         hval[..., 0, 1] = g2phi[..., 1]
         hval[..., 1, 0] = g2phi[..., 1]

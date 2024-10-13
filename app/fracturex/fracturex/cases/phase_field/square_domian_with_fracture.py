@@ -19,7 +19,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.0133
+        l0 = 0.015
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
 
@@ -52,7 +52,7 @@ class square_with_circular_notch():
         mesh.uniform_refine(n=n)
         return mesh
 
-    def is_force(self):
+    def is_y_force(self):
         """
         @brief 位移增量条件
         Notes
@@ -61,6 +61,12 @@ class square_with_circular_notch():
         """
         return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
             5.9e-3, 901)[1:]))
+    
+    def is_x_force(self):
+        """
+        @brief x 方向的力
+        """
+        return bm.linspace(0, 2.2e-2, 2201)
 
     def is_force_boundary(self, p):
         """
@@ -85,11 +91,15 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
+parser.add_argument('--maxit',
+        default=30, type=int,
+        help='最大迭代次数, 默认为 30 次.')
+
 parser.add_argument('--backend',
         default='numpy', type=str,
         help='有限元计算后端, 默认为 numpy.')
 
-parser.add_argument('--method',
+parser.add_argument('--model_type',
         default='HybridModel', type=str,
         help='有限元方法, 默认为 HybridModel.')
 
@@ -115,8 +125,9 @@ parser.add_argument('--vtkname',
 
 args = parser.parse_args()
 p= args.degree
+maxit = args.maxit
 backend = args.backend
-method = args.method
+model_type = args.model_type
 enable_adaptive = args.enable_adaptive
 marking_strategy = args.marking_strategy
 refine_method = args.refine_method
@@ -134,19 +145,32 @@ mesh = model.init_mesh(n=n)
 fname = 'square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=p, method=method)
+ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
 tmr.send('init')
+
 if enable_adaptive:
+    print('Enable adaptive refinement.')
     ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
 
-ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
+# 拉伸模型边界条件
+ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_y_force(), 'y')
+
+# 剪切模型边界条件
+#ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_x_force(), 'x')
+#ms.add_boundary_condition('displacement', 'Dirichlet', model.is_force_boundary, 0, 'y')
+
+# 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
-ms.solve(vtkname=vtkname)
+
+ms.solve(maxit=maxit, vtkname=vtkname)
+
+tmr.send('stop')
+end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
 with open('results_model1_ada.txt', 'w') as file:
-    file.write(f'force: {force}\n')
+    file.write(f'force: {force}\n, time: {end-start}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
@@ -156,6 +180,4 @@ plt.grid(True)
 plt.legend()
 plt.savefig('model1_force.png', dpi=300)
 
-tmr.send('stop')
-end = time.time()
 print(f"Time: {end - start}")

@@ -21,16 +21,19 @@ class VectorDirichletBC:
 
         # Prepare an index array with shape (GD, npoints)
         index = bm.zeros((GD, ipoints.shape[0]), dtype=bool)
+        #index = bm.zeros((ipoints.shape[0], GD), dtype=bool)
 
         # Map direction to axis: 'x' -> 0, 'y' -> 1, 'z' -> 2 (for GD = 3)
         direction_map = {'x': 0, 'y': 1, 'z': 2}
 
         if direction is None:
             bm.set_at(index, slice(None), is_bd_dof)  # Apply to all directions
+            #bm.set_at(index, slice(None), is_bd_dof[..., None])  # Apply to all directions
         else:
             idx = direction_map.get(direction)
             if idx is not None and idx < GD:
                 bm.set_at(index, idx, is_bd_dof)  # Apply only to the specified direction
+                #bm.set_at(index, (..., idx), is_bd_dof)
             else:
                 raise ValueError(f"Invalid direction '{direction}' for GD={GD}. Use 'x', 'y', 'z', or None.")
     
@@ -61,6 +64,8 @@ class VectorDirichletBC:
             The new right-hand-side vector.
         """
         isDDof = self.set_boundary_dof()
+        boundary_dof_index = bm.nonzero(isDDof)[0]
+
         kwargs = A.values_context()
 
         if isinstance(A, COOTensor):
@@ -81,7 +86,33 @@ class VectorDirichletBC:
             A = A.add(A1).coalesce()
 
         elif isinstance(A, CSRTensor):
-            raise NotImplementedError('The CSRTensor version has not been implemented.')
+            isIDof = bm.logical_not(isDDof)
+            crow = A.crow()
+            col = A.col()
+            indices_context = bm.context(col)
+            ZERO = bm.array([0], **indices_context)
+
+            nnz_per_row = crow[1:] - crow[:-1]
+            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
+            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
+            nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
+
+            new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
+
+            NNZ = new_crow[-1]
+            non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
+            loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
+            non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
+
+            new_col = bm.empty((NNZ,), **indices_context)
+            new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], boundary_dof_index)
+            new_col = bm.set_at(new_col, non_diag, col[remain_flag])
+
+            new_values = bm.empty((NNZ,), **kwargs)
+            new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
+            new_values = bm.set_at(new_values, non_diag, A.values()[remain_flag])
+
+            A = CSRTensor(new_crow, new_col, new_values)
 
         bm.set_at(f, isDDof, self.gd) 
         return A, f

@@ -102,6 +102,7 @@ class AdaptiveRefinement:
         mesh = self.mesh
         GD = mesh.geo_dimension()
         
+
         cm = mesh.entity_measure('cell')
         if GD == 3:
             hmin = self.l0**3/200

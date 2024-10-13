@@ -478,7 +478,6 @@ class TriangleMesh(SimplexMesh, Plotable):
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
                     if value.shape == (NC,):  # 分片常数
-                        print('value', value.ndim)
                         value = bm.concatenate((value[:], value[idx]))
                         options['data'][key] = value
                     elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
@@ -494,7 +493,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         p = int((bm.sqrt(1 + 8 * bm.array(ldof)) - 3) // 2)
                         bc = self.multi_index_matrix(p, etype=2) / p
 
-                        bcl = bm.zeros_like(bc,dtype=self.ftype)
+                        bcl = bm.zeros_like(bc, dtype=self.ftype)
                         bcl = bm.set_at(bcl , (slice(None), 0), bc[:, 1])
                         bcl = bm.set_at(bcl , (slice(None), 1), 0.5 * bc[:, 0] + bc[:, 2])
                         bcl = bm.set_at(bcl , (slice(None), 2), 0.5 * bc[:, 0])
@@ -510,7 +509,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         value = bm.set_at(value , slice(NC , None), bm.einsum('cj,kj->ck', value[idx], phi))
 
                         phi = self.shape_function(bcl, p=p)
-                        value = bm.set_at(value , (idx,slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
+                        value = bm.set_at(value , (idx, slice(None)), bm.einsum('cj,kj->ck', value[idx], phi))
 
                         options['data'][key] = value
 
