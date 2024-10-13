@@ -12,21 +12,23 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 
 class TriangleMesh(SimplexMesh, Plotable):
-    def __init__(self, node: TensorLike, cell: TensorLike) -> None:
+    def __init__(self, node: TensorLike, cell: TensorLike, device=None) -> None:
         """
         """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell) 
+        self.device = device
+
         self.node = node
         self.cell = cell
-        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
-        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
-        self.ccw = bm.tensor([0, 1, 2], **kwargs)
+        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
+        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
+        self.ccw = bm.tensor([0, 1, 2], **kwargsi, device=self.device)
 
         self.localCell = bm.tensor([
             (0, 1, 2),
             (1, 2, 0),
-            (2, 0, 1)], **kwargs)
+            (2, 0, 1)], **kwargs, device=self.device)
 
         self.construct()
 
@@ -1099,10 +1101,12 @@ class TriangleMesh(SimplexMesh, Plotable):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TriangleMesh instance
         """
+        device = self.device
+        
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
-        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64)
-        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64i, device=device)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64, device=device)
         X, Y = bm.meshgrid(x, y, indexing='ij')
     
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
