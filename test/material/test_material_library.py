@@ -32,7 +32,7 @@ def test_remove_material(setup_library):
 def test_import_from_file(setup_library):
     # 测试从 JSON 文件导入材料
     library = setup_library
-    test_data_path = os.path.join(os.path.dirname(__file__), '../../material/data/metals.json')
+    test_data_path = os.path.join(os.path.dirname(__file__), '../../fealpy/material/data/metals.json')
     library.import_from_file(test_data_path, 'json')
     assert 'Steel' in library.materials
 
@@ -58,7 +58,7 @@ def test_search_materials(setup_library):
 def test_load_standard_materials(setup_library):
     # 测试加载标准材料库
     library = setup_library
-    library.load_standard_materials(directory='../../material/data/')
+    library.load_standard_materials(directory='fealpy/material/data/')
     assert 'Steel' in library.materials
 
 if __name__ == "__main__":
