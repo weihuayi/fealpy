@@ -467,7 +467,6 @@ class TriangleMesh(SimplexMesh, Plotable):
             if ('data' in options) and (options['data'] is not None):
                 for key, value in options['data'].items():
                     if value.shape == (NC,):  # 分片常数
-                        print('value', value.ndim)
                         value = bm.concatenate((value[:], value[idx]))
                         options['data'][key] = value
                     elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况

@@ -91,6 +91,10 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
+parser.add_argument('--maxit',
+        default=30, type=int,
+        help='最大迭代次数, 默认为 30 次.')
+
 parser.add_argument('--backend',
         default='numpy', type=str,
         help='有限元计算后端, 默认为 numpy.')
@@ -121,6 +125,7 @@ parser.add_argument('--vtkname',
 
 args = parser.parse_args()
 p= args.degree
+maxit = args.maxit
 backend = args.backend
 model_type = args.model_type
 enable_adaptive = args.enable_adaptive
@@ -156,7 +161,8 @@ ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.i
 
 # 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
-ms.solve(vtkname=vtkname)
+ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
+ms.solve(maxit=maxit, vtkname=vtkname)
 
 tmr.send('stop')
 end = time.time()

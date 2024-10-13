@@ -134,7 +134,8 @@ class MainSolver:
             self.pfcm.update_phase(self.d)
             print(f"Phase field error after iteration {k + 1}: {er1}")
             tmr.send('phase_solve')
-
+            fname = f'test_dir{k:010d}.vtu'
+            self.save_vtkfile(fname=fname)
             self.H = self.pfcm.H
             
             if self.enable_refinement:
@@ -146,7 +147,7 @@ class MainSolver:
                     else:
                         raise ValueError(f"Unknown method: {self.method}")
                     self.update_interpolation_data(new_data)
-                    self._initialize_force_boundary()
+                    #self._initialize_force_boundary()
                     print(f"Refinement after iteration {k + 1}")
 
             tmr.send('refine')
@@ -193,7 +194,8 @@ class MainSolver:
         tmr.send('apply_bc')
 
         du = cg(A.tocsr(), R, atol=1e-14)
-        uh += du.flatten()[:]
+        
+        uh += du[:]
         self.uh = uh
         
         tmr.send('disp_solve')
