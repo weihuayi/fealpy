@@ -13,7 +13,7 @@ from fealpy.experimental.sparse import COOTensor, CSRTensor
 from fealpy.experimental.tests.fem.block_form_data import *
 
 class TestBlockForm:
-    @pytest.mark.parametrize("backend", ['pytorch', 'numpy'])
+    @pytest.mark.parametrize("backend", ['numpy','pytorch'])
     @pytest.mark.parametrize("data", diag_diffusion)
     def test_diag_diffusion(self, backend, data): 
         bm.set_backend(backend)
@@ -29,41 +29,20 @@ class TestBlockForm:
         
         blockform = BlockForm([[bform0,None],[None,bform1]])
         
+        a = bm.arange(blockform.shape[1], dtype=mesh.ftype)
+        vector = blockform @ a
+
         matrix = blockform.assembly() 
-        true_matrix = COOTensor(bm.array(data["indices"]), bm.array(data["values"]), blockform.shape)
-        
+        true_matrix = COOTensor(bm.array(data["indices"],dtype=mesh.itype), bm.array(data["values"], dtype=mesh.ftype), blockform.shape) 
+
+        true_vector = true_matrix.toarray() @ a
+
         np.testing.assert_array_almost_equal(matrix.toarray(), true_matrix.toarray(), 
                                      err_msg=f" `blockform` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_almost_equal(vector, true_vector, 
+                                     err_msg=f" `blockform __mult__` function is not equal to real result in backend {backend}")
 
 if __name__ == "__main__":
-    pytest.main(['./test_block_form.py', '-k', 'test_diag_diffusion'])
+    pytest.main(['./test_block_form.py', '-sk', 'test_diag_diffusion'])
 
 
-'''
-bm.set_backend('numpy')
-#bm.set_backend('pytorch')
-
-mesh = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=1, ny=1)
-space = LagrangeFESpace(mesh, p=1)
-space1 = LagrangeFESpace(mesh, p=2)
-
-bform0 = BilinearForm(space)
-bform0.add_integrator(ScalarDiffusionIntegrator())
-A1 = bform0.assembly()
-bform1 = BilinearForm(space1)
-bform1.add_integrator(ScalarDiffusionIntegrator())
-A2 = bform1.assembly()
-
-from scipy.sparse import coo_array, bmat
-def coo(A):
-    data = A._values
-    indices = A._indices
-    return coo_array((data, indices))
-
-A = bmat([[coo(A1), None],
-        [None, coo(A2)]], format='coo')
-A = COOTensor(bm.stack([A.row,A.col],axis=0), A.data, spshape=A.shape)
-print(A.indices())
-print(A.values())
-print(A)
-'''

@@ -337,7 +337,16 @@ class TriangleMesh(SimplexMesh, Plotable):
             return c
 
     def angle(self):
-        pass
+        NC = self.number_of_cells()
+        cell = self.entity('cell')
+        node = self.entity('node')
+        localEdge = self.localEdge
+        angle = bm.zeros((NC, 3), dtype=self.ftype)
+        for i,(j,k) in zip(range(3),localEdge):
+            v0 = node[cell[:, j]] - node[cell[:, i]]
+            v1 = node[cell[:, k]] - node[cell[:, i]]
+            angle[:,i] = bm.arccos(bm.sum(v0*v1,axis=1)/bm.sqrt(bm.sum(v0**2,axis=1)*bm.sum(v1**2,axis=1)))
+        return angle
 
     def show_angle(self, axes, angle=None):
         """
