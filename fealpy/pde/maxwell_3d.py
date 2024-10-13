@@ -1,9 +1,11 @@
 
-from fealpy.mesh import TetrahedronMesh, HexahedronMesh
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.decorator import cartesian, barycentric
 import sympy as sym
 from sympy.vector import CoordSys3D, Del, curl
+
+from ..mesh import TetrahedronMesh, HexahedronMesh
+from ..backend import backend_manager as bm
+from ..decorator import cartesian, barycentric
+
 
 class Bubble3dData():
     def __init__(self):
@@ -57,8 +59,8 @@ class Bubble3dData():
 
 
 import numpy as np
-from fealpy.mesh import TetrahedronMesh, HexahedronMesh
-from fealpy.decorator import cartesian, barycentric
+from ..mesh import TetrahedronMesh, HexahedronMesh
+from ..decorator import cartesian, barycentric
 import sympy as sym
 from sympy.vector import CoordSys3D, Del, curl
 

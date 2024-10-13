@@ -1,7 +1,8 @@
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.mesh import TriangleMesh
-from fealpy.decorator import cartesian, barycentric
+from ..backend import backend_manager as bm
+from ..mesh import TriangleMesh
+from ..decorator import cartesian, barycentric
+
 
 class SinData():
     def __init__(self, eps = 1, k = 1):
