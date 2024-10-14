@@ -62,6 +62,8 @@ y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
 ulist = get_flist(u)[:3]
+import ipdb
+ipdb.set_trace()
 mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 NDof = bm.zeros(maxit, dtype=bm.float64)
 
@@ -76,7 +78,6 @@ for i in range(maxit):
     isCornerNode = bm.zeros(len(node),dtype=bm.bool)
     for n in bm.array([[0,0],[1,0],[0,1],[1,1]], dtype=bm.float64):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
-
 
 
 
@@ -103,7 +104,10 @@ for i in range(maxit):
     bc1 = DirichletBC(space, gd = ulist)
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
-    A = csr_matrix((A.values(), A.indices()),A.shape)
+    A = A.to_scipy()
+    print(type(A))
+    #A = coo_matrix(A)
+    #A = csr_matrix((A.values(), A.indices()),A.shape)
     uh[:] = bm.tensor(spsolve(A, F))
     
     #uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)

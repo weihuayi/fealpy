@@ -122,12 +122,13 @@ def symmetry_span_array(arr, alpha):
             break
     return ret
 
-def symmetry_index(d, r):
+def symmetry_index(d, r, dtype=None):
+    dtype = dtype if dtype is not None else bm.int32
     """
     @brief 将 d 维 r 阶张量拉长以后，其对称部分对应的索引和出现的次数
     """
-    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)), dtype=bm.int32)
-    coe = bm.flip(d**bm.arange(r, dtype=bm.int32))
+    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)), dtype=dtype)
+    coe = bm.flip(d**bm.arange(r, dtype=dtype))
     symidx = bm.einsum('ij,j->i', symidx0, coe)
 
     midx = bm.multi_index_matrix(r, d-1)
@@ -138,7 +139,7 @@ def symmetry_index(d, r):
     #midx = midx0
 
     P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)],
-                       axis=0, dtype=bm.int32)
+                       axis=0, dtype=dtype)
     num = P[r]/bm.prod(P[midx], axis=1)
     return symidx, num
 
