@@ -130,24 +130,26 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         length = bm.sqrt(bm.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def quadrature_formula(self, q:int, etype:Union[int, str]='cell',
-                           qtype: str='legendre'):
+    def quadrature_formula(self, q: int, etype: Union[int, str] = 'cell',
+                           qtype: str = 'legendre'):
         """
         @brief 获取不同维度网格实体上的积分公式
         """
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+
         if etype in {'cell', 3}:
-            from ..quadrature import TetrahedronQuadrature
-            from ..quadrature.stroud_quadrature import StroudQuadrature
             if q > 7:
+                from ..quadrature.stroud_quadrature import StroudQuadrature
                 return StroudQuadrature(3, q)
             else:
-                return TetrahedronQuadrature(q, dtype=self.ftype)
+                from ..quadrature import TetrahedronQuadrature
+                return TetrahedronQuadrature(q, **kwargs)
         elif etype in {'face', 2}:
             from ..quadrature import TriangleQuadrature
-            return TriangleQuadrature(q, dtype=self.ftype)
+            return TriangleQuadrature(q, **kwargs)
         elif etype in {'edge', 1}:
             from ..quadrature import GaussLegendreQuadrature
-            return GaussLegendreQuadrature(q, dtype=self.ftype)
+            return GaussLegendreQuadrature(q, **kwargs)
 
     def cell_volume(self, index=_S):
         """
@@ -219,6 +221,18 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         Dlambda[:, 1] = bm.cross(n, v1) / length
         Dlambda[:, 2] = bm.cross(n, v2) / length
         return Dlambda
+
+    def boundary_edge_flag(self):
+        """
+        @brief 判断边界边 
+        """
+        NE = self.number_of_edges()
+        face2edge = self.face_to_edge()
+        isBdFace = self.boundary_face_flag()
+        isBdEdge = bm.zeros(NE, dtype=bm.bool)
+        isBdEdge[face2edge[isBdFace, :]] = True
+        return isBdEdge 
+        
 
     """
     def grad_shape_function(self, bc, p=1, index=_S, variables='x'):

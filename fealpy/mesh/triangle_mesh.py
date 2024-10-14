@@ -63,15 +63,15 @@ class TriangleMesh(SimplexMesh, Plotable):
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
-        from ..quadrature import TriangleQuadrature
-        from ..quadrature import GaussLegendreQuadrature
-
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        kwargs = {'dtype': self.ftype}
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+
         if etype == 2:
+            from ..quadrature import TriangleQuadrature
             quad = TriangleQuadrature(q, **kwargs)
         elif etype == 1:
+            from ..quadrature import GaussLegendreQuadrature
             quad = GaussLegendreQuadrature(q, **kwargs)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
@@ -1110,7 +1110,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if dtype is None:
-            dtype = bm.int32
+            dtype = bm.float64
 
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
