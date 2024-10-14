@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
-from fealpy.mesh import UniformMesh2d, QuadrangleMesh
+from fealpy.mesh import QuadrangleMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
@@ -28,7 +28,7 @@ class BoxDomainData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
         val[..., 0] = 35/13 * y - 35/13 * y**2 + 10/13 * x - 10/13 * x**2
         val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
         
@@ -39,7 +39,7 @@ class BoxDomainData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
         val[..., 0] = x * (1 - x) * y * (1 - y)
         val[..., 1] = 0
         
@@ -64,18 +64,12 @@ parser.add_argument('--ny',
                     default=2, type=int,
                     help='y 方向的初始网格单元数, 默认为 2.')
 args = parser.parse_args()
-
-pde = BoxDomainData2D()
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
+pde = BoxDomainData2D()
 nx, ny = args.nx, args.ny
 extent = pde.domain()
-h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
-origin = [extent[0], extent[2]]
-# mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
-#                     ipoints_ordering='nec')
-
 mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
