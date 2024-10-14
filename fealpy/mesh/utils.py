@@ -2,6 +2,8 @@
 from typing import Dict, Callable, TypeVar, Tuple, Any
 from math import comb
 
+from ..backend import backend_manager as bm
+from ..backend import TensorLike
 from .. import logger
 
 _Meth = TypeVar('_Meth', bound=Callable)

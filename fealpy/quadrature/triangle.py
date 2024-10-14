@@ -14,7 +14,7 @@ from .quadrature import backend_manager as bm
 
 class TriangleQuadrature(Quadrature):
     def make(self, index: int):
-        kwargs = {'dtype': self.dtype}
+        kwargs = {'dtype': self.dtype, 'device': self.device}
         if index==1: #  index 1, nQuad 1
             A = bm.tensor([
                 [0.3333333333333330, 0.3333333333333330, 0.3333333333333330, 1.0000000000000000]], **kwargs)

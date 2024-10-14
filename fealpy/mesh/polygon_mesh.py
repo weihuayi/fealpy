@@ -127,20 +127,22 @@ class PolygonMesh(Mesh, Plotable):
         
         a /= 2.0
         return a[index]
-    
-    def quadrature_formula(self,q,etype: Union[int,str]='cell',qtype='legendre'):
+
+    def quadrature_formula(self, q, etype: Union[int, str] = 'cell', qtype='legendre'):
         if isinstance(etype,str):
-            etype = estr2dim(self,etype)
+            etype = estr2dim(self, etype)
+        kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 2:
             from ..quadrature import TriangleQuadrature
-            return TriangleQuadrature(q)
+            return TriangleQuadrature(q, **kwargs)
         elif etype == 1:
             if qtype in {'legendre'}:
                 from ..quadrature import GaussLegendreQuadrature
-                return GaussLegendreQuadrature(q)
+                return GaussLegendreQuadrature(q, **kwargs)
             elif qtype in {'lobatto'}:
                 from ..quadrature import GaussLobattoQuadrature
-                return GaussLobattoQuadrature(q)
+                return GaussLobattoQuadrature(q, **kwargs)
+
     def number_of_global_ipoints(self, p: int) -> int:
         """
         @brief 插值点总数

@@ -5,7 +5,7 @@ from .quadrature import backend_manager as bm
 
 class TetrahedronQuadrature(Quadrature):
    def make(self, index: int):
-        kwargs = {'dtype': self.dtype}
+        kwargs = {'dtype': self.dtype, 'device': self.device}
         if index == 1:    # Order 1, nQuad 1
             A = bm.tensor([
                 [0.2500000000000000, 0.2500000000000000, 0.2500000000000000, 0.2500000000000000, 1.0000000000000000]],

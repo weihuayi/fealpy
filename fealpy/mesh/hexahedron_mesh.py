@@ -45,7 +45,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         @brief 获取不同维度网格实体上的积分公式
         """
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        qf = GaussLegendreQuadrature(q, dtype=self.ftype)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         if etype in {'cell', 3}:
             return TensorProductQuadrature((qf, qf, qf))
         elif etype in {'face', 2}:
