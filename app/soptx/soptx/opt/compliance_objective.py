@@ -1,16 +1,16 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as _DT
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as _DT
 
 from builtins import int, str, float, object
 
-from fealpy.experimental.typing import Union
+from fealpy.typing import Union
 
-from fealpy.experimental.opt.objective import Objective
+from fealpy.opt.objective import Objective
 
-from fealpy.experimental.mesh.mesh_base import Mesh
+from fealpy.mesh.mesh_base import Mesh
 
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.functionspace.tensor_space import TensorFunctionSpace
 
 from app.soptx.soptx.solver.fem_solver import FEMSolver
 
@@ -71,16 +71,8 @@ class ComplianceObjective(Objective):
     def _create_function_space(self, degree: int, 
                             dof_per_node: int, dof_ordering: str) -> TensorFunctionSpace:
         """
-        Create a TensorFunctionSpace instance based on the given degree, 
-            DOF per node, and DOF ordering.
-
-        Args:
-            degree (int): Degree of the function space.
-            dof_per_node (int): Number of degrees of freedom per node.
-            dof_ordering (str): DOF ordering, either 'dof-priority' or 'gd-priority'.
-
-        Returns:
-            TensorFunctionSpace: An instance of TensorFunctionSpace.
+        Create a TensorFunctionSpace instance based on the given 
+        degree, DOF per node, and DOF ordering.
         """
         space_C = LagrangeFESpace(mesh=self.mesh, p=degree, ctype='C')
 
@@ -94,37 +86,28 @@ class ComplianceObjective(Objective):
         return TensorFunctionSpace(scalar_space=space_C, shape=shape)
 
     def _create_filter_properties(self, filter_type: Union[int, str], 
-                                filter_rmin: float) -> FilterProperties:
+                                filter_rmin: float) -> Union[FilterProperties, None]:
         """
         Create a FilterProperties instance based on the given filter type and radius.
-
-        Args:
-            filter_type (Union[int, str]): Type of the filter 
-                (either 'density', 'sensitivity', 0, or 1).
-            rmin (float): Filter radius.
-
-        Returns:
-            FilterProperties: An instance of FilterProperties.
         """
+        if filter_type == 'None':
+            return None 
+    
         if filter_type == 'density' or filter_type == 0:
             ft = 0
         elif filter_type == 'sensitivity' or filter_type == 1:
             ft = 1
+        elif filter_type == 'heaviside' or filter_type == 2:
+            ft = 2
         else:
-            raise ValueError("Invalid filter type. Use 'density', 'sensitivity', 0, or 1.")
+            raise ValueError("Invalid filter type. \
+                            Use 'density', 'sensitivity', 'heaviside', 0, 1, or 2.")
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 
     def _create_displacement_solver(self) -> FEMSolver:
         """
         Create a FEMSolver instance based on the given solver method.
-
-        Args:
-            solver_method (str): The method used to solve the system
-              (e.g., 'mumps' for direct or 'cg' for iterative).
-
-        Returns:
-            FEMSolver: An instance of FEMSolver with the specified solving method.
         """
         return FEMSolver(material_properties=self.material_properties,
                         tensor_space=self.space,
@@ -133,12 +116,6 @@ class ComplianceObjective(Objective):
     def fun(self, rho: _DT) -> float:
         """
         Compute the compliance based on the density.
-        
-        Parameters:
-            rho (_DT): Design variable (density distribution).
-        
-        Returns:
-            float: Compliance value.
         """
         # tmr = timer("Compliance Objective")
         # next(tmr)
@@ -148,6 +125,7 @@ class ComplianceObjective(Objective):
         displacement_solver = self.displacement_solver
         ke0 = self.ke0
 
+        # `material_properties.rho` must be the physical density `rho_phys``
         material_properties.rho = rho
         if tmr:
             tmr.send('Assign Density')
@@ -179,36 +157,36 @@ class ComplianceObjective(Objective):
         
         return c
     
-    def jac(self, rho: _DT) -> _DT:
+    def jac(self, rho: _DT, beta: float = None, rho_tilde: _DT = None) -> _DT:
         """
         Compute the gradient of compliance w.r.t. density.
-
-        Parameters:
-            rho (_DT): Design variable (density distribution).
-        
-        Returns:
-            _DT: Gradient of the compliance.
         """
         material_properties = self.material_properties
-
         ce = self.ce
 
         dE = material_properties.material_model_derivative()
         dce = - bm.einsum('c, c -> c', dE, ce)
 
+        if self.filter_properties is None:
+            return dce
+
         ft = self.filter_properties.ft
         H = self.filter_properties.H
         Hs = self.filter_properties.Hs
-
         cell_measure = self.mesh.entity_measure('cell')
 
         if ft == 0:
-            # 先归一化再乘权重因子
+            # first normalize, then apply weight factor
             dce[:] = H.matmul(dce * cell_measure / H.matmul(cell_measure))
         elif ft == 1:
             rho_dce = bm.einsum('c, c -> c', rho[:], dce)
             filtered_dce = H.matmul(rho_dce)
             dce[:] = filtered_dce / Hs / bm.maximum(bm.array(0.001), rho[:])
+        elif ft == 2:
+            if beta is None or rho_tilde is None:
+                raise ValueError("Heaviside projection filter requires both beta and rho_tilde.")
+            dxe = beta * bm.exp(-beta * rho_tilde) + bm.exp(-beta)
+            dce[:] = H.matmul(dce * dxe * cell_measure / H.matmul(cell_measure))
 
         return dce
 

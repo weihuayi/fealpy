@@ -1,6 +1,6 @@
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
 
 import taichi as ti
 

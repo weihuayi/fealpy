@@ -1,857 +1,1316 @@
-import numpy as np
-import warnings
-from scipy.sparse import csr_matrix, diags, spdiags
-from types import ModuleType
+import numpy as np 
+from typing import Union, Optional, Sequence, Tuple, Any
 
-from .mesh_base import Mesh, Plotable
+from .utils import entitymethod, estr2dim
 
-# 这个数据接口为有限元服务
-from .mesh_data_structure import StructureMesh3dDataStructure
+from ..backend import backend_manager as bm 
+from ..typing import TensorLike, Index, _S, Union, Tuple
+from .. import logger
 
-from ..geometry import project
+from .mesh_base import StructuredMesh, TensorMesh
+from .plot import Plotable
 
-class UniformMesh3d(Mesh, Plotable):
+class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     """
-    @brief A class for representing a three-dimensional structured mesh with uniform discretization in x, y, and z directions.
+    Topological data structure of a structured hexahedral mesh
+    The ordering of the nodes in each element is as follows:
+      3 ------- 7
+     / |       /|
+    1 ------- 5 |
+    |  |      | |
+    |  2------|-6
+    | /       |/
+    0 ------- 4
+
+    The ordering of the edges in each element is as follows:
+          ----- 3---
+        / |       / |
+       5  |      7  |
+      /   9     /   11
+      ----1----     |
+     |    |    |    |
+     |     ----|2---     
+     8   /     10  /
+     |  4      |  6
+     | /       | /
+      ----0---- 
+    * Edge 0: (0, 4)
+    * Edge 1: (1, 5)
+    * Edge 2: (2, 6)
+    * Edge 3: (3, 7)
+    * Edge 4: (0, 2)
+    * Edge 5: (1, 3)
+    * Edge 6: (4, 6)
+    * Edge 7: (5, 7)
+    * Edge 8: (0, 1)
+    * Edge 9: (2, 3)
+    * Edge 10: (4, 5)
+    * Edge 11: (6, 7)
+
+    The ordering of the faces in each element is as follows:
+          ----------
+        / |       / |
+       /  | 5    /  |
+      /   |    3/   |
+      ---------     |
+     | 0  |    | 1  |
+     |     ----|----     
+     |   /2    |   /
+     |  /   4  |  /
+     | /       | /
+      --------- 
+    * Face 0: (0, 1, 2, 3)
+    * Face 1: (4, 5, 6, 7)
+    * Face 2: (0, 1, 4, 5)
+    * Face 3: (2, 3, 6, 7)
+    * Face 4: (0, 2, 4, 6)
+    * Face 5: (1, 3, 5, 7)
+
+    The ordering of entities in the entire mesh is as follows:
+
+    * Node numbering rule: first in the z direction, then in the y direction, and then in the x direction
+    * Edge numbering rule: first in the z direction, then in the y direction, and then in the x direction
+    * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
     """
-    def __init__(self, extent,
-            h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
-            ftype=np.float64, itype=np.int_
-            ):
+    def __init__(self, extent: tuple[int, int, int, int, int, int] = (0, 1, 0, 1, 0, 1), 
+             h: tuple[float, float, float] = (1.0, 1.0, 1.0), 
+             origin: tuple[float, float, float] = (0.0, 0.0, 0.0), 
+             ipoints_ordering='zyx', 
+             flip_direction=None, 
+             itype=None, ftype=None):
         """
-        @brief Initialize the 3D uniform mesh.
+        Initializes a 3D uniform structured mesh.
 
-        @param[in] extent A tuple representing the range of the mesh in the x, y, and z directions.
-        @param[in] h A tuple representing the mesh step sizes in the x, y, and z directions, default: (1.0, 1.0, 1.0).
-        @param[in] origin A tuple representing the coordinates of the starting point, default: (0.0, 0.0, 0.0).
-        @param[in] ftype Floating point type to be used, default: np.float64.
-        @param[in] itype Integer type to be used, default: np.int_.
-
-        @note The extent parameter defines the index range in the x, y, and z directions.
-              We can define an index range starting from 0, e.g., [0, 10, 0, 10, 0, 10],
-              or starting from a non-zero value, e.g., [2, 12, 3, 13, 4, 14]. The flexibility
-              in the index range is mainly for handling different scenarios
-              and data subsets, such as:
-              - Subgrids
-              - Parallel computing
-              - Data cropping
-              - Handling irregular data
-
-        @example
-        from fealpy.mesh import UniformMesh3d
-
-        I = [0, 1, 0, 1, 0, 1]
-        h = (0.1, 0.1, 0.1)
-        nx = int((I[1] - I[0])/h[0])
-        ny = int((I[3] - I[2])/h[1])
-        nz = int((I[5] - I[4])/h[2])
-        mesh = UniformMesh3d([0, nx, 0, ny, 0, nz], h=h, origin=(I[0], I[2], I[4]))
-
+        Parameters:
+        extent : tuple of int
+            Defines the number of cells in the mesh divisions.
+        h : tuple of float, optional
+            Defines the step size in the x, y, and z directions.
+        origin : tuple of float, optional
+            Specifies the coordinates of the origin of the mesh. 
+        ipoints_ordering : str, optional
+            Specifies the ordering of interpolation points in the mesh. 
+        flip_direction : str or None, optional
+            Specifies whether to flip the direction of node numbering.
+        itype : data type, optional
+            Data type for integer values used in the mesh. Default is None, which is assigned as bm.int32.
+        ftype : data type, optional
+            Data type for floating-point values used in the mesh. Default is None, which is assigned as bm.float64.
         """
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+        super().__init__(TD=3, itype=itype, ftype=ftype)
+
         # Mesh properties
-        self.extent = extent
-        self.h = h
-        self.origin = origin
-
-        self.ftype = ftype
-        self.itype = itype
-        self.type = "U3D"
+        self.extent = [int(e) for e in extent]
+        self.h = [float(val) for val in h]
+        self.origin = [float(o) for o in origin]
 
         # Mesh dimensions
-        self.nx = extent[1] - extent[0]
-        self.ny = extent[3] - extent[2]
-        self.nz = extent[5] - extent[4]
-        self.NC = self.nx * self.ny * self.nz
+        # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+        # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+        # self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
+        self.nx = self.extent[1] - self.extent[0]
+        self.ny = self.extent[3] - self.extent[2]
+        self.nz = self.extent[5] - self.extent[4]
         self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+        self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \
+                (self.nx + 1) * self.ny * (self.nz + 1) + \
+                self.nx * (self.ny + 1) * (self.nz + 1)
+        self.NF = self.nx * self.ny * (self.nz + 1) + \
+                self.nx * (self.ny + 1) * self.nz + \
+                (self.nx + 1) * self.ny * self.nz
+        self.NC = self.nx * self.ny * self.nz
 
-        # Data structure for finite element computation
-        self.ds: StructureMesh3dDataStructure = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype=itype)
+        # Mesh datas
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = {}
+        self.celldata = {}
+        self.meshdata = {}
+
+        self.meshtype = 'UniformMesh3d'
+
+        # Interpolation points
+        if ipoints_ordering not in ['zyx', 'nefc']:
+            raise ValueError("The ipoints_ordering parameter must be either 'zyx' or 'nefc'")
+        self.ipoints_ordering = ipoints_ordering
+
+        # Whether to flip
+        self.flip_direction = flip_direction
+
+        # Initialize face adjustment mask
+        self.adjusted_face_mask = self.get_adjusted_face_mask()
+
+        # Specify the counterclockwise drawing
+        self.ccw = bm.array([0, 2, 3, 1], dtype=self.itype)
+
+        self.cell2edge = self.cell_to_edge()
+        self.cell2face = self.cell_to_face()
+        self.face2edge = self.face_to_edge()
+        self.face2cell = self.face_to_cell()
+
+        self.localEdge = bm.array([
+        (0, 4), (1, 5), (2, 6), (3, 7),
+        (0, 2), (1, 3), (4, 6), (5, 7),
+        (0, 1), (2, 3), (4, 5), (6, 7)], dtype=self.itype)
+        self.localFace = bm.array([
+        (0, 1, 2, 3), (4, 5, 6, 7),  # left and right faces
+        (0, 1, 4, 5), (2, 3, 6, 7),  # front and back faces
+        (0, 2, 4, 6), (1, 3, 5, 7)], dtype=self.itype)  # bottom and top faces
+        self.localFace2edge = bm.array([
+        (4, 5, 8, 9), (6, 7, 10, 11),
+        (0, 1, 8, 10), (2, 3, 9, 11),
+        (0, 2, 4, 6), (1, 3, 5, 7)], dtype=self.itype)
 
 
-    ## @ingroup GeneralInterface
-    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+    # 实体生成方法
+    @entitymethod(0)
+    def _get_node(self) -> TensorLike:
         """
-        @brief
+        @brief Generate the nodes in a structured mesh.
         """
-        for i in range(n):
-            self.extent = [i*2 for i in self.extent]
-            self.h = [h/2.0 for h in self.h]
-            self.nx = self.extent[1] - self.extent[0]
-            self.ny = self.extent[3] - self.extent[2]
-            self.nz = self.extent[5] - self.extent[4]
-            self.NC = self.nx * self.ny * self.nz
-            self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
-            self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype=self.itype)
+        GD = 3
+        nx, ny, nz = self.nx, self.ny, self.nz
+        box = [self.origin[0], self.origin[0] + nx * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1],
+               self.origin[2], self.origin[2] + nz * self.h[2]]
 
-    ## @ingroup GeneralInterface
-    def cell_volume(self):
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
+        z = bm.linspace(box[4], box[5], nz + 1, dtype=self.ftype)
+        xx, yy, zz = bm.meshgrid(x, y, z, indexing='ij')
+        node = bm.concatenate((xx[..., None], yy[..., None], zz[..., None]), axis=-1)
+
+        if self.flip_direction == 'y':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, nz + 1, GD), axis=1).reshape(-1, GD)
+        elif self.flip_direction == 'z':
+            node = bm.flip(node.reshape(nx + 1, ny + 1, nz + 1, GD), axis=2).reshape(-1, GD)
+
+        return node.reshape(-1, GD)
+    
+    @entitymethod(1)
+    def _get_edge(self) -> TensorLike:
         """
-        @brief 返回单元的体积，注意这里只返回一个值（因为所有单元体积相同）
+        @brief Generate the edges in a structured mesh.
         """
-        return self.h[0]*self.h[1]*self.h[2]
+        NN = self.NN
+        NE = self.NE
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
 
-    ## @ingroup GeneralInterface
-    def face_area(self):
+        idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1, nz + 1)
+        edge = bm.zeros((NE, 2), dtype=self.itype)
+
+        NE0 = 0
+        NE1 = nx * (ny + 1) * (nz + 1)
+        c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
+        
+        NE0 = NE1
+        NE1 += (nx + 1) * ny * (nz + 1)
+        c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (nz + 1))
+
+        NE0 = NE1
+        NE1 += (nx + 1) * (ny + 1) * nz
+        c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
+        edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
+        edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + 1)
+
+        return edge
+
+    @entitymethod(2)
+    def _get_face(self) -> TensorLike:
         """
-        @brief 返回面的面积，注意这里返回三个值
+        @brief Generate the faces in a structured mesh.
         """
-        return self.h[1]*self.h[2], self.h[0]*self.h[2], self.h[0]*self.h[1]
+        NN = self.NN
+        NF = self.NF
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        idx = bm.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
+        face = bm.zeros((NF, 4), dtype=self.itype)
 
-    ## @ingroup GeneralInterface
-    def edge_length(self):
+        NF0 = 0
+        NF1 = (nx + 1) * ny * nz
+        c = idx[:, :-1, :-1]
+        face[NF0:NF1, 0] = c.flatten()
+        face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
+        face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + nz + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
+        # face = bm.set_at(face, (slice(NF0, NF0 + ny * nz), slice(None)), 
+        #              face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
+
+        NF0 = NF1
+        NF1 += nx * (ny + 1) * nz
+        c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
+        face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
+        face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
+        face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
+        NF2 = NF0 + ny * nz
+        N = nz * (ny + 1)
+        idx1 = bm.zeros((nx, nz), dtype=self.itype)
+        idx1 = bm.arange(NF2, NF2 + nz)
+        idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+        # face = bm.set_at(face, (idx1, slice(None)), face[idx1][:, [1, 0, 3, 2]])
+
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
+        face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
+        face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + nz + 1)
+        face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
+        face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + nz + 1)
+        N = ny * (nz + 1)
+        idx2 = bm.zeros((nx, ny), dtype=self.itype)
+        idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
+        idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+        # face = bm.set_at(face, (idx2, slice(None)), face[idx2][:, [1, 0, 3, 2]])
+
+        return face
+
+    @entitymethod(3)
+    def _get_cell(self) -> TensorLike:
         """
-        @brief 返回边长，注意这里返回三个值，一个 x 方向，一个 y 方向, 一个 z 方向
+        @brief Generate the cells in a structured mesh.
         """
-        return self.h[0], self.h[1], self.h[2]
+        NN = self.NN
+        NC = self.NC
+        nx, ny, nz = self.nx, self.ny, self.nz
 
-    ## @ingroup GeneralInterface
-    def cell_location(self, p):
+        idx = bm.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
+        c = idx[:-1, :-1, :-1]
+
+        cell = bm.zeros((NC, 8), dtype=self.itype)
+        nyz = (ny + 1) * (nz + 1)
+
+        cell = bm.set_at(cell, (slice(None), 0), c.flatten())
+        cell = bm.set_at(cell, (slice(None), 1), cell[:, 0] + 1)
+        cell = bm.set_at(cell, (slice(None), 2), cell[:, 0] + nz + 1)
+        cell = bm.set_at(cell, (slice(None), 3), cell[:, 2] + 1)
+        cell = bm.set_at(cell, (slice(None), 4), cell[:, 0] + nyz)
+        cell = bm.set_at(cell, (slice(None), 5), cell[:, 4] + 1)
+        cell = bm.set_at(cell, (slice(None), 6), cell[:, 2] + nyz)
+        cell = bm.set_at(cell, (slice(None), 7), cell[:, 6] + 1)
+
+        return cell
+
+        # # TODO: Provide a unified implementation that is not backend-specific
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     cell[:, 0] = c.flatten()
+        #     cell[:, 1] = cell[:, 0] + 1
+        #     cell[:, 2] = cell[:, 0] + nz + 1
+        #     cell[:, 3] = cell[:, 2] + 1
+        #     cell[:, 4] = cell[:, 0] + nyz
+        #     cell[:, 5] = cell[:, 4] + 1
+        #     cell[:, 6] = cell[:, 2] + nyz
+        #     cell[:, 7] = cell[:, 6] + 1
+
+        #     return cell
+        # elif bm.backend_name == 'jax':
+        #     cell = cell.at[:, 0].set(c.flatten())
+        #     cell = cell.at[:, 1].set(cell[:, 0] + 1)
+        #     cell = cell.at[:, 2].set(cell[:, 0] + nz + 1)
+        #     cell = cell.at[:, 3].set(cell[:, 2] + 1)
+        #     cell = cell.at[:, 4].set(cell[:, 0] + nyz)
+        #     cell = cell.at[:, 5].set(cell[:, 4] + 1)
+        #     cell = cell.at[:, 6].set(cell[:, 2] + nyz)
+        #     cell = cell.at[:, 7].set(cell[:, 6] + 1)
+
+        #     return cell
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
+    
+    
+    # 实体拓扑
+    def number_of_nodes_of_cells(self):
+        return 8
+
+    def number_of_edges_of_cells(self):
+        return 12
+
+    def number_of_faces_of_cells(self):
+        return 6
+    
+    def cell_to_edge(self) -> TensorLike:
         """
-        @brief 给定一组点，确定所有点所在的单元
-
+        @brief 单元和边的邻接关系, 储存每个单元相邻的 12 条边的编号
         """
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
+        NC = self.NC
 
-        v = p - np.array(self.origin, dtype=self.ftype)
-        n0 = v[..., 0]//hx
-        n1 = v[..., 1]//hy
-        n2 = v[..., 2]//hz
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
 
-        return n0.astype('int64'), n1.astype('int64'), n2.astype('int64')
+        cell2edge = bm.zeros((NC, 12), dtype=self.itype)
 
-    ## @ingroup GeneralInterface
-    def show_function(self, plot, uh, cmap='jet'):
+        # TODO: Provide a unified implementation that is not backend-specific
+        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+            idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            cell2edge[:, 0] = idx0[:, :-1, :-1].flatten()
+            cell2edge[:, 1] = idx0[:, :-1, 1:].flatten()
+            cell2edge[:, 2] = idx0[:, 1:, :-1].flatten()
+            cell2edge[:, 3] = idx0[:, 1:, 1:].flatten()
+
+            NE0 = nx * (ny + 1) * (nz + 1)
+            idx1 = bm.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)  
+            cell2edge[:, 4] = (NE0 + idx1[:-1, :, :-1]).flatten()
+            cell2edge[:, 5] = (NE0 + idx1[:-1, :, 1:]).flatten()
+            cell2edge[:, 6] = (NE0 + idx1[1:, :, :-1]).flatten()
+            cell2edge[:, 7] = (NE0 + idx1[1:, :, 1:]).flatten()
+
+            NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+            idx2 = bm.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
+            cell2edge[:, 8] = (NE1 + idx2[:-1, :-1, :]).flatten()
+            cell2edge[:, 9] = (NE1 + idx2[:-1, 1:, :]).flatten()
+            cell2edge[:, 10] = (NE1 + idx2[1:, :-1, :]).flatten()
+            cell2edge[:, 11] = (NE1 + idx2[1:, 1:, :]).flatten()
+
+            return cell2edge
+        elif bm.backend_name == 'jax':
+            idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+            cell2edge = cell2edge.at[:, 0].set(idx0[:, :-1, :-1].flatten())
+            cell2edge = cell2edge.at[:, 1].set(idx0[:, :-1, 1:].flatten())
+            cell2edge = cell2edge.at[:, 2].set(idx0[:, 1:, :-1].flatten())
+            cell2edge = cell2edge.at[:, 3].set(idx0[:, 1:, 1:].flatten())
+
+            NE0 = nx * (ny + 1) * (nz + 1)
+            idx1 = bm.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)  
+            cell2edge = cell2edge.at[:, 4].set((NE0 + idx1[:-1, :, :-1]).flatten())
+            cell2edge = cell2edge.at[:, 5].set((NE0 + idx1[:-1, :, 1:]).flatten())
+            cell2edge = cell2edge.at[:, 6].set((NE0 + idx1[1:, :, :-1]).flatten())
+            cell2edge = cell2edge.at[:, 7].set((NE0 + idx1[1:, :, 1:]).flatten())
+
+            NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+            idx2 = bm.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
+            cell2edge = cell2edge.at[:, 8].set((NE1 + idx2[:-1, :-1, :]).flatten())
+            cell2edge = cell2edge.at[:, 9].set((NE1 + idx2[:-1, 1:, :]).flatten())
+            cell2edge = cell2edge.at[:, 10].set((NE1 + idx2[1:, :-1, :]).flatten())
+            cell2edge = cell2edge.at[:, 11].set((NE1 + idx2[1:, 1:, :]).flatten())
+
+            return cell2edge
+        else:
+            raise NotImplementedError("Backend is not yet implemented.")
+        
+    def cell_to_face(self, index: Index=_S) -> TensorLike:
         """
+        @brief 单元和面的邻接关系, 储存每个单元相邻的六个面的编号
         """
-        pass
+        NC = self.NC
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
 
-    ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box,
-                       init, forward, fname='test.mp4',
-                       fargs=None, frames=1000, lw=2, interval=50):
+        cell2face = bm.zeros((NC, 6), dtype=self.itype)
+
+        # x direction
+        idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
+        cell2face = bm.set_at(cell2face, (slice(None), 0), idx0[:-1, :, :].flatten())
+        cell2face = bm.set_at(cell2face, (slice(None), 1), idx0[1:, :, :].flatten())    
+        # cell2face[:, 0] = idx0[:-1, :, :].flatten()
+        # cell2face[:, 1] = idx0[1:, :, :].flatten()
+
+        # y direction
+        NE0 = (nx + 1) * ny * nz
+        idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
+        # cell2face[:, 2] = (NE0 + idx1[:, :-1, :]).flatten()
+        # cell2face[:, 3] = (NE0 + idx1[:, 1:, :]).flatten()
+        cell2face = bm.set_at(cell2face, (slice(None), 2), (NE0 + idx1[:, :-1, :]).flatten())
+        cell2face = bm.set_at(cell2face, (slice(None), 3), (NE0 + idx1[:, 1:, :]).flatten())
+
+        # z direction
+        NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
+        idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
+        cell2face = bm.set_at(cell2face, (slice(None), 4), (NE1 + idx2[:, :, :-1]).flatten())
+        cell2face = bm.set_at(cell2face, (slice(None), 5), (NE1 + idx2[:, :, 1:]).flatten())
+        # cell2face[:, 4] = (NE1 + idx2[:, :, :-1]).flatten()
+        # cell2face[:, 5] = (NE1 + idx2[:, :, 1:]).flatten()
+        
+        return cell2face[index]
+        
+    def face_to_edge(self, index: Index=_S):
         """
-        @brief
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def to_vtk_file(self, filename, celldata=None, nodedata=None):
-        """
-        @brief 输出为 vtk 数据格式
-
-        """
-        from pyevtk.hl import gridToVTK
-
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2], self.origin[2] + ny*self.h[2],
-               ]
-
-        x = np.linspace(box[0], box[1], nx+1)
-        y = np.linspace(box[2], box[3], ny+1)
-        z = np.linspace(box[4], box[5], nz+1)
-        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
-
-        return filename
-
-    ## @ingroup FDMInterface
-    @property
-    def node(self):
-        """
-        @brief Get the coordinates of the nodes in the mesh.
-
-        @return A NumPy array of shape (nx+1, ny+1, nz+1, 3) containing the coordinates of the nodes.
-
-        @details This function calculates the coordinates of the nodes in the mesh based on the
-        mesh's origin, step size, and the number of cells in the x and y directions.
-        It returns a NumPy array with the coordinates of each node.
-
+        @brief 面和边的邻接关系, 储存每个面相邻的 4 条边的编号
         """
 
+        NE = self.NE
+        NF = self.NF
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        face2edge = bm.zeros((NF, 4), dtype=self.itype)
+
+        # x direction
+        NE0 = 0
+        NE1 = (nx + 1) * ny * nz
+        idx0 = bm.arange(nx * (ny + 1) * (nz + 1), 
+                         NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :, :-1].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 1), idx0[:, :, 1:].flatten())
+        # face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+        # face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+
+        idx1 = bm.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 2), idx1[:, :-1, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 3), idx1[:, 1:, :].flatten())
+        # face2edge[NE0:NE1, 2] = idx1[:, :-1, :].flatten()
+        # face2edge[NE0:NE1, 3] = idx1[:, 1:, :].flatten()
+
+        # y direction
+        NE0 = NE1
+        NE1 += nx * (ny + 1) * nz
+        idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :, :-1].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 1), idx0[:, :, 1:].flatten())
+        # face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+        # face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+
+        idx1 = bm.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 2), idx1[:-1, :, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 3), idx1[1:, :, :].flatten())
+        # face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+        # face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+
+        # z direction
+        NE0 = NE1
+        NE1 += nx * ny * (nz + 1)
+        idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :-1, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 1), idx0[:, 1:, :].flatten())
+        # face2edge[NE0:NE1, 0] = idx0[:, :-1, :].flatten()
+        # face2edge[NE0:NE1, 1] = idx0[:, 1:, :].flatten()
+
+        idx1 = bm.arange(nx * (ny + 1) * (nz + 1), 
+                         NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 2), idx1[:-1, :, :].flatten())
+        face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 3), idx1[1:, :, :].flatten())
+        # face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+        # face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+
+        return face2edge[index]
+
+    def face_to_cell(self) -> TensorLike:
+        """
+        @brief 面和单元的邻接关系, 储存每个面相邻的 2 个单元的编号
+        Notes:
+        - The first and second columns store the indices of the left and right cells adjacent to each face. 
+        When the two indices are the same, it indicates that the face is a boundary face.
+        - The third and fourth columns store the local indices of the face in the left and right cells, respectively.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        NC = self.NC
+
+        face2cell = bm.zeros((NF, 4), dtype=self.itype)
+
+        # x direction
+        NF0 = 0
+        NF1 = (nx+1) * ny * nz
+        idx = bm.arange(NC, dtype=face2cell.dtype).reshape(nx, ny, nz)
+        face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 0), idx.flatten())
+        face2cell = bm.set_at(face2cell, (slice(NF0 + ny * nz, NF1), 1), idx.flatten())
+        face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 2), 0)
+        face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 3), 1)
+        # face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
+        # face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
+        # face2cell[NF0:NF1-ny*nz, 2] = 0
+        # face2cell[NF0:NF1-ny*nz, 3] = 1
+
+        face2cell = bm.set_at(face2cell, (slice(NF1 - ny * nz, NF1), 0), idx[-1].flatten())
+        face2cell = bm.set_at(face2cell, (slice(NF0, NF0 + ny * nz), 1), idx[0].flatten())
+        face2cell = bm.set_at(face2cell, (slice(NF1 - ny * nz, NF1), 2), 1)
+        face2cell = bm.set_at(face2cell, (slice(NF0, NF0 + ny * nz), 3), 0)
+        # face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
+        # face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
+        # face2cell[NF1-ny*nz:NF1, 2] = 1
+        # face2cell[NF0:NF0+ny*nz, 3] = 0
+
+        # y direction
+        idy = bm.astype(bm.swapaxes(idx, 1, 0), face2cell.dtype)
+        NF0 = NF1
+        NF1 += nx * (ny+1) * nz
+        fidy = bm.arange(NF0, NF1, dtype=face2cell.dtype).reshape(nx, ny+1, nz).swapaxes(0, 1)
+        face2cell = bm.set_at(face2cell, (fidy[:-1], 0), idy)
+        face2cell = bm.set_at(face2cell, (fidy[1:], 1), idy)
+        face2cell = bm.set_at(face2cell, (fidy[:-1], 2), 0)
+        face2cell = bm.set_at(face2cell, (fidy[1:], 3), 1)
+        # face2cell[fidy[:-1], 0] = idy
+        # face2cell[fidy[1:], 1] = idy
+        # face2cell[fidy[:-1], 2] = 0
+        # face2cell[fidy[1:], 3] = 1
+
+        face2cell = bm.set_at(face2cell, (fidy[-1], 0), idy[-1])
+        face2cell = bm.set_at(face2cell, (fidy[0], 1), idy[0])
+        face2cell = bm.set_at(face2cell, (fidy[-1], 2), 1)
+        face2cell = bm.set_at(face2cell, (fidy[0], 3), 0)
+        # face2cell[fidy[-1], 0] = idy[-1]
+        # face2cell[fidy[0], 1] = idy[0]
+        # face2cell[fidy[-1], 2] = 1
+        # face2cell[fidy[0], 3] = 0
+
+        # z direction
+        idz = bm.astype(bm.transpose(idx, (2, 0, 1)), face2cell.dtype)
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        # NOTE 2021/09/07: The following line is incorrect. The correct line is the next one. 
+        # transpose 只接受两个参数
+        # fidz = bm.arange(NF0, NF1, dtype=face2cell.dtype).reshape(nx, ny, nz+1).transpose(2, 0, 1)
+        fidz = bm.permute_dims(bm.arange(NF0, NF1, dtype=face2cell.dtype).reshape(nx, ny, nz+1), axes=(2, 0, 1))
+        face2cell = bm.set_at(face2cell, (fidz[:-1], 0), idz)
+        face2cell = bm.set_at(face2cell, (fidz[1:], 1), idz)
+        face2cell = bm.set_at(face2cell, (fidz[:-1], 2), 0)
+        face2cell = bm.set_at(face2cell, (fidz[1:], 3), 1)
+        # face2cell[fidz[:-1], 0] = idz
+        # face2cell[fidz[1:], 1] = idz
+        # face2cell[fidz[:-1], 2] = 0
+        # face2cell[fidz[1:], 3] = 1
+
+        face2cell = bm.set_at(face2cell, (fidz[-1], 0), idz[-1])
+        face2cell = bm.set_at(face2cell, (fidz[0], 1), idz[0])
+        face2cell = bm.set_at(face2cell, (fidz[-1], 2), 1)
+        face2cell = bm.set_at(face2cell, (fidz[0], 3), 0)
+        # face2cell[fidz[-1], 0] = idz[-1]
+        # face2cell[fidz[0], 1] = idz[0]
+        # face2cell[fidz[-1], 2] = 1
+        # face2cell[fidz[0], 3] = 0
+
+        return face2cell
+        
+    def boundary_node_flag(self):
+        """
+        @brief Determine if a point is a boundary point.
+        """
+        NN = self.NN
+        face = self.face
+        isBdFace = self.boundary_face_flag()
+        isBdPoint = bm.zeros((NN,), dtype=bool)
+        # isBdPoint[face[isBdFace, :]] = True
+        isBdPoint = bm.set_at(isBdPoint, face[isBdFace, :], True)
+        
+        return isBdPoint
+        
+    def boundary_edge_flag(self):
+        """
+        @brief Determine if an edge is a boundary edge.
+        """
+        NE = self.NE
+        face2edge = self.face_to_edge()
+        isBdFace = self.boundary_face_flag()
+        isBdEdge = bm.zeros((NE,), dtype=bool)
+        # isBdEdge[face2edge[isBdFace, :]] = True
+        isBdEdge = bm.set_at(isBdEdge, face2edge[isBdFace, :], True)
+        
+        return isBdEdge
+        
+    def boundary_face_flag(self):
+        """
+        @brief Determine if a face is a boundary face.
+        """
+        face2cell = self.face_to_cell()
+
+        return face2cell[:, 0] == face2cell[:, 1]
+
+    def boundary_cell_flag(self):
+        """
+        @brief Determine if a cell is a boundary cell.
+        """
+        NC = self.NC
+
+        face2cell = self.face_to_cell()
+        isBdFace = self.boundary_face_flag()
+        isBdCell = bm.zeros((NC,), dtype=bool)
+        isBdCell = bm.set_at(isBdCell, face2cell[isBdFace, 0], True)
+        # isBdCell[face2cell[isBdFace, 0]] = True
+
+        return isBdCell
+        
+
+#################################### 实体几何 #############################################
+    def entity_measure(self, etype: Union[int, str], index: Index = _S) -> Union[Tuple, int]:
+        """
+        @brief Get the measure of the entities of the specified type.
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        NC = self.number_of_cells()
+        if etype == 0:
+            # Measure of vertices (points) is 0
+            return bm.tensor(0, dtype=self.ftype)
+        elif etype == 1:
+            # Measure of edges, assuming edges are along x, y, z directions
+            temp1 = bm.tensor([[self.h[0]], [self.h[1]], [self.h[2]]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1, (3, int(self.NE/3)))
+            return temp2.reshape(-1)
+        elif etype == 2:
+            # Measure of faces, assuming faces are aligned with the coordinate planes
+            temp1 = bm.tensor([self.h[0] * self.h[1], self.h[0] * self.h[2], self.h[1] * self.h[2]], dtype=self.ftype)
+            temp2 = bm.broadcast_to(temp1[:, None], (3, int(self.NF/3)))
+            return temp2.reshape(-1)
+        elif etype == 3:
+            # Measure of cells (volumes)
+            temp = bm.tensor(self.h[0] * self.h[1] * self.h[2], dtype=self.ftype)
+            return bm.broadcast_to(temp, (NC,))
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+        
+    def cell_barycenter(self) -> TensorLike:
+        '''
+        @brief Calculate the barycenter coordinates of the cells.
+        '''
         GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-        node = np.zeros((nx+1, ny+1, nz+1, GD), dtype=self.ftype)
-        node[..., 0], node[..., 1], node[..., 2] = np.mgrid[
-                                                   box[0]:box[1]:complex(0, nx+1),
-                                                   box[2]:box[3]:complex(0, ny+1),
-                                                   box[4]:box[5]:complex(0, nz+1)]
-        return node
-
-    ## @ingroup FDMInterface
-    def cell_barycenter(self):
-        """
-        @brief
-        """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
         box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
                self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1],
                self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz-1)*self.h[2]]
-        bc = np.zeros((nx, ny, nz, GD), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx),
-                                             box[2]:box[3]:complex(0, ny),
-                                             box[4]:box[5]:complex(0, nz)]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij')
+        bc = bm.zeros((nx, ny, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
+
         return bc
-
-    ## @ingroup FDMInterface
-    def edge_barycenter(self):
-        """
-        @brief
-        """
-        xbc = self.edgex_barycenter()
-        ybc = self.edgey_barycenter()
-        zbc = self.edgez_barycenter()
-        return xbc, ybc, zbc
-
-    ## @ingroup FDMInterface
-    def edgex_barycenter(self):
-        """
-        @brief
-        """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-        bc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx),
-                                             box[2]:box[3]:complex(0, ny + 1),
-                                             box[4]:box[5]:complex(0, nz + 1)]
-        return bc
-
-    ## @ingroup FDMInterface
-    def edgey_barycenter(self):
-        """
-        @brief
-        """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-        bc = np.zeros((nx + 1, ny, nz + 1, 3), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx + 1),
-                                             box[2]:box[3]:complex(0, ny),
-                                             box[4]:box[5]:complex(0, nz + 1)]
-        return bc
-
-    ## @ingroup FDMInterface
-    def edgez_barycenter(self):
-        """
-        @brief
-        """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-        bc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx + 1),
-                                             box[2]:box[3]:complex(0, ny + 1),
-                                             box[4]:box[5]:complex(0, nz)]
-        return bc
-
-    ## @ingroup FDMInterface
+    
     def face_barycenter(self):
         """
-        @brief
+        @brief Calculate the coordinates range for the face centers.
         """
         xbc = self.facex_barycenter()
         ybc = self.facey_barycenter()
         zbc = self.facez_barycenter()
+
         return xbc, ybc, zbc
 
-    ## @ingroup FDMInterface
     def facex_barycenter(self):
         """
-        @brief
+        @brief Calculate the coordinates range for the face centers in the x-direction.
         """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-        bc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx + 1),
-                                             box[2]:box[3]:complex(0, ny),
-                                             box[4]:box[5]:complex(0, nz)]
-        return bc
-
-    ## @ingroup FDMInterface
-    def facey_barycenter(self):
-        """
-        @brief
-        """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-               self.origin[1],               self.origin[1] + ny*self.h[1],
-               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-        bc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx),
-                                             box[2]:box[3]:complex(0, ny + 1),
-                                             box[4]:box[5]:complex(0, nz)]
-        return bc
-
-    ## @ingroup FDMInterface
-    def facez_barycenter(self):
-        """
-        @brief
-        """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-        bc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
-        bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                             box[0]:box[1]:complex(0, nx),
-                                             box[2]:box[3]:complex(0, ny),
-                                             box[4]:box[5]:complex(0, nz + 1)]
-        return bc
-
-    ## @ingroup FDMInterface
-    def function(self, etype='node', dtype=None, ex=0):
-        """
-        @brief 返回定义在节点、网格边、或者网格单元上离散函数（数组），元素取值为0
-
-        @param[in] ex 非负整数，把离散函数向外扩展一定宽度
-        """
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        dtype = self.ftype if dtype is None else dtype
-        if etype in {'node', 0}:
-            uh = np.zeros((nx+1+2*ex, ny+1+2*ex, nz+1+2*ex), dtype=dtype)
-        elif etype in {'facex'}: # 法线和 x 轴平行的面
-            uh = np.zeros((nx+1, ny, nz), dtype=dtype)
-        elif etype in {'facey'}: # 法线和 y 轴平行的面
-            uh = np.zeros((nx, ny+1, nz), dtype=dtype)
-        elif etype in {'facez'}: # 法线和 z 轴平行的面
-            uh = np.zeros((nx, ny, nz+1), dtype=dtype)
-        elif etype in {'face', 2}: # 所有的面
-            ex = np.zeros((nx+1, ny, nz), dtype=dtype)
-            ey = np.zeros((nx, ny+1, nz), dtype=dtype)
-            ez = np.zeros((nx, ny, nz+1), dtype=dtype)
-            uh = (ex, ey, ez)
-        elif etype in {'edgex'}: # 切向与 x 轴平行的边
-            uh = np.zeros((nx, ny+1, nz+1), dtype=dtype)
-        elif etype in {'edgey'}: # 切向与 y 轴平行的边
-            uh = np.zeros((nx+1, ny, nz+1), dtype=dtype)
-        elif etype in {'edgez'}: # 切向与 z 轴平行的边
-            uh = np.zeros((nx+1, ny+1, nz), dtype=dtype)
-        elif etype in {'edge', 1}: # 所有的边
-            ex = np.zeros((nx, ny+1, nz+1), dtype=dtype)
-            ey = np.zeros((nx+1, ny, nz+1), dtype=dtype)
-            ez = np.zeros((nx+1, ny+1, nz), dtype=dtype)
-            uh = (ex, ey, ez)
-        elif etype in {'cell', 3}:
-            uh = np.zeros((nx+2*ex, ny+2*ex, nz+2*ex), dtype=dtype)
-        else:
-            raise ValueError(f'the entity `{entity}` is not correct!')
-
-        return uh
-
-    ## @ingroup FDMInterface
-    def gradient(self, f, order=1):
-        """
-        @brief 求网格函数 f 的梯度
-        """
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
-        fx, fy, fz= np.gradient(f, hx, hy, hz, edge_order=order)
-        return fx, fy, fz
-
-    ## @ingroup FDMInterface
-    def divergence(self, f_x, f_y, f_z, order=1):
-        """
-        @brief 求向量网格函数 (fx, fy) 的散度
-        """
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
-        f_xx, f_xy, f_xz = np.gradient(f_x, hx, hy, hz, edge_order=order)
-        f_yx, f_yy, f_yz = np.gradient(f_y, hx, hy, hz, edge_order=order)
-        f_zx, f_zy, f_zz = np.gradient(f_z, hx, hy, hz, edge_order=order)
-        return f_xx + f_yy + f_zz
-
-    ## @ingroup FDMInterface
-    def laplace(self, f, order=1):
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
-        fx, fy, fz = np.gradient(f, hx, hy, hz, edge_order=order)
-        fxx, fxy, fxz = np.gradient(fx, hx, hy, hz, edge_order=order)
-        fyx, fyy, fyz = np.gradient(fy, hx, hy, hz, edge_order=order)
-        fzx, fzy, fzz = np.gradient(fz, hx, hy ,hz, edge_order=order)
-        return fxx + fyy + fzz
-
-    ## @ingroup FDMInterface
-    def value(self, p, f):
-        """
-        @brief 根据已知网格节点上的值，构造函数，求出非网格节点处的值
-
-        f: (nx+1, ny+1)
-        """
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
-
-        i, j, k = self.cell_location(p)
-        i[i==nx] = i[i==nx]-1
-        j[j==ny] = j[j==ny]-1
-        k[k==nz] = k[k==nz]-1
-        x0 = i*hx+box[0]
-        y0 = j*hy+box[2]
-        z0 = k*hz+box[4]
-        a = (p[..., 0]-x0)/hx
-        b = (p[..., 1]-y0)/hy
-        c = (p[..., 2]-z0)/hz
-        d = (x0+hx-p[...,0])/hx
-        e = (y0+hy-p[...,1])/hy
-        f = (z0+hy-p[...,2])/hz
-        F = f[i, j, k]*(1-a)*(1-b)*(1-c)\
-	  + f[i+1, j, k]*(1-d)*(1-b)*(1-c)\
-	  + f[i, j+1, k]*(1-a)*(1-e)*(1-c)\
-	  + f[i+1, j+1, k]*(1-d)*(1-e)*(1-c)\
-	  + f[i, j, k+1]*(1-a)*(1-b)*(1-f)\
-	  + f[i+1, j, k+1]*(1-d)*(1-b)*(1-f)\
-	  + f[i, j+1, k+1]*(1-a)*(1-e)*(1-f)\
-	  + f[i+1, j+1, k+1]*(1-d)*(1-e)*(1-f)
-        return F
-
-    ## @ingroup FDMInterface
-    def interpolation(self, f, intertype='node'):
-        """
-        @brief
-        """
-        node = self.node
-        if intertype == 'node':
-            F = f(node)
-        elif intertype in {'facex'}: # 法线和 x 轴平行的面
-            xbc = self.entity_barycenter('facex')
-            F = f(xbc)
-        elif intertype in {'facey'}: # 法线和 y 轴平行的面
-            ybc = self.entity_barycenter('facey')
-            F = f(ybc)
-        elif intertype in {'facez'}: # 法线和 z 轴平行的面
-            zbc = self.entity_barycenter('facez')
-            F = f(zbc)
-        elif intertype in {'face', 2}: # 所有的面
-            xbc, ybc, zbc = self.entity_barycenter('face')
-            F = f(xbc), f(ybc), f(zbc)
-        elif intertype in {'edgex'}: # 切向与 x 轴平行的边
-            xbc = self.entity_barycenter('edgex')
-            F = f(xbc)
-        elif intertype in {'edgey'}: # 切向与 y 轴平行的边
-            ybc = self.entity_barycenter('edgey')
-            F = f(ybc)
-        elif intertype in {'edgez'}: # 切向与 z 轴平行的边
-            zbc = self.entity_barycenter('edgez')
-            F = f(zbc)
-        elif intertype in {'edge', 1}: # 所有的边
-            xbc, ybc, zbc = self.entity_barycenter('edge')
-            F = f(xbc), f(ybc), f(zbc)
-        elif intertype == 'cell':
-            bc = self.entity_barycenter('cell')
-            F = f(bc)
-        return F
-
-    ## @ingroup FDMInterface
-    def interpolate(self, f, intertype='node'):
-        """
-        """
-        if intertype == 'node':
-            node = self.node
-            F = f(node)
-        elif intertype in {'facex'}: # 法线和 x 轴平行的面
-            xbc = self.facex_barycenter()
-            F = f(xbc)
-        elif intertype in {'facey'}: # 法线和 y 轴平行的面
-            ybc = self.facey_barycenter()
-            F = f(ybc)
-        elif intertype in {'facez'}: # 法线和 z 轴平行的面
-            zbc = self.facez_barycenter()
-            F = f(zbc)
-        elif intertype in {'face', 2}: # 所有的面
-            xbc, ybc, zbc = self.face_barycenter()
-            F = f(xbc), f(ybc), f(zbc)
-        elif intertype in {'edgex'}: # 切向与 x 轴平行的边
-            xbc = self.edgex_barycenter()
-            F = f(xbc)
-        elif intertype in {'edgey'}: # 切向与 y 轴平行的边
-            ybc = self.edgey_barycenter()
-            F = f(ybc)
-        elif intertype in {'edgez'}: # 切向与 z 轴平行的边
-            zbc = self.edgez_barycenter('edgez')
-            F = f(zbc)
-        elif intertype in {'edge', 1}: # 所有的边
-            xbc, ybc, zbc = self.edge_barycenter()
-            F = f(xbc), f(ybc), f(zbc)
-        elif intertype in {'cell', 3}:
-            bc = self.cell_barycenter()
-            F = f(bc)
-        return F
-        pass
-
-    ## @ingroup FDMInterface
-    def error(self, u, uh, errortype='all'):
-        """
-        @brief       Compute the error between the true solution and the numerical solution.
-
-        @param[in]   u: The true solution as a function.
-        @param[in]   uh: The numerical solution as an 2D array.
-        @param[in]   errortype: The error type, which can be 'all', 'max', 'L2' or 'l2'
-        """
-
-        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1) and (uh.shape[2] == self.nz+1)
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        node = self.node
-        uI = u(node)
-        e = uI - uh
+        GD = self.geo_dimension()
+        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx + 1, ny, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-        if errortype == 'all':
-            emax = np.max(np.abs(e))
-            e0 = np.sqrt(hx * hy * hz * np.sum(e ** 2))
-            el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * np.sum(e ** 2))
-
-            return emax, e0, el2
-        elif errortype == 'max':
-            emax = np.max(np.abs(e))
-            return emax
-        elif errortype == 'L2':
-            e0 = np.sqrt(hx * hy * hz * np.sum(e ** 2))
-            return e0
-        elif errortype == 'l2':
-            el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * np.sum(e ** 2))
-            return el2
-
-
-    ## @ingroup FDMInterface
-    def elliptic_operator(self, d=3, c=None, r=None):
+        return bc
+    
+    def facey_barycenter(self):
         """
-        @brief Assemble the finite difference matrix for a general elliptic operator.
+        @brief Calculate the coordinates range for the face centers in the y-direction.
         """
-        pass
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+               self.origin[1],               self.origin[1] + ny*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx, ny + 1, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-    ## @ingroup FDMInterface
-    def laplace_operator(self):
+        return bc
+
+    def facez_barycenter(self):
         """
-        @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x, y, z
-        三个方向都是均匀剖分，但各自步长可以不一样
-        @todo 处理带系数的情形
+        @brief Calculate the coordinates range for the face centers in the z-direction.
         """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz + 1)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx, ny, nz + 1, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-        n0 = self.ds.nx + 1
-        n1 = self.ds.ny + 1
-        n2 = self.ds.nz + 1
+        return bc
 
-        hx = self.h[0]
-        hy = self.h[1]
-        hz = self.h[2]
-
-        cx = 1 / (hx ** 2)
-        cy = 1 / (hy ** 2)
-        cz = 1 / (hz ** 2)
-
-        NN = self.number_of_nodes()
-        K = np.arange(NN).reshape(n0, n1, n2)
-
-        A = diags([2 * (cx + cy + cz)], [0], shape=(NN, NN), format='csr')
-
-        val = np.broadcast_to(-cx, (NN - n1 * n2,))
-        I = K[1:, :, :].flat
-        J = K[0:-1, :, :].flat
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-
-        val = np.broadcast_to(-cy, (NN - n0 * n2,))
-        I = K[:, 1:, :].flat
-        J = K[:, 0:-1, :].flat
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-
-        val = np.broadcast_to(-cz, (NN - n0 * n1,))
-        I = K[:, :, 1:].flat
-        J = K[:, :, 0:-1].flat
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-
-        return A
-
-    ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, gD, A, f, uh=None):
+    def edge_barycenter(self):
         """
-        @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
-
-        @param[in] A sparse matrix, (NN, NN)
-        @param[in] f
-
-        @todo 考虑 uh 是向量函数的情形
+        @brief Calculate the coordinates range for the edge centers.
         """
-        if uh is None:
-            uh = self.function('node').reshape(-1)
-        else:
-            uh = uh.reshape(-1) # 展开为一维数组 TODO:向量型函数
+        xbc = self.edgex_barycenter()
+        ybc = self.edgey_barycenter()
+        zbc = self.edgez_barycenter()
 
-        f = f.reshape(-1, ) # 展开为一维数组 TODO：向量型右端
+        return xbc, ybc, zbc
 
-        node = self.entity('node')
-        isBdNode = self.ds.boundary_node_flag()
-        uh[isBdNode]  = gD(node[isBdNode])
-        f -= A@uh
-        f[isBdNode] = uh[isBdNode]
+    def edgex_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the edge centers in the x-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+               self.origin[1], self.origin[1] + ny*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        z = bm.linspace(box[4], box[5], nz + 1)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx, ny + 1, nz + 1, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-        bdIdx = np.zeros(A.shape[0], dtype=self.itype)
-        bdIdx[isBdNode] = 1
-        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        A = D0@A@D0 + D1
-        return A, f
+        return bc
+    
+    def edgey_barycenter(self):
+        """
+        @brief Calculate the coordinates range for the edge centers in the y-direction.
+        """
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny)
+        z = bm.linspace(box[4], box[5], nz + 1)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx + 1, ny, nz + 1, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-    ## @ingroup FDMInterface
-    def wave_equation(self, r, theta):
-        """
-        @brief
-        """
-        pass
+        return bc
 
-    ## @ingroup FDMInterface
-    def fast_sweeping_method(self, phi0):
+    def edgez_barycenter(self):
         """
-        @brief 均匀网格上的 fast sweeping method
-        @param[in] phi 是一个离散的水平集函数
+        @brief Calculate the coordinates range for the edge centers in the z-direction.
         """
-        pass
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        GD = self.geo_dimension()
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
+               self.origin[1], self.origin[1] + ny*self.h[1],
+               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
+        x = bm.linspace(box[0], box[1], nx + 1)
+        y = bm.linspace(box[2], box[3], ny + 1)
+        z = bm.linspace(box[4], box[5], nz)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij') 
+        bc = bm.zeros((nx + 1, ny + 1, nz, GD), dtype=self.ftype)
+        bc = bm.concatenate((X[..., None], Y[..., None], Z[..., None]), axis=-1)
 
-    ## @ingroup FEMInterface
-    def geo_dimension(self):
+        return bc
+    
+    def bc_to_point(self, bcs: Union[Tuple, TensorLike], index=_S):
         """
-        @brief:    Get the geometry dimension of the mesh.
+        @brief Transform the barycentric coordinates of integration points
+        to Cartesian coordinates on the actual mesh entities.
 
-        @return:   The geometry dimension (3 for 3D mesh).
-        """
-        return 3
-
-    ## @ingroup FEMInterface
-    def top_dimension(self):
-        """
-        @brief Get the topological dimension of the mesh.
-
-        @return The topological dimension (3 for 3D mesh).
-        """
-        return 3
-
-    ## @ingroup FEMInterface
-    def integrator(self, q, etype='cell'):
-        """
-        @brief 获取不同维度网格实体上的积分公式
-        """
-        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        qf = GaussLegendreQuadrature(q)
-        if etype in {'cell', 3}:
-            return TensorProductQuadrature((qf, qf, qf))
-        elif etype in {'face', 2}:
-            return TensorProductQuadrature((qf, qf))
-        elif etype in {'edge', 1}:
-            return qf
-
-    ## @ingroup FEMInterface
-    def bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
+        Returns
+            TensorLike: (NC, NQ, GD), (NF, NQ, GD) or (NE, NQ, GD)
         """
         node = self.entity('node')
-        if isinstance(bc, tuple):
-            assert len(bc) in [2, 3]
-            if len(bc) == 3:
-                cell = self.entity('cell')[index]
+        if isinstance(bcs, tuple) and len(bcs) == 3:
+            cell = self.entity('cell', index)
 
-                bc0 = bc[0].reshape(-1, 2)  # (NQ0, 2)
-                bc1 = bc[1].reshape(-1, 2)  # (NQ1, 2)
-                bc2 = bc[2].reshape(-1, 2)  # (NQ2, 2)
-                bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8)  # (NQ0, NQ1, NQ2, 2, 2, 2)  (NQ0*NQ1*NQ2, 8)
+            bcs0 = bcs[0].reshape(-1, 2)
+            bcs1 = bcs[1].reshape(-1, 2)
+            bcs2 = bcs[2].reshape(-1, 2)
+            bcs = bm.einsum('im, jn, ko -> ijkmno', bcs0, bcs1, bcs2).reshape(-1, 8)
 
-                p = np.einsum('...j, cjk->...ck', bc, node[cell[:]])  # (NQ, NC, 3)
-                if p.shape[0] == 1:  # 如果只有一个积分点
-                    p = p.reshape(-1, 3)
-            else:
-                face = self.entity('face')[index]
-                bc0 = bc[0].reshape(-1, 2)
-                bc1 = bc[1].reshape(-1, 2)
-                bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4)
+            p = bm.einsum('qj, cjk -> cqk', bcs, node[cell[:]])
+        elif isinstance(bcs, tuple) and len(bcs) == 2:
+            face = self.entity('face', index)
 
-                p = np.einsum('...j, fjk->...fk', bc, node[face[:]])
-                if p.shape[0] == 1:  # 如果只有一个积分点
-                    p = p.reshape(-1, 3)
+            bcs0 = bcs[0].reshape(-1, 2)
+            bcs1 = bcs[1].reshape(-1, 2)
+            bcs = bm.einsum('im, jn -> ijmn', bcs0, bcs1).reshape(-1, 4)
+
+            p = bm.einsum('qj, fjk -> fqk', bcs, node[face[:]])
         else:
-            edge = self.entity('edge')[index]
-            p = np.einsum('...j, ejk->...ek', bc, node[edge])  # (NQ, NE, 3)
+            edge = self.entity('edge', index=index)
+            p = bm.einsum('qj, ejk -> eqk', bcs, node[edge]) 
+
         return p
 
-    ## @ingroup FEMInterface
-    def entity(self, etype):
+    def get_adjusted_face_mask(self) -> TensorLike:
         """
-        @brief Get the entity (either cell or node) based on the given entity type.
+        Determine which faces need to have their direction adjusted to ensure normals point outward.
 
-        @param[in] etype The type of entity, either 'cell', 3, 'face', 2, 'edge', 1, `node', 0.
-
-        @return The cell, edeg, face, or node array based on the input entity type.
-
-        @throws ValueError if the given etype is invalid.
+        Returns:
+            TensorLike[NF]: A boolean array where True indicates that the face's direction should be adjusted.
         """
-        if etype in {'cell', 3}:
-            return self.ds.cell
-        elif etype in {'face', 2}:
-            return self.ds.face
-        elif etype in {'edge', 1}:
-            return self.ds.edge
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, 3)
-        else:
-            raise ValueError("`etype` is wrong!")
-        pass
+        nx, ny, nz = self.nx, self.ny, self.nz
+        NF = self.NF
+        adjusted_face = bm.zeros((NF,), dtype=bool)
 
-    ## @ingroup FEMInterface
-    def entity_barycenter(self, etype='cell', index=np.s_[:]):
+        # Adjust faces in xy-plane
+        NF0 = 0
+        NF1 = (nx + 1) * ny * nz
+        flip_indices_xy = bm.arange(NF0, NF0 + ny * nz)
+        adjusted_face = bm.set_at(adjusted_face, flip_indices_xy, True)
+
+        # Adjust faces in yz-plane
+        NF0 = NF1
+        NF1 += nx * (ny + 1) * nz
+        NF2 = NF0 + ny * nz
+        N = nz * (ny + 1)
+        idx1 = bm.arange(NF2, NF2 + nz)
+        idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+        adjusted_face = bm.set_at(adjusted_face, idx1, True)
+
+        # Adjust faces in xz-plane
+        NF0 = NF1
+        NF1 += nx * ny * (nz + 1)
+        N = ny * (nz + 1)
+        idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
+        idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+        adjusted_face = bm.set_at(adjusted_face, idx2, True)
+
+        return adjusted_face
+
+    def face_normal(self, index: Index=_S, unit: bool=False, out=None) -> TensorLike:
         """
-        @brief Get the entity (cell, face, edge, or  node) based on the given entity type.
+        Calculate the normal vectors of the faces.
 
-        @param[in] etype The type of entity can be 'cell', 3, 'face', 2, 'edge',
-        1, 'node', 0.
+        Parameters:
+            index (Index, optional): Index to select specific faces. 
+                                        Defaults to _S (all faces).
+            unit (bool, optional): If True, returns unit normal vectors. 
+                                        Defaults to False.
+            out (TensorLike, optional): Optional output array to store the result. 
+                                        Defaults to None.
 
-        @return The cell or node array based on the input entity type.
-
-        @throws ValueError if the given etype is invalid
-
-        @TODO 修改成一维和二维的样子
+        Returns:
+            TensorLike[NF, GD]: Normal vectors of the faces.
+        
+        法向量方向的定义如下：
+            1 ---←--- 3
+            |         |
+            ↑         |
+            |         |
+            0 ------- 2
         """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        if etype in {'cell', 3}: # 所有单元
-            return self.cell_barycenter().reshape(-1, 3)
-        elif etype in {'face', 2}: # 所有的面
-            bcx, bcy, bcz = self.face_barycenter()
-            return np.concatenate((bcx.reshape(-1, 3), bcy.reshape(-1, 3), bcz.reshape(-1, 3)), axis=0)
-        elif etype in {'edge', 1}: # 所有的边
-            bcx, bcy, bcz = self.edge_barycenter()
-            return np.concatenate((bcx.reshape(-1, 3), bcy.reshape(-1, 3), bcz.reshape(-1, 3)), axis=0)
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, 3)
-        else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
-
-    ## @ingroup FEMInterface
-    def entity_measure(self, etype='cell', index=np.s_[:]):
-        """
-        @brief
-        """
+        face = self.entity('face', index=index)
         node = self.entity('node')
-        if etype in {'cell', 3}:
-            cell = self.entity('cell')[index]
-            v0 = node[cell[:, 1]] - node[cell[:, 0]]
-            v1 = node[cell[:, 2]] - node[cell[:, 0]]
-            v2 = node[cell[:, 4]] - node[cell[:, 0]]
-            return np.sum(v2*np.cross(v1, v0), axis=1)
-        elif etype in {'face', 2}:
-            norm = self.face_normal(index)
-            return np.sqrt(np.square(norm).sum(axis=1))
-        elif etype in {'edge', 1}:
-            edge = self.entity('edge')[index]
-            node0 = node[edge[:, 0]]
-            node1 = node[edge[:, 1]]
-            length = np.sqrt(np.sum(node1-node0).sum(axis=1))
+        
+        # Calculate vectors v1 and v2 for the normal calculation
+        v1 = node[face[:, 1]] - node[face[:, 0]]
+        v2 = node[face[:, 1]] - node[face[:, 3]]
+        normals = bm.cross(v1, v2)
+
+        adjusted_face_mask = self.get_adjusted_face_mask() 
+
+        # Use the adjusted face mask to flip the normals if necessary
+        normals = bm.set_at(normals, (adjusted_face_mask, slice(None)), 
+                                -normals[adjusted_face_mask])
+
+        # Normalize the normals if unit is True
+        if unit:
+            norm = bm.linalg.norm(normals, axis=1, keepdims=True)
+            normals = normals / norm
+
+        if out is not None:
+            out[...] = normals
+            return out
+
+        return normals 
+    
+    def face_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
+        """
+        Calculate the unit normal vectors of the faces.
+
+        Parameters:
+            index (Index, optional): Index to select specific faces. Defaults to _S (all faces).
+            out (TensorLike, optional): Optional output array to store the result. Defaults to None.
+
+        Returns:
+            TensorLike[NF, GD]: Unit normal vectors of the faces.
+        """
+        return self.face_normal(index=index, unit=True, out=out)
+
+
+#################################### 插值点 #############################################
+    def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Generate all interpolation points of the 3D mesh
+
+        Ordering of interpolation points follows the sequence:
+        - Z direction first, then Y direction, and finally X direction.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+        if p == 1:
+            return self.entity('node', index=index)
+        
+        ordering = self.ipoints_ordering
+        
+        if ordering == 'zyx':
+            nx = self.nx
+            ny = self.ny
+            nz = self.nz
+            hx = self.h[0]
+            hy = self.h[1]
+            hz = self.h[2]
+
+            nix = nx + 1 + nx * (p - 1)
+            niy = ny + 1 + ny * (p - 1)
+            niz = nz + 1 + nz * (p - 1)
+            
+            length_x = nx * hx
+            length_y = ny * hy
+            length_z = nz * hz
+
+            ix = bm.linspace(0, length_x, nix)
+            iy = bm.linspace(0, length_y, niy)
+            iz = bm.linspace(0, length_z, niz)
+
+            x, y, z = bm.meshgrid(ix, iy, iz, indexing='ij')
+            ipoints = bm.stack([x.flatten(), y.flatten(), z.flatten()], axis=-1)
+        elif ordering == 'nefc':
+            c2ip = self.cell_to_ipoint(p)
+            gp = self.number_of_global_ipoints(p)
+            ipoints = bm.zeros([gp, 3], dtype=self.ftype)
+
+            line = (bm.linspace(0, 1, p+1, endpoint=True, dtype=self.ftype)).reshape(-1, 1)
+            line = bm.concatenate([1-line, line], axis=1)
+            bcs = (line, line, line)
+
+            cip = self.bc_to_point(bcs)
+            ipoints[c2ip] = cip
         else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
+            raise ValueError("Invalid ordering type. \
+                    Choose 'yxz' for y-direction first, then x-direction, and finally z-direction ordering, "\
+                    "or 'nec' for node first, then edge, thean face, and finally cell ordering.")
+        
+        return ipoints[index]
+    
+    
+    def node_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each node in a 3D mesh.
 
-    def face_normal(self, index=np.s_[:]):
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific node interpolation points.
+
+        @return: A 1D array of size (NN,) containing the indices of interpolation points at each node.
+        '''
+        ordering = self.ipoints_ordering
+        
+        if ordering == 'zyx':
+            nx = self.nx
+            ny = self.ny
+            nz = self.nz
+            nix = nx + 1 + nx * (p - 1)
+            niy = ny + 1 + ny * (p - 1)
+            niz = nz + 1 + nz * (p - 1)
+            
+            node_x_indices = bm.arange(0, nix, p)
+            node_y_indices = bm.arange(0, niy, p)
+            node_z_indices = bm.arange(0, niz, p)
+            
+            node_z_grid, node_y_grid, node_x_grid = bm.meshgrid(node_z_indices, node_y_indices, node_x_indices, indexing='ij')
+            
+            node2ipoint = (node_z_grid * (nix * niy) + node_y_grid * nix + node_x_grid).flatten()
+        
+        elif ordering == 'nefc':
+            NN = self.NN
+            node2ipoint = bm.arange(0, NN)
+        
+        else:
+            raise ValueError("Invalid ordering type. Choose 'zyx' or 'nefc'.")
+        
+        return node2ipoint[index]
+    
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each edge in a 3D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+
+        @return: A 2D array of size (NE, p+1) containing the indices of interpolation points at each edge.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+        
+        ordering = self.ipoints_ordering
+        edges = self.edge[index]
+        
+        if ordering == 'zyx':
+            node_to_ipoint = self.node_to_ipoint(p)
+            
+            start_indices = node_to_ipoint[edges[:, 0]]
+            end_indices = node_to_ipoint[edges[:, 1]]
+            
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
+                          end_indices[:, None] * linspace_indices
+            edge2ipoint = edge2ipoint.astype(self.itype)
+        elif ordering == 'nefc':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            
+            indices = bm.arange(NE, dtype=self.itype)[index]
+            edge2ipoint =  bm.concatenate([
+                edges[:, 0].reshape(-1, 1),
+                (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, dtype=self.itype) + NN,
+                edges[:, 1].reshape(-1, 1),
+            ], axis=-1)
+        else:
+            raise ValueError("Invalid ordering type. Choose 'zyx' or 'nefc'.")
+        return edge2ipoint
+    
+    def face_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        '''
+        @brief Returns the interpolation point indices corresponding to each face in a 3D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific face interpolation points.
+
+        @return: A 2D array of size (NF, (p+1)**2) containing the indices of interpolation points at each face.
+        '''
+        if p <= 0:
+            raise ValueError("p must be an integer larger than 0.")
+
+        ordering = self.ipoints_ordering
+
+        if ordering == 'zyx':
+            edge_to_ipoint = self.edge_to_ipoint(p)
+            face2edge = self.face_to_edge(index=index)
+
+            start_indices = edge_to_ipoint[face2edge[:, 0]]
+            end_indices = edge_to_ipoint[face2edge[:, 1]]  
+
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            face_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
+                                        end_indices[:, :, None] * linspace_indices
+
+            face2ipoint = face_ipoints_interpolated.reshape(-1, (p+1)**2).astype(self.itype)
+        elif ordering == 'nefc':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NF = self.number_of_faces()
+            edge = self.entity('edge')
+            face = self.entity('face')
+            face2edge = self.face_to_edge()
+            edge2ipoint = self.edge_to_ipoint(p)
+
+            mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
+            multiIndex0 = mi.flatten().reshape(-1, 1);
+            multiIndex1 = mi.T.flatten().reshape(-1, 1);
+            multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
+
+            dofidx = [0 for i in range(4)] 
+            dofidx[0], = bm.nonzero(multiIndex[:, 1]==0)
+            dofidx[1], = bm.nonzero(multiIndex[:, 1]==p)
+            dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
+            dofidx[3], = bm.nonzero(multiIndex[:, 0]==p)
+
+            face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype)
+            localEdge = bm.array([[0, 2], [1, 3], [0, 1], [2, 3]], dtype=self.itype)
+
+            for i in range(4):
+                ge = face2edge[:, i]
+                idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
+
+                face2ipoint[:, dofidx[i]] = edge2ipoint[ge]
+                face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1)
+
+            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+            face2ipoint[:, indof] = bm.arange(NN+NE*(p-1),
+                    NN+NE*(p-1)+NF*(p-1)**2, dtype=self.itype).reshape(NF, -1)
+            face2ipoint = face2ipoint[index]
+            
+        return face2ipoint
+    
+    def cell_to_ipoint(self, p, index: Index=_S):
+        """
+        @brief Returns the interpolation point indices corresponding to each cell in a 3D mesh.
+
+        @param p: Interpolation order. Must be an integer greater than 0.
+        @param index: Index to select specific cell interpolation points.
+
+        @return: A 2D array of size (NC, (p+1)**3) containing the indices of interpolation points at each cell.
+        """
+        if p == 1:
+            return self.entity('cell', index=index)
+        
+        ordering = self.ipoints_ordering
+
+        if ordering == 'zyx':
+            face_to_ipoint = self.face_to_ipoint(p)
+            cell2face = self.cell_to_face(index=index)
+
+            start_indices = face_to_ipoint[cell2face[:, 0]]
+            end_indices = face_to_ipoint[cell2face[:, 1]]
+
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            cell_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
+                                        end_indices[:, :, None] * linspace_indices
+            
+            # 首先，转换形状以便重新排列为列优先
+            reshaped = cell_ipoints_interpolated.reshape(-1, (p+1)**2, p+1)
+            # 然后，转置最后两个维度，这样插值点会按照 z, y, x 的顺序排列
+            transposed = reshaped.transpose(0, 2, 1)
+            # 最后，reshape 到最终的形状，确保插值点是列优先排序
+            cell2ipoint = transposed.reshape(-1, (p+1)**3).astype(self.itype)
+        elif ordering == 'nefc':
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NF = self.number_of_faces()
+            NC = self.number_of_cells()
+
+            cell2face = self.cell_to_face()
+            face2edge = self.face_to_edge()
+            cell2edge = self.cell_to_edge()
+
+            face2ipoint = self.face_to_ipoint(p)
+
+            shape = (p+1, p+1, p+1)
+            mi    = bm.arange(p+1)
+            multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
+            multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
+            multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
+
+            multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
+
+            dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
+
+            dofidx[4], = bm.nonzero(multiIndex[:, 2]==0)
+            dofidx[5], = bm.nonzero(multiIndex[:, 2]==p)
+            dofidx[0], = bm.nonzero(multiIndex[:, 0]==0)
+            dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
+            dofidx[2], = bm.nonzero(multiIndex[:, 1]==0)
+            dofidx[3], = bm.nonzero(multiIndex[:, 1]==p)
+
+            cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
+            lf2e = bm.array([[4, 9, 5, 8], [6, 11, 7, 10],
+                            [0, 10, 1, 8], [2, 11, 3, 9],
+                            [0, 6, 2, 4], [1, 7, 3, 5]], dtype=self.itype)
+            multiIndex2d = multiIndex[:(p+1)**2, 1:]
+            multiIndex2d = bm.concatenate([multiIndex2d, p-multiIndex2d], axis=-1)
+            lf2e = lf2e[:, [3, 0, 1, 2]]
+            face2edge = face2edge[:, [2, 0, 3, 1]]
+
+            for i in range(6):
+                    gfe = face2edge[cell2face[:, i]]
+                    lfe = cell2edge[:, lf2e[i]]
+                    idx0 = bm.argsort(gfe, axis=-1)
+                    idx1 = bm.argsort(lfe, axis=-1)
+                    idx1 = bm.argsort(idx1, axis=-1)
+                    idx0 = idx0[bm.arange(NC)[:, None], idx1]
+                    idx = multiIndex2d[:, idx0].swapaxes(0, 1)
+
+                    idx = idx[..., 0]*(p+1)+idx[..., 1]
+                    cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
+
+            indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
+            cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
+                    NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+            cell2ipoint = cell2ipoint[index]
+            
+        return cell2ipoint
+         
+    # 形函数
+    def jacobi_matrix(self, bcs: TensorLike, index :Index=_S) -> TensorLike:
+        """
+        @brief Compute the Jacobi matrix for the mapping from the reference element 
+            (xi, eta, zeta) to the actual Lagrange hexahedron (x, y, z)
+
+        x(xi, eta, zeta) = phi_0(xi, eta, zeta) * x_0 + phi_1(xi, eta, zeta) * x_1 + 
+                    ... + phi_{ldof-1}(xi, eta, zeta) * x_{ldof-1}
+
+        """
+        assert isinstance(bcs, tuple)
+
         node = self.entity('node')
-        face = self.ds.face[index]
-        v0 = node[face[:, 1]] - node[face[:, 0]]
-        v2 = node[face[:, 3]] - node[face[:, 0]]
-        norm = np.cross(v2, v0)
-        return norm
+        cell = self.entity('cell', index=index)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')
+        J = bm.einsum( 'cim, qin -> qcmn', node[cell[:]], gphi)
 
-    def face_unit_normal(self, index=np.s_[:]):
-        norm = self.face_normal(index)
-        length = np.sqrt(np.square(norm).sum(axis=1))
-        return norm/length.reshape(-1, 1)
+        return J
+    
 
-    ## @ingroup FEMInterface
-    def shape_function(self, bc, p=1):
-        pass
+    # 其他方法
+    def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):
+        """
+        @brief Get the quadrature formula for numerical integration.
+        """
+        from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        qf = GaussLegendreQuadrature(q)
+        if etype == 3:
+            return TensorProductQuadrature((qf, qf, qf))
+        elif etype == 2:
+            return TensorProductQuadrature((qf, qf))
+        elif etype == 1:
+            return qf
+        else:
+            raise ValueError(f"entity type: {etype} is wrong!")
 
-    ## @ingroup FEMInterface
-    def grad_shape_function(self, bc, p=1):
-        pass
+    def uniform_refine(self, n: int=1):
+        """
+        @brief Uniformly refine the 2D structured mesh.
 
-    ## @ingroup FEMInterface
-    def number_of_local_ipoints(self, p, iptype='cell'):
-        pass
+        Note:
+        The clear method is used at the end to clear the cache of entities. 
+        This is necessary because the entities remain the same as before refinement due to caching.
+        Structured meshes have their own entity generation methods, so the cache needs to be manually cleared.
+        Unstructured meshes do not require this because they do not have entity generation methods.
+        """
+        for i in range(n):
+            self.extent = [i * 2 for i in self.extent]
+            self.h = [h / 2.0 for h in self.h]
+            # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
+            # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
+            # self.nz = int((self.extent[5] - self.extent[4]) / self.h[2])
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+            self.nz = self.extent[5] - self.extent[4]
 
-    ## @ingroup FEMInterface
-    def number_of_global_ipoints(self, p):
-        pass
+            self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+            self.NE = (self.nx + 1) * (self.ny + 1) * self.nz + \
+                    (self.nx + 1) * (self.ny + 1) * self.nz + \
+                    self.nx * (self.ny + 1) * (self.nz + 1)
+            self.NF = self.nx * self.ny * (self.nz + 1) + \
+                    self.nx * (self.ny + 1) * self.nz + \
+                    (self.nx + 1) * self.ny * self.nz
+            self.NC = self.nx * self.ny * self.nz
 
-    ## @ingroup FEMInterface
-    def interpolation_points(self, p):
-        pass
+            self.cell2edge = self.cell_to_edge()
+            self.cell2face = self.cell_to_face()
+            self.face2edge = self.face_to_edge()
+            self.face2cell = self.face_to_cell()
 
+        self.clear()
 
-    ## @ingroup FEMInterface
-    def face_to_ipoint(self, p):
-        pass
-
-    ## @ingroup FEMInterface
-    def cell_to_ipoint(self, p):
-        pass
 
 UniformMesh3d.set_ploter('3d')

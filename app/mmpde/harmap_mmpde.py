@@ -1,12 +1,12 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.mesh import TetrahedronMesh
-from fealpy.experimental.mesh import IntervalMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
+from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TetrahedronMesh
+from fealpy.mesh import IntervalMesh
 from fealpy.mesh import TriangleMesh as TM
 from fealpy.mesh import TetrahedronMesh as THM
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (BilinearForm 
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (BilinearForm 
                                      ,ScalarDiffusionIntegrator
                                      ,LinearForm
                                      ,ScalarSourceIntegrator

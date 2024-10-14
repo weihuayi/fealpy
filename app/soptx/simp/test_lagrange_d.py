@@ -1,12 +1,12 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 # bm.set_backend('numpy')
 bm.set_backend('pytorch')
 # bm.set_backend('jax')
 
-from fealpy.experimental.mesh import UniformMesh2d
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.mesh import UniformMesh2d
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
-from fealpy.experimental.typing import TensorLike
+from fealpy.typing import TensorLike
 
 # Half-MBB 
 def source(points: TensorLike) -> TensorLike:

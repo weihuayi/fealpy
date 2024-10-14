@@ -3,23 +3,9 @@ import gmsh
 import matplotlib.pyplot as plt
 
 #from TriRadiusRatio import TriRadiusRatio
-from fealpy.experimental.mesh.mesh_quality import RadiusRatioQuality
+from fealpy.mesh.mesh_quality import RadiusRatioQuality
 
 from fealpy.mesh import TriangleMesh
-
-'''
-gmsh.initialize()
-gmsh.merge('adaptive_case_4_RB_IGCT.msh')
-
-ntags, vxyz, _ = gmsh.model.mesh.getNodes()
-node = vxyz.reshape((-1,3))
-node = node[:,:2]
-vmap = dict({j:i for i,j in enumerate(ntags)})
-tris_tags,evtags = gmsh.model.mesh.getElementsByType(2)
-evid = np.array([vmap[j] for j in evtags])
-cell = evid.reshape((tris_tags.shape[-1],-1))
-mesh = TriangleMesh(node,cell)
-'''
 
 mesh = TriangleMesh.from_meshio('area_RB_adaptive.vtu')
 node = mesh.entity('node')
@@ -48,7 +34,9 @@ cell = mesh.entity('cell')
 # 去除度为4的点后进行优化
 #opt = TriRadiusRatio(mesh)
 
-from optimizer import *
+from app.HVSCMesh.optimizer import *
+from fealpy.mesh import TriangleMesh
+
 mesh = TriangleMesh(node,cell)
 mesh_quality = RadiusRatioQuality(mesh)
 node = mesh.entity('node')

@@ -1,6 +1,6 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.typing import TensorLike
+from fealpy.typing import TensorLike
 
 class ShortCantilever2dOneData:
     def __init__(self, nx: int, ny: int):

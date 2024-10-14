@@ -5,22 +5,22 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.utils import timer
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('WARNING')
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.pde.surface_poisson_model import SurfaceLevelSetPDEData
+from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
 from fealpy.geometry import SphereSurface
-from fealpy.experimental.mesh.triangle_mesh import TriangleMesh
-from fealpy.experimental.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
-from fealpy.experimental.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
-from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.sparse import COOTensor
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
+from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
+from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.sparse import COOTensor
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
-from fealpy.experimental.solver import cg
+from fealpy.solver import cg
 #from scipy.sparse.linalg import spsolve
 
 ## 参数解析

@@ -1,4 +1,4 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 import networkx as nx
 import scipy.sparse as sp
 from scipy.spatial.distance import pdist, squareform

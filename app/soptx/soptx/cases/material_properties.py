@@ -1,6 +1,6 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
+from fealpy.material.elastic_material import LinearElasticMaterial
 
 from builtins import float, int, str
 from typing import Optional
