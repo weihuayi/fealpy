@@ -409,54 +409,35 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return axes
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold:Optional[Callable]=None) -> 'QuadrangleMesh':
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, 
+                threshold:Optional[Callable]=None, device:str=None) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a rectangular domain.
-
-        :param box: list of four float values representing the x- and y-coordinates of the lower left and upper right corners of the domain (default: [0, 1, 0, 1])
-        :param nx: number of cells along the x-axis (default: 10)
-        :param ny: number of cells along the y-axis (default: 10)
-        :param threshold: optional function to filter cells based on their barycenter coordinates (default: None)
-        :return: QuadrangleMesh instance
         """
         NN = (nx + 1) * (ny + 1)
-        NC = nx * ny
-        node = bm.zeros((NN, 2))
-        x = bm.linspace(box[0], box[1], nx + 1,dtype=bm.float64)
-        y = bm.linspace(box[2], box[3], ny + 1,dtype=bm.float64)
+        node = bm.zeros((NN, 2), device=device)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=bm.float64, device=device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=bm.float64, device=device)
         X, Y = bm.meshgrid(x, y, indexing='ij')
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
         cell = bm.concatenate((idx[0:-1, 0:-1].reshape(-1, 1),
                                idx[1:, 0:-1].reshape(-1, 1),
                                idx[1:, 1:].reshape(-1, 1),
                                idx[0:-1, 1:].reshape(-1, 1),), axis=1)
 
         if threshold is not None:
-            if bm.backend_name in ["numpy", "pytorch"]:
-                bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
-                isDelCell = threshold(bc)
-                cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool)
-                isValidNode[cell] = True
-                node = node[isValidNode]
-                idxMap = bm.zeros(NN, dtype=cell.dtype)
-                t = bm.arange(isValidNode.sum())
-                idxMap[isValidNode] = bm.arange(isValidNode.sum())
-                cell = idxMap[cell]
-            elif bm.backend_name == "jax":
-                bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
-                isDelCell = threshold(bc)
-                cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool)
-                isValidNode = isValidNode.at[cell].set(True)
-                node = node[isValidNode]
-                idxMap = bm.zeros(NN, dtype=cell.dtype)
-                idxMap = idxMap.at[isValidNode].set(bm.tensor(bm.arange(isValidNode.sum())))
-                cell = idxMap[cell]
-            else:
-                raise ValueError("Unsupported backend")
+            bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype, device=device)
+            idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum()))
+            idxMap[isValidNode] = bm.arange(isValidNode.sum(), device=device)
+            cell = idxMap[cell]
 
         return cls(node, cell)
 

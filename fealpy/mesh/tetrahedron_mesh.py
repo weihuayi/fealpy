@@ -848,27 +848,22 @@ class TetrahedronMesh(SimplexMesh, Plotable):
    
     ## @ingroup MeshGenerators
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):
+    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, 
+                threshold=None, device: str = None):
         """
         Generate a tetrahedral mesh for a box domain.
-
-        @param nx Number of divisions along the x-axis (default: 10)
-        @param ny Number of divisions along the y-axis (default: 10)
-        @param nz Number of divisions along the z-axis (default: 10)
-        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
-        @return TetrahedronMesh instance
         """
         NN = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
-        node = bm.zeros((NN, 3), dtype=bm.float64)
-        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64)
-        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64)
-        z = bm.linspace(box[4], box[5], nz+1, dtype=bm.float64)
+        node = bm.zeros((NN, 3), dtype=bm.float64, device=device)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=bm.float64, device=device)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=bm.float64, device=device)
+        z = bm.linspace(box[4], box[5], nz+1, dtype=bm.float64, device=device)
         X, Y, Z = bm.meshgrid(x, y, z, indexing='ij')
  
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
 
-        idx = bm.arange(NN, dtype=bm.int32).reshape(nx+1, ny+1, nz+1)
+        idx = bm.arange(NN, dtype=bm.int32, device=device).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
         nyz = (ny + 1)*(nz + 1)
@@ -891,7 +886,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             [0, 4, 5, 6],
             [0, 7, 4, 6],
             [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=bm.int32)
+            [0, 2, 3, 6]], dtype=bm.int32, device=device)
         cell = cell[:, localCell].reshape(-1, 4)
 
         if threshold is not None:
@@ -899,10 +894,10 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             bc = bm.sum(node[cell, :], axis=1)/cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode = bm.zeros(NN, dtype=bm.bool, device=device)
             isValidNode[cell] = True
             node = node[isValidNode]
-            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap = bm.zeros(NN, dtype=cell.dtype, device=device)
             idxMap[isValidNode] = bm.arange(isValidNode.sum(), dtype=cell.dtype)
             cell = idxMap[cell]
         mesh = cls(node, cell)
