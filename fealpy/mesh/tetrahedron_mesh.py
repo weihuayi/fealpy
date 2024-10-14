@@ -220,6 +220,18 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         Dlambda[:, 2] = bm.cross(n, v2) / length
         return Dlambda
 
+    def boundary_edge_flag(self):
+        """
+        @brief 判断边界边 
+        """
+        NE = self.number_of_edges()
+        face2edge = self.face_to_edge()
+        isBdFace = self.boundary_face_flag()
+        isBdEdge = bm.zeros(NE, dtype=bm.bool)
+        isBdEdge[face2edge[isBdFace, :]] = True
+        return isBdEdge 
+        
+
     """
     def grad_shape_function(self, bc, p=1, index=_S, variables='x'):
         R = bm.simplex_grad_shape_function(bc, p=p)

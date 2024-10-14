@@ -1110,7 +1110,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if dtype is None:
-            dtype = bm.int32
+            dtype = bm.float64
 
         NN = (nx + 1) * (ny + 1)
         NC = nx * ny
