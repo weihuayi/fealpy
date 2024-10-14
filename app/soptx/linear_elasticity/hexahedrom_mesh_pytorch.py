@@ -18,8 +18,6 @@ from fealpy.fem.dirichlet_bc import DirichletBC
 
 from fealpy.decorator import cartesian
 
-from fealpy.sparse import COOTensor
-
 from fealpy.solver import cg
 
 from app.soptx.soptx.utilfs.timer import timer
@@ -112,7 +110,7 @@ parser.add_argument('--backend',
                     default='pytorch', type=str,
                     help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=2, type=int, 
+                    default=1, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--nx', 
                     default=2, type=int, 
@@ -139,7 +137,7 @@ tmr = timer("FEM Solver")
 next(tmr)
 
 maxit = 4
-errorType = ['$|| u  - u_h ||_{L2}$']
+errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
@@ -182,10 +180,12 @@ for i in range(maxit):
     tmr.send(None)
 
     u_exact = tensor_space.interpolate(pde.solution)
-    errorMatrix[0, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
+    errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh[:] - u_exact)**2 * (1 / NDof[i])))
+    errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
 
     if i < maxit-1:
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorType, "\n", errorMatrix)
-print("order_L2:\n ", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))

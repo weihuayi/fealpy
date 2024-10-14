@@ -104,7 +104,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         if etype == 2:
             return TensorProductQuadrature((qf, qf))
         elif etype == 1:
@@ -409,54 +409,35 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return axes
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold:Optional[Callable]=None) -> 'QuadrangleMesh':
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, 
+                threshold:Optional[Callable]=None, device:str=None) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a rectangular domain.
-
-        :param box: list of four float values representing the x- and y-coordinates of the lower left and upper right corners of the domain (default: [0, 1, 0, 1])
-        :param nx: number of cells along the x-axis (default: 10)
-        :param ny: number of cells along the y-axis (default: 10)
-        :param threshold: optional function to filter cells based on their barycenter coordinates (default: None)
-        :return: QuadrangleMesh instance
         """
         NN = (nx + 1) * (ny + 1)
-        NC = nx * ny
-        node = bm.zeros((NN, 2))
-        x = bm.linspace(box[0], box[1], nx + 1,dtype=bm.float64)
-        y = bm.linspace(box[2], box[3], ny + 1,dtype=bm.float64)
+        node = bm.zeros((NN, 2), device=device)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=bm.float64, device=device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=bm.float64, device=device)
         X, Y = bm.meshgrid(x, y, indexing='ij')
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
         cell = bm.concatenate((idx[0:-1, 0:-1].reshape(-1, 1),
                                idx[1:, 0:-1].reshape(-1, 1),
                                idx[1:, 1:].reshape(-1, 1),
                                idx[0:-1, 1:].reshape(-1, 1),), axis=1)
 
         if threshold is not None:
-            if bm.backend_name in ["numpy", "pytorch"]:
-                bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
-                isDelCell = threshold(bc)
-                cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool)
-                isValidNode[cell] = True
-                node = node[isValidNode]
-                idxMap = bm.zeros(NN, dtype=cell.dtype)
-                t = bm.arange(isValidNode.sum())
-                idxMap[isValidNode] = bm.arange(isValidNode.sum())
-                cell = idxMap[cell]
-            elif bm.backend_name == "jax":
-                bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
-                isDelCell = threshold(bc)
-                cell = cell[~isDelCell]
-                isValidNode = bm.zeros(NN, dtype=bm.bool)
-                isValidNode = isValidNode.at[cell].set(True)
-                node = node[isValidNode]
-                idxMap = bm.zeros(NN, dtype=cell.dtype)
-                idxMap = idxMap.at[isValidNode].set(bm.tensor(bm.arange(isValidNode.sum())))
-                cell = idxMap[cell]
-            else:
-                raise ValueError("Unsupported backend")
+            bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype, device=device)
+            idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum()))
+            idxMap[isValidNode] = bm.arange(isValidNode.sum(), device=device)
+            cell = idxMap[cell]
 
         return cls(node, cell)
 
@@ -679,10 +660,11 @@ class QuadrangleMesh(TensorMesh, Plotable):
             cell_cell_num.append(
                 (edge_segments_num[cell_to_edge[i, 0] // 2] - 1) * (edge_segments_num[cell_to_edge[i, 1] // 2] - 1))
         node_num += sum(cell_node_num)
-        cell_num = sum(cell_cell_num)
+        total_cell_num = sum(cell_cell_num)
         # 初始化单元与节点
         node = np.zeros((node_num, 2))
-        cell = np.zeros((cell_num, 4), dtype=np.int_)
+        cell = np.zeros((total_cell_num, 4), dtype=np.int_)
+        cell_domain_tag = np.zeros(total_cell_num, dtype=np.int_)
         node[0:origin_node_num] = origin_node
         # 离散边界节点
         edge_node_list = separator_streamlines
@@ -737,8 +719,10 @@ class QuadrangleMesh(TensorMesh, Plotable):
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 1] = cell_node_idx[0:-1, 1:].flatten()
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 2] = cell_node_idx[1:, 1:].flatten()
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 3] = cell_node_idx[1:, 0:-1].flatten()
+            cell_domain_tag[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1])] = i
 
         quad_mesh = cls(node, cell)
+        quad_mesh.celldata['cell_domain_tag'] = cell_domain_tag
 
         return quad_mesh
 

@@ -826,7 +826,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         if etype == 2:
             return TensorProductQuadrature((qf, qf))
         elif etype == 1:
