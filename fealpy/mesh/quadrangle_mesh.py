@@ -679,10 +679,11 @@ class QuadrangleMesh(TensorMesh, Plotable):
             cell_cell_num.append(
                 (edge_segments_num[cell_to_edge[i, 0] // 2] - 1) * (edge_segments_num[cell_to_edge[i, 1] // 2] - 1))
         node_num += sum(cell_node_num)
-        cell_num = sum(cell_cell_num)
+        total_cell_num = sum(cell_cell_num)
         # 初始化单元与节点
         node = np.zeros((node_num, 2))
-        cell = np.zeros((cell_num, 4), dtype=np.int_)
+        cell = np.zeros((total_cell_num, 4), dtype=np.int_)
+        cell_domain_tag = np.zeros(total_cell_num, dtype=np.int_)
         node[0:origin_node_num] = origin_node
         # 离散边界节点
         edge_node_list = separator_streamlines
@@ -737,8 +738,10 @@ class QuadrangleMesh(TensorMesh, Plotable):
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 1] = cell_node_idx[0:-1, 1:].flatten()
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 2] = cell_node_idx[1:, 1:].flatten()
             cell[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1]), 3] = cell_node_idx[1:, 0:-1].flatten()
+            cell_domain_tag[sum(cell_cell_num[:i]):sum(cell_cell_num[:i + 1])] = i
 
         quad_mesh = cls(node, cell)
+        quad_mesh.celldata['cell_domain_tag'] = cell_domain_tag
 
         return quad_mesh
 
