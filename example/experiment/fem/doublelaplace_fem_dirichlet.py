@@ -2,22 +2,22 @@ import argparse
 import sympy as sp
 from matplotlib import pyplot as plt
 
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('WARNING')
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import CmConformingFESpace2d 
-from fealpy.experimental.fem import BilinearForm 
-from fealpy.experimental.fem.mthlaplace_integrator import MthLaplaceIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.solver import cg
-from fealpy.experimental.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, get_flist
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import CmConformingFESpace2d 
+from fealpy.fem import BilinearForm 
+from fealpy.fem.mthlaplace_integrator import MthLaplaceIntegrator
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+from fealpy.backend import backend_manager as bm
+from fealpy.solver import cg
+from fealpy.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, get_flist
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -62,6 +62,8 @@ y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
 ulist = get_flist(u)[:3]
+import ipdb
+ipdb.set_trace()
 mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 NDof = bm.zeros(maxit, dtype=bm.float64)
 
@@ -76,7 +78,6 @@ for i in range(maxit):
     isCornerNode = bm.zeros(len(node),dtype=bm.bool)
     for n in bm.array([[0,0],[1,0],[0,1],[1,1]], dtype=bm.float64):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
-
 
 
 
@@ -103,7 +104,10 @@ for i in range(maxit):
     bc1 = DirichletBC(space, gd = ulist)
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
-    A = csr_matrix((A.values(), A.indices()),A.shape)
+    A = A.to_scipy()
+    print(type(A))
+    #A = coo_matrix(A)
+    #A = csr_matrix((A.values(), A.indices()),A.shape)
     uh[:] = bm.tensor(spsolve(A, F))
     
     #uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)

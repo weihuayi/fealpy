@@ -1,5 +1,5 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
 from builtins import float
 
 class TopOptProblem:

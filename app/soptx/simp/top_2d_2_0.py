@@ -1,17 +1,17 @@
-from fealpy.experimental.mesh import UniformMesh2d
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.mesh import UniformMesh2d
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
-from fealpy.experimental.fem import LinearElasticityIntegrator, BilinearForm
-from fealpy.experimental.fem import DirichletBC as DBC
+from fealpy.fem import LinearElasticityIntegrator, BilinearForm
+from fealpy.fem import DirichletBC as DBC
 
-from fealpy.experimental.typing import TensorLike, Tuple
+from fealpy.typing import TensorLike, Tuple
 from builtins import float
 
-from fealpy.experimental.sparse import COOTensor
+from fealpy.sparse import COOTensor
 
-from fealpy.experimental.solver import cg
+from fealpy.solver import cg
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 from math import ceil, sqrt
 

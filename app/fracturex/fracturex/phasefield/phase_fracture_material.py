@@ -1,11 +1,11 @@
 import numpy as np
 from typing import Optional
 
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
+from fealpy.typing import TensorLike
+from fealpy.backend import backend_manager as bm
+from fealpy.material.elastic_material import LinearElasticMaterial
 
-from fealpy.experimental.decorator import barycentric
+from fealpy.decorator import barycentric
 
 class BasedPhaseFractureMaterial(LinearElasticMaterial):
     def __init__(self, material, energy_degradation_fun):

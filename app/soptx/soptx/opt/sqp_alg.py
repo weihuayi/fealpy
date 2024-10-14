@@ -1,6 +1,6 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as _DT
-from fealpy.experimental.opt.optimizer_base import Optimizer
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as _DT
+from fealpy.opt.optimizer_base import Optimizer
 
 class SQPAlg(Optimizer):
     def __init__(self, options) -> None:

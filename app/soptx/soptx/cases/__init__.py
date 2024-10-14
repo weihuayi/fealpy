@@ -1,1 +1,0 @@
-from .mbb_beam_cases import MBBBeamCase
