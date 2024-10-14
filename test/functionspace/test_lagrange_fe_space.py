@@ -1,209 +1,111 @@
+
 import numpy as np
 import pytest
-import matplotlib.pyplot as plt
 
-from fealpy.functionspace import LagrangeFiniteElementSpace
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.mesh import IntervalMesh
-from fealpy.mesh import TriangleMesh
-from fealpy.mesh import TetrahedronMesh
-from fealpy.mesh.halfedge_mesh import HalfEdgeMesh2d 
 
-@pytest.mark.parametrize("p", range(1, 10))
-def test_interval_mesh(p):
-    mesh = IntervalMesh.from_one_triangle()
-    space = LagrangeFESpace(mesh, p=p)
+from lagrange_fe_space_data import *
 
-    assert space.geo_dimension() == 2
-    assert space.top_dimension() == 2
-    assert space.number_of_global_dofs() ==  (p+1)*(p+2)/2
-    assert space.number_of_local_dofs() == (p+1)*(p+2)/2
 
-    mesh = TriangleMesh.from_unit_square(nx=2, ny=2)
-    space = LagrangeFESpace(mesh, p=p)
-    NN = mesh.number_of_nodes()
-    NE = mesh.number_of_edges()
-    NC = mesh.number_of_cells()
-    assert space.geo_dimension() == 2
-    assert space.top_dimension() == 2
-    assert space.number_of_global_dofs() == NN + (p-1)*NE + (p-2)*(p-1)/2*NC  
-    assert space.number_of_local_dofs() == (p+1)*(p+2)/2
+class TestLagrangeFiniteElementSpace:
 
-@pytest.mark.parametrize("p", range(1, 10))
-def test_triangle_mesh(p):
-    mesh = TriangleMesh.from_one_triangle()
-    space = LagrangeFESpace(mesh, p=p)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", triangle_mesh_one_box)
+    def test_top(self, backend, data): 
+        bm.set_backend(backend)
+        
+        mesh = TriangleMesh.from_box([0,1,0,1],1,1)
+        space = LagrangeFESpace(mesh, 2)
+        ldofs = space.number_of_local_dofs()
+        gdofs = space.number_of_global_dofs()
+        TD = space.top_dimension()
+        GD = space.geo_dimension()
+        isBDof = space.is_boundary_dof()
+        cell2dof = space.cell_to_dof()
+        face2dof = space.face_to_dof()
+        edge2dof = space.edge_to_dof()
+        np.testing.assert_array_equal(ldofs, data["number_of_local_dofs"], 
+                                     err_msg=f" `number_of_local_dofs` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(gdofs, data["number_of_global_dofs"], 
+                                     err_msg=f" `number_of_global_dofs` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(cell2dof, data["cell_to_dof"], 
+                                    err_msg=f" `cell_to_dof` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(face2dof, data["face_to_dof"], 
+                                     err_msg=f" `face_to_dof` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(edge2dof, data["edge_to_dof"], 
+                                     err_msg=f" `edge_to_dof` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(GD, data["geo_dimension"], 
+                                     err_msg=f" `geo_dimension` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(TD, data["top_dimension"], 
+                                     err_msg=f" `top_dimension` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(isBDof, data["is_boundary_dof"], 
+                                             err_msg=f" `edge_to_dof` function is not equal to real result in backend {backend}")
 
-    assert space.geo_dimension() == 2
-    assert space.top_dimension() == 2
-    assert space.number_of_global_dofs() ==  (p+1)*(p+2)/2
-    assert space.number_of_local_dofs() == (p+1)*(p+2)/2
+    @pytest.mark.parametrize("backend", ['numpy','pytorch'])    
+    @pytest.mark.parametrize("data", triangle_mesh_one_box)
+    def test_basis(self, backend, data): 
+        bm.set_backend(backend)
 
-    mesh = TriangleMesh.from_unit_square(nx=2, ny=2)
-    space = LagrangeFESpace(mesh, p=p)
-    NN = mesh.number_of_nodes()
-    NE = mesh.number_of_edges()
-    NC = mesh.number_of_cells()
-    assert space.geo_dimension() == 2
-    assert space.top_dimension() == 2
-    assert space.number_of_global_dofs() == NN + (p-1)*NE + (p-2)*(p-1)/2*NC  
-    assert space.number_of_local_dofs() == (p+1)*(p+2)/2
+        mesh = TriangleMesh.from_box([0,1,0,1],1,1)
+        space = LagrangeFESpace(mesh, 2)
+        bcs = bm.array(data["bcs"])
+        phi = space.basis(bcs)
+        gphi = space.grad_basis(bcs)
+        np.testing.assert_array_almost_equal(phi, data["basis"], 
+                                     err_msg=f" `basis` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_almost_equal(gphi, data["grad_basis"], 
+                                     err_msg=f" `grad_basis` function is not equal to real result in backend {backend}")
+    
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", triangle_mesh_one_box)
+    def test_value(self, backend, data): 
+        bm.set_backend(backend)
+        
+        mesh = TriangleMesh.from_box([0,1,0,1],1,1)
+        space = LagrangeFESpace(mesh, 2)
+        bcs = bm.array(data["bcs"])
+        
+        def test_fun(point): 
+            x = point[..., 0]
+            y = point[..., 1]
+            result = bm.sin(x) * bm.sin(y)
+            return result
+        
+        uh = space.interpolate(test_fun)
+        value = space.value(uh, bcs)
+        grad_value = space.grad_value(uh, bcs)
+        np.testing.assert_almost_equal(data["interpolate"], bm.to_numpy(uh),decimal=7, 
+                                     err_msg=f" `interpolate` function is not equal to real result in backend {backend}")
+        np.testing.assert_almost_equal(data["value"], bm.to_numpy(value),decimal=7, 
+                                     err_msg=f" `value` function is not equal to real result in backend {backend}")
+        np.testing.assert_almost_equal(data["grad_value"], bm.to_numpy(grad_value),decimal=7, 
+                                     err_msg=f" `grad_value` function is not equal to real result in backend {backend}")
 
-@pytest.mark.parametrize("p", range(10))
-def test_tetrahedron_mesh(p):
-    mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
-    space = LagrangeFESpace(mesh, p=p)
 
-    assert space.geo_dimension() == 3
-    assert space.top_dimension() == 3
-    assert space.number_of_global_dofs() ==  (p+3)*(p+2)*(p+1)//6
-    assert space.number_of_local_dofs() == (p+3)*(p+2)*(p+1)//6
-
-    mesh = TetrahedronMesh.from_unit_cube(nx=10, ny=10, nz=10)
-    space = LagrangeFESpace(mesh, p=p)
-    NN = mesh.number_of_nodes()
-    NE = mesh.number_of_edges()
-    NF = mesh.number_of_faces()
-    NC = mesh.number_of_cells()
-    assert space.geo_dimension() == 3
-    assert space.top_dimension() == 3
-    assert space.number_of_global_dofs() == NN + NE*(p-1) + NF*(p-2)*(p-1)//2 + NC*(p-3)*(p-2)*(p-1)//6
-    assert space.number_of_local_dofs() == (p+1)*(p+2)*(p+3)//6
-
-    mesh = TetrahedronMesh.from_unit_sphere_gmsh(h=0.2)
-    space = LagrangeFESpace(mesh, p=p)
-    NN = mesh.number_of_nodes()
-    NE = mesh.number_of_edges()
-    NF = mesh.number_of_faces()
-    NC = mesh.number_of_cells()
-    assert space.geo_dimension() == 3
-    assert space.top_dimension() == 3
-    assert space.number_of_global_dofs() == NN + NE*(p-1) + NF*(p-2)*(p-1)//2 + NC*(p-3)*(p-2)*(p-1)//6
-    assert space.number_of_local_dofs() == (p+1)*(p+2)*(p+3)//6
-
-def test_interpolation_fe_function(p=1, method='rg'):
-    import copy
-    import time
-    mesh = TriangleMesh.from_box([0, 2, 0, 1], nx=20, ny=10)
-    mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3)
-    #mesh = HalfEdgeMesh2d.from_box([0, 2, 0, 1], 0.3)
-    mesho = copy.deepcopy(mesh)
-    space = LagrangeFESpace(mesh, p=p) 
-    spaceo = LagrangeFESpace(mesho, p=p) 
-
-    def u(p): return np.sin(2*p[..., 1])*np.sin(2*p[..., 0])
-    uIo = spaceo.interpolate(u)  
-
-    err = mesh.error(u, uIo)
-    print(err)
-
-    r, h, N = 0.5, 1e-3, 10
-    fff = 0
-    for i in range(N):
-        c = np.array([i*(2/N), 0.8])
-        for k in range(10):
-            fff+=1
-            node = mesh.entity('node')
-            halfedge = mesh.entity('halfedge')
-            pre = halfedge[:, 3]
-            flag = np.linalg.norm(node-c, axis=1)<r
-            isMarkedHEdge = flag[halfedge[:, 0]]&(~flag[halfedge[pre, 0]])
-            NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[halfedge[isMarkedHEdge, 1]] = True
-            isMarkedCell = isMarkedCell & (mesh.cell_area()>h**2)
-            if (~isMarkedCell).all():
-                break
-
-            if method == "rg":
-                mesh.refine_triangle_rg(isMarkedCell)
-            elif method == "nvb":
-                mesh.refine_triangle_nvb(isMarkedCell)
-            space = LagrangeFESpace(mesh, p=p)
-
-            t0 = time.time()
-            uI = space.interpolation_fe_function(uIo)
-            t1 = time.time()
-            print("插值用时: ", t1-t0, "s")
-
-            mesho = copy.deepcopy(mesh)
-            spaceo = LagrangeFESpace(mesho, p=p)
-            uIo = spaceo.function()
-            uIo[:] = uI[:]
-
-            mesh1 = copy.deepcopy(mesh)
-            node = mesh1.entity('node')
-            node = np.c_[node, uI[:, None]]
-            mesh1.node = node
-            mesh1.to_vtk(fname='out_ref_'+str(fff).zfill(3)+".vtu")
-
-            err0 = mesh.error(u, uIo)
-            print("err0 : ", err0)
-            print(mesho.number_of_cells())
-
-        for k in range(10):
-            fff+=1
-            halfedge = mesh.ds.halfedge
-            pre = halfedge[:, 3]
-            node = mesh.entity('node')
-            flag = np.linalg.norm(node-c, axis=1)<r
-            isMarkedHEdge = flag[halfedge[:, 0]]&(~flag[halfedge[pre, 0]])
-            NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[halfedge[isMarkedHEdge, 1]] = True
-            isMarkedCell = ~isMarkedCell & (mesh.cell_area()<0.01)
-            if (~isMarkedCell).all():
-                break
-            print('第', i, '轮粗化', k, '次')
-            if method == "rg":
-                mesh.coarsen_triangle_rg(isMarkedCell)
-            elif method == "nvb":
-                mesh.coarsen_triangle_nvb(isMarkedCell)
-            space = LagrangeFESpace(mesh, p=p)
-
-            t0 = time.time()
-            uI = space.interpolation_fe_function(uIo)
-            t1 = time.time()
-            print("插值用时: ", t1-t0, "s")
-
-            mesho = copy.deepcopy(mesh)
-            spaceo = LagrangeFESpace(mesho, p=p)
-            uIo = spaceo.function()
-            uIo[:] = uI[:]
-
-            mesh1 = copy.deepcopy(mesh)
-            node = mesh1.entity('node')
-            node = np.c_[node, uI[:, None]]
-            mesh1.node = node
-            mesh1.to_vtk(fname='out_ref_'+str(fff).zfill(3)+".vtu")
-
-            err0 = mesh.error(u, uIo)
-            print("err0 : ", err0)
-            print(mesho.number_of_cells())
-
-def test_domain_with_hole():
-    from fealpy.geometry import SquareWithCircleHoleDomain
-    domain = SquareWithCircleHoleDomain() 
-    mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
-    mesh = HalfEdgeMesh2d.from_mesh(mesh, NV=3) # 使用半边网格
-
-    fig = plt.figure()
-    axes = fig.gca()
-    mesh.add_plot(axes)
-    mesh.find_cell(axes)
-    #hmesh.add_halfedge_plot(axes, showindex=True)
-    #axes.scatter(points[:, 0], points[:, 1], color='r')
-    #for i in range(len(points)):
-    #    plt.annotate(i, points[i], textcoords="offset points", xytext=(0, 10),
-    #            ha='center', color='r', fontsize=40)
-    plt.show()
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", triangle_mesh_one_box)
+    def test_boundary_interpolate(self, backend, data): 
+        bm.set_backend(backend)
+        def solution(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            return bm.sin(bm.pi*x) * bm.sin(bm.pi*y)
+        
+        mesh = TriangleMesh.from_box([0,1,0,1],2,2)
+        space = LagrangeFESpace(mesh, 2)
+        uh = np.zeros(space.number_of_global_dofs())
+        b = space.boundary_interpolate(gD=solution, uh=uh)
+        np.testing.assert_array_almost_equal(uh, data["uh"], 
+                                     err_msg=f" `uh` function is not equal to real result in backend {backend}")
+        np.testing.assert_array_equal(b, data["isDDof"], 
+                                     err_msg=f" `b` function is not equal to real result in backend {backend}")
 
 
 
 
 
-if __name__ == '__main__':
-    #test_triangle_mesh(2)
-    #test_interpolation_fe_function(p=1, method='nvb')
-    test_domain_with_hole()
-
+if __name__ == "__main__":
+    #pytest.main(['test_lagrange_fe_space.py', "-q", "-k","test_basis", "-s"])
+    pytest.main(['test_lagrange_fe_space.py', "-q"])

@@ -1,7 +1,7 @@
 from scipy.sparse import spdiags
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.sparse import SparseTensor, COOTensor, CSRTensor
+from fealpy.backend import backend_manager as bm
+from fealpy.sparse import SparseTensor, COOTensor, CSRTensor
 
 class VectorDirichletBC:
     def __init__(self, space, gd, threshold, direction = None):

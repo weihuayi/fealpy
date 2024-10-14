@@ -3,8 +3,8 @@ import numpy as np
 from numpy import sin, cos, tan, pi, arctan, arctan2, radians, sqrt
 
 from scipy.optimize import fsolve
-from fealpy.experimental.mesh.quadrangle_mesh import QuadrangleMesh
-from fealpy.experimental.geometry.utils import *
+from fealpy.mesh.quadrangle_mesh import QuadrangleMesh
+from fealpy.geometry.utils import *
 
 class Gear(ABC):
     def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, material=None):

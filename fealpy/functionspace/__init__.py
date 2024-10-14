@@ -1,34 +1,16 @@
-# 新文件命名规则的空间类
+
+from .space import FunctionSpace
+from .function import Function
+
+from .dofs import LinearMeshCFEDof
+
 from .lagrange_fe_space import LagrangeFESpace
+from .tensor_space import TensorFunctionSpace
+from .cm_conforming_fe_space import CmConformingFESpace2d
 from .bernstein_fe_space import BernsteinFESpace
 
-from .interior_penalty_bernstein_fe_space import InteriorPenaltyBernsteinFESpace2d
+from .first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
+from .first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
 
-
-from .conforming_vector_ve_space_2d import ConformingVectorVESpace2d
-from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
-
-from .non_conforming_scalar_ve_space_2d import NonConformingScalarVESpace2d
-
-from .scaled_monomial_space_2d import ScaledMonomialSpace2d
-from .scaled_monomial_space_3d import ScaledMonomialSpace3d
-
-from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
-
-# Old class and interface
-from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
-
-# H(div)
-from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
-from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d
-
-# H(curl)
-from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementSpace2d
-from .FirstNedelecFiniteElementSpace2d import FirstNedelecFiniteElementSpace2d
-from .FirstNedelecFiniteElementSpace3d import FirstNedelecFiniteElementSpace3d
-
-# VEM
-from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
-
-# nodeset
-#from .node_set_kernel_function_space import NodeSetKernelSpace
+from.second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
+from.second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d

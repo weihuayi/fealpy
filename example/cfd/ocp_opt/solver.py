@@ -8,12 +8,12 @@
 	@ref 
 '''  
 
-from fealpy.experimental.fem import BilinearForm, ScalarMassIntegrator
-from fealpy.experimental.fem import PressWorkIntegrator, PressWorkIntegrator1
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.decorator import barycentric, cartesian
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.sparse import COOTensor
+from fealpy.fem import BilinearForm, ScalarMassIntegrator
+from fealpy.fem import PressWorkIntegrator, PressWorkIntegrator1
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.decorator import barycentric, cartesian
+from fealpy.backend import backend_manager as bm
+from fealpy.sparse import COOTensor
 from functools import partial
 
 from ocp_opt_pde import example_1

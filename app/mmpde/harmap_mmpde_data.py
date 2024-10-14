@@ -1,6 +1,6 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 from fealpy.geometry import RectangleDomain
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TM
 
 

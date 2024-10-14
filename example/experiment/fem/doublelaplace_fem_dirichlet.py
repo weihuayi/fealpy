@@ -2,22 +2,22 @@ import argparse
 import sympy as sp
 from matplotlib import pyplot as plt
 
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('WARNING')
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import CmConformingFESpace2d 
-from fealpy.experimental.fem import BilinearForm 
-from fealpy.experimental.fem.mthlaplace_integrator import MthLaplaceIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.solver import cg
-from fealpy.experimental.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, get_flist
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import CmConformingFESpace2d 
+from fealpy.fem import BilinearForm 
+from fealpy.fem.mthlaplace_integrator import MthLaplaceIntegrator
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+from fealpy.backend import backend_manager as bm
+from fealpy.solver import cg
+from fealpy.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, get_flist
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=

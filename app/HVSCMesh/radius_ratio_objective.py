@@ -1,8 +1,8 @@
 from scipy.sparse import csr_matrix
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike
-from fealpy.experimental.mesh.opt import SumObjective
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from fealpy.mesh.opt import SumObjective
 
 class RadiusRatioSumObjective(SumObjective):
     def __init__(self, mesh_quality):

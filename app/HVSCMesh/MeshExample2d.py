@@ -1,6 +1,6 @@
 import gmsh
 import numpy as np
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
 def to_TriangleMesh():
     ntags, vxyz, _ = gmsh.model.mesh.getNodes()

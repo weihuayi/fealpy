@@ -1,17 +1,17 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
 # bm.set_backend('pytorch')
 # bm.set_backend('jax')
 
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
-from fealpy.experimental.fem import LinearElasticityIntegrator, \
+from fealpy.fem import LinearElasticityIntegrator, \
                                     BilinearForm, LinearForm, \
                                     VectorSourceIntegrator
 
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
-from fealpy.experimental.typing import TensorLike, _S, Index
+from fealpy.typing import TensorLike, _S, Index
 
 
 from fealpy.decorator import barycentric

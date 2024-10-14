@@ -1,14 +1,14 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
     ScalarSourceIntegrator,
     ScalarMassIntegrator,
     DirichletBC
 )
-from fealpy.experimental.sparse.linalg import sparse_cg
+from fealpy.sparse.linalg import sparse_cg
 from fealpy.pde.heatequation_model_2d import SinSinExpData
 import matplotlib.pyplot as plt
 # bm.set_backend('pytorch')

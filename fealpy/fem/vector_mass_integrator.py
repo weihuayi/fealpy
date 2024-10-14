@@ -1,33 +1,69 @@
-import numpy as np
 
-from fealpy.fem.precomp_data import data
+from typing import Optional
 
-from .scalar_mass_integrator import ScalarMassIntegrator
+from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, _S
 
-class VectorMassIntegrator:
+from ..mesh import HomogeneousMesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
+from .integrator import (
+    LinearInt, OpInt, CellInt,
+    enable_cache,
+    assemblymethod,
+    CoefLike
+)
+
+class VectorMassIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c u, v)
     """    
-    def __init__(self, c=None, q=None):
-        self.coef = c
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None) -> None:
+        super().__init__()
+        self.coef = coef
         self.q = q
-        self.type = 'BL11'
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> TensorLike:
+        return space.cell_to_dof()
+
+    @enable_cache
+    def fetch(self, space: _FS):
+        q = self.q
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
+
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The ScalarMassIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = space.basis(bcs, index=index)
+        return bcs, ws, phi, cm, index
+
+    def assembly0(self, space: _FS) -> TensorLike:
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, cm, index = self.fetch(space)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
+
+    def assembly(self, space, index=_S, cellmeasure=None, out=None):
         """
         @note 没有参考单元的组装方式
         """
-        if isinstance(space, tuple): # 由标量空间组合而成的空间
-            return self.assembly_cell_matrix_for_scalar_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
-        else: # 空间基函数是向量函数
-            return self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
+        return self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
 
-    def assembly_cell_matrix_for_vector_basis_vspace(self, space, index=np.s_[:], cellmeasure=None, out=None):
+    def assembly_cell_matrix_for_vector_basis_vspace(self, space, index=_S, cellmeasure=None, out=None):
         """
         @brief 空间基函数是向量型
         """
-        p = space.p
-        q = self.q if self.q is not None else p+1 
+        q = space.p+3 if self.q is None else self.q
 
         coef = self.coef
         mesh = space.mesh
@@ -39,105 +75,32 @@ class VectorMassIntegrator:
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 
         if out is None:
-            D = np.zeros((NC, ldof, ldof), dtype=space.ftype)
+            D = bm.zeros((NC, ldof, ldof), dtype=space.ftype)
         else:
             D = out
 
-        qf = mesh.integrator(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         NQ = len(ws)
 
-        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof, GD)
+        phi0 = space.basis(bcs) # (NQ, NC, ldof, GD)
+        print(phi0.shape)
 
+        import time
+
+        start = time.time()
         if coef is None:
-            D += np.einsum('q, qcim, qcjm, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
-        else:
-            pass
+            D += bm.einsum('q, cqli, cqmi, c->clm', ws, phi0, phi0, cellmeasure)
+        elif isinstance(coef, (int, float)):
+            D += coef*bm.einsum('q, cqli, cqmi, c->clm', ws, phi0, phi0,
+                                #cellmeasure, optimize=True)
+                                cellmeasure)
+        end = time.time()
+        print(f"Time: {end-start}")
+
         if out is None:
             return D
-
-    def assembly_cell_matrix_for_scalar_basis_vspace(self, space, index=np.s_[:], cellmeasure=None, out=None):
-        """
-        @brief 标量空间拼成的向量空间 
-        """
-        
-        mesh = space[0].mesh
-        GD = space[0].geo_dimension()
-        assert len(space) == GD
-        
-        if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
-        ldof = space[0].number_of_local_dofs()
-        integrator = ScalarMassIntegrator(c=self.coef, q=self.q)
-        # 组装标量的单元扩散矩阵
-        # D.shape == (NC, ldof, ldof)
-        D = integrator.assembly_cell_matrix(space[0], index=index, cellmeasure=cellmeasure)
-        NC = len(cellmeasure)
-
-        if out is None:
-            VD = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
         else:
-            assert out.shape == (NC, GD*ldof, GD*ldof)
-            VD = out
-        if space[0].doforder == 'sdofs':
-            for i in range(GD):
-                VD[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D
-        elif space[0].doforder == 'vdims':
-            for i in range(GD):
-                VD[:, i::GD, i::GD] += D 
-        if out is None:
-            return VD
-
-    def assembly_cell_matrix_fast(self, space, trialspace=None, testspace=None, coefspace=None, index=np.s_[:], cellmeasure=None, out=None):
-        """
-        @note 基于无数值积分的组装方式
-        """
-        self.space = space
-        if isinstance(space, tuple): # 由标量空间组合而成的空间
-            return self.assembly_cell_matrix_for_scalar_basis_vspace_fast(space, trialspace, testspace, coefspace,
-                                                                        index=index, cellmeasure=cellmeasure, out=out)
-        else: # 空间基函数是向量函数
-            return self.assembly_cell_matrix_for_vector_basis_vspace(space, index=index, cellmeasure=cellmeasure, out=out)
-
-
-    def assembly_cell_matrix_for_scalar_basis_vspace_fast(self, space,
-            trialspace, testspace, coefspace,
-            index=np.s_[:], cellmeasure=None, out=None):
-        """
-        @brief 标量空间拼成的向量空间 
-        """
-        mesh = space[0].mesh
-        GD = space[0].geo_dimension()
-        assert len(space) == GD
-        
-        mesh =space[0].mesh
-        if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
-        ldof = space[0].number_of_local_dofs()
-        integrator = ScalarMassIntegrator(self.coef, self.q)
-        # 组装标量的单元扩散矩阵
-        # D.shape == (NC, ldof, ldof)
-        D = integrator.assembly_cell_matrix_fast(space[0], trialspace, testspace, coefspace, index=index, cellmeasure=cellmeasure)
-        NC = len(cellmeasure)
-
-        if out is None:
-            VD = np.zeros((NC, GD*ldof, GD*ldof), dtype=space[0].ftype)
-        else:
-            assert out.shape == (NC, GD*ldof, GD*ldof)
-            VD = out
-        if space[0].doforder == 'sdofs':
-            for i in range(GD):
-                VD[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D
-        elif space[0].doforder == 'vdims':
-            for i in range(GD):
-                VD[:, i::GD, i::GD] += D 
-        if out is None:
-            return VD
-
-    def assembly_cell_matrix_for_vector_basis_vspace_fast(self, space, index=np.s_[:], cellmeasure=None, out=None):
-        """
-        @brief 空间基函数是向量型
-        """
-        pass
+            out += D
 
 

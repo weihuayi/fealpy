@@ -1,25 +1,26 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.typing import TensorLike
+from fealpy.typing import TensorLike
 
-from fealpy.experimental.decorator import cartesian
+from fealpy.decorator import cartesian
 
-from fealpy.experimental.mesh import HexahedronMesh
+from fealpy.mesh import HexahedronMesh
 
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
+from fealpy.material.elastic_material import LinearElasticMaterial
 
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.fem.vector_source_integrator import VectorSourceIntegrator
-from fealpy.experimental.fem.bilinear_form import BilinearForm
-from fealpy.experimental.fem.linear_form import LinearForm
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
+from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem.linear_form import LinearForm
+from fealpy.fem.dirichlet_bc import DirichletBC
 
-from fealpy.experimental.decorator import cartesian
+from fealpy.decorator import cartesian
 
-from fealpy.experimental.sparse import COOTensor
+from fealpy.sparse import COOTensor
 
-from fealpy.experimental.solver import cg
+from fealpy.solver import cg
 
 from app.soptx.soptx.utilfs.timer import timer
 
@@ -105,22 +106,23 @@ class BoxDomainPolyLoaded3d():
         return bm.zeros(points.shape, 
                         dtype=points.dtype, device=points.device)
 
-parser = argparse.ArgumentParser(description="HexahedronMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
+parser = argparse.ArgumentParser(description="Solve linear elasticity problems \
+                            in arbitrary order Lagrange finite element space on HexahedronMesh.")
 parser.add_argument('--backend', 
                     default='pytorch', type=str,
-                    help='指定计算的后端类型, 默认为 pytorch.')
+                    help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=1, type=int, 
-                    help='Lagrange 有限元空间的次数, 默认为 1 次.')
+                    default=2, type=int, 
+                    help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--nx', 
                     default=2, type=int, 
-                    help='x 方向的初始网格单元数, 默认为 2.')
+                    help='Initial number of grid cells in the x direction, default is 2.')
 parser.add_argument('--ny',
                     default=2, type=int,
-                    help='y 方向的初始网格单元数, 默认为 2.')
+                    help='Initial number of grid cells in the y direction, default is 2.')
 parser.add_argument('--nz',
                     default=2, type=int,
-                    help='z 方向的初始网格单元数, 默认为 2.')
+                    help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 
 pde = BoxDomainPolyUnloaded3d()
@@ -153,7 +155,7 @@ for i in range(maxit):
     integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_K)
-    K = bform.assembly()
+    K = bform.assembly(format='csr')
     tmr.send('stiffness assembly')
 
     integrator_F = VectorSourceIntegrator(source=pde.source, q=tensor_space.p+3)
@@ -168,17 +170,8 @@ for i in range(maxit):
     F = F - K.matmul(uh_bd)
     F[isDDof] = uh_bd[isDDof]
 
-    indices = K.indices()
-    new_values = bm.copy(K.values())
-    IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
-    new_values[IDX] = 0
-
-    K = COOTensor(indices, new_values, K.sparse_shape)
-    index, = bm.nonzero(isDDof)
-    one_values = bm.ones(len(index), **K.values_context())
-    one_indices = bm.stack([index, index], axis=0)
-    K1 = COOTensor(one_indices, one_values, K.sparse_shape)
-    K = K.add(K1).coalesce()
+    dbc = DirichletBC(space=tensor_space)
+    K = dbc.apply_matrix(matrix=K, check=True)
     tmr.send('boundary')
 
     uh = tensor_space.function()
