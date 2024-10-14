@@ -31,8 +31,6 @@ class Camera():
         self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
 
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), data_path + chessboard_dir)
-        print("K: ", self.K)
-        print("D: ", self.D)
 
         self.theta2rho = lambda theta: theta 
         self.picture.rho2theta = lambda rho: fsolve(lambda theta: self.theta2rho(theta)-rho, 0)[0]
