@@ -1,6 +1,6 @@
 
+from ..backend import backend_manager as bm
 from .quadrature import Quadrature
-from .quadrature import backend_manager as bm
 
 # Reference
 # ---------
