@@ -49,8 +49,7 @@ def _scipy_solve(A, b):
     from scipy.sparse.linalg import spsolve as spsol 
     from scipy.sparse import csr_matrix
 
-    A = csr_matrix((bm.to_numpy(A.values()), bm.to_numpy(A.indices())), 
-                   shape = A.sparse_shape)
+    A = A.to_scipy()
     b = bm.to_numpy(b)
     return spsol(A, b)
 
@@ -77,6 +76,7 @@ def _to_cupy_data(A, b):
         indices = cp.from_dlpack(A.indices())
         data = cp.from_dlpack(A.values())
         A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
+
     if isinstance(b, np.ndarray) or b.device.type == "cpu":
         b = bm.to_numpy(b)
         b = cp.array(b)
