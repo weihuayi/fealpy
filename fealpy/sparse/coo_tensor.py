@@ -178,7 +178,7 @@ class COOTensor(SparseTensor):
         order = bm.lexsort(tuple(reversed(self._indices)))
         sorted_indices = self._indices[:, order]
         unique_mask = bm.concat([
-            bm.ones((1, ), dtype=bm.bool),
+            bm.ones((1, ), dtype=bm.bool, device=bm.get_device(sorted_indices)),
             bm.any(sorted_indices[:, 1:] - sorted_indices[:, :-1], axis=0)
         ], axis=0)
         new_indices = bm.copy(sorted_indices[..., unique_mask])

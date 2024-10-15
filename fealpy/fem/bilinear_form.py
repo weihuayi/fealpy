@@ -52,8 +52,8 @@ class BilinearForm(Form[LinearInt]):
         sparse_shape = (vgdof, ugdof)
 
         M = COOTensor(
-            indices = bm.empty((2, 0), dtype=space[0].itype),
-            values = bm.empty(init_value_shape, dtype=space[0].ftype),
+            indices = bm.empty((2, 0), dtype=space[0].itype, device=bm.get_device(space[0])),
+            values = bm.empty(init_value_shape, dtype=space[0].ftype, device=bm.get_device(space[0])),
             spshape = sparse_shape
         )
 

@@ -9,7 +9,7 @@ from scipy.sparse import spdiags, eye, tril, triu, bmat
 
 class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
-        super().__init__(TD=3,itype=cell.dtype,ftype=node.dtype)
+        super().__init__(TD=3, itype=cell.dtype, ftype=node.dtype)
         self.node = node
         self.cell = cell
 
