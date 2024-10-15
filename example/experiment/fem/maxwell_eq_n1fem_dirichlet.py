@@ -46,6 +46,7 @@ def Solve(A, b):
     # from scipy.sparse.linalg import minres, gmres
 
     A = coo_matrix((A.values(), (A.indices()[0], A.indices()[1])), shape=(gdof, gdof))
+
     # NN = len(b)
     # ctx = DMumpsContext()
     # ctx.set_silent()
@@ -144,6 +145,7 @@ for j, p in enumerate(ps):
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
         Eh[:] = bm.tensor(Solve(A, F))
+        #Eh[:]=cg(A, F)
         tmr.send(f'第{i}次求解器时间')
 
         # 计算误差
