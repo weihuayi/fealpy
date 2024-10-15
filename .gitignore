@@ -29,7 +29,7 @@ paper/*.pdf
 code/*.mat
 log.txt
 fealpyapp
-fealpy.egg-info
+*.egg-info
 dependcies
 *.npz
 *.csv
