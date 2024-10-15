@@ -24,7 +24,7 @@ from fealpy.fem import DirichletBC
 from fealpy.sparse import COOTensor
 from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import BlockForm
-from fealpy.solver import cg 
+from fealpy.solver import spsolve 
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.decorator import barycentric, cartesian
@@ -163,6 +163,8 @@ for i in range(10):
                   [None, A_bform, APY_bform],
                    [APX_bform.T, APY_bform.T, None]])
     A = A.assembly()
+    A = A.tocoo()
+    print(A.to_scipy())
     '''
     if backend == 'numpy':
         from scipy.sparse import coo_array, bmat
@@ -196,21 +198,20 @@ for i in range(10):
     b2 = bm.zeros(pgdof) 
     b = bm.concatenate([b0,b1,b2])
     
-    print(xx.dtype)
-    print(A.values().dtype)
     b -= A@xx
     b[isBdDof] = xx[isBdDof]
     
     A = DirichletBC(uspace, xx, isDDof=isBdDof).apply_matrix(A, check=False)
     #A,b = DirichletBC(uspace, xx, isDDof=isBdDof).apply(A, b, check=None)
-
+    '''
     import scipy.sparse as sp
     values = A.values()
     indices = A.indices()
     A = sp.coo_matrix((values, (indices[0], indices[1])), shape=A.shape) 
     A = A.tocsr()
     x = sp.linalg.spsolve(A,b)
-    
+    '''
+    x = spsolve(A, b, 'mumps')
     x = bm.array(x)
     ''' 
     x = cg(A, b, maxiter=10000)

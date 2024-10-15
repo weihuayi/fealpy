@@ -148,15 +148,13 @@ class COOTensor(SparseTensor):
 
     ### 4. Object Conversion ###
     def to_scipy(self, format: str='coo'):
-        from importlib import import_module
-
+        from scipy.sparse import coo_matrix
         if self.dense_ndim != 0:
             raise ValueError("Only COOTensor with 0 dense dimension "
                              "can be converted to scipy sparse matrix")
 
-        class_ = import_module(f'scipy.sparse.{format}_matrix')
 
-        return class_(
+        return coo_matrix(
             (bm.to_numpy(self.values()), bm.to_numpy(self.indices())),
             shape = self.sparse_shape
         )

@@ -63,8 +63,9 @@ F = lform.assembly()
 
 gdof = space.number_of_global_dofs()
 A, F = DirichletBC(space, gd=pde.solution).apply(A, F)
-
+A = A.tocoo()
 x = scipy_solve(A, F)
+print(x)
 #x = mumps_solve(A, F)
 #x = cupy_solve(A, F)
 
