@@ -176,7 +176,7 @@ for i in range(maxit):
     # face_to_dof__hex_cpu = mesh_cpu.quad_to_ipoint(p=p)
     # isDDof_cpu = space_cpu.is_boundary_dof(threshold=None)
 
-    edge_hex_cdua = mesh_cuda.edge
+    edge_hex_cuda = mesh_cuda.edge
     edge_quad_cuda = mesh_quad_cuda.edge
     edge2ipoint_hex_cpu = mesh_cuda.edge_to_ipoint(p=p)
     edge2ipoint_quad_cuda = mesh_quad_cuda.edge_to_ipoint(p=p)

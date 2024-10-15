@@ -629,7 +629,7 @@ class TensorMesh(HomogeneousMesh):
         dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
         dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
         dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
-        device = bm.get_device(edge).type
+        
 
         face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype, device=bm.get_device(edge))
         localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], 
@@ -642,19 +642,15 @@ class TensorMesh(HomogeneousMesh):
                                 edge2ipoint[ge])
             face2ipoint = bm.set_at(face2ipoint, (idx[:, None], dofidx[i]), 
                                 bm.flip(edge2ipoint[ge[idx]], axis=1))
-            # face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼
-            # face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
+            # face2ipoint[:, dofidx[i]] = edge2ipoint[ge]
+            # face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1)
 
-        # import numpy as np
-        # np.savetxt(device+"edge2ipoint.csv", bm.to_numpy(edge2ipoint), fmt='%d')
-        # np.savetxt(device+"face2ipoint.csv", bm.to_numpy(face2ipoint), fmt='%d')
         indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
         face2ipoint = bm.set_at(face2ipoint, (slice(None), indof), 
                     bm.arange(NN + NE * (p - 1), NN + NE * (p - 1) + NF * (p - 1) ** 2, 
                     dtype=self.itype, device=bm.get_device(edge)).reshape(NF, -1))
-
         # face2ipoint[:, indof] = bm.arange(NN+NE*(p-1), NN+NE*(p-1)+NF*(p-1)**2, 
-        #                     dtype=self.itype, device=bm.get_device(edge)).reshape(NF, -1) # TODO jax 不兼容
+        #                     dtype=self.itype, device=bm.get_device(edge)).reshape(NF, -1)
         face2ipoint = face2ipoint[index]
         
         return face2ipoint

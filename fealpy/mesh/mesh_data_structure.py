@@ -142,7 +142,7 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell
         localFace2edge = self.localFace2edge
         face2edge = cell2edge[face2cell[:, [0]], localFace2edge[face2cell[:, 2]]]
-        
+
         return face2edge[index]
 
     def cell_to_face(self, index: Index=_S) -> TensorLike:
@@ -285,6 +285,8 @@ class MeshDS(metaclass=MeshMeta):
                 return_inverse=True,
                 axis=0
             )
+            device = bm.get_device(totalEdge).type
+            print(device+"-i2:", i2)
             self.edge = totalEdge[i2, :]
             self.cell2edge = bm.astype(j.reshape(NC, NEC), self.itype)
 
