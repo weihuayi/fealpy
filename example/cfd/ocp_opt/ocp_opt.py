@@ -7,9 +7,9 @@
 	@bref 
 	@ref 
 '''  
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.functionspace import LagrangeFESpace
+from fealpy.mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.functionspace import LagrangeFESpace
 from fealpy.timeintegratoralg import UniformTimeLine
 
 from ocp_opt_pde import example_1
@@ -17,12 +17,12 @@ from solver import ocp_opt_solver
 
 from scipy.sparse import coo_array, bmat
 from functools import partial
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('ERROR') #积分子问题
 
 bm.set_backend("numpy")
 pde = example_1()
-n = 40
+n = 10
 q = 4
 T = 1
 nt = 30

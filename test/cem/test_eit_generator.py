@@ -1,8 +1,8 @@
 
 from fealpy.cem.generator import EITDataGenerator
 from fealpy.mesh import TriangleMesh as TM
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
 
 
 EXT = 63

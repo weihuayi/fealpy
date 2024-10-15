@@ -1,75 +1,52 @@
-import numpy as np
-from numpy.typing import NDArray
 
-from typing import TypedDict, Callable, Tuple, Union
+from typing import Optional
+
+from ..typing import TensorLike, Index, _S, SourceLike
+from ..mesh import HomogeneousMesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import linear_integral
+from .integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
-class ScalarSourceIntegrator():
-
-    def __init__(self, f: Union[Callable, int, float, NDArray], q=None):
-        """
-        @brief
-
-        @param[in] f 
-        """
-        self.f = f
+class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
+    r"""The domain source integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, source: Optional[SourceLike]=None, q: int=None, *,
+                 index: Index=_S,
+                 batched: bool=False) -> None:
+        super().__init__()
+        self.source = source
         self.q = q
-        self.vector = None
+        self.index = index
+        self.batched = batched
 
-    def assembly_cell_vector(self, 
-            space, 
-            index=np.s_[:], 
-            cellmeasure=None,
-            out=None):
-        """
-        @brief 组装单元向量
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> TensorLike:
+        return space.cell_to_dof()[self.index]
 
-        @param[in] space 一个标量的函数空间
-
-        """
-        f = self.f
-        p = space.p
+    @enable_cache
+    def fetch(self, space: _FS):
         q = self.q
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
 
-        q = p+3 if q is None else q
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
 
-        mesh = space.mesh
-        if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
-
-        NC = len(cellmeasure)
-        ldof = space.dof.number_of_local_dofs() 
-        if out is None:
-            bb = np.zeros((NC, ldof), dtype=space.ftype)
-        else:
-            bb = out
-
-        qf = mesh.integrator(q, 'cell')
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-
-        phi = space.basis(bcs, index=index) #TODO: 考虑非重心坐标的情形
-
-        if callable(f):
-            if hasattr(f, 'coordtype'):
-                if f.coordtype == 'barycentric':
-                    val = f(bcs, index=index)
-                elif f.coordtype == 'cartesian':
-                    ps = mesh.bc_to_point(bcs, index=index)
-                    val = f(ps)
-            else: # 默认是笛卡尔
-                ps = mesh.bc_to_point(bcs, index=index)
-                val = f(ps)
-        else:
-            val = f
-        if isinstance(val, (int, float)):
-            bb += val*np.einsum('q, qci, c->ci', ws, phi, cellmeasure, optimize=True)
-        else:
-            if val.shape == (NC, ): 
-                bb += np.einsum('q, c, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
-            else:
-                if val.shape[-1] == 1:
-                    val = val[..., 0]
-                bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
-        if out is None:
-            return bb 
+        phi = space.basis(bcs, index=index)
         
+        return bcs, ws, phi, cm, index
+
+    def assembly(self, space: _FS) -> TensorLike:
+        f = self.source
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, cm, index = self.fetch(space)
+ 
+        val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        return linear_integral(phi, ws, cm, val, batched=self.batched)

@@ -1,10 +1,10 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 from fealpy.geometry import RectangleDomain
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TM
 
 
-h = 0.05
+h = 0.033
 domain = RectangleDomain(hmin=h)
 vertices = bm.array([[0,0],[1,0],[1,0.5],[0.5,0.5],[0.5,1],[0,1]])
 mesh1 = TM.from_domain_distmesh(domain ,maxit=100)

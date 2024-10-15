@@ -1,17 +1,17 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.decorator import cartesian
-from fealpy.experimental.mesh import UniformMesh2d, QuadrangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.fem.vector_source_integrator import VectorSourceIntegrator
-from fealpy.experimental.material.elastic_material import LinearElasticMaterial
-from fealpy.experimental.fem.bilinear_form import BilinearForm
-from fealpy.experimental.fem.linear_form import LinearForm
-from fealpy.experimental.decorator import cartesian
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
+from fealpy.mesh import UniformMesh2d, QuadrangleMesh
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
+from fealpy.material.elastic_material import LinearElasticMaterial
+from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem.linear_form import LinearForm
+from fealpy.decorator import cartesian
 
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.solver import cg
+from fealpy.sparse import COOTensor
+from fealpy.solver import cg
 
 from fealpy.utils import timer
 
@@ -73,10 +73,10 @@ nx, ny = args.nx, args.ny
 extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
 origin = [extent[0], extent[2]]
-mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
-                    ipoints_ordering='nec')
+# mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
+#                     ipoints_ordering='nec')
 
-# mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
+mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
 # axes = fig.add_subplot(111)

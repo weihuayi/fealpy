@@ -1,10 +1,12 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.mesh import IntervalMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
+from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TetrahedronMesh
+from fealpy.mesh import IntervalMesh
 from fealpy.mesh import TriangleMesh as TM
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (BilinearForm 
+from fealpy.mesh import TetrahedronMesh as THM
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (BilinearForm 
                                      ,ScalarDiffusionIntegrator
                                      ,LinearForm
                                      ,ScalarSourceIntegrator
@@ -13,70 +15,92 @@ from scipy.sparse.linalg import spsolve
 from scipy.integrate import solve_ivp
 from scipy.sparse import csr_matrix,spdiags,hstack,block_diag,bmat,diags
 from sympy import *
-
+from typing import Union
 
 class LogicMesh():
-    def __init__(self , mesh: TriangleMesh):
+    def __init__(self , mesh: Union[TriangleMesh,TetrahedronMesh]) -> None:
         """
         mesh : 物理网格
         """
         self.mesh = mesh
+        self.TD = mesh.top_dimension()
         self.node = mesh.entity('node')
         self.cell = mesh.entity('cell')
         self.edge = mesh.entity('edge')
 
-        self.bdnodeindx = mesh.boundary_node_index()
-        self.bdedgeindx = mesh.boundary_face_index()
+        self.BdNodeidx = mesh.boundary_node_index()
+        self.BdFaceidx = mesh.boundary_face_index()
         # 新网格下没有该方法
-        self.node2edge = TM(self.node, self.cell).ds.node_to_edge()
-
-        self.side_node_idx,\
-        self.vertex_idx,\
-        self.bdtangent = self.get_side_vertex_tangent()
-
-    def __call__(self) :
-        if self.is_convex():
-            logic_mesh = TriangleMesh(self.node.copy(),self.cell) # 更新
+        if self.TD ==2:
+            self.node2edge = TM(self.node, self.cell).ds.node_to_edge()
         else:
-            logic_node = self.get_logic_node()
-            logic_cell = self.cell
-            logic_mesh = TriangleMesh(logic_node,logic_cell)
-        return logic_mesh
+            self.node2face = self.node_to_face()
+        self.local_n2f_norm,self.normal = self.get_basic_information()
+
+    def get_logic_mesh(self) :
+        if self.TD == 2:
+            if self.is_convex():
+                logic_mesh = TriangleMesh(self.node.copy(),self.cell)
+            else:
+                logic_node = self.get_logic_node()
+                logic_cell = self.cell
+                logic_mesh = TriangleMesh(logic_node,logic_cell)
+            return logic_mesh
+        elif self.TD == 3:
+            if not self.is_convex():
+                raise ValueError('非凸多面体无法构建逻辑网格')
+            else:
+                logic_mesh = TetrahedronMesh(self.node.copy(),self.cell)
+            return logic_mesh
     
     def is_convex(self):
         """
         判断边界是否是凸的
         """
-        vertex_idx = self.vertex_idx
-        node = self.node
-        intnode = node[vertex_idx]
-        v0 = bm.roll(intnode,-1,axis=0) - intnode
-        v1 = bm.roll(v0,-1,axis=0) 
-        cross = bm.cross(v0,v1)
-        return bm.all(cross > 0)
+        from scipy.spatial import ConvexHull
+        ln2f_norm = self.local_n2f_norm
+        vertex_idx = self.BdNodeidx[ln2f_norm[:,-1] >= 0]
+        intnode = self.node[vertex_idx]
+        hull = ConvexHull(intnode)
+        return len(intnode) == len(hull.vertices)
+    
+    def node_to_face(self): # 作为三维网格的辅助函数
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        NF = mesh.number_of_faces()
 
-    def get_side_vertex_tangent(self):
+        face = mesh.entity('face')
+        NVF = 3
+        node2face = csr_matrix(
+                (
+                    bm.ones(NVF*NF, dtype=bm.bool),
+                    (
+                        face.flat,
+                        bm.repeat(range(NF), NVF)
+                    )
+                ), shape=(NN, NF))
+        return node2face
+    
+    def sort_bdnode_and_bdface(self):
         """
-        side_node_idx : 每条边界上的节点全局索引的字典
-        vertex_idx : 角点全局索引
-        bdtangent : 每个边界节点的切向
+        对二维边界点和边界面进行排序
         """
-        bdnodeindx = self.bdnodeindx
-        bdedgeindx = self.bdedgeindx   
+        BdNodeidx = self.BdNodeidx
+        BdEdgeidx = self.BdFaceidx 
         node = self.node
         edge = self.edge
         # 对边界边和点进行排序
         node2edge = self.node2edge
-        bdnode2edge = node2edge[bdnodeindx][:,bdedgeindx]
+        bdnode2edge = node2edge[BdNodeidx][:,BdEdgeidx]
         i,j = bm.nonzero(bdnode2edge)
         bdnode2edge = j.reshape(-1,2)
         glob_bdnode2edge = bm.zeros_like(node,dtype=bm.int32)
-        glob_bdnode2edge = bm.set_at(glob_bdnode2edge,bdnodeindx,bdedgeindx[bdnode2edge])
+        glob_bdnode2edge = bm.set_at(glob_bdnode2edge,BdNodeidx,BdEdgeidx[bdnode2edge])
         
         sort_glob_bdedge_idx_list = []
         sort_glob_bdnode_idx_list = []
 
-        start_bdnode_idx = bdnodeindx[0]
+        start_bdnode_idx = BdNodeidx[0]
         sort_glob_bdnode_idx_list.append(start_bdnode_idx)
         current_node_idx = start_bdnode_idx
         
@@ -90,7 +114,7 @@ class LogicMesh():
             # 处理空洞区域
             if next_node_idx == start_bdnode_idx:
                 if i < bdnode2edge.shape[0] - 1:
-                    remian_bdnode_idx = list(set(bdnodeindx)-set(sort_glob_bdnode_idx_list))
+                    remian_bdnode_idx = list(set(BdNodeidx)-set(sort_glob_bdnode_idx_list))
                     start_bdnode_idx = remian_bdnode_idx[0]
                     next_node_idx = start_bdnode_idx
                 else:
@@ -98,45 +122,60 @@ class LogicMesh():
                     break
             sort_glob_bdnode_idx_list.append(next_node_idx)
             current_node_idx = next_node_idx
+        return bm.array(sort_glob_bdnode_idx_list,dtype=bm.int32),\
+               bm.array(sort_glob_bdedge_idx_list,dtype=bm.int32)
+    
+    def get_basic_information(self):
+        """
+        返回逻辑网格的基本信息
+        """
+        BdNodeidx = self.BdNodeidx
+        BdFaceidx = self.BdFaceidx
+        if self.TD == 3:
+            node2face = self.node_to_face()
+        else:
+            mesh = TM(self.node,self.cell)
+            node2face = mesh.ds.node_to_face()
+            BdNodeidx,BdFaceidx = self.sort_bdnode_and_bdface()
+            self.BdNodeidx = BdNodeidx
 
-        sort_glob_bdnode_idx = bm.array(sort_glob_bdnode_idx_list,dtype=bm.int32)
-        # 获得切向
-        bdtangent0 = node[edge[sort_glob_bdedge_idx_list]][:,1,:]\
-                    -node[edge[sort_glob_bdedge_idx_list]][:,0,:]
-        # 单位化
-        norm = bm.linalg.norm(bdtangent0,axis = 1)
-        bdtangent0 /= norm[:,None]
-        # 原排列切向
-        bdtangent = bm.zeros_like(node,dtype=bm.float64)
-        bdtangent = bm.set_at(bdtangent,sort_glob_bdnode_idx,bdtangent0)[bdnodeindx]
+        bd_node2face = node2face[BdNodeidx][:,BdFaceidx]
+        i , j = bm.nonzero(bd_node2face)
 
-        # 获得角点索引
-        vertex_idx = bm.where(bm.sum(bm.abs(bdtangent0 - bm.roll(bdtangent0,1,axis=0)),axis=1)
-                                > 1e-8)[0]
-        side_node_idx = {}
-        num_sides = len(vertex_idx)
-        for i in range(num_sides):
-            if i == num_sides - 1:
-                # 处理最后一个索引，闭环情况
-                side_node_idx[f'side{i}'] = bm.concatenate(
-                    (sort_glob_bdnode_idx[vertex_idx[i]+1:],
-                    sort_glob_bdnode_idx[:vertex_idx[(i+1)%num_sides]]))
+        bdfun = self.mesh.face_unit_normal(index=BdFaceidx[j])
+        normal = bm.unique(bdfun ,axis = 0)
+        K = bm.arange(len(normal),dtype = bm.int32)
+        _,index = bm.unique(i,return_index = True)
+        index = bm.concatenate((index , [j.shape[0]]))
 
+        node2face_normal = -bm.ones((BdNodeidx.shape[0],self.TD),dtype=bm.int32)
+        for n in range(BdNodeidx.shape[0]):
+            b = bm.arange(index[n],index[n+1])
+            lface_normal = bm.unique(bdfun[b],axis = 0)
+            num_of_lface_normal =  lface_normal.shape[0]
+            if num_of_lface_normal == 1:
+                tag = bm.all(normal == lface_normal,axis = 1)@K
+                node2face_normal[n,0] = tag
+            elif num_of_lface_normal == 2:
+                tag = [bm.all(normal == lface_normal[0],axis=1),
+                        bm.all(normal == lface_normal[1],axis=1)]@K
+                node2face_normal[n,:2] = tag
             else:
-                side_node_idx[f'side{i}'] = sort_glob_bdnode_idx[vertex_idx[i]+1:
-                                                vertex_idx[(i+1)%num_sides]]
-        
-        vertex_idx = sort_glob_bdnode_idx[vertex_idx]
-        return side_node_idx,vertex_idx,bdtangent
+                # 无关几个面，只取前三个
+                tag = [bm.all(normal == lface_normal[0],axis=1),
+                        bm.all(normal == lface_normal[1],axis=1),
+                        bm.all(normal == lface_normal[2],axis=1)]@K
+                node2face_normal[n,:3] = tag
+        return node2face_normal,normal
     
     def get_boundary_condition(self,p) -> TensorLike:
         """
-        逻辑网格的边界条件
+        逻辑网格的边界条件,为边界点的集合
         """
         node = self.node
-        side_node_idx = self.side_node_idx
-        vertex_idx = self.vertex_idx
-        physics_domain = node[vertex_idx]
+        local_n2f_norm = self.local_n2f_norm
+        Vertexidx = self.BdNodeidx[local_n2f_norm[:,-1] >= 0]
+        physics_domain = node[Vertexidx]
 
         num_sides = physics_domain.shape[0]
         angles = bm.linspace(0,2*bm.pi,num_sides,endpoint=False)
@@ -144,18 +183,21 @@ class LogicMesh():
         logic_domain = bm.stack([bm.cos(angles),bm.sin(angles)],axis=1)
 
         logic_bdnode = bm.zeros_like(node,dtype=bm.float64)
-        logic_bdnode = bm.set_at(logic_bdnode,vertex_idx,logic_domain)
+        logic_bdnode = bm.set_at(logic_bdnode,Vertexidx,logic_domain)
         
         Pside_length = bm.linalg.norm(bm.roll(physics_domain,-1,axis=0)
                                 - physics_domain,axis=1)
+        BDNN = len(self.BdNodeidx)
+        K = bm.arange(BDNN,dtype=bm.int32)[local_n2f_norm[:,-1] >= 0]
 
         for i in range(num_sides):
-            side_node = node[side_node_idx[f'side{i}']]
+            G = bm.arange(K[i]+1,K[i+1] if i < num_sides-1 else BDNN)
+            side_node = node[self.BdNodeidx[G]]
             side_part_length = bm.linalg.norm(side_node - physics_domain[i]
                                             ,axis=1)
             rate = (side_part_length/Pside_length[i]).reshape(-1,1)
 
-            logic_bdnode = bm.set_at(logic_bdnode,side_node_idx[f'side{i}'],(1-rate)*logic_domain[i]\
+            logic_bdnode = bm.set_at(logic_bdnode,self.BdNodeidx[G],(1-rate)*logic_domain[i]\
                                      + rate*logic_domain[(i+1)%num_sides])
 
         map = []
@@ -177,7 +219,7 @@ class LogicMesh():
         bform.add_integrator(ScalarDiffusionIntegrator(q=p+1))
         A = bform.assembly()
         lform = LinearForm(space)
-        lform.add_integrator(ScalarSourceIntegrator(source=lambda x:0,q=p+1))
+        lform.add_integrator(ScalarSourceIntegrator(source=0,q=p+1))
         F = lform.assembly()
         bc0 = DirichletBC(space = space, gd = lambda p : bdc(p)[:,0])
         bc1 = DirichletBC(space = space, gd = lambda p : bdc(p)[:,1])
@@ -191,7 +233,7 @@ class LogicMesh():
         return logic_node
     
 
-class Harmap_MMPDE():
+class Harmap_MMPDE(LogicMesh):
     def __init__(self, 
                  mesh:TriangleMesh , 
                  uh:TensorLike,
@@ -209,48 +251,40 @@ class Harmap_MMPDE():
         mol_times : 磨光次数
         redistribute : 是否预处理边界节点
         """
-        self.mesh = mesh
+        super().__init__(mesh)
         self.uh = uh
         self.pde = pde
         self.beta = beta
         self.alpha = alpha
         self.mol_times = mol_times
-        self.node = mesh.entity('node')
-        self.cell = mesh.entity('cell')
-
+ 
+        self.NN = mesh.number_of_nodes()
+        self.BDNN = len(self.BdNodeidx)
         self.cm = mesh.entity_measure('cell')
         # 新网格下没有该方法
-        self.node2cell = TM(self.node, self.cell).ds.node_to_cell()
+        if self.TD == 2:
+            self.node2cell = TM(self.node, self.cell).ds.node_to_cell()
+        else:
+            self.node2cell = THM(self.node, self.cell).ds.node_to_cell()
         self.isBdNode = mesh.boundary_node_flag()
         self.redistribute = redistribute
 
         self.W = bm.array([[0,1],[-1,0]],dtype=bm.int32)
         self.localEdge = bm.array([[1,2],[2,0],[0,1]],dtype=bm.int32)
 
-        LM = LogicMesh(mesh)
-        self.logic_mesh = LM()
+        self.logic_mesh = self.get_logic_mesh()
         self.logic_node = self.logic_mesh.entity('node')
-        self.side_node_idx = LM.side_node_idx
-        self.vertex_idx = LM.vertex_idx
-        self.bdtangent = LM.bdtangent
-        self.isconvex = LM.is_convex()
+        self.isconvex = self.is_convex()
 
         self.star_measure,self.i,self.j = self.get_star_measure()
         self.G = self.get_control_function(beta,mol_times)
         self.A , self.b = self.get_linear_constraint()
 
-    def __call__(self):
-        logic_node,vector_field = self.solve()
-        node = self.get_physical_node(vector_field,logic_node)
-        mesh = TriangleMesh(node,self.cell)
-        return mesh
-    
-
     def get_star_measure(self)->TensorLike:
         """
         计算每个节点的星的测度
         """
-        star_measure = bm.zeros_like(self.node[:,0],dtype=bm.float64)
+        star_measure = bm.zeros(self.NN,dtype=bm.float64)
         i,j = bm.nonzero(self.node2cell)
         bm.add_at(star_measure , i , self.cm[j])
         return star_measure,i,j
@@ -309,32 +343,99 @@ class Harmap_MMPDE():
         组装线性约束
         """
         logic_node = self.logic_node
-        side_node_idx = self.side_node_idx
-        vertex_idx = self.vertex_idx
+        NN = self.NN
+        BDNN = self.BDNN
         isBdNode = self.isBdNode
-        LNN = len(self.logic_node)
-        
-        logic_intnode = logic_node[vertex_idx]
-        logic_bdtangent = bm.roll(logic_intnode,-1,axis=0) - logic_intnode
-        logic_bdnormal = logic_bdtangent @ self.W
+        BdNodeidx = self.BdNodeidx
+        local_n2f_norm = self.local_n2f_norm
+        normal = self.normal
+        if self.TD == 2:
+            isBdinnernode = local_n2f_norm[:,1] < 0
+            isVertex = ~isBdinnernode
+            b = bm.zeros(NN,dtype=bm.float64)
+            logic_Bdnode = logic_node[BdNodeidx]
+            b_val0 = bm.sum(logic_Bdnode*
+                            normal[local_n2f_norm[:,0]],axis=1)
+            b_val1 = bm.sum(logic_Bdnode[isVertex]*
+                            normal[local_n2f_norm[isVertex,1]],axis=1)
+            b = bm.set_at(b,BdNodeidx,b_val0)
+            b = bm.concatenate([b[isBdNode],b_val1])
 
-        b = bm.sum(logic_bdnormal * logic_intnode,axis=1)
-        b_bdnode = bm.zeros(LNN , dtype=bm.float64)
-        b_bdnode = bm.set_at(b_bdnode,vertex_idx,b)
-        A1_diag = bm.zeros(LNN , dtype=bm.float64)
-        A2_diag = bm.zeros(LNN , dtype=bm.float64)
-        A1_diag = bm.set_at(A1_diag,vertex_idx,logic_bdnormal[:,0])
-        A2_diag = bm.set_at(A2_diag,vertex_idx,logic_bdnormal[:,1])
+            # 处理排序后的边界节点的顺序错位
+            A1_diag = bm.zeros(NN  , dtype=bm.float64)
+            A2_diag = bm.zeros(NN  , dtype=bm.float64)
+            A1_diag = bm.set_at(A1_diag,BdNodeidx,
+                                normal[local_n2f_norm[:,0]][:,0])[isBdNode]
+            A2_diag = bm.set_at(A2_diag,BdNodeidx,
+                                normal[local_n2f_norm[:,0]][:,1])[isBdNode]
+            A1 = spdiags(A1_diag ,0 , BDNN , BDNN,format='csr')
+            A2 = spdiags(A2_diag ,0 , BDNN , BDNN,format='csr')
 
-        for i in range(len(side_node_idx)):
-            A1_diag = bm.set_at(A1_diag,side_node_idx[f'side{i}'],logic_bdnormal[i,0])
-            A2_diag = bm.set_at(A2_diag,side_node_idx[f'side{i}'],logic_bdnormal[i,1])
-            b_bdnode = bm.set_at(b_bdnode,side_node_idx[f'side{i}'],b[i])
+            VNN = (isVertex).sum()
+            Vbd1_diag = normal[local_n2f_norm[isVertex,1]][:,0]
+            Vbd2_diag = normal[local_n2f_norm[isVertex,1]][:,1]
+            Vbd_constraint1 = bm.zeros((VNN,NN),dtype=bm.float64)
+            Vbd_constraint2 = bm.zeros((VNN,NN),dtype=bm.float64)
+            K = BdNodeidx[isVertex]
+            Vbd_constraint1 = bm.set_at(Vbd_constraint1,
+                                         (bm.arange(VNN),K),Vbd1_diag)
+            Vbd_constraint2 = bm.set_at(Vbd_constraint2,
+                                         (bm.arange(VNN),K),Vbd2_diag)
 
-        A1 = spdiags(A1_diag ,0 , LNN , LNN,format='csr')[isBdNode][:,isBdNode]
-        A2 = spdiags(A2_diag ,0 , LNN , LNN,format='csr')[isBdNode][:,isBdNode]
-        A = hstack([A1,A2])
-        b = b_bdnode[isBdNode]
+            A = bmat([[A1,A2],[Vbd_constraint1[:,isBdNode],
+                               Vbd_constraint2[:,isBdNode]]],format='csr')
+
+        elif self.TD == 3:    
+            # 此处为边界局部信息,非全局
+            isBdinnernode = local_n2f_norm[:,1] < 0
+            isArrisnode = (local_n2f_norm[:,1] >= 0) & (local_n2f_norm[:,2] < 0)
+            isVertex = local_n2f_norm[:,2] >= 0
+
+            logic_Bdnode = logic_node[BdNodeidx]
+            b_val0 = bm.sum(logic_Bdnode*normal[local_n2f_norm[:,0]],axis=1)
+            b_val1 = bm.sum(logic_Bdnode[~isBdinnernode]*
+                            normal[local_n2f_norm[~isBdinnernode,1]],axis=1)
+            b_val2 = bm.sum(logic_Bdnode[isVertex]*
+                            normal[local_n2f_norm[isVertex,2]],axis=1)
+            b = bm.concatenate([b_val0,b_val1,b_val2])
+
+            A1_diag = normal[local_n2f_norm[:,0]][:,0]
+            A2_diag = normal[local_n2f_norm[:,0]][:,1]
+            A3_diag = normal[local_n2f_norm[:,0]][:,2]
+
+            A1 = spdiags(A1_diag ,0 , BDNN , BDNN,format='csr')
+            A2 = spdiags(A2_diag ,0 , BDNN , BDNN,format='csr')
+            A3 = spdiags(A3_diag ,0 , BDNN , BDNN,format='csr')
+            BDBDNN = (~isBdinnernode).sum()
+            K1 = bm.arange(BDNN,dtype=bm.int32)[~isBdinnernode]
+            Bdbd1_diag = normal[local_n2f_norm[~isBdinnernode,1]][:,0]
+            Bdbd2_diag = normal[local_n2f_norm[~isBdinnernode,1]][:,1]
+            Bdbd3_diag = normal[local_n2f_norm[~isBdinnernode,1]][:,2]
+            Bdbd_constraint1 = bm.zeros((BDBDNN,BDNN),dtype=bm.float64)
+            Bdbd_constraint2 = bm.zeros((BDBDNN,BDNN),dtype=bm.float64)
+            Bdbd_constraint3 = bm.zeros((BDBDNN,BDNN),dtype=bm.float64)
+            Bdbd_constraint1 = bm.set_at(Bdbd_constraint1,
+                                         (bm.arange(BDBDNN),K1),Bdbd1_diag)
+            Bdbd_constraint2 = bm.set_at(Bdbd_constraint2,
+                                         (bm.arange(BDBDNN),K1),Bdbd2_diag)
+            Bdbd_constraint3 = bm.set_at(Bdbd_constraint3,
+                                         (bm.arange(BDBDNN),K1),Bdbd3_diag)
+            VNN = isVertex.sum()
+            K2 = bm.arange(BDNN,dtype=bm.int32)[isVertex]
+            Vbd1_diag = normal[local_n2f_norm[isVertex,2]][:,0]
+            Vbd2_diag = normal[local_n2f_norm[isVertex,2]][:,1]
+            Vbd3_diag = normal[local_n2f_norm[isVertex,2]][:,2]
+            Vertex_constraint1 = bm.zeros((VNN,BDNN),dtype=bm.float64)
+            Vertex_constraint2 = bm.zeros((VNN,BDNN),dtype=bm.float64)
+            Vertex_constraint3 = bm.zeros((VNN,BDNN),dtype=bm.float64)
+            Vertex_constraint1 = bm.set_at(Vertex_constraint1,
+                                          (bm.arange(VNN),K2),Vbd1_diag)
+            Vertex_constraint2 = bm.set_at(Vertex_constraint2,
+                                          (bm.arange(VNN),K2),Vbd2_diag)
+            Vertex_constraint3 = bm.set_at(Vertex_constraint3,
+                                          (bm.arange(VNN),K2),Vbd3_diag)
+            A = bmat([[A1,A2,A3],[Bdbd_constraint1,Bdbd_constraint2,Bdbd_constraint3],
+                      [Vertex_constraint1,Vertex_constraint2,Vertex_constraint3]],format='csr')
 
         return A,b 
     
@@ -346,7 +447,6 @@ class Harmap_MMPDE():
         """
         isBdNode = self.isBdNode
         logic_node = self.logic_node
-        vertex_idx = self.vertex_idx
         H11,H12,H21,H22 = self.get_stiff_matrix()
         A,b= self.A,self.b
 
@@ -378,8 +478,6 @@ class Harmap_MMPDE():
                                 bm.stack((move_bdlogic_node[:H22.shape[0]],
                                         move_bdlogic_node[H22.shape[0]:]),axis=1))
 
-        process_logic_node = bm.set_at(process_logic_node , 
-                                       vertex_idx,init_logic_node[vertex_idx])
         vector_field = init_logic_node - process_logic_node  
         return process_logic_node,vector_field
 
@@ -397,16 +495,18 @@ class Harmap_MMPDE():
         grad_x_incell = (A@bm.linalg.inv(B)) * cm[:,None,None]
 
 
-        grad_x = bm.zeros((node.shape[0],2,2),dtype=bm.float64)
+        grad_x = bm.zeros((self.NN,2,2),dtype=bm.float64)
         bm.add_at(grad_x , self.i , grad_x_incell[self.j])
         grad_x /= self.star_measure[:,None,None]
 
         delta_x = (grad_x @ vector_field[:,:,None]  ).reshape(-1,2)
 
-        bdtangent = self.bdtangent
-        isBdNode = self.isBdNode
-        dot = bm.sum(bdtangent * delta_x[isBdNode],axis=1)
-        delta_x[isBdNode] =  dot[:,None] * bdtangent
+        local_n2f_norm = self.local_n2f_norm
+        bdnode_normal = self.normal[local_n2f_norm[:,0]]
+        bdtangent = bdnode_normal @ self.W
+        BdNodeidx = self.BdNodeidx
+        dot = bm.sum(bdtangent * delta_x[BdNodeidx],axis=1)
+        delta_x = bm.set_at(delta_x,BdNodeidx,dot[:,None] * bdtangent)
         # 物理网格点移动距离
         C = (delta_x[cell[:,1:]] - delta_x[cell[:,0,None]]).transpose(0,2,1)
         a = C[:,0,0]*C[:,1,1] - C[:,0,1]*C[:,1,0]
@@ -429,16 +529,22 @@ class Harmap_MMPDE():
         """
         node = self.node
         logic_node = self.logic_node.copy()
-        side_node_idx = self.side_node_idx
-        vertex_idx = self.vertex_idx
+
+        local_n2f_norm = self.local_n2f_norm
+        vertex_idx = self.BdNodeidx[local_n2f_norm[:,-1] >= 0]
+        BDNN = self.BDNN
+        VNN = len(vertex_idx)
+        K = bm.arange(BDNN,dtype=bm.int32)[local_n2f_norm[:,-1] >= 0]
+
         isBdedge = self.mesh.boundary_face_flag()
         node2edge = TM(self.node, self.cell).ds.node_to_edge()
         edge2cell = self.mesh.face_to_cell()
-        for i in range(len(side_node_idx)):
+        for i in range(VNN):
+            G = bm.arange(K[i]+1,K[i+1] if i < VNN-1 else BDNN)
             side_node_idx_bar = bm.concatenate(([vertex_idx[i]],
-                                            side_node_idx[f'side{i}'],
-                                            [vertex_idx[(i+1)%len(side_node_idx)]]))
-            side_node2edge = node2edge[side_node_idx[f'side{i}']][:,isBdedge]
+                                            self.BdNodeidx[G],
+                                            [vertex_idx[(i+1)%VNN]]))
+            side_node2edge = node2edge[self.BdNodeidx[G]][:,isBdedge]
             i,j = bm.nonzero(side_node2edge)
             _,k = bm.unique(j,return_index=True)
             j = j[bm.sort(k)]

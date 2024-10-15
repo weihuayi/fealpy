@@ -1,8 +1,8 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike, Tuple
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.experimental.mesh.uniform_mesh_3d import UniformMesh3d
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Tuple
+from fealpy.sparse import COOTensor
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
 
 from math import ceil, sqrt
 

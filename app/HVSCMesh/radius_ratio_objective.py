@@ -1,8 +1,8 @@
 from scipy.sparse import csr_matrix
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike
-from fealpy.experimental.mesh.opt import SumObjective
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from fealpy.mesh.opt import SumObjective
 
 class RadiusRatioSumObjective(SumObjective):
     def __init__(self, mesh_quality):
@@ -15,7 +15,7 @@ class RadiusRatioSumObjective(SumObjective):
         TD = self.mesh_quality.mesh.TD
 
         if self.mesh_quality.mesh.TD == 2:
-            A,B = self.mesh_quality.jac(x,return_matrix)
+            A,B = self.mesh_quality.hess(x)
             I = bm.broadcast_to(cell[:,:,None],(NC,3,3))
             J = bm.broadcast_to(cell[:,None,:],(NC,3,3))
             A = csr_matrix((A.flat,(I.flat,J.flat)),shape=(NN,NN))
@@ -23,7 +23,7 @@ class RadiusRatioSumObjective(SumObjective):
             return (A,B)
 
         elif self.mesh_quality.mesh.TD == 3:
-            A,B0,B1,B2 = self.mesh_quality.jac(x,return_matrix)
+            A,B0,B1,B2 = self.mesh_quality.hess(x)
             I = bm.broadcast_to(cell[:,:,None],(NC,4,4))
             J = bm.broadcast_to(cell[:,None,:],(NC,4,4))
             A = csr_matrix((A.flat,(I.flat,J.flat)),shape=(NN,NN))

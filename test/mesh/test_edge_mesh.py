@@ -1,98 +1,100 @@
 import numpy as np
-from fealpy.mesh.edge_mesh import EdgeMesh
-from fealpy.quadrature import GaussLegendreQuadrature
 import pytest
 
-def test_init():
-    # Define sample node and cell arrays
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.edge_mesh import EdgeMesh
 
-    # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
-
-    # Test __init__ method
-    assert edge_mesh.node is node
-    assert edge_mesh.itype == cell.dtype
-    assert edge_mesh.ftype == node.dtype
-    assert edge_mesh.meshtype == 'edge'
-    assert edge_mesh.NN == node.shape[0]
-    assert edge_mesh.GD == node.shape[1]
-    assert edge_mesh.nodedata == {}
-    assert edge_mesh.celldata == {}
-
-    # Test geo_dimension method
-    assert edge_mesh.geo_dimension() == 2
-
-    # Test top_dimension method
-    assert edge_mesh.top_dimension() == 1
+from edge_mesh_data import *
 
 
-def test_add_plot():
-    import matplotlib.pyplot as plt
+class TestEdgeMeshInterfaces:
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_mesh_data)
+    def test_init(self, meshdata, backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
 
-    mesh = EdgeMesh.from_tower()
-    mesh.add_plot(plt)
+        mesh = EdgeMesh(node, cell)
+        
+        assert mesh.number_of_nodes() == meshdata["NN"] 
+        assert mesh.number_of_edges() == meshdata["NE"] 
+        assert mesh.number_of_cells() == meshdata["NC"] 
+        
+        cell2node = mesh.cell_to_node()
+        
+        
+        np.testing.assert_array_equal(bm.to_numpy(cell2node), meshdata["cell2node"])
 
-def test_grad_function():
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_mesh_data)
+    def test_edge_tangent(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
 
-    # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
-    bc = np.array([[0.2,0.8]],dtype=np.float_)
-    va = edge_mesh.grad_shape_function(bc,p=1)
-    print(va)
+        mesh = EdgeMesh(node, cell)
+        edge_tangent = mesh.edge_tangent()
+        np.testing.assert_array_equal(bm.to_numpy(edge_tangent), meshdata["edge_tangent"])
 
-def test_entity_measure():
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
 
-    # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
-    a = edge_mesh.entity_measure()
-    print(a)
+    
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_mesh_data)
+    def test_edge_length(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
 
-def test_grad_lambda():
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+        mesh = EdgeMesh(node, cell)
+        edge_length = mesh.edge_length()
+        np.testing.assert_allclose(bm.to_numpy(edge_length), meshdata["edge_length"], atol=1e-14)
+    
 
-    # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
-    val = edge_mesh.grad_lambda()
-    print(val)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_mesh_data)
+    def test_grad_lambda(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
+        mesh = EdgeMesh(node,cell)
+        grad_lambda = mesh.grad_lambda()
+        np.testing.assert_array_equal(bm.to_numpy(grad_lambda), meshdata["grad_lambda"])
 
-def test_interpolation_points():
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+ 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_mesh_data)
+    def test_interpolation_points(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
+        mesh = EdgeMesh(node,cell)
+        interpolation_points = mesh.interpolation_points(p=2)
+        np.testing.assert_array_equal(bm.to_numpy(interpolation_points), meshdata["interpolation_points"])
+        
 
-    # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
-    a = edge_mesh.interpolation_points(p=2)
-    print(a)
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_mesh_data)
+    def test_cell_normal(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell = bm.from_numpy(meshdata['cell'])
+        mesh = EdgeMesh(node,cell)
+        cell_normal = mesh.cell_normal()
+        np.testing.assert_array_equal(bm.to_numpy(cell_normal), meshdata["cell_normal"])
 
-def test_cell_normal():
-    node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-    cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
 
-    # Create EdgeMesh object
-    edge_mesh = EdgeMesh(node, cell)
-    val = edge_mesh.cell_normal()
-    print(val)
-
-'''
 if __name__ == "__main__":
-    # test_add_plot()
-    # test_grad_function()
-    # test_entity_measure()
-    # test_grad_lambda()
-    # test_interpolation_points()
-    # test_cell_normal()
-'''
-node = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
-cell = np.array([[0, 1], [0, 2], [1, 2], [1, 3]], dtype=np.int_)
+   pytest.main(["test_edge_mesh.py"])
 
-# Create EdgeMesh object
-mesh = EdgeMesh(node, cell)
-a = mesh.cell_normal()
-print((a,))
+
+
+
+
+    
+
+
+
+
+
+

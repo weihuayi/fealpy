@@ -1,12 +1,12 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from app.mmpde.harmap_mmpde import Harmap_MMPDE
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TM
 from app.mmpde.harmap_mmpde_data import *
 from sympy import *
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (BilinearForm 
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (BilinearForm 
                                      ,ScalarDiffusionIntegrator
                                      ,LinearForm
                                      ,ScalarSourceIntegrator
@@ -52,8 +52,8 @@ class PDEData():
     
 
 def test_harmap_mmpde(beta , mol_times , redistribute):
-    mesh = mesh_data['from_box']
-    pde = PDEData(function_data['u4'] , x='x',y='y' , D = [0,1,0,1])
+    mesh = mesh_data['from_domain_distmesh']
+    pde = PDEData(function_data['u2'] , x='x',y='y' , D = [0,1,0,1])
     print('Number of points:', mesh.number_of_nodes())
     print('Number of cells:', mesh.number_of_cells())
 
@@ -78,7 +78,11 @@ def test_harmap_mmpde(beta , mol_times , redistribute):
     error0_color = mesh.error(space.function(array = uh0) ,pde.solution,celltype=True)
     error1_color = mesh0.error(space.function(array = uh) ,pde.solution,celltype=True)
 
-    mesh1.show_function(plt,pde.solution(node))
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111, projection='3d')
+    ax1.plot_trisurf(node[:, 0], node[:, 1], pde.solution(node),
+                     triangles = cell, cmap='viridis', 
+                     edgecolor='blue',linewidth=0.2)
     
     fig , axes0 = plt.subplots(1,2)
     mesh2.add_plot(axes0[0])
@@ -89,9 +93,9 @@ def test_harmap_mmpde(beta , mol_times , redistribute):
     plt.show()
     
 if __name__ == '__main__':
-    beta_ = 0.1
+    beta_ = 0.42
     mol_times = 1
-    redistribute = True
+    redistribute = False
     test_harmap_mmpde(beta_ , mol_times , redistribute)
     
 
