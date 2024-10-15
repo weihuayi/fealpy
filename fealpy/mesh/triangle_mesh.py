@@ -479,9 +479,9 @@ class TriangleMesh(SimplexMesh, Plotable):
                     if value.shape == (NC,):  # 分片常数
                         value = bm.concatenate((value[:], value[idx]))
                         options['data'][key] = value
-                    elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
-                        value = bm.concatenate((value, value[idx, :])) 
-                        options['data'][key] = value
+                    #elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
+                    #    value = bm.concatenate((value, value[idx, :])) 
+                    #    options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
                             value = bm.concatenate((value, bm.zeros((nn,), dtype=self.ftype)))

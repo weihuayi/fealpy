@@ -1,111 +1,58 @@
-import numpy as np
-import argparse
-
-import pytest
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import TriangleMesh, QuadrangleMesh
-
+from fealpy.mesh import TetrahedronMesh, HexahedronMesh
 
 from app.fracturex.fracturex.phasefield.main_solver import MainSolver
 from fealpy.utils import timer
+
 import time
+import argparse
 import matplotlib.pyplot as plt
 
-class square_with_circular_notch():
+class square_with_circular_notch_3d():
     def __init__(self):
         """
         @brief 初始化模型参数
         """
         E = 210
         nu = 0.3
-        Gc = 2.7e-3
+        Gc = 5e-4
         l0 = 0.05
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
 
-    def init_quad_mesh(self, n=3):
+    def init_hex_mesh(self, n=3):
         """
         @brief 生成实始网格
         """
-        node = bm.array([
-            [0.0, 0.0],
-            [0.0, 0.5],
-            [0.0, 0.5],
-            [0.0, 1.0],
-            [0.5, 0.0],
-            [0.5, 0.5],
-            [0.5, 1.0],
-            [1.0, 0.0],
-            [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64)
+        pass
 
-        cell = bm.array([
-            [0, 4, 5, 1],
-            [4, 7, 8, 5],
-            [5, 8, 9, 6],
-            [2, 5, 6, 3]], dtype=bm.int64)
-        mesh = QuadrangleMesh(node, cell)
-        mesh.uniform_refine(n=n)
-        return mesh
-    
-
-    def init_tri_mesh(self, n=3):
+    def init_tet_mesh(self, n=3):
         """
         @brief 生成实始网格
         """
-        node = bm.array([
-            [0.0, 0.0],
-            [0.0, 0.5],
-            [0.0, 0.5],
-            [0.0, 1.0],
-            [0.5, 0.0],
-            [0.5, 0.5],
-            [0.5, 1.0],
-            [1.0, 0.0],
-            [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64)
+        pass
 
-        cell = bm.array([
-            [1, 0, 5],
-            [4, 5, 0],
-            [2, 5, 3],
-            [6, 3, 5],
-            [4, 7, 5],
-            [8, 5, 7],
-            [6, 5, 9],
-            [8, 9, 5]], dtype=bm.int32)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n=n)
-        return mesh
-
-    def is_y_force(self):
+    def is_z_force(self):
         """
-        @brief 位移增量条件
+        @brief Dirichlet 边界条件，位移边界条件
         Notes
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
-            5.9e-3, 901)[1:]))
-    
-    def is_x_force(self):
-        """
-        @brief x 方向的力
-        """
-        return bm.linspace(0, 2.2e-2, 2201)
+        return bm.linspace(0, 4e-2, 4001)
 
     def is_force_boundary(self, p):
         """
         @brief 标记位移增量的边界点
         """
-        isDNode = bm.abs(p[..., 1] - 1) < 1e-12 
+        isDNode = bm.abs(p[..., 2] - 10) < 1e-12
         return isDNode
 
     def is_dirchlet_boundary(self, p):
         """
-        @brief 标记边界条件
+        @brief 标记位移加载边界条件，该模型是下边界
         """
-        return bm.abs(p[..., 1]) < 1e-12
+        return np.abs(p[..., 2]) < 1e-12
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -130,8 +77,8 @@ parser.add_argument('--model_type',
         help='有限元方法, 默认为 HybridModel.')
 
 parser.add_argument('--mesh_type',
-        default='tri', type=str,
-        help='网格类型, 默认为 tri.')
+        default='tet', type=str,
+        help='网格类型, 默认为 tet.')
 
 parser.add_argument('--enable_adaptive',
         default=False, type=bool,
@@ -169,16 +116,16 @@ tmr = timer()
 next(tmr)
 start = time.time()
 bm.set_backend(backend)
-model = square_with_circular_notch()
+model = square_with_circular_notch_3d()
 
-if args.mesh_type == 'tri':
-    mesh = model.init_tri_mesh(n=n)
-elif args.mesh_type == 'quad':
-    mesh = model.init_quad_mesh(n=n)
+if args.mesh_type == 'hex':
+    mesh = model.init_hex_mesh(n=n)
+elif args.mesh_type == 'tet':
+    mesh = model.init_tet_mesh(n=n)
 else:
     raise ValueError('Invalid mesh type.')
 
-fname = 'square_with_a_notch_init.vtu'
+fname = 'square_with_a_notch_3d_init.vtu'
 mesh.to_vtk(fname=fname)
 
 
@@ -190,11 +137,8 @@ if enable_adaptive:
     ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
 
 # 拉伸模型边界条件
-ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_y_force(), 'y')
+ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_z_force(), 'z')
 
-# 剪切模型边界条件
-#ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_x_force(), 'x')
-#ms.add_boundary_condition('displacement', 'Dirichlet', model.is_force_boundary, 0, 'y')
 
 # 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
@@ -206,7 +150,7 @@ end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
-with open('results_model1_ada.txt', 'w') as file:
+with open('results_model3d.txt', 'w') as file:
     file.write(f'force: {force}\n, time: {end-start}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
@@ -215,6 +159,6 @@ plt.ylabel('Residual Force')
 plt.title('Changes in Residual Force')
 plt.grid(True)
 plt.legend()
-plt.savefig('model1_force.png', dpi=300)
+plt.savefig('model3d_force.png', dpi=300)
 
 print(f"Time: {end - start}")
