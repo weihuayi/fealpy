@@ -1,1 +1,0 @@
-# Electrical Impedence Tomography (EIT)

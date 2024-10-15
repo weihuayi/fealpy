@@ -80,7 +80,7 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        kwargs = {'dtype': self.ftype}
+        kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 1:
             quad = GaussLegendreQuadrature(q, **kwargs)
         else:

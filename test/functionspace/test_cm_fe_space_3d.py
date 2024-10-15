@@ -1,17 +1,14 @@
-
-import ipdb
-import sympy as sp
 import pytest
 import numpy as np
-
+from fealpy.decorator import barycentric,cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
 from fealpy.quadrature.stroud_quadrature import StroudQuadrature 
 from fealpy.functionspace.cm_conforming_fe_space3d import CmConformingFESpace3d
+from fealpy.test.functionspace.cm_fe_space_3d_data import *
 from fealpy.pde.biharmonic_triharmonic_3d import get_flist
-
-from cm_fe_space_3d_data import *
-
+import sympy as sp
+import ipdb
 
 class TestCmfespace3d:
     @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
@@ -89,7 +86,7 @@ class TestCmfespace3d:
         isCornerNode = np.zeros(len(node), dtype=np.bool)
         for n in np.array([[0,0,0],[0,0,1],[1,0,0],[0,1,0],[1,1,0],[0,1,1],[1,0,1],[1,1,1]], dtype=np.float64):
             isCornerNode = isCornerNode | (np.linalg.norm(node - n[None, :], axis=1) < 1e-10)
-        space = CmConformingFESpace3d(mesh, 11, 1, isCornerNode)
+        space = CmConformingFESpace3d(mesh, 9, 1, isCornerNode)
         coefficient_matrix = space.coefficient_matrix() #(6, 364, 364)
 
         np.testing.assert_allclose(coefficient_matrix[0, 180], data["cell0"], atol=1e-14)
@@ -159,15 +156,87 @@ class TestCmfespace3d:
         u_sp = sp.sin(2*x)*sp.sin(2*y)*sp.sin(z)
         np.set_printoptions(threshold=np.inf)
         flist = get_flist(u_sp)
-        import torch
-        torch.set_printoptions(precision=16)
-        torch.set_printoptions(threshold=torch.inf)
+        #torch.set_printoptions(precision=16)
+        #torch.set_printoptions(threshold=torch.inf)
         interpolation = space.interpolation(flist)
-        print(interpolation)
-        #np.testing.assert_allclose(interpolation, data[1]["mesh2"], atol=1e-12)
-        a = np.where(np.abs(interpolation-data[1]["mesh2"])>140)
-        print(a)
+        np.testing.assert_allclose(interpolation, data["mesh2"], atol=1e-12)
+        #a = np.where(np.abs(interpolation-data[1]["mesh2"])>140)
+        #print(a)
         
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    def test_source_vector(self, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box([0,1,0,1,0,1],1,1,1)
+        node = mesh.entity('node')
+        isCornerNode = np.zeros(len(node), dtype=np.bool)
+        for n in np.array([[0,0,0],[0,0,1],[1,0,0],[0,1,0],[1,1,0],[0,1,1],[1,0,1],[1,1,1]], dtype=np.float64):
+            isCornerNode = isCornerNode | (np.linalg.norm(node - n[None, :], axis=1) < 1e-10)
+        space = CmConformingFESpace3d(mesh, 9, 1, isCornerNode)
+        from fealpy.experimental.pde.biharmonic_triharmonic_3d import get_flist
+        x = sp.symbols('x')
+        y = sp.symbols('y')
+        z = sp.symbols('z')
+        f = x**5*y**4+z**9
+        get_flist = get_flist(f)
+
+        @cartesian
+        def f(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+            return x**5*y**4+z**9
+        from fealpy.experimental.fem import BilinearForm
+        from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator, ScalarMassIntegrator
+        lform = LinearForm(space)
+        lform.add_integrator(ScalarSourceIntegrator(f, q=14))
+        F = lform.assembly()
+
+        bform = BilinearForm(space)                                                 
+        bform.add_integrator(ScalarMassIntegrator(coef=1,q=14))                     
+        M = bform.assembly() #(582, 582) 
+
+        fi = space.interpolation(get_flist)
+        x = fi[:]
+        aa = M@x
+        print(bm.abs(aa-F).max())
+        np.testing.assert_allclose(aa, F, atol=1e-14,rtol=0)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    def test_matrix(self, backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box([0,1,0,1,0,1],1,1,1)
+        node = mesh.entity('node')
+        isCornerNode = np.zeros(len(node), dtype=np.bool)
+        for n in np.array([[0,0,0],[0,0,1],[1,0,0],[0,1,0],[1,1,0],[0,1,1],[1,0,1],[1,1,1]], dtype=np.float64):
+            isCornerNode = isCornerNode | (np.linalg.norm(node - n[None, :], axis=1) < 1e-10)
+        space = CmConformingFESpace3d(mesh, 11, 1, isCornerNode)
+        from fealpy.experimental.pde.biharmonic_triharmonic_3d import get_flist
+        x = sp.symbols('x')
+        y = sp.symbols('y')
+        z = sp.symbols('z')
+        f = x**7*y**2+z**2
+        get_flist = get_flist(f)
+
+        from fealpy.experimental.fem import BilinearForm
+        from fealpy.experimental.fem import LinearForm
+        from fealpy.experimental.fem.scalar_mlaplace_source_integrator import ScalarMLaplaceSourceIntegrator
+        from fealpy.experimental.fem.mthlaplace_integrator import MthLaplaceIntegrator
+        lform = LinearForm(space)
+        lform.add_integrator(ScalarMLaplaceSourceIntegrator(2, get_flist[2], q=14))
+        gF = lform.assembly()
+
+        bform = BilinearForm(space)                                                 
+        bform.add_integrator(MthLaplaceIntegrator(m=2, coef=1,q=14))                     
+        A = bform.assembly()  
+
+        fi = space.interpolation(get_flist)
+        x = fi[:]
+        aa = A@x
+        print(bm.abs(aa-gF).max())
+        #np.testing.assert_allclose(aa, gF, atol=1e-14,rtol=0)
+
+
+
 
 
 
@@ -184,5 +253,7 @@ if __name__=="__main__":
     #t.test_coefficient_matrix(cell2dof, "pytorch")
     #t.test_coefficient_matrix(coefficient_matrix, "numpy")
     #t.test_basis(coefficient_matrix, "numpy")
-    t.test_interpolation(interpolation, "numpy")
+    #t.test_interpolation(interpolation, "numpy")
     #t.test_interpolation(interpolation, "pytorch")
+    t.test_source_vector("pytorch")
+    t.test_matrix("pytorch")

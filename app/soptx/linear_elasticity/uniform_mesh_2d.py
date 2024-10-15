@@ -73,10 +73,10 @@ nx, ny = args.nx, args.ny
 extent = pde.domain()
 h = [(extent[1] - extent[0]) / nx, (extent[3] - extent[2]) / ny]
 origin = [extent[0], extent[2]]
-mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
-                    ipoints_ordering='nec')
+# mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
+#                     ipoints_ordering='nec')
 
-# mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
+mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
 # axes = fig.add_subplot(111)
