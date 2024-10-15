@@ -27,15 +27,9 @@ def normal_strain(gphi: TensorLike, indices: TensorLike, *, out:
         if out.shape != new_shape:
             raise ValueError(f'out.shape={out.shape} != {new_shape}')
 
-    # TODO: Provide a unified implementation that is not backend-specific
-    if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        for i in range(GD):
-            out[..., i, indices[:, i]] = gphi[..., :, i]
-    elif bm.backend_name == 'jax':
-        for i in range(GD):
-            out = out.at[..., i, indices[:, i]].set(gphi[..., :, i])
-    else:
-        raise NotImplementedError("Backend is not yet implemented.")
+    for i in range(GD):
+        out = bm.set_at(out, (..., i, indices[:, i]), gphi[..., :, i])
+        # out[..., i, indices[:, i]] = gphi[..., :, i]
 
     return out
 
@@ -67,20 +61,26 @@ def shear_strain(gphi: TensorLike, indices: TensorLike, *, out:
 
     cursor = 0
 
-    # TODO: Provide a unified implementation that is not backend-specific
-    if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        for i in range(0, GD-1):
-            for j in range(i+1, GD):
-                out[..., cursor, indices[:, i]] = gphi[..., :, j]
-                out[..., cursor, indices[:, j]] = gphi[..., :, i]
-                cursor += 1
-    elif bm.backend_name == 'jax':
-        for i in range(0, GD-1):
-            for j in range(i+1, GD):
-                out = out.at[..., cursor, indices[:, i]].set(gphi[..., :, j])
-                out = out.at[..., cursor, indices[:, j]].set(gphi[..., :, i])
-                cursor += 1
-    else:
-        raise NotImplementedError("Backend is not yet implemented.")
+    for i in range(0, GD-1):
+        for j in range(i+1, GD):
+            out = bm.set_at(out, (..., cursor, indices[:, i]), gphi[..., :, j])
+            out = bm.set_at(out, (..., cursor, indices[:, j]), gphi[..., :, i])
+            cursor += 1
+
+    # # TODO: Provide a unified implementation that is not backend-specific
+    # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+    #     for i in range(0, GD-1):
+    #         for j in range(i+1, GD):
+    #             out[..., cursor, indices[:, i]] = gphi[..., :, j]
+    #             out[..., cursor, indices[:, j]] = gphi[..., :, i]
+    #             cursor += 1
+    # elif bm.backend_name == 'jax':
+    #     for i in range(0, GD-1):
+    #         for j in range(i+1, GD):
+    #             out = out.at[..., cursor, indices[:, i]].set(gphi[..., :, j])
+    #             out = out.at[..., cursor, indices[:, j]].set(gphi[..., :, i])
+    #             cursor += 1
+    # else:
+    #     raise NotImplementedError("Backend is not yet implemented.")
 
     return out

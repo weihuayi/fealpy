@@ -1,12 +1,12 @@
 
+from ..backend import backend_manager as bm
 from .quadrature import Quadrature
-from .quadrature import backend_manager as bm
 
 # http://keisan.casio.com/exec/system/1280624821
 
 class GaussLegendreQuadrature(Quadrature):
     def make(self, index: int):
-        kwargs = {'dtype': bm.float64}
+        kwargs = {'dtype': bm.float64, 'device': self.device}
         if index == 1:
             A = bm.tensor([[0.0, 2.0]], **kwargs)
         elif index == 2:

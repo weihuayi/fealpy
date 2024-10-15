@@ -80,7 +80,7 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        kwargs = {'dtype': self.ftype}
+        kwargs = {'dtype': self.ftype, 'device': self.device}
         if etype == 1:
             quad = GaussLegendreQuadrature(q, **kwargs)
         else:
@@ -241,11 +241,12 @@ class IntervalMesh(SimplexMesh,Plotable):
         c1 = bm.arange(1,nx+1)
         cell = bm.stack([c0 , c1] , axis=1)
         return cls(node, cell)
-    
+
     @classmethod
-    def from_mesh_boundary(cls, mesh):
+    def from_mesh_boundary(cls, mesh, /):
         assert mesh.top_dimension() == 2
         itype = mesh.itype
+        device = mesh.device
         is_bd_node = mesh.boundary_node_flag()
         is_bd_face = mesh.boundary_face_flag()
         node = mesh.entity('node', index=is_bd_node)
@@ -253,8 +254,8 @@ class IntervalMesh(SimplexMesh,Plotable):
         NN = mesh.number_of_nodes()
         NN_bd = node.shape[0]
 
-        I = bm.zeros((NN, ), dtype=itype)
-        bm.set_at(I, is_bd_node, bm.arange(NN_bd, dtype=itype))
+        I = bm.zeros((NN, ), dtype=itype, device=device)
+        bm.set_at(I, is_bd_node, bm.arange(NN_bd, dtype=itype, device=device))
         face2bdnode = I[face]
         return cls(node=node, cell=face2bdnode)
 

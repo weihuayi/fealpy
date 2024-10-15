@@ -37,13 +37,13 @@ class EdgeMesh(SimplexMesh, Plotable):
         @brief 返回第 k 个高斯积分公式。
         """
         from ..quadrature import GaussLegendreQuadrature
-        return GaussLegendreQuadrature(q)
-    
+        return GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
+
     def edge_tangent(self,index = None):
         edge = self.entity('edge', index=index)
         node = self.entity('node')
         return bm.edge_tangent(edge, node)
-    
+
     def edge_length(self, index=None):
         """
         @brief 计算边的长度

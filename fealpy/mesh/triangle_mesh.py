@@ -63,19 +63,18 @@ class TriangleMesh(SimplexMesh, Plotable):
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
-        from ..quadrature import TriangleQuadrature
-        from ..quadrature import GaussLegendreQuadrature
-
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        kwargs = {'dtype': self.ftype}
+        kwargs = {'dtype': self.ftype, 'device': self.device}
+
         if etype == 2:
             from ..quadrature.stroud_quadrature import StroudQuadrature
-            if q>9:
+            if q > 9:
                 quad = StroudQuadrature(2, q)
             else:
                 quad = TriangleQuadrature(q, **kwargs)
         elif etype == 1:
+            from ..quadrature import GaussLegendreQuadrature
             quad = GaussLegendreQuadrature(q, **kwargs)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
@@ -1103,9 +1102,8 @@ class TriangleMesh(SimplexMesh, Plotable):
     ## @ingroup MeshGenerators
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, *, threshold=None,
-                 dtype=None, device=None):
-        """
-        Generate a triangle mesh for a box domain .
+                 itype=None, ftype=None, device=None):
+        """Generate a triangle mesh for a box domain.
 
         @param box
         @param nx Number of divisions along the x-axis (default: 10)
@@ -1113,18 +1111,19 @@ class TriangleMesh(SimplexMesh, Plotable):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TriangleMesh instance
         """
-        if dtype is None:
-            dtype = bm.float64
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
 
         NN = (nx + 1) * (ny + 1)
-        NC = nx * ny
-        x = bm.linspace(box[0], box[1], nx+1, dtype=dtype, device=device)
-        y = bm.linspace(box[2], box[3], ny+1, dtype=dtype, device=device)
+        x = bm.linspace(box[0], box[1], nx+1, dtype=ftype, device=device)
+        y = bm.linspace(box[2], box[3], ny+1, dtype=ftype, device=device)
         X, Y = bm.meshgrid(x, y, indexing='ij')
 
         node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1)), axis=1)
 
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, dtype=itype, device=device).reshape(nx + 1, ny + 1)
         cell0 = bm.concatenate((
             idx[1:, 0:-1].T.reshape(-1, 1),
             idx[1:, 1:].T.reshape(-1, 1),
@@ -1141,33 +1140,37 @@ class TriangleMesh(SimplexMesh, Plotable):
             bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
             isDelCell = threshold(bc)
             cell = cell[~isDelCell]
-            isValidNode = bm.zeros(NN, dtype=bm.bool)
-            isValidNode[cell] = True
+            isValidNode = bm.zeros(NN, dtype=bm.bool, device=device)
+            isValidNode = bm.set_at(isValidNode, cell, True)
             node = node[isValidNode]
-            idxMap = bm.zeros(NN, dtype=cell.dtype)
-            idxMap[isValidNode] = bm.arange(isValidNode.sum())
+            idxMap = bm.zeros(NN, dtype=itype, device=device)
+            idxMap = bm.set_at(
+                idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=itype, device=device)
+            )
             cell = idxMap[cell]
 
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_unit_sphere_surface(cls, refine=0, *, dtype=None, device=None):
-        """
-        @brief  Generate a triangular mesh on a unit sphere surface.
-        @return the triangular mesh.
-        """
+    def from_unit_sphere_surface(cls, refine=0, *, itype=None, ftype=None, device=None):
+        """Generate a triangular mesh on a unit sphere surface."""
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
         t = (bm.sqrt(bm.tensor(5)) - 1) / 2
         node = bm.array([
             [0, 1, t], [0, 1, -t], [1, t, 0], [1, -t, 0],
             [0, -1, -t], [0, -1, t], [t, 0, 1], [-t, 0, 1],
-            [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=bm.float64)
+            [t, 0, -1], [-t, 0, -1], [-1, t, 0], [-1, -t, 0]], dtype=ftype, device=device)
         cell = bm.array([
             [6, 2, 0], [3, 2, 6], [5, 3, 6], [5, 6, 7],
             [6, 0, 7], [3, 8, 2], [2, 8, 1], [2, 1, 0],
             [0, 1, 10], [1, 9, 10], [8, 9, 1], [4, 8, 3],
             [4, 3, 5], [4, 5, 11], [7, 10, 11], [0, 10, 7],
-            [4, 11, 9], [8, 4, 9], [5, 7, 11], [10, 9, 11]], dtype=bm.int32)
+            [4, 11, 9], [8, 4, 9], [5, 7, 11], [10, 9, 11]], dtype=itype, device=device)
         mesh = cls(node, cell)
         mesh.uniform_refine(refine)
         node = mesh.node
@@ -1180,14 +1183,14 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_ellipsoid(cls, radius=[9, 3, 1], refine=0, *, dtype=None, device=None):
+    def from_ellipsoid(cls, radius=[9, 3, 1], refine=0, *, itype=None, ftype=None, device=None):
         """
         a: 椭球的长半轴
         b: 椭球的中半轴
         c: 椭球的短半轴
         """
         a, b, c = radius
-        mesh = TriangleMesh.from_unit_sphere_surface()
+        mesh = TriangleMesh.from_unit_sphere_surface(itype=itype, ftype=ftype, device=device)
         mesh.uniform_refine(refine)
         node = mesh.node
         cell = mesh.entity('cell')
@@ -1195,13 +1198,12 @@ class TriangleMesh(SimplexMesh, Plotable):
         node[:, 1]*=b 
         node[:, 2]*=c
         return cls(node, cell)
-    
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_ellipsoid_surface(
         cls, ntheta=10, nphi=10, radius=(1, 1, 1), theta=None, phi=None,
-        returnuv=False, *, dtype=None, device=None
-        ):
+        returnuv=False, *, itype=None, ftype=None, device=None):
         """
         @brief 给定椭球面的三个轴半径 radius=(a, b, c)，以及天顶角 theta 的范围,
         生成相应带状区域的三角形网格
@@ -1285,6 +1287,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         concat = bm.concat
         mesh = uniform_mesh_2d
+        device = mesh.device
 
         iCellNodeIndex, cutNode, auxNode, isInterfaceCell = mesh.find_interface_node(phi)
         nonInterfaceCellIndex = bm.nonzero(~isInterfaceCell)[0]
@@ -1298,7 +1301,8 @@ class TriangleMesh(SimplexMesh, Plotable):
             axis = 0
         )
         dt = Delaunay(bm.to_numpy(interfaceNode))
-        tri = bm.from_numpy(dt.simplices) # TODO: tri = bm.device_put(tri, mesh.device)
+        tri = bm.from_numpy(dt.simplices)
+        tri = bm.device_put(tri, device)
         del dt, interfaceNode # 释放内存
         # 如果 3 个顶点至少有一个是切点（不都在前 NI 个里），则纳入考虑
         NI = iCellNodeIndex.shape[0]
@@ -1307,7 +1311,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         # 把顶点在 Delaunay 内的编号，转换为整个三角形内的编号
         interfaceNodeIdx = concat(
             [bm.astype(iCellNodeIndex, dtype=mesh.itype),
-             NN + bm.arange(cutNode.shape[0] + auxNode.shape[0], dtype=mesh.itype)],
+             NN + bm.arange(cutNode.shape[0] + auxNode.shape[0], dtype=mesh.itype, device=device)],
             axis = 0
         )
         tri = interfaceNodeIdx[tri]

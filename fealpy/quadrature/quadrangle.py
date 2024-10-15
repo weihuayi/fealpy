@@ -1,5 +1,5 @@
 
-from .quadrature import backend_manager as bm
+from ..backend import backend_manager as bm
 from .gauss_legendre import GaussLegendreQuadrature
 
 
