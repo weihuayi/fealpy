@@ -42,6 +42,9 @@ class MemoryDataset(Dataset):
             _preloader = _tqdm(_preloader, desc=f"Loading", unit=f'sample')
 
         for sample_id, pair in enumerate(_preloader):
+            if not isinstance(pair, tuple):
+                pair = (pair,)
+
             if not self._header_data_read: # the first data
                 for col in pair: # check the shape of the first data
                     self.data.append(torch.empty((NUM, *col.shape), dtype=col.dtype, **kwargs))
@@ -50,10 +53,17 @@ class MemoryDataset(Dataset):
             for col_id, col in enumerate(pair):
                 self.data[col_id][sample_id].copy_(col, non_blocking=True)
 
+    def __len__(self) -> int:
+        return len(self.data[0])
+
     def __getitem__(self, index) -> Tuple[Tensor, Tensor]:
+        if len(self.data) == 1:
+            return self.data[0][index]
         return tuple(col[index] for col in self.data)
 
     def __getitems__(self, indices) -> Tuple[Tensor, Tensor]:
+        if len(self.data) == 1:
+            return self.data[0][indices]
         return tuple(col[indices] for col in self.data)
 
     def loader(self, batch_size: int, drop_last=False):
