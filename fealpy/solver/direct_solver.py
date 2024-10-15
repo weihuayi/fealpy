@@ -1,6 +1,7 @@
 
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor, CSRTensor
+import numpy as np
 
 def _mumps_solve(A, b):
     """Solve a linear system using MUMPS.
@@ -13,6 +14,7 @@ def _mumps_solve(A, b):
         Tensor: The solution of the linear system.
 
     Note:
+        The matrix `A` must be on the CPU.
         This function requires the `mumps` package to be installed.
         A simple way to install it is
         ```
@@ -22,9 +24,7 @@ def _mumps_solve(A, b):
     """
     from mumps import DMumpsContext
     from scipy.sparse import coo_matrix
-
-    A = coo_matrix((bm.to_numpy(A.values()), bm.to_numpy(A.indices())), 
-                   shape = A.sparse_shape)
+    A = A.to_scipy()
     x = bm.to_numpy(b).copy()
 
     ctx = DMumpsContext()
@@ -51,8 +51,38 @@ def _scipy_solve(A, b):
 
     A = csr_matrix((bm.to_numpy(A.values()), bm.to_numpy(A.indices())), 
                    shape = A.sparse_shape)
-    x = bm.to_numpy(b).copy()
+    b = bm.to_numpy(b)
     return spsol(A, b)
+
+def _to_cupy_data(A, b):
+    """Convert the input tensors to cupy tensors.
+
+    Parameters:
+        A(COOTensor | CSRTensor): The matrix of the linear system.
+        b(Tensor): The right-hand side.
+
+    Returns:
+        Tuple: The converted tensors.
+    """
+    import cupy as cp
+    if isinstance(A.indices(), np.ndarray): # numpy backend
+        A =  A.to_scipy() 
+        A = cp.sparse.csr_matrix(A.astype(cp.float64))
+    elif A.indices().device.type == "cpu": # torch backend
+        A = A.device_put("cuda")
+        indices = cp.from_dlpack(A.indices())
+        data = cp.from_dlpack(A.values())
+        A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
+    else:
+        indices = cp.from_dlpack(A.indices())
+        data = cp.from_dlpack(A.values())
+        A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
+    if isinstance(b, np.ndarray) or b.device.type == "cpu":
+        b = bm.to_numpy(b)
+        b = cp.array(b)
+    else:
+        b = cp.from_dlpack(b)
+    return A, b
 
 def _cupy_solve(A, b):
     """Solve a linear system using cupy.
@@ -67,12 +97,11 @@ def _cupy_solve(A, b):
     import cupy as cp
     from cupyx.scipy.sparse.linalg import spsolve as spsol
 
-    indices = cp.from_dlpack(A.indices())
-    data = cp.from_dlpack(A.values())
-
-    A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
-    b = cp.from_dlpack(b) 
+    iscpu = isinstance(b, np.ndarray) or b.device.type == "cpu"
+    A, b = _to_cupy_data(A, b)
     x = spsol(A,b)
+    if iscpu:
+        x = cp.asnumpy(x)
     return x
 
 def spsolve(A:[COOTensor, CSRTensor], b, solver:str="mumps"):
