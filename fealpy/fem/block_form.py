@@ -39,8 +39,10 @@ class BlockForm(Form):
         for j in range(self.ncols):
             block = self.blocks[0][j]
             if block is not None:
+                print(block._spaces)
                 indices = bm.empty((2, 0), dtype=block.space.mesh.itype)
                 values = bm.empty((0,), dtype=block.space.mesh.ftype)
+                break
         sparse_shape = self.shape
         
         for i in range(self.nrows):
@@ -48,13 +50,13 @@ class BlockForm(Form):
                 block = self.blocks[i][j]
                 if block is None:
                     continue
-                ## 不用assemble的方法
                 block_matrix = block.assembly().tocoo()
                 block_indices = block_matrix.indices() + bm.array([[row_offset[i]], [col_offset[j]]])
                 block_values = block_matrix.values() 
                 indices = bm.concatenate((indices, block_indices), axis=1)
                 values = bm.concatenate((values, block_values))
         M = COOTensor(indices, values, sparse_shape) 
+        
         if format == 'csr':
             self._M = M.coalesce().tocsr()
         elif format == 'coo':

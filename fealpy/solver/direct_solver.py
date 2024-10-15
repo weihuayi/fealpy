@@ -28,10 +28,8 @@ def _mumps_solve(A, b):
     """
     from mumps import DMumpsContext
 
-    NN = len(b)
     ctx = DMumpsContext()
     ctx.set_silent()
-    ctx.set_centralized_assembled(I+1, J+1, data)
     ctx.set_centralized_sparse(A)
 
     x = b.copy()
@@ -59,7 +57,7 @@ def _cupy_solve(A, b):
     @return     The solution of the linear system.
     """
     import cupy as cp
-    from cupyx.scipy.sparse.linalg import spsolve
+    from cupyx.scipy.sparse.linalg import spsolve as spsol
 
     A = cp.sparse.csr_matrix(A.astype(cp.float64))
     b = cp.array(b, dtype=b.dtype)
