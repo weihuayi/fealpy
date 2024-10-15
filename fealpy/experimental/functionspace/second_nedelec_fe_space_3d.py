@@ -39,7 +39,10 @@ class NedelecDof():
         e2ld[0][0] += ldof//2
         e2ld[0][-1] += ldof//2
 
-        e2ld[1] = bm.where(multiindex[:, 1]==0)[0][::-1]
+        #e2ld[1] = bm.where(multiindex[:, 1]==0)[0][::-1]
+        array = bm.where(multiindex[:, 1]==0)[0]
+        e2ld[1] =  bm.flip(array)
+
         e2ld[1][-1] += ldof//2
 
         e2ld[2], = bm.where(multiindex[:, 2]==0)
@@ -406,8 +409,9 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # 面内部的标量自由度
         fDofIdx, = bm.where(bm.all(self.dof.multiindex2!=0, axis=-1)) 
         n2fe = bm.array([[(i+1)%3, (i+2)%3] for i in range(3)])
-        n2dof = e2fdof[n2fe[:, ::-1], [[0, -1]]] 
-
+        #n2dof = e2fdof[n2fe[:, ::-1], [[0, -1]]]
+        array =  bm.flip(n2fe, axis=1)
+        n2dof = e2fdof[array, [[0, -1]]]
         sdof = fdof//2
         for i in range(4):
             # 面内部的自由度
