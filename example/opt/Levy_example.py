@@ -10,24 +10,24 @@ device = 'cuda'
 import time
 start_time = time.perf_counter()
 
-n = 1000000
-num = 10
+n = 500000
+num = 100
 iter_num = 1
 
-L = bm.zeros([1 + n * iter_num, 2, num], device=device)
-B = bm.zeros([1 + n * iter_num, 2, num], device=device)
-L[0, :] = L[0, :, :] + 10
-B[0, :] = B[0, :, :] + 10
+L = bm.zeros(1 + n * iter_num, 2, num, device=device)
+B = bm.zeros(1 + n * iter_num, 2, num, device=device)
+L[0, :, :] = L[0, :, :] + 10
+B[0, :, :] = B[0, :, :] + 10
 
 for i in range(iter_num):
-    randn_steps = bm.random.randn([n, 2, num], device=device)
+    bround_steps = bm.random.randn(n, 2, num, device=device)
     levy_steps = levy(n, 2, 1.5, num, device)
 
     levy_steps_tensor = bm.array(levy_steps, device=device, dtype=bm.float32)
-    randn_steps_tensor = bm.array(randn_steps, device=device, dtype=bm.float32)
+    bround_steps_tensor = bm.array(bround_steps, device=device, dtype=bm.float32)
 
-    L[n * i : (i + 1) * n, :, :] = bm.cumsum(levy_steps_tensor, dim=0) + 10
-    B[n * i : (i + 1) * n, :, :] = bm.cumsum(randn_steps_tensor, dim=0) + 10
+    L[n * i : (i + 1) * n, :, :] = bm.cumsum(levy_steps_tensor, axis=0)
+    B[n * i : (i + 1) * n, :, :] = bm.cumsum(bround_steps_tensor, axis=0)
 
 end_time = time.perf_counter()
 running_time = end_time - start_time
