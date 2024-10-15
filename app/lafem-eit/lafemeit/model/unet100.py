@@ -123,7 +123,7 @@ class EITModel(nn.Module):
     __call__: Callable[[Tensor], Tensor]
 
 
-def build_model(
+def build_eit_model(
         name: str,
         ext: int,
         n_channel: int, *,
@@ -175,4 +175,4 @@ def build_model(
 
 
 if __name__ == "__main__":
-    build_model('cpu', '')
+    build_eit_model('cpu', '')

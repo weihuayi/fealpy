@@ -15,6 +15,15 @@ Index = Union[int, Tensor, Sequence[int], slice]
 
 _S = slice(None, None, None)
 
+__all__ = [
+    'Fractional',
+    'FractionalWithHighcut',
+    'MultiChannelFractional',
+    'RegressiveFractional',
+    'EigenNorm',
+    'StackedFractional',
+    'RegressiveLoss'
+]
 
 class _EigenvalueBase(Module):
     n_dofs: int
