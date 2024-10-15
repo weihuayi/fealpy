@@ -32,7 +32,7 @@ class TestDirectSolver:
         return A, x, b
 
     @pytest.mark.parametrize('backend', ['numpy', 'pytorch'])
-    @pytest.mark.parametrize('solver_type', ['scipy', 'mumps'])
+    @pytest.mark.parametrize('solver_type', ['scipy', 'mumps', 'cupy'])
     def test_cpu(self, backend, solver_type):
         bm.set_backend(backend)
         solver = lambda A, b: spsolve(A, b, solver_type)
@@ -51,14 +51,15 @@ class TestDirectSolver:
         print("Pytorch GPU test passed!")
 
 if __name__ == '__main__':
-    #test0 = TestDirectSolver(solver_type='scipy')
-    #test0.test_cpu()
+    #test = TestDirectSolver()
+    #test.test_cpu('numpy', 'scipy')
+    #test.test_cpu('numpy', 'mumps')
+    #test.test_cpu('numpy', 'cupy')
+    #test.test_gpu()
 
     #test1 = TestDirectSolver(solver_type='mumps')
     #test1.test_cpu()
 
-    #test2 = TestDirectSolver(solver_type='cupy')
-    #test2.test_gpu()
     pytest.main(['test_cpu', "-q"])   
     pytest.main(['test_gpu', "-q"])   
 
