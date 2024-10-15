@@ -136,7 +136,7 @@ p = args.degree
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 4
+maxit = 3
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
