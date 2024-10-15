@@ -14,10 +14,10 @@ class TestDirectSolver:
         return residual < tolerance
 
     def _get_cpu_data(self):
-        A = sp.rand(100, 100, density=0.1)  # 随机生成一个稀疏矩阵
-        A = A + sp.eye(100)  # 保证矩阵非奇异
+        A = sp.rand(10, 10, density=0.3)  # 随机生成一个稀疏矩阵
+        A = A + sp.eye(10)  # 保证矩阵非奇异
         A = A.tocoo()
-        x = np.random.rand(100)
+        x = np.random.rand(10)
         b = A.dot(x)
 
         A = COOTensor.from_scipy(A)
@@ -32,7 +32,7 @@ class TestDirectSolver:
         return A, x, b
 
     @pytest.mark.parametrize('backend', ['numpy', 'pytorch'])
-    @pytest.mark.parametrize('solver_type', ['scipy', 'mumps'])
+    @pytest.mark.parametrize('solver_type', ['scipy', 'mumps', 'cupy'])
     def test_cpu(self, backend, solver_type):
         bm.set_backend(backend)
         solver = lambda A, b: spsolve(A, b, solver_type)
@@ -51,14 +51,15 @@ class TestDirectSolver:
         print("Pytorch GPU test passed!")
 
 if __name__ == '__main__':
-    #test0 = TestDirectSolver(solver_type='scipy')
-    #test0.test_cpu()
+    test = TestDirectSolver()
+    #test.test_cpu('numpy', 'scipy')
+    #test.test_cpu('numpy', 'mumps')
+    #test.test_cpu('numpy', 'cupy')
+    #test.test_gpu()
 
     #test1 = TestDirectSolver(solver_type='mumps')
     #test1.test_cpu()
 
-    #test2 = TestDirectSolver(solver_type='cupy')
-    #test2.test_gpu()
     pytest.main(['test_cpu', "-q"])   
     pytest.main(['test_gpu', "-q"])   
 
