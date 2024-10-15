@@ -70,7 +70,11 @@ class TriangleMesh(SimplexMesh, Plotable):
             etype = estr2dim(self, etype)
         kwargs = {'dtype': self.ftype}
         if etype == 2:
-            quad = TriangleQuadrature(q, **kwargs)
+            from ..quadrature.stroud_quadrature import StroudQuadrature
+            if q>9:
+                quad = StroudQuadrature(2, q)
+            else:
+                quad = TriangleQuadrature(q, **kwargs)
         elif etype == 1:
             quad = GaussLegendreQuadrature(q, **kwargs)
         else:
