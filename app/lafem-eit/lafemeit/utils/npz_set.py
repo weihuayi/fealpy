@@ -16,6 +16,33 @@ from torch.utils.data import Dataset
 ArrayFunction = Callable[[NDArray[Any]], NDArray[Any]]
 
 
+class NPYDataset(Dataset):
+    def __init__(self, folder: str, names: Sequence[str]) -> None:
+        super().__init__()
+        self.folder = folder
+        self.names = names
+
+    def __len__(self) -> int:
+        return len(self.names)
+
+    def read_data(self, file_name: str):
+        data = np.load(os.path.join(self.folder, file_name + ".npy"))
+        return torch.from_numpy(data)
+
+    def __getitem__(self, index: int):
+        return self.read_data(self.names[index])
+
+    def read_batch(self, names: Sequence[str]):
+        return [self.read_data(name) for name in names]
+
+    def __getitems__(self, indices: Sequence[int]):
+        samples = []
+        for index in indices:
+            sample = self.read_data(self.names[index])
+            samples.append(sample)
+        return torch.stack(samples, dim=0)
+
+
 class NPZDataset(Dataset):
     path: str
     names_seq: Sequence
