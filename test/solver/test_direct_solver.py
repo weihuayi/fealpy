@@ -14,10 +14,10 @@ class TestDirectSolver:
         return residual < tolerance
 
     def _get_cpu_data(self):
-        A = sp.rand(100, 100, density=0.1)  # 随机生成一个稀疏矩阵
-        A = A + sp.eye(100)  # 保证矩阵非奇异
+        A = sp.rand(10, 10, density=0.3)  # 随机生成一个稀疏矩阵
+        A = A + sp.eye(10)  # 保证矩阵非奇异
         A = A.tocoo()
-        x = np.random.rand(100)
+        x = np.random.rand(10)
         b = A.dot(x)
 
         A = COOTensor.from_scipy(A)
@@ -51,7 +51,7 @@ class TestDirectSolver:
         print("Pytorch GPU test passed!")
 
 if __name__ == '__main__':
-    #test = TestDirectSolver()
+    test = TestDirectSolver()
     #test.test_cpu('numpy', 'scipy')
     #test.test_cpu('numpy', 'mumps')
     #test.test_cpu('numpy', 'cupy')
