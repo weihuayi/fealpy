@@ -186,6 +186,9 @@ class CSRTensor(SparseTensor):
 
     ### 5. Manipulation ###
     def copy(self):
+        if self._values is None:
+            return CSRTensor(bm.copy(self._crow), bm.copy(self._col),
+                             None, self._spshape)
         return CSRTensor(bm.copy(self._crow), bm.copy(self._col),
                          bm.copy(self._values), self._spshape)
 

@@ -103,7 +103,7 @@ class COOTensor(SparseTensor):
                          is_coalesced=self.is_coalesced)
 
     ### 3. Format Conversion ###
-    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
+    def to_dense(self, *, fill_value: Number = 1.0) -> TensorLike:
         if self._values is None:
             context = dict(dtype=bm.float64)
         else:
@@ -123,7 +123,7 @@ class COOTensor(SparseTensor):
 
     def tocoo(self, *, copy=False):
         if copy:
-            return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
+            return self.copy()
         return self
 
     def tocsr(self, *, copy=False):
@@ -139,15 +139,17 @@ class COOTensor(SparseTensor):
         crow = bm.nonzero((bm.not_equal(new_row, bm.roll(new_row, 1))))[0]
         crow = bm.concat([crow, bm.tensor([self.nnz], **bm.context(crow))])
         new_col = bm.copy(self._indices[-1, order])
+
         if self.values() is None:
             new_values = None
         else:
             new_values = self.values()[..., order]
             new_values = bm.copy(new_values) if copy else new_values
+
         return CSRTensor(crow, new_col, new_values, spshape=self._spshape)
 
     ### 4. Object Conversion ###
-    def to_scipy(self, format: str='coo'):
+    def to_scipy(self):
         from scipy.sparse import coo_matrix
 
         if self.dense_ndim != 0:
@@ -167,6 +169,8 @@ class COOTensor(SparseTensor):
 
     ### 5. Manipulation ###
     def copy(self):
+        if self._values is None:
+            return COOTensor(bm.copy(self._indices), None, self._spshape)
         return COOTensor(bm.copy(self._indices), bm.copy(self._values), self._spshape)
 
     def coalesce(self, accumulate: bool=True) -> 'COOTensor':
@@ -357,7 +361,7 @@ class COOTensor(SparseTensor):
         the original if `other` is a number or a dense tensor.
         """
         if isinstance(other, COOTensor):
-            pass
+            raise NotImplementedError
 
         elif isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
@@ -381,7 +385,7 @@ class COOTensor(SparseTensor):
         the original if `other` is a number or a dense tensor.
         """
         if self._values is None:
-                raise ValueError("Cannot divide COOTensor without value")
+            raise ValueError("Cannot divide COOTensor without value")
 
         if isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
