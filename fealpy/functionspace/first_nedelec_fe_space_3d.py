@@ -81,7 +81,9 @@ class FirstNedelecDof3d():
         for i in range(3):
             flag = face[:, s[i]] == edge[f2e[:, i], 1]
             #f2d[flag, eldof*i:eldof*(i+1)] = f2d[flag, eldof*i:eldof*(i+1)][:, ::-1]
-            f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),f2d[flag, eldof*i:eldof*(i+1)][:, ::-1])
+            k = bm.flip(f2d[flag, eldof*i:eldof*(i+1)],axis=-1)
+            f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),k)
+            #f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),f2d[flag, eldof*i:eldof*(i+1)][:, ::-1])
         #f2d[:, eldof*3:] = self.face_to_internal_dof() 
         f2d = bm.set_at(f2d,(slice(None),slice(eldof*3,eldof*3+fldof)),self.face_to_internal_dof())
         return f2d
