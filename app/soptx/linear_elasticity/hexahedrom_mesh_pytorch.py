@@ -129,20 +129,21 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 nx, ny, nz = args.nx, args.ny, args.nz
-mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cpu')
+mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cuda')
 
 p = args.degree
 
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 4
+maxit = 3
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
+    # cell2ldof = tensor_space.cell_to_dof()
     NDof[i] = tensor_space.number_of_global_dofs()
 
     linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 

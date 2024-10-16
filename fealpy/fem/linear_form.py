@@ -41,8 +41,8 @@ class LinearForm(Form[LinearInt]):
         sparse_shape = (gdof, )
 
         M = COOTensor(
-            indices = bm.empty((1, 0), dtype=space.itype),
-            values = bm.empty(init_value_shape, dtype=space.ftype),
+            indices = bm.empty((1, 0), dtype=space.itype, device=bm.get_device(space)),
+            values = bm.empty(init_value_shape, dtype=space.ftype, device=bm.get_device(space)),
             spshape = sparse_shape
         )
 

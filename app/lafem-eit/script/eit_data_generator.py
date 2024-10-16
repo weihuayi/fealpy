@@ -33,15 +33,6 @@ def levelset(p: Tensor, centers: Tensor, radius: Tensor):
     return ret.reshape(struct)
 
 
-# def levelset_np(p: NDArray, centers: NDArray, radius: NDArray):
-#     """Calculate level set function value."""
-#     struct = p.shape[:-1]
-#     p = p.reshape(-1, p.shape[-1])
-#     dis = np.linalg.norm(p[:, None, :] - centers[None, :, :], axis=-1) # (N, NCir)
-#     ret = np.min(dis - radius[None, :], axis=-1) # (N, )
-#     return ret.reshape(struct)
-
-
 args = parser.parse_args()
 with open(args.config, "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)

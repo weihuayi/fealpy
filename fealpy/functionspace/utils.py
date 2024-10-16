@@ -66,7 +66,7 @@ def to_tensor_dof(to_dof: TensorLike, dof_numel: int, gdof: int, dof_priority: b
     return indices.reshape(num_entity, -1)
 
 
-def tensor_basis(shape: Size, *, dtype=None) -> TensorLike:
+def tensor_basis(shape: Size, *, dtype=None, device=None) -> TensorLike:
     """Generate tensor basis with 0-1 elements.
 
     Parameters:
@@ -76,7 +76,7 @@ def tensor_basis(shape: Size, *, dtype=None) -> TensorLike:
         Tensor: Tensor basis shaped (numel, *shape).
     """
     numel = prod(shape)
-    return bm.eye(numel, dtype=dtype).reshape((numel,) + shape)
+    return bm.eye(numel, dtype=dtype, device=device).reshape((numel,) + shape)
 
 
 def normal_strain(gphi: TensorLike, indices: TensorLike, *, out: Optional[TensorLike]=None) -> TensorLike:

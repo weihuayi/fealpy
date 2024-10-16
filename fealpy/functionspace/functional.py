@@ -23,7 +23,8 @@ def generate_tensor_basis(basis: TensorLike, shape: Tuple[int, ...], dof_priorit
         Tensor: Basis of the tensor space, shaped (..., ldof*numel, *shape),\
         where numel is the number of elements in the shape.
     """
-    factor = tensor_basis(shape, dtype=basis.dtype)
+    kwargs = bm.context(basis)
+    factor = tensor_basis(shape, **kwargs)
     tb = bm.tensordot(basis, factor, axes=0)
     ldof = basis.shape[-1]
     numel = factor.shape[0]

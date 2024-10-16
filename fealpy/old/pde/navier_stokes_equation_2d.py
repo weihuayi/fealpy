@@ -5,8 +5,8 @@ from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian
 #from fealpy.geometry import DistDomain2d
 #from fealpy.mesh import DistMesh2d
-from fealpy.geometry import dcircle,drectangle,ddiff,dmin
-from fealpy.geometry import huniform
+from fealpy.old.geometry import dcircle,drectangle,ddiff,dmin
+from fealpy.old.geometry import huniform
 from fealpy.backend import backend_manager as bm
 class SinCosData:
     """

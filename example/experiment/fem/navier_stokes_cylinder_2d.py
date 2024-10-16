@@ -19,7 +19,6 @@ from fealpy.fem import (
         ScalarMassIntegrator, PressWorkIntegrator0, PressWorkIntegrator ,
         PressWorkIntegrator1, ScalarConvectionIntegrator)
 
-
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.sparse import COOTensor
@@ -29,7 +28,7 @@ from fealpy.solver import cg
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.decorator import barycentric, cartesian
-from fealpy.timeintegratoralg import UniformTimeLine
+from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
 backend = 'pytorch'
@@ -46,10 +45,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-omesh = pde.mesh1(0.05)
-node = bm.from_numpy(omesh.entity('node'))
-cell = bm.from_numpy(omesh.entity('cell'))
-mesh = TriangleMesh(node, cell)
+mesh = pde.mesh1(0.05)
 
 
 timeline = UniformTimeLine(0, T, nt)
@@ -74,13 +70,12 @@ fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['velocity'] = u0 
 mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
-'''
-M_bform = BilinearForm(uspace)
-M_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
-M = M_bform.assembly()
-'''
 
 '''
+M_bform = BilinearForm(tensor_uspace)
+M_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
+M = M_bform.assembly()
+
 from scipy.sparse import coo_array, bmat
 def coo(A):
     data = A._values
@@ -90,7 +85,9 @@ def coo(A):
 A = bmat([[coo(M), None],[None, coo(M)]],  format='coo')
 
 print(bm.sum(bm.abs(A.toarray()-coo(MM).toarray())))
+
 exit()
+'''
 
 S_bform = BilinearForm(uspace)
 S_bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q))
@@ -99,7 +96,7 @@ S = S_bform.assembly()
 P_bform = BilinearForm((pspace, tensor_uspace))
 P_bform.add_integrator(PressWorkIntegrator(mu, q=q))
 P = P_bform.assembly()
-'''
+
 
 A_bform = BilinearForm(uspace)
 A_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
