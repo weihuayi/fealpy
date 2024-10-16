@@ -56,10 +56,8 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws, phi, gphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         if is_tensor(coef):
-            if self.batched:
-                result = bm.einsum('q, cqk, cqmd, bcqd, c->bckm', ws, phi, gphi, coef.squeeze(0), cm)
-            else:
-                result = bm.einsum('q, cqk, cqmd, cqd, c->ckm', ws, phi, gphi, coef, cm)
+                gphi = bm.einsum('cqj...i, cq...i->cqj...' ,gphi, coef)
+                result = bilinear_integral(gphi, phi, ws, cm, coef=None, batched=self.batched)
         else:
-            raise TypeError(f"coef should be int, float or Tensor, but got {type(coef)}.")
+            raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result

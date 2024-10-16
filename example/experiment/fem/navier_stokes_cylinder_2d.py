@@ -31,8 +31,8 @@ from fealpy.decorator import barycentric, cartesian
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
-backend = 'pytorch'
-#backend = 'numpy'
+#backend = 'pytorch'
+backend = 'numpy'
 bm.set_backend(backend)
 
 output = './'
@@ -47,13 +47,12 @@ mu = pde.mu
 
 mesh = pde.mesh1(0.05)
 
-
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
 uspace = LagrangeFESpace(mesh, p=udegree)
-tensor_uspace = TensorFunctionSpace(uspace, (-1, 2))
+tensor_uspace = TensorFunctionSpace(uspace, (2, -1))
 
 u0x = uspace.function()
 u0y = uspace.function()
@@ -70,32 +69,33 @@ fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['velocity'] = u0 
 mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
+APX_bform = BilinearForm((pspace, uspace))
+APX_bform.add_integrator(PressWorkIntegrator0(coef=-1, q=q)) 
 
+APY_bform = BilinearForm((pspace, uspace))
+APY_bform.add_integrator(PressWorkIntegrator1(coef=-1, q=q)) 
 '''
-M_bform = BilinearForm(tensor_uspace)
+
+M_bform = BilinearForm(uspace)
 M_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
 M = M_bform.assembly()
-
-from scipy.sparse import coo_array, bmat
-def coo(A):
-    data = A._values
-    indices = A._indices
-    return coo_array((data, indices))
-
-A = bmat([[coo(M), None],[None, coo(M)]],  format='coo')
-
-print(bm.sum(bm.abs(A.toarray()-coo(MM).toarray())))
-
-exit()
-'''
 
 S_bform = BilinearForm(uspace)
 S_bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q))
 S = S_bform.assembly()
 
 P_bform = BilinearForm((pspace, tensor_uspace))
-P_bform.add_integrator(PressWorkIntegrator(mu, q=q))
+P_bform.add_integrator(PressWorkIntegrator(-1, q=q))
 P = P_bform.assembly()
+
+
+from scipy.sparse import bmat
+A = bmat([[APX.to_scipy()],[APY.to_scipy()]],  format='coo')
+
+print(bm.sum(bm.abs(A.toarray()-P.to_scipy().toarray())))
+
+exit()
+'''
 
 
 A_bform = BilinearForm(uspace)
@@ -163,8 +163,6 @@ for i in range(10):
                   [None, A_bform, APY_bform],
                    [APX_bform.T, APY_bform.T, None]])
     A = A.assembly()
-    A = A.tocoo()
-    print(A.to_scipy())
     '''
     if backend == 'numpy':
         from scipy.sparse import coo_array, bmat
