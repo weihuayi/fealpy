@@ -106,14 +106,16 @@ class BoxDomainPolyLoaded3d():
 
 parser = argparse.ArgumentParser(description="Solve linear elasticity problems \
                             in arbitrary order Lagrange finite element space on HexahedronMesh.")
-parser.add_argument('--backend', 
-                    default='pytorch', type=str,
+parser.add_argument('--backend',
+                    choices=['numpy', 'pytorch'], 
+                    default='numpy', type=str,
                     help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=2, type=int, 
+                    default=1, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--solver',
-                    default='spsolve', type=str,
+                    choices=['cg', 'spsolve'],
+                    default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
                     default=2, type=int, 
@@ -126,20 +128,20 @@ parser.add_argument('--nz',
                     help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 
-pde = BoxDomainPolyUnloaded3d()
+pde = BoxDomainPolyLoaded3d()
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
 
 nx, ny, nz = args.nx, args.ny, args.nz
-mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cuda')
+mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cpu')
 
 p = args.degree
 
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 3
+maxit = 4
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -179,7 +181,7 @@ for i in range(maxit):
     if args.solver == 'cg':
         uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
     elif args.solver == 'spsolve':
-        uh[:] = spsolve(K, F, solver='scipy')
+        uh[:] = spsolve(K, F, solver='mumps')
     tmr.send('solve({})'.format(args.solver))
     
     tmr.send(None)
