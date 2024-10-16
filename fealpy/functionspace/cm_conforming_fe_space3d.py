@@ -262,16 +262,32 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         return c2dof
     def is_boundary_dof(self, threshold=None): #TODO:threshold 未实现
         mesh = self.mesh
-        gdof = self.number_of_global_dofs()
+        m = self.m
+        nndof = self.number_of_internal_dofs('node')
         isbdnode = mesh.boundary_node_flag()
+        bdnodedof = self.node_to_dof()[isbdnode]
+        l = (m+1)*(m+2)//2
+        a = self.dof_index["node"][0]
+        idxnode = []
+        for r in a:
+            idx1 = r[:l]
+            idxnode.append(idx1)
+        idxnode = bm.concatenate(idxnode)
+        bdnodedof = bdnodedof[:, idxnode].reshape(-1)
+
         isbdedge = mesh.boundary_edge_flag()
-        isbdFace = mesh.boundary_face_flag()
-        bd1 = self.node_to_dof()[isbdnode]
-        bd2 = self.edge_to_internal_dof()[isbdedge]
-        bd3 = self.face_to_internal_dof()[isbdFace]
-        bd = bm.concatenate([bd1.flatten(), bd2.flatten(), bd3.flatten()])
-        isBdDof = bm.zeros(gdof, dtype=bm.bool)
-        isBdDof[bd] = True
+        bdedgedof = self.edge_to_internal_dof()[isbdedge]
+        a = self.dof_index["edge"][0]
+        a = bm.concatenate([arr for sublist in a for arr in sublist][:l]) 
+        a = bm.arange(a.shape[0])
+        bdedgedof = bdedgedof[:, a].reshape(-1) 
+
+        # 面
+        isbdface = mesh.boundary_face_flag()
+        bdfacedof = self.face_to_internal_dof()[isbdface].reshape(-1)
+        isBdDof = bm.zeros(self.number_of_global_dofs(), dtype=bm.bool) 
+        bdidx = bm.concatenate([bdnodedof, bdedgedof, bdfacedof])
+        isBdDof[bdidx] = True
         return isBdDof 
 
     def get_corner(self):
@@ -752,7 +768,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
             val = gD[r](node)
             symidx, num = symmetry_index(3, r)
             #bdnidxmap = 
-            idx = bdnidxmap[coridx]
+            #idx = bdnidxmap[coridx]
             #print(idx)
         return
 

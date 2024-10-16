@@ -257,7 +257,34 @@ class TestCmfespace3d:
         boundary_interpolation = space.boundary_interpolate(gD, uh)
 
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    #@pytest.mark.parametrize("data", interpolation)
+    def test_boundary_dof(self,  backend):
+        bm.set_backend(backend)
+        mesh = TetrahedronMesh.from_box([0,1,0,1,0,1],1,1,1)
+        node = mesh.entity('node')
+        import numpy as np
+        isCornerNode = np.zeros(len(node), dtype=np.bool)
+        for n in np.array([[0,0,0],[0,0,1],[1,0,0],[0,1,0],[1,1,0],[0,1,1],[1,0,1],[1,1,1]], dtype=np.float64):
+            isCornerNode = isCornerNode | (np.linalg.norm(node - n[None, :], axis=1) < 1e-10)
 
+        space = CmConformingFESpace3d(mesh,11, 1, isCornerNode)
+        #uh = space.function()
+        #from fealpy.pde.biharmonic_triharmonic_3d import get_flist
+        #x = sp.symbols('x')
+        #y = sp.symbols('y')
+        #z = sp.symbols('z')
+        #f = x**7*y**2+z**2
+        #gD = get_flist(f)
+        np.set_printoptions(threshold=np.inf)
+        idxx = space.dof_index['edge']
+        #print(idxx)
+
+        boundary_dof = space.is_boundary_dof()
+        mul = space.multiIndex
+        all_edge_dof_index = bm.concatenate([bm.concatenate(item) if isinstance(item, list) else item for sublist in idxx for item in sublist])
+
+        #print(mul[all_edge_dof_index])
 
 
 
@@ -277,4 +304,4 @@ if __name__=="__main__":
     #t.test_interpolation(interpolation, "pytorch")
     #t.test_source_vector("pytorch")
     #t.test_matrix("pytorch")
-    t.test_boundary_interpolation("numpy")
+    t.test_boundary_dof("numpy")
