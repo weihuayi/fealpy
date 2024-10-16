@@ -153,7 +153,7 @@ class CSRTensor(SparseTensor):
         from .coo_tensor import COOTensor
         count = self._crow[1:] - self._crow[:-1]
         nrow = self._crow.shape[0] - 1
-        row = bm.repeat(bm.arange(nrow), count)
+        row = bm.repeat(bm.arange(nrow, device=bm.get_device(count)), count)
         indices = bm.stack([row, self._col], axis=0)
         new_values = bm.copy(self._values) if copy else self._values
         return COOTensor(indices, new_values, self.sparse_shape)

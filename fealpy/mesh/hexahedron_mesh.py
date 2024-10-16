@@ -136,11 +136,9 @@ class HexahedronMesh(TensorMesh, Plotable):
 
     def interpolation_points(self, p, index=_S):
         """
-        @brief 生成整个网格上的插值点
+        @brief Generate interpolation points for the entire mesh
         """
-        # node = self.entity('node')
         cell = self.entity('cell')
-        # NC = self.number_of_cells()
 
         c2ip = self.cell_to_ipoint(p)
         gp = self.number_of_global_ipoints(p)

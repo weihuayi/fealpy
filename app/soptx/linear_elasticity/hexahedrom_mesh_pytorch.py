@@ -18,7 +18,7 @@ from fealpy.fem.dirichlet_bc import DirichletBC
 
 from fealpy.decorator import cartesian
 
-from fealpy.solver import cg
+from fealpy.solver import cg, spsolve
 
 from app.soptx.soptx.utilfs.timer import timer
 
@@ -112,6 +112,9 @@ parser.add_argument('--backend',
 parser.add_argument('--degree', 
                     default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
+parser.add_argument('--solver',
+                    default='spsolve', type=str,
+                    help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
                     default=2, type=int, 
                     help='Initial number of grid cells in the x direction, default is 2.')
@@ -136,14 +139,13 @@ p = args.degree
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 4
+maxit = 3
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
 for i in range(maxit):
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
-    # cell2ldof = tensor_space.cell_to_dof()
     NDof[i] = tensor_space.number_of_global_dofs()
 
     linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
@@ -163,7 +165,7 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send('source assembly')
 
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=mesh.device)
+    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
     uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
 
     F = F - K.matmul(uh_bd)
@@ -174,9 +176,11 @@ for i in range(maxit):
     tmr.send('boundary')
 
     uh = tensor_space.function()
-    K = K.tocsr()
-    uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
-    tmr.send('solve(cg)')
+    if args.solver == 'cg':
+        uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
+    elif args.solver == 'spsolve':
+        uh[:] = spsolve(K, F, solver='scipy')
+    tmr.send('solve({})'.format(args.solver))
     
     tmr.send(None)
 

@@ -55,19 +55,19 @@ class BoxDomainData2D():
         return self.solution(points)
     
 
-parser = argparse.ArgumentParser(description="QuadrangleMesh 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
+parser = argparse.ArgumentParser(description="Solve linear elasticity problems in arbitrary order Lagrange finite element space on QuadrangleMesh.")
 parser.add_argument('--backend', 
                     default='pytorch', type=str,
-                    help='指定计算的后端类型, 默认为 pytroch.')
+                    help='Specify the backend type for computation, default is pytorch.')
 parser.add_argument('--degree', 
                     default=2, type=int, 
-                    help='Lagrange 有限元空间的次数, 默认为 2 次.')
+                    help='Degree of the Lagrange finite element space, default is 2.')
 parser.add_argument('--nx', 
                     default=4, type=int, 
-                    help='x 方向的初始网格单元数, 默认为 4.')
+                    help='Initial number of grid cells in the x direction, default is 4.')
 parser.add_argument('--ny',
                     default=4, type=int,
-                    help='y 方向的初始网格单元数, 默认为 4.')
+                    help='Initial number of grid cells in the y direction, default is 4.')
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
@@ -117,7 +117,7 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send('source assembly')
 
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64)
+    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
     uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
 
     F = F - K.matmul(uh_bd)
