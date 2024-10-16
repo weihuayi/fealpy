@@ -25,9 +25,10 @@ class Mesh(MeshDS):
 
     GD = property(geo_dimension)
 
-    def multi_index_matrix(self, p: int, etype: int, dtype=None) -> TensorLike:
+    def multi_index_matrix(self, p: int, etype: int, dtype=None, device=None) -> TensorLike:
         dtype = self.itype if dtype is None else dtype
-        return bm.multi_index_matrix(p, etype, dtype=dtype)
+        device = self.device if device is None else device
+        return bm.device_put(bm.multi_index_matrix(p, etype, dtype=dtype), device=device)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """Get the barycenter of the entity.
