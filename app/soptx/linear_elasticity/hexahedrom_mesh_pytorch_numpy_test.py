@@ -110,7 +110,7 @@ parser.add_argument('--backend',
                     default='pytorch', type=str,
                     help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=1, type=int, 
+                    default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--nx', 
                     default=2, type=int, 
@@ -141,7 +141,7 @@ p = args.degree
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 3
+maxit = 4
 
 errorType_cpu = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix_cpu = bm.zeros((len(errorType_cpu), maxit), dtype=bm.float64, device=bm.get_device(mesh_cpu))
@@ -168,22 +168,6 @@ for i in range(maxit):
                                                 hypo='3D')
     tmr.send('material_cuda')
 
-    edge_hex_cpu = mesh_cpu.edge
-    edge_quad_cpu = mesh_quad_cpu.edge
-    edge2ipoint_hex_cpu = mesh_cpu.edge_to_ipoint(p=p)
-    edge2ipoint_quad_cpu = mesh_quad_cpu.edge_to_ipoint(p=p)
-
-    # face_to_dof__hex_cpu = mesh_cpu.quad_to_ipoint(p=p)
-    # isDDof_cpu = space_cpu.is_boundary_dof(threshold=None)
-
-    edge_hex_cuda = mesh_cuda.edge
-    edge_quad_cuda = mesh_quad_cuda.edge
-    edge2ipoint_hex_cpu = mesh_cuda.edge_to_ipoint(p=p)
-    edge2ipoint_quad_cuda = mesh_quad_cuda.edge_to_ipoint(p=p)
-    # face_to_dof_hex_cuda = mesh_cuda.quad_to_ipoint(p=p)
-    # isDDof_cuda = space_cuda.is_boundary_dof(threshold=None)
-    error_face_to_dof = bm.sum(bm.abs(face_to_dof_cpu - bm.device_put(face_to_dof_cuda, device='cpu')))
-
     integrator_K_cpu = LinearElasticIntegrator(material=linear_elastic_material_cpu, 
                                             q=tensor_space_cpu.p+3)
     bform_cpu = BilinearForm(tensor_space_cpu)
@@ -208,8 +192,8 @@ for i in range(maxit):
     lform_cuda = LinearForm(tensor_space_cuda)
     lform_cuda.add_integrator(integrator_F_cuda)
     F_cuda = lform_cuda.assembly()
-    error_F1 = bm.sum(bm.abs(F_cpu - bm.device_put(F_cuda, device='cpu')))
-    error_K1 = bm.sum(bm.abs(K_cpu.to_dense() - bm.device_put(K_cuda.to_dense(), device='cpu')))
+    # error_F1 = bm.sum(bm.abs(F_cpu - bm.device_put(F_cuda, device='cpu')))
+    # error_K1 = bm.sum(bm.abs(K_cpu.to_dense() - bm.device_put(K_cuda.to_dense(), device='cpu')))
     tmr.send('source assembly_cuda')
 
     uh_bd_cpu = bm.zeros(tensor_space_cpu.number_of_global_dofs(), 
@@ -231,10 +215,10 @@ for i in range(maxit):
     dbc_cuda = DirichletBC(space=tensor_space_cuda)
     K_cuda = dbc_cuda.apply_matrix(matrix=K_cuda, check=True)
 
-    error_isDDof = bm.where(isDDof_cpu != bm.device_put(uh_bd_cuda, device='cpu'))
-    error_uh_bd = bm.sum(bm.abs(uh_bd_cpu - bm.device_put(uh_bd_cuda, device='cpu')))
-    error_F2 = bm.sum(bm.abs(F_cpu - bm.device_put(F_cuda, device='cpu')))
-    error_K2 = bm.sum(bm.abs(K_cpu.to_dense() - bm.device_put(K_cuda.to_dense(), device='cpu')))
+    # error_isDDof = bm.where(isDDof_cpu != bm.device_put(uh_bd_cuda, device='cpu'))
+    # error_uh_bd = bm.sum(bm.abs(uh_bd_cpu - bm.device_put(uh_bd_cuda, device='cpu')))
+    # error_F2 = bm.sum(bm.abs(F_cpu - bm.device_put(F_cuda, device='cpu')))
+    # error_K2 = bm.sum(bm.abs(K_cpu.to_dense() - bm.device_put(K_cuda.to_dense(), device='cpu')))
     tmr.send('boundary_cuda')  
 
     uh_cpu = tensor_space_cpu.function()
