@@ -136,6 +136,7 @@ def build_eit_model(
     ):
     BdDofs = ext * 4
     mesh = TriangleMesh.from_box([-1, 1, -1, 1], ext, ext, device=device)
+    print(mesh.boundary_face_index().shape)
 
     if fractype == 'nograd':
         frac = Fractional(BdDofs, device=device)

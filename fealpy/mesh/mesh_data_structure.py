@@ -4,7 +4,7 @@ from typing import Union, Optional, Dict, overload, Callable, Any
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, EntityName, _S, _int_func
 from .. import logger
-from .utils import estr2dim, edim2entity, MeshMeta
+from .utils import estr2dim, edim2entity, MeshMeta, flocc
 
 
 ##################################################
@@ -142,7 +142,7 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell
         localFace2edge = self.localFace2edge
         face2edge = cell2edge[face2cell[:, [0]], localFace2edge[face2cell[:, 2]]]
-        
+
         return face2edge[index]
 
     def cell_to_face(self, index: Index=_S) -> TensorLike:
@@ -261,7 +261,7 @@ class MeshDS(metaclass=MeshMeta):
             raise RuntimeError('Can not construct for a non-homogeneous mesh.')
 
         totalFace = self.total_face()
-        _, i0, i1, j, _ = bm.unique_all_(bm.sort(totalFace, axis=1), axis=0)
+        i0, i1, j = flocc(bm.sort(totalFace, axis=1))
 
         if self.TD > 1: # Do not add faces for interval mesh
             self.face = totalFace[i0, :] # this also adds the edge in 2-d meshes
@@ -279,12 +279,7 @@ class MeshDS(metaclass=MeshMeta):
             NEC = self.number_of_edges_of_cells()
 
             totalEdge = self.total_edge()
-            _, i2, j = bm.unique(
-                bm.sort(totalEdge, axis=1),
-                return_index=True,
-                return_inverse=True,
-                axis=0
-            )
+            i2, _, j = flocc(bm.sort(totalEdge, axis=1))
             self.edge = totalEdge[i2, :]
             self.cell2edge = bm.astype(j.reshape(NC, NEC), self.itype)
 

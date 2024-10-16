@@ -39,7 +39,10 @@ class NedelecDof():
         e2ld[0][0] += ldof//2
         e2ld[0][-1] += ldof//2
 
-        e2ld[1] = bm.where(multiindex[:, 1]==0)[0][::-1]
+        #e2ld[1] = bm.where(multiindex[:, 1]==0)[0][::-1]
+        array = bm.where(multiindex[:, 1]==0)[0]
+        e2ld[1] =  bm.flip(array)
+
         e2ld[1][-1] += ldof//2
 
         e2ld[2], = bm.where(multiindex[:, 2]==0)
@@ -91,7 +94,7 @@ class NedelecDof():
         isndof = bm.zeros(ldof, dtype=bm.bool)
         isndof[f2ld] = True
 
-        c2d = bm.zeros((NC, ldof), dtype=self.itype)
+        c2d = bm.zeros((NC, ldof), dtype=bm.int64)#
         idx = bm.zeros((NC, 3), dtype=self.itype)
         fe = bm.tensor([[0, 1], [0, 2], [1, 2]], dtype=self.itype) #局部边
         for i in range(4):
@@ -111,9 +114,10 @@ class NedelecDof():
             # 顶点的自由度可能需要交换
             for j in range(3):
                 flag = bm.sum(idx[:, fe[fe[j, 0]]]-idx[:, fe[fe[j, 1]]], axis=-1)>0
-                tmp = c2d[flag, f2ld[i, e2lfd[(j+1)%3, -1]]].copy()
+                #tmp = c2d[flag, f2ld[i, e2lfd[(j+1)%3, -1]]].copy()
+                tmp = bm.copy(c2d[flag, f2ld[i, e2lfd[(j+1)%3, -1]]])
                 # c2d[flag, f2ld[i, e2lfd[(j+1)%3, -1]]] = c2d[flag, f2ld[i, e2lfd[(j+2)%3, 0]]]
-                # c2d[flag, f2ld[i, e2lfd[(j+2)%3, 0]]] = tmp
+                # c2d[flag, f2ld[i, e2lfd[(j+2)%3,qqqqqqqqqqqqqqqqq 0]]] = tmp
                 c2d = bm.set_at(c2d,(flag,f2ld[i, e2lfd[(j+1)%3, -1]]),c2d[flag, f2ld[i, e2lfd[(j+2)%3, 0]]])
                 c2d = bm.set_at(c2d,(flag,f2ld[i, e2lfd[(j+2)%3, 0]]),tmp)
 
@@ -149,10 +153,11 @@ class NedelecDof():
         f2esign = bm.zeros((NF, 3), dtype=bm.bool)
         f2esign = edge[f2e, 0]==face[:, [1, 2, 0]]
 
-        f2d = bm.zeros((NF, ldof), dtype=self.itype)
+        f2d = bm.zeros((NF, ldof), dtype=bm.int64)###
         # c2d[:, e2ldof] : (NC, 3, p+1), e2dof[c2e] : (NC, 3, p+1)
         tmp = e2dof[f2e]
-        tmp[~f2esign] = tmp[~f2esign, ::-1]
+        #tmp[~f2esign] = tmp[~f2esign, ::-1]
+        tmp[~f2esign] = bm.flip(tmp[~f2esign], [1])
         # f2d[:, e2ldof] = tmp 
         # f2d[:, ~istdof] = bm.arange(NE*edof, NE*edof+NF*fdof).reshape(NF, -1)
         f2d = bm.set_at(f2d,(slice(None),e2ldof),tmp)
@@ -284,7 +289,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         e2t = mesh.edge_tangent()/em[:, None]
         e2t = e2t[f2e]
       
-        e2n = -bm.cross(f2n[:, None], e2t) #(NF, 3, 3)
+        e2n = -bm.linalg.cross(f2n[:, None], e2t) #(NF, 3, 3)
 
         NF = len(f2e)
 
@@ -331,7 +336,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         e2t = mesh.edge_tangent()/em[:, None]
         e2t = e2t[f2e]
         
-        e2n = -bm.cross(f2n[:, None], e2t) #(NF, 3, 3)
+        e2n = -bm.linalg.cross(f2n[:, None], e2t) #(NF, 3, 3)
 
         NF = len(f2e)
 
@@ -367,9 +372,9 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # val[..., ldof//3:2*(ldof//3), :] = bm.cross(sgval, c2v[:,None, ldof//3:2*(ldof//3), :])
         # val[..., 2*(ldof//3):, :] = bm.cross(sgval, c2v[:,None, 2*(ldof//3):, :])
            
-        val = bm.set_at(val,(...,slice(None,ldof//3),slice(None)),bm.cross(sgval, c2v[:,None, :ldof//3, :]))
-        val = bm.set_at(val,(...,slice(ldof//3,2*ldof//3),slice(None)),bm.cross(sgval, c2v[:,None, ldof//3:2*(ldof//3), :]))
-        val = bm.set_at(val,(...,slice(2*ldof//3,None),slice(None)),bm.cross(sgval, c2v[:,None, 2*(ldof//3):, :]))
+        val = bm.set_at(val,(...,slice(None,ldof//3),slice(None)),bm.linalg.cross(sgval, c2v[:,None, :ldof//3, :]))
+        val = bm.set_at(val,(...,slice(ldof//3,2*ldof//3),slice(None)),bm.linalg.cross(sgval, c2v[:,None, ldof//3:2*(ldof//3), :]))
+        val = bm.set_at(val,(...,slice(2*ldof//3,None),slice(None)),bm.linalg.cross(sgval, c2v[:,None, 2*(ldof//3):, :]))
 
         return val
 
@@ -406,8 +411,9 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # 面内部的标量自由度
         fDofIdx, = bm.where(bm.all(self.dof.multiindex2!=0, axis=-1)) 
         n2fe = bm.array([[(i+1)%3, (i+2)%3] for i in range(3)])
-        n2dof = e2fdof[n2fe[:, ::-1], [[0, -1]]] 
-
+        #n2dof = e2fdof[n2fe[:, ::-1], [[0, -1]]]
+        array =  bm.flip(n2fe, axis=1)
+        n2dof = e2fdof[array, [[0, -1]]]
         sdof = fdof//2
         for i in range(4):
             # 面内部的自由度
@@ -415,7 +421,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             # bv[:, f2ldof[i, fDofIdx+sdof]] = bm.cross(e2t[f2e[c2f[:, i], 0],None], f2n[c2f[:, i], None])
             # bv[:, f2ldof[i, fDofIdx] + 2*(ldof//3)] = f2n[c2f[:, i], None]
             bv = bm.set_at(bv,(slice(None),f2ldof[i, fDofIdx]),e2t[f2e[c2f[:, i], 0], None])
-            bv = bm.set_at(bv,(slice(None),f2ldof[i, fDofIdx+sdof]),bm.cross(e2t[f2e[c2f[:, i], 0],None], f2n[c2f[:, i], None]))
+            bv = bm.set_at(bv,(slice(None),f2ldof[i, fDofIdx+sdof]),bm.linalg.cross(e2t[f2e[c2f[:, i], 0],None], f2n[c2f[:, i], None]))
             bv = bm.set_at(bv,(slice(None),f2ldof[i, fDofIdx]+2*(ldof//3)),f2n[c2f[:, i], None])
 
             #边上的切向自由度
@@ -424,14 +430,16 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             # 与边垂直的自由度
             # bv[:, f2ldof[i, e2ldof[:, 1:-1]+sdof]] : (NC, 3, p-1, 3)
             f2fn = f2n[c2f[:, lf2f[i]], None]
-            f2ft = bm.cross(e2t[c2e[:, lf2e[i]], None], f2n[c2f[:, i], None, None])
+            f2ft = bm.linalg.cross(e2t[c2e[:, lf2e[i]], None], f2n[c2f[:, i], None, None])
             #bv[:, f2ldof[i, e2fdof[:, 1:-1]+sdof]] = f2fn/(bm.sum(f2fn*f2ft,axis=-1))[..., None]
             bv = bm.set_at(bv,(slice(None),f2ldof[i, e2fdof[:, 1:-1]+sdof]),f2fn/(bm.sum(f2fn*f2ft,axis=-1))[..., None])
             # 顶点上的自由度
             # bv[:, f2ldof[i, n2dof]] (NC, 3, 2, 3)
             # f2n[c2f[:, n2fe]] (NC, 3, 2, 3)
             tmp0 = f2n[c2f[:, lf2f[i, n2fe]]]
-            tmp1 = e2t[c2e[:, lf2e[i, n2fe[:, ::-1]]]]
+            #tmp1 = e2t[c2e[:, lf2e[i, n2fe[:, ::-1]]]]
+            k = bm.flip(n2fe, axis=-1)
+            tmp1 = e2t[c2e[:, lf2e[i, k]]]
             #bv[:, f2ldof[i, n2dof]] = tmp0/(bm.sum(tmp0*tmp1, axis=-1))[..., None]
             bv = bm.set_at(bv,(slice(None),f2ldof[i, n2dof]),tmp0/(bm.sum(tmp0*tmp1, axis=-1))[..., None])
         return bv
@@ -522,7 +530,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         f2v = self.face_dof_vector(index=index) #(NF, ldof, 3)
 
         #bcs = self.lspace.multi_index_matrix[2](p)/p
-        bcs = self.mesh.multi_index_matrix(p, 2)/p
+        bcs = self.mesh.multi_index_matrix(p, 2,dtype=self.ftype)/p
         point = mesh.bc_to_point(bcs, index=index) #.swapaxes(0, 1) #(ldof//2, NF, 3)
         # nor = mesh.face_unit_normal()[index] #(NF, 3)
 

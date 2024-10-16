@@ -31,7 +31,7 @@ class DataPreprocessor(nn.Module):
         # NOTE: Merge the Batch and Channel axis to vectorize in the FDM solver.
         input = input.reshape(-1, 2, NNBD) # [B*CH, 2, NN_bd]
         gd, gn = input[:, 0, :], input[:, 1, :] # [B*CH, NN_bd]
-        vuh = solver.solve_from_potential(gd, BATCH*CHANNEL) # [B*CH, gdof]
+        vuh = solver.solve_from_potential(gd) # [B*CH, gdof]
         vn = solver.normal_derivative(vuh) # [B*CH, bddof]
         # gnvn = solver.solve_from_gnf(None, gn-vn, f_only=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
         gnvn = gn - vn # [B*CH, bddof]

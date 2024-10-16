@@ -564,7 +564,7 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def triangle_grad_lambda_2d(tri: Tensor, node: Tensor) -> Tensor:
         shape = tri.shape[:-1] + (3, 2)
-        result = torch.zeros(shape, dtype=node.dtype)
+        result = torch.zeros(shape, dtype=node.dtype, device=node.device)
 
         result[..., 0, :] = node[tri[..., 2]] - node[tri[..., 1]]
         result[..., 1, :] = node[tri[..., 0]] - node[tri[..., 2]]
