@@ -1,4 +1,4 @@
-from typing import Union, Optional, Sequence, Tuple, Any, Callable
+from typing import Union, Optional, List, Tuple, Any, Callable
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
@@ -454,7 +454,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
 
     @classmethod
-    def from_polygon_gmsh(cls, vertices: list[tuple], h: float) -> 'QuadrangleMesh':
+    def from_polygon_gmsh(cls, vertices: List[tuple], h: float) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a polygonal region by gmsh.
 
