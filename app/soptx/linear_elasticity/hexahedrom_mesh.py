@@ -108,23 +108,23 @@ parser = argparse.ArgumentParser(description="Solve linear elasticity problems \
                             in arbitrary order Lagrange finite element space on HexahedronMesh.")
 parser.add_argument('--backend',
                     choices=['numpy', 'pytorch'], 
-                    default='numpy', type=str,
+                    default='pytorch', type=str,
                     help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=1, type=int, 
+                    default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--solver',
                     choices=['cg', 'spsolve'],
                     default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
-                    default=2, type=int, 
+                    default=8, type=int, 
                     help='Initial number of grid cells in the x direction, default is 2.')
 parser.add_argument('--ny',
-                    default=2, type=int,
+                    default=8, type=int,
                     help='Initial number of grid cells in the y direction, default is 2.')
 parser.add_argument('--nz',
-                    default=2, type=int,
+                    default=8, type=int,
                     help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 
@@ -134,14 +134,14 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 nx, ny, nz = args.nx, args.ny, args.nz
-mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cpu')
+mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cuda')
 
 p = args.degree
 
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 4
+maxit = 1
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
