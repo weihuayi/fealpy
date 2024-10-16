@@ -50,7 +50,9 @@ class NedelecDof():
         e2ld[0][0] += ldof//2
         e2ld[0][-1] += ldof//2
 
-        e2ld[1] = bm.where(multiindex[:, 1]==0)[0][::-1]
+        #e2ld[1] = bm.where(multiindex[:, 1]==0)[0][::-1]
+        array = bm.where(multiindex[:, 1]==0)[0]
+        e2ld[1] = bm.flip(array)
         e2ld[1][-1] += ldof//2
 
         e2ld[2], = bm.where(multiindex[:, 2]==0)
@@ -100,7 +102,7 @@ class NedelecDof():
         # tmp[~c2esign] = tmp[~c2esign, ::-1]       
         # c2d[:, e2ldof] = tmp
         # c2d[:, ~isndof] = bm.arange(NE*edof, gdof).reshape(NC, -1)
-        tmp = bm.set_at(tmp,(~c2esign),tmp[~c2esign, ::-1])
+        tmp[~c2esign] = bm.flip(tmp[~c2esign], [1])
         c2d = bm.set_at(c2d,(slice(None), e2ldof),tmp)
         c2d = bm.set_at(c2d,(slice(None), ~isndof),bm.arange(NE*edof, gdof).reshape(NC, -1))
         return c2d
@@ -257,6 +259,9 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
         val = sphi[..., None]*e2t[index, None, None, :]
         return val
+    
+    def cross2d(self,a,b):
+        return a[...,0]*b[...,1] - a[...,1]*b[...,0]
 
     @barycentric
     def curl_basis(self, bcs: TensorLike)->TensorLike:
@@ -280,8 +285,8 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
         # val[..., :ldof//2] = bm.cross(sgval, c2v[:, None, :ldof//2, :])
         # val[..., ldof//2:] = bm.cross(sgval, c2v[:, None, ldof//2:, :])
-        val = bm.set_at(val,(...,slice(None,ldof//2)),bm.cross(sgval, c2v[:, None, :ldof//2, :]))
-        val = bm.set_at(val,(...,slice(ldof//2,None)),bm.cross(sgval, c2v[:, None, ldof//2:, :]))
+        val = bm.set_at(val,(...,slice(None,ldof//2)),self.cross2d(sgval, c2v[:, None, :ldof//2, :]))
+        val = bm.set_at(val,(...,slice(ldof//2,None)),self.cross2d(sgval, c2v[:, None, ldof//2:, :]))
 
         return val
 
@@ -471,7 +476,7 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         edge2dof = self.dof.edge_to_dof()[index]
         e2v = self.edge_dof_vector(index=index) #(NE, p+1, 3)
 
-        bcs = self.mesh.multi_index_matrix(p, 1)/p
+        bcs = self.mesh.multi_index_matrix(p, 1, dtype=self.ftype)/p
         point = mesh.bc_to_point(bcs, index=index)
         gval = gD(point,e2v) #(NE, p+1, 3)
         #uh[edge2dof] = bm.sum(gval*e2v, axis=-1)
