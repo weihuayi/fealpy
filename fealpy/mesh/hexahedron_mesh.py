@@ -231,14 +231,15 @@ class HexahedronMesh(TensorMesh, Plotable):
 
     def uniform_refine(self, n=1):
         """
-        @brief 一致加密六面体网格 n 次
+        @brief Uniformly refine the hexahedral mesh n times
         """
         for i in range(n):
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NF = self.number_of_faces()
             NC = self.number_of_cells()
-            node = bm.zeros((NN + NE + NF + NC, 3), dtype=self.ftype, device=self.device)
+            node = bm.zeros((NN + NE + NF + NC, 3), 
+                            dtype=self.ftype, device=self.device)
             start = 0
             end = NN
             node[start:end] = self.entity('node')
@@ -252,7 +253,8 @@ class HexahedronMesh(TensorMesh, Plotable):
             end = start + NF
             node[start:end] = self.entity_barycenter('cell')
 
-            cell = bm.zeros((8*NC, 8), dtype=self.itype, device=self.device)
+            cell = bm.zeros((8*NC, 8), 
+                            dtype=self.itype, device=self.device)
             c2n = self.entity('cell')
             c2e = self.cell_to_edge() + NN
             c2f = self.cell_to_face() + (NN + NE)
