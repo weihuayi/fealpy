@@ -193,3 +193,68 @@ class BubbleData(MaxwellPDE):
         #box = [0, 1, 0, 1, 0, 1]
         return box
      
+class BubbleData3d():
+
+    @cartesian
+    def solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        f = (x**2-x)*(y**2-y)*(z**2-z)
+        return bm.concatenate([f, bm.sin(bm.pi*x)*f, bm.sin(bm.pi*y)*f], axis=-1)
+    
+    @cartesian
+    def curl_solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        sin = bm.sin
+        cos = bm.cos
+        pi = bm.pi
+        f1 = ((x**2 - x)*(2*y - 1)*(z**2 - z)*sin(y*pi) - (x**2 - x)*(y**2 - y)*(2*z - 1)*sin(x*pi) + pi*(x**2 - x)*(y**2 - y)*(z**2 - z)*cos(y*pi))
+        f2 =  (-(2*x - 1)*(y**2 - y)*(z**2 - z)*sin(y*pi) + (x**2 - x)*(y**2 - y)*(2*z - 1))
+        f3 =  ((2*x - 1)*(y**2 - y)*(z**2 - z)*sin(x*pi) - (x**2 - x)*(2*y - 1)*(z**2 - z) + pi*(x**2 - x)*(y**2 - y)*(z**2 - z)*cos(x*pi))
+
+        return bm.concatenate([f1, f2, f3], axis=-1)
+
+    @cartesian
+    def source(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        sin = bm.sin
+        cos = bm.cos
+        pi = bm.pi
+        f1 = (-(1 - 2*x)*(y**2 - y)*(2*z - 1)*sin(y*pi) + (2*x - 1)*(2*y - 1)*(z**2 - z)*sin(x*pi) + (-2*x**2 + 2*x)*(z**2 - z) + pi*(x**2 - x)*(2*y - 1)*(z**2 - z)*cos(x*pi) - (x**2 - x)*(y**2 - y)*(z**2 - z) - (2*x**2 - 2*x)*(y**2 - y))
+        f2 = (-(1 - 2*y)*(2*x - 1)*(z**2 - z) - 2*pi*(2*x - 1)*(y**2 - y)*(z**2 - z)*cos(x*pi) + (-2*x**2 + 2*x)*(y**2 - y)*sin(x*pi) + (x**2 - x)*(2*y - 1)*(2*z - 1)*sin(y*pi) + pi*(x**2 - x)*(y**2 - y)*(2*z - 1)*cos(y*pi) - (x**2 - x)*(y**2 - y)*(z**2 - z)*sin(x*pi) + pi**2*(x**2 - x)*(y**2 - y)*(z**2 - z)*sin(x*pi) - (2*y**2 - 2*y)*(z**2 - z)*sin(x*pi))
+        f3 = (-(1 - 2*z)*(x**2 - x)*(2*y - 1)*sin(x*pi) + (2*x - 1)*(y**2 - y)*(2*z - 1) - 2*pi*(x**2 - x)*(2*y - 1)*(z**2 - z)*cos(y*pi) - (x**2 - x)*(y**2 - y)*(z**2 - z)*sin(y*pi) + pi**2*(x**2 - x)*(y**2 - y)*(z**2 - z)*sin(y*pi) - (2*x**2 - 2*x)*(z**2 - z)*sin(y*pi) + (-2*y**2 + 2*y)*(z**2 - z)*sin(y*pi))
+        return bm.concatenate([f1, f2, f3], axis=-1)
+    
+    @cartesian
+    def dirichlet(self, p):
+        val = self.solution(p)
+        return val
+    
+    @cartesian
+    def neumann(self, p,n):
+        """
+        @note p : (NF, NQ, 3)
+              n : (NF, 3)
+              self.curl_solution(p) : (NF, NQ, 3)
+        """     
+        return  bm.cross(n[:, None,:], self.curl_solution(p))
+    
+    def init_mesh(self, n=1):
+        box = [0, 1, 0, 1, 0, 1]
+        mesh = TetrahedronMesh.from_box(box, nx=n, ny=n, nz=n)
+        return mesh
+    
+    def domain(self):
+        box = [0, 1/2, 0, 1/2, 0, 1/2]
+        #box = [0, 1, 0, 1, 0, 1]
+        return box    
+
+
+
+
+

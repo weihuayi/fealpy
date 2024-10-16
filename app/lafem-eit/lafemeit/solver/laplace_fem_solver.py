@@ -18,38 +18,45 @@ from fealpy.fem import (
 
 class LaplaceFEMSolver():
     def __init__(self, mesh: TriangleMesh, p: int = 1, q: Optional[int] = None, *,
-                 bd_dof_flag: Optional[Tensor]=None,
-                 reserve_matrix=False) -> None:
+                 is_sampler_dof: Optional[Tensor] = None, reserve_mat=False) -> None:
+        """_summary_
+
+        Args:
+            mesh (TriangleMesh): FEALPy Mesh object.
+            p (int, optional): Order of the FE space. Defaults to 1.
+            q (int | None, optional): ID of the quadrature formula, using `p+2` if None. Defaults to None.
+            is_sampler_dof (Tensor | None, optional): A bool Tensor indicating sampler dofs.\
+                Use all the boundary dofs if None. Defaults to None.
+            reserve_mat (bool, optional): _description_. Defaults to False.
+        """
         assert bm.backend_name == 'pytorch', "FEALPy should work with PyTorch backend."
 
         q = q or p + 2
         self.space = LagrangeFESpace(mesh, p=p)
         self.dtype = mesh.ftype
         self.device = mesh.device
-        self.reserve_matrix = reserve_matrix
+        self.reserve_mat = reserve_mat
 
-        if bd_dof_flag is not None:
-            self.bd_dof_flag = bd_dof_flag
+        is_Ddof = self.space.is_boundary_dof()
+
+        if is_sampler_dof is not None:
+            assert torch.all(is_Ddof[is_sampler_dof]), "All sampler dofs should be boundary dofs"
+            self.is_sampler_dof = is_sampler_dof
         else:
-            self.bd_dof_flag = self.space.is_boundary_dof()
+            self.is_sampler_dof = is_Ddof
 
-        self.bd_dof_id = torch.nonzero(self.bd_dof_flag, as_tuple=True)[0]
+        self.sampler_dof_id = torch.nonzero(self.is_sampler_dof, as_tuple=True)[0]
         self.gdof = self.space.number_of_global_dofs()
 
-        # Generate left-hand-size matrix and define integrators
+        # Generate left-hand-size matrix
         bform = BilinearForm(self.space)
         bform.add_integrator(ScalarDiffusionIntegrator(q=q))
         self._A = bform.assembly(format='csr')
-        # self.bsi = ScalarNeumannBCIntegrator(None, q=q, batched=True)
-
-        # fetch some constants
-        self.bd_face = mesh.boundary_face_index()
-        self.bd_en = mesh.edge_unit_normal(index=self.bd_face)
 
     def _init_dirichlet(self):
-        self.dbc = DirichletBC(self.space, isDDof=self.bd_dof_flag)
+        self.dbc = DirichletBC(self.space, isDDof=self.is_sampler_dof)
         A_d = self.dbc.apply_matrix(self._A).to_dense()
-        if self.reserve_matrix:
+        if self.reserve_mat:
             self.A_d = A_d
         self.A_d_LU, self.pivots_d = lu_factor(A_d)
 
@@ -65,7 +72,7 @@ class LaplaceFEMSolver():
             cat([A, c.T], dim=1),
             cat([c, ZERO], dim=1)
         ], dim=0)
-        if self.reserve_matrix:
+        if self.reserve_mat:
             self.A_n = A_n
         self.A_n_LU, self.pivots_n = lu_factor(A_n)
 
@@ -77,9 +84,9 @@ class LaplaceFEMSolver():
         batch_size = potential.shape[0]
         # NOTE: this can work if the initial f is zero.
         f = torch.zeros((batch_size, self.gdof), dtype=self.dtype, device=self.device)
-        f[:, self.bd_dof_id] = potential
+        f[:, self.sampler_dof_id] = potential
         f = f - self._A.matmul(f.T).T
-        f[:, self.bd_dof_id] = potential
+        f[:, self.sampler_dof_id] = potential
 
         self._latest_fd = f
         uh = lu_solve(self.A_d_LU, self.pivots_d, f, left=False)
@@ -92,10 +99,10 @@ class LaplaceFEMSolver():
 
         batch_size = current.shape[0]
         f = torch.zeros((batch_size, self.gdof + 1), dtype=self.dtype, device=self.device)
-        f[:, self.bd_dof_id] = current
+        f[:, self.sampler_dof_id] = current
 
         if remove_offset:
-            f[:, self.bd_dof_id] -= f[:, self.bd_dof_id].mean(dim=-1, keepdim=True)
+            f[:, self.sampler_dof_id] -= f[:, self.sampler_dof_id].mean(dim=-1, keepdim=True)
 
         self._latest_fn = f
         uh = lu_solve(self.A_n_LU, self.pivots_n, f, left=False)
@@ -103,11 +110,11 @@ class LaplaceFEMSolver():
 
     def boundary_value(self, uh: Tensor, /) -> Tensor:
         """From global dofs to boundary potential."""
-        return uh[..., self.bd_dof_id]
+        return uh[..., self.sampler_dof_id]
 
     def normal_derivative(self, uh: Tensor, /) -> Tensor:
         """From global dofs to boundary current."""
-        return self._A.matmul(uh.T).T[..., self.bd_dof_id]
+        return self._A.matmul(uh.T).T[..., self.sampler_dof_id]
 
     def value_on_nodes(self, uh: Tensor, /) -> Tensor:
         """Find values on mesh nodes."""
@@ -117,14 +124,14 @@ class LaplaceFEMSolver():
     def residual_fd(self, uh: Tensor, /) -> Tensor:
         if not hasattr(self, 'A_d'):
             raise RuntimeError("A_d is not initialized. Please call `init_gd` first "
-                               "and make sure reserve_matrix is set to True")
+                               "and make sure reserve_mat is set to True")
         diff = uh @ self.A_d - self._latest_fd
         return diff.norm(dim=-1).mean()
 
     def residual_fn(self, uh: Tensor, /) -> Tensor:
         if not hasattr(self, 'A_n'):
             raise RuntimeError("A_n is not initialized. Please call `init_gn` first "
-                               "and make sure reserve_matrix is set to True")
+                               "and make sure reserve_mat is set to True")
         ZERO = torch.zeros((uh.shape[0], 1), dtype=self.dtype, device=self.device)
         uh = torch.cat([uh, ZERO], dim=-1)
         diff = uh @ self.A_n - self._latest_fn
