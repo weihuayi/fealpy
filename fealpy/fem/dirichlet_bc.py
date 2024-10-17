@@ -19,19 +19,22 @@ class DirichletBC():
         self.gd = gd
         self.threshold = threshold
         self.bctype = 'Dirichlet'
-        
+     
         if isinstance(space, tuple):
             self.gdof = [i.number_of_global_dofs() for i in space]
-            if threshold is tuple:
+            if isinstance(threshold, tuple):
                 self.is_boundary_dof = []
                 for i in range(len(threshold)):
                     self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i]))
                 self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
             else:
                 if threshold is None:
+                    self.threshold = [None for i in range(len(space))]
                     self.is_boundary_dof = [i.is_boundary_dof(j) for i in space]
                     self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
                 else:
+                    index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof)))
+                    self.threshold = [threshold[i:i+1] for i in range(len(index)-1)]
                     self.is_boundary_dof = threshold 
             self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
             self.gdof = bm.sum(self.gdof)
@@ -215,19 +218,21 @@ class DirichletBC():
         if gd is None:
             raise RuntimeError("The boundary condition is None.")
         
-        if gd is tuple:
-            uh = []
-            for i in range(len(gd)):
-                suh, sidDDdof = self.space[i].boundary_interpolate(gd)
-                uh.append(suh)
-        else:##TnesorLike
-            index = bm.concatenate((bm.array([0]), bm.cumsum(self.gdof)))
-            self.is_boundary_dof = [threshold[index[i]:index[i+1]] for i in range(len(index)-1)]
-    
+        if isinstance(self.space, tuple):
+            if gd is tuple:
+                uh = []
+                for i in range(len(gd)):
+                    suh, sidDDdof = self.space[i].boundary_interpolate(gd, threshold=self.threshold[i])
+                    uh.append(suh)
+                uh = bm.concatenate(uh)
+            else:
+                uh = gd
+        else:
+            if uh is None:
+                uh = bm.zeros_like(f)
+            uh = self.space.boundary_interpolate(gd, uh, self.threshold)
 
-         
         bd_idx = self.boundary_dof_index
-
         f = f - A.matmul(uh[:])
         f = bm.set_at(f, bd_idx, uh[bd_idx])
         return f

@@ -45,8 +45,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh1(0.05)##改一下接口
-
+mesh = pde.mesh(0.05,'fealpy')
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -67,7 +66,7 @@ mesh.nodedata['velocity'] = u1.reshape(2,-1).T
 mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
 
-## BilinearForm
+##BilinearForm
 P_bform = BilinearForm((pspace, uspace))
 P_bform.add_integrator(PressWorkIntegrator(-1, q=q))
 
@@ -76,6 +75,7 @@ A_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
 A_bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q)) 
 ConvectionIntegrator = ScalarConvectionIntegrator(q=q)
 A_bform.add_integrator(ConvectionIntegrator)
+
 ##LinearForm
 lform = LinearForm(uspace)
 SourceIntegrator = ScalarSourceIntegrator(q = q)
@@ -84,26 +84,24 @@ lform.add_integrator(SourceIntegrator)
 
 #边界处理
 ## 边界处理太繁琐
+## threshold一定要传tuple或者list吗
+u_isbddof = uspace.is_boundary_dof()
+u_out_isbd = uspace.is_boundary_dof(threshold=(pde.is_outflow_boundary,))
+u_isbddof[u_out_isbd] = False
+p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary)
+isBdDof = bm.concatenate([u_isbddof, p_isbddof])
+## b
+#xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=(pde.is_inflow_boundary,))
+#xp = bm.zeros(pgdof)
+#axx = bm.concatenate((xu,xp))
+
 xx = bm.zeros(gdof, dtype=mesh.ftype)
-
-u_isbddof_u0 = space.is_boundary_dof()
 u_isbddof_in = space.is_boundary_dof(threshold = pde.is_inflow_boundary)
-u_isbddof_out = space.is_boundary_dof(threshold = pde.is_outflow_boundary)
-
-u_isbddof_u0[u_isbddof_in] = False 
-u_isbddof_u0[u_isbddof_out] = False 
-
-u_isbddof = u_isbddof_u0
-u_isbddof[u_isbddof_in] = True
 ipoint = space.interpolation_points()
 uinflow = pde.u_inflow_dirichlet(ipoint)
-
-p_isBdDof_p0 = pspace.is_boundary_dof(threshold = pde.is_outflow_boundary) 
-bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isBdDof_p0))
+bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isbddof))
 value_bd = bm.concatenate((uinflow[:,0],uinflow[:,1], bm.zeros(pgdof)))
 xx[bd] = value_bd[bd] 
-
-isBdDof = bm.concatenate([u_isbddof, u_isbddof, p_isBdDof_p0], axis=0)
 
 
 for i in range(10):
@@ -119,20 +117,12 @@ for i in range(10):
     
     SourceIntegrator.source = u0
     SourceIntegrator.clear()
+    ##LinearBlockForm 
     b0 = lform.assembly()
     b2 = bm.zeros(pgdof) 
     b = bm.concatenate([b0, b2])
     
-    ##LinearBlockForm
-    b -= A@xx
-    b[isBdDof] = xx[isBdDof]
-    
-    #A = DirichletBC(uspace, xx, threshold=isBdDof).apply_matrix(A, check=False)
-    #A,b = DirichletBC(uspace, xx, isDDof=isBdDof).apply(A, b, check=None)
-    diri = DirichletBC((uspace,pspace), xx ,threshold=isBdDof)
-    A = diri.apply_matrix(A)
-    b = diri.apply_vector(b, A)
-    exit() 
+    A,b = DirichletBC((uspace,pspace), xx, threshold=isBdDof).apply(A, b)
     x = spsolve(A, b, 'mumps')
     
     u1[:] = x[:ugdof]
