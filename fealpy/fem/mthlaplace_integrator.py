@@ -76,8 +76,6 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         cmcoeff = space.coeff
         bgm = MLaplaceBernsteinIntegrator(m=m, q=q).assembly(space.bspace)
-        print(bgm.dtype)
-        print(cmcoeff.dtype)
         M = bm.einsum('cil,clm,cpm->cip', cmcoeff, bgm, cmcoeff)
         return M
 

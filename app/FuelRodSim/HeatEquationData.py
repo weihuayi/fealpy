@@ -113,7 +113,7 @@ class FuelRod2dData:
     def duration(self):
         return [0, 1]
 
-    def source(self,p,t):
+    def source(self, p, t):
         return 0
 
     def dirichlet(self, p, t):

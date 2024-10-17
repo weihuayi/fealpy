@@ -1,7 +1,7 @@
 import time
 from fealpy.backend import backend_manager as bm
 import matplotlib.pyplot as plt
-from fealpy.iopt.ANT_TSP import calD, Ant_TSP
+from fealpy.opt.ANT_TSP import calD, Ant_TSP
 # bm.set_backend('pytorch')
 
 # 导入数据(34个城市)
