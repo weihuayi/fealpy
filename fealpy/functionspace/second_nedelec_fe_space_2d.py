@@ -96,7 +96,7 @@ class NedelecDof():
         c2e = self.mesh.cell_to_edge()
         c2esign = self.mesh.cell_to_face_sign()
 
-        c2d = bm.zeros((NC, ldof), dtype=self.itype)
+        c2d = bm.zeros((NC, ldof), dtype=bm.int64)
         # c2d[:, e2ldof] : (NC, 3, p+1), e2dof[c2e] : (NC, 3, p+1)
         tmp = e2dof[c2e]
         # tmp[~c2esign] = tmp[~c2esign, ::-1]       
