@@ -2,7 +2,7 @@ import numpy as np
 import gmsh
 
 #from fealpy.mesh import TriangleMesh
-from fealpy.mesh import TriangleMesh
+from fealpy.old.mesh import TriangleMesh
 
 class Mesh:
     def __init__(self):
@@ -86,7 +86,7 @@ gmsh.model.mesh.field.setAsBackgroundMesh(bg_field)
 #gmsh.option.setNumber("Mesh.MeshSizeMax", 20)
 gmsh.model.mesh.optimize('', True)
 gmsh.model.mesh.generate(2)
-#gmsh.fltk.run()
+gmsh.fltk.run()
 
 ntags, vxyz, _ = gmsh.model.mesh.getNodes()
 node = vxyz.reshape((-1,3))

@@ -26,6 +26,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         self.dof = LinearMeshCFEDof(mesh, p)
         self.multi_index_matrix = mesh.multi_index_matrix
 
+        self.device = mesh.device
         self.GD = mesh.geo_dimension()
         self.TD = mesh.top_dimension()
         

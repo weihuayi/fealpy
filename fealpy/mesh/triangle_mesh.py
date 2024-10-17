@@ -68,8 +68,11 @@ class TriangleMesh(SimplexMesh, Plotable):
         kwargs = {'dtype': self.ftype, 'device': self.device}
 
         if etype == 2:
-            from ..quadrature import TriangleQuadrature
-            quad = TriangleQuadrature(q, **kwargs)
+            from ..quadrature.stroud_quadrature import StroudQuadrature
+            if q > 9:
+                quad = StroudQuadrature(2, q)
+            else:
+                quad = TriangleQuadrature(q, **kwargs)
         elif etype == 1:
             from ..quadrature import GaussLegendreQuadrature
             quad = GaussLegendreQuadrature(q, **kwargs)
