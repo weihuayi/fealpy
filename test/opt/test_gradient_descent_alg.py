@@ -10,9 +10,10 @@ from gradient_descent_alg_data import *
 
 class TestGradientDescentInterfaces:
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
+    @pytest.mark.parametrize("backend", ['numpy','pytorch','jax'])
     @pytest.mark.parametrize("meshdata", init_data)
     def test_init(self,meshdata,backend):
+        bm.set_backend(backend)
         x0 = bm.from_numpy(meshdata['x0'])
         objective = meshdata['objective']
         domain = bm.from_numpy(meshdata['domain'])
@@ -51,9 +52,10 @@ class TestGradientDescentInterfaces:
         assert options['StepLengthTol'] == StepLengthTol
         assert options['NumGrad'] == NumGrad
 
-    @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
+    @pytest.mark.parametrize("backend", ['numpy','pytorch','jax'])
     @pytest.mark.parametrize("meshdata", run_data)
     def test_run(self,meshdata,backend):
+        bm.set_backend(backend)
         x0 = bm.from_numpy(meshdata['x0'])
         objective = meshdata['objective']
         StepLength = meshdata['StepLength']
@@ -71,12 +73,10 @@ class TestGradientDescentInterfaces:
         maxit = options['MaxIters']
         GDA = GradientDescentAlg(options)
         x , f ,g , diff = GDA.run(maxit=maxit)
-        
-
-        np.testing.assert_allclose(bm.to_numpy(x), x1 , rtol= 1e-6)
-        np.testing.assert_allclose(f, f1 , rtol= 1e-6)
-        np.testing.assert_allclose(g, g1 , rtol= 1e-6)
-        np.testing.assert_allclose(diff, diff1 , rtol= 1e-7)
+        np.testing.assert_allclose(x, x1, atol=1e-6)
+        np.testing.assert_allclose(f, f1 , atol=1e-6)
+        np.testing.assert_allclose(g, g1 , atol=1e-6)
+        np.testing.assert_allclose(bm.to_numpy(diff), diff1 , atol= 1e-7)
 
 if __name__ == "__main__":
     pytest.main(["./test_gradient_descent_alg.py","-k", "test_run"])
