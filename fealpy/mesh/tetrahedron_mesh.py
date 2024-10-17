@@ -96,7 +96,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         face = self.face
         NF = len(face2edge)
         NEF = 3
-        face2edgeSign = bm.zeros((NF, NEF), dtype=bm.bool)
+        face2edgeSign = bm.zeros((NF, NEF),device=bm.get_device(face), dtype=bm.bool)
         n = [1, 2, 0]
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
@@ -194,7 +194,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         node = self.node
         cell = self.cell
         NC = self.number_of_cells() if index == _S else len(index)
-        Dlambda = bm.zeros((NC, 4, 3), dtype=self.ftype)
+        Dlambda = bm.zeros((NC, 4, 3), device=self.device, dtype=self.ftype)
         volume = self.entity_measure('cell', index=index)
         for i in range(4):
             j,k,m = localFace[i]
@@ -213,7 +213,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         v2 = node[face[..., 1]] - node[face[..., 0]]
         GD = self.geo_dimension()
         nv = bm.cross(v1, v2)
-        Dlambda = bm.zeros((NF, 3, GD), dtype=self.ftype)
+        Dlambda = bm.zeros((NF, 3, GD),device=bm.get_device(face), dtype=self.ftype)
 
         length = bm.linalg.norm(nv, axis=-1, keepdims=True)
         n = nv / length

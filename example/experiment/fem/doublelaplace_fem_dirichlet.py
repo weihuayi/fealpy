@@ -62,8 +62,6 @@ y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
 ulist = get_flist(u)[:3]
-import ipdb
-ipdb.set_trace()
 mesh = TriangleMesh.from_box([0,1,0,1], n, n)
 NDof = bm.zeros(maxit, dtype=bm.float64)
 
@@ -94,6 +92,7 @@ for i in range(maxit):
     lform.add_integrator(ScalarSourceIntegrator(pde.source, q=p+4))
 
     A = bform.assembly()
+    #print(space.number_of_global_dofs())
     F = lform.assembly()
     tmr.send(f'第{i}次矩组装时间')
 
@@ -105,7 +104,10 @@ for i in range(maxit):
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
     A = A.to_scipy()
-    print(type(A))
+
+    from numpy.linalg import cond
+    print(gdof)
+    print(cond(A.toarray()))
     #A = coo_matrix(A)
     #A = csr_matrix((A.values(), A.indices()),A.shape)
     uh[:] = bm.tensor(spsolve(A, F))

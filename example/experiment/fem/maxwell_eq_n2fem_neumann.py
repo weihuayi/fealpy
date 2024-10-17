@@ -33,35 +33,12 @@ from fealpy.decorator import cartesian, barycentric
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
-from fealpy.solver import cg
+from fealpy.solver import spsolve
 
 from fealpy.pde.maxwell_2d import SinData as PDE2d
-from fealpy.pde.maxwell_3d import BubbleData as PDE3d
+from fealpy.pde.maxwell_3d import BubbleData3d as PDE3d
 from fealpy.utils import timer
 
-
-def Solve(A, b):
-    
-    # from mumps import DMumpsContext
-    # from scipy.sparse.linalg import minres, gmres
-
-    A = coo_matrix((A.values(), (A.indices()[0], A.indices()[1])), shape=(gdof, gdof))
-    # NN = len(b)
-    # ctx = DMumpsContext()
-    # ctx.set_silent()
-    # ctx.set_centralized_sparse(A)
-
-    # x = np.array(b)
-
-    # ctx.set_rhs(x)
-    # ctx.run(job=6)
-    # ctx.destroy() # Cleanup
-    '''
-    #x, _ = minres(A, b, x0=b, tol=1e-10)
-    x, _ = gmres(A, b, tol=1e-10)
-    '''
-    x = spsolve(A,b)
-    return x
 
 # 参数解析
 parser = argparse.ArgumentParser(description=
@@ -87,10 +64,8 @@ parser.add_argument('--maxit',
 
 args = parser.parse_args()
 p = args.degree
-#maxit = args.maxit
-maxit = 3
-#dim = args.dim
-dim = 3
+maxit = args.maxit
+dim = args.dim
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -144,7 +119,7 @@ for j, p in enumerate(ps):
         tmr.send(f'第{i}次边界处理时间')
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-        Eh[:] = bm.tensor(Solve(A, F))
+        Eh[:] = spsolve(A,F,"scipy")
         tmr.send(f'第{i}次求解器时间')
 
         # 计算误差

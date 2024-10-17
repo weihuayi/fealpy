@@ -55,22 +55,17 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         phi = space0.basis(bcs, index=index)
-        gphi = scalar_space.grad_basis(bcs ,index=index)
-        if space1.dof_priority:
-            gphi = gphi.swapaxes(-1,-2)
-            gphi = gphi.reshape(*gphi.shape[:2], -1) 
-        else:
-            gphi = gphi.reshape(*gphi.shape[:2], -1)
+        gphi = space1.grad_basis(bcs ,index=index)
         return phi, gphi, cm, bcs, ws, index
 
     def assembly(self, space: _FS) -> TensorLike:
         assert space[0].mesh == space[1].mesh, "The mesh should be same for two space " 
         coef = self.coef
         mesh = getattr(space[0], 'mesh', None)
-        phi, gphi, cm, bcs, ws, index = self.fetch(space) 
+        phi, gphi, cm, bcs, ws, index = self.fetch(space)
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        gphi = bm.einsum('...ii->...', gphi)
         result = bilinear_integral(gphi, phi, ws, cm, val, batched=self.batched)
-        print(result.shape)
         return result
 
 
@@ -104,7 +99,6 @@ class PressWorkIntegrator0(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-
         phi = space0.basis(bcs, index=index)
         gphi = space1.grad_basis(bcs, index=index)
         return phi, gphi, cm, bcs, ws, index

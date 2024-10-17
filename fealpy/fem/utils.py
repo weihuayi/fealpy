@@ -67,20 +67,4 @@ def shear_strain(gphi: TensorLike, indices: TensorLike, *, out:
             out = bm.set_at(out, (..., cursor, indices[:, j]), gphi[..., :, i])
             cursor += 1
 
-    # # TODO: Provide a unified implementation that is not backend-specific
-    # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-    #     for i in range(0, GD-1):
-    #         for j in range(i+1, GD):
-    #             out[..., cursor, indices[:, i]] = gphi[..., :, j]
-    #             out[..., cursor, indices[:, j]] = gphi[..., :, i]
-    #             cursor += 1
-    # elif bm.backend_name == 'jax':
-    #     for i in range(0, GD-1):
-    #         for j in range(i+1, GD):
-    #             out = out.at[..., cursor, indices[:, i]].set(gphi[..., :, j])
-    #             out = out.at[..., cursor, indices[:, j]].set(gphi[..., :, i])
-    #             cursor += 1
-    # else:
-    #     raise NotImplementedError("Backend is not yet implemented.")
-
     return out

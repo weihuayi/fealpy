@@ -25,9 +25,10 @@ class Mesh(MeshDS):
 
     GD = property(geo_dimension)
 
-    def multi_index_matrix(self, p: int, etype: int, dtype=None) -> TensorLike:
+    def multi_index_matrix(self, p: int, etype: int, dtype=None, device=None) -> TensorLike:
         dtype = self.itype if dtype is None else dtype
-        return bm.multi_index_matrix(p, etype, dtype=dtype)
+        device = self.device if device is None else device
+        return bm.device_put(bm.multi_index_matrix(p, etype, dtype=dtype), device=device)
 
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """Get the barycenter of the entity.
@@ -609,8 +610,7 @@ class TensorMesh(HomogeneousMesh):
 
     def quad_to_ipoint(self, p, index=None):
         """
-        @brief 生成每个面上的插值点全局编号
-        @note 本函数可能出现 jax 不兼容问题
+        @brief Generate global indices for interpolation points on each face
         """
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -620,7 +620,7 @@ class TensorMesh(HomogeneousMesh):
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
 
-        mi = bm.repeat(bm.arange(p+1), p+1).reshape(-1, p+1)
+        mi = bm.repeat(bm.arange(p+1, device=bm.get_device(edge)), p+1).reshape(-1, p+1)
         multiIndex0 = mi.flatten().reshape(-1, 1);
         multiIndex1 = mi.T.flatten().reshape(-1, 1);
         multiIndex = bm.concatenate([multiIndex0, multiIndex1], axis=1)
@@ -630,25 +630,28 @@ class TensorMesh(HomogeneousMesh):
         dofidx[1], = bm.nonzero(multiIndex[:, 0]==p)
         dofidx[2], = bm.nonzero(multiIndex[:, 1]==p)
         dofidx[3], = bm.nonzero(multiIndex[:, 0]==0)
+        
 
         face2ipoint = bm.zeros([NF, (p+1)**2], dtype=self.itype, device=bm.get_device(edge))
-        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], dtype=self.itype, device=bm.get_device(edge))
-        for i in range(4): #边上的自由度
+        localEdge = bm.array([[0, 1], [1, 2], [3, 2], [0, 3]], 
+                            dtype=self.itype, device=bm.get_device(edge))
+        for i in range(4):
             ge = face2edge[:, i]
             idx = bm.nonzero(face[:, localEdge[i, 0]] != edge[ge, 0])[0]
 
-            face2ipoint = bm.set_at(face2ipoint, (slice(None), dofidx[i]), edge2ipoint[ge])
-            face2ipoint = bm.set_at(face2ipoint, (idx[:, None], dofidx[i]), bm.flip(edge2ipoint[ge[idx]], axis=1))
-            # face2ipoint[:, dofidx[i]] = edge2ipoint[ge] # TODO jax 不兼
-            # face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1) # TODO jax 不兼容
+            face2ipoint = bm.set_at(face2ipoint, (slice(None), dofidx[i]), 
+                                edge2ipoint[ge])
+            face2ipoint = bm.set_at(face2ipoint, (idx[:, None], dofidx[i]), 
+                                bm.flip(edge2ipoint[ge[idx]], axis=1))
+            # face2ipoint[:, dofidx[i]] = edge2ipoint[ge]
+            # face2ipoint[idx[:, None], dofidx[i]] = bm.flip(edge2ipoint[ge[idx]], axis=1)
 
         indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
         face2ipoint = bm.set_at(face2ipoint, (slice(None), indof), 
                     bm.arange(NN + NE * (p - 1), NN + NE * (p - 1) + NF * (p - 1) ** 2, 
                     dtype=self.itype, device=bm.get_device(edge)).reshape(NF, -1))
-
         # face2ipoint[:, indof] = bm.arange(NN+NE*(p-1), NN+NE*(p-1)+NF*(p-1)**2, 
-        #                     dtype=self.itype, device=bm.get_device(edge)).reshape(NF, -1) # TODO jax 不兼容
+        #                     dtype=self.itype, device=bm.get_device(edge)).reshape(NF, -1)
         face2ipoint = face2ipoint[index]
         
         return face2ipoint
