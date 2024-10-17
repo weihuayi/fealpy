@@ -161,12 +161,12 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
     def interpolation_points(self, p:int, index: Index = _S):
         """
-        @brief 获取四边形网格上所有 p 次插值点
+        @brief Get all p-th order interpolation points on the quadrilateral mesh
         """
         cell = self.entity('cell')
         node = self.entity('node')
         if p == 1:
-            return node
+            return node[index]
 
         GD = self.geo_dimension()
 
@@ -181,7 +181,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
         ipoints = bm.concatenate((node, ipoints0, ipoints1), axis=0)
 
-        return ipoints
+        return ipoints[index]
 
     def number_of_corner_nodes(self):
         return self.number_of_nodes()
