@@ -68,4 +68,19 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
     #return bilinear_integral(gmphi1, gmphi, ws, cm, coef,
     #                             batched=self.batched)
 
+    @assemblymethod('without_numerical_integration')
+    def assembly_without_numerical_integration(self, space: _FS):
+        from .bilinear_form import BilinearForm
+        from .mlaplace_bernstein_integrator import MLaplaceBernsteinIntegrator
+        m = self.m
+        q = space.p+3 if self.q is None else self.q
+        cmcoeff = space.coeff
+        bgm = MLaplaceBernsteinIntegrator(m=m, q=q).assembly(space.bspace)
+        print(bgm.dtype)
+        print(cmcoeff.dtype)
+        M = bm.einsum('cil,clm,cpm->cip', cmcoeff, bgm, cmcoeff)
+        return M
+
+        
+
 

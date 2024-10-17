@@ -7,7 +7,7 @@ from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
 from fealpy.functionspace.cm_conforming_fe_space3d import CmConformingFESpace3d 
 from fealpy.fem import LinearForm 
 from fealpy.fem.scalar_mlaplace_source_integrator import ScalarMLaplaceSourceIntegrator
-#from fealpy.tests.fem.mthlaplace_integrator_data import *
+from fealpy.tests.fem.mthlaplace_integrator_data import *
 from fealpy.pde.biharmonic_triharmonic_3d import get_flist
 class TestScalarMLaplaceSourceIntegrator:
     @pytest.mark.parametrize("backend", ['numpy','pytorch'])

@@ -8,7 +8,7 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
-from .bernstein_fe_space import BernsteinFESpace
+from fealpy.functionspace.bernstein_fe_space import BernsteinFESpace
 from .functional import symmetry_span_array, symmetry_index, span_array
 from scipy.special import factorial, comb
 from fealpy.decorator import barycentric
@@ -260,6 +260,20 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         ## cell
         c2dof[:, ldof-cidof:] = c2id
         return c2dof
+    def is_boundary_dof(self, threshold=None): #TODO:threshold 未实现
+        mesh = self.mesh
+        gdof = self.number_of_global_dofs()
+        isbdnode = mesh.boundary_node_flag()
+        isbdedge = mesh.boundary_edge_flag()
+        isbdFace = mesh.boundary_face_flag()
+        bd1 = self.node_to_dof()[isbdnode]
+        bd2 = self.edge_to_internal_dof()[isbdedge]
+        bd3 = self.face_to_internal_dof()[isbdFace]
+        bd = bm.concatenate([bd1.flatten(), bd2.flatten(), bd3.flatten()])
+        isBdDof = bm.zeros(gdof, dtype=bm.bool)
+        isBdDof[bd] = True
+        return isBdDof 
+
     def get_corner(self):
         """
         @brief 获取角点, 角边, 不太对啊
@@ -540,10 +554,10 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         coeff[:, 4*ndof:4*ndof+6*edof] = bm.einsum('cji, cjk->cik',coeff2, coeff[:, 4*ndof:4*ndof+6*edof])
         return coeff[:, : , dof2num]
 
-    def basis(self, bcs):
+    def basis(self, bcs, index=_S):
         coeff = self.coeff
         bphi = self.bspace.basis(bcs)
-        return bm.einsum('cil, cql -> cqi', coeff, bphi)
+        return bm.einsum('cil, cql -> cqi', coeff, bphi)[:,:,index]
 
     def grad_m_basis(self, bcs, m):
         coeff = self.coeff
@@ -705,7 +719,58 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         S3 = self.dof_index["cell"]
         fI[c2id] = bcoeff[:, S3]
         return fI
+
+    def boundary_interpolate(self, gD, uh, threshold=None):
+        mesh = self.mesh
+        m = self.m
+        p = self.p
+        isCornerNode = self.isCornerNode
+        isBdNode = mesh.boundary_node_flag()
+        isBdEdge = mesh.boundary_edge_flag()
+        isBdFace = mesh.boundary_face_flag()
+
+        node = mesh.entity('node')[isBdNode]
+        edge = mesh.entity('edge')[isBdEdge]
+        face = mesh.entity('face')[isBdFace]
+
+        NN = len(node)
+        NE = len(edge)
+        NF = len(face)
+
+        nodeframe, edgeframe, faceframe = self.get_frame()
+        nodeframe = nodeframe[isBdNode]
+        edgeframe = edgeframe[isBdEdge]
+        faceframe = faceframe[isBdFace]
+
+        n2id = self.node_to_dof()[isBdNode]
+        e2id = self.edge_to_internal_dof()[isBdEdge]
+        f2id = self.face_to_internal_dof()[isBdFace]
+        # 顶点
+        uh[n2id[:, 0]] = gD[0](node)
+        k = 1
+        for r in range(1, 4*m+1):
+            val = gD[r](node)
+            symidx, num = symmetry_index(3, r)
+            #bdnidxmap = 
+            idx = bdnidxmap[coridx]
+            #print(idx)
+        return
+
+        
+
+
     
+
+
+
+
+
+
+
+
+
+
+
 
 
 
