@@ -26,7 +26,7 @@ class NedelecDof():
         self.multiindex3 = mesh.multi_index_matrix(p,3)
         self.ftype = mesh.ftype
         self.itype = mesh.itype
-
+        self.device=mesh.device
 
     def edge_to_local_face_dof(self):
         multiindex = self.multiindex2
@@ -53,7 +53,7 @@ class NedelecDof():
         ldof = self.number_of_local_dofs()
 
         fdof = self.number_of_local_dofs('faceall')
-        f2ld = bm.zeros((4, fdof), dtype=self.itype)
+        f2ld = bm.zeros((4, fdof),device=self.device, dtype=self.itype)
         eldof = self.edge_to_local_face_dof()
         nldof = bm.tensor([[eldof[(i+1)%3, 0], eldof[(i+2)%3, -1]] for i in range(3)])
 
@@ -91,10 +91,10 @@ class NedelecDof():
         cdof = self.number_of_local_dofs('cell')
         fdof = self.number_of_local_dofs('faceall')
 
-        isndof = bm.zeros(ldof, dtype=bm.bool)
+        isndof = bm.zeros(ldof, device=self.device, dtype=bm.bool)
         isndof[f2ld] = True
 
-        c2d = bm.zeros((NC, ldof), dtype=bm.int64)#
+        c2d = bm.zeros((NC, ldof), device=self.device, dtype=bm.int64)#
         idx = bm.zeros((NC, 3), dtype=self.itype)
         fe = bm.tensor([[0, 1], [0, 2], [1, 2]], dtype=self.itype) #局部边
         for i in range(4):
@@ -235,7 +235,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         c2v = self.basis_vector() #(NC, ldof, GD)
         
         shape = bc.shape[:-1]
-        val = bm.zeros((NC,)+ shape + (ldof, GD), dtype=self.ftype)
+        val = bm.zeros((NC,)+ shape + (ldof, GD),device=self.device, dtype=self.ftype)
 
         bval = self.lspace.basis(bc) #(NC, NQ, ldof//3)
 
@@ -260,7 +260,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         f2v = self.face_basis_vector(index=index)#(NF, ldof, GD)
         NF = len(f2v)
         shape = bc.shape[:-1]
-        val = bm.zeros((NF,) + shape+(ldof, GD), dtype=self.ftype)
+        val = bm.zeros((NF,) + shape+(ldof, GD), device=self.device, dtype=self.ftype)
 
         bval = self.lspace.basis(bc) #(NF, NQ, ldof//3)
 
@@ -293,7 +293,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
 
         NF = len(f2e)
 
-        f2v = bm.zeros((NF, ldof, GD), dtype=self.ftype)
+        f2v = bm.zeros((NF, ldof, GD),device=self.device, dtype=self.ftype)
         # f2v[:, :ldof//2] = e2t[:, 0, None] #(NF, ldof//2, 3)
         # f2v[:, ldof//2:] = e2n[:, 0, None]
         f2v = bm.set_at(f2v,(slice(None),slice(None,ldof//2)),e2t[:, 0, None])
@@ -340,7 +340,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
 
         NF = len(f2e)
 
-        f2v = bm.zeros((NF, ldof, GD), dtype=self.ftype)
+        f2v = bm.zeros((NF, ldof, GD), device=self.device,dtype=self.ftype)
         # f2v[:, :ldof//2] = e2t[:, 0, None] #(NF, ldof//2, 3)
         # f2v[:, ldof//2:] = e2n[:, 0, None]
         f2v = bm.set_at(f2v,(slice(None),slice(None,ldof//2)),e2t[:, 0, None])
@@ -366,7 +366,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
 
         c2v = self.basis_vector()#(NC, ldof, GD)
         sgval = self.lspace.grad_basis(bc) #(NQ, NC, lldof, GD)
-        val = bm.zeros((NC,)+(bc.shape[0], )+(ldof, GD), dtype=self.ftype)
+        val = bm.zeros((NC,)+(bc.shape[0], )+(ldof, GD),device=self.device, dtype=self.ftype)
 
         # val[..., :ldof//3, :] = bm.cross(sgval, c2v[:,None, :ldof//3, :])
         # val[..., ldof//3:2*(ldof//3), :] = bm.cross(sgval, c2v[:,None, ldof//3:2*(ldof//3), :])
@@ -544,7 +544,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         uh[face2dof[:, ldof//2:]] = bm.sum(gval*f2v[:, ldof//2:], axis=-1)
         # uh[face2dof[:, :ldof//2]] =0
         # uh[face2dof[:, ldof//2:]] =0
-        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        isDDof = bm.zeros(gdof, device=self.device,dtype=bm.bool)
         isDDof[face2dof] = True
         return uh,isDDof
     
@@ -564,7 +564,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         points = mesh.bc_to_point(bcs)[isbdFace]
         n = mesh.face_unit_normal()[isbdFace]
         hval = gD(points,n)
-        vec = bm.zeros(gdof, dtype=self.ftype)
+        vec = bm.zeros(gdof, device=self.device,dtype=self.ftype)
         k = bm.einsum('fqg, fqlg,q,f->fl', hval, bphi,ws,fm) # (NF, ldof)
         bm.add.at(vec,face2dof,k)
         #bm.scatter_add(vec,face2dof,k)

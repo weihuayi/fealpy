@@ -65,9 +65,11 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 p = args.degree
 maxit = args.maxit
+maxit = 3
 dim = args.dim
+dim = 3
 backend = args.backend
-bm.set_backend("pytorch")
+bm.set_backend(backend)
 if dim == 2:
     pde = PDE2d()
 else:
@@ -79,8 +81,8 @@ errorType = ['$|| E - E_h||_0$ with k=2',
              '$||\\nabla \\times u - \\nabla_h \\times u_h||_0$ with k=2',
              '$||\\nabla \\times u - \\nabla_h \\times u_h||_0$ with k=3',
              '$||\\nabla \\times u - \\nabla_h \\times u_h||_0$ with k=4']
-errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
-NDof = bm.zeros(maxit, dtype=bm.float64)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.float64)
 
 tmr = timer()
 next(tmr)
