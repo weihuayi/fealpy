@@ -281,6 +281,7 @@ class TestCmfespace3d:
         #print(idxx)
 
         boundary_dof = space.is_boundary_dof()
+        #boundary_dof = space.is_boundary_dof1()
         mul = space.multiIndex
         all_edge_dof_index = bm.concatenate([bm.concatenate(item) if isinstance(item, list) else item for sublist in idxx for item in sublist])
 
