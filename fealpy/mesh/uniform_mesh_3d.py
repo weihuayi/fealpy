@@ -72,9 +72,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
     * Edge numbering rule: first in the z direction, then in the y direction, and then in the x direction
     * Cell numbering rule: first in the z direction, then in the y direction, and then in the x direction
     """
-    def __init__(self, extent: tuple[int, int, int, int, int, int] = (0, 1, 0, 1, 0, 1), 
-             h: tuple[float, float, float] = (1.0, 1.0, 1.0), 
-             origin: tuple[float, float, float] = (0.0, 0.0, 0.0), 
+    def __init__(self, extent: Tuple[int, int, int, int, int, int] = (0, 1, 0, 1, 0, 1), 
+             h: Tuple[float, float, float] = (1.0, 1.0, 1.0), 
+             origin: Tuple[float, float, float] = (0.0, 0.0, 0.0), 
              ipoints_ordering='zyx', 
              flip_direction=None, 
              itype=None, ftype=None):
@@ -1266,7 +1266,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         if etype == 3:
             return TensorProductQuadrature((qf, qf, qf))
         elif etype == 2:

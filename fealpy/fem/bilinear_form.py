@@ -52,8 +52,8 @@ class BilinearForm(Form[LinearInt]):
         sparse_shape = (vgdof, ugdof)
 
         M = COOTensor(
-            indices = bm.empty((2, 0), dtype=space[0].itype),
-            values = bm.empty(init_value_shape, dtype=space[0].ftype),
+            indices = bm.empty((2, 0), dtype=space[0].itype, device=bm.get_device(space[0])),
+            values = bm.empty(init_value_shape, dtype=space[0].ftype, device=bm.get_device(space[0])),
             spshape = sparse_shape
         )
 
@@ -65,7 +65,6 @@ class BilinearForm(Form[LinearInt]):
 
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
-
             I = bm.broadcast_to(ve2dof[:, :, None], local_shape)
             J = bm.broadcast_to(ue2dof[:, None, :], local_shape)
             indices = bm.stack([I.ravel(), J.ravel()], axis=0)

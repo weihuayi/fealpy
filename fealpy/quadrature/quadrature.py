@@ -2,14 +2,14 @@
 from typing import Tuple, Optional
 
 from ..backend import TensorLike
-from ..backend import backend_manager
+from ..backend import backend_manager as bm
 
 
 class Quadrature():
     r"""Base class for quadrature generators."""
-    def __init__(self, index: Optional[int]=None, *,
-                 dtype=None) -> None:
-        self.dtype = dtype
+    def __init__(self, index: Optional[int]=None, *, dtype=None, device=None) -> None:
+        self.dtype = dtype if dtype else bm.float64
+        self.device = device
         self.quadpts, self.weights = self.make(index)
 
     def __len__(self) -> int:

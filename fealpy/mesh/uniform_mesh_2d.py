@@ -69,9 +69,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     """
 
-    def __init__(self, extent: tuple[int, int, int, int] = (0, 1, 0, 1), 
-                h: tuple[float, float] = (1.0, 1.0), 
-                origin: tuple[float, float] = (0.0, 0.0), 
+    def __init__(self, extent: Tuple[int, int, int, int] = (0, 1, 0, 1), 
+                h: Tuple[float, float] = (1.0, 1.0), 
+                origin: Tuple[float, float] = (0.0, 0.0), 
                 ipoints_ordering='yx', 
                 flip_direction=None, 
                 *, itype=None, ftype=None, device=None):
@@ -826,7 +826,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
-        qf = GaussLegendreQuadrature(q)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         if etype == 2:
             return TensorProductQuadrature((qf, qf))
         elif etype == 1:

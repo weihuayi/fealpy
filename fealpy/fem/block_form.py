@@ -29,7 +29,7 @@ class BlockForm(Form):
     def shape(self) -> Size:
         return self.sparse_shape
 
-    def assembly(self, format='coo'):
+    def assembly(self, format='csr'):
         a = bm.max(self.block_shape[...,0], axis=1)
         row_offset = bm.cumsum(bm.max(self.block_shape[...,0],axis = 1), axis=0)
         col_offset = bm.cumsum(bm.max(self.block_shape[...,1],axis = 0), axis=0)
@@ -41,6 +41,7 @@ class BlockForm(Form):
             if block is not None:
                 indices = bm.empty((2, 0), dtype=block.space.mesh.itype)
                 values = bm.empty((0,), dtype=block.space.mesh.ftype)
+                break
         sparse_shape = self.shape
         
         for i in range(self.nrows):
@@ -48,13 +49,13 @@ class BlockForm(Form):
                 block = self.blocks[i][j]
                 if block is None:
                     continue
-                ## 不用assemble的方法
                 block_matrix = block.assembly().tocoo()
                 block_indices = block_matrix.indices() + bm.array([[row_offset[i]], [col_offset[j]]])
                 block_values = block_matrix.values() 
                 indices = bm.concatenate((indices, block_indices), axis=1)
                 values = bm.concatenate((values, block_values))
         M = COOTensor(indices, values, sparse_shape) 
+        
         if format == 'csr':
             self._M = M.coalesce().tocsr()
         elif format == 'coo':

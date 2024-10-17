@@ -6,26 +6,32 @@ from .plot import Plotable
 
 class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
-        super(HexahedronMesh, self).__init__(TD=3, itype = cell.dtype, ftype = node.dtype)
+        super(HexahedronMesh, self).__init__(TD = 3, 
+                                        itype = cell.dtype, ftype = node.dtype)
         self.node = node
         self.cell = cell
+
+        self.meshtype = 'hex'
+        self.p = 1
+
+        kwargs = bm.context(cell)
 
         self.localEdge = bm.array([
             (0, 1), (1, 2), (2, 3), (0, 3),
             (0, 4), (1, 5), (2, 6), (3, 7),
-            (4, 5), (5, 6), (6, 7), (4, 7)])
+            (4, 5), (5, 6), (6, 7), (4, 7)], **kwargs)
         self.localFace = bm.array([
             (0, 3, 2, 1), (4, 5, 6, 7), # bottom and top faces
             (0, 4, 7, 3), (1, 2, 6, 5), # left and right faces
-            (0, 1, 5, 4), (2, 3, 7, 6)])# front and back faces
+            (0, 1, 5, 4), (2, 3, 7, 6)], **kwargs)# front and back faces
         self.localFace2edge = bm.array([
             (3,  2, 1, 0), (8, 9, 10, 11),
             (4, 11, 7, 3), (1, 6,  9,  5),
-            (0,  5, 8, 4), (2, 7, 10,  6)])
+            (0,  5, 8, 4), (2, 7, 10,  6)], **kwargs)
         self.localEdge2face = bm.array([
             [4, 0], [3, 0], [5, 0], [0, 2],
             [2, 4], [4, 3], [3, 5], [5, 2],
-            [1, 4], [1, 3], [1, 5], [2, 1]])
+            [1, 4], [1, 3], [1, 5], [2, 1]], **kwargs)
 
         self.construct()
         self.nodedata = {}
@@ -45,7 +51,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         @brief 获取不同维度网格实体上的积分公式
         """
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
-        qf = GaussLegendreQuadrature(q, dtype=self.ftype)
+        qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         if etype in {'cell', 3}:
             return TensorProductQuadrature((qf, qf, qf))
         elif etype in {'face', 2}:
@@ -130,22 +136,22 @@ class HexahedronMesh(TensorMesh, Plotable):
 
     def interpolation_points(self, p, index=_S):
         """
-        @brief 生成整个网格上的插值点
+        @brief Generate interpolation points for the entire mesh
         """
-        node = self.entity('node')
         cell = self.entity('cell')
-        NC = self.number_of_cells()
 
         c2ip = self.cell_to_ipoint(p)
         gp = self.number_of_global_ipoints(p)
-        ipoint = bm.zeros([gp, 3], dtype=self.ftype)
+        ipoint = bm.zeros([gp, 3], dtype=self.ftype, device=bm.get_device(cell))
 
-        line = (bm.linspace(0, 1, p+1, endpoint=True, dtype=self.ftype)).reshape(-1, 1)
+        line = (bm.linspace(0, 1, p+1, endpoint=True, 
+                        dtype=self.ftype, device=bm.get_device(cell))).reshape(-1, 1)
         line = bm.concatenate([1-line, line], axis=1)
         bcs = (line, line, line)
 
         cip = self.bc_to_point(bcs)
         ipoint[c2ip] = cip
+
         return ipoint
 
     def face_to_ipoint(self, p, index=_S):
@@ -156,10 +162,8 @@ class HexahedronMesh(TensorMesh, Plotable):
 
     def cell_to_ipoint(self, p, index=_S):
         """!
-        @brief 生成每个单元上的插值点全局编号
-        @note 本函数在 jax 后端下不可用
+        @brief Generate global indices for interpolation points in each cell
         """
-
         cell = self.entity('cell', index=index)
         if p == 1:
             return cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]
@@ -169,9 +173,6 @@ class HexahedronMesh(TensorMesh, Plotable):
         NF = self.number_of_faces()
         NC = self.number_of_cells()
 
-        edge = self.entity('edge')
-        face = self.entity('face')
-
         cell2face = self.cell_to_face()
         face2edge = self.face_to_edge()
         cell2edge = self.cell_to_edge()
@@ -179,14 +180,15 @@ class HexahedronMesh(TensorMesh, Plotable):
         face2ipoint = self.face_to_ipoint(p)
 
         shape = (p+1, p+1, p+1)
-        mi    = bm.arange(p+1)
+        mi = bm.arange(p+1, device=bm.get_device(cell))
         multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
         multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
         multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
 
         multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
 
-        dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
+        dofidx = bm.zeros((6, (p+1)**2), 
+                        dtype=self.itype, device=bm.get_device(cell))
         dofidx[0], = bm.nonzero(multiIndex[:, 2]==0)
         dofidx[1], = bm.nonzero(multiIndex[:, 2]==p)
         dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
@@ -194,7 +196,8 @@ class HexahedronMesh(TensorMesh, Plotable):
         dofidx[4], = bm.nonzero(multiIndex[:, 1]==0)
         dofidx[5], = bm.nonzero(multiIndex[:, 1]==p)
 
-        cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
+        cell2ipoint = bm.zeros([NC, (p+1)**3], 
+                            dtype=self.itype, device=bm.get_device(cell))
         lf2e = bm.array([[0, 1, 2, 3], [8, 9, 10, 11],
                          [3, 7, 11, 4], [1, 6, 9, 5],
                          [0, 5, 8, 4], [2, 6, 10, 7]], dtype=self.itype)
@@ -204,7 +207,7 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         lf2e = lf2e[:, [3, 0, 1, 2]]
         face2edge = face2edge[:, [3, 0, 1, 2]]
-        for i in range(6): #面上的自由度
+        for i in range(6):
             gfe = face2edge[cell2face[:, i]]
             lfe = cell2edge[:, lf2e[i]]
             idx0 = bm.argsort(gfe, axis=-1)
@@ -214,23 +217,30 @@ class HexahedronMesh(TensorMesh, Plotable):
             idx = multiIndex2d[:, idx0].swapaxes(0, 1) #(NC, NQ, 4)
 
             idx = idx[..., 0]*(p+1)+idx[..., 1]
-            cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
+            cell2ipoint = bm.set_at(cell2ipoint, (slice(None), dofidx[i]), 
+                                    face2ipoint[cell2face[:, i, None], idx])
+            # cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
 
-        indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
-        cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
-                NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+        indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
+        cell2ipoint = bm.set_at(cell2ipoint, (slice(None), indof),
+                        bm.arange(NN + NE*(p-1) + NF*(p-1)**2, NN + NE*(p-1) + NF*(p-1)**2 + NC*(p-1)**3, 
+                        device=bm.get_device(cell)).reshape(NC, -1))
+        # cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
+        #         NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+
         return cell2ipoint[index]
 
     def uniform_refine(self, n=1):
         """
-        @brief 一致加密六面体网格 n 次
+        @brief Uniformly refine the hexahedral mesh n times
         """
         for i in range(n):
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NF = self.number_of_faces()
             NC = self.number_of_cells()
-            node = bm.zeros((NN + NE + NF + NC, 3), dtype=self.ftype)
+            node = bm.zeros((NN + NE + NF + NC, 3), 
+                            dtype=self.ftype, device=self.device)
             start = 0
             end = NN
             node[start:end] = self.entity('node')
@@ -244,11 +254,12 @@ class HexahedronMesh(TensorMesh, Plotable):
             end = start + NF
             node[start:end] = self.entity_barycenter('cell')
 
-            cell = bm.zeros((8*NC, 8), dtype=self.itype)
+            cell = bm.zeros((8*NC, 8), 
+                            dtype=self.itype, device=self.device)
             c2n = self.entity('cell')
             c2e = self.cell_to_edge() + NN
             c2f = self.cell_to_face() + (NN + NE)
-            c2c = bm.arange(NC) + (NN + NE + NF)
+            c2c = bm.arange(NC, device=bm.get_device(cell)) + (NN + NE + NF)
 
             cell[0::8, 0] = c2n[:, 0]
             cell[0::8, 1] = c2e[:, 0]

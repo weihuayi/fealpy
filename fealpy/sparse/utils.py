@@ -41,7 +41,8 @@ def shape_to_strides(shape: Size, item_size: int):
 def flatten_indices(indices: TensorLike, shape: Size) -> TensorLike:
     nnz = indices.shape[-1]
     strides = shape_to_strides(shape, 1)
-    flatten = bm.zeros((nnz,), dtype=indices.dtype)
+    kwargs = bm.context(indices)
+    flatten = bm.zeros((nnz,), **kwargs)
 
     for d, s in enumerate(strides):
         flatten += indices[d, :] * s

@@ -19,21 +19,20 @@ from fealpy.fem import (
         ScalarMassIntegrator, PressWorkIntegrator0, PressWorkIntegrator ,
         PressWorkIntegrator1, ScalarConvectionIntegrator)
 
-
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.sparse import COOTensor
 from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import BlockForm
-from fealpy.solver import cg 
+from fealpy.solver import spsolve 
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.decorator import barycentric, cartesian
-from fealpy.timeintegratoralg import UniformTimeLine
+from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
-backend = 'pytorch'
-#backend = 'numpy'
+#backend = 'pytorch'
+backend = 'numpy'
 bm.set_backend(backend)
 
 output = './'
@@ -46,18 +45,14 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-omesh = pde.mesh1(0.05)
-node = bm.from_numpy(omesh.entity('node'))
-cell = bm.from_numpy(omesh.entity('cell'))
-mesh = TriangleMesh(node, cell)
-
+mesh = pde.mesh1(0.05)
 
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
 uspace = LagrangeFESpace(mesh, p=udegree)
-tensor_uspace = TensorFunctionSpace(uspace, (-1, 2))
+tensor_uspace = TensorFunctionSpace(uspace, (2, -1))
 
 u0x = uspace.function()
 u0y = uspace.function()
@@ -74,32 +69,34 @@ fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['velocity'] = u0 
 mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
+APX_bform = BilinearForm((pspace, uspace))
+APX_bform.add_integrator(PressWorkIntegrator0(coef=-1, q=q)) 
+
+APY_bform = BilinearForm((pspace, uspace))
+APY_bform.add_integrator(PressWorkIntegrator1(coef=-1, q=q)) 
 '''
+
 M_bform = BilinearForm(uspace)
 M_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
 M = M_bform.assembly()
-'''
-
-'''
-from scipy.sparse import coo_array, bmat
-def coo(A):
-    data = A._values
-    indices = A._indices
-    return coo_array((data, indices))
-
-A = bmat([[coo(M), None],[None, coo(M)]],  format='coo')
-
-print(bm.sum(bm.abs(A.toarray()-coo(MM).toarray())))
-exit()
 
 S_bform = BilinearForm(uspace)
 S_bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q))
 S = S_bform.assembly()
 
 P_bform = BilinearForm((pspace, tensor_uspace))
-P_bform.add_integrator(PressWorkIntegrator(mu, q=q))
+P_bform.add_integrator(PressWorkIntegrator(-1, q=q))
 P = P_bform.assembly()
+
+
+from scipy.sparse import bmat
+A = bmat([[APX.to_scipy()],[APY.to_scipy()]],  format='coo')
+
+print(bm.sum(bm.abs(A.toarray()-P.to_scipy().toarray())))
+
+exit()
 '''
+
 
 A_bform = BilinearForm(uspace)
 A_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
@@ -199,21 +196,20 @@ for i in range(10):
     b2 = bm.zeros(pgdof) 
     b = bm.concatenate([b0,b1,b2])
     
-    print(xx.dtype)
-    print(A.values().dtype)
     b -= A@xx
     b[isBdDof] = xx[isBdDof]
     
     A = DirichletBC(uspace, xx, isDDof=isBdDof).apply_matrix(A, check=False)
     #A,b = DirichletBC(uspace, xx, isDDof=isBdDof).apply(A, b, check=None)
-
+    '''
     import scipy.sparse as sp
     values = A.values()
     indices = A.indices()
     A = sp.coo_matrix((values, (indices[0], indices[1])), shape=A.shape) 
     A = A.tocsr()
     x = sp.linalg.spsolve(A,b)
-    
+    '''
+    x = spsolve(A, b, 'mumps')
     x = bm.array(x)
     ''' 
     x = cg(A, b, maxiter=10000)

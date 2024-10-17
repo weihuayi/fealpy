@@ -35,7 +35,7 @@ class FunctionSpace():
                     uh: TensorLike, dim: Optional[int]=None, index: Index=_S) -> TensorLike:
         raise NotImplementedError
 
-    def array(self, batch: Union[int, Size, None]=None, *, dtype=None):
+    def array(self, batch: Union[int, Size, None]=None, *, dtype=None, device=None) -> TensorLike:
         """Initialize a Tensor filled with zeros as values of DoFs.
 
         Parameters:
@@ -58,11 +58,12 @@ class FunctionSpace():
         if dtype is None:
             dtype = self.ftype 
 
-        return bm.zeros(shape, dtype=dtype)
+        return bm.zeros(shape, dtype=dtype, device=device)
 
     def function(self, array: Optional[TensorLike]=None,
-                 batch: Union[int, Size, None]=None, *,
-                 coordtype='barycentric', dtype=None):
+                batch: Union[int, Size, None]=None, *,
+                coordtype='barycentric', 
+                dtype=None, device=None):
         """Initialize a Function in the space.
 
         Parameters:
@@ -72,7 +73,9 @@ class FunctionSpace():
         """
         if array is None:
             if dtype is None:
-                dtype = self.ftype 
-            array = self.array(batch=batch, dtype=dtype)
+                dtype = self.ftype
+            if device is None:
+                device = self.device
+            array = self.array(batch=batch, dtype=dtype, device=device)
 
         return Function(self, array, coordtype)

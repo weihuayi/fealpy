@@ -24,6 +24,7 @@ class FirstNedelecDof3d():
         self.multiindex = mesh.multi_index_matrix(p,3)
         self.ftype = mesh.ftype
         self.itype = mesh.itype
+        self.device = mesh.device
 
     def number_of_local_dofs(self, doftype='all'):
         p = self.p
@@ -74,14 +75,16 @@ class FirstNedelecDof3d():
         edge = self.mesh.entity('edge')
         face = self.mesh.entity('face')
 
-        f2d = bm.zeros((NF, fdof), dtype=self.itype)
+        f2d = bm.zeros((NF, fdof), device=self.device,dtype=self.itype)
         #f2d[:, :eldof*3] = e2dof[f2e].reshape(NF, eldof*3)
         f2d = bm.set_at(f2d,(slice(None),slice(eldof*3)),e2dof[f2e].reshape(NF, eldof*3))
         s = [1, 0, 0]
         for i in range(3):
             flag = face[:, s[i]] == edge[f2e[:, i], 1]
             #f2d[flag, eldof*i:eldof*(i+1)] = f2d[flag, eldof*i:eldof*(i+1)][:, ::-1]
-            f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),f2d[flag, eldof*i:eldof*(i+1)][:, ::-1])
+            k = bm.flip(f2d[flag, eldof*i:eldof*(i+1)],axis=-1)
+            f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),k)
+            #f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),f2d[flag, eldof*i:eldof*(i+1)][:, ::-1])
         #f2d[:, eldof*3:] = self.face_to_internal_dof() 
         f2d = bm.set_at(f2d,(slice(None),slice(eldof*3,eldof*3+fldof)),self.face_to_internal_dof())
         return f2d
@@ -222,7 +225,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
 
         c2esign = mesh.cell_to_edge_sign() #(NC, 3, 2)
 
-        l = bm.zeros((4, )+bcs[None,: ,0,None, None].shape, dtype=self.ftype)
+        l = bm.zeros((4, )+bcs[None,: ,0,None, None].shape,device=self.device, dtype=self.ftype)
 
         l = bm.set_at(l,(0),bcs[None, :,0,None, None])
         l = bm.set_at(l,(1),bcs[None, :,1,None, None])
@@ -298,7 +301,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         
         fdof = self.dof.number_of_local_dofs("face")
         glambda = mesh.grad_face_lambda()
-        val = bm.zeros((NF,) + bcs.shape[:-1]+(fdof, 3), dtype=self.ftype)
+        val = bm.zeros((NF,) + bcs.shape[:-1]+(fdof, 3),device=self.device, dtype=self.ftype)
         
         l = bm.zeros((3, )+bcs[None, :,0, None, None].shape, dtype=self.ftype)
         l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
@@ -336,7 +339,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # edge basis
         phi = self.bspace.basis(bcs, p=p)
         multiIndex = self.mesh.multi_index_matrix(p, 2)
-        val = bm.zeros((NF,) + bcs.shape[:-1]+(ldof, 3), dtype=self.ftype)
+        val = bm.zeros((NF,) + bcs.shape[:-1]+(ldof, 3),device=self.device, dtype=self.ftype)
         for i in range(3):
             phie = phi[:, :, multiIndex[:, i]==0]
             c2esi = c2esign[:, i]
@@ -382,7 +385,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         phi = self.bspace.basis(bcs, p=p)
         gphi = self.bspace.grad_basis(bcs, p=p)
         multiIndex = self.mesh.multi_index_matrix(p, 3)
-        val = bm.zeros((NC,)+bcs.shape[:-1]+(ldof, 3), dtype=self.ftype)
+        val = bm.zeros((NC,)+bcs.shape[:-1]+(ldof, 3),device=self.device, dtype=self.ftype)
 
         # edge basis
         locEdgeDual = bm.tensor([[2, 3], [1, 3], [1, 2], [0, 3], [0, 2], [0, 1]])

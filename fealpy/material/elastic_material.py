@@ -156,7 +156,7 @@ class LinearElasticMaterial(ElasticMaterial):
             number of quadrature points, both of which are set to 1 for compatibility with other finite 
             element tensor operations.
         """
-        return self.D[None, None, ...]
+        return bm.device_put(self.D[None, None, ...], device=bm.get_device(bcs[0]))
     
     def strain_matrix(self, dof_priority: bool, gphi: TensorLike) -> TensorLike:
         '''

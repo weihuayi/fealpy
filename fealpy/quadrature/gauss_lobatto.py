@@ -1,9 +1,11 @@
+
+from ..backend import backend_manager as bm
 from .quadrature import Quadrature
-from .quadrature import backend_manager as bm
+
 
 class GaussLobattoQuadrature(Quadrature):
     def make(self, index:int):
-        kwargs = {'dtype': bm.float64}
+        kwargs = {'dtype': bm.float64, 'device': self.device}
         if index == 2:
             A = bm.tensor([[-1, 1], [1, 1]], **kwargs)
         elif index == 3:

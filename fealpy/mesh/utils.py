@@ -2,6 +2,8 @@
 from typing import Dict, Callable, TypeVar, Tuple, Any
 from math import comb
 
+from ..backend import backend_manager as bm
+from ..backend import TensorLike
 from .. import logger
 
 _Meth = TypeVar('_Meth', bound=Callable)
@@ -43,6 +45,38 @@ def edim2entity(storage: Dict, factory: Dict, edim: int, index=None):
         return et
     else: # TODO: finish this for homogeneous mesh
         return et[index]
+
+
+def flocc(array: TensorLike, /):
+    """Find the first and last occurrence of each unique row in a 2D array.
+
+    Returns:
+        out (TensorLike, TensorLike, TensorLike):
+        - The first occurrence index of each unique row.
+        - The last occurrence index of each unique row.
+        - The indices of `array` that result in the unique rows.
+    """
+    if array.ndim != 2:
+        raise ValueError("total_face must be a 2D array.")
+
+    indices = bm.lexsort(tuple(reversed(array.T)), axis=0)
+    sorted_array = array[indices]
+    diff_flag = bm.any(
+        sorted_array[1:] != sorted_array[:-1],
+        axis=1,
+    )
+    TRUE = bm.ones((1,), dtype=bm.bool, device=bm.get_device(diff_flag))
+    diff_flag = bm.concat([TRUE, diff_flag, TRUE])
+    group_index = bm.cumsum(diff_flag[:-1], axis=0) - 1
+
+    i0 = indices[diff_flag[:-1]] # first occurrence index: unique -> original
+    i1 = indices[diff_flag[1:]] # last occurrence index: unique -> original
+    j = bm.empty_like(indices)
+    # NOTE: This will hardly cause thread conflicts because it is a one-to-one correspondence.
+    j = bm.set_at(j, indices, bm.arange(len(indices), dtype=j.dtype, device=bm.get_device(j))) # original <> sorted
+    j = group_index[j] # original >> unique
+
+    return i0, i1, j
 
 
 # NOTE: this meta class is used to register the entity factory method.

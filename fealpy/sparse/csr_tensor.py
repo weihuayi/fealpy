@@ -126,13 +126,15 @@ class CSRTensor(SparseTensor):
     ### 3. Format Conversion ###
     def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
         if self._values is None:
-            context = dict(dtype=bm.float64)
+            context = dict(dtype=bm.float64, device=bm.get_device(self._crow))
         else:
             context = self.values_context()
 
+        index_context = {'dtype': self._crow.dtype, 'device': bm.get_device(self._crow)}
+
         count = self._crow[1:] - self._crow[:-1]
         nrow = self._crow.shape[0] - 1
-        row = bm.repeat(bm.arange(nrow), count)
+        row = bm.repeat(bm.arange(nrow, **index_context), count)
         indices = bm.stack([row, self._col], axis=0)
 
         dense_tensor = bm.zeros(self.dense_shape + (prod(self._spshape),), **context)
@@ -151,7 +153,7 @@ class CSRTensor(SparseTensor):
         from .coo_tensor import COOTensor
         count = self._crow[1:] - self._crow[:-1]
         nrow = self._crow.shape[0] - 1
-        row = bm.repeat(bm.arange(nrow), count)
+        row = bm.repeat(bm.arange(nrow, device=bm.get_device(count)), count)
         indices = bm.stack([row, self._col], axis=0)
         new_values = bm.copy(self._values) if copy else self._values
         return COOTensor(indices, new_values, self.sparse_shape)
@@ -184,6 +186,9 @@ class CSRTensor(SparseTensor):
 
     ### 5. Manipulation ###
     def copy(self):
+        if self._values is None:
+            return CSRTensor(bm.copy(self._crow), bm.copy(self._col),
+                             None, self._spshape)
         return CSRTensor(bm.copy(self._crow), bm.copy(self._col),
                          bm.copy(self._values), self._spshape)
 
