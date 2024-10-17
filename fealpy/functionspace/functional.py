@@ -128,7 +128,8 @@ def symmetry_index(d, r, dtype=None):
     """
     @brief 将 d 维 r 阶张量拉长以后，其对称部分对应的索引和出现的次数
     """
-    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)), dtype=dtype)
+    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)),
+                        dtype=dtype)
     coe = bm.flip(d**bm.arange(r, dtype=dtype))
     symidx = bm.einsum('ij,j->i', symidx0, coe)
 
