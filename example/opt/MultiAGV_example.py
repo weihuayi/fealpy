@@ -9,7 +9,8 @@ from random import randint
 import sys
 import time 
 from fealpy.backend import backend_manager as bm
-from fealpy.iopt.A_star import AStar, GridMap, Graph
+from fealpy.opt.A_star import AStar, GridMap, Graph
+# from fealpy.iopt.A_star import AStar, GridMap, Graph
 bm.set_backend('pytorch')
 
 

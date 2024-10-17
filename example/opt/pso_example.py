@@ -1,4 +1,4 @@
-from fealpy.iopt.particle_swarm_opt_alg import  PSOProblem, PSO, QPSO
+from fealpy.opt.particle_swarm_opt_alg import PSOProblem, PSO, QPSO
 from fealpy.backend import backend_manager as bm
 import time
 
