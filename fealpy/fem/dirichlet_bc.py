@@ -230,7 +230,7 @@ class DirichletBC():
         else:
             if uh is None:
                 uh = bm.zeros_like(f)
-            uh = self.space.boundary_interpolate(gd, uh, self.threshold)
+            uh, _ = self.space.boundary_interpolate(gd, uh, self.threshold)
 
         bd_idx = self.boundary_dof_index
         f = f - A.matmul(uh[:])
