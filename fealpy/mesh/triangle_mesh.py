@@ -69,7 +69,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         if etype == 2:
             from ..quadrature.stroud_quadrature import StroudQuadrature
-            from ..quadrature.triangle import TriangleQuadrature
+            from ..quadrature import TriangleQuadrature
             if q > 9:
                 quad = StroudQuadrature(2, q)
             else:
