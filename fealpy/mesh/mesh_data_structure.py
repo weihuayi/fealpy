@@ -153,8 +153,8 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell
         dtype = self.itype
 
-        cell2face = bm.zeros((NC, NFC), dtype=dtype)
-        arange_tensor = bm.arange(0, NF, dtype=dtype)
+        cell2face = bm.zeros((NC, NFC),device=bm.get_device(face2cell), dtype=dtype)
+        arange_tensor = bm.arange(0, NF,device=bm.get_device(face2cell),dtype=dtype)
 
         assert cell2face.dtype == arange_tensor.dtype, f"Data type mismatch: cell2face is {cell2face.dtype}, arange_tensor is {arange_tensor.dtype}"
 
