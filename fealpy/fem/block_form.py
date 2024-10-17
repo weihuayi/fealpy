@@ -29,7 +29,7 @@ class BlockForm(Form):
     def shape(self) -> Size:
         return self.sparse_shape
 
-    def assembly(self, format='coo'):
+    def assembly(self, format='csr'):
         a = bm.max(self.block_shape[...,0], axis=1)
         row_offset = bm.cumsum(bm.max(self.block_shape[...,0],axis = 1), axis=0)
         col_offset = bm.cumsum(bm.max(self.block_shape[...,1],axis = 0), axis=0)
@@ -39,7 +39,6 @@ class BlockForm(Form):
         for j in range(self.ncols):
             block = self.blocks[0][j]
             if block is not None:
-                print(block._spaces)
                 indices = bm.empty((2, 0), dtype=block.space.mesh.itype)
                 values = bm.empty((0,), dtype=block.space.mesh.ftype)
                 break
