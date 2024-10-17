@@ -19,7 +19,6 @@ from fealpy import logger
 from fealpy.cem import EITDataGenerator
 
 
-logger.setLevel('INFO')
 parser = argparse.ArgumentParser()
 parser.add_argument("config", help="path of the .yaml file")
 
@@ -73,9 +72,10 @@ def neumann(points: Tensor, *args):
     return bm.sin(bm.tensordot(freq, theta, axes=0))
 
 
-def main(sigma_iterable: Sequence[int], seed=0, index=0):
+def main(sigma_iterable: Sequence[int], seed: int = 0, index: int = 0):
     np.random.seed(seed)
     umesh = UniformMesh2d([0, EXT, 0, EXT], [H, H], [-1., -1.], itype=bm.int32, ftype=DTYPE)
+    pixel = umesh.entity('node')
 
     for sigma_idx in tqdm(sigma_iterable,
                           desc=f"task{index}",
@@ -96,7 +96,7 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
         interface_mesh = TriangleMesh.interfacemesh_generator(umesh, phi=ls_fn)
         generator = EITDataGenerator(mesh=interface_mesh, p=P, q=Q)
         gn = generator.set_boundary(neumann, batch_size=len(FREQ))
-        label = generator.set_levelset(SIGMA, ls_fn)
+        label = generator.set_levelset(SIGMA, ls_fn, pixel)
         gd = generator.run()
 
         np.save(
