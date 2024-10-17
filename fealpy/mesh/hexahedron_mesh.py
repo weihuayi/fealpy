@@ -136,11 +136,9 @@ class HexahedronMesh(TensorMesh, Plotable):
 
     def interpolation_points(self, p, index=_S):
         """
-        @brief 生成整个网格上的插值点
+        @brief Generate interpolation points for the entire mesh
         """
-        # node = self.entity('node')
         cell = self.entity('cell')
-        # NC = self.number_of_cells()
 
         c2ip = self.cell_to_ipoint(p)
         gp = self.number_of_global_ipoints(p)
@@ -164,10 +162,8 @@ class HexahedronMesh(TensorMesh, Plotable):
 
     def cell_to_ipoint(self, p, index=_S):
         """!
-        @brief 生成每个单元上的插值点全局编号
-        @note 本函数在 jax 后端下不可用
+        @brief Generate global indices for interpolation points in each cell
         """
-
         cell = self.entity('cell', index=index)
         if p == 1:
             return cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]
@@ -177,9 +173,6 @@ class HexahedronMesh(TensorMesh, Plotable):
         NF = self.number_of_faces()
         NC = self.number_of_cells()
 
-        edge = self.entity('edge')
-        face = self.entity('face')
-
         cell2face = self.cell_to_face()
         face2edge = self.face_to_edge()
         cell2edge = self.cell_to_edge()
@@ -187,14 +180,15 @@ class HexahedronMesh(TensorMesh, Plotable):
         face2ipoint = self.face_to_ipoint(p)
 
         shape = (p+1, p+1, p+1)
-        mi    = bm.arange(p+1)
+        mi = bm.arange(p+1, device=bm.get_device(cell))
         multiIndex0 = bm.broadcast_to(mi[:, None, None], shape).reshape(-1, 1)
         multiIndex1 = bm.broadcast_to(mi[None, :, None], shape).reshape(-1, 1)
         multiIndex2 = bm.broadcast_to(mi[None, None, :], shape).reshape(-1, 1)
 
         multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
 
-        dofidx = bm.zeros((6, (p+1)**2), dtype=self.itype) #四条边上自由度的局部编号
+        dofidx = bm.zeros((6, (p+1)**2), 
+                        dtype=self.itype, device=bm.get_device(cell))
         dofidx[0], = bm.nonzero(multiIndex[:, 2]==0)
         dofidx[1], = bm.nonzero(multiIndex[:, 2]==p)
         dofidx[2], = bm.nonzero(multiIndex[:, 0]==0)
@@ -202,7 +196,8 @@ class HexahedronMesh(TensorMesh, Plotable):
         dofidx[4], = bm.nonzero(multiIndex[:, 1]==0)
         dofidx[5], = bm.nonzero(multiIndex[:, 1]==p)
 
-        cell2ipoint = bm.zeros([NC, (p+1)**3], dtype=self.itype)
+        cell2ipoint = bm.zeros([NC, (p+1)**3], 
+                            dtype=self.itype, device=bm.get_device(cell))
         lf2e = bm.array([[0, 1, 2, 3], [8, 9, 10, 11],
                          [3, 7, 11, 4], [1, 6, 9, 5],
                          [0, 5, 8, 4], [2, 6, 10, 7]], dtype=self.itype)
@@ -212,7 +207,7 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         lf2e = lf2e[:, [3, 0, 1, 2]]
         face2edge = face2edge[:, [3, 0, 1, 2]]
-        for i in range(6): #面上的自由度
+        for i in range(6):
             gfe = face2edge[cell2face[:, i]]
             lfe = cell2edge[:, lf2e[i]]
             idx0 = bm.argsort(gfe, axis=-1)
@@ -222,11 +217,17 @@ class HexahedronMesh(TensorMesh, Plotable):
             idx = multiIndex2d[:, idx0].swapaxes(0, 1) #(NC, NQ, 4)
 
             idx = idx[..., 0]*(p+1)+idx[..., 1]
-            cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
+            cell2ipoint = bm.set_at(cell2ipoint, (slice(None), dofidx[i]), 
+                                    face2ipoint[cell2face[:, i, None], idx])
+            # cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
 
-        indof = bm.all(multiIndex>0, axis=-1)&bm.all(multiIndex<p, axis=-1)
-        cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
-                NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+        indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
+        cell2ipoint = bm.set_at(cell2ipoint, (slice(None), indof),
+                        bm.arange(NN + NE*(p-1) + NF*(p-1)**2, NN + NE*(p-1) + NF*(p-1)**2 + NC*(p-1)**3, 
+                        device=bm.get_device(cell)).reshape(NC, -1))
+        # cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
+        #         NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
+
         return cell2ipoint[index]
 
     def uniform_refine(self, n=1):
