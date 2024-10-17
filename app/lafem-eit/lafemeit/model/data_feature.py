@@ -13,11 +13,6 @@ TensorFunc = Callable[[Tensor], Tensor]
 class DataPreprocessor(nn.Module):
     """Data Feature Boundary Solver based on FEM."""
     def __init__(self, solver: LaplaceFEMSolver) -> None:
-        """_summary_
-
-        Args:
-            solver (LaplaceFEMSolver): _description_
-        """
         super().__init__()
         self.solver = solver
         self.vuh = None
@@ -33,7 +28,6 @@ class DataPreprocessor(nn.Module):
         gd, gn = input[:, 0, :], input[:, 1, :] # [B*CH, NN_bd]
         vuh = solver.solve_from_potential(gd) # [B*CH, gdof]
         vn = solver.normal_derivative(vuh) # [B*CH, bddof]
-        # gnvn = solver.solve_from_gnf(None, gn-vn, f_only=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
         gnvn = gn - vn # [B*CH, bddof]
         self.vuh = vuh
 
@@ -44,12 +38,6 @@ class DataFeature(nn.Module):
     """Data Feature Solver based on FEM."""
     def __init__(self, solver: LaplaceFEMSolver,
                  bc_filter: Optional[TensorFunc]=None) -> None:
-        """_summary_
-
-        Args:
-            solver (LaplaceFEMSolver): _description_
-            bc_filter (Optional[TensorFunc], optional): _description_. Defaults to None.
-        """
         super().__init__()
         self.solver = solver
         self.bc_filter = bc_filter
