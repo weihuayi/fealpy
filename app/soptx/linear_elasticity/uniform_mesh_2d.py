@@ -15,6 +15,8 @@ from fealpy.solver import cg
 
 from fealpy.utils import timer
 
+
+
 import argparse
 
 # 平面应变问题
@@ -49,13 +51,86 @@ class BoxDomainData2D():
 
         return self.solution(points)
     
+class MBBBeam2dOneData:
+    def __init__(self, nx: int, ny: int):
+        """
+        flip_direction = True
+        0 ------- 3 ------- 6 
+        |    0    |    2    |
+        1 ------- 4 ------- 7 
+        |    1    |    3    |
+        2 ------- 5 ------- 8 
+        """
+        self.nx = nx
+        self.ny = ny
+        self.eps = 1e-12
+
+    def domain(self):
+        return [0, 1, 0, 1]
+    
+    def force(self, points: TensorLike) -> TensorLike:
+
+        val = bm.zeros(points.shape, dtype=points.dtype)
+        # val[self.ny, 1] = -1
+        val[0, 1] = -1
+
+        return val
+    
+    def dirichlet(self, points: TensorLike) -> TensorLike:
+
+        return bm.zeros(points.shape, dtype=points.dtype)
+    
+    def is_dirichlet_boundary_dof(self, points):
+        x = points[..., 0]
+        y = points[..., 1]
+
+        cond1 = (bm.abs(x - 0) < self.eps) & (bm.abs(y - 0) < self.eps)
+        cond2 = (bm.abs(x - 0) < self.eps) & (bm.abs(y - 1) < self.eps)
+        cond3 = (bm.abs(x - 1) < self.eps) & (bm.abs(y - 0) < self.eps)
+        cond4 = (bm.abs(x - 1) < self.eps) & (bm.abs(y - 1) < self.eps)
+
+        
+
+        result = cond1 | cond2 | cond3 | cond4
+
+        return result
+    
+    # def is_dirichlet_boundary_edge(self, edge_centers: TensorLike) -> TensorLike:
+
+    #     left_edge = (edge_centers[:, 0] == 0.0)
+    #     specific_edge = (edge_centers[:, 0] == self.nx) & (edge_centers[:, 1] == 0.5)
+        
+    #     result = left_edge | specific_edge
+
+    #     return result
+    
+    # def is_dirichlet_boundary_node(self) -> TensorLike:
+        
+    #     dirichlet_nodes = bm.zeros((self.nx+1)*(self.ny+1), dtype=bool)
+
+    #     dirichlet_nodes[0:self.ny + 1] = True
+    #     # dirichlet_nodes[(self.ny + 1) * self.nx] = True
+    #     dirichlet_nodes[-1] = True
+
+    #     return dirichlet_nodes
+    
+    # def is_dirichlet_boundary_dof(self) -> TensorLike:
+        
+    #     direction_flags = bm.zeros(((self.nx + 1) * (self.ny + 1), 2), dtype=bool)
+
+    #     direction_flags[0:self.ny+1, 0] = True
+    #     # direction_flags[(self.ny + 1) * self.nx, 1] = True
+    #     direction_flags[-1, 1] = True
+
+    #     return direction_flags
+    
 
 parser = argparse.ArgumentParser(description="UniformMesh2d 上的任意次 Lagrange 有限元空间的线性弹性问题求解.")
 parser.add_argument('--backend', 
                     default='numpy', type=str,
                     help='指定计算的后端类型, 默认为 numpy.')
 parser.add_argument('--degree', 
-                    default=2, type=int, 
+                    default=1, type=int, 
                     help='Lagrange 有限元空间的次数, 默认为 1 次.')
 parser.add_argument('--nx', 
                     default=2, type=int, 
@@ -65,7 +140,7 @@ parser.add_argument('--ny',
                     help='y 方向的初始网格单元数, 默认为 2.')
 args = parser.parse_args()
 
-pde = BoxDomainData2D()
+pde = MBBBeam2dOneData(nx=4, ny=4)
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
@@ -76,7 +151,7 @@ origin = [extent[0], extent[2]]
 # mesh = UniformMesh2d(extent=[0, 1, 0, 1], h=h, origin=origin, 
 #                     ipoints_ordering='nec')
 
-mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny)
+mesh = QuadrangleMesh.from_box(box=extent, nx=4, ny=4)
 # import matplotlib.pyplot as plt
 # fig = plt.figure()
 # axes = fig.add_subplot(111)
@@ -98,6 +173,8 @@ for i in range(maxit):
 
     space = LagrangeFESpace(mesh, p=p, ctype='C')
     tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+
+    isBdDof = tensor_space.is_boundary_dof(threshold=(pde.is_dirichlet_boundary_dof, ))
     gdof = space.number_of_global_dofs()
     NDof[i] = tensor_space.number_of_global_dofs()
 
