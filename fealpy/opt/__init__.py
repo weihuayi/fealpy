@@ -10,3 +10,4 @@ from .snowmelt_opt_alg import SnowmeltOptAlg
 from .grey_wolf_optimizer import GreyWolfOptimizer
 from .particle_swarm_opt import ParticleSwarmOptAlg
 from .hippopotamus_opt_alg import HippopotamusOptAlg
+from .Antcolony_opt_alg import AntColonyOptAlg
