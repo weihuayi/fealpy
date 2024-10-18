@@ -4,13 +4,10 @@ from fealpy.typing import TensorLike
 
 from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.fem.bilinear_form import BilinearForm
-from fealpy.fem import DirichletBC as DBC
+from fealpy.fem import DirichletBC
 from fealpy.sparse import COOTensor
 
-from fealpy.solver import cg
-
-from scipy.sparse.linalg import spsolve
-# from scipy.sparse import csr_matrix
+from fealpy.solver import cg, spsolve
 
 from app.soptx.soptx.utilfs.timer import timer
 
@@ -80,17 +77,8 @@ class FEMSolver:
         F = F - K.matmul(uh_bd)
         F[isDDof] = uh_bd[isDDof]
 
-        indices = K.indices()
-        new_values = bm.copy(K.values())
-        IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
-        new_values[IDX] = 0
-
-        K = COOTensor(indices, new_values, K.sparse_shape)
-        index, = bm.nonzero(isDDof)
-        one_values = bm.ones(len(index), **K.values_context())
-        one_indices = bm.stack([index, index], axis=0)
-        K1 = COOTensor(one_indices, one_values, K.sparse_shape)
-        K = K.add(K1).coalesce()
+        dbc = DirichletBC(space=self.tensor_space)
+        K = dbc.apply_matrix(matrix=K, check=True)
 
         return K, F
 
@@ -121,9 +109,6 @@ class FEMSolver:
         uh = self.tensor_space.function()
         
         if solver_method == 'cg':
-            # K = K.to_scipy()
-            # uh_values, info = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-            # uh[:] = uh_values
             uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
             if tmr:
                 tmr.send('Solve System with CG')
@@ -132,7 +117,6 @@ class FEMSolver:
             raise NotImplementedError("Direct solver using MUMPS is not implemented.")
         
         elif solver_method == 'spsolve':
-            K = K.to_scipy()
             uh[:] = spsolve(K, F)
             if tmr:
                 tmr.send('Solve System with spsolve')
