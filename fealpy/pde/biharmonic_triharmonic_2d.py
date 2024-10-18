@@ -59,7 +59,8 @@ class DoubleLaplacePDE():
     """
     \Delta^2 u = f
     """
-    def __init__(self, u):
+    def __init__(self, u, device=None):
+        self.device = device
         x = sp.symbols("x")
         y = sp.symbols("y")
 
@@ -91,10 +92,13 @@ class DoubleLaplacePDE():
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
         #sin = bm.sin
         #pi = bm.pi
         #cos = bm.cos
-        return self.L2u(x, y)
+        print(bm.array(self.L2u(x_cpu, y_cpu),device=self.device))
+        return bm.array(self.L2u(x_cpu, y_cpu),device=self.device)
 
     def solution(self, p):
         x = p[..., 0]
