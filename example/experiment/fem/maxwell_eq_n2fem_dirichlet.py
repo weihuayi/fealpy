@@ -67,7 +67,7 @@ p = args.degree
 maxit = args.maxit
 maxit = 3
 dim = args.dim
-dim = 3
+#dim = 3
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:

@@ -17,11 +17,12 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell)
+        self.device = device
 
         self.node = node
         self.cell = cell
-        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
-        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
+        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
         self.ccw = bm.tensor([0, 1, 2], **kwargs)
 
         self.localCell = bm.tensor([
@@ -69,6 +70,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         if etype == 2:
             from ..quadrature.stroud_quadrature import StroudQuadrature
+            from ..quadrature import TriangleQuadrature
             if q > 9:
                 quad = StroudQuadrature(2, q)
             else:
@@ -194,7 +196,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         ldof = self.number_of_local_ipoints(p, 'cell')
 
         kwargs = bm.context(cell)
-        c2p = bm.zeros((NC, ldof), **kwargs)
+        c2p = bm.zeros((NC, ldof), **kwargs, device=self.device)
 
         flag = face2cell[:, 2] == 0
         c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])
@@ -233,7 +235,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         NC = self.number_of_cells()
         NEC = self.number_of_edges_of_cells()
         face2cell = self.face_to_cell() 
-        cell2faceSign = bm.zeros((NC, NEC), dtype=bm.bool)
+        cell2faceSign = bm.zeros((NC, NEC), dtype=bm.bool, device=self.device)
         cell2faceSign = bm.set_at(cell2faceSign, (face2cell[:, 0], face2cell[:, 2]), True)
         return cell2faceSign
 
@@ -271,7 +273,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge = self.entity('edge')
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
-            edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype)
+            edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype, device=self.device)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
 
             self.node = bm.concatenate((node, newNode), axis=0)
@@ -343,7 +345,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = self.entity('cell')
         node = self.entity('node')
         localEdge = self.localEdge
-        angle = bm.zeros((NC, 3), dtype=self.ftype)
+        angle = bm.zeros((NC, 3), dtype=self.ftype, device=self.device)
         for i,(j,k) in zip(range(3),localEdge):
             v0 = node[cell[:, j]] - node[cell[:, i]]
             v1 = node[cell[:, k]] - node[cell[:, i]]
@@ -414,7 +416,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell2edge = self.cell_to_edge()
         cell2cell = self.cell_to_cell()
         #cell2ipoint = self.cell_to_ipoint(self.p)
-        isCutEdge = bm.zeros((NE,), dtype=bm.bool)
+        isCutEdge = bm.zeros((NE,), dtype=bm.bool, device=self.device)
 
         if options['disp']:
             print('The initial number of marked elements:', isMarkedCell.sum())
@@ -428,8 +430,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         if options['disp']:
             print('The number of markedg edges: ', isCutEdge.sum())
 
-        edge2newNode = bm.zeros((NE,), dtype=self.itype)
-        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum(), dtype=self.itype))
+        edge2newNode = bm.zeros((NE,), dtype=self.itype, device=self.device)
+        edge2newNode = bm.set_at(edge2newNode, isCutEdge, bm.arange(NN, NN + isCutEdge.sum(), dtype=self.itype, device=self.device))
 
         node = self.node
         newNode = 0.5 * (node[edge[isCutEdge, 0], :] + node[edge[isCutEdge, 1], :])
@@ -487,7 +489,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                         options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
-                            value = bm.concatenate((value, bm.zeros((nn,), dtype=self.ftype)))
+                            value = bm.concatenate((value, bm.zeros((nn,),  dtype=self.ftype, device=self.device)))
                             value = bm.set_at(value , slice(NN, None), 0.5 * (value[edge[isCutEdge, 0]] + value[edge[isCutEdge, 1]]))
                             options['data'][key] = value
                     else:
@@ -495,17 +497,17 @@ class TriangleMesh(SimplexMesh, Plotable):
                         p = int((bm.sqrt(1 + 8 * bm.array(ldof)) - 3) // 2)
                         bc = self.multi_index_matrix(p, etype=2) / p
 
-                        bcl = bm.zeros_like(bc, dtype=self.ftype)
+                        bcl = bm.zeros_like(bc, dtype=self.ftype, device=self.device)
                         bcl = bm.set_at(bcl , (slice(None), 0), bc[:, 1])
                         bcl = bm.set_at(bcl , (slice(None), 1), 0.5 * bc[:, 0] + bc[:, 2])
                         bcl = bm.set_at(bcl , (slice(None), 2), 0.5 * bc[:, 0])
 
-                        bcr = bm.zeros_like(bc,dtype=self.ftype)
+                        bcr = bm.zeros_like(bc,dtype=self.ftype, device=self.device)
                         bcr = bm.set_at(bcr , (slice(None), 0), bc[:, 2])
                         bcr = bm.set_at(bcr , (slice(None), 1), 0.5 * bc[:, 0])
                         bcr = bm.set_at(bcr , (slice(None), 2), 0.5 * bc[:, 0] + bc[:, 1])
 
-                        value = bm.concatenate((value, bm.zeros((nc, ldof), dtype=self.ftype)))
+                        value = bm.concatenate((value, bm.zeros((nc, ldof), dtype=self.ftype, device=self.device)))
 
                         phi = self.shape_function(bcr, p=p)
                         value = bm.set_at(value , slice(NC , None), bm.einsum('cj,kj->ck', value[idx], phi))
@@ -519,7 +521,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             p1 = cell[idx, 1]
             p2 = cell[idx, 2]
             p3 = edge2newNode[cell2edge0[idx]]
-            cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype)), axis=0)
+            cell = bm.concatenate((cell, bm.zeros((nc, 3), dtype=self.itype, device=self.device)), axis=0)
             
             cell = bm.set_at(cell , (L, 0), p3)
             cell = bm.set_at(cell , (L, 1), p0)
@@ -528,7 +530,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             cell = bm.set_at(cell , (R, 1), p2)
             cell = bm.set_at(cell , (R, 2), p0)
             if k == 0:
-                cell2edge0 = bm.zeros((NC + nc,), dtype=self.itype)
+                cell2edge0 = bm.zeros((NC + nc,), dtype=self.itype, device=self.device)
                 cell2edge0 = bm.set_at(cell2edge0 , slice(NC) , cell2edge[:, 0])
                 cell2edge0 = bm.set_at(cell2edge0 , L , cell2edge[idx, 2])
                 cell2edge0 = bm.set_at(cell2edge0 , R , cell2edge[idx, 1])
@@ -554,10 +556,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = self.entity('cell')
         node = self.entity('node')
 
-        valence = bm.zeros(NN, dtype=self.itype)
+        valence = bm.zeros(NN, dtype=self.itype, device=self.device)
         bm.add_at(valence, cell, 1)
 
-        valenceNew = bm.zeros(NN, dtype=self.itype)
+        valenceNew = bm.zeros(NN, dtype=self.itype, device=self.device)
         bm.add_at(valenceNew, cell[isMarkedCell][:, 0], 1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
@@ -640,7 +642,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = cell[isKeepCell]
         isGoodNode = (isIGoodNode | isBGoodNode)
 
-        idxMap = bm.zeros(NN, dtype=self.itype)
+        idxMap = bm.zeros(NN, dtype=self.itype, device=self.device)
         self.node = node[~isGoodNode]
 
         NN = self.node.shape[0]
@@ -797,8 +799,8 @@ class TriangleMesh(SimplexMesh, Plotable):
             markedCell, = bm.nonzero(isMarkedCell)
 
         # allocate new memory for node and cell
-        node = bm.zeros((5 * NN, GD), dtype=self.ftype)
-        cell = bm.zeros((3 * NC, 3), dtype=self.itype)
+        node = bm.zeros((5 * NN, GD), dtype=self.ftype, device=self.device)
+        cell = bm.zeros((3 * NC, 3), dtype=self.itype, device=self.device)
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
             options['numrefine'] = bm.concatenate((options['numrefine'], bm.zeros(2 * NC)))
@@ -807,15 +809,15 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.set_at(cell , slice(NC), self.entity('cell'))
 
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
-        generation = bm.zeros(NN + 2 * NC, dtype=bm.uint8)
+        generation = bm.zeros(NN + 2 * NC, dtype=bm.uint8, device=self.device)
 
         # 用于记录被二分的边及其中点编号
-        cutEdge = bm.zeros((4 * NN, 3), dtype=self.itype)
+        cutEdge = bm.zeros((4 * NN, 3), dtype=self.itype, device=self.device)
 
         # 当前的二分边的数目
         nCut = 0
         # 非协调边的标记数组
-        nonConforming = bm.ones(4 * NN, dtype=bm.bool)
+        nonConforming = bm.ones(4 * NN, dtype=bm.bool, device=self.device)
         while len(markedCell) != 0:
             # 标记最长边
             self.label(node, cell, markedCell)
@@ -827,7 +829,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
             # 找到新的二分边和新的中点
             nMarked = len(markedCell)
-            p3 = bm.zeros(nMarked, dtype=self.itype)
+            p3 = bm.zeros(nMarked, dtype=self.itype, device=self.device)
 
             if nCut == 0:  # 如果是第一次循环
                 idx = bm.arange(nMarked)  # cells introduce new cut edges
@@ -860,13 +862,13 @@ class TriangleMesh(SimplexMesh, Plotable):
                     ), shape=(NN, NN))
                 # 获得唯一的边
                 i, j = s.nonzero()
-                i = bm.tensor(i,dtype=self.itype)
-                j = bm.tensor(j,dtype=self.itype)
+                i = bm.tensor(i,dtype=self.itype, device=self.device)
+                j = bm.tensor(j,dtype=self.itype, device=self.device)
                 nNew = len(i)
-                newCutEdge = bm.arange(nCut, nCut + nNew)
+                newCutEdge = bm.arange(nCut, nCut + nNew, device=self.device)
                 cutEdge = bm.set_at(cutEdge , (newCutEdge, 0) , i)
                 cutEdge = bm.set_at(cutEdge , (newCutEdge, 1) , j)
-                cutEdge = bm.set_at(cutEdge , (newCutEdge, 2) , bm.arange(NN, NN + nNew))
+                cutEdge = bm.set_at(cutEdge , (newCutEdge, 2) , bm.arange(NN, NN + nNew, device=self.device))
                 node = bm.set_at(node, slice(NN, NN + nNew), 0.5 * (node[i, :] + node[j, :]))
                 nCut += nNew
                 NN += nNew
@@ -874,12 +876,12 @@ class TriangleMesh(SimplexMesh, Plotable):
                 # 新点和旧点的邻接矩阵
                 I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
-                val = bm.ones(len(I), dtype=bm.bool)
+                val = bm.ones(len(I), dtype=bm.bool, device=self.device)
                 nv2v = csr_matrix(
                     (val, (I, J)),
                     shape=(NN, NN))
                 i, j = (nv2v[:, p1].multiply(nv2v[:, p2])).nonzero()
-                p3 = bm.set_at(p3, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
+                p3 = bm.set_at(p3, bm.array(j,dtype=self.itype, device=self.device), bm.array(i,dtype=self.itype, device=self.device))
 
             # 如果新点的代数仍然为 0
             idx = (generation[p3] == 0)
@@ -905,7 +907,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
             # 找到非协调的单元
             checkEdge, = bm.nonzero(nonConforming[:nCut])
-            isCheckNode = bm.zeros(NN, dtype=bm.bool)
+            isCheckNode = bm.zeros(NN, dtype=bm.bool, device=self.device)
             isCheckNode = bm.set_at(isCheckNode, cutEdge[checkEdge], True)
             isCheckCell = bm.sum(
                 isCheckNode[cell[:NC]],
@@ -914,7 +916,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             checkCell, = bm.nonzero(isCheckCell)
             I = bm.repeat(checkCell, 3)
             J = cell[checkCell].reshape(-1)
-            val = bm.ones(len(I), dtype=bm.bool)
+            val = bm.ones(len(I), dtype=bm.bool, device=self.device)
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             i, j = (cell2node[:, cutEdge[checkEdge, 0]].multiply(
                     cell2node[:, cutEdge[checkEdge, 1]]
@@ -983,7 +985,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         node = self.entity('node')
         cell = self.entity('cell')
 
-        J = bm.zeros((NC, GD, 2), dtype=self.ftype)
+        J = bm.zeros((NC, GD, 2), dtype=self.ftype, device=self.device)
 
         J[..., 0] = node[cell[:, 1]] - node[cell[:, 0]]
         J[..., 1] = node[cell[:, 2]] - node[cell[:, 0]]
@@ -1055,7 +1057,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                 [0.0, 0.0],
                 [1.0, 0.0],
                 [0.0, 1.0]], dtype=bm.float64)
-        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
+        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32, device=self.device)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
@@ -1071,7 +1073,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             [0.5, 1.0],
             [1.0, 0.0],
             [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64)
+            [1.0, 1.0]], dtype=bm.float64, device=self.device)
 
         cell = bm.tensor([
             [1, 0, 5],
@@ -1081,7 +1083,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             [4, 7, 5],
             [8, 5, 7],
             [6, 5, 9],
-            [8, 9, 5]], dtype=bm.int32)
+            [8, 9, 5]], dtype=bm.int32, device=self.device)
 
         return cls(node, cell)
 

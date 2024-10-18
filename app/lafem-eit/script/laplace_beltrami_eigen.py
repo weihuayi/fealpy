@@ -34,7 +34,7 @@ assert Q_ >= 1
 P_ = config['fem']['order']
 
 
-def laplace_eigen_fem(mesh: IntervalMesh, p: int=1) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+def laplace_eigen_fem(mesh: IntervalMesh, p: int = 1) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
     """_summary_
 
     Args:
@@ -58,6 +58,7 @@ def laplace_eigen_fem(mesh: IntervalMesh, p: int=1) -> Tuple[NDArray, NDArray, N
 EXTx, EXTy = config['mesh']["ext"]
 Lx, Ly = config['mesh']['length']
 Origin = config['mesh']['origin']
+refine = config['mesh']['refine']
 box = [Origin[0], Origin[0] + Lx, Origin[1], Origin[1] + Ly]
 
 print("Generating Boundary Laplace Beltrami operator...")
@@ -75,12 +76,19 @@ if signal_ in {'y', 'Y'}:
     mesh = IntervalMesh.from_mesh_boundary(tri_mesh)
     del tri_mesh
 
-    NN = mesh.number_of_nodes()
+    bform_2 = BilinearForm(LagrangeFESpace(mesh))
+    bform_2.add_integrator(ScalarMassIntegrator(q=Q_))
+    M0 = bform_2.assembly().to_dense()
+    del bform_2
 
-    w, v, _, M = laplace_eigen_fem(mesh, p=P_)
+    NN = mesh.number_of_nodes()
+    mesh.uniform_refine(refine)
+
+    w, v, _, _ = laplace_eigen_fem(mesh, p=P_)
     w = w[1:NN+1]
-    vinv = (v.T @ M)[1:NN+1, :NN]
+    vinv = v.T[1:NN+1, :NN] @ M0
     v = v[:NN, 1:NN+1]
+    print(vinv @ v)
 
     np.savez(config['file'], w=w, v=v, vinv=vinv)
     print("Saved.")
