@@ -21,7 +21,7 @@ from fealpy.sparse import COOTensor
 
 from fealpy.solver import cg
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 
 import argparse
 

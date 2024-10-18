@@ -14,7 +14,7 @@ from fealpy.functionspace.tensor_space import TensorFunctionSpace
 
 from app.soptx.soptx.solver.fem_solver import FEMSolver
 
-from app.soptx.soptx.utilfs.calculate_ke0 import calculate_ke0
+from app.soptx.soptx.utils.calculate_ke0 import calculate_ke0
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
 
@@ -22,27 +22,23 @@ from app.soptx.soptx.filter.filter_properties import FilterProperties
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 
 class ComplianceObjective(Objective):
     """
     Compliance Minimization Objective for Topology Optimization.
-
-    This class implements the objective function (compliance) and Hessian matrix
-    for compliance minimization in topology optimization.
     """
-    
     def __init__(self,
                 mesh: Mesh,
                 space_degree: int,
                 dof_per_node: int,
                 dof_ordering: str,
                 material_properties: ElasticMaterialProperties,
-                filter_type: Union[int, str],
-                filter_rmin: float,
                 pde: object,
                 solver_method: str,
-                volume_constraint: VolumeConstraint) -> None:
+                volume_constraint: VolumeConstraint,
+                filter_type: Union[int, str, None] = None,
+                filter_rmin: Union[float, None] = None) -> None:
         """
         Initialize the compliance objective function.
         """
@@ -52,11 +48,11 @@ class ComplianceObjective(Objective):
         self.dof_per_node = dof_per_node
         self.dof_ordering = dof_ordering
         self.material_properties = material_properties
-        self.filter_type = filter_type
-        self.filter_rmin = filter_rmin
         self.pde = pde
         self.solver_method = solver_method
         self.volume_constraint = volume_constraint
+        self.filter_type = filter_type
+        self.filter_rmin = filter_rmin
 
         self.space = self._create_function_space(self.space_degree, 
                                                 self.dof_per_node, self.dof_ordering)
