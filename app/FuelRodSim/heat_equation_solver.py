@@ -1,11 +1,11 @@
-import numpy as np
+from fealpy.backend import backend_manager as bm
 import os
-from scipy.sparse.linalg import spsolve
 from fealpy.mesh import TriangleMesh,TetrahedronMesh
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import DiffusionIntegrator, BilinearForm, ScalarMassIntegrator, LinearForm, ScalarSourceIntegrator
+from fealpy.fem import ScalarDiffusionIntegrator, BilinearForm, ScalarMassIntegrator, LinearForm, ScalarSourceIntegrator
 from fealpy.fem.dirichlet_bc import DirichletBC
 import matplotlib.pyplot as plt
+from fealpy.solver import cg
 
 class FuelRod3dData:
     def domain(self):
@@ -18,7 +18,7 @@ class FuelRod3dData:
         return 0
 
     def dirichlet(self, p, t):
-        return np.array([500])
+        return bm.array([500])
     
 class HeatEquationSolver:
     def __init__(self, mesh: TriangleMesh, pde:FuelRod3dData, nt, bdnidx, p0, alpha_caldding=4e-4, alpha_inner=8e-4, layered=True, ficdx=None ,cacidx=None,output: str = './result', filename: str = 'temp'):
@@ -53,39 +53,36 @@ class HeatEquationSolver:
         self.threshold = self.create_threshold()
         self.errors = []  # 用于存储每个时间步的误差
 
-    def initialize_output_directory(self):
-        if not os.path.exists(self.output):
-            os.makedirs(self.output)
-
     def create_threshold(self):
         """
         可以分辨布尔数组和编号索引，如果是布尔数组直接传入，如果是索引编号转换为布尔数组
         """
-        if isinstance(self.bdnidx, np.ndarray) and self.bdnidx.dtype == bool:
+        if isinstance(self.bdnidx, bm.DATA_CLASS) and self.bdnidx.dtype == bool:
             return self.bdnidx
         else:
             NN = len(self.mesh.entity('node'))
-            isbdnidx = np.full(NN, False, dtype=bool)
+            isbdnidx = bm.full(NN, False, dtype=bool)
             isbdnidx[self.bdnidx] = True
             return isbdnidx
 
 
     def solve(self):
-        self.p = self.space.function()
+        d = self.space.function()
+        self.p = bm.zeros_like(d)
         self.p += self.p0  
         for n in range(self.nt):
             t = self.duration[0] + n * self.tau
             bform3 = LinearForm(self.space)
             # 这里应该传入后的得到的为qc
             #f=self.pde.source(node,t)
-            source=lambda p: self.pde.source(p, t)
-            print(source)
-            bform3.add_domain_integrator(ScalarSourceIntegrator(source, q=3))
+            source=lambda p, index: self.pde.source(p, t)
+            # source = pde.source
+            bform3.add_integrator(ScalarSourceIntegrator(source))
             self.F = bform3.assembly()
             
             # 组装刚度矩阵
             NC = self.mesh.number_of_cells()
-            alpha = np.zeros(NC)
+            alpha = bm.zeros(NC)
         
             if self.layered:
                 # 假设 ficdx 和 cacidx 是定义好的两个索引列表
@@ -97,12 +94,12 @@ class HeatEquationSolver:
                 alpha += self.alpha_caldding
 
             bform = BilinearForm(self.space)
-            bform.add_domain_integrator(DiffusionIntegrator(alpha, q=3))
+            bform.add_integrator(ScalarDiffusionIntegrator(alpha, q=3))
             self.K = bform.assembly()
 
             # 组装质量矩阵
             bform2 = BilinearForm(self.space)
-            bform2.add_domain_integrator(ScalarMassIntegrator(q=3))
+            bform2.add_integrator(ScalarMassIntegrator(q=3))
             self.M = bform2.assembly()
             A = self.M + self.alpha_caldding * self.K * self.tau
             b = self.M @ self.p + self.tau * self.F
@@ -110,27 +107,29 @@ class HeatEquationSolver:
                 A = A
                 b = b
             else:
-                gD=lambda x : self.pde.dirichlet(x,t)
+                gd=lambda x : self.pde.dirichlet(x,t)
                 ipoints = self.space.interpolation_points()
-                gD=gD(ipoints[self.threshold])
-                bc = DirichletBC(space=self.space, gD=gD.reshape(-1,1), threshold=self.threshold)
+                gd=gd(ipoints[self.threshold])
+                bc = DirichletBC(space=self.space, gd=gd, threshold=self.threshold)
                 A, b = bc.apply(A, b)
-                self.p = spsolve(A, b)
+                self.p = cg(A, b, maxiter=5000, atol=1e-14, rtol=1e-14)
             print(self.p)
             # 计算并存储误差，如果 solution 方法存在
             if hasattr(self.pde, 'solution'):
                 exact_solution = self.pde.solution(self.mesh.node, t)
-                error = np.linalg.norm(exact_solution - self.p.flatten('F'))
+                error = bm.linalg.norm(exact_solution - self.p.flatten('F'))
                 self.errors.append(error)
             self.mesh.nodedata['temp'] = self.p.flatten('F')
             name = os.path.join(self.output, f'{self.filename}_{n:010}.vtu')
             self.mesh.to_vtk(fname=name)
-        print('self.p',self.p)
-        print(self.p.shape)
+            
+    def initialize_output_directory(self):
+        if not os.path.exists(self.output):
+            os.makedirs(self.output)
         
     def plot_error_over_time(self):
         plt.figure(figsize=(10, 6))
-        plt.plot(np.linspace(self.duration[0], self.duration[1], self.nt), self.errors, marker='o', linestyle='-')
+        plt.plot(bm.linspace(self.duration[0], self.duration[1], self.nt), self.errors, marker='o', linestyle='-')
         plt.title('Error over Time')
         plt.xlabel('Time')
         plt.ylabel('L2 Norm of Error')
@@ -168,7 +167,7 @@ class HeatEquationSolver:
         t = self.duration[1]
         exact_solution = self.pde.solution(self.mesh.node, t)
         numerical_solution = self.p.flatten('F')
-        error = np.abs(exact_solution - numerical_solution)
+        error = bm.abs(exact_solution - numerical_solution)
         print('error',error)
 
         if self.GD == 2:
@@ -218,7 +217,7 @@ class HeatEquationSolver:
         t = self.duration[1]
         exact_solution = self.pde.solution(self.mesh.node, t)
         numerical_solution = self.p.flatten('F')
-        error = np.abs(exact_solution - numerical_solution)
+        error = bm.abs(exact_solution - numerical_solution)
         print('error', error)
 
         if self.GD == 2:
