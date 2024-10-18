@@ -20,12 +20,13 @@ Number = Union[int, float]
 _S = slice(None)
 
 class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh:_MT, p: int, m: int, isCornerNode:bool):
+    def __init__(self, mesh:_MT, p: int, m: int, isCornerNode:bool): 
         assert(p>8*m)
         self.mesh = mesh
         self.p = p
         self.m = m
         self.bspace = BernsteinFESpace(mesh, p)
+        self.device = mesh.device
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
