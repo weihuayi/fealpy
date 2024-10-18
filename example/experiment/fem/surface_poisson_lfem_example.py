@@ -16,11 +16,12 @@ from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.sparse import COOTensor
+from fealpy.sparse import COOTensor, CSRTensor
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
-from fealpy.solver import cg
+from fealpy.solver import cg, spsolve
+from scipy.sparse import coo_array, bmat
 #from scipy.sparse.linalg import spsolve
 
 ## 参数解析
@@ -76,15 +77,24 @@ bfrom.add_integrator(ScalarDiffusionIntegrator())
 lfrom = LinearForm(space)
 lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
 
-A = bfrom.assembly()
+A = bfrom.assembly(format='coo')
 F = lfrom.assembly()
 #tmr.send(f'第{i}次矩阵组装时间')
 
 C = space.integral_basis()
-A = COOTensor.concat()
-#A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
-F = bm.r_[F, 0]
 
+def coo(A):
+    data = A._values
+    indices = A._indices
+    return coo_array((data, indices), shape=A.shape)
+A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
+A = COOTensor(bm.stack([A.row,A.col],axis=0), A.data, spshape=A.shape)
+
+F = bm.concatenate((F,bm.array([0])))
+
+print(A.shape)
+print(F.shape)
+#uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
 uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
 
 error = mesh.error(pde.solution, uh)
