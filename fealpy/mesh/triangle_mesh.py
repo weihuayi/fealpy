@@ -21,7 +21,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell)
         
-        self.device = bm.get_device(cell)
         self.node = node
         self.cell = cell
 
@@ -201,7 +200,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         ldof = self.number_of_local_ipoints(p, 'cell')
 
         kwargs = bm.context(cell)
-        c2p = bm.zeros((NC, ldof), **kwargs, device=self.device)
+        c2p = bm.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
         c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])

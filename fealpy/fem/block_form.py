@@ -35,7 +35,7 @@ class BlockForm(Form):
         col_offset = bm.cumsum(bm.max(self.block_shape[...,1],axis = 0), axis=0)
         row_offset = bm.concatenate((bm.array([0]),row_offset))
         col_offset = bm.concatenate((bm.array([0]),col_offset))
-        
+         
         for j in range(self.ncols):
             block = self.blocks[0][j]
             if block is not None:
@@ -49,13 +49,12 @@ class BlockForm(Form):
                 block = self.blocks[i][j]
                 if block is None:
                     continue
-                block_matrix = block.assembly().tocoo()
+                block_matrix = block.assembly(format='coo')
                 block_indices = block_matrix.indices() + bm.array([[row_offset[i]], [col_offset[j]]])
                 block_values = block_matrix.values() 
                 indices = bm.concatenate((indices, block_indices), axis=1)
                 values = bm.concatenate((values, block_values))
         M = COOTensor(indices, values, sparse_shape) 
-        
         if format == 'csr':
             self._M = M.coalesce().tocsr()
         elif format == 'coo':
