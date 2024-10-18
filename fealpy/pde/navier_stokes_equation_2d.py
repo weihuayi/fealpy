@@ -125,6 +125,8 @@ class FlowPastCylinder:
     def mesh(self, h, method:str='fealpy', device=None):
         if method == 'fealpy':
             node,cell = self._fealpy_mesh(h)
+            node = bm.device_put(node, device)
+            cell = bm.device_put(cell, device) 
         elif mesh == 'gmesh':
             node,cell = self._gmesh_mesh(h)
         #elif method == 'distmesh':

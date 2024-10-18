@@ -47,7 +47,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh(0.05)
+mesh = pde.mesh(0.05, device = device)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -128,6 +128,7 @@ for i in range(10):
     
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
+    
     ##mesh.nodedata 
     mesh.nodedata['velocity'] = u1.reshape(2,-1).T
     mesh.nodedata['pressure'] = p1
