@@ -1015,6 +1015,84 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         gmsh.finalize()
         return cls(node, cell)
 
+    @classmethod
+    def from_crack_box(cls, box=[0, 2, 0, 5, 0, 10], nx=2, ny=5, nz=10,
+                       threshold=None, itype=None, ftype=None, device=None):
+        """
+        Generate a tetrahedral mesh for a box domain.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param nz Number of divisions along the z-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TetrahedronMesh instance
+        """
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        NN = (nx + 1) * (ny + 1) * (nz + 1)
+        NC = nx * ny * nz
+        node = bm.zeros((NN, 3), dtype=ftype)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=ftype, device=device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=ftype, device=device)
+        z = bm.linspace(box[4], box[5], nz + 1, dtype=ftype, device=device)
+        X, Y, Z = bm.meshgrid(x, y, z, indexing='ij')
+        node = bm.concatenate((X.reshape(-1, 1), Y.reshape(-1, 1), Z.reshape(-1, 1)), axis=1)
+
+        idx = bm.arange(NN, dtype=itype, device=device).reshape(nx + 1, ny + 1, nz + 1)
+        c = idx[:-1, :-1, :-1]
+        nyz = (ny + 1) * (nz + 1)
+
+        cell0 = c.flatten().reshape((-1, 1))
+        cell1 = cell0 + nyz
+        cell2 = cell1 + nz + 1
+        cell3 = cell0 + nz + 1
+        cell4 = cell0 + 1
+        cell5 = cell4 + nyz
+        cell6 = cell5 + nz + 1
+        cell7 = cell4 + nz + 1
+        cell = bm.concatenate((cell0, cell1, cell2, cell3, cell4, cell5, cell6, cell7), axis=1)
+
+        localCell = bm.tensor([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=itype, device=device)
+        cell = cell[:, localCell].reshape(-1, 4)
+
+        if threshold is not None:
+            bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = bm.zeros(NN, dtype=bm.bool, device=device)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=itype, device=device)
+            # idxMap[isValidNode] = bm.arange(isValidNode.sum(), dtype=cell.dtype)
+            idxMap = bm.set_at(
+                idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=itype, device=device)
+            )
+            cell = idxMap[cell]
+
+        # 切口节点重复
+        NN = node.shape[0]
+        # 找到切口处 node
+        nidx = bm.nonzero((bm.abs(node[:, 2] - 5) < 1e-5) & (node[:, 1] > 3.01))[0]
+        # 找到切口处节点所在单元
+        nidxmap = bm.arange(NN, dtype=itype, device=device)
+
+        nidxmap = bm.set_at(nidxmap, nidx, NN + bm.arange(len(nidx), dtype=itype, device=device))
+        # 计算 z 坐标平均值
+        flag = bm.mean(node[:, 2][cell], axis=1) > 5
+        cell = bm.set_at(cell, flag, nidxmap[cell[flag]])
+
+        node = bm.concatenate((node, node[nidx]), axis=0)
+        mesh = cls(node, cell)
+        return mesh
 
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
         from .vtk_extent import  write_to_vtu

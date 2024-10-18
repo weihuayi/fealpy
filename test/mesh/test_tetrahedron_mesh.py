@@ -326,6 +326,18 @@ class TestTetrahedronMeshInterfaces:
         u = bm.array(data1['nodedata'][0],dtype=bm.float64)
         np.testing.assert_allclose(bm.to_numpy(u), data["u"],atol= 1e-6)
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
+    @pytest.mark.parametrize("data", crack_box_data)
+    def test_from_crack_box(self,data,backend):
+        bm.set_backend(backend)
+        tmesh_threshold = data['threshold']
+        mesh = TetrahedronMesh.from_crack_box(threshold=tmesh_threshold)
+
+        node = mesh.node
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-7)
+        cell = mesh.cell
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
 if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
     pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
