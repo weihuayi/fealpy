@@ -57,9 +57,11 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         m = self.m
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
+        device = bm.get_device(mesh.cell)
         GD = mesh.geo_dimension()
         idx = bm.array(mesh.multi_index_matrix(m, GD-1))
-        num = factorial(m)/bm.prod(bm.array(factorial(idx)), axis=1)
+        idx_cpu = bm.to_numpy(idx)
+        num = factorial(m)/bm.prod(bm.array(factorial(idx_cpu), device=device), axis=1)
         bcs, ws, gmphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell',
                                  index=index)

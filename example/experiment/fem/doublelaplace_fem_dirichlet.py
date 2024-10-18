@@ -34,11 +34,11 @@ parser.add_argument('--n',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=4, type=int,
+        default=2, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
+        default='pytorch', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--meshtype',
@@ -49,7 +49,7 @@ args = parser.parse_args()
 
 
 bm.set_backend(args.backend)
-decive = "cuda"
+device = "cuda"
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -62,19 +62,23 @@ y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
 ulist = get_flist(u)[:3]
-mesh = TriangleMesh.from_box([0,1,0,1], n, n)
-NDof = bm.zeros(maxit, dtype=bm.float64)
+mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
+
+ikwargs = bm.context(mesh.cell)
+fkwargs = bm.context(mesh.node)
+
+NDof = bm.zeros(maxit, **ikwargs)
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',
              '$||\\nabla^2 u - \\nabla^2 u_h||_{\\Omega,0}$']
-errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
+errorMatrix = bm.zeros((3, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
     node = mesh.entity('node')
-    isCornerNode = bm.zeros(len(node),dtype=bm.bool)
-    for n in bm.array([[0,0],[1,0],[0,1],[1,1]], dtype=bm.float64):
+    isCornerNode = bm.zeros(len(node),dtype=bm.bool, device=device)
+    for n in bm.array([[0,0],[1,0],[0,1],[1,1]], **fkwargs):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
 
 
