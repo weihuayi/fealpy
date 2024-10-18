@@ -65,7 +65,6 @@ class BilinearForm(Form[LinearInt]):
 
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
-
             I = bm.broadcast_to(ve2dof[:, :, None], local_shape)
             J = bm.broadcast_to(ue2dof[:, None, :], local_shape)
             indices = bm.stack([I.ravel(), J.ravel()], axis=0)
@@ -75,7 +74,7 @@ class BilinearForm(Form[LinearInt]):
         return M
 
     @overload
-    def assembly(self, *, retain_ints: bool=False) -> COOTensor: ...
+    def assembly(self, *, retain_ints: bool=False) -> CSRTensor: ...
     @overload
     def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
     @overload

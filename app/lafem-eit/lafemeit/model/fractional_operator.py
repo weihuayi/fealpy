@@ -22,7 +22,7 @@ __all__ = [
     'RegressiveFractional',
     'EigenNorm',
     'StackedFractional',
-    'RegressiveLoss'
+    'RegressionLoss'
 ]
 
 class _EigenvalueBase(Module):
@@ -159,7 +159,7 @@ class MultiChannelFractional(_EigenvalueBase):
         self.reset_paramters()
 
     def reset_paramters(self):
-        init.constant_(self.s, 0.0)
+        init.constant_(self.gamma, 0.0)
         if self.hc is not None:
             init.constant_(self.hc, self.w.max().item())
 

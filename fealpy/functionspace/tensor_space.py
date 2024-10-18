@@ -1,5 +1,5 @@
 
-from typing import Tuple, Union, Callable
+from typing import Tuple, Union, Callable,Optional
 from math import prod
 
 from ..backend import backend_manager as bm
@@ -181,7 +181,7 @@ class TensorFunctionSpace(FunctionSpace):
     
     def boundary_interpolate(self,
         gD: Union[Callable, int, float, TensorLike],
-        uh: TensorLike,
+        uh: Optional[TensorLike]=None,
         threshold: Union[Callable, TensorLike, None]=None) -> TensorLike:
 
         ipoints = self.interpolation_points()
@@ -258,7 +258,8 @@ class TensorFunctionSpace(FunctionSpace):
                                                             edge_threshold, 
                                                             node_threshold, 
                                                             dof_threshold))
-
+        if uh is None:
+            uh = bm.zeros_like(isTensorBDof)
         if self.dof_priority:
             uh = bm.set_at(uh, isTensorBDof, gD_vector.T.reshape(-1))
         else:

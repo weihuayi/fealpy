@@ -68,6 +68,7 @@ class VectorMassIntegrator(LinearInt, OpInt, CellInt):
         coef = self.coef
         mesh = space.mesh
         GD = mesh.geo_dimension()
+        self.device = mesh.device
 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
@@ -75,7 +76,7 @@ class VectorMassIntegrator(LinearInt, OpInt, CellInt):
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 
         if out is None:
-            D = bm.zeros((NC, ldof, ldof), dtype=space.ftype)
+            D = bm.zeros((NC, ldof, ldof), device=self.device,dtype=space.ftype)
         else:
             D = out
 

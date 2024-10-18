@@ -16,8 +16,9 @@ Number = Union[int, float]
 _S = slice(None)
 
 class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh: _MT, p: int, m: int, isCornerNode: bool):
+    def __init__(self, mesh: _MT, p: int, m: int, isCornerNode: bool, device=None):
         assert(p>4*m)
+        self.device = device
         self.mesh = mesh
         self.p = p
         self.m = m
@@ -72,7 +73,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         ndof = self.number_of_internal_dofs('node')
 
         NN = mesh.number_of_nodes()
-        n2d = bm.arange(NN*ndof, dtype=self.itype).reshape(NN, ndof)
+        n2d = bm.arange(NN*ndof, dtype=self.itype, device=self.device).reshape(NN, ndof)
         return n2d
 
     def edge_to_internal_dof(self):
@@ -83,7 +84,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         mesh = self.mesh 
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        e2id = bm.arange(NN*ndof, NN*ndof+NE*eidof,dtype=self.itype).reshape(NE, eidof)
+        e2id = bm.arange(NN*ndof, NN*ndof+NE*eidof,dtype=self.itype, device=self.device).reshape(NE, eidof)
         return e2id
     def cell_to_internal_dof(self):
         p = self.p
@@ -96,7 +97,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         c2id = bm.arange(NN*ndof + NE*eidof,
-                NN*ndof+NE*eidof+NC*cidof,dtype=self.itype).reshape(NC, cidof)
+                NN*ndof+NE*eidof+NC*cidof,dtype=self.itype, device=self.device).reshape(NC, cidof)
         return c2id
     def cell_to_dof(self):
         p = self.p
@@ -114,11 +115,11 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         cidof = self.number_of_internal_dofs('cell')
         eidof = self.number_of_internal_dofs('edge')
         ndof = self.number_of_internal_dofs('node')
-        c2d = bm.zeros((NC, ldof), dtype=self.itype)
+        c2d = bm.zeros((NC, ldof), dtype=self.itype, device=self.device)
         e2id = self.edge_to_internal_dof()
         n2d = self.node_to_dof()
         c2d[:, ldof-cidof:] = bm.arange(NN*ndof + NE*eidof,
-                NN*ndof+NE*eidof+NC*cidof,dtype=self.itype).reshape(NC, cidof)
+                NN*ndof+NE*eidof+NC*cidof,dtype=self.itype, device=self.device).reshape(NC, cidof)
         c2d[:, :ndof*3] = n2d[cell].reshape(NC,-1) 
         c2eSign = mesh.cell_to_face_sign()
         for e in bm.arange(3):
@@ -136,7 +137,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         p = self.p
         m = self.m
         gdof = self.number_of_global_dofs()
-        isBdDof = bm.zeros(gdof, dtype=bm.bool)
+        isBdDof = bm.zeros(gdof, dtype=bm.bool, device=self.device)
         isBdEdge = self.mesh.boundary_face_flag() #TODO:ds 中没有edge
         isBdNode = self.mesh.boundary_node_flag()
         # 边界边
@@ -162,7 +163,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
 
         NC = mesh.number_of_cells()
         ldof = self.number_of_local_dofs('cell')
-        tem = bm.eye(ldof, dtype=self.ftype)
+        tem = bm.eye(ldof, dtype=self.ftype, device=self.device)
         coeff = bm.tile(tem, (NC, 1, 1))
 
         # 多重指标
@@ -184,7 +185,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         # 局部自由度 顶点
         S02m = [S02m0, S02m1, S02m2]
         for v in range(3):
-            flag = bm.ones(3, dtype=bm.bool)
+            flag = bm.ones(3, dtype=bm.bool, device=self.device)
             flag[v] = False
             for alpha in S02m[v]:
                 i = midx2num(alpha[None, :])
@@ -212,7 +213,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         N = bm.einsum('cfd, ced->cef', glambda, n)
         S1m = [S1m0, S1m1, S1m2]
         for de in range(3):
-            e = bm.ones(3, dtype=bm.bool)
+            e = bm.ones(3, dtype=bm.bool, device=self.device)
             e[de] = False # e
             for alpha in S1m[de]:
                 i = midx2num(alpha[None, :])
@@ -234,7 +235,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         # 全局自由度
         node = mesh.entity('node')
         cell = mesh.entity('cell')
-        Ndelat = bm.zeros((NC, 3, 2, 2), dtype=self.ftype)
+        Ndelat = bm.zeros((NC, 3, 2, 2), dtype=self.ftype, device=self.device)
         t0 = node[cell[:, 2]] - node[cell[:, 1]]
         t1 = node[cell[:, 0]] - node[cell[:, 2]]
         t2 = node[cell[:, 1]] - node[cell[:, 0]]
@@ -245,7 +246,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         Ndelat[:, 2, 0] = t1
         Ndelat[:, 2, 1] = -t0
         ndof = self.number_of_internal_dofs('node')
-        coeff1 = bm.zeros((NC, 3*ndof, 3*ndof), dtype=self.ftype)
+        coeff1 = bm.zeros((NC, 3*ndof, 3*ndof), dtype=self.ftype, device=self.device)
         symidx = [symmetry_index(2, r) for r in range(1, 2*m+1)]
         # 边界自由度
         isBdNode = mesh.boundary_node_flag()
@@ -253,17 +254,17 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         edge = mesh.entity('edge')[isBdEdge]
         n = mesh.edge_unit_normal()[isBdEdge]
         NN = isBdNode.sum()
-        coeff2 = bm.tile(bm.eye(3*ndof, dtype=self.ftype), (NC, 1, 1))
-        nodefram = bm.zeros((NN, 2, 2), dtype=self.ftype)
-        bdnidxmap = bm.zeros(len(isBdNode),dtype=self.itype) 
-        bdnidxmap[isBdNode] = bm.arange(NN, dtype=self.itype)
+        coeff2 = bm.tile(bm.eye(3*ndof, dtype=self.ftype, device=self.device), (NC, 1, 1))
+        nodefram = bm.zeros((NN, 2, 2), dtype=self.ftype, device=self.device)
+        bdnidxmap = bm.zeros(len(isBdNode),dtype=self.itype, device=self.device) 
+        bdnidxmap[isBdNode] = bm.arange(NN, dtype=self.itype, device=self.device)
         nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
         nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
         nodefram[:, 0] = nodefram[:, 1]@bm.array([[0,1],[-1, 0]],
-                                                 dtype=self.ftype)
+                                                 dtype=self.ftype, device=self.device)
         kk = 0
         for v in range(3):
-            flag = bm.ones(3, dtype=bm.bool) 
+            flag = bm.ones(3, dtype=bm.bool, device=self.device) 
             flag[v] = False #v^*
             coeff1[:, ndof*v, ndof*v] = 1
             cidx = isBdNode[cell[:, v]] & ~isCornerNode[cell[:, v]] 
@@ -311,8 +312,8 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         coridx = bm.where(isCornerNode)[0]
         isBdNode = mesh.boundary_node_flag()
         isBdEdge = mesh.boundary_face_flag()
-        bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32)
-        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum(),dtype=bm.int32)
+        bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32, device=self.device)
+        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum(),dtype=bm.int32, device=self.device)
         n2id = self.node_to_dof()[isBdNode]
         e2id = self.edge_to_internal_dof()[isBdEdge]
 
@@ -322,12 +323,12 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         NE = len(edge)
 
         n = mesh.edge_unit_normal()[isBdEdge]
-        nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64) ## 注意！！！先 t 后 n
+        nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64, device=self.device) ## 注意！！！先 t 后 n
         nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
         nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
         nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1,
-                                                           0]],dtype=bm.float64)
-        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=bm.float64), (len(coridx), 1, 1))
+                                                           0]],dtype=bm.float64, device=self.device)
+        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=bm.float64, device=self.device), (len(coridx), 1, 1))
 
         # 顶点自由度
         uh[n2id[:, 0]] = gD[0](node) 
@@ -450,8 +451,8 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         coridx = bm.where(isCornerNode)[0]
         isBdNode = mesh.boundary_node_flag()
         isBdEdge = mesh.boundary_face_flag()
-        bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32)
-        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum(),dtype=bm.int32)
+        bdnidxmap = bm.zeros(len(isBdNode), dtype=bm.int32, device=self.device)
+        bdnidxmap[isBdNode] = bm.arange(isBdNode.sum(),dtype=bm.int32, device=self.device)
         n2id = self.node_to_dof()[isBdNode]
         e2id = self.edge_to_internal_dof()[isBdEdge]
 
@@ -461,12 +462,12 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         NE = len(edge)
 
         n = mesh.edge_unit_normal()[isBdEdge]
-        nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64) ## 注意！！！先 t 后 n
+        nodefram = bm.zeros((NN, 2, 2), dtype=bm.float64, device=self.device) ## 注意！！！先 t 后 n
         nodefram[bdnidxmap[edge[:, 0]], 1] += 0.5*n
         nodefram[bdnidxmap[edge[:, 1]], 1] += 0.5*n
         nodefram[:, 0] = nodefram[:, 1]@bm.array([[0, 1], [-1,
-                                                           0]],dtype=bm.float64)
-        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=self.ftype), (len(coridx), 1, 1))
+                                                           0]],dtype=bm.float64, device=self.device)
+        nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=self.ftype, device=self.device), (len(coridx), 1, 1))
 
         k = 1; 
         for r in range(1, 2*m+1):
