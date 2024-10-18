@@ -10,9 +10,6 @@ class MaterialInterpolation(ABC):
     def __init__(self, name: str):
         """
         Initialize the material interpolation model.
-
-        Args:
-            name (str): Name of the interpolation model.
         """
         self.name = name
 
@@ -30,33 +27,25 @@ class ElasticMaterialProperties(LinearElasticMaterial):
     def __init__(self, E0: float = 1.0, Emin: float = 1e-9, nu: float = 0.3, 
                 penal: int = 3, hypo: str = 'plane_stress', 
                 rho: Optional[TensorLike] = None, 
-                interpolation_model: MaterialInterpolation = None):
+                interpolation_model: MaterialInterpolation = None,
+                device: Optional[str] = None):
         """
         Initialize material properties.
 
-        This class inherits from LinearElasticMaterial and adds material interpolation models 
+        This class inherits from `LinearElasticMaterial` and adds material interpolation models 
             for topology optimization.
-
-        Args:
-            E0 (float): Young's modulus of the solid material.
-            Emin (float): Young's modulus of the void or empty space.
-            nu (float): Poisson's ratio.
-            penal (int): Penalization factor to control material interpolation.
-            hypo (str): Material model hypothesis, either 'plane_stress' or '3D'.
-            rho (Optional[TensorLike]): Density distribution of the material (default is None).
-            interpolation_model (MaterialInterpolation): Material interpolation model, 
-                default is SIMP interpolation.
         """
         if hypo not in ["plane_stress", "3D"]:
             raise ValueError("hypo should be either 'plane_stress' or '3D'")
     
         super().__init__(name="ElasticMaterialProperties", 
-                        elastic_modulus=E0, poisson_ratio=nu, hypo=hypo)
+                        elastic_modulus=E0, poisson_ratio=nu, hypo=hypo, device=device)
         self.E0 = E0
         self.Emin = Emin
         self.penal = penal
         self.rho = rho
         self.interpolation_model = interpolation_model if interpolation_model else SIMPInterpolation()
+        self.device = device
 
     def material_model(self) -> TensorLike:
         """

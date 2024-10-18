@@ -8,6 +8,9 @@ from .utils import simplex_gdof, simplex_ldof
 from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
 
+from fealpy.sparse.coo_tensor import COOTensor
+from fealpy.sparse.csr_tensor import CSRTensor
+
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 
@@ -444,25 +447,34 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         if 'IM' in options:
             nn = len(newNode)
-            IM = coo_matrix((bm.ones(NN), (bm.arange(NN), bm.arange(NN))),
+            IM = COOTensor( indices=bm.stack((bm.arange(NN), bm.arange(NN)), axis=0),
+                            values=bm.ones(NN), 
                             shape=(NN + nn, NN))
+            # IM = coo_matrix((bm.ones(NN), (bm.arange(NN), bm.arange(NN))),
+            #                 shape=(NN + nn, NN))
             val = bm.full((nn,), 0.5)
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + bm.arange(nn),
-                        edge[isCutEdge, 0]
-                    )
-                ), shape=(NN + nn, NN))
-            IM += coo_matrix(
-                (
-                    val,
-                    (
-                        NN + bm.arange(nn),
-                        edge[isCutEdge, 1]
-                    )
-                ), shape=(NN + nn, NN))
+            IM += COOTensor(indices=bm.stack((NN + bm.arange(nn), edge[isCutEdge, 0]), axis=0),
+                            values=val,
+                            shape=(NN + nn, NN))
+            # IM += coo_matrix(
+            #     (
+            #         val,
+            #         (
+            #             NN + bm.arange(nn),
+            #             edge[isCutEdge, 0]
+            #         )
+            #     ), shape=(NN + nn, NN))
+            IM += COOTensor(indices=bm.stack((NN + bm.arange(nn), edge[isCutEdge, 1]), axis=0),
+                            values=val,
+                            shape=(NN + nn, NN))
+            # IM += coo_matrix(
+            #     (
+            #         val,
+            #         (
+            #             NN + bm.arange(nn),
+            #             edge[isCutEdge, 1]
+            #         )
+            #     ), shape=(NN + nn, NN))
             options['IM'] = IM.tocsr()
 
         if 'HB' in options:
@@ -485,9 +497,9 @@ class TriangleMesh(SimplexMesh, Plotable):
                     if value.shape == (NC,):  # 分片常数
                         value = bm.concatenate((value[:], value[idx]))
                         options['data'][key] = value
-                    elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
-                        value = bm.concatenate((value, value[idx, :])) 
-                        options['data'][key] = value
+                    #elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
+                    #    value = bm.concatenate((value, value[idx, :])) 
+                    #    options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
                             value = bm.concatenate((value, bm.zeros((nn,),  dtype=self.ftype, device=self.device)))

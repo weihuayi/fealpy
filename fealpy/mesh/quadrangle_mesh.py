@@ -161,12 +161,12 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
     def interpolation_points(self, p:int, index: Index = _S):
         """
-        @brief 获取四边形网格上所有 p 次插值点
+        @brief Get all p-th order interpolation points on the quadrilateral mesh
         """
         cell = self.entity('cell')
         node = self.entity('node')
         if p == 1:
-            return node
+            return node[index]
 
         GD = self.geo_dimension()
 
@@ -181,7 +181,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
         ipoints = bm.concatenate((node, ipoints0, ipoints1), axis=0)
 
-        return ipoints
+        return ipoints[index]
 
     def number_of_corner_nodes(self):
         return self.number_of_nodes()
@@ -603,6 +603,28 @@ class QuadrangleMesh(TensorMesh, Plotable):
                 [1.5, math.sqrt(3) / 2],
                 [0.5, math.sqrt(3) / 2]], dtype=bm.float64)
         cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int64)
+        return cls(node, cell)
+    
+    @classmethod
+    def from_square_domain_with_fracture(cls):
+        node = bm.tensor([
+            [0.0, 0.0],
+            [0.0, 0.5],
+            [0.0, 0.5],
+            [0.0, 1.0],
+            [0.5, 0.0],
+            [0.5, 0.5],
+            [0.5, 1.0],
+            [1.0, 0.0],
+            [1.0, 0.5],
+            [1.0, 1.0]], dtype=bm.float64)
+
+        cell = bm.tensor([
+            [0, 4, 5, 1],
+            [4, 7, 8, 5],
+            [5, 8, 9, 6],
+            [2, 5, 6, 3]], dtype=bm.int32)
+
         return cls(node, cell)
 
     @classmethod
