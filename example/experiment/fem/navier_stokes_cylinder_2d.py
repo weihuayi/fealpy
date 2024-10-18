@@ -31,9 +31,11 @@ from fealpy.decorator import barycentric, cartesian
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
-#backend = 'pytorch'
-backend = 'numpy'
+backend = 'pytorch'
+#backend = 'numpy'
+device = 'cuda'
 bm.set_backend(backend)
+bm.set_default_device(device)
 
 output = './'
 udegree = 2
@@ -45,7 +47,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh(0.05,'fealpy')
+mesh = pde.mesh(0.05)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -80,13 +82,8 @@ A_bform.add_integrator(ConvectionIntegrator)
 ulform = LinearForm(uspace)
 SourceIntegrator = ScalarSourceIntegrator(q = q)
 ulform.add_integrator(SourceIntegrator)
-SourceIntegrator.source = u0
 plform = LinearForm(pspace)
-b = LinearBlockForm([ulform, plform])
-bb = b.assembly()
-print(bb)
 
-exit()
 #边界处理
 ## 边界处理太繁琐
 ## threshold一定要传tuple或者list吗
@@ -115,17 +112,13 @@ for i in range(10):
 
     ConvectionIntegrator.coef = u0
     ConvectionIntegrator.clear()
-
     A = BlockForm([[A_bform, P_bform],
                    [P_bform.T, None]])
     A = A.assembly()
     
     SourceIntegrator.source = u0
-    SourceIntegrator.clear()
-    ##LinearBlockForm 
-    b0 = ulform.assembly()
-    b2 = bm.zeros(pgdof) 
-    b = bm.concatenate([b0, b2])
+    SourceIntegrator.clear() 
+    b = LinearBlockForm([ulform, plform]).assembly()
     
     A,b = DirichletBC((uspace,pspace), xx, threshold=isBdDof).apply(A, b)
     x = spsolve(A, b, 'mumps')
@@ -142,4 +135,4 @@ for i in range(10):
         
     u0[:] = u1[:] 
     timeline.advance()
-print(bm.sum(bm.abs(u1)))
+print(bm.sum(bm.abs(u1[:])))

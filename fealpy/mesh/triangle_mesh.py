@@ -18,7 +18,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell)
         
-        self.device = bm.get_device(cell)
         self.node = node
         self.cell = cell
 
@@ -198,7 +197,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         ldof = self.number_of_local_ipoints(p, 'cell')
 
         kwargs = bm.context(cell)
-        c2p = bm.zeros((NC, ldof), **kwargs, device=self.device)
+        c2p = bm.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
         c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])
@@ -1064,7 +1063,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_square_domain_with_fracture(cls):
+    def from_square_domain_with_fracture(cls, device=None):
         node = bm.tensor([
             [0.0, 0.0],
             [0.0, 0.5],
@@ -1075,7 +1074,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             [0.5, 1.0],
             [1.0, 0.0],
             [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64, device=self.device)
+            [1.0, 1.0]], dtype=bm.float64, device=device)
 
         cell = bm.tensor([
             [1, 0, 5],
@@ -1085,7 +1084,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             [4, 7, 5],
             [8, 5, 7],
             [6, 5, 9],
-            [8, 9, 5]], dtype=bm.int32, device=self.device)
+            [8, 9, 5]], dtype=bm.int32, device=device)
 
         return cls(node, cell)
 
