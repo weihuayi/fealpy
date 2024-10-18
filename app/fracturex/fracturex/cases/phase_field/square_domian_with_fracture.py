@@ -1,7 +1,6 @@
 import numpy as np
 import argparse
 
-import pytest
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, QuadrangleMesh
 
@@ -19,64 +18,8 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.05
+        l0 = 0.015
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
-
-
-    def init_quad_mesh(self, n=3):
-        """
-        @brief 生成实始网格
-        """
-        node = bm.array([
-            [0.0, 0.0],
-            [0.0, 0.5],
-            [0.0, 0.5],
-            [0.0, 1.0],
-            [0.5, 0.0],
-            [0.5, 0.5],
-            [0.5, 1.0],
-            [1.0, 0.0],
-            [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64)
-
-        cell = bm.array([
-            [0, 4, 5, 1],
-            [4, 7, 8, 5],
-            [5, 8, 9, 6],
-            [2, 5, 6, 3]], dtype=bm.int64)
-        mesh = QuadrangleMesh(node, cell)
-        mesh.uniform_refine(n=n)
-        return mesh
-    
-
-    def init_tri_mesh(self, n=3):
-        """
-        @brief 生成实始网格
-        """
-        node = bm.array([
-            [0.0, 0.0],
-            [0.0, 0.5],
-            [0.0, 0.5],
-            [0.0, 1.0],
-            [0.5, 0.0],
-            [0.5, 0.5],
-            [0.5, 1.0],
-            [1.0, 0.0],
-            [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64)
-
-        cell = bm.array([
-            [1, 0, 5],
-            [4, 5, 0],
-            [2, 5, 3],
-            [6, 3, 5],
-            [4, 7, 5],
-            [8, 5, 7],
-            [6, 5, 9],
-            [8, 9, 5]], dtype=bm.int32)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n=n)
-        return mesh
 
     def is_y_force(self):
         """
@@ -106,6 +49,17 @@ class square_with_circular_notch():
         @brief 标记边界条件
         """
         return bm.abs(p[..., 1]) < 1e-12
+    
+
+    def adaptive_mesh(self, mesh, d0=0.49, d1=1.01, h=0.005):
+        cell = mesh.entity("cell")
+        node = mesh.entity("node")
+        isMarkedCell = mesh.entity_measure('cell') > 0.00001
+        isMarkedCell = isMarkedCell & (bm.min(bm.abs(node[cell, 1] - 0.5),
+                                          axis=-1) < h)
+        isMarkedCell = isMarkedCell & (bm.min(node[cell, 0], axis=-1) > d0) & (
+            bm.min(node[cell, 0], axis=-1) < d1)
+        return isMarkedCell
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -153,6 +107,10 @@ parser.add_argument('--vtkname',
         default='test', type=str,
         help='vtk 文件名, 默认为 test.')
 
+parser.add_argument('--save_vtkfile',
+        default=True, type=bool,
+        help='是否保存 vtk 文件, 默认为 False.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -162,7 +120,8 @@ enable_adaptive = args.enable_adaptive
 marking_strategy = args.marking_strategy
 refine_method = args.refine_method
 n = args.n
-vtkname = args.vtkname
+save_vtkfile = args.save_vtkfile
+vtkname = args.vtkname +'_' + args.mesh_type + '_'
 
 
 tmr = timer()
@@ -172,13 +131,22 @@ bm.set_backend(backend)
 model = square_with_circular_notch()
 
 if args.mesh_type == 'tri':
-    mesh = model.init_tri_mesh(n=n)
+    mesh = TriangleMesh.from_square_domain_with_fracture()
+
 elif args.mesh_type == 'quad':
-    mesh = model.init_quad_mesh(n=n)
+    mesh = QuadrangleMesh.from_square_domain_with_fracture()
 else:
     raise ValueError('Invalid mesh type.')
 
-fname = 'square_with_a_notch_init.vtu'
+
+mesh.uniform_refine(n=n)
+
+isMarkedCell = model.adaptive_mesh(mesh)
+while isMarkedCell.any():
+    mesh.bisect(isMarkedCell)
+    isMarkedCell = model.adaptive_mesh(mesh)
+
+fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
 
@@ -199,15 +167,17 @@ ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.i
 # 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 
-ms.solve(maxit=maxit, vtkname=vtkname)
+
+ms.solve(maxit=maxit, save_vtkfile=save_vtkfile, vtkname=vtkname)
 
 tmr.send('stop')
 end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
-with open('results_model1_ada.txt', 'w') as file:
-    file.write(f'force: {force}\n, time: {end-start}\n')
+tname = args.mesh_type + '_' + str(p) + '_' + 'model1_disp.txt'
+with open(tname, 'w') as file:
+    file.write(f'force: {force},\n time: {end-start},\n l0: {model.l0},\n E: {model.E},\n, nu: {model.nu},\n, Gc: {model.Gc},\n, degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
@@ -215,6 +185,7 @@ plt.ylabel('Residual Force')
 plt.title('Changes in Residual Force')
 plt.grid(True)
 plt.legend()
-plt.savefig('model1_force.png', dpi=300)
+pname = args.mesh_type + '_' + str(p) + '_' + 'model1_force.png'
+plt.savefig(pname, dpi=300)
 
 print(f"Time: {end - start}")
