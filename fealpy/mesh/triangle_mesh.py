@@ -17,12 +17,13 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell)
-        self.device = device
-
+        
         self.node = node
         self.cell = cell
-        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
-        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs, device=self.device)
+
+
+        self.localEdge = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
+        self.localFace = bm.tensor([(1, 2), (2, 0), (0, 1)], **kwargs)
         self.ccw = bm.tensor([0, 1, 2], **kwargs)
 
         self.localCell = bm.tensor([
@@ -1117,7 +1118,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             itype = bm.int32
         if ftype is None:
             ftype = bm.float64
-
+        
         NN = (nx + 1) * (ny + 1)
         x = bm.linspace(box[0], box[1], nx+1, dtype=ftype, device=device)
         y = bm.linspace(box[2], box[3], ny+1, dtype=ftype, device=device)
