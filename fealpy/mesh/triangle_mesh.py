@@ -486,9 +486,9 @@ class TriangleMesh(SimplexMesh, Plotable):
                     if value.shape == (NC,):  # 分片常数
                         value = bm.concatenate((value[:], value[idx]))
                         options['data'][key] = value
-                    elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
-                        value = bm.concatenate((value, value[idx, :])) 
-                        options['data'][key] = value
+                    #elif value.ndim == 2 and value.shape[0] == NC:  # 处理(NC, NQ)的情况
+                    #    value = bm.concatenate((value, value[idx, :])) 
+                    #    options['data'][key] = value
                     elif value.shape == (NN + k * nn,):
                         if k == 0:
                             value = bm.concatenate((value, bm.zeros((nn,),  dtype=self.ftype, device=self.device)))
@@ -1064,7 +1064,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_square_domain_with_fracture(cls):
+    def from_square_domain_with_fracture(cls, device=None):
         node = bm.tensor([
             [0.0, 0.0],
             [0.0, 0.5],
@@ -1075,7 +1075,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             [0.5, 1.0],
             [1.0, 0.0],
             [1.0, 0.5],
-            [1.0, 1.0]], dtype=bm.float64, device=self.device)
+            [1.0, 1.0]], dtype=bm.float64, device=device)
 
         cell = bm.tensor([
             [1, 0, 5],
@@ -1085,7 +1085,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             [4, 7, 5],
             [8, 5, 7],
             [6, 5, 9],
-            [8, 9, 5]], dtype=bm.int32, device=self.device)
+            [8, 9, 5]], dtype=bm.int32, device=device)
 
         return cls(node, cell)
 

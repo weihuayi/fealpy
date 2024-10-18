@@ -604,6 +604,28 @@ class QuadrangleMesh(TensorMesh, Plotable):
                 [0.5, math.sqrt(3) / 2]], dtype=bm.float64)
         cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int64)
         return cls(node, cell)
+    
+    @classmethod
+    def from_square_domain_with_fracture(cls):
+        node = bm.tensor([
+            [0.0, 0.0],
+            [0.0, 0.5],
+            [0.0, 0.5],
+            [0.0, 1.0],
+            [0.5, 0.0],
+            [0.5, 0.5],
+            [0.5, 1.0],
+            [1.0, 0.0],
+            [1.0, 0.5],
+            [1.0, 1.0]], dtype=bm.float64)
+
+        cell = bm.tensor([
+            [0, 4, 5, 1],
+            [4, 7, 8, 5],
+            [5, 8, 9, 6],
+            [2, 5, 6, 3]], dtype=bm.int32)
+
+        return cls(node, cell)
 
     @classmethod
     def from_triangle_mesh(cls, mesh) -> 'QuadrangleMesh':
