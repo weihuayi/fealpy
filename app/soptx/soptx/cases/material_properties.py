@@ -10,9 +10,6 @@ class MaterialInterpolation(ABC):
     def __init__(self, name: str):
         """
         Initialize the material interpolation model.
-
-        Args:
-            name (str): Name of the interpolation model.
         """
         self.name = name
 

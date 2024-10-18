@@ -21,7 +21,6 @@ class LinearMeshCFEDof(Generic[_MT]):
         self.multiIndex = mesh.multi_index_matrix(p, TD)
 
     def is_boundary_dof(self, threshold=None):
-        TD = self.mesh.top_dimension()
         gdof = self.number_of_global_dofs()
         if bm.is_tensor(threshold):
             index = threshold
@@ -29,14 +28,34 @@ class LinearMeshCFEDof(Generic[_MT]):
                 return index
         else:
             index = self.mesh.boundary_face_index()
-            if callable(threshold):
-                bc = self.mesh.entity_barycenter(TD-1, index=index)
-                flag = threshold(bc)
-                index = index[flag]
+            face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
+            index_dof = face2dof.flatten()
 
-        face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
+            if callable(threshold):
+                bc = self.mesh.interpolation_points(p=self.p, index=index_dof)
+                flag = threshold(bc)
+                index_dof = index_dof[flag]
+
         isBdDof = bm.zeros(gdof, dtype=bm.bool, device=bm.get_device(self.mesh))
-        isBdDof = bm.set_at(isBdDof, face2dof, True)
+        isBdDof = bm.set_at(isBdDof, index_dof, True)
+
+    # def is_boundary_dof(self, threshold=None):
+    #     TD = self.mesh.top_dimension()
+    #     gdof = self.number_of_global_dofs()
+    #     if bm.is_tensor(threshold):
+    #         index = threshold
+    #         if (index.dtype == bm.bool) and (len(index) == gdof):
+    #             return index
+    #     else:
+    #         index = self.mesh.boundary_face_index()
+    #         if callable(threshold):
+    #             bc = self.mesh.entity_barycenter(TD-1, index=index)
+    #             flag = threshold(bc)
+    #             index = index[flag]
+
+    #     face2dof = self.face_to_dof(index=index) # 只获取指定的面的自由度信息
+    #     isBdDof = bm.zeros(gdof, dtype=bm.bool, device=bm.get_device(self.mesh))
+    #     isBdDof = bm.set_at(isBdDof, face2dof, True)
 
         return isBdDof
 
