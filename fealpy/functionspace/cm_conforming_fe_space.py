@@ -343,7 +343,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         for r in range(1, 2*m+1):
             val = gD[r](node) 
             multiIndex = self.mesh.multi_index_matrix(r, 1)
-            symidx, num = symmetry_index(2, r)
+            symidx, num = symmetry_index(2, r, device=self.device)
 
             #idx = self.mesh.multi_index_matrix(r, 1)
             #num = factorial(r)/bm.prod(factorial(idx), axis=1)
@@ -371,7 +371,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 bcoeff = bm.einsum('el, il->ei', ffval, b2l)
                 uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             else:
-                symidx, num = symmetry_index(2, r)
+                symidx, num = symmetry_index(2, r, device=self.device)
                 nnn = span_array(n[:, None, :], bm.array([r]))
                 nnn = nnn.reshape(NE, -1)[:, symidx]
 
@@ -427,9 +427,9 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 bcoeff = bm.einsum('el, il->ei', ffval, b2l)
                 fI[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             else:
-                symidx, num = symmetry_index(2, r)
+                symidx, num = symmetry_index(2, r, device=self.device)
 
-                nnn = span_array(n[:, None, :], bm.array([r]))
+                nnn = span_array(n[:, None, :], bm.array([r], device=self.device))
                 nnn = nnn.reshape(NE, -1)[:, symidx]
 
                 #GD = self.mesh.geo_dimension()
@@ -480,7 +480,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         for r in range(1, 2*m+1):
             val = flist[r](node) 
             multiIndex = self.mesh.multi_index_matrix(r, 1)
-            symidx, num = symmetry_index(2, r)
+            symidx, num = symmetry_index(2, r, device=self.device)
 
             #idx = self.mesh.multi_index_matrix(r, 1)
             #num = factorial(r)/bm.prod(factorial(idx), axis=1)
