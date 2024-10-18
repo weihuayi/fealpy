@@ -1021,8 +1021,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         """
         Generate a tetrahedral mesh for a box domain.
 
-        @param nx Number of divisions along the x-axis (default: 10)
-        @param ny Number of divisions along the y-axis (default: 10)
+        @param nx Number of divisions along the x-axis (default: 2)
+        @param ny Number of divisions along the y-axis (default: 5)
         @param nz Number of divisions along the z-axis (default: 10)
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TetrahedronMesh instance
