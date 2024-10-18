@@ -7,8 +7,8 @@
 	@bref 
 	@ref 
 '''  
-from fealpy import logger
-logger.setLevel('ERROR')
+#from fealpy import logger
+#logger.setLevel('ERROR')
 
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
@@ -16,14 +16,14 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import TensorFunctionSpace
 from fealpy.fem import (
         BilinearForm, ScalarDiffusionIntegrator, 
-        ScalarMassIntegrator, PressWorkIntegrator0, PressWorkIntegrator ,
-        PressWorkIntegrator1, ScalarConvectionIntegrator)
+        ScalarMassIntegrator,  PressWorkIntegrator ,
+        ScalarConvectionIntegrator)
 
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.sparse import COOTensor
 from fealpy.fem import VectorSourceIntegrator
-from fealpy.fem import BlockForm
+from fealpy.fem import LinearBlockForm, BlockForm
 from fealpy.solver import spsolve 
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
@@ -45,58 +45,30 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh1(0.05)
-
+mesh = pde.mesh(0.05,'fealpy')
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
-uspace = LagrangeFESpace(mesh, p=udegree)
-tensor_uspace = TensorFunctionSpace(uspace, (2, -1))
+space = LagrangeFESpace(mesh, p=udegree)
+uspace = TensorFunctionSpace(space, (2, -1))
 
-u0x = uspace.function()
-u0y = uspace.function()
-u0 = bm.stack((u0x[:], u0y[:]), axis=1)
-u1x = uspace.function()
-u1y = uspace.function()
+u0 = uspace.function() 
+u1 = uspace.function()
 p1 = pspace.function()
 
 ugdof = uspace.number_of_global_dofs()
 pgdof = pspace.number_of_global_dofs()
-gdof = pgdof+2*ugdof
+gdof = ugdof + pgdof
 
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
-mesh.nodedata['velocity'] = u0 
+mesh.nodedata['velocity'] = u1.reshape(2,-1).T
 mesh.nodedata['pressure'] = p1
 mesh.to_vtk(fname=fname)
-APX_bform = BilinearForm((pspace, uspace))
-APX_bform.add_integrator(PressWorkIntegrator0(coef=-1, q=q)) 
 
-APY_bform = BilinearForm((pspace, uspace))
-APY_bform.add_integrator(PressWorkIntegrator1(coef=-1, q=q)) 
-'''
-
-M_bform = BilinearForm(uspace)
-M_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
-M = M_bform.assembly()
-
-S_bform = BilinearForm(uspace)
-S_bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q))
-S = S_bform.assembly()
-
-P_bform = BilinearForm((pspace, tensor_uspace))
+##BilinearForm
+P_bform = BilinearForm((pspace, uspace))
 P_bform.add_integrator(PressWorkIntegrator(-1, q=q))
-P = P_bform.assembly()
-
-
-from scipy.sparse import bmat
-A = bmat([[APX.to_scipy()],[APY.to_scipy()]],  format='coo')
-
-print(bm.sum(bm.abs(A.toarray()-P.to_scipy().toarray())))
-
-exit()
-'''
-
 
 A_bform = BilinearForm(uspace)
 A_bform.add_integrator(ScalarMassIntegrator(rho/dt, q=q))
@@ -104,128 +76,70 @@ A_bform.add_integrator(ScalarDiffusionIntegrator(mu, q=q))
 ConvectionIntegrator = ScalarConvectionIntegrator(q=q)
 A_bform.add_integrator(ConvectionIntegrator)
 
-APX_bform = BilinearForm((pspace, uspace))
-APX_bform.add_integrator(PressWorkIntegrator0(coef=-1, q=q)) 
-APX = APX_bform.assembly()
+##LinearForm
+ulform = LinearForm(uspace)
+SourceIntegrator = ScalarSourceIntegrator(q = q)
+ulform.add_integrator(SourceIntegrator)
+SourceIntegrator.source = u0
+plform = LinearForm(pspace)
+b = LinearBlockForm([ulform, plform])
+bb = b.assembly()
+print(bb)
 
-APY_bform = BilinearForm((pspace, uspace))
-APY_bform.add_integrator(PressWorkIntegrator1(coef=-1, q=q)) 
-APY = APY_bform.assembly()
-
+exit()
 #边界处理
+## 边界处理太繁琐
+## threshold一定要传tuple或者list吗
+u_isbddof = uspace.is_boundary_dof()
+u_out_isbd = uspace.is_boundary_dof(threshold=(pde.is_outflow_boundary,))
+u_isbddof[u_out_isbd] = False
+p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary)
+isBdDof = bm.concatenate([u_isbddof, p_isbddof])
+## b
+#xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=(pde.is_inflow_boundary,))
+#xp = bm.zeros(pgdof)
+#axx = bm.concatenate((xu,xp))
+
 xx = bm.zeros(gdof, dtype=mesh.ftype)
-u_isbddof_u0 = uspace.is_boundary_dof()
-u_isbddof_in = uspace.is_boundary_dof(threshold = pde.is_inflow_boundary)
-u_isbddof_out = uspace.is_boundary_dof(threshold = pde.is_outflow_boundary)
-u_isbddof_circle = uspace.is_boundary_dof(threshold = pde.is_circle_boundary)
-
-u_isbddof_u0[u_isbddof_in] = False 
-u_isbddof_u0[u_isbddof_out] = False 
-xx[0:ugdof][u_isbddof_u0] = 0
-xx[ugdof:2*ugdof][u_isbddof_u0] = 0
-
-u_isbddof = u_isbddof_u0
-u_isbddof[u_isbddof_in] = True
-#ipoint = uspace.interpolation_points()[u_isbddof_in]
-ipoint = uspace.interpolation_points()
+u_isbddof_in = space.is_boundary_dof(threshold = pde.is_inflow_boundary)
+ipoint = space.interpolation_points()
 uinflow = pde.u_inflow_dirichlet(ipoint)
-
-#xx[0:ugdof][u_isbddof_in] = uinflow[:,0]
-#xx[ugdof:2*ugdof][u_isbddof_in] = uinflow[:,1]
-#print(u_bd_in.shape)
-#print(xx.shape)
-#xx[u_bd_in] = uinflow.reshape(-1)
-
-p_isBdDof_p0 = pspace.is_boundary_dof(threshold = pde.is_outflow_boundary) 
-bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isBdDof_p0))
+bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isbddof))
 value_bd = bm.concatenate((uinflow[:,0],uinflow[:,1], bm.zeros(pgdof)))
 xx[bd] = value_bd[bd] 
 
 
-isBdDof = bm.concatenate([u_isbddof, u_isbddof, p_isBdDof_p0], axis=0)
-
 for i in range(10):
     t1 = timeline.next_time_level()
     print("time=", t1)
-    
-    @barycentric
-    def concoef(bcs, index):
-        a1 = u0x(bcs, index)
-        a2 = u0y(bcs, index)
-        result = bm.concatenate((a1[...,bm.newaxis],a2[..., bm.newaxis]), axis=2)
-        return result
-    
 
-    ConvectionIntegrator.coef = concoef
+    ConvectionIntegrator.coef = u0
     ConvectionIntegrator.clear()
 
-    A = BlockForm([[A_bform, None, APX_bform],
-                  [None, A_bform, APY_bform],
-                   [APX_bform.T, APY_bform.T, None]])
+    A = BlockForm([[A_bform, P_bform],
+                   [P_bform.T, None]])
     A = A.assembly()
-    '''
-    if backend == 'numpy':
-        from scipy.sparse import coo_array, bmat
-        def coo(A):
-            data = A._values
-            indices = A._indices
-            return coo_array((data, indices))
-
-        A = bmat([[coo(M+S+C), None,coo(-APX)],
-                [None, coo(M+S+C), coo(-APY)],
-                [coo(-APX).T, coo(-APY).T, None]], format='coo')
-        A = COOTensor(bm.stack([A.row,A.col],axis=0), A.data, spshape=A.shape)
-        A = A.coalesce()
     
-    if backend == 'pytorch':
-        indices = bm.tensor([[],[]])
-        data = bm.tensor([])
-        zeros_0 = COOTensor(indices, data, (ugdof,ugdof))
-        zeros_1 = COOTensor(indices, data, (pgdof,pgdof))
-        A0 = bm.concatenate([M+S+C, zeros_0, -APX], axis=1)
-        A1 = bm.concatenate([zeros_0, M+S+C, -APY], axis=1)
-        A2 = bm.concatenate([-APX.T, -APY.T ,zeros_1], axis=1)
-        A = bm.concatenate((A0,A1,A2),axis=0)
-    '''
-    lform = LinearForm(uspace)
-    lform.add_integrator(ScalarSourceIntegrator(u0x))
-    b0 = lform.assembly()
-    lform = LinearForm(uspace)
-    lform.add_integrator(ScalarSourceIntegrator(u0y))
-    b1 = lform.assembly()
+    SourceIntegrator.source = u0
+    SourceIntegrator.clear()
+    ##LinearBlockForm 
+    b0 = ulform.assembly()
     b2 = bm.zeros(pgdof) 
-    b = bm.concatenate([b0,b1,b2])
+    b = bm.concatenate([b0, b2])
     
-    b -= A@xx
-    b[isBdDof] = xx[isBdDof]
-    
-    A = DirichletBC(uspace, xx, isDDof=isBdDof).apply_matrix(A, check=False)
-    #A,b = DirichletBC(uspace, xx, isDDof=isBdDof).apply(A, b, check=None)
-    '''
-    import scipy.sparse as sp
-    values = A.values()
-    indices = A.indices()
-    A = sp.coo_matrix((values, (indices[0], indices[1])), shape=A.shape) 
-    A = A.tocsr()
-    x = sp.linalg.spsolve(A,b)
-    '''
+    A,b = DirichletBC((uspace,pspace), xx, threshold=isBdDof).apply(A, b)
     x = spsolve(A, b, 'mumps')
-    x = bm.array(x)
-    ''' 
-    x = cg(A, b, maxiter=10000)
-    '''
     
-    u1x[:] = x[:ugdof]
-    u1y[:] = x[ugdof:2*ugdof]
-    p1[:] = x[2*ugdof:]
-     
-    u0x[:] = u1x[:]
-    u0y[:] = u1y[:]
-    u0 = bm.stack((u0x[:], u0y[:]), axis=1)
+    u1[:] = x[:ugdof]
+    p1[:] = x[ugdof:]
     
+
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
-    mesh.nodedata['velocity'] = u0
+    ##mesh.nodedata 
+    mesh.nodedata['velocity'] = u1.reshape(2,-1).T
     mesh.nodedata['pressure'] = p1
     mesh.to_vtk(fname=fname)
-    
-    timeline.advance() 
+        
+    u0[:] = u1[:] 
+    timeline.advance()
+print(bm.sum(bm.abs(u1)))

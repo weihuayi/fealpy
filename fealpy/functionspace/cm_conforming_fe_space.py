@@ -159,6 +159,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         p = self.p
         m = self.m
         mesh = self.mesh
+        device = bm.get_device(mesh.cell)
         isCornerNode = self.isCornerNode
 
         NC = mesh.number_of_cells()
@@ -201,9 +202,13 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     j = midx2num(beta[None, :])
                     j = dof2num[j]
                     dbeta = beta[flag]
-                    coeff[:, i, j] = sign*comb(bm.sum(beta),
-                            r)*bm.prod(bm.array(comb(dalpha, dbeta)),
-                                    axis=0)*factorial(r) 
+                    beta_cpu = bm.to_numpy(bm.sum(beta))
+                    dalpha_cpu = bm.to_numpy(dalpha)
+                    dbeta_cpu = bm.to_numpy(dbeta)
+                    coeff[:, i, j] = sign*comb(beta_cpu,r)*bm.prod(bm.array(
+                        comb(dalpha_cpu, dbeta_cpu),device=device),axis=0)*factorial(r)
+                    #coeff[:, i, j] = sign*comb(bm.sum(beta),r)*bm.prod(bm.array(comb(dalpha, dbeta),**ikwargs),
+                    #                                                   axis=0)*factorial(r)
 
 
         # 局部自由度 边
@@ -221,11 +226,13 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 dalpha = alpha[de] 
                 betas = mesh.multi_index_matrix(int(dalpha), 2)
                 for beta in betas:
-                    val = bm.prod(N[:, de]**beta,axis=1)/bm.prod(bm.array(factorial(beta)), axis=0)
+                    beta_cpu = bm.to_numpy(beta)
+                    val = bm.prod(N[:, de]**beta,axis=1)/bm.prod(bm.array(factorial(beta_cpu), device=device), axis=0)
                     beta[e] = beta[e] +alpha[e]
+                    beta_sum_cpu = bm.to_numpy(bm.sum(beta))
                     j = midx2num(beta[None, :])
                     j = dof2num[j]
-                    coeff[:, i, j] = comb(bm.sum(beta),
+                    coeff[:, i, j] = comb(beta_sum_cpu,
                                           int(dalpha))*(factorial(int(dalpha)))**2*val[:, None]
         #for i in range(NC):
         
@@ -247,7 +254,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         Ndelat[:, 2, 1] = -t0
         ndof = self.number_of_internal_dofs('node')
         coeff1 = bm.zeros((NC, 3*ndof, 3*ndof), dtype=self.ftype, device=self.device)
-        symidx = [symmetry_index(2, r) for r in range(1, 2*m+1)]
+        symidx = [symmetry_index(2, r, device=device) for r in range(1, 2*m+1)]
         # 边界自由度
         isBdNode = mesh.boundary_node_flag()
         isBdEdge = mesh.boundary_face_flag()
