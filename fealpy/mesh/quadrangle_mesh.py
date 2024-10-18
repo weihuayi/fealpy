@@ -1,4 +1,4 @@
-from typing import Union, Optional, Sequence, Tuple, Any, Callable
+from typing import Union, Optional, List, Tuple, Any, Callable
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
@@ -161,23 +161,18 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
     def interpolation_points(self, p:int, index: Index = _S):
         """
-        @brief 获取四边形网格上所有 p 次插值点
+        @brief Get all p-th order interpolation points on the quadrilateral mesh
         """
         cell = self.entity('cell')
         node = self.entity('node')
         if p == 1:
-            return node
+            return node[index]
 
-        NN = self.number_of_nodes()
         GD = self.geo_dimension()
-
-        gdof = self.number_of_global_ipoints(p)
-
-        NE = self.number_of_edges()
 
         edge = self.entity('edge')
 
-        multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
+        multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype, device=bm.get_device(cell))
         w = multiIndex[1:-1, :] / p
         ipoints0 = bm.einsum('ij, ...jm->...im', w, node[edge, :]).reshape(-1, GD)
 
@@ -185,7 +180,8 @@ class QuadrangleMesh(TensorMesh, Plotable):
         ipoints1 = bm.einsum('ij, kj...->ki...', w, node[cell[:, [0, 3, 1, 2]]]).reshape(-1, GD)
 
         ipoints = bm.concatenate((node, ipoints0, ipoints1), axis=0)
-        return ipoints
+
+        return ipoints[index]
 
     def number_of_corner_nodes(self):
         return self.number_of_nodes()
@@ -208,55 +204,84 @@ class QuadrangleMesh(TensorMesh, Plotable):
         NE = self.number_of_edges()
         NC = self.number_of_cells()
 
-        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype)
+        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype, device=bm.get_device(cell))
         c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
         e2p = self.edge_to_ipoint(p)
-        if bm.backend_name in ["numpy", "pytorch"]:
-            flag = edge2cell[:, 2] == 0
-            c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
-            flag = edge2cell[:, 2] == 1
-            c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
-            flag = edge2cell[:, 2] == 2
-            c2p[edge2cell[flag, 0], :, -1] = bm.flip(e2p[flag], axis=-1)
-            flag = edge2cell[:, 2] == 3
-            c2p[edge2cell[flag, 0], 0, :] = bm.flip(e2p[flag], axis=-1)
 
-            iflag = edge2cell[:, 0] != edge2cell[:, 1]
-            flag = iflag & (edge2cell[:, 3] == 0)
-            c2p[edge2cell[flag, 1], :, 0] = bm.flip(e2p[flag], axis=-1)
-            flag = iflag & (edge2cell[:, 3] == 1)
-            c2p[edge2cell[flag, 1], -1, :] = bm.flip(e2p[flag], axis=-1)
-            flag = iflag & (edge2cell[:, 3] == 2)
-            c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
-            flag = iflag & (edge2cell[:, 3] == 3)
-            c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+        flag = edge2cell[:, 2] == 0
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), 0), e2p[flag])
 
-            c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
-        elif bm.backend_name == "jax":
-            flag = edge2cell[:, 2] == 0
-            c2p = c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
-            flag = edge2cell[:, 2] == 1
-            c2p = c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
-            flag = edge2cell[:, 2] == 2
-            c2p = c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
-            flag = edge2cell[:, 2] == 3
-            c2p = c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
+        flag = edge2cell[:, 2] == 1
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], -1, slice(None)), e2p[flag])
 
-            iflag = edge2cell[:, 0] != edge2cell[:, 1]
-            flag = iflag & (edge2cell[:, 3] == 0)
-            c2p = c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
-            flag = iflag & (edge2cell[:, 3] == 1)
-            c2p = c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
-            flag = iflag & (edge2cell[:, 3] == 2)
-            c2p = c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
-            flag = iflag & (edge2cell[:, 3] == 3)
-            c2p = c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
+        flag = edge2cell[:, 2] == 2
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), -1), bm.flip(e2p[flag], axis=-1))
 
-            c2p = c2p.at[:, 1:-1, 1:-1].set(NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
+        flag = edge2cell[:, 2] == 3
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], 0, slice(None)), bm.flip(e2p[flag], axis=-1))
 
-            cell2ipoint = c2p.reshape((NC, (p + 1) * (p + 1)))
-        else:
-            raise ValueError("Unsupported backend")
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        flag = iflag & (edge2cell[:, 3] == 0)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), 0), bm.flip(e2p[flag], axis=-1))
+
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], -1, slice(None)), bm.flip(e2p[flag], axis=-1))
+
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), -1), e2p[flag])
+
+        flag = iflag & (edge2cell[:, 3] == 3)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], 0, slice(None)), e2p[flag])
+
+        c2p = bm.set_at(c2p, (slice(None), slice(1, -1), slice(1, -1)), NN + NE * (p - 1) + 
+                        bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
+
+        # if bm.backend_name in ["numpy", "pytorch"]:
+        #     flag = edge2cell[:, 2] == 0
+        #     c2p[edge2cell[flag, 0], :, 0] = e2p[flag]
+        #     flag = edge2cell[:, 2] == 1
+        #     c2p[edge2cell[flag, 0], -1, :] = e2p[flag]
+        #     flag = edge2cell[:, 2] == 2
+        #     c2p[edge2cell[flag, 0], :, -1] = bm.flip(e2p[flag], axis=-1)
+        #     flag = edge2cell[:, 2] == 3
+        #     c2p[edge2cell[flag, 0], 0, :] = bm.flip(e2p[flag], axis=-1)
+
+        #     iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        #     flag = iflag & (edge2cell[:, 3] == 0)
+        #     c2p[edge2cell[flag, 1], :, 0] = bm.flip(e2p[flag], axis=-1)
+        #     flag = iflag & (edge2cell[:, 3] == 1)
+        #     c2p[edge2cell[flag, 1], -1, :] = bm.flip(e2p[flag], axis=-1)
+        #     flag = iflag & (edge2cell[:, 3] == 2)
+        #     c2p[edge2cell[flag, 1], :, -1] = e2p[flag]
+        #     flag = iflag & (edge2cell[:, 3] == 3)
+        #     c2p[edge2cell[flag, 1], 0, :] = e2p[flag]
+
+        #     c2p[:, 1:-1, 1:-1] = NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1)
+        # elif bm.backend_name == "jax":
+        #     flag = edge2cell[:, 2] == 0
+        #     c2p = c2p.at[edge2cell[flag, 0], :, 0].set(e2p[flag])
+        #     flag = edge2cell[:, 2] == 1
+        #     c2p = c2p.at[edge2cell[flag, 0], -1, :].set(e2p[flag])
+        #     flag = edge2cell[:, 2] == 2
+        #     c2p = c2p.at[edge2cell[flag, 0], :, -1].set(e2p[flag, -1::-1])
+        #     flag = edge2cell[:, 2] == 3
+        #     c2p = c2p.at[edge2cell[flag, 0], 0, :].set(e2p[flag, -1::-1])
+
+        #     iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        #     flag = iflag & (edge2cell[:, 3] == 0)
+        #     c2p = c2p.at[edge2cell[flag, 1], :, 0].set(e2p[flag, -1::-1])
+        #     flag = iflag & (edge2cell[:, 3] == 1)
+        #     c2p = c2p.at[edge2cell[flag, 1], -1, :].set(e2p[flag, -1::-1])
+        #     flag = iflag & (edge2cell[:, 3] == 2)
+        #     c2p = c2p.at[edge2cell[flag, 1], :, -1].set(e2p[flag])
+        #     flag = iflag & (edge2cell[:, 3] == 3)
+        #     c2p = c2p.at[edge2cell[flag, 1], 0, :].set(e2p[flag])
+
+        #     c2p = c2p.at[:, 1:-1, 1:-1].set(NN + NE * (p - 1) + bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
+
+        #     cell2ipoint = c2p.reshape((NC, (p + 1) * (p + 1)))
+        # else:
+        #     raise ValueError("Unsupported backend")
         return cell2ipoint[index]
 
     def prolongation_matrix(self, p0: int, p1: int):
@@ -313,7 +338,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
     def uniform_refine(self, n:int=1) -> 'QuadrangleMesh':
         """
-        @brief 一致加密四边形网格
+        @brief Uniformly refine the quadrilateral mesh
         """
         for i in range(n):
             NN = self.number_of_nodes()
@@ -325,32 +350,48 @@ class QuadrangleMesh(TensorMesh, Plotable):
             edgeCenter = self.entity_barycenter('edge')
             cellCenter = self.entity_barycenter('cell')
 
-            edge2center = bm.arange(NN, NN + NE)
+            edge2center = bm.arange(NN, NN + NE, device=bm.get_device(cell2edge))
 
             cell = self.cell
             cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
             ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
-            cc = bm.arange(NN + NE, NN + NE + NC).reshape(-1, 1)
+            cc = bm.arange(NN + NE, NN + NE + NC, device=bm.get_device(cell2edge)).reshape(-1, 1)
 
-            cell = bm.zeros((4 * NC, 4), dtype=bm.int64)
-            if bm.backend_name in ["numpy", "pytorch"]:
-                cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
-                cell[1::4, :] = bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1)
-                cell[2::4, :] = bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1)
-                cell[3::4, :] = bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1)
-            elif bm.backend_name == "jax":
-                row_indices = bm.arange(4 * NC).reshape(NC, 4)
-                # 将单元块的行索引和列索引拼接在一起
-                cell = cell.at[row_indices[:, 0]].set(bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=-1))
-                cell = cell.at[row_indices[:, 1]].set(bm.concatenate([ep[0], cp[1], ep[1], cc], axis=-1))
-                cell = cell.at[row_indices[:, 2]].set(bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=-1))
-                cell = cell.at[row_indices[:, 3]].set(bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=-1))
+            cell = bm.zeros((4 * NC, 4), dtype=bm.int64, device=bm.get_device(cell2edge))
 
-            else:
-                raise ValueError("Unsupported backend")
+            cell = bm.set_at(cell, (slice(0, None, 4), slice(None)), 
+                            bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1))
+            cell = bm.set_at(cell, (slice(1, None, 4), slice(None)), 
+                            bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1))
+            cell = bm.set_at(cell, (slice(2, None, 4), slice(None)),
+                            bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1))
+            cell = bm.set_at(cell, (slice(3, None, 4), slice(None)), 
+                            bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1))
+            # cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
+            # cell[1::4, :] = bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1)
+            # cell[2::4, :] = bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1)
+            # cell[3::4, :] = bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1)
+
+
+            # if bm.backend_name in ["numpy", "pytorch"]:
+            #     cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
+            #     cell[1::4, :] = bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1)
+            #     cell[2::4, :] = bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1)
+            #     cell[3::4, :] = bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1)
+            # elif bm.backend_name == "jax":
+            #     row_indices = bm.arange(4 * NC, device=bm.get_device(cell2edge)).reshape(NC, 4)
+            #     # 将单元块的行索引和列索引拼接在一起
+            #     cell = cell.at[row_indices[:, 0]].set(bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=-1))
+            #     cell = cell.at[row_indices[:, 1]].set(bm.concatenate([ep[0], cp[1], ep[1], cc], axis=-1))
+            #     cell = cell.at[row_indices[:, 2]].set(bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=-1))
+            #     cell = cell.at[row_indices[:, 3]].set(bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=-1))
+
+            # else:
+            #     raise ValueError("Unsupported backend")
 
             self.node = bm.concatenate([self.node, edgeCenter, cellCenter], axis=0)
             self.cell = cell
+            
             self.construct()
 
     def vtk_cell_type(self, etype='cell'):
@@ -454,7 +495,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
 
     @classmethod
-    def from_polygon_gmsh(cls, vertices: list[tuple], h: float) -> 'QuadrangleMesh':
+    def from_polygon_gmsh(cls, vertices: List[tuple], h: float) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a polygonal region by gmsh.
 

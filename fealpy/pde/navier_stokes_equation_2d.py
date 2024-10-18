@@ -21,10 +21,79 @@ class FlowPastCylinder:
         self.rho = rho
         self.mu = mu
     
+    def _gmesh_mesh(self, h): 
+        import gmsh
+        gmsh.initialize()
 
+        gmsh.model.add("gntest2")
+        lc = h
 
+        gmsh.model.geo.addPoint(0.0,0.0,0.0,lc,1)
+        gmsh.model.geo.addPoint(2.2,0.0,0.0,lc,2)
+        gmsh.model.geo.addPoint(2.2,0.41,0.0,lc,3)
+        gmsh.model.geo.addPoint(0.0,0.41,0.0,lc,4)
 
-    def mesh1(self,h):
+        gmsh.model.geo.addLine(1,2,1)
+        gmsh.model.geo.addLine(2,3,2)
+        gmsh.model.geo.addLine(3,4,3)
+        gmsh.model.geo.addLine(4,1,4)
+
+        gmsh.model.geo.addPoint(0.15,0.2,0.0,lc,5)
+        gmsh.model.geo.addPoint(0.25,0.2,0.0,lc,6)
+        gmsh.model.geo.addPoint(0.2,0.2,0.0,lc,7)
+
+        gmsh.model.geo.add_circle_arc(6,7,5,5)
+        gmsh.model.geo.add_circle_arc(5,7,6,6)
+
+        gmsh.model.geo.addCurveLoop([1,2,3,4],1)
+        gmsh.model.geo.add_curve_loop([5,6],2)
+
+        gmsh.model.geo.addPlaneSurface([1,2],1)
+        gmsh.model.geo.synchronize()
+
+        gmsh.model.mesh.field.add("Distance",1)
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[5,6])
+        gmsh.model.mesh.field.setNumber(1,"Sampling",100)
+
+        gmsh.model.mesh.field.add("Threshold",2)
+        gmsh.model.mesh.field.setNumber(2,"InField",1)
+        gmsh.model.mesh.field.setNumber(2,"SizeMin",0.01)
+        gmsh.model.mesh.field.setNumber(2,"SizeMax",0.01)
+        gmsh.model.mesh.field.setNumber(2,"DistMin",0.01)
+        gmsh.model.mesh.field.setNumber(2,"DistMax",0.01)
+
+        #gmsh.model.mesh.field.setAsBackgroundMesh(2)
+        gmsh.option.setNumber('Mesh.Algorithm',6) 
+        gmsh.model.mesh.generate(2)
+        gmsh.write("gn.msh")
+        mesh = meshio.read('gn.msh',file_format = 'gmsh')
+        node = mesh.points[:,:2]
+        cell = mesh.cells_dict['triangle']
+        mesh = TriangleMesh(node,cell)
+        return mesh
+    
+    def _dist_mesh(self, h0):
+        from fealpy.geometry import DistDomain2d
+        from fealpy.mesh import DistMesh2d
+        fd1 = lambda p: dcircle(p,[0.2,0.2],0.05)
+        fd2 = lambda p: drectangle(p,[0.0,2.2,0.0,0.41])
+        fd = lambda p: ddiff(fd2(p),fd1(p))
+
+        def fh(p):
+            h = 0.003 + 0.05*fd1(p)
+            h[h>0.01] = 0.01
+            return h
+
+        bbox = [0,3,0,1]
+        pfix = np.array([(0.0,0.0),(2.2,0.0),(2.2,0.41),(0.0,0.41)],dtype=np.float64)
+        domain = DistDomain2d(fd,fh,bbox,pfix)
+        distmesh2d = DistMesh2d(domain,h0)
+        distmesh2d.run()
+
+        mesh = distmesh2d.mesh
+        return mesh
+
+    def _fealpy_mesh(self,h):
         from meshpy.triangle import MeshInfo, build
         from fealpy.mesh import IntervalMesh
         points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
@@ -55,7 +124,16 @@ class FlowPastCylinder:
         mesh = TriangleMesh(node,cell)  
         return mesh
 
-
+    def mesh(self, h, method:str='fealpy'):
+        if method == 'fealpy':
+            return self._fealpy_mesh(h)
+        elif method == 'distmesh':
+            return self._dist_mesh(h)
+        elif mesh == 'gmesh':
+            return self._gmesh_mesh(h)
+        else:
+            raise ValueError(f"Unknown method:{method}")
+        
     @cartesian
     def is_outflow_boundary(self,p):
         return bm.abs(p[..., 0] - 2.2) < self.eps
@@ -64,12 +142,7 @@ class FlowPastCylinder:
     def is_inflow_boundary(self,p):
         return bm.abs(p[..., 0]) < self.eps
     
-    @cartesian
-    def is_circle_boundary(self,p):
-        x = p[...,0]
-        y = p[...,1]
-        return (bm.sqrt(x**2 + y**2) - 0.05) < self.eps
-      
+    
     @cartesian
     def is_wall_boundary(self,p):
         return (bm.abs(p[..., 1] -0.41) < self.eps) | \

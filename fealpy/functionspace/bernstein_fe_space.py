@@ -20,6 +20,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh: _MT, p: int=1, ctype='C'):
         self.mesh = mesh
         self.p = p
+        self.device = mesh.device
 
         assert ctype in {'C', 'D'}
         self.ctype = ctype # 空间连续性类型
@@ -85,19 +86,18 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         ldof = multiIndex.shape[0]
 
         B = bcs
-        B = bm.ones((NQ, p+1, TD+1), dtype=self.ftype)
+        B = bm.ones((NQ, p+1, TD+1), device=self.device, dtype=self.ftype)
         # B[:, 1:] = bcs[:, None, :]
         B = bm.set_at(B,(slice(None),slice(1,None)),bcs[:,None,:])
         B = bm.cumprod(B, axis=1)
-        P = bm.arange(p+1)
+        P = bm.arange(p+1, device=self.device)
         P = bm.set_at(P,(0),1)
         P = bm.cumprod(P,axis=0).reshape(1, -1, 1)
         B = B/P
 
         # B : (NQ, p+1, TD+1) 
         # B[:, multiIndex, bm.arange(TD+1).reshape(1, -1)]: (NQ, ldof, TD+1)
-        phi = P[0, -1, 0]*bm.prod(B[:, multiIndex, 
-            bm.arange(TD+1).reshape(1, -1)], axis=-1)
+        phi = P[0, -1, 0]*bm.prod(B[:, multiIndex, bm.arange(TD+1).reshape(1, -1)], axis=-1)
         return phi[None, :]
 
     @barycentric
@@ -132,26 +132,26 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         ldof = multiIndex.shape[0]
 
         B = bcs
-        B = bm.ones((NQ, p+1, TD+1), dtype=self.ftype)
+        B = bm.ones((NQ, p+1, TD+1), device=self.device, dtype=self.ftype)
         # B[:, 1:] = bcs[:, None, :]
         B = bm.set_at(B,(slice(None),slice(1,None)),bcs[:,None,:])
         B = bm.cumprod(B, axis=1)
 
-        P = bm.arange(p+1)
+        P = bm.arange(p+1,device=self.device)
         # P[0] = 1
         P = bm.set_at(P,(0),1)
         P = bm.cumprod(P,axis=0).reshape(1, -1, 1)
         B = B/P
 
-        F = bm.zeros(B.shape, dtype=self.ftype)
+        F = bm.zeros(B.shape, device=self.device, dtype=self.ftype)
         # F[:, 1:] = B[:, :-1]
         F = bm.set_at(F,(slice(None),slice(1,None)),B[:,:-1])
         shape = bcs.shape[:-1]+(ldof, TD+1)
-        R = bm.zeros(shape, dtype=self.ftype)
+        R = bm.zeros(shape,device=self.device,dtype=self.ftype)
         for i in range(TD+1):
             idx = list(range(TD+1))
             idx.remove(i)
-            idx = bm.array(idx, dtype=self.itype)
+            idx = bm.array(idx,device=self.device, dtype=self.itype)
             # R[..., i] = bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]]
             R = bm.set_at(R,(...,i),bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]])
         Dlambda = self.mesh.grad_lambda()
@@ -167,7 +167,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         g2phi = self.grad_m_basis(bcs, 2, index=index)
         TD = self.mesh.top_dimension()
         shape = g2phi.shape[:-1] + (TD, TD)
-        hval  = bm.zeros(shape, dtype=self.ftype)
+        hval  = bm.zeros(shape, device=self.device, dtype=self.ftype)
         hval = bm.set_at(hval,(...,0,0),g2phi[..., 0])
         hval = bm.set_at(hval,(...,0,1),g2phi[..., 1])
         hval = bm.set_at(hval,(...,1,0),g2phi[..., 1])
@@ -222,8 +222,8 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         midxp_1 = bm.multi_index_matrix(m, GD) # m   次多重指标
 
         N, N1 = len(symidx), midxp_1.shape[0]
-        B = bm.zeros((N1, NQ, ldof), dtype=self.ftype)
-        symLambdaBeta = bm.zeros((N1, NC, N), dtype=self.ftype)
+        B = bm.zeros((N1, NQ, ldof), device=self.device, dtype=self.ftype)
+        symLambdaBeta = bm.zeros((N1, NC, N), dtype=self.ftype, device=self.device)
         for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
             midxp_0 -= beta[None, :]
             idx = bm.where(bm.all(midxp_0>-1, axis=1))[0]
@@ -336,7 +336,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         isbdface = self.mesh.boundary_face_flag()
         f2d  = self.face_to_dof()[isbdface]
 
-        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        isDDof = bm.zeros(gdof, device=self.device, dtype=bm.bool)
         # isDDof[f2d] = True
         isDDof = bm.set_at(isDDof,(f2d),True)
         if callable(gD):

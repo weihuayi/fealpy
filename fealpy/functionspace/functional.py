@@ -123,14 +123,17 @@ def symmetry_span_array(arr, alpha):
             break
     return ret
 
-def symmetry_index(d, r, dtype=None):
+def symmetry_index(d, r, dtype=None, device=None):
     dtype = dtype if dtype is not None else bm.int32
     """
     @brief 将 d 维 r 阶张量拉长以后，其对称部分对应的索引和出现的次数
     """
-    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)), dtype=dtype)
-    coe = bm.flip(d**bm.arange(r, dtype=dtype))
-    symidx = bm.einsum('ij,j->i', symidx0, coe)
+    symidx0 = bm.tensor(list(combinations_with_replacement(range(d), r)),
+                        dtype=dtype, device=device)
+    coe = bm.flip(d**bm.arange(r, dtype=dtype, device=device))
+
+    symidx = bm.einsum('ij,j->i', bm.astype(symidx0, bm.float64), bm.astype(coe, bm.float64))
+    symidx = bm.astype(symidx, dtype)
 
     midx = bm.multi_index_matrix(r, d-1)
     #midx0 = bm.zeros_like(midx) 
@@ -139,7 +142,7 @@ def symmetry_index(d, r, dtype=None):
     #print(midx0-midx)
     #midx = midx0
 
-    P = bm.concatenate([bm.tensor([1]), bm.cumprod(bm.arange(r+1)[1:], axis=0)],
+    P = bm.concatenate([bm.tensor([1],device=device), bm.cumprod(bm.arange(r+1, device=device)[1:], axis=0)],
                        axis=0, dtype=dtype)
     num = P[r]/bm.prod(P[midx], axis=1)
     return symidx, num

@@ -10,7 +10,7 @@ logger.setLevel('WARNING')
 from fealpy.backend import backend_manager as bm
 
 from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
-from fealpy.geometry import SphereSurface
+from fealpy.geometry.implicit_surface import SphereSurface
 from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
@@ -63,8 +63,8 @@ p = mdegree
 surface = SphereSurface()
 tmesh = TriangleMesh.from_unit_sphere_surface()
 mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
-#fname = f"sphere_test.vtu"
-#mesh.to_vtk(fname=fname)
+fname = f"sphere_test.vtu"
+mesh.to_vtk(fname=fname)
 
 space = ParametricLagrangeFESpace(mesh, p=sdegree)
 #tmr.send(f'第{i}次空间时间')

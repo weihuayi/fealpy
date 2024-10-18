@@ -69,32 +69,15 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     """
 
-    def __init__(self, extent: tuple[int, int, int, int] = (0, 1, 0, 1), 
-                h: tuple[float, float] = (1.0, 1.0), 
-                origin: tuple[float, float] = (0.0, 0.0), 
+    def __init__(self, extent: Tuple[int, int, int, int] = (0, 1, 0, 1), 
+                h: Tuple[float, float] = (1.0, 1.0), 
+                origin: Tuple[float, float] = (0.0, 0.0), 
                 ipoints_ordering='yx', 
                 flip_direction=None, 
                 *, itype=None, ftype=None, device=None):
         """
         Initializes a 2D uniform structured mesh.
-
-        Parameters:
-        extent : tuple of int
-            Defines the number of cells in the mesh divisions.
-        h : tuple of float, optional
-            Defines the step size in the x and y directions.
-        origin : tuple of float, optional
-            Specifies the coordinates of the origin of the mesh. 
-        ipoints_ordering : str, optional
-            Specifies the ordering of interpolation points in the mesh. 
-        flip_direction : str or None, optional
-            Specifies whether to flip the direction of node numbering.
-        itype : data type, optional
-            Data type for integer values used in the mesh. Default is None, which is assigned as bm.int32.
-        ftype : data type, optional
-            Data type for floating-point values used in the mesh. Default is None, which is assigned as bm.float64.
         """
-            
         if itype is None:
             itype = bm.int32
         if ftype is None:

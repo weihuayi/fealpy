@@ -12,23 +12,40 @@ _ST = TypeVar('_ST', bound=SparseTensor)
 
 class DirichletBC():
     """Dirichlet boundary condition."""
-    def __init__(self, space: FunctionSpace,
-                 gd: Optional[CoefLike]=None,
-                 isDDof=None,
-                 *, threshold: Optional[Callable]=None, left: bool=True):
+    def __init__(self, space: Tuple[FunctionSpace, ...],
+                 gd: Optional[Tuple[CoefLike,...]]=None,
+                 *, threshold: Optional[Tuple[CoefLike,...]]=None):
         self.space = space
         self.gd = gd
         self.threshold = threshold
-        self.left = left
         self.bctype = 'Dirichlet'
+     
+        if isinstance(space, tuple):
+            self.gdof = [i.number_of_global_dofs() for i in space]
+            if isinstance(threshold, tuple):
+                self.is_boundary_dof = []
+                for i in range(len(threshold)):
+                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i]))
+                self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
+            else:
+                if threshold is None:
+                    self.threshold = [None for i in range(len(space))]
+                    self.is_boundary_dof = [i.is_boundary_dof(j) for i in space]
+                    self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
+                else:
+                    index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof)))
+                    self.threshold = [threshold[i:i+1] for i in range(len(index)-1)]
+                    self.is_boundary_dof = threshold 
+            self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
+            self.gdof = bm.sum(self.gdof)
+        else:
+            self.gdof = space.number_of_global_dofs()
+            if isinstance(threshold, TensorLike):
+                self.is_boundary_dof = threshold
+            else:
+                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold)
 
-        if isDDof is None:
-            isDDof = space.is_boundary_dof(threshold=threshold) # on the same device as space
-            self.is_boundary_dof = isDDof
-        else :
-            self.is_boundary_dof = isDDof
-        self.boundary_dof_index = bm.nonzero(isDDof)[0]
-        self.gdof = space.number_of_global_dofs()
+            self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
 
     def check_matrix(self, matrix: SparseTensor, /) -> SparseTensor:
         """Check if the input matrix is available for Dirichlet boundary condition.
@@ -75,12 +92,8 @@ class DirichletBC():
             raise ValueError('The type of vector must be a tensor.')
         if vector.ndim not in (1, 2):
             raise ValueError('The vector must be 1-D or 2-D.')
-        if self.left:
-            if vector.shape[-1] != self.gdof:
-                raise ValueError('The vector size must match the gdof of the space.')
-        else:
-            if vector.shape[0] != self.gdof:
-                raise ValueError('The vector size must match the gdof of the space.')
+        if vector.shape[0] != self.gdof:
+            raise ValueError('The vector size must match the gdof of the space.')
         return vector
 
     def apply(self, A: SparseTensor, f: TensorLike, uh: Optional[TensorLike]=None,
@@ -197,33 +210,31 @@ class DirichletBC():
         Returns:
             TensorLike: New adjusted right-hand-size vector.
         """
-        A = matrix
+        A = self.check_matrix(matrix) if check else matrix
         f = self.check_vector(vector) if check else vector
         gd = self.gd if gd is None else gd
+        
 
         if gd is None:
             raise RuntimeError("The boundary condition is None.")
-        bd_idx = self.boundary_dof_index
-
-        if uh is None:
-            uh = bm.zeros_like(f)
-        uh, isDDof = self.space.boundary_interpolate(gd, uh, self.threshold)
-
-        if uh.ndim == 1:
-            f = f - A.matmul(uh[:])
-            f = bm.set_at(f, bd_idx, uh[bd_idx])
-
-        elif uh.ndim == 2:
-            if self.left:
-                uh = bm.swapaxes(uh, 0, 1)
-                f = bm.swapaxes(f, 0, 1)
-            f = f - A.matmul(uh)
-            f = bm.set_at(f, bd_idx, uh[bd_idx])
-            if self.left:
-                f = bm.swapaxes(f, 0, 1)
+        
+        if isinstance(self.space, tuple):
+            if gd is tuple:
+                uh = []
+                for i in range(len(gd)):
+                    suh, sidDDdof = self.space[i].boundary_interpolate(gd, threshold=self.threshold[i])
+                    uh.append(suh)
+                uh = bm.concatenate(uh)
+            else:
+                uh = gd
         else:
-            raise ValueError('The dimension of uh must be 1 or 2.')
+            if uh is None:
+                uh = bm.zeros_like(f)
+            uh, _ = self.space.boundary_interpolate(gd, uh, self.threshold)
 
+        bd_idx = self.boundary_dof_index
+        f = f - A.matmul(uh[:])
+        f = bm.set_at(f, bd_idx, uh[bd_idx])
         return f
 
 
