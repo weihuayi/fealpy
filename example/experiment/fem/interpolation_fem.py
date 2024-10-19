@@ -37,18 +37,19 @@ args = parser.parse_args()
 tmr = timer()
 next(tmr)
 bm.set_backend(args.backend)
-decive = "cpu"
+device = "cuda"
 p = args.degree
 m = args.m
 n = args.n
 maxit = args.maxit
-
-bm.set_default_device('cpu')
+import torch 
+torch.set_printoptions(precision=10)
+bm.set_default_device("cuda")
 x = sp.symbols('x')
 y = sp.symbols('y')
 z = sp.symbols('z')
-#u = sp.sin(2*x)*sp.sin(2*y)*sp.sin(z)
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*z))**4
+u = sp.sin(2*x)*sp.sin(2*y)*sp.sin(z)
+#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*z))**4
 flist = get_flist(u)
 NDof = bm.zeros(maxit, dtype=bm.float64)
 
@@ -65,7 +66,9 @@ for i in range(maxit):
     isCornerNode = bm.zeros(len(node),dtype=bm.bool)
     for n in bm.array([[0,0,0],[1,0,0],[0,1,0],[1,1,0],[1,1,1],[0,0,1],[1,0,1],[0,1,1]], dtype=bm.float64):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
-    mesh.node = node/2
+    #mesh.node = node/2
+    import ipdb
+    ipdb.set_trace()
     space = CmConformingFESpace3d(mesh, p=p, m=m, isCornerNode=isCornerNode)
     tmr.send(f'第{i}次空间生成时间')
     fI = space.interpolation(flist)
