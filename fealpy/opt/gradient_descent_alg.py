@@ -25,22 +25,21 @@ class GradientDescentAlg(Optimizer):
 
         alpha = options['StepLength']
 
-#        gnorm = bm.linalg.norm(self.g)
+        gnorm = bm.linalg.norm(self.g)
         self.diff = bm.inf 
 
         if maxit is None:
            maxit = options['MaxFunEvals']
 
         for i in range(maxit):
-            reslult = self.line_search_method.search(self.x, self.fun, -self.g)
-            alpha = reslult['alpha']
+            alpha = self.line_search_method.search(self.x, self.fun, -self.g)
             self.x -= alpha*self.g
             f, g = self.fun(self.x)
             self.diff = bm.abs(f - self.f)
             self.f = f
             self.g = g
             
- #           gnorm = bm.linalg.norm(self.g)
+            gnorm = bm.linalg.norm(self.g)
             maxg = bm.max(bm.abs(self.g.flatten()))
             
             if (maxg < options['NormGradTol']):

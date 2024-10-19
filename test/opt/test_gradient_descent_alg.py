@@ -74,11 +74,6 @@ class TestGradientDescentInterfaces:
         GDA = GradientDescentAlg(options)
         maxit = options['MaxIters']
         GDA = GradientDescentAlg(options)
-#        x , f ,g , diff = GDA.run(maxit=maxit)
-#        np.testing.assert_allclose(bm.to_numpy(x), x1 , rtol= 1e-6)
-#        np.testing.assert_allclose(f, f1 , rtol= 1e-6)
-#        np.testing.assert_allclose(g, g1 , rtol= 1e-6)
-#        np.testing.assert_allclose(diff, diff1 , rtol= 1e-7)
         x , f ,g , diff = GDA.run(maxit=maxit)
         np.testing.assert_allclose(x, x1, atol=1e-6)
         np.testing.assert_allclose(f, f1 , atol=1e-6)
