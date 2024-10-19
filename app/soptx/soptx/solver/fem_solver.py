@@ -9,7 +9,7 @@ from fealpy.sparse import COOTensor
 
 from fealpy.solver import cg, spsolve
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 
 
 class FEMSolver:
