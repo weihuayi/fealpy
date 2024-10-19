@@ -3,6 +3,7 @@ from typing import TypedDict, Callable, Tuple, Union, Optional
 from fealpy.backend import backend_manager as bm 
 from fealpy.typing import TensorLike, Index, _S
 from fealpy import logger
+from fealpy.opt.line_search_rules import LineSearch, ArmijoLineSearch, PowellLineSearch, GoldsteinLineSearch
 
 def opt_alg_options(
     x0: TensorLike,
@@ -17,9 +18,12 @@ def opt_alg_options(
     StepLength: float = 1.0,
     StepLengthTol: float = 1e-8,
     NumGrad: int = 10,
-    LineSearch: Optional[str] = None,
+    LineSearch: Optional[LineSearch] = None,  # 默认值为 None,
     Print: bool = True,
 ):
+    if LineSearch is None:
+        LineSearch = PowellLineSearch()  # 默认使用 Powell 线搜索
+    
     options = {
             "x0": x0,
             "objective": objective,

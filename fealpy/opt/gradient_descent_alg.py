@@ -1,8 +1,8 @@
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
-from .. import logger
-from .optimizer_base import Optimizer, opt_alg_options
-
+from fealpy.backend import backend_manager as bm 
+from fealpy.typing import TensorLike, Index, _S
+from fealpy import logger
+from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
+from fealpy.opt.line_search_rules import LineSearch, ArmijoLineSearch, PowellLineSearch, GoldsteinLineSearch
 """
 Reference
 ---------
@@ -13,10 +13,11 @@ https://en.wikipedia.org/wiki/Gradient_descent
 class GradientDescentAlg(Optimizer):
     def __init__(self, options) -> None:
         super().__init__(options)
-
+    
 
     def run(self, queue=None, maxit=None):
         options = self.options
+        self.line_search_method = options['LineSearch']
         x0 = options['x0']
 
         self.x = x0
@@ -24,22 +25,23 @@ class GradientDescentAlg(Optimizer):
 
         alpha = options['StepLength']
 
-        gnorm = bm.linalg.norm(self.g)
+#        gnorm = bm.linalg.norm(self.g)
         self.diff = bm.inf 
 
         if maxit is None:
            maxit = options['MaxFunEvals']
 
         for i in range(maxit):
+            alpha = self.line_search_method.search(self.x, self.fun, -self.g)
             self.x -= alpha*self.g
             f, g = self.fun(self.x)
             self.diff = bm.abs(f - self.f)
             self.f = f
             self.g = g
             
-            gnorm = bm.linalg.norm(self.g)
-
-            maxg = bm.max(bm.abs(self.g.flat))
+ #           gnorm = bm.linalg.norm(self.g)
+            maxg = bm.max(bm.abs(self.g.flatten()))
+            
             if (maxg < options['NormGradTol']):
                 print("""
                 The max norm of gradeint value : %12.11g (the tol  is %12.11g)
