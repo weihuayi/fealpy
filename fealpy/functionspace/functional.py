@@ -144,7 +144,7 @@ def symmetry_index(d, r, dtype=None, device=None):
 
     P = bm.concatenate([bm.tensor([1],device=device), bm.cumprod(bm.arange(r+1, device=device)[1:], axis=0)],
                        axis=0, dtype=dtype)
-    num = P[r]/bm.prod(P[midx], axis=1)
+    num = P[r]/bm.prod(P[midx], axis=1, dtype=bm.float64)
     return symidx, num
 
 def multi_index2d_to_index(midx):

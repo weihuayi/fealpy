@@ -1,3 +1,6 @@
+# from test.mesh.tetrahedron_mesh_data import from_box
+from typing import Union, Optional
+from math import sqrt
 from ..backend import backend_manager as bm
 from .mesh_base import TensorMesh
 from ..typing import TensorLike, Index, _S
@@ -573,6 +576,42 @@ class HexahedronMesh(TensorMesh, Plotable):
         print(f"Number of cells: {cell.shape[0]}")
 
         return cls(node,cell)
+
+    @classmethod
+    def from_crack_box(cls, box=[0, 2, 0, 5, 0, 10], nx=2, ny=5, nz=10,
+                       threshold=None, itype=None, ftype=None, device=None):
+        """
+        Generate a tetrahedral mesh for a box domain.
+
+        @param nx Number of divisions along the x-axis (default: 2)
+        @param ny Number of divisions along the y-axis (default: 5)
+        @param nz Number of divisions along the z-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TetrahedronMesh instance
+        """
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+        temp_mesh = cls.from_box(box=box, nx=nx, ny=ny, nz=nz, threshold=threshold, itype=itype, ftype=ftype, device=device)
+        node = temp_mesh.node
+        cell = temp_mesh.cell
+
+        # 切口节点重复
+        NN = node.shape[0]
+        # 找到切口处 node
+        nidx = bm.nonzero((bm.abs(node[:, 2] - 5) < 1e-5) & (node[:, 1] > 3.01))[0]
+        # 找到切口处节点所在单元
+        nidxmap = bm.arange(NN, dtype=itype, device=device)
+
+        nidxmap = bm.set_at(nidxmap, nidx, NN + bm.arange(len(nidx), dtype=itype, device=device))
+        # 计算 z 坐标平均值
+        flag = bm.mean(node[:, 2][cell], axis=1) > 5
+        cell = bm.set_at(cell, flag, nidxmap[cell[flag]])
+
+        node = bm.concatenate((node, node[nidx]), axis=0)
+        mesh = cls(node, cell)
+        return mesh
     
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
         from .vtk_extent import  write_to_vtu
