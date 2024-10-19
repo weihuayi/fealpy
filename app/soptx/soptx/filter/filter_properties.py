@@ -10,11 +10,6 @@ class FilterProperties:
     def __init__(self, mesh, rmin: float, ft: int):
         """
         Initialize the filter properties based on the mesh.
-
-        Args:
-            mesh: The mesh object which contains information about the grid.
-            rmin (float): The filter radius, which controls the minimum feature size.
-            ft (int): The filter type, 0 for sensitivity filter, 1 for density filter.
         """
         self.ft = ft
 
