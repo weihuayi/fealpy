@@ -144,11 +144,20 @@ class FlowPastCylinder:
     def is_inflow_boundary(self,p):
         return bm.abs(p[..., 0]) < self.eps
     
+    @cartesian
+    def is_circle_boundary(self,p):
+        x = p[...,0]
+        y = p[...,1]
+        return (bm.sqrt((x-0.2)**2 + (y-0.2)**2) - 0.05) < self.eps
     
     @cartesian
     def is_wall_boundary(self,p):
         return (bm.abs(p[..., 1] -0.41) < self.eps) | \
                (bm.abs(p[..., 1] ) < self.eps)
+    
+    @cartesian
+    def is_u_boundary(self,p):
+        return bm.abs(p[..., 0] - 2.2) > self.eps
 
     @cartesian
     def u_inflow_dirichlet(self, p):

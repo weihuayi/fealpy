@@ -34,6 +34,7 @@ from fealpy.fem import DirichletBC
 backend = 'pytorch'
 #backend = 'numpy'
 device = 'cuda'
+#device = 'cpu'
 bm.set_backend(backend)
 bm.set_default_device(device)
 
@@ -87,11 +88,9 @@ plform = LinearForm(pspace)
 #边界处理
 ## 边界处理太繁琐
 ## threshold一定要传tuple或者list吗
-u_isbddof = uspace.is_boundary_dof()
-u_out_isbd = uspace.is_boundary_dof(threshold=(pde.is_outflow_boundary,))
-u_isbddof[u_out_isbd] = False
-p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary)
-isBdDof = bm.concatenate([u_isbddof, p_isbddof])
+u_isbddof = uspace.is_boundary_dof(threshold=pde.is_u_boundary, method='interp')
+p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary, method='interp')
+
 ## b
 #xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=(pde.is_inflow_boundary,))
 #xp = bm.zeros(pgdof)
@@ -120,16 +119,14 @@ for i in range(10):
     SourceIntegrator.clear() 
     b = LinearBlockForm([ulform, plform]).assembly()
     
-    A,b = DirichletBC((uspace,pspace), xx, threshold=isBdDof).apply(A, b)
+    A,b = DirichletBC((uspace,pspace), xx, threshold=(u_isbddof, p_isbddof)).apply(A, b)
     x = spsolve(A, b, 'mumps')
     
     u1[:] = x[:ugdof]
     p1[:] = x[ugdof:]
-    
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     
-    ##mesh.nodedata 
     mesh.nodedata['velocity'] = u1.reshape(2,-1).T
     mesh.nodedata['pressure'] = p1
     mesh.to_vtk(fname=fname)
