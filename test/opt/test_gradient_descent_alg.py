@@ -36,7 +36,6 @@ class TestGradientDescentInterfaces:
                                   StepLength = StepLength, 
                                   StepLengthTol = StepLengthTol,
                                   NumGrad = NumGrad)
-        options['LineSearch'] = 'powell' 
         GDA = GradientDescentAlg(options)
         options = GDA.options
         np.testing.assert_array_equal(bm.to_numpy(options['x0']), x0)
@@ -72,7 +71,6 @@ class TestGradientDescentInterfaces:
             StepLength=StepLength,
             MaxIters=MaxIters
         )
-        options['LineSearch'] = 'powell'  
         GDA = GradientDescentAlg(options)
         maxit = options['MaxIters']
         GDA = GradientDescentAlg(options)
