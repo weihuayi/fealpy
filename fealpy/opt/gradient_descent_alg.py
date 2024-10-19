@@ -1,8 +1,9 @@
-from fealpy.backend import backend_manager as bm 
+from fealpy.backend import backend_manager as bm
+import numpy as np 
 from fealpy.typing import TensorLike, Index, _S
 from fealpy import logger
 from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
-from fealpy.opt.line_search_rules import LineSearch, ArmijoLineSearch, PowellLineSearch, GoldsteinLineSearch
+from fealpy.opt.line_search_rules import *
 """
 Reference
 ---------
@@ -18,9 +19,13 @@ class GradientDescentAlg(Optimizer):
     def run(self, queue=None, maxit=None):
         options = self.options
         self.line_search_method = options['LineSearch']
+        self.x = []
         x0 = options['x0']
 
-        self.x = x0
+#        self.x = x0
+        
+        self.x.append(x0)  # 使用 copy() 方法
+
         self.f, self.g = self.fun(x0)
 
         alpha = options['StepLength']
@@ -30,11 +35,15 @@ class GradientDescentAlg(Optimizer):
 
         if maxit is None:
            maxit = options['MaxFunEvals']
-
+        C = self.f
         for i in range(maxit):
-            alpha = self.line_search_method.search(self.x, self.fun, -self.g)
-            self.x -= alpha*self.g
-            f, g = self.fun(self.x)
+            if isinstance(self.line_search_method, ZhangHagerLineSearch):
+                alpha,C = self.line_search_method.search(self.x, self.fun, -self.g, C)
+            else:
+                alpha = self.line_search_method.search(self.x, self.fun, -self.g)
+            x_new = self.x[-1]- alpha*self.g
+            self.x.append(x_new)
+            f, g = self.fun(self.x[-1])
             self.diff = bm.abs(f - self.f)
             self.f = f
             self.g = g
@@ -51,4 +60,4 @@ class GradientDescentAlg(Optimizer):
                     self.diff, options['FunValDiff'])
                 )
                 break
-        return self.x, self.f, self.g, self.diff
+        return self.x[-1], self.f, self.g, self.diff

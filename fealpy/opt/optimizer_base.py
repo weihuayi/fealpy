@@ -3,7 +3,7 @@ from typing import TypedDict, Callable, Tuple, Union, Optional
 from fealpy.backend import backend_manager as bm 
 from fealpy.typing import TensorLike, Index, _S
 from fealpy import logger
-from fealpy.opt.line_search_rules import LineSearch, ArmijoLineSearch, PowellLineSearch, GoldsteinLineSearch
+from fealpy.opt.line_search_rules import *
 
 def opt_alg_options(
     x0: TensorLike,
