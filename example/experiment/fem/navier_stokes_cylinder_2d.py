@@ -31,9 +31,12 @@ from fealpy.decorator import barycentric, cartesian
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
-#backend = 'pytorch'
-backend = 'numpy'
+backend = 'pytorch'
+#backend = 'numpy'
+device = 'cuda'
+#device = 'cpu'
 bm.set_backend(backend)
+bm.set_default_device(device)
 
 output = './'
 udegree = 2
@@ -45,7 +48,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh(0.05,'fealpy')
+mesh = pde.mesh(0.05, device = device)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -80,21 +83,14 @@ A_bform.add_integrator(ConvectionIntegrator)
 ulform = LinearForm(uspace)
 SourceIntegrator = ScalarSourceIntegrator(q = q)
 ulform.add_integrator(SourceIntegrator)
-SourceIntegrator.source = u0
 plform = LinearForm(pspace)
-b = LinearBlockForm([ulform, plform])
-bb = b.assembly()
-print(bb)
 
-exit()
 #边界处理
 ## 边界处理太繁琐
 ## threshold一定要传tuple或者list吗
-u_isbddof = uspace.is_boundary_dof()
-u_out_isbd = uspace.is_boundary_dof(threshold=(pde.is_outflow_boundary,))
-u_isbddof[u_out_isbd] = False
-p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary)
-isBdDof = bm.concatenate([u_isbddof, p_isbddof])
+u_isbddof = uspace.is_boundary_dof(threshold=pde.is_u_boundary, method='interp')
+p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary, method='interp')
+
 ## b
 #xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=(pde.is_inflow_boundary,))
 #xp = bm.zeros(pgdof)
@@ -115,31 +111,26 @@ for i in range(10):
 
     ConvectionIntegrator.coef = u0
     ConvectionIntegrator.clear()
-
     A = BlockForm([[A_bform, P_bform],
                    [P_bform.T, None]])
     A = A.assembly()
     
     SourceIntegrator.source = u0
-    SourceIntegrator.clear()
-    ##LinearBlockForm 
-    b0 = ulform.assembly()
-    b2 = bm.zeros(pgdof) 
-    b = bm.concatenate([b0, b2])
+    SourceIntegrator.clear() 
+    b = LinearBlockForm([ulform, plform]).assembly()
     
-    A,b = DirichletBC((uspace,pspace), xx, threshold=isBdDof).apply(A, b)
+    A,b = DirichletBC((uspace,pspace), xx, threshold=(u_isbddof, p_isbddof)).apply(A, b)
     x = spsolve(A, b, 'mumps')
     
     u1[:] = x[:ugdof]
     p1[:] = x[ugdof:]
-    
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
-    ##mesh.nodedata 
+    
     mesh.nodedata['velocity'] = u1.reshape(2,-1).T
     mesh.nodedata['pressure'] = p1
     mesh.to_vtk(fname=fname)
         
     u0[:] = u1[:] 
     timeline.advance()
-print(bm.sum(bm.abs(u1)))
+print(bm.sum(bm.abs(u1[:])))

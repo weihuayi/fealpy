@@ -21,7 +21,7 @@ class DirichletBC():
         self.bctype = 'Dirichlet'
      
         if isinstance(space, tuple):
-            self.gdof = [i.number_of_global_dofs() for i in space]
+            self.gdof = bm.array([i.number_of_global_dofs() for i in space])
             if isinstance(threshold, tuple):
                 self.is_boundary_dof = []
                 for i in range(len(threshold)):
@@ -33,7 +33,7 @@ class DirichletBC():
                     self.is_boundary_dof = [i.is_boundary_dof(j) for i in space]
                     self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
                 else:
-                    index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof)))
+                    index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof, axis=0)))
                     self.threshold = [threshold[i:i+1] for i in range(len(index)-1)]
                     self.is_boundary_dof = threshold 
             self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
