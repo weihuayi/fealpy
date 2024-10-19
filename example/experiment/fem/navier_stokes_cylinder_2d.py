@@ -42,7 +42,7 @@ bm.set_backend(backend)
 bm.set_default_device(device)
 
 output = './'
-udegree = 2
+udegree = 1
 pdegree = 1
 q = 4
 T = 5
@@ -51,7 +51,8 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh(0.05, device = device)
+#mesh = pde.mesh(0.05, device = device)
+mesh = TriangleMesh.from_box([0,1,0,1], nx=2, ny=2)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -89,7 +90,7 @@ ulform.add_integrator(SourceIntegrator)
 plform = LinearForm(pspace)
 
 ## b
-#xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=(pde.is_inflow_boundary,))
+xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=pde.is_inflow_boundary, method='interp')
 #xp = bm.zeros(pgdof)
 #axx = bm.concatenate((xu,xp))
 
@@ -100,8 +101,13 @@ uinflow = pde.u_inflow_dirichlet(ipoint)
 p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary, method='interp')
 bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isbddof))
 value_bd = bm.concatenate((uinflow[:,0],uinflow[:,1], bm.zeros(pgdof)))
-xx[bd] = value_bd[bd] 
+xx[bd] = value_bd[bd]
 
+true = bm.concatenate((uinflow[:,0],uinflow[:,1]))
+print("asdad",xu)
+print("Asdasdasdad",xx[:ugdof])
+#print(bm.sum(~(u_in_isbd == true)))
+exit()
 
 for i in range(10):
     t1 = timeline.next_time_level()

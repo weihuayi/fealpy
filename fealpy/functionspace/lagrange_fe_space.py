@@ -91,7 +91,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def boundary_interpolate(self,
             gD: Union[Callable, int, float, TensorLike],
             uh: Optional[TensorLike] = None,
-            threshold: Optional[Threshold]=None) -> TensorLike:
+            threshold: Optional[Threshold]=None, method=None) -> TensorLike:
         """Set the first type (Dirichlet) boundary conditions.
 
         Parameters:
@@ -106,8 +106,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         different types for the boundary condition `gD`, such as a function, a scalar, or a array.
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-        isDDof = self.is_boundary_dof(threshold=threshold)
-
+        isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
         if callable(gD):
             gD = gD(ipoints[isDDof])
         if uh is None:
