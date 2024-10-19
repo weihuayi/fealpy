@@ -16,7 +16,7 @@ class ArmijoLineSearch(LineSearch):
             if f_new <= f + self.sigma * alpha * (g @ direction):
                 break
             alpha *= self.beta
-        return alpha
+        return {'alpha': alpha}
 
 class   PowellLineSearch(LineSearch):
     def __init__(self, beta=0.6, sigma1=0.01,sigma2=0.01, c=0.9):
@@ -39,7 +39,7 @@ class   PowellLineSearch(LineSearch):
             if g_new @ direction >= self.c * (g @ direction):
                 break
             alpha += self.sigma2  * (k/self.beta - k)
-        return alpha
+        return {'alpha': alpha}
 
 class   GoldsteinLineSearch(LineSearch):  
    
@@ -60,4 +60,4 @@ class   GoldsteinLineSearch(LineSearch):
             if f_new > f + (1-self.sigma) * alpha * (g @ direction):
                 break
             alpha *= self.beta
-        return alpha
+        return {'alpha': alpha}

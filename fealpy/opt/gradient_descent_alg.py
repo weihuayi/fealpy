@@ -32,7 +32,8 @@ class GradientDescentAlg(Optimizer):
            maxit = options['MaxFunEvals']
 
         for i in range(maxit):
-            alpha = self.line_search_method.search(self.x, self.fun, -self.g)
+            reslult = self.line_search_method.search(self.x, self.fun, -self.g)
+            alpha = reslult['alpha']
             self.x -= alpha*self.g
             f, g = self.fun(self.x)
             self.diff = bm.abs(f - self.f)
