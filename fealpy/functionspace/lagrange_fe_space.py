@@ -59,7 +59,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def edge_to_dof(self, index=_S):
         return self.dof.edge_to_dof()[index]
 
-    def is_boundary_dof(self, threshold=None, method='centroid') -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
             return self.dof.is_boundary_dof(threshold, method=method)
         else:

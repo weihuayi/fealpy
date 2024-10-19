@@ -31,6 +31,9 @@ from fealpy.decorator import barycentric, cartesian
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
+#TODO:mesh.nodedata对tensorspace的情况
+#TODO:boundary_interpolate的不同情况
+
 backend = 'pytorch'
 #backend = 'numpy'
 device = 'cuda'
@@ -85,12 +88,6 @@ SourceIntegrator = ScalarSourceIntegrator(q = q)
 ulform.add_integrator(SourceIntegrator)
 plform = LinearForm(pspace)
 
-#边界处理
-## 边界处理太繁琐
-## threshold一定要传tuple或者list吗
-u_isbddof = uspace.is_boundary_dof(threshold=pde.is_u_boundary, method='interp')
-p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary, method='interp')
-
 ## b
 #xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=(pde.is_inflow_boundary,))
 #xp = bm.zeros(pgdof)
@@ -100,6 +97,7 @@ xx = bm.zeros(gdof, dtype=mesh.ftype)
 u_isbddof_in = space.is_boundary_dof(threshold = pde.is_inflow_boundary)
 ipoint = space.interpolation_points()
 uinflow = pde.u_inflow_dirichlet(ipoint)
+p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary, method='interp')
 bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isbddof))
 value_bd = bm.concatenate((uinflow[:,0],uinflow[:,1], bm.zeros(pgdof)))
 xx[bd] = value_bd[bd] 
@@ -119,7 +117,7 @@ for i in range(10):
     SourceIntegrator.clear() 
     b = LinearBlockForm([ulform, plform]).assembly()
     
-    A,b = DirichletBC((uspace,pspace), xx, threshold=(u_isbddof, p_isbddof)).apply(A, b)
+    A,b = DirichletBC((uspace,pspace), xx, threshold=(pde.is_u_boundary, pde.is_outflow_boundary), method='interp').apply(A, b)
     x = spsolve(A, b, 'mumps')
     
     u1[:] = x[:ugdof]

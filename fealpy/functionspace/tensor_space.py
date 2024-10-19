@@ -111,7 +111,7 @@ class TensorFunctionSpace(FunctionSpace):
 
         return uI.reshape(-1)
     
-    def is_boundary_dof(self, threshold=None, method='centroid') -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         scalar_space = self.scalar_space
         mesh = self.mesh
 

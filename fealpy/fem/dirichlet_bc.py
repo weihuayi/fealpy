@@ -14,7 +14,8 @@ class DirichletBC():
     """Dirichlet boundary condition."""
     def __init__(self, space: Tuple[FunctionSpace, ...],
                  gd: Optional[Tuple[CoefLike,...]]=None,
-                 *, threshold: Optional[Tuple[CoefLike,...]]=None):
+                 *, threshold: Optional[Tuple[CoefLike,...]]=None,
+                 method = None):
         self.space = space
         self.gd = gd
         self.threshold = threshold
@@ -25,12 +26,12 @@ class DirichletBC():
             if isinstance(threshold, tuple):
                 self.is_boundary_dof = []
                 for i in range(len(threshold)):
-                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i]))
+                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i], method=method))
                 self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
             else:
                 if threshold is None:
                     self.threshold = [None for i in range(len(space))]
-                    self.is_boundary_dof = [i.is_boundary_dof(j) for i in space]
+                    self.is_boundary_dof = [i.is_boundary_dof(j, method=method) for i in space]
                     self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
                 else:
                     index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof, axis=0)))
@@ -43,7 +44,7 @@ class DirichletBC():
             if isinstance(threshold, TensorLike):
                 self.is_boundary_dof = threshold
             else:
-                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold)
+                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold, method=method)
 
             self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
 

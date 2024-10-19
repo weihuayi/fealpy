@@ -70,28 +70,6 @@ class FlowPastCylinder:
         cell = mesh.cells_dict['triangle']
         return node, cell
     
-    def _dist_mesh(self, h0):
-        from fealpy.geometry import DistDomain2d
-        from fealpy.mesh import DistMesh2d
-        import numpy as np
-        fd1 = lambda p: dcircle(p,[0.2,0.2],0.05)
-        fd2 = lambda p: drectangle(p,[0.0,2.2,0.0,0.41])
-        fd = lambda p: ddiff(fd2(p),fd1(p))
-
-        def fh(p):
-            h = 0.003 + 0.05*fd1(p)
-            h[h>0.01] = 0.01
-            return h
-
-        bbox = [0,3,0,1]
-        pfix = np.array([(0.0,0.0),(2.2,0.0),(2.2,0.41),(0.0,0.41)],dtype=np.float64)
-        domain = DistDomain2d(fd,fh,bbox,pfix)
-        distmesh2d = DistMesh2d(domain,h0)
-        distmesh2d.run()
-
-        mesh = distmesh2d.mesh
-        return mesh
-
     def _fealpy_mesh(self,h):
         from meshpy.triangle import MeshInfo, build
         from fealpy.mesh import IntervalMesh
@@ -129,8 +107,6 @@ class FlowPastCylinder:
             cell = bm.device_put(cell, device) 
         elif mesh == 'gmesh':
             node,cell = self._gmesh_mesh(h)
-        #elif method == 'distmesh':
-        #    return self._dist_mesh(h)
         else:
             raise ValueError(f"Unknown method:{method}")
         return TriangleMesh(node, cell)
