@@ -29,16 +29,21 @@ class MBBBeam2dOneData:
         return [0, 1, 0, 1]
     
     def force(self, points: TensorLike) -> TensorLike:
+        x = points[..., 0]
+        y = points[..., 1]
 
-        val = bm.zeros(points.shape, dtype=points.dtype)
-        # val[self.ny, 1] = -1
-        val[0, 1] = -1
+        index1 = (
+            (bm.abs(x - self.domain[0]) < self.eps) & 
+            (bm.abs(y - self.domain[1]) < self.eps)
+        )
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
+        val[index1, 1] = -1
 
         return val
     
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
-        return bm.zeros(points.shape, dtype=points.dtype)
+        return bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
     
     def is_dirichlet_boundary_dof(self, points):
         x = points[..., 0]
@@ -48,8 +53,6 @@ class MBBBeam2dOneData:
         cond2 = (bm.abs(x - 0) < self.eps) & (bm.abs(y - 1) < self.eps)
         cond3 = (bm.abs(x - 1) < self.eps) & (bm.abs(y - 0) < self.eps)
         cond4 = (bm.abs(x - 1) < self.eps) & (bm.abs(y - 1) < self.eps)
-
-        
 
         result = cond1 | cond2 | cond3 | cond4
 

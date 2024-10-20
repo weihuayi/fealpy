@@ -51,9 +51,10 @@ class ElasticMaterialProperties(LinearElasticMaterial):
         """
         Use the interpolation model to calculate Young's modulus.
         """
-        return self.interpolation_model.calculate_property(self.rho, 
+        E = self.interpolation_model.calculate_property(self.rho, 
                                                         self.E0, self.Emin, 
                                                         self.penal)
+        return E
 
     def material_model_derivative(self) -> TensorLike:
         """
@@ -119,25 +120,21 @@ class SIMPInterpolation(MaterialInterpolation):
     def __init__(self):
         super().__init__(name="SIMP")
 
-    def calculate_property(self, rho: TensorLike, 
-                        P0: float, Pmin: float, 
-                        penal: float) -> TensorLike:
+    def calculate_property(
+        self, 
+        rho: TensorLike, 
+        P0: float, Pmin: float, 
+        penal: float
+    ) -> TensorLike:
         """
-        Calculate the interpolated property using the SIMP model.
-
-        Args:
-            rho (TensorLike): Density distribution of the material.
-            P0 (float): Property value of the solid material (e.g., Young's modulus or conductivity).
-            Pmin (float): Property value of the void or empty space.
-            penal (float): Penalization factor for the interpolation.
-
-        Returns:
-            TensorLike: Interpolated property value based on the density distribution.
+        Calculate the interpolated property using the `SIMP` model.
         """
         if Pmin is None:
-            return rho[:] ** penal * P0
+            P = rho[:] ** penal * P0
+            return P
         else:
-            return Pmin + rho[:] ** penal * (P0 - Pmin)
+            P = Pmin + rho[:] ** penal * (P0 - Pmin)
+            return P
 
     def calculate_property_derivative(self, rho: TensorLike, 
                                     P0: float, Pmin: float, 
