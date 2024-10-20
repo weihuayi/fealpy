@@ -3,17 +3,17 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 import random
 from .optimizer_base import Optimizer
-from app.TSP.TSP_citys import calD
+
 
 class AntColonyOptAlg(Optimizer):
     def __init__(self, option, D) -> None:
         super().__init__(option)
         self.alpha = 1
-        self.beta = 1
+        self.beta = 5
         self.rho = 0.5
-        self.Q = 100
+        self.Q = 1
         self.D = D
-    
+
     def run(self):
         option = self.options
         x = option["x0"]
@@ -54,19 +54,22 @@ class AntColonyOptAlg(Optimizer):
                 target_index = bm.array([bm.where(row >= rand_val)[0][0] if bm.any(row >= rand_val) else -1 for row, rand_val in zip(Pc, rand_vals.flatten())])
                 Table[:, j] = allow[bm.arange(N), target_index]
 
-                fit_new = bm.zeros(N)
-                fit_new += bm.sum(self.D[Table[:, route_id], Table[:, route_id + 1]], axis=1)
-                fit_new += self.D[Table[:, -1], Table[:, 0]]
+            fit = bm.zeros(N)
+            fit += bm.sum(self.D[Table[:, route_id], Table[:, route_id + 1]], axis=1)
+            fit += self.D[Table[:, -1], Table[:, 0]]
 
-                gbest_idx = bm.argmin(fit_new)
-                if fit_new[gbest_idx] < gbest_f:
-                    gbest_f = fit_new[gbest_idx]
-                    gbest = Table[gbest_idx]
+            gbest_idx = bm.argmin(fit)
+            if fit[gbest_idx] < gbest_f:
+                gbest_f = fit[gbest_idx]
+                gbest = Table[gbest_idx]
 
             Delta_Tau = bm.zeros((dim, dim))
-            Delta_Tau[Table[:, :-1], Table[:, 1:]] += (self.Q / fit_new).reshape(-1, 1)
-            Delta_Tau[Table[:, -1], Table[:, 0]] += self.Q / fit_new
+            Delta_Tau[Table[:, :-1], Table[:, 1:]] += (self.Q / fit).reshape(-1, 1)
+            Delta_Tau[Table[:, -1], Table[:, 0]] += self.Q / fit
             Tau = (1 - self.rho) * Tau + Delta_Tau
+            if t == T-1:
+                random_values = x[1,:]
+                gbest = random_values[gbest]
 
         return gbest, gbest_f
 
