@@ -107,11 +107,17 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
         isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
+        if bm.is_tensor(gD):
+            assert len(gD) == self.number_of_global_dofs()
+            if uh is None:
+                uh = bm.zeros_like(gD)
+            uh[isDDof] = gD[isDDof] 
+            return uh,isDDof 
         if callable(gD):
             gD = gD(ipoints[isDDof])
         if uh is None:
-            uh = bm.zeros_like(isDDof)
-        uh = bm.set_at(uh, (..., isDDof), gD)
+            uh = self.function()
+        uh[:] = bm.set_at(uh[:], (..., isDDof), gD)
         return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate

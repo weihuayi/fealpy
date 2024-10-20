@@ -1070,7 +1070,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                 [0.0, 0.0],
                 [1.0, 0.0],
                 [0.0, 1.0]], dtype=bm.float64)
-        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32, device=self.device)
+        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators

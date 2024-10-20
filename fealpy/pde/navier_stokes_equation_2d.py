@@ -134,13 +134,32 @@ class FlowPastCylinder:
     @cartesian
     def is_u_boundary(self,p):
         return bm.abs(p[..., 0] - 2.2) > self.eps
+    
+    @cartesian
+    def is_p_boundary(self,p):
+        return self.is_outflow_boundary(p) 
 
     @cartesian
     def u_inflow_dirichlet(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = bm.zeros(p.shape, dtype=p.dtype)
+        value = bm.zeros_like(p)
         value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
         value[...,1] = 0
         return value
+    
+    @cartesian
+    def p_dirichlet(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        value = bm.zeros_like(x)
+        return value
 
+    @cartesian
+    def u_dirichlet(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        index = self.is_inflow_boundary(p)
+        result = bm.zeros_like(p)
+        result[index] = self.u_inflow_dirichlet(p[index])
+        return result

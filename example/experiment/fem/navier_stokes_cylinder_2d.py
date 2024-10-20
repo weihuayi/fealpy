@@ -26,6 +26,9 @@ from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import LinearBlockForm, BlockForm
 from fealpy.solver import spsolve 
 
+from fealpy.functionspace import Function 
+
+
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.decorator import barycentric, cartesian
 from fealpy.old.timeintegratoralg import UniformTimeLine
@@ -42,7 +45,7 @@ bm.set_backend(backend)
 bm.set_default_device(device)
 
 output = './'
-udegree = 1
+udegree = 2
 pdegree = 1
 q = 4
 T = 5
@@ -51,8 +54,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-#mesh = pde.mesh(0.05, device = device)
-mesh = TriangleMesh.from_box([0,1,0,1], nx=2, ny=2)
+mesh = pde.mesh(0.05, device = device)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -90,24 +92,8 @@ ulform.add_integrator(SourceIntegrator)
 plform = LinearForm(pspace)
 
 ## b
-xu,u_in_isbd = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=pde.is_inflow_boundary, method='interp')
-#xp = bm.zeros(pgdof)
-#axx = bm.concatenate((xu,xp))
-
-xx = bm.zeros(gdof, dtype=mesh.ftype)
-u_isbddof_in = space.is_boundary_dof(threshold = pde.is_inflow_boundary)
-ipoint = space.interpolation_points()
-uinflow = pde.u_inflow_dirichlet(ipoint)
-p_isbddof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary, method='interp')
-bd = bm.concatenate((u_isbddof_in, u_isbddof_in, p_isbddof))
-value_bd = bm.concatenate((uinflow[:,0],uinflow[:,1], bm.zeros(pgdof)))
-xx[bd] = value_bd[bd]
-
-true = bm.concatenate((uinflow[:,0],uinflow[:,1]))
-print("asdad",xu)
-print("Asdasdasdad",xx[:ugdof])
-#print(bm.sum(~(u_in_isbd == true)))
-exit()
+#u_dirichlet,is_u_boundary = uspace.boundary_interpolate(pde.u_dirichlet, threshold = pde.is_u_boundary, method='interp')
+#p_dirichlet,is_p_boundary = pspace.boundary_interpolate(pde.p_dirichlet, threshold = pde.is_p_boundary, method='interp')
 
 for i in range(10):
     t1 = timeline.next_time_level()
@@ -123,7 +109,20 @@ for i in range(10):
     SourceIntegrator.clear() 
     b = LinearBlockForm([ulform, plform]).assembly()
     
-    A,b = DirichletBC((uspace,pspace), xx, threshold=(pde.is_u_boundary, pde.is_outflow_boundary), method='interp').apply(A, b)
+    A,b = DirichletBC((uspace,pspace), gD=(pde.u_dirichlet, pde.p_dirichlet), 
+                      threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
+
+    #A,b = DirichletBC((uspace,pspace), (u_dirichlet, bm.zeros(pgdof)), 
+    #                  threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
+    #A,b = DirichletBC((uspace,pspace), (u_dirichlet, pde.p_dirichlet), 
+    #                  threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
+    #A,b = DirichletBC((uspace,pspace), bm.concatenate((u_dirichlet[:], bm.zeros(pgdof))), 
+    #                  threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
+    #A,b = DirichletBC((uspace,pspace), gD=(pde.u_dirichlet, pde.p_dirichlet), 
+    #                  threshold=(is_u_boundary, is_p_boundary), method='interp').apply(A, b)
+    #A,b = DirichletBC((uspace,pspace), bm.concatenate((u_dirichlet[:], bm.zeros(pgdof))), 
+    #                  threshold=bm.concatenate((is_u_boundary, is_p_boundary)), method='interp').apply(A, b)
+    
     x = spsolve(A, b, 'mumps')
     
     u1[:] = x[:ugdof]

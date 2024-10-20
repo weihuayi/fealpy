@@ -5,7 +5,7 @@ from math import prod
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Size, _S
 from .functional import generate_tensor_basis, generate_tensor_grad_basis
-from .space import FunctionSpace, _S, Index
+from .space import FunctionSpace, _S, Index, Function
 from .utils import to_tensor_dof
 from fealpy.decorator import barycentric, cartesian
 
@@ -201,30 +201,45 @@ class TensorFunctionSpace(FunctionSpace):
     def boundary_interpolate(self,
         gD: Union[Callable, int, float, TensorLike],
         uh: Optional[TensorLike]=None,
+        *,
         threshold: Union[Callable, TensorLike, None]=None, method=None) -> TensorLike:
 
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
         mesh = self.mesh
-
-        if bm.is_tensor(gD):
-            ## TODO:gD threshold 不同情况
-            assert bm.is_tensor(threshold)
-            assert len(threshold) == len(gD)
-            assert len(gD) == self.number_of_global_dofs()
-            isTensorBDof = threshold
+        if (bm.is_tensor(gD)) or (isinstance(gD, Function)):
+            assert len(gD[:]) == self.number_of_global_dofs()
+            if bm.is_tensor(threshold):
+                assert len(threshold) == self.number_of_global_dofs()
+                isTensorBDof = threshold
+            else : #threshold callable None 
+                isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
             if uh is None:
-                uh = bm.zeros_like(isTensorBDof)
-            else:
-                uh = bm.set_at(uh, isTensorBDof, gD) 
+                uh = self.function()
+            uh[isTensorBDof] = gD[isTensorBDof] 
             return uh, isTensorBDof
         
-        elif callable(gD): 
-            if (threshold is None) | (callable(threshold)) :
+        elif callable(gD):
+            if (threshold is None) | (callable(threshold)):
                 isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold, method=method) 
                 gD_tensor = gD(ipoints[isScalarBDof])
                 assert gD_tensor.shape[-1] == self.dof_numel
                 isTensorBDof = self.is_boundary_dof(threshold = threshold, method=method) 
+            
+            elif bm.is_tensor(threshold):
+                assert len(threshold) == self.number_of_global_dofs()
+                isTensorBDof = threshold
+                gD_tensor = gD(ipoints)
+                assert gD_tensor.shape[-1] == self.dof_numel
+                if uh is None:
+                    uh = self.function()
+                if self.dof_priority:
+                    gD_tensor = gD_tensor.T.reshape(-1)
+                else:
+                    gD_tensor = gD_tensor.reshape(-1) 
+                uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor[isTensorBDof])
+                return uh, isTensorBDof
+                
             elif isinstance(threshold, tuple):
                 ## TODO:以后修修改centroid
                 if method=='centroid': 
@@ -292,12 +307,12 @@ class TensorFunctionSpace(FunctionSpace):
                     gD_tensor = [gD(ipoints[isScalarBDof[i]])[...,i] for i in range(self.dof_numel)]
                     isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
                     if uh is None:
-                        uh = bm.zeros_like(isTensorBDof, dtype=bm.float64) 
+                        uh = self.function()
                     if self.dof_priority:
                         gD_tensor = bm.concatenate(gD_tensor)
                     else:
                         gD_tensor = bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof]) for i in range(scalar_gdof)])
-                    uh = bm.set_at(uh, isTensorBDof, gD_tensor)
+                    uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor)
                     return uh, isTensorBDof
                 else:
                     raise ValueError(f"Unknown method: {method}")
@@ -306,11 +321,11 @@ class TensorFunctionSpace(FunctionSpace):
         else: 
             raise ValueError(f"Unknown type of gD {type(gD)}")
         if uh is None:
-            uh = bm.zeros_like(isTensorBDof, dtype=bm.float64)
+            uh = self.function() 
         if self.dof_priority:
-            uh = bm.set_at(uh, isTensorBDof, gD_tensor.T.reshape(-1))
+            uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor.T.reshape(-1))
         else:
-            uh = bm.set_at(uh, isTensorBDof, gD_tensor.reshape(-1))
+            uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor.reshape(-1))
         return uh, isTensorBDof
 
     @barycentric
