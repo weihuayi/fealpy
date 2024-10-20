@@ -1,12 +1,14 @@
 import pytest
 import numpy as np
-
+import warnings
 from fealpy.backend import backend_manager as bm
 from fealpy.opt.gradient_descent_alg import GradientDescentAlg
 from fealpy.opt.optimizer_base import opt_alg_options
 
 from gradient_descent_alg_data import *
 from fealpy.opt.line_search_rules import *
+
+
 
 class TestGradientDescentInterfaces:
 
@@ -57,8 +59,9 @@ class TestGradientDescentInterfaces:
         ArmijoLineSearch(),
         PowellLineSearch(),
         GoldsteinLineSearch(),
-#        ZhangHagerLineSearch(),
+        ZhangHagerLineSearch(),
         GrippoLineSearch(),
+        ExactLineSearch(),
     ])
 
     def test_run(self,meshdata,backend,line_search_method):
@@ -71,6 +74,9 @@ class TestGradientDescentInterfaces:
         f1 = meshdata['f']
         g1= bm.from_numpy(meshdata['g'])
         diff1 = bm.from_numpy(np.array(meshdata['diff']))
+        
+        # 忽略 DeprecationWarning
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         options = opt_alg_options(
             x0=x0,

@@ -1,7 +1,4 @@
 from fealpy.backend import backend_manager as bm
-import numpy as np 
-from fealpy.typing import TensorLike, Index, _S
-from fealpy import logger
 from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
 from fealpy.opt.line_search_rules import *
 """
@@ -18,14 +15,13 @@ class GradientDescentAlg(Optimizer):
 
     def run(self, queue=None, maxit=None):
         options = self.options
+        if self.options['LineSearch'] is None:
+            self.options['LineSearch'] = PowellLineSearch()  # 默认使用 Powell 线搜索
         self.line_search_method = options['LineSearch']
-        self.x = []
+        self.x = [] # 保存迭代点
         x0 = options['x0']
-
-#        self.x = x0
         
-        self.x.append(x0)  # 使用 copy() 方法
-
+        self.x.append(x0) 
         self.f, self.g = self.fun(x0)
 
         alpha = options['StepLength']
@@ -37,6 +33,7 @@ class GradientDescentAlg(Optimizer):
            maxit = options['MaxFunEvals']
         C = self.f
         for i in range(maxit):
+            
             if isinstance(self.line_search_method, ZhangHagerLineSearch):
                 alpha,C = self.line_search_method.search(self.x, self.fun, -self.g, C)
             else:

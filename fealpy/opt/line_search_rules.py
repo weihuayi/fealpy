@@ -1,3 +1,6 @@
+
+from scipy.optimize import minimize_scalar
+
 class LineSearch:
     def search(self, x, objective, direction):
         raise NotImplementedError("Subclasses should implement this method.")
@@ -106,6 +109,22 @@ class   ZhangHagerLineSearch(LineSearch):
             if f_new <= C + self.c * alpha * (g @ direction):
                 break
             alpha *= self.eta
-            Qp = (1 - pow(self.gamma, iter))/(1 - self.gamma)
-            C = (self.gamma * Qp * C + f) / (self.gamma * Qp + 1)   
+        Qp = (1 - pow(self.gamma, iter))/(1 - self.gamma)
+        C = (self.gamma * Qp * C + f) / (self.gamma * Qp + 1)   
         return alpha, C
+
+class ExactLineSearch(LineSearch):
+
+    def __init__(self, step_length_bounds=(0, 0.3)):
+        self.step_length_bounds = step_length_bounds  # 步长范围
+       
+
+    def search(self, x,objective, direction):
+
+        def f(p):
+            return objective(p)[0]
+        def func(alpha):
+            return f(x[-1] + alpha * direction)
+        res = minimize_scalar(func,bounds=self.step_length_bounds, method='bounded')
+
+        return res.x
