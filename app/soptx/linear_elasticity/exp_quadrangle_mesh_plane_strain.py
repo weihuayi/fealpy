@@ -33,7 +33,7 @@ class BoxDomainPolyData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = 35/13 * y - 35/13 * y**2 + 10/13 * x - 10/13 * x**2
         val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
         
@@ -44,7 +44,7 @@ class BoxDomainPolyData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = x * (1 - x) * y * (1 - y)
         val[..., 1] = 0
         
@@ -64,7 +64,7 @@ class BoxDomainTriData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = (22.5 * bm.pi**2) / 13 * bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
         val[..., 1] = - (12.5 * bm.pi**2) / 13 * bm.cos(bm.pi * x) * bm.cos(bm.pi * y)
         
@@ -75,7 +75,7 @@ class BoxDomainTriData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
         val[..., 1] = 0
         
@@ -117,7 +117,7 @@ p = args.degree
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 4
+maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -146,7 +146,8 @@ for i in range(maxit):
     tmr.send('source assembly')
 
     uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
+    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
+                                                    threshold=None, method='interp')
 
     F = F - K.matmul(uh_bd)
     F[isDDof] = uh_bd[isDDof]
@@ -173,5 +174,6 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
+print("NDof:", NDof)
 print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
 print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))

@@ -326,6 +326,7 @@ class TensorFunctionSpace(FunctionSpace):
             uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor.T.reshape(-1))
         else:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor.reshape(-1))
+            
         return uh, isTensorBDof
 
     @barycentric
