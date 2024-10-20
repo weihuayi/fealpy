@@ -7,7 +7,6 @@
 	@bref 
 	@ref 
 '''  
-import numpy as np
 from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
@@ -69,12 +68,12 @@ class FlowPastCylinder:
         mesh = meshio.read('gn.msh',file_format = 'gmsh')
         node = mesh.points[:,:2]
         cell = mesh.cells_dict['triangle']
-        mesh = TriangleMesh(node,cell)
-        return mesh
+        return node, cell
     
     def _dist_mesh(self, h0):
         from fealpy.geometry import DistDomain2d
         from fealpy.mesh import DistMesh2d
+        import numpy as np
         fd1 = lambda p: dcircle(p,[0.2,0.2],0.05)
         fd2 = lambda p: drectangle(p,[0.0,2.2,0.0,0.41])
         fd = lambda p: ddiff(fd2(p),fd1(p))
@@ -96,44 +95,47 @@ class FlowPastCylinder:
     def _fealpy_mesh(self,h):
         from meshpy.triangle import MeshInfo, build
         from fealpy.mesh import IntervalMesh
-        points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
-                dtype=np.float64)
-        facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
+        backend = bm.backend_name
+        bm.set_backend('numpy')
+        points = bm.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
+                dtype=bm.float64)
+        facets = bm.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=bm.int32)
 
 
-        mm = IntervalMesh.from_circle_boundary([0.2, 0.2], 0.1, int(2*0.1*np.pi/0.01))
+        mm = IntervalMesh.from_circle_boundary([0.2, 0.2], 0.1, int(2*0.1*bm.pi/0.01))
         p = mm.entity('node')
         f = mm.entity('cell')
 
-        points = np.append(points, p, axis=0)
-        facets = np.append(facets, f+4, axis=0)
-
-        fm = np.array([0, 1, 2, 3])
-
-
+        points = bm.concat((points, p), axis=0)
+        facets = bm.concat((facets, f+4), axis=0)
+        
         mesh_info = MeshInfo()
-        mesh_info.set_points(points)
-        mesh_info.set_facets(facets)
-
+        mesh_info.set_points(bm.to_numpy(points))
+        mesh_info.set_facets(bm.to_numpy(facets))
         mesh_info.set_holes([[0.2, 0.2]])
-
         mesh = build(mesh_info, max_volume=h**2)
-
         node = bm.array(mesh.points, dtype=bm.float64)
         cell = bm.array(mesh.elements, dtype=bm.int32)
-        mesh = TriangleMesh(node,cell)  
-        return mesh
+        
+        bm.set_backend(backend)
+        node = bm.from_numpy(node)
+        cell = bm.from_numpy(cell)
+        return node,cell
 
-    def mesh(self, h, method:str='fealpy'):
+    def mesh(self, h, method:str='fealpy', device=None):
         if method == 'fealpy':
-            return self._fealpy_mesh(h)
-        elif method == 'distmesh':
-            return self._dist_mesh(h)
+            node,cell = self._fealpy_mesh(h)
+            node = bm.device_put(node, device)
+            cell = bm.device_put(cell, device) 
         elif mesh == 'gmesh':
-            return self._gmesh_mesh(h)
+            node,cell = self._gmesh_mesh(h)
+        #elif method == 'distmesh':
+        #    return self._dist_mesh(h)
         else:
             raise ValueError(f"Unknown method:{method}")
-        
+        return TriangleMesh(node, cell)
+
+
     @cartesian
     def is_outflow_boundary(self,p):
         return bm.abs(p[..., 0] - 2.2) < self.eps
@@ -142,11 +144,20 @@ class FlowPastCylinder:
     def is_inflow_boundary(self,p):
         return bm.abs(p[..., 0]) < self.eps
     
+    @cartesian
+    def is_circle_boundary(self,p):
+        x = p[...,0]
+        y = p[...,1]
+        return (bm.sqrt((x-0.2)**2 + (y-0.2)**2) - 0.05) < self.eps
     
     @cartesian
     def is_wall_boundary(self,p):
         return (bm.abs(p[..., 1] -0.41) < self.eps) | \
                (bm.abs(p[..., 1] ) < self.eps)
+    
+    @cartesian
+    def is_u_boundary(self,p):
+        return bm.abs(p[..., 0] - 2.2) > self.eps
 
     @cartesian
     def u_inflow_dirichlet(self, p):

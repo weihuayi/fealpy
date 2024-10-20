@@ -11,10 +11,10 @@ from app.soptx.soptx.filter.filter_properties import FilterProperties
 
 class VolumeConstraint(Constraint):
     def __init__(self, 
-                 mesh: Mesh,
-                 volfrac: float,
-                 filter_type: Union[int, str],
-                 filter_rmin: float) -> None:
+                mesh: Mesh,
+                volfrac: float,
+                filter_type: Union[int, str, None] = None,
+                filter_rmin: Union[float, None] = None) -> None:
         """
         Initialize the volume constraint for topology optimization.
         """

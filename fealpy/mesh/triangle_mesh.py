@@ -143,7 +143,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """Fetch all p-order interpolation points on the triangle mesh."""
         node = self.entity('node')
         if p == 1:
-            return node
+            return node[index]
         if p <= 0:
             raise ValueError("p must be a integer larger than 0.")
 
@@ -174,7 +174,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                                           node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
             ipoint_list.append(ipoints_from_cell)
 
-        return bm.concatenate(ipoint_list, axis=0)  # (gdof, GD)
+        return bm.concatenate(ipoint_list, axis=0)[index]  # (gdof, GD)
 
     def cell_to_ipoint(self, p: int, index: Index=_S):
         """
@@ -200,7 +200,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         ldof = self.number_of_local_ipoints(p, 'cell')
 
         kwargs = bm.context(cell)
-        c2p = bm.zeros((NC, ldof), **kwargs, device=self.device)
+        c2p = bm.zeros((NC, ldof), **kwargs)
 
         flag = face2cell[:, 2] == 0
         c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])
