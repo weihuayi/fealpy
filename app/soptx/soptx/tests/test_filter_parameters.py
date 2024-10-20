@@ -3,7 +3,7 @@ import numpy as np
 from fealpy.backend import backend_manager as bm
 
 from fealpy.sparse import COOTensor
-from ..utilfs.filter_parameters import compute_filter, compute_filter_3d, apply_filter
+from ..utils.filter_parameters import compute_filter, compute_filter_3d, apply_filter
 from .filter_parameters_data import *
 
 from math import ceil, sqrt

@@ -15,7 +15,7 @@ from fealpy.decorator import cartesian
 
 from fealpy.solver import cg, spsolve
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 
 from fealpy.material.elastic_material import LinearElasticMaterial
 

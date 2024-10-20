@@ -65,6 +65,7 @@ mesh = QuadrangleMesh.from_box(box=[0, 1, 0, 1], nx=4, ny=4)
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+bm.jacfwd()
 
 isBdDof = tensor_space.is_boundary_dof(threshold=(pde.is_dirichlet_boundary_dof, ))
 print("-----------------")
