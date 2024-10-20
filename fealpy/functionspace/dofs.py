@@ -20,7 +20,7 @@ class LinearMeshCFEDof(Generic[_MT]):
         self.p = p
         self.multiIndex = mesh.multi_index_matrix(p, TD)
    
-    def is_boundary_dof(self, threshold=None, method='centroid'):
+    def is_boundary_dof(self, threshold=None, method=None):
         TD = self.mesh.top_dimension()
         gdof = self.number_of_global_dofs()
         if bm.is_tensor(threshold):
@@ -28,7 +28,7 @@ class LinearMeshCFEDof(Generic[_MT]):
             if (index.dtype == bm.bool) and (len(index) == gdof):
                 return index
         else:
-            if method == 'centroid':
+            if (method == 'centroid') | (method is None):
                 index = self.mesh.boundary_face_index()
                 if callable(threshold):
                     bc = self.mesh.entity_barycenter(TD-1, index=index)
