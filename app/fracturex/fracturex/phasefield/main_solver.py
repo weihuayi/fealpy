@@ -226,7 +226,7 @@ class MainSolver:
         tmr.send('phase_matrix_assemble')
 
         dlform = LinearForm(self.space)
-        dlform.add_integrator(ScalarSourceIntegrator(coef=coef, q=self.q))
+        dlform.add_integrator(ScalarSourceIntegrator(source=coef, q=self.q))
         R = dlform.assembly()
         R -= A @ d[:]
         tmr.send('phase_R_assemble')

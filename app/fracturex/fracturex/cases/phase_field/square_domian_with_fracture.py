@@ -18,7 +18,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.015
+        l0 = 0.03
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):
@@ -100,8 +100,8 @@ parser.add_argument('--refine_method',
         help='网格加密方法, 默认为 bisect.')
 
 parser.add_argument('--n',
-        default=4, type=int,
-        help='初始网格加密次数, 默认为 4.')
+        default=6, type=int,
+        help='初始网格加密次数, 默认为 6.')
 
 parser.add_argument('--vtkname',
         default='test', type=str,
@@ -141,11 +141,12 @@ else:
 
 mesh.uniform_refine(n=n)
 
+'''
 isMarkedCell = model.adaptive_mesh(mesh)
 while isMarkedCell.any():
     mesh.bisect(isMarkedCell)
     isMarkedCell = model.adaptive_mesh(mesh)
-
+'''
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
@@ -175,9 +176,9 @@ end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
-tname = args.mesh_type + '_' + str(p) + '_' + 'model1_disp.txt'
+tname = args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
 with open(tname, 'w') as file:
-    file.write(f'force: {force},\n time: {end-start},\n l0: {model.l0},\n E: {model.E},\n, nu: {model.nu},\n, Gc: {model.Gc},\n, degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+    file.write(f'force: {force},\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
@@ -185,7 +186,7 @@ plt.ylabel('Residual Force')
 plt.title('Changes in Residual Force')
 plt.grid(True)
 plt.legend()
-pname = args.mesh_type + '_' + str(p) + '_' + 'model1_force.png'
+pname = args.mesh_type + '_p' + str(p) + '_' + 'model1_force.png'
 plt.savefig(pname, dpi=300)
 
 print(f"Time: {end - start}")
