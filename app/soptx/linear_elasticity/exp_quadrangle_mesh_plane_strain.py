@@ -89,7 +89,7 @@ class BoxDomainTriData2D():
 parser = argparse.ArgumentParser(description="Solve linear elasticity problems in arbitrary order Lagrange finite element space on QuadrangleMesh.")
 parser.add_argument('--backend',
                     choices=('numpy', 'pytorch'), 
-                    default='numpy', type=str,
+                    default='pytorch', type=str,
                     help='Specify the backend type for computation, default is pytorch.')
 parser.add_argument('--solver',
                     choices=('cg', 'spsolve'),
@@ -110,7 +110,7 @@ bm.set_backend(args.backend)
 pde = BoxDomainTriData2D()
 nx, ny = args.nx, args.ny
 extent = pde.domain()
-mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cpu')
+mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cuda')
 
 p = args.degree
 

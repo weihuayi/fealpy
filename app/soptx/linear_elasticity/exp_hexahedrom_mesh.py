@@ -37,7 +37,7 @@ class BoxDomainPolyUnloaded3d():
         y = points[..., 1]
         z = points[..., 2]
         val = bm.zeros(points.shape, 
-                       dtype=points.dtype, device=points.device)
+                       dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = 2*x**3 - 3*x*y**2 - 3*x*z**2
         val[..., 1] = 2*y**3 - 3*y*x**2 - 3*y*z**2
         val[..., 2] = 2*z**3 - 3*z*y**2 - 3*z*x**2
@@ -47,7 +47,7 @@ class BoxDomainPolyUnloaded3d():
     @cartesian
     def source(self, points: TensorLike):
         val = bm.zeros(points.shape, 
-                       dtype=points.dtype, device=points.device)
+                       dtype=points.dtype, device=bm.get_device(points))
         
         return val
     
@@ -111,20 +111,20 @@ parser.add_argument('--backend',
                     default='pytorch', type=str,
                     help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=1, type=int, 
+                    default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--solver',
                     choices=['cg', 'spsolve'],
                     default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
-                    default=3, type=int, 
+                    default=2, type=int, 
                     help='Initial number of grid cells in the x direction, default is 2.')
 parser.add_argument('--ny',
-                    default=3, type=int,
+                    default=2, type=int,
                     help='Initial number of grid cells in the y direction, default is 2.')
 parser.add_argument('--nz',
-                    default=3, type=int,
+                    default=2, type=int,
                     help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 
