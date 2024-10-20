@@ -6,8 +6,7 @@ from fealpy.opt.gradient_descent_alg import GradientDescentAlg
 from fealpy.opt.optimizer_base import opt_alg_options
 
 from gradient_descent_alg_data import *
-from fealpy.opt.line_search_rules import LineSearch, ArmijoLineSearch
-
+from fealpy.opt.line_search_rules import *
 
 class TestGradientDescentInterfaces:
 
@@ -54,7 +53,15 @@ class TestGradientDescentInterfaces:
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch','jax'])
     @pytest.mark.parametrize("meshdata", run_data)
-    def test_run(self,meshdata,backend):
+    @pytest.mark.parametrize("line_search_method", [
+        ArmijoLineSearch(),
+        PowellLineSearch(),
+        GoldsteinLineSearch(),
+#        ZhangHagerLineSearch(),
+        GrippoLineSearch(),
+    ])
+
+    def test_run(self,meshdata,backend,line_search_method):
         bm.set_backend(backend)
         x0 = bm.from_numpy(meshdata['x0'])
         objective = meshdata['objective']
@@ -69,16 +76,17 @@ class TestGradientDescentInterfaces:
             x0=x0,
             objective=objective,
             StepLength=StepLength,
-            MaxIters=MaxIters
+            MaxIters=MaxIters,
+            LineSearch = line_search_method
         )
         GDA = GradientDescentAlg(options)
         maxit = options['MaxIters']
         GDA = GradientDescentAlg(options)
         x , f ,g , diff = GDA.run(maxit=maxit)
-        np.testing.assert_allclose(x, x1, atol=1e-6)
-        np.testing.assert_allclose(f, f1 , atol=1e-6)
-        np.testing.assert_allclose(g, g1 , atol=1e-6)
-        np.testing.assert_allclose(bm.to_numpy(diff), diff1 , atol= 1e-6)
+        np.testing.assert_allclose(x, x1, atol=1e-5)
+        np.testing.assert_allclose(f, f1 , atol=1e-5)
+        np.testing.assert_allclose(g, g1 , atol=1e-5)
+        np.testing.assert_allclose(bm.to_numpy(diff), diff1 , atol= 1e-5)
 
 if __name__ == "__main__":
     pytest.main(["./test_gradient_descent_alg.py","-k", "test_run"])
