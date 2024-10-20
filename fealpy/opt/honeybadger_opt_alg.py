@@ -6,7 +6,7 @@ from fealpy.opt.optimizer_base import Optimizer
 
 
 class HoneybadgerOptAlg(Optimizer):
-    def __init__(self, option) -> None:
+    def __init__(self, option, D) -> None:
         super().__init__(option)
 
 
