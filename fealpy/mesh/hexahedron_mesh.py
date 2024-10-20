@@ -394,7 +394,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         node = bm.concatenate([X, Y, Z], axis=-1)
 
         NN = (nx+1)*(ny+1)*(nz+1)
-        idx = bm.arange(0, NN, device=device).reshape(nx+1, ny+1, nz+1)
+        idx = bm.arange(0, NN, dtype=itype, device=device).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
         nyz = (ny + 1)*(nz + 1)
@@ -417,7 +417,7 @@ class HexahedronMesh(TensorMesh, Plotable):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype, device=device)
-            idxMap[isValidNode] = bm.arange(isValidNode.sum(), device=device)
+            idxMap[isValidNode] = bm.arange(isValidNode.sum(), dtype=itype, device=device)
             cell = idxMap[cell]
 
         return cls(node, cell)
