@@ -1,7 +1,4 @@
 from typing import Union, Optional, Callable
-
-from torch import dtype
-
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
