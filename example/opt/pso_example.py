@@ -41,7 +41,7 @@ dataE=[19, 19]
 if MAP[dataS[0]][dataS[1]] != 0 or MAP[dataE[0]][dataE[1]] != 0: 
     print("Error: Wrong start point or end point") # 判断起点终点坐标是否有效
 else:
-    textMAP = PSOProblem(MAP,dataS,dataE)
+    textMAP = PSOProblem(MAP, dataS, dataE)
     textMAP.builddata() # 建立地图字典
     fobj = lambda x: textMAP.fitness(x)
     
@@ -65,5 +65,3 @@ else:
     end_time = time.perf_counter()
     running_time = end_time - start_time
     textMAP.printMAP(result, running_time)
-
-    
