@@ -17,7 +17,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
         kwargs = bm.context(cell)
-        self.device = device
 
         self.node = node
         self.cell = cell

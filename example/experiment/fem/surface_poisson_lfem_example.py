@@ -21,7 +21,7 @@ from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
 from fealpy.solver import cg, spsolve
-from scipy.sparse import coo_array, bmat
+from scipy.sparse import coo_array, csr_array, bmat
 #from scipy.sparse.linalg import spsolve
 
 ## 参数解析
@@ -39,7 +39,7 @@ parser.add_argument('--mdegree',
         help='网格的阶数, 默认为 3 次.')
 
 parser.add_argument('--mtype',
-        default='tri', type=str,
+        default='ltri', type=str,
         help='网格类型， 默认三角形网格.')
 
 parser.add_argument('--backend',
@@ -64,8 +64,8 @@ p = mdegree
 surface = SphereSurface()
 tmesh = TriangleMesh.from_unit_sphere_surface()
 mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
-fname = f"sphere_test.vtu"
-mesh.to_vtk(fname=fname)
+#fname = f"sphere_test.vtu"
+#mesh.to_vtk(fname=fname)
 
 space = ParametricLagrangeFESpace(mesh, p=sdegree)
 #tmr.send(f'第{i}次空间时间')
@@ -88,14 +88,13 @@ def coo(A):
     indices = A._indices
     return coo_array((data, indices), shape=A.shape)
 A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
-A = COOTensor(bm.stack([A.row,A.col],axis=0), A.data, spshape=A.shape)
+A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
 
-F = bm.concatenate((F,bm.array([0])))
+F = bm.concatenate((F, bm.array([0])))
 
-print(A.shape)
-print(F.shape)
-#uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
+uh[:] = x[:-1]
+#uh[:] = spsolve(A, F, 'scipy')[:-1]
 
 error = mesh.error(pde.solution, uh)
 print(error)
