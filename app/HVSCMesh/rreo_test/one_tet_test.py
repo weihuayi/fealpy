@@ -41,7 +41,7 @@ NN = mesh.number_of_nodes()
 NC = mesh.number_of_cells()
 
 meshquality = RadiusRatioQuality(mesh)
-isFreeNode = np.array([0,0,0,1],dtype=np.bool)
+isFreeNode = np.array([0,0,1,1],dtype=np.bool)
 volume = mesh.entity_measure('cell')
 
 q = np.zeros((2, NC),dtype=np.float64)
@@ -55,7 +55,6 @@ for i in range(0,100):
     A,B0,B1,B2 = meshquality.hess(node)
     mu = meshquality(node)
     cm = mesh.entity_measure("cell")
-    print("cm:",cm)
     
     A *= cm**2
     B0 *= cm**2
@@ -69,7 +68,8 @@ for i in range(0,100):
     B1 = csr_matrix((B1.flat, (I.flat, J.flat)), shape=(NN, NN))
     B2 = csr_matrix((B2.flat, (I.flat, J.flat)), shape=(NN, NN))
     node = BlockJacobi3d(node,A,B0,B1,B2,isFreeNode)
-    
+    fname = './data/tet'+str(i)+'.vtu'
+    mesh.to_vtk(fname)
     q[1] = meshquality(node)
     minq = np.min(q[1])
     avgq = np.mean(q[1])

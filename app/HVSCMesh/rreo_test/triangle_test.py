@@ -63,6 +63,8 @@ for i in range(0,100):
     A = csr_matrix((A.flat,(I.flat,J.flat)),shape=(NN,NN))
     B = csr_matrix((B.flat,(I.flat,J.flat)),shape=(NN,NN))    
     node = BlockJacobi2d(node,A,B,isFreeNode)
+    fname = 'test'+str(i)+'.vtu'
+    mesh.to_vtk(fname)
     
     q[1] = meshquality(node)
     minq = np.min(q[1])
