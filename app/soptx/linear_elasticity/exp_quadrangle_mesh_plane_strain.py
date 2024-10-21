@@ -89,7 +89,7 @@ class BoxDomainTriData2D():
 parser = argparse.ArgumentParser(description="Solve linear elasticity problems in arbitrary order Lagrange finite element space on QuadrangleMesh.")
 parser.add_argument('--backend',
                     choices=('numpy', 'pytorch'), 
-                    default='pytorch', type=str,
+                    default='numpy', type=str,
                     help='Specify the backend type for computation, default is pytorch.')
 parser.add_argument('--solver',
                     choices=('cg', 'spsolve'),
@@ -110,14 +110,14 @@ bm.set_backend(args.backend)
 pde = BoxDomainTriData2D()
 nx, ny = args.nx, args.ny
 extent = pde.domain()
-mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cuda')
+mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cpu')
 
 p = args.degree
 
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 5
+maxit = 3
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -145,15 +145,18 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send('source assembly')
 
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
-                                                    threshold=None, method='interp')
-
-    F = F - K.matmul(uh_bd)
-    F[isDDof] = uh_bd[isDDof]
-
-    dbc = DirichletBC(space=tensor_space)
-    K = dbc.apply_matrix(matrix=K, check=True)
+    dbc = DirichletBC(space=tensor_space, 
+                    gD=pde.dirichlet, 
+                    threshold=None, 
+                    method='interp')
+    K, F = dbc.apply(A=K, f=F, uh=None, gD=pde.dirichlet, check=True)
+    # uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
+    #                 dtype=bm.float64, device=bm.get_device(mesh))
+    # uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
+    #                                                 threshold=None, method='interp')
+    # F = F - K.matmul(uh_bd)
+    # F = bm.set_at(F, isDDof, uh_bd[isDDof])
+    # K = dbc.apply_matrix(matrix=K, check=True)
     tmr.send('boundary')
 
     uh = tensor_space.function()
