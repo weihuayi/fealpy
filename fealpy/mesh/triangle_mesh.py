@@ -1,5 +1,4 @@
 from typing import Union, Optional, Callable
-
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
@@ -1388,5 +1387,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             mesh.add_plot(ax)
             plt.show()
         return mesh
+
+    @classmethod
+    def from_domain_distmesh(cls, domain, maxit=100, output=False, itype=None, ftype=None, device=None):
+        from fealpy.old.mesh import DistMesher2d
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        mesher = DistMesher2d(domain, domain.hmin, output=output)
+        mesh = mesher.meshing(maxit=maxit)
+        node = bm.array(mesh.entity('node'), dtype=ftype, device=device)
+        cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
+
+        return cls(node, cell)
 
 TriangleMesh.set_ploter('2d')
