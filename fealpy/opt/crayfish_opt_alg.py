@@ -9,7 +9,7 @@ from .optimizer_base import Optimizer, opt_alg_options
 
 class CrayfishOptAlg(Optimizer):
 
-    def __init__(self, option) -> None:
+    def __init__(self, option, D) -> None:
         super().__init__(option)
     
     
@@ -55,11 +55,8 @@ class CrayfishOptAlg(Optimizer):
             newbest_id = bm.argmin(fit_new)
             (global_position, global_fitness) = (x_new[newbest_id], fit_new[newbest_id]) if fit_new[newbest_id] < global_fitness else (global_position, global_fitness)
             gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            if (t + 1) % 50 == 0:
-                print("COA" + " iter" , t  + 1 , ":", gbest_f)
+            if fit[gbest_idx] < gbest_f:
+                gbest_f = fit[gbest_idx]
+                gbest = x[gbest_idx].reshape(1, dim)
+            gbest = gbest.flatten()
         return gbest, gbest_f
-        
-
-
-

@@ -15,7 +15,7 @@ from fealpy.decorator import cartesian
 
 from fealpy.solver import cg, spsolve
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 
 from fealpy.material.elastic_material import LinearElasticMaterial
 
@@ -23,7 +23,7 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 import argparse
 
 # 平面应变问题
-class BoxDomainData2D():
+class BoxDomainPolyData2D():
 
     def domain(self):
         return [0, 1, 0, 1]
@@ -33,7 +33,7 @@ class BoxDomainData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = 35/13 * y - 35/13 * y**2 + 10/13 * x - 10/13 * x**2
         val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
         
@@ -44,7 +44,7 @@ class BoxDomainData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = x * (1 - x) * y * (1 - y)
         val[..., 1] = 0
         
@@ -53,17 +53,50 @@ class BoxDomainData2D():
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return self.solution(points)
+
+class BoxDomainTriData2D():
+
+    def domain(self):
+        return [0, 1, 0, 1]
+
+    @cartesian
+    def source(self, points: TensorLike, index=None) -> TensorLike:
+        x = points[..., 0]
+        y = points[..., 1]
+        
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
+        val[..., 0] = (22.5 * bm.pi**2) / 13 * bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
+        val[..., 1] = - (12.5 * bm.pi**2) / 13 * bm.cos(bm.pi * x) * bm.cos(bm.pi * y)
+        
+        return val
+    
+    @cartesian
+    def solution(self, points: TensorLike) -> TensorLike:
+        x = points[..., 0]
+        y = points[..., 1]
+        
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
+        val[..., 0] = bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
+        val[..., 1] = 0
+        
+        return val
+    
+    def dirichlet(self, points: TensorLike) -> TensorLike:
+        return self.solution(points)
+
     
 
 parser = argparse.ArgumentParser(description="Solve linear elasticity problems in arbitrary order Lagrange finite element space on QuadrangleMesh.")
-parser.add_argument('--backend', 
-                    default='numpy', type=str,
-                    help='Specify the backend type for computation, default is numpy.')
+parser.add_argument('--backend',
+                    choices=('numpy', 'pytorch'), 
+                    default='pytorch', type=str,
+                    help='Specify the backend type for computation, default is pytorch.')
 parser.add_argument('--solver',
+                    choices=('cg', 'spsolve'),
                     default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--degree', 
-                    default=1, type=int, 
+                    default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 2.')
 parser.add_argument('--nx', 
                     default=8, type=int, 
@@ -74,17 +107,17 @@ parser.add_argument('--ny',
 args = parser.parse_args()
 
 bm.set_backend(args.backend)
-pde = BoxDomainData2D()
+pde = BoxDomainTriData2D()
 nx, ny = args.nx, args.ny
 extent = pde.domain()
-mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cpu')
+mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cuda')
 
 p = args.degree
 
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 4
+maxit = 5
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -113,7 +146,8 @@ for i in range(maxit):
     tmr.send('source assembly')
 
     uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
+    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
+                                                    threshold=None, method='interp')
 
     F = F - K.matmul(uh_bd)
     F[isDDof] = uh_bd[isDDof]
@@ -140,5 +174,6 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
+print("NDof:", NDof)
 print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
 print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))

@@ -33,18 +33,25 @@ parser.add_argument('--backend',
         default='pytorch', type=str,
         help='默认后端为numpy')
 
+parser.add_argument('--device',
+        default='cuda', type=str,
+        help='默认gpu上运行')
+
+
 args = parser.parse_args()
 tmr = timer()
 next(tmr)
 bm.set_backend(args.backend)
-decive = "cpu"
+#device = "cuda"
 p = args.degree
 m = args.m
 n = args.n
 maxit = args.maxit
-import torch
+device = args.device
+import torch 
 torch.set_printoptions(precision=10)
-bm.set_default_device('cpu')
+bm.set_default_device(device)
+>>>>>>> upstream/master
 x = sp.symbols('x')
 y = sp.symbols('y')
 z = sp.symbols('z')
@@ -68,6 +75,10 @@ for i in range(maxit):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
     #mesh.node = node/2
     import ipdb
+<<<<<<< HEAD
+=======
+    ipdb.set_trace()
+>>>>>>> upstream/master
     space = CmConformingFESpace3d(mesh, p=p, m=m, isCornerNode=isCornerNode)
     tmr.send(f'第{i}次空间生成时间')
     ipdb.set_trace()
