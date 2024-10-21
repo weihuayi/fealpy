@@ -127,14 +127,17 @@ class SemilinearForm(Form[SemilinearInt]):
 
         return M
 
-    def assembly(self, *, return_dense=True, coalesce=True, retain_ints: bool=False) -> COOTensor:
+    def assembly(self, *, return_dense=True, coalesce=True, format='csr',retain_ints: bool=False) -> COOTensor:
         
         M = self._scalar_assembly_A(retain_ints, self.batch_size)
-
-        self._M = M.coalesce() if coalesce else M
+        if format == 'csr':
+            self._M = M.coalesce().tocsr()
+        elif format == 'coo':
+            self._M = M.coalesce()
+        else:
+            raise ValueError(f"Unsupported format {format}.")
 
         V = self._scalar_assembly_F(retain_ints, self.batch_size)
-
         self._V = V.coalesce() if coalesce else V
         if return_dense:
             return self._M, self._V.to_dense()
