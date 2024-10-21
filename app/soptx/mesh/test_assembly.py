@@ -1,15 +1,15 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.experimental.fem.bilinear_form import BilinearForm
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+from fealpy.fem.bilinear_form import BilinearForm
 from app.soptx.soptx.pde.mbb_beam import MBBBeamOneData
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.solver import cg
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.functionspace.tensor_space import TensorFunctionSpace
+from fealpy.fem import DirichletBC
+from fealpy.sparse import COOTensor
+from fealpy.solver import cg
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.functionspace.tensor_space import TensorFunctionSpace
 
 bm.set_backend('numpy')
 

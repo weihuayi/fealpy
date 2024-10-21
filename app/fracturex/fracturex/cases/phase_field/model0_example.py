@@ -1,8 +1,8 @@
 import numpy as np
 
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
 from fealpy.geometry import SquareWithCircleHoleDomain
 
 from app.fracturex.fracturex.phasefield.main_solver import MainSolver

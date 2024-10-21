@@ -1,6 +1,6 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 
 bm.set_backend('pytorch')
 nx, ny = 1, 1

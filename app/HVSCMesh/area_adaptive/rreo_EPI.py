@@ -3,7 +3,7 @@ import gmsh
 import matplotlib.pyplot as plt
 
 #from TriRadiusRatio import TriRadiusRatio
-from fealpy.experimental.mesh.mesh_quality import RadiusRatioQuality
+from fealpy.mesh.mesh_quality import RadiusRatioQuality
 
 from fealpy.mesh import TriangleMesh
 
@@ -35,7 +35,7 @@ cell = mesh.entity('cell')
 #opt = TriRadiusRatio(mesh)
 
 from app.HVSCMesh.optimizer import *
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
 mesh = TriangleMesh(node,cell)
 mesh_quality = RadiusRatioQuality(mesh)

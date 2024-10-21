@@ -1,17 +1,17 @@
 
 from typing import Tuple, Callable, Union, Optional
 
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as Tensor
-from fealpy.experimental.mesh import Mesh
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as Tensor
+from fealpy.mesh import Mesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
     ScalarNeumannBCIntegrator
 )
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.solver import cg
+from fealpy.sparse import COOTensor
+from fealpy.solver import cg
 
 
 class EITDataGenerator():
@@ -23,8 +23,8 @@ class EITDataGenerator():
         Args:
             mesh (Mesh): _description_
             p (int, optional): Order of the Lagrange finite element space. Defaults to 1.
-            q (int | None, optional): Order of the quadrature, use `q = p + 2` if None.\
-            Defaults to None.
+            q (int | None, optional): Order of the quadrature, use `q = p + 2` if None.
+                Defaults to None.
         """
         q = p + 2 if q is None else q
 
@@ -53,16 +53,19 @@ class EITDataGenerator():
         self.cdata_indices = bm.stack([cdata_row, cdata_col], axis=0)
 
     def set_levelset(self, sigma_vals: Tuple[float, float],
-                     levelset: Callable[[Tensor], Tensor]) -> Tensor:
+                     levelset: Callable[[Tensor], Tensor],
+                     pixel: Tensor) -> Tensor:
         """Set inclusion distribution.
 
         Args:
             sigma_vals (Tuple[float, float]): Sigma value of inclusion and background.
             levelset (Callable): level-set function indicating inclusion and background.
+            pixel (Tensor): Sampler points on the interior on which the inclusion is indicated.
+                This may be different from the mesh nodes or cell barycenters.
 
         Returns:
             Tensor: Label boolean Tensor with True for inclusion nodes and False\
-                for background nodes, shaped (nodes, ).
+                for background nodes, shaped (pixels, ).
         """
         def _coef_func(p: Tensor):
             inclusion = levelset(p) < 0.
@@ -78,17 +81,16 @@ class EITDataGenerator():
         self._di.coef = _coef_func
         self._di.clear() # clear the cached result as the coef has changed
         bform.add_integrator(self._di)
-        self._A = bform.assembly()
+        self._A = bform.assembly(format='coo')
 
         cdata_indices = self.cdata_indices
         cdataT_indices = bm.flip(cdata_indices, axis=0)
         A_n_indices = bm.concat([self._A.indices(), cdata_indices, cdataT_indices], axis=1)
         A_n_values = bm.concat([self._A.values(), self.cdata, self.cdata], axis=-1)
-        self.A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
-        self.A_n = self.A_n.tocsr()
+        A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
+        self.A_n = A_n.tocsr()
 
-        node = space.mesh.entity('node')
-        return levelset(node) < 0.
+        return levelset(pixel) < 0.
 
     def set_boundary(self, gn_source: Union[Callable[[Tensor], Tensor], Tensor],
                      batch_size: int=0, *, zero_integral=False) -> Tensor:

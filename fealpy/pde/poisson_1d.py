@@ -1,4 +1,4 @@
-import numpy as np
+from ..backend import backend_manager as bm
 from ..decorator import cartesian
 
 class CosData:
@@ -13,7 +13,7 @@ class CosData:
         @param[in] p NDArray 
         """
         x = p[..., 0]
-        val = np.cos(np.pi*x)
+        val = bm.cos(bm.pi*x)
         return val 
 
     @cartesian
@@ -22,8 +22,8 @@ class CosData:
         @brief 方程真解的的导数
 
         """
-        pi = np.pi
-        val = -pi*np.sin(pi*p)
+        pi = bm.pi
+        val = -pi*bm.sin(pi*p)
         return val
 
     @cartesian
@@ -32,7 +32,7 @@ class CosData:
         @brief 方程的源项
         """
         x = p[..., 0] # (NQ, NC)
-        val = np.pi**2*np.cos(np.pi*x)
+        val = bm.pi**2*bm.cos(bm.pi*x)
         return val
 
     @cartesian

@@ -1,20 +1,22 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as _DT
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as _DT
 
-from fealpy.experimental.typing import Union
+from fealpy.typing import Union
 
-from fealpy.experimental.opt.objective import Constraint
-from fealpy.experimental.mesh.mesh_base import Mesh
+from fealpy.opt.objective import Constraint
+from fealpy.mesh.mesh_base import Mesh
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 
 
 class VolumeConstraint(Constraint):
-    def __init__(self, 
-                 mesh: Mesh,
-                 volfrac: float,
-                 filter_type: Union[int, str],
-                 filter_rmin: float) -> None:
+    def __init__(
+        self, 
+        mesh: Mesh,
+        volfrac: float,
+        filter_type: Union[int, str, None] = None,
+        filter_rmin: Union[float, None] = None
+    ) -> None:
         """
         Initialize the volume constraint for topology optimization.
         """
@@ -25,23 +27,39 @@ class VolumeConstraint(Constraint):
 
         super().__init__(self.fun, self.jac, type='ineq')
 
-    def _create_filter_properties(self, filter_type: Union[int, str], 
-                                filter_rmin: float) -> Union[FilterProperties, None]:
+    def _create_filter_properties(
+        self, 
+        filter_type: Union[int, str, None], 
+        filter_rmin: Union[float, None]
+    ) -> Union[FilterProperties, None]:
         """
         Create a FilterProperties instance based on the given filter type and radius.
         """
-        if filter_type == 'None':
-            return None 
-    
-        if filter_type == 'density' or filter_type == 0:
-            ft = 0
-        elif filter_type == 'sensitivity' or filter_type == 1:
-            ft = 1
-        elif filter_type == 'heaviside' or filter_type == 2:
-            ft = 2
+        if filter_type is None:
+            if filter_rmin is not None:
+                raise ValueError("When `filter_type` is None, `filter_rmin` must also be None.")
+            return None
+        
+        filter_type_mapping = {
+        'sens': 0,
+        'dens': 1,
+        'heaviside': 2,
+        }
+
+        if isinstance(filter_type, int):
+            ft = filter_type
+        elif isinstance(filter_type, str):
+            ft = filter_type_mapping.get(filter_type.lower())
+            if ft is None:
+                raise ValueError(
+                    f"Invalid `filter type` '{filter_type}'. "
+                    f"Please use one of {list(filter_type_mapping.keys())} or add it to the `filter_type_mapping`."
+                )
         else:
-            raise ValueError("Invalid filter type. \
-                            Use 'density', 'sensitivity', 'heaviside', 0, 1, or 2.")
+            raise TypeError("`filter_type` must be an integer, string, or None.")
+        
+        if filter_rmin is None:
+            raise ValueError("`filter_rmin` cannot be None when `filter_type` is specified.")
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 

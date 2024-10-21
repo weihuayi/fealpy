@@ -10,16 +10,16 @@
 import argparse
 from matplotlib import pyplot as plt
 
-from fealpy.experimental import logger
+from fealpy import logger
 logger.setLevel('WARNING')
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import BernsteinFESpace
-from fealpy.experimental.fem import BilinearForm, ScalarDiffusionIntegrator, ScalarMassIntegrator
-from fealpy.experimental.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.solver import cg
-from fealpy.experimental.pde.poisson_2d import CosCosData
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import BernsteinFESpace
+from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator, ScalarMassIntegrator
+from fealpy.fem import LinearForm, ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
+from fealpy.backend import backend_manager as bm
+from fealpy.solver import cg
+from fealpy.pde.poisson_2d import CosCosData
 from fealpy.utils import timer
 
 ## 参数解析

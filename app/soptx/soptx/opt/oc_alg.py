@@ -1,8 +1,8 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.opt.optimizer_base import Optimizer
+from fealpy.opt.optimizer_base import Optimizer
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 from time import time 
 
 class OCAlg(Optimizer):

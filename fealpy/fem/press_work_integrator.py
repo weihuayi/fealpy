@@ -1,64 +1,158 @@
-import numpy as np
+#!/usr/bin/python3
+'''!    	
+	@Author: wpx
+	@File Name: press_work_integrator.py
+	@Mail: wpx15673207315@gmail.com 
+	@Created Time: Thu 15 Aug 2024 12:08:28 PM CST
+	@bref 
+	@ref 
+'''  
+from typing import Optional
 
-class PressWorkIntegrator:
-    def __init__(self, q=None):
-        self.q = q 
-
-    def assembly_cell_matrix(self, trialspace, testspace, index=np.s_[:], cellmeasure=None, out=None):
-        """
-        construct the (pI, nabla v) fem matrix
-        """ 
-        mesh = trialspace[0].mesh
-        
-        trial_space = trialspace[0]
-        test_space = testspace[0]
-        
-        trial_D = len(trialspace)
-        test_D = len(testspace)
-    
-        trial_ldof = trial_space.number_of_local_dofs()
-        test_ldof = test_space.number_of_local_dofs()
-        trial_gdof = trial_space.number_of_global_dofs()
-        test_gdof = test_space.number_of_global_dofs()
-        trial_cell2dof = trial_space.cell_to_dof() 
-        test_cell2dof = test_space.cell_to_dof() 
-        
-        p = trial_space.p
-        q = self.q if self.q is not None else p+1
+from ..mesh import HomogeneousMesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import bilinear_integral
+from .integrator import LinearInt, OpInt, CellInt, CoefLike, enable_cache
+from ..typing import TensorLike, Index, _S
+from ..backend import backend_manager as bm
 
 
-        if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell', index=index)
+'''
+(pI, \nabla v)
+'''
+class PressWorkIntegrator(LinearInt, OpInt, CellInt):
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+                 index: Index=_S,
+                 batched: bool=False) -> None:
+        super().__init__()
+        self.coef = coef
+        self.q = q
+        self.index = index
+        self.batched = batched
 
-        qf =  mesh.integrator(q, 'cell')
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> TensorLike:
+        return space.cell_to_dof()[self.index]
+
+    @enable_cache
+    def fetch(self, space: _FS):
+        space0 = space[0]
+        space1 = space[1]
+        scalar_space = space[1].scalar_space
+         
+        index = self.index
+        mesh = getattr(space[0], 'mesh', None)
+
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The PressWorkIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        test_gradphi = test_space.grad_basis(bcs, index=index) # (NQ, NC, ldof, GD)
-        trial_phi = trial_space.basis(bcs, index=index) # (NQ, NC, ldof)
 
-        NC = len(cellmeasure)
-        if out is None:
-            K = np.zeros((NC, test_ldof*test_D, trial_D*trial_ldof), dtype=np.float64)
-        else:
-            assert out.shape == (NC, test_ldof*test_D, trial_D*trial_ldof)
-            K = out
-        if trial_space.doforder == 'sdofs': # 标量自由度优先排序 
-            for i in range(test_D):
-                for j in range(trial_D):
-                    val = np.einsum('i, ijm, ijn, j->jnm', ws, trial_phi, test_gradphi[..., i], cellmeasure, optimize=True)
-                    K[:, i*test_ldof:(i+1)*test_ldof, j*trial_ldof:(j+1)*trial_ldof] =val 
-                        
-        elif trial_space.doforder == 'vdims':
-            for i in range(test_D):
-                for j in range(trial_D):
-                    val = np.einsum('i, ijm, ijn, j->jnm', ws, trial_phi, test_gradphi[..., i], cellmeasure, optimize=True)
-                    K[:, i::test_D, j::trial_D] += val 
-        if out is None:
-            return K
+        phi = space0.basis(bcs, index=index)
+        gphi = space1.grad_basis(bcs ,index=index)
+        return phi, gphi, cm, bcs, ws, index
+
+    def assembly(self, space: _FS) -> TensorLike:
+        assert space[0].mesh == space[1].mesh, "The mesh should be same for two space " 
+        coef = self.coef
+        mesh = getattr(space[0], 'mesh', None)
+        phi, gphi, cm, bcs, ws, index = self.fetch(space)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        gphi = bm.einsum('...ii->...', gphi)
+        result = bilinear_integral(gphi, phi, ws, cm, val, batched=self.batched)
+        return result
 
 
-    def assembly_cell_matrix_fast(self, space, index=np.s_[:], cellmeasure=None):
-        pass
+class PressWorkIntegrator0(LinearInt, OpInt, CellInt):
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+                 index: Index=_S,
+                 batched: bool=False) -> None:
+        super().__init__()
+        self.coef = coef
+        self.q = q
+        self.index = index
+        self.batched = batched
+
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> TensorLike:
+        return space.cell_to_dof()[self.index]
+
+    @enable_cache
+    def fetch(self, space: _FS):
+        space0 = space[0]
+        space1 = space[1]
+        index = self.index
+        mesh = getattr(space[0], 'mesh', None)
+
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The PressWorkIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = space0.basis(bcs, index=index)
+        gphi = space1.grad_basis(bcs, index=index)
+        return phi, gphi, cm, bcs, ws, index
+
+    def assembly(self, space: _FS) -> TensorLike:
+        assert space[0].mesh == space[1].mesh, "The mesh should be same for two space " 
+        coef = self.coef
+        mesh = getattr(space[0], 'mesh', None)
+        phi_0, gphi_1, cm, bcs, ws, index = self.fetch(space) 
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        result = bilinear_integral(gphi_1[...,0], phi_0, ws, cm, val, batched=self.batched)
+        return result
 
 
-    def assembly_cell_matrix_ref(self, space, index=np.s_[:], cellmeasure=None):
-        pass
+class PressWorkIntegrator1(LinearInt, OpInt, CellInt):
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+                 index: Index=_S,
+                 batched: bool=False) -> None:
+        super().__init__()
+        self.coef = coef
+        self.q = q
+        self.index = index
+        self.batched = batched
+
+    @enable_cache
+    def to_global_dof(self, space: _FS) -> TensorLike:
+        return space.cell_to_dof()[self.index]
+
+    @enable_cache
+    def fetch(self, space: _FS):
+        space0 = space[0]
+        space1 = space[1]
+        index = self.index
+        mesh = getattr(space[0], 'mesh', None)
+
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The PressWorkIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        phi = space0.basis(bcs, index=index)
+        gphi = space1.grad_basis(bcs, index=index)
+        return phi, gphi, cm, bcs, ws, index
+
+    def assembly(self, space: _FS) -> TensorLike:
+        assert space[0].mesh == space[1].mesh, "The mesh should be same for two space " 
+        coef = self.coef
+        mesh = getattr(space[0], 'mesh', None)
+        phi_0, gphi_1, cm, bcs, ws, index = self.fetch(space) 
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        result = bilinear_integral(gphi_1[...,1], phi_0, ws, cm, val, batched=self.batched)
+        return result

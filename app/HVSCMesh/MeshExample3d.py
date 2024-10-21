@@ -2,7 +2,7 @@ import numpy as np
 import gmsh
 import os
 import sys
-from fealpy.experimental.mesh import TetrahedronMesh
+from fealpy.mesh import TetrahedronMesh
 
 def to_TetrahedronMesh():
     ntags, vxyz, _ = gmsh.model.mesh.getNodes()

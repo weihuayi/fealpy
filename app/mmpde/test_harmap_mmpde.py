@@ -1,12 +1,12 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from app.mmpde.harmap_mmpde import Harmap_MMPDE
-from fealpy.experimental.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh as TM
 from app.mmpde.harmap_mmpde_data import *
 from sympy import *
-from fealpy.experimental.functionspace import LagrangeFESpace
-from fealpy.experimental.fem import (BilinearForm 
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (BilinearForm 
                                      ,ScalarDiffusionIntegrator
                                      ,LinearForm
                                      ,ScalarSourceIntegrator
