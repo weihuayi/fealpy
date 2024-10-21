@@ -7,9 +7,6 @@
 	@bref 
 	@ref 
 '''  
-#from fealpy import logger
-#logger.setLevel('ERROR')
-
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
@@ -26,16 +23,13 @@ from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import LinearBlockForm, BlockForm
 from fealpy.solver import spsolve 
 
-from fealpy.functionspace import Function 
-
-
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.decorator import barycentric, cartesian
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.fem import DirichletBC
 
+from fealpy import logger
 #TODO:mesh.nodedata对tensorspace的情况
-#TODO:boundary_interpolate的不同情况
 
 backend = 'pytorch'
 #backend = 'numpy'
@@ -54,7 +48,7 @@ pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh(0.05, device = device)
+mesh = pde.mesh(0.01, device = device)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
@@ -91,10 +85,7 @@ SourceIntegrator = ScalarSourceIntegrator(q = q)
 ulform.add_integrator(SourceIntegrator)
 plform = LinearForm(pspace)
 
-## b
-#u_dirichlet,is_u_boundary = uspace.boundary_interpolate(pde.u_dirichlet, threshold = pde.is_u_boundary, method='interp')
-#p_dirichlet,is_p_boundary = pspace.boundary_interpolate(pde.p_dirichlet, threshold = pde.is_p_boundary, method='interp')
-
+print(f"总共自由度为:{gdof}")
 for i in range(10):
     t1 = timeline.next_time_level()
     print("time=", t1)
@@ -109,19 +100,9 @@ for i in range(10):
     SourceIntegrator.clear() 
     b = LinearBlockForm([ulform, plform]).assembly()
     
-    A,b = DirichletBC((uspace,pspace), gD=(pde.u_dirichlet, pde.p_dirichlet), 
+    A,b = DirichletBC((uspace,pspace), gd=(pde.u_dirichlet, pde.p_dirichlet), 
                       threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
 
-    #A,b = DirichletBC((uspace,pspace), (u_dirichlet, bm.zeros(pgdof)), 
-    #                  threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
-    #A,b = DirichletBC((uspace,pspace), (u_dirichlet, pde.p_dirichlet), 
-    #                  threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
-    #A,b = DirichletBC((uspace,pspace), bm.concatenate((u_dirichlet[:], bm.zeros(pgdof))), 
-    #                  threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp').apply(A, b)
-    #A,b = DirichletBC((uspace,pspace), gD=(pde.u_dirichlet, pde.p_dirichlet), 
-    #                  threshold=(is_u_boundary, is_p_boundary), method='interp').apply(A, b)
-    #A,b = DirichletBC((uspace,pspace), bm.concatenate((u_dirichlet[:], bm.zeros(pgdof))), 
-    #                  threshold=bm.concatenate((is_u_boundary, is_p_boundary)), method='interp').apply(A, b)
     
     x = spsolve(A, b, 'mumps')
     
