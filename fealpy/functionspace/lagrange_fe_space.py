@@ -91,7 +91,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def boundary_interpolate(self,
             gD: Union[Callable, int, float, TensorLike],
             uh: Optional[TensorLike] = None,
-            threshold: Optional[Threshold]=None, method=None) -> TensorLike:
+            *, threshold: Optional[Threshold]=None, method=None) -> TensorLike:
         """Set the first type (Dirichlet) boundary conditions.
 
         Parameters:
@@ -118,6 +118,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         if uh is None:
             uh = self.function()
         uh[:] = bm.set_at(uh[:], (..., isDDof), gD)
+        
         return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate
