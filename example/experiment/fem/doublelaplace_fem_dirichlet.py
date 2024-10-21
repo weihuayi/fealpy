@@ -62,12 +62,6 @@ next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
-<<<<<<< HEAD
-pde = DoubleLaplacePDE(u) 
-ulist = get_flist(u)[:3]
-mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
-NDof = bm.zeros(maxit, dtype=bm.float64)
-=======
 pde = DoubleLaplacePDE(u, device=device) 
 ulist = get_flist(u, device=device)[:3]
 mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
@@ -76,7 +70,6 @@ ikwargs = bm.context(mesh.cell)
 fkwargs = bm.context(mesh.node)
 
 NDof = bm.zeros(maxit, **ikwargs)
->>>>>>> upstream/master
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',

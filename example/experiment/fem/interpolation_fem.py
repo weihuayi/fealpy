@@ -50,8 +50,9 @@ maxit = args.maxit
 device = args.device
 import torch 
 torch.set_printoptions(precision=10)
-bm.set_default_device(device)
->>>>>>> upstream/master
+if args.backend=="pytorch": 
+    bm.set_default_device(device)
+
 x = sp.symbols('x')
 y = sp.symbols('y')
 z = sp.symbols('z')
@@ -74,14 +75,8 @@ for i in range(maxit):
     for n in bm.array([[0,0,0],[1,0,0],[0,1,0],[1,1,0],[1,1,1],[0,0,1],[1,0,1],[0,1,1]], dtype=bm.float64):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
     #mesh.node = node/2
-    import ipdb
-<<<<<<< HEAD
-=======
-    ipdb.set_trace()
->>>>>>> upstream/master
     space = CmConformingFESpace3d(mesh, p=p, m=m, isCornerNode=isCornerNode)
     tmr.send(f'第{i}次空间生成时间')
-    ipdb.set_trace()
     fI = space.interpolation(flist)
     tmr.send(f'第{i}次插值时间')
 
