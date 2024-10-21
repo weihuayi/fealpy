@@ -42,19 +42,20 @@ parser.add_argument('--backend',
         default='pytorch', type=str,
         help='默认后端为numpy')
 
-parser.add_argument('--meshtype',
-        default='tri', type=str,
-        help='默认网格为三角形网格')
+parser.add_argument('--device',
+        default='cuda', type=str,
+        help='默认gpu计算')
 
 args = parser.parse_args()
 
 
 bm.set_backend(args.backend)
-device = "cuda"
+#device = "cuda"
 p = args.degree
 n = args.n
 meshtype = args.meshtype
 maxit = args.maxit
+device = args.device
 
 tmr = timer()
 next(tmr)

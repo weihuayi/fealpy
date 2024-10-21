@@ -33,18 +33,26 @@ parser.add_argument('--backend',
         default='pytorch', type=str,
         help='默认后端为numpy')
 
+parser.add_argument('--device',
+        default='cuda', type=str,
+        help='默认gpu上运行')
+
+
 args = parser.parse_args()
 tmr = timer()
 next(tmr)
 bm.set_backend(args.backend)
-device = "cuda"
+#device = "cuda"
 p = args.degree
 m = args.m
 n = args.n
 maxit = args.maxit
+device = args.device
 import torch 
 torch.set_printoptions(precision=10)
-bm.set_default_device("cuda")
+if args.backend=="pytorch": 
+    bm.set_default_device(device)
+
 x = sp.symbols('x')
 y = sp.symbols('y')
 z = sp.symbols('z')
@@ -67,8 +75,6 @@ for i in range(maxit):
     for n in bm.array([[0,0,0],[1,0,0],[0,1,0],[1,1,0],[1,1,1],[0,0,1],[1,0,1],[0,1,1]], dtype=bm.float64):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
     #mesh.node = node/2
-    import ipdb
-    ipdb.set_trace()
     space = CmConformingFESpace3d(mesh, p=p, m=m, isCornerNode=isCornerNode)
     tmr.send(f'第{i}次空间生成时间')
     fI = space.interpolation(flist)
@@ -86,15 +92,12 @@ for i in range(maxit):
         return fI.grad_m_value(p, 3)
 
     errorMatrix[0, i] = mesh.error(flist[0], fI, q=p+3)
-    import ipdb
-    ipdb.set_trace()
     errorMatrix[1, i] = mesh.error(flist[1], ug1val, q=p+3)
     #errorMatrix[2, i] = mesh.error(flist[2], ug2val, q=p+3)
     #errorMatrix[3, i] = mesh.error(flist[3], ug3val, q=p+3)
     print(errorMatrix)
 
 
-next(tmr)
 
 
 next(tmr)
