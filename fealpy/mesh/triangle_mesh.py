@@ -61,7 +61,14 @@ class TriangleMesh(SimplexMesh, Plotable):
             return bm.edge_length(edge, node)
         elif etype == 2:
             cell = self.entity(2, index)
-            return bm.simplex_measure(cell, node)
+            if self.geo_dimension()==2:
+                return bm.simplex_measure(cell, node)
+            else: 
+                v0 = node[cell[:, 1], :] - node[cell[:, 0], :]
+                v1 = node[cell[:, 2], :] - node[cell[:, 0], :]
+
+                nv = bm.cross(v0, v1)
+                return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
   

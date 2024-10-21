@@ -64,10 +64,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             node, _ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=True)
+        lmesh.tmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
         lmesh.cell2edge = mesh.cell_to_edge()
-        #lmesh.edge  = mesh.edge_to_ipoint(p)
+        lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh 
 
     # quadrature
