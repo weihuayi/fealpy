@@ -63,8 +63,8 @@ p = mdegree
 surface = SphereSurface()
 tmesh = TriangleMesh.from_unit_sphere_surface()
 mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
-#fname = f"sphere_test.vtu"
-#mesh.to_vtk(fname=fname)
+fname = f"sphere_test.vtu"
+mesh.to_vtk(fname=fname)
 
 space = ParametricLagrangeFESpace(mesh, p=sdegree)
 #tmr.send(f'第{i}次空间时间')
