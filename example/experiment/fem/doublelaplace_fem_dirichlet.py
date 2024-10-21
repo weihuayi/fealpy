@@ -38,22 +38,23 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
+        default='pytorch', type=str,
         help='默认后端为numpy')
 
-parser.add_argument('--meshtype',
-        default='tri', type=str,
-        help='默认网格为三角形网格')
+parser.add_argument('--device',
+        default='cuda', type=str,
+        help='默认gpu计算')
 
 args = parser.parse_args()
 
 
 bm.set_backend(args.backend)
-decive = "cuda"
+#device = "cuda"
 p = args.degree
 n = args.n
 meshtype = args.meshtype
 maxit = args.maxit
+device = args.device
 
 tmr = timer()
 next(tmr)
@@ -62,7 +63,7 @@ y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u) 
 ulist = get_flist(u)[:3]
-mesh = TriangleMesh.from_box([0,1,0,1], n, n)
+mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
 NDof = bm.zeros(maxit, dtype=bm.float64)
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
