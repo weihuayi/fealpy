@@ -21,8 +21,6 @@ def opt_alg_options(
     LineSearch: Optional[LineSearch] = None,  # 默认值为 None,
     Print: bool = True,
 ):
-    if LineSearch is None:
-        LineSearch = PowellLineSearch()  # 默认使用 Powell 线搜索
     
     options = {
             "x0": x0,

@@ -20,12 +20,13 @@ Number = Union[int, float]
 _S = slice(None)
 
 class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh:_MT, p: int, m: int, isCornerNode:bool):
+    def __init__(self, mesh:_MT, p: int, m: int, isCornerNode:bool): 
         assert(p>8*m)
         self.mesh = mesh
         self.p = p
         self.m = m
         self.bspace = BernsteinFESpace(mesh, p)
+        self.device = mesh.device
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
@@ -324,6 +325,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
             ncell, nu = bm.where(c2f==f)
             #print(ncell,nu)
             isbdmul = multiIndex[:, int(nu)]<=m 
+
             bdmul = multiIndex[isbdmul]
             #print(bdmul.shape)
             idx = l(bdmul)
@@ -401,7 +403,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         NE = mesh.number_of_edges()
         edge_frame = bm.zeros((NE, 3, 3), dtype=self.ftype)
         edge_frame[:, 0] = et
-        edge_frame[f2e, 2] = fn[:, None] 
+        for i in range(len(f2e)):
+            edge_frame[f2e[i], 2] = fn[i][None,:]
+        #edge_frame[f2e, 2] = fn[:, None] 
 
         # face frame
         NF = mesh.number_of_faces()
@@ -416,7 +420,12 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         node_frame[face[isBdFace]] = face_frame[isBdFace, None]
 
         # edge frame at boundary
-        edge_frame[f2e[isBdFace], 2] = fn[isBdFace, None]
+        import ipdb
+        ipdb.set_trace()
+        for i in range(len(f2e[isBdFace])):
+            edge_frame[f2e[isBdFace][i], 2] = fn[isBdFace][i][None,:]
+
+        #edge_frame[f2e[isBdFace], 2] = fn[isBdFace, None]
         edge_frame[:, 1] = bm.cross(edge_frame[:, 2], edge_frame[:, 0])
 
         # corner node frame
@@ -474,7 +483,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     sign = (-1)**(gamma[v]-(p-r)) #\alpha_v = p-r
                     I = dof2num[i]
                     J = dof2num[j]
+                    alpha = bm.to_numpy(alpha)
+                    flag = bm.to_numpy(flag)
+                    gamma = bm.to_numpy(gamma)
+
                     coeff[:, I, J] = sign * factorial(r)*comb(p,r) * bm.prod(bm.array(comb(alpha, gamma[flag])))
+                    alpha = bm.array(alpha)
+                    flag = bm.array(flag)
+                    gamma = bm.array(gamma)
                     
         # edge
         glambda = mesh.grad_lambda() # (NC, 4, 3)
@@ -509,7 +525,12 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     if bm.any(alpha_kl-gamma_kl<0)|bm.any(gamma_ij-alpha_ij<0):
                         continue
                     c = factorial(r)*comb(p, r)
+                    alpha_kl = bm.to_numpy(alpha_kl)
+                    gamma_kl = bm.to_numpy(gamma_kl)
                     c *= bm.prod(bm.array(comb(alpha_kl, gamma_kl)))
+                    alpha_kl = bm.array(alpha_kl)
+                    gamma_kl = bm.array(gamma_kl)
+
                     I = dof2num[i]
                     J = dof2num[j]
                     coeff[:, I, J] = 0 #这个为什么
@@ -517,7 +538,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     for sig in sigmas:
                         if bm.any(alpha_kl-sig-gamma_kl<0):
                             continue
+                        alpha_kl = bm.to_numpy(alpha_kl)
+                        gamma_kl = bm.to_numpy(gamma_kl)
+                        sig = bm.to_numpy(sig)
+
                         cc = c*bm.prod(bm.array(comb(alpha_kl-gamma_kl, sig)))
+                        alpha_kl = bm.array(alpha_kl)
+                        gamma_kl = bm.array(gamma_kl)
+                        sig = bm.array(sig)
                         coeff[:, I, J] += cc*bm.prod(Eij**bm.concatenate([sig, alpha_kl-gamma_kl-sig]), axis=1)
         # face
         fn = mesh.face_unit_normal()
@@ -544,7 +572,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     beta[f] += r
                     if bm.any(beta<0):
                         continue
+                    beta = bm.to_numpy(beta)
                     c = factorial(r)**2*comb(p, r)/bm.prod(bm.array(factorial(beta)))
+                    beta = bm.array(beta)
                     #flag = beta>0
                     val = c*bm.prod(Fki**beta, axis=1)
                     I = dof2num[i]

@@ -59,9 +59,9 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def edge_to_dof(self, index=_S):
         return self.dof.edge_to_dof()[index]
 
-    def is_boundary_dof(self, threshold=None) -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
-            return self.dof.is_boundary_dof(threshold)
+            return self.dof.is_boundary_dof(threshold, method=method)
         else:
             raise RuntimeError("boundary dof is not supported by discontinuous spaces.")
 
@@ -91,7 +91,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def boundary_interpolate(self,
             gD: Union[Callable, int, float, TensorLike],
             uh: Optional[TensorLike] = None,
-            threshold: Optional[Threshold]=None) -> TensorLike:
+            *, threshold: Optional[Threshold]=None, method=None) -> TensorLike:
         """Set the first type (Dirichlet) boundary conditions.
 
         Parameters:
@@ -106,13 +106,19 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         different types for the boundary condition `gD`, such as a function, a scalar, or a array.
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-        isDDof = self.is_boundary_dof(threshold=threshold)
-
+        isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
+        if bm.is_tensor(gD):
+            assert len(gD) == self.number_of_global_dofs()
+            if uh is None:
+                uh = bm.zeros_like(gD)
+            uh[isDDof] = gD[isDDof] 
+            return uh,isDDof 
         if callable(gD):
             gD = gD(ipoints[isDDof])
         if uh is None:
-            uh = bm.zeros_like(isDDof)
-        uh = bm.set_at(uh, (..., isDDof), gD)
+            uh = self.function()
+        uh[:] = bm.set_at(uh[:], (..., isDDof), gD)
+        
         return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate

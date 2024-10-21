@@ -220,6 +220,8 @@ class TestQuadrangleMeshInterfaces:
         domain_line = bm.from_numpy(meshdata['domain_line'])
         domain_half_edge = bm.from_numpy(meshdata['domain_half_edge'])
         mesh = QuadrangleMesh.sub_domain_mesh_generator(domain_half_edge, domain_node, domain_line)
+        cell_domain_tag = mesh.celldata['cell_domain_tag']
+        print(cell_domain_tag)
 
     @pytest.mark.parametrize("backend", ['numpy'])
     @pytest.mark.parametrize("meshdata", mesh_from_sub_domain_data)
