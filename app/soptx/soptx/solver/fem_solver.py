@@ -1,32 +1,23 @@
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
-from fealpy.experimental.typing import TensorLike
+from fealpy.typing import TensorLike
 
-from fealpy.experimental.fem.linear_elastic_integrator import LinearElasticIntegrator
-from fealpy.experimental.fem.bilinear_form import BilinearForm
-from fealpy.experimental.fem import DirichletBC as DBC
-from fealpy.experimental.sparse import COOTensor
+from fealpy.functionspace import TensorFunctionSpace
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem import DirichletBC
 
-from fealpy.experimental.solver import cg
+from fealpy.sparse import CSRTensor
 
-from scipy.sparse.linalg import spsolve, cg
-from scipy.sparse import csr_matrix
+from fealpy.solver import cg, spsolve
 
-from app.soptx.soptx.utilfs.timer import timer
+from app.soptx.soptx.utils.timer import timer
 
 
 class FEMSolver:
-    def __init__(self, material_properties, tensor_space, pde):
+    def __init__(self, material_properties, tensor_space: TensorFunctionSpace, pde):
         """
         Initialize the FEMSolver with the provided parameters.
-
-        Args:
-            material_properties: MaterialProperties object defining material behavior.
-            tensor_space: TensorFunctionSpace object for the computational space.
-            pde: PDEData object defining boundary conditions and forces.
-            solver_method (str): The method used to solve the system 
-                (e.g., 'mumps' for direct or 'cg' for iterative).
-
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
@@ -38,10 +29,10 @@ class FEMSolver:
         """
         integrator = LinearElasticIntegrator(material=self.material_properties, 
                                             q=self.tensor_space.p+3)
-        KE = integrator.assembly(space=self.tensor_space)
+        # KE = integrator.assembly(space=self.tensor_space)
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
-        K = bform.assembly()
+        K = bform.assembly(format='csr')
 
         return K
     
@@ -54,60 +45,31 @@ class FEMSolver:
 
         return F
 
-    def apply_boundary_conditions(self, K: TensorLike, F: TensorLike) -> TensorLike:
+    def apply_boundary_conditions(self, K: CSRTensor, F: TensorLike) -> TensorLike:
         """
         Apply boundary conditions to the stiffness matrix and force vector.
         """
-        # force = self.pde.force
         dirichlet = self.pde.dirichlet
-        is_dirichlet_boundary_face = getattr(self.pde, 'is_dirichlet_boundary_face', None)
-        is_dirichlet_boundary_edge = getattr(self.pde, 'is_dirichlet_boundary_edge', None)
-        is_dirichlet_boundary_node = getattr(self.pde, 'is_dirichlet_boundary_node', None)
-        is_dirichlet_boundary_dof = getattr(self.pde, 'is_dirichlet_boundary_dof', None)
-        
-        # K = self.assemble_stiffness_matrix()
-        # F = self.tensor_space.interpolate(force)
+        is_dirichlet_boundary_dof_x = self.pde.is_dirichlet_boundary_dof_x
+        is_dirichlet_boundary_dof_y = self.pde.is_dirichlet_boundary_dof_y
 
-        uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), dtype=bm.float64)
-
-        thresholds = []
-        if is_dirichlet_boundary_face is not None:
-            thresholds.append(is_dirichlet_boundary_face)
-        if is_dirichlet_boundary_edge is not None:
-            thresholds.append(is_dirichlet_boundary_edge)
-        if is_dirichlet_boundary_node is not None:
-            thresholds.append(is_dirichlet_boundary_node)
-        if is_dirichlet_boundary_dof is not None:
-            thresholds.append(is_dirichlet_boundary_dof)
-
-        if thresholds:
-            uh_bd, isDDof = self.tensor_space.boundary_interpolate(gD=dirichlet, 
-                                                                uh=uh_bd, 
-                                                                threshold=tuple(thresholds))
+        uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), 
+                        dtype=bm.float64, device=bm.get_device(self.tensor_space))
+        isBdDof = self.tensor_space.is_boundary_dof(
+                            threshold=(is_dirichlet_boundary_dof_x, is_dirichlet_boundary_dof_y), 
+                            method='interp')
 
         F = F - K.matmul(uh_bd)
-        F[isDDof] = uh_bd[isDDof]
+        F[isBdDof] = uh_bd[isBdDof]
 
-        indices = K.indices()
-        new_values = bm.copy(K.values())
-        IDX = isDDof[indices[0, :]] | isDDof[indices[1, :]]
-        new_values[IDX] = 0
-
-        K = COOTensor(indices, new_values, K.sparse_shape)
-        index, = bm.nonzero(isDDof)
-        one_values = bm.ones(len(index), **K.values_context())
-        one_indices = bm.stack([index, index], axis=0)
-        K1 = COOTensor(one_indices, one_values, K.sparse_shape)
-        K = K.add(K1).coalesce()
+        dbc = DirichletBC(space=self.tensor_space)
+        K = dbc.apply_matrix(matrix=K, check=True)
 
         return K, F
 
     def solve(self, solver_method) -> TensorLike:
         """
         Solve the displacement field.
-
-        Returns:
-            TensorLike: The displacement vector.
         """
 
         # tmr = timer("FEM Solver")
@@ -115,43 +77,25 @@ class FEMSolver:
         tmr = None
 
         K0 = self.assemble_stiffness_matrix()
-
         if tmr:
             tmr.send('Assemble Stiffness Matrix')
 
         F0 = self.assemble_force_vector()
-        # if tmr:
-        #     tmr.send('Assemble Force Vector')
         
         K, F = self.apply_boundary_conditions(K=K0, F=F0)
         if tmr:
             tmr.send('Apply Boundary Conditions')
-
-        K = K.tocsr()
-        # if tmr:
-        #     tmr.send('Convert to CSR') 
         
         uh = self.tensor_space.function()
-        # if tmr:
-        #     tmr.send('Initialize Displacement Vector')
-        
+
         if solver_method == 'cg':
-            # K = K.to_scipy()
-            # uh_values, info = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-            # uh[:] = uh_values
             uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
             if tmr:
                 tmr.send('Solve System with CG')
-
-        elif solver_method == 'mumps':
-            raise NotImplementedError("Direct solver using MUMPS is not implemented.")
-        
         elif solver_method == 'spsolve':
-            K = K.to_scipy()
-            uh[:] = spsolve(K, F)
+            uh[:] = spsolve(K, F, solver='mumps')
             if tmr:
                 tmr.send('Solve System with spsolve')
-
         else:
             raise ValueError(f"Unsupported solver method: {solver_method}")
         

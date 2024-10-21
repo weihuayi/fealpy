@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.experimental.mesh.tetrahedron_mesh import TetrahedronMesh
-from fealpy.experimental.mesh.mesh_quality import RadiusRatioQuality
+from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
+from fealpy.mesh.mesh_quality import RadiusRatioQuality
 
 import MeshExample3d
 from optimizer import *

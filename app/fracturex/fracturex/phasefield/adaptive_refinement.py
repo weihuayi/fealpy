@@ -1,6 +1,6 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.fem.recovery_alg import RecoveryAlg
-from fealpy.experimental.mesh.mesh_base import Mesh
+from fealpy.backend import backend_manager as bm
+from fealpy.fem.recovery_alg import RecoveryAlg
+from fealpy.mesh.mesh_base import Mesh
 
 
 class AdaptiveRefinement:
@@ -102,6 +102,7 @@ class AdaptiveRefinement:
         mesh = self.mesh
         GD = mesh.geo_dimension()
         
+
         cm = mesh.entity_measure('cell')
         if GD == 3:
             hmin = self.l0**3/200

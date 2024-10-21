@@ -1,8 +1,8 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.typing import TensorLike, Tuple
-from fealpy.experimental.sparse import COOTensor
-from fealpy.experimental.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.experimental.mesh.uniform_mesh_3d import UniformMesh3d
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Tuple
+from fealpy.sparse import COOTensor
+from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
+from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
 
 from math import ceil, sqrt
 
@@ -10,11 +10,6 @@ class FilterProperties:
     def __init__(self, mesh, rmin: float, ft: int):
         """
         Initialize the filter properties based on the mesh.
-
-        Args:
-            mesh: The mesh object which contains information about the grid.
-            rmin (float): The filter radius, which controls the minimum feature size.
-            ft (int): The filter type, 0 for sensitivity filter, 1 for density filter.
         """
         self.ft = ft
 

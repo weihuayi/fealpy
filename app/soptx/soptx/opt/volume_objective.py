@@ -1,28 +1,24 @@
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.backend import TensorLike as _DT
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike as _DT
 
-from fealpy.experimental.typing import Union
+from fealpy.typing import Union
 
-from fealpy.experimental.opt.objective import Constraint
-from fealpy.experimental.mesh.mesh_base import Mesh
+from fealpy.opt.objective import Constraint
+from fealpy.mesh.mesh_base import Mesh
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 
 
 class VolumeConstraint(Constraint):
-    def __init__(self, 
-                 mesh: Mesh,
-                 volfrac: float,
-                 filter_type: Union[int, str],
-                 filter_rmin: float) -> None:
+    def __init__(
+        self, 
+        mesh: Mesh,
+        volfrac: float,
+        filter_type: Union[int, str, None] = None,
+        filter_rmin: Union[float, None] = None
+    ) -> None:
         """
         Initialize the volume constraint for topology optimization.
-
-        Parameters:
-            mesh (Mesh): The mesh object containing information about the finite element mesh.
-            volfrac (float): The desired volume fraction of the structure.
-            filter_type (Union[int, str]): The filter type, either 'density', 'sensitivity', 0, or 1.
-            filter_rmin (float): The filter radius, which controls the minimum feature size.
         """
         self.mesh = mesh
         self.volfrac = volfrac
@@ -31,76 +27,77 @@ class VolumeConstraint(Constraint):
 
         super().__init__(self.fun, self.jac, type='ineq')
 
-    def _create_filter_properties(self, filter_type: Union[int, str], filter_rmin: float) -> FilterProperties:
+    def _create_filter_properties(
+        self, 
+        filter_type: Union[int, str, None], 
+        filter_rmin: Union[float, None]
+    ) -> Union[FilterProperties, None]:
         """
         Create a FilterProperties instance based on the given filter type and radius.
-
-        Args:
-            filter_type (Union[int, str]): Type of the filter (either 'density', 'sensitivity', 0, or 1).
-            filter_rmin (float): Filter radius.
-
-        Returns:
-            FilterProperties: An instance of FilterProperties.
         """
-        if filter_type == 'density' or filter_type == 0:
-            ft = 0
-        elif filter_type == 'sensitivity' or filter_type == 1:
-            ft = 1
+        if filter_type is None:
+            if filter_rmin is not None:
+                raise ValueError("When `filter_type` is None, `filter_rmin` must also be None.")
+            return None
+        
+        filter_type_mapping = {
+        'sens': 0,
+        'dens': 1,
+        'heaviside': 2,
+        }
+
+        if isinstance(filter_type, int):
+            ft = filter_type
+        elif isinstance(filter_type, str):
+            ft = filter_type_mapping.get(filter_type.lower())
+            if ft is None:
+                raise ValueError(
+                    f"Invalid `filter type` '{filter_type}'. "
+                    f"Please use one of {list(filter_type_mapping.keys())} or add it to the `filter_type_mapping`."
+                )
         else:
-            raise ValueError("Invalid filter type. Use 'density', 'sensitivity', 0, or 1.")
+            raise TypeError("`filter_type` must be an integer, string, or None.")
+        
+        if filter_rmin is None:
+            raise ValueError("`filter_rmin` cannot be None when `filter_type` is specified.")
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 
     def fun(self, rho: _DT) -> float:
         """
         Compute the volume constraint function.
-
-        This function calculates the total volume of the material distribution 
-        in the design domain and subtracts the desired volume fraction. The 
-        result indicates whether the current design violates the volume constraint.
-
-        Parameters:
-            rho (_DT): Design variable (density distribution), representing the 
-                material distribution in the design domain.
-        
-        Returns:
-            float: The volume constraint value, where a positive value indicates 
-                a feasible design, and a negative value indicates a violation of 
-                the volume constraint.
         """
-
         NC = self.mesh.number_of_cells()
         cell_measure = self.mesh.entity_measure('cell')
 
         volfrac_true = bm.einsum('c, c -> ', cell_measure, rho[:]) / bm.sum(cell_measure)
         gneq = (volfrac_true - self.volfrac) * NC
-        # gneq = bm.sum(rho_phys[:]) - self.volfrac * NC
+        # gneq = bm.sum(rho[:]) - self.volfrac * NC
         
         return gneq
 
-    def jac(self, rho: _DT) -> _DT:
+    def jac(self, rho: _DT, beta: float = None, rho_tilde: _DT = None) -> _DT:
         """
         Compute the gradient of the volume constraint function.
-
-        This function returns the gradient of the volume constraint with respect 
-        to the design variables. The gradient is typically used in the optimization 
-        process to update the design variables while satisfying the volume constraint.
-
-        Returns:
-            _DT: The gradient of the volume constraint, representing the sensitivity 
-                of the constraint to changes in the design variables.
         """
+        cell_measure = self.mesh.entity_measure('cell')
+        dge = bm.copy(cell_measure)
+
+        if self.filter_properties is None:
+            return dge
+        
         H = self.filter_properties.H
-        Hs = self.filter_properties.Hs
         ft = self.filter_properties.ft
 
-        cell_measure = self.mesh.entity_measure('cell')
-        dge = cell_measure.copy()
-
         if ft == 0:
-            # 先归一化再乘权重因子
+            # first normalize, then apply weight factor
             dge[:] = H.matmul(dge * cell_measure / H.matmul(cell_measure))
         elif ft == 1:
-            pass
+            print("Notice: Volume constraint sensitivity is not filtered when using sensitivity filter (ft == 1).")
+        elif ft == 2:
+            if beta is None or rho_tilde is None:
+                raise ValueError("Heaviside projection filter requires both beta and rho_tilde.")
+            dxe = beta * bm.exp(-beta * rho_tilde) + bm.exp(-beta)
+            dge[:] = H.matmul(dge * dxe * cell_measure / H.matmul(cell_measure))
 
         return dge

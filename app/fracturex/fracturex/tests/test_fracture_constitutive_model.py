@@ -1,9 +1,9 @@
 import ipdb
 
 import pytest
-from fealpy.experimental.backend import backend_manager as bm
-from fealpy.experimental.mesh import TriangleMesh
-from fealpy.experimental.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory

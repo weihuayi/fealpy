@@ -9,59 +9,36 @@ import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 
-from fealpy.experimental.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.experimental.functionspace import SecondNedelecFiniteElementSpace2d
-from fealpy.experimental.functionspace import SecondNedelecFiniteElementSpace3d
-from fealpy.experimental import logger
+from fealpy.mesh import TriangleMesh, TetrahedronMesh
+from fealpy.functionspace import SecondNedelecFiniteElementSpace2d
+from fealpy.functionspace import SecondNedelecFiniteElementSpace3d
+from fealpy import logger
 logger.setLevel('WARNING')
 
-from fealpy.experimental.backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 # 双线性型
-from fealpy.experimental.fem import BilinearForm
+from fealpy.fem import BilinearForm
 
 # 线性型
-from fealpy.experimental.fem import LinearForm
+from fealpy.fem import LinearForm
 
 # 积分子
-from fealpy.experimental.fem import VectorMassIntegrator
-from fealpy.experimental.fem import CurlIntegrator
-from fealpy.experimental.fem import VectorSourceIntegrator
-from fealpy.experimental.fem import DirichletBC
+from fealpy.fem import VectorMassIntegrator
+from fealpy.fem import CurlIntegrator
+from fealpy.fem import VectorSourceIntegrator
+from fealpy.fem import DirichletBC
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
-from fealpy.experimental.solver import cg
+from fealpy.solver import spsolve
 
-from fealpy.experimental.pde.maxwell_2d import SinData as PDE2d
-from fealpy.experimental.pde.maxwell_3d import BubbleData as PDE3d
+from fealpy.pde.maxwell_2d import SinData as PDE2d
+from fealpy.pde.maxwell_3d import BubbleData3d as PDE3d
 from fealpy.utils import timer
 
-
-def Solve(A, b):
-    
-    # from mumps import DMumpsContext
-    # from scipy.sparse.linalg import minres, gmres
-
-    A = coo_matrix((A.values(), (A.indices()[0], A.indices()[1])), shape=(gdof, gdof))
-    # NN = len(b)
-    # ctx = DMumpsContext()
-    # ctx.set_silent()
-    # ctx.set_centralized_sparse(A)
-
-    # x = np.array(b)
-
-    # ctx.set_rhs(x)
-    # ctx.run(job=6)
-    # ctx.destroy() # Cleanup
-    '''
-    #x, _ = minres(A, b, x0=b, tol=1e-10)
-    x, _ = gmres(A, b, tol=1e-10)
-    '''
-    x = spsolve(A,b)
-    return x
 
 # 参数解析
 parser = argparse.ArgumentParser(description=
@@ -87,10 +64,8 @@ parser.add_argument('--maxit',
 
 args = parser.parse_args()
 p = args.degree
-#maxit = args.maxit
-maxit = 3
-#dim = args.dim
-dim = 3
+maxit = args.maxit
+dim = args.dim
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -144,7 +119,7 @@ for j, p in enumerate(ps):
         tmr.send(f'第{i}次边界处理时间')
 
         #Eh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
-        Eh[:] = bm.tensor(Solve(A, F))
+        Eh[:] = spsolve(A,F,"scipy")
         tmr.send(f'第{i}次求解器时间')
 
         # 计算误差

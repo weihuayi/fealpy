@@ -1,106 +1,170 @@
 import numpy as np
-import ipdb
 import pytest
-import matplotlib.pyplot as plt
 
-from fealpy.mesh.polygon_mesh import PolygonMesh 
-from fealpy.mesh import TriangleMesh
-from fealpy.functionspace import ConformingScalarVESpace2d 
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh.polygon_mesh import PolygonMesh
+from fealpy.mesh.triangle_mesh import TriangleMesh
 
-def test_polygon_mesh_constructor():
-    node = np.array([
-        (0.0, 0.0), (0.0, 1.0), (0.0, 2.0), (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
-        (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float64)
-    cell = np.array([0, 3, 4, 4, 1, 0, 1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5],
-            dtype=np.int_)
-    cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int_)
-    mesh = PolygonMesh(node, cell, cellLocation)
+from mesh.polygon_mesh_data import *
 
-    fig, axes = plt.subplots()
-    mesh.add_plot(axes)
-    plt.show()
 
-def test_polygon_mesh_interpolation_points_4():
-    node = np.array([
-        (0.0, 0.0), (0.0, 1.0), (0.0, 2.0), (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
-        (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float64)
-    cell = np.array([0, 3, 4, 4, 1, 0, 1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5],
-            dtype=np.int_)
-    cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int_)
-    mesh = PolygonMesh(node, cell, cellLocation)
+class TestPolygonMeshInterfaces:
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
+    #@pytest.mark.parametrize("backend", ["numpy","pytorch"])
+    @pytest.mark.parametrize("meshdata", init_data)
+    def test_init(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell0 = bm.from_numpy(meshdata['cell'][0])
+        if meshdata['cell'][1] is None:
+            cell1 = None
+        else:
+            cell1 = bm.from_numpy(meshdata['cell'][1])
+        cell = (cell0, cell1)
+        mesh = PolygonMesh(node, cell)
+        assert mesh.number_of_nodes() == meshdata["NN"]
+        assert mesh.number_of_edges() == meshdata["NE"]
+        assert mesh.number_of_faces() == meshdata["NF"]
+        assert mesh.number_of_cells() == meshdata["NC"]
+        face2cell = mesh.face2cell
+        np.testing.assert_array_equal(face2cell, meshdata["face2cell"])
+    
+    @pytest.mark.parametrize("backend", ["numpy","pytorch","jax"])
+    #@pytest.mark.parametrize("backend", ["jax"])
+    @pytest.mark.parametrize("meshdata", entity_data)
+    def test_entity(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell0 = bm.from_numpy(meshdata['cell'][0])
+        q = meshdata['q']
+        if meshdata['cell'][1] is None:
+            cell1 = None
+        else:
+            cell1 = bm.from_numpy(meshdata['cell'][1])
+        cell = (cell0, cell1)
+        mesh = PolygonMesh(node, cell)
 
-    gdof = mesh.number_of_global_ipoints(p)
-    ips = mesh.interpolation_points(p)
+        assert mesh.entity_measure(0) == meshdata["entity_measure"][0]
+        np.testing.assert_allclose(bm.to_numpy(mesh.entity_measure(1)),
+                                   meshdata["entity_measure"][1],
+                                   atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(mesh.entity_measure(2)),
+                                   meshdata["entity_measure"][2],
+                                   atol=1e-7)
+        edge_barycenter = mesh.entity_barycenter('edge')
+        cell_barycenter = mesh.entity_barycenter('cell')
 
-    c2p = mesh.cell_to_ipoint(p)
-    result = [
-            np.array([ 0, 12, 13, 14,  3, 27, 28, 29,  4, 15, 16, 17, 48, 49, 50, 51, 52, 53]), 
-            np.array([ 4, 21, 22, 23,  1,  9, 10, 11,  0, 17, 16, 15, 54, 55, 56, 57, 58, 59]), 
-            np.array([ 1, 23, 22, 21,  4, 33, 34, 35,  5, 24, 25, 26,  2, 18, 19, 20, 60, 61, 62, 63, 64, 65]), 
-            array([ 3, 30, 31, 32,  6, 42, 43, 44,  7, 36, 37, 38,  4, 29, 28, 27, 66, 67, 68, 69, 70, 71]), 
-            array([ 4, 38, 37, 36,  7, 45, 46, 47,  8, 39, 40, 41,  5, 35, 34, 33, 72, 73, 74, 75, 76, 77])
-            ]
-    for a0, a1 in zip(c2p, result):
-        np.testing.assert_equal(a0, a1) 
+        np.testing.assert_allclose(bm.to_numpy(edge_barycenter), meshdata["edge_barycenter"], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(cell_barycenter), meshdata["cell_barycenter"], atol=1e-7)
+        boundary_node_index = mesh.boundary_node_index()
+        boundary_cell_index = mesh.boundary_cell_index()
+        boundary_face_index = mesh.boundary_face_index()
+        
+        np.testing.assert_array_equal(bm.to_numpy(boundary_node_index), meshdata["boundary_node_index"])
+        np.testing.assert_array_equal(bm.to_numpy(boundary_face_index),meshdata["boundary_face_index"])
+        np.testing.assert_array_equal(bm.to_numpy(boundary_cell_index), meshdata["boundary_cell_index"])
+        integrator = mesh.quadrature_formula(q)
+        bcs, ws = integrator.get_quadrature_points_and_weights()
+        np.testing.assert_allclose(bm.to_numpy(bcs[0]), meshdata["bcs"][0], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(bcs[1]), meshdata["bcs"][1], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(bcs[2]), meshdata["bcs"][2], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(ws), meshdata["weight"], atol=1e-7)
+        
+        edge_integrator = mesh.quadrature_formula(q, 'edge',qtype='lobatto')
+        edge_bcs, edge_ws = edge_integrator.get_quadrature_points_and_weights()
 
-    fig, axes = plt.subplots()
-    mesh.add_plot(axes)
-    mesh.find_node(axes, node=ips, showindex=True)
-    plt.show()
+        np.testing.assert_allclose(bm.to_numpy(bcs[0]), meshdata["bcs"][0], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(bcs[1]), meshdata["bcs"][1], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(bcs[2]), meshdata["bcs"][2], atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(edge_ws), meshdata["edge_weight"], atol=1e-7)
 
-@pytest.mark.parametrize('meshtype', ['equ', 'iso'])
-def test_from_one_triangle(meshtype): 
-    mesh = PolygonMesh.from_one_triangle(meshtype=meshtype)
-    fig, axes = plt.subplots()
-    mesh.add_plot(axes)
-    mesh.find_node(axes, showindex=True)
-    mesh.find_cell(axes, showindex=True)
-    mesh.find_edge(axes, showindex=True)
-    plt.show()
+    @pytest.mark.parametrize("backend", ["numpy","pytorch","jax"])
+    #@pytest.mark.parametrize("backend", ["numpy"])
+    @pytest.mark.parametrize("meshdata", extend_data)
+    def test_extend_data(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell0 = bm.from_numpy(meshdata['cell'][0])
+        p1 = meshdata['p1']
+        p2 = meshdata['p2']
+        if meshdata['cell'][1] is None:
+            cell1 = None
+        else:
+            cell1 = bm.from_numpy(meshdata['cell'][1])
+        cell = (cell0, cell1)
+        mesh = PolygonMesh(node, cell)
 
-def test_from_one():
-    #mesh = PolygonMesh.from_one_square()
-    #mesh = PolygonMesh.from_one_pentagon() 
-    #mesh = PolygonMesh.from_one_hexagon()
-    fig, axes = plt.subplots()
-    mesh.add_plot(axes)
-    mesh.find_node(axes, showindex=True)
-    mesh.find_cell(axes, showindex=True)
-    mesh.find_edge(axes, showindex=True)
-    plt.show()
-def test_from_triangle_mesh_by_dual():
-    mesh = TriangleMesh.from_one_triangle()
-    mesh.uniform_refine()
-    mesh = PolygonMesh.from_triangle_mesh_by_dual(mesh)
- 
-    fig, axes = plt.subplots()
-    mesh.add_plot(axes)
-    mesh.find_node(axes, showindex=True)
-    mesh.find_cell(axes, showindex=True)
-    mesh.find_edge(axes, showindex=True)
-    plt.show()
-def test_integral():
-    nx = 20
-    ny = 20
-    domain = [0, 1, 0, 1]
-    tmesh = TriangleMesh.from_box(domain, nx=nx, ny=ny)
-    mesh = PolygonMesh.from_triangle_mesh_by_dual(tmesh)
-    p = 2
-    space =  ConformingScalarVESpace2d(mesh, p=p)
-    phi = space.smspace.basis
-    def f(p, index):
-        x = p[...,0]
-        y = p[...,1]
-        val = x**2+y**2
-        return val
-    a = mesh.integral(f, q=5, celltype=False)
-    np.testing.assert_allclose(a,2/3,atol=1e-16)
-    return a 
+        ipoints = mesh.interpolation_points(p=p1)
+        ipoints2 = mesh.interpolation_points(p=p2)
+        np.testing.assert_allclose(bm.to_numpy(ipoints), meshdata["ipoints"],atol=1e-7)
+        np.testing.assert_allclose(bm.to_numpy(ipoints2), meshdata["ipoints2"],atol=1e-7)
+        cell2ipoint = mesh.cell_to_ipoint(p=p1)
+        for i in range(len(cell2ipoint)):
+            np.testing.assert_array_equal(cell2ipoint[i],meshdata["cell2ipoint"][i])
+        def f(p,index):
+            x = p[...,0]
+            y = p[...,1]
+            val = x**2+y**2
+            return val
+        a1 = mesh.integral(f,q=3,celltype=False)
+        a2 = mesh.integral(f,q=3,celltype=True)
+        np.testing.assert_allclose(a1, meshdata["a1"], atol=1e-7)
+        np.testing.assert_allclose(a2, meshdata["a2"], atol=1e-7)
+    
+    @pytest.mark.parametrize("backend", ["numpy","pytorch","jax"])
+    @pytest.mark.parametrize("meshdata",geo_data)
+    def test_geo_data(self,meshdata,backend):
+        bm.set_backend(backend)
+        node = bm.from_numpy(meshdata['node'])
+        cell0 = bm.from_numpy(meshdata['cell'][0])
+        if meshdata['cell'][1] is None:
+            cell1 = None
+        else:
+            cell1 = bm.from_numpy(meshdata['cell'][1])
+        cell = (cell0, cell1)
+        mesh = PolygonMesh(node, cell)
+       
+        edge_normal = mesh.edge_normal()
+        edge_unit_normal = mesh.edge_unit_normal()
+
+    @pytest.mark.parametrize("backend", ["numpy","pytorch","jax"])
+    @pytest.mark.parametrize("meshdata",mesh_example_data)
+    def test_mesh_example(self,meshdata,backend):
+        bm.set_backend(backend)
+        mesh1 = PolygonMesh.from_one_triangle()
+        edge1 = mesh1.entity('edge')
+        edge2cell1 = mesh1.edge_to_cell()
+        mesh2 = PolygonMesh.from_one_square()
+        edge2 = mesh2.entity('edge')
+        edge2cell2 = mesh2.edge_to_cell()
+        mesh3 = PolygonMesh.from_one_pentagon()
+        edge3 = mesh3.entity('edge')
+        edge2cell3 = mesh3.edge_to_cell()
+        mesh4 = PolygonMesh.from_one_hexagon()
+        edge4 = mesh4.entity('edge')
+        edge2cell4 = mesh4.edge_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(edge1),meshdata["one_triangle_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell1),meshdata["one_triangle_edge2cell"])
+        np.testing.assert_array_equal(bm.to_numpy(edge2),meshdata["one_square_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell2),meshdata["one_square_edge2cell"])
+        np.testing.assert_array_equal(bm.to_numpy(edge3),meshdata["one_pentagon_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell3),meshdata["one_pentagon_edge2cell"])
+        np.testing.assert_array_equal(bm.to_numpy(edge4),meshdata["one_hexagon_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(edge2cell4),meshdata["one_hexagon_edge2cell"])
+        node = bm.from_numpy(meshdata['triangle_node'])
+        cell = bm.from_numpy(meshdata['triangle_cell'])
+        mesh = TriangleMesh(node, cell)
+        pmesh = PolygonMesh.from_mesh(mesh)
+        pedge = pmesh.entity('edge')
+        pedge2cell = pmesh.edge_to_cell()
+        np.testing.assert_array_equal(bm.to_numpy(pedge),meshdata["pmesh_edge"]),
+        np.testing.assert_array_equal(bm.to_numpy(pedge2cell),meshdata["pmesh_edge2cell"])
 
 if __name__ == "__main__":
-    #test_polygon_mesh_constructor()
-    #test_polygon_mesh_interpolation_points(4)
-    #test_from_one_triangle('iso')
-    #test_from_one()
-    #test_from_triangle_mesh_by_dual()
-    test_integral()
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_extend_data"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_mesh_example"])
+    
+    
