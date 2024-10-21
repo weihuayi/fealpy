@@ -167,17 +167,20 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send('source assembly')
 
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
-                                                    threshold=None, method='interp')
-
-    F = F - K.matmul(uh_bd)
-    F[isDDof] = uh_bd[isDDof]
-
-    dbc = DirichletBC(space=tensor_space)
-    K = dbc.apply_matrix(matrix=K, check=True)
+    dbc = DirichletBC(space=tensor_space, 
+                    gD=pde.dirichlet, 
+                    threshold=None, 
+                    method='interp')
+    K, F = dbc.apply(A=K, f=F, uh=None, gD=pde.dirichlet, check=True)
+    # uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
+    #                 dtype=bm.float64, device=bm.get_device(mesh))
+    # uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
+    #                                                 threshold=None, method='interp')
+    # F = F - K.matmul(uh_bd)
+    # F = bm.set_at(F, isDDof, uh_bd[isDDof])
+    # K = dbc.apply_matrix(matrix=K, check=True)
     tmr.send('boundary')
-
+    
     uh = tensor_space.function()
     if args.solver == 'cg':
         uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
