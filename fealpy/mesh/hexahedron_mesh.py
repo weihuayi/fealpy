@@ -227,7 +227,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
         cell2ipoint = bm.set_at(cell2ipoint, (slice(None), indof),
                         bm.arange(NN + NE*(p-1) + NF*(p-1)**2, NN + NE*(p-1) + NF*(p-1)**2 + NC*(p-1)**3, 
-                        device=bm.get_device(cell)).reshape(NC, -1))
+                        dtype=cell2ipoint.dtype, device=bm.get_device(cell2ipoint)).reshape(NC, -1))
         # cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
         #         NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
 

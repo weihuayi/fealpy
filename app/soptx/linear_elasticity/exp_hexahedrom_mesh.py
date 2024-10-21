@@ -152,7 +152,7 @@ for i in range(maxit):
 
     linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
                                                 lame_lambda=1, shear_modulus=1, 
-                                                hypo='3D')
+                                                hypo='3D', device=bm.get_device(mesh))
     tmr.send('material')
 
     integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
