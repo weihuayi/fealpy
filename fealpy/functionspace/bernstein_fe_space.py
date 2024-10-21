@@ -228,7 +228,9 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             midxp_0 -= beta[None, :]
             idx = bm.where(bm.all(midxp_0>-1, axis=1))[0]
             num = midx2num(midxp_0[idx]) 
+            beta = bm.to_numpy(beta)
             fbeta = bm.tensor(factorial(beta))
+            beta = bm.array(beta)
             symi = bm.set_at(symi,(slice(None)),symmetry_span_array(glambda, beta).reshape(NC, -1)[:, symidx])
             c = (factorial(m)**2)*comb(p, m)/bm.prod(fbeta,axis=0,dtype=self.itype) # 数
             Bi = bm.set_at(Bi,(slice(None),idx),c*phi[:, num])
