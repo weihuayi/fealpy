@@ -311,7 +311,8 @@ class TensorFunctionSpace(FunctionSpace):
                     if self.dof_priority:
                         gD_tensor = bm.concatenate(gD_tensor)
                     else:
-                        gD_tensor = bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof]) for i in range(scalar_gdof)])
+                        scalar_gdof = scalar_space.number_of_global_dofs()
+                        gD_tensor = bm.concatenate([bm.array([j[i] for j in isScalarBDof]) for i in range(scalar_gdof)])
                     uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor)
                     return uh, isTensorBDof
                 else:
