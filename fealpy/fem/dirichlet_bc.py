@@ -13,27 +13,29 @@ _ST = TypeVar('_ST', bound=SparseTensor)
 class DirichletBC():
     """Dirichlet boundary condition."""
     def __init__(self, space: Tuple[FunctionSpace, ...],
-                 gd: Optional[Tuple[CoefLike,...]]=None,
-                 *, threshold: Optional[Tuple[CoefLike,...]]=None):
+                 gD: Optional[Tuple[CoefLike,...]]=None,
+                 *, threshold: Optional[Tuple[CoefLike,...]]=None,
+                 method = None):
         self.space = space
-        self.gd = gd
+        self.gD = gD
         self.threshold = threshold
         self.bctype = 'Dirichlet'
-     
+        self.method = method
+
         if isinstance(space, tuple):
-            self.gdof = [i.number_of_global_dofs() for i in space]
+            self.gdof = bm.array([i.number_of_global_dofs() for i in space])
             if isinstance(threshold, tuple):
                 self.is_boundary_dof = []
                 for i in range(len(threshold)):
-                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i]))
+                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i], method=method))
                 self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
             else:
                 if threshold is None:
                     self.threshold = [None for i in range(len(space))]
-                    self.is_boundary_dof = [i.is_boundary_dof(j) for i in space]
+                    self.is_boundary_dof = [i.is_boundary_dof() for i in space]
                     self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
                 else:
-                    index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof)))
+                    index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof, axis=0)))
                     self.threshold = [threshold[i:i+1] for i in range(len(index)-1)]
                     self.is_boundary_dof = threshold 
             self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
@@ -43,7 +45,7 @@ class DirichletBC():
             if isinstance(threshold, TensorLike):
                 self.is_boundary_dof = threshold
             else:
-                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold)
+                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold, method=method)
 
             self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
 
@@ -97,7 +99,7 @@ class DirichletBC():
         return vector
 
     def apply(self, A: SparseTensor, f: TensorLike, uh: Optional[TensorLike]=None,
-              gd: Optional[CoefLike]=None, *,
+              gD: Optional[CoefLike]=None, *,
               check=True) -> Tuple[TensorLike, TensorLike]:
         """Apply Dirichlet boundary conditions.
 
@@ -107,14 +109,14 @@ class DirichletBC():
             uh (Tensor | None, optional): The solution uh Tensor. Boundary interpolation\
                 will be done on `uh` if given, which is an **in-place** operation.\
                 Defaults to None.
-            gd (CoefLike | None, optional): The Dirichlet boundary condition.\
-                Use the default gd passed in the __init__ if `None`. Default to None.
+            gD (CoefLike | None, optional): The Dirichlet boundary condition.\
+                Use the default gD passed in the __init__ if `None`. Default to None.
             check (bool, optional): _description_. Defaults to True.
 
         Returns:
             out (SparseTensor, Tensor): New adjusted `A` and `f`.
         """
-        f = self.apply_vector(f, A, uh, gd, check=check)
+        f = self.apply_vector(f, A, uh, gD, check=check)
         A = self.apply_matrix(A, check=check)
         return A, f
 
@@ -192,7 +194,7 @@ class DirichletBC():
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,
-                     gd: Optional[CoefLike]=None, *, check=True) -> TensorLike:
+                     gD: Optional[CoefLike]=None, *, check=True) -> TensorLike:
         """Apply Dirichlet boundary contition to right-hand-size vector only.
 
         Parameters:
@@ -200,37 +202,42 @@ class DirichletBC():
             matrix (COOTensor): The original COO/CSR sparse matrix.
             uh (TensorLike | None, optional): The solution uh Tensor. Defuault to None.\
                 See `DirichletBC.apply()` for more details.
-            gd (CoefLike | None, optional): The Dirichlet boundary condition.\
-                Use the default gd passed in the __init__ if `None`. Default to None.
+            gD (CoefLike | None, optional): The Dirichlet boundary condition.\
+                Use the default gD passed in the __init__ if `None`. Default to None.
             check (bool, optional): Whether to check the vector. Defaults to True.
 
         Raises:
-            RuntimeError: If gd is `None` and no default gd exists.
+            RuntimeError: If gD is `None` and no default gD exists.
 
         Returns:
             TensorLike: New adjusted right-hand-size vector.
         """
         A = self.check_matrix(matrix) if check else matrix
         f = self.check_vector(vector) if check else vector
-        gd = self.gd if gd is None else gd
+        gD = self.gD if gD is None else gD
         
 
-        if gd is None:
+        if gD is None:
             raise RuntimeError("The boundary condition is None.")
         
         if isinstance(self.space, tuple):
-            if gd is tuple:
+            if isinstance(gD, tuple):
+                assert len(gD) == len(self.space)
+                assert uh is None
                 uh = []
-                for i in range(len(gd)):
-                    suh, sidDDdof = self.space[i].boundary_interpolate(gd, threshold=self.threshold[i])
-                    uh.append(suh)
+                for i in range(len(gD)):
+                    suh, sidDDdof = self.space[i].boundary_interpolate(gD=gD[i], uh=uh,
+                                                                    threshold=self.threshold[i], method=self.method)
+                    uh.append(suh[:])
                 uh = bm.concatenate(uh)
             else:
-                uh = gd
+                assert len(gD) == self.gdof
+                uh = gD
         else:
             if uh is None:
                 uh = bm.zeros_like(f)
-            uh, _ = self.space.boundary_interpolate(gd, uh, self.threshold)
+            uh, _ = self.space.boundary_interpolate(gD=gD, uh=uh, 
+                                                threshold=self.threshold, method=self.method)
 
         bd_idx = self.boundary_dof_index
         f = f - A.matmul(uh[:])

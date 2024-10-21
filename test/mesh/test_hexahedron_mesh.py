@@ -146,6 +146,18 @@ class TestHexahedronMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(edge), edge_true, atol=1e-14)
         np.testing.assert_allclose(bm.to_numpy(face2cell), face2cell_true, atol=1e-14)
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", crack_box_data)
+    def test_from_crack_box(self,data,backend):
+        bm.set_backend(backend)
+        tmesh_threshold = data['threshold']
+        mesh = HexahedronMesh.from_crack_box(threshold=tmesh_threshold)
+
+        node = mesh.node
+        np.testing.assert_allclose(bm.to_numpy(node), data["node"], atol=1e-7)
+        cell = mesh.cell
+        np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
+
 if __name__ == "__main__":
     pytest.main(["-k", "test_hexahedron_mesh.py"])
 

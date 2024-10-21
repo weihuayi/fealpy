@@ -1,4 +1,4 @@
-import numpy as np
+from fealpy.backend import backend_manager as bm
 import sympy as sp
 from fealpy.mesh import TetrahedronMesh 
 #from fealpy.mesh import TriangleMesh
@@ -34,28 +34,34 @@ class LaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        return -self.Lu(x, y, z)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        return bm.array(-self.Lu(x, y, z))
 
     def solution(self, p):
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return self.u(x, y, z) 
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        return bm.array(self.u(x, y, z)) 
 
     def gradient(self, p):
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        val = np.zeros(p.shape, dtype=np.float64)
-        val[..., 0] = self.ux(x, y)
-        val[..., 1] = self.uy(x, y) 
-        val[..., 2] = self.uz(x, y)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        val = bm.zeros(p.shape, dtype=bm.float64)
+        val[..., 0] = self.ux(x, y,z)
+        val[..., 1] = self.uy(x, y,z) 
+        val[..., 2] = self.uz(x, y,z)
         return val
 
     def dirichlet(self, p):
@@ -116,10 +122,10 @@ class DoubleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        val = np.zeros(p.shape, dtype=np.float64)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        val = bm.zeros(p.shape, dtype=bm.float64)
         val[..., 0] = self.ux(x, y, z)
         val[..., 1] = self.uy(x, y, z) 
         val[..., 2] = self.uz(x, y, z)
@@ -130,10 +136,10 @@ class DoubleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        val = np.zeros(p.shape[:-1]+(6, ), dtype=np.float64)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        val = bm.zeros(p.shape[:-1]+(6, ), dtype=bm.float64)
         val[..., 0] = self.uxx(x, y, z) 
         val[..., 1] = self.uxy(x, y, z) 
         val[..., 2] = self.uxz(x, y, z)
@@ -216,9 +222,9 @@ class TripleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
         return -self.L3u(x, y, z) 
 
     def solution(self, p):
@@ -231,10 +237,10 @@ class TripleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        val = np.zeros(p.shape, dtype=np.float64)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        val = bm.zeros(p.shape, dtype=bm.float64)
         val[..., 0] = self.ux(x, y, z)
         val[..., 1] = self.uy(x, y, z) 
         val[..., 2] = self.uz(x, y, z)
@@ -244,10 +250,10 @@ class TripleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        val = np.zeros(p.shape[:-1]+(6, ), dtype=np.float64)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        val = bm.zeros(p.shape[:-1]+(6, ), dtype=bm.float64)
         val[..., 0] = self.uxx(x, y, z) 
         val[..., 1] = self.uxy(x, y, z) 
         val[..., 2] = self.uxz(x, y, z)
@@ -260,10 +266,10 @@ class TripleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        sin = np.sin
-        pi = np.pi
-        cos = np.cos
-        val = np.zeros(p.shape[:-1]+(10, ), dtype=np.float64)
+        sin = bm.sin
+        pi = bm.pi
+        cos = bm.cos
+        val = bm.zeros(p.shape[:-1]+(10, ), dtype=bm.float64)
 
         val[..., 0] = self.uxxx(x, y, z)              
         val[..., 1] = self.uxxy(x, y, z)
@@ -364,34 +370,58 @@ def get_flist(u_sp):
     uyzzz = sp.lambdify(('x', 'y', 'z'), uyzzz_sp, 'numpy')
     uzzzz = sp.lambdify(('x', 'y', 'z'), uzzzz_sp, 'numpy')
 
-    f    = lambda node : u(node[..., 0], node[..., 1], node[..., 2])
+    #f    = lambda node : u(node[..., 0], node[..., 1], node[..., 2])
+
+    @cartesian
+    def f(node):
+        x = node[..., 0]
+        y = node[..., 1]
+        z = node[..., 2]
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        return bm.array(u(x, y, z))
+
+    @cartesian
     def grad_f(node):
         x = node[..., 0]
         y = node[..., 1]
         z = node[..., 2]
-        val = np.zeros_like(node)
-        val[..., 0] = ux(x, y, z)
-        val[..., 1] = uy(x, y, z)
-        val[..., 2] = uz(x, y, z)
-        return val 
+        val = bm.zeros_like(node)
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        val[..., 0] = bm.array(ux(x, y, z))
+        val[..., 1] = bm.array(uy(x, y, z))
+        val[..., 2] = bm.array(uz(x, y, z))
+        return bm.array(val) 
+    @cartesian
     def grad_2_f(node):
         x = node[..., 0]
         y = node[..., 1]
         z = node[..., 2]
-        val = np.zeros(x.shape+(6, ), dtype=np.float64)
-        val[..., 0] = uxx(x, y, z) 
-        val[..., 1] = uxy(x, y, z) 
-        val[..., 2] = uxz(x, y, z)
-        val[..., 3] = uyy(x, y, z) 
-        val[..., 4] = uyz(x, y, z) 
-        val[..., 5] = uzz(x, y, z)
-        return val 
+        val = bm.zeros(x.shape+(6, ), dtype=bm.float64)
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        val[..., 0] = bm.array(uxx(x, y, z))
+        val[..., 1] = bm.array(uxy(x, y, z))
+        val[..., 2] = bm.array(uxz(x, y, z))
+        val[..., 3] = bm.array(uyy(x, y, z))
+        val[..., 4] = bm.array(uyz(x, y, z))
+        val[..., 5] = bm.array(uzz(x, y, z))
+        return bm.array(val) 
     def grad_3_f(node):
         x = node[..., 0]
         y = node[..., 1]
         z = node[..., 2]
-        val = np.zeros(x.shape+(10, ), dtype=np.float64)
-        val[..., 0] = uxxx(x, y, z)              
+        val = bm.zeros(x.shape+(10, ), dtype=bm.float64)
+        val = bm.to_numpy(val)
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        
+        val[..., 0] = uxxx(x, y, z)          
         val[..., 1] = uxxy(x, y, z)
         val[..., 2] = uxxz(x, y, z) 
         val[..., 3] = uxyy(x, y, z) 
@@ -401,12 +431,17 @@ def get_flist(u_sp):
         val[..., 7] = uyyz(x, y, z)
         val[..., 8] = uyzz(x, y, z)
         val[..., 9] = uzzz(x, y, z)
+        val = bm.array(val)
         return val 
     def grad_4_f(node):
         x = node[..., 0]
         y = node[..., 1]
         z = node[..., 2]
-        val = np.zeros(x.shape+(15, ), dtype=np.float64)
+        val = bm.zeros(x.shape+(15, ), dtype=bm.float64)
+        val = bm.to_numpy(val)
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
         val[..., 0] = uxxxx(x, y, z)
         val[..., 1] = uyxxx(x, y, z)
         val[..., 2] = uxxxz(x, y, z)
@@ -422,6 +457,7 @@ def get_flist(u_sp):
         val[..., 12] = uyyzz(x, y, z)
         val[..., 13] = uyzzz(x, y, z)
         val[..., 14] = uzzzz(x, y, z)
+        val = bm.array(val)
         return val 
 
     flist = [f, grad_f, grad_2_f, grad_3_f, grad_4_f]

@@ -223,12 +223,14 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
 
         N, N1 = len(symidx), midxp_1.shape[0]
         B = bm.zeros((N1, NQ, ldof), device=self.device, dtype=self.ftype)
-        symLambdaBeta = bm.zeros((N1, NC, N), dtype=self.ftype)
+        symLambdaBeta = bm.zeros((N1, NC, N), dtype=self.ftype, device=self.device)
         for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
             midxp_0 -= beta[None, :]
             idx = bm.where(bm.all(midxp_0>-1, axis=1))[0]
             num = midx2num(midxp_0[idx]) 
+            beta = bm.to_numpy(beta)
             fbeta = bm.tensor(factorial(beta))
+            beta = bm.array(beta)
             symi = bm.set_at(symi,(slice(None)),symmetry_span_array(glambda, beta).reshape(NC, -1)[:, symidx])
             c = (factorial(m)**2)*comb(p, m)/bm.prod(fbeta,axis=0,dtype=self.itype) # 数
             Bi = bm.set_at(Bi,(slice(None),idx),c*phi[:, num])

@@ -1,4 +1,5 @@
 # 三维带真解的测试
+# TODO: 1. 三维真解的测试(其他五个已经通过)
 from fealpy.mesh import TetrahedronMesh
 from app.FuelRodSim.HeatEquationData import Parabolic3dData
 from app.FuelRodSim.heat_equation_solver import HeatEquationSolver
@@ -8,7 +9,7 @@ ny = 5
 nz = 5
 mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx, ny, nz)
 node = mesh.node
-isBdNode = mesh.ds.boundary_node_flag()
+isBdNode = mesh.boundary_node_flag()
 p0=pde.init_solution(node) #准备一个初值
 Box3DSolver = HeatEquationSolver(mesh, pde, 160, isBdNode, p0=p0, alpha_caldding=1, layered=False, output='./result_box3dtest')
 Box3DSolver.solve()

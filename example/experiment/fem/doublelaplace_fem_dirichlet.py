@@ -18,6 +18,7 @@ from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 from fealpy import logger
+from fealpy.solver import spsolve
 logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -38,7 +39,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
+        default='pytorch', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--meshtype',
@@ -49,7 +50,7 @@ args = parser.parse_args()
 
 
 bm.set_backend(args.backend)
-decive = "cuda"
+device = "cuda"
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -60,21 +61,25 @@ next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
-pde = DoubleLaplacePDE(u) 
-ulist = get_flist(u)[:3]
-mesh = TriangleMesh.from_box([0,1,0,1], n, n)
-NDof = bm.zeros(maxit, dtype=bm.float64)
+pde = DoubleLaplacePDE(u, device=device) 
+ulist = get_flist(u, device=device)[:3]
+mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
+
+ikwargs = bm.context(mesh.cell)
+fkwargs = bm.context(mesh.node)
+
+NDof = bm.zeros(maxit, **ikwargs)
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',
              '$||\\nabla^2 u - \\nabla^2 u_h||_{\\Omega,0}$']
-errorMatrix = bm.zeros((3, maxit), dtype=bm.float64)
+errorMatrix = bm.zeros((3, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
     node = mesh.entity('node')
-    isCornerNode = bm.zeros(len(node),dtype=bm.bool)
-    for n in bm.array([[0,0],[1,0],[0,1],[1,1]], dtype=bm.float64):
+    isCornerNode = bm.zeros(len(node),dtype=bm.bool, device=device)
+    for n in bm.array([[0,0],[1,0],[0,1],[1,1]], **fkwargs):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
 
 
@@ -101,16 +106,19 @@ for i in range(maxit):
     gdof = space.number_of_global_dofs()
     NDof[i] = 1/4/2**i
     bc1 = DirichletBC(space, gd = ulist)
+    #import ipdb
+    #ipdb.set_trace()
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
-    A = A.to_scipy()
+    #A = A.to_scipy()
 
-    from numpy.linalg import cond
-    print(gdof)
-    print(cond(A.toarray()))
+    #from numpy.linalg import cond
+    #print(gdof)
+    #print(cond(A.toarray()))
     #A = coo_matrix(A)
     #A = csr_matrix((A.values(), A.indices()),A.shape)
-    uh[:] = bm.tensor(spsolve(A, F))
+    #uh[:] = bm.tensor(spsolve(A, F))
+    uh[:] = spsolve(A, F, "cupy")
     
     #uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
