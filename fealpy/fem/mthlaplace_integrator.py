@@ -65,7 +65,17 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws, gmphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell',
                                  index=index)
-        M = bm.einsum('cqlg,cqmg,g,q,c->clm',gmphi,gmphi,num,ws,cm)
+        N = 10
+        NCN = gmphi.shape[0]//N
+        M = bm.zeros((gmphi.shape[0], gmphi.shape[2], gmphi.shape[2]), device=device)
+        for i in range(N-1):
+            gmphi1 = gmphi[NCN*i:NCN*(i+1)]
+            cm1 = cm[NCN*i:NCN*(i+1)]
+            M[NCN*i:NCN*(i+1)] = bm.einsum('cqlg,cqmg,g,q,c->clm',gmphi1,gmphi1,num,ws,cm1)
+        cm1 = cm[NCN*(N-1):]
+        gmphi1 = gmphi[NCN*(N-1):]
+        M[NCN*(N-1):] = bm.einsum('cqlg,cqmg,g,q,c->clm',gmphi1,gmphi1,num,ws,cm1)
+        #M = bm.einsum('cqlg,cqmg,g,q,c->clm',gmphi,gmphi,num,ws,cm)
         return M
     #return bilinear_integral(gmphi1, gmphi, ws, cm, coef,
     #                             batched=self.batched)
