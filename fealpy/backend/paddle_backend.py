@@ -13,14 +13,14 @@ except ImportError:
                       'See https://www.paddlepaddle.org.cn/ for installation.')
 
 from .base import (
-    Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+    BackendProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 )
 
 
 Tensor = paddle.Tensor
 _device = paddle.device
 
-class PaddleBackend(Backend[Tensor], backend_name='paddle'):
+class PaddleBackend(BackendProxy, backend_name='paddle'):
     DATA_CLASS = paddle.Tensor
 
     linalg = paddle.linalg

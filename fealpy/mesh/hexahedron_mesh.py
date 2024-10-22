@@ -227,7 +227,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
         cell2ipoint = bm.set_at(cell2ipoint, (slice(None), indof),
                         bm.arange(NN + NE*(p-1) + NF*(p-1)**2, NN + NE*(p-1) + NF*(p-1)**2 + NC*(p-1)**3, 
-                        device=bm.get_device(cell)).reshape(NC, -1))
+                        dtype=cell2ipoint.dtype, device=bm.get_device(cell2ipoint)).reshape(NC, -1))
         # cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
         #         NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
 
@@ -394,7 +394,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         node = bm.concatenate([X, Y, Z], axis=-1)
 
         NN = (nx+1)*(ny+1)*(nz+1)
-        idx = bm.arange(0, NN, device=device).reshape(nx+1, ny+1, nz+1)
+        idx = bm.arange(0, NN, dtype=itype, device=device).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
         nyz = (ny + 1)*(nz + 1)
@@ -417,7 +417,7 @@ class HexahedronMesh(TensorMesh, Plotable):
             isValidNode[cell] = True
             node = node[isValidNode]
             idxMap = bm.zeros(NN, dtype=cell.dtype, device=device)
-            idxMap[isValidNode] = bm.arange(isValidNode.sum(), device=device)
+            idxMap[isValidNode] = bm.arange(isValidNode.sum(), dtype=itype, device=device)
             cell = idxMap[cell]
 
         return cls(node, cell)

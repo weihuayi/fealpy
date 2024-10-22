@@ -64,11 +64,15 @@ class ComplianceObjective(Objective):
                                 tensor_space=self.space)
         
 
-    def _create_function_space(self, degree: int, 
-                            dof_per_node: int, dof_ordering: str) -> TensorFunctionSpace:
+    def _create_function_space(
+        self, 
+        degree: int, 
+        dof_per_node: int, 
+        dof_ordering: str
+    ) -> TensorFunctionSpace:
         """
         Create a TensorFunctionSpace instance based on the given 
-        degree, DOF per node, and DOF ordering.
+            `degree`, `dof_per_node`, and `dof_ordering`.
         """
         space_C = LagrangeFESpace(mesh=self.mesh, p=degree, ctype='C')
 
@@ -77,27 +81,44 @@ class ComplianceObjective(Objective):
         elif dof_ordering == 'dof-priority':
             shape = (dof_per_node, -1)
         else:
-            raise ValueError("Invalid DOF ordering. Use 'gd-priority' or 'dof-priority'.")
+            raise ValueError("Invalid `dof_ordering`. \
+                                Use 'gd-priority' or 'dof-priority'.")
 
         return TensorFunctionSpace(scalar_space=space_C, shape=shape)
 
-    def _create_filter_properties(self, filter_type: Union[int, str], 
-                                filter_rmin: float) -> Union[FilterProperties, None]:
+    def _create_filter_properties(
+        self, 
+        filter_type: Union[int, str, None], 
+        filter_rmin: Union[float, None]
+    ) -> Union[FilterProperties, None]:
         """
         Create a FilterProperties instance based on the given filter type and radius.
         """
-        if filter_type == 'None':
-            return None 
-    
-        if filter_type == 'density' or filter_type == 0:
-            ft = 0
-        elif filter_type == 'sensitivity' or filter_type == 1:
-            ft = 1
-        elif filter_type == 'heaviside' or filter_type == 2:
-            ft = 2
+        if filter_type is None:
+            if filter_rmin is not None:
+                raise ValueError("When `filter_type` is None, `filter_rmin` must also be None.")
+            return None
+        
+        filter_type_mapping = {
+        'sens': 0,
+        'dens': 1,
+        'heaviside': 2,
+        }
+
+        if isinstance(filter_type, int):
+            ft = filter_type
+        elif isinstance(filter_type, str):
+            ft = filter_type_mapping.get(filter_type.lower())
+            if ft is None:
+                raise ValueError(
+                    f"Invalid `filter type` '{filter_type}'. "
+                    f"Please use one of {list(filter_type_mapping.keys())} or add it to the `filter_type_mapping`."
+                )
         else:
-            raise ValueError("Invalid filter type. \
-                            Use 'density', 'sensitivity', 'heaviside', 0, 1, or 2.")
+            raise TypeError("`filter_type` must be an integer, string, or None.")
+        
+        if filter_rmin is None:
+            raise ValueError("`filter_rmin` cannot be None when `filter_type` is specified.")
 
         return FilterProperties(mesh=self.mesh, rmin=filter_rmin, ft=ft)
 
@@ -109,44 +130,90 @@ class ComplianceObjective(Objective):
                         tensor_space=self.space,
                         pde=self.pde)
 
-    def fun(self, rho: _DT) -> float:
+    def compute_displacement(self, rho: _DT):
         """
-        Compute the compliance based on the density.
+        Compute the displacement field 'uh' based on the density 'rho'.
+        """
+        material_properties = self.material_properties
+        displacement_solver = self.displacement_solver
+
+        material_properties.rho = rho
+
+        uh = displacement_solver.solve(solver_method=self.solver_method)
+
+        return uh
+    
+    def compute_ce(self, rho: _DT, uh: _DT = None) -> _DT:
+        """
+        Compute the element compliance values 'ce' based on the density 'rho' and displacement 'uh'.
+        """
+        ke0 = self.ke0
+
+        if uh is None:
+            uh = self.compute_displacement(rho)
+
+        cell2ldof = self.space.cell_to_dof()
+        uhe = uh[cell2ldof]
+
+        ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
+
+        return ce
+
+    def fun(self, rho_phys: _DT) -> float:
+        """
+        Compute the compliance `c` based on the density `rho`.
         """
         # tmr = timer("Compliance Objective")
         # next(tmr)
         tmr = None
 
-        material_properties = self.material_properties
-        displacement_solver = self.displacement_solver
-        ke0 = self.ke0
-
-        # `material_properties.rho` must be the physical density `rho_phys``
-        material_properties.rho = rho
-        if tmr:
-            tmr.send('Assign Density')
-
-        uh = displacement_solver.solve(solver_method=self.solver_method)
+        uh = self.compute_displacement(rho=rho_phys)
         if tmr:
             tmr.send('Solve Displacement')
 
-        cell2ldof = self.space.cell_to_dof()
-        uhe = uh[cell2ldof]
-        if tmr:
-            tmr.send('Extract Element Displacements')
-
-        ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
-        self.ce = ce
+        ce = self.compute_ce(rho=rho_phys, uh=uh)
         if tmr:
             tmr.send('Compute Element Compliance')
 
-        E = self.material_properties.material_model()
-        if tmr:
-            tmr.send('Compute Material Model')
+        self.ce = ce
+        self.uh = uh
 
-        c = bm.einsum('c, c -> ', E, ce)
+        E = self.material_properties.material_model()
+
+        c = bm.einsum('c, c -> ', E, ce) 
         if tmr:
             tmr.send('Compute Compliance Value')
+
+        # material_properties = self.material_properties
+        # displacement_solver = self.displacement_solver
+        # ke0 = self.ke0
+
+        # # `material_properties.rho` must be the physical density `rho_phys``
+        # material_properties.rho = rho
+        # if tmr:
+        #     tmr.send('Assign Density')
+
+        # uh = displacement_solver.solve(solver_method=self.solver_method)
+        # if tmr:
+        #     tmr.send('Solve Displacement')
+
+        # cell2ldof = self.space.cell_to_dof()
+        # uhe = uh[cell2ldof]
+        # if tmr:
+        #     tmr.send('Extract Element Displacements')
+
+        # ce = bm.einsum('ci, cik, ck -> c', uhe, ke0, uhe)
+        # self.ce = ce
+        # if tmr:
+        #     tmr.send('Compute Element Compliance')
+
+        # E = self.material_properties.material_model()
+        # if tmr:
+        #     tmr.send('Compute Material Model')
+
+        # c = bm.einsum('c, c -> ', E, ce)
+        # if tmr:
+        #     tmr.send('Compute Compliance Value')
 
         if tmr:
             tmr.send(None)
@@ -157,11 +224,22 @@ class ComplianceObjective(Objective):
         """
         Compute the gradient of compliance w.r.t. density.
         """
-        material_properties = self.material_properties
-        ce = self.ce
+        ce = getattr(self, 'ce', None)
+        uh = getattr(self, 'uh', None)
 
+        if ce is None or uh is None:
+            uh = self.compute_displacement(rho)
+            ce = self.compute_ce(rho, uh)
+
+        material_properties = self.material_properties
         dE = material_properties.material_model_derivative()
         dce = - bm.einsum('c, c -> c', dE, ce)
+
+        # material_properties = self.material_properties
+        # ce = self.ce
+
+        # dE = material_properties.material_model_derivative()
+        # dce = - bm.einsum('c, c -> c', dE, ce)
 
         if self.filter_properties is None:
             return dce
@@ -172,12 +250,12 @@ class ComplianceObjective(Objective):
         cell_measure = self.mesh.entity_measure('cell')
 
         if ft == 0:
-            # first normalize, then apply weight factor
-            dce[:] = H.matmul(dce * cell_measure / H.matmul(cell_measure))
-        elif ft == 1:
             rho_dce = bm.einsum('c, c -> c', rho[:], dce)
             filtered_dce = H.matmul(rho_dce)
             dce[:] = filtered_dce / Hs / bm.maximum(bm.array(0.001), rho[:])
+        elif ft == 1:
+            # first normalize, then apply weight factor
+            dce[:] = H.matmul(dce * cell_measure / H.matmul(cell_measure))
         elif ft == 2:
             if beta is None or rho_tilde is None:
                 raise ValueError("Heaviside projection filter requires both beta and rho_tilde.")

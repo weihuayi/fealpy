@@ -14,23 +14,25 @@ class DirichletBC():
     """Dirichlet boundary condition."""
     def __init__(self, space: Tuple[FunctionSpace, ...],
                  gd: Optional[Tuple[CoefLike,...]]=None,
-                 *, threshold: Optional[Tuple[CoefLike,...]]=None):
+                 *, threshold: Optional[Tuple[CoefLike,...]]=None,
+                 method = None):
         self.space = space
         self.gd = gd
         self.threshold = threshold
         self.bctype = 'Dirichlet'
-     
+        self.method = method
+
         if isinstance(space, tuple):
             self.gdof = bm.array([i.number_of_global_dofs() for i in space])
             if isinstance(threshold, tuple):
                 self.is_boundary_dof = []
                 for i in range(len(threshold)):
-                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i]))
+                    self.is_boundary_dof.append(space[i].is_boundary_dof(threshold[i], method=method))
                 self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
             else:
                 if threshold is None:
                     self.threshold = [None for i in range(len(space))]
-                    self.is_boundary_dof = [i.is_boundary_dof(j) for i in space]
+                    self.is_boundary_dof = [i.is_boundary_dof() for i in space]
                     self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
                 else:
                     index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof, axis=0)))
@@ -43,7 +45,7 @@ class DirichletBC():
             if isinstance(threshold, TensorLike):
                 self.is_boundary_dof = threshold
             else:
-                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold)
+                self.is_boundary_dof = space.is_boundary_dof(threshold=threshold, method=method)
 
             self.boundary_dof_index = bm.nonzero(self.is_boundary_dof)[0]
 
@@ -219,19 +221,23 @@ class DirichletBC():
             raise RuntimeError("The boundary condition is None.")
         
         if isinstance(self.space, tuple):
-            if gd is tuple:
+            if isinstance(gd, tuple):
+                assert len(gd) == len(self.space)
+                assert uh is None
                 uh = []
                 for i in range(len(gd)):
-                    suh, sidDDdof = self.space[i].boundary_interpolate(gd, threshold=self.threshold[i])
-                    uh.append(suh)
+                    suh, sidDDdof = self.space[i].boundary_interpolate(gd=gd[i],
+                                                                    threshold=self.threshold[i], method=self.method)
+                    uh.append(suh[:])
                 uh = bm.concatenate(uh)
             else:
+                assert len(gd) == self.gdof
                 uh = gd
         else:
             if uh is None:
                 uh = bm.zeros_like(f)
-            uh, _ = self.space.boundary_interpolate(gd, uh, self.threshold)
-
+            uh, _ = self.space.boundary_interpolate(gd=gd,uh=uh,
+                                                threshold=self.threshold, method=self.method)
         bd_idx = self.boundary_dof_index
         f = f - A.matmul(uh[:])
         f = bm.set_at(f, bd_idx, uh[bd_idx])

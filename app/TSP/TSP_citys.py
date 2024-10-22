@@ -234,41 +234,6 @@ def city_eil51():
     ])
     return citys
 
-def city_oliver30():
-    citys = bm.array([
-        [5, 2, 99],
-        [10, 4, 50],
-        [6, 7, 64],
-        [11, 13, 40],
-        [12, 18, 40],
-        [9, 18, 54],
-        [8, 22, 60],
-        [13, 24, 42],
-        [14, 25, 38],
-        [7, 25, 62],
-        [3, 37, 84],
-        [16, 41, 26],
-        [4, 41, 94],
-        [15, 44, 35],
-        [17, 45, 21],
-        [2, 54, 62],
-        [1, 54, 67],
-        [18, 58, 35],
-        [30, 58, 69],
-        [19, 62, 32],
-        [24, 64, 60],
-        [25, 68, 58],
-        [23, 71, 44],
-        [29, 71, 71],
-        [28, 74, 78],
-        [20, 82, 7],
-        [22, 83, 46],
-        [26, 83, 69],
-        [27, 87, 76],
-        [21, 91, 38]
-    ])
-    return citys
-
 def city_rand50():
     citys = bm.array([
         [475, 110],
@@ -324,6 +289,41 @@ def city_rand50():
     ])
     return citys
 
+def city_oliver30():
+    citys = bm.array([
+        [5, 2, 99],
+        [10, 4, 50],
+        [6, 7, 64],
+        [11, 13, 40],
+        [12, 18, 40],
+        [9, 18, 54],
+        [8, 22, 60],
+        [13, 24, 42],
+        [14, 25, 38],
+        [7, 25, 62],
+        [3, 37, 84],
+        [16, 41, 26],
+        [4, 41, 94],
+        [15, 44, 35],
+        [17, 45, 21],
+        [2, 54, 62],
+        [1, 54, 67],
+        [18, 58, 35],
+        [30, 58, 69],
+        [19, 62, 32],
+        [24, 64, 60],
+        [25, 68, 58],
+        [23, 71, 44],
+        [29, 71, 71],
+        [28, 74, 78],
+        [20, 82, 7],
+        [22, 83, 46],
+        [26, 83, 69],
+        [27, 87, 76],
+        [21, 91, 38]
+    ])
+    return citys
+
 def city_3():
     citys = bm.array([
         [475, 110, 112],
@@ -348,102 +348,95 @@ def city_3():
     return citys
 
 TSP_data = [
+    #二维地图
     {
         "citys": ciyt0,
-        "dim": 34,
+        "num": 34,
     },
     {
         "citys":city_ulysses22,
-        "dim":22,
+        "num":22,
         "opt":74,
     },
     {
         "citys": city_ulysses16,
-        "dim": 16,
+        "num": 16,
         "opt":72,
     },
     {
         "citys": city_att48,
-        "dim": 48,
+        "num": 48,
         "opt":33522,
     },
     {
         "citys": city_chn31,
-        "dim": 31,
+        "num": 31,
         "opt":15377,
     },
     {
         "citys": city_eil51,
-        "dim": 51,
+        "num": 51,
         "opt":426,
     },
     {
+        "citys": city_rand50,
+        "num": 50,
+        "opt":5553,
+    },
+    #三维地图
+    {
         "citys": city_oliver30,
-        "dim": 30,
+        "num": 30,
         "opt":420,
     },
     {
-        "citys": city_rand50,
-        "dim": 50,
-        "opt":5553,
-    },
-    {
         "citys": city_3,
-        "dim": 18,
+        "num": 18,
     },
 ]
 
 
-def soler_tsp_with_ant(algorithm, fobj, lb, ub, NP, dim, D):
-    x0 = lb + bm.random.rand(NP, dim) * (ub - lb)
-    option = opt_alg_options(x0, fobj, (lb, ub), NP, MaxIters = 10000)
-    optimizer = algorithm(option, D)
-    gbest, gbest_f = optimizer.run()
-    return gbest, gbest_f
-
 def soler_tsp_with_algorithm(algorithm, fobj, lb, ub, NP, dim, D):
     x0 = lb + bm.random.rand(NP, dim) * (ub - lb)
-    option = opt_alg_options(x0, fobj, (lb, ub), NP, MaxIters = 10000)
+    option = opt_alg_options(x0, fobj, (lb, ub), NP, MaxIters = 100)
     optimizer = algorithm(option, D)
     gbest, gbest_f = optimizer.run()
     return gbest, gbest_f
 
-def gbest2route(gbest, citys):
+def gbestroute(gbest, citys):
     route = bm.argsort(gbest)
     route = bm.concatenate((route, route[0: 1]))
     route_citys = citys[route]
     return route, route_citys
 
-def printroute(route_citys, citys, alg_name):
-    dim = citys.shape[1]
-    if dim == 2:
-        for i in range(route_citys.shape[0]):
+def printroute(route_citys_all, citys, alg_name):
+    dim_citys = citys.shape[1]
+    if dim_citys == 2:
+        for i in range(route_citys_all.shape[0]):
             plt.figure()
             plt.title(f"{alg_name[i]} optimal path")
             plt.scatter(citys[:, 0], citys[:, 1])
-            plt.plot(route_citys[i, :, 0], route_citys[i, :, 1])
-    elif dim == 3:
-        for i in range(route_citys.shape[0]):
+            plt.plot(route_citys_all[i, :, 0], route_citys_all[i, :, 1])
+    elif dim_citys == 3:
+        for i in range(route_citys_all.shape[0]):
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
             ax.set_title(f"{alg_name[i]} optimal path")
             ax.scatter(citys[:, 0], citys[:, 1], citys[:, 2]) 
-            ax.plot(route_citys[i, :, 0], route_citys[i, :, 1], route_citys[i, :, 2])
-    plt.show()
-
-def calD(citys):
-    n = citys.shape[0]
-    D = bm.zeros((n, n)) 
-    diff = citys[:, None, :] - citys[None, :, :]
-    D = bm.sqrt(bm.sum(diff ** 2, axis = -1))
-    D[bm.arange(n), bm.arange(n)] = 2.2204e-16
-    return D
+            ax.plot(route_citys_all[i, :, 0], route_citys_all[i, :, 1], route_citys_all[i, :, 2])
+    # plt.show()
 
 class TravellingSalesmanProblem:
     def __init__(self, citys) -> None:
         self.citys = citys
         self.D = bm.zeros((citys.shape[0], citys.shape[0]))
-    
+
+    def calD(self):
+        n = self.citys.shape[0] 
+        diff = self.citys[:, None, :] - self.citys[None, :, :]
+        self.D = bm.sqrt(bm.sum(diff ** 2, axis = -1))
+        self.D[bm.arange(n), bm.arange(n)] = 2.2204e-16
+
     def fitness(self, x):
         index = bm.argsort(x, axis=-1)
         distance = self.D[index[:, -1], index[:, 0]]
@@ -451,16 +444,6 @@ class TravellingSalesmanProblem:
             dis = self.D[index[:, i], index[:, i + 1]]
             distance = distance + dis
         return distance
-
-    def calD(self):
-        n = self.citys.shape[0] 
-        diff = self.citys[:, None, :] - self.citys[None, :, :]
-        self.D = bm.sqrt(bm.sum(diff ** 2, axis = -1))
-        self.D[bm.arange(n), bm.arange(n)] = 2.2204e-16
-        
-        
-
-
 
 
 
