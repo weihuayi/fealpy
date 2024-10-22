@@ -45,7 +45,7 @@ parser.add_argument('--meshtype',
         help='默认网格为三角形网格')
 
 args = parser.parse_args()
-args.backend = 'numpy'
+args.backend = 'pytorch'
 bm.set_backend(args.backend)
 p = args.degree
 n = args.n
