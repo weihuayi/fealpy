@@ -39,11 +39,11 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='pytorch', type=str,
+        default='numpy', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--device',
-        default='cuda', type=str,
+        default='cpu', type=str,
         help='默认gpu计算')
 
 args = parser.parse_args()
@@ -86,6 +86,7 @@ for i in range(maxit):
 
     space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
     
+    tmr.send(f'第{i}次空间生成时间')
 
     uh = space.function()
 
