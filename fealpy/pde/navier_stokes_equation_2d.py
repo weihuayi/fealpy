@@ -100,7 +100,7 @@ class FlowPastCylinder:
         cell = bm.from_numpy(cell)
         return node,cell
 
-    def mesh(self, h, method:str='fealpy', device=None):
+    def mesh(self, h, method:str='fealpy', device='cpu'):
         if method == 'fealpy':
             node,cell = self._fealpy_mesh(h)
             node = bm.device_put(node, device)
