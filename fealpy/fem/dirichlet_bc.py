@@ -226,7 +226,7 @@ class DirichletBC():
                 assert uh is None
                 uh = []
                 for i in range(len(gd)):
-                    suh, sidDDdof = self.space[i].boundary_interpolate(gD=gd[i],
+                    suh, sidDDdof = self.space[i].boundary_interpolate(gd=gd[i],
                                                                     threshold=self.threshold[i], method=self.method)
                     uh.append(suh[:])
                 uh = bm.concatenate(uh)
