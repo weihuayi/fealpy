@@ -54,7 +54,7 @@ class LaplaceFEMSolver():
         self._A = bform.assembly(format='csr')
 
     def _init_dirichlet(self):
-        self.dbc = DirichletBC(self.space, isDDof=self.is_sampler_dof)
+        self.dbc = DirichletBC(self.space, threshold=self.is_sampler_dof)
         A_d = self.dbc.apply_matrix(self._A).to_dense()
         if self.reserve_mat:
             self.A_d = A_d
