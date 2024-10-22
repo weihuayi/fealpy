@@ -99,10 +99,10 @@ parser.add_argument('--degree',
                     default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 2.')
 parser.add_argument('--nx', 
-                    default=8, type=int, 
+                    default=16, type=int, 
                     help='Initial number of grid cells in the x direction, default is 4.')
 parser.add_argument('--ny',
-                    default=8, type=int,
+                    default=16, type=int,
                     help='Initial number of grid cells in the y direction, default is 4.')
 args = parser.parse_args()
 
@@ -117,7 +117,7 @@ p = args.degree
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 3
+maxit = 4
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -137,7 +137,7 @@ for i in range(maxit):
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_K)
     K = bform.assembly(format='csr')
-    tmr.send('stiffness assembly')
+    # tmr.send('stiffness assembly')
     
     integrator_F = VectorSourceIntegrator(source=pde.source, q=tensor_space.p+3)
     lform = LinearForm(tensor_space)    
