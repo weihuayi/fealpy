@@ -23,7 +23,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         self.mesh = mesh
         self.p = p
         self.cellmeasure = mesh.cell_area()
-        self.dof = LinearMeshCFEDof(mesh, p)
+        self.dof = LinearMeshCFEDof(mesh.tmesh, p)
         self.multi_index_matrix = mesh.multi_index_matrix
 
         self.device = mesh.device
@@ -116,12 +116,10 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S):
-        phi = self.basis(bc)
+        phi = self.basis(bc) #
         cell2dof = self.dof.cell_to_dof()[index]
         dim = len(uh.shape) - 1
-        s0 = 'abcdefg'
-        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = bm.einsum(s1, phi, uh[cell2dof])
+        val = bm.einsum('cql, cl -> cq', phi, uh[cell2dof])
         return val
 
     @barycentric
@@ -129,9 +127,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
-        s0 = 'abcdefg'
-        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = bm.einsum(s1, gphi, uh[cell2dof])
+        val = bm.einsum('cqlm, cl -> cqm', gphi, uh[cell2dof])
         return val
 
     def integral_basis(self, q=None):

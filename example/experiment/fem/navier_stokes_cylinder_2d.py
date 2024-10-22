@@ -71,17 +71,20 @@ mesh.to_vtk(fname=fname)
 P_bform = BilinearForm((pspace, uspace))
 P_bform.add_integrator(PressWorkIntegrator(-1, q=q))
 
-A_bform = BilinearForm(uspace)
+U_bform = BilinearForm(uspace)
 M = ScalarMassIntegrator(rho/dt, q=q)
 S = ScalarDiffusionIntegrator(mu, q=q)
 D = ScalarConvectionIntegrator(rho, q=q)
-A_bform.add_integrator([M,S,D])
+U_bform.add_integrator([M,S,D])
+BForm = BlockForm([[U_bform, P_bform],
+               [P_bform.T, None]])
 
 ##LinearForm
 ulform = LinearForm(uspace)
 f = ScalarSourceIntegrator(q = q)
 ulform.add_integrator(f)
 plform = LinearForm(pspace)
+LBForm = LinearBlockForm([ulform, plform])
 tmr.send('网格和pde生成时间')
 print(f"总共自由度为:{gdof}")
 
@@ -92,13 +95,11 @@ for i in range(5):
     tmr.send("其他") 
     D.coef = u0
     D.clear()
-    A = BlockForm([[A_bform, P_bform],
-                   [P_bform.T, None]])
-    A = A.assembly()
+    A = BForm.assembly()
     
     f.source = u0
-    f.clear() 
-    b = LinearBlockForm([ulform, plform]).assembly()
+    f.clear()
+    b = LBForm.assembly()
     tmr.send("组装") 
     
     A,b = DirichletBC((uspace,pspace), gd=(pde.u_dirichlet, pde.p_dirichlet), 

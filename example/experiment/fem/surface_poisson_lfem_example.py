@@ -16,11 +16,13 @@ from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.sparse import COOTensor
+from fealpy.sparse import COOTensor, CSRTensor
 from fealpy.tools.show import showmultirate, show_error_table
+from fealpy.functionspace import LagrangeFESpace
 
 # solver
-from fealpy.solver import cg
+from fealpy.solver import cg, spsolve
+from scipy.sparse import coo_array, csr_array, bmat
 #from scipy.sparse.linalg import spsolve
 
 ## 参数解析
@@ -34,16 +36,20 @@ parser.add_argument('--sdegree',
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--mdegree',
-        default=3, type=int,
-        help='网格的阶数, 默认为 3 次.')
+        default=1, type=int,
+        help='网格的阶数, 默认为 1 次.')
 
 parser.add_argument('--mtype',
-        default='tri', type=str,
+        default='ltri', type=str,
         help='网格类型， 默认三角形网格.')
 
 parser.add_argument('--backend',
         default='numpy', type=str,
         help="默认后端为 numpy.")
+
+parser.add_argument('--refine',
+        default=0, type=int,
+        help="默认不加密网格.")
 
 args = parser.parse_args()
 
@@ -51,6 +57,7 @@ bm.set_backend(args.backend)
 sdegree = args.sdegree
 mdegree = args.mdegree
 mtype = args.mtype
+refine = args.refine
 
 #tmr = timer()
 #next(tmr)
@@ -62,30 +69,47 @@ pde = SurfaceLevelSetPDEData(F, u)
 p = mdegree
 surface = SphereSurface()
 tmesh = TriangleMesh.from_unit_sphere_surface()
+tmesh.uniform_refine(n=refine)
+
 mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
-fname = f"sphere_test.vtu"
-mesh.to_vtk(fname=fname)
+#fname = f"sphere_test.vtu"
+#mesh.to_vtk(fname=fname)
 
 space = ParametricLagrangeFESpace(mesh, p=sdegree)
 #tmr.send(f'第{i}次空间时间')
-uI = space.interpolate(pde.solution)
-uh = space.function()
+uI0 = space.function()
+uI0[:] = space.interpolate(pde.solution)
+error = mesh.error(pde.solution, uI0)
+print("uI error:", error)
 
-bfrom = BilinearForm(space)
-bfrom.add_integrator(ScalarDiffusionIntegrator())
-lfrom = LinearForm(space)
-lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
 
-A = bfrom.assembly()
-F = lfrom.assembly()
-#tmr.send(f'第{i}次矩阵组装时间')
 
-C = space.integral_basis()
-A = COOTensor.concat()
-#A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
-F = bm.r_[F, 0]
+if 0 :
+    uh = space.function()
 
-uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    bfrom = BilinearForm(space)
+    bfrom.add_integrator(ScalarDiffusionIntegrator())
+    lfrom = LinearForm(space)
+    lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
 
-error = mesh.error(pde.solution, uh)
-print(error)
+    A = bfrom.assembly(format='coo')
+    F = lfrom.assembly()
+    #tmr.send(f'第{i}次矩阵组装时间')
+
+    C = space.integral_basis()
+
+    def coo(A):
+        data = A._values
+        indices = A._indices
+        return coo_array((data, indices), shape=A.shape)
+    A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
+    A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
+
+    F = bm.concatenate((F, bm.array([0])))
+
+    x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
+    uh[:] = x[:-1]
+    #uh[:] = spsolve(A, F, 'scipy')[:-1]
+
+    error = mesh.error(pde.solution, uh)
+    print(error)
