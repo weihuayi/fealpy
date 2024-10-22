@@ -18,7 +18,8 @@ from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.sparse import COOTensor, CSRTensor
 from fealpy.tools.show import showmultirate, show_error_table
-from fealpy.functionspace import LagrangeFESpace
+
+from fealpy.functionspace.lagrange_fe_space import LagrangeFESpace
 
 # solver
 from fealpy.solver import cg, spsolve
@@ -75,7 +76,7 @@ mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
 #fname = f"sphere_test.vtu"
 #mesh.to_vtk(fname=fname)
 
-space = ParametricLagrangeFESpace(mesh, p=sdegree)
+space = ParametricLagrangeFESpace(mesh, q=sdegree)
 #tmr.send(f'第{i}次空间时间')
 uI0 = space.function()
 uI0[:] = space.interpolate(pde.solution)
