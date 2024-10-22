@@ -18,14 +18,14 @@ except ImportError:
                       'the MindSpore backend in fealpy. '
                       'See https://www.mindspore.cn/ for installation.')
 
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+from .base import BackendProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 
 Tensor = ms.Tensor
 context.set_context(mode=context.GRAPH_MODE, device_target="CPU")
 _device = context.get_context("device_target")
 
 
-class MindSporeBackend(Backend[Tensor], backend_name='mindspore'):
+class MindSporeBackend(BackendProxy, backend_name='mindspore'):
     DATA_CLASS = ms.Tensor
 
     @staticmethod

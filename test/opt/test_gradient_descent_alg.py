@@ -1,11 +1,13 @@
 import pytest
 import numpy as np
-
+import warnings
 from fealpy.backend import backend_manager as bm
 from fealpy.opt.gradient_descent_alg import GradientDescentAlg
 from fealpy.opt.optimizer_base import opt_alg_options
 
 from gradient_descent_alg_data import *
+from fealpy.opt.line_search_rules import *
+
 
 
 class TestGradientDescentInterfaces:
@@ -35,7 +37,7 @@ class TestGradientDescentInterfaces:
                                   FunValDiff = FunValDiff, 
                                   StepLength = StepLength, 
                                   StepLengthTol = StepLengthTol,
-                                  NumGrad = NumGrad )
+                                  NumGrad = NumGrad)
         GDA = GradientDescentAlg(options)
         options = GDA.options
         np.testing.assert_array_equal(bm.to_numpy(options['x0']), x0)
@@ -54,7 +56,16 @@ class TestGradientDescentInterfaces:
 
     @pytest.mark.parametrize("backend", ['numpy','pytorch','jax'])
     @pytest.mark.parametrize("meshdata", run_data)
-    def test_run(self,meshdata,backend):
+    @pytest.mark.parametrize("line_search_method", [
+        ArmijoLineSearch(),
+        PowellLineSearch(),
+        GoldsteinLineSearch(),
+        ZhangHagerLineSearch(),
+        GrippoLineSearch(),
+        ExactLineSearch(),
+    ])
+
+    def test_run(self,meshdata,backend,line_search_method):
         bm.set_backend(backend)
         x0 = bm.from_numpy(meshdata['x0'])
         objective = meshdata['objective']
@@ -63,13 +74,19 @@ class TestGradientDescentInterfaces:
         x1 = bm.from_numpy(meshdata['x'])
         f1 = meshdata['f']
         g1= bm.from_numpy(meshdata['g'])
-        diff1 = bm.from_numpy(meshdata['diff'])
+        diff1 = bm.from_numpy(np.array(meshdata['diff']))
+        
+        # 忽略 DeprecationWarning
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        options = opt_alg_options(x0 = x0,
-                                  objective=objective,
-                                  StepLength= StepLength,
-                                  MaxIters=MaxIters
-                                  )
+        options = opt_alg_options(
+            x0=x0,
+            objective=objective,
+            StepLength=StepLength,
+            MaxIters=MaxIters,
+            LineSearch = line_search_method
+        )
+        GDA = GradientDescentAlg(options)
         maxit = options['MaxIters']
         GDA = GradientDescentAlg(options)
         x , f ,g , diff = GDA.run(maxit=maxit)

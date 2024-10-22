@@ -10,11 +10,11 @@ from cupy.typing import NDArray
 from cupy.linalg import det
 
 from .base import (
-    Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+    BackendProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 )
 
 
-class CuPyBackend(Backend[NDArray], backend_name='cupy'):
+class CuPyBackend(BackendProxy, backend_name='cupy'):
     DATA_CLASS = cp.ndarray
 
     linalg = cp.linalg
