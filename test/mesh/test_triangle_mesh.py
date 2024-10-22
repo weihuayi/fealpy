@@ -375,6 +375,23 @@ class TestTriangleMeshInterfaces:
         np.testing.assert_array_equal(bm.to_numpy(face2cell), data["face2cell"])
         np.testing.assert_allclose(u , data['u'])
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    @pytest.mark.parametrize("data", mesh_feom_domain_data)
+    def test_mesh_feom_domain(self, data, backend):
+        from fealpy.old.geometry.domain_2d import BoxWithCircleHolesDomain
+        bm.set_backend(backend)
+        box = data['box']
+        circles = data['circles']
+        hmin = data['hmin']
+        hmax = data['hmax']
+
+        domain = BoxWithCircleHolesDomain(box=box, circles=circles, hmin=hmin, hmax=hmax)
+        box_with_circle_mesh = TriangleMesh.from_domain_distmesh(domain)
+
+        node = box_with_circle_mesh.node
+        cell = box_with_circle_mesh.cell
+
+
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()
     #a.test_from_box(from_box[0], 'pytorch')

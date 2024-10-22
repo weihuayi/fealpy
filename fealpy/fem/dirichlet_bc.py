@@ -32,7 +32,7 @@ class DirichletBC():
             else:
                 if threshold is None:
                     self.threshold = [None for i in range(len(space))]
-                    self.is_boundary_dof = [i.is_boundary_dof(j, method=method) for i in space]
+                    self.is_boundary_dof = [i.is_boundary_dof() for i in space]
                     self.is_boundary_dof = bm.concatenate(self.is_boundary_dof)
                 else:
                     index = bm.concatenate((bm.array([0]),bm.cumsum(self.gdof, axis=0)))
@@ -226,7 +226,8 @@ class DirichletBC():
                 assert uh is None
                 uh = []
                 for i in range(len(gD)):
-                    suh, sidDDdof = self.space[i].boundary_interpolate(gD[i], threshold=self.threshold[i])
+                    suh, sidDDdof = self.space[i].boundary_interpolate(gD=gD[i], uh=uh,
+                                                                    threshold=self.threshold[i], method=self.method)
                     uh.append(suh[:])
                 uh = bm.concatenate(uh)
             else:
@@ -235,7 +236,8 @@ class DirichletBC():
         else:
             if uh is None:
                 uh = bm.zeros_like(f)
-            uh, _ = self.space.boundary_interpolate(gD, uh, self.threshold)
+            uh, _ = self.space.boundary_interpolate(gD=gD, uh=uh, 
+                                                threshold=self.threshold, method=self.method)
 
         bd_idx = self.boundary_dof_index
         f = f - A.matmul(uh[:])

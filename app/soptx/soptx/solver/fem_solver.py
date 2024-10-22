@@ -50,14 +50,12 @@ class FEMSolver:
         Apply boundary conditions to the stiffness matrix and force vector.
         """
         dirichlet = self.pde.dirichlet
-        is_dirichlet_boundary_dof_x = self.pde.is_dirichlet_boundary_dof_x
-        is_dirichlet_boundary_dof_y = self.pde.is_dirichlet_boundary_dof_y
+        threshold = self.pde.threshold
+ 
 
         uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(), 
                         dtype=bm.float64, device=bm.get_device(self.tensor_space))
-        isBdDof = self.tensor_space.is_boundary_dof(
-                            threshold=(is_dirichlet_boundary_dof_x, is_dirichlet_boundary_dof_y), 
-                            method='interp')
+        isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
 
         F = F - K.matmul(uh_bd)
         F[isBdDof] = uh_bd[isBdDof]
