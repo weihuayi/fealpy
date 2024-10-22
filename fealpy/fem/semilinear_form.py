@@ -1,4 +1,3 @@
-
 from typing import Optional
 
 from .. import logger
@@ -7,6 +6,7 @@ from ..backend import backend_manager as bm
 from ..sparse import COOTensor
 from .form import Form
 from .integrator import SemilinearInt, OpInt, SrcInt
+from .semilinear_wrapper import SemilinearWrapperInt
 
 
 class SemilinearForm(Form[SemilinearInt]):
@@ -15,23 +15,28 @@ class SemilinearForm(Form[SemilinearInt]):
 
     def _get_sparse_shape(self):
         pass
-    
+
     def _assembly_group(self, group: str, retain_ints: bool=False):
         if group in self.memory:
             return self.memory[group]
- 
+
         INTS = self.integrators[group]
         SEMILINEAR_INTS = []
         etg = [INTS[0].to_global_dof(s) for s in self._spaces]
 
         for ints_ in INTS:
-            if isinstance(ints_, OpInt) and isinstance(ints_, SemilinearInt):
+            if isinstance(ints_, OpInt):
+                if not isinstance(ints_, SemilinearInt):
+                    ints_ = SemilinearWrapperInt(ints_)
                 SEMILINEAR_INTS.append(ints_)
-        
+
         ct_F = SEMILINEAR_INTS[0](self.space)[1] if len(SEMILINEAR_INTS) !=0 else None
-        
+
         if isinstance(INTS[0], OpInt):
-            ct_A = INTS[0](self.space)[0]
+            if not isinstance(INTS[0], SemilinearInt):
+                ct_A = SemilinearWrapperInt(INTS[0])(self.space)[0]
+            else:
+                ct_A = INTS[0](self.space)[0]
         else:
             ct_A = INTS[0](self.space)
 
@@ -48,7 +53,7 @@ class SemilinearForm(Form[SemilinearInt]):
                 ct_A = ct_A + new_ct_A[None, ...]
             else:
                 ct_A = ct_A+ new_ct_A
-        
+
         for int_sem_ in SEMILINEAR_INTS[1:]:
             new_ct_F = int_sem_(self.space)[1]
             fdim_F = min(ct_F.ndim, new_ct_F.ndim)
@@ -128,7 +133,7 @@ class SemilinearForm(Form[SemilinearInt]):
         return M
 
     def assembly(self, *, return_dense=True, coalesce=True, format='csr',retain_ints: bool=False) -> COOTensor:
-        
+
         M = self._scalar_assembly_A(retain_ints, self.batch_size)
         if format == 'csr':
             self._M = M.coalesce().tocsr()
@@ -143,3 +148,4 @@ class SemilinearForm(Form[SemilinearInt]):
             return self._M, self._V.to_dense()
 
         return self._M, self._V
+    
