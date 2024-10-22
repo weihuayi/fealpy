@@ -161,8 +161,8 @@ class FlowPastCylinder:
 
         node = np.array(mesh.points, dtype=np.float64)
         cell = np.array(mesh.elements, dtype=np.int_)
-        mesh = TriangleMesh(node,cell)  
-        return mesh
+        #mesh = TriangleMesh(node,cell)  
+        return node,cell
 
     def mesh(self): 
         gmsh.initialize()

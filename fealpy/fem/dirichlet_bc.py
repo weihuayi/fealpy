@@ -143,7 +143,6 @@ class DirichletBC():
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
-
         if isinstance(A, COOTensor):
             indices = A.indices()
             remove_flag = bm.logical_or(

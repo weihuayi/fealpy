@@ -12,20 +12,16 @@ import numpy as np
 import scipy.sparse as sp
 
 from fealpy.utils import timer
-from fealpy.timeintegratoralg import UniformTimeLine
-from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
+from fealpy.old.timeintegratoralg import UniformTimeLine
+from fealpy.old.pde.navier_stokes_equation_2d import FlowPastCylinder
 
-from fealpy.torch.typing import Tensor, Index
-from fealpy.torch.mesh import TriangleMesh
-from fealpy.mesh import IntervalMesh
-from fealpy.mesh import TriangleMesh as OTM
-from fealpy.torch.solver import sparse_cg
+from fealpy.old.torch.mesh import TriangleMesh
+from fealpy.solver import cg
 
-from fealpy.torch.functionspace import LagrangeFESpace
-from fealpy.torch.functionspace import TensorFunctionSpace
+from fealpy.old.torch.functionspace import LagrangeFESpace
 
 from fealpy.decorator import barycentric, cartesian
-from fealpy.torch.fem import (
+from fealpy.old.torch.fem import (
     BilinearForm, LinearForm,
     ScalarDiffusionIntegrator,
     ScalarConvectionIntegrator,
@@ -34,9 +30,9 @@ from fealpy.torch.fem import (
     PressWorkIntegrator,PressWorkIntegrator1,
     DirichletBC
 )
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-#device = torch.device('cpu')
-
+#device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = torch.device('cpu')
+torch.set_printoptions(15)
 tmr = timer()
 next(tmr)
 
@@ -45,7 +41,7 @@ udegree = 2
 pdegree = 1
 T = 5
 nt = 5000
-q = 3
+q = 4
 eps=1e-12
 pde = FlowPastCylinder()
 rho = pde.rho
@@ -54,26 +50,26 @@ fwargs = {'dtype': torch.float64, "device": device}
 iwargs = {'dtype': torch.int32, "device": device}
 
 @cartesian
-def is_inflow_boundary( p:Tensor):
+def is_inflow_boundary( p ):
     return torch.abs(p[..., 0]) < eps
 
 @cartesian
-def is_outflow_boundary(p:Tensor):
+def is_outflow_boundary(p ):
     return torch.abs(p[..., 0] - 2.2) < eps
 
 @cartesian
-def is_circle_boundary( p:Tensor):
+def is_circle_boundary( p ):
     x = p[...,0]
     y = p[...,1]
     return (torch.sqrt(x**2 + y**2) - 0.05) < eps
   
 @cartesian
-def is_wall_boundary( p:Tensor):
+def is_wall_boundary( p ):
     return (torch.abs(p[..., 1] -0.41) < eps) | \
            (torch.abs(p[..., 1] ) < eps)
 
 @cartesian
-def u_inflow_dirichlet( p:Tensor):
+def u_inflow_dirichlet( p ):
     x = p[...,0]
     y = p[...,1]
     value = torch.zeros(p.shape, **fwargs)
@@ -81,9 +77,9 @@ def u_inflow_dirichlet( p:Tensor):
     value[...,1] = 0
     return value
 
-omesh = pde.mesh1(0.01)
-node = torch.from_numpy(omesh.entity('node')).to(**fwargs)
-cell = torch.from_numpy(omesh.entity('cell')).to(**iwargs)
+node,cell = pde.mesh1(0.05)
+node = torch.from_numpy(node)
+cell = torch.from_numpy(cell)
 mesh = TriangleMesh(node, cell)
 
 timeline = UniformTimeLine(0, T, nt)
@@ -128,7 +124,6 @@ xx = torch.zeros(gdof, **fwargs)
 u_isbddof_u0 = uspace.is_boundary_dof()
 u_isbddof_in = uspace.is_boundary_dof(threshold = is_inflow_boundary)
 u_isbddof_out = uspace.is_boundary_dof(threshold = is_outflow_boundary)
-u_isbddof_circle = uspace.is_boundary_dof(threshold = is_circle_boundary)
 
 u_isbddof_u0[u_isbddof_in] = False 
 u_isbddof_u0[u_isbddof_out] = False 
@@ -145,21 +140,27 @@ xx[ugdof:2*ugdof][u_isbddof_in] = uinfow[:,1]
 p_isBdDof_p0 = pspace.is_boundary_dof(threshold =  is_outflow_boundary) 
 xx[2*ugdof:][p_isBdDof_p0] = 0 
 isBdDof = torch.cat([u_isbddof, u_isbddof, p_isBdDof_p0], dim=0)
+import numpy as np
+#np.save('oxx.npy', xx.numpy())
+#np.save('oisBdDof.npy', isBdDof.numpy())
 
-
-for i in range(nt):
+for i in range(10):
     t1 = timeline.next_time_level()
     print("time=", t1)
     
     @barycentric
-    def concoef(bcs:Tensor, index):
+    def concoef(bcs, index):
         kwargs = {'dtype': bcs.dtype, "device": bcs.device}
         return u0(bcs, index).to(**kwargs)
     
     bform = BilinearForm(uspace)
     bform.add_integrator(ScalarConvectionIntegrator(concoef, q=4))
     C = bform.assembly() 
-    
+    torch.sum(torch.abs(C.to_dense()))
+    np.save('ou0.npy', u0.numpy())
+    np.save('oA.npy', C.to_dense().numpy())
+
+
     indices = torch.tensor([[],[]], **iwargs)
     data = torch.tensor([], **fwargs)
     zeros_0 = torch.sparse_coo_tensor(indices, data, (ugdof,ugdof))
@@ -168,7 +169,7 @@ for i in range(nt):
     A0 = torch.cat([M+S+C, zeros_0, -APX], dim=1)
     A1 = torch.cat([zeros_0, M+S+C, -APY], dim=1)
     A2 = torch.cat([-APX.T, -APY.T ,zeros_1], dim=1)
-    A = torch.cat((A0,A1,A2),dim=0)
+    A = torch.cat((A0,A1,A2),dim=0) 
     
     b0 = M@u0[:,0] 
     b1 = M@u0[:,1]
@@ -197,10 +198,13 @@ for i in range(nt):
     A = A.tocsr()
     b = b.cpu().numpy()
     
+    import numpy as np
     x = sp.linalg.spsolve(A,b)
     x = torch.from_numpy(x).to(**fwargs)
     #x = sparse_cg(A, b, maxiter=10000)
-
+  
+    print(torch.sum(torch.abs(x)))
+    
     u1[:,0] = x[:ugdof]
     u1[:,1] = x[ugdof:2*ugdof]
     p1[:] = x[2*ugdof:]

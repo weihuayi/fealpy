@@ -28,14 +28,14 @@ from fealpy.utils import timer
 
 #TODO:mesh.nodedata对tensorspace的情况
 
-#backend = 'pytorch'
-backend = 'numpy'
-#device = 'cuda'
-device = 'cpu'
+backend = 'pytorch'
+#backend = 'numpy'
+device = 'cuda'
+#device = 'cpu'
 bm.set_backend(backend)
-#bm.set_default_device(device)
+bm.set_default_device(device)
 
-output = './numpy/'
+output = './pytorch/'
 udegree = 2
 pdegree = 1
 q = 4
