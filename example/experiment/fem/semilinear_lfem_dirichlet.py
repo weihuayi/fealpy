@@ -1,4 +1,3 @@
-
 import argparse
 
 from scipy.sparse import csr_matrix
@@ -10,7 +9,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import SemilinearForm
-from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
+from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator, ScalarDiffusionIntegrator
 from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.pde.semilinear_2d import SemilinearData
@@ -46,7 +45,7 @@ parser.add_argument('--meshtype',
         help='默认网格为三角形网格')
 
 args = parser.parse_args()
-args.backend = 'pytorch'
+args.backend = 'numpy'
 bm.set_backend(args.backend)
 p = args.degree
 n = args.n
@@ -64,17 +63,6 @@ tol = 1e-14
 NDof = bm.zeros(maxit, dtype=bm.int64)
 errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
-def kernel_func_reaction(u):
-    return u**3
-
-def grad_kernel_func_reaction(u):
-    return 3*u**2
-
-def kernel_func_diffusion(u):
-    return u
-
-def grad_kernel_func_diffusion(u):
-    return bm.ones_like(u)
 
 def diffusion_coef(p, **args):
     return pde.diffusion_coefficient(p)
@@ -82,13 +70,23 @@ def diffusion_coef(p, **args):
 def reaction_coef(p, **args):
     return pde.reaction_coefficient(p)
 
+def kernel_func_diffusion(u):
+    return u
+def kernel_func_reaction(u):
+    return u**3
+
+def grad_kernel_func_reaction(u):
+    return 3*u**2
+def grad_kernel_func_diffusion(u):
+    return bm.ones_like(u)
+
 reaction_coef.kernel_func = kernel_func_reaction
 diffusion_coef.kernel_func = kernel_func_diffusion
 
 if bm.backend_name == 'numpy':
     reaction_coef.grad_kernel_func = grad_kernel_func_reaction
     diffusion_coef.grad_kernel_func = grad_kernel_func_diffusion
-    
+
 for i in range(maxit):
     #定义函数空间
     space = LagrangeFESpace(mesh, p=p)
@@ -101,21 +99,22 @@ for i in range(maxit):
     reaction_coef.uh = u0
     isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
 
-    #定义积分子
-    D = ScalarSemilinearDiffusionIntegrator(diffusion_coef, q=p+2)
+    #添加积分子
+    D = ScalarDiffusionIntegrator(diffusion_coef, q=p+2)
     M = ScalarSemilinearMassIntegrator(reaction_coef, q=p+2)
     f = ScalarSourceIntegrator(pde.source, q=p+2)
 
+    sform = SemilinearForm(space)
+    sform.add_integrator([D, M])
+    sform.add_integrator(f)
+
     while True:
-        #矩阵组装
-        sform = SemilinearForm(space)
-        sform.add_integrator([D, M])
-        sform.add_integrator(f)
+        #矩阵组装、边界条件处理
         A, F = sform.assembly()
         tmr.send(f'第{i}次矩组装时间')
-        
+        A, F = DirichletBC(space, gd=0.0, threshold=isDDof).apply(A, F)
+
         #求解增量
-        A, F = DirichletBC(space, gD=pde.solution, threshold=isDDof).apply(A, F)
         du = cg(A, F)
         u0 += du
         tmr.send(f'第{i}次求解器时间')

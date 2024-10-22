@@ -35,3 +35,6 @@ from .dirichlet_bc_operator import DirichletBCOperator
 
 ### recovery estimate
 from .recovery_alg import RecoveryAlg
+
+### Other
+from .semilinear_wrapper import SemilinearWrapperInt
