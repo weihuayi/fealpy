@@ -12,7 +12,9 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import SemilinearForm
 from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
 from fealpy.fem import ScalarSourceIntegrator
+from fealpy.fem import DirichletBC
 from fealpy.pde.semilinear_2d import SemilinearData
+from fealpy.solver import cg
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 
@@ -74,10 +76,10 @@ def kernel_func_diffusion(u):
 def grad_kernel_func_diffusion(u):
     return bm.ones_like(u)
 
-def diffusion_coef(p):
+def diffusion_coef(p, **args):
     return pde.diffusion_coefficient(p)
 
-def reaction_coef(p):
+def reaction_coef(p, **args):
     return pde.reaction_coefficient(p)
 
 reaction_coef.kernel_func = kernel_func_reaction
@@ -97,8 +99,7 @@ for i in range(maxit):
     du = space.function()
     diffusion_coef.uh = u0
     reaction_coef.uh = u0
-    isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)[-1]
-    isIDof = ~isDDof
+    isDDof = space.set_dirichlet_bc(pde.dirichlet, u0)
 
     #定义积分子
     D = ScalarSemilinearDiffusionIntegrator(diffusion_coef, q=p+2)
@@ -114,8 +115,8 @@ for i in range(maxit):
         tmr.send(f'第{i}次矩组装时间')
         
         #求解增量
-        A = csr_matrix((A.values(), A.indices()), A.shape)
-        du[isIDof] = bm.tensor(spsolve(A[isIDof, :][:, isIDof], F[isIDof]).reshape(-1), dtype=du[isIDof].dtype)
+        A, F = DirichletBC(space, gD=pde.solution, threshold=isDDof).apply(A, F)
+        du = cg(A, F)
         u0 += du
         tmr.send(f'第{i}次求解器时间')
 
@@ -124,7 +125,7 @@ for i in range(maxit):
         M.clear()
 
         #计算误差
-        err = bm.max(bm.abs(du.array))
+        err = bm.max(bm.abs(du))
         if err < tol:
             break
 

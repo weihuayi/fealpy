@@ -1,5 +1,6 @@
 
 from typing import Optional, Union, Tuple
+import threading
 from functools import reduce
 from math import factorial
 from itertools import combinations_with_replacement
@@ -10,7 +11,8 @@ from numpy.linalg import det
 from scipy.sparse._sparsetools import coo_matvec, csr_matvec, csr_matvecs, coo_tocsr
 
 from .base import (
-    Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING
+    ModuleProxy, BackendProxy,
+    ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 )
 
 
@@ -22,7 +24,7 @@ def _remove_device(func):
     return wrapper
 
 
-class NumPyBackend(Backend[NDArray], backend_name='numpy'):
+class NumPyBackend(BackendProxy, backend_name='numpy'):
     DATA_CLASS = np.ndarray
 
     linalg = np.linalg
@@ -425,3 +427,36 @@ if int(np.__version__[:1]) < 2:
 
 NumPyBackend.attach_attributes(attribute_mapping, np)
 NumPyBackend.attach_methods(function_mapping, np)
+
+
+##################################################
+### Random Submodule
+##################################################
+
+class NumpyRandom(ModuleProxy):
+    def __init__(self):
+        super().__init__()
+        self._THREAD_LOCAL = threading.local()
+        self.rng = np.random.default_rng()
+
+    @property
+    def rng(self) -> np.random.Generator:
+        return self._THREAD_LOCAL.rng
+
+    @rng.setter
+    def setter(self, value):
+        self._THREAD_LOCAL.rng = value
+
+    def seed(self, seed: int):
+        self.rng = np.random.default_rng(seed)
+
+    def rand(self, *size, dtype=None, device=None):
+        if len(size) == 1: size = size[0]
+        return self.rng.random(size=size, dtype=dtype)
+
+    def randint(self, low, high=None, size=None, dtype=None, device=None):
+        return self.rng.integers(low, high, size=size, dtype=dtype)
+
+    def randn(self, *size, dtype=None, device=None):
+        if len(size) == 1: size = size[0]
+        return self.rng.standard_normal(size, dtype=dtype)

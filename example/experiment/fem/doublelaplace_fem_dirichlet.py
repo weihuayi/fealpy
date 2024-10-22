@@ -39,11 +39,11 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='pytorch', type=str,
+        default='numpy', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--device',
-        default='cuda', type=str,
+        default='cpu', type=str,
         help='默认gpu计算')
 
 args = parser.parse_args()
@@ -53,7 +53,6 @@ bm.set_backend(args.backend)
 #device = "cuda"
 p = args.degree
 n = args.n
-meshtype = args.meshtype
 maxit = args.maxit
 device = args.device
 
@@ -87,6 +86,7 @@ for i in range(maxit):
 
     space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
     
+    tmr.send(f'第{i}次空间生成时间')
 
     uh = space.function()
 
@@ -106,7 +106,7 @@ for i in range(maxit):
 
     gdof = space.number_of_global_dofs()
     NDof[i] = 1/4/2**i
-    bc1 = DirichletBC(space, gd = ulist)
+    bc1 = DirichletBC(space, gD = ulist)
     #import ipdb
     #ipdb.set_trace()
     A, F = bc1.apply(A, F)  
@@ -119,7 +119,7 @@ for i in range(maxit):
     #A = coo_matrix(A)
     #A = csr_matrix((A.values(), A.indices()),A.shape)
     #uh[:] = bm.tensor(spsolve(A, F))
-    uh[:] = spsolve(A, F, "cupy")
+    uh[:] = spsolve(A, F, "scipy")
     
     #uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
