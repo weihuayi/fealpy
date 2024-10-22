@@ -199,7 +199,7 @@ class TensorFunctionSpace(FunctionSpace):
 
     
     def boundary_interpolate(self,
-        gD: Union[Callable, int, float, TensorLike],
+        gd: Union[Callable, int, float, TensorLike],
         uh: Optional[TensorLike]=None,
         *,
         threshold: Union[Callable, TensorLike, None]=None, method=None) -> TensorLike:
@@ -207,8 +207,8 @@ class TensorFunctionSpace(FunctionSpace):
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
         mesh = self.mesh
-        if (bm.is_tensor(gD)) or (isinstance(gD, Function)):
-            assert len(gD[:]) == self.number_of_global_dofs()
+        if (bm.is_tensor(gd)) or (isinstance(gd, Function)):
+            assert len(gd[:]) == self.number_of_global_dofs()
             if bm.is_tensor(threshold):
                 assert len(threshold) == self.number_of_global_dofs()
                 isTensorBDof = threshold
@@ -216,28 +216,28 @@ class TensorFunctionSpace(FunctionSpace):
                 isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
             if uh is None:
                 uh = self.function()
-            uh[isTensorBDof] = gD[isTensorBDof] 
+            uh[isTensorBDof] = gd[isTensorBDof] 
             return uh, isTensorBDof
         
-        elif callable(gD):
+        elif callable(gd):
             if (threshold is None) | (callable(threshold)):
                 isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold, method=method) 
-                gD_tensor = gD(ipoints[isScalarBDof])
-                assert gD_tensor.shape[-1] == self.dof_numel
+                gd_tensor = gd(ipoints[isScalarBDof])
+                assert gd_tensor.shape[-1] == self.dof_numel
                 isTensorBDof = self.is_boundary_dof(threshold = threshold, method=method) 
             
             elif bm.is_tensor(threshold):
                 assert len(threshold) == self.number_of_global_dofs()
                 isTensorBDof = threshold
-                gD_tensor = gD(ipoints)
-                assert gD_tensor.shape[-1] == self.dof_numel
+                gd_tensor = gd(ipoints)
+                assert gd_tensor.shape[-1] == self.dof_numel
                 if uh is None:
                     uh = self.function()
                 if self.dof_priority:
-                    gD_tensor = gD_tensor.T.reshape(-1)
+                    gd_tensor = gd_tensor.T.reshape(-1)
                 else:
-                    gD_tensor = gD_tensor.reshape(-1) 
-                uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor[isTensorBDof])
+                    gd_tensor = gd_tensor.reshape(-1) 
+                uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor[isTensorBDof])
                 return uh, isTensorBDof
                 
             elif isinstance(threshold, tuple):
@@ -254,17 +254,17 @@ class TensorFunctionSpace(FunctionSpace):
                             node_flags = node_threshold()
                             isScalarBDof = isScalarBDof & node_flags
 
-                        if callable(gD):
-                            gD_scalar = gD(ipoints[isScalarBDof])
+                        if callable(gd):
+                            gd_scalar = gd(ipoints[isScalarBDof])
                         else:
-                            gD_scalar = gD
+                            gd_scalar = gd
 
                         if dof_threshold is not None:
                             dof_flags = dof_threshold()
                             node_dof_flags = dof_flags[node_flags] 
-                            gD_vector = gD_scalar[node_dof_flags] 
+                            gd_vector = gd_scalar[node_dof_flags] 
                         else:
-                            gD_vector = gD_scalar
+                            gd_vector = gd_scalar
 
                         isTensorBDof = self.is_boundary_dof(threshold=(edge_threshold, 
                                                                     node_threshold, 
@@ -285,17 +285,17 @@ class TensorFunctionSpace(FunctionSpace):
                             node_flags = node_threshold()
                             isScalarBDof = isScalarBDof & node_flags
 
-                        if callable(gD):
-                            gD_scalar = gD(ipoints[isScalarBDof])
+                        if callable(gd):
+                            gd_scalar = gd(ipoints[isScalarBDof])
                         else:
-                            gD_scalar = gD
+                            gd_scalar = gd
 
                         if dof_threshold is not None:
                             dof_flags = dof_threshold()
                             node_dof_flags = dof_flags[node_flags] 
-                            gD_vector = gD_scalar[node_dof_flags] 
+                            gd_vector = gd_scalar[node_dof_flags] 
                         else:
-                            gD_vector = gD_scalar
+                            gd_vector = gd_scalar
 
                         isTensorBDof = self.is_boundary_dof(threshold=(face_threshold,
                                                                     edge_threshold, 
@@ -304,29 +304,29 @@ class TensorFunctionSpace(FunctionSpace):
                 elif method == 'interp':
                     assert len(threshold) == self.dof_numel 
                     isScalarBDof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold] 
-                    gD_tensor = [gD(ipoints[isScalarBDof[i]])[...,i] for i in range(self.dof_numel)]
+                    gd_tensor = [gd(ipoints[isScalarBDof[i]])[...,i] for i in range(self.dof_numel)]
                     isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
                     if uh is None:
                         uh = self.function()
                     if self.dof_priority:
-                        gD_tensor = bm.concatenate(gD_tensor)
+                        gd_tensor = bm.concatenate(gd_tensor)
                     else:
                         scalar_gdof = scalar_space.number_of_global_dofs()
-                        gD_tensor = bm.concatenate([bm.array([j[i] for j in isScalarBDof]) for i in range(scalar_gdof)])
-                    uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor)
+                        gd_tensor = bm.concatenate([bm.array([j[i] for j in isScalarBDof]) for i in range(scalar_gdof)])
+                    uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor)
                     return uh, isTensorBDof
                 else:
                     raise ValueError(f"Unknown method: {method}")
             else:
                 raise ValueError(f"Unknown type of threshold {type(threshold)}")
         else: 
-            raise ValueError(f"Unknown type of gD {type(gD)}")
+            raise ValueError(f"Unknown type of gd {type(gd)}")
         if uh is None:
             uh = self.function() 
         if self.dof_priority:
-            uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor.T.reshape(-1))
+            uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.T.reshape(-1))
         else:
-            uh[:] = bm.set_at(uh[:], isTensorBDof, gD_tensor.reshape(-1))
+            uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.reshape(-1))
             
         return uh, isTensorBDof
 
