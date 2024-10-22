@@ -324,29 +324,6 @@ def city_oliver30():
     ])
     return citys
 
-def city_3():
-    citys = bm.array([
-        [475, 110, 112],
-        [29, 929, 873],
-        [755, 897, 968],
-        [698, 979, 444],
-        [871, 317, 941],
-        [535, 184, 366],
-        [548, 73, 614],
-        [594, 380, 383],
-        [233, 845, 431],
-        [881, 654, 144],
-        [200, 540, 587],
-        [9, 800, 457],
-        [526, 456, 722],
-        [765, 30, 486],
-        [992, 449, 513],
-        [659, 193, 467],
-        [938, 370, 895],
-        [233, 966, 863]
-    ])
-    return citys
-
 TSP_data = [
     #二维地图
     {
@@ -389,23 +366,18 @@ TSP_data = [
         "num": 30,
         "opt":420,
     },
-    {
-        "citys": city_3,
-        "num": 18,
-    },
 ]
 
 
-def soler_tsp_with_algorithm(algorithm, fobj, lb, ub, NP, dim, D):
+def soler_tsp_with_algorithm(algorithm, fobj, lb, ub, NP, dim, MaxIters):
     x0 = lb + bm.random.rand(NP, dim) * (ub - lb)
-    option = opt_alg_options(x0, fobj, (lb, ub), NP, MaxIters = 100)
-    optimizer = algorithm(option, D)
+    option = opt_alg_options(x0, fobj, (lb, ub), NP, MaxIters)
+    optimizer = algorithm(option)
     gbest, gbest_f = optimizer.run()
     return gbest, gbest_f
 
 def gbestroute(gbest, citys):
-    route = bm.argsort(gbest)
-    route = bm.concatenate((route, route[0: 1]))
+    route = bm.concatenate((gbest, gbest[0: 1]))
     route_citys = citys[route]
     return route, route_citys
 
