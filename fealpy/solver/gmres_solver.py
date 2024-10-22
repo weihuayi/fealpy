@@ -49,7 +49,7 @@ def _cupy_solve(A, b, atol):
 
     iscpu = isinstance(b, np.ndarray) or b.device.type == "cpu"
     A, b = _to_cupy_data(A, b)
-    x, info = cpx.gmres(A, b, atol=atol)
+    x, info = cpx.gmres(A, b, tol=atol)
     if iscpu:
         x = cp.asnumpy(x)
     return x

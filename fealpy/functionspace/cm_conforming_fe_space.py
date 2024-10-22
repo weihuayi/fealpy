@@ -308,9 +308,9 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
 
 
-    def boundary_interpolate(self, gD, uh, threshold=None, method="interp"):
+    def boundary_interpolate(self, gd, uh, threshold=None, method="interp"):
         '''
-        @param gD : [right, tr], 第一个位置为方程的右端项，第二个位置为迹函数
+        @param gd : [right, tr], 第一个位置为方程的右端项，第二个位置为迹函数
         '''
         #TODO 只处理的边界为 0 的情况
         mesh = self.mesh
@@ -339,10 +339,10 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         nodefram[bdnidxmap[coridx]] = bm.tile(bm.eye(2,dtype=bm.float64, device=self.device), (len(coridx), 1, 1))
 
         # 顶点自由度
-        uh[n2id[:, 0]] = gD[0](node) 
+        uh[n2id[:, 0]] = gd[0](node) 
         k = 1; 
         for r in range(1, 2*m+1):
-            val = gD[r](node) 
+            val = gd[r](node) 
             multiIndex = self.mesh.multi_index_matrix(r, 1)
             symidx, num = symmetry_index(2, r, device=self.device)
 
@@ -368,7 +368,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
             b2l = self.bspace.bernstein_to_lagrange(p-r, 1)
             point = self.mesh.bc_to_point(bcs)[isBdEdge]
             if r==0:
-                ffval = gD[0](point) #(ldof, NE)
+                ffval = gd[0](point) #(ldof, NE)
                 bcoeff = bm.einsum('el, il->ei', ffval, b2l)
                 uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             else:
@@ -380,13 +380,13 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 #idx = self.mesh.multi_index_matrix(r, GD-1)
                 #num = factorial(r)/bm.prod(factorial(idx), axis=1)
 
-                ffval = gD[r](point) #(ldof, NE, L), L 指的是分量个数，k 阶导有 k 个
+                ffval = gd[r](point) #(ldof, NE, L), L 指的是分量个数，k 阶导有 k 个
                 bcoeff = bm.einsum('ej, elj, j, il->ei', nnn, ffval, num, b2l)
                 uh[e2id[:, k:l]] = bcoeff[:, 2*m+1-r: -2*m-1+r]
             k = l
             l += p-4*m+r
         isDDof = self.is_boundary_dof(threshold=threshold)
-        uI = self.interpolation(gD)
+        uI = self.interpolation(gd)
         isDDofidx = bm.where(isDDof)[0]
         #uh[isDDof] = uI[isDDof]
         return uh, isDDof
