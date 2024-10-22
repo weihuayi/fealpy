@@ -4,7 +4,7 @@ from typing import (
     Literal, TypeGuard, overload, TypeVar
 )
 
-from .base import Backend, Size, Number
+from .base import BackendProxy, Size, Number
 from .base import TensorLike as _DT
 
 Axes = Union[int, Tuple[Optional[int], ...], None]
@@ -17,12 +17,29 @@ All methods in this class are static methods by default,
 unless explicitly annotated otherwise.
 """
 
+
+class SparseModule():
+    pass
+
+
+class RandomModule():
+    def seed(self, seed: int, /) -> None: ...
+    def rand(self, shape: Size, /, *, dtype=None, device=None) -> _DT: ...
+    def randint(self, low: int, high: Optional[int] = None, shape: Optional[Size] = None, *,
+                dtype=None, device=None) -> _DT: ...
+    def randn(self, shape: Size, /, *, dtype=None, device=None) -> _DT: ...
+
+
+class LinalgModule():
+    pass
+
+
 class BackendManager():
     backend_name: Literal['numpy', 'pytorch', 'jax', 'mindspore', 'paddle', 'taichi', 'cupy']
     def __init__(self, *, default_backend: Optional[str]=None): ... # instance method
     def set_backend(self, name: str) -> None: ... # instance method
     def load_backend(self, name: str) -> None: ... # instance method
-    def get_current_backend(self) -> Backend: ... # instance method
+    def get_current_backend(self) -> BackendProxy: ... # instance method
 
     ### constants ###
 

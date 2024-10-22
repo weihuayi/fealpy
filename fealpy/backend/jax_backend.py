@@ -16,12 +16,12 @@ except ImportError:
                       'the JAX backend in FEALPy. '
                       'See https://github.com/google/jax for installation.')
 
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
+from .base import BackendProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
 
 Array = jax.Array
 _device = jax.Device
 
-class JAXBackend(Backend[Array], backend_name='jax'):
+class JAXBackend(BackendProxy, backend_name='jax'):
     DATA_CLASS = Array
     linalg = jnp.linalg
     random = jax.random

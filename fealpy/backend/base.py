@@ -230,23 +230,7 @@ TRANSFORMS_MAPPING = _make_default_mapping(
 )
 
 
-class Backend(Generic[_DT]):
-    """
-    Base class for all backends.
-    """
-    DATA_CLASS: Optional[Type[_DT]] = None
-    _available_backends: Dict[str, Type["Backend"]] = {}
-
-    def __init_subclass__(cls, backend_name: str, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        if backend_name != "":
-            cls._available_backends[backend_name.lower()] = cls
-            cls.backend_name = backend_name
-            TensorLike.register(cls.DATA_CLASS)
-        else:
-            raise ValueError("Backend name cannot be empty.")
-
+class ModuleProxy():
     @classmethod
     def attach_attributes(cls, mapping: Dict[str, str], source: Any, /):
         for target_key, source_key in mapping.items():
@@ -277,6 +261,22 @@ class Backend(Generic[_DT]):
             logger.warning(f"{cls.__name__} does not support the "
                            f"'{arg_name}' argument in the function {function_name}. "
                            f"The argument will be ignored.")
+
+
+class BackendProxy(ModuleProxy):
+    """Base class for all backend proxies."""
+    DATA_CLASS: Optional[Type] = None
+    _available_backends: Dict[str, Type["BackendProxy"]] = {}
+
+    def __init_subclass__(cls, backend_name: str, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        if backend_name != "":
+            cls._available_backends[backend_name.lower()] = cls
+            cls.backend_name = backend_name
+            TensorLike.register(cls.DATA_CLASS)
+        else:
+            raise ValueError("Backend name cannot be empty.")
 
     @classmethod
     def is_tensor(cls, obj: Any, /) -> bool:
