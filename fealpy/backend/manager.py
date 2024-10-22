@@ -4,7 +4,7 @@ import importlib
 import threading
 
 from ..import logger
-from .base import Backend
+from .base import BackendProxy
 
 
 class BackendManager():
@@ -16,7 +16,7 @@ class BackendManager():
     #     return cls._instance
 
     def __init__(self, *, default_backend: Optional[str]=None):
-        self._backends: Dict[str, Backend] = {}
+        self._backends: Dict[str, BackendProxy] = {}
         self._THREAD_LOCAL = threading.local()
         self._default_backend_name = default_backend
 
@@ -28,19 +28,24 @@ class BackendManager():
 
     def load_backend(self, name: str) -> None:
         """Load a backend by name."""
-        if name not in Backend._available_backends:
+        if name not in BackendProxy._available_backends:
             try:
                 importlib.import_module(f"fealpy.backend.{name}_backend")
             except ImportError:
                 raise RuntimeError(f"Backend '{name}' is not found.")
 
-        if name in Backend._available_backends:
-            backend = Backend._available_backends[name]()
+        if name in BackendProxy._available_backends:
+            if name in self._backends:
+                logger.info(f"Backend '{name}' has already been loaded.")
+                return
+            # NOTE: initialize a backend proxy instance when loading.
+            # Backend proxy instances are singletons as there is no need to load twice.
+            backend = BackendProxy._available_backends[name]()
             self._backends[name] = backend
         else:
             raise RuntimeError(f"Failed to load backend '{name}'.")
 
-    def get_current_backend(self, logger_msg=None) -> Backend:
+    def get_current_backend(self, logger_msg=None) -> BackendProxy:
         """Get the current backend."""
         if 'backend' not in self._THREAD_LOCAL.__dict__:
             if self._default_backend_name is None:

@@ -1,5 +1,4 @@
 from typing import Union, Optional, Callable
-
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
@@ -61,7 +60,14 @@ class TriangleMesh(SimplexMesh, Plotable):
             return bm.edge_length(edge, node)
         elif etype == 2:
             cell = self.entity(2, index)
-            return bm.simplex_measure(cell, node)
+            if self.geo_dimension()==2:
+                return bm.simplex_measure(cell, node)
+            else: 
+                v0 = node[cell[:, 1], :] - node[cell[:, 0], :]
+                v1 = node[cell[:, 2], :] - node[cell[:, 0], :]
+
+                nv = bm.cross(v0, v1)
+                return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
   
@@ -1070,7 +1076,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                 [0.0, 0.0],
                 [1.0, 0.0],
                 [0.0, 1.0]], dtype=bm.float64)
-        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32, device=self.device)
+        cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
@@ -1388,5 +1394,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             mesh.add_plot(ax)
             plt.show()
         return mesh
+
+    @classmethod
+    def from_domain_distmesh(cls, domain, maxit=100, output=False, itype=None, ftype=None, device=None):
+        from fealpy.old.mesh import DistMesher2d
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        mesher = DistMesher2d(domain, domain.hmin, output=output)
+        mesh = mesher.meshing(maxit=maxit)
+        node = bm.array(mesh.entity('node'), dtype=ftype, device=device)
+        cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
+
+        return cls(node, cell)
 
 TriangleMesh.set_ploter('2d')

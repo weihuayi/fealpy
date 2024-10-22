@@ -59,7 +59,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def edge_to_dof(self, index=_S):
         return self.dof.edge_to_dof()[index]
 
-    def is_boundary_dof(self, threshold=None, method='centroid') -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
             return self.dof.is_boundary_dof(threshold, method=method)
         else:
@@ -89,13 +89,13 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return uI
 
     def boundary_interpolate(self,
-            gD: Union[Callable, int, float, TensorLike],
+            gd: Union[Callable, int, float, TensorLike],
             uh: Optional[TensorLike] = None,
-            threshold: Optional[Threshold]=None) -> TensorLike:
+            *, threshold: Optional[Threshold]=None, method=None) -> TensorLike:
         """Set the first type (Dirichlet) boundary conditions.
 
         Parameters:
-            gD: boundary condition function or value (can be a callable, int, float, TensorLike).
+            gd: boundary condition function or value (can be a callable, int, float, TensorLike).
             uh: TensorLike, FE function uh .
             threshold: optional, threshold for determining boundary degrees of freedom (default: None).
 
@@ -103,16 +103,22 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             TensorLike: a bool array indicating the boundary degrees of freedom.
 
         This function sets the Dirichlet boundary conditions for the FE function `uh`. It supports
-        different types for the boundary condition `gD`, such as a function, a scalar, or a array.
+        different types for the boundary condition `gd`, such as a function, a scalar, or a array.
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-        isDDof = self.is_boundary_dof(threshold=threshold)
-
-        if callable(gD):
-            gD = gD(ipoints[isDDof])
+        isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
+        if bm.is_tensor(gd):
+            assert len(gd) == self.number_of_global_dofs()
+            if uh is None:
+                uh = bm.zeros_like(gd)
+            uh[isDDof] = gd[isDDof] 
+            return uh,isDDof 
+        if callable(gd):
+            gd = gd(ipoints[isDDof])
         if uh is None:
-            uh = bm.zeros_like(isDDof)
-        uh = bm.set_at(uh, (..., isDDof), gD)
+            uh = self.function()
+        uh[:] = bm.set_at(uh[:], (..., isDDof), gd)
+        
         return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate

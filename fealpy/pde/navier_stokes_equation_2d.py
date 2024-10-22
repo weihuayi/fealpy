@@ -70,28 +70,6 @@ class FlowPastCylinder:
         cell = mesh.cells_dict['triangle']
         return node, cell
     
-    def _dist_mesh(self, h0):
-        from fealpy.geometry import DistDomain2d
-        from fealpy.mesh import DistMesh2d
-        import numpy as np
-        fd1 = lambda p: dcircle(p,[0.2,0.2],0.05)
-        fd2 = lambda p: drectangle(p,[0.0,2.2,0.0,0.41])
-        fd = lambda p: ddiff(fd2(p),fd1(p))
-
-        def fh(p):
-            h = 0.003 + 0.05*fd1(p)
-            h[h>0.01] = 0.01
-            return h
-
-        bbox = [0,3,0,1]
-        pfix = np.array([(0.0,0.0),(2.2,0.0),(2.2,0.41),(0.0,0.41)],dtype=np.float64)
-        domain = DistDomain2d(fd,fh,bbox,pfix)
-        distmesh2d = DistMesh2d(domain,h0)
-        distmesh2d.run()
-
-        mesh = distmesh2d.mesh
-        return mesh
-
     def _fealpy_mesh(self,h):
         from meshpy.triangle import MeshInfo, build
         from fealpy.mesh import IntervalMesh
@@ -122,15 +100,13 @@ class FlowPastCylinder:
         cell = bm.from_numpy(cell)
         return node,cell
 
-    def mesh(self, h, method:str='fealpy', device=None):
+    def mesh(self, h, method:str='fealpy', device='cpu'):
         if method == 'fealpy':
             node,cell = self._fealpy_mesh(h)
             node = bm.device_put(node, device)
             cell = bm.device_put(cell, device) 
         elif mesh == 'gmesh':
             node,cell = self._gmesh_mesh(h)
-        #elif method == 'distmesh':
-        #    return self._dist_mesh(h)
         else:
             raise ValueError(f"Unknown method:{method}")
         return TriangleMesh(node, cell)
@@ -158,13 +134,32 @@ class FlowPastCylinder:
     @cartesian
     def is_u_boundary(self,p):
         return bm.abs(p[..., 0] - 2.2) > self.eps
+    
+    @cartesian
+    def is_p_boundary(self,p):
+        return self.is_outflow_boundary(p) 
 
     @cartesian
     def u_inflow_dirichlet(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = bm.zeros(p.shape, dtype=p.dtype)
+        value = bm.zeros_like(p)
         value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
         value[...,1] = 0
         return value
+    
+    @cartesian
+    def p_dirichlet(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        value = bm.zeros_like(x)
+        return value
 
+    @cartesian
+    def u_dirichlet(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        index = self.is_inflow_boundary(p)
+        result = bm.zeros_like(p)
+        result[index] = self.u_inflow_dirichlet(p[index])
+        return result
