@@ -18,7 +18,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.03
+        l0 = 0.0133
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):

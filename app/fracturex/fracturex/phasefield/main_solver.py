@@ -87,7 +87,8 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(len(self.force_value)-1):
+        for i in range(2):
+        #for i in range(len(self.force_value)-1):
             print('i', i)
             self._currt_force_value = self.force_value[i+1]
             # Run Newton-Raphson iteration
@@ -136,6 +137,11 @@ class MainSolver:
 
             print(f"Phase field error after iteration {k + 1}: {er1}")
             tmr.send('phase_solve')
+
+            print('u', self.uh)
+            print('H', self.H)
+            print('d', self.d)
+
             
             if self.enable_refinement:
                 data = self.set_interpolation_data()
@@ -199,7 +205,7 @@ class MainSolver:
         
         self.pfcm.update_disp(uh)
         tmr.send('disp_solve')
-        return np.linalg.norm(R)
+        return bm.linalg.norm(R)
 
     def solve_phase_field(self) -> float:
         """
@@ -219,7 +225,8 @@ class MainSolver:
         tmr.send('start')
 
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(coef==Gc * l0, q=self.q))
+        dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0, q=self.q))
+
         dbform.add_integrator(ScalarMassIntegrator(coef=Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef=coef, q=self.q))
         A = dbform.assembly()
@@ -228,7 +235,8 @@ class MainSolver:
         dlform = LinearForm(self.space)
         dlform.add_integrator(ScalarSourceIntegrator(source=coef, q=self.q))
         R = dlform.assembly()
-        R -= A @ d[:]
+        R -= A @ d[:] 
+        
         tmr.send('phase_R_assemble')
 
         A, R = self._apply_boundary_conditions(A, R, field='phase')
@@ -237,12 +245,13 @@ class MainSolver:
         dd = cg(A.tocsr(), R, atol=1e-14)
         d += dd.flatten()[:]
 
+
         self.d = d
         self.pfcm.update_phase(d)
         self.H = self.pfcm.H
 
         tmr.send('phase_solve')
-        return np.linalg.norm(R)
+        return bm.linalg.norm(R)
 
     def set_lfe_space(self):
         """
