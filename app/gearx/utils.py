@@ -4,14 +4,12 @@
 # 版本：
 #
 # 该文件包含了齿轮六面体网格生成的工具函数，主要包括：
-# 1. get_helix_points: 根据端面网格生成螺旋线上的点
-# 2. sweep_points: 根据端面网格，使用扫掠法，生成整体网格节点
-# 3. cylindrical_to_cartesian: 给定宽度坐标以及半径，计算其对应的笛卡尔坐标，适用于外齿轮
-# 4. sign_of_tetrahedron_volume: 给定三维空间中一个面上三个点坐标，以及任意另一点的坐标，通过计算四点构成的四面体的有符号体积，判断任一点是在面的左侧、右侧还是面上
-# 5. barycentric_coordinates: 计算点 P 在四面体 ABCD 上的重心坐标
-# 6. hex_cell_search: 六面体网格单元搜索
-# 7. hex_cell_search: 六面体网格单元搜索
-# 8. hex_cell_search: 六面体网格单元搜索
+# 1. get_helix_points：根据端面网格，基于扫掠法，获取指定参数位置的节点坐标
+# 2. sweep_points：根据端面网格，使用扫掠法，生成整体网格节点
+# 3. generate_hexahedral_mesh：根据齿轮端面网格，使用扫掠法，生成整体网格
+# 4. cylindrical_to_cartesian：给定宽度坐标以及半径，计算其对应的笛卡尔坐标，适用于外齿轮
+# 5. sign_of_tetrahedron_volume：计算四点构成的四面体的有符号体积，四点满足右手系则结果为正，否则为负
+# 6. find_node_location_kd_tree：查找目标节点在六面体网格中的位置，基于 kd_tree
 #
 # 注：这些函数后续可能会进一步封装成齿轮的类方法，但是为了后续工作能顺利开展目前暂时作为工具函数使用
 # ======================================================================================================================
@@ -22,7 +20,6 @@ from numpy import tan, arctan, sin, cos, pi, arctan2
 from scipy.optimize import fsolve
 
 from fealpy.mesh import QuadrangleMesh, HexahedronMesh
-from .gear import ExternalGear, InternalGear
 
 
 def get_helix_points(points, beta, r, h, t):
