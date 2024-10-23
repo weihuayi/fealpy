@@ -4,7 +4,17 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 import random
 from .optimizer_base import Optimizer
-from .Levy import levy
+# from .Levy import levy
+from scipy.special import gamma
+
+def levy(n, m, beta):
+    num = gamma(1 + beta) * bm.sin(bm.array(bm.pi * beta / 2))
+    den = gamma((1 + beta) / 2) * beta * 2 ** ((beta - 1) / 2)
+    sigma_u = (num / den) ** (1 / beta)
+    u = bm.random.randn(n, m) * sigma_u
+    v = bm.random.randn(n, m)
+    z = u / (bm.abs(v) ** (1 / beta))
+    return z
 
 
 class HippopotamusOptAlg(Optimizer):
