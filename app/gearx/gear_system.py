@@ -1,4 +1,4 @@
-from gear import Gear, ExternalGear, InternalGear
+from app.gearx.gear import Gear, ExternalGear, InternalGear
 
 
 class GearSystem:
