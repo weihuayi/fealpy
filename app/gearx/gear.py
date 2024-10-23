@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from fealpy.geometry.utils import delta_angle_calculator
 from numpy import sin, cos, tan, pi, arctan, arctan2, radians, sqrt
 
 from scipy.optimize import fsolve
@@ -24,10 +25,20 @@ class Gear(ABC):
         @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
+        @param nw: 沿齿宽分段数
+        @param tooth_width: 齿宽
         @param material: 齿轮材料
+        @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
+        @param center: 齿轮中心坐标，默认为原点
+        @param name: 齿轮名称
         """
-        if not isinstance(z, int) or (isinstance(z, float) and not z.is_integer()):
-            raise TypeError(f'The provided value {z} is not an integer or cannot be safely converted to an integer.')
+        # 参数类型检查
+        for param in [z, n1, n2, n3, na, nf, nw]:
+            if not isinstance(param, int) or (isinstance(param, float) and not param.is_integer()):
+                raise TypeError(
+                    f'The provided value {param} is not an integer or cannot be safely converted to an integer.')
+        assert rotation_direction in [-1, 1, -1., 1., "-1", "1"], 'The rotation direction must be either 1 or -1.'
+
         self.m_n = m_n
         self.z = z
         self.alpha_n = alpha_n if alpha_n < 2 * pi else radians(alpha_n)
@@ -46,6 +57,9 @@ class Gear(ABC):
         self.tooth_width = tooth_width
         self.mesh = None
         self._material = material
+        self.rotation_direction = rotation_direction
+        self.center = center
+        self.name = name
 
         # 端面变位系数
         self.x_t = self.x_n * cos(self.beta)
@@ -103,7 +117,7 @@ class Gear(ABC):
 
 class ExternalGear(Gear):
     def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia, inner_diam, tooth_width,
-                 material=None):
+                 material=None, rotation_direction=1, center=(0,0,0), name=None):
         """
 
         @param m_n: 法向模数
@@ -120,11 +134,16 @@ class ExternalGear(Gear):
         @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
+        @param nw: 沿齿宽分段数
         @param chamfer_dia: 倒角高度（直径方向）
         @param inner_diam: 轮缘内径
+        @param tooth_width: 齿宽
         @param material: 齿轮材料
+        @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
+        @param center: 齿轮中心坐标，默认为原点
+        @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material, rotation_direction, center, name)
         self.inner_diam = inner_diam
         self.chamfer_dia = chamfer_dia
         # 齿顶圆直径与半径
@@ -260,7 +279,11 @@ class ExternalGear(Gear):
         points = self.get_profile_points()
         r_inner = self.inner_diam / 2
 
-        max_angle_flag = False
+        one_tooth_angle = delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector")
+        if one_tooth_angle*z > 2*pi:
+            max_angle_flag = True
+        else:
+            max_angle_flag = False
         # TODO: 改用齿根圆角是否超过最大圆角进行判断与分类
         # 两侧过渡曲线之间相连，齿槽底面为一条直线，宽度为 0
         if max_angle_flag:  # 构造关键点
@@ -783,7 +806,7 @@ class ExternalGear(Gear):
 
 class InternalGear(Gear):
     def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
-                 xn_cutter, tooth_width, material=None):
+                 xn_cutter, tooth_width, material=None, rotation_direction=1, center=(0,0,0), name=None):
         """
 
         @param m_n: 法向模数
@@ -800,12 +823,17 @@ class InternalGear(Gear):
         @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
-        @param outter_diam: 轮缘外径
+        @param nw: 沿齿宽方向分段数
+        @param outer_diam: 轮缘外径
         @param z_cutter: 刀具齿数
         @param xn_cutter: 刀具变位系数
+        @param tooth_width: 齿宽
         @param material: 齿轮材料
+        @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
+        @param center: 齿轮中心坐标，默认为原点
+        @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material, rotation_direction, center, name)
         self.outer_diam = outer_diam
         self.z_cutter = z_cutter
         self.xn_cutter = xn_cutter
@@ -1570,7 +1598,7 @@ if __name__ == '__main__':
     # 外齿轮
     # ================================================
     # 参数读取
-    with open('./external_gear_data.json', 'r') as file:
+    with open('data/external_gear_data.json', 'r') as file:
         data = json.load(file)
     m_n = data['mn']  # 法向模数
     z = data['z']  # 齿数
@@ -1597,7 +1625,7 @@ if __name__ == '__main__':
     # 内齿轮
     # ==================================================
     # 参数读取
-    with open('./internal_gear_data.json', 'r') as file:
+    with open('data/internal_gear_data.json', 'r') as file:
         data = json.load(file)
     m_n = data['mn']  # 法向模数
     z = data['z']  # 齿数
