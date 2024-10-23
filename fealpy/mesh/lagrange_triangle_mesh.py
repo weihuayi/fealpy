@@ -352,6 +352,97 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         """
         TD = bc.shape[-1] - 1
         pass
+    
+    # tools
+    def integral(self, f, q=3, celltype=False) -> TensorLike:
+        """
+        @brief 在网格中数值积分一个函数
+        """
+        GD = self.geo_dimension()
+        qf = self.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+        
+        rm = self.reference_cell_measure()
+        G = self.first_fundamental_form(bcs) 
+        d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
+
+        if callable(f):
+            if getattr(f, 'coordtype', None) == 'barycentric':
+                f = f(bcs)
+            else:
+                f = f(ps)
+
+        cm = self.entity_measure('cell')
+
+        if isinstance(f, (int, float)): #  u 为标量常函数
+            e = f*cm
+        elif bm.is_tensor(f):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
+        else:
+            raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
+
+        if celltype:
+            return e
+        else:
+            return bm.sum(e)
+
+    def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
+        """
+        @brief Calculate the error between two functions.
+        """
+        GD = self.geo_dimension()
+
+        qf = self.quadrature_formula(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.bc_to_point(bcs)
+
+        rm = self.reference_cell_measure()
+        G = self.first_fundamental_form(bcs) 
+        d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
+
+        if callable(u):
+            if getattr(u, 'coordtype', None) == 'barycentric':
+                u = u(bcs)
+            else:
+                u = u(ps)
+
+        if callable(v):
+            if getattr(v, 'coordtype', None) == 'barycentric':
+                v = v(bcs)
+            else:
+                v = v(ps)
+        cm = self.entity_measure('cell')
+        NC = self.number_of_cells()
+        if v.shape[-1] == NC:
+            v = bm.swapaxes(v, 0, -1)
+        #f = bm.power(bm.abs(u - v), power)
+        f = bm.abs(u - v)**power
+        if len(f.shape) == 1:
+            f = f[:, None]
+
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*cm
+        elif bm.is_tensor(f):
+            if f.shape == (GD, ): # 常向量函数
+                e = cm[:, None]*f
+            elif f.shape == (GD, GD):
+                e = cm[:, None, None]*f
+            else:
+                e = bm.einsum('q, cq..., cq -> c...', ws*rm, f, d)
+
+        if celltype is False:
+            #e = bm.power(bm.sum(e), 1/power)
+            e = bm.sum(e)**(1/power)
+        else:
+            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e # float or (NC, )
+
 
     def vtk_cell_type(self, etype='cell'):
         """
@@ -376,7 +467,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         node = self.entity('node')
         GD = self.geo_dimension()
         if GD == 2:
-            node = np.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
 
         #cell = self.entity(etype)[index]
         cell = self.entity(etype, index)
