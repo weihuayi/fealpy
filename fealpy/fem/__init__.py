@@ -22,6 +22,7 @@ from .curl_integrator import CurlIntegrator
 
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
+from .source_integrator import SourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
 
 ### Face Operator
@@ -35,3 +36,6 @@ from .dirichlet_bc_operator import DirichletBCOperator
 
 ### recovery estimate
 from .recovery_alg import RecoveryAlg
+
+### Other
+from .semilinear_wrapper import SemilinearWrapperInt

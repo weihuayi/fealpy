@@ -67,9 +67,6 @@ class AntColonyOptAlg(Optimizer):
             Delta_Tau[Table[:, :-1], Table[:, 1:]] += (self.Q / fit).reshape(-1, 1)
             Delta_Tau[Table[:, -1], Table[:, 0]] += self.Q / fit
             Tau = (1 - self.rho) * Tau + Delta_Tau
-            if t == T-1:
-                random_values = x[1,:]
-                gbest = random_values[gbest]
 
         return gbest, gbest_f
 

@@ -1,3 +1,7 @@
+
+from typing import Sequence
+
+from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from ..decorator import cartesian
 
@@ -79,3 +83,68 @@ class CosCosCosData:
         val = bm.sum(grad*n, axis=-1) + self.solution(p) 
         return val, kappa
 
+
+class BatchedCosCosCosData():
+    def __init__(self, omega: Sequence[float], kappa: float = 1., *,
+                 dtype=None, device=None):
+        self.dtype = dtype
+        self.device = device
+        self.kappa = kappa
+
+        if isinstance(omega, TensorLike):
+            self.omega = bm.astype(omega, dtype=dtype, copy=True, device=device)
+        else:
+            self.omega = bm.array(omega, dtype=dtype, device=device)
+
+    @staticmethod
+    def domain():
+        return [0, 1, 0, 1, 0, 1]
+
+    @cartesian
+    def solution(self, p: TensorLike): # (*shape, 3)
+        pi = bm.pi
+        cos = bm.cos
+        opx = bm.tensordot(self.omega, p[..., 0], axes=0) * pi
+        opy = bm.tensordot(self.omega, p[..., 1], axes=0) * pi
+        opz = bm.tensordot(self.omega, p[..., 2], axes=0) * pi
+        return cos(opx) * cos(opy) * cos(opz) # (B, *shape)
+
+    dirichlet = solution
+
+    @cartesian
+    def gradient(self, p: TensorLike):
+        pi = bm.pi
+        sin = bm.sin
+        cos = bm.cos
+        opx = bm.tensordot(self.omega, p[..., 0], axes=0) * pi
+        opy = bm.tensordot(self.omega, p[..., 1], axes=0) * pi
+        opz = bm.tensordot(self.omega, p[..., 2], axes=0) * pi
+        val = bm.stack([
+            -sin(opx) * cos(opy) * cos(opz),
+            -cos(opx) * sin(opy) * cos(opz),
+            -cos(opx) * cos(opy) * sin(opz)
+        ], axis=-1) * pi # (B, *shape, 3)
+        return bm.einsum('b, b...d -> b...d', self.omega, val)
+
+    @cartesian
+    def source(self, p: TensorLike):
+        pi = bm.pi
+        cos = bm.cos
+        opx = bm.tensordot(self.omega, p[..., 0], axes=0) * pi
+        opy = bm.tensordot(self.omega, p[..., 1], axes=0) * pi
+        opz = bm.tensordot(self.omega, p[..., 2], axes=0) * pi
+        val = 3 * pi**2 * cos(opx) * cos(opy) * cos(opz) # (B, *shape)
+        return bm.einsum('b, b... -> b...', self.omega**2, val)
+
+    @cartesian
+    def neumann(self, p: TensorLike, n: TensorLike): # (*shape, 3)
+        grad = self.gradient(p) # (B, *shape, 3)
+
+        if n.ndim == 2:
+            n = bm.expand_dims(n, axis=1)
+
+        return bm.einsum('b...d, ...d -> b...', grad, n) # (B, *shape)
+
+    @cartesian
+    def robin(self, p: TensorLike, n: TensorLike):
+        return self.neumann(p, n) + self.kappa * self.dirichlet(p)

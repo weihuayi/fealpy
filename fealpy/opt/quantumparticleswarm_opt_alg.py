@@ -25,8 +25,8 @@ class QuantumParticleSwarmOptAlg(Optimizer):
         gbest = pbest[gbest_index]
         gbest_f = pbest_f[gbest_index]
         for it in range(0, MaxIT):
-            alpha = 1 - (it + 1) / (2 * MaxIT)
-            mbest = sum(pbest) / N
+            alpha = bm.array(0.9 - (it + 1) / (2 * MaxIT))
+            mbest = bm.sum(pbest, axis=0) / N
             phi = bm.random.rand(N, dim)
             p = phi * pbest + (1 - phi) * gbest
             u = bm.random.rand(N, dim)
