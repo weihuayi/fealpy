@@ -114,9 +114,9 @@ class HexahedronMesh(TensorMesh, Plotable):
         entity = self.entity(TD, index=index)
         gphi = self.grad_shape_function(bc, p=1, variables='u')
         if TD == 3:
-            J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
+            J = bm.einsum( 'cim, qin -> cqmn', node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
         elif TD == 2:
-            J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
+            J = bm.einsum( 'cim, qin -> cqmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
 
 
