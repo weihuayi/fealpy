@@ -56,6 +56,7 @@ p = args.degree
 n = args.n
 maxit = args.maxit
 device = args.device
+bm.set_default_device(device)
 
 tmr = timer()
 next(tmr)
