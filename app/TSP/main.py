@@ -4,7 +4,8 @@ from fealpy.backend import backend_manager as bm
 from fealpy.opt import QuantumParticleSwarmOptAlg, SnowmeltOptAlg, ParticleSwarmOptAlg
 from fealpy.opt import CrayfishOptAlg, GreyWolfOptimizer, HoneybadgerOptAlg, AntColonyOptAlg, HippopotamusOptAlg
 from fealpy.opt.optimizer_base import opt_alg_options
-from TSP_data import TSPdata
+# from TSP_data import TSPdata
+from TSP_citys import TSP_data as TSPdata
 from TSP_citys import TravellingSalesmanProblem
 from TSP_citys import gbestroute, soler_tsp_with_algorithm, printroute
 
