@@ -588,7 +588,6 @@ class TensorMesh(HomogeneousMesh):
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 J = bm.linalg.inv(J)
-                # J^{-T}\nabla_u phi
                 gphi = bm.einsum('cqmn, qlm -> cqln', J, gphi)
 
                 return gphi
