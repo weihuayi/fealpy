@@ -4,8 +4,6 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 from .optimizer_base import Optimizer
 
-import random
-
 
 class SnowmeltOptAlg(Optimizer):
 
@@ -27,9 +25,9 @@ class SnowmeltOptAlg(Optimizer):
             ub = bm.array([ub] * dim)
         
         #空列表
-        Convergence_curve = []
+        Convergence_curve = bm.zeros([1, Max_iter])
 
-        N1 = int(bm.floor(bm.array(N * 0.5)))
+        N1 = bm.array(int(bm.floor(bm.array(N * 0.5))))
 
         #升序 的索引数组
         idx1 = bm.argsort(Objective_values)
@@ -45,20 +43,20 @@ class SnowmeltOptAlg(Optimizer):
         half_best_mean = sum1 / N1
         Elite_pool = bm.concatenate((Best_pos.reshape(dim, 1), second_best.reshape(dim, 1), third_best.reshape(dim, 1), half_best_mean.reshape(dim, 1)),axis=1)
         Elite_pool = Elite_pool.reshape(4, dim)
-
-        Convergence_curve.append(Best_score)
         
         #分割
         index = bm.arange(N)
-        Na = int(N / 2)
-        Nb = int(N / 2)
+        Na = bm.array(int(N / 2))
+        Nb = bm.array(int(N / 2))
 
         # 更新迭代
         for t in range(Max_iter):
             RB = bm.random.randn(N, dim)
             T = bm.exp(bm.array(-t / Max_iter))
+            
             # eq.(9)
             DDF = 0.35 + 0.25 * (bm.exp(bm.array(t / Max_iter)) - 1) / (bm.exp(bm.array((1)) - 1))
+            
             # eq.(10)
             #融雪速率
             M = DDF * T
@@ -67,12 +65,12 @@ class SnowmeltOptAlg(Optimizer):
             X_centroid = bm.mean(X, axis=0)
 
             # 随机分配索引号
-            index1 = list(set([random.randint(0, N - 1) for _ in range(Na)]))
-            index2 = list(set(index).difference(index1))
-            
+            index1 = bm.unique(bm.random.randint(0, N - 1, (Na,)))
+            index2 = bm.array(list(set(index).difference(index1)))
+
             r1 = bm.random.rand(len(index1), 1)
-            k1 = [random.randint(0,3) for _ in range(len(index1))]
-                  
+            k1 = bm.random.randint(0, 3, (len(index1),))
+            
             X[index1] = Elite_pool[k1] + RB[index1] * (r1 * (Best_pos - X[index1]) + (1 - r1) * (X_centroid - X[index1]))
                 
             Na, Nb = (Na + 1, Nb - 1) if Na < N else (Na, Nb)
@@ -99,7 +97,7 @@ class SnowmeltOptAlg(Optimizer):
             Elite_pool[1] = second_best
             Elite_pool[2] = third_best
             Elite_pool[3] = half_best_mean
-            Convergence_curve.append(Best_score)
+            Convergence_curve[0, t] = bm.copy(Best_score)
         return Best_pos, Best_score
 
 
