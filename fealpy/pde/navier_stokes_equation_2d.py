@@ -15,7 +15,7 @@ class FlowPastCylinder:
     '''
     @brief 圆柱绕流
     '''
-    def __init__(self, eps=1e-12, rho=1, mu=0.001):
+    def __init__(self, eps=1e-10, rho=1, mu=0.001):
         self.eps = eps
         self.rho = rho
         self.mu = mu
@@ -114,7 +114,12 @@ class FlowPastCylinder:
 
     @cartesian
     def is_outflow_boundary(self,p):
-        return bm.abs(p[..., 0] - 2.2) < self.eps
+        x = p[...,0]
+        y = p[...,1]
+        cond1 = bm.abs(x - 2.2) < self.eps
+        cond2 = bm.abs(y-0)>self.eps
+        cond3 = bm.abs(y-0.41)>self.eps
+        return (cond1) & (cond2 & cond3) 
     
     @cartesian
     def is_inflow_boundary(self,p):
@@ -133,7 +138,7 @@ class FlowPastCylinder:
     
     @cartesian
     def is_u_boundary(self,p):
-        return bm.abs(p[..., 0] - 2.2) > self.eps
+        return ~self.is_outflow_boundary(p)
     
     @cartesian
     def is_p_boundary(self,p):
