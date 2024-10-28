@@ -2,7 +2,6 @@
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
-import random
 from .optimizer_base import Optimizer
 # from .Levy import levy
 from scipy.special import gamma
@@ -33,10 +32,10 @@ class HippopotamusOptAlg(Optimizer):
         gbest_idx = bm.argmin(fit)
         gbest_f = fit[gbest_idx]
         gbest = x[gbest_idx].reshape(1, -1)
-        Convergence_curve = []
+        Convergence_curve = bm.zeros([1, MaxIT])
         for it in range(0, MaxIT):
             T = bm.exp(bm.array(it / MaxIT)) # Eq.(5)
-            i1 = int(N / 2)
+            i1 = bm.array(int(N / 2))
             I1 = bm.random.randint(1, 3, (i1, 1)) 
             I2 = bm.random.randint(1, 3, (i1, 1)) 
             Ip1 = bm.random.randint(0, 2, (i1, 1)) 
@@ -48,11 +47,15 @@ class HippopotamusOptAlg(Optimizer):
             Alfa2 = bm.random.rand(i1, dim) 
             Alfa3 = I1 * bm.random.rand(i1, dim) + Ip2
             Alfa4 = bm.random.rand(i1, 1) * bm.ones((i1, dim))
-            AA = bm.array([random.randint(0, 5) for _ in range(i1)])[:, None] 
-            BB = bm.array([random.randint(0, 5) for _ in range(i1)])[:, None]
+            AA = bm.random.randint(0, 5, (i1,))[:, None]
+            BB = bm.random.randint(0, 5, (i1,))[:, None]
+            # AA = bm.array([random.randint(0, 5) for _ in range(i1)])[:, None] 
+            # BB = bm.array([random.randint(0, 5) for _ in range(i1)])[:, None]
             A = (AA == 0) * Alfa0 + (AA == 1) * Alfa1 + (AA == 2) * Alfa2 + (AA == 3) * Alfa3 + (AA == 4) * Alfa4
             B = (BB == 0) * Alfa0 + (BB == 1) * Alfa1 + (BB == 2) * Alfa2 + (BB == 3) * Alfa3 + (BB == 4) * Alfa4
-            RandGroupNumber = [random.randint(1, N + 1) for _ in range(i1)]
+            RandGroupNumber = bm.random.randint(1, N + 1, (i1))
+            # RandGroupNumber = [random.randint(1, N + 1) for _ in range(i1)]
+            print(RandGroupNumber)
             MeanGroup = bm.zeros((i1, dim))
             for i in range(i1):
                 RandGroup = bm.random.permutation(N)[: RandGroupNumber[i]]
@@ -127,5 +130,5 @@ class HippopotamusOptAlg(Optimizer):
 
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            Convergence_curve.append(gbest_f[0])
-        return gbest, gbest_f, Convergence_curve
+            Convergence_curve[0, it] = bm.copy(gbest_f[0])
+        return gbest, gbest_f
