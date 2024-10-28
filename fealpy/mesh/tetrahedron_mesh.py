@@ -902,6 +902,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell = idxMap[cell]
         mesh = cls(node, cell)
 
+        mesh.box = box
         bdface = mesh.boundary_face_index()
         f2n = mesh.face_unit_normal()[bdface]
         isLeftBd   = bm.abs(f2n[:, 0]+1)<1e-14
