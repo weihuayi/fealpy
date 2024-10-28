@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--degree',
-        default=11, type=int,
+        default=9, type=int,
         help='光滑有限元空间的次数, 默认为 11 次.')
 
 parser.add_argument('--m',
@@ -30,11 +30,11 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
-        default='pytorch', type=str,
+        default='numpy', type=str,
         help='默认后端为numpy')
 
 parser.add_argument('--device',
-        default='cuda', type=str,
+        default='cpu', type=str,
         help='默认gpu上运行')
 
 
@@ -75,6 +75,8 @@ for i in range(maxit):
     for n in bm.array([[0,0,0],[1,0,0],[0,1,0],[1,1,0],[1,1,1],[0,0,1],[1,0,1],[0,1,1]], dtype=bm.float64):
         isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
     #mesh.node = node/2
+    from fealpy.functionspace.cm_conforming_fe_space3d_old import CmConformingFESpace3d as CmConformingFESpace3d_old
+    #space = CmConformingFESpace3d_old(mesh,9, 1, isCornerNode)
     space = CmConformingFESpace3d(mesh, p=p, m=m, isCornerNode=isCornerNode)
     tmr.send(f'第{i}次空间生成时间')
     fI = space.interpolation(flist)
