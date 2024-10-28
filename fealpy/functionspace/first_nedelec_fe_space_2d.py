@@ -218,7 +218,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         
 
 
-    def is_boundary_dof(self, threshold=None):
+    def is_boundary_dof(self, threshold=None, method=None):
         return self.dof.is_boundary_dof()
 
     def cell_to_dof(self):
@@ -330,7 +330,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         bm.scatter_add(vec, c2d.reshape(-1), val.reshape(-1))
         return vec
 
-    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+    def set_dirichlet_bc(self, gd, uh, threshold=None, q=None, method=None):
         """
         @brief 设置狄利克雷边界条件，使用边界上的 L2 投影
         """
@@ -351,7 +351,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         Minv = Minv*fm[:,None,None]
 
         points = mesh.bc_to_point(bcs)[isbdFace]
-        gDval = gD(points, t) 
+        gDval = gd(points, t) 
         g = bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
         
         #uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
