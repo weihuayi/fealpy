@@ -13,7 +13,7 @@ def inv(alpha):
     return bm.tan(alpha)-alpha
 
 # 参数读取
-with open('./external_gear_data.json', 'r') as file:
+with open('data/external_gear_data.json', 'r') as file:
     data = json.load(file)
 center = data['center'][:-1]  # 中心坐标（只读取二维）
 x = data['x']  # 变位系数

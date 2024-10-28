@@ -17,11 +17,12 @@ from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elastic_integrator import LinearElasticIntegrator
 from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator0, PressWorkIntegrator1
 from .vector_mass_integrator import VectorMassIntegrator
-from .curl_integrator import CurlIntegrator
+from .curl_integrator import CurlCurlIntegrator
 
 
 ### Cell Source
 from .scalar_source_integrator import ScalarSourceIntegrator
+from .source_integrator import SourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
 
 ### Face Operator
@@ -35,3 +36,6 @@ from .dirichlet_bc_operator import DirichletBCOperator
 
 ### recovery estimate
 from .recovery_alg import RecoveryAlg
+
+### Other
+from .semilinear_wrapper import SemilinearWrapperInt

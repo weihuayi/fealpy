@@ -24,8 +24,8 @@ from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 
 # 积分子
-from fealpy.fem import VectorMassIntegrator
-from fealpy.fem import CurlIntegrator
+from fealpy.fem import VectorMassIntegrator,ScalarMassIntegrator
+from fealpy.fem import CurlCurlIntegrator
 from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import DirichletBC
 
@@ -67,7 +67,7 @@ p = args.degree
 maxit = args.maxit
 maxit = 3
 dim = args.dim
-dim = 3
+dim = 2
 backend = args.backend
 bm.set_backend("pytorch")
 if dim == 2:
@@ -105,8 +105,8 @@ for j, p in enumerate(ps):
         NDof[i] = 1/2**i 
 
         bform = BilinearForm(space)
-        bform.add_integrator(VectorMassIntegrator(coef=-1, q=p+3))
-        bform.add_integrator(CurlIntegrator(coef=1, q=p+3))
+        bform.add_integrator(ScalarMassIntegrator(coef=-1, q=p+3))
+        bform.add_integrator(CurlCurlIntegrator(coef=1, q=p+3))
         A = bform.assembly()
         tmr.send(f'第{i}次矩组装时间')
 

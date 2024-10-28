@@ -1,64 +1,78 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt import QuantumParticleSwarmOptAlg
-from fealpy.opt import SnowmeltOptAlg 
-from fealpy.opt import ParticleSwarmOptAlg
-from fealpy.opt import CrayfishOptAlg
-from fealpy.opt import GreyWolfOptimizer
-from fealpy.opt import HoneybadgerOptAlg
-from fealpy.opt import AntColonyOptAlg
-from TSP_data import TSPdata
-from TSP_citys import TravellingSalesmanProblem
-from TSP_citys import gbestroute, soler_tsp_with_algorithm, printroute
 import time
 import matplotlib.pyplot as plt
+from fealpy.backend import backend_manager as bm
+from fealpy.opt import *
+from fealpy.opt.optimizer_base import opt_alg_options
+from TSP_citys import TSP_data as TSPdata
+from TSP_citys import TravellingSalesmanProblem
+from TSP_citys import gbestroute, soler_tsp_with_algorithm, printroute
 # bm.set_backend('pytorch')
 
+class TSPOptimizerApp:
+    def __init__(self, num, NP=100, lb=0, ub=1, MaxIters = 10000):
+        self.num = num
+        self.NP = NP
+        self.lb = lb
+        self.ub = ub
+        self.MaxIters = MaxIters
+        self.citys = TSPdata[self.num]['citys']()
+        self.test = TravellingSalesmanProblem(self.citys)
+        self.test.calD()
+        self.D = self.test.D
+        self.fobj = lambda x: self.test.fitness(x)
 
-start_time = time.perf_counter()
+        self.optimizers = {
+            'SAO': SnowmeltOptAlg,
+            'COA': CrayfishOptAlg,
+            'HBO': HoneybadgerOptAlg,
+            'QPSO': QuantumParticleSwarmOptAlg,
+            'PSO': ParticleSwarmOptAlg,
+            'GWO': GreyWolfOptimizer,
+            'ACO': AntColonyOptAlg,
+            'Ho': HippopotamusOptAlg,
+        }
 
-qpso_optimizer = QuantumParticleSwarmOptAlg
-pso_optimizer = ParticleSwarmOptAlg
-sao_optimizer = SnowmeltOptAlg 
-coa_optimizer = CrayfishOptAlg
-gwo_optimizer = GreyWolfOptimizer
-hbo_optimizer = HoneybadgerOptAlg
-ant_optimezer = AntColonyOptAlg
+        self.results = {}
 
-num = 7
-citys = TSPdata[num]['citys']()
-test = TravellingSalesmanProblem(citys)
-test.calD()
-D = test.D
-fobj = lambda x: test.fitness(x)
-NP = 100
-lb, ub = (0, 1)
+    def optimize(self):
+        start_time = time.perf_counter()
 
-optimizers = {  
-    'SAO': sao_optimizer, 
-    'COA': coa_optimizer,
-    'HBO': hbo_optimizer,
-    'QPSO': qpso_optimizer,  
-    'PSO': pso_optimizer,  
-    'GWO': gwo_optimizer, 
-    'ACO': ant_optimezer,   
-} 
+        for algorithm, optimizer in self.optimizers.items():
+            if algorithm == 'ACO':
+                NP = 10 
+                MaxIters = 100 
+                x0 = self.lb + bm.random.rand(NP, self.citys.shape[0]) * (self.ub - self.lb)
+                option = opt_alg_options(x0, self.fobj, (self.lb, self.ub), NP, MaxIters) 
+                optimizer_aco = optimizer(option, self.D)
+                gbest, gbest_f = optimizer_aco.run()
+            else:
+                gbest, gbest_f = soler_tsp_with_algorithm(optimizer, self.fobj, self.lb, self.ub, self.NP, self.citys.shape[0], self.MaxIters)
+                gbest = bm.argsort(gbest)
 
-results = {} 
-start_time = time.perf_counter()
+            if isinstance(gbest_f, (float, int)):  
+                gbest_f = bm.array([gbest_f])  
+            route, route_citys = gbestroute(gbest, self.citys)
+            self.results[algorithm] = {'route': route, 'route_citys': route_citys, 'gbest_f': gbest_f}
 
-for algorithm, optimizer in optimizers.items():   
-    gbest, gbest_f = soler_tsp_with_algorithm(optimizer, fobj, lb, ub, NP, citys.shape[0], D)  
-    route, route_citys = gbestroute(gbest, citys)  
-    results[algorithm] = {'route': route, 'route_citys': route_citys, 'gbest_f': gbest_f}  
+        end_time = time.perf_counter()
+        running_time = end_time - start_time
 
-for algorithm, result in results.items():  
-    print(f'The best solution obtained by {algorithm} is:', result['route'])  
-    print(f'The best optimal value of the objective function found by {algorithm} is:', result['gbest_f'])  
+        self.print_results()
+        print("Running time: ", running_time)
+        self.visualize_routes()
 
-end_time = time.perf_counter()
-running_time = end_time - start_time
-print("Running time: ", running_time)
+    def print_results(self):
+        for algorithm, result in self.results.items():
+            # print(f'The best solution obtained by {algorithm} is:', result['route'])
+            print(f'The best optimal value of the objective function found by {algorithm} is:', result['gbest_f'])
 
-route_citys_all = bm.array([result['route_citys'].tolist() for result in results.values()]) 
-alg_name = list(results.keys())  
-printroute(route_citys_all, citys, alg_name)
+    def visualize_routes(self):
+        route_citys_all = bm.array([result['route_citys'].tolist() for result in self.results.values()])
+        alg_name = list(self.results.keys())
+        printroute(route_citys_all, self.citys, alg_name)
+
+
+if __name__ == "__main__":
+    num = 2  # Example city index [0 - 6]
+    tsp_optimizer = TSPOptimizerApp(num)
+    tsp_optimizer.optimize()
