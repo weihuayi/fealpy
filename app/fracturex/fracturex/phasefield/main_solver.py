@@ -1,16 +1,19 @@
 from typing import Optional, Dict
 import numpy as np
 from fealpy.utils import timer
-from scipy.sparse import spdiags
 
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
-from fealpy.decorator import barycentric, cartesian
+from fealpy.decorator import barycentric
 from fealpy.fem import BilinearForm, LinearForm
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem import LinearElasticIntegrator, ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
-from fealpy.solver import cg
+from fealpy.solver import cg, spsolve
+from scipy.sparse.linalg import lgmres
+#from scipy.sparse.linalg import gmres
+#from scipy.sparse.linalg import minres
+#from scipy.linalg import issymmetric
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
@@ -87,10 +90,11 @@ class MainSolver:
         self._initialize_force_boundary()
         self.Rforce = bm.zeros_like(self.force_value)
         
-        for i in range(2):
-        #for i in range(len(self.force_value)-1):
+#        for i in range(1):
+        for i in range(len(self.force_value)-1):
             print('i', i)
             self._currt_force_value = self.force_value[i+1]
+
             # Run Newton-Raphson iteration
             self.newton_raphson(maxit)
             
@@ -138,11 +142,10 @@ class MainSolver:
             print(f"Phase field error after iteration {k + 1}: {er1}")
             tmr.send('phase_solve')
 
-            print('u', self.uh)
-            print('H', self.H)
-            print('d', self.d)
+            print('uh:', self.uh)
+            print('d:', self.d)
 
-            
+            # Adaptive refinement
             if self.enable_refinement:
                 data = self.set_interpolation_data()
                 self.mesh, new_data = self.adaptive.perform_refinement(self.mesh, self.d, data, self.l0)
@@ -156,6 +159,8 @@ class MainSolver:
                     print(f"Refinement after iteration {k + 1}")
 
             tmr.send('refine')
+
+            # Check for convergence
             if k == 0:
                 e0, e1 = er0, er1
             
@@ -198,8 +203,10 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
 
-        du = cg(A.tocsr(), R, atol=1e-14)
-        
+        #du = cg(A.tocsr(), R, atol=1e-18)
+        du = spsolve(A, R)
+        #du = self._solver(A.tocsr(), R)
+
         uh += du[:]
         self.uh = uh
         
@@ -226,7 +233,6 @@ class MainSolver:
 
         dbform = BilinearForm(self.space)
         dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0, q=self.q))
-
         dbform.add_integrator(ScalarMassIntegrator(coef=Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef=coef, q=self.q))
         A = dbform.assembly()
@@ -242,9 +248,10 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        dd = cg(A.tocsr(), R, atol=1e-14)
-        d += dd.flatten()[:]
-
+        #dd = cg(A.tocsr(), R, atol=1e-18)
+        #dd = self._solver(A.tocsr(), R)
+        dd = spsolve(A, R) 
+        d += dd[:]
 
         self.d = d
         self.pfcm.update_phase(d)
@@ -415,3 +422,20 @@ class MainSolver:
                         raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
         return A, R
 
+    def _solver(self, A, R):
+        """
+        Solve the linear system.
+
+        Parameters
+        ----------
+        A : sparse matrix
+            System matrix.
+        R : ndarray
+            Residual vector.
+        """
+        A = A.to_scipy()
+        b = bm.to_numpy(R)
+        #x = gmres(A, b)
+        x,info = lgmres(A, b, atol=1e-18)
+        x = bm.tensor(x)
+        return x

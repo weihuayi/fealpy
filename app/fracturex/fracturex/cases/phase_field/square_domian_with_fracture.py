@@ -18,7 +18,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.0133
+        l0 = 0.1
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):
@@ -29,7 +29,7 @@ class square_with_circular_notch():
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
         return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
-            5.9e-3, 901)[1:]))
+            6.1e-3, 1101)[1:]))
     
     def is_x_force(self):
         """
@@ -111,6 +111,10 @@ parser.add_argument('--save_vtkfile',
         default=True, type=bool,
         help='是否保存 vtk 文件, 默认为 False.')
 
+parser.add_argument('--force_type',
+        default='y', type=str,
+        help='Force type, default is y.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -122,6 +126,7 @@ refine_method = args.refine_method
 n = args.n
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
+force_type = args.force_type
 
 
 tmr = timer()
@@ -141,12 +146,12 @@ else:
 
 mesh.uniform_refine(n=n)
 
-'''
+
 isMarkedCell = model.adaptive_mesh(mesh)
 while isMarkedCell.any():
     mesh.bisect(isMarkedCell)
     isMarkedCell = model.adaptive_mesh(mesh)
-'''
+
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
@@ -158,12 +163,15 @@ if enable_adaptive:
     print('Enable adaptive refinement.')
     ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
 
-# 拉伸模型边界条件
-ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_y_force(), 'y')
-
-# 剪切模型边界条件
-#ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_x_force(), 'x')
-#ms.add_boundary_condition('displacement', 'Dirichlet', model.is_force_boundary, 0, 'y')
+if force_type == 'y':
+    # 拉伸模型边界条件
+    ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_y_force(), 'y')
+elif force_type == 'x':
+    # 剪切模型边界条件
+    ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_x_force(), 'x')
+    ms.add_boundary_condition('displacement', 'Dirichlet', model.is_force_boundary, 0, 'y')
+else:
+    raise ValueError('Invalid force type.')
 
 # 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)

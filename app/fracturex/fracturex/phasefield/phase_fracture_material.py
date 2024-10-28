@@ -126,12 +126,10 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         """
         d = self._d
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
-        D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵
+        D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵 
         D = D0 * gd[..., None, None]
         return D
     
-       
-
 class AnisotropicModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算各向异性模型下的应力
@@ -271,7 +269,6 @@ class HybridModel(BasedPhaseFractureMaterial):
     def elastic_matrix(self, bc) -> TensorLike: 
         self._isotropic_model._uh = self._uh
         self._isotropic_model._d = self._d
-        
         return self._isotropic_model.elastic_matrix(bc=bc)
 
     @ barycentric

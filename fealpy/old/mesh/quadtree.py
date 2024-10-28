@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix
 from .quadrangle_mesh import QuadrangleMesh
-from ..common import ranges
+from fealpy.common import ranges
 from .adaptive_tools import mark
 from .polygon_mesh import PolygonMesh
 

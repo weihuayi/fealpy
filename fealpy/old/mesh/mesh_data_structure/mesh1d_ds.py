@@ -3,7 +3,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 
-from ...common import ranges
+from fealpy.common import ranges
 from .mesh_ds import ArrRedirector, HomogeneousMeshDS, StructureMeshDS
 
 

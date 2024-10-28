@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from scipy.sparse import csr_matrix, coo_matrix
 import inspect
 
-from ..common import ranges
+from fealpy.common import ranges
 
 from .mesh_base import Mesh, Plotable
 from .mesh_data_structure import Mesh2dDataStructure, ArrRedirector

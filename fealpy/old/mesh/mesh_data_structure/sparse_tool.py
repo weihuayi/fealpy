@@ -3,7 +3,7 @@ from scipy.sparse import csr_matrix
 from numpy.typing import NDArray
 import numpy as np
 
-from ...common import ranges
+from fealpy.common import ranges
 
 
 def enable_csr(fn: Callable[..., NDArray]):

@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from .hexahedron_mesh import HexahedronMesh 
-from ..common import ranges
+from fealpy.common import ranges
 
 class Octree(HexahedronMesh):
     localFace2childCell = np.array([
