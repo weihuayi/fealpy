@@ -1,13 +1,12 @@
 import time
 import matplotlib.pyplot as plt
 from fealpy.backend import backend_manager as bm
-from fealpy.opt import QuantumParticleSwarmOptAlg, SnowmeltOptAlg, ParticleSwarmOptAlg
-from fealpy.opt import CrayfishOptAlg, GreyWolfOptimizer, HoneybadgerOptAlg, AntColonyOptAlg, HippopotamusOptAlg
+from fealpy.opt import *
 from fealpy.opt.optimizer_base import opt_alg_options
-from TSP_data import TSPdata
+from TSP_citys import TSP_data as TSPdata
 from TSP_citys import TravellingSalesmanProblem
 from TSP_citys import gbestroute, soler_tsp_with_algorithm, printroute
-
+# bm.set_backend('pytorch')
 
 class TSPOptimizerApp:
     def __init__(self, num, NP=100, lb=0, ub=1, MaxIters = 10000):
@@ -30,7 +29,7 @@ class TSPOptimizerApp:
             'PSO': ParticleSwarmOptAlg,
             'GWO': GreyWolfOptimizer,
             'ACO': AntColonyOptAlg,
-            # 'Ho': HippopotamusOptAlg,
+            'Ho': HippopotamusOptAlg,
         }
 
         self.results = {}
@@ -74,6 +73,6 @@ class TSPOptimizerApp:
 
 
 if __name__ == "__main__":
-    num = 0  # Example city index
+    num = 2  # Example city index [0 - 6]
     tsp_optimizer = TSPOptimizerApp(num)
     tsp_optimizer.optimize()

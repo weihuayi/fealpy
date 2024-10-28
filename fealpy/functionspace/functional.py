@@ -24,16 +24,20 @@ def generate_tensor_basis(basis: TensorLike, shape: Tuple[int, ...], dof_priorit
         where numel is the number of elements in the shape.
     """
     kwargs = bm.context(basis)
-    factor = tensor_basis(shape, **kwargs)
-    tb = bm.tensordot(basis, factor, axes=0)
+    factor = tensor_basis(shape, **kwargs) # (numel, numel)
+    # 计算张量积
+    tb = bm.tensordot(basis, factor, axes=0) # (1, ldof ,ldof, numel, numel)
     ldof = basis.shape[-1]
     numel = factor.shape[0]
 
     if dof_priority:
         ndim = len(shape)
-        tb = bm.swapaxes(tb, -ndim-1, -ndim-2)
+        # 如果 dof_priority 为 True，交换 ldof 和 numel 这两个维度的位置
+        tb = bm.swapaxes(tb, -ndim-1, -ndim-2) # (1, ldof, numel, ldof, numel)
 
-    return tb.reshape(basis.shape[:-1] + (numel*ldof,) + shape)
+    tb = tb.reshape(basis.shape[:-1] + (numel*ldof,) + shape) # (1, ldof, ldof*numel, numel)
+
+    return tb
 
 
 def generate_tensor_grad_basis(grad_basis: TensorLike, shape: Tuple[int, ...], dof_priority=True) -> TensorLike:

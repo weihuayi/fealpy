@@ -515,7 +515,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     #     fh[cell2dof[:, 2*ldof//3:]] = bm.sum(fval*dv[:, 2*ldof//3:], axis=-1)
     #     return fh
 
-    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+    def set_dirichlet_bc(self, gd, uh, threshold=None, q=None,method=None):
         p = self.p
         mesh = self.mesh
         ldof = (p+1)*(p+2) 
@@ -537,7 +537,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # gval = gD(point, nor[:, None]) #(NF, ldof//2, 3)
         # gval = bm.cross(gval, nor[:, None])
         # print(bm.max(bm.abs(gval)))
-        gval = gD(point)
+        gval = gd(point)
 
 
         uh[face2dof[:, :ldof//2]] = bm.sum(gval*f2v[:, :ldof//2], axis=-1)
@@ -580,7 +580,7 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype)
     
-    def is_boundary_dof(self, threshold=None):
+    def is_boundary_dof(self, threshold=None,method=None):
         return self.dof.is_boundary_dof()
 
     @barycentric

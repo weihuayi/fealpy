@@ -134,7 +134,7 @@ def produce_involute_gear_profile_points(mn, z, alpha_n, beta, x, hac, cc, rco, 
 
 if __name__ == '__main__':
     # 参数读取
-    with open('./cal_gear_data.json', 'r') as file:
+    with open('cal_gear_data.json', 'r') as file:
         data = json.load(file)
     mn = data['mn']  # 法向模数
     z = data['z']  # 齿数
