@@ -1,4 +1,4 @@
-from ..backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 from scipy.special import gamma
 
 def levy(n, m, beta, Num, device):
@@ -9,3 +9,10 @@ def levy(n, m, beta, Num, device):
     v = bm.random.randn(n, m, Num, device=device)
     z = u / (abs(v) ** (1 / beta))
     return z
+
+
+def initialize(pop_size, dim, ub, lb, way: int = 0):
+    if way == 0:
+        pop = lb + bm.random.rand(pop_size, dim) * (ub - lb)
+    
+    return pop
