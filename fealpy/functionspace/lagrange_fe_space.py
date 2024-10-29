@@ -127,6 +127,9 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         phi = self.mesh.shape_function(bc, self.p, index=index)
         return phi[None, ...] # (NC, NQ, LDOF)
 
+    face_basis = basis
+    edge_basis = basis
+
     def grad_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
         return self.mesh.grad_shape_function(bc, self.p, index=index, variables=variable)
 

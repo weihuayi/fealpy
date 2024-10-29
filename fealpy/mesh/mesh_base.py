@@ -478,6 +478,9 @@ class SimplexMesh(HomogeneousMesh):
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         phi = bm.simplex_shape_function(bcs, p, mi)
         return phi
+    
+    face_shape_function = shape_function
+    edge_shape_function = shape_function
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -562,6 +565,9 @@ class TensorMesh(HomogeneousMesh):
         else:
             raise ValueError("Variables type is expected to be 'u' or 'x', "
                              f"but got '{variables}'.")
+    
+    face_shape_function = shape_function
+    edge_shape_function = shape_function
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
