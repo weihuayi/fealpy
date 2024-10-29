@@ -1,19 +1,24 @@
+from fealpy.backend import backend_manager as bm
 
 from typing import Optional
-
 from ..typing import TensorLike, SourceLike, Threshold
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
-from ..functional import linear_integral
-from .integrator import LinearInt, SrcInt, FaceInt, enable_cache, assemblymethod
+from ..utils import process_coef_func
+from ..functional import bilinear_integral
 
-
-class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
-    def __init__(self, gn: SourceLike, q:Optional[int]=None, *,
+from .integrator import (
+    LinearInt, OpInt, CellInt,
+    enable_cache,
+    assemblymethod,
+    CoefLike
+)
+class ScalarRobinBCIntegrator(LinearInt, OpInt, CellInt):
+    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
         super().__init__()
-        self.gn = gn
+        self.coef = coef
         self.q = q
         self.threshold = threshold
         self.batched = batched
@@ -30,21 +35,20 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
             if callable(threshold):
                 bc = mesh.entity_barycenter('face', index=index)
                 index = index[threshold(bc)]
-
         return index
-
+    
     @enable_cache
-    def to_global_dof(self, space) -> TensorLike:
+    def to_global_dof(self, space: _FS) -> TensorLike:
         index = self.make_index(space)
         return space.face_to_dof(index=index)
-
+    
     @enable_cache
-    def fetch(self, space: _FS) -> TensorLike:
+    def fetch(self, space: _FS):
         index = self.make_index(space)
         mesh = space.mesh
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarNeumannBCIntegrator only support spaces on"
+            raise RuntimeError("The ScalarRobinBCIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -57,23 +61,11 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
         phi = space.face_basis(bcs)
 
         return bcs, ws, phi, facemeasure, n
+    
+    def assembly(self, space: _FS):
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, cm, index = self.fetch(space)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
 
-    def assembly(self, space):
-        gN = self.gn
-        index = self.make_index(space)
-        bcs, ws, phi, fm, n = self.fetch(space)
-
-        if callable(gN):
-            if (not hasattr(gN, 'coordtype')) or (gN.coordtype == 'cartesian'):
-                mesh = space.mesh
-                ps = mesh.bc_to_point(bcs, index=index)
-                # 在实际问题当中，法向 n  这个参数一般不需要
-                # 传入 n， 用户可根据需要来计算 Neumann 边界的法向梯度
-                val = gN(ps, n)
-            elif gN.coordtype == 'barycentric':
-                # 这个时候 gN 是一个有限元函数，一定不需要算面法向
-                val = gN(bcs, index=index)
-        else:
-            val = gN
-
-        return linear_integral(phi, ws, fm, val, self.batched)
+        return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
