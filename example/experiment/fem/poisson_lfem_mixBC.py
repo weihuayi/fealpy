@@ -22,9 +22,9 @@ from fealpy.mesh import Mesh
 from fealpy.solver import cg
 
 bm.set_backend('numpy')
-p = 1 
+p = 3 
 n = 10 
-maxit = 5
+maxit = 4
 pde = CosCosData()
 
 tmr = timer()
