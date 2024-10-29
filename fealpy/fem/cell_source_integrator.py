@@ -9,7 +9,7 @@ from ..functional import linear_integral
 from .integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
-class SourceIntegrator(LinearInt, SrcInt, CellInt):
+class CellSourceIntegrator(LinearInt, SrcInt, CellInt):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
     def __init__(self, source: Optional[SourceLike]=None, q: int=None, *,
                  index: Index=_S,
@@ -50,3 +50,4 @@ class SourceIntegrator(LinearInt, SrcInt, CellInt):
  
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
         return linear_integral(phi, ws, cm, val, batched=self.batched)
+
