@@ -118,13 +118,13 @@ parser.add_argument('--solver',
                     default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
-                    default=20, type=int, 
+                    default=3, type=int, 
                     help='Initial number of grid cells in the x direction, default is 2.')
 parser.add_argument('--ny',
-                    default=20, type=int,
+                    default=3, type=int,
                     help='Initial number of grid cells in the y direction, default is 2.')
 parser.add_argument('--nz',
-                    default=20, type=int,
+                    default=3, type=int,
                     help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 
@@ -134,14 +134,14 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 nx, ny, nz = args.nx, args.ny, args.nz
-mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cuda')
+mesh = HexahedronMesh.from_box(box=pde.domain(), nx=nx, ny=ny, nz=nz, device='cpu')
 
 p = args.degree
 
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 1
+maxit = 4
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -168,10 +168,10 @@ for i in range(maxit):
     tmr.send('source assembly')
 
     dbc = DirichletBC(space=tensor_space, 
-                    gD=pde.dirichlet, 
+                    gd=pde.dirichlet, 
                     threshold=None, 
                     method='interp')
-    K, F = dbc.apply(A=K, f=F, uh=None, gD=pde.dirichlet, check=True)
+    K, F = dbc.apply(A=K, f=F, uh=None, gd=pde.dirichlet, check=True)
     # uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
     #                 dtype=bm.float64, device=bm.get_device(mesh))
     # uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
