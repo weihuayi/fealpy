@@ -17,6 +17,8 @@ from fealpy.fem import ScalarRobinBCIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.mesh import TriangleMesh
+from fealpy.mesh import QuadrangleMesh 
+from fealpy.mesh import Mesh
 from fealpy.solver import cg
 
 bm.set_backend('numpy')
@@ -28,7 +30,8 @@ pde = CosCosData()
 tmr = timer()
 next(tmr)
 
-mesh = TriangleMesh.from_box(pde.domain(), n, n)
+#mesh = TriangleMesh.from_box(pde.domain(), n, n)
+mesh = QuadrangleMesh.from_box(pde.domain(), n, n)
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
