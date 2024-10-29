@@ -60,7 +60,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         elif etype in {'face', 2}:
             return TensorProductQuadrature((qf, qf))
         elif etype in {'edge', 1}:
-            return qf
+            return TensorProductQuadrature((qf,))
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 

@@ -540,7 +540,7 @@ class TensorMesh(HomogeneousMesh):
             p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('qj, ejk->eqk', bc, node[edge]) # (NE, NQ, 2)
+            p = bm.einsum('qj, ejk->eqk', bc[0], node[edge]) # (NE, NQ, 2)
         return p
 
     edge_bc_to_point = bc_to_point
@@ -553,7 +553,6 @@ class TensorMesh(HomogeneousMesh):
 
     def shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                        variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
-        TD = len(bcs)
         if mi is None:
             mi = bm.multi_index_matrix(p, 1, dtype=self.itype)
         raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
