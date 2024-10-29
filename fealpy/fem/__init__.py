@@ -21,8 +21,10 @@ from .curl_integrator import CurlCurlIntegrator
 
 
 ### Cell Source
+from .cell_source_integrator import CellSourceIntegrator
+SourceIntegrator = CellSourceIntegrator
+
 from .scalar_source_integrator import ScalarSourceIntegrator
-from .source_integrator import SourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
 
 ### Face Operator
