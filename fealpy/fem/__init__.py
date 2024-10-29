@@ -26,9 +26,10 @@ from .source_integrator import SourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
 
 ### Face Operator
-from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 
 ### Face Source
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC
