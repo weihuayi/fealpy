@@ -19,7 +19,7 @@ from fealpy.fem import LinearForm, SourceIntegrator
 from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.fem import LinearBlockForm, BlockForm
-from fealpy.solver import spsolve, cg 
+from fealpy.solver import spsolve, cg, gmres 
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder
 from fealpy.old.timeintegratoralg import UniformTimeLine
@@ -35,21 +35,21 @@ device = 'cpu'
 bm.set_backend(backend)
 #bm.set_default_device(device)
 
-output = './numpy/'
+output = './'
 udegree = 2
 pdegree = 1
 q = 4
-T = 7
-nt = 7000
+T = 6
+nt = 6000
 pde = FlowPastCylinder()
 rho = pde.rho
 mu = pde.mu
 
-mesh = pde.mesh(0.007, device = device)
+mesh = pde.mesh(0.009, device = device)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
-#tmr = timer()
-#next(tmr)
+tmr = timer()
+next(tmr)
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
 space = LagrangeFESpace(mesh, p=udegree)
@@ -90,14 +90,14 @@ LBForm = LinearBlockForm([ulform, plform])
 #边界处理
 BC = DirichletBC((uspace,pspace), gd=(pde.u_dirichlet, pde.p_dirichlet), 
                       threshold=(pde.is_u_boundary, pde.is_p_boundary), method='interp')
-#tmr.send('网格和pde生成时间')
-print(f"总共自由度为:{gdof}")
 
-for i in range(nt):
+tmr.send('网格和pde生成时间')
+print(f"总共自由度为:{gdof}")
+for i in range(5):
     t1 = timeline.next_time_level()
     print("time=", t1)
 
-    #tmr.send("其他") 
+    tmr.send("数据写入") 
     D.coef = rho*u0
     D.clear()
     A = BForm.assembly()
@@ -105,13 +105,26 @@ for i in range(nt):
     f.source = u0/dt
     f.clear()
     b = LBForm.assembly()
-    
+    tmr.send("矩阵组装") 
+     
     A,b = BC.apply(A,b)
-    #tmr.send("边界处理") 
+    tmr.send("边界处理") 
     
-    x = spsolve(A, b, 'scipy')
+    #A = A.to_scipy()
+    #b = bm.to_numpy(b)
+
+    #from scipy.sparse.linalg import lgmres
+    #from scipy.sparse.linalg import gmres
+    #from scipy.sparse.linalg import minres
+    #from scipy.linalg import issymmetric
+    #x = gmres(A, b)
+    #x,info = minres(A, b, rtol=1e-9, show=False,check=True)
+    #print(info)
+    #x = bm.tensor(x)
+    x = spsolve(A, b, 'mumps')
+    #x = gmres(A, b, 'cupy', x0=x0, maxiter=None, tol=1e-7)
     #x = cg(A, b)
-    #tmr.send("求解") 
+    tmr.send("求解") 
     u1[:] = x[:ugdof]
     p1[:] = x[ugdof:]
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
@@ -122,4 +135,4 @@ for i in range(nt):
     mesh.to_vtk(fname=fname)
         
     timeline.advance()
-#next(tmr)
+next(tmr)

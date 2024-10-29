@@ -1,7 +1,7 @@
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor, CSRTensor
 import numpy as np
-def _to_cupy_data(A, b):
+def _to_cupy_data(A, b, x0):
     """Convert the input tensors to cupy tensors.
 
     Parameters:
@@ -28,12 +28,15 @@ def _to_cupy_data(A, b):
     if isinstance(b, np.ndarray) or b.device.type == "cpu":
         b = bm.to_numpy(b)
         b = cp.array(b)
+        x0 = bm.to_numpy(x0)
+        x0 = cp.array(x0)
     else:
         b = cp.from_dlpack(b)
-    return A, b
+        x0 = cp.from_dlpack(x0)
+    return A, b, x0
 
 
-def _cupy_solve(A, b, atol):
+def _cupy_solve(A, b, tol, x0, maxiter ,atol):
 
     """Solve a linear system using cupy.
 
@@ -48,19 +51,18 @@ def _cupy_solve(A, b, atol):
     import cupyx.scipy.sparse.linalg as cpx
 
     iscpu = isinstance(b, np.ndarray) or b.device.type == "cpu"
-    A, b = _to_cupy_data(A, b)
-    x, info = cpx.gmres(A, b, atol=atol)
+    A, b, x0 = _to_cupy_data(A, b, x0)
+    x, info = cpx.gmres(A, b, tol=tol, x0=x0, maxiter=maxiter, atol=atol)
     if iscpu:
         x = cp.asnumpy(x)
     return x
 
-def _mumps_solve(A, b, atol):
-    pass
 def _scipy_solve(A, b, atol):
     pass
 
 
-def gmres(A:[COOTensor, CSRTensor], b, solver:str="cupy", atol=1e-18):
+def gmres(A:[COOTensor, CSRTensor], b, solver:str="cupy", 
+          tol=1e-5, x0=None, maxiter=None, atol=1e-12):
     """Solve a linear system using a direct solver.
 
     Parameters:
@@ -72,12 +74,12 @@ def gmres(A:[COOTensor, CSRTensor], b, solver:str="cupy", atol=1e-18):
         Tensor: The solution of the linear system.
     """
     if solver == "mumps":
-        return bm.tensor(_mumps_solve(A, b))
+        return bm.tensor(_mumps_solve(A, b, atol=atol))
     elif solver == "scipy":
-        return bm.tensor(_scipy_solve(A, b))
+        return bm.tensor(_scipy_solve(A, b, atol=atol))
     elif solver == "cupy":
         A = A.tocoo()
-        return bm.tensor(_cupy_solve(A, b, atol=atol))
+        return bm.tensor(_cupy_solve(A, b, tol=tol, x0=x0, maxiter=maxiter, atol=atol))
     else:
         raise ValueError(f"Unknown solver: {solver}")
 
