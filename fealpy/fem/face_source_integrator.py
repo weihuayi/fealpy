@@ -5,6 +5,7 @@ from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..functional import linear_integral
 from .integrator import LinearInt, SrcInt, FaceInt, enable_cache, assemblymethod
+from ..utils import process_coef_func
 
 
 class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
@@ -46,8 +47,11 @@ class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
     def assembly(self, space):
         source = self.source
         index = self.make_index(space)
-        bcs, ws, phi, fm, n = self.fetch(space)
+        bcs, ws, phi, fm, n = self.fetch(space) 
+        mesh = getattr(space, 'mesh', None)
 
+        val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='cell', index=index, n=n)
+        '''
         if callable(source):
             if (not hasattr(source, 'coordtype')) or (source.coordtype == 'cartesian'):
                 mesh = space.mesh
@@ -60,7 +64,7 @@ class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
                 val = source(bcs, index=index)
         else:
             val = source 
-
+        '''
         return linear_integral(phi, ws, fm, val, self.batched)
 
 class InterFaceSourceIntegrator(_FaceSourceIntegrator):
