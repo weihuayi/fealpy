@@ -13,8 +13,6 @@ from fealpy.utils import timer
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.fem import BoundaryFaceSourceIntegrator, BoundaryFaceMassIntegrator 
-from fealpy.fem import ScalarNeumannBCIntegrator
-from fealpy.fem import ScalarRobinBCIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.mesh import TriangleMesh

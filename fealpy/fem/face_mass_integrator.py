@@ -13,6 +13,7 @@ from .integrator import (
     assemblymethod,
     CoefLike
 )
+
 class _FaceMassIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
