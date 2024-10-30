@@ -32,14 +32,6 @@ origin = [extent[0], extent[2]]
 
 mesh = UniformMesh2d(extent=extent, h=h, origin=origin, flip_direction=True)
 
-# import matplotlib.pyplot as plt
-# fig = plt.figure()
-# axes = fig.gca()
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_edge(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()
 p_C = 1
 space_C = LagrangeFESpace(mesh, p=p_C, ctype='C')
 tensor_space = TensorFunctionSpace(space_C, shape=(-1, 2))
