@@ -46,4 +46,3 @@ CH_LForm = solver.CH_LForm()
 NS_BForm = solver.CH_BForm()
 NS_LForm = solver.CH_LForm()
 
-
