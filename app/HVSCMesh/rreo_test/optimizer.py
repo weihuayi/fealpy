@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
-from fealpy.mesh.mesh_quality import RadiusRatioQuality
-from app.HVSCMesh.radius_ratio_objective import RadiusRatioSumObjective
+from mesh_quality import RadiusRatioQuality
+from radius_ratio_objective import RadiusRatioSumObjective
 
 def show_mesh_quality(q1,ylim=1000):
     fig,axes= plt.subplots()

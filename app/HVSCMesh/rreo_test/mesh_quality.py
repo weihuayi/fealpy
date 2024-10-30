@@ -1,7 +1,7 @@
 from typing import TypeVar, Generic
 
 from fealpy.backend import backend_manager as bm
-from felapy.backend import TensorLike
+from fealpy.backend import TensorLike
 
 from fealpy.mesh.opt import MeshCellQuality
 
@@ -38,6 +38,7 @@ class RadiusRatioQuality(MeshCellQuality):
         return quality
 
     def jac(self,x:TensorLike) -> TensorLike:
+        #node = self.mesh.entity('node')
         node = x
         cell = self.mesh.entity('cell')
         NC = self.mesh.number_of_cells()
@@ -242,6 +243,7 @@ class RadiusRatioQuality(MeshCellQuality):
             return grad
 
     def hess(self,x:TensorLike,funtype=0):
+        #node = self.mesh.entity('node')
         node = x
         cell = self.mesh.entity('cell')
         NC = self.mesh.number_of_cells()
@@ -269,13 +271,12 @@ class RadiusRatioQuality(MeshCellQuality):
 
                 c = mu*(1/(p*l)+1/l2)
                 cn = mu/area
-            if funtype==1:
+            elif funtype==1:
                 mu = area*p*q/16
                 c = mu*(1/(p*l)+1/l2)
-                cn = mu
-            if funtype==2:
+                cn = mu/area
+            elif funtype==2:
                 mu = p*q/16
-
                 c = mu*(1/(p*l)+1/l2)
                 cn = mu
 
@@ -422,29 +423,29 @@ class RadiusRatioQuality(MeshCellQuality):
             B2 /= ld0[:,None,None]
 
             S  /= s_sum[:,None,None]
-
-
+            
             if funtype==0:
+                C0 /= 3*cm[:,None,None]
+                C1 /= 3*cm[:,None,None]
+                C2 /= 3*cm[:,None,None]
+
                 mu = s_sum*bm.sqrt(ld0)/(108*cm**2)
+            elif funtype==1:
                 C0 /= 3*cm[:,None,None]
                 C1 /= 3*cm[:,None,None]
                 C2 /= 3*cm[:,None,None]
-            if funtype==1:
-                mu = cm*s_sum*bm.sqrt(ld0)/108
-                C0 /= 3*cm[:,None,None]
-                C1 /= 3*cm[:,None,None]
-                C2 /= 3*cm[:,None,None]
-            if funtype==2: 
-                mu = s_sum*bm.sqrt(ld0)/108
+                mu = cm*s_sum*np.sqrt(ld0)/108
+            elif funtype==2:
                 C0 /= 3
                 C1 /= 3
                 C2 /= 3
+                mu = s_sum*np.sqrt(ld0)/108
 
             A  += S
             B0 -= C0
             B1 -= C1
             B2 -= C2
-
+            
             A  *= mu[:,None,None]/NC
             B0 *= mu[:,None,None]/NC
             B1 *= mu[:,None,None]/NC
