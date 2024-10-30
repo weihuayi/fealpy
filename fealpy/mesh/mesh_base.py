@@ -478,6 +478,9 @@ class SimplexMesh(HomogeneousMesh):
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         phi = bm.simplex_shape_function(bcs, p, mi)
         return phi
+    
+    face_shape_function = shape_function
+    edge_shape_function = shape_function
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -537,7 +540,7 @@ class TensorMesh(HomogeneousMesh):
             p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('qj, ejk->eqk', bc, node[edge]) # (NE, NQ, 2)
+            p = bm.einsum('qj, ejk->eqk', bc[0], node[edge]) # (NE, NQ, 2)
         return p
 
     edge_bc_to_point = bc_to_point
@@ -550,7 +553,6 @@ class TensorMesh(HomogeneousMesh):
 
     def shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                        variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
-        TD = len(bcs)
         if mi is None:
             mi = bm.multi_index_matrix(p, 1, dtype=self.itype)
         raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
@@ -562,6 +564,9 @@ class TensorMesh(HomogeneousMesh):
         else:
             raise ValueError("Variables type is expected to be 'u' or 'x', "
                              f"but got '{variables}'.")
+    
+    face_shape_function = shape_function
+    edge_shape_function = shape_function
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -588,9 +593,7 @@ class TensorMesh(HomogeneousMesh):
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
                 J = bm.linalg.inv(J)
-                # J^{-T}\nabla_u phi
-                gphi = bm.einsum('qcmn, qlm -> cqln', J, gphi)
-                # gphi = bm.concatenate((gphi0, gphi1), axis=-1)
+                gphi = bm.einsum('cqmn, qlm -> cqln', J, gphi)
 
                 return gphi
         elif TD == 2:

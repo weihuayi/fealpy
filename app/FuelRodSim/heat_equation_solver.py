@@ -73,11 +73,17 @@ class HeatEquationSolver:
         for n in range(self.nt):
             t = self.duration[0] + n * self.tau
             bform3 = LinearForm(self.space)
-            # 这里应该传入后的得到的为qc
-            #f=self.pde.source(node,t)
-            source=lambda p, index: self.pde.source(p, t)
+            from fealpy.decorator import cartesian
+            @cartesian
+            def coef(p):
+                time = t
+                val = self.pde.source(p, time)
+                return val
+            # f=self.pde.source(node,t)
+            #source=lambda p, index: pde.source(p, t)
             # source = pde.source
-            bform3.add_integrator(ScalarSourceIntegrator(source))
+            bform3.add_integrator(ScalarSourceIntegrator(coef))
+
             self.F = bform3.assembly()
             
             # 组装刚度矩阵

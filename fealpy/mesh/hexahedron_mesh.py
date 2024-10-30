@@ -60,7 +60,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         elif etype in {'face', 2}:
             return TensorProductQuadrature((qf, qf))
         elif etype in {'edge', 1}:
-            return qf
+            return TensorProductQuadrature((qf,))
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 
@@ -86,7 +86,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs, index=index)
         detJ = bm.linalg.det(J)
-        val = bm.einsum('q, qc->c', ws, detJ)
+        val = bm.einsum('q, cq->c', ws, detJ)
         return val
 
     def face_area(self, index=_S):
@@ -114,9 +114,10 @@ class HexahedronMesh(TensorMesh, Plotable):
         entity = self.entity(TD, index=index)
         gphi = self.grad_shape_function(bc, p=1, variables='u')
         if TD == 3:
-            J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]], gphi)
+            node_cell_flip = node[entity[:, [0, 4, 3, 7, 1, 5, 2, 6]]]
+            J = bm.einsum( 'cim, qin -> cqmn', node_cell_flip, gphi)
         elif TD == 2:
-            J = bm.einsum( 'cim, qin->qcmn', node[entity[:, [0, 3, 1, 2]]], gphi)
+            J = bm.einsum( 'cim, qin -> cqmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
 
 

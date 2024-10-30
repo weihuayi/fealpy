@@ -40,7 +40,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.get_dof_index()
  
         #self.isCornerNode = isCornerNode
-        self.isCornerNode, self.isCornerEdge = self.get_corner()
+        #self.isCornerNode, self.isCornerEdge,_,_,_ = self.get_corner()
         self.coeff = self.coefficient_matrix()
    
     def get_dof_index(self):
@@ -262,118 +262,165 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         c2dof[:, ldof-cidof:] = c2id
         return c2dof
 
-    def is_boundary_dof1(self, threshold=None): #TODO:threshold 未实现
+    def boundary_interpolate(self, gd, uh, threshold=None, method="interp"):
+        isDDof = self.is_boundary_dof(threshold=threshold)
+        uI = self.interpolation(gd)
+        uh[isDDof] = uI[isDDof]
+        return uh, isDDof
+
+
+    def is_boundary_dof(self, threshold=None, method='interp'): #TODO:threshold 未实现
         mesh = self.mesh
         m = self.m
-        nndof = self.number_of_internal_dofs('node')
-        isbdnode = mesh.boundary_node_flag()
-        bdnodedof = self.node_to_dof()[isbdnode]
-        l = (m+1)*(m+2)//2
-        a = self.dof_index["node"][0]
-        idxnode = []
-        import ipdb
-        ipdb.set_trace()
-        d = 0
-        for r in a:
-            l = d+ d+1
-            idx1 = r[:l]
-            d = d+1
-            #print(idx1)
-            idxnode.append(idx1)
-        idxnode = bm.concatenate(idxnode)
-        bdnodedof = bdnodedof[:, idxnode].reshape(-1)
+        p = self.p
+        multiIndex = self.multiIndex
+        iscornernode, isbdedgenode, isbdfacenode, iscorneredge, isbdfaceedge = self.get_corner()
+        gdof = self.number_of_global_dofs()
 
-        isbdedge = mesh.boundary_edge_flag()
-        bdedgedof = self.edge_to_internal_dof()[isbdedge]
-        a = self.dof_index["edge"][0]
-        a = bm.concatenate([arr for sublist in a for arr in sublist][:5]) 
-        a = bm.arange(a.shape[0])
-        bdedgedof = bdedgedof[:, a].reshape(-1) 
+        # 点
+        n2d = self.node_to_dof()
+        cnidx = n2d[iscornernode]
+        enidx = bm.arange(len(multiIndex))[((multiIndex[:, 3]<=m) | (multiIndex[:, 2]<=m)) & (multiIndex[:, 0]>= p-4*m)]
+        enidx = n2d[isbdedgenode][:, enidx]
+        fnidx = bm.arange(len(multiIndex))[(multiIndex[:, 3] <=m) & (multiIndex[:, 0]>= p-4*m)]
+        fnidx = n2d[isbdfacenode][:, fnidx]
+        nidx = bm.concatenate([cnidx.flatten(), enidx.flatten(), fnidx.flatten()])
+
+        # 边
+        e2id = self.edge_to_internal_dof()
+        ceidx = e2id[iscorneredge]
+        flag = (multiIndex[:, 0]<p-4*m) & (multiIndex[:, 1]<p-4*m) & (bm.sum(multiIndex[:, 2:], axis=1)<=2*m) & (multiIndex[:, 3]<=m) 
+        a = self.dof_index['edge'][0]
+        a = bm.concatenate([arr for sublist in a for arr in sublist])
+        b = bm.arange(len(multiIndex))[flag]
+        indices = [bm.where(a == num)[0][0] for num in b]
+        feidx = e2id[isbdfaceedge][:, indices]
+        eidx = bm.concatenate([ceidx.flatten(), feidx.flatten()])
 
         # 面
         isbdface = mesh.boundary_face_flag()
-        bdfacedof = self.face_to_internal_dof()[isbdface].reshape(-1)
-        #print(bdfacedof)
-        isBdDof = bm.zeros(self.number_of_global_dofs(), dtype=bm.bool) 
-        bdidx = bm.concatenate([bdnodedof, bdedgedof, bdfacedof])
-        fidof = self.number_of_internal_dofs('face')
-        #print('2222222',bdidx.shape)
-        isBdDof[bdidx] = True
-        return isBdDof 
+        f2id = self.face_to_internal_dof()
+        fidx = f2id[isbdface].flatten()
+        idx = bm.concatenate([nidx, eidx, fidx])
 
-    def is_boundary_dof(self, threshold=None): #TODO:threshold 未实现
-        mesh = self.mesh
-        m = self.m
-        isbdface = mesh.boundary_face_flag()
-        bdfaceidx = bm.arange(isbdface.shape[0])[isbdface]
-        #print(bdfaceidx)
-        c2f = mesh.cell_to_face()
-        multiIndex = self.multiIndex
-        print(multiIndex)
-        nodedof = self.dof_index['node']
-        ndi = bm.concatenate([bm.concatenate(item) if isinstance(item, list) else item for sublist in nodedof for item in sublist])
-
-        print(ndi)
-        print(multiIndex[ndi])
-        #mask = bm.isin(c2f, bdfaceidx)
-        l = lambda x: (x[:,1]+x[:,2]+x[:,3]+2)*(x[:,1]+x[:,2]+x[:,3]+1)*(x[:,1]+x[:,2]+x[:,3])//6 + (x[:,2]+x[:,3]+1)*(x[:,2]+x[:,3])//2 + x[:,3]
-        cell2dof = self.cell_to_dof() 
-        #print(cell2dof)
-        #print(self.dof_index['all'])
-        bdidx = []
-        for f in bdfaceidx:
-            ncell, nu = bm.where(c2f==f)
-            #print(ncell,nu)
-            isbdmul = multiIndex[:, int(nu)]<=m 
-
-            bdmul = multiIndex[isbdmul]
-            #print(bdmul.shape)
-            idx = l(bdmul)
-            #print('idx',idx)
-            idx = bm.argsort(self.dof_index['all'])[idx]
-        
-
-            bdidx.append(cell2dof[ncell, idx])
-            #print(bdidx)
-        bdidx = bm.unique(bm.concatenate(bdidx))
-        print('111111', bdidx.shape)
+        isBdDof = bm.zeros(gdof, dtype=bm.bool)
+        isBdDof[idx] = True
+        return isBdDof
 
 
-        return
+#        isbdnode = mesh.boundary_node_flag()
+#        bdnodedof = self.node_to_dof()[isbdnode]
+#        l = (m+1)*(m+2)//2
+#        a = self.dof_index["node"]#[0]
+#        print('aa',a)
+#        idxnode = []
+#        d = 0
+#        for r in a:
+#            l = d+ d+1
+#            idx1 = r[:l]
+#            d = d+1
+#            #print(idx1)
+#            idxnode.append(idx1)
+#        idxnode = bm.concatenate(idxnode)
+#        bdnodedof = bdnodedof[:, idxnode].reshape(-1)
+#
+#        isbdedge = mesh.boundary_edge_flag()
+#        bdedgedof = self.edge_to_internal_dof()[isbdedge]
+#        a = self.dof_index["edge"][0]
+#        a = bm.concatenate([arr for sublist in a for arr in sublist][:5]) 
+#        a = bm.arange(a.shape[0])
+#        bdedgedof = bdedgedof[:, a].reshape(-1) 
+#
+#        # 面
+#        isbdface = mesh.boundary_face_flag()
+#        bdfacedof = self.face_to_internal_dof()[isbdface].reshape(-1)
+#        #print(bdfacedof)
+#        isBdDof = bm.zeros(self.number_of_global_dofs(), dtype=bm.bool) 
+#        bdidx = bm.concatenate([bdnodedof, bdedgedof, bdfacedof])
+#        fidof = self.number_of_internal_dofs('face')
+#        #print('2222222',bdidx.shape)
+#        isBdDof[bdidx] = True
+#        return isBdDof 
+
+#    def is_boundary_dof(self, threshold=None): #TODO:threshold 未实现
+#        mesh = self.mesh
+#        m = self.m
+#        isbdface = mesh.boundary_face_flag()
+#        bdfaceidx = bm.arange(isbdface.shape[0])[isbdface]
+#        #print(bdfaceidx)
+#        c2f = mesh.cell_to_face()
+#        multiIndex = self.multiIndex
+#        print(multiIndex)
+#        nodedof = self.dof_index['node']
+#        ndi = bm.concatenate([bm.concatenate(item) if isinstance(item, list) else item for sublist in nodedof for item in sublist])
+#
+#        print(ndi)
+#        print(multiIndex[ndi])
+#        #mask = bm.isin(c2f, bdfaceidx)
+#        l = lambda x: (x[:,1]+x[:,2]+x[:,3]+2)*(x[:,1]+x[:,2]+x[:,3]+1)*(x[:,1]+x[:,2]+x[:,3])//6 + (x[:,2]+x[:,3]+1)*(x[:,2]+x[:,3])//2 + x[:,3]
+#        cell2dof = self.cell_to_dof() 
+#        #print(cell2dof)
+#        #print(self.dof_index['all'])
+#        bdidx = []
+#        for f in bdfaceidx:
+#            ncell, nu = bm.where(c2f==f)
+#            #print(ncell,nu)
+#            isbdmul = multiIndex[:, int(nu)]<=m 
+#
+#            bdmul = multiIndex[isbdmul]
+#            #print(bdmul.shape)
+#            idx = l(bdmul)
+#            #print('idx',idx)
+#            idx = bm.argsort(self.dof_index['all'])[idx]
+#        
+#
+#            bdidx.append(cell2dof[ncell, idx])
+#            #print(bdidx)
+#        bdidx = bm.unique(bm.concatenate(bdidx))
+#        print('111111', bdidx.shape)
+#        return
 
     def get_corner(self):
         """
         @brief 获取角点, 角边, 不太对啊
         """
         mesh = self.mesh
+        box = mesh.box
         node = mesh.entity('node')
         edge = mesh.entity('edge')
-        face = mesh.entity('face')
-        cell = mesh.entity('cell')
 
         f2e = mesh.face_to_edge()
         fn  = mesh.face_unit_normal()
         NE  = mesh.number_of_edges()
-        NN  = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
 
-        ## 角点
-        isBdNode = mesh.boundary_node_flag()
-        isBdFace = mesh.boundary_face_flag()
+        # 角点
+        isCornerNode = ((bm.abs(node[:, 0]-box[0])<1e-14) | (bm.abs(node[:, 0]-box[1])<1e-14)) & ((bm.abs(node[:, 1]-box[2])<1e-14) | (bm.abs(node[:, 1]-box[3])<1e-14)) & ((bm.abs(node[:, 2]-box[4])<1e-14)| (bm.abs(node[:, 2]-box[5])<1e-14)) 
 
+        # 棱边
         isCornerEdge = bm.zeros(NE, dtype=bm.bool)
-
-        en = bm.zeros((NE, 3), dtype=self.ftype)
-        en[f2e[isBdFace]] = fn[isBdFace, None]
-        #print(fn)
+        isBdFace = mesh.boundary_face_flag()
+        bb = bm.zeros((NE, 3), dtype=self.ftype)
+        bb[f2e[isBdFace]] = fn[isBdFace, None]
         fn = bm.tile(fn[:, None], (1, 3, 1))
-        #print(fn)
-        #print(bm.cross(en[f2e], fn))
-        flag = bm.linalg.norm(bm.cross(en[f2e], fn), axis=-1)>1e-10
-        isCornerEdge[f2e[flag]] = True
+        flag = bm.linalg.norm(bm.cross(bb[f2e[isBdFace]], fn[isBdFace]), axis=-1)>1e-10
+        isCornerEdge[f2e[isBdFace][flag]] = True
 
-        isCornerNode = bm.zeros(NN, dtype=bm.bool)
-        isCornerNode[edge[isCornerEdge]] = True
-        return isCornerNode, isCornerEdge 
+        # 棱点
+        isBdEdgeNode = bm.zeros(NN, dtype=bm.bool)
+        isBdEdgeNode[edge[isCornerEdge]] = True
+        isBdEdgeNode[isCornerNode] = False
+
+        # 边界面上点
+        isBdNode = mesh.boundary_node_flag()
+        isBdFaceNode = isBdNode
+        isBdFaceNode[isBdEdgeNode | isCornerNode] = False
+
+        # 面上边界边
+        isBdFaceEdge = mesh.boundary_edge_flag()
+        isBdFaceEdge[isCornerEdge] = False
+
+        return isCornerNode, isBdEdgeNode, isBdFaceNode,  isCornerEdge,isBdFaceEdge 
 
 
 
@@ -393,19 +440,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         fn = mesh.face_unit_normal()
         et = mesh.edge_tangent(unit=True)
+        isBdNode = mesh.boundary_node_flag()
+        isBdFace = mesh.boundary_face_flag()
 
-        # node frame 
-        NN = mesh.number_of_nodes()
-        node_frame = bm.zeros((NN, 3, 3), dtype=self.ftype)
-        node_frame[:] = bm.eye(3, dtype=self.ftype)
-
-        # edge frame
-        NE = mesh.number_of_edges()
-        edge_frame = bm.zeros((NE, 3, 3), dtype=self.ftype)
-        edge_frame[:, 0] = et
-        for i in range(len(f2e)):
-            edge_frame[f2e[i], 2] = fn[i][None,:]
-        #edge_frame[f2e, 2] = fn[:, None] 
 
         # face frame
         NF = mesh.number_of_faces()
@@ -414,24 +451,41 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         face_frame[:, 0] = et[f2e[:, 0]] 
         face_frame[:, 1] = bm.cross(face_frame[:, 2], face_frame[:, 0])
 
-        # node frame boundary
-        isBdNode = mesh.boundary_node_flag()
-        isBdFace = mesh.boundary_face_flag()
-        node_frame[face[isBdFace]] = face_frame[isBdFace, None]
+
+        # edge frame
+        NE = mesh.number_of_edges()
+        edge_frame = bm.zeros((NE, 3, 3), dtype=self.ftype)
+        edge_frame[:, 0] = et
+        edge_frame[f2e, 2] = fn[:, None] 
 
         # edge frame at boundary
-        import ipdb
-        ipdb.set_trace()
-        for i in range(len(f2e[isBdFace])):
-            edge_frame[f2e[isBdFace][i], 2] = fn[isBdFace][i][None,:]
-
-        #edge_frame[f2e[isBdFace], 2] = fn[isBdFace, None]
+        edge_frame[f2e[isBdFace], 2] = fn[isBdFace, None]
         edge_frame[:, 1] = bm.cross(edge_frame[:, 2], edge_frame[:, 0])
 
-        # corner node frame
-        isCornerNode = self.isCornerNode # 原来的isCornerNode不对吧
-        node_frame[isCornerNode] = bm.eye(3, dtype=self.ftype)
+        # node frame 
+        NN = mesh.number_of_nodes()
+        node_frame = bm.zeros((NN, 3, 3), dtype=self.ftype)
+        node_frame[:] = bm.eye(3, dtype=self.ftype)
 
+        # 边界表面点
+        node_frame[face[isBdFace]] = face_frame[isBdFace, None]
+
+        # 边界棱点
+        isCornerNode, isbdedgenode, isbdfacenode, iscorneredge, isbdfaceedge = self.get_corner()
+        node_frame[edge[iscorneredge]] = edge_frame[iscorneredge, None]
+
+        # 角点
+        node_frame[isCornerNode] = bm.eye(3, dtype=self.ftype)
+#        for i in range(len(f2e)):
+#            edge_frame[f2e[i], 2] = fn[i][None,:]
+#        for i in range(len(edge[iscorneredge])):
+#            node_frame[edge[iscorneredge][i]] = edge_frame[iscorneredge][i][None,:]
+#        for i in range(len(face[isBdFace])):
+#            node_frame[face[isBdFace][i]] = face_frame[isBdFace][i][None,:]
+#        for i in range(len(f2e[isBdFace])):
+#            edge_frame[f2e[isBdFace][i], 2] = fn[isBdFace][i][None,:]
+#
+      
         return node_frame, edge_frame, face_frame
 
 
@@ -815,41 +869,41 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         fI[c2id] = bcoeff[:, S3]
         return fI
 
-    def boundary_interpolate(self, gD, uh, threshold=None):
-        mesh = self.mesh
-        m = self.m
-        p = self.p
-        isCornerNode = self.isCornerNode
-        isBdNode = mesh.boundary_node_flag()
-        isBdEdge = mesh.boundary_edge_flag()
-        isBdFace = mesh.boundary_face_flag()
-
-        node = mesh.entity('node')[isBdNode]
-        edge = mesh.entity('edge')[isBdEdge]
-        face = mesh.entity('face')[isBdFace]
-
-        NN = len(node)
-        NE = len(edge)
-        NF = len(face)
-
-        nodeframe, edgeframe, faceframe = self.get_frame()
-        nodeframe = nodeframe[isBdNode]
-        edgeframe = edgeframe[isBdEdge]
-        faceframe = faceframe[isBdFace]
-
-        n2id = self.node_to_dof()[isBdNode]
-        e2id = self.edge_to_internal_dof()[isBdEdge]
-        f2id = self.face_to_internal_dof()[isBdFace]
-        # 顶点
-        uh[n2id[:, 0]] = gD[0](node)
-        k = 1
-        for r in range(1, 4*m+1):
-            val = gD[r](node)
-            symidx, num = symmetry_index(3, r)
-            #bdnidxmap = 
-            #idx = bdnidxmap[coridx]
-            #print(idx)
-        return
+#    def boundary_interpolate(self, gD, uh, threshold=None):
+#        mesh = self.mesh
+#        m = self.m
+#        p = self.p
+#        isCornerNode = self.isCornerNode
+#        isBdNode = mesh.boundary_node_flag()
+#        isBdEdge = mesh.boundary_edge_flag()
+#        isBdFace = mesh.boundary_face_flag()
+#
+#        node = mesh.entity('node')[isBdNode]
+#        edge = mesh.entity('edge')[isBdEdge]
+#        face = mesh.entity('face')[isBdFace]
+#
+#        NN = len(node)
+#        NE = len(edge)
+#        NF = len(face)
+#
+#        nodeframe, edgeframe, faceframe = self.get_frame()
+#        nodeframe = nodeframe[isBdNode]
+#        edgeframe = edgeframe[isBdEdge]
+#        faceframe = faceframe[isBdFace]
+#
+#        n2id = self.node_to_dof()[isBdNode]
+#        e2id = self.edge_to_internal_dof()[isBdEdge]
+#        f2id = self.face_to_internal_dof()[isBdFace]
+#        # 顶点
+#        uh[n2id[:, 0]] = gD[0](node)
+#        k = 1
+#        for r in range(1, 4*m+1):
+#            val = gD[r](node)
+#            symidx, num = symmetry_index(3, r)
+#            #bdnidxmap = 
+#            #idx = bdnidxmap[coridx]
+#            #print(idx)
+#        return
 
         
 

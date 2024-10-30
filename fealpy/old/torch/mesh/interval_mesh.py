@@ -5,8 +5,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from fealpy.torch.mesh.mesh_base import _S
-from fealpy.torch.mesh.quadrature import Quadrature
+from fealpy.old.torch.mesh.mesh_base import _S
+from fealpy.old.torch.mesh.quadrature import Quadrature
 
 from .. import logger
 from . import functional as F

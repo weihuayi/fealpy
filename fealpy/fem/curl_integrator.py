@@ -17,7 +17,7 @@ from .integrator import (
 )
 
 
-class CurlIntegrator(LinearInt, OpInt, CellInt):
+class CurlCurlIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c curl u, curl v)
     """    
