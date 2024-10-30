@@ -68,7 +68,7 @@ for i in range(0,100):
     B1 = csr_matrix((B1.flat, (I.flat, J.flat)), shape=(NN, NN))
     B2 = csr_matrix((B2.flat, (I.flat, J.flat)), shape=(NN, NN))
     node = BlockJacobi3d(node,A,B0,B1,B2,isFreeNode)
-    fname = './data/tet'+str(i)+'.vtu'
+    fname = './datatet/tet'+str(i)+'.vtu'
     mesh.to_vtk(fname)
     q[1] = meshquality(node)
     minq = np.min(q[1])

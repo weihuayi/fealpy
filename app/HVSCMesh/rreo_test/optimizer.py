@@ -112,7 +112,7 @@ def BlockJacobi3d(node,A,B0,B1,B2,isFreeNode):
     node += 0.3*p
     return node
 
-def iterate_solver(mesh):
+def iterate_solver(mesh,funtype=0):
     NC = mesh.number_of_cells()
     node = mesh.entity('node')
     cell = mesh.entity('cell')
@@ -127,7 +127,7 @@ def iterate_solver(mesh):
     print('iter=',0,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
     if mesh.TD == 2:
         for i in range(0,30):
-            A,B = mesh_objective.hess(node)
+            A,B = mesh_objective.hess(node,funtype)
             node = BlockJacobi2d(node, A, B, isFreeNode)
                         ## count quality
             q[1] = mesh_quality(node)
@@ -144,7 +144,7 @@ def iterate_solver(mesh):
         mesh = TriangleMesh(node,cell)
     elif mesh.TD == 3:
         for i in range(0,100):
-            A,B0,B1,B2 = mesh_objective.hess(node)
+            A,B0,B1,B2 = mesh_objective.hess(node,funtype)
             node = BlockJacobi3d(node, A, B0, B1, B2, isFreeNode)
                         ## count quality
             q[1] = mesh_quality(node)
