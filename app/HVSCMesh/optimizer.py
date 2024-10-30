@@ -103,6 +103,7 @@ def BlockJacobi3d(node,A,B0,B1,B2,isFreeNode):
     newNode[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
             b[isFreeNode], x0=node[isFreeNode, 1], rtol=1e-6)
     b = B1*node[:,0]+B0*node[:,1]-A*newNode[:,2]
+
     newNode[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
             b[isFreeNode], x0=node[isFreeNode, 2], rtol=1e-6)
     #node[isFreeNode, :] = newNode[isFreeNode, :]
