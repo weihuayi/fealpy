@@ -95,6 +95,30 @@ class TensorFunctionSpace(FunctionSpace):
             self.scalar_space.number_of_global_dofs(),
             self.dof_priority
         )
+    
+    def edge_to_dof(self) -> TensorLike:
+        """Get the edge to dof mapping.
+
+        Returns:
+            Tensor: Edge to dof mapping, shaped (NE, ldof*dof_numel).
+        """
+        return to_tensor_dof(
+            self.scalar_space.edge_to_dof(),
+            self.dof_numel,
+            self.scalar_space.number_of_global_dofs(),
+            self.dof_priority
+        )
+    
+    def entity_to_dof(self, etype: int, index: Index=_S):
+        TD = self.mesh.top_dimension()
+        if etype == TD:
+            return self.cell_to_dof()[index]
+        elif etype == TD-1:
+            return self.face_to_dof()[index]
+        elif etype == 1:
+            return self.edge_to_dof()[index]
+        else:
+            raise ValueError(f"Unknown entity type: {etype}")
 
     def interpolation_points(self) -> TensorLike:
 
@@ -330,16 +354,19 @@ class TensorFunctionSpace(FunctionSpace):
             
         return uh, isTensorBDof
 
+    
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        TD = bc.shape[-1] - 1
         phi = self.basis(bc, index=index)
-        c2dof = self.cell_to_dof()[index]
-        val = bm.einsum('cql..., cl... -> cq...', phi, uh[c2dof, ...])
+        e2dof = self.entity_to_dof(TD, index=index)
+        val = bm.einsum('cql..., cl... -> cq...', phi, uh[e2dof, ...])
         return val
     
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        TD = bc.shape[-1] - 1
         gphi = self.grad_basis(bc, index=index)
-        cell2dof = self.cell_to_dof()[index]
-        val = bm.einsum('cqlmn..., cl... -> cqmn', gphi, uh[cell2dof, ...])
+        e2dof = self.entity_to_dof(TD, index=index)
+        val = bm.einsum('cqlmn..., cl... -> cqmn', gphi, uh[e2dof, ...])
         return val[...]
