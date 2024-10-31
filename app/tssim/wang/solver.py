@@ -15,6 +15,11 @@ from fealpy.fem import (ScalarConvectionIntegrator,
                         ScalarMassIntegrator,
                         SourceIntegrator)
 
+from fealpy.fem import (BoundaryFaceMassIntegrator,
+                        BoundaryFaceSourceIntegrator)
+                        
+                        
+                        
 
 
 class Solver():
@@ -33,11 +38,11 @@ class Solver():
         L_d = self.pde.L_d
         epsilon = self.pde.epsilon
         s = self.pde.s
+        V_s = self.pde.V_s
         q = self.q
 
         A00 = BilinearForm(phispace)
         M = ScalarMassIntegrator(coef=3, q=q)
-        #外面更新C积分子
         self.phi_C = ScalarConvectionIntegrator(q=q)
         A00.add_integrator([M,self.phi_C])
 
@@ -47,7 +52,7 @@ class Solver():
         A10 = BilinearForm(phispace)
         A10.add_integrator(ScalarDiffusionIntegrator(coef=-epsilon, q=q))
         A10.add_integrator(ScalarMassIntegrator(coef=-s/epsilon, q=q))
-        ##TODO:差一个边界积分子
+        A10.add_integrator(BoundaryFaceMassIntegrator(coef=-3/(2*dt*V_s), q=q, threshold=pde.is_wall_boundary))     
 
         A11 = BilinearForm(phispace)
         A11.add_integrator(ScalarMassIntegrator(q=q))
@@ -69,6 +74,7 @@ class Solver():
 
         L1 = LinearForm(phispace)
         self.mu_SI = SourceIntegrator(q=q)
+        self.mu_BFSI = BoundaryFaceSourceIntegrator(q=q)
         L1.add_integrator(self.mu_SI)
 
         L = LinearBlockForm([L0, L1])
@@ -76,6 +82,8 @@ class Solver():
 
     def CH_update(self, u_0, u_1, phi_0, phi_1, mu_n):
         dt = self.dt
+        s = self.pde.s
+        epsilon =self.pde.epsilon
 
         @barycentric
         def C_coef(bcs, index):
@@ -85,15 +93,37 @@ class Solver():
         
         @barycentric
         def phi_coef(bcs, index):
-            result = 4*phi(bcs, index) - phi_0(bcs, index) 
+            result = 4*phi_1(bcs, index) - phi_0(bcs, index) 
             result1 = bm.einsum('jimd, jimd->jim', u_0(bcs. index), phi_1.grad_value(bcs, index))
             result += 2*dt*result1
             return result
         self.phi_SI.clear()
         self.phi_SI.source = phi_coef
        
-        ## TODO:写mu的source
+        @bartcentric
+        def mu_coef(bcs, index):
+            result = -2*(1+s)*phi_1(bcs, index)
+            result += (1+s)*phi_0(bcs, index)
+            result += 2*phi_1(bcs, index)**3
+            result -= phi_0(bcs, index)**3
+            result /= epsilon
         self.mu_SI.clear()
+        self.mu_SI.source = mu_coef
+        
+        @bartcentric
+        def mu_coef(bcs, index):
+            result = -2*(1+s)*phi_1(bcs, index)
+            result += (1+s)*phi_0(bcs, index)
+            result += 2*phi_1(bcs, index)**3
+            result -= phi_0(bcs, index)**3
+            result /= epsilon
+        self.mu_SI.clear()
+        self.mu_SI.source = mu_coef
+        
+        @bartcentric
+        def mu_BF_coef(bcs, index):
+            result = (-4*phi_1(bcs, index) + phi_0(bcs, index))/2*dt
+            result += 2*
 
     def NS_BForm(self):
         pspace = self.pspace

@@ -81,41 +81,6 @@ phi = space.basis(bcs)
 
 
 
-def save_array_to_txt(array, filename):
-    """
-    保存三维数组到txt文件，保持二维数组格式，每个数字保留8位小数
-    array: 要保存的numpy数组
-    filename: 文件名
-    """
-    with open(filename, 'w') as f:
-        # 写入数组的形状信息
-        f.write(f"# Array shape: {array.shape}\n")
-        
-        # 逐层保存数据
-        for i in range(array.shape[0]):
-            f.write(f"# Layer {i}\n")
-            for j in range(array.shape[1]):
-                # 将每行数据格式化为保留8位小数的字符串，使用制表符分隔
-                row_data = '\t'.join(f"{x:.8f}" for x in array[i, j, :])
-                f.write(row_data + '\n')
-            f.write('\n')  # 每层之间添加空行
-
-def save_2d_array_to_txt(array, filename):
-    """
-    保存二维数组到txt文件，每个数字保留8位小数
-    array: 要保存的numpy数组
-    filename: 文件名
-    """
-    with open(filename, 'w') as f:
-        # 写入数组的形状信息
-        f.write(f"# Array shape: {array.shape}\n")
-        
-        # 逐行保存数据
-        for i in range(array.shape[0]):
-            # 将每行数据格式化为保留8位小数的字符串，使用制表符分隔
-            row_data = '\t'.join(f"{x:.8f}" for x in array[i, :])
-            f.write(row_data + '\n')
-
 
 linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
                                                 lame_lambda=1, shear_modulus=1, 
@@ -137,25 +102,39 @@ KK_dof = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B_dof, D, B_dof) # (
 KK_gd = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B_gd, D, B_gd)
 
 cell = mesh.entity('cell')
-cel2dof = space.cell_to_dof()
 cell2dof_dof = tensor_space_dof.cell_to_dof() # (NC, tldof)
 cell2dof_gd = tensor_space_gd.cell_to_dof() # (NC, tldof)
 tgdof = tensor_space_dof.number_of_global_dofs()
 
+
 I_dof = bm.broadcast_to(cell2dof_dof[:, :, None], shape=KK_dof.shape)
 J_dof = bm.broadcast_to(cell2dof_dof[:, None, :], shape=KK_dof.shape)
+K_dof_me = COOTensor(
+            indices = bm.empty((2, 0), dtype=bm.int32, device=bm.get_device(space)),
+            values = bm.empty((0, ), dtype=bm.float64, device=bm.get_device(space)),
+            spshape = (tgdof, tgdof))
+indices = bm.stack([I_dof.ravel(), J_dof.ravel()], axis=0)
+K_dof_me = K_dof_me.add(COOTensor(indices, KK_dof.reshape(-1), (tgdof, tgdof))).to_dense()
 
-# M_dof = COOTensor(
-#             indices = bm.empty((2, 0), dtype=bm.int32, device=bm.get_device(space)),
-#             values = bm.empty((0, ), dtype=bm.float64, device=bm.get_device(space)),
-#             spshape = (tgdof, tgdof))
+I_gd = bm.broadcast_to(cell2dof_gd[:, :, None], shape=KK_dof.shape)
+J_gd = bm.broadcast_to(cell2dof_gd[:, None, :], shape=KK_dof.shape)
+K_gd_me = COOTensor(
+            indices = bm.empty((0, 2), dtype=bm.int32, device=bm.get_device(space)),
+            values = bm.empty((0, ), dtype=bm.float64, device=bm.get_device(space)),
+            spshape = (tgdof, tgdof))
+indices = bm.stack([I_gd.ravel(), J_gd.ravel()], axis=0)
+K_gd_me = K_gd_me.add(COOTensor(indices, KK_gd.reshape(-1), (tgdof, tgdof))).to_dense()
 
-# indices = bm.stack([I_dof.ravel(), J_dof.ravel()], axis=0)
-# # group_tensor = bm.reshape(KK_dof, (-1, ))
-# M_dof = M_dof.add(COOTensor(indices, KK_dof.reshape(-1), (tgdof, tgdof))).to_dense()
+
 
 
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=2)
+
+bform_gd = BilinearForm(tensor_space_gd)
+bform_gd.add_integrator(integrator_K)
+K_gd_fealpy = bform_gd.assembly(format='csr').to_dense()
+
+
 KE_dof = integrator_K.assembly(space=tensor_space_dof)
 KE_gd = integrator_K.assembly(space=tensor_space_gd)
 

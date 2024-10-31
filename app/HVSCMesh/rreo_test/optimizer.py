@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
-from fealpy.mesh.mesh_quality import RadiusRatioQuality
-from app.HVSCMesh.radius_ratio_objective import RadiusRatioSumObjective
+from mesh_quality import RadiusRatioQuality
+from radius_ratio_objective import RadiusRatioSumObjective
 
 def show_mesh_quality(q1,ylim=1000):
     fig,axes= plt.subplots()
@@ -103,7 +103,6 @@ def BlockJacobi3d(node,A,B0,B1,B2,isFreeNode):
     newNode[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
             b[isFreeNode], x0=node[isFreeNode, 1], rtol=1e-6)
     b = B1*node[:,0]+B0*node[:,1]-A*newNode[:,2]
-
     newNode[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
             b[isFreeNode], x0=node[isFreeNode, 2], rtol=1e-6)
     #node[isFreeNode, :] = newNode[isFreeNode, :]
@@ -113,7 +112,7 @@ def BlockJacobi3d(node,A,B0,B1,B2,isFreeNode):
     node += 0.3*p
     return node
 
-def iterate_solver(mesh):
+def iterate_solver(mesh,funtype=0):
     NC = mesh.number_of_cells()
     node = mesh.entity('node')
     cell = mesh.entity('cell')
@@ -128,7 +127,7 @@ def iterate_solver(mesh):
     print('iter=',0,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
     if mesh.TD == 2:
         for i in range(0,30):
-            A,B = mesh_objective.hess(node)
+            A,B = mesh_objective.hess(node,funtype)
             node = BlockJacobi2d(node, A, B, isFreeNode)
                         ## count quality
             q[1] = mesh_quality(node)
@@ -145,7 +144,7 @@ def iterate_solver(mesh):
         mesh = TriangleMesh(node,cell)
     elif mesh.TD == 3:
         for i in range(0,100):
-            A,B0,B1,B2 = mesh_objective.hess(node)
+            A,B0,B1,B2 = mesh_objective.hess(node,funtype)
             node = BlockJacobi3d(node, A, B0, B1, B2, isFreeNode)
                         ## count quality
             q[1] = mesh_quality(node)
