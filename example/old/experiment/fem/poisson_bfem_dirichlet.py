@@ -49,9 +49,8 @@ parser.add_argument('--meshtype',
         help='默认网格为三角形网格')
 
 args = parser.parse_args()
-
-
 bm.set_backend(args.backend)
+
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -94,6 +93,7 @@ for i in range(maxit):
     if i < maxit-1:
         mesh.uniform_refine(n=1)
     tmr.send(f'第{i}次误差计算及网格加密时间')
+
 next(tmr)
-print("最终误差",errorMatrix)
+print("最终误差", errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
