@@ -12,7 +12,7 @@ mesh_quality = RadiusRatioQuality(mesh)
 q = mesh_quality(node)
 show_mesh_quality(q,ylim = 1000)
 
-mesh = iterate_solver(mesh) 
+mesh = iterate_solver(mesh)
 
 node = mesh.entity('node')
 q = mesh_quality(node)

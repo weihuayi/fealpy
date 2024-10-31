@@ -108,7 +108,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         if etype == 2:
             return TensorProductQuadrature((qf, qf))
         elif etype == 1:
-            return qf
+            return TensorProductQuadrature((qf,))
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
 

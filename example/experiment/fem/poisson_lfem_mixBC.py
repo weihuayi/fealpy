@@ -12,23 +12,25 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.utils import timer
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.fem import ScalarNeumannBCIntegrator
-from fealpy.fem import ScalarRobinBCIntegrator
+from fealpy.fem import BoundaryFaceSourceIntegrator, BoundaryFaceMassIntegrator 
 from fealpy.fem import DirichletBC
 from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.mesh import TriangleMesh
+from fealpy.mesh import QuadrangleMesh 
+from fealpy.mesh import Mesh
 from fealpy.solver import cg
 
 bm.set_backend('numpy')
-p = 1 
-n = 10 
-maxit = 5
+p = 2 
+n = 4 
+maxit = 4
 pde = CosCosData()
 
 tmr = timer()
 next(tmr)
 
 mesh = TriangleMesh.from_box(pde.domain(), n, n)
+#mesh = QuadrangleMesh.from_box(pde.domain(), n, n)
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
@@ -41,11 +43,11 @@ for i in range(maxit):
 
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator())
-    bform.add_integrator(ScalarRobinBCIntegrator(coef=pde.kappa, threshold=pde.is_robin_boundary))
+    bform.add_integrator(BoundaryFaceMassIntegrator(coef=pde.kappa, threshold=pde.is_robin_boundary))
     lform = LinearForm(space)
-    lform.add_integrator(ScalarSourceIntegrator(pde.source))
-    lform.add_integrator(ScalarNeumannBCIntegrator(gn=pde.robin, threshold=pde.is_robin_boundary))
-    lform.add_integrator(ScalarNeumannBCIntegrator(gn=pde.neumann, threshold=pde.is_neumann_boundary))
+    lform.add_integrator(ScalarSourceIntegrator(source=pde.source))
+    lform.add_integrator(BoundaryFaceSourceIntegrator(source=pde.robin, threshold=pde.is_robin_boundary))
+    lform.add_integrator(BoundaryFaceSourceIntegrator(source=pde.neumann, threshold=pde.is_neumann_boundary))
 
     A = bform.assembly()
     F = lform.assembly()
