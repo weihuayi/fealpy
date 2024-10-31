@@ -93,7 +93,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         return quad
 
     # shape function
-    def grad_lambda(self, index: Index=_S) -> TensorLike:
+    def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
         """
         node = self.node
