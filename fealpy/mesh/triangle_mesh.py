@@ -1331,7 +1331,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         tri = tri[isNecessaryCell, :]
         # 把顶点在 Delaunay 内的编号，转换为整个三角形内的编号
         interfaceNodeIdx = concat(
-            [bm.astype(iCellNodeIndex, dtype=mesh.itype),
+            [bm.astype(iCellNodeIndex, mesh.itype),
              NN + bm.arange(cutNode.shape[0] + auxNode.shape[0], dtype=mesh.itype, device=device)],
             axis = 0
         )
