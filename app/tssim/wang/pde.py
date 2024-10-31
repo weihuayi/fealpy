@@ -30,8 +30,7 @@ class CouetteFlow:
 
     def mesh(self, h=1/256):
         box = [-0.5, 0.5, -0.125, 0.125]
-        n = int(1/h)
-        mesh = TriangleMesh.from_box(box, nx=256, ny=64)
+        mesh = TriangleMesh.from_box(box, nx=int(1/h), ny=int(0.25/h))
         return mesh
 
     @cartesian
