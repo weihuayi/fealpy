@@ -9,7 +9,7 @@ from ..utils import process_coef_func
 
 
 class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
-    def __init__(self, source: SourceLike, q:Optional[int]=None, *,
+    def __init__(self, source: Optional[SourceLike]=None, q:Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
         super().__init__()
