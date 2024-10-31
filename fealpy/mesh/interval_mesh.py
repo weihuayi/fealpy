@@ -94,15 +94,8 @@ class IntervalMesh(SimplexMesh,Plotable):
         """
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        v = node[cell[:, 1]] - node[cell[:, 0]]
-        NC = len(cell)
-        GD = self.geo_dimension()
-        Dlambda = bm.zeros((NC, 2, GD), dtype=self.ftype)
-        h2 = bm.sum(v**2, axis=-1)
-        v /=h2.reshape(-1, 1)
-        Dlambda[:, 0, :] = -v
-        Dlambda[:, 1, :] = v
-        return Dlambda[index]
+        Dlambda = bm.interval_grad_lambda(cell, node)
+        return Dlambda
     
     def prolongation_matrix(self, p0:int, p1:int):
         """
