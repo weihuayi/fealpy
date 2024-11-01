@@ -18,7 +18,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.1
+        l0 = 0.015
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):
@@ -72,8 +72,8 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--maxit',
-        default=30, type=int,
-        help='最大迭代次数, 默认为 30 次.')
+        default=100, type=int,
+        help='最大迭代次数, 默认为 100 次.')
 
 parser.add_argument('--backend',
         default='numpy', type=str,
@@ -152,6 +152,7 @@ while isMarkedCell.any():
     mesh.bisect(isMarkedCell)
     isMarkedCell = model.adaptive_mesh(mesh)
 
+
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
@@ -159,9 +160,11 @@ mesh.to_vtk(fname=fname)
 ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
 tmr.send('init')
 
+'''
 if enable_adaptive:
     print('Enable adaptive refinement.')
     ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
+'''
 
 if force_type == 'y':
     # 拉伸模型边界条件
@@ -177,7 +180,11 @@ else:
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 
 
-ms.solve(maxit=maxit, save_vtkfile=save_vtkfile, vtkname=vtkname)
+if bm.backend_name == 'pytorch':
+    ms.auto_assembly_matrix()
+
+ms.save_vtkfile(fname=vtkname)
+ms.solve(maxit=maxit)
 
 tmr.send('stop')
 end = time.time()
@@ -185,8 +192,9 @@ end = time.time()
 force = ms.Rforce
 disp = ms.force_value
 tname = args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
+np.savetxt(tname, bm.to_numpy(force))
 with open(tname, 'w') as file:
-    file.write(f'force: {force},\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+    file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')

@@ -15,24 +15,24 @@ from .integrator import (
     CoefLike
 )
 
-
-class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
-    r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+class NonlinearElasticIntegrator(SemilinearInt, OpInt, CellInt):
+    r"""The nonlinear elastic integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, material, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
-        self.coef = coef
-        if hasattr(coef, 'uh'):
-            self.uh = coef.uh
-            self.kernel_func = coef.kernel_func
-            if not hasattr(coef, 'grad_kernel_func'):
+        self.material = material
+
+        if hasattr(material, 'uh'):
+            self.uh = material.uh
+            self.stress_func = material.stress_func
+            if not hasattr(material, 'grad_stress_func'):
                 assert bm.backend_name != "numpy", "In the numpy backend, you must provide a 'grad_kernel_func' method for the coefficient."
-                self.grad_kernel_func = None
+                self.grad_stress_func = None
             else:
-                self.grad_kernel_func = coef.grad_kernel_func
+                self.grad_stress_func = material.elastic_matrix
         self.q = q
         self.index = index
         self.batched = batched
@@ -58,46 +58,38 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index
     
+
     def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
-        coef = self.coef 
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, gphi, cm, index = self.fetch(space)       # gphi.shape ==[NC, NQ, ldof, dof_numel]
-        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        
-        if self.grad_kernel_func is not None:
-            val_A = self.grad_kernel_func(uh(bcs))         # [NC, NQ]          
-            coef_A = get_semilinear_coef(val_A, coef)
-            A = bilinear_integral(gphi, gphi, ws, cm, coef_A, batched=self.batched)
-            val_F = -uh.grad_value(bcs)                    # [NC, NQ, dof_numel]
-            coef_F = get_semilinear_coef(val_F, coef)
-            F = linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
+        bcs, ws, gphi, cm, index = self.fetch(space)       # gphi.shape ==[NC, NQ, ldof, dof_numel, GD]
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, gphi=gphi)
+        self._B = B
+        self._bcs = bcs
+        if self.grad_stress_func is not None:
+            val_A = self.grad_stress_func(bcs)         # [NC, NQ]          
+            A = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, val_A, B)
+            val_F = -uh.grad_value(bcs)                    # [NC, NQ, dof_numel, GD]
+            F = linear_integral(gphi, ws, cm, val_F, batched=self.batched)
         else:
             uh_ = uh[space.cell_to_dof()]
-            A, F = self.auto_grad(space, uh_, coef, batched=self.batched) 
+            A, F = self.auto_grad(space, uh_, bcs=bcs, batched=self.batched) 
 
         return A, F
     
-    def cell_integral(self, u, gphi, cm, ws, coef, batched) -> TensorLike:
-        val = self.kernel_func(bm.einsum('i, qid -> qd', u, gphi))
+    def cell_integral(self, u, B, cm, ws, batched) -> TensorLike:
+        bcs = self._bcs
+        val = self.stress_func(bm.einsum('cqkl, cl... -> cqk', B, u), bcs)
+        return bm.einsum('q, c, cqki, cqk -> ci', ws, cm, B, val)
 
-        if coef is None:
-            return bm.einsum('q, qid, qd -> i', ws, gphi, val) * cm
-        
-        if is_scalar(coef):
-            return bm.einsum('q, qid, qd -> i', ws, gphi, val) * cm * coef
-        
-        if is_tensor(coef):
-            coef = fill_axis(coef, 3 if batched else 2)
-            return bm.einsum(f'q, qid, qd, ...qd -> ...i', ws, gphi, val, coef) * cm
-
-    def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
+    def auto_grad(self, space, uh_, bcs, batched) -> TensorLike:
         _, ws, gphi, cm, _ = self.fetch(space)
+        B = self._B
         fn_A = bm.vmap(bm.jacfwd(                         
-            partial(self.cell_integral, ws=ws, coef=coef, batched=batched)
+            partial(self.cell_integral, ws=ws, batched=batched)
             ))
         fn_F = bm.vmap(
-            partial(self.cell_integral, ws=ws, coef=coef, batched=batched)
+            partial(self.cell_integral, ws=ws, batched=batched)
         )
-        return fn_A(uh_, gphi, cm), -fn_F(uh_, gphi, cm)
+        return fn_A(uh_, B, cm), -fn_F(uh_, B, cm)
         

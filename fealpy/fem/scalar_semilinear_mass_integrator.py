@@ -77,18 +77,18 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
 
         return A, F
     
-    def cell_integral(self, u, cm, phi, ws, coef, batched) -> TensorLike:
+    def cell_integral(self, u, cm, coef, phi, ws, batched) -> TensorLike:
         val = self.kernel_func(bm.einsum('i, qi -> q', u, phi[0]))
-        
+
         if coef is None:
             return bm.einsum('q, qi, q -> i', ws, phi[0], val) * cm
-        
+
         if is_scalar(coef):
             return bm.einsum('q, qi, q -> i', ws, phi[0], val) * cm * coef
-        
+
         if is_tensor(coef):
             coef = fill_axis(coef, 2 if batched else 1)
-            return bm.einsum(f'q, qi, q, ...q -> ...i', ws, phi[0], val, coef) * cm
+            return bm.einsum(f'q, qi, q, q -> i', ws, phi[0], val, coef) * cm
 
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, phi, cm, _ = self.fetch(space)
@@ -99,3 +99,17 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
             partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
         )
         return  fn_A(uh_, cm), -fn_F(uh_, cm)
+    
+    def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
+        _, ws, phi, cm, _ = self.fetch(space)
+        if is_scalar(coef) or coef is None:
+            cell_integral = partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched) 
+        else:
+            cell_integral = partial(self.cell_integral, phi=phi, ws=ws, batched=batched)
+
+        fn_A = bm.vmap(bm.jacfwd(cell_integral))
+        fn_F = bm.vmap(cell_integral)
+        if is_scalar(coef) or coef is None:
+            return fn_A(uh_, cm), -fn_F(uh_, cm)
+        else:
+            return fn_A(uh_, cm, coef), -fn_F(uh_, cm, coef)

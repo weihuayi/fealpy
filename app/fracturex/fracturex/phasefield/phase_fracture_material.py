@@ -130,6 +130,21 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         D = D0 * gd[..., None, None]
         return D
     
+    def stress_func(self, guh, bc) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        D = self.elastic_matrix(bc)
+        flat_stress = bm.einsum('cqkl, cql -> cqk', D, guh)
+        return flat_stress
+    
 class AnisotropicModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算各向异性模型下的应力

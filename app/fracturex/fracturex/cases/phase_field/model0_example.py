@@ -89,9 +89,9 @@ parser.add_argument('--refine_method',
         default='bisect', type=str,
         help='网格加密方法, 默认为 bisect.')
 
-parser.add_argument('--n',
-        default=6, type=int,
-        help='初始网格加密次数, 默认为 6.')
+parser.add_argument('--h',
+        default=0.01, type=float,
+        help='初始网格最小尺寸, 默认为 0.01.')
 
 parser.add_argument('--vtkname',
         default='test', type=str,
@@ -109,7 +109,7 @@ model_type = args.model_type
 enable_adaptive = args.enable_adaptive
 marking_strategy = args.marking_strategy
 refine_method = args.refine_method
-n = args.n
+h = args.h
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
 
@@ -121,18 +121,12 @@ bm.set_backend(backend)
 
 model = square_with_circular_notch()
 
-if args.mesh_type == 'tri':
-    domain = SquareWithCircleHoleDomain(hmin=0.01) 
-    mesh = TriangleMesh.from_domain_distmesh(domain, maxit=100)
-else:
-    raise ValueError('Unknown mesh type: %s' % args.mesh_type)
+domain = SquareWithCircleHoleDomain(hmin=h) 
+mesh = TriangleMesh.from_domain_distmesh(domain, maxit=100)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
+
+ms = MainSolver(mesh=mesh, material_params=model.params, p=p)
 tmr.send('init')
-
-if enable_adaptive:
-    print('Enable adaptive refinement.')
-    ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
 
 # 拉伸模型边界条件
 ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
@@ -141,8 +135,11 @@ ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.i
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
 
+if bm.backend_name == 'pytorch':
+    ms.auto_assembly_matrix()
 
-ms.solve(maxit=maxit, save_vtkfile=save_vtkfile, vtkname=vtkname)
+ms.save_vtkfile(fname=vtkname)
+ms.solve(maxit=maxit)
 
 tmr.send('stop')
 end = time.time()
@@ -151,8 +148,9 @@ force = ms.Rforce
 disp = ms.force_value
 
 tname = args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.txt'
+np.savetxt(tname, bm.to_numpy(force))
 with open(tname, 'w') as file:
-    file.write(f'force: {force},\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+    file.write(f'time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, hmin:{h},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
