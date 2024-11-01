@@ -4,7 +4,7 @@ from ..typing import TensorLike, Index, _S, Threshold
 
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
-from ..mesh.mesh_base import Mesh
+from ..mesh.mesh_base import Mesh, SimplexMesh
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
 from .function import Function
@@ -138,9 +138,15 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
-        TD = bc.shape[-1] - 1
+        if isinstance(bc, tuple):
+            TD = bc[0].shape[-1] - 1
+        else:
+            TD = bc.shape[-1] - 1
         phi = self.basis(bc, index=index)
-        e2dof = self.dof.entity_to_dof(TD, index=index)
+        if isinstance(self.mesh, SimplexMesh):
+            e2dof = self.dof.entity_to_dof(TD, index=index)
+        else :
+            e2dof = self.dof.cell_to_dof(index=index)
         val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., e2dof])
         return val
 
