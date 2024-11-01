@@ -29,13 +29,20 @@ def flatten_indices(shape: Size, permute: Size) -> TensorLike:
     Returns:
         Tensor: Indices of elements in the flattened tensor.
     """
+    # 如果 permute = [1, 0]，则 permuted_shape = [GD, ldof]
     permuted_shape = [shape[d] for d in permute]
+    # 总元素数量
     numel = prod(permuted_shape)
+    # 生成排列后的索引张量, [GD, ldof]
     permuted_indices = bm.arange(numel, dtype=bm.int32).reshape(permuted_shape)
+    # 计算逆转换
     inv_permute = [None, ] * len(permute)
     for d in range(len(permute)):
         inv_permute[permute[d]] = d
-    return bm.transpose(permuted_indices, inv_permute)
+    # 对索引张量进行转置，恢复到原始维度顺序 [ldof ,GD] 
+    indices = bm.transpose(permuted_indices, inv_permute)
+
+    return indices
 
 
 def to_tensor_dof(to_dof: TensorLike, dof_numel: int, gdof: int, dof_priority: bool=True) -> TensorLike:

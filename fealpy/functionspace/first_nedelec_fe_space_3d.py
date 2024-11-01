@@ -461,7 +461,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             val = bm.set_at(val,(...,slice(N+2*cldof//3,N+cldof),slice(None)),self.cross(gphi, v2)+phi[..., None]*cv2)
         return val
 
-    def is_boundary_dof(self, threshold=None):
+    def is_boundary_dof(self, threshold=None,method=None):
         return self.dof.is_boundary_dof()
 
     def cell_to_dof(self):
@@ -591,7 +591,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     #     return self.function(array=val)
 
     # dirichlet边界条件
-    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+    def set_dirichlet_bc(self, gd, uh, threshold=None, q=None,method=None):
         p = self.p
         mesh = self.mesh
         gdof = self.number_of_global_dofs()       
@@ -614,7 +614,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             points = mesh.bc_to_point(bcs)[index1]
             n = mesh.face_unit_normal()[index1]
             n = n[:,None,:]
-            h2 = gD(points)
+            h2 = gd(points)
             g = bm.cross(n, h2) 
             g = bm.cross(g,n)
 
@@ -642,7 +642,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         Minv = Minv*em[:,None,None]
         
         points1 = mesh.bc_to_point(bcs)[index2]
-        h1 = gD(points1)
+        h1 = gd(points1)
         b = bm.einsum('eqd, ed->eq', h1, t) 
         
         g2 = bm.einsum('eql, eq,q->el', bphi, b,ws)

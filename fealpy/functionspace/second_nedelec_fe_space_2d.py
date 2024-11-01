@@ -299,7 +299,7 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype)
     
-    def is_boundary_dof(self, threshold=None):
+    def is_boundary_dof(self, threshold=None,method=None):
         return self.dof.is_boundary_dof()
 
     @barycentric
@@ -462,7 +462,7 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         vec[edge2dof] = bm.einsum('eqg, eqlg,q,e->el', hval, bphi,ws,fm) # (NE, ldof)
         return vec
     
-    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
+    def set_dirichlet_bc(self, gd, uh, threshold=None, q=None,method=None):
         p = self.p
         mesh = self.mesh
         ldof = p+1
@@ -478,7 +478,7 @@ class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
         bcs = self.mesh.multi_index_matrix(p, 1, dtype=self.ftype)/p
         point = mesh.bc_to_point(bcs, index=index)
-        gval = gD(point,e2v) #(NE, p+1, 3)
+        gval = gd(point,e2v) #(NE, p+1, 3)
         #uh[edge2dof] = bm.sum(gval*e2v, axis=-1)
         uh[edge2dof] = gval
 

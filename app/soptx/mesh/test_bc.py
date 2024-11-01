@@ -7,8 +7,15 @@ from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
 
 from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem.linear_form import LinearForm
+
 from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
+
+from fealpy.sparse import COOTensor, CSRTensor
+from fealpy.fem.dirichlet_bc import DirichletBC
+from fealpy.solver import cg, spsolve
+
 
 class BoxDomainPolyLoaded3d():
     def domain(self):
@@ -56,8 +63,10 @@ class BoxDomainPolyLoaded3d():
     
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
-        return bm.zeros(points.shape, 
-                        dtype=points.dtype, device=bm.get_device(points))
+        return self.solution(points)
+
+        # return bm.zeros(points.shape, 
+        #                 dtype=points.dtype, device=bm.get_device(points))
 
 
 bm.set_backend('numpy')
@@ -74,7 +83,6 @@ q = 2
 qf = mesh.quadrature_formula(q)
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs)
-gphi = space.grad_basis(bc=bcs) # (NC, NQ, 8, 3)
 
 
 
@@ -97,41 +105,108 @@ def save_array_to_txt(array, filename):
                 f.write(row_data + '\n')
             f.write('\n')  # 每层之间添加空行
 
-tensor_space_dof = TensorFunctionSpace(space, shape=(3, -1))
-tensor_space_gd = TensorFunctionSpace(space, shape=(-1, 3))
+def save_2d_array_to_txt(array, filename):
+    """
+    保存二维数组到txt文件，每个数字保留8位小数
+    array: 要保存的numpy数组
+    filename: 文件名
+    """
+    with open(filename, 'w') as f:
+        # 写入数组的形状信息
+        f.write(f"# Array shape: {array.shape}\n")
+        
+        # 逐行保存数据
+        for i in range(array.shape[0]):
+            # 将每行数据格式化为保留8位小数的字符串，使用制表符分隔
+            row_data = '\t'.join(f"{x:.8f}" for x in array[i, :])
+            f.write(row_data + '\n')
+
 
 linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
                                                 lame_lambda=1, shear_modulus=1, 
                                                 hypo='3D', device=bm.get_device(mesh))
 
-# B_dof = linear_elastic_material.strain_matrix(dof_priority=True, gphi=gphi, shear_order=['xy', 'yz', 'zx'])
-# B_dof_0 = B_dof[0, :, :, :]
-# save_array_to_txt(B_dof_0, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/B_dof_0.txt")
+tensor_space_dof = TensorFunctionSpace(space, shape=(3, -1))
+tensor_space_gd = TensorFunctionSpace(space, shape=(-1, 3))
 
-# B_gd = linear_elastic_material.strain_matrix(dof_priority=False, gphi=gphi, shear_order=['xy', 'yz', 'zx'])
-# B_gd_0 = B_gd[0, :, :, :]
-# save_array_to_txt(B_gd_0, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/B_gd_0.txt")
+gphi = space.grad_basis(bcs) # (NC, NQ, ldof, 3)
+gphi_dof = tensor_space_dof.grad_basis(bcs) # (NC, NQ, ldof, 3)
 
-# D = linear_elastic_material.elastic_matrix(bcs)
 cm = mesh.cell_volume()
 
-# KK_dof = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B_dof, D, B_dof)
-# save_array_to_txt(KK_dof, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/KK_dof.txt")
+cell = mesh.entity('cell')
+cel2dof = space.cell_to_dof()
+cell2dof_dof = tensor_space_dof.cell_to_dof() # (NC, tldof)
+cell2dof_gd = tensor_space_gd.cell_to_dof() # (NC, tldof)
+tgdof = tensor_space_dof.number_of_global_dofs()
 
-# KK_gd = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B_gd, D, B_gd)
-# save_array_to_txt(KK_gd, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/KK_gd.txt")
 
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=2)
-KE_dof = integrator_K.assembly(space=tensor_space_dof)
 
-bform = BilinearForm(tensor_space)
-bform.add_integrator(integrator_K)
-K = bform.assembly(format='csr')
+bform_dof = BilinearForm(tensor_space_dof)
+bform_dof.add_integrator(integrator_K)
+K_dof = bform_dof.assembly(format='csr')
+K_dof_dense = K_dof.to_dense()
 
-KE_gd = integrator_K.assembly(space=tensor_space_gd)
-
+isDDof_dof = tensor_space_dof.is_boundary_dof()
+isDDof_gd = tensor_space_gd.is_boundary_dof()
 
 pde = BoxDomainPolyLoaded3d()
+dbc_dof = DirichletBC(space=tensor_space_dof, 
+                    gd=pde.dirichlet, 
+                    threshold=None, 
+                    method='interp')
+K1_dof = dbc_dof.apply_matrix(matrix=K_dof, check=True)
+K1_dof_dense = K1_dof.to_dense()
+
+save_2d_array_to_txt(K1_dof_dense, 
+                     "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/K1_dof_dense.txt")
+
+
+integrator_F = VectorSourceIntegrator(source=pde.source, q=2)
+
+
+lform_dof = LinearForm(tensor_space_dof)    
+lform_dof.add_integrator(integrator_F)
+F_dof = lform_dof.assembly()
+
+K_dof, F_dof = dbc_dof.apply(A=K1_dof, f=F_dof, uh=None, gd=pde.dirichlet, check=True)
+
+
+# indices = K_dof.indices()
+# new_values = bm.copy(K_dof.values())
+# IDX = isDDof_dof[indices[0, :]] | isDDof_dof[indices[1, :]]
+# new_values[IDX] = 0
+
+# K_dof = COOTensor(indices, new_values, K_dof.sparse_shape)
+# index, = bm.nonzero(isDDof_dof)
+# one_values = bm.ones(len(index), **K_dof.values_context())
+# one_indices = bm.stack([index, index], axis=0)
+# K2_dof = COOTensor(one_indices, one_values, K_dof.sparse_shape)
+# K_dof = K_dof.add(K2_dof).coalesce()
+# K2_dof_dense = K_dof.to_dense()
+
+# error = bm.sum(bm.abs(K1_dof_dense - K2_dof_dense))
+
+
+uh_bd_dof = bm.zeros(tensor_space_dof.number_of_global_dofs(), 
+                    dtype=bm.float64, device=bm.get_device(mesh))
+uh_bd_dof, _ = tensor_space_dof.boundary_interpolate(gd=pde.dirichlet, uh=uh_bd_dof, 
+                                                threshold=None, method='interp')
+F_dof = F_dof - K1_dof.matmul(uh_bd_dof)
+F_dof = bm.set_at(F_dof, isDDof_dof, uh_bd_dof[isDDof_dof])
+
+
+uh_dof = tensor_space_dof.function()
+uh_dof[:] = cg(K_dof, F_dof, maxiter=1000, atol=1e-14, rtol=1e-14)
+
+
+
+bform_gd = BilinearForm(tensor_space_gd)
+bform_gd.add_integrator(integrator_K)
+K_gd = bform_gd.assembly(format='csr').to_dense()
+
+
 
 ps = mesh.bc_to_point(bcs)
 coef_val = pde.source(ps) # (NC, NQ, GD)
@@ -141,18 +216,23 @@ phi_dof_test = phi_dof.squeeze(0)
 phi_gd = tensor_space_gd.basis(bcs) # (1, NQ, tldof, GD)
 phi_gd_test = phi_gd.squeeze(0)
 
-FE_dof = bm.einsum('q, c, cqid, cqd -> ci', ws, cm, phi_dof, coef_val) # (NC, tldof)
-
-FE_gd = bm.einsum('q, c, cqid, cqd -> ci', ws, cm, phi_gd, coef_val) # (NC, tldof)
 
 integrator_F = VectorSourceIntegrator(source=pde.source, q=2)
-FF_dof = integrator_F.assembly(space=tensor_space_dof) # (NC, tldof)
-
-FF_gd = integrator_F.assembly(space=tensor_space_gd)
 
 
-lform = LinearForm(tensor_space)    
-# lform.add_integrator(integrator_F
+lform_dof = LinearForm(tensor_space_dof)    
+lform_dof.add_integrator(integrator_F)
+F_dof = lform_dof.assembly()
+
+
+# lform_gd = LinearForm(tensor_space_gd)
+# lform_gd.add_integrator(integrator_F)
+# F_gd = lform_gd.assembly()
+
+# error = bm.sum(bm.abs(M_dof - F_dof))
+
+
+print("-------------------------")
 
 
 
