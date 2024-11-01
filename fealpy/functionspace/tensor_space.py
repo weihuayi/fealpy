@@ -357,7 +357,10 @@ class TensorFunctionSpace(FunctionSpace):
     
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
-        TD = bc.shape[-1] - 1
+        if isinstance(bc, tuple):
+            TD = len(bc)
+        else :
+            TD = bc.shape[-1] - 1
         phi = self.basis(bc, index=index)
         e2dof = self.entity_to_dof(TD, index=index)
         val = bm.einsum('cql..., cl... -> cq...', phi, uh[e2dof, ...])
@@ -365,7 +368,10 @@ class TensorFunctionSpace(FunctionSpace):
     
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
-        TD = bc.shape[-1] - 1
+        if isinstance(bc, tuple):
+            TD = len(bc)
+        else :
+            TD = bc.shape[-1] - 1
         gphi = self.grad_basis(bc, index=index)
         e2dof = self.entity_to_dof(TD, index=index)
         val = bm.einsum('cqlmn..., cl... -> cqmn', gphi, uh[e2dof, ...])

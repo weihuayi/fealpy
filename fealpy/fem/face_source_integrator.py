@@ -49,22 +49,7 @@ class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
         index = self.make_index(space)
         bcs, ws, phi, fm, n = self.fetch(space) 
         mesh = getattr(space, 'mesh', None)
-
         val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='cell', index=index, n=n)
-        '''
-        if callable(source):
-            if (not hasattr(source, 'coordtype')) or (source.coordtype == 'cartesian'):
-                mesh = space.mesh
-                ps = mesh.bc_to_point(bcs, index=index)
-                # 在实际问题当中，法向 n  这个参数一般不需要
-                # 传入 n， 用户可根据需要来计算 Neumann 边界的法向梯度
-                val = source(ps, n)
-            elif gN.coordtype == 'barycentric':
-                # 这个时候 gN 是一个有限元函数，一定不需要算面法向
-                val = source(bcs, index=index)
-        else:
-            val = source 
-        '''
         return linear_integral(phi, ws, fm, val, self.batched)
 
 class InterFaceSourceIntegrator(_FaceSourceIntegrator):
