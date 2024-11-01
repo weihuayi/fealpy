@@ -22,7 +22,7 @@ from scipy.optimize import fsolve, minimize, differential_evolution
 from fealpy.mesh import QuadrangleMesh, HexahedronMesh
 
 
-def get_helix_points(points, beta, r, h, t):
+def get_helix_points(points, beta, r, h, t, rotation_direction=1):
     """
     根据端面网格，基于扫掠法，获取指定参数位置的节点坐标
     :param points: 端面网格点
@@ -30,10 +30,11 @@ def get_helix_points(points, beta, r, h, t):
     :param r: 分度圆半径
     :param h: 齿宽
     :param t: 目标点参数
+    :param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
     :return: 指定参数位置的节点坐标
     """
     r_points = np.sqrt(np.sum(points ** 2, axis=-1))
-    tooth_helix = h * tan(beta) / r
+    tooth_helix = rotation_direction * h * tan(beta) / r
     start_angle = np.arctan2(points[..., 1], points[..., 0])
 
     if isinstance(t, (float, int)):
@@ -57,7 +58,7 @@ def get_helix_points(points, beta, r, h, t):
     return volume_points
 
 
-def sweep_points(points, beta, r, h, n):
+def sweep_points(points, beta, r, h, n, rotation_direction=1):
     """
     根据端面网格，使用扫掠法，生成整体网格节点
     :param points: 端面网格点
@@ -65,15 +66,16 @@ def sweep_points(points, beta, r, h, n):
     :param r: 分度圆半径
     :param h: 齿宽
     :param n: 沿齿宽分段数
+    @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
     :return: 整体网格节点
     """
     t = np.linspace(0, 1, n + 1)
-    volume_points = get_helix_points(points, beta, r, h, t)
+    volume_points = get_helix_points(points, beta, r, h, t, rotation_direction)
 
     return volume_points
 
 
-def generate_hexahedral_mesh(quad_mesh, beta, r, tooth_width, nw):
+def generate_hexahedron_mesh(quad_mesh, beta, r, tooth_width, nw, rotation_direction=1):
     """
     根据齿轮端面网格，使用扫掠法，生成整体网格
     :param quad_mesh: 端面四面体网格
@@ -92,7 +94,7 @@ def generate_hexahedral_mesh(quad_mesh, beta, r, tooth_width, nw):
 
     # 创建齿轮整体网格
     # 拉伸节点
-    volume_node = sweep_points(new_node, beta, r, tooth_width, nw).reshape(-1, 3)
+    volume_node = sweep_points(new_node, beta, r, tooth_width, nw, rotation_direction).reshape(-1, 3)
     # 将端面四边形单元拉伸为六面体单元
     volume_cell = np.zeros((nw, len(cell), 8), dtype=np.int64)
     cell_domain_tag = np.zeros((nw, len(cell)))
@@ -138,7 +140,7 @@ def cylindrical_to_cartesian(d, width, gear):
         # 根据螺旋线与当前宽度，计算实际坐标
         total_width = gear.tooth_width
         t2 = width / total_width
-        point = get_helix_points(point_t, gear.beta, gear.r, total_width, t2)
+        point = get_helix_points(point_t, gear.beta, gear.r, total_width, t2, gear.rotation_direction)
     elif isinstance(r, (np.ndarray, list)):
         point_t = np.zeros((len(r), 3))
         total_width = gear.tooth_width
@@ -151,7 +153,7 @@ def cylindrical_to_cartesian(d, width, gear):
             # 计算端面点（z=0）坐标
             t = fsolve(involutecross, gear.m_n)[0]
             point_t[i, 0:2] = gear.get_involute_points(t)
-            point[i] = get_helix_points(point_t[i], gear.beta, gear.r, total_width, t2[i])
+            point[i] = get_helix_points(point_t[i], gear.beta, gear.r, total_width, t2[i], gear.rotation_direction)
 
     return point
 

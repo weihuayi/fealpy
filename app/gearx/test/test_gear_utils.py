@@ -62,7 +62,7 @@ class TestGearUtils:
         nw = gear_data['nw']
 
         # 生成六面体网格
-        hex_mesh = generate_hexahedral_mesh(mesh, beta, r, tooth_width, nw)
+        hex_mesh = generate_hexahedron_mesh(mesh, beta, r, tooth_width, nw)
         volume_node = hex_mesh.node
         volume_cell = hex_mesh.cell
         NN = hex_mesh.number_of_nodes()
@@ -75,15 +75,49 @@ class TestGearUtils:
             data = pickle.load(f)
         external_gear = data['gear']
         hex_mesh = data['hex_mesh']
+        quad_mesh = data['mesh']
+        # quad_mesh.to_vtk(fname='external_quad_mesh.vtu')
+        node = hex_mesh.node
+        face = hex_mesh.face
         n = 15
         helix_d = np.linspace(external_gear.d, external_gear.effective_da, n)
         helix_width = np.linspace(0, external_gear.tooth_width, n)
         helix_node = cylindrical_to_cartesian(helix_d, helix_width, external_gear)
-        print(helix_node)
+        # print(helix_node)
 
-        for t_node in helix_node:
-            target_cell_idx = find_node_location_kd_tree(t_node, hex_mesh)
-            print(target_cell_idx)
+        # target_cell_idx = np.zeros(n, np.int32)
+        # local_face_idx = np.zeros(n, np.int32)
+        # parameters = np.zeros((n, 3), np.float64)
+        # for i, t_node in enumerate(helix_node):
+        #     target_cell_idx[i], local_face_idx[i], parameters[i] = find_node_location_kd_tree(t_node, external_gear, hex_mesh)
+        # print(target_cell_idx)
+        # print(local_face_idx)
+        # print(parameters)
+
+        # # 寻找内圈上节点
+        # node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        # is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+        # inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+
+        # with open('external_gear_test_data.pkl', 'wb') as f:
+        #     pickle.dump({'hex_mesh': hex_mesh, 'helix_node': helix_node, 'target_cell_idx': target_cell_idx,
+        #                  'parameters': parameters, 'is_inner_node': is_inner_node, 'inner_node_idx': inner_node_idx}, f)
+
+        # 齿廓标记
+        is_bd_cell = quad_mesh.boundary_cell_flag()
+        tooth_flag = quad_mesh.celldata["cell_tooth_tag"] == 0
+        domain_flag = quad_mesh.celldata["cell_domain_tag"] == 6
+
+        cell_flag = is_bd_cell & tooth_flag & domain_flag
+        cell_idx = np.where(cell_flag)[0][1:]
+        tooth_profile_cell = quad_mesh.cell[cell_idx]
+        tooth_profile_node = np.zeros(external_gear.n1+1, dtype=np.int32)
+        tooth_profile_node[0:external_gear.n1] = tooth_profile_cell[:, 1]
+        tooth_profile_node[-1] = tooth_profile_cell[-1, 2]
+
+        print(-1)
+
+
 
 
 if __name__ == "__main__":
