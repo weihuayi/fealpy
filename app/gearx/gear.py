@@ -236,7 +236,7 @@ class ExternalGear(Gear):
         def involutecross_rb_i(t):
             return self.get_tip_intersection_points(t) - self.r_b
 
-        # t1 = (mn * x - (ha_cutter - rc + rc * sin(alpha_t))) / cos(alpha_t)
+        # t_temp = (mn * x - (ha_cutter - rc + rc * sin(alpha_t))) / cos(alpha_t)
         t1 = fsolve(involutecross_rb_i, mn)[0]
 
         def involutecross(t2):
@@ -280,7 +280,7 @@ class ExternalGear(Gear):
         points = self.get_profile_points()
         r_inner = self.inner_diam / 2
 
-        one_tooth_angle = delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector")
+        one_tooth_angle = abs(delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector"))
         if one_tooth_angle*z > 2*pi:
             max_angle_flag = True
         else:
@@ -998,8 +998,7 @@ class InternalGear(Gear):
                         rc * sin(t[1]) + t[3]),
                 (rb_cutter * t[0] * sin(etab) * sin(t[0]) + rb_cutter * t[0] * cos(etab) * cos(t[0])) / (
                         rb_cutter * t[0] * cos(etab) * sin(t[0]) - rb_cutter * t[0] * cos(t[0]) * sin(etab)) + cos(
-                    t[1]) / sin(
-                    t[1]),
+                    t[1]) / sin(t[1]),
                 t[2] ** 2 + t[3] ** 2 - (ra_cutter - rc) ** 2
             ]
 
@@ -1009,16 +1008,16 @@ class InternalGear(Gear):
             y0 = t[3]
             func4 = lambda t: self.get_transition_intersection_points(E, x0, y0, rc, ratio, t) - self.r_f
 
-            # t3 = pi / 2 - arctan(x0 / y0)
-            t3 = fsolve(func4, pi / 2 - arctan(x0 / y0))[0]
+            t3 = pi / 2 - arctan(x0 / y0)
+            # t3 = fsolve(func4, pi / 2 - arctan(x0 / y0))[0]
             t4 = t[1]
 
             tt = np.linspace(t4, t3, n2, endpoint=False)
             points[n1 + 1:n1 + n2 + 1, 0:2] = self.get_transition_points(E, x0, y0, rc, ratio, tt)
 
             func3 = lambda t: self.get_transition_intersection_points(E, 0, 0, ra_cutter, ratio, t) - self.r_f
-            # t5 = pi / 2 - arctan(x0 / y0)
-            t5 = fsolve(func3, pi / 2 - arctan(x0 / y0))[0]
+            t5 = pi / 2 - arctan(x0 / y0)
+            # t5 = fsolve(func3, pi / 2 - arctan(x0 / y0))[0]
             t6 = pi / 2
             tt = np.linspace(t5, t6, nf - 1, endpoint=False)
             points[n1 + n2 + 1:n1 + n2 + nf, 0:2] = self.get_transition_points(E, 0, 0, ra_cutter, ratio, tt)
