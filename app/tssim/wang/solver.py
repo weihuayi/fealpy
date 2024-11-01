@@ -32,6 +32,10 @@ class Solver():
         self.dt = dt
         self.q = q
     
+    def dirction_grad(self, u, n):
+        result = bm.einsum('eld, ed', u(bcs, index), n[index,:])
+        return result
+
     def CH_BForm(self):
         phispace = self.phispace
         dt = self.dt
@@ -84,13 +88,17 @@ class Solver():
         dt = self.dt
         s = self.pde.s
         epsilon =self.pde.epsilon
+        tangent = self.mesh.edge_unit_tangent()
+        V_s = self.pde.V_s
 
+        # BilinearForm
         @barycentric
         def C_coef(bcs, index):
             return 4*dt*u_1(bcs, index)
         self.phi_C.coef = C_coef
         self.phi_C.clear()
         
+        # LinearForm 
         @barycentric
         def phi_coef(bcs, index):
             result = 4*phi_1(bcs, index) - phi_0(bcs, index) 
@@ -102,22 +110,21 @@ class Solver():
        
         @barycentric
         def mu_coef(bcs, index):
-            result = -2*(1+s)*phi_1(bcs, index)
-            result += (1+s)*phi_0(bcs, index)
-            result += 2*phi_1(bcs, index)**3
-            result -= phi_0(bcs, index)**3
+            result = -2*(1+s)*phi_1(bcs, index) + (1+s)*phi_0(bcs, index)
+            result += 2*phi_1(bcs, index)**3 - phi_0(bcs, index)**3
             result /= epsilon
+            return result
         self.mu_SI.source = mu_coef
         self.mu_SI.clear()
         
-        '''
+        
         @bartcentric
         def mu_BF_coef(bcs, index):
-            result = (-4*phi_1(bcs, index) + phi_0(bcs, index))/2*dt
-            result += 2*
+            result0 = (-4*phi_1(bcs, index) + phi_0(bcs, index))/2*(dt*V_s)
+            result1 = 2*bm.einsum('eld, ed', u1(bcs, index), tangent[index,:])\
+                      *bm.einsum('eld, ed', phi_1.grad_value(bcs, index), tangent[index,:])
         self.mu_BF_SI.clear()
         self.mu_BF_SI.source = mu_BF_coef
-        '''
 
     def NS_BForm(self):
         pspace = self.pspace

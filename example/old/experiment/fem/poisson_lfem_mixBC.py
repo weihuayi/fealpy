@@ -7,30 +7,72 @@
 	@bref 
 	@ref 
 '''  
+import argparse
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.utils import timer
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.fem import BoundaryFaceSourceIntegrator, BoundaryFaceMassIntegrator 
+from fealpy.fem.face_mass_integrator import BoundaryFaceMassIntegrator 
+from fealpy.fem.face_source_integrator import BoundaryFaceSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.pde.poisson_2d import CosCosData 
-from fealpy.mesh import TriangleMesh
-from fealpy.mesh import QuadrangleMesh 
+from fealpy.mesh import TriangleMesh, QuadrangleMesh
 from fealpy.mesh import Mesh
 from fealpy.solver import cg
 
-bm.set_backend('numpy')
-p = 2 
-n = 4 
-maxit = 4
-pde = CosCosData()
+
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        任意次有限元方法求解半线性方程
+        """)
+
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--n',
+        default=4, type=int,
+        help='初始网格剖分段数.')
+
+parser.add_argument('--maxit',
+        default=4, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
+
+parser.add_argument('--backend',
+        default='numpy', type=str,
+        help='默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等')
+
+parser.add_argument('--meshtype',
+        default='tri', type=str,
+                    help="默认网格为 tri (三角形网格)"
+                         "tri：三角形网格；quad: 四边形网格"
+                    )
+
+args = parser.parse_args()
+args.backend = 'pytorch'
+bm.set_backend(args.backend)
+p = args.degree
+n = args.n
+meshtype = args.meshtype
+maxit = args.maxit
 
 tmr = timer()
 next(tmr)
+if meshtype == 'tri':
+    from fealpy.pde.poisson_2d import CosCosData 
+    from fealpy.mesh import TriangleMesh
+    pde = CosCosData()
+    mesh = TriangleMesh.from_box([0,1,0,1], n, n)
+elif meshtype == 'quad':
+    from fealpy.pde.poisson_2d import CosCosData 
+    from fealpy.mesh import QuadrangleMesh
+    pde = CosCosData()
+    mesh = QuadrangleMesh.from_box([0,1,0,1], n, n)
+else: 
+    raise ValueError(f"Unsupported : {meshtype} mesh")
 
-mesh = TriangleMesh.from_box(pde.domain(), n, n)
-#mesh = QuadrangleMesh.from_box(pde.domain(), n, n)
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
@@ -40,15 +82,15 @@ for i in range(maxit):
     tmr.send(f'第{i}次空间时间') 
 
     uh = space.function() # 建立一个有限元函数
-
+    
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator())
     bform.add_integrator(BoundaryFaceMassIntegrator(coef=pde.kappa, threshold=pde.is_robin_boundary))
     lform = LinearForm(space)
-    lform.add_integrator(ScalarSourceIntegrator(source=pde.source))
+    lform.add_integrator(ScalarSourceIntegrator(pde.source))
     lform.add_integrator(BoundaryFaceSourceIntegrator(source=pde.robin, threshold=pde.is_robin_boundary))
     lform.add_integrator(BoundaryFaceSourceIntegrator(source=pde.neumann, threshold=pde.is_neumann_boundary))
-
+    
     A = bform.assembly()
     F = lform.assembly()
     tmr.send(f'第{i}次矩组装时间')
