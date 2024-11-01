@@ -22,14 +22,19 @@ from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 
 
 ### Cell Source
+from .cell_source_integrator import CellSourceIntegrator
+SourceIntegrator = CellSourceIntegrator
+
 from .scalar_source_integrator import ScalarSourceIntegrator
-from .source_integrator import SourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
 
 ### Face Operator
-from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
+from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
 
 ### Face Source
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC

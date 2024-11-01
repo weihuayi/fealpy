@@ -84,8 +84,6 @@ qf = mesh.quadrature_formula(q)
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs)
 
-
-
 def save_array_to_txt(array, filename):
     """
     保存三维数组到txt文件，保持二维数组格式，每个数字保留8位小数

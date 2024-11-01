@@ -104,13 +104,13 @@ linear_elastic_material = LinearElasticMaterial(name='lam1_mu1',
                                                 lame_lambda=1, shear_modulus=1, 
                                                 hypo='3D', device=bm.get_device(mesh))
 
-# B_dof = linear_elastic_material.strain_matrix(dof_priority=True, gphi=gphi, shear_order=['xy', 'yz', 'zx'])
-# B_dof_0 = B_dof[0, :, :, :]
-# save_array_to_txt(B_dof_0, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/B_dof_0.txt")
+B_dof = linear_elastic_material.strain_matrix(dof_priority=True, gphi=gphi, shear_order=['xy', 'yz', 'zx'])
+B_dof_0 = B_dof[0, :, :, :]
+save_array_to_txt(B_dof_0, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/B_dof_0.txt")
 
-# B_gd = linear_elastic_material.strain_matrix(dof_priority=False, gphi=gphi, shear_order=['xy', 'yz', 'zx'])
-# B_gd_0 = B_gd[0, :, :, :]
-# save_array_to_txt(B_gd_0, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/B_gd_0.txt")
+B_gd = linear_elastic_material.strain_matrix(dof_priority=False, gphi=gphi, shear_order=['xy', 'yz', 'zx'])
+B_gd_0 = B_gd[0, :, :, :]
+save_array_to_txt(B_gd_0, "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/B_gd_0.txt")
 
 # D = linear_elastic_material.elastic_matrix(bcs)
 cm = mesh.cell_volume()

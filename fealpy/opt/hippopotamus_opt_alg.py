@@ -55,7 +55,6 @@ class HippopotamusOptAlg(Optimizer):
             B = (BB == 0) * Alfa0 + (BB == 1) * Alfa1 + (BB == 2) * Alfa2 + (BB == 3) * Alfa3 + (BB == 4) * Alfa4
             RandGroupNumber = bm.random.randint(1, N + 1, (i1))
             # RandGroupNumber = [random.randint(1, N + 1) for _ in range(i1)]
-            print(RandGroupNumber)
             MeanGroup = bm.zeros((i1, dim))
             for i in range(i1):
                 RandGroup = bm.random.permutation(N)[: RandGroupNumber[i]]

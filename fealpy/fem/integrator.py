@@ -178,3 +178,8 @@ class FaceInt(Integrator):
     """### Face Integrator
     Base class for integrators that integrate over mesh faces."""
     pass
+
+class EdgeInt(Integrator):
+    """### Edge Integrator
+    Base class for integrators that integrate over mesh edges."""
+    pass

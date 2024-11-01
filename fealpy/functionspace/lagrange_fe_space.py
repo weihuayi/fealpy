@@ -127,6 +127,9 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         phi = self.mesh.shape_function(bc, self.p, index=index)
         return phi[None, ...] # (NC, NQ, LDOF)
 
+    face_basis = basis
+    edge_basis = basis
+
     def grad_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
         return self.mesh.grad_shape_function(bc, self.p, index=index, variables=variable)
 
@@ -134,15 +137,23 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
 
     @barycentric
-    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
+        if isinstance(bc, tuple):
+            TD = len(bc)
+        else :
+            TD = bc.shape[-1] - 1
         phi = self.basis(bc, index=index)
-        e2dof = self.dof.cell_to_dof(index=index)
+        e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., e2dof])
         return val
 
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        if isinstance(bc, tuple):
+            TD = len(bc)
+        else :
+            TD = bc.shape[-1] - 1
         gphi = self.grad_basis(bc, index=index)
-        cell2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('cilm, cl -> cim', gphi, uh[cell2dof])
+        e2dof = self.dof.entity_to_dof(TD, index=index)
+        val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
         return val[...]
