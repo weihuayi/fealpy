@@ -1,6 +1,6 @@
 # 作者：concha
 # 创建时间：2024-10-23
-# 最后修改时间：2020-12-12
+# 最后修改时间：
 # 版本：
 #
 # 该文件包含了齿轮六面体网格生成的工具函数，主要包括：
@@ -17,7 +17,7 @@ import pickle
 import json
 import numpy as np
 from numpy import tan, arctan, sin, cos, pi, arctan2
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, minimize, differential_evolution
 
 from fealpy.mesh import QuadrangleMesh, HexahedronMesh
 
@@ -56,6 +56,7 @@ def get_helix_points(points, beta, r, h, t):
 
     return volume_points
 
+
 def sweep_points(points, beta, r, h, n):
     """
     根据端面网格，使用扫掠法，生成整体网格节点
@@ -67,9 +68,10 @@ def sweep_points(points, beta, r, h, n):
     :return: 整体网格节点
     """
     t = np.linspace(0, 1, n + 1)
-    volume_points = get_helix_points(points, beta, r, h,t)
+    volume_points = get_helix_points(points, beta, r, h, t)
 
     return volume_points
+
 
 def generate_hexahedral_mesh(quad_mesh, beta, r, tooth_width, nw):
     """
@@ -113,6 +115,7 @@ def generate_hexahedral_mesh(quad_mesh, beta, r, tooth_width, nw):
 
     return hex_mesh
 
+
 def cylindrical_to_cartesian(d, width, gear):
     """
     给定宽度坐标以及半径，计算其对应的笛卡尔坐标，适用于外齿轮，内齿轮需要进一步测试
@@ -121,11 +124,12 @@ def cylindrical_to_cartesian(d, width, gear):
     :param gear: 齿轮对象
     :return: 节点笛卡尔坐标
     """
-    r = d/2
+    r = d / 2
 
     if isinstance(r, (float, int)):
         def involutecross(t2):
             return gear.get_tip_intersection_points(t2) - r
+
         # 计算端面点（z=0）坐标
         t = fsolve(involutecross, gear.m_n)[0]
         point_t = np.zeros(3)
@@ -143,12 +147,14 @@ def cylindrical_to_cartesian(d, width, gear):
         for i in range(len(r)):
             def involutecross(t2):
                 return gear.get_tip_intersection_points(t2) - r[i]
+
             # 计算端面点（z=0）坐标
             t = fsolve(involutecross, gear.m_n)[0]
             point_t[i, 0:2] = gear.get_involute_points(t)
             point[i] = get_helix_points(point_t[i], gear.beta, gear.r, total_width, t2[i])
 
     return point
+
 
 def sign_of_tetrahedron_volume(p0, p1, p2, p3):
     """
@@ -164,7 +170,22 @@ def sign_of_tetrahedron_volume(p0, p1, p2, p3):
     v2 = p3 - p0
     return np.dot(np.cross(v0, v1, axis=-1), v2) / 6
 
-def find_node_location_kd_tree(target_node, mesh: HexahedronMesh, error=1e-3):
+
+def trilinear_interpolation(u, v, w, P):
+    P000, P100, P010, P110, P001, P101, P011, P111 = P
+    return (
+            (1 - u) * (1 - v) * (1 - w) * P000 +
+            u * (1 - v) * (1 - w) * P100 +
+            (1 - u) * v * (1 - w) * P010 +
+            u * v * (1 - w) * P110 +
+            (1 - u) * (1 - v) * w * P001 +
+            u * (1 - v) * w * P101 +
+            (1 - u) * v * w * P011 +
+            u * v * w * P111
+    )
+
+
+def find_node_location_kd_tree(target_node, gear, mesh: HexahedronMesh, error=1e-3):
     """
     查找目标节点在六面体网格中的位置，基于 kd_tree
     :param target_node: 目标节点坐标
@@ -189,6 +210,13 @@ def find_node_location_kd_tree(target_node, mesh: HexahedronMesh, error=1e-3):
         [0, 2, 3, 6]], dtype=np.int32)
     tetra_local_face = np.array([
         (1, 2, 3), (0, 3, 2), (0, 1, 3), (0, 2, 1)], dtype=np.int32)
+    tetra_face_to_hex_face = np.array([
+        (3, -1, -1, 0),
+        (3, -1, -1, 4),
+        (1, -1, -1, 4),
+        (1, -1, -1, 2),
+        (5, -1, -1, 2),
+        (5, -1, -1, 0)], dtype=np.int32)
     # 根据网格单元测度设置误差限制
     error = np.max(mesh.entity_measure('cell')) * error
 
@@ -214,7 +242,7 @@ def find_node_location_kd_tree(target_node, mesh: HexahedronMesh, error=1e-3):
         # 若六个四面体中有一个包含目标点，则返回当前六面体单元索引
         tetras = cell_node[local_tetra]
         # 遍历六个四面体
-        for tetra in tetras:
+        for j, tetra in enumerate(tetras):
             for i in range(tetra_local_face.shape[0]):
                 current_face_node = tetra[tetra_local_face[i]]
                 v = -sign_of_tetrahedron_volume(current_face_node[0], current_face_node[1], current_face_node[2],
@@ -222,14 +250,66 @@ def find_node_location_kd_tree(target_node, mesh: HexahedronMesh, error=1e-3):
                 if v < 0 and abs(v - 0) > error:
                     break
                 if (v > 0 or abs(v - 0) < error) and i == tetra_local_face.shape[0] - 1:
-                    return cell_idx
+                    t = (target_node[2] - cell_node[0, 2]) / (cell_node[4, 2] - cell_node[0, 2]);
+                    r_points = np.sqrt(np.sum(cell_node[0:4, 0:2] ** 2, axis=-1))
+                    tooth_helix = (cell_node[4, 2] - cell_node[0, 2]) * tan(gear.beta) / gear.r
+                    start_angle = arctan2(cell_node[0:4, 1], cell_node[0:4, 0])
+                    t_z = (cell_node[4, 2] - cell_node[0, 2]) * t + cell_node[0, 2]
 
-    return -1
+                    # 构建目标节点所在截面四边形
+                    t_node = np.zeros((4, 2))
+                    t_node[:, 0] = r_points * cos((tooth_helix * t) + start_angle)
+                    t_node[:, 1] = r_points * sin((tooth_helix * t) + start_angle)
+                    # t_node[:, 2] = t_z
+                    P00 = t_node[0]
+                    P10 = t_node[1]
+                    P11 = t_node[2]
+                    P01 = t_node[3]
+                    P = target_node[0:2]
+
+                    # # 判断五点是否共面
+                    # v_sign1 = sign_of_tetrahedron_volume(P00, P10, P11, P01)
+                    # v_sign2 = sign_of_tetrahedron_volume(P00, P10, P11, target_node)
+                    # v_sign3 = sign_of_tetrahedron_volume(P00, P11, P01, target_node)
 
 
+                    # 计算二元一次方程组系数
+                    # (P00-P10)x(P01-P11)u**2 + ((P-P00)x(P01-P11)-(P-P01)x(P00-P10))u + (P-P00)x(P-P01) = 0
+                    a = (P00[0] * P01[1] - P01[0] * P00[1] - P00[0] * P11[1] + P01[0] * P10[1]
+                         - P10[0] * P01[1] + P11[0] * P00[1] + P10[0] * P11[1] - P11[0] * P10[1])
+                    b = (P[0] * P01[1] - P[0] * P00[1] + P00[0] * P[1] - P01[0] * P[1]
+                         + P[0] * P10[1] - P[0] * P11[1] + P11[0] * P[1] - P10[0] * P[1]
+                         - 2 * P00[0] * P01[1] + 2 * P01[0] * P00[1] +
+                         P00[0] * P11[1] - P01[0] * P10[1] + P10[0] * P01[1] - P11[0] * P00[1])
+                    c = (P[0] * P00[1] - P[0] * P01[1] + P01[0] * P[1] - P00[0] * P[1]
+                         + P00[0] * P01[1] - P01[0] * P00[1])
 
+                    # a1 = np.cross((P00-P10), (P01-P11))
+                    # b1 = np.cross((P-P00), (P01-P11))-np.cross((P-P01), (P00-P10))
+                    # c1 = np.cross((P-P00), (P-P01))
+                    # 计算参数
+                    delta = b ** 2 - 4 * a * c
+                    u = -1
+                    if delta < 0:
+                        break
+                    else:
+                        u0 = (-b + np.sqrt(delta)) / (2 * a)
+                        u1 = (-b - np.sqrt(delta)) / (2 * a)
+                        if 0-error*10 <= u0 <= 1+error*10:
+                            u = u0
+                        elif 0-error*10 <= u1 <= 1+error*10:
+                            u = u1
+                    v = -1
+                    if u != -1:
+                        Pu0 = (1 - u) * P00 + u * P10
+                        Pu1 = (1 - u) * P01 + u * P11
+                        v0 = (P[0]-Pu0[0]) / (Pu1[0] - Pu0[0])
+                        v1 = (P[1]-Pu0[1]) / (Pu1[1] - Pu0[1])
+                        if abs(v0-v1) < error**2:
+                            if 0-error <= v0 <= 1+error:
+                                v = v0
+                    w = t
 
+                    return cell_idx, tetra_face_to_hex_face[j, i], (u, v, w)
 
-
-
-
+    return -1, -1, -1
