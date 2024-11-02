@@ -7,7 +7,7 @@
 	@bref 
 	@ref 
 '''  
-from fealpy.decorator import cartesian
+from fealpy.decorator import barycentric,cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 
@@ -21,12 +21,13 @@ class CouetteFlow:
         
         ## init the parameter
         self.R = 5 ##dimensionless
-        self.l_s = 0.0025 ##dimensionless slip length
+        self.L_s = 0.0025 ##dimensionless slip length
         self.epsilon = 0.004 ## the thickness of interface
         self.lam = 12.0 ##dimensionless
         self.V_s = 200 ##dimensionless 
         self.L_d = 0.0005 ##phenomenological mobility cofficient
         self.s = 2.5 ##stablilizing parameter
+        self.theta_s = 90
 
     def mesh(self, h=1/256):
         box = [-0.5, 0.5, -0.125, 0.125]
@@ -48,3 +49,14 @@ class CouetteFlow:
         phi[tagfluid] = 1.0
         phi[tagwall] = -1.0
         return phi
+
+    @cartesian        
+    def u_w(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        u = bm.zeros_like(p)
+        tag_up = bm.abs(y-0.125) < self.eps
+        tag_down = bm.abs(y+0.125) < self.eps
+        u[tag_up, 0] = 0.2
+        u[tag_down, 0] = -0.2
+        return u
