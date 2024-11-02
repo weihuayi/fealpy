@@ -66,7 +66,7 @@ class BoxDomainPolyLoaded3d():
                         dtype=points.dtype, device=bm.get_device(points))
 
 bm.set_backend('numpy')
-nx, ny, nz = 1, 1, 1 
+nx, ny, nz = 4, 4, 4 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], nx=nx, ny=ny, nz=nz)
 NC = mesh.number_of_cells()
 
@@ -80,8 +80,7 @@ NC = mesh.number_of_cells()
 
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
-
-q = 2
+q = 3
 qf = mesh.quadrature_formula(q)
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs)
@@ -171,8 +170,8 @@ K2_after_dof_fealpy = COOTensor(one_indices, one_values, K_dof.sparse_shape)
 K1_after_dof_fealpy = K1_after_dof_fealpy.add(K2_after_dof_fealpy).coalesce()
 
 
-integrator_F = VectorSourceIntegrator(source=pde.source, q=2)
-
+integrator_F = VectorSourceIntegrator(source=pde.source, q=3)
+FE = integrator_F.assembly(tensor_space_dof)
 lform_dof = LinearForm(tensor_space_dof)    
 lform_dof.add_integrator(integrator_F)
 F_dof = lform_dof.assembly()
@@ -183,83 +182,6 @@ uh_bd_dof, _ = tensor_space_dof.boundary_interpolate(gd=pde.dirichlet, uh=uh_bd_
                                                 threshold=None, method='interp')
 F_dof = F_dof - K_dof.matmul(uh_bd_dof)
 F_dof = bm.set_at(F_dof, isDDof_dof, uh_bd_dof[isDDof_dof])
-
-
-
-
-
-save_2d_array_to_txt(K1_dof_dense, 
-                     "/home/heliang/FEALPy_Development/fealpy/app/soptx/mesh/K1_dof_dense.txt")
-
-
-integrator_F = VectorSourceIntegrator(source=pde.source, q=2)
-
-
-lform_dof = LinearForm(tensor_space_dof)    
-lform_dof.add_integrator(integrator_F)
-F_dof = lform_dof.assembly()
-
-K_dof, F_dof = dbc_dof.apply(A=K1_dof, f=F_dof, uh=None, gd=pde.dirichlet, check=True)
-
-
-# indices = K_dof.indices()
-# new_values = bm.copy(K_dof.values())
-# IDX = isDDof_dof[indices[0, :]] | isDDof_dof[indices[1, :]]
-# new_values[IDX] = 0
-
-# K_dof = COOTensor(indices, new_values, K_dof.sparse_shape)
-# index, = bm.nonzero(isDDof_dof)
-# one_values = bm.ones(len(index), **K_dof.values_context())
-# one_indices = bm.stack([index, index], axis=0)
-# K2_dof = COOTensor(one_indices, one_values, K_dof.sparse_shape)
-# K_dof = K_dof.add(K2_dof).coalesce()
-# K2_dof_dense = K_dof.to_dense()
-
-# error = bm.sum(bm.abs(K1_dof_dense - K2_dof_dense))
-
-
-uh_bd_dof = bm.zeros(tensor_space_dof.number_of_global_dofs(), 
-                    dtype=bm.float64, device=bm.get_device(mesh))
-uh_bd_dof, _ = tensor_space_dof.boundary_interpolate(gd=pde.dirichlet, uh=uh_bd_dof, 
-                                                threshold=None, method='interp')
-F_dof = F_dof - K1_dof.matmul(uh_bd_dof)
-F_dof = bm.set_at(F_dof, isDDof_dof, uh_bd_dof[isDDof_dof])
-
-
-uh_dof = tensor_space_dof.function()
-uh_dof[:] = cg(K_dof, F_dof, maxiter=1000, atol=1e-14, rtol=1e-14)
-
-
-
-bform_gd = BilinearForm(tensor_space_gd)
-bform_gd.add_integrator(integrator_K)
-K_gd = bform_gd.assembly(format='csr').to_dense()
-
-
-
-ps = mesh.bc_to_point(bcs)
-coef_val = pde.source(ps) # (NC, NQ, GD)
-
-phi_dof = tensor_space_dof.basis(bcs) # (1, NQ, tldof, GD)
-phi_dof_test = phi_dof.squeeze(0)
-phi_gd = tensor_space_gd.basis(bcs) # (1, NQ, tldof, GD)
-phi_gd_test = phi_gd.squeeze(0)
-
-
-integrator_F = VectorSourceIntegrator(source=pde.source, q=2)
-
-
-lform_dof = LinearForm(tensor_space_dof)    
-lform_dof.add_integrator(integrator_F)
-F_dof = lform_dof.assembly()
-
-
-# lform_gd = LinearForm(tensor_space_gd)
-# lform_gd.add_integrator(integrator_F)
-# F_gd = lform_gd.assembly()
-
-# error = bm.sum(bm.abs(M_dof - F_dof))
-
 
 print("-------------------------")
 
