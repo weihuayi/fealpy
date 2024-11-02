@@ -154,7 +154,7 @@ def cylindrical_to_cartesian(d, width, gear):
             t = fsolve(involutecross, gear.m_n)[0]
             point_t[i, 0:2] = gear.get_involute_points(t)
             point[i] = get_helix_points(point_t[i], gear.beta, gear.r, total_width, t2[i], gear.rotation_direction)
-
+    point[..., 0:2] = np.dot(point[..., 0:2], np.array([[0, -1], [1, 0]]))
     return point
 
 
@@ -308,7 +308,6 @@ def find_node_location_kd_tree(target_node, gear, mesh: HexahedronMesh, error=1e
                         v0 = (P[0]-Pu0[0]) / (Pu1[0] - Pu0[0])
                         v1 = (P[1]-Pu0[1]) / (Pu1[1] - Pu0[1])
                         if abs(v0-v1) < error**2:
-                            if 0-error <= v0 <= 1+error:
                                 v = v0
                     w = t
 

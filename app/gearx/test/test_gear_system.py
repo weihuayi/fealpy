@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 import pytest
 
-from fealpy.mesh import QuadrangleMesh, HexahedronMesh
+from fealpy.mesh import QuadrangleMesh, HexahedronMesh, IntervalMesh
 from app.gearx.gear import ExternalGear, InternalGear
 from app.gearx.utils import *
 
@@ -38,9 +38,9 @@ class TestGearSystem:
                                      inner_diam, tooth_width)
 
         quad_mesh = external_gear.generate_mesh()
-        quad_mesh.to_vtk(fname='external_quad_mesh.vtu')
+        # quad_mesh.to_vtk(fname='external_quad_mesh.vtu')
         hex_mesh = external_gear.generate_hexahedron_mesh()
-        hex_mesh.to_vtk(fname='external_hex_mesh.vtu')
+        # hex_mesh.to_vtk(fname='external_hex_mesh.vtu')
         #
         # with open('external_gear.pkl', 'wb') as f:
         #     pickle.dump({'quad_mesh': quad_mesh, 'gear': external_gear, 'hex_mesh': hex_mesh}, f)
@@ -50,6 +50,9 @@ class TestGearSystem:
         #
         # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
         # quad_mesh_from_cpp.to_vtk(fname='external_quad_mesh_cpp.vtu')
+
+        # with open('../data/external_gear.pkl', 'wb') as f:
+        #     pickle.dump({'external_gear': external_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh}, f)
 
     def test_internal_gear(self):
         with open('../data/internal_gear_data.json', 'r') as file:
@@ -103,6 +106,36 @@ class TestGearSystem:
         quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
         quad_mesh_from_cpp.to_vtk(fname='internal_quad_mesh_cpp.vtu')
 
+    def test_get_profile_node(self):
+        with open('../data/external_gear.pkl', 'rb') as f:
+            data = pickle.load(f)
+        external_gear = data['external_gear']
+
+        idx0, node0 = external_gear.get_profile_node(tooth_tag=0)
+        idx1, node1 = external_gear.get_profile_node(tooth_tag=(0, 2, 3))
+        idx2, node2 = external_gear.get_profile_node(tooth_tag=None)
+
+        print(-1)
+
+    def test_find_node_and_parameters(self):
+        with open('../data/external_gear.pkl', 'rb') as f:
+            data = pickle.load(f)
+        external_gear = data['external_gear']
+        hex_mesh = data['hex_mesh']
+        quad_mesh = data['quad_mesh']
+
+        n = 15
+        helix_d = np.linspace(external_gear.d, external_gear.effective_da, n)
+        helix_width = np.linspace(0, external_gear.tooth_width, n)
+        helix_node = external_gear.cylindrical_to_cartesian(helix_d, helix_width)
+
+        target_cell_idx = np.zeros(n, np.int32)
+        local_face_idx = np.zeros(n, np.int32)
+        parameters = np.zeros((n, 3), np.float64)
+        for i, t_node in enumerate(helix_node):
+            target_cell_idx[i], local_face_idx[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
+
+        print(-1)
 
 
 

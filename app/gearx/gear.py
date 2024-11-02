@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+
 from fealpy.geometry.utils import delta_angle_calculator
 from numpy import sin, cos, tan, pi, arctan, arctan2, radians, sqrt
 
@@ -143,7 +144,7 @@ class Gear(ABC):
                 t = fsolve(involutecross, self.m_n)[0]
                 point_t[i, 0:2] = self.get_involute_points(t)
                 point[i] = get_helix_points(point_t[i], self.beta, self.r, total_width, t2[i], self.rotation_direction)
-
+        point[..., 0:2] = np.dot(point[..., 0:2], np.array([[0, -1], [1, 0]]))
         return point
 
     def generate_hexahedron_mesh(self):
@@ -196,7 +197,7 @@ class Gear(ABC):
         查找目标节点在六面体网格中的位置，基于 kd_tree
         :param target_node: 目标节点坐标
         :param error: 误差限制
-        :return: 目标节点所在的单元索引，若未找到则返回-1
+        :return: 目标节点所在的单元索引，节点所在单元局部面索引，节点关于所在节点参数，若未找到则返回-1
         """
         # 使用 kd_tree 算法，先计算所有单元的重心坐标，再根据重心坐标与target_node构建 kd_tree
         if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
@@ -309,30 +310,46 @@ class Gear(ABC):
             else:
                 raise TypeError('The tooth_tag must be an integer or a list of integers.')
         quad_mesh = self.mesh
+        hex_mesh = self.hex_mesh
+        t_NN = quad_mesh.number_of_nodes()
+        n1 = self.n1
+        nw = self.nw
+        hex_node = hex_mesh.node
 
         is_bd_cell = quad_mesh.boundary_cell_flag()
         domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 6
         domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 5
-        if (tooth_tag is None) or (len(tooth_tag) != 1):
+        if tooth_tag is None:
+            folder = self.z
             cell_flag_left = is_bd_cell & domain_flag_left
             cell_flag_right = is_bd_cell & domain_flag_right
         else:
-            tooth_flag = quad_mesh.celldata["cell_tooth_tag"] in tooth_tag
+            folder = len(tooth_tag)
+            tooth_flag = np.isin(quad_mesh.celldata["cell_tooth_tag"], tooth_tag)
 
-            cell_flag_left = is_bd_cell & tooth_flag & domain_flag_left
-            cell_flag_right = is_bd_cell & tooth_flag & domain_flag_right
+            cell_flag_left = is_bd_cell & domain_flag_left & tooth_flag
+            cell_flag_right = is_bd_cell & domain_flag_right & tooth_flag
 
-            cell_idx_right = np.where(cell_flag)[0][0:self.n1]
-            tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
-            tooth_profile_node_right = np.zeros(self.n1+1, dtype=np.int32)
-            tooth_profile_node_right[0:self.n1] = tooth_profile_cell[:, 0]
-            tooth_profile_node_right[-1] = tooth_profile_cell[-1, 1]
+        # 右侧齿面
+        # TODO: 考虑是否给单元局部起始节点编号加检测，即不一定从 0 和 2 开始
+        cell_idx_right = np.where(cell_flag_right)[0].reshape(folder, -1)[..., 0:n1]
+        tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
+        tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+        tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 0]
+        tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
 
-            cell_idx_left = np.where(cell_flag)[0][1:]
-            tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
-            tooth_profile_node_left = np.zeros(self.n1 + 1, dtype=np.int32)
-            tooth_profile_node_left[0:self.n1] = tooth_profile_cell[:, 0]
-            tooth_profile_node_left[-1] = tooth_profile_cell[-1, 1]
+        # 左侧齿面
+        cell_idx_left = np.flip(np.flip(np.where(cell_flag_left)[0]).reshape(folder, -1)[..., 0:n1], axis=0)
+        tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
+        tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+        tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 2]
+        tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+
+        for i in range(1, nw+1):
+            tooth_profile_node_right[..., i, :] = tooth_profile_node_right[..., 0, :] + i * t_NN
+            tooth_profile_node_left[..., i, :] = tooth_profile_node_left[..., 0, :] + i * t_NN
+
+        return (tooth_profile_node_right, tooth_profile_node_left), (hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
 
     @property
     def material(self):
