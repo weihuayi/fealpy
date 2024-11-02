@@ -17,13 +17,13 @@ from solver import Solver
 
 output = './'
 #h = 1/256
-h = 1/8
+h = 1/4
 dt = 0.1*h
 pde = CouetteFlow()
 mesh = pde.mesh(h)
 
 phispace = LagrangeFESpace(mesh, p=1)
-pspace = LagrangeFESpace(mesh, p=0)
+pspace = LagrangeFESpace(mesh, p=0, ctype='D')
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 solver = Solver(pde, mesh, pspace, phispace, uspace, dt)
@@ -31,9 +31,11 @@ solver = Solver(pde, mesh, pspace, phispace, uspace, dt)
 u0 = uspace.function()
 u1 = uspace.function()
 u2 = uspace.function()
-phi0 = phispace.function(phispace.interpolate(pde.init_phi))
+phi0 = phispace.interpolate(pde.init_phi)
 phi1 = phispace.function()
 phi2 = phispace.function()
+mu1 = phispace.function()
+mu2 =phispace.function()
 p0 = pspace.function()
 p1 = pspace.function()
 
@@ -44,19 +46,17 @@ mesh.to_vtk(fname=fname)
 CH_BForm = solver.CH_BForm()
 CH_LForm = solver.CH_LForm()
 
-#NS_BForm = solver.NS_BForm()
-#NS_LForm = solver.NS_LForm()
+solver.CH_update(u0, u1, phi0, phi1)
+CH_BForm.assembly()
+CH_LForm.assembly()
 
-tagent = mesh.edge_unit_tangent()
-qf = mesh.quadrature_formula(3, 'face')
-bcs, ws = qf.get_quadrature_points_and_weights()
-#print(bcs.shape)
-#print(phispace.basis(bcs).shape)
-print(phi0.grad_value(bcs).shape)
+'''
+bcs = bm.array([[1/3,1/3,1/3],[1/3,1/3,1/3],[1/3,1/3,1/3]])
 print(u0(bcs).shape)
-#print(phi0.grad_value(bcs).shape)
-print(tagent.shape)
-#print(mesh.edge2cell.shape)
+print(u0.grad_value(bcs).shape)
+'''
+NS_BForm = solver.NS_BForm()
+NS_LForm = solver.NS_LForm()
 
-#solver.CH_update(u0, u1, phi0, phi1)
-#CH_BForm.assembly()
+solver.NS_update(u0, u1, mu2, phi2)
+NS_BForm.assembly()

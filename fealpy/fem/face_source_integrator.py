@@ -42,24 +42,21 @@ class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs) # just for simplex mesh, TODO: consider othter type mesh
 
-        return bcs, ws, phi, facemeasure, n
+        return bcs, ws, phi, facemeasure, index, n
 
     def assembly(self, space):
         source = self.source
-        index = self.make_index(space)
-        bcs, ws, phi, fm, n = self.fetch(space) 
+        bcs, ws, phi, fm, index, n = self.fetch(space) 
         mesh = getattr(space, 'mesh', None)
         val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='cell', index=index, n=n)
         return linear_integral(phi, ws, fm, val, self.batched)
 
 class InterFaceSourceIntegrator(_FaceSourceIntegrator):
-    @enable_cache
     def make_index(self, space: _FS):
         index = self.threshold
         return index
 
 class BoundaryFaceSourceIntegrator(_FaceSourceIntegrator): 
-    @enable_cache
     def make_index(self, space: _FS):
         threshold = self.threshold
 

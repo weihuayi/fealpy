@@ -65,6 +65,11 @@ class TensorFunctionSpace(FunctionSpace):
     def basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike:
         phi = self.scalar_space.basis(p, index, **kwargs) # (NC, NQ, ldof)
         return generate_tensor_basis(phi, self.dof_shape, self.dof_priority)
+    
+    def face_basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike:
+        phi = self.scalar_space.face_basis(p, index, **kwargs)
+        return generate_tensor_basis(phi, self.dof_shape, self.dof_priority)
+
 
     def grad_basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike:
         gphi = self.scalar_space.grad_basis(p, index, **kwargs)
@@ -133,7 +138,7 @@ class TensorFunctionSpace(FunctionSpace):
         else:
             uI = self.scalar_space.interpolate(u)   
 
-        return uI.reshape(-1)
+        return self.function(uI.reshape(-1))
     
     def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         scalar_space = self.scalar_space
