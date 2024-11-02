@@ -32,36 +32,31 @@ class HippopotamusOptAlg(Optimizer):
         gbest_idx = bm.argmin(fit)
         gbest_f = fit[gbest_idx]
         gbest = x[gbest_idx].reshape(1, -1)
-        Convergence_curve = bm.zeros([1, MaxIT])
+        # Convergence_curve = bm.zeros([1, MaxIT])
         for it in range(0, MaxIT):
             T = bm.exp(bm.array(it / MaxIT)) # Eq.(5)
             i1 = bm.array(int(N / 2))
             I1 = bm.random.randint(1, 3, (i1, 1)) 
             I2 = bm.random.randint(1, 3, (i1, 1)) 
-            Ip1 = bm.random.randint(0, 2, (i1, 1)) 
-            Ip2 = bm.random.randint(0, 2, (i1, 1)) 
 
             # Eq.(4)
-            Alfa0 = I2 * bm.random.rand(i1, dim) + Ip1
+            Alfa0 = I2 * bm.random.rand(i1, dim) + bm.random.randint(0, 2, (i1, 1)) 
             Alfa1= 2 * bm.random.rand(i1, dim) - 1
             Alfa2 = bm.random.rand(i1, dim) 
-            Alfa3 = I1 * bm.random.rand(i1, dim) + Ip2
+            Alfa3 = I1 * bm.random.rand(i1, dim) + bm.random.randint(0, 2, (i1, 1)) 
             Alfa4 = bm.random.rand(i1, 1) * bm.ones((i1, dim))
             AA = bm.random.randint(0, 5, (i1,))[:, None]
             BB = bm.random.randint(0, 5, (i1,))[:, None]
-            # AA = bm.array([random.randint(0, 5) for _ in range(i1)])[:, None] 
-            # BB = bm.array([random.randint(0, 5) for _ in range(i1)])[:, None]
             A = (AA == 0) * Alfa0 + (AA == 1) * Alfa1 + (AA == 2) * Alfa2 + (AA == 3) * Alfa3 + (AA == 4) * Alfa4
             B = (BB == 0) * Alfa0 + (BB == 1) * Alfa1 + (BB == 2) * Alfa2 + (BB == 3) * Alfa3 + (BB == 4) * Alfa4
-            RandGroupNumber = bm.random.randint(1, N + 1, (i1))
-            # RandGroupNumber = [random.randint(1, N + 1) for _ in range(i1)]
+            
+            RandGroupNumber = bm.random.randint(1, N + 1, (i1,))
             MeanGroup = bm.zeros((i1, dim))
             for i in range(i1):
-                RandGroup = bm.random.permutation(N)[: RandGroupNumber[i]]
+                RandGroup = bm.unique(bm.random.randint(0, N - 1, (RandGroupNumber[i],)))
                 MeanGroup[i] = x[RandGroup].mean(axis=0)
 
-            r1 = bm.random.rand(i1 ,1)
-            X_P1 = x[: i1] + r1 * (gbest - I1 * x[: i1]) # Eq.(3)
+            X_P1 = x[: i1] + bm.random.rand(i1 ,1) * (gbest - I1 * x[: i1]) # Eq.(3)
             X_P1 = X_P1 + (lb - X_P1) * (X_P1 < lb) + (ub - X_P1) * (X_P1 > ub)
             F_P1 = self.fun(X_P1)[:, None]
 
@@ -90,16 +85,11 @@ class HippopotamusOptAlg(Optimizer):
             distance2Leader = abs(predator - x[i1:]) # Eq.(11)
             RL = 0.05 * levy(i1, dim, 1.5) # Eq.(13)
 
-            b = bm.random.uniform(2, 4, (i1, 1))
-            c = bm.random.uniform(1, 1.5, (i1, 1))
-            d = bm.random.uniform(2, 3, (i1, 1))
-            g = bm.random.uniform(-1, 1, (i1, 1))
-
             # Eq.(12)
             X_P3 = ((fit[i1:] > F_HL) * 
-                    (RL * predator + b / (c - d * bm.cos(2 * bm.pi * g)) / distance2Leader) + 
+                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / distance2Leader) + 
                     (fit[i1:] <= F_HL) * 
-                    (RL * predator + b / (c - d * bm.cos(2 * bm.pi * g)) / (bm.random.rand(i1, dim) + 2 * distance2Leader)))
+                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / (bm.random.rand(i1, dim) + 2 * distance2Leader)))
             X_P3 = X_P3 + (lb - X_P3) * (X_P3 < lb) + (ub - X_P3) * (X_P3 > ub)
             F_P3 = self.fun(X_P3)[:, None]
 
@@ -116,10 +106,10 @@ class HippopotamusOptAlg(Optimizer):
             Blfa1 = bm.random.rand(N, 1) * bm.ones((N, dim))
             Blfa2 = bm.random.randn(N, 1) * bm.ones((N, dim))
 
-            DD = bm.random.randint(0, 3, N)[:, None] 
+            DD = bm.random.randint(0, 3, (N,))[:, None] 
             D = (DD == 0) * Blfa0 + (DD == 1) * Blfa1 + (DD == 2) * Blfa2
 
-            X_P4 = x + bm.random.rand() * (l_local + D * (h_local - l_local)) # Eq.(17)
+            X_P4 = x + bm.random.rand(N, 1) * (l_local + D * (h_local - l_local)) # Eq.(17)
             X_P4 = X_P4 + (lb - X_P4) * (X_P4 < lb) + (ub - X_P4) * (X_P4 > ub)
             F_P4 = self.fun(X_P4)[:, None]
 
@@ -129,5 +119,5 @@ class HippopotamusOptAlg(Optimizer):
 
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            Convergence_curve[0, it] = bm.copy(gbest_f[0])
+            # Convergence_curve[0, it] = bm.copy(gbest_f[0])
         return gbest, gbest_f
