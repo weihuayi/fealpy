@@ -167,8 +167,9 @@ class Solver():
         L0 = LinearForm(uspace) 
         self.u_SI = SourceIntegrator(q=q)
         self.u_BF_SI = BoundaryFaceSourceIntegrator(q=q, threshold=self.pde.is_wall_boundary)
+        uw_BF_SI = BoundaryFaceSourceIntegrator(source=self.pde.u_w, q=q, threshold=self.pde.is_wall_boundary)
         L0.add_integrator(self.u_SI)
-        L0.add_integrator(self.u_BF_SI)
+        L0.add_integrator([self.u_BF_SI, uw_BF_SI])
 
         L1 = LinearForm(pspace)
         L = LinearBlockForm([L0, L1])
@@ -178,6 +179,10 @@ class Solver():
         dt = self.dt
         R = self.pde.R
         lam = self.pde.lam
+        epsilon = self.pde.epsilon
+        n = self.mesh.edge_unit_normal()
+        t = self.mesh.edge_unit_tangent()
+        theta_s = self.pde.theta_s
         
         ## BilinearForm
         def u_C_coef(bcs, index):
@@ -189,16 +194,18 @@ class Solver():
             result = R*(4*u_1(bcs, index) - u_0(bcs, index))
             ##TODO:确认
             result += 2*R*dt*bm.einsum('jin, jimn->jim', u_0(bcs, index), u_1.grad_value(bcs, index))
-            result += 2*lam*dt*mu_2(bcs, index)*phi2.grad_value(bcs, index)
-            print(asd)
+            result += 2*lam*dt*mu_2(bcs, index)[...,bm.newaxis]*phi_2.grad_value(bcs, index)
             return result
 
         self.u_SI.source = u_SI_coef
         self.u_SI.clear()
         
         def u_BF_SI_coef(bcs, index):
-            result = 2*dt*lamd*bm.einsum('eld, ed', u_1(bcs, index), tangent[index,:])
-            result *= bm.einsum('eld, ed', u_1.grad_value(bcs, index), tangent[index,:])
+            result = 2*dt*lam*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), t[index,:])
+            L_phi = epsilon*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), n[index,:])
+            L_phi -= (bm.sqrt(2)/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_2(bcs, index))
+            result *= L_phi
+            result = bm.repeat(bm.expand_dims(result, axis=-1), 2, axis=-1)
             return result
         self.u_BF_SI.source = u_BF_SI_coef
         self.u_BF_SI.clear()

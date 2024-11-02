@@ -75,7 +75,7 @@ class TensorFunctionSpace(FunctionSpace):
         gphi = self.scalar_space.grad_basis(p, index, **kwargs)
         return generate_tensor_grad_basis(gphi, self.dof_shape, self.dof_priority)
 
-    def cell_to_dof(self) -> TensorLike:
+    def cell_to_dof(self, index: Index=_S) -> TensorLike:
         """Get the cell to dof mapping.
 
         Returns:
@@ -86,9 +86,9 @@ class TensorFunctionSpace(FunctionSpace):
             self.dof_numel,
             self.scalar_space.number_of_global_dofs(),
             self.dof_priority
-        )
+        )[index]
 
-    def face_to_dof(self) -> TensorLike:
+    def face_to_dof(self, index: Index=_S) -> TensorLike:
         """Get the face to dof mapping.
 
         Returns:
@@ -99,9 +99,9 @@ class TensorFunctionSpace(FunctionSpace):
             self.dof_numel,
             self.scalar_space.number_of_global_dofs(),
             self.dof_priority
-        )
+        )[index]
     
-    def edge_to_dof(self) -> TensorLike:
+    def edge_to_dof(self, index: Index=_S) -> TensorLike:
         """Get the edge to dof mapping.
 
         Returns:
@@ -112,16 +112,16 @@ class TensorFunctionSpace(FunctionSpace):
             self.dof_numel,
             self.scalar_space.number_of_global_dofs(),
             self.dof_priority
-        )
+        )[index]
     
     def entity_to_dof(self, etype: int, index: Index=_S):
         TD = self.mesh.top_dimension()
         if etype == TD:
-            return self.cell_to_dof()[index]
+            return self.cell_to_dof(index=index)
         elif etype == TD-1:
-            return self.face_to_dof()[index]
+            return self.face_to_dof(index=index)
         elif etype == 1:
-            return self.edge_to_dof()[index]
+            return self.edge_to_dof(index=index)
         else:
             raise ValueError(f"Unknown entity type: {etype}")
 
