@@ -60,7 +60,7 @@ class TestIOptInterfaces:
         optimizer = SnowmeltOptAlg(option)
         gbest, gbest_f = optimizer.run()
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data", iopt_data)
     @pytest.mark.parametrize("NP", [100])
     def test_hippopotamus_optimizer(self, backend, data, NP):
