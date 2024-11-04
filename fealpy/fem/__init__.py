@@ -17,7 +17,7 @@ from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elastic_integrator import LinearElasticIntegrator
 from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator0, PressWorkIntegrator1
 from .vector_mass_integrator import VectorMassIntegrator
-from .curl_integrator import CurlCurlIntegrator
+from .curlcurl_integrator import CurlCurlIntegrator
 
 
 ### Cell Source
