@@ -20,18 +20,6 @@ class square_with_circular_notch_3d():
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
 
-    def init_hex_mesh(self, n=3):
-        """
-        @brief 生成实始网格
-        """
-        pass
-
-    def init_tet_mesh(self, n=3):
-        """
-        @brief 生成实始网格
-        """
-        pass
-
     def is_z_force(self):
         """
         @brief Dirichlet 边界条件，位移边界条件
@@ -52,7 +40,7 @@ class square_with_circular_notch_3d():
         """
         @brief 标记位移加载边界条件，该模型是下边界
         """
-        return np.abs(p[..., 2]) < 1e-12
+        return bm.abs(p[..., 2]) < 1e-12
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -93,12 +81,16 @@ parser.add_argument('--refine_method',
         help='网格加密方法, 默认为 bisect.')
 
 parser.add_argument('--n',
-        default=4, type=int,
-        help='初始网格加密次数, 默认为 4.')
+        default=2, type=int,
+        help='初始网格加密次数, 默认为 2.')
 
 parser.add_argument('--vtkname',
         default='test', type=str,
         help='vtk 文件名, 默认为 test.')
+
+parser.add_argument('--save_vtkfile',
+        default=True, type=bool,
+        help='是否保存 vtk 文件, 默认为 False.')
 
 args = parser.parse_args()
 p= args.degree
@@ -110,6 +102,8 @@ marking_strategy = args.marking_strategy
 refine_method = args.refine_method
 n = args.n
 vtkname = args.vtkname
+save_vtkfile = args.save_vtkfile
+vtkname = args.vtkname +'_' + args.mesh_type + '_'
 
 
 tmr = timer()
@@ -119,15 +113,16 @@ bm.set_backend(backend)
 model = square_with_circular_notch_3d()
 
 if args.mesh_type == 'hex':
-    mesh = model.init_hex_mesh(n=n)
+    mesh = HexahedronMesh.from_crack_box()
 elif args.mesh_type == 'tet':
-    mesh = model.init_tet_mesh(n=n)
+    mesh = TetrahedronMesh.from_crack_box()
 else:
     raise ValueError('Invalid mesh type.')
 
-fname = 'square_with_a_notch_3d_init.vtu'
-mesh.to_vtk(fname=fname)
+mesh.uniform_refine(n=n)
 
+fname = args.mesh_type + '_3d_square_with_a_notch_init.vtu'
+mesh.to_vtk(fname=fname)
 
 ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
 tmr.send('init')
@@ -150,8 +145,9 @@ end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
-with open('results_model3d.txt', 'w') as file:
-    file.write(f'force: {force}\n, time: {end-start}\n')
+tname = args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.txt'
+with open(tname, 'w') as file:
+    file.write(f'force: {force},\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
@@ -159,6 +155,7 @@ plt.ylabel('Residual Force')
 plt.title('Changes in Residual Force')
 plt.grid(True)
 plt.legend()
-plt.savefig('model3d_force.png', dpi=300)
+pname = args.mesh_type + '_p' + str(p) + '_' + 'model3d_force.png'
+plt.savefig(pname, dpi=300)
 
 print(f"Time: {end - start}")

@@ -7,6 +7,8 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 
 from fealpy.decorator import barycentric
 
+from app.fracturex.fracturex.utilfuc.utils import flatten_symmetric_matrices
+
 class BasedPhaseFractureMaterial(LinearElasticMaterial):
     def __init__(self, material, energy_degradation_fun):
         """
@@ -28,22 +30,22 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
             raise ValueError("The material parameters are not correct.")
 
 
-        self._uh = None
-        self._d = None
+        self.uh = None
+        self.d = None
 
         self.H = None # 谱分解模型下的最大历史场
 
     def update_disp(self, uh):
-        self._uh = uh
+        self.uh = uh
 
     def update_phase(self, d):
-        self._d = d
+        self.d = d
 
     def update_historical_field(self, H):
         self.H = H
 
     @ barycentric
-    def effective_stress(self, bc=None) -> TensorLike:
+    def effective_stress(self, bc) -> TensorLike:
         """
         Compute the effective stress tensor, which is the stress tensor without the damage effect.
 
@@ -65,16 +67,16 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
         trace_e = np.trace(strain, axis1=-2, axis2=-1)
         I = bm.eye(strain.shape[-1])
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
+        
         return stress
 
     @ barycentric
-    def strain_value(self, bc=None) -> TensorLike:
+    def strain_value(self,bc=None) -> TensorLike:
         """
         Compute the strain tensor.
         """ 
-#        if bc is None:
-#            bc = bm.array([1/3, 1/3, 1/3], dtype=bm.float64)
-        uh = self._uh
+    
+        uh = self.uh
         guh = uh.grad_value(bc)
         
         strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
@@ -109,14 +111,14 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
 
 class IsotropicModel(BasedPhaseFractureMaterial):
     @ barycentric
-    def stress_value(self, bc) -> TensorLike:
+    def stress_value(self, bc=None) -> TensorLike:
         """
         Compute the fracture stress tensor.
         """
-        d = self._d
+        d = self.d
 
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
-        stress = self.effective_stress(bc) * gd[..., None, None]
+        stress = self.effective_stress(bc=bc) * gd[..., None, None]
         return stress
 
     @ barycentric
@@ -124,14 +126,65 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         """
         Compute the tangent matrix.
         """
-        d = self._d
+        d = self.d
         gd = self._gd.degradation_function(d(bc)) # 能量退化函数 (NC, NQ)
-        D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵
+        D0 = self.linear_elastic_matrix(bc=bc) # 线弹性矩阵 
         D = D0 * gd[..., None, None]
         return D
     
-       
-
+    def positive_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the positive energy coefficient.
+        """
+        d = self.d
+        gd = self._gd.degradation_function(d(bc))
+        return gd
+    
+    def positive_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        GD = guh.shape[-1]
+        lam = self.lam
+        mu = self.mu
+        strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
+        
+        trace_e = bm.vmap(bm.trace)(strain)
+        
+        I = bm.eye(GD)
+        stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
+        flat_stress = flatten_symmetric_matrices(stress)
+        return flat_stress
+    
+    def negative_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        GD = guh.shape[-1]
+        stress = bm.zeros(guh.shape, dtype=bm.float64)
+        flat_stress = flatten_symmetric_matrices(stress)
+        return flat_stress
+    
+    def negative_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the negative energy coefficient.
+        """
+        return 1
+    
 class AnisotropicModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算各向异性模型下的应力
@@ -140,6 +193,46 @@ class AnisotropicModel(BasedPhaseFractureMaterial):
     def elastic_matrix(self, bc) -> TensorLike: 
         # 计算各向异性模型下的切线刚度矩阵
         pass
+
+    def positive_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        pass
+
+    def positive_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the positive energy coefficient.
+        """
+        d = self.d
+        gd = self._gd.degradation_function(d(bc))
+        return gd
+    
+    def negative_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        pass
+
+    def negative_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the negative energy coefficient.
+        """
+        return 1
 
 class DeviatoricModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
@@ -150,6 +243,45 @@ class DeviatoricModel(BasedPhaseFractureMaterial):
         # 计算偏应力模型下的切线刚度矩阵
         pass
 
+    def positive_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        pass
+
+    def positive_coef(self, bc) -> TensorLike:      
+        """
+        @brief Compute the positive energy coefficient.
+        """
+        d = self.d
+        gd = self._gd.degradation_function(d(bc))
+        return gd
+
+    def negative_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        pass
+        
+    def negative_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the negative energy coefficient.
+        """
+        return 1
 
 class SpectralModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
@@ -244,7 +376,46 @@ class SpectralModel(BasedPhaseFractureMaterial):
         else:
             self.H = np.fmax(self.H, phip)
         return self.H
-        
+    
+    def positive_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        pass
+
+    def positive_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the positive energy coefficient.
+        """
+        d = self.d
+        gd = self._gd.degradation_function(d(bc))
+        return gd
+    
+    def negative_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        pass  
+
+    def negative_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the negative energy coefficient.
+        """
+        return 1     
 
 class HybridModel(BasedPhaseFractureMaterial):
     def __init__(self, material, energy_degradation_fun):
@@ -263,24 +434,63 @@ class HybridModel(BasedPhaseFractureMaterial):
         """
         Compute the fracture stress tensor.
         """
-        self._isotropic_model._uh = self._uh
-        self._isotropic_model._d = self._d
+        self._isotropic_model.uh = self.uh
+        self._isotropic_model.d = self.d
         return self._isotropic_model.stress_value(bc=bc)
 
     @ barycentric
     def elastic_matrix(self, bc) -> TensorLike: 
-        self._isotropic_model._uh = self._uh
-        self._isotropic_model._d = self._d
-        
+        self._isotropic_model.uh = self.uh
+        self._isotropic_model.d = self.d
         return self._isotropic_model.elastic_matrix(bc=bc)
+    
+    def positive_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        return self._isotropic_model.positive_stress_func(guh)
+
+    def positive_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the positive energy coefficient.
+        """
+        d = self.d
+        gd = self._gd.degradation_function(d(bc))
+        return gd
+    
+    def negative_coef(self, bc) -> TensorLike:
+        """
+        @brief Compute the negative energy coefficient.
+        """
+        return 1
+    
+    def negative_stress_func(self, guh) -> TensorLike:
+        """
+        @brief Compute the stress tensor from the grad displacement tensor.
+        ----------
+        guh : TensorLike
+            The grad displacement tensor.
+        Returns
+        -------
+        TensorLike
+            The flattened stress tensor.
+        """
+        return self._isotropic_model.negative_stress_func(guh)
 
     @ barycentric
     def maximum_historical_field(self, bc):
         """
         @brief Maximum historical field
         """
-        self._spectral_model._uh = self._uh
-        self._spectral_model._d = self._d
+        self._spectral_model.uh = self.uh
+        self._spectral_model.d = self.d
         self._spectral_model.H = self.H
         
         self.H = self._spectral_model.maximum_historical_field(bc)
