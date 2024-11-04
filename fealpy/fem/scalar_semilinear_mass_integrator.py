@@ -90,15 +90,15 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
             coef = fill_axis(coef, 2 if batched else 1)
             return bm.einsum(f'q, qi, q, q -> i', ws, phi[0], val, coef) * cm
 
-    def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
-        _, ws, phi, cm, _ = self.fetch(space)
-        fn_A = bm.vmap(bm.jacfwd(                         
-            partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
-            ))
-        fn_F = bm.vmap(
-            partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
-        )
-        return  fn_A(uh_, cm), -fn_F(uh_, cm)
+    # def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
+    #     _, ws, phi, cm, _ = self.fetch(space)
+    #     fn_A = bm.vmap(bm.jacfwd(                         
+    #         partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
+    #         ))
+    #     fn_F = bm.vmap(
+    #         partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
+    #     )
+    #     return  fn_A(uh_, cm), -fn_F(uh_, cm)
     
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, phi, cm, _ = self.fetch(space)

@@ -57,6 +57,7 @@ class MainSolver:
 
         # Material and energy degradation function
         self.EDFunc = EDFunc()
+        self.model_type = model_type
         self.pfcm = PhaseFractureMaterialFactory.create(model_type, material_params, self.EDFunc)
 
         self._method = method
@@ -160,8 +161,6 @@ class MainSolver:
 
             tmr.send('phase_solve')
 
-            print('uh:', self.uh)
-            print('d:', self.d)
 
             # Adaptive refinement
             if self.enable_refinement:
@@ -300,10 +299,29 @@ class MainSolver:
         fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self._force_dof, direction=self._force_direction)
         uh, force_index = fbc.apply_value(uh)
         self.pfcm.update_disp(uh)
-        self.pfcm.uh = uh
+
+        @barycentric
+        def postive_coef(bc, **kwargs):
+            return self.pfcm.positive_coef(bc)
         
+        postive_coef.uh = uh
+        postive_coef.kernel_func = self.pfcm.positive_stress_func
+
         ubform = SemilinearForm(self.tspace)
-        ubform.add_integrator(NonlinearElasticIntegrator(self.pfcm, q=self.q))
+        ubform.add_integrator(NonlinearElasticIntegrator(coef=postive_coef, material=self.pfcm, q=self.q))
+
+        if self.model_type == 'HybridModel' or self.model_type == 'IsotropicModel':
+            pass
+        else:
+            @barycentric
+            def negative_coef(bc, **kwargs):
+                return self.pfcm.negative_coef(bc)
+            
+            negative_coef.uh = uh
+            negative_coef.kernel_func = self.pfcm.negative_stress_func
+
+            ubform.add_integrator(NonlinearElasticIntegrator(coef=negative_coef, material=self.pfcm, q=self.q))
+            
         A, R = ubform.assembly()
 
         self._Rfu = bm.sum(-R[force_index])
@@ -486,6 +504,7 @@ class MainSolver:
         """
         Assemble the system matrix using automatic differentiation.
         """
+        assert bm.backend_name != "numpy", "In the numpy backend, you cannot use automatic differentiation method to assembly matrix."
         self._atype = 'auto'
 
     def fast_assembly_matrix(self):

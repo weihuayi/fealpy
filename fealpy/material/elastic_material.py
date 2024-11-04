@@ -177,21 +177,6 @@ class LinearElasticMaterial(ElasticMaterial):
                     self._shear_strain(gphi, indices, shear_order)], axis=-2)
         return B
     
-    def stress_func(self, guh, bc) -> TensorLike:
-        """
-        @brief Compute the stress tensor from the grad displacement tensor.
-        ----------
-        guh : TensorLike
-            The grad displacement tensor.
-        Returns
-        -------
-        TensorLike
-            The flattened stress tensor.
-        """
-        D = self.elastic_matrix(bc)
-        flat_stress = bm.einsum('cqkl, cql -> cqk', D, guh)
-        return flat_stress
-    
     def _normal_strain(self, gphi: TensorLike, 
                     indices: TensorLike, *, 
                     out: Optional[TensorLike]=None) -> TensorLike:

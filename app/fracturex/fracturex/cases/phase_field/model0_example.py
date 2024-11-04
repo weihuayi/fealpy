@@ -144,8 +144,8 @@ ms.solve(maxit=maxit)
 tmr.send('stop')
 end = time.time()
 
-force = ms.Rforce
-disp = ms.force_value
+force = ms.get_residual_force()
+disp = model.is_force()
 
 tname = args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.txt'
 np.savetxt(tname, bm.to_numpy(force))
