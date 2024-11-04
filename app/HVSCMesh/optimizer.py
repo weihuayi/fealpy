@@ -103,6 +103,7 @@ def BlockJacobi3d(node,A,B0,B1,B2,isFreeNode):
     newNode[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
             b[isFreeNode], x0=node[isFreeNode, 1], rtol=1e-6)
     b = B1*node[:,0]+B0*node[:,1]-A*newNode[:,2]
+
     newNode[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
             b[isFreeNode], x0=node[isFreeNode, 2], rtol=1e-6)
     #node[isFreeNode, :] = newNode[isFreeNode, :]
@@ -121,16 +122,20 @@ def iterate_solver(mesh):
     mesh_quality = RadiusRatioQuality(mesh)
     mesh_objective = RadiusRatioSumObjective(mesh_quality)
     q[0] = mesh_quality(node)
+    minq = bm.min(q[0])
+    avgq = bm.mean(q[0])
+    maxq = bm.max(q[0])
+    print('iter=',0,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
     if mesh.TD == 2:
         for i in range(0,30):
             A,B = mesh_objective.hess(node)
             node = BlockJacobi2d(node, A, B, isFreeNode)
                         ## count quality
             q[1] = mesh_quality(node)
-            minq = bm.min(q)
-            avgq = bm.mean(q)
-            maxq = bm.max(q)
-            print('minq=',minq,'avgq=',avgq, 'maxq=',maxq)
+            minq = bm.min(q[1])
+            avgq = bm.mean(q[1])
+            maxq = bm.max(q[1])
+            print('iter=',i+1,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
             
             if bm.max(np.abs(q[1]-q[0]))<1e-8:
                 print("Bjacobi迭代次数为%d次"%(i+1))

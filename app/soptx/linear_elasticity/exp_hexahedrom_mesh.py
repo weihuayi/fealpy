@@ -111,20 +111,20 @@ parser.add_argument('--backend',
                     default='numpy', type=str,
                     help='Specify the backend type for computation, default is "pytorch".')
 parser.add_argument('--degree', 
-                    default=2, type=int, 
+                    default=1, type=int, 
                     help='Degree of the Lagrange finite element space, default is 1.')
 parser.add_argument('--solver',
                     choices=['cg', 'spsolve'],
                     default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
-                    default=8, type=int, 
+                    default=4, type=int, 
                     help='Initial number of grid cells in the x direction, default is 2.')
 parser.add_argument('--ny',
-                    default=8, type=int,
+                    default=4, type=int,
                     help='Initial number of grid cells in the y direction, default is 2.')
 parser.add_argument('--nz',
-                    default=8, type=int,
+                    default=4, type=int,
                     help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 
@@ -141,7 +141,7 @@ p = args.degree
 tmr = timer("FEM Solver")
 next(tmr)
 
-maxit = 3
+maxit = 4
 errorType = ['$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
@@ -168,10 +168,10 @@ for i in range(maxit):
     tmr.send('source assembly')
 
     dbc = DirichletBC(space=tensor_space, 
-                    gD=pde.dirichlet, 
+                    gd=pde.dirichlet, 
                     threshold=None, 
                     method='interp')
-    K, F = dbc.apply(A=K, f=F, uh=None, gD=pde.dirichlet, check=True)
+    K, F = dbc.apply(A=K, f=F, uh=None, gd=pde.dirichlet, check=True)
     # uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
     #                 dtype=bm.float64, device=bm.get_device(mesh))
     # uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 

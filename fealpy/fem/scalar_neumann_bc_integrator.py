@@ -44,7 +44,7 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
         mesh = space.mesh
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
+            raise RuntimeError("The ScalarNeumannBCIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -54,7 +54,7 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs)
+        phi = space.face_basis(bcs)
 
         return bcs, ws, phi, facemeasure, n
 
