@@ -5,6 +5,7 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
+from fealpy.fem.dirichlet_bc import DirichletBC
 
 from fealpy.fem.bilinear_form import BilinearForm
 from fealpy.fem.linear_form import LinearForm
@@ -12,19 +13,60 @@ from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
 from fealpy.sparse import COOTensor, CSRTensor
 
+class BoxDomainPolyLoaded3d():
+    def domain(self):
+        return [0, 1, 0, 1, 0, 1]
+    
+    @cartesian
+    def source(self, points: TensorLike):
+        x = points[..., 0]
+        y = points[..., 1]
+        z = points[..., 2]
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=bm.get_device(points))
+        mu = 1
+        factor1 = -400 * mu * (2 * y - 1) * (2 * z - 1)
+        term1 = 3 * (x ** 2 - x) ** 2 * (y ** 2 - y + z ** 2 - z)
+        term2 = (1 - 6 * x + 6 * x ** 2) * (y ** 2 - y) * (z ** 2 - z)
+        val[..., 0] = factor1 * (term1 + term2)
+
+        factor2 = 200 * mu * (2 * x - 1) * (2 * z - 1)
+        term1 = 3 * (y ** 2 - y) ** 2 * (x ** 2 - x + z ** 2 - z)
+        term2 = (1 - 6 * y + 6 * y ** 2) * (x ** 2 - x) * (z ** 2 - z)
+        val[..., 1] = factor2 * (term1 + term2)
+
+        factor3 = 200 * mu * (2 * x - 1) * (2 * y - 1)
+        term1 = 3 * (z ** 2 - z) ** 2 * (x ** 2 - x + y ** 2 - y)
+        term2 = (1 - 6 * z + 6 * z ** 2) * (x ** 2 - x) * (y ** 2 - y)
+        val[..., 2] = factor3 * (term1 + term2)
+
+        return val
+
+    @cartesian
+    def solution(self, points: TensorLike):
+        x = points[..., 0]
+        y = points[..., 1]
+        z = points[..., 2]
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=bm.get_device(points))
+
+        mu = 1
+        val[..., 0] = 200*mu*(x-x**2)**2 * (2*y**3-3*y**2+y) * (2*z**3-3*z**2+z)
+        val[..., 1] = -100*mu*(y-y**2)**2 * (2*x**3-3*x**2+x) * (2*z**3-3*z**2+z)
+        val[..., 2] = -100*mu*(z-z**2)**2 * (2*y**3-3*y**2+y) * (2*x**3-3*x**2+x)
+
+        return val
+    
+    def dirichlet(self, points: TensorLike) -> TensorLike:
+
+        return bm.zeros(points.shape, 
+                        dtype=points.dtype, device=bm.get_device(points))
 
 bm.set_backend('numpy')
 nx, ny, nz = 3, 3, 3 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], nx=nx, ny=ny, nz=nz)
 NC = mesh.number_of_cells()
 cm = mesh.entity_measure('cell')
-# import matplotlib.pyplot as plt
-# fig = plt.figure()
-# axes = fig.add_subplot(111, projection='3d')
-# mesh.add_plot(axes)
-# mesh.find_node(axes, showindex=True)
-# mesh.find_cell(axes, showindex=True)
-# plt.show()
 
 cell = mesh.entity("cell")
 cell_indices = [10, 13, 16]
@@ -126,8 +168,26 @@ def is_dirichlet_boundary_dof(points: TensorLike) -> TensorLike:
         coord = bm.abs(x - domain[0]) < eps
         
         return coord
+pde = BoxDomainPolyLoaded3d()
 
 isDDof_dof = tensor_space_dof.is_boundary_dof(threshold=is_dirichlet_boundary_dof, method='interp')
+
+linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
+                                                lame_lambda=1, shear_modulus=1, 
+                                                hypo='3D', device=bm.get_device(mesh))
+
+integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=2)
+
+bform = BilinearForm(tensor_space_dof)
+bform.add_integrator(integrator_K)
+K = bform.assembly(format='csr')
+K_dense = K.to_dense()
+
+dbc = DirichletBC(space=tensor_space_dof, 
+                    gd=pde.dirichlet, 
+                    threshold=isDDof_dof, 
+                    method='interp')
+K, F = dbc.apply(A=K, f=F_dof, check=True)
 
 print('---------------------------------------------')
 

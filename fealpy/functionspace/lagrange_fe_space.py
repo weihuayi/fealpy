@@ -86,7 +86,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
                 p = self.p
                 bcs = self.mesh.multi_index_matrix(p, TD)/p
                 uI = u(bcs)
-        return uI
+        return self.function(uI)
 
     def boundary_interpolate(self,
             gd: Union[Callable, int, float, TensorLike],
@@ -119,7 +119,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             uh = self.function()
         uh[:] = bm.set_at(uh[:], (..., isDDof), gd)
         
-        return uh, isDDof
+        return self.function(uh), isDDof
 
     set_dirichlet_bc = boundary_interpolate
 

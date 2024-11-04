@@ -524,8 +524,6 @@ class TensorMesh(HomogeneousMesh):
             bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
             bc = bm.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
 
-            # node[cell].shape == (NC, 8, 3)
-            # bc.shape == (NQ, 8)
             p = bm.einsum('qj, cjk->cqk', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NC, NQ, 3)
 
         elif isinstance(bc, tuple) and len(bc) == 2:
@@ -535,8 +533,6 @@ class TensorMesh(HomogeneousMesh):
             bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
             bc = bm.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
 
-            # node[cell].shape == (NC, 4, 2)
-            # bc.shape == (NQ, 4)
             p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)

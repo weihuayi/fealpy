@@ -41,7 +41,9 @@ def process_coef_func(
             coef_val = coef(bcs, index=index)
         else:
             ps = mesh.bc_to_point(bcs, index=index)
-            if n is not None:
+            ##TODO:适应不同情况的coef, coef的接口应该是coef(ps, n)或者coef(ps)
+            import inspect
+            if (n is not None) & (len(inspect.signature(coef).parameters) == 2):
                 coef_val = coef(ps, n)
             else:
                 coef_val = coef(ps)
