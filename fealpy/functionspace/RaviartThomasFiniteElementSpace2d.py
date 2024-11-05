@@ -270,7 +270,7 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         phi = self.basis(bcs)
         c2d = self.dof.cell_to_dof()
         # uh[c2d].shape = (NC, ldof); phi.shape = (..., NC, ldof, GD)
-        val = bm.einsum("cl, clqk->cqk", uh[c2d], phi)
+        val = bm.einsum("cl, cqlk->cqk", uh[c2d], phi)
         return val
 
     @barycentric
