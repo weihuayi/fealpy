@@ -19,7 +19,6 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 from fealpy import logger
 from fealpy.solver import spsolve
-from fealpy.solver.gmres_solver import gmres
 logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -48,6 +47,7 @@ parser.add_argument('--device',
         help='默认gpu计算')
 
 args = parser.parse_args()
+
 
 bm.set_backend(args.backend)
 #device = "cuda"

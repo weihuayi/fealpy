@@ -133,7 +133,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                 n0 += n1
                 n1 += 1
         return c2d
-    def is_boundary_dof(self, threshold, method='interp'): #TODO:这个threshold 没有实现
+    def is_boundary_dof(self, threshold, method="interp"): #TODO:这个threshold 没有实现
         p = self.p
         m = self.m
         gdof = self.number_of_global_dofs()
