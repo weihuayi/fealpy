@@ -18,8 +18,8 @@ class MBBBeam2dData1:
         self.eps = 1e-12
 
     def domain(self, 
-        xmin: float=0, xmax: float=4, 
-        ymin: float=0, ymax: float=4) -> list:
+        xmin: float=0, xmax: float=60, 
+        ymin: float=0, ymax: float=20) -> list:
         
         box = [xmin, xmax, ymin, ymax]
 
