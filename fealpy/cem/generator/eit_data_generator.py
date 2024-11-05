@@ -11,7 +11,7 @@ from fealpy.fem import (
     ScalarNeumannBCIntegrator
 )
 from fealpy.sparse import COOTensor
-from fealpy.solver import cg
+from fealpy.solver import cg, spsolve
 
 
 class EITDataGenerator():
@@ -145,7 +145,8 @@ class EITDataGenerator():
             Tensor: gd Tensor, shaped (Boundary nodes, )\
                 or (Batch, Boundary nodes).
         """
-        uh = cg(self.A_n, self.b_, batch_first=True, atol=1e-12, rtol=0.)
+        # uh = cg(self.A_n, self.b_, batch_first=True, atol=1e-12, rtol=0.)
+        uh = spsolve(self.A_n, self.b_.T, solver='scipy').T
 
         if return_full:
             return uh[:-1]

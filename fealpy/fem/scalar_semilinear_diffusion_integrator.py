@@ -57,6 +57,7 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
         return bcs, ws, gphi, cm, index
+    
     def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
         coef = self.coef 

@@ -1,1 +1,0 @@
-# Array shape: (81,)

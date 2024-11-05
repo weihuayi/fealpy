@@ -98,8 +98,8 @@ class CosCosData:
         """
         @brief Robin 边界条件
         """
-        grad = self.gradient(p) # (NQ, NE, 2)
-        val = bm.sum(grad*n, axis=-1)
+        grad = self.gradient(p) # (NE, NQ, 2)
+        val = bm.sum(grad*n[:,None,:], axis=-1)
         val += self.kappa*self.solution(p) 
         return val
 

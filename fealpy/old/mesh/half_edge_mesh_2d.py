@@ -19,7 +19,7 @@ from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendre
 from .mesh_base import Mesh, Plotable
 from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
-from ..common import DynamicArray
+from fealpy.common import DynamicArray
 from .triangle_mesh import TriangleMesh
 
 

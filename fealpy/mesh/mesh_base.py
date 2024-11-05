@@ -478,6 +478,9 @@ class SimplexMesh(HomogeneousMesh):
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         phi = bm.simplex_shape_function(bcs, p, mi)
         return phi
+    
+    face_shape_function = shape_function
+    edge_shape_function = shape_function
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
@@ -521,8 +524,6 @@ class TensorMesh(HomogeneousMesh):
             bc2 = bc[2].reshape(-1, 2) # (NQ2, 2)
             bc = bm.einsum('im, jn, ko->ijkmno', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2, 2)
 
-            # node[cell].shape == (NC, 8, 3)
-            # bc.shape == (NQ, 8)
             p = bm.einsum('qj, cjk->cqk', bc, node[cell[:, [0, 4, 3, 7, 1, 5, 2, 6]]]) # (NC, NQ, 3)
 
         elif isinstance(bc, tuple) and len(bc) == 2:
@@ -532,12 +533,10 @@ class TensorMesh(HomogeneousMesh):
             bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
             bc = bm.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
 
-            # node[cell].shape == (NC, 4, 2)
-            # bc.shape == (NQ, 4)
             p = bm.einsum('qj, cjk->cqk', bc, node[face[:, [0, 3, 1, 2]]]) # (NC, NQ, 2)
         else:
             edge = self.entity('edge', index=index)
-            p = bm.einsum('qj, ejk->eqk', bc, node[edge]) # (NE, NQ, 2)
+            p = bm.einsum('qj, ejk->eqk', bc[0], node[edge]) # (NE, NQ, 2)
         return p
 
     edge_bc_to_point = bc_to_point
@@ -550,7 +549,6 @@ class TensorMesh(HomogeneousMesh):
 
     def shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                        variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
-        TD = len(bcs)
         if mi is None:
             mi = bm.multi_index_matrix(p, 1, dtype=self.itype)
         raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
@@ -562,6 +560,9 @@ class TensorMesh(HomogeneousMesh):
         else:
             raise ValueError("Variables type is expected to be 'u' or 'x', "
                              f"but got '{variables}'.")
+    
+    face_shape_function = shape_function
+    edge_shape_function = shape_function
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
