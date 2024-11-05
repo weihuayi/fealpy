@@ -6,7 +6,7 @@ from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
 
 from fealpy.opt import opt_alg_options
 
-from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties, SIMPInterpolation
+from app.soptx.soptx.material.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
 from app.soptx.soptx.pde.short_cantilever_2d import ShortCantilever2dOneData
 
