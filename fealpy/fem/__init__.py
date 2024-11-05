@@ -19,6 +19,7 @@ from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator0, Pr
 from .vector_mass_integrator import VectorMassIntegrator
 from .curlcurl_integrator import CurlCurlIntegrator
 from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
+from .div_integrator import DivIntegrator
 
 
 ### Cell Source
