@@ -27,7 +27,6 @@ class FEMSolver:
         """Assemble the global stiffness matrix using the material properties and integrator."""
         integrator = LinearElasticIntegrator(material=self.material_properties, 
                                             q=self.tensor_space.p+3)
-        KE = integrator.assembly(self.tensor_space)
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         K = bform.assembly(format='csr')
@@ -53,7 +52,12 @@ class FEMSolver:
         F = F - K.matmul(uh_bd)
         F[isBdDof] = uh_bd[isBdDof]
 
-        dbc = DirichletBC(space=self.tensor_space, gd=dirichlet, threshold=threshold)
+        dbc = DirichletBC(
+                        space=self.tensor_space, 
+                        gd=dirichlet, 
+                        threshold=threshold, 
+                        method='interp'
+                        )
         K = dbc.apply_matrix(matrix=K, check=True)
 
         return K, F
@@ -80,11 +84,11 @@ class FEMSolver:
         uh = self.tensor_space.function()
 
         if solver_method == 'cg':
-            uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+            uh[:] = cg(K, F[:], maxiter=5000, atol=1e-14, rtol=1e-14)
             if tmr:
                 tmr.send('Solve System with CG')
         elif solver_method == 'spsolve':
-            uh[:] = spsolve(K, F, solver='mumps')
+            uh[:] = spsolve(K, F[:], solver='mumps')
             if tmr:
                 tmr.send('Solve System with spsolve')
         else:
