@@ -1378,7 +1378,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                          nodedata=self.nodedata,
                          celldata=self.celldata)
-            
+    @classmethod        
     def from_meshio(cls, file, show=False):
         import meshio
         data = meshio.read(file)
