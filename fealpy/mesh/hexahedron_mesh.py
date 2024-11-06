@@ -86,7 +86,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs, index=index)
         detJ = bm.linalg.det(J)
-        val = bm.einsum('q, cq->c', ws, detJ)
+        val = bm.einsum('q, cq -> c', ws, detJ)
         return val
 
     def face_area(self, index=_S):

@@ -118,13 +118,13 @@ parser.add_argument('--solver',
                     default='cg', type=str,
                     help='Specify the solver type for solving the linear system, default is "cg".')
 parser.add_argument('--nx', 
-                    default=3, type=int, 
+                    default=4, type=int, 
                     help='Initial number of grid cells in the x direction, default is 2.')
 parser.add_argument('--ny',
-                    default=3, type=int,
+                    default=4, type=int,
                     help='Initial number of grid cells in the y direction, default is 2.')
 parser.add_argument('--nz',
-                    default=3, type=int,
+                    default=4, type=int,
                     help='Initial number of grid cells in the z direction, default is 2.')
 args = parser.parse_args()
 

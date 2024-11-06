@@ -1,0 +1,220 @@
+@DSL    Implicit;
+@Behaviour Gurson;
+@Author Sebastien Melin;
+@Date 11/05/2015;
+
+@Description{
+  "> Local and non-local Gurson-based"
+  "> ductile damage and failure modelling"
+  "> at large deformation"
+  "> Reusch, Frederick and Svendsen, Bob and Klingbeil, Dietmar"
+  "> European Journal of Mechanics - A/Solids. Nov 2003"
+}
+
+@Epsilon 1.e-12;
+@Theta 1.;
+
+@UMATFiniteStrainStrategies[umat] {None,MieheApelLambrechtLogarithmicStrain};
+
+@StateVariable strain p;
+p.setGlossaryName("EquivalentPlasticStrain");
+@StateVariable strain em;
+em.setEntryName("MatrixEquivalentPlasticStrain");
+@PhysicalBounds p  in [0:*[;
+@PhysicalBounds em in [0:*[;
+
+@StateVariable real f;
+f.setGlossaryName("Porosity");
+@PhysicalBounds f in [0:1];
+
+@IntegrationVariable real fg; // Growth porosity
+@IntegrationVariable real fn; // Nucleation porosity
+
+@Parameter q1 = 1.5;
+q1.setEntryName("FirstGursonParameter");
+@Parameter q2 = 1.;
+q2.setEntryName("SecondGursonParameter");
+@Parameter q3 = 1.;
+q3.setEntryName("ThirdGursonParameter");
+
+@Parameter ffb  = 0.5   ;
+@Parameter fmax = 0.18  ;
+@Parameter fc   = 0.1   ;
+@Parameter sm   = 400.e6;
+@Parameter fNH  = 0.1;
+@Parameter en   = 0.3;
+@Parameter sn   = 0.1;
+
+@LocalVariable stress young;      //! Young modulus
+@LocalVariable stress lambda;     //! first lame coefficient coefficient
+@LocalVariable stress mu;         //! shear modulus
+@LocalVariable stress  K;         //! bulk modulus
+@LocalVariable ushort nbroken; // number of times the material has been considered broken during the time step
+@LocalVariable bool broken;
+@LocalVariable real Phi_el;
+@LocalVariable real delta;
+@LocalVariable real flim;
+
+@InitLocalVariables{
+  delta = ((ffb-fc)/(fmax-fc));
+  const real feq = (f<fc ? f : fc+delta*(f-fc));
+  if(q3>q1){
+    string msg("gurson : q3 is greater than q1 !");
+    throw(runtime_error(msg));
+  }
+  flim   = min(fc+delta*(fmax-fc),0.95*(q1-sqrt(q1*q1-q3*q3))/(q3*q3));
+  broken = (feq>=flim);
+  if(!broken){
+    //Calcul des coefficients d'élasticité et du tenseur d'élasticité
+    young         = 209999.e6;
+    const real nu = 0.3;
+    lambda        = computeLambda(young,nu);
+    mu            = computeMu(young,nu);
+    K             = lambda+(2*mu)/3;
+    nbroken = 0u;
+    const StrainStensor e   = eel+deto;
+    const StressStensor sel = 2*mu*e+lambda*trace(e)*StrainStensor::Id();
+    const stress pr_el  = trace(sel)/3;
+    const stress seq_el = sigmaeq(sel);
+    // Prédiction élastique
+    const real sigeq_r = seq_el/sm;
+    const real pr_r    = pr_el/sm;
+    const real exp_pr_r   = exp((3*q2/2.)*pr_r);
+    const real cosh_pr_r  = 0.5*(exp_pr_r+1/exp_pr_r);
+    Phi_el = sigeq_r*sigeq_r+2*q1*feq*cosh_pr_r-1-q3*feq*feq;
+  }
+}
+
+/*La directive @Integrator permet de définir le système implicite à résoudre
+  ainsi que la matrice jacobienne.*/
+@Integrator{
+  constexpr const double pi = 3.14159265359;
+  feel -= deto;
+  if(Phi_el<=0){
+    return true;
+  }
+  // porosite totale (milieu du pas de temps)
+  const real f_      = max(f+theta*df,real(0));
+  // porosite effective (milieu du pas de temps)
+  const real fs      = (ffb-fc)/(fmax-fc);
+  const real feq_    = (f_<fc) ? f_ : fc+fs*(f_-fc);
+  const real dfeq_df = (f_<fc) ? real(1) : fs;
+  if(feq_>flim){
+    ++nbroken;
+    if(nbroken>4){
+      broken=true;
+    }
+  }
+  if(!(broken || (feq_>flim))){
+    const Stensor4 H     = Stensor4::M();
+    const StrainStensor id = StrainStensor::Id();
+    const real em_       = max(em+theta*dem,real(0));
+    const StrainStensor eel_ = eel+theta*deel;
+    const real eps       = min(0.1*epsilon,1.e-8);
+    const real one_third = real(1)/3;
+    sig = lambda*trace(eel_)*id+2*mu*eel_;
+    const stress pr      = trace(sig)*one_third;
+    const stress sigeq   = sigmaeq(sig);
+    const real inv_sigeq = (sigeq > eps*young) ? 1/sigeq : 0;
+    // normale
+    const Stensor nH     = H*sig*inv_sigeq;
+    const real inv_sm    = 1/sm;
+    // Contrainte de Von Mises
+    const real sigeq_r = sigeq*inv_sm;
+    // pression reduite
+    const real pr_r    = pr*inv_sm;
+    const real exp_pr_r   = exp((3*q2/2.)*pr_r);
+    const real sinh_pr_r  = 0.5*(exp_pr_r-1/exp_pr_r);
+    const real cosh_pr_r  = 0.5*(exp_pr_r+1/exp_pr_r);
+    // on normalise par sm pour avoir p de l'ordre de grandeur des déformations
+    const real dPhi_dsigeq     = (2*sigeq_r*inv_sm)*sm;
+    const real dPhi_dp         = (3*q1*q2*feq_*inv_sm*sinh_pr_r)*sm;
+    const real dPhi_dfeq       = (2*q1*cosh_pr_r-2*q3*feq_)*sm;
+    const real d2Phi_dsigeq2   = (2*inv_sm*inv_sm)*sm;
+    const real d2Phi_dp2       = (18*feq_*q1*q2*q2/(4)*cosh_pr_r*inv_sm*inv_sm)*sm;
+    const real d2Phi_dpdf      = (3*q1*q2*sinh_pr_r*inv_sm)*sm;
+    const real Phi = (sigeq_r*sigeq_r+2*q1*feq_*cosh_pr_r-1-q3*feq_*feq_)*sm;
+    fp = Phi/sm;
+    dfp_ddp     = 0;
+    dfp_ddeel   = 2*mu*theta*(dPhi_dsigeq/sm)*nH+K*theta*(dPhi_dp/sm)*id;
+    dfp_ddf = theta*(dPhi_dfeq/sm)*dfeq_df;
+    // Normalisation
+    const real nf = 1.e-2;
+    fp        *= nf;
+    dfp_ddeel *= nf;
+    dfp_ddf   *= nf;
+    // direction d'écoulement
+    const Stensor n= (dPhi_dsigeq*nH+one_third*dPhi_dp*id); 
+    // trace de n
+    const real  trn = dPhi_dp;
+    const Stensor4 dn_deel = (2*mu*(d2Phi_dsigeq2*(nH^nH)+dPhi_dsigeq*(H-(nH^nH))*inv_sigeq
+				    +one_third*one_third*d2Phi_dp2*(id^id))
+			      +lambda*((one_third*d2Phi_dp2*id)^id));;
+    const real  dtrn_dfeq = d2Phi_dpdf;
+    const Stensor  dn_dfeq   = one_third*dtrn_dfeq*id;
+    const Stensor  dtrn_deel = (2*mu*one_third*d2Phi_dp2+lambda*d2Phi_dp2)*id;
+    //Équation associée à la déformation élastique
+    feel        += dp*n;
+    dfeel_ddeel += theta*dp*dn_deel;
+    dfeel_ddp   += n;
+    dfeel_ddf   += dp*dn_dfeq*dfeq_df;
+    fem = (1-f_)*dem-dp*(dPhi_dsigeq*sigeq+dPhi_dp*pr)/sm;
+    dfem_ddem =(1-f_);
+    dfem_ddp  = -(dPhi_dsigeq*sigeq+dPhi_dp*pr)/sm;
+    dfem_ddeel= -dp*(2*mu*theta*(d2Phi_dsigeq2*sigeq+dPhi_dsigeq)*n+K*theta*one_third*(d2Phi_dp2*pr+dPhi_dp)*id)/sm;
+    dfem_ddf  = -theta*(dem+dp*d2Phi_dpdf*pr/sm);
+    // Porosité totale
+    ff       = df-dfg-dfn;
+    dff_ddf  = 1;
+    dff_ddfg = -1;
+    dff_ddfn = -1;
+    // Évolution de la porosité due à la croissance de cavités pré-existantes 
+    ffg       -= (1-f_)*(1-f_)*dp*trn;
+    dffg_ddp   = -(1-f_)*(1-f_)*trn;
+    dffg_ddf   = theta*(1-f_)*dp*(2*trn-(1-f_)*dtrn_dfeq*dfeq_df);
+    dffg_ddeel = -theta*(1-f_)*(1-f_)*dp*dtrn_deel;
+    // Évolution de la porosité due à la germination de cavités
+    const real peq     = (em_-en)/sn;
+    const real cste    = 1/(sn*sqrt(2*pi)); 
+    const real cste2   = -cste*fNH*exp(-0.5*peq*peq);
+    ffn       +=  cste2*dem;
+    dffn_ddem  =  cste2*(1-peq*theta*dem/sn);
+  }
+ }
+
+/*Calcul de la contrainte en fin de pas de temps : on met à jour le module d'Young
+  et les coefficients de Lame avant de calcule la contrainte finale.*/
+@ComputeFinalStress{
+  if(!broken){
+    const real f_  = max(f,real(0));
+    const real feq_ = ((f_<fc) ? f_ : fc+delta*(f_-fc));
+    broken = feq_>flim;
+  }
+  if(!broken){
+    sig = lambda*trace(eel)*StrainStensor::Id()+2*mu*eel;
+  } else {
+    sig = StressStensor(stress(0));
+  }
+}
+
+@IsTangentOperatorSymmetric true;
+@TangentOperator{
+  if(!broken){
+    if((smt==ELASTIC)||(smt==SECANTOPERATOR)||
+       (smt==TANGENTOPERATOR)){
+      computeAlteredElasticStiffness<hypothesis,Type>::exe(Dt,lambda,mu);
+    } else if (smt==CONSISTENTTANGENTOPERATOR){
+      StiffnessTensor Hooke;
+      Stensor4 Je;
+      computeElasticStiffness<N,Type>::exe(Hooke,lambda,mu);
+      getPartialJacobianInvert(Je);
+      Dt = Hooke*Je;
+    } else {
+      return false;
+    }
+  } else {
+    StiffnessTensor Hooke;
+    computeAlteredElasticStiffness<hypothesis,Type>::exe(Hooke,lambda,mu);
+    Dt = 1.e-7*Hooke;
+  }
+}

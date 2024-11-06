@@ -14,3 +14,5 @@ from .particle_swarm_opt import ParticleSwarmOptAlg
 from .hippopotamus_opt_alg import HippopotamusOptAlg
 from .Antcolony_opt_alg import AntColonyOptAlg
 from .opt_function import initialize, levy
+from .crested_porcupine_opt import CrestedPorcupineOpt
+from .black_winged_kite_alg import BlackwingedKiteAlg

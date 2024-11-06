@@ -112,7 +112,7 @@ class TestLagrangeTriangleMeshInterfaces:
 
         x, y, z = sp.symbols('x, y, z', real=True)
         F = x**2 + y**2 + z**2
-        u = x * y
+        u = sp.sin(x) * sp.sin(y)
         pde = SurfaceLevelSetPDEData(F, u)
 
         surface = SphereSurface() #以原点为球心，1 为半径的球
@@ -120,9 +120,11 @@ class TestLagrangeTriangleMeshInterfaces:
 
         refine = 4
         uI_error = np.zeros(refine, dtype=np.float64)
+        uI_error_ratio = np.zeros(refine-1, dtype=np.float64)
 
         for i in range(refine):
             lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=1, surface=surface)
+            cm = lmesh.entity_measure(etype='cell')
 
             space = ParametricLagrangeFESpace(lmesh, p=1)
 
@@ -132,10 +134,10 @@ class TestLagrangeTriangleMeshInterfaces:
 
             if i < refine-1:
                 mesh.uniform_refine()
-
+        print('cm', cm)
         print("uI error:",uI_error)
-
-        #np.testing.assert_allclose(bm.to_numpy(uI_error), data["uI error"], atol=1e-14)   
+        #print('uI_error_ratio:', uI_error[:-1]/uI_error[1:])
+        #np.testing.assert_allclose(bm.to_numpy(uI_error_ratio), data["uI_error_ratio"], atol=1e-14)   
 
 
 if __name__ == "__main__":

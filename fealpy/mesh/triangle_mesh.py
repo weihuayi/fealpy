@@ -93,9 +93,22 @@ class TriangleMesh(SimplexMesh, Plotable):
         return quad
 
     # shape function
-    def grad_lambda(self, index: Index=_S) -> TensorLike:
+    def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
         """
+        node = self.entity('node')
+        entity = self.entity(TD, index=index)
+        GD = self.GD
+        if TD == 1:
+            return bm.interval_grad_lambda(entity, node)
+        elif TD == 2:
+            if GD == 2:
+                return bm.triangle_grad_lambda_2d(entity, node)
+            elif GD == 3:
+                return bm.triangle_grad_lambda_3d(entity, node)
+        else:
+            raise ValueError("Unsupported topological dimension: {TD}")
+        '''
         node = self.node
         cell = self.cell[index]
         GD = self.GD
@@ -103,7 +116,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             return bm.triangle_grad_lambda_2d(cell, node)
         elif GD == 3:
             return bm.triangle_grad_lambda_3d(cell, node)
-    
+        '''
     def rot_lambda(self, index: Index=_S): # TODO
         pass
     
@@ -111,9 +124,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @berif 这里调用的是网格空间基函数的梯度
         """
+        TD = bc.shape[1] - 1
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
-            Dlambda = self.grad_lambda(index=index)
+            Dlambda = self.grad_lambda(index=index, TD=TD)
             gphi = bm.einsum('...ij, kjm -> k...im', R, Dlambda)
             return gphi  # (NC, NQ, ldof, GD)
         elif variables == 'u':
@@ -1331,7 +1345,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         tri = tri[isNecessaryCell, :]
         # 把顶点在 Delaunay 内的编号，转换为整个三角形内的编号
         interfaceNodeIdx = concat(
-            [bm.astype(iCellNodeIndex, dtype=mesh.itype),
+            [bm.astype(iCellNodeIndex, mesh.itype),
              NN + bm.arange(cutNode.shape[0] + auxNode.shape[0], dtype=mesh.itype, device=device)],
             axis = 0
         )

@@ -1,37 +1,40 @@
-import numpy as np
+
 from typing import Optional
 
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 
-from fealpy.material.elastic_material import LinearElasticMaterial
 
-
-def compute_strain(u: TensorLike, q=None) -> TensorLike:
+def flatten_symmetric_matrices(matrices):
     """
-    Compute the strain tensor.
-
-    Parameters
-    ----------
-    u : TensorLike
-        The displacement field.
-
-    Returns
-    -------
-    TensorLike
-        The strain tensor.
+    Shape it as Flatten the symmetric matrix.
     """
-    q = self.q
-    mesh = u.space.mesh
-    qf = mesh.quadrature_formula(q, 'cell')
-    bc, ws = qf.get_quadrature_points_and_weights() 
-    guh = u.grad_value(bc)
+    flatten_rules = {
+        (2, 2): [ 
+            (0, 0),  
+            (1, 1), 
+            (0, 1)  
+        ],
+        (3, 3): [
+            (0, 0),  
+            (1, 1),  
+            (2, 2), 
+            (0, 1), 
+            (1, 2),
+            (0, 2) 
+        ]
+    }
 
-    GD = guh.shape[-1]
-    strain = bm.zeros_like(guh)
-    for i in range(GD):
-        for j in range(GD):
-            strain[..., i, j] = 0.5 * (guh[..., i, j] + guh[..., j, i])
-    return strain
+    matrix_shape = matrices.shape[-2:]
+
+    if matrix_shape not in flatten_rules:
+        raise ValueError("The shape of the matrix is not supported.")
+    
+    rules = flatten_rules[matrix_shape]
+
+    flattened = bm.stack([matrices[..., i, j] for i, j in rules], axis=-1)
+
+    return flattened
+
 
 

@@ -1,16 +1,27 @@
 from typing import Optional, Dict
 import numpy as np
 from fealpy.utils import timer
-from scipy.sparse import spdiags
 
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
-from fealpy.decorator import barycentric, cartesian
+from fealpy.decorator import barycentric
 from fealpy.fem import BilinearForm, LinearForm
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem import LinearElasticIntegrator, ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator
+
+# 自动微分模块
+from fealpy.fem import SemilinearForm
+from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
+from fealpy.fem import NonlinearElasticIntegrator
+
+# 边界处理模块
 from fealpy.fem import DirichletBC
-from fealpy.solver import cg
+
+from fealpy.solver import cg, spsolve
+from scipy.sparse.linalg import lgmres
+#from scipy.sparse.linalg import gmres
+#from scipy.sparse.linalg import minres
+#from scipy.linalg import issymmetric
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
@@ -20,9 +31,7 @@ from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichl
 
 class MainSolver:
     def __init__(self, mesh, material_params: Dict, 
-                 p: int = 1, q: Optional[int] = None, 
-                 model_type: str = 'HybridModel',
-                 method: str = 'lfem'):
+                 model_type: str = 'HybridModel', method: str = 'lfem', p: int = 1, q: int = None):
         """
         Initialize the MainSolver class with more customization options.
 
@@ -42,21 +51,23 @@ class MainSolver:
             The method for solving the problem, by default 'lfem'.
         """
         self.mesh = mesh
-        self.p = p
-        self.q = self.p + 2 if q is None else q
+        self.p = 1
+        self.q = self.p + 2
 #        self.model = model
 
         # Material and energy degradation function
         self.EDFunc = EDFunc()
+        self.model_type = model_type
         self.pfcm = PhaseFractureMaterialFactory.create(model_type, material_params, self.EDFunc)
 
-        self.method = method
+        self._method = method
 
         # Initialize spaces
-        if self.method == 'lfem':
+        if self._method == 'lfem':
             self.set_lfe_space()
         else:
             raise ValueError(f"Unknown method: {self.method}")
+        
         self.pfcm.update_disp(self.uh)
         self.pfcm.update_phase(self.d)
 
@@ -68,12 +79,15 @@ class MainSolver:
 
         self.enable_refinement = False
 
+        self._save_vtk = False
+        self._atype = None
+
         # Initialize the timer
         self.tmr = timer()
         next(self.tmr)
 
 
-    def solve(self, maxit: int = 50, save_vtkfile : bool = True, vtkname: Optional[str] = None):
+    def solve(self, maxit: int = 50):
         """
         Solve the phase-field fracture problem.
 
@@ -81,27 +95,30 @@ class MainSolver:
         ----------
         maxit : int, optional
             Maximum number of iterations, by default 30.
+        atype : str, optional
+            Type of the solver, by default None. if 'auto', using automatic differentiation to assemble matrix. 
         vtkname : str, optional
             VTK output file name, by default None.
         """
         self._initialize_force_boundary()
-        self.Rforce = bm.zeros_like(self.force_value)
+        self._Rforce = bm.zeros_like(self._force_value)
         
-        for i in range(len(self.force_value)-1):
+#        for i in range(1):
+        for i in range(len(self._force_value)-1):
             print('i', i)
-            self._currt_force_value = self.force_value[i+1]
+            self._currt_force_value = self._force_value[i+1]
+
             # Run Newton-Raphson iteration
             self.newton_raphson(maxit)
             
-            if save_vtkfile:
-                if vtkname is None:
+            if self._save_vtk:
+                if self._vtkfname is None:
                     fname = f'test{i:010d}.vtu'
                 else:
-                    fname = f'{vtkname}{i:010d}.vtu'
-                self.save_vtkfile(fname=fname)
+                    fname = f'{self._vtkfname}{i:010d}.vtu'
+                self._save_vtkfile(fname=fname)
             
-            bm.set_at(self.Rforce, i+1, self.Rfu)
-            
+            bm.set_at(self._Rforce, i+1, self._Rfu)
             
 
     def newton_raphson(self, maxit: int = 50):
@@ -122,21 +139,30 @@ class MainSolver:
             tmr.send('start')
 
             # Solve the displacement field
-            er0 = self.solve_displacement()
-
-            tmr.send('disp_solve')
-            
-            print(f"Displacement error after iteration {k + 1}: {er0}")
-
-            # Solve the phase field
-            if self.method == 'lfem':
-                er1 = self.solve_phase_field()
+            if self._method == 'lfem':
+                if self._atype == 'auto':
+                    er0 = self.solve_displacement_auto()
+                else:
+                    er0 = self.solve_displacement()
             else:
                 raise ValueError(f"Unknown method: {self.method}")
 
-            print(f"Phase field error after iteration {k + 1}: {er1}")
+            tmr.send('disp_solve')
+
+            # Solve the phase field
+            if self._method == 'lfem':
+                if self._atype == 'auto':
+                    print(f"Using automatic differentiation to assemble phase field matrix.")
+                    er1 = self.solve_phase_field_auto()
+                else:
+                    er1 = self.solve_phase_field()
+            else:
+                raise ValueError(f"Unknown method: {self.method}")
+
             tmr.send('phase_solve')
-            
+
+
+            # Adaptive refinement
             if self.enable_refinement:
                 data = self.set_interpolation_data()
                 self.mesh, new_data = self.adaptive.perform_refinement(self.mesh, self.d, data, self.l0)
@@ -146,16 +172,20 @@ class MainSolver:
                     else:
                         raise ValueError(f"Unknown method: {self.method}")
                     self.update_interpolation_data(new_data)
-                    #self._initialize_force_boundary()
                     print(f"Refinement after iteration {k + 1}")
 
             tmr.send('refine')
+
+            # Check for convergence
             if k == 0:
                 e0, e1 = er0, er1
             
             error = max(er0/e0, er1/e1)
             tmr.send('end')
-            print(f'Iteration {k}, Error: {error}')
+
+            print(f"Displacement error after iteration {k + 1}: {er0/e0}")
+            print(f"Phase field error after iteration {k + 1}: {er1/e1}")
+            print(f'Iteration {k+1}, Error: {error}')
             if error < 1e-5:
                 print(f"Convergence achieved after {k + 1} iterations.")
                 break
@@ -173,7 +203,7 @@ class MainSolver:
         tmr = self.tmr
         tmr.send('start')
 
-        fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self.force_dof, direction=self.force_direction)
+        fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self._force_dof, direction=self._force_direction)
         uh, force_index = fbc.apply_value(uh)
         self.pfcm.update_disp(uh)
 
@@ -181,25 +211,27 @@ class MainSolver:
         ubform.add_integrator(LinearElasticIntegrator(self.pfcm, q=self.q))
         A = ubform.assembly()
         R = -A @ uh[:]
-        self.Rfu = bm.sum(-R[force_index])
+        self._Rfu = bm.sum(-R[force_index])
         tmr.send('disp_assemble')
 
         # Apply force boundary conditions
-        ubc = VectorDirichletBC(self.tspace, 0, threshold=self.force_dof, direction=self.force_direction)  
+        ubc = VectorDirichletBC(self.tspace, 0, threshold=self._force_dof, direction=self._force_direction)  
         A, R = ubc.apply(A, R)
 
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
 
-        du = cg(A.tocsr(), R, atol=1e-14)
-        
+        #du = cg(A.tocsr(), R, atol=1e-18)
+        #du = spsolve(A, R)
+        du = self._solver(A.tocsr(), R)
+
         uh += du[:]
         self.uh = uh
         
         self.pfcm.update_disp(uh)
         tmr.send('disp_solve')
-        return np.linalg.norm(R)
+        return bm.linalg.norm(R)
 
     def solve_phase_field(self) -> float:
         """
@@ -211,6 +243,7 @@ class MainSolver:
             The norm of the residual.
         """
         Gc, l0, d = self.Gc, self.l0, self.d
+
         @barycentric
         def coef(bc, index):
             return 2 * self.pfcm.maximum_historical_field(bc)
@@ -219,30 +252,166 @@ class MainSolver:
         tmr.send('start')
 
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(coef==Gc * l0, q=self.q))
+        dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef=Gc / l0, q=self.q))
         dbform.add_integrator(ScalarMassIntegrator(coef=coef, q=self.q))
         A = dbform.assembly()
         tmr.send('phase_matrix_assemble')
 
         dlform = LinearForm(self.space)
-        dlform.add_integrator(ScalarSourceIntegrator(coef=coef, q=self.q))
+        dlform.add_integrator(ScalarSourceIntegrator(source=coef, q=self.q))
         R = dlform.assembly()
-        R -= A @ d[:]
+        R -= A @ d[:] 
+ 
+        
         tmr.send('phase_R_assemble')
 
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        dd = cg(A.tocsr(), R, atol=1e-14)
-        d += dd.flatten()[:]
+        #dd = cg(A.tocsr(), R, atol=1e-18)
+        dd = self._solver(A.tocsr(), R)
+        
+        #dd = spsolve(A, R) 
+        d += dd[:]
+  
 
         self.d = d
         self.pfcm.update_phase(d)
         self.H = self.pfcm.H
 
         tmr.send('phase_solve')
-        return np.linalg.norm(R)
+        return bm.linalg.norm(R)
+    
+    def solve_displacement_auto(self) -> float:
+        """
+        Using automatic differentiation to assemble matrix and solve the displacement field and return the residual norm.
+
+        Returns
+        -------
+        float
+            The norm of the residual.
+        """
+        uh = self.uh
+        tmr = self.tmr
+        tmr.send('start')
+
+        fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self._force_dof, direction=self._force_direction)
+        uh, force_index = fbc.apply_value(uh)
+        self.pfcm.update_disp(uh)
+
+        @barycentric
+        def postive_coef(bc, **kwargs):
+            return self.pfcm.positive_coef(bc)
+        
+        postive_coef.uh = uh
+        postive_coef.kernel_func = self.pfcm.positive_stress_func
+
+        ubform = SemilinearForm(self.tspace)
+        ubform.add_integrator(NonlinearElasticIntegrator(coef=postive_coef, material=self.pfcm, q=self.q))
+
+        if self.model_type == 'HybridModel' or self.model_type == 'IsotropicModel':
+            pass
+        else:
+            @barycentric
+            def negative_coef(bc, **kwargs):
+                return self.pfcm.negative_coef(bc)
+            
+            negative_coef.uh = uh
+            negative_coef.kernel_func = self.pfcm.negative_stress_func
+
+            ubform.add_integrator(NonlinearElasticIntegrator(coef=negative_coef, material=self.pfcm, q=self.q))
+            
+        A, R = ubform.assembly()
+
+        self._Rfu = bm.sum(-R[force_index])
+        tmr.send('disp_assemble')
+
+        # Apply force boundary conditions
+        ubc = VectorDirichletBC(self.tspace, 0, threshold=self._force_dof, direction=self._force_direction)  
+        A, R = ubc.apply(A, R)
+
+        # Apply displacement boundary conditions
+        A, R = self._apply_boundary_conditions(A, R, field='displacement')
+        tmr.send('apply_bc')
+
+        #du = cg(A.tocsr(), R, atol=1e-18)
+        #du = spsolve(A, R)
+        du = self._solver(A.tocsr(), R)
+
+        uh += du[:]
+        self.uh = uh
+        
+        self.pfcm.update_disp(uh)
+        tmr.send('disp_solve')
+        return bm.linalg.norm(R)
+    
+    def solve_phase_field_auto(self) -> float:
+        """
+        Solve the phase field and return the residual norm.
+
+        Returns
+        -------
+        float
+            The norm of the residual.
+        """
+        Gc, l0, d = self.Gc, self.l0, self.d
+        @barycentric
+        def diffusion_coef(bc, **kwargs):
+            return Gc * l0
+
+        @barycentric
+        def mass_coef(bc, **kwargs):
+            return 2 * self.pfcm.maximum_historical_field(bc) + Gc / l0
+        
+        @barycentric
+        def kernel_func(u):
+            return u
+
+        def grad_kernel_func(u):
+            return bm.ones_like(u)
+        
+        @barycentric
+        def source_coef(bc, index):
+            return 2 * self.pfcm.maximum_historical_field(bc)
+        
+        diffusion_coef.kernel_func = kernel_func
+        mass_coef.kernel_func = kernel_func
+
+        if bm.backend_name == 'numpy':
+            diffusion_coef.grad_kernel_func = grad_kernel_func
+            mass_coef.grad_kernel_func = grad_kernel_func
+
+        mass_coef.uh = d
+        diffusion_coef.uh = d
+
+        tmr = self.tmr
+        tmr.send('start')
+
+        # using automatic differentiation to assemble the phase field system        
+        dform = SemilinearForm(self.space)
+        dform.add_integrator(ScalarSemilinearDiffusionIntegrator(diffusion_coef, q=self.q)) 
+        dform.add_integrator(ScalarSemilinearMassIntegrator(mass_coef, q=self.q))
+        dform.add_integrator(ScalarSourceIntegrator(source_coef, q=self.q))
+
+        A, R = dform.assembly()
+        tmr.send('phase_matrix_assemble')
+
+        A, R = self._apply_boundary_conditions(A, R, field='phase')
+        tmr.send('phase_apply_bc')
+
+        #dd = cg(A.tocsr(), R, atol=1e-18)
+        dd = self._solver(A.tocsr(), R)
+        #dd = spsolve(A, R) 
+        d += dd[:]
+
+        self.d = d
+        self.pfcm.update_phase(d)
+        self.H = self.pfcm.H
+
+        tmr.send('phase_solve')
+        return bm.linalg.norm(R)
+
 
     def set_lfe_space(self):
         """
@@ -304,7 +473,7 @@ class MainSolver:
         self.pfcm.update_disp(self.uh)
         self.pfcm.update_phase(self.d)
 
-    def save_vtkfile(self, fname: str):
+    def _save_vtkfile(self, fname: str):
         """
         Save the solution to a VTK file.
 
@@ -318,6 +487,31 @@ class MainSolver:
         mesh.nodedata['damage'] = self.d
         mesh.nodedata['uh'] = self.uh.reshape(GD, -1).T
         mesh.to_vtk(fname=fname)
+
+    def save_vtkfile(self, fname: str):
+        """
+        Save the solution to a VTK file.
+
+        Parameters
+        ----------
+        fname : str
+            File name for saving the VTK output.
+        """
+        self._vtkfname = fname
+        self._save_vtk = True
+
+    def auto_assembly_matrix(self):
+        """
+        Assemble the system matrix using automatic differentiation.
+        """
+        assert bm.backend_name != "numpy", "In the numpy backend, you cannot use automatic differentiation method to assembly matrix."
+        self._atype = 'auto'
+
+    def fast_assembly_matrix(self):
+        """
+        Assemble the system matrix using fast assembly.
+        """
+        self._atype = 'fast'
 
     def add_boundary_condition(self, field_type: str, bc_type: str, boundary_dof: TensorLike, value: TensorLike, direction: Optional[str] = None):
         """
@@ -347,7 +541,7 @@ class MainSolver:
         })
 
         
-    def get_boundary_conditions(self, field_type: str):
+    def _get_boundary_conditions(self, field_type: str):
         """
         Get the boundary conditions for a specific field.
 
@@ -368,12 +562,12 @@ class MainSolver:
         """
         Initialize the force boundary conditions.
         """
-        force_data = self.get_boundary_conditions('force')
+        force_data = self._get_boundary_conditions('force')
         force_data = force_data[0]
-        self.force_type = force_data.get('type')
-        self.force_dof = force_data.get('bcdof')
-        self.force_value = force_data.get('value')
-        self.force_direction = force_data.get('direction')
+        self._force_type = force_data.get('type')
+        self._force_dof = force_data.get('bcdof')
+        self._force_value = force_data.get('value')
+        self._force_direction = force_data.get('direction')
 
     def _apply_boundary_conditions(self, A, R, field: str):
         """
@@ -388,7 +582,7 @@ class MainSolver:
         field : str
             Field type: 'displacement' or 'phase'.
         """
-        bc_list = self.get_boundary_conditions(field)
+        bc_list = self._get_boundary_conditions(field)
 
         if bc_list:
             for bcdata in bc_list:
@@ -405,4 +599,41 @@ class MainSolver:
                     else:
                         raise NotImplementedError(f"Boundary condition '{bcdata['type']}' is not implemented.")
         return A, R
+    
+    def get_residual_force(self):
+        """
+        Get the residual vector.
+        """
+        return self._Rforce
 
+    def set_energy_degradation(self, EDfunc=None):
+        """
+        Set the energy degradation function.
+
+        Parameters
+        ----------
+        EDfunc : object
+            Energy degradation function.
+        """
+        if EDfunc is not None:
+            pass
+        else:
+            self.EDFunc = EDFunc
+
+    def _solver(self, A, R):
+        """
+        Solve the linear system.
+
+        Parameters
+        ----------
+        A : sparse matrix
+            System matrix.
+        R : ndarray
+            Residual vector.
+        """
+        A = A.to_scipy()
+        b = bm.to_numpy(R)
+        #x = gmres(A, b)
+        x,info = lgmres(A, b, atol=1e-18)
+        x = bm.tensor(x)
+        return x

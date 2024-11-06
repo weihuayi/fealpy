@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
 import pytest
 
-from fealpy.mesh import QuadrangleMesh, HexahedronMesh
+from fealpy.mesh import QuadrangleMesh, HexahedronMesh, IntervalMesh
 from app.gearx.gear import ExternalGear, InternalGear
 from app.gearx.utils import *
 
@@ -62,7 +62,7 @@ class TestGearUtils:
         nw = gear_data['nw']
 
         # 生成六面体网格
-        hex_mesh = generate_hexahedral_mesh(mesh, beta, r, tooth_width, nw)
+        hex_mesh = generate_hexahedron_mesh(mesh, beta, r, tooth_width, nw)
         volume_node = hex_mesh.node
         volume_cell = hex_mesh.cell
         NN = hex_mesh.number_of_nodes()
@@ -73,18 +73,34 @@ class TestGearUtils:
     def test_cylindrical_to_cartesian_and_find_node_location_kd_tree(self):
         with open('../data/external_gear.pkl', 'rb') as f:
             data = pickle.load(f)
-        external_gear = data['gear']
+        external_gear = data['external_gear']
         hex_mesh = data['hex_mesh']
+        quad_mesh = data['quad_mesh']
+        # quad_mesh.to_vtk(fname='external_quad_mesh.vtu')
+        node = hex_mesh.node
+        face = hex_mesh.face
         n = 15
         helix_d = np.linspace(external_gear.d, external_gear.effective_da, n)
         helix_width = np.linspace(0, external_gear.tooth_width, n)
         helix_node = cylindrical_to_cartesian(helix_d, helix_width, external_gear)
-        print(helix_node)
+        # hex_mesh.to_vtk(fname='../data/external_hex_mesh.vtu')
+        # helix_cell = np.array([[i, i + 1] for i in range(n - 1)])
+        # i_mesh = IntervalMesh(helix_node, helix_cell)
+        # i_mesh.to_vtk(fname='../data/interval_mesh.vtu')
 
-        for t_node in helix_node:
-            target_cell_idx = find_node_location_kd_tree(t_node, hex_mesh)
-            print(target_cell_idx)
+        target_cell_idx = np.zeros(n, np.int32)
+        local_face_idx = np.zeros(n, np.int32)
+        parameters = np.zeros((n, 3), np.float64)
+        for i, t_node in enumerate(helix_node):
+            target_cell_idx[i], local_face_idx[i], parameters[i] = find_node_location_kd_tree(t_node, external_gear, hex_mesh)
+        print(target_cell_idx)
+        print(local_face_idx)
+        print(parameters)
 
+        # # 寻找内圈上节点
+        # node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        # is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+        # inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
 
 if __name__ == "__main__":
     pytest.main(["./test_gear_utils.py", "-k", "test_get_helix_points_and_sweep_points"])

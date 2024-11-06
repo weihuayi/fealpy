@@ -1,5 +1,3 @@
-from fealpy.backend import backend_manager as bm
-
 from typing import Optional
 from ..typing import TensorLike, SourceLike, Threshold
 from ..mesh import HomogeneousMesh
@@ -13,6 +11,7 @@ from .integrator import (
     assemblymethod,
     CoefLike
 )
+
 class _FaceMassIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
@@ -39,32 +38,26 @@ class _FaceMassIntegrator(LinearInt, OpInt, CellInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        n = mesh.face_unit_normal(index=index)
         facemeasure = mesh.entity_measure('face', index=index)
-
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.face_basis(bcs)
-
-        return bcs, ws, phi, facemeasure, n
+        return bcs, ws, phi, facemeasure, index
     
     def assembly(self, space: _FS):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, cm, index = self.fetch(space)
+        bcs, ws, phi, fm, index = self.fetch(space)
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-
-        return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)\
+        return bilinear_integral(phi, phi, ws, fm, val, batched=self.batched)
 
 class InterFaceMassIntegrator(_FaceMassIntegrator):
-    @enable_cache
     def make_index(self, space: _FS):
         index = self.threshold
         return index
 
 class BoundaryFaceMassIntegrator(_FaceMassIntegrator):
-    @enable_cache
     def make_index(self, space: _FS):
         threshold = self.threshold
 

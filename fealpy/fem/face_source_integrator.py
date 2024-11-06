@@ -5,10 +5,11 @@ from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..functional import linear_integral
 from .integrator import LinearInt, SrcInt, FaceInt, enable_cache, assemblymethod
+from ..utils import process_coef_func
 
 
 class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
-    def __init__(self, source: SourceLike, q:Optional[int]=None, *,
+    def __init__(self, source: Optional[SourceLike]=None, q:Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
         super().__init__()
@@ -39,38 +40,23 @@ class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs) # just for simplex mesh, TODO: consider othter type mesh
+        phi = space.face_basis(bcs) # just for simplex mesh, TODO: consider othter type mesh
 
-        return bcs, ws, phi, facemeasure, n
+        return bcs, ws, phi, facemeasure, index, n
 
     def assembly(self, space):
         source = self.source
-        index = self.make_index(space)
-        bcs, ws, phi, fm, n = self.fetch(space)
-
-        if callable(source):
-            if (not hasattr(source, 'coordtype')) or (source.coordtype == 'cartesian'):
-                mesh = space.mesh
-                ps = mesh.bc_to_point(bcs, index=index)
-                # 在实际问题当中，法向 n  这个参数一般不需要
-                # 传入 n， 用户可根据需要来计算 Neumann 边界的法向梯度
-                val = source(ps, n)
-            elif gN.coordtype == 'barycentric':
-                # 这个时候 gN 是一个有限元函数，一定不需要算面法向
-                val = source(bcs, index=index)
-        else:
-            val = source 
-
+        bcs, ws, phi, fm, index, n = self.fetch(space) 
+        mesh = getattr(space, 'mesh', None)
+        val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='cell', index=index, n=n)
         return linear_integral(phi, ws, fm, val, self.batched)
 
 class InterFaceSourceIntegrator(_FaceSourceIntegrator):
-    @enable_cache
     def make_index(self, space: _FS):
         index = self.threshold
         return index
 
 class BoundaryFaceSourceIntegrator(_FaceSourceIntegrator): 
-    @enable_cache
     def make_index(self, space: _FS):
         threshold = self.threshold
 
