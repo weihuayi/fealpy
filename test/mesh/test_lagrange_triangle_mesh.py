@@ -106,8 +106,7 @@ class TestLagrangeTriangleMeshInterfaces:
         np.testing.assert_allclose(bm.to_numpy(el), data["el"], atol=1e-14)   
 
     @pytest.mark.parametrize("backend", ['numpy'])
-    @pytest.mark.parametrize("data", uI_error_data)
-    def test_error(self, data, backend):
+    def test_error(self, backend):
         bm.set_backend(backend)
 
         x, y, z = sp.symbols('x, y, z', real=True)
@@ -118,15 +117,15 @@ class TestLagrangeTriangleMeshInterfaces:
         surface = SphereSurface() #以原点为球心，1 为半径的球
         mesh = TriangleMesh.from_unit_sphere_surface()
 
-        refine = 4
+        refine = 5
         uI_error = np.zeros(refine, dtype=np.float64)
         uI_error_ratio = np.zeros(refine-1, dtype=np.float64)
 
         for i in range(refine):
-            lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=1, surface=surface)
+            lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=2, surface=surface)
             cm = lmesh.entity_measure(etype='cell')
 
-            space = ParametricLagrangeFESpace(lmesh, p=1)
+            space = ParametricLagrangeFESpace(lmesh, p=2)
 
             uI = space.function()
             uI[:] = space.interpolate(pde.solution)
@@ -134,10 +133,9 @@ class TestLagrangeTriangleMeshInterfaces:
 
             if i < refine-1:
                 mesh.uniform_refine()
-        print('cm', cm)
+
         print("uI error:",uI_error)
-        #print('uI_error_ratio:', uI_error[:-1]/uI_error[1:])
-        #np.testing.assert_allclose(bm.to_numpy(uI_error_ratio), data["uI_error_ratio"], atol=1e-14)   
+        print('uI_error_ratio:', uI_error[:-1]/uI_error[1:])
 
 
 if __name__ == "__main__":
@@ -148,5 +146,5 @@ if __name__ == "__main__":
     #a.test_cell_area(cell_area_data[0], 'numpy')
     #a.test_edge_length(edge_length_data[0], 'numpy')
     #a.test_(cell_[0], 'numpy')
-    a.test_error(uI_error_data[0], 'numpy')
+    a.test_error('numpy')
     #pytest.main(["./test_lagrange_triangle_mesh.py"])
