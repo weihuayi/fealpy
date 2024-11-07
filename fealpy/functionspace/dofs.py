@@ -93,14 +93,20 @@ class LinearMeshDFEDof(Generic[_MT]):
             self.multiIndex = bm.array((TD+1)*(0,), dtype=mesh.itype)
         self.cell2dof = self.cell_to_dof()
 
+    def entity_to_dof(self, etype: int, index: Index=_S):
+        TD = self.mesh.top_dimension()
+        if etype == TD:
+            return self.cell_to_dof(index)
+        else:
+            raise ValueError(f"Unknown entity type: {etype}")
 
-    def cell_to_dof(self):
+    def cell_to_dof(self, index : Index=_S) -> TensorLike:
         mesh = self.mesh
         NC = mesh.number_of_cells()
         ldof = self.number_of_local_dofs()
         cell2dof = bm.arange(NC*ldof).reshape(NC, ldof)
 
-        return cell2dof
+        return cell2dof[index]
 
     def number_of_global_dofs(self):
         NC = self.mesh.number_of_cells()

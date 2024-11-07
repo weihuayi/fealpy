@@ -364,8 +364,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         ps = self.bc_to_point(bcs)
         
         rm = self.reference_cell_measure()
-        G = self.first_fundamental_form(bcs) 
-        d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
+        #G = self.first_fundamental_form(bcs) 
+        #d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
 
         if callable(f):
             if getattr(f, 'coordtype', None) == 'barycentric':
@@ -391,7 +391,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             return e
         else:
             return bm.sum(e)
-
+    
     def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
         """
         @brief Calculate the error between two functions.
@@ -405,7 +405,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         rm = self.reference_cell_measure()
         G = self.first_fundamental_form(bcs) 
         d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
+        print('d:', d)
 
+        J = self.jacobi_matrix(bcs)
+        print('J:', J)
+        
         if callable(u):
             if getattr(u, 'coordtype', None) == 'barycentric':
                 u = u(bcs)
@@ -434,7 +438,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             elif f.shape == (GD, GD):
                 e = cm[:, None, None]*f
             else:
-                e = bm.einsum('q, cq..., cq -> c...', ws*rm, f, d)
+                e = bm.einsum('q, cq..., c, cq -> c...', ws*rm, f, cm, d)
 
         if celltype is False:
             #e = bm.power(bm.sum(e), 1/power)
@@ -442,8 +446,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
-
-
+    
     def vtk_cell_type(self, etype='cell'):
         """
         @berif  返回网格单元对应的 vtk类型。
