@@ -1,15 +1,12 @@
 import argparse
 
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
-
 from fealpy import logger
 logger.setLevel('WARNING')
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import SemilinearForm
-from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator, ScalarDiffusionIntegrator
+from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarDiffusionIntegrator
 from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.pde.semilinear_2d import SemilinearData
@@ -36,17 +33,25 @@ parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
-parser.add_argument('--backend',
-        default='numpy', type=str,
-        help='默认后端为numpy')
-
 parser.add_argument('--meshtype',
         default='tri', type=str,
         help='默认网格为三角形网格')
 
+parser.add_argument('--backend',
+        default='numpy', type=str,
+        help='默认后端为numpy')
+
+parser.add_argument('--device',
+        default='cuda', type=str,
+        help='默认gpu上运行')
+
+
 args = parser.parse_args()
 args.backend = 'pytorch'
 bm.set_backend(args.backend)
+if args.backend =='pytorch':
+    bm.set_default_device(args.device)
+
 p = args.degree
 n = args.n
 meshtype = args.meshtype
@@ -57,11 +62,11 @@ next(tmr)
 
 domain = [0, 1, 0, 2]
 pde = SemilinearData(domain)
-mesh = TriangleMesh.from_box(domain, nx=n, ny=n)
+mesh = TriangleMesh.from_box(domain, nx=n, ny=n, device=args.device)
 
 tol = 1e-14
-NDof = bm.zeros(maxit, dtype=bm.int64)
-errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
+NDof = bm.zeros(maxit, dtype=bm.int64, device=args.device)
+errorMatrix = bm.zeros((2, maxit), dtype=bm.float64, device=args.device)
 tmr.send('网格和pde生成时间')
 
 def diffusion_coef(p, **args):
@@ -70,22 +75,16 @@ def diffusion_coef(p, **args):
 def reaction_coef(p, **args):
     return pde.reaction_coefficient(p)
 
-def kernel_func_diffusion(u):
-    return u
 def kernel_func_reaction(u):
     return u**3
 
-def grad_kernel_func_reaction(u):
-    return 3*u**2
-def grad_kernel_func_diffusion(u):
-    return bm.ones_like(u)
-
 reaction_coef.kernel_func = kernel_func_reaction
-diffusion_coef.kernel_func = kernel_func_diffusion
 
 if bm.backend_name == 'numpy':
+    def grad_kernel_func_reaction(u):
+        return 3*u**2
+
     reaction_coef.grad_kernel_func = grad_kernel_func_reaction
-    diffusion_coef.grad_kernel_func = grad_kernel_func_diffusion
 
 for i in range(maxit):
     #定义函数空间
@@ -107,20 +106,20 @@ for i in range(maxit):
     sform = SemilinearForm(space)
     sform.add_integrator([D, M])
     sform.add_integrator(f)
+    bc = DirichletBC(space, gd=0.0, threshold=isDDof)
 
     while True:
         #矩阵组装、边界条件处理
         A, F = sform.assembly()
         tmr.send(f'第{i}次矩组装时间')
-        A, F = DirichletBC(space, gd=0.0, threshold=isDDof).apply(A, F)
+        A, F = bc.apply(A, F)
 
         #求解增量
         du = cg(A, F)
         u0 += du
         tmr.send(f'第{i}次求解器时间')
 
-        #清除积分子缓存
-        D.clear()
+        #清除半线性积分子缓存
         M.clear()
 
         #计算误差
@@ -141,3 +140,4 @@ for i in range(maxit):
 next(tmr)
 print(errorMatrix)
 print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
+print(NDof)
