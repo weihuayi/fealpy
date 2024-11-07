@@ -98,9 +98,7 @@ def setup_problem(args):
                                         )
 
     # 创建插值模型实例
-    interpolation_model = SIMPInterpolation(
-                                            penalty_factor=3.0
-                                        )
+    interpolation_model = SIMPInterpolation(penalty_factor=3.0)
 
     # 创建材料属性对象
     material_properties = ElasticMaterialProperties(
@@ -114,7 +112,8 @@ def setup_problem(args):
                             tensor_space=tensor_space_C,
                             pde=pde
                         )
-    uh = fem_solver.solve(solver_method=args.solver_method)
+    solver_method = args.solver_method
+    uh = fem_solver.solve(solver_method=solver_method)
     
 
 
