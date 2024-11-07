@@ -58,10 +58,9 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
 
     def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
-        # coef = self.coef
+        coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
-        coef = bm.ones(mesh.number_of_cells(), ws.shape[0], dtype=ws.dtype, device=space.device)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
 
         if self.grad_kernel_func is not None:
