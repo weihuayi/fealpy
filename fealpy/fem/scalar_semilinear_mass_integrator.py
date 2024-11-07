@@ -1,4 +1,3 @@
-
 from typing import Optional
 from functools import partial
 
@@ -56,14 +55,14 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.basis(bcs, index=index)
         return bcs, ws, phi, cm, index
-    
+
     def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
-        coef = self.coef 
+        coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        
+
         if self.grad_kernel_func is not None:
             val_A = self.grad_kernel_func(uh(bcs))
             coef_A = get_semilinear_coef(val_A, coef)
@@ -74,9 +73,8 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
         else:
             uh_ = self.uh[space.cell_to_dof()]
             A, F = self.auto_grad(space, uh_, coef, batched=self.batched)
-
         return A, F
-    
+
     def cell_integral(self, u, cm, coef, phi, ws, batched) -> TensorLike:
         val = self.kernel_func(bm.einsum('i, qi -> q', u, phi[0]))
 
@@ -90,16 +88,6 @@ class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
             coef = fill_axis(coef, 2 if batched else 1)
             return bm.einsum(f'q, qi, q, q -> i', ws, phi[0], val, coef) * cm
 
-    # def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
-    #     _, ws, phi, cm, _ = self.fetch(space)
-    #     fn_A = bm.vmap(bm.jacfwd(                         
-    #         partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
-    #         ))
-    #     fn_F = bm.vmap(
-    #         partial(self.cell_integral, phi=phi, ws=ws, coef=coef, batched=batched)
-    #     )
-    #     return  fn_A(uh_, cm), -fn_F(uh_, cm)
-    
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, phi, cm, _ = self.fetch(space)
         if is_scalar(coef) or coef is None:

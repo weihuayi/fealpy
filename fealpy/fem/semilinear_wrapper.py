@@ -24,14 +24,13 @@ class SemilinearWrapperInt(SemilinearInt):
         mesh = getattr(space, 'mesh', None)
         bcs, ws, gphi, cm, index = self.linear_int.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        if bm.backend_name =='numpy' and self.linear_int.coef.grad_kernel_func is not None:
-            val_F = -uh.grad_value(bcs)                    # [NC, NQ, dof_numel]
+        if bm.backend_name == 'numpy':
+            val_F = -uh.grad_value(bcs)   # [NC, NQ, dof_numel]
             coef_F = get_semilinear_coef(val_F, coef)
             F = linear_integral(gphi, ws, cm, coef_F, batched=self.linear_int.batched)
         else:
             uh_ = uh[space.cell_to_dof()]
             F = self.auto_grad(space, uh_, coef, batched=self.linear_int.batched)
-
         return self.linear_int.assembly(space), F
 
     def cell_integral(self, u, gphi, cm, ws, coef, batched) -> TensorLike:
@@ -45,7 +44,6 @@ class SemilinearWrapperInt(SemilinearInt):
 
         if is_tensor(coef):
             coef = fill_axis(coef, 3 if batched else 2)
-            print(bm.einsum(f'q, qid, qd, ...qd -> ...i', ws, gphi, val, coef) * cm)
             return bm.einsum(f'q, qid, qd, ...qd -> ...i', ws, gphi, val, coef) * cm
 
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
