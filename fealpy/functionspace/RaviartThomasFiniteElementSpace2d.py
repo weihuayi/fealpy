@@ -246,7 +246,7 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
         ephi = self.bspace.basis(bcs) #(NE, NQ, eldof)
         val = ephi[..., None] * en[:, None,None,:]
-        return val
+        return -val
     
     def is_boundary_dof(self, threshold=None, method=None):
         return self.dof.is_boundary_dof()
