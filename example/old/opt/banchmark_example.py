@@ -20,7 +20,7 @@ MaxIters = 1000
 dim = 30
 x0 = lb + bm.random.rand(NP, dim) * (ub - lb)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = QuantumParticleSwarmOptAlg(option)
+optimizer = QuantumParticleSwarmOpt(option)
 
 gbest, gbest_f = optimizer.run()
 print("The final result by QPSO: ", gbest_f)
