@@ -3,7 +3,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 from .optimizer_base import Optimizer
-# from .Levy import levy
+from .opt_function import levy
 from scipy.special import gamma
 
 def levy(n, m, beta):
@@ -15,6 +15,11 @@ def levy(n, m, beta):
     z = u / (bm.abs(v) ** (1 / beta))
     return z
 
+
+"""
+Hippopotamus Optimization Algorithm
+
+"""
 
 class HippopotamusOptAlg(Optimizer):
     def __init__(self, option) -> None:
