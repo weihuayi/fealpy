@@ -95,9 +95,13 @@ def bilinear_integral(basis1: TensorLike, basis2: TensorLike, weights: TensorLik
         return bm.einsum(f'q, c, cqid, cqjd -> cij', weights, measure, basis1, basis2) * coef
 
     elif is_tensor(coef):
-        coef = fill_axis(coef, 4 if batched else 3)
-        return bm.einsum(f'q, c, cqid, cqjd, ...cqd -> ...cij', weights, measure, basis1, basis2, coef)
-
+        ndim = coef.ndim - int(batched)
+        if ndim == 4:
+            return  bm.einsum(f'q, c, cqid, cqjn, ...cqdn -> ...cij', weights, measure, basis1, basis2, coef)
+        else:
+            coef = fill_axis(coef, 4 if batched else 3)
+            return bm.einsum(f'q, c, cqid, cqjd, ...cqd -> ...cij', weights, measure, basis1, basis2, coef)
+        
     else:
         raise TypeError(f"coef should be int, float or TensorLike, but got {type(coef)}.")
 
