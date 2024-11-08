@@ -5,7 +5,10 @@ from .. import logger
 
 from .optimizer_base import Optimizer
 
+"""
+Crested Porcupine Optimization
 
+"""
 class CrestedPorcupineOpt(Optimizer):
     def __init__(self, option) -> None:
         super().__init__(option)
