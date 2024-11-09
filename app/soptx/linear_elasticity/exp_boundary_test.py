@@ -59,7 +59,7 @@ class BoxDomainPolyLoaded3d():
 
 
 bm.set_backend('numpy')
-nx, ny, nz = 3, 3, 2 
+nx, ny, nz = 4, 4, 4
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
 
@@ -72,11 +72,16 @@ q = 2
 qf = mesh.quadrature_formula(q)
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs) # (1, NQ, ldof)
+phi0 = phi[0]
 gphi = space.grad_basis(bc=bcs) # (NC, NQ, ldof, GD)
 
 tensor_space = TensorFunctionSpace(space, shape=(3, -1))
 tgdof = tensor_space.number_of_global_dofs()
 phi_tensor = tensor_space.basis(bcs) # (1, NQ, tldof, GD)
+phi_tensor00 = phi_tensor[0, 0]
+phi_tensor01 = phi_tensor[0, 1]
+phi_tensor02 = phi_tensor[0, 2]
+phi_tensor03 = phi_tensor[0, 3]
 cell2tdof = tensor_space.cell_to_dof() # (NC, tldof)
 
 linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
@@ -101,6 +106,7 @@ K = K.add(COOTensor(indices, KE.reshape(-1), (tgdof, tgdof)))
 pde = BoxDomainPolyLoaded3d()
 ps = mesh.bc_to_point(bc=bcs)
 f = pde.source(ps) # (NC, NQ, GD)
+f0 = f[0]
 FE = bm.einsum('q, c, cqid, cqd -> ci', ws, cm, phi_tensor, f) # (NC, tldof)
 
 F = COOTensor(
@@ -109,6 +115,13 @@ F = COOTensor(
             spshape = (tgdof, ))
 indices = cell2tdof.reshape(1, -1)
 F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense()
+
+values = K.values()
+# K_norm = bm.sqrt(bm.sum(values * values))
+K_norm = bm.sqrt(bm.sum(K.to_dense()*K.to_dense()))
+F_norm = bm.sqrt(bm.sum(F * F))   
+print(f"Matrix norm: {K_norm:.6f}")
+print(f"Load vector norm: {F_norm:.6f}")
 
 isDDof = tensor_space.is_boundary_dof(threshold=None, method='interp')
 kwargs = K.values_context()
@@ -137,8 +150,23 @@ uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, uh=uh_bd,
 F = F - K.matmul(uh_bd)
 F = bm.set_at(F, isDDof, uh_bd[isDDof])
 
+# 矩阵和载荷向量的范数
+values = K.values()
+# K_norm = bm.sqrt(bm.sum(values * values))
+K_norm = bm.sqrt(bm.sum(K.to_dense()*K.to_dense()))
+F_norm = bm.sqrt(bm.sum(F * F))   
+print(f"Matrix norm_after: {K_norm:.6f}")
+print(f"Load vector norm_after: {F_norm:.6f}")
+
+# 载荷向量的范围
+F_min = bm.min(F)
+F_max = bm.max(F)
+print(f"F min: {F_min:.6f}")
+print(f"F max: {F_max:.6f}")
+
 uh = tensor_space.function()
 uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
 u_exact = tensor_space.interpolate(pde.solution)
+error_max = bm.max(uh - u_exact)
 error = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
 print("----------------------")

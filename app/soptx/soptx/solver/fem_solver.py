@@ -23,6 +23,22 @@ class FEMSolver:
         self.tensor_space = tensor_space
         self.pde = pde
 
+
+    def compute_base_stiffness_matrix(self) -> TensorLike:
+        """
+        计算 E=1 时的单元刚度矩阵，用于柔度计算
+        
+        Returns:
+            TensorLike: 基础单元刚度矩阵(E=1)
+        """
+        base_material = self.material_properties.base_elastic_material
+        integrator = LinearElasticIntegrator(
+                                            material=base_material, 
+                                            q=self.tensor_space.p + 3
+                                        )
+        ke0 = integrator.assembly(space=self.tensor_space)
+        return ke0
+
     def assemble_stiffness_matrix(self) -> CSRTensor:
         """Assemble the global stiffness matrix using the material properties and integrator."""
         integrator = LinearElasticIntegrator(material=self.material_properties, 
