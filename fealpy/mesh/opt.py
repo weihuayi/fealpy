@@ -51,6 +51,7 @@ _QT = TypeVar('_QT', bound=MeshCellQuality)
 class SumObjective(Objective, Generic[_QT]):
     def __init__(self, mesh_quality: _QT, /):
         self.mesh_quality = mesh_quality
+        self.__NF: int = 0
 
     def fun(self, x: TensorLike):
         """Objective function.
@@ -61,7 +62,9 @@ class SumObjective(Objective, Generic[_QT]):
         Returns:
             TensorLike: Global cell quality in the shape of (1, ).
         """
-        return bm.sum(self.mesh_quality.fun(x), axis=0)
+        self.__NF +=1
+        NC = self.mesh_quality.mesh.number_of_cells()
+        return bm.sum(self.mesh_quality.fun(x), axis=0)/NC
 
     def jac(self, x: TensorLike):
         """Gradient of the objective function.
@@ -73,10 +76,17 @@ class SumObjective(Objective, Generic[_QT]):
             TensorLike: Gradient of cell quality in the shape of (NN, GD).
         """
         cell = self.mesh_quality.mesh.entity('cell')
-        NN = self.mesh_quality.mesh.number_of_nodes()
         TD = self.mesh_quality.mesh.TD
+        NN = self.mesh_quality.mesh.number_of_nodes()
         grad = self.mesh_quality.jac(x)
         jacobi = bm.zeros((NN,TD))
         for i in range(TD):
             bm.index_add(jacobi[:,i],cell.flatten(),grad[:,:,i].flatten())
-        return jacobi 
+        return jacobi
+
+    @property
+    def NF(self) -> int:
+        """
+        @brief The number of times the function valueand gradient are calculated
+        """
+        return self.__NF
