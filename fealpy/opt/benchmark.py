@@ -1,38 +1,71 @@
 from fealpy.backend import backend_manager as bm
 
 def F1(x):
+    """
+    Step
+    """
     return bm.sum((x + 0.5) ** 2, axis=-1)
 
 def F2(x):
+    """
+    Sphere
+    """
     return bm.sum(x ** 2, axis=-1)
 
 def F3(x):
+    """
+    Sum Quares
+    """
     dim = x.shape[-1]
     return bm.sum(bm.arange(1, dim + 1) * (x ** 2), axis=-1)
 
 def F4(x):
+    """
+    Bent Cigar
+    """
     return x[:,0] ** 2 + bm.sum(1e6 * x[:,1:] ** 2, axis=-1)
 
 def F5(x):
+    """
+    Beale
+    """
     return (1.5 - x[:,0] + x[:,0] * x[:,1]) ** 2 + (2.25 - x[:,0] + x[:,0] * x[:,1] ** 2) ** 2 + (2.625 - x[:,0] + x[:,0] * x[:,1] ** 3) ** 2
 
 def F6(x):
+    """
+    Eason
+    """
     return -bm.cos(x[:,0]) * bm.cos(x[:,1]) * bm.exp(-((x[:,0] - bm.pi) ** 2 + (x[:,1] - bm.pi) ** 2))
 
 def F7(x):
+    """
+    Matyas
+    """
     return 0.26 * (x[:,0] ** 2 + x[:,1] ** 2) - 0.48 * x[:,0] * x[:,1]
 
 def F8(x):
+    """
+    Colville
+    """
     return 100 * (x[:,0] ** 2 - x[:,1]) ** 2 + (x[:,0] - 1) ** 2 + (x[:,2] - 1) ** 2 + 90 * (x[:,2] ** 2 - x[:,3]) ** 2 + 10.1 * ((x[:,1] - 1) ** 2 + (x[:,3] - 1) ** 2) + 19.8 * (x[:,1] - 1) * (x[:,3] - 1)
 
 def F9(x):
+    """
+    Zakharov
+    """
     dim = x.shape[-1]
     return bm.sum(x ** 2, axis= -1) + (bm.sum(0.5 * bm.arange(1, dim + 1) * x, axis= -1)) ** 2 + (bm.sum(0.5 * bm.arange(1, dim + 1) * x, axis=-1)) ** 4
 
 def F10(x):
+    """
+    Schwefel 2.22
+    """
     return bm.sum(bm.abs(x), axis= -1) + bm.prod(bm.abs(x), axis= -1)
 
 def F11(x):
+    """
+    Schwefel 1.2
+    """
     dim = x.shape[-1]
     o = 0
     for j in range(1, dim + 1):
@@ -43,6 +76,9 @@ def F11(x):
     return o
 
 def F12(x):
+    """
+    Dixon-Price
+    """
     dim = x.shape[-1]
     o = (x[:,0] - 1) ** 2
     for j in range(2, dim + 1):
@@ -50,24 +86,42 @@ def F12(x):
     return o
 
 def F13(x):
+    """
+    Bohachevsky1
+    """
     return x[:,0] ** 2 + 2 * x[:,1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[:,0]) - 0.4 * bm.cos(4 * bm.pi * x[:,1]) + 0.7
 
 def F14(x):
+    """
+    Booth
+    """
     return (x[:,0] + 2 * x[:,1]) ** 2 + (2 * x[:,0] + x[:,1] - 5) ** 2
 
 def F15(x):
+    """
+    Michalewicz2
+    """
     dim = x.shape[-1]
     return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis= -1)  
 
 def F16(x):
+    """
+    Michalewicz5
+    """
     dim = x.shape[-1]
     return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis=-1)
 
 def F17(x):
+    """
+    Michalewicz10
+    """
     dim = x.shape[-1]
     return -bm.sum(bm.sin(x) * (bm.sin(bm.arange(1, dim + 1) * (x ** 2) / bm.pi) ** 20), axis=-1)
 
 def F18(x):
+    """
+    Rastrigin
+    """
     n = x.shape[-1]
     o = 0
     for i in range(n):
@@ -75,19 +129,34 @@ def F18(x):
     return o
 
 def F19(x):
+    """
+    Schaffer
+    """
     return 0.5 + ((bm.sin(bm.linalg.norm(x, axis= -1))) ** 2 - 0.5) / ((1 + 0.001 * (bm.linalg.norm(x,axis=-1) ** 2)) ** 2)
 
 
 def F20(x):
+    """
+    Six Hump Camel Back
+    """
     return 4 * x[:,0] ** 2 - 2.1 * x[:,0] ** 4 + (1 / 3) * x[:,0] ** 6 + x[:,0] * x[:,1] - 4 * x[:,1] ** 2 + 4 * x[:,1] ** 4
 
 def F21(x):
+    """
+    Boachevsky2
+    """
     return x[:,0] ** 2 + 2 * x[:,1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[:,0]) * bm.cos(4 * bm.pi * x[:,1]) + 0.3
 
 def F22(x):
+    """
+    Boachevsky3
+    """
     return x[:,0] ** 2 + 2 * x[:,1] ** 2 - 0.3 * bm.cos(3 * bm.pi * x[:,0]) * bm.cos(4 * bm.pi * x[:,1]) + 0.3
 
 def F23(x):
+    """
+    Shubert
+    """
     x1 = x[:,0]
     x2 = x[:,1]
     sum1 = 0
@@ -98,6 +167,9 @@ def F23(x):
     return sum1 * sum2
 
 def F24(x):
+    """
+    Rosenbrock
+    """
     o = 0
     n = x.shape[-1]
     for i in range(n - 1):
@@ -105,6 +177,9 @@ def F24(x):
     return o
 
 def F25(x):
+    """
+    Griewank
+    """
     n = x.shape[-1]
     y1 = bm.sum(x ** 2, axis =-1) / 4000
     y2 = 1
@@ -113,13 +188,16 @@ def F25(x):
     return 1 + y1 - y2
 
 def F26(x):
+    """
+    Ackley
+    """
     y1 = bm.sum(x ** 2, axis= -1)
     y2 = bm.sum(bm.cos(2 * bm.pi * x), axis=-1 )
     n = len(x)
     return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(bm.array(1))
 
 iopt_benchmark_data = [
-    {
+    {   
         "objective": F1, #Step
         "ndim": 30,
         "domain": (-5.12, 5.12), # (lower bound, higher bound)
