@@ -52,7 +52,7 @@ class NearFieldDataFEMGenerator2d:
                 self.mesh = UniformMesh2d((0, EXTC_1, 0, EXTC_2), (HC_1, HC_2), origin=(self.domain[0], self.domain[2]))
                 self.meshtype = 'UniformMesh'
 
-        self.mesh.ftype = bm.complex128
+        # self.mesh.ftype = bm.complex128
         self.d = d 
         self.k = k
         self.reciever_points = reciever_points
@@ -158,7 +158,6 @@ class NearFieldDataFEMGenerator2d:
     def visualization_of_nearfield_data(self, k:float, d:Sequence[float]):
 
         uh = self.get_nearfield_data(k=k, d=d)
-        # fig = plt.figure()
         value = uh(self.bc)
         if self.meshtype == 'UniformMesh':
             self.mesh.ftype = bm.float64
@@ -166,6 +165,7 @@ class NearFieldDataFEMGenerator2d:
         self.mesh.add_plot(plt, cellcolor=value[..., 0].imag, linewidths=0)
         
         #TODO
+        # fig = plt.figure()
         # axes = fig.add_subplot(1, 3, 1)
         # self.mesh.add_plot(axes)
         # if self.meshtype == 'UniformMesh':
