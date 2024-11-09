@@ -18,7 +18,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.015
+        l0 = 0.02
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):
@@ -28,8 +28,8 @@ class square_with_circular_notch():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
-            6.1e-3, 1101)[1:]))
+        return bm.concatenate((bm.linspace(0, 5e-3, 501, dtype=bm.float64), bm.linspace(5e-3,
+            6.1e-3, 1101, dtype=bm.float64)[1:]))
     
     def is_x_force(self):
         """
@@ -146,12 +146,12 @@ else:
 
 mesh.uniform_refine(n=n)
 
-
+''''
 isMarkedCell = model.adaptive_mesh(mesh)
 while isMarkedCell.any():
     mesh.bisect(isMarkedCell)
     isMarkedCell = model.adaptive_mesh(mesh)
-
+'''
 
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)

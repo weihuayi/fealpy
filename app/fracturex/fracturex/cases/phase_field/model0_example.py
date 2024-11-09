@@ -32,8 +32,8 @@ class square_with_circular_notch():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return bm.concatenate((bm.linspace(0, 70e-3, 6), bm.linspace(70e-3,
-            125e-3, 26)[1:]))
+        return bm.concatenate((bm.linspace(0, 70e-3, 6, dtype=bm.float64), bm.linspace(70e-3,
+            125e-3, 26, dtype=bm.float64)[1:]))
 
     def is_force_boundary(self, p):
         """

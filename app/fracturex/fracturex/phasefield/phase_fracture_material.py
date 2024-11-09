@@ -64,7 +64,7 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
 
         lam = self.lam
         mu = self.mu
-        trace_e = np.trace(strain, axis1=-2, axis2=-1)
+        trace_e = bm.einsum('...ii', strain)
         I = bm.eye(strain.shape[-1])
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
         
@@ -156,7 +156,7 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         mu = self.mu
         strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
         
-        trace_e = bm.vmap(bm.trace)(strain)
+        trace_e = bm.einsum('...ii', strain)
         
         I = bm.eye(GD)
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
@@ -305,12 +305,20 @@ class SpectralModel(BasedPhaseFractureMaterial):
         # 应变正负分解
         sp, sm = self.strain_pm_eig_decomposition(s)
 
-        _ts = np.trace(s, axis1=-2, axis2=-1)
-        ts = bm.array(_ts, dtype=bm.float64)
+        ts = bm.einsum('...ii', s)
+        #ts = bm.diadonal(s, axis1=-2, axis2=-1).sum(axis=-1)
+        #_ts = np.trace(s, axis1=-2, axis2=-1)
+        #ts = bm.array(_ts, dtype=bm.float64)
 
         tp, tm = self.macaulay_operation(ts)
-        tsp = np.trace(sp**2, axis1=-2, axis2=-1)
-        tsm = np.trace(sm**2, axis1=-2, axis2=-1)
+
+        tsp = bm.einsum('...ii', sp)
+        tsm = bm.einsum('...ii', sm)
+        #tsp = bm.diadonal(sp**2, axis1=-2, axis2=-1).sum(axis=-1)
+        #tsm = bm.diadonal(sm**2, axis1=-2, axis2=-1).sum(axis=-1)
+
+        #tsp = np.trace(sp**2, axis1=-2, axis2=-1)
+        #tsm = np.trace(sm**2, axis1=-2, axis2=-1)
 
         phi_p = lam * tp ** 2 / 2.0 + mu * tsp
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm
