@@ -262,14 +262,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         c2dof[:, ldof-cidof:] = c2id
         return c2dof
 
-    def boundary_interpolate(self, gd, uh, threshold=None, method="interp"):
+    def boundary_interpolate(self, gD, uh, threshold=None, method="interp"):
         isDDof = self.is_boundary_dof(threshold=threshold)
-        uI = self.interpolation(gd)
+        uI = self.interpolation(gD)
         uh[isDDof] = uI[isDDof]
         return uh, isDDof
 
 
-    def is_boundary_dof(self, threshold=None, method='interp'): #TODO:threshold 未实现
+    def is_boundary_dof(self, threshold=None): #TODO:threshold 未实现
         mesh = self.mesh
         m = self.m
         p = self.p
@@ -385,7 +385,6 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         @brief 获取角点, 角边, 不太对啊
         """
         mesh = self.mesh
-        box = mesh.box
         node = mesh.entity('node')
         edge = mesh.entity('edge')
 
@@ -395,7 +394,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         NN = mesh.number_of_nodes()
 
         # 角点
-        isCornerNode = ((bm.abs(node[:, 0]-box[0])<1e-14) | (bm.abs(node[:, 0]-box[1])<1e-14)) & ((bm.abs(node[:, 1]-box[2])<1e-14) | (bm.abs(node[:, 1]-box[3])<1e-14)) & ((bm.abs(node[:, 2]-box[4])<1e-14)| (bm.abs(node[:, 2]-box[5])<1e-14)) 
+        #isCornerNode = ((bm.abs(node[:, 0]-box[0])<1e-14) | (bm.abs(node[:, 0]-box[1])<1e-14)) & ((bm.abs(node[:, 1]-box[2])<1e-14) | (bm.abs(node[:, 1]-box[3])<1e-14)) & ((bm.abs(node[:, 2]-box[4])<1e-14)| (bm.abs(node[:, 2]-box[5])<1e-14)) 
 
         # 棱边
         isCornerEdge = bm.zeros(NE, dtype=bm.bool)
@@ -407,9 +406,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         isCornerEdge[f2e[isBdFace][flag]] = True
 
         # 棱点
+        cornernode, num = bm.unique(edge[isCornerEdge].flatten(), return_counts=True)
         isBdEdgeNode = bm.zeros(NN, dtype=bm.bool)
-        isBdEdgeNode[edge[isCornerEdge]] = True
-        isBdEdgeNode[isCornerNode] = False
+        isBdEdgeNode[cornernode[num==2]] = True
+
+        isCornerNode = bm.zeros(NN, dtype=bm.bool)
+        isCornerNode[cornernode[num>2]] = True
+        #isBdEdgeNode[edge[isCornerEdge]] = True
+        #isBdEdgeNode[isCornerNode] = False
 
         # 边界面上点
         isBdNode = mesh.boundary_node_flag()
@@ -441,6 +445,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         fn = mesh.face_unit_normal()
         et = mesh.edge_tangent(unit=True)
         isBdNode = mesh.boundary_node_flag()
+        isBdEdge = mesh.boundary_edge_flag()
         isBdFace = mesh.boundary_face_flag()
 
 
@@ -768,17 +773,41 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
 
         # node  
+        __import__('ipdb').set_trace()
         fI[n2id[:, 0]] = flist[0](node)
         k = 1
         for r in range(1, 4*m+1):
             symidx, num = symmetry_index(3, r)
             val = flist[r](node)
             midx = mesh.multi_index_matrix(r, 2)
-            num = num**2 # 这里为什么要平方
-            for idx in midx:
+            mul = bm.repeat(midx, num.astype(int), axis=0)
+            #num = num**2 # 这里为什么要平方
+            kkk = bm.repeat(bm.arange(num.shape[0]), num.astype(int), axis=0)
+            #print(kkk)
+            kk = 0 
+            for idx in mul:
                 nnn = symmetry_span_array(nframe, idx).reshape(-1, 3**r)[:, symidx]
-                fI[n2id[:, k]] = bm.sum(nnn*val*num, axis=1)
-                k += 1
+                #nnn = symmetry_span_array(bm.tile(bm.eye(3),(27,1,1)), idx).reshape(-1, 3**r)[:, symidx]
+                fI[n2id[:, kkk[kk]+k]] += bm.sum(nnn*val*num, axis=1)
+                #fI[n2id[:, kkk[kk]+k]] = bm.einsum('ni,ni,i->n', nnn, val, num)
+                #print(kkk[kk]+k)
+                #fI[n2id[:, k]] = bm.einsum('ni,ni,i->n', nnn, val, num)
+                kk = kk+1
+            k = k + num.shape[0]
+
+        #fI[n2id[:, 0]] = flist[0](node)
+        #k = 1
+        #for r in range(1, 4*m+1):
+        #    symidx, num = symmetry_index(3, r)
+        #    val = flist[r](node)
+        #    midx = mesh.multi_index_matrix(r, 2)
+        #    num = num**2 # 这里为什么要平方
+        #    for idx in midx:
+        #        nnn = symmetry_span_array(nframe, idx).reshape(-1, 3**r)[:, symidx]
+        #        #nnn = symmetry_span_array(bm.tile(bm.eye(3),(27,1,1)), idx).reshape(-1, 3**r)[:, symidx]
+        #        fI[n2id[:, k]] = bm.sum(nnn*val*num, axis=1)
+        #        #fI[n2id[:, k]] = bm.einsum('ni,ni,i->n', nnn, val, num)
+        #        k += 1
         # edge
         locEdge = bm.array([[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]],
                            dtype=self.itype)
