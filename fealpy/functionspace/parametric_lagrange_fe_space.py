@@ -46,7 +46,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.dof.number_of_global_dofs()
 
     def interpolation_points(self) -> TensorLike:
-        return self.dof.interpolation_points()
+        return self.mesh.interpolation_points(self.p)
 
     def cell_to_dof(self, index: Index=_S) -> TensorLike:
         return self.dof.cell_to_dof()[index]

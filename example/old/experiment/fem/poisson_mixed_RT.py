@@ -77,7 +77,7 @@ for j, p in enumerate(ps):
         print("The {}-th computation:".format(i))
 
         mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2**i, ny=2**i)
-        space1 = LagrangeFESpace(mesh,p=p-1)
+        space1 = LagrangeFESpace(mesh,p=p,ctype="D")
         space2 = RTFiniteElementSpace2d(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
@@ -119,6 +119,6 @@ for j, p in enumerate(ps):
         print("error = ", errorMatrix)
 
 next(tmr)
-showmultirate(plt, 3, NDof, errorMatrix,  errorType, propsize=20)
+showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
 plt.show()
