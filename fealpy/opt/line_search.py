@@ -1,10 +1,15 @@
-from typing import Tuple, Optional, Callable, Dict
+from typing import Tuple, Optional, Callable, Union,Dict
 
 import numpy as np
 from numpy.typing import NDArray
 
-from .optimizer_base import ObjFunc, Float
 
+ObjFunc = Callable[
+    [NDArray],
+    Tuple[np.floating, NDArray[np.floating]]
+]
+
+Float = Union[float, np.floating]
 
 def show_line_fun(axes, fun, a, b, n=100):
     """
@@ -22,7 +27,7 @@ def show_line_fun(axes, fun, a, b, n=100):
         F[i] = f
     axes.plot(t, F)
 
-def quadratic_search(x0: NDArray, f: np.float_, d: NDArray, fun: ObjFunc,
+def quadratic_search(x0: NDArray, f: np.float64, d: NDArray, fun: ObjFunc,
                 alpha: Optional[float]=None,**kwargs) -> Tuple[Optional[float], NDArray, np.floating, NDArray]:
     """
     @brief 二次搜索算法
@@ -141,6 +146,7 @@ def zoom(x: NDArray, s: Float, d: NDArray,
 
             if sc*(alpha_1 - alpha_0) >= 0:
                 alpha_1 = alpha_0
+                fl = fc
             alpha_0 = alpha
 
         iter_ += 1
