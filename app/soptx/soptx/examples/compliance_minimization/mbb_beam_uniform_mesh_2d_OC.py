@@ -15,6 +15,7 @@ from soptx.material import (
     SIMPInterpolation
 )
 from soptx.solver import FEMSolver
+from soptx.filter import create_filter_properties, TopologyFilter
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective

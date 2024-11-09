@@ -46,6 +46,19 @@ class ElasticMaterialProperties(LinearElasticMaterial):
         self.rho = rho
         self.interpolation_model = interpolation_model
 
+        # 创建E=1时的基础材料属性
+        self.base_material = LinearElasticMaterial(
+                                                    name="BaseMaterial",
+                                                    elastic_modulus=1.0,  # E0 = 1
+                                                    poisson_ratio=config.poisson_ratio,
+                                                    hypo=config.plane_assumption
+                                                )
+        
+    @property
+    def base_elastic_material(self) -> LinearElasticMaterial:
+        """获取 E=1 时的基础材料属性"""
+        return self.base_material
+
     def material_model(self) -> TensorLike:
         """Calculate interpolated Young's modulus."""
         E = self.interpolation_model.calculate_property(
@@ -82,4 +95,5 @@ class ElasticMaterialProperties(LinearElasticMaterial):
         E = self.material_model()
         base_D = super().elastic_matrix()
         D = E[:, None, None, None] * base_D
+
         return D
