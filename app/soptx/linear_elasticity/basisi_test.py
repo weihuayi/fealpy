@@ -55,9 +55,12 @@ w = bm.clip(w, 0, 1)
 
 bcs_gearxs = [
     (
-        bm.tensor([[1 - u, u]]),
-        bm.tensor([[1 - v, v]]),
-        bm.tensor([[1 - w, w]])
+        # bm.tensor([[1 - u, u]]),
+        # bm.tensor([[1 - v, v]]),
+        # bm.tensor([[1 - w, w]])
+        bm.tensor([[u, 1 - u]]),
+        bm.tensor([[v, 1 - v]]),
+        bm.tensor([[w, 1 - w]])
     )
     for u, v, w in zip(u, v, w)
 ]
@@ -65,7 +68,7 @@ for idx, (u_tensor, v_tensor, w_tensor) in enumerate(bcs_gearxs):
     u_values = u_tensor.flatten()
     v_values = v_tensor.flatten()
     w_values = w_tensor.flatten()
-    print(f"载荷点 {idx + 1} 的重心坐标:\n 1-u,u = {u_values}, 1-v,v = {v_values}, 1-w,w = {w_values}")
+    print(f"载荷点 {idx + 1} 的重心坐标:\n u,1-u = {u_values}, v,1-v = {v_values}, w,1-w = {w_values}")
 
 
 phi_gearxs = []
