@@ -16,7 +16,7 @@ from app.soptx.soptx.solver.fem_solver import FEMSolver
 
 from app.soptx.soptx.utils.calculate_ke0 import calculate_ke0
 
-from app.soptx.soptx.cases.material_properties import ElasticMaterialProperties
+from app.soptx.soptx.material.material_properties import ElasticMaterialProperties
 
 from app.soptx.soptx.filter.filter_properties import FilterProperties
 

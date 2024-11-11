@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse.linalg import cg
+from scipy.linalg import norm
 import matplotlib.pyplot as plt
 
 from fealpy.backend import backend_manager as bm
@@ -7,6 +8,8 @@ from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
 from fealpy.mesh.mesh_quality import RadiusRatioQuality
 from app.HVSCMesh.radius_ratio_objective import RadiusRatioSumObjective
+from fealpy.opt.line_search import wolfe_line_search
+#from line_search import wolfe_line_search
 
 def show_mesh_quality(q1,ylim=1000):
     fig,axes= plt.subplots()
@@ -113,6 +116,26 @@ def BlockJacobi3d(node,A,B0,B1,B2,isFreeNode):
     node += 0.3*p
     return node
 
+def BlockJacobi3d_wolfe(node,A,B0,B1,B2,isFreeNode):
+    NN = node.shape[0]
+    isBdNode = ~isFreeNode
+    newNode = bm.zeros((NN, 3), dtype=bm.float64)
+    newNode[isBdNode, :] = node[isBdNode, :]
+    b = -B2*node[:, 1] -B1*node[:, 2] - A*newNode[:, 0]
+    newNode[isFreeNode, 0], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
+            b[isFreeNode], x0=node[isFreeNode, 0], tol=1e-6)
+    b = B2*node[:, 0] - A*newNode[:, 1] - B0*node[:, 2]
+    newNode[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
+            b[isFreeNode], x0=node[isFreeNode, 1], rtol=1e-6)
+    b = B1*node[:,0]+B0*node[:,1]-A*newNode[:,2]
+
+    newNode[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
+            b[isFreeNode], x0=node[isFreeNode, 2], rtol=1e-6)
+    p = bm.zeros((NN,3),dtype=bm.float64)
+    p[isFreeNode,:] = newNode[isFreeNode,:] - node[isFreeNode,:]
+    p = p.T.flatten()
+    return p
+
 def iterate_solver(mesh):
     NC = mesh.number_of_cells()
     node = mesh.entity('node')
@@ -125,7 +148,7 @@ def iterate_solver(mesh):
     minq = bm.min(q[0])
     avgq = bm.mean(q[0])
     maxq = bm.max(q[0])
-    print('iter=',0,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
+    print('Init_quality=',0,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
     if mesh.TD == 2:
         for i in range(0,30):
             A,B = mesh_objective.hess(node)
@@ -137,7 +160,7 @@ def iterate_solver(mesh):
             maxq = bm.max(q[1])
             print('iter=',i+1,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
             
-            if bm.max(np.abs(q[1]-q[0]))<1e-8:
+            if bm.max(np.abs(q[1]-q[0]))<1e-6:
                 print("Bjacobi迭代次数为%d次"%(i+1))
                 break
             q[0] = q[1]
@@ -154,10 +177,59 @@ def iterate_solver(mesh):
             maxq = bm.max(q)
             print('minq=',minq,'avgq=',avgq, 'maxq=',maxq)
 
-            if bm.max(np.abs(q[1]-q[0]))<1e-8:
+            if bm.max(np.abs(q[1]-q[0]))<1e-6:
                 print("Bjacobi迭代次数为%d次"%(i+1))
                 break
             q[0] = q[1]
 
         mesh = TetrahedronMesh(node,cell)
     return mesh
+
+def iterate_solver_wolfe(mesh,alpha=1.0,ite:int=100):
+    NC = mesh.number_of_cells()
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    isFreeNode = ~mesh.boundary_node_flag()
+    isFreeNode3 = np.concatenate([isFreeNode,isFreeNode,isFreeNode])
+    q = bm.zeros((2, NC),dtype=bm.float64)
+    mesh_quality = RadiusRatioQuality(mesh)
+    mesh_objective = RadiusRatioSumObjective(mesh_quality)
+    q[0] = mesh_quality(node)
+    minq = bm.min(q[0])
+    avgq = bm.mean(q[0])
+    maxq = bm.max(q[0])
+    print('Init_quality=',0,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
+    f0,g0 = mesh_objective.fun_with_grad(node)
+    x0 = node.T.flatten()
+    x0 = x0[isFreeNode3]
+    g0 = g0[isFreeNode3]
+    for i in range(1,ite):
+        A,B0,B1,B2 = mesh_objective.hess(node)
+        d = BlockJacobi3d_wolfe(node, A, B0, B1, B2, isFreeNode)
+        d = d[isFreeNode3]
+        s = np.dot(g0,d)
+        alpha,x0,f1,g0 = wolfe_line_search(x0,f0,s,d,mesh_objective.fun_with_grad,alpha0=alpha)
+        gnorm = norm(g0)
+        node[isFreeNode,:] = x0.reshape(3,-1).T 
+                    ## count quality
+        q[1] = mesh_quality(node)
+        minq = bm.min(q)
+        avgq = bm.mean(q)
+        maxq = bm.max(q)
+        #print('ite:',i,'minq=',minq,'avgq=',avgq, 'maxq=',maxq)
+        print(f'current step {i}, StepLength = {alpha}, ', end='') 
+        print(f'nfval = {mesh_objective.NF}, f = {f0}, gnorm = {gnorm}')
+        if bm.max(bm.abs(q[1]-q[0]))<1e-8:
+            print("Bjacobi迭代次数为%d次"%(i))
+            break
+        elif bm.abs(f1-f0)<1e-8: 
+            print("Bjacobi迭代次数为%d次"%(i))
+            break
+        q[0] = q[1]
+        f0 = f1
+
+    mesh = TetrahedronMesh(node,cell)
+    return mesh
+   
+
+

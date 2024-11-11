@@ -1,12 +1,17 @@
 import numpy as np
+import argparse
 
-import pytest
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
-from fealpy.geometry import SquareWithCircleHoleDomain
+from fealpy.old.geometry.domain_2d import SquareWithCircleHoleDomain
 
 from app.fracturex.fracturex.phasefield.main_solver import MainSolver
 
+from fealpy.utils import timer
+
+import time
+import matplotlib.pyplot as plt
+import json
 
 class square_with_circular_notch():
     def __init__(self):
@@ -16,8 +21,8 @@ class square_with_circular_notch():
         E = 200
         nu = 0.2
         Gc = 1.0
-        l0 = 0.1
-        self.params = {'E': E, 'nu': nu, 'Gc': 1.0, 'l0': 0.1}
+        l0 = 0.02
+        self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
 
     def is_force(self):
@@ -46,15 +51,114 @@ class square_with_circular_notch():
         """
         return bm.abs((p[..., 0]-0.5)**2 + bm.abs(p[..., 1]-0.5)**2 - 0.04) < 0.001
 
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        脆性断裂任意次自适应有限元
+        """)
+
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--maxit',
+        default=30, type=int,
+        help='最大迭代次数, 默认为 30 次.')
+
+parser.add_argument('--backend',
+        default='numpy', type=str,
+        help='有限元计算后端, 默认为 numpy.')
+
+parser.add_argument('--model_type',
+        default='HybridModel', type=str,
+        help='有限元方法, 默认为 HybridModel.')
+
+parser.add_argument('--mesh_type',
+        default='tri', type=str,
+        help='网格类型, 默认为 tri.')
+
+parser.add_argument('--enable_adaptive',
+        default=False, type=bool,
+        help='是否启用自适应加密, 默认为 False.')
+
+parser.add_argument('--marking_strategy',
+        default='recovery', type=str,
+        help='标记策略, 默认为重构型后验误差估计.')
+
+parser.add_argument('--refine_method',
+        default='bisect', type=str,
+        help='网格加密方法, 默认为 bisect.')
+
+parser.add_argument('--h',
+        default=0.01, type=float,
+        help='初始网格最小尺寸, 默认为 0.01.')
+
+parser.add_argument('--vtkname',
+        default='test', type=str,
+        help='vtk 文件名, 默认为 test.')
+
+parser.add_argument('--save_vtkfile',
+        default=True, type=bool,
+        help='是否保存 vtk 文件, 默认为 False.')
+
+args = parser.parse_args()
+p= args.degree
+maxit = args.maxit
+backend = args.backend
+model_type = args.model_type
+enable_adaptive = args.enable_adaptive
+marking_strategy = args.marking_strategy
+refine_method = args.refine_method
+h = args.h
+save_vtkfile = args.save_vtkfile
+vtkname = args.vtkname +'_' + args.mesh_type + '_'
+
+
+tmr = timer()
+next(tmr)
+start = time.time()
+bm.set_backend(backend)
 
 model = square_with_circular_notch()
 
-domain = SquareWithCircleHoleDomain(hmin=0.01) 
+domain = SquareWithCircleHoleDomain(hmin=h) 
 mesh = TriangleMesh.from_domain_distmesh(domain, maxit=100)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=1, method='HybridModel')
-        
 
-ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force, 'y')
-ms.add_boundary_condition('both', 'Dirichlet', model.is_dirchlet_boundary, 0)
-ms.solve(vtkname='test')
+ms = MainSolver(mesh=mesh, material_params=model.params, p=p)
+tmr.send('init')
+
+# 拉伸模型边界条件
+ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_force(), 'y')
+
+# 固定位移边界条件
+ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
+ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
+
+if bm.backend_name == 'pytorch':
+    ms.auto_assembly_matrix()
+
+ms.save_vtkfile(fname=vtkname)
+ms.solve(maxit=maxit)
+
+tmr.send('stop')
+end = time.time()
+
+force = ms.get_residual_force()
+disp = model.is_force()
+
+tname = args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.txt'
+np.savetxt(tname, bm.to_numpy(force))
+with open(tname, 'w') as file:
+    file.write(f'time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, hmin:{h},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+fig, axs = plt.subplots()
+plt.plot(disp, force, label='Force')
+plt.xlabel('Displacement Increment')
+plt.ylabel('Residual Force')
+plt.title('Changes in Residual Force')
+plt.grid(True)
+plt.legend()
+pname = args.mesh_type + '_p' + str(p) + '_' + 'model0_force.png'
+plt.savefig(pname, dpi=300)
+
+print(f"Time: {end - start}")
