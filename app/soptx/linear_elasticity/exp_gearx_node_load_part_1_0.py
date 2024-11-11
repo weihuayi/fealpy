@@ -48,9 +48,12 @@ w = bm.clip(w, 0, 1)
 
 bcs_list = [
     (
-        bm.tensor([[1 - u, u]]),
-        bm.tensor([[1 - v, v]]),
-        bm.tensor([[1 - w, w]])
+        # bm.tensor([[1 - u, u]]),
+        # bm.tensor([[1 - v, v]]),
+        # bm.tensor([[1 - w, w]])
+        bm.tensor([[u, 1 - u]]),
+        bm.tensor([[v, 1 - v]]),
+        bm.tensor([[w, 1 - w]])
     )
     for u, v, w in zip(u, v, w)
 ]
@@ -84,6 +87,10 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
                                                 elastic_modulus=206e3, poisson_ratio=0.3, 
                                                 hypo='3D', device=bm.get_device(mesh))
+lam = linear_elastic_material.lam
+mu = linear_elastic_material.mu
+print("lam:", lam)
+print("mu:", mu)
 
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=2)
 
@@ -96,16 +103,18 @@ K = bform.assembly(format='csr')
 values = K.values()
 K_norm = bm.sqrt(bm.sum(values * values))
 F_norm = bm.sqrt(bm.sum(F * F))   
-print(f"Matrix norm: {K_norm:.6f}")
-print(f"Load vector norm: {F_norm:.6f}")
+print(f"Matrix norm before dc: {K_norm:.6f}")
+print(f"Load vector norm before dc: {F_norm:.6f}")
 
 def dirichlet(points: TensorLike) -> TensorLike:
     return bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
 
 scalar_is_bd_dof = is_inner_node
+scalar_num = bm.sum(scalar_is_bd_dof)
 tensor_is_bd_dof = tensor_space.is_boundary_dof(
         threshold=(scalar_is_bd_dof, scalar_is_bd_dof, scalar_is_bd_dof), 
         method='interp')
+tensor_num = bm.sum(tensor_is_bd_dof)
 
 dbc = DirichletBC(space=tensor_space, 
                     gd=dirichlet, 
@@ -113,15 +122,13 @@ dbc = DirichletBC(space=tensor_space,
                     method='interp')
 K, F = dbc.apply(A=K, f=F, check=True)
 
-# 输出诊断信息
-print("\n7. Solving linear system...")
 
 # 矩阵和载荷向量的范数
 values = K.values()
 K_norm = bm.sqrt(bm.sum(values * values))
 F_norm = bm.sqrt(bm.sum(F * F))   
-print(f"Matrix norm_after: {K_norm:.6f}")
-print(f"Load vector norm_after: {F_norm:.6f}")
+print(f"Matrix norm after dc: {K_norm:.6f}")
+print(f"Load vector norm after dc: {F_norm:.6f}")
 
 # 载荷向量的范围
 F_min = bm.min(F)
