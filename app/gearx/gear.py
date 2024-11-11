@@ -248,7 +248,6 @@ class Gear(ABC):
                         r_points = np.sqrt(np.sum(cell_node[0:4, 0:2] ** 2, axis=-1))
                         tooth_helix = (cell_node[4, 2] - cell_node[0, 2]) * tan(self.beta) / self.r
                         start_angle = arctan2(cell_node[0:4, 1], cell_node[0:4, 0])
-                        t_z = (cell_node[4, 2] - cell_node[0, 2]) * t + cell_node[0, 2]
                         # 构建目标节点所在截面四边形
                         t_node = np.zeros((4, 2))
                         t_node[:, 0] = r_points * cos((tooth_helix * t) + start_angle)
@@ -293,7 +292,7 @@ class Gear(ABC):
                         return cell_idx, tetra_face_to_hex_face[j, i], (u, v, w)
         raise ValueError('Target node not found in any cell.')
 
-    def get_profile_node(self, tooth_tag=None):
+    def get_profile_node_index(self, tooth_tag=None):
         """
         寻找目标齿两侧齿廓上的节点索引及坐标
         :param tooth_tag: 目标齿编号，默认为 None，即所有齿
