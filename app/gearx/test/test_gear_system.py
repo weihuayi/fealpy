@@ -137,6 +137,91 @@ class TestGearSystem:
 
         print(-1)
 
+    def test_get_one_tooth(self):
+        with open('../data/external_gear_data.json', 'r') as file:
+            data = json.load(file)
+        m_n = data['mn']  # 法向模数
+        z = data['z']  # 齿数
+        alpha_n = data['alpha_n']  # 法向压力角
+        beta = data['beta']  # 螺旋角
+        x_n = data['xn']  # 法向变位系数
+        hac = data['hac']  # 齿顶高系数
+        cc = data['cc']  # 顶隙系数
+        rcc = data['rcc']  # 刀尖圆弧半径
+        jn = data['jn']  # 法向侧隙
+        n1 = data['n1']  # 渐开线分段数
+        n2 = data['n2']  # 过渡曲线分段数
+        n3 = data['n3']
+        na = data['na']
+        nf = data['nf']
+        nw = data['nw']
+        tooth_width = data['tooth_width']
+        inner_diam = data['inner_diam']  # 轮缘内径
+        chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
+
+        external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
+                                     inner_diam, tooth_width)
+
+        hex_mesh = external_gear.generate_hexahedron_mesh()
+
+        target_hex_mesh = external_gear.set_target_tooth([0, 1, 18])
+        # target_hex_mesh.to_vtk(fname='../data/target_hex_mesh.vtu')
+
+        n = 15
+        helix_d = np.linspace(external_gear.d, external_gear.effective_da, n)
+        helix_width = np.linspace(0, external_gear.tooth_width, n)
+        helix_node = external_gear.cylindrical_to_cartesian(helix_d, helix_width)
+        helix_cell = np.array([[i, i + 1] for i in range(n - 1)])
+        i_mesh = IntervalMesh(helix_node, helix_cell)
+        # i_mesh.to_vtk(fname='../data/target_interval_mesh.vtu')
+
+        target_cell_idx = np.zeros(n, np.int32)
+        local_face_idx = np.zeros(n, np.int32)
+        parameters = np.zeros((n, 3), np.float64)
+        for i, t_node in enumerate(helix_node):
+            target_cell_idx[i], local_face_idx[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
+
+        node = target_hex_mesh.node
+        # 寻找内圈上节点
+        node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+        inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+
+        with open('../data/external_gear_test_data.pkl', 'wb') as f:
+            pickle.dump({'external_gear': external_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
+                         'target_cell_idx': target_cell_idx, 'parameters': parameters,
+                         'is_inner_node': is_inner_node, 'inner_node_idx': inner_node_idx}, f)
+
+    def test_export_to_inp(self):
+        with open('../data/external_gear_test_data.pkl', 'rb') as f:
+            data = pickle.load(f)
+        external_gear = data['external_gear']
+        hex_mesh = data['hex_mesh']
+        helix_node = data['helix_node']
+        target_cell_idx = data['target_cell_idx']
+        parameters = data['parameters']
+        is_inner_node = data['is_inner_node']
+        inner_node_idx = data['inner_node_idx']
+
+        node = hex_mesh.node
+        cell = hex_mesh.cell
+        fixed_nodes = inner_node_idx
+        load_nodes = cell[target_cell_idx[0]]
+        loads = np.array([[-10, -10, 0],
+                          [-10, -10, 0],
+                          [-10, -10, 0],
+                          [-10, -10, 0],
+                          [-10, -10, 0],
+                          [-10, -10, 0],
+                          [-10, -10, 0],
+                          [-10, -10, 0]])
+        young_modulus = 206e9
+        poisson_ratio = 0.3
+        density = 7850
+
+        export_to_inp('../data/external_gear_test.inp', node, cell, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density)
+
+
 
 
 if __name__ == "__main__":

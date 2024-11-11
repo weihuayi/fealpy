@@ -15,7 +15,7 @@ from app.gearx.utils import *
 from fealpy.mesh import HexahedronMesh
 
 
-with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/external_gear_test_data.pkl', 'rb') as f:
+with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/external_gear_data_all.pkl', 'rb') as f:
     data = pickle.load(f)
 
 hex_mesh = data['hex_mesh']
@@ -31,15 +31,12 @@ hex_cell = hex_mesh.cell
 hex_node = hex_mesh.node
 
 mesh = HexahedronMesh(hex_node, hex_cell)
-# nx, ny, nz = 10, 10, 10
-# mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
-#                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
+
 GD = mesh.geo_dimension()   
 NC = mesh.number_of_cells()
 NN = mesh.number_of_nodes()
 node = mesh.entity('node')
 cell = mesh.entity('cell')
-# cell_target = cell[target_cell_idx, :]
 
 load_values = bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 102.0, 109.0, 114.0,
                         119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64)
@@ -49,12 +46,17 @@ v = parameters[..., 1]
 w = parameters[..., 2]
 bcs_list = [
     (
-        bm.tensor([[u, 1 - u]]),
-        bm.tensor([[v, 1 - v]]),
-        bm.tensor([[w, 1 - w]])
+        bm.tensor([[1 - u, u]]),
+        bm.tensor([[1 - v, v]]),
+        bm.tensor([[1 - w, w]])
     )
     for u, v, w in parameters
 ]
+# for idx, (u_tensor, v_tensor, w_tensor) in enumerate(bcs_list):
+#     u_values = u_tensor.flatten()
+#     v_values = v_tensor.flatten()
+#     w_values = w_tensor.flatten()
+#     print(f"载荷点 {idx + 1} 的重心坐标:\n u = {u_values}, v = {v_values}, w = {w_values}")
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 scalar_gdof = space.number_of_global_dofs()
@@ -63,14 +65,24 @@ tgdof = tensor_space.number_of_global_dofs()
 tldof = tensor_space.number_of_local_dofs()
 cell2tdof = tensor_space.cell_to_dof()
 
+# scalar_phi_loads = []
+# for bcs in bcs_list:
+#     scalar_phi = space.basis(bcs)
+#     scalar_phi_loads.append(scalar_phi)
+
+# for idx, scalar_phi in enumerate(scalar_phi_loads):
+#     print(f"载荷点 {idx + 1} 处的基函数值:\n", scalar_phi.flatten())
+
 phi_loads = []
 for bcs in bcs_list:
     phi = tensor_space.basis(bcs)
     phi_loads.append(phi)
 
+
 phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, NP, tldof, GD)
 
 FE_load = bm.einsum('p, cpld -> pl', load_values, phi_loads_array) # (NP, tldof)
+
 FE = bm.zeros((NC, tldof), dtype=bm.float64)
 FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)
 
@@ -83,8 +95,9 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
                                                 lame_lambda=1, shear_modulus=1, 
                                                 hypo='3D', device=bm.get_device(mesh))
-
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=2)
+
+KE = integrator_K.assembly(space=tensor_space)
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
@@ -148,18 +161,18 @@ print(f"Max symmetry error: {max_symmetry_error:.6e}")
 nrow, ncol = K.shape
 print(f"Matrix size: {nrow}x{ncol}")
 
-# 非零元素个数
-nnz = K.nnz
-print(f"Matrix non-zeros: {nnz}")
-sparsity = (nnz / (nrow * ncol)) * 100
-print(f"Matrix sparsity: {sparsity:.2f}%")
+# # 非零元素个数
+# nnz = K.nnz
+# print(f"Matrix non-zeros: {nnz}")
+# sparsity = (nnz / (nrow * ncol)) * 100
+# print(f"Matrix sparsity: {sparsity:.2f}%")
 
 # 矩阵和载荷向量的范数
 values = K.values()
 K_norm = bm.sqrt(bm.sum(values * values))
 F_norm = bm.sqrt(bm.sum(F * F))   
-print(f"Matrix norm: {K_norm:.6f}")
-print(f"Load vector norm: {F_norm:.6f}")
+print(f"Matrix norm_after: {K_norm:.6f}")
+print(f"Load vector norm_after: {F_norm:.6f}")
 
 # 载荷向量的范围
 F_min = bm.min(F)
