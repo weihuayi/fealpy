@@ -18,8 +18,8 @@ from fealpy.fem import ScalarMassIntegrator           # (r*u, v)
 from fealpy.fem import ScalarSourceIntegrator         # (f, v)
 
 #边界积分子
-from fealpy.fem import ScalarRobinSourceIntegrator    # <g_R, v>
-from fealpy.fem import ScalarRobinBoundaryIntegrator  # <kappa*u, v>
+from fealpy.fem import BoundaryFaceSourceIntegrator   # <g_R, v>
+from fealpy.fem import ScalarRobinBCIntegrator  # <kappa*u, v>
 
 #双线性形
 from fealpy.fem import BilinearForm
@@ -72,12 +72,12 @@ errorType = ['$|| u - u_I||_{\Omega,0}$',
 
 errorMatrix = np.zeros((4, maxit), dtype=np.float64)
 
-D = ScalarDiffusionIntegrator(c=1, q=p+2)
-M = ScalarMassIntegrator(c=-k**2, q=p+2)
-R = ScalarRobinBoundaryIntegrator(kappa=kappa, q=p+2)
+D = ScalarDiffusionIntegrator(coef=1, q=p+2)
+M = ScalarMassIntegrator(coef=-k**2, q=p+2)
+R = ScalarRobinBCIntegrator(coef=kappa, q=p+2)
 f = ScalarSourceIntegrator(pde.source, q=p+2)
 
-Vr = ScalarRobinSourceIntegrator(pde.robin, q=p+2)
+Vr = BoundaryFaceSourceIntegrator(pde.robin, q=p+2)
 
 for i in range(maxit):
 
@@ -87,12 +87,12 @@ for i in range(maxit):
     space = LagrangeFESpace(mesh, p=p)
 
     b = BilinearForm(space)
-    b.add_domain_integrator([D, M])
-    b.add_boundary_integrator(R)
+    b.add_integrator([D, M])
+    b.add_integrator(R)
 
     l = LinearForm(space)
-    l.add_domain_integrator(f)
-    l.add_boundary_integrator([Vr])
+    l.add_integrator(f)
+    l.add_integrator([Vr])
 
     A = b.assembly() 
     F = l.assembly()

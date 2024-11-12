@@ -31,6 +31,7 @@ class HelmholtzData2d():
 
     @cartesian
     def gradient(self, p):
+        print(p.shape)
         """
         x*(I*sin(k) + cos(k))*besselj(1, R*k)/(R*(besselj(0, k) + I*besselj(1, k))) - x*sin(R*k)/R
         y*(I*sin(k) + cos(k))*besselj(1, R*k)/(R*(besselj(0, k) + I*besselj(1, k))) - y*sin(R*k)/R
