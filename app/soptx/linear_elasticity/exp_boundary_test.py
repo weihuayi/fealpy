@@ -73,6 +73,7 @@ qf = mesh.quadrature_formula(q)
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs) # (1, NQ, ldof)
 phi0 = phi[0]
+gphi_u = mesh.grad_shape_function(bcs) # (NC, NQ, ldof, GD)
 gphi = space.grad_basis(bc=bcs) # (NC, NQ, ldof, GD)
 
 tensor_space = TensorFunctionSpace(space, shape=(3, -1))
@@ -102,12 +103,14 @@ K = COOTensor(
             spshape = (tgdof, tgdof))
 indices = bm.stack([I.ravel(), J.ravel()], axis=0)
 K = K.add(COOTensor(indices, KE.reshape(-1), (tgdof, tgdof)))
+K_before = K.to_dense()
 
 pde = BoxDomainPolyLoaded3d()
 ps = mesh.bc_to_point(bc=bcs)
 f = pde.source(ps) # (NC, NQ, GD)
 f0 = f[0]
 FE = bm.einsum('q, c, cqid, cqd -> ci', ws, cm, phi_tensor, f) # (NC, tldof)
+FE0 = FE[0]
 
 F = COOTensor(
             indices = bm.empty((1, 0), dtype=bm.int32, device=bm.get_device(mesh)),
@@ -140,6 +143,7 @@ one_values = bm.ones(shape, **kwargs)
 one_indices = bm.stack([index, index], axis=0)
 K1 = COOTensor(one_indices, one_values, K.sparse_shape)
 K = K.add(K1).coalesce()
+K_after = K.to_dense()
 
 # 1. 边界插值
 uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
