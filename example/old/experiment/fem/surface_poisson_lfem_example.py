@@ -2,6 +2,7 @@ import ipdb
 import argparse
 import sympy as sp
 import matplotlib.pyplot as plt
+from scipy.sparse import coo_array, csr_array, bmat
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.utils import timer
@@ -19,12 +20,9 @@ from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.sparse import COOTensor, CSRTensor
 from fealpy.tools.show import showmultirate, show_error_table
 
-from fealpy.functionspace.lagrange_fe_space import LagrangeFESpace
-
 # solver
 from fealpy.solver import cg, spsolve
-from scipy.sparse import coo_array, csr_array, bmat
-#from scipy.sparse.linalg import spsolve
+import ipdb
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -48,20 +46,18 @@ parser.add_argument('--backend',
         default='numpy', type=str,
         help="默认后端为 numpy.")
 
-parser.add_argument('--refine',
-        default=0, type=int,
-        help="默认不加密网格.")
+parser.add_argument('--maxit',
+        default=4, type=int,
+        help="默认网格加密求解次数，默认加密求解4次.")
 
 args = parser.parse_args()
-
 bm.set_backend(args.backend)
+
 sdegree = args.sdegree
 mdegree = args.mdegree
 mtype = args.mtype
-refine = args.refine
+maxit = args.maxit
 
-#tmr = timer()
-#next(tmr)
 x, y, z = sp.symbols('x, y, z', real=True)
 F = x**2 + y**2 + z**2
 u = x * y
@@ -70,34 +66,33 @@ pde = SurfaceLevelSetPDEData(F, u)
 p = mdegree
 surface = SphereSurface()
 tmesh = TriangleMesh.from_unit_sphere_surface()
-tmesh.uniform_refine(n=refine)
-
-mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p, surface=surface)
-#fname = f"sphere_test.vtu"
-#mesh.to_vtk(fname=fname)
-
-space = ParametricLagrangeFESpace(mesh, q=sdegree)
-#tmr.send(f'第{i}次空间时间')
-uI0 = space.function()
-uI0[:] = space.interpolate(pde.solution)
-error = mesh.error(pde.solution, uI0)
-print("uI error:", error)
 
 
+errorType = ['$|| u - u_h||_{\Omega,0}$']
+errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
+NDof = bm.zeros(maxit, dtype=bm.int32)
 
-if 0 :
-    uh = space.function()
+for i in range(maxit):
+    print("The {}-th computation:".format(i))
+    
+    mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p=mdegree, surface=surface)
+    #fname = f"sphere_test.vtu"
+    #mesh.to_vtk(fname=fname)
+    
+    space = ParametricLagrangeFESpace(mesh, p=sdegree)
+    NDof[i] = space.number_of_global_dofs()
 
+    uI = space.interpolate(pde.solution)
+
+    #ipdb.set_trace()
     bfrom = BilinearForm(space)
-    bfrom.add_integrator(ScalarDiffusionIntegrator())
+    bfrom.add_integrator(ScalarDiffusionIntegrator(q=p+3))
     lfrom = LinearForm(space)
-    lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
+    lfrom.add_integrator(ScalarSourceIntegrator(pde.source, q=p+3))
 
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
-    #tmr.send(f'第{i}次矩阵组装时间')
-
-    C = space.integral_basis()
+    C = space.integral_basis(q=p+3)
 
     def coo(A):
         data = A._values
@@ -107,10 +102,22 @@ if 0 :
     A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
 
     F = bm.concatenate((F, bm.array([0])))
-
+    
+    uh = space.function()
     x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-    uh[:] = x[:-1]
-    #uh[:] = spsolve(A, F, 'scipy')[:-1]
+    uh[:] = -x[:-1]
 
-    error = mesh.error(pde.solution, uh)
-    print(error)
+    #uh[:] = -spsolve(A, F)[:-1]
+    
+    #tmr.send(f'第{i}次求解器时间')
+
+    errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
+
+    if i < maxit-1:
+        tmesh.uniform_refine()
+
+print("最终误差:", errorMatrix)
+print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
+show_error_table(NDof, errorType, errorMatrix)
+showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
+plt.show()
