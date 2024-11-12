@@ -2,11 +2,10 @@ from ..backend import backend_manager as bm
 
 from builtins import float, str
 from .material_base import MaterialBase
-from fealpy.fem.utils import shear_strain, normal_strain
 from ..functionspace.utils import flatten_indices
 
 from ..typing import TensorLike
-from typing import Optional
+from typing import Optional, Tuple, List
 
 class ElasticMaterial(MaterialBase):
     def __init__(self, name):
@@ -140,9 +139,17 @@ class LinearElasticMaterial(ElasticMaterial):
 
         return D
     
-    def strain_matrix(self, dof_priority: bool, gphi: TensorLike) -> TensorLike:
+    def strain_matrix(self, dof_priority: bool, 
+                    gphi: TensorLike, 
+                    shear_order: List[str]=['xy', 'zx', 'yz']) -> TensorLike:
         '''
         Constructs the strain-displacement matrix B for the material based on the gradient of the shape functions.
+        B = [∂Ni/∂x   0       0    ]
+            [0        ∂Ni/∂y  0    ]
+            [0        0       ∂Ni/∂z]
+            [∂Ni/∂y   ∂Ni/∂x  0    ]
+            [∂Ni/∂z   0       ∂Ni/∂x]
+            [0        ∂Ni/∂z       ∂Ni/∂y]
 
         Parameters:
             dof_priority (bool): A flag that determines the ordering of DOFs.
@@ -150,6 +157,9 @@ class LinearElasticMaterial(ElasticMaterial):
             gphi (TensorLike): A tensor representing the gradient of the shape functions. Its shape
                             typically includes the number of local degrees of freedom and the geometric 
                             dimension (GD).
+            shear_order (List[str], optional): Specifies the order of shear strain components for GD=3.
+                                           Valid options are permutations of {'xy', 'yz', 'zx'}.
+                                           Defaults to ['xy', 'zx', 'yz']
         
         Returns:
             TensorLike: The strain-displacement matrix `B`, which is a tensor with shape:
@@ -163,12 +173,123 @@ class LinearElasticMaterial(ElasticMaterial):
             indices = flatten_indices((ldof, GD), (1, 0))
         else:
             indices = flatten_indices((ldof, GD), (0, 1))
-        B = bm.concat([normal_strain(gphi, indices),
-                       shear_strain(gphi, indices)], axis=-2)
+        B = bm.concat([self._normal_strain(gphi, indices),
+                    self._shear_strain(gphi, indices, shear_order)], axis=-2)
         return B
+    
+    def _normal_strain(self, gphi: TensorLike, 
+                    indices: TensorLike, *, 
+                    out: Optional[TensorLike]=None) -> TensorLike:
+        """Assembly normal strain tensor.
 
-    def strain_value(self):
-        pass
+        Parameters:
+            gphi (TensorLike): Gradient of the scalar basis functions shaped (..., ldof, GD).\n
+            indices (bool, optional): Indices of DoF components in the flattened DoF, shaped (ldof, GD).\n
+            out (TensorLike | None, optional): Output tensor. Defaults to None.
 
-    def stress_value(self):
-        pass
+        Returns:
+            TensorLike: Normal strain shaped (..., GD, GD*ldof).
+        """
+        kwargs = bm.context(gphi)
+        ldof, GD = gphi.shape[-2:]
+        new_shape = gphi.shape[:-2] + (GD, GD*ldof) # (NC, NQ, GD, GD*ldof)
+
+        if out is None:
+            out = bm.zeros(new_shape, **kwargs)
+        else:
+            if out.shape != new_shape:
+                raise ValueError(f'out.shape={out.shape} != {new_shape}')
+
+        for i in range(GD):
+            out = bm.set_at(out, (..., i, indices[:, i]), gphi[..., :, i])
+
+        return out
+    
+    def _shear_strain(self, gphi: TensorLike, 
+                    indices: TensorLike, 
+                    shear_order: List[str], *,
+                    out: Optional[TensorLike]=None) -> TensorLike:
+        """Assembly shear strain tensor.
+
+        Parameters:
+            gphi (TensorLike): Gradient of the scalar basis functions shaped (..., ldof, GD).\n
+            indices (bool, optional): Indices of DoF components in the flattened DoF, shaped (ldof, GD).\n
+            out (TensorLike | None, optional): Output tensor. Defaults to None.
+
+        Returns:
+            TensorLike: Sheared strain shaped (..., NNZ, GD*ldof) where NNZ = (GD + (GD+1))//2.
+        """
+        kwargs = bm.context(gphi)
+        ldof, GD = gphi.shape[-2:]
+        if GD < 2:
+            raise ValueError(f"The shear strain requires GD >= 2, but GD = {GD}")
+        NNZ = (GD * (GD-1))//2 # 剪切应变分量的数量
+        new_shape = gphi.shape[:-2] + (NNZ, GD*ldof) # (NC, NQ, NNZ, GD*ldof)
+
+        if GD == 2:
+            shear_indices = [(0, 1)]  # Corresponds to 'xy'
+        elif GD == 3:
+            valid_pairs = {'xy', 'zx', 'yz'}
+            if not set(shear_order).issubset(valid_pairs):
+                raise ValueError(f"Invalid shear_order: {shear_order}. Valid options are {valid_pairs}")
+
+            index_map = {
+                'xy': (0, 1),
+                'yz': (1, 2),
+                'zx': (2, 0),
+            }
+            shear_indices = [index_map[pair] for pair in shear_order]
+        else:
+            raise ValueError(f"GD={GD} is not supported")
+
+        if out is None:
+            out = bm.zeros(new_shape, **kwargs)
+        else:
+            if out.shape != new_shape:
+                raise ValueError(f'out.shape={out.shape} != {new_shape}')
+
+        for cursor, (i, j) in enumerate(shear_indices):
+            out = bm.set_at(out, (..., cursor, indices[:, i]), gphi[..., :, j])
+            out = bm.set_at(out, (..., cursor, indices[:, j]), gphi[..., :, i])
+
+        return out
+    
+    # def shear_strain(self, gphi: TensorLike, 
+    #             indices: TensorLike, *, 
+    #             out: Optional[TensorLike]=None) -> TensorLike:
+    #     """Assembly shear strain tensor.
+
+    #     Parameters:
+    #         gphi (TensorLike): Gradient of the scalar basis functions shaped (..., ldof, GD).\n
+    #         indices (bool, optional): Indices of DoF components in the flattened DoF, shaped (ldof, GD).\n
+    #         out (TensorLike | None, optional): Output tensor. Defaults to None.
+
+    #     Returns:
+    #         TensorLike: Sheared strain shaped (..., NNZ, GD*ldof) where NNZ = (GD + (GD+1))//2.
+    #     """
+    #     kwargs = bm.context(gphi)
+    #     ldof, GD = gphi.shape[-2:]
+    #     if GD < 2:
+    #         raise ValueError(f"The shear strain requires GD >= 2, but GD = {GD}")
+    #     NNZ = (GD * (GD-1))//2 # 剪切应变分量的数量
+    #     new_shape = gphi.shape[:-2] + (NNZ, GD*ldof) # (NC, NQ, NNZ, GD*ldof)
+
+    #     if out is None:
+    #         out = bm.zeros(new_shape, **kwargs)
+    #     else:
+    #         if out.shape != new_shape:
+    #             raise ValueError(f'out.shape={out.shape} != {new_shape}')
+
+    #     cursor = 0
+
+    #     for i in range(0, GD-1):
+    #         for j in range(i+1, GD):
+    #             out = bm.set_at(out, (..., cursor, indices[:, i]), gphi[..., :, j])
+    #             out = bm.set_at(out, (..., cursor, indices[:, j]), gphi[..., :, i])
+    #             cursor += 1
+
+    #     return out
+    
+
+    
+

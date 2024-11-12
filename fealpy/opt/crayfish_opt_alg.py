@@ -5,11 +5,14 @@ from .. import logger
 import random
 from .optimizer_base import Optimizer, opt_alg_options
 
+"""
+Crayfish Optimization Algorithm
 
+"""
 
 class CrayfishOptAlg(Optimizer):
 
-    def __init__(self, option, D) -> None:
+    def __init__(self, option) -> None:
         super().__init__(option)
     
     

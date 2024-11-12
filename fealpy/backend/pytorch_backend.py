@@ -16,7 +16,10 @@ except ImportError:
                       'See https://pytorch.org/ for installation.')
 
 from .. import logger
-from .base import Backend, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
+from .base import (
+    BackendProxy, ModuleProxy,
+    ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
+)
 
 Tensor = torch.Tensor
 _device = torch.device
@@ -55,7 +58,7 @@ def _axis_keepdims_dispatch(func, **defaults):
     return wrapper
 
 
-class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
+class PyTorchBackend(BackendProxy, backend_name='pytorch'):
     DATA_CLASS = torch.Tensor
     linalg = torch.linalg
     random = torch.random
@@ -149,6 +152,11 @@ class PyTorchBackend(Backend[Tensor], backend_name='pytorch'):
     @staticmethod
     def dot(x1, x2, /, *, axis=-1):
         return torch.tensordot(x1, x2, dims=[[axis], [axis]])
+
+    @staticmethod
+    def trace(x, /, *, offset: int = 0, axis1=0, axis2=1):
+        data = torch.diagonal(x, offset=offset, dim1=axis1, dim2=axis2)
+        return torch.sum(data, dim=-1)
 
     ### Manipulation Functions ###
     # python array API standard v2023.12
@@ -629,3 +637,31 @@ PyTorchBackend.random.randint_like = torch.randint_like
 PyTorchBackend.random.randn = torch.randn
 PyTorchBackend.random.randn_like = torch.randn_like
 PyTorchBackend.random.randperm = torch.randperm
+
+
+##################################################
+### Random Submodule
+##################################################
+
+class PyTorchRandom(ModuleProxy):
+    def seed(self, seed: int):
+        torch.manual_seed(seed)
+
+    def rand(self, *size, dtype=None, device=None):
+        return torch.rand(*size, dtype=dtype, device=device)
+
+    def randint(self, low, high=None, size=None, dtype=None, device=None):
+        kwargs = {'dtype': dtype, 'device': device}
+        if size is None:
+            size = (1,)
+        elif isinstance(size, int):
+            size = (size,)
+
+        if high is None: return torch.randint(low, size, **kwargs)
+        return torch.randint(low, high, size, **kwargs)
+
+    def randn(self, *size, dtype=None, device=None):
+        return torch.randn(*size, dtype=dtype, device=device)
+
+
+PyTorchRandom.attach_methods({'seed': 'manual_seed'}, torch)

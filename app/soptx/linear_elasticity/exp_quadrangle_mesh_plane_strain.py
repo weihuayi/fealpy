@@ -33,7 +33,7 @@ class BoxDomainPolyData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = 35/13 * y - 35/13 * y**2 + 10/13 * x - 10/13 * x**2
         val[..., 1] = -25/26 * (-1 + 2 * y) * (-1 + 2 * x)
         
@@ -44,7 +44,7 @@ class BoxDomainPolyData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = x * (1 - x) * y * (1 - y)
         val[..., 1] = 0
         
@@ -64,7 +64,7 @@ class BoxDomainTriData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = (22.5 * bm.pi**2) / 13 * bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
         val[..., 1] = - (12.5 * bm.pi**2) / 13 * bm.cos(bm.pi * x) * bm.cos(bm.pi * y)
         
@@ -75,7 +75,7 @@ class BoxDomainTriData2D():
         x = points[..., 0]
         y = points[..., 1]
         
-        val = bm.zeros(points.shape, dtype=points.dtype, device=points.device)
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
         val[..., 0] = bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
         val[..., 1] = 0
         
@@ -89,7 +89,7 @@ class BoxDomainTriData2D():
 parser = argparse.ArgumentParser(description="Solve linear elasticity problems in arbitrary order Lagrange finite element space on QuadrangleMesh.")
 parser.add_argument('--backend',
                     choices=('numpy', 'pytorch'), 
-                    default='numpy', type=str,
+                    default='pytorch', type=str,
                     help='Specify the backend type for computation, default is pytorch.')
 parser.add_argument('--solver',
                     choices=('cg', 'spsolve'),
@@ -99,10 +99,10 @@ parser.add_argument('--degree',
                     default=2, type=int, 
                     help='Degree of the Lagrange finite element space, default is 2.')
 parser.add_argument('--nx', 
-                    default=8, type=int, 
+                    default=16, type=int, 
                     help='Initial number of grid cells in the x direction, default is 4.')
 parser.add_argument('--ny',
-                    default=8, type=int,
+                    default=16, type=int,
                     help='Initial number of grid cells in the y direction, default is 4.')
 args = parser.parse_args()
 
@@ -110,7 +110,7 @@ bm.set_backend(args.backend)
 pde = BoxDomainTriData2D()
 nx, ny = args.nx, args.ny
 extent = pde.domain()
-mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cpu')
+mesh = QuadrangleMesh.from_box(box=extent, nx=nx, ny=ny, device='cuda')
 
 p = args.degree
 
@@ -130,14 +130,14 @@ for i in range(maxit):
 
     linear_elastic_material = LinearElasticMaterial(name='E1nu0.3', 
                                                 elastic_modulus=1, poisson_ratio=0.3, 
-                                                hypo='plane_strain')
+                                                hypo='plane_strain', device=bm.get_device(mesh))
     tmr.send('material')
     
     integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_K)
     K = bform.assembly(format='csr')
-    tmr.send('stiffness assembly')
+    # tmr.send('stiffness assembly')
     
     integrator_F = VectorSourceIntegrator(source=pde.source, q=tensor_space.p+3)
     lform = LinearForm(tensor_space)    
@@ -145,14 +145,18 @@ for i in range(maxit):
     F = lform.assembly()
     tmr.send('source assembly')
 
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-    uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, threshold=None)
-
-    F = F - K.matmul(uh_bd)
-    F[isDDof] = uh_bd[isDDof]
-
-    dbc = DirichletBC(space=tensor_space)
-    K = dbc.apply_matrix(matrix=K, check=True)
+    dbc = DirichletBC(space=tensor_space, 
+                    gD=pde.dirichlet, 
+                    threshold=None, 
+                    method='interp')
+    K, F = dbc.apply(A=K, f=F, uh=None, gD=pde.dirichlet, check=True)
+    # uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
+    #                 dtype=bm.float64, device=bm.get_device(mesh))
+    # uh_bd, isDDof = tensor_space.boundary_interpolate(gD=pde.dirichlet, uh=uh_bd, 
+    #                                                 threshold=None, method='interp')
+    # F = F - K.matmul(uh_bd)
+    # F = bm.set_at(F, isDDof, uh_bd[isDDof])
+    # K = dbc.apply_matrix(matrix=K, check=True)
     tmr.send('boundary')
 
     uh = tensor_space.function()
@@ -173,5 +177,6 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 print("errorMatrix:\n", errorMatrix)
+print("NDof:", NDof)
 print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
 print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))

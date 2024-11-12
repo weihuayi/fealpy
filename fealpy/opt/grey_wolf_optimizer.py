@@ -2,9 +2,12 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 from .optimizer_base import Optimizer
+"""
+Grey Wolf Optimizer
 
+"""
 class GreyWolfOptimizer(Optimizer):
-    def __init__(self, option, D) -> None:
+    def __init__(self, option) -> None:
         super().__init__(option)
 
 

@@ -22,7 +22,8 @@ def process_coef_func(
     bcs: Optional[TensorLike]=None,
     mesh: Optional[HomogeneousMesh]=None,
     etype: Optional[Union[int, str]]=None,
-    index: Optional[TensorLike]=None
+    index: Optional[TensorLike]=None,
+    n: Optional[TensorLike]=None
 ):
     r"""Fetch the result Tensor if `coef` is a function."""
     if callable(coef):
@@ -40,8 +41,12 @@ def process_coef_func(
             coef_val = coef(bcs, index=index)
         else:
             ps = mesh.bc_to_point(bcs, index=index)
-            coef_val = coef(ps)
-
+            ##TODO:适应不同情况的coef, coef的接口应该是coef(ps, n)或者coef(ps)
+            import inspect
+            if (n is not None) & (len(inspect.signature(coef).parameters) == 2):
+                coef_val = coef(ps, n)
+            else:
+                coef_val = coef(ps)
     else:
         coef_val = coef
     return coef_val

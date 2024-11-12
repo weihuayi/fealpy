@@ -1,5 +1,4 @@
 from typing import Union, Optional, Callable
-
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
 from .. import logger
@@ -61,7 +60,14 @@ class TriangleMesh(SimplexMesh, Plotable):
             return bm.edge_length(edge, node)
         elif etype == 2:
             cell = self.entity(2, index)
-            return bm.simplex_measure(cell, node)
+            if self.geo_dimension()==2:
+                return bm.simplex_measure(cell, node)
+            else: 
+                v0 = node[cell[:, 1], :] - node[cell[:, 0], :]
+                v1 = node[cell[:, 2], :] - node[cell[:, 0], :]
+
+                nv = bm.cross(v0, v1)
+                return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
   
@@ -87,9 +93,22 @@ class TriangleMesh(SimplexMesh, Plotable):
         return quad
 
     # shape function
-    def grad_lambda(self, index: Index=_S) -> TensorLike:
+    def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
         """
+        node = self.entity('node')
+        entity = self.entity(TD, index=index)
+        GD = self.GD
+        if TD == 1:
+            return bm.interval_grad_lambda(entity, node)
+        elif TD == 2:
+            if GD == 2:
+                return bm.triangle_grad_lambda_2d(entity, node)
+            elif GD == 3:
+                return bm.triangle_grad_lambda_3d(entity, node)
+        else:
+            raise ValueError("Unsupported topological dimension: {TD}")
+        '''
         node = self.node
         cell = self.cell[index]
         GD = self.GD
@@ -97,7 +116,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             return bm.triangle_grad_lambda_2d(cell, node)
         elif GD == 3:
             return bm.triangle_grad_lambda_3d(cell, node)
-    
+        '''
     def rot_lambda(self, index: Index=_S): # TODO
         pass
     
@@ -105,9 +124,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @berif 这里调用的是网格空间基函数的梯度
         """
+        TD = bc.shape[1] - 1
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
-            Dlambda = self.grad_lambda(index=index)
+            Dlambda = self.grad_lambda(index=index, TD=TD)
             gphi = bm.einsum('...ij, kjm -> k...im', R, Dlambda)
             return gphi  # (NC, NQ, ldof, GD)
         elif variables == 'u':
@@ -1325,7 +1345,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         tri = tri[isNecessaryCell, :]
         # 把顶点在 Delaunay 内的编号，转换为整个三角形内的编号
         interfaceNodeIdx = concat(
-            [bm.astype(iCellNodeIndex, dtype=mesh.itype),
+            [bm.astype(iCellNodeIndex, mesh.itype),
              NN + bm.arange(cutNode.shape[0] + auxNode.shape[0], dtype=mesh.itype, device=device)],
             axis = 0
         )
@@ -1372,7 +1392,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                          nodedata=self.nodedata,
                          celldata=self.celldata)
-            
+    @classmethod        
     def from_meshio(cls, file, show=False):
         import meshio
         data = meshio.read(file)
@@ -1388,5 +1408,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             mesh.add_plot(ax)
             plt.show()
         return mesh
+
+    @classmethod
+    def from_domain_distmesh(cls, domain, maxit=100, output=False, itype=None, ftype=None, device=None):
+        from fealpy.old.mesh import DistMesher2d
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        mesher = DistMesher2d(domain, domain.hmin, output=output)
+        mesh = mesher.meshing(maxit=maxit)
+        node = bm.array(mesh.entity('node'), dtype=ftype, device=device)
+        cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
+
+        return cls(node, cell)
 
 TriangleMesh.set_ploter('2d')

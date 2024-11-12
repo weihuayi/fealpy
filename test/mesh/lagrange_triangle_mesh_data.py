@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.geometry import SphereSurface
+from fealpy.geometry.implicit_surface import SphereSurface
 from fealpy.mesh.triangle_mesh import TriangleMesh
 
 # 定义多个典型的 LagrangeTriangleMesh 对象
@@ -177,3 +177,8 @@ edge_length_data = [
                1.1097288, 1.1097288, 1.1097288, 1.1097288, 1.1097288, 1.1097288], dtype=np.float64)
        }
 ]
+
+# 网格阶数 p=2
+uI_error_data = [
+        {"uI_error_ratio": np.array([8.0, 8.0, 8.0, 8.0], dtype=np.float64)}
+        ]

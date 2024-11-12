@@ -86,16 +86,16 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
                 p = self.p
                 bcs = self.mesh.multi_index_matrix(p, TD)/p
                 uI = u(bcs)
-        return uI
+        return self.function(uI)
 
     def boundary_interpolate(self,
-            gD: Union[Callable, int, float, TensorLike],
+            gd: Union[Callable, int, float, TensorLike],
             uh: Optional[TensorLike] = None,
-            threshold: Optional[Threshold]=None, method=None) -> TensorLike:
+            *, threshold: Optional[Threshold]=None, method=None) -> TensorLike:
         """Set the first type (Dirichlet) boundary conditions.
 
         Parameters:
-            gD: boundary condition function or value (can be a callable, int, float, TensorLike).
+            gd: boundary condition function or value (can be a callable, int, float, TensorLike).
             uh: TensorLike, FE function uh .
             threshold: optional, threshold for determining boundary degrees of freedom (default: None).
 
@@ -103,28 +103,32 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             TensorLike: a bool array indicating the boundary degrees of freedom.
 
         This function sets the Dirichlet boundary conditions for the FE function `uh`. It supports
-        different types for the boundary condition `gD`, such as a function, a scalar, or a array.
+        different types for the boundary condition `gd`, such as a function, a scalar, or a array.
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
         isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
-        if bm.is_tensor(gD):
-            assert len(gD) == self.number_of_global_dofs()
+        if bm.is_tensor(gd):
+            assert len(gd) == self.number_of_global_dofs()
             if uh is None:
-                uh = bm.zeros_like(gD)
-            uh[isDDof] = gD[isDDof] 
+                uh = bm.zeros_like(gd)
+            uh[isDDof] = gd[isDDof] 
             return uh,isDDof 
-        if callable(gD):
-            gD = gD(ipoints[isDDof])
+        if callable(gd):
+            gd = gd(ipoints[isDDof])
         if uh is None:
             uh = self.function()
-        uh[:] = bm.set_at(uh[:], (..., isDDof), gD)
-        return uh, isDDof
+        uh[:] = bm.set_at(uh[:], (..., isDDof), gd)
+        
+        return self.function(uh), isDDof
 
     set_dirichlet_bc = boundary_interpolate
 
     def basis(self, bc: TensorLike, index: Index=_S):
         phi = self.mesh.shape_function(bc, self.p, index=index)
         return phi[None, ...] # (NC, NQ, LDOF)
+
+    face_basis = basis
+    edge_basis = basis
 
     def grad_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
         return self.mesh.grad_shape_function(bc, self.p, index=index, variables=variable)
@@ -133,15 +137,23 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
 
     @barycentric
-    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
+        if isinstance(bc, tuple):
+            TD = len(bc)
+        else :
+            TD = bc.shape[-1] - 1
         phi = self.basis(bc, index=index)
-        e2dof = self.dof.cell_to_dof(index=index)
+        e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cql, ...cl -> ...cq', phi, uh[..., e2dof])
         return val
 
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
+        if isinstance(bc, tuple):
+            TD = len(bc)
+        else :
+            TD = bc.shape[-1] - 1
         gphi = self.grad_basis(bc, index=index)
-        cell2dof = self.dof.cell_to_dof(index=index)
-        val = bm.einsum('cilm, cl -> cim', gphi, uh[cell2dof])
+        e2dof = self.dof.entity_to_dof(TD, index=index)
+        val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
         return val[...]

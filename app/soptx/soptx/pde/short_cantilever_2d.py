@@ -2,6 +2,61 @@ from fealpy.backend import backend_manager as bm
 
 from fealpy.typing import TensorLike
 
+from typing import Tuple, Callable
+from builtins import list
+
+class ShortCantilever2dData1:
+    def __init__(self):
+        """
+        flip_direction = True
+        0 ------- 3 ------- 6 
+        |    0    |    2    |
+        1 ------- 4 ------- 7 
+        |    1    |    3    |
+        2 ------- 5 ------- 8 
+        """
+        self.eps = 1e-12
+
+    def domain(self, 
+            xmin: float=0, xmax: float=4, 
+            ymin: float=0, ymax: float=4) -> list:
+        
+        box = [xmin, xmax, ymin, ymax]
+
+        return box
+    
+    def force(self, points: TensorLike) -> TensorLike:
+        domain = self.domain()
+
+        x = points[..., 0]
+        y = points[..., 1]
+
+        coord = (
+            (bm.abs(x - domain[0]) < self.eps) & 
+            (bm.abs(y - domain[3]) < self.eps)
+        )
+        val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
+        val[coord, 1] = -1
+
+        return val
+    
+    def dirichlet(self, points: TensorLike) -> TensorLike:
+
+        return bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
+    
+    def is_dirichlet_boundary_dof(self, points: TensorLike) -> TensorLike:
+        domain = self.domain()
+
+        x = points[..., 0]
+
+        coord = bm.abs(x - domain[0]) < self.eps
+        
+        return coord
+    
+    def threshold(self) -> Callable:
+
+        return self.is_dirichlet_boundary_dof
+    
 class ShortCantilever2dOneData:
     def __init__(self, nx: int, ny: int):
         """

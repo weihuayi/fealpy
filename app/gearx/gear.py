@@ -1,13 +1,17 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from sympy import false
+
+from fealpy.geometry.utils import delta_angle_calculator
 from numpy import sin, cos, tan, pi, arctan, arctan2, radians, sqrt
 
 from scipy.optimize import fsolve
 from fealpy.mesh.quadrangle_mesh import QuadrangleMesh
 from fealpy.geometry.utils import *
+from app.gearx.utils import *
 
 class Gear(ABC):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, material=None):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material=None, rotation_direction=1, center=(0,0,0), name=None):
         """
 
         @param m_n: 法向模数
@@ -24,10 +28,20 @@ class Gear(ABC):
         @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
+        @param nw: 沿齿宽分段数
+        @param tooth_width: 齿宽
         @param material: 齿轮材料
+        @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
+        @param center: 齿轮中心坐标，默认为原点
+        @param name: 齿轮名称
         """
-        if not isinstance(z, int) or (isinstance(z, float) and not z.is_integer()):
-            raise TypeError(f'The provided value {z} is not an integer or cannot be safely converted to an integer.')
+        # 参数类型检查
+        for param in [z, n1, n2, n3, na, nf, nw]:
+            if not isinstance(param, int) or (isinstance(param, float) and not param.is_integer()):
+                raise TypeError(
+                    f'The provided value {param} is not an integer or cannot be safely converted to an integer.')
+        assert rotation_direction in [-1, 1, -1., 1., "-1", "1"], 'The rotation direction must be either 1 or -1.'
+
         self.m_n = m_n
         self.z = z
         self.alpha_n = alpha_n if alpha_n < 2 * pi else radians(alpha_n)
@@ -42,8 +56,16 @@ class Gear(ABC):
         self.n3 = n3
         self.na = na
         self.nf = nf
+        self.nw = nw
+        self.tooth_width = tooth_width
         self.mesh = None
+        self.hex_mesh = None
+        self.target_quad_mesh = None
+        self.targer_hex_mesh = None
         self._material = material
+        self.rotation_direction = rotation_direction
+        self.center = center
+        self.name = name
 
         # 端面变位系数
         self.x_t = self.x_n * cos(self.beta)
@@ -89,6 +111,290 @@ class Gear(ABC):
             plt.savefig(save_path, dpi=600, bbox_inches='tight')
         plt.show()
 
+    def cylindrical_to_cartesian(self, d, width):
+        """
+        给定宽度坐标以及半径，计算其对应的笛卡尔坐标，适用于外齿轮，内齿轮需要进一步测试
+        TODO: 内齿轮的计算，实现自定义所在齿
+        :param d: 节点所在圆弧的直径
+        :param width: 宽度
+        :return: 节点笛卡尔坐标
+        """
+        r = d / 2
+
+        if isinstance(r, (float, int)):
+            def involutecross(t2):
+                return self.get_tip_intersection_points(t2) - r
+
+            # 计算端面点（z=0）坐标
+            t = fsolve(involutecross, self.m_n)[0]
+            point_t = np.zeros(3)
+            point_t[0:2] = self.get_involute_points(t)
+
+            # 根据螺旋线与当前宽度，计算实际坐标
+            total_width = self.tooth_width
+            t2 = width / total_width
+            point = get_helix_points(point_t, self.beta, self.r, total_width, t2, self.rotation_direction)
+        elif isinstance(r, (np.ndarray, list)):
+            point_t = np.zeros((len(r), 3))
+            total_width = self.tooth_width
+            t2 = width / total_width
+            point = np.zeros((len(r), 3))
+            for i in range(len(r)):
+                def involutecross(t2):
+                    return self.get_tip_intersection_points(t2) - r[i]
+
+                # 计算端面点（z=0）坐标
+                t = fsolve(involutecross, self.m_n)[0]
+                point_t[i, 0:2] = self.get_involute_points(t)
+                point[i] = get_helix_points(point_t[i], self.beta, self.r, total_width, t2[i], self.rotation_direction)
+        point[..., 0:2] = np.dot(point[..., 0:2], np.array([[0, -1], [1, 0]]))
+        return point
+
+    def generate_hexahedron_mesh(self):
+        """
+        根据齿轮端面网格，使用扫掠法，生成整体网格
+
+        :return: 端面四边形网格对应的六面体网格
+        """
+        quad_mesh = self.mesh if self.mesh is not None else self.generate_mesh()
+        node = quad_mesh.node
+        cell = quad_mesh.cell
+        beta = self.beta
+        r = self.r
+        tooth_width = self.tooth_width
+        nw = self.nw
+        rotation_direction = self.rotation_direction
+        # 数据处理，将二维点转换为三维点
+        new_node = np.zeros((len(node), 3))
+        new_node[:, 0:2] = node
+        one_section_node_num = len(new_node)
+
+        # 创建齿轮整体网格
+        # 拉伸节点
+        volume_node = sweep_points(new_node, beta, r, tooth_width, nw, rotation_direction).reshape(-1, 3)
+        # 将端面四边形单元拉伸为六面体单元
+        volume_cell = np.zeros((nw, len(cell), 8), dtype=np.int64)
+        cell_domain_tag = np.zeros((nw, len(cell)))
+        cell_tooth_tag = np.zeros((nw, len(cell)))
+        transverse_cell_domain_tag = quad_mesh.celldata['cell_domain_tag'][None, :]
+        transverse_cell_tooth_tag = quad_mesh.celldata['cell_tooth_tag'][None, :]
+        # 填充单元的节点索引
+        for i in range(nw):
+            volume_cell[i, :, 0:4] = cell + i * one_section_node_num
+            volume_cell[i, :, 4:8] = cell + (i + 1) * one_section_node_num
+            cell_domain_tag[i, :] = transverse_cell_domain_tag
+            cell_tooth_tag[i, :] = transverse_cell_tooth_tag
+        volume_cell = volume_cell.reshape(-1, 8)
+        cell_domain_tag = cell_domain_tag.reshape(-1)
+        cell_tooth_tag = cell_tooth_tag.reshape(-1)
+
+        hex_mesh = HexahedronMesh(volume_node, volume_cell)
+        hex_mesh.celldata['cell_domain_tag'] = cell_domain_tag
+        hex_mesh.celldata['cell_tooth_tag'] = cell_tooth_tag
+        self.hex_mesh = hex_mesh
+
+        return hex_mesh
+
+    def find_node_location_kd_tree(self, target_node, error=1e-3):
+        """
+        查找目标节点在六面体网格中的位置，基于 kd_tree
+        :param target_node: 目标节点坐标
+        :param error: 误差限制
+        :return: 目标节点所在的单元索引，节点所在单元局部面索引，节点关于所在节点参数，若未找到则返回-1
+        """
+        # 使用 kd_tree 算法，先计算所有单元的重心坐标，再根据重心坐标与target_node构建 kd_tree
+        if self.target_hex_mesh is not None:
+            mesh = self.target_hex_mesh
+        elif self.hex_mesh is not None:
+            mesh = self.hex_mesh
+        else:
+            raise ValueError('The hex_mesh attribute is not set.')
+        cell_barycenter = mesh.entity_barycenter('cell')
+        # 计算每个单元重心坐标与 target_node 的距离，并排序从而构建kd_tree
+        distance = np.linalg.norm(cell_barycenter - target_node, axis=1)
+        kd_tree = np.argsort(distance)
+        # 获取网格实体信息
+        cell = mesh.cell
+        node = mesh.node
+        local_tetra = np.array([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int32)
+        tetra_local_face = np.array([
+            (1, 2, 3), (0, 3, 2), (0, 1, 3), (0, 2, 1)], dtype=np.int32)
+        tetra_face_to_hex_face = np.array([
+            (3, -1, -1, 0),
+            (3, -1, -1, 4),
+            (1, -1, -1, 4),
+            (1, -1, -1, 2),
+            (5, -1, -1, 2),
+            (5, -1, -1, 0)], dtype=np.int32)
+        # 根据网格单元测度设置误差限制
+        error = np.max(mesh.entity_measure('cell')) * error
+        # 遍历单元搜寻
+        for i in range(len(kd_tree)):
+            cell_idx = kd_tree[i]
+            cell_node = node[cell[cell_idx]]
+            # 将一个六面体分成六个四面体，计算目标点是否在某一个四面体内（包括边界面与点）
+            # 若六个四面体中有一个包含目标点，则返回当前六面体单元索引
+            tetras = cell_node[local_tetra]
+            # 遍历六个四面体
+            for j, tetra in enumerate(tetras):
+                for i in range(tetra_local_face.shape[0]):
+                    current_face_node = tetra[tetra_local_face[i]]
+                    v = -sign_of_tetrahedron_volume(current_face_node[0], current_face_node[1], current_face_node[2],
+                                                    target_node)
+                    if v < 0 and abs(v - 0) > error:
+                        break
+                    if (v > 0 or abs(v - 0) < error) and i == tetra_local_face.shape[0] - 1:
+                        t = (target_node[2] - cell_node[0, 2]) / (cell_node[4, 2] - cell_node[0, 2]);
+                        r_points = np.sqrt(np.sum(cell_node[0:4, 0:2] ** 2, axis=-1))
+                        tooth_helix = (cell_node[4, 2] - cell_node[0, 2]) * tan(self.beta) / self.r
+                        start_angle = arctan2(cell_node[0:4, 1], cell_node[0:4, 0])
+                        t_z = (cell_node[4, 2] - cell_node[0, 2]) * t + cell_node[0, 2]
+                        # 构建目标节点所在截面四边形
+                        t_node = np.zeros((4, 2))
+                        t_node[:, 0] = r_points * cos((tooth_helix * t) + start_angle)
+                        t_node[:, 1] = r_points * sin((tooth_helix * t) + start_angle)
+                        P00 = t_node[0]
+                        P10 = t_node[1]
+                        P11 = t_node[2]
+                        P01 = t_node[3]
+                        P = target_node[0:2]
+                        # 计算二元一次方程组系数
+                        # (P00-P10)x(P01-P11)u**2 + ((P-P00)x(P01-P11)-(P-P01)x(P00-P10))u + (P-P00)x(P-P01) = 0
+                        a = (P00[0] * P01[1] - P01[0] * P00[1] - P00[0] * P11[1] + P01[0] * P10[1]
+                             - P10[0] * P01[1] + P11[0] * P00[1] + P10[0] * P11[1] - P11[0] * P10[1])
+                        b = (P[0] * P01[1] - P[0] * P00[1] + P00[0] * P[1] - P01[0] * P[1]
+                             + P[0] * P10[1] - P[0] * P11[1] + P11[0] * P[1] - P10[0] * P[1]
+                             - 2 * P00[0] * P01[1] + 2 * P01[0] * P00[1] +
+                             P00[0] * P11[1] - P01[0] * P10[1] + P10[0] * P01[1] - P11[0] * P00[1])
+                        c = (P[0] * P00[1] - P[0] * P01[1] + P01[0] * P[1] - P00[0] * P[1]
+                             + P00[0] * P01[1] - P01[0] * P00[1])
+
+                        delta = b ** 2 - 4 * a * c
+                        u = -1
+                        if delta < 0:
+                            break
+                        else:
+                            u0 = (-b + np.sqrt(delta)) / (2 * a)
+                            u1 = (-b - np.sqrt(delta)) / (2 * a)
+                            if 0 - error * 10 <= u0 <= 1 + error * 10:
+                                u = u0
+                            elif 0 - error * 10 <= u1 <= 1 + error * 10:
+                                u = u1
+                        v = -1
+                        if u != -1:
+                            Pu0 = (1 - u) * P00 + u * P10
+                            Pu1 = (1 - u) * P01 + u * P11
+                            v0 = (P[0] - Pu0[0]) / (Pu1[0] - Pu0[0])
+                            v1 = (P[1] - Pu0[1]) / (Pu1[1] - Pu0[1])
+                            if abs(v0 - v1) < error ** 2:
+                                if 0 - error <= v0 <= 1 + error:
+                                    v = v0
+                        w = t
+                        return cell_idx, tetra_face_to_hex_face[j, i], (u, v, w)
+        raise ValueError('Target node not found in any cell.')
+
+    def get_profile_node(self, tooth_tag=None):
+        """
+        寻找目标齿两侧齿廓上的节点索引及坐标
+        :param tooth_tag: 目标齿编号，默认为 None，即所有齿
+        :return: 齿廓节点索引及坐标
+        """
+        if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
+            raise ValueError('The hex_mesh attribute is not set.')
+        # tooth_tag 输入类型检测，只能是整数或整数列表，并将其转换为列表
+        if tooth_tag is not None:
+            if isinstance(tooth_tag, int):
+                tooth_tag = [tooth_tag]
+            elif isinstance(tooth_tag, (list, tuple)):
+                tooth_tag = list(tooth_tag)
+            else:
+                raise TypeError('The tooth_tag must be an integer or a list of integers.')
+        quad_mesh = self.mesh
+        hex_mesh = self.hex_mesh
+        t_NN = quad_mesh.number_of_nodes()
+        n1 = self.n1
+        nw = self.nw
+        hex_node = hex_mesh.node
+
+        is_bd_cell = quad_mesh.boundary_cell_flag()
+        domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 6
+        domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 5
+        if tooth_tag is None:
+            folder = self.z
+            cell_flag_left = is_bd_cell & domain_flag_left
+            cell_flag_right = is_bd_cell & domain_flag_right
+        else:
+            folder = len(tooth_tag)
+            tooth_flag = np.isin(quad_mesh.celldata["cell_tooth_tag"], tooth_tag)
+
+            cell_flag_left = is_bd_cell & domain_flag_left & tooth_flag
+            cell_flag_right = is_bd_cell & domain_flag_right & tooth_flag
+
+        # 右侧齿面
+        # TODO: 考虑是否给单元局部起始节点编号加检测，即不一定从 0 和 2 开始
+        cell_idx_right = np.where(cell_flag_right)[0].reshape(folder, -1)[..., 0:n1]
+        tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
+        tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+        tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 0]
+        tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+
+        # 左侧齿面
+        cell_idx_left = np.flip(np.flip(np.where(cell_flag_left)[0]).reshape(folder, -1)[..., 0:n1], axis=0)
+        tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
+        tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+        tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 2]
+        tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+
+        for i in range(1, nw+1):
+            tooth_profile_node_right[..., i, :] = tooth_profile_node_right[..., 0, :] + i * t_NN
+            tooth_profile_node_left[..., i, :] = tooth_profile_node_left[..., 0, :] + i * t_NN
+
+        return (tooth_profile_node_right, tooth_profile_node_left), (hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
+
+    def set_target_tooth(self, target_tooth_tag):
+        if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
+            raise ValueError('The hex_mesh attribute is not set.')
+        target_tooth_tag = sorted(set(target_tooth_tag))
+        self.target_tooth_tag = target_tooth_tag
+        total_quad_mesh = self.mesh
+        total_hex_mesh = self.hex_mesh
+
+        tooth_num = len(target_tooth_tag)
+        # 获取目标齿相关单元
+        cell_tooth_tag = total_hex_mesh.celldata["cell_tooth_tag"]
+        is_target_cell = np.zeros(total_hex_mesh.number_of_cells(), dtype=bool)
+        for tag in target_tooth_tag:
+            is_target_cell |= (cell_tooth_tag == tag)
+        target_cell_idx = np.where(is_target_cell)[0]
+        target_cell = total_hex_mesh.cell[target_cell_idx]
+
+        # 标记目标齿面相关节点
+        is_target_node = np.zeros(total_hex_mesh.number_of_nodes(), dtype=bool)
+        # for cell in target_cell:
+        #     for node in cell:
+        #         is_target_node[node] = True
+        is_target_node[target_cell] = True
+        target_node_idx = np.where(is_target_node)[0]
+        target_node = total_hex_mesh.node[target_node_idx]
+
+        # 构建节点映射
+        node_idx_map = np.zeros(total_hex_mesh.number_of_nodes(), dtype=int)
+        node_idx_map[target_node_idx] = np.arange(len(target_node_idx))
+        # 单元映射
+        # for i, cell in enumerate(target_cell):
+        #     for j, node in enumerate(cell):
+        #         target_cell[i, j] = node_idx_map[node]
+        target_cell = node_idx_map[target_cell]
+
+        self.target_hex_mesh = HexahedronMesh(target_node, target_cell)
+        return self.target_hex_mesh
+
     @property
     def material(self):
         return self._material
@@ -100,8 +406,8 @@ class Gear(ABC):
 
 
 class ExternalGear(Gear):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, chamfer_dia, inner_diam,
-                 material=None):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia, inner_diam, tooth_width,
+                 material=None, rotation_direction=1, center=(0,0,0), name=None):
         """
 
         @param m_n: 法向模数
@@ -118,11 +424,16 @@ class ExternalGear(Gear):
         @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
+        @param nw: 沿齿宽分段数
         @param chamfer_dia: 倒角高度（直径方向）
         @param inner_diam: 轮缘内径
+        @param tooth_width: 齿宽
         @param material: 齿轮材料
+        @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
+        @param center: 齿轮中心坐标，默认为原点
+        @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, material)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material, rotation_direction, center, name)
         self.inner_diam = inner_diam
         self.chamfer_dia = chamfer_dia
         # 齿顶圆直径与半径
@@ -193,6 +504,10 @@ class ExternalGear(Gear):
         points = np.concatenate([xt, yt], axis=-1)
         return points
 
+    def get_transition_intersection_points(self, t):
+        points = self.get_transition_points(t)
+        return np.sqrt(points[..., 0] ** 2 + points[..., 1] ** 2)
+
     def get_profile_points(self):
         n1 = self.n1
         n2 = self.n2
@@ -207,15 +522,26 @@ class ExternalGear(Gear):
 
         points = np.zeros(((n1 + n2 + 1) * 2, 3))
 
-        t1 = (mn * x - (ha_cutter - rc + rc * sin(alpha_t))) / cos(alpha_t)
+        def involutecross_rb_i(t):
+            return self.get_tip_intersection_points(t) - self.r_b
+
+        # t_temp = (mn * x - (ha_cutter - rc + rc * sin(alpha_t))) / cos(alpha_t)
+        t1 = fsolve(involutecross_rb_i, mn)[0]
 
         def involutecross(t2):
             return self.get_tip_intersection_points(t2) - (0.5 * effective_da)
 
         t2 = fsolve(involutecross, mn)[0]  # 求解渐开线与齿顶圆的交点
 
-        t3 = 2 * np.pi - alpha_t
-        t4 = 1.5 * np.pi
+        # t3 = 2 * np.pi - alpha_t
+        # t4 = 1.5 * np.pi
+        def involutecross_rb(t):
+            return self.get_transition_intersection_points(t) - self.r_b
+        def involutecross_rf(t):
+            return self.get_transition_intersection_points(t) - self.r_f
+
+        t3 = fsolve(involutecross_rb, 2*np.pi-alpha_t)[0]
+        t4 = fsolve(involutecross_rf, 1.5*np.pi)[0]
         width2 = t3 - t4
         t = np.linspace(t4, t3, n2 + 1)
         points[0:n2 + 1, 0:-1] = self.get_transition_points(t)
@@ -243,7 +569,11 @@ class ExternalGear(Gear):
         points = self.get_profile_points()
         r_inner = self.inner_diam / 2
 
-        max_angle_flag = False
+        one_tooth_angle = abs(delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector"))
+        if one_tooth_angle*z > 2*pi:
+            max_angle_flag = True
+        else:
+            max_angle_flag = False
         # TODO: 改用齿根圆角是否超过最大圆角进行判断与分类
         # 两侧过渡曲线之间相连，齿槽底面为一条直线，宽度为 0
         if max_angle_flag:  # 构造关键点
@@ -380,9 +710,12 @@ class ExternalGear(Gear):
 
             # 单齿网格及其节点与单元
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
+            cell_domain_tag = quad_mesh.celldata['cell_domain_tag']
             tooth_node = quad_mesh.node
             tooth_cell = quad_mesh.cell
             origin_cell = quad_mesh.cell
+            cell_cell_num = len(origin_cell)
+            cell_tooth_tag = np.zeros(cell_cell_num * z, dtype=np.int_)
 
             # 旋转构建剩余点与单元，并依次拼接
             single_node_num = len(tooth_node) - (n3 + na1 + 1)
@@ -413,6 +746,7 @@ class ExternalGear(Gear):
             rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
             new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
             new_cell = trans_matrix[origin_cell]
+            cell_tooth_tag[cell_cell_num:2 * cell_cell_num] = 1
             # 拼接
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
@@ -439,6 +773,7 @@ class ExternalGear(Gear):
                 trans_matrix[len(key_points) + (n3 - 1) + (na1 - 1):] += single_node_num
                 # 新单元映射与拼接
                 new_cell = trans_matrix[origin_cell]
+                cell_tooth_tag[i * cell_cell_num:(i + 1) * cell_cell_num] = i
                 tooth_node = np.concatenate([tooth_node, new_node], axis=0)
                 tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
@@ -468,10 +803,14 @@ class ExternalGear(Gear):
             trans_matrix[len(key_points) + 2 * (n3 - 1) + 2 * (na1 - 1):] += single_node_num - (n3 - 1) - (na1 - 1) - 3
             # 新单元映射与拼接
             new_cell = trans_matrix[origin_cell]
+            cell_tooth_tag[(z - 1) * cell_cell_num:] = z - 1
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_node = np.dot(tooth_node, np.array([[0, -1], [1, 0]]))
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
             # 最终网格
             t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
+            t_mesh.celldata['cell_domain_tag'] = np.tile(cell_domain_tag, z)
+            t_mesh.celldata['cell_tooth_tag'] = cell_tooth_tag
         else:
             # 构造关键点
             kp20 = points[n1 + n2 + 1, :2]
@@ -746,6 +1085,7 @@ class ExternalGear(Gear):
             new_cell = trans_matrix[origin_cell]
             cell_tooth_tag[(z-1) * cell_cell_num:] = z-1
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_node = np.dot(tooth_node, np.array([[0, -1], [1, 0]]))
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
             # 最终网格
             t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
@@ -757,8 +1097,8 @@ class ExternalGear(Gear):
 
 
 class InternalGear(Gear):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, outer_diam, z_cutter,
-                 xn_cutter, material=None):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
+                 xn_cutter, tooth_width, material=None, rotation_direction=1, center=(0,0,0), name=None):
         """
 
         @param m_n: 法向模数
@@ -775,12 +1115,17 @@ class InternalGear(Gear):
         @param n3: 齿轮内部分段数
         @param na: 齿顶分段数
         @param nf: 齿根圆部分分段数（一侧，非最大圆角时）
-        @param outter_diam: 轮缘外径
+        @param nw: 沿齿宽方向分段数
+        @param outer_diam: 轮缘外径
         @param z_cutter: 刀具齿数
         @param xn_cutter: 刀具变位系数
+        @param tooth_width: 齿宽
         @param material: 齿轮材料
+        @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
+        @param center: 齿轮中心坐标，默认为原点
+        @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, material)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material, rotation_direction, center, name)
         self.outer_diam = outer_diam
         self.z_cutter = z_cutter
         self.xn_cutter = xn_cutter
@@ -885,6 +1230,10 @@ class InternalGear(Gear):
         points = np.concatenate([xt, yt], axis=1)
         return points
 
+    def get_transition_intersection_points(self, E, x0, y0, rc, ratio, t):
+        points = self.get_transition_points(E, x0, y0, rc, ratio, t)
+        return np.sqrt(points[..., 0] ** 2 + points[..., 1] ** 2)
+
     def get_profile_points(self):
         ra_cutter = self.ra_cutter
         rb_cutter = self.rb_cutter
@@ -940,8 +1289,7 @@ class InternalGear(Gear):
                         rc * sin(t[1]) + t[3]),
                 (rb_cutter * t[0] * sin(etab) * sin(t[0]) + rb_cutter * t[0] * cos(etab) * cos(t[0])) / (
                         rb_cutter * t[0] * cos(etab) * sin(t[0]) - rb_cutter * t[0] * cos(t[0]) * sin(etab)) + cos(
-                    t[1]) / sin(
-                    t[1]),
+                    t[1]) / sin(t[1]),
                 t[2] ** 2 + t[3] ** 2 - (ra_cutter - rc) ** 2
             ]
 
@@ -949,13 +1297,18 @@ class InternalGear(Gear):
             self.t = t
             x0 = t[2]
             y0 = t[3]
+            func4 = lambda t: self.get_transition_intersection_points(E, x0, y0, rc, ratio, t) - self.r_f
+
             t3 = pi / 2 - arctan(x0 / y0)
+            # t3 = fsolve(func4, pi / 2 - arctan(x0 / y0))[0]
             t4 = t[1]
 
             tt = np.linspace(t4, t3, n2, endpoint=False)
             points[n1 + 1:n1 + n2 + 1, 0:2] = self.get_transition_points(E, x0, y0, rc, ratio, tt)
 
+            func3 = lambda t: self.get_transition_intersection_points(E, 0, 0, ra_cutter, ratio, t) - self.r_f
             t5 = pi / 2 - arctan(x0 / y0)
+            # t5 = fsolve(func3, pi / 2 - arctan(x0 / y0))[0]
             t6 = pi / 2
             tt = np.linspace(t5, t6, nf - 1, endpoint=False)
             points[n1 + n2 + 1:n1 + n2 + nf, 0:2] = self.get_transition_points(E, 0, 0, ra_cutter, ratio, tt)
@@ -1119,9 +1472,12 @@ class InternalGear(Gear):
             half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
 
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
+            cell_domain_tag = quad_mesh.celldata['cell_domain_tag']
             tooth_node = quad_mesh.node
             tooth_cell = quad_mesh.cell
             origin_cell = quad_mesh.cell
+            cell_cell_num = len(origin_cell)
+            cell_tooth_tag = np.zeros(cell_cell_num * z, dtype=np.int_)
 
             # 旋转角
             rot_phi = np.linspace(0, 2 * np.pi, z, endpoint=False)
@@ -1160,6 +1516,7 @@ class InternalGear(Gear):
             rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
             new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
             new_cell = trans_matrix[origin_cell]
+            cell_tooth_tag[cell_cell_num:2 * cell_cell_num] = 1
 
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
@@ -1190,6 +1547,7 @@ class InternalGear(Gear):
                 trans_matrix[len(key_points) + (n1 + n2 + n3 - 3):] += single_node_num
 
                 new_cell = trans_matrix[origin_cell]
+                cell_tooth_tag[i * cell_cell_num:(i + 1) * cell_cell_num] = i
                 tooth_node = np.concatenate([tooth_node, new_node], axis=0)
                 tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
@@ -1229,10 +1587,14 @@ class InternalGear(Gear):
             trans_matrix[len(key_points) + 2 * (n1 + n2 + n3 - 3):] += single_node_num - (n1 + n2 + n3 + 1)
 
             new_cell = trans_matrix[origin_cell]
+            cell_tooth_tag[(z - 1) * cell_cell_num:] = z - 1
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_node = np.dot(tooth_node, np.array([[0, -1], [1, 0]]))
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
             t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
+            t_mesh.celldata['cell_domain_tag'] = np.tile(cell_domain_tag, z)
+            t_mesh.celldata['cell_tooth_tag'] = cell_tooth_tag
         else:
             points = self.get_profile_points()
             # 构建关键点
@@ -1394,9 +1756,12 @@ class InternalGear(Gear):
             half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
 
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
+            cell_domain_tag = quad_mesh.celldata['cell_domain_tag']
             tooth_node = quad_mesh.node
             tooth_cell = quad_mesh.cell
             origin_cell = quad_mesh.cell
+            cell_cell_num = len(origin_cell)
+            cell_tooth_tag = np.zeros(cell_cell_num * z, dtype=np.int_)
 
             # 旋转角
             rot_phi = np.linspace(0, 2 * np.pi, z, endpoint=False)
@@ -1435,6 +1800,7 @@ class InternalGear(Gear):
             rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
             new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
             new_cell = trans_matrix[origin_cell]
+            cell_tooth_tag[cell_cell_num:2 * cell_cell_num] = 1
 
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
@@ -1465,6 +1831,7 @@ class InternalGear(Gear):
                 trans_matrix[len(key_points) + (n1 + n2 + n3 - 3):] += single_node_num
 
                 new_cell = trans_matrix[origin_cell]
+                cell_tooth_tag[i * cell_cell_num:(i + 1) * cell_cell_num] = i
                 tooth_node = np.concatenate([tooth_node, new_node], axis=0)
                 tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
@@ -1504,10 +1871,14 @@ class InternalGear(Gear):
             trans_matrix[len(key_points) + 2 * (n1 + n2 + n3 - 3):] += single_node_num - (n1 + n2 + n3 + 1)
 
             new_cell = trans_matrix[origin_cell]
+            cell_tooth_tag[(z - 1) * cell_cell_num:] = z - 1
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
+            tooth_node = np.dot(tooth_node, np.array([[0, -1], [1, 0]]))
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
             t_mesh = QuadrangleMesh(tooth_node, tooth_cell)
+            t_mesh.celldata['cell_domain_tag'] = np.tile(cell_domain_tag, z)
+            t_mesh.celldata['cell_tooth_tag'] = cell_tooth_tag
 
         self.mesh = t_mesh
         return t_mesh
@@ -1520,7 +1891,7 @@ if __name__ == '__main__':
     # 外齿轮
     # ================================================
     # 参数读取
-    with open('./external_gear_data.json', 'r') as file:
+    with open('data/external_gear_data.json', 'r') as file:
         data = json.load(file)
     m_n = data['mn']  # 法向模数
     z = data['z']  # 齿数
@@ -1547,7 +1918,7 @@ if __name__ == '__main__':
     # 内齿轮
     # ==================================================
     # 参数读取
-    with open('./internal_gear_data.json', 'r') as file:
+    with open('data/internal_gear_data.json', 'r') as file:
         data = json.load(file)
     m_n = data['mn']  # 法向模数
     z = data['z']  # 齿数

@@ -1,11 +1,14 @@
-
 import numpy as np
+import sympy as sp
 
 import pytest
-from fealpy.geometry import SphereSurface, EllipsoidSurface
+from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
+from fealpy.geometry.implicit_surface import SphereSurface
 from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
+from fealpy.functionspace.lagrange_fe_space import LagrangeFESpace
+from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 
 from lagrange_triangle_mesh_data import *
 
@@ -62,13 +65,6 @@ class TestLagrangeTriangleMeshInterfaces:
         fname = f"sphere_test.vtu"
         lmesh.to_vtk(fname=fname)
         
-        ellsurface = EllipsoidSurface()
-        ellmesh = TriangleMesh.from_ellipsoid(radius=[5,5,3])
-
-        elmesh = LagrangeTriangleMesh.from_triangle_mesh(ellmesh, p=3, surface=ellsurface)
-        fname = f"elip_test.vtu"
-        elmesh.to_vtk(fname=fname)
-
     @pytest.mark.parametrize("backend", ['numpy'])
     @pytest.mark.parametrize("data", cell_area_data)
     def test_cell_area(self, data, backend):
@@ -109,12 +105,46 @@ class TestLagrangeTriangleMeshInterfaces:
        
         np.testing.assert_allclose(bm.to_numpy(el), data["el"], atol=1e-14)   
 
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_error(self, backend):
+        bm.set_backend(backend)
+
+        x, y, z = sp.symbols('x, y, z', real=True)
+        F = x**2 + y**2 + z**2
+        u = sp.sin(x) * sp.sin(y)
+        pde = SurfaceLevelSetPDEData(F, u)
+
+        surface = SphereSurface() #以原点为球心，1 为半径的球
+        mesh = TriangleMesh.from_unit_sphere_surface()
+
+        refine = 5
+        uI_error = np.zeros(refine, dtype=np.float64)
+        uI_error_ratio = np.zeros(refine-1, dtype=np.float64)
+
+        for i in range(refine):
+            lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=2, surface=surface)
+            cm = lmesh.entity_measure(etype='cell')
+
+            space = ParametricLagrangeFESpace(lmesh, p=2)
+
+            uI = space.function()
+            uI[:] = space.interpolate(pde.solution)
+            uI_error[i] = lmesh.error(pde.solution, uI)
+
+            if i < refine-1:
+                mesh.uniform_refine()
+
+        print("uI error:",uI_error)
+        print('uI_error_ratio:', uI_error[:-1]/uI_error[1:])
+
+
 if __name__ == "__main__":
-    #a = TestLagrangeTriangleMeshInterfaces()
+    a = TestLagrangeTriangleMeshInterfaces()
     #a.test_init_mesh(init_data[0], 'numpy')
     #a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
     #a.test_surface_mesh('numpy')
     #a.test_cell_area(cell_area_data[0], 'numpy')
     #a.test_edge_length(edge_length_data[0], 'numpy')
     #a.test_(cell_[0], 'numpy')
-    pytest.main(["./test_lagrange_triangle_mesh.py"])
+    a.test_error('numpy')
+    #pytest.main(["./test_lagrange_triangle_mesh.py"])
