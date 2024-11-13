@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.fem.precomp_data import data
+from fealpy.old.fem.precomp_data import data
 
 class ScalarMassIntegrator:
     """
@@ -59,11 +59,8 @@ class ScalarMassIntegrator:
                 else:
                     ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
-            if grad_uh_func is not None:
-                val1 = grad_uh_func(uh(bcs))
-                # coef = coef * grad_uh_func(uh(bcs))
             if np.isscalar(coef):
-                M += coef*np.einsum('q, qc, qci, qcj, c->cij', ws, val1, phi0, phi0, cellmeasure, optimize=True)
+                M += coef*np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
             elif isinstance(coef, np.ndarray): 
                 if coef.shape == (NC, ):
                     M += np.einsum('q, c, qci, qcj, c -> cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
