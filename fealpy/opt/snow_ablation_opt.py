@@ -7,6 +7,11 @@ from .optimizer_base import Optimizer
 """
 Snow Ablation Optimizer
 
+Reference
+~~~~~~~~~
+Lingyun Deng, Sanyang Liu.
+Snow ablation optimizer: A novel metaheuristic technique for numerical optimization and engineering design.
+Expert Systems With Applications, 2023, 225: 120069
 """
 class SnowAblationOpt(Optimizer):
 

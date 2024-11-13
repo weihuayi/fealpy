@@ -51,7 +51,8 @@ Levy Quantum Paricle Swarm Optimization (LQPSO)
 
 Reference
 ~~~~~~~~~
-Xiao-li Lu, Guang He. QPSO algorithm based on Lévy flight and its application in fuzzy portfolio.
+Xiao-li Lu, Guang He. 
+QPSO algorithm based on Lévy flight and its application in fuzzy portfolio.
 Applied Soft Computing Journal, 2021, 99: 106894.
 """
 
