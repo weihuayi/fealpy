@@ -7,6 +7,11 @@ from .optimizer_base import Optimizer
 """
 Black_winged Kite Algorithm
 
+Reference
+~~~~~~~~~
+Jun Wang, Wen-chuan Wang, Xiao-xue Hu, Lin Qiu, Hong-fei Zang.
+Black-winged kite algorithm: a nature-inspired meta-heuristic for solving benchmark functions and engineering problems.
+Artificial Intelligence Review, 2024, 2024: 57-98.
 """
 class BlackwingedKiteAlg(Optimizer):
     def __init__(self, option) -> None:

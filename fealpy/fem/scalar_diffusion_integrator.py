@@ -77,8 +77,8 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         A = bm.einsum('ijkl, ckm, clm, c->cij', M, glambda, glambda, cm)
         return A
 
-    @assemblymethod('semilinear')
-    def semilinear_assembly(self, space: _FS) -> TensorLike:
+    @assemblymethod('nonlinear')
+    def nonlinear_assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
@@ -88,3 +88,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         coef_F = get_semilinear_coef(val_F, coef)
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched),\
                linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
+
+    @assemblymethod('isopara')
+    def isopara_assembly(self, space: _FS) -> TensorLike:
+        pass

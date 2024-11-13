@@ -19,6 +19,11 @@ def levy(n, m, beta):
 """
 Hippopotamus Optimization Algorithm
 
+Reference
+~~~~~~~~~
+Mohammad Hussein Amiri, Nastaran Mehrabi Hashjin, Mohsen Montazeri, Seyedali Mirjalili, Nima Khodadadi. 
+Hippopotamus optimization algorithm: a novel nature-inspired optimization algorithm.
+Scientific reports, 2024, 14: 5032.
 """
 
 class HippopotamusOptAlg(Optimizer):

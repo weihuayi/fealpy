@@ -398,7 +398,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         @brief Calculate the error between two functions.
         """
         GD = self.geo_dimension()
-
         qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)

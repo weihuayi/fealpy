@@ -18,6 +18,7 @@ class HelmholtzData2d():
 
     @cartesian
     def solution(self, p):
+        p = np.transpose(p, (1, 0, 2))
         k = self.k
         x = p[..., 0]
         y = p[..., 1]
@@ -31,11 +32,11 @@ class HelmholtzData2d():
 
     @cartesian
     def gradient(self, p):
-        print(p.shape)
         """
         x*(I*sin(k) + cos(k))*besselj(1, R*k)/(R*(besselj(0, k) + I*besselj(1, k))) - x*sin(R*k)/R
         y*(I*sin(k) + cos(k))*besselj(1, R*k)/(R*(besselj(0, k) + I*besselj(1, k))) - y*sin(R*k)/R
         """
+        p = np.transpose(p, (1, 0, 2))
         k = self.k
         x = p[..., 0]
         y = p[..., 1]
@@ -48,10 +49,12 @@ class HelmholtzData2d():
         t2 = t1 - t0
         val[..., 0] = t2*x
         val[..., 1] = t2*y
+        
         return val
 
     @cartesian
     def source(self, p):
+        p = np.transpose(p, (1, 0, 2))
         k = self.k
         x = p[..., 0]
         y = p[..., 1]
@@ -62,6 +65,7 @@ class HelmholtzData2d():
 
     @cartesian
     def robin(self, p, n):
+        p = np.transpose(p, (1, 0, 2))
         k = self.k
         x = p[..., 0]
         y = p[..., 1]
