@@ -22,7 +22,6 @@ from fealpy.tools.show import showmultirate, show_error_table
 
 # solver
 from fealpy.solver import cg, spsolve
-import ipdb
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -86,13 +85,13 @@ for i in range(maxit):
 
     #ipdb.set_trace()
     bfrom = BilinearForm(space)
-    bfrom.add_integrator(ScalarDiffusionIntegrator(q=p+3))
+    bfrom.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
     lfrom = LinearForm(space)
-    lfrom.add_integrator(ScalarSourceIntegrator(pde.source, q=p+3))
+    lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
 
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
-    C = space.integral_basis(q=p+3)
+    C = space.integral_basis()
 
     def coo(A):
         data = A._values
