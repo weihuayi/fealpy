@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from numpy import tan, arctan, sin, cos, pi, arctan2
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import fsolve
 import pytest
 
@@ -39,7 +40,7 @@ class TestGearSystem:
                                      inner_diam, tooth_width)
 
         quad_mesh = external_gear.generate_mesh()
-        quad_mesh.to_vtk(fname='../data/external_quad_mesh.vtu')
+        # quad_mesh.to_vtk(fname='../data/external_quad_mesh.vtu')
         hex_mesh = external_gear.generate_hexahedron_mesh()
         # hex_mesh.to_vtk(fname='external_hex_mesh.vtu')
         #
@@ -97,7 +98,7 @@ class TestGearSystem:
         # p = internal_gear.get_profile_points()
 
         quad_mesh = internal_gear.generate_mesh()
-        quad_mesh.to_vtk(fname='../data/internal_quad_mesh.vtu')
+        # quad_mesh.to_vtk(fname='../data/internal_quad_mesh.vtu')
         # r = internal_gear.r
         # # hex_mesh = generate_hexahedral_mesh(quad_mesh, internal_gear.beta, r, tooth_width, nw)
         # # hex_mesh.to_vtk(fname='internal_hex_mesh.vtu')
@@ -133,16 +134,29 @@ class TestGearSystem:
 
         helix_cell = np.array([[i, i + 1] for i in range(n - 1)])
         i_mesh = IntervalMesh(helix_node, helix_cell)
-        i_mesh.to_vtk('../data/interval_mesh.vtu')
+        # i_mesh.to_vtk('../data/interval_mesh.vtu')
 
-        # target_cell_idx = np.zeros(n, np.int32)
-        # local_face_idx = np.zeros(n, np.int32)
-        # parameters = np.zeros((n, 3), np.float64)
-        # for i, t_node in enumerate(helix_node):
-        #     target_cell_idx[i], local_face_idx[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
+        target_cell_idx = np.zeros(n, np.int32)
+        face_normal = np.zeros((n, 3), np.float64)
+        parameters = np.zeros((n, 3), np.float64)
+        for i, t_node in enumerate(helix_node):
+            target_cell_idx[i], face_normal[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
+
         # print(target_cell_idx)
-        # print(parameters)
-        # print(-1)
+        print(face_normal)
+        # 法向量后处理
+        # 计算平均法向量
+        average_normal = np.mean(face_normal, axis=0)
+        average_normal /= np.linalg.norm(average_normal)
+
+        threshold = 0.1
+        for i in range(len(face_normal)):
+            deviation = np.linalg.norm(face_normal[i] - average_normal)
+            if deviation > threshold:
+                face_normal[i] = average_normal
+        print((face_normal,))
+        # print((parameters,))
+        print(-1)
 
     def test_data(self):
         def read_csv_to_numpy(file_path):
@@ -242,10 +256,10 @@ class TestGearSystem:
         is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
         inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
 
-        with open('../data/external_gear_test_data.pkl', 'wb') as f:
-            pickle.dump({'external_gear': external_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
-                         'target_cell_idx': target_cell_idx, 'parameters': parameters,
-                         'is_inner_node': is_inner_node, 'inner_node_idx': inner_node_idx}, f)
+        # with open('../data/external_gear_test_data.pkl', 'wb') as f:
+        #     pickle.dump({'external_gear': external_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
+        #                  'target_cell_idx': target_cell_idx, 'parameters': parameters,
+        #                  'is_inner_node': is_inner_node, 'inner_node_idx': inner_node_idx}, f)
 
     def test_export_to_inp(self):
         with open('../data/external_gear_test_data.pkl', 'rb') as f:
@@ -275,6 +289,21 @@ class TestGearSystem:
         density = 7850
 
         export_to_inp('../data/external_gear_test.inp', node, cell, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density)
+
+    def test_face_normal(self):
+        import matplotlib.pyplot as plt
+
+        tesh_mesh = HexahedronMesh.from_box(nx=1, ny=1, nz=1)
+        normal = tesh_mesh.cell_normal()
+        print(normal)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        tesh_mesh.add_plot(ax)
+        tesh_mesh.find_face(ax, showindex=True)
+        plt.show()
+
+
 
 
 
