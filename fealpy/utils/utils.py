@@ -52,14 +52,14 @@ def process_coef_func(
     return coef_val
 
 
-def is_scalar(input: Union[int, float, TensorLike]) -> bool:
+def is_scalar(input: Union[int, float, complex, TensorLike]) -> bool:
     if isinstance(input, TensorLike):
         return bm.size(input) == 1
     else:
-        return isinstance(input, (int, float))
+        return isinstance(input, (int, float, complex))
 
 
-def is_tensor(input: Union[int, float, TensorLike]) -> bool:
+def is_tensor(input: Union[int, float, complex, TensorLike]) -> bool:
     if isinstance(input, TensorLike):
         return bm.size(input) >= 2
     return False
