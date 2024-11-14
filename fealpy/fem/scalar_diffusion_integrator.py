@@ -95,4 +95,21 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
 
     @assemblymethod('isopara')
     def isopara_assembly(self, space: _FS) -> TensorLike:
-        pass
+        """
+        曲面等参有限元积分子组装
+        """
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
+
+        rm = mesh.reference_cell_measure()
+        cm = mesh.entity_measure('cell', index=index)
+
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        G = mesh.first_fundamental_form(bcs) 
+        d = bm.sqrt(bm.linalg.det(G))
+        gphi = space.grad_basis(bcs, index=index, variable='u')
+
+        A = bm.einsum('q, cqim, cqmn, cqjn, cq -> cij', ws*rm, gphi, G, gphi, d)
+        return A
