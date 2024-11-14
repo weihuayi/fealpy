@@ -4,15 +4,15 @@
 from .integrator import *
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
-from .semilinear_form import SemilinearForm
+from .semilinear_form import NonlinearForm
 from .block_form import BlockForm
 from .linear_block_form import LinearBlockForm
 
 ### Cell Operator
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
-from .scalar_semilinear_diffusion_integrator import ScalarSemilinearDiffusionIntegrator
+from .scalar_nonlinear_diffusion_integrator import ScalarNonlinearDiffusionIntegrator
 from .scalar_mass_integrator import ScalarMassIntegrator
-from .scalar_semilinear_mass_integrator import ScalarSemilinearMassIntegrator
+from .scalar_nonlinear_mass_integrator import ScalarNonlinearMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elastic_integrator import LinearElasticIntegrator
 from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator0, PressWorkIntegrator1
@@ -45,4 +45,4 @@ from .dirichlet_bc_operator import DirichletBCOperator
 from .recovery_alg import RecoveryAlg
 
 ### Other
-from .semilinear_wrapper import SemilinearWrapperInt
+from .semilinear_wrapper import NonlinearWrapperInt
