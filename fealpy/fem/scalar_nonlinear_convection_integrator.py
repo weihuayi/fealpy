@@ -1,3 +1,4 @@
+
 from typing import Optional
 from functools import partial
 
@@ -9,14 +10,13 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func, is_scalar, is_tensor, fill_axis
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
-    SemilinearInt, OpInt, CellInt,
+    NonlinearInt, OpInt, CellInt,
     enable_cache,
     CoefLike
 )
 
 
-class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
-    r"""The diffusion integrator for function spaces based on homogeneous meshes."""
+class ScalarNonlinearConvectionIntegrator(NonlinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -46,7 +46,7 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarDiffusionIntegrator only support spaces on"
+            raise RuntimeError("The ScalarConvectionIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -54,50 +54,35 @@ class ScalarSemilinearDiffusionIntegrator(SemilinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable='x')
-        return bcs, ws, gphi, cm, index
+        gphi = space.grad_basis(bcs, index=index)
+        phi = space.basis(bcs, index=index)
+        return bcs, ws, phi, gphi, cm, index
+    
     def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
         coef = self.coef 
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, gphi, cm, index = self.fetch(space)       # gphi.shape ==[NC, NQ, ldof, dof_numel]
+        bcs, _, _, _, index = self.fetch(space)       
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-
-        if self.grad_kernel_func is not None:
-            val_A = self.grad_kernel_func(uh(bcs))         # [NC, NQ]          
-            coef_A = get_semilinear_coef(val_A, coef)
-            A = bilinear_integral(gphi, gphi, ws, cm, coef_A, batched=self.batched)
-            val_F = -uh.grad_value(bcs)                    # [NC, NQ, dof_numel]
-            coef_F = get_semilinear_coef(val_F, coef)
-            F = linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
-        else:
-            uh_ = uh[space.cell_to_dof()]
-            A, F = self.auto_grad(space, uh_, coef, batched=self.batched) 
+        uh_ = uh[space.cell_to_dof()]
+        A, F = self.auto_grad(space, uh_, coef, batched=self.batched) 
 
         return A, F
 
-    def cell_integral(self, u, cm, coef, gphi, ws, batched) -> TensorLike:
-        val = self.kernel_func(bm.einsum('i, qid -> qd', u, gphi))
-
-        if coef is None:
-            return bm.einsum('q, qid, qd -> i', ws, gphi, val) * cm
-
-        if is_scalar(coef):
-            return bm.einsum('q, qid, qd -> i', ws, gphi, val) * cm * coef
+    def cell_integral(self, u, cm, phi, coef, gphi, ws, batched) -> TensorLike:
+        val = self.kernel_func(bm.einsum('i, qi -> q', u, phi[0]))
 
         if is_tensor(coef):
             coef = fill_axis(coef, 3 if batched else 2)
-            return bm.einsum(f'q, qid, qd, ...qd -> ...i', ws, gphi, val, coef) * cm
+            return bm.einsum(f'q, qid, q, ...qd -> ...i', ws, gphi, val, coef) * cm
+        else:
+            raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
 
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
-        _, ws, gphi, cm, _ = self.fetch(space)
-        if is_scalar(coef) or coef is None:
-            cell_integral = partial(self.cell_integral, gphi=gphi, ws=ws, coef=coef, batched=batched) 
-        else:
-            cell_integral = partial(self.cell_integral, gphi=gphi, ws=ws, batched=batched)
+        _, ws, phi, gphi, cm, _ = self.fetch(space)
+        cell_integral = partial(self.cell_integral, phi=phi, gphi=gphi, ws=ws, batched=batched)
         fn_A = bm.vmap(bm.jacfwd(cell_integral))
         fn_F = bm.vmap(cell_integral)
-        if is_scalar(coef) or coef is None:
-            return fn_A(uh_, gphi, cm), -fn_F(uh_, gphi, cm)
-        else:
-            return fn_A(uh_, gphi, cm, coef), -fn_F(uh_, gphi, cm, coef)
+        return fn_A(uh_, gphi, cm, coef), -fn_F(uh_, gphi, cm, coef)
+
+    

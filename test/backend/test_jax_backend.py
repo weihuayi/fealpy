@@ -13,31 +13,31 @@ node = bm.array([
     [0.0, 0.0],
     [0.0, 1.0],
     [1.0, 0.0],
-    [1.0, 1.0]], dtype=bm.float_) # (NN, 2)
+    [1.0, 1.0]], dtype=bm.float32) # (NN, 2)
 
 edge = bm.array([
      [1,0],
      [0,2],
      [3,0],
      [3,1],
-     [2,3]], dtype=bm.int_)
+     [2,3]], dtype=bm.int32)
 
 cell = bm.array([
      [2,3,0],
-     [1,0,3]], dtype=bm.int_)
+     [1,0,3]], dtype=bm.int32)
 
 cellquad = bm.array([
-     [0,1,3,2]], dtype=bm.int_)
+     [0,1,3,2]], dtype=bm.int32)
 
 bcs = bm.array([
      [0,0,1],
      [1,0,0],
      [0,1,0],
-     [1/3,1/3,1/3]], dtype=bm.float_)
+     [1/3,1/3,1/3]], dtype=bm.float32)
 
 bcs1d = bm.array([
      [1/2,1/2],
-     [0,1]], dtype=bm.float_)
+     [0,1]], dtype=bm.float32)
 
 def test_multi_index_matrix():
     m = bm.multi_index_matrix(3, 2)

@@ -6,10 +6,10 @@ class MaterialInterpolation(ABC):
     
     def __init__(self, name: str):
         """
-        Initialize the material interpolation model.
+        初始化插值模型并设置标识名.
         
         Args:
-            name (str): Name of the interpolation model
+            name : 插值模型的唯一标识符
         """
         self.name = name
 
@@ -18,15 +18,16 @@ class MaterialInterpolation(ABC):
                         rho: TensorLike, 
                         P0: float, 
                         Pmin: float, 
-                        penal: float) -> TensorLike:
+                        penal: float
+                        ) -> TensorLike:
         """
-        Calculate the interpolated material property.
+        计算插值后的材料属性场.
         
         Args:
-            rho (TensorLike): Material density field
-            P0 (float): Property value for solid material
-            Pmin (float): Property value for void material
-            penal (float): Penalization factor
+            rho : Material density field
+            P0 : Property value for solid material
+            Pmin : Property value for void material 
+            penal : Penalization factor
             
         Returns:
             TensorLike: Interpolated property field
@@ -38,15 +39,16 @@ class MaterialInterpolation(ABC):
                                     rho: TensorLike, 
                                     P0: float, 
                                     Pmin: float, 
-                                    penal: float) -> TensorLike:
+                                    penal: float
+                                    ) -> TensorLike:
         """
-        Calculate the derivative of interpolated material property.
-        
+        计算插值后材料属性的导数
+                
         Args:
-            rho (TensorLike): Material density field
-            P0 (float): Property value for solid material
-            Pmin (float): Property value for void material
-            penal (float): Penalization factor
+            rho : Material density field
+            P0 : Property value for solid material
+            Pmin : Property value for void material
+            penal : Penalization factor
             
         Returns:
             TensorLike: Derivative of interpolated property field

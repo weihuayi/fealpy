@@ -9,13 +9,13 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func, is_scalar, is_tensor, fill_axis
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
-    SemilinearInt, OpInt, CellInt,
+    NonlinearInt, OpInt, CellInt,
     enable_cache,
     CoefLike
 )
 
 
-class ScalarSemilinearMassIntegrator(SemilinearInt, OpInt, CellInt):
+class ScalarNonlinearMassIntegrator(NonlinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
