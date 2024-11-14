@@ -18,7 +18,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.015
+        l0 = 0.02
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):
@@ -28,14 +28,14 @@ class square_with_circular_notch():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
-            6.1e-3, 1101)[1:]))
+        return bm.concatenate((bm.linspace(0, 5e-3, 501, dtype=bm.float64), bm.linspace(5e-3,
+            6.1e-3, 1101, dtype=bm.float64)[1:]))
     
     def is_x_force(self):
         """
         @brief x 方向的力
         """
-        return bm.linspace(0, 2.2e-2, 2201)
+        return bm.linspace(0, 2.2e-2, 2201, dtype=bm.float64)
 
     def is_force_boundary(self, p):
         """
@@ -115,6 +115,10 @@ parser.add_argument('--force_type',
         default='y', type=str,
         help='Force type, default is y.')
 
+parser.add_argument('--gpu', 
+        default=False, type=bool,
+        help='是否使用 GPU, 默认为 False.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -127,12 +131,14 @@ n = args.n
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
 force_type = args.force_type
-
+gpu = args.gpu
 
 tmr = timer()
 next(tmr)
 start = time.time()
 bm.set_backend(backend)
+if gpu:
+    bm.set_default_device('cuda')
 model = square_with_circular_notch()
 
 if args.mesh_type == 'tri':
@@ -146,12 +152,12 @@ else:
 
 mesh.uniform_refine(n=n)
 
-
+'''
 isMarkedCell = model.adaptive_mesh(mesh)
 while isMarkedCell.any():
     mesh.bisect(isMarkedCell)
     isMarkedCell = model.adaptive_mesh(mesh)
-
+'''
 
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)

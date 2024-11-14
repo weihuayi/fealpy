@@ -76,7 +76,7 @@ class ScalarNonlinearDiffusionIntegrator(NonlinearInt, OpInt, CellInt):
 
         return A, F
 
-    def cell_integral(self, u, cm, coef, gphi, ws, batched) -> TensorLike:
+    def cell_integral(self, u, cm, gphi, coef, ws, batched) -> TensorLike:
         val = self.kernel_func(bm.einsum('i, qid -> qd', u, gphi))
 
         if coef is None:
@@ -92,12 +92,12 @@ class ScalarNonlinearDiffusionIntegrator(NonlinearInt, OpInt, CellInt):
     def auto_grad(self, space, uh_, coef, batched) -> TensorLike:
         _, ws, gphi, cm, _ = self.fetch(space)
         if is_scalar(coef) or coef is None:
-            cell_integral = partial(self.cell_integral, gphi=gphi, ws=ws, coef=coef, batched=batched) 
+            cell_integral = partial(self.cell_integral, ws=ws, coef=coef, batched=batched) 
         else:
-            cell_integral = partial(self.cell_integral, gphi=gphi, ws=ws, batched=batched)
+            cell_integral = partial(self.cell_integral, ws=ws, batched=batched)
         fn_A = bm.vmap(bm.jacfwd(cell_integral))
         fn_F = bm.vmap(cell_integral)
         if is_scalar(coef) or coef is None:
-            return fn_A(uh_, gphi, cm), -fn_F(uh_, gphi, cm)
+            return fn_A(uh_, cm, gphi), -fn_F(uh_, cm, gphi)
         else:
-            return fn_A(uh_, gphi, cm, coef), -fn_F(uh_, gphi, cm, coef)
+            return fn_A(uh_, cm, gphi, coef), -fn_F(uh_, cm, gphi, coef)
