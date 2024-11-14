@@ -96,7 +96,7 @@ for i in range(maxit):
     uh = space.function() # 建立一个有限元函数
 
     bform = BilinearForm(space)
-    bform.add_integrator(ScalarDiffusionIntegrator())
+    bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
     lform = LinearForm(space)
     lform.add_integrator(ScalarSourceIntegrator(pde.source))
 
