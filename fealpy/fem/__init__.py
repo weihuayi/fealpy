@@ -4,7 +4,7 @@
 from .integrator import *
 from .bilinear_form import BilinearForm
 from .linear_form import LinearForm
-from .semilinear_form import NonlinearForm
+from .nonlinear_form import NonlinearForm
 from .block_form import BlockForm
 from .linear_block_form import LinearBlockForm
 
@@ -45,4 +45,4 @@ from .dirichlet_bc_operator import DirichletBCOperator
 from .recovery_alg import RecoveryAlg
 
 ### Other
-from .semilinear_wrapper import NonlinearWrapperInt
+from .nonlinear_wrapper import NonlinearWrapperInt

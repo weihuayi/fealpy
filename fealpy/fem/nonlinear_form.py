@@ -6,7 +6,7 @@ from ..backend import backend_manager as bm
 from ..sparse import COOTensor
 from .form import Form
 from .integrator import NonlinearInt, OpInt, SrcInt
-from .semilinear_wrapper import NonlinearWrapperInt
+from .nonlinear_wrapper import NonlinearWrapperInt
 
 
 class NonlinearForm(Form[NonlinearInt]):
