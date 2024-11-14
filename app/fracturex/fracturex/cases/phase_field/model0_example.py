@@ -11,7 +11,6 @@ from fealpy.utils import timer
 
 import time
 import matplotlib.pyplot as plt
-import json
 
 class square_with_circular_notch():
     def __init__(self):
@@ -138,10 +137,14 @@ ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
 
+
+ms.output_timer()
+
 ms.save_vtkfile(fname=vtkname)
 ms.solve(maxit=maxit)
 
 tmr.send('stop')
+tmr.send(None)
 end = time.time()
 
 force = ms.get_residual_force()

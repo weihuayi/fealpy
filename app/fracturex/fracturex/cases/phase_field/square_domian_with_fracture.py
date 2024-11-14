@@ -189,10 +189,12 @@ ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundar
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
 
+ms.output_timer()
 ms.save_vtkfile(fname=vtkname)
 ms.solve(maxit=maxit)
 
 tmr.send('stop')
+tmr.send(None)
 end = time.time()
 
 force = ms.Rforce
