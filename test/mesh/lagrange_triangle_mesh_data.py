@@ -177,8 +177,3 @@ edge_length_data = [
                1.1097288, 1.1097288, 1.1097288, 1.1097288, 1.1097288, 1.1097288], dtype=np.float64)
        }
 ]
-
-# 使用 lagrange_fe_space 来验证(此时p=1)
-uI_error_data = [
-        {"uI error": np.array([0.15084958, 0.0377124 , 0.0094281 , 0.00235702], dtype=np.float64)}
-        ]

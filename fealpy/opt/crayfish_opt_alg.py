@@ -5,7 +5,16 @@ from .. import logger
 import random
 from .optimizer_base import Optimizer, opt_alg_options
 
+"""
+Crayfish Optimization Algorithm
 
+Reference
+~~~~~~~~~
+Heming Jia, Honghua Rao, Changsheng Wen, Seyedali Mirjalili. 
+Crayfish optimization algorithm. 
+Artificial Intelligence Review, 2023, 56: S1919-S1979.
+
+"""
 
 class CrayfishOptAlg(Optimizer):
 

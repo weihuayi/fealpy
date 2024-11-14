@@ -7,10 +7,17 @@ from .dofs import LinearMeshCFEDof
 from .lagrange_fe_space import LagrangeFESpace
 from .tensor_space import TensorFunctionSpace
 from .cm_conforming_fe_space import CmConformingFESpace2d
+from .cm_conforming_fe_space3d import CmConformingFESpace3d
 from .bernstein_fe_space import BernsteinFESpace
 
 from .first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
 from .first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
 
-from.second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
-from.second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d
+from .second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
+from .second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d
+
+from .RaviartThomasFiniteElementSpace2d import RTFiniteElementSpace2d
+
+from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
+
+from .huzhang_fe_space_2d import HuZhangFESpace2D

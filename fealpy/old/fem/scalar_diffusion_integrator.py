@@ -1,6 +1,6 @@
 import numpy as np
 
-from fealpy.fem.precomp_data import data
+from fealpy.old.fem.precomp_data import data
 
 class ScalarDiffusionIntegrator:
     """

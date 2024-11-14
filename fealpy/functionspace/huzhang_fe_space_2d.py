@@ -5,20 +5,20 @@ from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
 
-from .lagrange_fe_space import LagrangeFiniteElementSpace
-from .function import Function
+from .lagrange_fe_space import LagrangeFESpace
+from .space import FunctionSpace
 from fealpy.decorator import barycentric, cartesian
 
 _MT = TypeVar("_MT", bound=Mesh)
 
-class HuZhangFE2D(FunctionSpace, Generic[_MT]):
+class HuZhangFESpace2D(FunctionSpace, Generic[_MT]):
     """
     Hu-Zhang finite element space in 2D.
     """
     def __init__(self, mesh: _MT, p: int=1):
         self.mesh = mesh
         self.p = p
-        self.space = LagrangeFiniteElementSpace(mesh, p)
+        self.space = LagrangeFESpace(mesh, p)
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
@@ -113,7 +113,7 @@ class HuZhangFE2D(FunctionSpace, Generic[_MT]):
             ldof: number of local degrees of freedom of the p-th order scalar space
             tdim: dimension of the symmetric tensor
         """
-        slef.face2dof = self.edge_to_dof()[:]
+        self.face2dof = self.edge_to_dof()[:]
 
     def init_edge_to_dof(self):
         """

@@ -59,7 +59,7 @@ class BoxDomainPolyLoaded3d():
 
 
 bm.set_backend('numpy')
-nx, ny, nz = 8, 8, 8 
+nx, ny, nz = 3, 3, 3 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
 
@@ -139,5 +139,6 @@ F = bm.set_at(F, isDDof, uh_bd[isDDof])
 
 uh = tensor_space.function()
 uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
+u_exact = tensor_space.interpolate(pde.solution)
 error = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
 print("----------------------")
