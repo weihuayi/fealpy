@@ -1,5 +1,5 @@
 """
-Abaqus 中需要
+一个载荷点，不处理重心坐标，考虑外法线方向的载荷的验证
 """
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
@@ -23,10 +23,12 @@ with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/e
 
 hex_mesh = data['hex_mesh']
 helix_node = data['helix_node']
-
-target_cell_idx = data['target_cell_idx']
+target_cells_idx = data['target_cell_idx']
 parameters = data['parameters']
 is_inner_node = data['is_inner_node']
+
+parameter = parameters[-1:] # (1, 3)
+target_cell_idx = target_cells_idx[-1:] # (1, )
 
 hex_cell = hex_mesh.cell
 hex_node = hex_mesh.node
@@ -40,19 +42,20 @@ node = mesh.entity('node')
 cell = mesh.entity('cell')
 
 # 带有载荷的节点的全局编号
-load_node_indices = cell[target_cell_idx].flatten() # (15*8, )
+load_node_indices = cell[target_cell_idx].flatten() # (1*8, )
 
-# load_values = bm.array([5000.0, 6000.0, 7900.0, 7800.0, 8700.0, 9500.0, 10200.0, 10900.0, 11400.0,
-#                         11900.0, 12300.0, 12700.0, 12900.0, 13000.0, 13100.0], dtype=bm.float64)
-load_values = bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 1020.0, 1090.0, 1140.0,
-                        1190.0, 1230.0, 1270.0, 1290.0, 1300.0, 1310.0], dtype=bm.float64)
+# 点载荷值
+load_values = bm.array([131.0], dtype=bm.float64)
+# 单位外法向量 
+cellnorm = mesh.cell_normal() # (NC, 3)
 
-u = parameters[..., 0]
-v = parameters[..., 1]
-w = parameters[..., 2]
-u = bm.clip(u, 0, 1)
-v = bm.clip(v, 0, 1)
-w = bm.clip(w, 0, 1)
+# 点载荷向量
+target_cellnorm = cellnorm[target_cell_idx] # (3, )
+P = bm.einsum('p, pd -> pd', load_values, target_cellnorm)  # (1, 3)
+
+u = parameter[..., 0]
+v = parameter[..., 1]
+w = parameter[..., 2]
 
 bcs_list = [
     (
@@ -62,7 +65,6 @@ bcs_list = [
     )
     for u, v, w in zip(u, v, w)
 ]
-
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 scalar_gdof = space.number_of_global_dofs()
 tensor_space = TensorFunctionSpace(space, shape=(3, -1))
@@ -71,7 +73,7 @@ tldof = tensor_space.number_of_local_dofs()
 cell2tdof = tensor_space.cell_to_dof()
 
 # 带有载荷的节点对应的全局自由度编号
-dof_indices = bm.stack([scalar_gdof * d + load_node_indices for d in range(GD)], axis=1)  # (15*8, GD)
+dof_indices = bm.stack([scalar_gdof * d + load_node_indices for d in range(GD)], axis=1)  # (1*8, 3)
 
 phi_loads = []
 for bcs in bcs_list:
@@ -80,7 +82,7 @@ for bcs in bcs_list:
 
 phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, NP, tldof, GD)
 
-FE_load = bm.einsum('p, cpld -> pl', load_values, phi_loads_array) # (NP, tldof)
+FE_load = bm.einsum('pd, cpld -> pl', P, phi_loads_array) # (1, 24)
 
 FE = bm.zeros((NC, tldof), dtype=bm.float64)
 FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)
@@ -92,5 +94,5 @@ indices = cell2tdof.reshape(1, -1)
 F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 
 # 从全局载荷向量中提取有载荷节点处的值
-F_load_nodes = F[dof_indices] # (15*8, GD)
+F_load_nodes = F[dof_indices] # (1*8, 3)
 print("----------------------------")
