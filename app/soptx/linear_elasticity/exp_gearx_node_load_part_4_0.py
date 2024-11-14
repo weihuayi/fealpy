@@ -1,3 +1,6 @@
+"""
+一个载荷点，不处理重心坐标，考虑外法线方向的载荷的计算
+"""
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.sparse import COOTensor
@@ -20,11 +23,12 @@ with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/e
 
 hex_mesh = data['hex_mesh']
 helix_node = data['helix_node']
-
-target_cell_idx = data['target_cell_idx']
+target_cells_idx = data['target_cell_idx']
 parameters = data['parameters']
 is_inner_node = data['is_inner_node']
 
+parameter = parameters[-1]
+target_cell_idx = target_cells_idx[-1]
 hex_cell = hex_mesh.cell
 hex_node = hex_mesh.node
 
@@ -36,32 +40,19 @@ NN = mesh.number_of_nodes()
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 
+load_values = bm.array([131.0], dtype=bm.float64) # (1, )
+# cellnorm = mesh.cell_normal() # (NC, 3)
+cellnorm = bm.zeros((NC, 3), dtype=bm.float64)
+cellnorm[:, 1] = -1
 
-# load_values = bm.array([5000.0, 6000.0, 7900.0, 7800.0, 8700.0, 9500.0, 10200.0, 10900.0, 11400.0,
-#                         11900.0, 12300.0, 12700.0, 12900.0, 13000.0, 13100.0], dtype=bm.float64)
-# load_values = bm.array([500.0, 600.0, 790.0, 780.0, 870.0, 950.0, 1020.0, 1090.0, 1140.0,
-#                         1190.0, 1230.0, 1270.0, 1290.0, 1300.0, 1310.0], dtype=bm.float64)
-load_values = bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 102.0, 109.0, 114.0,
-                        119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64)
+target_cellnorm = cellnorm[target_cell_idx] # (3, )
+P = bm.einsum('p,d -> pd', load_values, target_cellnorm)  # (1, 3)
 
-u = parameters[..., 0]
-v = parameters[..., 1]
-w = parameters[..., 2]
-# u = bm.clip(u, 0, 1)
-# v = bm.clip(v, 0, 1)
-# w = bm.clip(w, 0, 1)
+u = parameter[..., 0]
+v = parameter[..., 1]
+w = parameter[..., 2]
 
-bcs_list = [
-    (
-        # bm.tensor([[1 - u, u]]),
-        # bm.tensor([[1 - v, v]]),
-        # bm.tensor([[1 - w, w]])
-        bm.tensor([[u, 1 - u]]),
-        bm.tensor([[v, 1 - v]]),
-        bm.tensor([[w, 1 - w]])
-    )
-    for u, v, w in zip(u, v, w)
-]
+bcs = (bm.tensor([[u, 1 - u]]), bm.tensor([[v, 1 - v]]), bm.tensor([[w, 1 - w]]))
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 scalar_gdof = space.number_of_global_dofs()
@@ -70,14 +61,9 @@ tgdof = tensor_space.number_of_global_dofs()
 tldof = tensor_space.number_of_local_dofs()
 cell2tdof = tensor_space.cell_to_dof()
 
-phi_loads = []
-for bcs in bcs_list:
-    phi = tensor_space.basis(bcs)
-    phi_loads.append(phi)
+phi_loads_array = tensor_space.basis(bcs) # (1, 1, 24, 3)
 
-phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, NP, tldof, GD)
-
-FE_load = bm.einsum('p, cpld -> pl', load_values, phi_loads_array) # (NP, tldof)
+FE_load = bm.einsum('pd, cpld -> pl', P, phi_loads_array) # (1, 24)
 
 FE = bm.zeros((NC, tldof), dtype=bm.float64)
 FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)
@@ -156,5 +142,5 @@ print(f"Final residual norm: {residual_norm:.6e}")
 uh = uh.reshape(GD, NN).T
 
 mesh.nodedata['deform'] = uh[:]
-mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gearx_part_cg.vtu')
+mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gearx_part_1_node_load.vtu')
 print("-----------")

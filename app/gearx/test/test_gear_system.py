@@ -262,7 +262,7 @@ class TestGearSystem:
         #                  'is_inner_node': is_inner_node, 'inner_node_idx': inner_node_idx}, f)
 
     def test_export_to_inp(self):
-        with open('../data/external_gear_test_data.pkl', 'rb') as f:
+        with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/external_gear_data_part.pkl', 'rb') as f:
             data = pickle.load(f)
         external_gear = data['external_gear']
         hex_mesh = data['hex_mesh']
