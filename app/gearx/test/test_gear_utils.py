@@ -133,10 +133,15 @@ class TestGearUtils:
         print(local_face_idx)
         print(parameters)
 
-        # # 寻找内圈上节点
-        # node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
-        # is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
-        # inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+        # 寻找内圈上节点
+        node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+        inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+
+        with open('../data/external_gear_test_data.pkl', 'wb') as f:
+            pickle.dump({'external_gear': external_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh,
+                         'helix_node': helix_node, 'target_cell_idx': target_cell_idx,
+                         'parameters': parameters, 'is_inner_node': is_inner_node}, f)
 
 if __name__ == "__main__":
     pytest.main(["./test_gear_utils.py", "-k", "test_get_helix_points_and_sweep_points"])

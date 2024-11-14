@@ -203,9 +203,9 @@ class Gear(ABC):
         :return: 目标节点所在的单元索引，节点所在单元局部面索引，节点关于所在节点参数，若未找到则返回-1
         """
         # 使用 kd_tree 算法，先计算所有单元的重心坐标，再根据重心坐标与target_node构建 kd_tree
-        if self.target_hex_mesh is not None:
+        if hasattr(self, 'target_hex_mesh'):
             mesh = self.target_hex_mesh
-        elif self.hex_mesh is not None:
+        elif hasattr(self, 'hex_mesh'):
             mesh = self.hex_mesh
         else:
             raise ValueError('The hex_mesh attribute is not set.')
@@ -216,6 +216,7 @@ class Gear(ABC):
         # 获取网格实体信息
         cell = mesh.cell
         node = mesh.node
+        face = mesh.entity('face')
         local_tetra = np.array([
             [0, 1, 2, 6],
             [0, 5, 1, 6],
@@ -232,6 +233,7 @@ class Gear(ABC):
             (1, -1, -1, 2),
             (5, -1, -1, 2),
             (5, -1, -1, 0)], dtype=np.int32)
+        cell2face = mesh.cell2face
         # 根据网格单元测度设置误差限制
         error = np.max(mesh.entity_measure('cell')) * error
         # 遍历单元搜寻
@@ -243,18 +245,17 @@ class Gear(ABC):
             tetras = cell_node[local_tetra]
             # 遍历六个四面体
             for j, tetra in enumerate(tetras):
-                for i in range(tetra_local_face.shape[0]):
-                    current_face_node = tetra[tetra_local_face[i]]
+                for k in range(tetra_local_face.shape[0]):
+                    current_face_node = tetra[tetra_local_face[k]]
                     v = -sign_of_tetrahedron_volume(current_face_node[0], current_face_node[1], current_face_node[2],
                                                     target_node)
                     if v < 0 and abs(v - 0) > error:
                         break
-                    if (v > 0 or abs(v - 0) < error) and i == tetra_local_face.shape[0] - 1:
-                        t = (target_node[2] - cell_node[0, 2]) / (cell_node[4, 2] - cell_node[0, 2]);
+                    if (v > 0 or abs(v - 0) < error) and k == tetra_local_face.shape[0] - 1:
+                        t = (target_node[2] - cell_node[0, 2]) / (cell_node[4, 2] - cell_node[0, 2])
                         r_points = np.sqrt(np.sum(cell_node[0:4, 0:2] ** 2, axis=-1))
                         tooth_helix = (cell_node[4, 2] - cell_node[0, 2]) * tan(self.beta) / self.r
                         start_angle = arctan2(cell_node[0:4, 1], cell_node[0:4, 0])
-                        t_z = (cell_node[4, 2] - cell_node[0, 2]) * t + cell_node[0, 2]
                         # 构建目标节点所在截面四边形
                         t_node = np.zeros((4, 2))
                         t_node[:, 0] = r_points * cos((tooth_helix * t) + start_angle)
@@ -296,16 +297,18 @@ class Gear(ABC):
                                 if 0 - error <= v0 <= 1 + error:
                                     v = v0
                         w = t
-                        return cell_idx, tetra_face_to_hex_face[j, i], (u, v, w)
+                        # 计算接触点所在面外法线方向
+                        face_normal = -face_normal_bilinear(cell_node, u, v, w)
+                        return cell_idx, face_normal, (u, v, w)
         raise ValueError('Target node not found in any cell.')
 
-    def get_profile_node(self, tooth_tag=None):
+    def get_profile_node_index(self, tooth_tag=None):
         """
         寻找目标齿两侧齿廓上的节点索引及坐标
         :param tooth_tag: 目标齿编号，默认为 None，即所有齿
         :return: 齿廓节点索引及坐标
         """
-        if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
+        if not hasattr(self, 'hex_mesh'):
             raise ValueError('The hex_mesh attribute is not set.')
         # tooth_tag 输入类型检测，只能是整数或整数列表，并将其转换为列表
         if tooth_tag is not None:
