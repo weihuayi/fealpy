@@ -1,14 +1,20 @@
 # Am example config file for `box_tri_generator.py`
 
 head: 0
-tail: 2
+tail: 20
 
 data:
+  gd_folder: 'gd'
+  gn_file: 'gn'
   sigma: [10., 1.]
   ext: 63
   num_cir: 3
   freq: [1, 2, 3, 4, 5, 6, 8, 16]
-  dtype: 'float64'
+
+label:
+  label_folder: 'inclusion'
+  dtype: 'bool'
+  transition: 'bool'
 
 fem:
   p: 1
