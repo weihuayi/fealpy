@@ -153,6 +153,11 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
     def dot(x1, x2, /, *, axis=-1):
         return torch.tensordot(x1, x2, dims=[[axis], [axis]])
 
+    @staticmethod
+    def trace(x, /, *, offset: int = 0, axis1=0, axis2=1):
+        data = torch.diagonal(x, offset=offset, dim1=axis1, dim2=axis2)
+        return torch.sum(data, dim=-1)
+
     ### Manipulation Functions ###
     # python array API standard v2023.12
     concat = staticmethod(_dim_to_axis(torch.concat))

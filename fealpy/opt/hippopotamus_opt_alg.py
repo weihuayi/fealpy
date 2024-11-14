@@ -3,7 +3,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 from .optimizer_base import Optimizer
-# from .Levy import levy
+from .opt_function import levy
 from scipy.special import gamma
 
 def levy(n, m, beta):
@@ -15,6 +15,16 @@ def levy(n, m, beta):
     z = u / (bm.abs(v) ** (1 / beta))
     return z
 
+
+"""
+Hippopotamus Optimization Algorithm
+
+Reference
+~~~~~~~~~
+Mohammad Hussein Amiri, Nastaran Mehrabi Hashjin, Mohsen Montazeri, Seyedali Mirjalili, Nima Khodadadi. 
+Hippopotamus optimization algorithm: a novel nature-inspired optimization algorithm.
+Scientific reports, 2024, 14: 5032.
+"""
 
 class HippopotamusOptAlg(Optimizer):
     def __init__(self, option) -> None:

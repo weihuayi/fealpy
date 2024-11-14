@@ -62,7 +62,7 @@ class BilinearForm(Form[LinearInt]):
             ue2dof = e2dofs[0]
             ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
             local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
-
+            
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
             I = bm.broadcast_to(ve2dof[:, :, None], local_shape)

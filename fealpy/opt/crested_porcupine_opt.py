@@ -5,7 +5,15 @@ from .. import logger
 
 from .optimizer_base import Optimizer
 
+"""
+Crested Porcupine Optimization
 
+Reference
+~~~~~~~~~
+Mohamed Abdel-Basset, Reda Mohamed, Mohamed Abouhawwash.
+Crested Porcupine Optimizer: A new nature-inspired metaheuristic.
+Knowledge-Based Systems, 2024, 284: 111257
+"""
 class CrestedPorcupineOpt(Optimizer):
     def __init__(self, option) -> None:
         super().__init__(option)

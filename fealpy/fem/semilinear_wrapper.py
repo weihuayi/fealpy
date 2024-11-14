@@ -3,15 +3,15 @@ from typing import Union, Callable, Optional, Any, TypeVar, Tuple, Dict
 
 from ..typing import TensorLike, CoefLike
 from ..functionspace.space import FunctionSpace as _FS
-from .integrator import SemilinearInt, LinearInt
+from .integrator import NonlinearInt, LinearInt
 from ..functional import linear_integral, get_semilinear_coef
 from ..utils import is_scalar, is_tensor, fill_axis, process_coef_func
 from ..backend import backend_manager as bm
 
 
-class SemilinearWrapperInt(SemilinearInt):
-    """### Semilinear Wrapper Integrator
-    A wrapper class that converts a LinearInt into a SemilinearInt by extracting and passing parameters."""
+class NonlinearWrapperInt(NonlinearInt):
+    """### Nonlinear Wrapper Integrator
+    A wrapper class that converts a LinearInt into a NonlinearInt by extracting and passing parameters."""
 
     def __init__(self, linear_int: LinearInt, method: Optional[str]=None):
         method = 'assembly' if (method is None) else method

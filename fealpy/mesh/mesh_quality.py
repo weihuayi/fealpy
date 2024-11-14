@@ -26,19 +26,28 @@ class RadiusRatioQuality(MeshCellQuality):
             area = bm.cross(v[2], -v[1])/2
             quality = p*q/(16*area**2)
         elif self.mesh.top_dimension() == 3:
-            s = self.mesh.face_area()
+            vji = node[cell[:,0]] - node[cell[:,1]]
+            vki = node[cell[:,0]] - node[cell[:,2]]
+            vmi = node[cell[:,0]] - node[cell[:,3]]
+
+            vji2 = bm.sum(vji**2,axis=-1)
+            vki2 = bm.sum(vki**2,axis=-1)
+            vmi2 = bm.sum(vmi**2,axis=-1)
+
+            d = vmi2[:,None]*(bm.cross(vji,vki))+vji2[:,None]*(bm.cross(vki,vmi))+vki2[:,None]*(bm.cross(vmi,vji))
+            dl = bm.sqrt(bm.sum(d**2,axis=-1))
+            face = self.mesh.face
+            v01 = node[face[:,1],:] - node[face[:,0],:]
+            v02 = node[face[:,2],:] - node[face[:,0],:]
+            fm = bm.sqrt(bm.square(bm.cross(v01,v02)).sum(axis=1))/2.0
+
+            cm = bm.sum(-vmi*bm.cross(vji,vki),axis=1)/6.0
             cell2face = self.mesh.cell_to_face()
-            ss = bm.sum(s[cell2face], axis=1)
-            d = self.mesh.direction(0)
-            ld = bm.sqrt(bm.sum(d**2, axis=1))
-            vol = self.mesh.cell_volume()
-            R = ld/vol/12.0
-            r = 3.0*vol/ss
-            quality = R/r/3.0
+            s_sum = bm.sum(fm[cell2face], axis=-1) 
+            quality = s_sum*dl/108/cm/cm
         return quality
 
     def jac(self,x:TensorLike) -> TensorLike:
-        #node = self.mesh.entity('node')
         node = x
         cell = self.mesh.entity('cell')
         NC = self.mesh.number_of_cells()
@@ -130,8 +139,14 @@ class RadiusRatioQuality(MeshCellQuality):
             K[:, 3, 2] += l10
 
             S = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
-            fm = self.mesh.entity_measure("face")
-            cm = self.mesh.entity_measure("cell")
+            face = self.mesh.entity('face')
+            fv01 = node[face[:,1],:] - node[face[:,0],:]
+            fv02 = node[face[:,2],:] - node[face[:,0],:]
+            fm = bm.sqrt(bm.square(bm.cross(fv01,fv02)).sum(axis=1))/2.0
+            #fm = self.mesh.entity_measure("face")
+            #cm = self.mesh.entity_measure("cell")
+
+            cm = bm.sum(-v30*bm.cross(v10,v20),axis=1)/6.0
             c2f = self.mesh.cell_to_face()
 
             s = fm[c2f]
@@ -204,15 +219,10 @@ class RadiusRatioQuality(MeshCellQuality):
 
             S  /= s_sum[:,None,None]
 
-            #''' 
             C0 /= 3*cm[:,None,None]
             C1 /= 3*cm[:,None,None]
             C2 /= 3*cm[:,None,None]
-            '''
-            C0 /= 3
-            C1 /= 3
-            C2 /= 3
-            '''
+
             A  += S
             B0 -= C0
             B1 -= C1
@@ -221,17 +231,11 @@ class RadiusRatioQuality(MeshCellQuality):
             mu = s_sum*bm.sqrt(ld0)/(108*cm**2)
             #mu = s_sum*np.sqrt(ld0)/(108)
 
-            #''' 
             A  *= mu[:,None,None]/NC
             B0 *= mu[:,None,None]/NC
             B1 *= mu[:,None,None]/NC
             B2 *= mu[:,None,None]/NC
-            '''
-            A  *= mu[:,None,None]
-            B0 *= mu[:,None,None]
-            B1 *= mu[:,None,None]
-            B2 *= mu[:,None,None]
-            '''
+
             cell_node = node[cell]
             grad = bm.zeros((NC, 4, 3), dtype=bm.float64)
 
@@ -341,8 +345,14 @@ class RadiusRatioQuality(MeshCellQuality):
             K[:, 3, 2] += l10
 
             S = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
-            fm = self.mesh.entity_measure("face")
-            cm = self.mesh.entity_measure("cell")
+            face = self.mesh.entity('face')
+            fv01 = node[face[:,1],:] - node[face[:,0],:]
+            fv02 = node[face[:,2],:] - node[face[:,0],:]
+            fm = bm.sqrt(bm.square(bm.cross(fv01,fv02)).sum(axis=1))/2.0
+            #fm = self.mesh.entity_measure("face")
+            #cm = self.mesh.entity_measure("cell")
+
+            cm = bm.sum(-v30*bm.cross(v10,v20),axis=1)/6.0
             c2f = self.mesh.cell_to_face()
 
             s = fm[c2f]

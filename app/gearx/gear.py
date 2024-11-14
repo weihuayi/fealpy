@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from sympy import false
 
 from fealpy.geometry.utils import delta_angle_calculator
 from numpy import sin, cos, tan, pi, arctan, arctan2, radians, sqrt
@@ -59,6 +60,8 @@ class Gear(ABC):
         self.tooth_width = tooth_width
         self.mesh = None
         self.hex_mesh = None
+        self.target_quad_mesh = None
+        self.targer_hex_mesh = None
         self._material = material
         self.rotation_direction = rotation_direction
         self.center = center
@@ -200,9 +203,12 @@ class Gear(ABC):
         :return: 目标节点所在的单元索引，节点所在单元局部面索引，节点关于所在节点参数，若未找到则返回-1
         """
         # 使用 kd_tree 算法，先计算所有单元的重心坐标，再根据重心坐标与target_node构建 kd_tree
-        if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
+        if hasattr(self, 'target_hex_mesh'):
+            mesh = self.target_hex_mesh
+        elif hasattr(self, 'hex_mesh'):
+            mesh = self.hex_mesh
+        else:
             raise ValueError('The hex_mesh attribute is not set.')
-        mesh = self.hex_mesh
         cell_barycenter = mesh.entity_barycenter('cell')
         # 计算每个单元重心坐标与 target_node 的距离，并排序从而构建kd_tree
         distance = np.linalg.norm(cell_barycenter - target_node, axis=1)
@@ -210,6 +216,7 @@ class Gear(ABC):
         # 获取网格实体信息
         cell = mesh.cell
         node = mesh.node
+        face = mesh.entity('face')
         local_tetra = np.array([
             [0, 1, 2, 6],
             [0, 5, 1, 6],
@@ -226,6 +233,7 @@ class Gear(ABC):
             (1, -1, -1, 2),
             (5, -1, -1, 2),
             (5, -1, -1, 0)], dtype=np.int32)
+        cell2face = mesh.cell2face
         # 根据网格单元测度设置误差限制
         error = np.max(mesh.entity_measure('cell')) * error
         # 遍历单元搜寻
@@ -237,18 +245,17 @@ class Gear(ABC):
             tetras = cell_node[local_tetra]
             # 遍历六个四面体
             for j, tetra in enumerate(tetras):
-                for i in range(tetra_local_face.shape[0]):
-                    current_face_node = tetra[tetra_local_face[i]]
+                for k in range(tetra_local_face.shape[0]):
+                    current_face_node = tetra[tetra_local_face[k]]
                     v = -sign_of_tetrahedron_volume(current_face_node[0], current_face_node[1], current_face_node[2],
                                                     target_node)
                     if v < 0 and abs(v - 0) > error:
                         break
-                    if (v > 0 or abs(v - 0) < error) and i == tetra_local_face.shape[0] - 1:
-                        t = (target_node[2] - cell_node[0, 2]) / (cell_node[4, 2] - cell_node[0, 2]);
+                    if (v > 0 or abs(v - 0) < error) and k == tetra_local_face.shape[0] - 1:
+                        t = (target_node[2] - cell_node[0, 2]) / (cell_node[4, 2] - cell_node[0, 2])
                         r_points = np.sqrt(np.sum(cell_node[0:4, 0:2] ** 2, axis=-1))
                         tooth_helix = (cell_node[4, 2] - cell_node[0, 2]) * tan(self.beta) / self.r
                         start_angle = arctan2(cell_node[0:4, 1], cell_node[0:4, 0])
-                        t_z = (cell_node[4, 2] - cell_node[0, 2]) * t + cell_node[0, 2]
                         # 构建目标节点所在截面四边形
                         t_node = np.zeros((4, 2))
                         t_node[:, 0] = r_points * cos((tooth_helix * t) + start_angle)
@@ -290,16 +297,18 @@ class Gear(ABC):
                                 if 0 - error <= v0 <= 1 + error:
                                     v = v0
                         w = t
-                        return cell_idx, tetra_face_to_hex_face[j, i], (u, v, w)
+                        # 计算接触点所在面外法线方向
+                        face_normal = -face_normal_bilinear(cell_node, u, v, w)
+                        return cell_idx, face_normal, (u, v, w)
         raise ValueError('Target node not found in any cell.')
 
-    def get_profile_node(self, tooth_tag=None):
+    def get_profile_node_index(self, tooth_tag=None):
         """
         寻找目标齿两侧齿廓上的节点索引及坐标
         :param tooth_tag: 目标齿编号，默认为 None，即所有齿
         :return: 齿廓节点索引及坐标
         """
-        if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
+        if not hasattr(self, 'hex_mesh'):
             raise ValueError('The hex_mesh attribute is not set.')
         # tooth_tag 输入类型检测，只能是整数或整数列表，并将其转换为列表
         if tooth_tag is not None:
@@ -350,6 +359,44 @@ class Gear(ABC):
             tooth_profile_node_left[..., i, :] = tooth_profile_node_left[..., 0, :] + i * t_NN
 
         return (tooth_profile_node_right, tooth_profile_node_left), (hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
+
+    def set_target_tooth(self, target_tooth_tag):
+        if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
+            raise ValueError('The hex_mesh attribute is not set.')
+        target_tooth_tag = sorted(set(target_tooth_tag))
+        self.target_tooth_tag = target_tooth_tag
+        total_quad_mesh = self.mesh
+        total_hex_mesh = self.hex_mesh
+
+        tooth_num = len(target_tooth_tag)
+        # 获取目标齿相关单元
+        cell_tooth_tag = total_hex_mesh.celldata["cell_tooth_tag"]
+        is_target_cell = np.zeros(total_hex_mesh.number_of_cells(), dtype=bool)
+        for tag in target_tooth_tag:
+            is_target_cell |= (cell_tooth_tag == tag)
+        target_cell_idx = np.where(is_target_cell)[0]
+        target_cell = total_hex_mesh.cell[target_cell_idx]
+
+        # 标记目标齿面相关节点
+        is_target_node = np.zeros(total_hex_mesh.number_of_nodes(), dtype=bool)
+        # for cell in target_cell:
+        #     for node in cell:
+        #         is_target_node[node] = True
+        is_target_node[target_cell] = True
+        target_node_idx = np.where(is_target_node)[0]
+        target_node = total_hex_mesh.node[target_node_idx]
+
+        # 构建节点映射
+        node_idx_map = np.zeros(total_hex_mesh.number_of_nodes(), dtype=int)
+        node_idx_map[target_node_idx] = np.arange(len(target_node_idx))
+        # 单元映射
+        # for i, cell in enumerate(target_cell):
+        #     for j, node in enumerate(cell):
+        #         target_cell[i, j] = node_idx_map[node]
+        target_cell = node_idx_map[target_cell]
+
+        self.target_hex_mesh = HexahedronMesh(target_node, target_cell)
+        return self.target_hex_mesh
 
     @property
     def material(self):
