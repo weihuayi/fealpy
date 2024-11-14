@@ -26,6 +26,7 @@ class TestGearUtils:
         points = np.concatenate([a * np.cos(phi), b * np.sin(phi), np.zeros((len(phi), 1))], axis=-1)
 
         volume_points = sweep_points(points, beta, r, h, n)
+        print(-1)
 
         # # 绘制图像
         # # 创建3D图形对象
@@ -70,6 +71,41 @@ class TestGearUtils:
         print(NN)
         print(NC)
 
+    def test_generate_hexahedral_mesh2(self):
+        node = np.array([[0.0, 0.0],
+                         [0.0, 1.0],
+                         [0.0, 2.0],
+                         [1.0, 0.0],
+                         [1.0, 1.0],
+                         [1.0, 2.0],
+                         [2.0, 0.0],
+                         [2.0, 1.0],
+                         [2.0, 2.0]])
+
+        cell = np.array([[0, 3, 4, 1],
+                         [1, 4, 5, 2],
+                         [3, 6, 7, 4],
+                         [4, 7, 8, 5]])
+
+        quad_mesh = QuadrangleMesh(node, cell)
+        quad_mesh.celldata['cell_domain_tag'] = np.array([1, 2, 3, 4])
+        quad_mesh.celldata['cell_tooth_tag'] = np.array([1, 1, 2, 2])
+
+        beta = 0.2617993877991494
+        r = 49.17561856947894
+        tooth_width = 36.0
+        nw = 16
+        hex_mesh = generate_hexahedron_mesh(quad_mesh, beta, r, tooth_width, nw)
+
+
+        print(-1)
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # hex_mesh.add_plot(ax)
+        # hex_mesh.find_node(ax, showindex=True)
+        # hex_mesh.find_cell(ax, showindex=True)
+        # plt.show()
+
     def test_cylindrical_to_cartesian_and_find_node_location_kd_tree(self):
         with open('../data/external_gear.pkl', 'rb') as f:
             data = pickle.load(f)
@@ -97,10 +133,15 @@ class TestGearUtils:
         print(local_face_idx)
         print(parameters)
 
-        # # 寻找内圈上节点
-        # node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
-        # is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
-        # inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+        # 寻找内圈上节点
+        node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+        inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+
+        with open('../data/external_gear_test_data.pkl', 'wb') as f:
+            pickle.dump({'external_gear': external_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh,
+                         'helix_node': helix_node, 'target_cell_idx': target_cell_idx,
+                         'parameters': parameters, 'is_inner_node': is_inner_node}, f)
 
 if __name__ == "__main__":
     pytest.main(["./test_gear_utils.py", "-k", "test_get_helix_points_and_sweep_points"])

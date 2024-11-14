@@ -121,6 +121,31 @@ class LinearElasticMaterial(ElasticMaterial):
                                 [0, 0, mu]], dtype=bm.float64, device=device)
         else:
             raise NotImplementedError("Only 3D, plane_stress, and plane_strain are supported.")
+    
+    @property
+    def elastic_modulus(self) -> float:
+        """获取弹性模量"""
+        return self.E
+
+    @property
+    def poisson_ratio(self) -> float:
+        """获取泊松比"""
+        return self.nu
+
+    @property
+    def lame_lambda(self) -> float:
+        """获取拉梅常数 λ"""
+        return self.lam
+
+    @property
+    def shear_modulus(self) -> float:
+        """获取剪切模量 μ"""
+        return self.mu
+
+    @property
+    def hypothesis(self) -> str:
+        """获取平面假设"""
+        return self.hypo
 
     def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
         """

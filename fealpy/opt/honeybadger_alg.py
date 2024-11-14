@@ -8,6 +8,11 @@ from fealpy.opt.optimizer_base import Optimizer
 """
 Honey Badger Algorithm
 
+Reference
+~~~~~~~~~
+Fatma A. Hashim, Essam H. Houssein, Kashif Hussain, Mai S. Mabrouk, Walid Al-Atabany.
+Honey Badger Algorithm: New metaheuristic algorithm for solving optimization problems.
+Mathematics and Computers in Simulation, 2022, 192: 84-110.
 """
 
 class HoneybadgerAlg(Optimizer):

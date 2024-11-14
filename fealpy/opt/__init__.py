@@ -7,7 +7,7 @@ from .optimizer_base import opt_alg_options, Optimizer
 from .initialize import initialize
 from .crayfish_opt_alg import CrayfishOptAlg
 from .honeybadger_alg import HoneybadgerAlg
-from .quantum_particle_swarm_opt import QuantumParticleSwarmOpt
+from .quantum_particle_swarm_opt import QuantumParticleSwarmOpt, LevyQuantumParticleSwarmOpt
 from .snow_ablation_opt import SnowAblationOpt
 from .grey_wolf_optimizer import GreyWolfOptimizer
 from .particle_swarm_opt import ParticleSwarmOpt

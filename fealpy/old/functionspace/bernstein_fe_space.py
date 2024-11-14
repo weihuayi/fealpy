@@ -6,7 +6,7 @@ from .fem_dofs import *
 from .Function import Function
 from ..common.tensor import *
 
-from fealpy.quadrature.TetrahedronQuadrature import TetrahedronQuadrature
+from fealpy.old.quadrature.TetrahedronQuadrature import TetrahedronQuadrature
 from scipy.special import factorial, comb
 from scipy.sparse import csc_matrix, csr_matrix
 

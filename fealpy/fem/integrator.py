@@ -7,7 +7,7 @@ from ..functionspace.space import FunctionSpace as _FS
 __all__ = [
     'Integrator',
     'NonlinearInt',
-    'SemilinearInt',
+    # 'SemilinearInt',
     'LinearInt',
     'OpInt',
     'SrcInt',
@@ -144,10 +144,10 @@ class NonlinearInt(Integrator):
     pass
 
 
-class SemilinearInt(Integrator):
-    """### Semilinear Integrator
-    Base class for integrators generating integration linear to test functions `v`."""
-    pass
+# class SemilinearInt(Integrator):
+#     """### Semilinear Integrator
+#     Base class for integrators generating integration linear to test functions `v`."""
+#     pass
 
 
 class LinearInt(Integrator):
