@@ -2,7 +2,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import spsolve
+from fealpy.solver import cg
 
 from fealpy.pde.helmholtz_2d import HelmholtzData2d
 
@@ -18,7 +18,7 @@ from fealpy.fem import ScalarMassIntegrator           # (r*u, v)
 from fealpy.fem import ScalarSourceIntegrator         # (f, v)
 
 #边界积分子
-from fealpy.fem import BoundaryFaceSourceIntegrator   # <g_R, v>
+from fealpy.fem import ScalarRobinSourceIntegrator   # <g_R, v>
 from fealpy.fem import ScalarRobinBCIntegrator  # <kappa*u, v>
 
 #双线性形
@@ -56,7 +56,6 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 k = args.wavenum
 kappa = k * 1j
-c = complex(args.cip[0], args.cip[1])
 ns = args.ns
 maxit = args.maxit
 p=1
@@ -75,9 +74,9 @@ errorMatrix = np.zeros((4, maxit), dtype=np.float64)
 D = ScalarDiffusionIntegrator(coef=1, q=p+2)
 M = ScalarMassIntegrator(coef=-k**2, q=p+2)
 R = ScalarRobinBCIntegrator(coef=kappa, q=p+2)
-f = ScalarSourceIntegrator(pde.source, q=p+2)
 
-Vr = BoundaryFaceSourceIntegrator(pde.robin, q=p+2)
+f = ScalarSourceIntegrator(pde.source, q=p+2)
+Vr = ScalarRobinSourceIntegrator(pde.robin, q=p+2)
 
 for i in range(maxit):
 
@@ -95,13 +94,16 @@ for i in range(maxit):
     l.add_integrator([Vr])
 
     A = b.assembly() 
-    F = l.assembly()
+    F = l.assembly()   
+    D.clear()
+    M.clear()
+    R.clear()
 
+    f.clear()
+    Vr.clear()
+    
     uh = space.function(dtype=np.complex128)
-    uh[:] = spsolve(A, F)
-
-    print("线性系统求解残量：", np.linalg.norm(np.abs(A@uh-F)))
-
+    uh[:] = cg(A, F)
     uI = space.interpolate(pde.solution)
 
     errorMatrix[0, i] = mesh.error(pde.solution, uI, )
@@ -109,7 +111,7 @@ for i in range(maxit):
     errorMatrix[2, i] = mesh.error(pde.solution, uh, q=p+2)
     errorMatrix[3, i] = mesh.error(pde.gradient, uh.grad_value, q=p+2)
 
-bc = np.array([1/3, 1/3, 1/3])
+bc = np.array([[1/3, 1/3, 1/3]])
 ps = mesh.bc_to_point(bc)
 u = pde.solution(ps)
 uI = uI(bc)
