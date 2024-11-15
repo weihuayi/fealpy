@@ -17,3 +17,4 @@ from.second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
 from.second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d
 
 from.RaviartThomasFiniteElementSpace2d import RTFiniteElementSpace2d
+from.RaviartThomasFiniteElementSpace3d import RTFiniteElementSpace3d
