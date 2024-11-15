@@ -53,22 +53,15 @@ class EITDataGenerator():
         self.cdata_indices = bm.stack([cdata_row, cdata_col], axis=0)
 
     def set_levelset(self, sigma_vals: Tuple[float, float],
-                     levelset: Callable[[Tensor], Tensor],
-                     pixel: Tensor) -> Tensor:
+                     levelset: Callable[[Tensor], Tensor]) -> None:
         """Set inclusion distribution.
 
         Args:
             sigma_vals (Tuple[float, float]): Sigma value of inclusion and background.
             levelset (Callable): level-set function indicating inclusion and background.
-            pixel (Tensor): Sampler points on the interior on which the inclusion is indicated.
-                This may be different from the mesh nodes or cell barycenters.
-
-        Returns:
-            Tensor: Label boolean Tensor with True for inclusion nodes and False\
-                for background nodes, shaped (pixels, ).
         """
         def _coef_func(p: Tensor):
-            inclusion = levelset(p) < 0.
+            inclusion = levelset(p) < 0. # a bool tensor on quadrature points.
             sigma = bm.empty(p.shape[:2], **bm.context(p)) # (Q, C)
             sigma = bm.set_at(sigma, inclusion, sigma_vals[0])
             sigma = bm.set_at(sigma, ~inclusion, sigma_vals[1])
@@ -89,8 +82,6 @@ class EITDataGenerator():
         A_n_values = bm.concat([self._A.values(), self.cdata, self.cdata], axis=-1)
         A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
         self.A_n = A_n.tocsr()
-
-        return levelset(pixel) < 0.
 
     def set_boundary(self, gn_source: Union[Callable[[Tensor], Tensor], Tensor],
                      batch_size: int=0, *, zero_integral=False) -> Tensor:
@@ -154,14 +145,3 @@ class EITDataGenerator():
         # NOTE: interpolation points on nodes are arranged firstly,
         # therefore the value on the boundary nodes can be fetched like this:
         return uh[..., self._bd_node_index] # voltage
-
-# TODO: finish this
-class EITDataPreprocessor():
-    """Process the EIT data from voltage & current to the neumann boundary condition
-    of the data feature."""
-    def __init__(self, mesh: Mesh, p: int=1, q: Optional[int]=None):
-        q = q or p + 2
-
-        # setup function space
-        space = LagrangeFESpace(mesh, p=p, q=q)
-        self.space = space

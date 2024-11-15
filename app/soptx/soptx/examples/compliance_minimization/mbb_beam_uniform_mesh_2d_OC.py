@@ -15,6 +15,7 @@ from soptx.material import (
     SIMPInterpolation
 )
 from soptx.solver import FEMSolver
+from soptx.filter import create_filter_properties, TopologyFilter
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
@@ -98,9 +99,7 @@ def setup_problem(args):
                                         )
 
     # 创建插值模型实例
-    interpolation_model = SIMPInterpolation(
-                                            penalty_factor=3.0
-                                        )
+    interpolation_model = SIMPInterpolation(penalty_factor=3.0)
 
     # 创建材料属性对象
     material_properties = ElasticMaterialProperties(
@@ -114,7 +113,8 @@ def setup_problem(args):
                             tensor_space=tensor_space_C,
                             pde=pde
                         )
-    uh = fem_solver.solve(solver_method=args.solver_method)
+    solver_method = args.solver_method
+    uh = fem_solver.solve(solver_method=solver_method)
     
 
 

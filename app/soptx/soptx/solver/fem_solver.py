@@ -9,13 +9,18 @@ from fealpy.fem import DirichletBC
 
 from fealpy.sparse import CSRTensor
 
+from soptx.material import ElasticMaterialProperties
+
 from fealpy.solver import cg, spsolve
 
 from app.soptx.soptx.utils.timer import timer
 
 
 class FEMSolver:
-    def __init__(self, material_properties, tensor_space: TensorFunctionSpace, pde):
+    def __init__(self, 
+                material_properties: ElasticMaterialProperties, 
+                tensor_space: TensorFunctionSpace, 
+                pde):
         """
         Initialize the FEMSolver with the provided parameters.
         """
@@ -23,11 +28,28 @@ class FEMSolver:
         self.tensor_space = tensor_space
         self.pde = pde
 
+
+    def compute_base_stiffness_matrix(self) -> TensorLike:
+        """
+        计算 E=1 时的单元刚度矩阵，用于柔度计算
+        
+        Returns:
+            TensorLike: 基础单元刚度矩阵(E=1)
+        """
+        base_material = self.material_properties.base_elastic_material
+        integrator = LinearElasticIntegrator(
+                                            material=base_material, 
+                                            q=self.tensor_space.p + 3
+                                        )
+        ke0 = integrator.assembly(space=self.tensor_space)
+        return ke0
+
     def assemble_stiffness_matrix(self) -> CSRTensor:
         """Assemble the global stiffness matrix using the material properties and integrator."""
-        integrator = LinearElasticIntegrator(material=self.material_properties, 
-                                            q=self.tensor_space.p+3)
-        KE = integrator.assembly(self.tensor_space)
+        integrator = LinearElasticIntegrator(
+                                            material=self.material_properties, 
+                                            q=self.tensor_space.p + 3
+                                            )
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         K = bform.assembly(format='csr')
@@ -53,7 +75,12 @@ class FEMSolver:
         F = F - K.matmul(uh_bd)
         F[isBdDof] = uh_bd[isBdDof]
 
-        dbc = DirichletBC(space=self.tensor_space, gd=dirichlet, threshold=threshold)
+        dbc = DirichletBC(
+                        space=self.tensor_space, 
+                        gd=dirichlet, 
+                        threshold=threshold, 
+                        method='interp'
+                        )
         K = dbc.apply_matrix(matrix=K, check=True)
 
         return K, F
@@ -80,11 +107,11 @@ class FEMSolver:
         uh = self.tensor_space.function()
 
         if solver_method == 'cg':
-            uh[:] = cg(K, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+            uh[:] = cg(K, F[:], maxiter=5000, atol=1e-14, rtol=1e-14)
             if tmr:
                 tmr.send('Solve System with CG')
         elif solver_method == 'spsolve':
-            uh[:] = spsolve(K, F, solver='mumps')
+            uh[:] = spsolve(K, F[:], solver='mumps')
             if tmr:
                 tmr.send('Solve System with spsolve')
         else:

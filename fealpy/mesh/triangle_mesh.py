@@ -286,8 +286,15 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
+        Uniform refine the triangle mesh n times.
 
+        Parameters:
+            n (int): times refine the triangle mesh.
+            surface (function): the surface function.
+            returnim (bool): return the interpolation matrix or not.
         """
+        if returnim is True:
+            IM = []
 
         for i in range(n):
             NN = self.number_of_nodes()
@@ -300,12 +307,25 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype, device=self.device)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
 
+            if returnim is True:
+                A = coo_matrix(
+                        (bm.ones(NN, dtype=self.ftype), (bm.arange(NN), bm.arange(NN))), 
+                        shape=(NN + NE, NN))
+                A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 0])), 
+                                shape=(NN + NE, NN))
+                A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 1])), 
+                                shape=(NN + NE, NN))
+                IM.append(A.tocsr())
+
             self.node = bm.concatenate((node, newNode), axis=0)
             p = bm.concatenate((cell, edge2newNode[cell2edge]), axis=1)
             self.cell = bm.concatenate(
                     (p[:,[0,5,4]], p[:,[5,1,3]], p[:,[4,3,2]], p[:,[3,4,5]]),
                     axis=0)
             self.construct()
+
+        if returnim is True:
+            return IM
 
     def is_crossed_cell(self, point, segment):
         """
@@ -1392,7 +1412,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                          nodedata=self.nodedata,
                          celldata=self.celldata)
-            
+    @classmethod        
     def from_meshio(cls, file, show=False):
         import meshio
         data = meshio.read(file)

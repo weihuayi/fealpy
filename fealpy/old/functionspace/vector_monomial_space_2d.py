@@ -2,13 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 from numpy.linalg import inv
-from fealpy.functionspace.Function import Function
+from fealpy.old.functionspace.Function import Function
 from fealpy.decorator import cartesian, barycentric
 from fealpy.common import ranges
 
-from fealpy.functionspace.femdof import multi_index_matrix2d, multi_index_matrix1d
-from fealpy.functionspace.LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
-from fealpy.functionspace.scaled_monomial_space_2d import ScaledMonomialSpace2d 
+from fealpy.old.functionspace.femdof import multi_index_matrix2d, multi_index_matrix1d
+from fealpy.old.functionspace.LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
+from fealpy.old.functionspace.scaled_monomial_space_2d import ScaledMonomialSpace2d 
 class VMDof2d():
     """
     缩放单项式空间自由度管理类
