@@ -109,7 +109,6 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         G = mesh.first_fundamental_form(bcs) 
         d = bm.sqrt(bm.linalg.det(G))
-        gphi = space.grad_basis(bcs, index=index, variable='u')
-
-        A = bm.einsum('q, cqim, cqmn, cqjn, cq -> cij', ws*rm, gphi, G, gphi, d)
+        gphi = space.grad_basis(bcs, index=index, variable='x')
+        A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d)
         return A

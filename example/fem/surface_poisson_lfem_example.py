@@ -87,7 +87,7 @@ for i in range(maxit):
     bfrom = BilinearForm(space)
     bfrom.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
     lfrom = LinearForm(space)
-    lfrom.add_integrator(ScalarSourceIntegrator(pde.source))
+    lfrom.add_integrator(ScalarSourceIntegrator(pde.source, method='isopara'))
 
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
@@ -104,10 +104,7 @@ for i in range(maxit):
     
     uh = space.function()
     x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-    uh[:] = -x[:-1]
-
-    #uh[:] = -spsolve(A, F)[:-1]
-    
+    uh[:] = -x[:-1] 
     #tmr.send(f'第{i}次求解器时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)

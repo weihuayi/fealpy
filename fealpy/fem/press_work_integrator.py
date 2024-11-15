@@ -69,7 +69,7 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         return result
 
 
-class PressWorkIntegrator0(LinearInt, OpInt, CellInt):
+class PressWorkIntegratorX(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
@@ -113,7 +113,7 @@ class PressWorkIntegrator0(LinearInt, OpInt, CellInt):
         return result
 
 
-class PressWorkIntegrator1(LinearInt, OpInt, CellInt):
+class PressWorkIntegratorY(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False) -> None:
