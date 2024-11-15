@@ -166,11 +166,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         elif variables == 'x':
             G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
             G = bm.linalg.inv(G)
-            print("jjj", J.shape)  # NC,NQ,ldof,TD
-            print("ggg", G.shape)  # NC,NQ, 
-            print("ppp", gphi.shape)
-
-            gphi = bm.einsum('cqkm, cqmn, qln -> cqim', J, G, gphi) 
+            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
             return gphi
 
     # ipoint --> copy TriangleMesh
