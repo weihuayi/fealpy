@@ -77,3 +77,7 @@ class ScalarNeumannBCIntegrator(LinearInt, SrcInt, FaceInt):
             val = gN
 
         return linear_integral(phi, ws, fm, val, self.batched)
+    
+
+class ScalarRobinSourceIntegrator(ScalarNeumannBCIntegrator):
+    pass
