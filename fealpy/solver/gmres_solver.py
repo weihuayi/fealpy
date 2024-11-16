@@ -57,13 +57,18 @@ def _cupy_solve(A, b, tol, x0, maxiter ,atol):
         x = cp.asnumpy(x)
     return x
 
-def _scipy_solve(A, b, atol):
-    pass
+def _scipy_solve(A, b, tol, x0, maxiter ,atol):
+    from scipy.sparse.linalg import gmres 
+    from scipy.sparse import csr_matrix
+
+    A = A.to_scipy()
+    b = bm.to_numpy(b)
+    return gmres(A, b, x0=x0, maxiter=maxiter, atol=atol, rtol=tol)[0]
 
 
 def gmres(A:[COOTensor, CSRTensor], b, solver:str="cupy", 
-          tol=1e-5, x0=None, maxiter=None, atol=1e-12):
-    """Solve a linear system using a direct solver.
+          tol=1e-5, x0=None, maxiter=None, atol=0.0):
+    """Solve a linear system using a gmres solver.
 
     Parameters:
         A(COOTensor | CSRTensor): The matrix of the linear system.
@@ -73,10 +78,8 @@ def gmres(A:[COOTensor, CSRTensor], b, solver:str="cupy",
     Returns:
         Tensor: The solution of the linear system.
     """
-    if solver == "mumps":
-        return bm.tensor(_mumps_solve(A, b, atol=atol))
-    elif solver == "scipy":
-        return bm.tensor(_scipy_solve(A, b, atol=atol))
+    if solver == "scipy":
+        return bm.tensor(_scipy_solve(A, b, tol=tol, x0=x0, maxiter=maxiter, atol=atol))
     elif solver == "cupy":
         A = A.tocoo()
         return bm.tensor(_cupy_solve(A, b, tol=tol, x0=x0, maxiter=maxiter, atol=atol))
