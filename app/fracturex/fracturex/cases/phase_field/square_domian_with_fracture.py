@@ -200,8 +200,9 @@ end = time.time()
 force = ms.Rforce
 disp = ms.force_value
 tname = args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
-np.savetxt(tname, bm.to_numpy(force))
-with open(tname, 'w') as file:
+torch.save(force, 'force'+tname)
+#np.savetxt(tname, bm.to_numpy(force))
+with open('params'+tname, 'w') as file:
     file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')

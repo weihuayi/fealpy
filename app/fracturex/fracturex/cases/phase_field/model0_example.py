@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import argparse
 
 from fealpy.backend import backend_manager as bm
@@ -151,8 +152,9 @@ force = ms.get_residual_force()
 disp = model.is_force()
 
 tname = args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.txt'
-np.savetxt(tname, bm.to_numpy(force))
-with open(tname, 'w') as file:
+torch.save(force, 'force'+tname)
+#np.savetxt('force'+tname, bm.to_numpy(force))
+with open('params'+tname, 'w') as file:
     file.write(f'time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, hmin:{h},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
