@@ -6,7 +6,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.old.geometry.domain_2d import SquareWithCircleHoleDomain
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolver
+from app.fracturex.fracturex.phasefield.main_solver import MainSolve
 
 from fealpy.utils import timer
 
@@ -133,7 +133,7 @@ domain = SquareWithCircleHoleDomain(hmin=h)
 mesh = TriangleMesh.from_domain_distmesh(domain, maxit=100)
 
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=p)
+ms = MainSolve(mesh=mesh, material_params=model.params, p=p)
 tmr.send('init')
 
 # 拉伸模型边界条件
@@ -159,10 +159,12 @@ end = time.time()
 force = ms.get_residual_force()
 disp = model.is_force()
 
-tname = args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.txt'
-torch.save(force, 'force'+tname)
+ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.pt'
+
+torch.save(force, ftname)
 #np.savetxt('force'+tname, bm.to_numpy(force))
-with open('params'+tname, 'w') as file:
+tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model0_disp.txt'
+with open(tname, 'w') as file:
     file.write(f'time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, hmin:{h},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')

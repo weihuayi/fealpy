@@ -18,7 +18,7 @@ from fealpy.fem import NonlinearElasticIntegrator
 from fealpy.fem import DirichletBC
 
 from fealpy.solver import cg, spsolve, gmres
-#from scipy.sparse.linalg import lgmres
+from scipy.sparse.linalg import lgmres
 #from scipy.sparse.linalg import gmres
 #from scipy.sparse.linalg import minres
 #from scipy.linalg import issymmetric
@@ -29,7 +29,7 @@ from app.fracturex.fracturex.phasefield.adaptive_refinement import AdaptiveRefin
 from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichletBC
 
 
-class MainSolver:
+class MainSolve:
     def __init__(self, mesh, material_params: Dict, 
                  model_type: str = 'HybridModel', method: str = 'lfem', p: int = 1, q: int = None):
         """
@@ -223,9 +223,9 @@ class MainSolver:
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
-        print('aaaaaaaaaa')
-        du = spsolve(A.tocsr(), R, solver=self._solver)
-        print('bbbbbbbbbb')
+        
+        du = self.solver(A, R, atol=1e-20)
+        
         uh += du[:]
         self.uh = uh
         
@@ -269,7 +269,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        dd = gmres(A.tocsr(), R, solver=self._solver, tol=1e-18)
+        dd = self.solver(A, R, atol=1e-20)
          
         d += dd[:]
   
@@ -333,7 +333,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
 
-        du = gmres(A.tocsr(), R, solver=self._solver, tol=1e-18)
+        du = self.solver(A, R, atol=1e-20)
 
         uh += du[:]
         self.uh = uh
@@ -396,7 +396,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        dd = gmres(A.tocsr(), R, solver=self._solver, tol=1e-18)
+        dd = self.solver(A, R, atol=1e-20)
         d += dd[:]
 
         self.d = d
@@ -623,3 +623,20 @@ class MainSolver:
         Use GPU to solve the problem.
         """
         self._solver = 'cupy'
+
+    def solver(self, A, R, atol=1e-20):
+        """
+        Choose the solver.
+        """
+        if self._solver == 'scipy':
+            A = A.to_scipy()
+            R = bm.to_numpy(R)
+
+            x,info = lgmres(A, R, atol=atol)
+            x = bm.tensor(x)
+        elif self._solver == 'cupy':
+            x = gmres(A, R, atol=atol, solver=self._solver)
+        else:
+            raise ValueError(f"Unknown solver: {self._solver}")
+        return x
+        
