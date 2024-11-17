@@ -1,11 +1,12 @@
 import numpy as np
 import argparse
+import torch
 
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, QuadrangleMesh
 
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolver
+from app.fracturex.fracturex.phasefield.main_solver import MainSolve
 from fealpy.utils import timer
 import time
 import matplotlib.pyplot as plt
@@ -163,7 +164,7 @@ fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
+ms = MainSolve(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
 tmr.send('init')
 
 '''
@@ -189,16 +190,22 @@ ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundar
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
 
+ms.output_timer()
 ms.save_vtkfile(fname=vtkname)
 ms.solve(maxit=maxit)
 
 tmr.send('stop')
+tmr.send(None)
 end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
-tname = args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
-np.savetxt(tname, bm.to_numpy(force))
+
+ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.pt'
+
+torch.save(force, ftname)
+#np.savetxt('force'+tname, bm.to_numpy(force))
+tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
 with open(tname, 'w') as file:
     file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()

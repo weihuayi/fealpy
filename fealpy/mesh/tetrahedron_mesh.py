@@ -68,6 +68,15 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         NC = len(cell)
         c2f_order = c2f_loc[bm.arange(NC*4)[:, None], c2f_glo]
         return c2f_order.reshape(NC, 4, 3)
+    
+    def cell_to_face_sign(self):
+        
+        NC = self.number_of_cells()
+        NFC = self.number_of_faces_of_cells()
+        cell2faceSign = bm.zeros((NC, NFC), dtype=bm.bool)
+        f2c = self.face_to_cell()
+        cell2faceSign[f2c[:, 0], f2c[:, 2]] = True
+        return cell2faceSign
 
 
     ## @ingroup MeshGenerators
@@ -601,8 +610,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         for i in range(n):
             self.bisect()
 
-    def bisect_options(self, HB = None, data=None, disp=None):
-        options = {'HB' : HB, 'data': data, 'disp': disp}
+    def bisect_options(self, HB=None, data=None, disp=None):
+        options = {'HB': HB, 'data': data, 'disp': disp}
         return options
            
     def bisect(self, isMarkedCell=None, data=None, returnim=False, options={'disp': True}):
@@ -623,7 +632,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             oldnode = self.entity('node')
             oldcell = self.entity('cell')
         
-        if("HB" in options) & (options["HB"] is not None):
+        if ('HB' in options) and (options['HB'] is not None):
             HB = bm.tile(bm.arange(NC*4)[:, None], (1, 2))
             options["HB"] = HB
    
@@ -791,7 +800,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             self.celldata = bm.set_at(self.celldata, key, self.celldata[key][:NC])
             
 
-        if("HB" in options) & (options["HB"] is not None):
+        if("HB" in options) and (options["HB"] is not None):
             options['HB'] = options['HB'][:NC]
 
         if ('data' in options) and (options['data'] is not None):

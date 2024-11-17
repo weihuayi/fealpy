@@ -8,13 +8,13 @@ from fealpy.utils import process_coef_func
 from fealpy.functional import bilinear_integral
 
 from fealpy.fem.integrator import (
-    LinearInt, OpInt, CellInt,
+    LinearInt, OpInt, FaceInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class TangentFaceMassIntegrator(LinearInt, OpInt, CellInt):
+class TangentFaceMassIntegrator(LinearInt, OpInt, FaceInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
@@ -57,14 +57,16 @@ class TangentFaceMassIntegrator(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.face_basis(bcs)
+        phi = space.face_basis(bcs, index)
         return bcs, ws, phi, facemeasure, index, t
     
     def assembly(self, space: _FS):
         coef = self.coef
-        mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, fm, index, t = self.fetch(space)
-        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        phit = bm.einsum('eqid, ed -> eqi', phi, t[index])
+        mesh = space.mesh
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
+        phit = bm.einsum('eqid, ed -> eqi', phi, t[index,...])
         phii = bm.einsum('eqid -> eqi', phi)
-        return bilinear_integral(phii, phit, ws, fm, val, batched=self.batched)
+        #result = bm.einsum('eqi, eqj, q, e ->eij', phii, phit, ws, fm)*coef
+        result = bilinear_integral(phii, phit, ws, fm, val, batched=self.batched)
+        return result

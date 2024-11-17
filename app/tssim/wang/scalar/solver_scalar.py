@@ -14,15 +14,13 @@ from fealpy.fem import (ScalarConvectionIntegrator,
                         ScalarDiffusionIntegrator, 
                         ScalarMassIntegrator,
                         SourceIntegrator,
-                        PressWorkIntegrator)
+                        PressWorkIntegrator,
+                        PressWorkIntegratorX,
+                        PressWorkIntegratorY)
 from fealpy.fem import (BoundaryFaceMassIntegrator,
                         BoundaryFaceSourceIntegrator)
-from tangent_face_mass_integrator import TangentFaceMassIntegrator
+#from tangent_face_mass_integrator import TangentFaceMassIntegrator
                         
-                        
-                        
-
-
 class Solver():
     def __init__(self, pde, mesh, pspace, phispace, uspace, dt, q=5):
         self.mesh = mesh
@@ -64,6 +62,10 @@ class Solver():
 
     def CH_LForm(self):
         phispace = self.phispace
+        dt = self.dt
+        L_d = self.pde.L_d
+        epsilon = self.pde.epsilon
+        s = self.pde.s
         q = self.q
 
         L0 = LinearForm(phispace)
@@ -79,7 +81,7 @@ class Solver():
         L = LinearBlockForm([L0, L1])
         return L
 
-    def CH_update(self, u_0, u_1, phi_0, phi_1):
+    def CH_update(self, u_0x, u_0y, u_1x, u_1y, phi_0, phi_1):
         dt = self.dt
         s = self.pde.s
         epsilon =self.pde.epsilon
@@ -90,7 +92,7 @@ class Solver():
         # BilinearForm
         @barycentric
         def phi_C_coef(bcs, index):
-            return 4*dt*u_1(bcs, index)
+            return 4*dt*bm.stack((u_1x(bcs, index), u_1y(bcs, index)), axis=-1)
         self.phi_C.coef = phi_C_coef
         self.phi_C.clear()
         
@@ -98,7 +100,8 @@ class Solver():
         @barycentric
         def phi_coef(bcs, index):
             result = 4*phi_1(bcs, index) - phi_0(bcs, index) 
-            result += 2*dt*bm.einsum('jid, jid->ji', u_0(bcs, index), phi_1.grad_value(bcs, index))
+            result += 2*dt*bm.einsum('ji, ji->ji', u_0x(bcs, index), phi_1.grad_value(bcs, index)[...,0])
+            result += 2*dt*bm.einsum('ji, ji->ji', u_0y(bcs, index), phi_1.grad_value(bcs, index)[...,1])
             return result
         self.phi_SI.source = phi_coef
         self.phi_SI.clear()
@@ -117,14 +120,20 @@ class Solver():
         def mu_BF_coef(bcs, index):
             result0 = (-4*phi_1(bcs, index) + phi_0(bcs, index))/(2*dt)
 
-            result10 = 2*bm.einsum('eld, ed->el', u_1(bcs, index), tangent[index,:])
-            result10 *= bm.einsum('eld, ed->el', phi_1.grad_value(bcs, index), tangent[index,:])
-            result11 = bm.einsum('eld, ed->el', u_0(bcs, index), tangent[index,:])
-            result11 *= bm.einsum('eld, ed->el', phi_0.grad_value(bcs, index), tangent[index,:])
+            result10 = (2*bm.einsum('el, e->el', u_1x(bcs, index), tangent[index,0]) + 
+                        2*bm.einsum('el, e->el', u_1y(bcs, index), tangent[index,1]))
+            result10 *= (bm.einsum('el, e->el', phi_1.grad_value(bcs, index)[...,0], tangent[index,0])+ \
+                        bm.einsum('el, e->el', phi_1.grad_value(bcs, index)[...,1], tangent[index,1]))
+            
+            result11 = (bm.einsum('el, e->el', u_0x(bcs, index), tangent[index,0]) + 
+                        bm.einsum('el, e->el', u_0y(bcs, index), tangent[index,1]))
+            result11 *= (bm.einsum('el, e->el', phi_0.grad_value(bcs, index)[...,0], tangent[index,0])+
+                        bm.einsum('el, e->el', phi_0.grad_value(bcs, index)[...,1], tangent[index,1]))
+
             result1 = result10 - result11
 
-            result2 = -2*(bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2) * phi_1(bcs, index))
-            result2 += (bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2)*phi_0(bcs, index))
+            result2 = -2*(bm.sqrt(2)/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2) * phi_1(bcs, index))
+            result2 += (bm.sqrt(2)/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2)*phi_0(bcs, index))
             
             result = (1/V_s)*(result0 + result1) + result2
             return result
@@ -144,19 +153,21 @@ class Solver():
         self.u_C = ScalarConvectionIntegrator(q=q)
         D = ScalarDiffusionIntegrator(coef=2*dt, q=q)
         ## TODO:和老师确认一下这个边界积分子 
-        FM = TangentFaceMassIntegrator(coef=2*dt/L_s, q=q, threshold=self.pde.is_wall_boundary)
+        #FM = TangentFaceMassIntegrator(coef=2*dt/L_s, q=q, threshold=self.pde.is_wall_boundary)
         A00.add_integrator(M)
         A00.add_integrator(self.u_C)
         A00.add_integrator(D)
-        A00.add_integrator(FM)
+        #A00.add_integrator(FM)
 
-        A01 = BilinearForm((pspace, uspace))
-        A01.add_integrator(PressWorkIntegrator(coef=-2*dt, q=q))
+        A02 = BilinearForm((pspace, uspace))
+        A02.add_integrator(PressWorkIntegratorX(coef=-2*dt, q=q))
  
-        A10 = BilinearForm((pspace, uspace))
-        A10.add_integrator(PressWorkIntegrator(coef=1, q=q))
+        A12 = BilinearForm((pspace, uspace))
+        A12.add_integrator(PressWorkIntegratorY(coef=-2*dt, q=q))
         
-        A = BlockForm([[A00, A01], [A10.T, None]]) 
+        A = BlockForm([[A00, None, A02], 
+                       [None, A00, A12],
+                       [A02.T, A12.T, None]]) 
         return A
 
     def NS_LForm(self, q=None):
@@ -168,63 +179,73 @@ class Solver():
         L_s = self.pde.L_s
 
         L0 = LinearForm(uspace) 
-        self.u_SI = SourceIntegrator(q=q)
-        self.u_BF_SI = BoundaryFaceSourceIntegrator(q=q, threshold=self.pde.is_wall_boundary)
+        self.u_SI_x = SourceIntegrator(q=q)
+        self.u_BF_SI_x = BoundaryFaceSourceIntegrator(q=q, threshold=self.pde.is_wall_boundary)
         
         @cartesian
-        def uw_BF_SI_coef(p):
-            return (2*dt/L_s)*self.pde.u_w(p)
-        uw_BF_SI = BoundaryFaceSourceIntegrator(source=uw_BF_SI_coef, q=q, threshold=self.pde.is_wall_boundary)
+        def ux_BF_SI_coef(p):
+            return 2*dt*self.pde.u_w(p)[..., 0]/L_s
+        uw_BF_SI = BoundaryFaceSourceIntegrator(source=ux_BF_SI_coef, q=q, threshold=self.pde.is_wall_boundary)
         
+        L0.add_integrator(self.u_SI_x)
+        L0.add_integrator(self.u_BF_SI_x)
         L0.add_integrator(uw_BF_SI)
-        L0.add_integrator(self.u_SI)
-        L0.add_integrator(self.u_BF_SI)
+        
+        L1 = LinearForm(uspace) 
+        self.u_SI_y = SourceIntegrator(q=q)
+        self.u_BF_SI_y = BoundaryFaceSourceIntegrator(q=q, threshold=self.pde.is_wall_boundary)
+         
+        L1.add_integrator(self.u_SI_y)
+        L1.add_integrator(self.u_BF_SI_y)
 
-        L1 = LinearForm(pspace)
-        L = LinearBlockForm([L0, L1])
+        L2 = LinearForm(pspace)
+        L = LinearBlockForm([L0, L1, L2])
         return L
 
-    def NS_update(self, u_0, u_1, mu_2, phi_2, phi_1):
+    def NS_update(self, u_0x, u_0y, u_1x, u_1y, mu_2, phi_2, phi_1):
         dt = self.dt
         R = self.pde.R
         lam = self.pde.lam
         epsilon = self.pde.epsilon
-        normal = self.mesh.edge_unit_normal()
-        tangent = self.mesh.edge_unit_tangent()
-        
-        L_s = self.pde.L_s
+        n = self.mesh.edge_unit_normal()
+        t = self.mesh.edge_unit_tangent()
         theta_s = self.pde.theta_s
         
         ## BilinearForm
         def u_C_coef(bcs, index):
-            return 4*R*dt*u_1(bcs, index)
+            return 4*R*dt*bm.stack((u_1x(bcs, index), u_1y(bcs, index)), axis=-1)
         self.u_C.coef = u_C_coef
         self.u_C.clear()
         
-        def u_SI_coef(bcs, index):
-            result = R*(4*u_1(bcs, index) - u_0(bcs, index))
-            result += 2*R*dt*bm.einsum('cqij, cqj->cqi', u_1.grad_value(bcs, index), u_0(bcs, index))
-            result += 2*lam*dt*mu_2(bcs, index)[...,bm.newaxis]*phi_2.grad_value(bcs, index)
+        ## LinearForm
+        def u_SI_coef_x(bcs, index):
+            result = R*(4*u_1x(bcs, index) - u_0x(bcs, index))
+            result += 2*R*dt*(bm.einsum('cq, cq->cq', u_0x(bcs, index), u_1x.grad_value(bcs, index)[...,0])
+                              +bm.einsum('cq, cq->cq', u_0y(bcs, index), u_1x.grad_value(bcs, index)[...,1]))
+            result += 2*lam*dt*mu_2(bcs, index)*phi_2.grad_value(bcs, index)[...,0]
             return result
 
-        self.u_SI.source = u_SI_coef
-        self.u_SI.clear()
+        self.u_SI_x.source = u_SI_coef_x
+        self.u_SI_x.clear()
+        
+        def u_SI_coef_y(bcs, index):
+            result = R*(4*u_1y(bcs, index) - u_0y(bcs, index))
+            result += 2*R*dt*(bm.einsum('cq, cq->cq', u_0x(bcs, index), u_1y.grad_value(bcs, index)[...,0])
+                              +bm.einsum('cq, cq->cq', u_0y(bcs, index), u_1y.grad_value(bcs, index)[...,1]))
+            result += 2*lam*dt*mu_2(bcs, index)*phi_2.grad_value(bcs, index)[...,1]
+            return result
+
+        self.u_SI_y.source = u_SI_coef_y
+        self.u_SI_y.clear()
         
         def u_BF_SI_coef(bcs, index):
-            L_phi = epsilon*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), normal[index,:])
-            L_phi -= 2*(bm.sqrt(bm.array(2))/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_2(bcs, index))
-            L_phi +=   (bm.sqrt(bm.array(2))/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_1(bcs, index))
-            
-            result = 2*dt*lam*L_phi*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), tangent[index,:])
-            result = bm.repeat(result[..., bm.newaxis], 2, axis=-1)
-            
+            result = 2*dt*lam*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), t[index,:])
+            L_phi = epsilon*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), n[index,:])
+            L_phi -= 2*(bm.sqrt(2)/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_2(bcs, index))
+            L_phi += (bm.sqrt(2)/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_1(bcs, index))
+            result *= L_phi
             return result
-        self.u_BF_SI.source = u_BF_SI_coef
-        self.u_BF_SI.clear()
-
-    def reinit_phi(self, phi):
-       tag0 = phi[:] > 2.1*self.pde.epsilon
-       tag1 = phi[:] < -2.1*self.pde.epsilon
-       phi[tag0] = 1
-       phi[tag1] = -1
-       return phi[:]
+        self.u_BF_SI_x.source = u_BF_SI_coef
+        self.u_BF_SI_x.clear()
+        self.u_BF_SI_y.source = u_BF_SI_coef
+        self.u_BF_SI_y.clear()
