@@ -10,14 +10,14 @@ from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem import LinearElasticIntegrator, ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator
 
 # 自动微分模块
-from fealpy.fem import SemilinearForm
-from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarSemilinearDiffusionIntegrator
+from fealpy.fem import NonlinearForm
+from fealpy.fem import ScalarNonlinearMassIntegrator, ScalarNonlinearDiffusionIntegrator
 from fealpy.fem import NonlinearElasticIntegrator
 
 # 边界处理模块
 from fealpy.fem import DirichletBC
 
-from fealpy.solver import cg, spsolve
+from fealpy.solver import cg, spsolve, gmres
 from scipy.sparse.linalg import lgmres
 #from scipy.sparse.linalg import gmres
 #from scipy.sparse.linalg import minres
@@ -29,7 +29,7 @@ from app.fracturex.fracturex.phasefield.adaptive_refinement import AdaptiveRefin
 from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichletBC
 
 
-class MainSolver:
+class MainSolve:
     def __init__(self, mesh, material_params: Dict, 
                  model_type: str = 'HybridModel', method: str = 'lfem', p: int = 1, q: int = None):
         """
@@ -81,6 +81,12 @@ class MainSolver:
 
         self._save_vtk = False
         self._atype = None
+        self._timer = False
+        
+        if self.uh.device == 'cpu':
+            self._solver = 'scipy'
+        else:
+            self._solver = 'cupy'
 
         # Initialize the timer
         self.tmr = timer()
@@ -147,8 +153,6 @@ class MainSolver:
             else:
                 raise ValueError(f"Unknown method: {self.method}")
 
-            tmr.send('disp_solve')
-
             # Solve the phase field
             if self._method == 'lfem':
                 if self._atype == 'auto':
@@ -158,9 +162,6 @@ class MainSolver:
                     er1 = self.solve_phase_field()
             else:
                 raise ValueError(f"Unknown method: {self.method}")
-
-            tmr.send('phase_solve')
-
 
             # Adaptive refinement
             if self.enable_refinement:
@@ -174,14 +175,15 @@ class MainSolver:
                     self.update_interpolation_data(new_data)
                     print(f"Refinement after iteration {k + 1}")
 
-            tmr.send('refine')
+                tmr.send('refine')
 
             # Check for convergence
             if k == 0:
                 e0, e1 = er0, er1
             
             error = max(er0/e0, er1/e1)
-            tmr.send('end')
+            if self._timer:
+                tmr.send(None)
 
             print(f"Displacement error after iteration {k + 1}: {er0/e0}")
             print(f"Phase field error after iteration {k + 1}: {er1/e1}")
@@ -201,7 +203,7 @@ class MainSolver:
         """
         uh = self.uh
         tmr = self.tmr
-        tmr.send('start')
+        tmr.send('disp_start')
 
         fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self._force_dof, direction=self._force_direction)
         uh, force_index = fbc.apply_value(uh)
@@ -221,16 +223,14 @@ class MainSolver:
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
-
-        #du = cg(A.tocsr(), R, atol=1e-18)
-        #du = spsolve(A, R)
-        du = self._solver(A.tocsr(), R)
-
+        
+        du = self.solver(A, R, atol=1e-20)
+        
         uh += du[:]
         self.uh = uh
         
         self.pfcm.update_disp(uh)
-        tmr.send('disp_solve')
+        tmr.send('disp_solver')
         return bm.linalg.norm(R)
 
     def solve_phase_field(self) -> float:
@@ -249,7 +249,7 @@ class MainSolver:
             return 2 * self.pfcm.maximum_historical_field(bc)
 
         tmr = self.tmr
-        tmr.send('start')
+        tmr.send('phase_start')
 
         dbform = BilinearForm(self.space)
         dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0, q=self.q))
@@ -269,10 +269,8 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        #dd = cg(A.tocsr(), R, atol=1e-18)
-        dd = self._solver(A.tocsr(), R)
-        
-        #dd = spsolve(A, R) 
+        dd = self.solver(A, R, atol=1e-20)
+         
         d += dd[:]
   
 
@@ -280,7 +278,7 @@ class MainSolver:
         self.pfcm.update_phase(d)
         self.H = self.pfcm.H
 
-        tmr.send('phase_solve')
+        tmr.send('phase_solver')
         return bm.linalg.norm(R)
     
     def solve_displacement_auto(self) -> float:
@@ -294,7 +292,7 @@ class MainSolver:
         """
         uh = self.uh
         tmr = self.tmr
-        tmr.send('start')
+        tmr.send('diap_start')
 
         fbc = VectorDirichletBC(self.tspace, self._currt_force_value, self._force_dof, direction=self._force_direction)
         uh, force_index = fbc.apply_value(uh)
@@ -307,7 +305,7 @@ class MainSolver:
         postive_coef.uh = uh
         postive_coef.kernel_func = self.pfcm.positive_stress_func
 
-        ubform = SemilinearForm(self.tspace)
+        ubform = NonlinearForm(self.tspace)
         ubform.add_integrator(NonlinearElasticIntegrator(coef=postive_coef, material=self.pfcm, q=self.q))
 
         if self.model_type == 'HybridModel' or self.model_type == 'IsotropicModel':
@@ -335,15 +333,13 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
 
-        #du = cg(A.tocsr(), R, atol=1e-18)
-        #du = spsolve(A, R)
-        du = self._solver(A.tocsr(), R)
+        du = self.solver(A, R, atol=1e-20)
 
         uh += du[:]
         self.uh = uh
         
         self.pfcm.update_disp(uh)
-        tmr.send('disp_solve')
+        tmr.send('disp_solver')
         return bm.linalg.norm(R)
     
     def solve_phase_field_auto(self) -> float:
@@ -386,12 +382,12 @@ class MainSolver:
         diffusion_coef.uh = d
 
         tmr = self.tmr
-        tmr.send('start')
+        tmr.send('phase_start')
 
         # using automatic differentiation to assemble the phase field system        
-        dform = SemilinearForm(self.space)
-        dform.add_integrator(ScalarSemilinearDiffusionIntegrator(diffusion_coef, q=self.q)) 
-        dform.add_integrator(ScalarSemilinearMassIntegrator(mass_coef, q=self.q))
+        dform = NonlinearForm(self.space)
+        dform.add_integrator(ScalarNonlinearDiffusionIntegrator(diffusion_coef, q=self.q)) 
+        dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef, q=self.q))
         dform.add_integrator(ScalarSourceIntegrator(source_coef, q=self.q))
 
         A, R = dform.assembly()
@@ -400,16 +396,14 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        #dd = cg(A.tocsr(), R, atol=1e-18)
-        dd = self._solver(A.tocsr(), R)
-        #dd = spsolve(A, R) 
+        dd = self.solver(A, R, atol=1e-20)
         d += dd[:]
 
         self.d = d
         self.pfcm.update_phase(d)
         self.H = self.pfcm.H
 
-        tmr.send('phase_solve')
+        tmr.send('phase_solver')
         return bm.linalg.norm(R)
 
 
@@ -605,6 +599,10 @@ class MainSolver:
         Get the residual vector.
         """
         return self._Rforce
+    
+    def output_timer(self):
+        self._timer = True
+
 
     def set_energy_degradation(self, EDfunc=None):
         """
@@ -620,20 +618,25 @@ class MainSolver:
         else:
             self.EDFunc = EDFunc
 
-    def _solver(self, A, R):
+    def gpu_solver(self):
         """
-        Solve the linear system.
+        Use GPU to solve the problem.
+        """
+        self._solver = 'cupy'
 
-        Parameters
-        ----------
-        A : sparse matrix
-            System matrix.
-        R : ndarray
-            Residual vector.
+    def solver(self, A, R, atol=1e-20):
         """
-        A = A.to_scipy()
-        b = bm.to_numpy(R)
-        #x = gmres(A, b)
-        x,info = lgmres(A, b, atol=1e-18)
-        x = bm.tensor(x)
+        Choose the solver.
+        """
+        if self._solver == 'scipy':
+            A = A.to_scipy()
+            R = bm.to_numpy(R)
+
+            x,info = lgmres(A, R, atol=atol)
+            x = bm.tensor(x)
+        elif self._solver == 'cupy':
+            x = gmres(A, R, atol=atol, solver=self._solver)
+        else:
+            raise ValueError(f"Unknown solver: {self._solver}")
         return x
+        
