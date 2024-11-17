@@ -4,7 +4,6 @@ from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
 from fealpy.mesh import QuadrangleMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.fem import SemilinearForm
 from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
 from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
 from fealpy.fem.bilinear_form import BilinearForm
