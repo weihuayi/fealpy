@@ -34,7 +34,7 @@ from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
 
 ### Face Source
-from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator
 from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
 
 ### Dirichlet BC
