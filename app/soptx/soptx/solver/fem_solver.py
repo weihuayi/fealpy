@@ -9,13 +9,18 @@ from fealpy.fem import DirichletBC
 
 from fealpy.sparse import CSRTensor
 
+from soptx.material import ElasticMaterialProperties
+
 from fealpy.solver import cg, spsolve
 
 from app.soptx.soptx.utils.timer import timer
 
 
 class FEMSolver:
-    def __init__(self, material_properties, tensor_space: TensorFunctionSpace, pde):
+    def __init__(self, 
+                material_properties: ElasticMaterialProperties, 
+                tensor_space: TensorFunctionSpace, 
+                pde):
         """
         Initialize the FEMSolver with the provided parameters.
         """
@@ -41,8 +46,10 @@ class FEMSolver:
 
     def assemble_stiffness_matrix(self) -> CSRTensor:
         """Assemble the global stiffness matrix using the material properties and integrator."""
-        integrator = LinearElasticIntegrator(material=self.material_properties, 
-                                            q=self.tensor_space.p+3)
+        integrator = LinearElasticIntegrator(
+                                            material=self.material_properties, 
+                                            q=self.tensor_space.p + 3
+                                            )
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         K = bform.assembly(format='csr')

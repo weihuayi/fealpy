@@ -5,8 +5,8 @@ logger.setLevel('WARNING')
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import SemilinearForm
-from fealpy.fem import ScalarSemilinearMassIntegrator, ScalarDiffusionIntegrator
+from fealpy.fem import NonlinearForm
+from fealpy.fem import ScalarNonlinearMassIntegrator, ScalarDiffusionIntegrator
 from fealpy.fem import ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.pde.semilinear_2d import SemilinearData
@@ -100,10 +100,10 @@ for i in range(maxit):
 
     #添加积分子
     D = ScalarDiffusionIntegrator(diffusion_coef, q=p+2)
-    M = ScalarSemilinearMassIntegrator(reaction_coef, q=p+2)
+    M = ScalarNonlinearMassIntegrator(reaction_coef, q=p+2)
     f = ScalarSourceIntegrator(pde.source, q=p+2)
 
-    sform = SemilinearForm(space)
+    sform = NonlinearForm(space)
     sform.add_integrator([D, M])
     sform.add_integrator(f)
     bc = DirichletBC(space, gd=0.0, threshold=isDDof)

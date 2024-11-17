@@ -36,15 +36,20 @@ NN = mesh.number_of_nodes()
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 
-load_values = bm.array([5000.0, 6000.0, 7900.0, 7800.0, 8700.0, 9500.0, 10200.0, 10900.0, 11400.0,
-                        11900.0, 12300.0, 12700.0, 12900.0, 13000.0, 13100.0], dtype=bm.float64)
+
+# load_values = bm.array([5000.0, 6000.0, 7900.0, 7800.0, 8700.0, 9500.0, 10200.0, 10900.0, 11400.0,
+#                         11900.0, 12300.0, 12700.0, 12900.0, 13000.0, 13100.0], dtype=bm.float64)
+# load_values = bm.array([500.0, 600.0, 790.0, 780.0, 870.0, 950.0, 1020.0, 1090.0, 1140.0,
+#                         1190.0, 1230.0, 1270.0, 1290.0, 1300.0, 1310.0], dtype=bm.float64)
+load_values = bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 102.0, 109.0, 114.0,
+                        119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64)
 
 u = parameters[..., 0]
 v = parameters[..., 1]
 w = parameters[..., 2]
-u = bm.clip(u, 0, 1)
-v = bm.clip(v, 0, 1)
-w = bm.clip(w, 0, 1)
+# u = bm.clip(u, 0, 1)
+# v = bm.clip(v, 0, 1)
+# w = bm.clip(w, 0, 1)
 
 bcs_list = [
     (
@@ -140,7 +145,7 @@ from fealpy import logger
 logger.setLevel('INFO')
 
 uh = tensor_space.function()
-uh[:] = cg(K, F, maxiter=10000, atol=1e-6, rtol=1e-6)
+uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
 # uh[:] = spsolve(K, F, solver='mumps')
 
 # 计算残差向量和范数

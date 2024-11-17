@@ -5,11 +5,11 @@ from ..typing import TensorLike
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor
 from .form import Form
-from .integrator import SemilinearInt, OpInt, SrcInt
-from .semilinear_wrapper import SemilinearWrapperInt
+from .integrator import NonlinearInt, OpInt, SrcInt
+from .nonlinear_wrapper import NonlinearWrapperInt
 
 
-class SemilinearForm(Form[SemilinearInt]):
+class NonlinearForm(Form[NonlinearInt]):
     _M: Optional[COOTensor] = None
     _V: Optional[COOTensor] = None
 
@@ -26,15 +26,15 @@ class SemilinearForm(Form[SemilinearInt]):
 
         for ints_ in INTS:
             if isinstance(ints_, OpInt):
-                if not isinstance(ints_, SemilinearInt):
-                    ints_ = SemilinearWrapperInt(ints_)
+                if not isinstance(ints_, NonlinearInt):
+                    ints_ = NonlinearWrapperInt(ints_)
                 SEMILINEAR_INTS.append(ints_)
 
         ct_F = SEMILINEAR_INTS[0](self.space)[1] if len(SEMILINEAR_INTS) !=0 else None
 
         if isinstance(INTS[0], OpInt):
-            if not isinstance(INTS[0], SemilinearInt):
-                ct_A = SemilinearWrapperInt(INTS[0])(self.space)[0]
+            if not isinstance(INTS[0], NonlinearInt):
+                ct_A = NonlinearWrapperInt(INTS[0])(self.space)[0]
             else:
                 ct_A = INTS[0](self.space)[0]
         else:

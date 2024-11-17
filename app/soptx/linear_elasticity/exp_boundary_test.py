@@ -76,7 +76,7 @@ phi0 = phi[0]
 gphi_u = mesh.grad_shape_function(bcs) # (NC, NQ, ldof, GD)
 gphi = space.grad_basis(bc=bcs) # (NC, NQ, ldof, GD)
 
-tensor_space = TensorFunctionSpace(space, shape=(3, -1))
+tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
 tgdof = tensor_space.number_of_global_dofs()
 phi_tensor = tensor_space.basis(bcs) # (1, NQ, tldof, GD)
 phi_tensor00 = phi_tensor[0, 0]

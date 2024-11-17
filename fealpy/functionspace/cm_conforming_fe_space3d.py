@@ -12,7 +12,7 @@ from fealpy.functionspace.bernstein_fe_space import BernsteinFESpace
 from .functional import symmetry_span_array, symmetry_index, span_array
 from scipy.special import factorial, comb
 from fealpy.decorator import barycentric
-import ipdb
+
 
 _MT = TypeVar('_MT', bound=Mesh)
 Index = Union[int, slice, TensorLike]

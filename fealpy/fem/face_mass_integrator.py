@@ -6,13 +6,13 @@ from ..utils import process_coef_func
 from ..functional import bilinear_integral
 
 from .integrator import (
-    LinearInt, OpInt, CellInt,
+    LinearInt, OpInt, FaceInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
 
-class _FaceMassIntegrator(LinearInt, OpInt, CellInt):
+class _FaceMassIntegrator(LinearInt, OpInt, FaceInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
@@ -49,7 +49,7 @@ class _FaceMassIntegrator(LinearInt, OpInt, CellInt):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, fm, index = self.fetch(space)
-        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
         return bilinear_integral(phi, phi, ws, fm, val, batched=self.batched)
 
 class InterFaceMassIntegrator(_FaceMassIntegrator):

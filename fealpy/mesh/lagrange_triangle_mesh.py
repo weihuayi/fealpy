@@ -158,15 +158,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
         else:
             Dlambda = bm.array([[-1], [1]], dtype=bm.float64)
-        R = bm.simplex_grad_shape_function(bc, p=p) # (..., ldof, TD+1)
-        gphi = bm.einsum('...ij, jn -> ...in', R, Dlambda) # (..., ldof, TD)
+        R = bm.simplex_grad_shape_function(bc, p=p) # (NQ, ldof, TD+1)
+        gphi = bm.einsum('qij, jn -> qin', R, Dlambda) # (NQ, ldof, TD)
         
         if variables == 'u':
-            return gphi[..., None, :, :] #(..., 1, ldof, TD)
+            return gphi[None, :, :, :] #(1, ..., ldof, TD)
         elif variables == 'x':
             G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
             G = bm.linalg.inv(G)
-            gphi = bm.einsum('q...km, q...mn, ...ln -> q...lk', J, G, gphi) 
+            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
             return gphi
 
     # ipoint --> copy TriangleMesh
@@ -309,7 +309,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         entity = self.entity(TD, index)
         gphi = self.grad_shape_function(bc, p=p, variables='u')
         J = bm.einsum(
-                'cin, ...cim -> c...nm',
+                'cin, cqim -> cqnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
         if return_grad is False:
             return J #(NC,NQ,GD,TD)
