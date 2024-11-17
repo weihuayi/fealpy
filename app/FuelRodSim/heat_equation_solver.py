@@ -107,7 +107,7 @@ class HeatEquationSolver:
             bform2 = BilinearForm(self.space)
             bform2.add_integrator(ScalarMassIntegrator(q=3))
             self.M = bform2.assembly()
-            A = self.M + self.alpha_caldding * self.K * self.tau
+            A = self.M + self.K * self.tau
             b = self.M @ self.p + self.tau * self.F
             if n == 0:
                 A = A
@@ -119,7 +119,6 @@ class HeatEquationSolver:
                 bc = DirichletBC(space=self.space, gd=gd, threshold=self.threshold)
                 A, b = bc.apply(A, b)
                 self.p = cg(A, b, maxiter=5000, atol=1e-14, rtol=1e-14)
-            print(self.p)
             # 计算并存储误差，如果 solution 方法存在
             if hasattr(self.pde, 'solution'):
                 exact_solution = self.pde.solution(self.mesh.node, t)
