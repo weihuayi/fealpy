@@ -107,7 +107,7 @@ class HeatEquationSolver:
             bform2 = BilinearForm(self.space)
             bform2.add_integrator(ScalarMassIntegrator(q=3))
             self.M = bform2.assembly()
-            A = self.M + self.alpha_caldding * self.K * self.tau
+            A = self.M + self.K * self.tau
             b = self.M @ self.p + self.tau * self.F
             if n == 0:
                 A = A
