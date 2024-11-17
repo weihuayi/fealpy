@@ -101,6 +101,11 @@ parser.add_argument('--save_vtkfile',
         default=True, type=bool,
         help='是否保存 vtk 文件, 默认为 False.')
 
+
+parser.add_argument('--gpu', 
+        default=False, type=bool,
+        help='是否使用 GPU, 默认为 False.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -112,12 +117,15 @@ refine_method = args.refine_method
 h = args.h
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
-
+gpu = args.gpu
 
 tmr = timer()
 next(tmr)
 start = time.time()
 bm.set_backend(backend)
+
+if gpu:
+    bm.set_default_device('cuda')
 
 model = square_with_circular_notch()
 

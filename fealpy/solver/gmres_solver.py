@@ -66,7 +66,7 @@ def _scipy_solve(A, b, tol, x0, maxiter ,atol):
     return gmres(A, b, x0=x0, maxiter=maxiter, atol=atol, rtol=tol)[0]
 
 
-def gmres(A:[COOTensor, CSRTensor], b, solver:str="cupy", 
+def gmres(A:[COOTensor, CSRTensor], b, solver:str="scipy", 
           tol=1e-5, x0=None, maxiter=None, atol=0.0):
     """Solve a linear system using a gmres solver.
 

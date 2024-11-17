@@ -17,8 +17,8 @@ from fealpy.fem import NonlinearElasticIntegrator
 # 边界处理模块
 from fealpy.fem import DirichletBC
 
-from fealpy.solver import cg, spsolve
-from scipy.sparse.linalg import lgmres
+from fealpy.solver import cg, spsolve, gmres
+#from scipy.sparse.linalg import lgmres
 #from scipy.sparse.linalg import gmres
 #from scipy.sparse.linalg import minres
 #from scipy.linalg import issymmetric
@@ -82,6 +82,11 @@ class MainSolver:
         self._save_vtk = False
         self._atype = None
         self._timer = False
+        
+        if self.uh.device == 'cpu':
+            self._solver = 'scipy'
+        else:
+            self._solver = 'cupy'
 
         # Initialize the timer
         self.tmr = timer()
@@ -218,11 +223,9 @@ class MainSolver:
         # Apply displacement boundary conditions
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
-
-        #du = cg(A.tocsr(), R, atol=1e-18)
-        #du = spsolve(A, R)
-        du = self._solver(A.tocsr(), R)
-
+        print('aaaaaaaaaa')
+        du = spsolve(A.tocsr(), R, solver=self._solver)
+        print('bbbbbbbbbb')
         uh += du[:]
         self.uh = uh
         
@@ -266,10 +269,8 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        #dd = cg(A.tocsr(), R, atol=1e-18)
-        dd = self._solver(A.tocsr(), R)
-        
-        #dd = spsolve(A, R) 
+        dd = gmres(A.tocsr(), R, solver=self._solver, tol=1e-18)
+         
         d += dd[:]
   
 
@@ -332,9 +333,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='displacement')
         tmr.send('apply_bc')
 
-        #du = cg(A.tocsr(), R, atol=1e-18)
-        #du = spsolve(A, R)
-        du = self._solver(A.tocsr(), R)
+        du = gmres(A.tocsr(), R, solver=self._solver, tol=1e-18)
 
         uh += du[:]
         self.uh = uh
@@ -397,9 +396,7 @@ class MainSolver:
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
 
-        #dd = cg(A.tocsr(), R, atol=1e-18)
-        dd = self._solver(A.tocsr(), R)
-        #dd = spsolve(A, R) 
+        dd = gmres(A.tocsr(), R, solver=self._solver, tol=1e-18)
         d += dd[:]
 
         self.d = d
@@ -621,20 +618,8 @@ class MainSolver:
         else:
             self.EDFunc = EDFunc
 
-    def _solver(self, A, R):
+    def gpu_solver(self):
         """
-        Solve the linear system.
-
-        Parameters
-        ----------
-        A : sparse matrix
-            System matrix.
-        R : ndarray
-            Residual vector.
+        Use GPU to solve the problem.
         """
-        A = A.to_scipy()
-        b = bm.to_numpy(R)
-        #x = gmres(A, b)
-        x,info = lgmres(A, b, atol=1e-18)
-        x = bm.tensor(x)
-        return x
+        self._solver = 'cupy'
