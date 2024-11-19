@@ -1,25 +1,25 @@
 class EnergyDegradationFunction:
     def __init__(self, degradation_type='quadratic', **kwargs):
         """
-        初始化能量退化函数模块。
+        Initialize the energy degradation function module.
 
-        参数:
-        degradation_type (str): 能量退化函数的类型，支持 'quadratic',
-        'thrice', 'user_defined' 等。
-        kwargs (dict): 额外的参数用于不同类型的退化函数，例如指数函数中的指数因子。
+        Parameters:
+        Degradation-type (str): The type of energy degradation function that supports' quadratic ',
+        'thrice ',' user_define ', etc.
+        Kwargs (dict): Additional parameters are used for different types of degenerate functions, such as exponential factors in exponential functions.
         """
         self.degradation_type = degradation_type
         self.params = kwargs
 
     def degradation_function(self, d):
         """
-        根据相场值 d 计算能量退化因子 g(d)。
+        Calculate the energy degradation factor g (d) based on the phase field value d.
 
-        参数:
-        d (float or numpy array): 相场值，取值范围为 [0, 1]。
+        Parameters:
+        d (float or numpy array): Phase field value, with a value range of [0,1].
 
-        返回:
-        g (float or numpy array): 退化因子 g(d)。
+        return:
+        g (float or numpy array): Degradation factor g (d).
         """
         if self.degradation_type == 'quadratic':
             return self._quadratic_degradation(d)
@@ -37,17 +37,25 @@ class EnergyDegradationFunction:
             return self._user_defined_grad_degradation(d)
         else:
             raise ValueError(f"Unknown degradation type: {self.degradation_type}")
+        
+    def grad_grad_degradation_function(self, d):
+        if self.degradation_type == 'quadratic':
+            return self._quadratice_grad_grad_degradation(d)
+        elif self.degradation_type == 'user_defined':
+            return self._user_defined_grad_grad_degradation(d)
+        else:
+            raise ValueError(f"Unknown degradation type: {self.degradation_type}")
 
 
     def _quadratic_degradation(self, d):
         """
-        二次能量退化函数 g(d) = (1 - d)^2。
+        The quadratic energy degradation function g (d)=(1-d) ^ 2.
 
-        参数:
-        d (float or numpy array): 相场值。
+        Parameters:
+        d (float or numpy array): phase field value.
 
-        返回:
-        g (float or numpy array): 退化因子 g(d)。
+        return:
+        g (float or numpy array): Degradation factor g (d).
         """
         eps = 1e-10
         gd = (1 - d)**2 + eps
@@ -55,22 +63,27 @@ class EnergyDegradationFunction:
     
     def _quadratic_grad_degradation(self, d):
         """
-        二次能量退化函数的导数 g'(d) = -2(1 - d)。
+        The derivative of the quadratic energy degradation function g'(d) = -2(1 - d)。
         """
         eps = 1e-10
-        gd = -2*(1 - d) + eps
-        return gd
+        g_gd = -2*(1 - d)
+        return g_gd
+    
+    def _quadratice_grad_grad_degradation(self, d):
+        """
+        The second derivative of the quadratic energy degradation function g''(d) = 2。
+        """
+        return 2
 
     def _thrice_degradation(self, d):
         """
-        指数型能量退化函数 g(d) = 3(1-d)^2-2(1-d)^3。
+        The thrice degradation function g(d) = 3(1-d)^2-2(1-d)^3。
 
-        参数:
-        d (float or numpy array): 相场值。
-        alpha (float): 指数函数中的指数因子，通常为一个正数。
+        Parameters:
+        d (float or numpy array): phase field value.
 
-        返回:
-        g (float or numpy array): 退化因子 g(d)。
+        return:
+        g (float or numpy array): Degradation factor g (d).
         """
         eps = 1e-10
         gd = 3*(1 - d)**2 - 2*(1-d)**3 + eps
@@ -78,13 +91,13 @@ class EnergyDegradationFunction:
 
     def _user_defined_degradation(self, d):
         """
-        用户自定义能量退化函数，可以是任何用户定义的形式。
+        User defined energy degradation function, which can be in any user-defined form.
 
-        参数:
-        d (float or numpy array): 相场值。
+        Parameters:
+        d (float or numpy array): phase field value.
 
-        返回:
-        g (float or numpy array): 退化因子 g(d)。
+        return:
+        g (float or numpy array): Degradation factor g (d).
         """
         custom_function = self.params.get('custom_function')
         if custom_function is None:

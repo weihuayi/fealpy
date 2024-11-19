@@ -56,7 +56,8 @@ class MainSolve:
 #        self.model = model
 
         # Material and energy degradation function
-        self.EDFunc = EDFunc()
+        self.set_energy_degradation(degradation_type='quadratic')
+        self.EDFunc = EDFunc(degradation_type='quadratic')
         self.model_type = model_type
         self.pfcm = PhaseFractureMaterialFactory.create(model_type, material_params, self.EDFunc)
 
@@ -91,7 +92,12 @@ class MainSolve:
         # Initialize the timer
         self.tmr = timer()
         next(self.tmr)
-
+    
+    def initialization_settings(self):
+        """
+        Initialize the settings for the problem.
+        """
+        pass
 
     def solve(self, maxit: int = 50):
         """
@@ -614,7 +620,7 @@ class MainSolve:
             Energy degradation function.
         """
         if EDfunc is not None:
-            pass
+            self.EDFunc = EDfunc
         else:
             self.EDFunc = EDFunc
 
