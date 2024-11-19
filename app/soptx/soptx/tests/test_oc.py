@@ -33,6 +33,8 @@ def test_oc_optimizer():
         ipoints_ordering='yx', flip_direction='y',
         device='cpu'
     )
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
     
     # 创建函数空间
     p = 1
@@ -143,6 +145,9 @@ def test_oc_optimizer():
         # 运行优化
         print("\n开始优化迭代...")
         rho_opt = oc_optimizer.optimize(rho=rho[:])
+        mesh.celldata['density'] = rho_opt[:]
+        mesh.to_vtk(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/density.vts')
+
         
         # 输出优化结果统计
         print("\n优化结果统计:")
