@@ -19,9 +19,6 @@ from fealpy.fem import DirichletBC
 
 from fealpy.solver import cg, spsolve, gmres
 from scipy.sparse.linalg import lgmres
-#from scipy.sparse.linalg import gmres
-#from scipy.sparse.linalg import minres
-#from scipy.linalg import issymmetric
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
@@ -83,10 +80,14 @@ class MainSolve:
         self._atype = None
         self._timer = False
         
-        if self.uh.device == 'cpu':
+        if bm.device_type(self.uh) == 'cpu':
+            print('Using scipy solver.')
             self._solver = 'scipy'
-        else:
+        elif bm.device_type(self.uh) == 'cuda':
+            print('Using cupy solver.')
             self._solver = 'cupy'
+        else:
+            raise ValueError(f"Unknown device type: {bm.device_type(self.uh)}")
 
         # Initialize the timer
         self.tmr = timer()
@@ -225,7 +226,6 @@ class MainSolve:
         tmr.send('apply_bc')
         
         du = self.solver(A, R, atol=1e-20)
-        
         uh += du[:]
         self.uh = uh
         
@@ -268,9 +268,8 @@ class MainSolve:
 
         A, R = self._apply_boundary_conditions(A, R, field='phase')
         tmr.send('phase_apply_bc')
-
+        
         dd = self.solver(A, R, atol=1e-20)
-         
         d += dd[:]
   
 
@@ -618,11 +617,19 @@ class MainSolve:
         else:
             self.EDFunc = EDFunc
 
-    def gpu_solver(self):
+    def set_cupy_solver(self):
         """
         Use GPU to solve the problem.
         """
+        print('Using cupy solver.')
         self._solver = 'cupy'
+
+    def set_scipy_solver(self):
+        """
+        Use GPU to solve the problem.
+        """
+        print('Using scipy solver.')
+        self._solver = 'scipy'
 
     def solver(self, A, R, atol=1e-20):
         """
