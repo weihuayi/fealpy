@@ -15,7 +15,7 @@ from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_nonlinear_mass_integrator import ScalarNonlinearMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elastic_integrator import LinearElasticIntegrator
-from .press_work_integrator import PressWorkIntegrator, PressWorkIntegrator0, PressWorkIntegrator1
+from .press_work_integrator import PressWorkIntegrator, PressWorkIntegratorX, PressWorkIntegratorY
 from .vector_mass_integrator import VectorMassIntegrator
 from .curlcurl_integrator import CurlCurlIntegrator
 from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
@@ -34,7 +34,7 @@ from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
 
 ### Face Source
-from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator
+from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator
 from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
 
 ### Dirichlet BC

@@ -7,9 +7,8 @@
 	@bref 
 	@ref 
 '''  
-
 import os
-os.system(f'rm *.vtu')
+
 
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace
@@ -21,34 +20,30 @@ from fealpy.fem import DirichletBC
 from pde import CouetteFlow
 from solver import Solver
 
-from fealpy.utils import timer
-
-bm.set_backend('pytorch')
-#bm.set_default_device('cuda')
-
 output = './'
 h = 1/256
+#h = 1/16
 T = 2
 nt = int(T/(0.1*h))
 
-pde = CouetteFlow(h=h)
-mesh = pde.mesh()
+pde = CouetteFlow()
+mesh = pde.mesh(h)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
-time = timer()
-next(time)
 
 phispace = LagrangeFESpace(mesh, p=1)
 #pspace = LagrangeFESpace(mesh, p=0, ctype='D')
 pspace = LagrangeFESpace(mesh, p=1)
-space = LagrangeFESpace(mesh, p=2)
-uspace = TensorFunctionSpace(space, (2,-1))
+uspace = LagrangeFESpace(mesh, p=2)
 
-solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=7)
+solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=5)
 
-u0 = uspace.function()
-u1 = uspace.function()
-u2 = uspace.function()
+u0x = uspace.function()
+u1x = uspace.function()
+u2x = uspace.function()
+u0y = uspace.function()
+u1y = uspace.function()
+u2y = uspace.function()
 phi0 = phispace.interpolate(pde.init_phi)
 phi1 = phispace.function()
 # TODO:第一步求解
@@ -65,7 +60,8 @@ phigdof = phispace.number_of_global_dofs()
 
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['phi'] = phi0
-mesh.nodedata['u'] = u0.reshape(2,-1).T
+mesh.nodedata['ux'] = u0x
+mesh.nodedata['uy'] = u0y
 #mesh.celldata['p'] = p1
 mesh.nodedata['mu'] = mu1
 mesh.to_vtk(fname=fname)
@@ -75,47 +71,39 @@ CH_LForm = solver.CH_LForm()
 NS_BForm = solver.NS_BForm()
 NS_LForm = solver.NS_LForm()
 
-is_uy_bd = space.is_boundary_dof(pde.is_uy_Dirichlet)
-ux_gdof = space.number_of_global_dofs()
-
-#NS_BC = DirichletBC(space=(uspace,pspace), \
-#        gd=(pde.u_w, pde.p_dirichlet), \
-#        threshold=(pde.is_wall_boundary, pde.is_p_dirichlet), method='interp')
-
-is_bd = bm.concatenate((bm.zeros(ux_gdof, dtype=bool), is_uy_bd, bm.zeros(pgdof, dtype=bool)))
-NS_BC = DirichletBC(space=(uspace,pspace), \
-        gd=bm.zeros(ugdof+pgdof, dtype=bm.float64), \
+is_uy_bd = uspace.is_boundary_dof(pde.is_uy_Dirichlet)
+is_bd = bm.concatenate((bm.zeros(ugdof, dtype=bool), is_uy_bd, bm.zeros(pgdof, dtype=bool)))
+NS_BC = DirichletBC(space=(uspace,uspace,pspace), \
+        gd=bm.zeros(2*ugdof+pgdof), \
         threshold=is_bd, method='interp')
 
-time.send("初始化用时")
-for i in range(nt):
+for i in range(3):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
 
-    solver.CH_update(u0, u1, phi0, phi1)
+    solver.CH_update(u0x, u0y, u1x, u1y, phi0, phi1)
     CH_A = CH_BForm.assembly()
     CH_b = CH_LForm.assembly()
-    time.send(f"第{i+1}次CH组装用时")
     CH_x = spsolve(CH_A, CH_b, 'mumps')
-    time.send(f"第{i+1}次CH求解用时")
     
     phi2[:] = CH_x[:phigdof]
-    #phi2[:] = solver.reinit_phi(phi2)
     mu2[:] = CH_x[phigdof:] 
 
-    solver.NS_update(u0, u1, mu2, phi2, phi1)
+    solver.NS_update(u0x, u0y, u1x, u1y, mu2, phi2, phi1)
     NS_A = NS_BForm.assembly()
     NS_b = NS_LForm.assembly()
     NS_A,NS_b = NS_BC.apply(NS_A,NS_b)
-    time.send(f"第{i+1}次NS组装用时") 
+     
     NS_x = spsolve(NS_A, NS_b, 'mumps') 
-    time.send(f"第{i+1}次NS求解用时")
-    u2[:] = NS_x[:ugdof]
-    p2[:] = NS_x[ugdof:]
+    u2x[:] = NS_x[:ugdof]
+    u2y[:] = NS_x[ugdof:-pgdof]
+    p2[:] = NS_x[-pgdof:]
     
-    u0[:] = u1[:]
-    u1[:] = u2[:]
+    u0x[:] = u1x[:]
+    u1x[:] = u2x[:]
+    u0y[:] = u1y[:]
+    u1y[:] = u2y[:]
     phi0[:] = phi1[:]
     phi1[:] = phi2[:]
     mu1[:] = mu2[:]
@@ -123,12 +111,11 @@ for i in range(nt):
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['phi'] = phi2
-    mesh.nodedata['u'] = u2.reshape(2,-1).T
+    mesh.nodedata['ux'] = u2x
+    mesh.nodedata['uy'] = u2y
     #mesh.celldata['p'] = p2
     mesh.nodedata['mu'] = mu2
     mesh.to_vtk(fname=fname)
     timeline.advance()
-    time.send(f"第{i+1}次画图用时")
-#print(bm.sum(bm.abs(u1[:])))
-#next(time)
+
 

@@ -1,22 +1,22 @@
 from typing import Optional
 
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
-from ..utils import is_tensor
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Index, _S
 
-from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..functional import bilinear_integral
-from .integrator import (
+from fealpy.mesh import HomogeneousMesh
+from fealpy.functionspace.space import FunctionSpace as _FS
+from fealpy.utils import process_coef_func
+from fealpy.functional import linear_integral, get_semilinear_coef
+
+from fealpy.fem.integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
+from bilinear import bilinear_integral
 
-class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
-    r"""The convection integrator for function spaces based on homogeneous meshes."""
+class TensorMassIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -34,11 +34,12 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
 
     @enable_cache
     def fetch(self, space: _FS):
+        q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarConvectionIntegrator only support spaces on"
+            raise RuntimeError("The ScalarMassIntegrator only support spaces on"
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
@@ -46,18 +47,28 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index)
         phi = space.basis(bcs, index=index)
-        return bcs, ws, phi, gphi, cm, index
+        return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, gphi, cm, index = self.fetch(space)
+        bcs, ws, phi, cm, index = self.fetch(space)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+
+        return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
+
+    @assemblymethod('semilinear')
+    def semilinear_assembly(self, space: _FS) -> TensorLike:
+        uh = self.uh
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, cm, index = self.fetch(space)
+        val_A = coef.grad_func(uh(bcs))  #(C, Q)
+        val_F = -coef.func(uh(bcs))      #(C, Q)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        if is_tensor(coef):
-            gphi = bm.einsum('cqi...j, cq...j->cqi...' ,gphi, coef)
-            result = bilinear_integral(phi, gphi, ws, cm, coef=None, batched=self.batched)
-        else:
-            raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
-        return result
+        coef_A = get_semilinear_coef(val_A, coef)
+        coef_F = get_semilinear_coef(val_F, coef)
+
+        return bilinear_integral(phi, phi, ws, cm, coef_A, batched=self.batched), \
+               linear_integral(phi, ws, cm, coef_F, batched=self.batched)

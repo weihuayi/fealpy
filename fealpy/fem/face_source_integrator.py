@@ -48,7 +48,7 @@ class _FaceSourceIntegrator(LinearInt, SrcInt, FaceInt):
         source = self.source
         bcs, ws, phi, fm, index, n = self.fetch(space) 
         mesh = getattr(space, 'mesh', None)
-        val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='cell', index=index, n=n)
+        val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='face', index=index, n=n)
         return linear_integral(phi, ws, fm, val, self.batched)
 
 class InterFaceSourceIntegrator(_FaceSourceIntegrator):

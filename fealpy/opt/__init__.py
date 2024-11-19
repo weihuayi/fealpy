@@ -18,3 +18,5 @@ from .crested_porcupine_opt import CrestedPorcupineOpt
 from .black_winged_kite_alg import BlackwingedKiteAlg
 from .cuckoo_search_opt import CuckooSearchOpt
 from .Butterfly_opt_alg import ButterflyOptAlg
+from .exponential_trigonometric_opt_alg import ExponentialTrigonometricOptAlg
+from .Differential_Evolution import DifferentialEvolution

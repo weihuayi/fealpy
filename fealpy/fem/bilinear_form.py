@@ -56,7 +56,6 @@ class BilinearForm(Form[LinearInt]):
             values = bm.empty(init_value_shape, dtype=space[0].ftype, device=bm.get_device(space[0])),
             spshape = sparse_shape
         )
-
         for group in self.integrators.keys():
             group_tensor, e2dofs = self._assembly_group(group, retain_ints)
             ue2dof = e2dofs[0]
