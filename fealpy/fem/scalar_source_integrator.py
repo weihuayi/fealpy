@@ -53,15 +53,15 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
         return linear_integral(phi, ws, cm, val, batched=self.batched)
 
-    @enable_cache
-    def fetch_isopara(self, space: _FS):
-        pass
-
     @assemblymethod('isopara')
     def isopara_assembly(self, space: _FS) -> TensorLike: 
         f = self.source
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, cm, index, rm, G, d = self.fetch(space)
+        bcs, ws, phi, cm, index = self.fetch(space)
+
+        rm = space.mesh.reference_cell_measure()
+        G = space.mesh.first_fundamental_form(bcs)
+        d = bm.sqrt(bm.linalg.det(G))
 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
         M = bm.einsum('q, cq, cql, cq -> cl', ws*rm, val, phi, d)

@@ -146,7 +146,7 @@ ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
 
-
+#ms.set_scipy_solver()
 ms.output_timer()
 
 ms.save_vtkfile(fname=vtkname)
