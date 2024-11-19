@@ -1,4 +1,6 @@
+
 import argparse
+import matplotlib.pyplot as plt
 
 from fealpy import logger
 logger.setLevel('WARNING')
@@ -18,7 +20,7 @@ from fealpy.decorator import barycentric
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        任意次有限元方法求解半线性方程
+        在三角形网格上使用任意次有限元方法求解半线性方程
         """)
 
 parser.add_argument('--degree',
@@ -30,12 +32,8 @@ parser.add_argument('--n',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=4, type=int,
-        help='默认网格加密求解的次数, 默认加密求解 4 次')
-
-parser.add_argument('--meshtype',
-        default='tri', type=str,
-        help='默认网格为三角形网格')
+        default=6, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 6 次')
 
 parser.add_argument('--backend',
         default='numpy', type=str,
@@ -47,14 +45,11 @@ parser.add_argument('--device',
 
 
 args = parser.parse_args()
-args.backend = 'pytorch'
-bm.set_backend(args.backend)
 if args.backend =='pytorch':
     bm.set_default_device(args.device)
 
 p = args.degree
 n = args.n
-meshtype = args.meshtype
 maxit = args.maxit
 
 tmr = timer()
@@ -141,3 +136,17 @@ next(tmr)
 print(errorMatrix)
 print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
 print(NDof)
+
+bc = bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64)
+ps = mesh.bc_to_point(bc)
+u = pde.solution(ps)
+uh = u0(bc)
+
+next(tmr)
+print(errorMatrix)
+print(errorMatrix[:, 0:-1]/errorMatrix[:, 1:])
+
+fig, axes = plt.subplots(1, 2)
+mesh.add_plot(axes[0], cellcolor=u, linewidths=0)
+mesh.add_plot(axes[1], cellcolor=uh, linewidths=0) 
+plt.show()
