@@ -48,9 +48,11 @@ class SIMPInterpolation(MaterialInterpolation):
         self._validate_inputs(rho, P0, Pmin)
 
         if Pmin is None:
-            return penalty_factor * rho[:] ** (penalty_factor - 1) * P0
+            dP = penalty_factor * rho[:] ** (penalty_factor - 1) * P0
+            return dP
         else:
-            return penalty_factor * rho[:] ** (penalty_factor - 1) * (P0 - Pmin)
+            dP = penalty_factor * rho[:] ** (penalty_factor - 1) * (P0 - Pmin)
+            return dP
 
 class RAMPInterpolation(MaterialInterpolation):
     """Rational Approximation of Material Properties (RAMP) interpolation model."""

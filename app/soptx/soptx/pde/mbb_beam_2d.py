@@ -6,7 +6,9 @@ from typing import Tuple, Callable
 from builtins import list
 
 class MBBBeam2dData1:
-    def __init__(self):
+    def __init__(self, 
+                xmin: float=0, xmax: float=60, 
+                ymin: float=0, ymax: float=20):
         """
         flip_direction = True
         0 ------- 3 ------- 6 
@@ -15,13 +17,13 @@ class MBBBeam2dData1:
         |    1    |    3    |
         2 ------- 5 ------- 8 
         """
+        self.xmin, self.xmax = xmin, xmax
+        self.ymin, self.ymax = ymin, ymax
         self.eps = 1e-12
 
-    def domain(self, 
-        xmin: float=0, xmax: float=60, 
-        ymin: float=0, ymax: float=20) -> list:
+    def domain(self) -> list:
         
-        box = [xmin, xmax, ymin, ymax]
+        box = [self.xmin, self.xmax, self.ymin, self.ymax]
 
         return box
     
