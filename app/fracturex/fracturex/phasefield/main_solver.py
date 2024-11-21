@@ -21,6 +21,7 @@ from fealpy.solver import cg, spsolve, gmres
 from scipy.sparse.linalg import lgmres
 
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
+from app.fracturex.fracturex.phasefield.crack_surface_density_function import CrackSurfaceDensityFunction as CSDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
 from app.fracturex.fracturex.phasefield.adaptive_refinement import AdaptiveRefinement
 from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichletBC
@@ -41,19 +42,20 @@ class MainSolve:
         p : int, optional
             Polynomial order for the function space, by default 1.
         q : int, optional
-            Quadrature degree, by default p + 2.
+            Quadrature degree, by default p + 3.
         model_type : str, optional
             Stress decomposition model, by default 'HybridModel'.
         method : str, optional
             The method for solving the problem, by default 'lfem'.
         """
         self.mesh = mesh
-        self.p = 1
-        self.q = self.p + 2
-#        self.model = model
+        self.p = p
+        self.q = self.p + 3 if q is None else q
 
         # Material and energy degradation function
-        self.EDFunc = EDFunc()
+        self.set_energy_degradation(degradation_type='quadratic')
+        self.set_crack_surface_density(density_type='AT2')
+        
         self.model_type = model_type
         self.pfcm = PhaseFractureMaterialFactory.create(model_type, material_params, self.EDFunc)
 
@@ -92,7 +94,12 @@ class MainSolve:
         # Initialize the timer
         self.tmr = timer()
         next(self.tmr)
-
+    
+    def initialization_settings(self):
+        """
+        Initialize the settings for the problem.
+        """
+        pass
 
     def solve(self, maxit: int = 50):
         """
@@ -243,18 +250,26 @@ class MainSolve:
             The norm of the residual.
         """
         Gc, l0, d = self.Gc, self.l0, self.d
-
+        
         @barycentric
         def coef(bc, index):
-            return 2 * self.pfcm.maximum_historical_field(bc)
+            gg_gd = self.EDFunc.grad_grad_degradation_function(d)
+            return gg_gd * self.pfcm.maximum_historical_field(bc)
+        
+        @barycentric
+        def source_coef(bc, index):
+            gg_gd = self.EDFunc.grad_degradation_function_constant_coef()
+            return -1 * gg_gd * self.pfcm.maximum_historical_field(bc)
 
         tmr = self.tmr
         tmr.send('phase_start')
 
+        gg_hd, c_d = self.CSDFunc.grad_grad_density_function(d)
+
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0, q=self.q))
-        dbform.add_integrator(ScalarMassIntegrator(coef=Gc / l0, q=self.q))
-        dbform.add_integrator(ScalarMassIntegrator(coef=coef, q=self.q))
+        dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0 * 2 / c_d, q=self.q))
+        dbform.add_integrator(ScalarMassIntegrator(coef=gg_hd * Gc / (l0 * c_d), q=self.q))
+        dbform.add_integrator(ScalarMassIntegrator(coef=source_coef, q=self.q))
         A = dbform.assembly()
         tmr.send('phase_matrix_assemble')
 
@@ -351,33 +366,51 @@ class MainSolve:
             The norm of the residual.
         """
         Gc, l0, d = self.Gc, self.l0, self.d
+        
+        c_d = self.CSDFunc.grad_density_function(d)[1]
         @barycentric
         def diffusion_coef(bc, **kwargs):
-            return Gc * l0
+            return Gc * l0 * 2 / c_d
 
         @barycentric
-        def mass_coef(bc, **kwargs):
-            return 2 * self.pfcm.maximum_historical_field(bc) + Gc / l0
+        def mass_coef1(bc, **kwargs):
+            return Gc / (l0 * c_d)
+        
+        @barycentric
+        def mass_coef2(bc, **kwargs):
+            return self.pfcm.maximum_historical_field(bc)
+        
+        @barycentric
+        def mass_kernel_func2(u):
+            return self.EDFunc.grad_degradation_function(u)
+        
+        @barycentric
+        def mass_grad_kernel_func2(u):
+            return self.EDFunc.grad_grad_degradation_function(u)
         
         @barycentric
         def kernel_func(u):
-            return u
+            return self.CSDFunc.grad_density_function(u)[0]
 
         def grad_kernel_func(u):
-            return bm.ones_like(u)
+            return self.CSDFunc.grad_grad_density_function(u)[0]
         
         @barycentric
         def source_coef(bc, index):
-            return 2 * self.pfcm.maximum_historical_field(bc)
+            gg_gd = self.EDFunc.grad_degradation_function_constant_coef()
+            return -1 * gg_gd * self.pfcm.maximum_historical_field(bc)
         
         diffusion_coef.kernel_func = kernel_func
-        mass_coef.kernel_func = kernel_func
+        mass_coef1.kernel_func = kernel_func
+        mass_coef2.kernel_func = mass_kernel_func2
 
         if bm.backend_name == 'numpy':
             diffusion_coef.grad_kernel_func = grad_kernel_func
-            mass_coef.grad_kernel_func = grad_kernel_func
+            mass_coef1.grad_kernel_func = grad_kernel_func
+            mass_coef2.grad_kernel_func = mass_grad_kernel_func2
 
-        mass_coef.uh = d
+        mass_coef1.uh = d
+        mass_coef2.uh = d
         diffusion_coef.uh = d
 
         tmr = self.tmr
@@ -386,8 +419,9 @@ class MainSolve:
         # using automatic differentiation to assemble the phase field system        
         dform = NonlinearForm(self.space)
         dform.add_integrator(ScalarNonlinearDiffusionIntegrator(diffusion_coef, q=self.q)) 
-        dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef, q=self.q))
-        dform.add_integrator(ScalarSourceIntegrator(source_coef, q=self.q))
+        dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef1, q=self.q))
+        dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef2, q=self.q))
+        #dform.add_integrator(ScalarSourceIntegrator(source_coef, q=self.q))
 
         A, R = dform.assembly()
         tmr.send('phase_matrix_assemble')
@@ -603,19 +637,41 @@ class MainSolve:
         self._timer = True
 
 
-    def set_energy_degradation(self, EDfunc=None):
+    def set_energy_degradation(self, degradation_type='quadratic', EDfunc=None, **kwargs):
         """
         Set the energy degradation function.
 
         Parameters
         ----------
-        EDfunc : object
-            Energy degradation function.
+        EDfunc : callable, optional
+            Energy degradation function class or factory. If None, a default energy degradation function is used.
+        degradation_type : str, optional
+            Type of energy degradation function. Default is 'quadratic'.
+        **kwargs : dict
+            Additional parameters passed to the energy degradation function.
         """
         if EDfunc is not None:
-            pass
+            self.EDFunc = EDfunc(degradation_type=degradation_type, **kwargs)
         else:
-            self.EDFunc = EDFunc
+            self.EDFunc = EDFunc(degradation_type=degradation_type)
+
+    def set_crack_surface_density(self, density_type='AT2', CSDfunc=None, **kwargs):
+        """
+        Set the crack surface density function.
+
+        Parameters
+        ----------
+        CSDFunc : callable, optional
+            Crack surface density function class or factory. If None, a default crack surface density function is used.
+        density_type : str, optional
+            Type of crack surface density function. Default is 'AT2'.
+        **kwargs : dict
+            Additional parameters passed to the crack surface density function.
+        """
+        if CSDfunc is not None:
+            self.CSDFunc = CSDfunc(density_type=density_type, **kwargs)
+        else:
+            self.CSDFunc = CSDFunc(density_type=density_type)
 
     def set_cupy_solver(self):
         """
