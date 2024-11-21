@@ -9,6 +9,10 @@ from .mesh_base import TensorMesh
 from .plot import Plotable
 
 
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import spdiags, eye, tril, triu, bmat
+
+
 class QuadrangleMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
         """
@@ -336,14 +340,45 @@ class QuadrangleMesh(TensorMesh, Plotable):
         # cell = cell[bm.arange(NC).reshape(-1, 1), self.localCell[idx]]
         # self.ds.reinit(NN, cell)
 
-    def uniform_refine(self, n:int=1) -> 'QuadrangleMesh':
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False) -> 'QuadrangleMesh':
         """
-        @brief Uniformly refine the quadrilateral mesh
+        Uniform refine the triangle mesh n times.
+
+        Parameters:
+            n (int): times refine the triangle mesh.
+            surface (function): the surface function.
+            returnim (bool): return the interpolation matrix or not.
         """
+        if returnim is True:
+            IM = []
         for i in range(n):
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
+            edge2node = self.edge_to_node()
+            cell2node = self.cell_to_node()
+            if returnim is True:
+                nonzeros = NN+2*NE+4*NC
+                num_new_node = NN+NE+NC
+
+                data = bm.zeros(nonzeros,dtype=bm.float64)
+                indices = bm.zeros(nonzeros,dtype=bm.int32)
+                indptr = bm.zeros(num_new_node+1,dtype=bm.int32)
+
+                #赋值
+                data[:NN] = 1
+                data[NN:NN+2*NE] = 1/2
+                data[NN+2*NE:] = 1/4
+
+                indices[:NN] = bm.arange(NN) 
+                indices[NN:NN+2*NE] = edge2node.flatten()
+                indices[NN+2*NE:] = cell2node.flatten()
+
+                indptr[:NN+1] = bm.arange(NN+1)
+                indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
+                indptr[NN+NE+1:] = bm.arange(NN+2*NE+4,NN+2*NE+4*NC+1,step=4)
+                A = csr_matrix((data,indices,indptr),dtype=bm.float64)
+                IM.append(A)
 
             # Find the cutted edge
             cell2edge = self.cell2edge
@@ -393,6 +428,8 @@ class QuadrangleMesh(TensorMesh, Plotable):
             self.cell = cell
             
             self.construct()
+        if returnim is True:
+            return IM           
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
