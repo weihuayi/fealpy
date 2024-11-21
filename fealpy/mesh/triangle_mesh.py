@@ -291,10 +291,12 @@ class TriangleMesh(SimplexMesh, Plotable):
         Parameters:
             n (int): times refine the triangle mesh.
             surface (function): the surface function.
-            returnim (bool): return the interpolation matrix or not.
+            returnim (bool): return the interpolation  matrix or not.
         """
         if returnim is True:
             IM = []
+        if returnrm is True:
+            RM = []
 
         for i in range(n):
             NN = self.number_of_nodes()
@@ -315,7 +317,10 @@ class TriangleMesh(SimplexMesh, Plotable):
                                 shape=(NN + NE, NN))
                 A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 1])), 
                                 shape=(NN + NE, NN))
+                
                 IM.append(A.tocsr())
+                
+
 
             self.node = bm.concatenate((node, newNode), axis=0)
             p = bm.concatenate((cell, edge2newNode[cell2edge]), axis=1)
