@@ -37,7 +37,7 @@ class example_1:
         x1 = self.x1
         x2 = self.x2
         t = self.t
-        result = sp.lambdify([x1,x2,t], self.p[0], self.manager)
+        result = sp.lambdify([x1,x2,t], self.y, self.manager)
         return result(space[...,0], space[...,1], time)
 
     @cartesian
@@ -160,6 +160,7 @@ class example_1:
         t = self.t
         x1 = self.x1
         x2 = self.x2
-        self.y_d = y - sp.diff(z, t, 2) + sp.diff(q[0], x1) + sp.diff(q[1], x2)
+        #self.y_d = y - sp.diff(z, t, 2) + sp.diff(q[0], x1) + sp.diff(q[1], x2)
+        self.y_d = y - sp.diff(z, t, 2) - sp.diff(q[0], x1) - sp.diff(q[1], x2) - z
         result = sp.lambdify([x1,x2,t], self.y_d, self.manager) 
         return result(space[...,0], space[...,1], time)
