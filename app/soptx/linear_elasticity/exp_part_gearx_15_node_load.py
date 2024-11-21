@@ -20,7 +20,6 @@ with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/e
 
 hex_mesh = data['hex_mesh']
 helix_node = data['helix_node']
-
 target_cell_idx = data['target_cell_idx']
 parameters = data['parameters']
 is_inner_node = data['is_inner_node']
@@ -44,18 +43,17 @@ cell = mesh.entity('cell')
 load_values = bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 102.0, 109.0, 114.0,
                         119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64)
 
+cellnorm = mesh.cell_normal() # (NC, GD)
+
+target_cellnorm = cellnorm[target_cell_idx] # (15, GD)
+P = bm.einsum('p, pd -> pd', load_values, target_cellnorm)  # (15, GD)
+
 u = parameters[..., 0]
 v = parameters[..., 1]
 w = parameters[..., 2]
-# u = bm.clip(u, 0, 1)
-# v = bm.clip(v, 0, 1)
-# w = bm.clip(w, 0, 1)
 
 bcs_list = [
     (
-        # bm.tensor([[1 - u, u]]),
-        # bm.tensor([[1 - v, v]]),
-        # bm.tensor([[1 - w, w]])
         bm.tensor([[u, 1 - u]]),
         bm.tensor([[v, 1 - v]]),
         bm.tensor([[w, 1 - w]])
@@ -77,7 +75,7 @@ for bcs in bcs_list:
 
 phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, NP, tldof, GD)
 
-FE_load = bm.einsum('p, cpld -> pl', load_values, phi_loads_array) # (NP, tldof)
+FE_load = bm.einsum('pd, cpld -> pl', P, phi_loads_array) # (NP, 24)
 
 FE = bm.zeros((NC, tldof), dtype=bm.float64)
 FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)

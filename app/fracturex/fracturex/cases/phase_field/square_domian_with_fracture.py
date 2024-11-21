@@ -120,6 +120,10 @@ parser.add_argument('--gpu',
         default=False, type=bool,
         help='是否使用 GPU, 默认为 False.')
 
+parser.add_argument('--cupy', 
+        default=False, type=bool,
+        help='是否使用cupy求解.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -133,6 +137,7 @@ save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
 force_type = args.force_type
 gpu = args.gpu
+cupy = args.cupy
 
 tmr = timer()
 next(tmr)
@@ -163,7 +168,6 @@ while isMarkedCell.any():
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-
 ms = MainSolve(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
 tmr.send('init')
 
@@ -189,6 +193,8 @@ ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundar
 
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
+if cupy:
+    ms.set_cupy_solver()
 
 ms.output_timer()
 ms.save_vtkfile(fname=vtkname)

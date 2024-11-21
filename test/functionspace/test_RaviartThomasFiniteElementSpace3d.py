@@ -39,9 +39,24 @@ class TestRTFiniteElementSpace3d:
 
         np.testing.assert_allclose(bm.to_numpy(basis), meshdata["basis"],1e-15)
 
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("meshdata", init_data)
+    def test_div_basis(self,meshdata,backend):
+        bm.set_backend(backend)
+
+        mesh = TetrahedronMesh.from_box(nx = 1,ny =1,nz=1)
+        p =  1
+        a = RTFiniteElementSpace3d(mesh,p)
+        bcs = bm.array([[0.1,0.2,0.3,0.4],
+                [0.5,0.1,0.3,0.1]])
+        div_basis = a.div_basis(bcs)
+
+        np.testing.assert_allclose(bm.to_numpy(div_basis), meshdata["div_basis"],1e-14)
+
 
 if __name__ == "__main__":
     # test = TestFirstNedelecDof3d()
     # test.test_cell_to_dof(init_data[0],'numpy')
     test = TestRTFiniteElementSpace3d()
-    test.test_basis(init_data[0],'pytorch')
+    #test.test_basis(init_data[0],'numpy')
+    test.test_div_basis(init_data[0],'numpy')
