@@ -846,6 +846,78 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         self.clear() 
 
+    def to_vtk(self, filename, celldata=None, nodedata=None):
+        """
+        @brief: Converts the mesh data to a VTK structured grid format and writes to a VTS file
+        """
+        import vtk
+        from vtk.util.numpy_support import numpy_to_vtk
+
+        if celldata is None:
+            celldata = self.celldata
+
+        if nodedata is None:
+            nodedata = self.nodedata
+
+        # 网格参数
+        nx, ny = self.nx, self.ny
+        h = self.h
+        origin = self.origin
+
+        # 创建坐标点
+        x = bm.linspace(origin[0], origin[0] + nx * h[0], nx + 1)
+        y = bm.linspace(origin[1], origin[1] + ny * h[1], ny + 1)
+        z = bm.zeros(1)
+
+        # 按 y, x 顺序重新组织坐标数组（左上到右下）
+        xy_x, xy_y = bm.meshgrid(x, y, indexing='ij')
+        xy_z = bm.zeros_like(xy_x)
+
+        if self.flip_direction == 'y':
+            # 左上到右下
+            yx_x = xy_x[:, ::-1].flatten()
+            yx_y = xy_y[:, ::-1].flatten()
+            yx_z = xy_z[:, ::-1].flatten()
+        else:
+            # 默认：左下到右上
+            yx_x = xy_x.flatten()
+            yx_y = xy_y.flatten()
+            yx_z = xy_z.flatten()
+
+        # 创建 VTK 网格对象
+        rectGrid = vtk.vtkStructuredGrid()
+        rectGrid.SetDimensions(ny + 1, nx + 1, 1)
+
+        # 创建点
+        points = vtk.vtkPoints()
+        for i in range(len(yx_x)):
+            points.InsertNextPoint(yx_x[i], yx_y[i], yx_z[i])
+        rectGrid.SetPoints(points)
+
+        # 添加节点数据
+        if nodedata is not None:
+            for name, data in nodedata.items():
+                data_array = numpy_to_vtk(data, deep=True)
+                data_array.SetName(name)
+                rectGrid.GetPointData().AddArray(data_array)
+
+        # 添加单元格数据
+        if celldata is not None:
+            for name, data in celldata.items():
+                data_array = numpy_to_vtk(data, deep=True)
+                data_array.SetName(name)
+                rectGrid.GetCellData().AddArray(data_array)
+
+        # 写入 VTK 文件
+        print("Writting to vtk...")
+        writer = vtk.vtkXMLStructuredGridWriter()
+        writer.SetInputData(rectGrid)
+        writer.SetFileName(filename)
+        writer.Write()
+
+        return filename
+
+
     # 界面网格
     def is_cut_cell(self, phi: Callable, *, eps=1e-10) -> TensorLike:
         """Return a bool tensor on cells indicating whether each cell is cut
