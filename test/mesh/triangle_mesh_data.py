@@ -2791,5 +2791,82 @@ mesh_feom_domain_data = [
 ]
 
 interpolation_matrix_data = [
-
-        ]
+        "node": np.array([[0, 0], [1, 0], [0, 1]], dtype=np.float64),
+        "edge": np.array([[0, 1], [2, 0], [1, 2]], dtype=np.int32), 
+        "cell": np.array([[0, 1, 2]], dtype=np.int32),
+        {
+            "n":1
+            "func":node[:,0]+2*node[:,1]+3
+            "IM":
+            <Compressed Sparse Row sparse matrix of dtype 'float64'
+            with 9 stored elements and shape (6, 3)>
+                Coords        Values
+                (0, 0)        1.0
+                (1, 1)        1.0
+                (2, 2)        1.0
+                (3, 0)        0.5
+                (3, 1)        0.5
+                (4, 0)        0.5
+                (4, 2)        0.5
+                (5, 1)        0.5
+                (5, 2)        0.5
+            "excat_value":
+           [[3.  4.  5.  3.5 4.  4.5],
+            dtype = np.float64]
+            "test_value":
+            [[3.  4.  5.  3.5 4.  4.5],
+            dtype = np.float64]
+            "is_excat_close_test":True
+        }
+        {
+            "n":3
+            "func":2*node[:,0]+2*node[:,1]+2
+            "IM":
+            <Compressed Sparse Row sparse matrix of dtype 'float64'
+            with 9 stored elements and shape (6, 3)>
+                Coords        Values
+                (0, 0)        1.0
+                (1, 1)        1.0
+                (2, 2)        1.0
+                (3, 0)        0.5
+                (3, 1)        0.5
+                (4, 0)        0.5
+                (4, 2)        0.5
+                (5, 1)        0.5
+                (5, 2)        0.5
+            <Compressed Sparse Row sparse matrix of dtype 'float64'
+            with 24 stored elements and shape (15, 6)>
+                Coords        Values
+                (0, 0)        1.0
+                (1, 1)        1.0
+                (2, 2)        1.0
+                (3, 3)        1.0
+                (4, 4)        1.0
+                (5, 5)        1.0
+                (6, 0)        0.5
+                (6, 3)        0.5
+                (7, 0)        0.5
+                (7, 4)        0.5
+                (8, 1)        0.5
+                (8, 3)        0.5
+                (9, 1)        0.5
+                (9, 5)        0.5
+                (10, 2)       0.5
+                (10, 4)       0.5
+                (11, 2)       0.5
+                (11, 5)       0.5
+                (12, 3)       0.5
+                (12, 4)       0.5
+                (13, 3)       0.5
+                (13, 5)       0.5
+                (14, 4)       0.5
+                (14, 5)       0.5
+            "excat_value":
+           [[2.  4.  4.  3.  3.  4.  2.5 2.5 3.5 4.  3.5 4.  3.  3.5 3.5],
+            dtype = np.float64]
+            "test_value":
+            [[2.  4.  4.  3.  3.  4.  2.5 2.5 3.5 4.  3.5 4.  3.  3.5 3.5],
+            dtype = np.float64]
+            "is_excat_close_test":True
+        }
+]
