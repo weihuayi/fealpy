@@ -878,7 +878,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             yx_x = xy_x[:, ::-1].flatten()
             yx_y = xy_y[:, ::-1].flatten()
             yx_z = xy_z[:, ::-1].flatten()
-        else:
+        elif self.flip_direction == None:
             # 默认：左下到右上
             yx_x = xy_x.flatten()
             yx_y = xy_y.flatten()

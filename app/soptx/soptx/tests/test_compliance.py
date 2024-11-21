@@ -1,8 +1,11 @@
-"""
-测试 compliance.py 中柔度目标函数的功能
-"""
+"""Test cases for compliance objective and volume constraint."""
+
+from dataclasses import dataclass
+from typing import Literal, Optional, Union, Dict, Any
+from pathlib import Path
+
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import UniformMesh2d
+from fealpy.mesh import UniformMesh2d, UniformMesh3d
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from soptx.material import (
@@ -10,199 +13,220 @@ from soptx.material import (
     ElasticMaterialProperties,
     SIMPInterpolation
 )
-
-from soptx.pde import MBBBeam2dData1
+from soptx.pde import MBBBeam2dData1, Cantilever2dData1, Cantilever3dData1
 from soptx.solver import ElasticFEMSolver
-from soptx.opt import ComplianceObjective
+from soptx.opt import ComplianceObjective, VolumeConstraint
 from soptx.filter import Filter, FilterConfig
 
-def test_compliance_objective():
-    print("\n=== 柔度目标函数测试 ===")
+@dataclass
+class TestConfig:
+    """Configuration for topology optimization test cases."""
+    # Required parameters (no default values)
+    problem_type: Literal['mbb_2d', 'cantilever_2d', 'cantilever_3d']
+    nx: int
+    ny: int
+    volume_fraction: float
+    filter_radius: float
+    filter_type: Literal['sensitivity', 'density', 'heaviside']
     
-    # 1. 创建网格
-    nx, ny = 60, 20
-    extent = [0, nx, 0, ny]
-    h = [1.0, 1.0]
-    origin = [0.0, 0.0]
-    mesh = UniformMesh2d(
-        extent=extent, h=h, origin=origin,
-        ipoints_ordering='yx', flip_direction='y',
-        device='cpu'
-    )
+    # Optional parameters (with default values)
+    nz: Optional[int] = None  # Only for 3D problems
+    elastic_modulus: float = 1.0
+    poisson_ratio: float = 0.3
+    minimal_modulus: float = 1e-9
+    penalty_factor: float = 3.0
+    projection_beta: Optional[float] = None  # Only for Heaviside projection
+    move_limit: float = 0.2
+    tolerance: float = 0.01
+    initial_lambda: float = 1e9
+    bisection_tol: float = 1e-3
+
+def create_base_components(config: TestConfig):
+    """Create basic components needed for topology optimization based on configuration."""
+    # Create mesh and determine dimensionality
+    if config.problem_type == 'cantilever_3d':
+        extent = [0, config.nx, 0, config.ny, 0, config.nz]
+        h = [1.0, 1.0, 1.0]
+        origin = [0.0, 0.0, 0.0]
+        mesh = UniformMesh3d(
+            extent=extent, h=h, origin=origin,
+            ipoints_ordering='zyx', flip_direction='y',
+            device='cpu'
+        )
+        dimension = 3
+    else:
+        extent = [0, config.nx, 0, config.ny]
+        h = [1.0, 1.0]
+        origin = [0.0, 0.0]
+        mesh = UniformMesh2d(
+            extent=extent, h=h, origin=origin,
+            ipoints_ordering='yx', flip_direction='y',
+            device='cpu'
+        )
+        dimension = 2
     
-    # 2. 创建函数空间
+    # Create function spaces
     p = 1
     space_C = LagrangeFESpace(mesh=mesh, p=p, ctype='C')
-    tensor_space_C = TensorFunctionSpace(space_C, (-1, 2))
+    tensor_space_C = TensorFunctionSpace(space_C, (-1, dimension))
     space_D = LagrangeFESpace(mesh=mesh, p=p-1, ctype='D')
     
-    # 3. 创建材料属性
-    # 材料配置
+    # Create material properties
     material_config = ElasticMaterialConfig(
-        elastic_modulus=1.0,
-        minimal_modulus=1e-9,
-        poisson_ratio=0.3,
-        plane_assumption="plane_stress"
+        elastic_modulus=config.elastic_modulus,
+        minimal_modulus=config.minimal_modulus,
+        poisson_ratio=config.poisson_ratio,
+        plane_assumption="3D" if dimension == 3 else "plane_stress"
     )
-    
-    # 插值模型
-    interpolation_model = SIMPInterpolation(penalty_factor=3.0)
-    
-    # 密度场（初始为均匀分布）
-    volfrac = 0.5
-    array = volfrac * bm.ones(mesh.number_of_cells(), dtype=bm.float64)
-    rho_elem = space_D.function(array)
-    
-    # 创建材料属性对象
+    interpolation_model = SIMPInterpolation(penalty_factor=config.penalty_factor)
     material_properties = ElasticMaterialProperties(
         config=material_config,
         interpolation_model=interpolation_model
     )
-    E = material_properties.material_model(rho=rho_elem[:])
-    print(f"\n单元杨氏模量信息:")
-    print(f"- 形状 - {E.shape}:\n {E}")
-    print(f"杨氏模量均值: {bm.mean(E)}")
-    print(f"杨氏模量最大值: {bm.max(E)}")
-    print(f"杨氏模量最小值: {bm.min(E)}")
     
-    # 4. 创建PDE问题
-    pde = MBBBeam2dData1(xmin=0, xmax=nx*h[0], ymin=0, ymax=ny*h[1])
+    # Create PDE problem based on problem type
+    if config.problem_type == 'mbb_2d':
+        pde = MBBBeam2dData1(
+            xmin=0, xmax=config.nx*h[0],
+            ymin=0, ymax=config.ny*h[1]
+        )
+    elif config.problem_type == 'cantilever_2d':
+        pde = Cantilever2dData1(
+            xmin=0, xmax=config.nx*h[0],
+            ymin=0, ymax=config.ny*h[1]
+        )
+    else:  # cantilever_3d
+        pde = Cantilever3dData1(
+            xmin=0, xmax=config.nx*h[0],
+            ymin=0, ymax=config.ny*h[1],
+            zmin=0, zmax=config.nz*h[2]
+        )
     
-    # 5. 创建求解器
-    solver = ElasticFEMSolver(
-        material_properties=material_properties,
-        tensor_space=tensor_space_C,
-        pde=pde
-    )
+    # Create solver
+    # solver = ElasticFEMSolver(
+    #     material_properties=material_properties,
+    #     tensor_space=tensor_space_C,
+    #     pde=pde
+    # )
 
-    # 6. 创建目标函数对象
+    solver = ElasticFEMSolver(
+       material_properties=material_properties,
+       tensor_space=tensor_space_C,
+       pde=pde,
+       solver_type='cg',  # 添加默认求解器类型
+       solver_params={'maxiter': 5000, 'atol': 1e-12, 'rtol': 1e-12}  # 添加求解器参数
+   )
+    
+    # Initialize density field
+    array = config.volume_fraction * bm.ones(mesh.number_of_cells(), dtype=bm.float64)
+    rho = space_D.function(array)
+    
+    return mesh, space_D, material_properties, solver, rho
+
+def test_compliance_objective(config: TestConfig):
+    """Test compliance objective computation and sensitivity analysis."""
+    print(f"\n=== Testing Compliance Objective with {config.filter_type} filter ===")
+    
+    # Create base components
+    mesh, space_D, material_properties, solver, rho = create_base_components(config)
+    
+    # Test solver
+    solver.update_density(rho[:])
+    solver_result = solver.solve_cg()
+    displacement = solver_result.displacement
+    print(f"\nSolver information:")
+    print(f"- Displacement shape: {displacement.shape}:\n {displacement[:]}")
+
+    # 获取求解后的全局矩阵和向量
+    K = solver.get_global_stiffness_matrix()
+    F = solver.get_global_force_vector()
+    
+    # Create filter
+    filter_config = FilterConfig(
+        filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
+        filter_radius=config.filter_radius
+    )
+    filter_obj = Filter(filter_config)
+    filter_obj.initialize(mesh)
+    
+    # Create objective and constraint
     objective = ComplianceObjective(
         material_properties=material_properties,
-        solver=solver
+        solver=solver,
+        filter=filter_obj
     )
-
-    print("\n=== 测试目标函数计算 ===")
-    try:
-        # 求解位移场
-        solver_result = solver.solve_cg()
-        displacement = solver_result.displacement
-
-        # 计算目标函数值
-        obj_value = objective.fun(design_vars=rho_elem[:], 
-                                state_vars=displacement)
-        print(f"目标函数值: {obj_value:.6e}")
-
-        # 获取单元柔顺度
-        ce = objective.get_element_compliance()
-        print(f"\n单元柔顺度信息:")
-        print(f"- 形状 - {ce.shape}:\n {ce}")
-        print(f"- 最小值: {bm.min(ce):.6e}")
-        print(f"- 最大值: {bm.max(ce):.6e}")
-        print(f"- 平均值: {bm.mean(ce):.6e}")
-
-        # 测试不同密度下的目标函数值
-        print("\n=== 测试不同密度下的目标函数值 ===")
-        # 测试较小密度
-        rho_small = 0.1 * bm.ones_like(rho_elem[:])
-        obj_small = objective.fun(design_vars=rho_small[:], 
-                                state_vars=displacement)
-        print(f"密度=0.1时的目标函数值: {obj_small:.6e}")
-
-        # 测试较大密度
-        rho_large = 0.9 * bm.ones_like(rho_elem[:])
-        obj_large = objective.fun(design_vars=rho_large[:],
-                                state_vars=displacement)
-        print(f"密度=0.9时的目标函数值: {obj_large:.6e}")
-
-    except Exception as e:
-        print(f"目标函数计算失败: {str(e)}")
-
-    print("\n=== 测试目标函数梯度计算 ===")
-    try:
-
-        # 计算单元灵敏度（不使用滤波器）
-        dce = objective.jac(design_vars=rho_elem[:], state_vars=displacement)
-        print(f"\n原始单元灵敏度信息:")
-        print(f"- 形状 - {dce.shape}:\n, {dce}")
-        print(f"- 最小值: {bm.min(dce):.6e}")
-        print(f"- 最大值: {bm.max(dce):.6e}")
-        print(f"- 平均值: {bm.mean(dce):.6e}")
-
-        # 测试不同类型的滤波器
-        print("\n=== 测试不同类型的滤波器 ===")
-        
-        # 灵敏度滤波
-        filter_sens = Filter(FilterConfig(filter_type=0, filter_radius=2.4))
-        filter_sens.initialize(mesh)
-        
-        objective_sens = ComplianceObjective(
-            material_properties=material_properties,
-            solver=solver,
-            filter=filter_sens
-        )
-        
-        grad_filter_sens = objective_sens.jac(design_vars=rho_elem[:], state_vars=displacement)
-        print(f"\n灵敏度滤波后的梯度信息:")
-        print(f"- 形状 - {grad_filter_sens.shape}:\n, {grad_filter_sens}")
-        print(f"- 最小值: {bm.min(grad_filter_sens):.6e}")
-        print(f"- 最大值: {bm.max(grad_filter_sens):.6e}")
-        print(f"- 平均值: {bm.mean(grad_filter_sens):.6e}")
-
-        # 密度滤波
-        filter_dens = Filter(FilterConfig(filter_type=1, filter_radius=2.4))
-        filter_dens.initialize(mesh)
-        
-        objective_dens = ComplianceObjective(
-            material_properties=material_properties,
-            solver=solver,
-            filter=filter_dens
-        )
-        
-        grad_filter_dens = objective_dens.jac(design_vars=rho_elem[:], state_vars=displacement)
-        print(f"\n密度滤波后的梯度信息:")
-        print(f"- 形状 - {grad_filter_dens.shape}:\n, {grad_filter_dens}")
-        print(f"- 最小值: {bm.min(grad_filter_dens):.6e}")
-        print(f"- 最大值: {bm.max(grad_filter_dens):.6e}")
-        print(f"- 平均值: {bm.mean(grad_filter_dens):.6e}")
-
-        # Heaviside投影滤波
-        filter_heav = Filter(FilterConfig(filter_type=2, filter_radius=2.0))
-        filter_heav.initialize(mesh)
-        
-        # objective_heav = ComplianceObjective(
-        #     material_properties=material_properties,
-        #     solver=solver,
-        #     filter=filter_heav
-        # )
-        
-        # # 创建Heaviside滤波参数
-        # beta = 1.0
-        # rho_tilde = rho_elem[:]  # 这里简单使用原始密度作为示例
-        
-        # gradient_heav = objective_heav.jac(
-        #     design_vars=rho_elem[:],
-        #     filter_params={'beta': beta, 'rho_tilde': rho_tilde}
-        # )
-        # print(f"\nHeaviside投影滤波后的梯度信息:")
-        # print(f"- 形状: {gradient_heav.shape}")
-        # print(f"- 最小值: {bm.min(gradient_heav):.6e}")
-        # print(f"- 最大值: {bm.max(gradient_heav):.6e}")
-        # print(f"- 平均值: {bm.mean(gradient_heav):.6e}")
-
-        # # 测试滤波矩阵属性
-        # print("\n=== 测试滤波矩阵属性 ===")
-        # H = filter_sens.H
-        # Hs = filter_sens.Hs
-        # print(f"滤波矩阵 H 的形状: {H.shape}")
-        # print(f"滤波矩阵行和向量 Hs 的形状: {Hs.shape}")
-        # print(f"Hs 的最小值: {bm.min(Hs):.6e}")
-        # print(f"Hs 的最大值: {bm.max(Hs):.6e}")
-
-    except Exception as e:
-        print(f"梯度计算失败: {str(e)}")
-        raise e
-
+    constraint = VolumeConstraint(
+        mesh=mesh,
+        volume_fraction=config.volume_fraction,
+        filter=filter_obj
+    )
     
+    # Test objective function
+    obj_value = objective.fun(rho=rho[:], u=displacement)
+    print(f"Objective function value: {obj_value:.6e}")
+    
+    # Test element compliance
+    ce = objective.get_element_compliance()
+    print(f"\nElement compliance information:")
+    print(f"- Shape: {ce.shape}:\n {ce}")
+    print(f"- Min: {bm.min(ce):.6e}")
+    print(f"- Max: {bm.max(ce):.6e}")
+    print(f"- Mean: {bm.mean(ce):.6e}")
+    
+    # Test sensitivity
+    dce = objective.jac(rho=rho[:], u=displacement)
+    print(f"\nElement sensitivity information:")
+    print(f"- Shape: {dce.shape}:\n, {dce}")
+    print(f"- Min: {bm.min(dce):.6e}")
+    print(f"- Max: {bm.max(dce):.6e}")
+    print(f"- Mean: {bm.mean(dce):.6e}")
+    
+    # Test constraint
+    constraint_value = constraint.fun(rho=rho[:])
+    print(f"\nConstraint function value: {constraint_value:.6e}")
+    
+    gradient = constraint.jac(rho=rho[:])
+    print(f"\nConstraint gradient information:")
+    print(f"- Shape: {gradient.shape}")
+    print(f"- Min: {bm.min(gradient):.6e}")
+    print(f"- Max: {bm.max(gradient):.6e}")
+    print(f"- Mean: {bm.mean(gradient):.6e}")
+    
+    return {
+        'objective_value': obj_value,
+        'element_compliance': ce,
+        'sensitivity': dce,
+        'constraint_value': constraint_value,
+        'constraint_gradient': gradient
+    }
 
 if __name__ == "__main__":
-    test_compliance_objective()
+    # # Test 3D case with density filter
+    # config_3d = TestConfig(
+    #     problem_type='cantilever_3d',
+    #     nx=60, ny=20, nz=4,
+    #     volume_fraction=0.3,
+    #     filter_radius=1.5,
+    #     filter_type='density'
+    # )
+    # results_3d = test_compliance_objective(config_3d)
+    
+    # # Test 2D case with sensitivity filter
+    # config_2d = TestConfig(
+    #     problem_type='mbb_2d',
+    #     nx=60, ny=20,
+    #     volume_fraction=0.5,
+    #     filter_radius=2.4,
+    #     filter_type='sensitivity'
+    # )
+    # results_2d = test_compliance_objective(config_2d)
+
+    # Test 2D case with sensitivity filter
+    config_cantilever_2d = TestConfig(
+        problem_type='cantilever_2d',
+        nx=4, ny=3,
+        volume_fraction=0.4,
+        filter_radius=6,
+        filter_type='sensitivity'
+    )
+    results_cantilever_2d = test_compliance_objective(config_cantilever_2d)

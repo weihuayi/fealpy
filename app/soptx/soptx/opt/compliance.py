@@ -65,7 +65,8 @@ class ComplianceObjective(ObjectiveBase):
             
             # 更新求解器中的密度并求解
             self.solver.update_density(rho)
-            self._current_u = self.solver.solve_cg().displacement
+            self._current_u = self.solver.solve().displacement 
+            # self._current_u = self.solver.solve_cg().displacement
             # self._current_rho = bm.copy(rho)  # 这里的 copy 导致内部状态与外部不同步
             self._current_rho = rho  # 直接引用，内部状态会随外部更新
             
