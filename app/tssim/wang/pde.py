@@ -22,10 +22,8 @@ class CouetteFlow:
         ## init the parameter
         self.R = 5.0 ##dimensionless
         self.l_s = 0.0025 ##dimensionless slip length
-        #self.L_s = self.l_s / h 
-        #self.L_s = 1/self.l_s 
+        self.L_s = self.l_s 
         self.epsilon = 0.004 ## the thickness of interface
-        self.L_s = self.l_s/self.epsilon
         self.L_d = 0.0005 ##phenomenological mobility cofficient
         self.lam = 12.0 ##dimensionless
         self.V_s = 200.0 ##dimensionless 

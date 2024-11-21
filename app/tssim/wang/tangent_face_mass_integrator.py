@@ -66,7 +66,7 @@ class TangentFaceMassIntegrator(LinearInt, OpInt, FaceInt):
         mesh = space.mesh
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
         phit = bm.einsum('eqid, ed -> eqi', phi, t[index,...])
-        phii = bm.einsum('eqid -> eqi', phi)
-        #result = bm.einsum('eqi, eqj, q, e ->eij', phii, phit, ws, fm)*coef
+        #phii = bm.einsum('eqid -> eqi', phi)
+        phii = phi[...,0]
         result = bilinear_integral(phii, phit, ws, fm, val, batched=self.batched)
         return result

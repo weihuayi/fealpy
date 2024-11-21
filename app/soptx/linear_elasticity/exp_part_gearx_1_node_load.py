@@ -27,8 +27,8 @@ target_cells_idx = data['target_cell_idx']
 parameters = data['parameters']
 is_inner_node = data['is_inner_node']
 
-parameter = parameters[-1]
-target_cell_idx = target_cells_idx[-1]
+parameter = parameters[-1:] # (1, 3)
+target_cell_idx = target_cells_idx[-1:] # (1, )
 hex_cell = hex_mesh.cell
 hex_node = hex_mesh.node
 
@@ -41,18 +41,23 @@ node = mesh.entity('node')
 cell = mesh.entity('cell')
 
 load_values = bm.array([131.0], dtype=bm.float64) # (1, )
-# cellnorm = mesh.cell_normal() # (NC, 3)
-cellnorm = bm.zeros((NC, 3), dtype=bm.float64)
-cellnorm[:, 1] = -1
+cellnorm = mesh.cell_normal() # (NC, 3)
 
-target_cellnorm = cellnorm[target_cell_idx] # (3, )
-P = bm.einsum('p,d -> pd', load_values, target_cellnorm)  # (1, 3)
+target_cellnorm = cellnorm[target_cell_idx] # (1, 3)
+P = bm.einsum('p, pd -> pd', load_values, target_cellnorm)  # (1, 3)
 
 u = parameter[..., 0]
 v = parameter[..., 1]
 w = parameter[..., 2]
 
-bcs = (bm.tensor([[u, 1 - u]]), bm.tensor([[v, 1 - v]]), bm.tensor([[w, 1 - w]]))
+bcs_list = [
+    (
+        bm.tensor([[u, 1 - u]]),
+        bm.tensor([[v, 1 - v]]),
+        bm.tensor([[w, 1 - w]])
+    )
+    for u, v, w in zip(u, v, w)
+]
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 scalar_gdof = space.number_of_global_dofs()
@@ -61,7 +66,12 @@ tgdof = tensor_space.number_of_global_dofs()
 tldof = tensor_space.number_of_local_dofs()
 cell2tdof = tensor_space.cell_to_dof()
 
-phi_loads_array = tensor_space.basis(bcs) # (1, 1, 24, 3)
+phi_loads = []
+for bcs in bcs_list:
+    phi = tensor_space.basis(bcs)
+    phi_loads.append(phi)
+
+phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, NP, tldof, GD)
 
 FE_load = bm.einsum('pd, cpld -> pl', P, phi_loads_array) # (1, 24)
 

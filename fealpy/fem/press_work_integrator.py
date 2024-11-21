@@ -16,7 +16,7 @@ from ..functional import bilinear_integral
 from .integrator import LinearInt, OpInt, CellInt, CoefLike, enable_cache
 from ..typing import TensorLike, Index, _S
 from ..backend import backend_manager as bm
-
+from ..functionspace import TensorFunctionSpace
 
 '''
 (pI, \nabla v)
@@ -39,7 +39,6 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
     def fetch(self, space: _FS):
         space0 = space[0]
         space1 = space[1]
-        scalar_space = space[1].scalar_space
          
         index = self.index
         mesh = getattr(space[0], 'mesh', None)
@@ -64,7 +63,10 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         mesh = getattr(space[0], 'mesh', None)
         phi, gphi, cm, bcs, ws, index = self.fetch(space)
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        gphi = bm.einsum('...ii->...', gphi)
+        if isinstance(space[0], TensorFunctionSpace):
+            gphi = gphi
+        else:
+            gphi = bm.einsum('...ii->...', gphi)
         result = bilinear_integral(gphi, phi, ws, cm, val, batched=self.batched)
         return result
 
