@@ -4,23 +4,21 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.functionspace import TensorFunctionSpace
 from ocp_opt_pde import example_1
-#from solver import ocp_opt_solver
 from solver_update import ocp_opt_solver
 from fealpy.fem import DirichletBC  
 
-from scipy.sparse import coo_array, bmat
 from functools import partial
 from fealpy import logger
 from fealpy.solver import spsolve
 logger.setLevel('ERROR') #积分子问题
 
 bm.set_backend("numpy")
-pde = example_1(c=0)
-n = 10
+pde = example_1()
+n = 20
 q = 3
 T = 1
-nt = 200
-maxit = 15
+nt = 100
+maxit = 10
 
 mesh = TriangleMesh.from_box(pde.domain(), nx=n, ny=n)
 timeline = UniformTimeLine(0, T, nt)
@@ -154,9 +152,18 @@ for k in range(maxit):
        allu[i] = ufunction
     print(f"第{k}次的前后u差别",bm.sum(allu[0] - un_pre))
     
-#ysolution = yspace.function(yspace.interpolate(partial(pde.y_solution, time=T))) 
+ysolution = yspace.function(yspace.interpolate(partial(pde.y_solution, time=T))) 
+psolution = pspace.function(pspace.interpolate(partial(pde.p_solution, time=T))) 
 usolution = yspace.function(yspace.interpolate(partial(pde.u_solution, time=0))) 
-#errory = mesh.error(ally[-1], ysolution)
+zsolution = yspace.function(yspace.interpolate(partial(pde.z_solution, time=0))) 
+qsolution = pspace.function(pspace.interpolate(partial(pde.q_solution, time=0))) 
+errory = mesh.error(ally[-1], ysolution)
+errorp = mesh.error(allp[-1], psolution)
 erroru = mesh.error(allu[0], usolution)
-#print(errory)
-print(erroru)
+errorz = mesh.error(allz[0], zsolution)
+errorq = mesh.error(q2, qsolution)
+print("y误差",errory)
+print("p误差",errorp)
+print("u误差",erroru)
+print("z误差",errorz)
+print("q误差",errorq)
