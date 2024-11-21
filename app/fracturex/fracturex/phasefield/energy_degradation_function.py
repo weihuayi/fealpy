@@ -45,6 +45,23 @@ class EnergyDegradationFunction:
             return self._user_defined_grad_grad_degradation(d)
         else:
             raise ValueError(f"Unknown degradation type: {self.degradation_type}")
+        
+    def grad_degradation_function_constant_coef(self):
+        """
+        Get the constant coefficient in the gradient of the energy degradation function.
+
+        Parameters:
+        d (float or numpy array): phase field value.
+
+        return:
+        c (float or numpy array): The constant coefficient in the gradient of the energy degradation function.
+        """
+        if self.degradation_type == 'quadratic':
+            return -2
+        elif self.degradation_type == 'user_defined':
+            return self.params.get('constant_coef')
+        else:
+            raise ValueError(f"Unknown degradation type: {self.degradation_type}")
 
 
     def _quadratic_degradation(self, d):
@@ -65,8 +82,7 @@ class EnergyDegradationFunction:
         """
         The derivative of the quadratic energy degradation function g'(d) = -2(1 - d)。
         """
-        eps = 1e-10
-        g_gd = -2*(1 - d)
+        g_gd = -2 + 2*d
         return g_gd
     
     def _quadratice_grad_grad_degradation(self, d):
@@ -103,6 +119,24 @@ class EnergyDegradationFunction:
         if custom_function is None:
             raise ValueError("For user_defined degradation, 'custom_function' must be provided.")
         return custom_function(d)
+    
+    def _user_defined_grad_degradation(self, d):
+        """
+        The derivative of the user-defined energy degradation function.
+        """
+        custom_grad_function = self.params.get('custom_grad_function')
+        if custom_grad_function is None:
+            raise ValueError("For user_defined degradation, 'custom_grad_function' must be provided.")
+        return custom_grad_function(d)
+    
+    def _user_defined_grad_grad_degradation(self, d):
+        """
+        The second derivative of the user-defined energy degradation function.
+        """
+        custom_grad_grad_function = self.params.get('custom_grad_grad_function')
+        if custom_grad_grad_function is None:
+            raise ValueError("For user_defined degradation, 'custom_grad_grad_function' must be provided.")
+        return custom_grad_grad_function(d)
 
     def plot_degradation_function(self, d_values):
         """
