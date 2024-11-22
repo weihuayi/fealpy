@@ -391,3 +391,56 @@ def export_to_inp(filename, nodes, elements, fixed_nodes, load_nodes, loads, you
         file.write("*MATRIX GENERATE, STIFFNESS\n")
         file.write("*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE\n")
         file.write("*End Step\n")
+
+def face_normal_bilinear(cell_nodes, u, v, w, error=1e-3, is_normalize=True):
+    """
+    计算面外法线方向
+    :param cell: 计算单元节点
+    :param u: 参数
+    :param v: 参数
+    :param w: 参数
+    :return:
+    """
+    P0 = cell_nodes[0]
+    P1 = cell_nodes[1]
+    P2 = cell_nodes[2]
+    P3 = cell_nodes[3]
+    P4 = cell_nodes[4]
+    P5 = cell_nodes[5]
+    P6 = cell_nodes[6]
+    P7 = cell_nodes[7]
+
+    if abs(u - 0) <= error*10:
+        u = w
+        P0 = P0
+        P1 = P4
+        P2 = P7
+        P3 = P3
+    elif abs(u - 1) <= error*10:
+        u = w
+        P0 = P1
+        P1 = P2
+        P2 = P6
+        P3 = P5
+    elif abs(v - 0) <= error*10:
+        v = w
+        P0 = P0
+        P1 = P1
+        P2 = P5
+        P3 = P4
+    elif abs(v - 1) <= error*10:
+        v = w
+        P0 = P3
+        P1 = P7
+        P2 = P6
+        P3 = P2
+
+    Pu = -(1 - v) * P0 + (1 - v) * P1 + v * P2 - v * P3
+    Pv = -(1 - u) * P0 - u * P1 + u * P2 + (1 - u) * P3
+
+    if is_normalize:
+        normal = np.cross(Pu, Pv)
+        normal = normal / np.linalg.norm(normal)
+        return normal
+    else:
+        return np.cross(Pu, Pv)

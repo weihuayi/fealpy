@@ -2,7 +2,7 @@ import ipdb
 import numpy as np 
 import pytest
 from fealpy.backend import backend_manager as bm
-from fealpy.tests.backend.backend_data import *
+from backend_data import *
 
 class TestBackendInterfaces:
     ######## Constants

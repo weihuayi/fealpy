@@ -1,12 +1,9 @@
-from .types import FilterType, FilterProperties
-from .matrix import FilterMatrixBuilder
-from .filter import TopologyFilter
-from .factory import create_filter_properties
+from .filter import FilterConfig, Filter
+from .matrix import FilterMatrix
+
 
 __all__ = [
-    'FilterType',
-    'FilterProperties',
-    'FilterMatrixBuilder',
-    'TopologyFilter',
-    'create_filter_properties'
+    'FilterConfig',
+    'Filter',
+    'FilterMatrix',
 ]

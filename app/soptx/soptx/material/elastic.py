@@ -15,85 +15,62 @@ class ElasticMaterialConfig:
     poisson_ratio: float = 0.3
     plane_assumption: Literal["plane_stress", "plane_strain", "3d"] = "plane_stress"
 
-class ElasticMaterialProperties(LinearElasticMaterial):
-    """Class for elastic material properties with interpolation capabilities."""
+class ElasticMaterialInstance(LinearElasticMaterial):
+    """具有特定杨氏模量的弹性材料实例"""
+    def __init__(self, E: TensorLike, config: ElasticMaterialConfig):
+        super().__init__(
+            name="ElasticMaterial",
+            elastic_modulus=1.0,                # 基础值，实际值由 _E 控制
+            poisson_ratio=config.poisson_ratio,
+            hypo=config.plane_assumption
+        )
+        self._E = E
+        self.config = config
 
-    def __init__(self, 
-                 config: ElasticMaterialConfig, 
-                 rho: TensorLike,
-                 interpolation_model: MaterialInterpolation):
-        """
-        Initialize elastic material properties.
+    @property
+    def elastic_modulus(self) -> TensorLike:
+        """获取当前的杨氏模量场"""
+        return self._E
         
-        Args:
-            config (ElasticMaterialConfig): Material configuration
-            rho (TensorLike): Density field
-            interpolation_model (MaterialInterpolation): Material interpolation model
-        """
+    def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
+        """计算弹性矩阵"""
+        base_D = super().elastic_matrix()
+        D = self._E[:, None, None, None] * base_D
+        return D
+    
+class ElasticMaterialProperties:
+    """材料属性计算类，负责材料的插值计算"""
+    def __init__(self, config: ElasticMaterialConfig, interpolation_model: MaterialInterpolation):
         if not isinstance(config, ElasticMaterialConfig):
             raise TypeError("'config' must be an instance of ElasticMaterialConfig")
-        if rho is None or not isinstance(rho, TensorLike):
-            raise TypeError("'rho' must be of type TensorLike and cannot be None")
+        
         if interpolation_model is None or not isinstance(interpolation_model, MaterialInterpolation):
             raise TypeError("'interpolation_model' must be an instance of MaterialInterpolation")
-        
-        super().__init__(name="ElasticMaterialProperties",
-                         elastic_modulus=config.elastic_modulus,
-                         poisson_ratio=config.poisson_ratio,
-                         hypo=config.plane_assumption)
-        
+            
         self.config = config
-        self.rho = rho
         self.interpolation_model = interpolation_model
 
-        # 创建E=1时的基础材料属性
-        self.base_material = LinearElasticMaterial(
-                                                    name="BaseMaterial",
-                                                    elastic_modulus=1.0,  # E0 = 1
-                                                    poisson_ratio=config.poisson_ratio,
-                                                    hypo=config.plane_assumption
-                                                )
-        
-    @property
-    def base_elastic_material(self) -> LinearElasticMaterial:
-        """获取 E=1 时的基础材料属性"""
-        return self.base_material
-
-    def material_model(self) -> TensorLike:
-        """Calculate interpolated Young's modulus."""
+    def calculate_elastic_modulus(self, density: TensorLike) -> TensorLike:
+        """根据密度计算杨氏模量"""
         E = self.interpolation_model.calculate_property(
-            self.rho,
+            density,
             self.config.elastic_modulus,
             self.config.minimal_modulus,
             self.interpolation_model.penalty_factor
         )
         return E
 
-    def material_model_derivative(self) -> TensorLike:
-        """Calculate derivative of interpolated Young's modulus."""
+    def calculate_elastic_modulus_derivative(self, density: TensorLike) -> TensorLike:
+        """计算杨氏模量对密度的导数"""
         dE = self.interpolation_model.calculate_property_derivative(
-            self.rho,
+            density,
             self.config.elastic_modulus,
             self.config.minimal_modulus,
             self.interpolation_model.penalty_factor
         )
         return dE
 
-    def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
-        """
-        Calculate the elastic matrix D for each element.
-        
-        Args:
-            bcs (Optional[TensorLike]): Boundary conditions
-            
-        Returns:
-            TensorLike: Elastic matrix D for each element
-        """
-        if self.rho is None:
-            raise ValueError("Density rho must be set for MaterialProperties.")
-        
-        E = self.material_model()
-        base_D = super().elastic_matrix()
-        D = E[:, None, None, None] * base_D
-
-        return D
+    def get_base_material(self) -> ElasticMaterialInstance:
+        """获取基础材料实例（E=1）"""
+        E = bm.ones(1, dtype=bm.float64)
+        return ElasticMaterialInstance(E, self.config)

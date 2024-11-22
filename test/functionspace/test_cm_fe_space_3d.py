@@ -431,9 +431,9 @@ class TestCmfespace3d:
         np.testing.assert_allclose(grad4fI[cc,j], g4f, atol=1e-10)
 
  
-    #@pytest.mark.parametrize("backend", ["numpy", "pytorch"])
-    @pytest.mark.parametrize("data", interpolation)
-    def test_interpolation(self,  backend):
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    # @pytest.mark.parametrize("data", interpolation)
+    def test_interpolation(self, backend):
         bm.set_backend(backend)
         mesh = TetrahedronMesh.from_box([0,1,0,1,0,1],2,2,2)
         node = mesh.entity('node')

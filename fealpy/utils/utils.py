@@ -1,9 +1,8 @@
 
-from typing import Optional, Union, Callable
-
+from typing import Optional, Union, Callable, Literal
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, Number, CoefLike, _S
+from ..typing import TensorLike, CoefLike
 
 from ..mesh import HomogeneousMesh, Mesh
 
@@ -11,6 +10,8 @@ __all__ = [
     'process_coef_func',
     'is_scalar',
     'is_tensor',
+    'itype_memory_size',
+    'ftype_memory_size',
     'fill_axis',
     'get_coef_subscripts',
     'process_threshold'
@@ -52,17 +53,44 @@ def process_coef_func(
     return coef_val
 
 
-def is_scalar(input: Union[int, float, TensorLike]) -> bool:
+def is_scalar(input: Union[int, float, complex, TensorLike]) -> bool:
     if isinstance(input, TensorLike):
         return bm.size(input) == 1
     else:
-        return isinstance(input, (int, float))
+        return isinstance(input, (int, float, complex))
 
 
-def is_tensor(input: Union[int, float, TensorLike]) -> bool:
+def is_tensor(input: Union[int, float, complex, TensorLike]) -> bool:
     if isinstance(input, TensorLike):
         return bm.size(input) >= 2
     return False
+
+
+def itype_memory_size(input: TensorLike, /, unit: Literal['bit', 'b', 'kb', 'mb', 'gb'] = 'mb') -> float:
+    single_bits = bm.iinfo(input.dtype).bits
+    total_bits = single_bits * bm.size(input)
+    return size_unit(total_bits, unit)
+
+
+def ftype_memory_size(input: TensorLike, /, unit: Literal['bit', 'b', 'kb', 'mb', 'gb'] = 'mb') -> float:
+    single_bits = bm.finfo(input.dtype).bits
+    total_bits = single_bits * bm.size(input)
+    return size_unit(total_bits, unit)
+
+
+def size_unit(bits: int, unit: Literal['bit', 'b', 'kb', 'mb', 'gb'] = 'mb'):
+    if unit == 'bit':
+        return bits
+    elif unit == 'b':
+        return bits / 8
+    elif unit == 'kb':
+        return bits / 8 / 1024
+    elif unit == 'mb':
+        return bits / 8 / 1024 / 1024
+    elif unit == 'gb':
+        return bits / 8 / 1024 / 1024 / 1024
+    else:
+        raise ValueError(f"Unsupported unit '{unit}'.")
 
 
 def fill_axis(input: TensorLike, ndim: int):
