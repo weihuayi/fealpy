@@ -29,7 +29,7 @@ from app.fracturex.fracturex.phasefield.vector_Dirichlet_bc import VectorDirichl
 
 class MainSolve:
     def __init__(self, mesh, material_params: Dict, 
-                 model_type: str = 'HybridModel', method: str = 'lfem', p: int = 1, q: int = None):
+                 model_type: str = 'HybridModel'):
         """
         Initialize the MainSolver class with more customization options.
 
@@ -49,26 +49,10 @@ class MainSolve:
             The method for solving the problem, by default 'lfem'.
         """
         self.mesh = mesh
-        self.p = p
-        self.q = self.p + 3 if q is None else q
 
-        # Material and energy degradation function
-        self.set_energy_degradation(degradation_type='quadratic')
-        self.set_crack_surface_density(density_type='AT2')
-        
         self.model_type = model_type
-        self.pfcm = PhaseFractureMaterialFactory.create(model_type, material_params, self.EDFunc)
 
-        self._method = method
-
-        # Initialize spaces
-        if self._method == 'lfem':
-            self.set_lfe_space()
-        else:
-            raise ValueError(f"Unknown method: {self.method}")
-        
-        self.pfcm.update_disp(self.uh)
-        self.pfcm.update_phase(self.d)
+        self.material_params = material_params
 
         # Material parameters
         self.Gc = material_params['Gc']
@@ -76,32 +60,54 @@ class MainSolve:
         
         self.bc_dict = {}
 
+        self.CSDFunc = None
+        self.EDFunc = None
+
         self.enable_refinement = False
 
         self._save_vtk = False
         self._atype = None
         self._timer = False
-        
-        if bm.device_type(self.uh) == 'cpu':
-            print('Using scipy solver.')
-            self._solver = 'scipy'
-        elif bm.device_type(self.uh) == 'cuda':
-            print('Using cupy solver.')
-            self._solver = 'cupy'
-        else:
-            raise ValueError(f"Unknown device type: {bm.device_type(self.uh)}")
+
+        self._solver = None
 
         # Initialize the timer
         self.tmr = timer()
         next(self.tmr)
     
-    def initialization_settings(self):
+    def initialization_settings(self, p: int = 1, q: int = None, ):
         """
         Initialize the settings for the problem.
         """
-        pass
+        # Material and energy degradation function
+        if self.EDFunc is None:
+            self.set_energy_degradation(degradation_type='quadratic')
+        if self.CSDFunc is None:
+            self.set_crack_surface_density(density_type='AT2')
 
-    def solve(self, maxit: int = 50):
+        self.pfcm = PhaseFractureMaterialFactory.create(self.model_type, self.material_params, self.EDFunc)
+
+        # Initialize spaces
+        if self._method == 'lfem':
+            self.set_lfe_space(p=p, q=q)
+        else:
+            raise ValueError(f"Unknown method: {self.method}")
+        
+        self.pfcm.update_disp(self.uh)
+        self.pfcm.update_phase(self.d)
+
+        # solver
+        if self._solver is None:                
+            if bm.device_type(self.uh) == 'cpu':
+                print('Using scipy solver.')
+                self._solver = 'scipy'
+            elif bm.device_type(self.uh) == 'cuda':
+                print('Using cupy solver.')
+                self._solver = 'cupy'
+            else:
+                raise ValueError(f"Unknown device type: {bm.device_type(self.uh)}")
+
+    def solve(self, method: str = 'lfem', p: int = 1, q: int = None, maxit: int = 50):
         """
         Solve the phase-field fracture problem.
 
@@ -114,6 +120,8 @@ class MainSolve:
         vtkname : str, optional
             VTK output file name, by default None.
         """
+        self._method = method
+        self.initialization_settings(p=p, q=q)
         self._initialize_force_boundary()
         self._Rforce = bm.zeros_like(self._force_value)
         
@@ -314,7 +322,7 @@ class MainSolve:
 
         @barycentric
         def postive_coef(bc, **kwargs):
-            return self.pfcm.positive_coef(bc)
+            return self.EDFunc.degradation_function(self.d(bc))
         
         postive_coef.uh = uh
         postive_coef.kernel_func = self.pfcm.positive_stress_func
@@ -327,7 +335,7 @@ class MainSolve:
         else:
             @barycentric
             def negative_coef(bc, **kwargs):
-                return self.pfcm.negative_coef(bc)
+                return 1
             
             negative_coef.uh = uh
             negative_coef.kernel_func = self.pfcm.negative_stress_func
@@ -371,11 +379,24 @@ class MainSolve:
         @barycentric
         def diffusion_coef(bc, **kwargs):
             return Gc * l0 * 2 / c_d
+        
+        def diffusion_kernel_func(u):
+            return u
+        
+        def diffusion_grad_kernel_func(u):
+            return 1
 
         @barycentric
         def mass_coef1(bc, **kwargs):
             return Gc / (l0 * c_d)
         
+        @barycentric
+        def mass_kernel_func1(u):
+            return self.CSDFunc.grad_density_function(u)[0]
+
+        def mass_grad_kernel_func1(u):
+            return self.CSDFunc.grad_grad_density_function(u)[0]
+                
         @barycentric
         def mass_coef2(bc, **kwargs):
             return self.pfcm.maximum_historical_field(bc)
@@ -389,24 +410,17 @@ class MainSolve:
             return self.EDFunc.grad_grad_degradation_function(u)
         
         @barycentric
-        def kernel_func(u):
-            return self.CSDFunc.grad_density_function(u)[0]
-
-        def grad_kernel_func(u):
-            return self.CSDFunc.grad_grad_density_function(u)[0]
-        
-        @barycentric
         def source_coef(bc, index):
             gg_gd = self.EDFunc.grad_degradation_function_constant_coef()
             return -1 * gg_gd * self.pfcm.maximum_historical_field(bc)
         
-        diffusion_coef.kernel_func = kernel_func
-        mass_coef1.kernel_func = kernel_func
+        diffusion_coef.kernel_func = diffusion_kernel_func
+        mass_coef1.kernel_func = mass_kernel_func1
         mass_coef2.kernel_func = mass_kernel_func2
 
         if bm.backend_name == 'numpy':
-            diffusion_coef.grad_kernel_func = grad_kernel_func
-            mass_coef1.grad_kernel_func = grad_kernel_func
+            diffusion_coef.grad_kernel_func = diffusion_grad_kernel_func
+            mass_coef1.grad_kernel_func = mass_grad_kernel_func1
             mass_coef2.grad_kernel_func = mass_grad_kernel_func2
 
         mass_coef1.uh = d
@@ -440,10 +454,12 @@ class MainSolve:
         return bm.linalg.norm(R)
 
 
-    def set_lfe_space(self):
+    def set_lfe_space(self, p: int = 1, q: int = None):
         """
         Set the finite element spaces for displacement and phase fields.
         """
+        self.p = p
+        self.q = self.p + 3 if q is None else q
         self.space = LagrangeFESpace(self.mesh, self.p)
         self.tspace = TensorFunctionSpace(self.space, (self.mesh.geo_dimension(), -1))
         self.d = self.space.function()

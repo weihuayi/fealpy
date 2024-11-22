@@ -1,7 +1,9 @@
 from fealpy.backend import backend_manager as bm
+import torch
+import numpy as np
 from fealpy.mesh import TetrahedronMesh, HexahedronMesh
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolver
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 from fealpy.utils import timer
 
 import time
@@ -64,9 +66,10 @@ parser.add_argument('--model_type',
         default='HybridModel', type=str,
         help='有限元方法, 默认为 HybridModel.')
 
+
 parser.add_argument('--mesh_type',
-        default='tet', type=str,
-        help='网格类型, 默认为 tet.')
+        default='tri', type=str,
+        help='网格类型, 默认为 tri.')
 
 parser.add_argument('--enable_adaptive',
         default=False, type=bool,
@@ -81,8 +84,8 @@ parser.add_argument('--refine_method',
         help='网格加密方法, 默认为 bisect.')
 
 parser.add_argument('--n',
-        default=2, type=int,
-        help='初始网格加密次数, 默认为 2.')
+        default=6, type=int,
+        help='初始网格加密次数, 默认为 6.')
 
 parser.add_argument('--vtkname',
         default='test', type=str,
@@ -91,6 +94,18 @@ parser.add_argument('--vtkname',
 parser.add_argument('--save_vtkfile',
         default=True, type=bool,
         help='是否保存 vtk 文件, 默认为 False.')
+
+parser.add_argument('--force_type',
+        default='y', type=str,
+        help='Force type, default is y.')
+
+parser.add_argument('--gpu', 
+        default=False, type=bool,
+        help='是否使用 GPU, 默认为 False.')
+
+parser.add_argument('--cupy', 
+        default=False, type=bool,
+        help='是否使用cupy求解.')
 
 args = parser.parse_args()
 p= args.degree
@@ -101,15 +116,18 @@ enable_adaptive = args.enable_adaptive
 marking_strategy = args.marking_strategy
 refine_method = args.refine_method
 n = args.n
-vtkname = args.vtkname
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
-
+force_type = args.force_type
+gpu = args.gpu
+cupy = args.cupy
 
 tmr = timer()
 next(tmr)
 start = time.time()
 bm.set_backend(backend)
+if gpu:
+    bm.set_default_device('cuda')
 model = square_with_circular_notch_3d()
 
 if args.mesh_type == 'hex':
@@ -121,33 +139,43 @@ else:
 
 mesh.uniform_refine(n=n)
 
+
 fname = args.mesh_type + '_3d_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
+ms = MainSolve(mesh=mesh, material_params=model.params, model_type=model_type)
 tmr.send('init')
 
-if enable_adaptive:
-    print('Enable adaptive refinement.')
-    ms.set_adaptive_refinement(marking_strategy=marking_strategy, refine_method=refine_method)
-
-# 拉伸模型边界条件
 ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.is_z_force(), 'z')
 
 
 # 固定位移边界条件
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 
-ms.solve(maxit=maxit, vtkname=vtkname)
+
+if bm.backend_name == 'pytorch':
+    ms.auto_assembly_matrix()
+if cupy:
+    ms.set_cupy_solver()
+
+ms.output_timer()
+ms.save_vtkfile(fname=vtkname)
+ms.solve(p=p, maxit=maxit)
 
 tmr.send('stop')
+tmr.send(None)
 end = time.time()
 
 force = ms.Rforce
 disp = ms.force_value
-tname = args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.txt'
+
+ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.pt'
+
+torch.save(force, ftname)
+#np.savetxt('force'+tname, bm.to_numpy(force))
+tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.txt'
 with open(tname, 'w') as file:
-    file.write(f'force: {force},\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+    file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
