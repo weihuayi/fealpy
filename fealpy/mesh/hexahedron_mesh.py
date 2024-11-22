@@ -6,6 +6,7 @@ from .mesh_base import TensorMesh
 from ..typing import TensorLike, Index, _S
 from .plot import Plotable
 
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
@@ -234,10 +235,17 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         return cell2ipoint[index]
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
-        @brief Uniformly refine the hexahedral mesh n times
+        @brief Uniform refine the hexahedron mesh n times.
+
+        Parameters:
+            n (int): times refine the hexahedron mesh.
+            surface (function): the surface function.
+            returnim (bool): return the interpolation matrix or not.
         """
+        if returnim is True:
+            IM = []
         for i in range(n):
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -264,6 +272,32 @@ class HexahedronMesh(TensorMesh, Plotable):
             c2e = self.cell_to_edge() + NN
             c2f = self.cell_to_face() + (NN + NE)
             c2c = bm.arange(NC, device=bm.get_device(cell)) + (NN + NE + NF)
+            edge2node = self.edge_to_node()
+            face2node = self.face_to_node()
+            cell2node = self.cell_to_node()
+            if returnim is True:
+                new_node_num = NN+NE+NF+NC
+                nonzeros = NN+2*NE+4*NF+8*NC
+                data = bm.zeros(nonzeros,dtype=bm.float64)
+                data[:NN] = 1
+                data[NN:NN+2*NE] = 1/2
+                data[NN+2*NE:NN+2*NE+4*NE] = 1/4
+                data[NN+2*NE+4*NF:] = 1/8
+
+                indices = bm.zeros(nonzeros,dtype=bm.int32)
+                indices[:NN] = bm.arange(NN)
+                indices[NN:NN+2*NE] = edge2node.flatten()
+                indices[NN+2*NE:NN+2*NE+4*NF] = face2node.flatten()
+                indices[NN+2*NE+4*NF:] = cell2node.flatten()
+
+                indptr = bm.zeros(new_node_num+1,dtype=bm.int32)
+                indptr[:NN+1] = bm.arange(NN+1)
+                indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
+                indptr[NN+NE+1:NN+NE+NF+1] = bm.arange(NN+2*NE+4,NN+2*NE+4*NF+1,step=4)
+                indptr[NN+NE+NF+1:] = bm.arange(NN+2*NE+4*NF+8,nonzeros+1,step=8)
+
+                A = csr_matrix((data,indices,indptr),dtype=bm.float64)
+                IM.append(A)
 
             cell[0::8, 0] = c2n[:, 0]
             cell[0::8, 1] = c2e[:, 0]
@@ -340,6 +374,9 @@ class HexahedronMesh(TensorMesh, Plotable):
             self.node = node
             self.cell = cell
             self.construct()
+
+        if returnim is True:
+            return IM
 
 
     @classmethod

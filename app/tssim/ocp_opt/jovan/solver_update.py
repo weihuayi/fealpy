@@ -6,7 +6,6 @@ from fealpy.decorator import barycentric, cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.sparse import COOTensor
 from functools import partial
-from tensor_mass_integrator import TensorMassIntegrator
 from ocp_opt_pde import example_1
 
 class ocp_opt_solver():
@@ -89,7 +88,6 @@ class ocp_opt_solver():
         Ly.add_integrator(self.forward_0_b_coef)
         
         Lp = LinearForm(pspace)
-        #TODO:检查是不是一直是0 
         L = LinearBlockForm([Ly, Lp])
         return L
     
@@ -103,7 +101,7 @@ class ocp_opt_solver():
             result = (dt**2)*u1(bcs)
             return result
         self.forward_0_b_coef.source = coef_u1
-
+        self.forward_0_b_coef.clear()
 
     def Forward_LForm_b(self):
         yspace = self.yspace
@@ -145,12 +143,6 @@ class ocp_opt_solver():
         self.c_coef.clear()
     
 
-    ### 反向求解
-    def z_to_u(self, z1):
-        result = bm.max(self.mesh.integral(z1), 0) - z1 #积分子
-        return result
-
-    ## TODO:Pd Yd 的求解
     def Backward_LForm_bn(self):
         yspace = self.yspace
         pspace = self.pspace
@@ -253,6 +245,9 @@ class ocp_opt_solver():
         self.backward_q_b_coef.source = coef_b_q
         self.backward_q_b_coef.clear()
           
-    
-        
-    
+    def solve_z_bar(self, allz):
+        dt = self.dt
+        integral_z = bm.array([self.mesh.integral(i, q=self.q) for i in allz],dtype=bm.float64)
+        z_bar = (dt/2)*(integral_z[:-1] + integral_z[1:])
+        return bm.sum(z_bar)
+

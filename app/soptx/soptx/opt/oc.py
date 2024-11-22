@@ -130,7 +130,6 @@ class OCOptimizer(OptimizerBase):
             # 二分法求解拉格朗日乘子
             l1, l2 = 0.0, self.options.initial_lambda
             
-            print(f"rho: {bm.mean(rho[:]):.12f}")
             while (l2 - l1) / (l2 + l1) > bisection_tol:
                 lmid = 0.5 * (l2 + l1)
                 rho_new = self._update_density(rho, obj_grad, con_grad, lmid)
@@ -156,7 +155,7 @@ class OCOptimizer(OptimizerBase):
             iteration_time = time() - start_time
             print(f"Iteration: {iter_idx + 1}, "
                   f"Objective: {obj_val:.3f}, "
-                  f"Volume: {bm.mean(rho_new[:]):.12f}, "
+                  f"Volume: {bm.mean(rho_phys[:]):.12f}, "
                   f"Change: {change:.3f}, "
                   f"Time: {iteration_time:.3f} sec")
                   
