@@ -507,6 +507,32 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         return self.edge_normal(index=index, unit=True, out=out)
     
+    def cell_location(self, points) -> TensorLike:
+        """
+        @brief 给定一组点，确定所有点所在的单元
+
+        """
+        hx = self.h[0]
+        hy = self.h[1]
+        v = bm.real(points - bm.array(self.origin, dtype=points.dtype))
+        n0 = v[..., 0] // hx
+        n1 = v[..., 1] // hy
+
+        return n0.astype('int64'), n1.astype('int64')
+    
+    def point_to_bc(self, points):
+
+        x = points[..., 0]
+        y = points[..., 1]
+
+        bc_x_ = bm.real((x - self.origin[0]) / self.h[0]) % 1
+        bc_y_ = bm.real((y - self.origin[1]) / self.h[1]) % 1
+        bc_x = bm.array([[bc_x_, 1 - bc_x_]], dtype=bm.float64)
+        bc_y = bm.array([[bc_y_, 1 - bc_y_]], dtype=bm.float64)
+        val = (bc_x, bc_y)
+
+        return val
+    
 
 #################################### 插值点 #############################################
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:

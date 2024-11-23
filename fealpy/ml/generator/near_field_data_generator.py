@@ -12,6 +12,8 @@ from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSo
 from fealpy.fem import BilinearForm, LinearForm
 from fealpy.pde.pml_2d import PMLPDEModel2d
 
+bm.set_backend('numpy')
+
 
 class NearFieldDataFEMGenerator2d:
     def __init__(self, 
@@ -52,7 +54,6 @@ class NearFieldDataFEMGenerator2d:
                 self.mesh = UniformMesh2d((0, EXTC_1, 0, EXTC_2), (HC_1, HC_2), origin=(self.domain[0], self.domain[2]))
                 self.meshtype = 'UniformMesh'
 
-        # self.mesh.ftype = bm.complex128
         self.d = d 
         self.k = k
         self.reciever_points = reciever_points
@@ -139,6 +140,7 @@ class NearFieldDataFEMGenerator2d:
                 b = self.mesh.point_to_bc(reciever_points[i])
                 u = uh(b).reshape(-1)
                 data[i] = u[location]
+        print(data)
         return data
     
     def save(self, save_path:str, scatterer_index:int):
@@ -152,7 +154,7 @@ class NearFieldDataFEMGenerator2d:
                 d_name = d_values[j]
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
-        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.bmz")
+        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
         bm.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k:float, d:Sequence[float]):
