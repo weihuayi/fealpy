@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from fealpy.backend import backend_manager as bm
-from fealpy.typing import TensorLike
+from fealpy.typing import TensorLike, Union
 from fealpy.functionspace import TensorFunctionSpace
 from fealpy.fem import LinearElasticIntegrator, BilinearForm, DirichletBC
 from fealpy.sparse import CSRTensor
@@ -33,20 +33,25 @@ class ElasticFEMSolver:
     def __init__(self, 
                 material_properties: ElasticMaterialProperties, 
                 tensor_space: TensorFunctionSpace,
-                pde):
+                pde,
+                solver_type: str = 'cg',
+                solver_params: Optional[dict] = None):
         """
         Parameters
         ----------
-        material_properties : ElasticMaterialProperties
-            材料属性计算器
-        tensor_space : TensorFunctionSpace
-            张量函数空间
-        pde : object
-            包含荷载和边界条件的PDE模型
+        material_properties : 材料属性计算器
+        tensor_space : 张量函数空间
+        pde : 包含荷载和边界条件的PDE模型
+        solver_type : 求解器类型, 'cg' 或 'direct' 
+        solver_params : 求解器参数
+            cg: maxiter, atol, rtol
+            direct: solver_type
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
         self.pde = pde
+        self.solver_type = solver_type
+        self.solver_params = solver_params or {}
 
         # 状态管理
         self._current_density = None
@@ -109,9 +114,9 @@ class ElasticFEMSolver:
         if self._base_local_stiffness_matrix is None:
             base_material = self.material_properties.get_base_material()
             integrator = LinearElasticIntegrator(
-                material=base_material,
-                q=self.tensor_space.p + 3
-            )
+                                            material=base_material,
+                                            q=self.tensor_space.p + 3
+                                        )
             self._base_local_stiffness_matrix = integrator.assembly(space=self.tensor_space)
         return self._base_local_stiffness_matrix
     
@@ -121,9 +126,9 @@ class ElasticFEMSolver:
             raise ValueError("Material not initialized. Call update_density first.")
         
         integrator = LinearElasticIntegrator(
-            material=self._current_material,
-            q=self.tensor_space.p + 3
-        )
+                                        material=self._current_material,
+                                        q=self.tensor_space.p + 3
+                                    )
 
         KE = integrator.assembly(space=self.tensor_space)
         
@@ -138,9 +143,9 @@ class ElasticFEMSolver:
             raise ValueError("Material not initialized. Call update_density first.")
             
         integrator = LinearElasticIntegrator(
-            material=self._current_material,
-            q=self.tensor_space.p + 3
-        )
+                                        material=self._current_material,
+                                        q=self.tensor_space.p + 3
+                                    )
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         K = bform.assembly(format='csr')
@@ -188,7 +193,16 @@ class ElasticFEMSolver:
 
     #---------------------------------------------------------------------------
     # 求解方法
-    #---------------------------------------------------------------------------           
+    #---------------------------------------------------------------------------
+    def solve(self) -> Union[IterativeSolverResult, DirectSolverResult]:
+        """统一的求解接口"""
+        if self.solver_type == 'cg':
+            return self.solve_cg(**self.solver_params)
+        elif self.solver_type == 'direct':
+            return self.solve_direct(**self.solver_params)
+        else:
+            raise ValueError(f"Unsupported solver type: {self.solver_type}")
+               
     def solve_cg(self, 
                 maxiter: int = 5000,
                 atol: float = 1e-12,

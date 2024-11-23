@@ -73,21 +73,28 @@ class CrackSurfaceDensityFunction:
         """
         return 0, 8/3
     
+    # User-defined model implementations
     def _user_defined_density(self, d):
         """
-        The user defined crack surface density function g(d).
+        The user-defined crack surface density function h(d).
         """
-        raise NotImplementedError()
-    
+        if 'density_func' in self.params:
+            return self.params['density_func'](d)
+        raise NotImplementedError("User-defined density function is not provided.")
+
     def _user_defined_grad_density(self, d):
         """
-        The derivative of the user defined crack surface density function g'(d).
+        The first derivative of the user-defined crack surface density function h'(d).
         """
-        raise NotImplementedError()
-    
+        if 'grad_density_func' in self.params:
+            return self.params['grad_density_func'](d)
+        raise NotImplementedError("User-defined first derivative function is not provided.")
+
     def _user_defined_grad_grad_density(self, d):
         """
-        The second derivative of the user defined crack surface density function g''(d).
+        The second derivative of the user-defined crack surface density function h''(d).
         """
-        raise NotImplementedError()
+        if 'grad_grad_density_func' in self.params:
+            return self.params['grad_grad_density_func'](d)
+        raise NotImplementedError("User-defined second derivative function is not provided.")
     
