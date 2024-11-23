@@ -30,7 +30,9 @@ class VolumeConstraint(ConstraintBase):
         self.volume_fraction = volume_fraction
         self.filter = filter
         
-    def fun(self, rho: TensorLike) -> float:
+    def fun(self, 
+            rho: TensorLike, 
+            u: Optional[TensorLike] = None) -> float:
         """计算体积约束函数值
         
         Parameters
@@ -48,9 +50,8 @@ class VolumeConstraint(ConstraintBase):
         volfrac_true = (bm.einsum('c, c -> ', cell_measure, rho) / 
                          bm.sum(cell_measure))
 
-        # gneq = volfrac_true - self.volume_fraction
-        # gneq = (volfrac_true - self.volume_fraction) * NC
-        gneq = bm.sum(rho[:]) - self.volume_fraction * NC
+        gneq = (volfrac_true - self.volume_fraction) * NC
+        # gneq = bm.sum(rho[:]) - self.volume_fraction * NC
                                  
         return gneq
         
@@ -78,10 +79,6 @@ class VolumeConstraint(ConstraintBase):
             
          # 明确指定这是约束函数的梯度
         return self.filter.filter_sensitivity(gradient, rho, 'constraint', filter_params)
-        # 对梯度应用滤波
-        # gradient = self.filter.filter_sensitivity(gradient, rho, filter_params)
-            
-        return gradient
         
     def hess(self, rho: TensorLike, lambda_: Dict[str, Any]) -> TensorLike:
         """计算体积约束 Hessian 矩阵（未实现）
