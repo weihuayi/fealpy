@@ -153,7 +153,7 @@ class ocp_opt_solver():
 
         @cartesian
         def z_coef_c(p, index=None):
-            result = 2*self.pde.z_solution(p, T) - 2*self.pde.z_t_solution(p, T)*self.dt
+            result = 2*self.pde.z_solution(p, T) - 2*dt*self.pde.z_t_solution(p, T)
             result -= dt**2 * self.pde.y_d_fun(p, time=T-dt)  
             return result
          
@@ -216,6 +216,7 @@ class ocp_opt_solver():
     
     def Backward_update(self, zn0, zn1, yn2, p2, t2):
         dt = self.dt
+        
         @cartesian
         def coef_c_z(p, index=None):
             result = -dt**2 * self.pde.y_d_fun(p, time=t2)
@@ -248,6 +249,7 @@ class ocp_opt_solver():
     def solve_z_bar(self, allz):
         dt = self.dt
         integral_z = bm.array([self.mesh.integral(i, q=self.q) for i in allz],dtype=bm.float64)
-        z_bar = (dt/2)*(integral_z[:-1] + integral_z[1:])
-        return bm.sum(z_bar)
+        z_bar = bm.sum((dt/2)*(integral_z[:-1] + integral_z[1:]))
+        z_bar /= (self.timeline.T1 - self.timeline.T0)*self.mesh.integral(1, q=self.q)
+        return z_bar
 
