@@ -22,3 +22,5 @@ from .RaviartThomasFiniteElementSpace3d import RTFiniteElementSpace3d
 from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
 
 from .huzhang_fe_space_2d import HuZhangFESpace2D
+
+from .BrezziDouglasMariniFiniteElementSpace2d import BDMFiniteElementSpace2d
