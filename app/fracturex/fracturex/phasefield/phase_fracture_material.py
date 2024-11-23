@@ -132,14 +132,6 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         D = D0 * gd[..., None, None]
         return D
     
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
-    
     def positive_stress_func(self, guh) -> TensorLike:
         """
         @brief Compute the stress tensor from the grad displacement tensor.
@@ -179,12 +171,6 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         flat_stress = flatten_symmetric_matrices(stress)
         return flat_stress
     
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
-    
 class AnisotropicModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算各向异性模型下的应力
@@ -206,14 +192,6 @@ class AnisotropicModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         pass
-
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
     
     def negative_stress_func(self, guh) -> TensorLike:
         """
@@ -227,12 +205,6 @@ class AnisotropicModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         pass
-
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
 
 class DeviatoricModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
@@ -256,14 +228,6 @@ class DeviatoricModel(BasedPhaseFractureMaterial):
         """
         pass
 
-    def positive_coef(self, bc) -> TensorLike:      
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
-
     def negative_stress_func(self, guh) -> TensorLike:
         """
         @brief Compute the stress tensor from the grad displacement tensor.
@@ -277,11 +241,6 @@ class DeviatoricModel(BasedPhaseFractureMaterial):
         """
         pass
         
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
 
 class SpectralModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
@@ -391,14 +350,6 @@ class SpectralModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         pass
-
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
     
     def negative_stress_func(self, guh) -> TensorLike:
         """
@@ -411,13 +362,7 @@ class SpectralModel(BasedPhaseFractureMaterial):
         TensorLike
             The flattened stress tensor.
         """
-        pass  
-
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1     
+        pass     
 
 class HybridModel(BasedPhaseFractureMaterial):
     def __init__(self, material, energy_degradation_fun):
@@ -458,20 +403,6 @@ class HybridModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         return self._isotropic_model.positive_stress_func(guh)
-
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
-    
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
     
     def negative_stress_func(self, guh) -> TensorLike:
         """

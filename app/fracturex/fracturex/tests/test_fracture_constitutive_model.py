@@ -8,7 +8,7 @@ from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from app.fracturex.fracturex.phasefield.energy_degradation_function import EnergyDegradationFunction as EDFunc
 from app.fracturex.fracturex.phasefield.phase_fracture_material import PhaseFractureMaterialFactory
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolver
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 
 class TestfracutreConstitutiveModel:
 
