@@ -1,11 +1,11 @@
 """Test cases for compliance objective and volume constraint."""
 
 from dataclasses import dataclass
+import dataclasses
 from typing import Literal, Optional, Union, Dict, Any
-from pathlib import Path
 
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import UniformMesh2d, UniformMesh3d
+from fealpy.mesh import UniformMesh2d, UniformMesh3d, TriangleMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from soptx.material import (
@@ -14,10 +14,13 @@ from soptx.material import (
     SIMPInterpolation
 )
 from soptx.pde import MBBBeam2dData1, Cantilever2dData1, Cantilever3dData1
-from soptx.solver import ElasticFEMSolver
+from soptx.solver import ElasticFEMSolver, AssemblyMethod, AssemblyConfig
 from soptx.opt import ComplianceObjective, VolumeConstraint
 from soptx.filter import Filter, FilterConfig
 
+bm.set_backend('pytorch')
+
+mesh = TriangleMesh.from_box(box=[0,1,0,1], nx=10, ny=10)
 @dataclass
 class TestConfig:
     """Configuration for topology optimization test cases."""
@@ -41,6 +44,11 @@ class TestConfig:
     initial_lambda: float = 1e9
     bisection_tol: float = 1e-3
 
+    assembly_method: AssemblyMethod = AssemblyMethod.STANDARD  # 矩阵组装方法
+    quadrature_degree_increase: int = 3  # 积分阶数增量
+    solver_type: Literal['cg', 'direct'] = 'cg'  # 求解器类型
+    solver_params: Optional[Dict[str, Any]] = None  # 求解器参数
+
 def create_base_components(config: TestConfig):
     """Create basic components needed for topology optimization based on configuration."""
     # Create mesh and determine dimensionality
@@ -63,6 +71,8 @@ def create_base_components(config: TestConfig):
             ipoints_ordering='yx', flip_direction='y',
             device='cpu'
         )
+        # mesh = TriangleMesh.from_box(box=[0, config.nx*h[0], 0, config.ny*h[1]], 
+        #                             nx=config.nx, ny=config.ny, device='cpu')
         dimension = 2
     
     # Create function spaces
@@ -95,26 +105,32 @@ def create_base_components(config: TestConfig):
             xmin=0, xmax=config.nx*h[0],
             ymin=0, ymax=config.ny*h[1]
         )
-    else:  # cantilever_3d
+    elif config.problem_type == 'cantilever_3d':  
         pde = Cantilever3dData1(
             xmin=0, xmax=config.nx*h[0],
             ymin=0, ymax=config.ny*h[1],
             zmin=0, zmax=config.nz*h[2]
         )
-    
-    # Create solver
-    # solver = ElasticFEMSolver(
-    #     material_properties=material_properties,
-    #     tensor_space=tensor_space_C,
-    #     pde=pde
-    # )
+
+    assembly_config = AssemblyConfig(
+        method=config.assembly_method,
+        quadrature_degree_increase=config.quadrature_degree_increase
+    )
+
+    # 设置默认的求解器参数
+    default_solver_params = {
+        'cg': {'maxiter': 5000, 'atol': 1e-12, 'rtol': 1e-12},
+        'direct': {'solver_type': 'mumps'}
+    }
+    solver_params = config.solver_params or default_solver_params[config.solver_type]
 
     solver = ElasticFEMSolver(
        material_properties=material_properties,
        tensor_space=tensor_space_C,
        pde=pde,
-       solver_type='cg',  # 添加默认求解器类型
-       solver_params={'maxiter': 5000, 'atol': 1e-12, 'rtol': 1e-12}  # 添加求解器参数
+       assembly_config=assembly_config,
+       solver_type=config.solver_type,  # 添加默认求解器类型
+       solver_params=solver_params  # 添加求解器参数
    )
     
     # Initialize density field
@@ -122,6 +138,35 @@ def create_base_components(config: TestConfig):
     rho = space_D.function(array)
     
     return mesh, space_D, material_properties, solver, rho
+
+def test_solver(config: TestConfig):
+    """测试不同矩阵组装方法的 solver."""
+    print(f"\n=== Testing Solver with {config.assembly_method} ===")
+    
+    # Create base components
+    mesh, space_D, material_properties, solver, rho = create_base_components(config)
+    
+    # Test solver
+    solver.update_density(rho[:])
+    solver_result = solver.solve_cg()
+    displacement = solver_result.displacement
+    print(f"\nSolver information:")
+    print(f"- Displacement shape: {displacement.shape}:\n {displacement[:]}")
+
+    # base_local_K = solver.get_base_local_stiffness_matrix()
+    # print("\n=== 基础局部刚度矩阵信息 ===")
+    # print(f"基础局部刚度矩阵 - {base_local_K.shape}:\n {base_local_K[0]}")
+    # local_K = solver.compute_local_stiffness_matrix()
+    # print("\n=== 当前材料局部刚度矩阵 ===")
+    # print(f"局部刚度矩阵 - {local_K.shape}:\n {local_K.round(4)}")
+
+    # K = solver.get_global_stiffness_matrix()
+    # F = solver.get_global_force_vector()
+    # print("\n=== 全局矩阵和载荷向量信息 ===")
+    # print(f"全局刚度矩阵 - {K.shape}:\n {K.to_dense().round(4)}")
+    # print(f"全局刚度矩阵最大值: {bm.max(bm.abs(K.to_dense()))}")
+    # print(f"全局载荷向量 -  {F.shape}:\n {F[:]}")
+    
 
 def test_compliance_objective(config: TestConfig):
     """Test compliance objective computation and sensitivity analysis."""
@@ -136,10 +181,6 @@ def test_compliance_objective(config: TestConfig):
     displacement = solver_result.displacement
     print(f"\nSolver information:")
     print(f"- Displacement shape: {displacement.shape}:\n {displacement[:]}")
-
-    # 获取求解后的全局矩阵和向量
-    K = solver.get_global_stiffness_matrix()
-    F = solver.get_global_force_vector()
     
     # Create filter
     filter_config = FilterConfig(
@@ -161,17 +202,17 @@ def test_compliance_objective(config: TestConfig):
         filter=filter_obj
     )
     
-    # Test objective function
-    obj_value = objective.fun(rho=rho[:], u=displacement)
-    print(f"Objective function value: {obj_value:.6e}")
+    # # Test objective function
+    # obj_value = objective.fun(rho=rho[:], u=displacement)
+    # print(f"Objective function value: {obj_value:.6e}")
     
-    # Test element compliance
-    ce = objective.get_element_compliance()
-    print(f"\nElement compliance information:")
-    print(f"- Shape: {ce.shape}:\n {ce}")
-    print(f"- Min: {bm.min(ce):.6e}")
-    print(f"- Max: {bm.max(ce):.6e}")
-    print(f"- Mean: {bm.mean(ce):.6e}")
+    # # Test element compliance
+    # ce = objective.get_element_compliance()
+    # print(f"\nElement compliance information:")
+    # print(f"- Shape: {ce.shape}:\n {ce}")
+    # print(f"- Min: {bm.min(ce):.6e}")
+    # print(f"- Max: {bm.max(ce):.6e}")
+    # print(f"- Mean: {bm.mean(ce):.6e}")
     
     # Test sensitivity
     dce = objective.jac(rho=rho[:], u=displacement)
@@ -201,32 +242,47 @@ def test_compliance_objective(config: TestConfig):
     }
 
 if __name__ == "__main__":
-    # # Test 3D case with density filter
-    # config_3d = TestConfig(
-    #     problem_type='cantilever_3d',
-    #     nx=60, ny=20, nz=4,
-    #     volume_fraction=0.3,
-    #     filter_radius=1.5,
-    #     filter_type='density'
-    # )
+    # Test 3D case with density filter
+    config_3d = TestConfig(
+        problem_type='cantilever_3d',
+        nx=60, ny=20, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type='density'
+    )
     # results_3d = test_compliance_objective(config_3d)
     
-    # # Test 2D case with sensitivity filter
-    # config_2d = TestConfig(
-    #     problem_type='mbb_2d',
-    #     nx=60, ny=20,
-    #     volume_fraction=0.5,
-    #     filter_radius=2.4,
-    #     filter_type='sensitivity'
-    # )
+    # Test 2D case with sensitivity filter
+    config_2d = TestConfig(
+        problem_type='mbb_2d',
+        nx=60, ny=20,
+        volume_fraction=0.5,
+        filter_radius=2.4,
+        filter_type='sensitivity'
+    )
     # results_2d = test_compliance_objective(config_2d)
 
     # Test 2D case with sensitivity filter
     config_cantilever_2d = TestConfig(
         problem_type='cantilever_2d',
-        nx=4, ny=3,
+        # nx=160, ny=100,
+        nx=8, ny=5,
         volume_fraction=0.4,
         filter_radius=6,
         filter_type='sensitivity'
     )
-    results_cantilever_2d = test_compliance_objective(config_cantilever_2d)
+    # # 测试标准组装方法
+    # config_standard = dataclasses.replace(
+    #     config_cantilever_2d, 
+    #     assembly_method=AssemblyMethod.STANDARD
+    # )
+    # results_standard = test_solver(config_standard)
+
+    # # 测试快速应力组装方法
+    # config_fast_stress = dataclasses.replace(
+    #     config_cantilever_2d, 
+    #     assembly_method=AssemblyMethod.FAST_STRESS
+    # )
+    # results_fast_stress = test_solver(config_fast_stress)
+
+    result = test_compliance_objective(config_cantilever_2d)

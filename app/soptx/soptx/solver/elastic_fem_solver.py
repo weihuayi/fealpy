@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
+from enum import Enum, auto
 
 from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike, Union
@@ -9,6 +10,7 @@ from fealpy.sparse import CSRTensor
 from fealpy.solver import cg, spsolve
 
 from soptx.material import ElasticMaterialInstance, ElasticMaterialProperties
+from soptx.utils import timer
 
 @dataclass
 class IterativeSolverResult:
@@ -19,6 +21,19 @@ class IterativeSolverResult:
 class DirectSolverResult:
     """直接求解器的结果"""
     displacement: TensorLike
+
+class AssemblyMethod(Enum):
+    """矩阵组装方法的枚举类"""
+    STANDARD = auto()     # 标准组装方法
+    FAST_STRAIN = auto()  # 应变快速组装
+    FAST_STRESS = auto()  # 应力快速组装
+    FAST_3D = auto()      # 3D 快速组装
+
+@dataclass
+class AssemblyConfig:
+    """矩阵组装的配置类"""
+    method: AssemblyMethod = AssemblyMethod.STANDARD
+    quadrature_degree_increase: int = 3 
 
 class ElasticFEMSolver:
     """专门用于求解线弹性问题的有限元求解器
@@ -34,6 +49,7 @@ class ElasticFEMSolver:
                 material_properties: ElasticMaterialProperties, 
                 tensor_space: TensorFunctionSpace,
                 pde,
+                assembly_config: Optional[AssemblyConfig] = None,
                 solver_type: str = 'cg',
                 solver_params: Optional[dict] = None):
         """
@@ -42,6 +58,7 @@ class ElasticFEMSolver:
         material_properties : 材料属性计算器
         tensor_space : 张量函数空间
         pde : 包含荷载和边界条件的PDE模型
+        assembly_config : 矩阵组装配置
         solver_type : 求解器类型, 'cg' 或 'direct' 
         solver_params : 求解器参数
             cg: maxiter, atol, rtol
@@ -50,6 +67,7 @@ class ElasticFEMSolver:
         self.material_properties = material_properties
         self.tensor_space = tensor_space
         self.pde = pde
+        self.assembly_config = assembly_config or AssemblyConfig()
         self.solver_type = solver_type
         self.solver_params = solver_params or {}
 
@@ -125,30 +143,77 @@ class ElasticFEMSolver:
         if self._current_material is None:
             raise ValueError("Material not initialized. Call update_density first.")
         
-        integrator = LinearElasticIntegrator(
-                                        material=self._current_material,
-                                        q=self.tensor_space.p + 3
-                                    )
+        # 创建适当的积分器
+        integrator = self._create_integrator()
 
-        KE = integrator.assembly(space=self.tensor_space)
+        # 根据 assembly_config.method 选择对应的组装函数
+        method_map = {
+            AssemblyMethod.STANDARD: integrator.assembly,
+            AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
+            AssemblyMethod.FAST_STRESS: integrator.fast_assembly_stress,
+            AssemblyMethod.FAST_3D: integrator.fast_assembly
+        }
+        
+        try:
+            assembly_func = method_map[self.assembly_config.method]
+        except KeyError:
+            raise RuntimeError(f"Unsupported assembly method: {self.assembly_config.method}")
+        
+        # 调用选定的组装函数
+        KE = assembly_func(space=self.tensor_space)
         
         return KE
 
     #---------------------------------------------------------------------------
     # 内部方法：组装和边界条件
     #---------------------------------------------------------------------------
+    def _create_integrator(self) -> LinearElasticIntegrator:
+        """创建适当的积分器实例
+        
+        根据配置创建对应的积分器，并设置正确的积分方法
+        """
+        # 确定积分方法
+        method_map = {
+            AssemblyMethod.STANDARD: 'assembly',
+            AssemblyMethod.FAST_STRAIN: 'fast_strain',
+            AssemblyMethod.FAST_STRESS: 'fast_stress',
+            AssemblyMethod.FAST_3D: 'fast_3d'
+        }
+        
+        method = method_map[self.assembly_config.method]
+        
+        # 创建积分器
+        q = self.tensor_space.p + self.assembly_config.quadrature_degree_increase
+        
+        integrator = LinearElasticIntegrator(
+            material=self._current_material,
+            q=q,
+            method=method
+        )
+        
+        return integrator
+    
+    
     def _assemble_global_stiffness_matrix(self) -> CSRTensor:
         """组装全局刚度矩阵"""
         if self._current_material is None:
             raise ValueError("Material not initialized. Call update_density first.")
+        
+        # 创建计时器
+        # t = timer("Assemble Timing")
+        # next(t)  # 启动计时器
             
-        integrator = LinearElasticIntegrator(
-                                        material=self._current_material,
-                                        q=self.tensor_space.p + 3
-                                    )
+        # 创建适当的积分器
+        integrator = self._create_integrator()
+
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
+        # t.send('Local Assembly')
         K = bform.assembly(format='csr')
+        # t.send('Global Assembly')
+
+        # 结束计时
+        # t.send(None)
         self._global_stiffness_matrix = K
 
         return K
@@ -157,6 +222,13 @@ class ElasticFEMSolver:
         """组装全局载荷向量"""
         force = self.pde.force
         F = self.tensor_space.interpolate(force)
+
+        # # 让 F 依赖于当前密度
+        # if self._current_density is not None:
+        #     # 创建一个非常小的系数，使 F 依赖于密度但几乎不改变其值
+        #     epsilon = 1e-30
+        #     F = F * (1.0 + epsilon * bm.sum(self._current_density))
+
         self._global_force_vector = F
 
         return F
@@ -181,7 +253,7 @@ class ElasticFEMSolver:
                         dtype=bm.float64, device=bm.get_device(self.tensor_space))
                         
         isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
-        
+
         F = F - K.matmul(uh_bd)
         F[isBdDof] = uh_bd[isBdDof]
         
@@ -224,19 +296,34 @@ class ElasticFEMSolver:
         """
         if self._current_density is None:
             raise ValueError("Density not set. Call update_density first.")
+        
+        # 创建计时器
+        t = timer("CG Solver Timing")
+        next(t)  # 启动计时器
     
         K0 = self._assemble_global_stiffness_matrix()
+        t.send('Stiffness Matrix Assembly')
+
         F0 = self._assemble_global_force_vector()
+        t.send('Force Vector Assembly')
+
         K, F = self._apply_boundary_conditions(K0, F0)
+        t.send('Boundary Conditions')
         
         uh = self.tensor_space.function()
+
         try:
             # logger.setLevel('INFO')
             # uh[:], info = cg(K, F[:], x0=x0, maxiter=maxiter, atol=atol, rtol=rtol)
             # TODO 目前 FEALPy 中的 cg 只能通过 logger 获取迭代步数，无法直接返回
             uh[:] = cg(K, F[:], x0=x0, maxiter=maxiter, atol=atol, rtol=rtol)
+            t.send('Solving Phase')  # 记录求解阶段时间
+
+            # 结束计时
+            t.send(None)
         except Exception as e:
             raise RuntimeError(f"CG solver failed: {str(e)}")
+        
         
         return IterativeSolverResult(displacement=uh)
     

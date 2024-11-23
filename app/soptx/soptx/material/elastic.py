@@ -35,7 +35,13 @@ class ElasticMaterialInstance(LinearElasticMaterial):
     def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
         """计算弹性矩阵"""
         base_D = super().elastic_matrix()
-        D = self._E[:, None, None, None] * base_D
+
+        # 处理不同类型的张量
+        if len(self._E.shape) > 0:
+            D = bm.einsum('b, ijkl -> bjkl', self._E, base_D)
+        else:
+            D = self._E * base_D
+   
         return D
     
 class ElasticMaterialProperties:

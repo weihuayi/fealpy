@@ -134,7 +134,7 @@ class Filter:
                 # 应用滤波矩阵
                 filtered_gradient = self._H.matmul(weighted_gradient)
                  # 计算修正因子
-                correction_factor = self._Hs * bm.maximum(0.001, design_vars)
+                correction_factor = self._Hs * bm.maximum(bm.tensor(0.001, dtype=bm.float64), design_vars)
                 # 返回最终修改的灵敏度
                 modified_gradient = filtered_gradient / correction_factor
 

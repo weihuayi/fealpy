@@ -106,26 +106,19 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             # Fill the diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, ldof, 1), slice(0, ldof, 1)), D00 * A_xx + D22 * A_yy)
             KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1], 1), slice(ldof, KK.shape[1], 1)), D00 * A_yy + D22 * A_xx)
-            # KK[:, 0:ldof:1, 0:ldof:1] = D00 * A_xx + D22 * A_yy
-            # KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, ldof, 1), slice(ldof, KK.shape[1], 1)), D01 * A_xy + D22 * A_yx)
             KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1], 1), slice(0, ldof, 1)), D01 * A_yx + D22 * A_xy)
-            # KK[:, 0:ldof:1, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
-            # KK[:, ldof:KK.shape[1]:1, 0:ldof:1] = D01 * A_yx + D22 * A_xy
         else:
             # Fill the diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D00 * A_xx + D22 * A_yy)
             KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D00 * A_yy + D22 * A_xx)
-            # KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
-            # KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_xy + D22 * A_yx)
             KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D01 * A_yx + D22 * A_xy)
-            # KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
-            # KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_yx + D22 * A_xy
+
         
         return KK
 
@@ -166,35 +159,27 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         if D.shape[1] != 1:
             raise ValueError("fast_assembly_stress currently only supports elastic matrices "
                             "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        D00 = D[..., 0, 0, None]
-        D01 = D[..., 0, 1, None]
-        D22 = D[..., 2, 2, None]
+        D00 = D[..., 0, 0, None]  # 2*\mu + \lambda
+        D01 = D[..., 0, 1, None]  # \lambda
+        D22 = D[..., 2, 2, None]  # \mu
 
         if space.dof_priority:
             # Fill the diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), D00 * A_xx + D22 * A_yy)
             KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), D00 * A_yy + D22 * A_xx)
-            # KK[:, 0:ldof, 0:ldof] = D00 * A_xx + D22 * A_yy
-            # KK[:, ldof:KK.shape[1]:1, ldof:KK.shape[1]:1] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), D01 * A_xy + D22 * A_yx)
-            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), D22 * A_yx + D01 * A_xy)
-            # KK[:, 0:ldof, ldof:KK.shape[1]:1] = D01 * A_xy + D22 * A_yx
-            # KK[:, ldof:KK.shape[1]:1, 0:ldof] = D22 * A_yx + D01 * A_xy
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), D01 * A_yx + D22 * A_xy)
         else:
             # Fill the diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D00 * A_xx + D22 * A_yy)
             KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D00 * A_yy + D22 * A_xx)
-            # KK[:, 0:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D00 * A_xx + D22 * A_yy
-            # KK[:, 1:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D00 * A_yy + D22 * A_xx
 
             # Fill the off-diagonal part
             KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_xy + D22 * A_yx)
-            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D22 * A_yx + D01 * A_xy)
-            # KK[:, 0:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_xy + D22 * A_yx
-            # KK[:, 1:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D22 * A_yx + D01 * A_xy
-        
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D01 * A_yx + D22 * A_xy)
+
         return KK
     
     @assemblymethod('fast_3d')
@@ -291,4 +276,4 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             # KK[:, 2:KK.shape[1]:GD, 0:KK.shape[2]:GD] = D01 * A_zx + D55 * A_xz
             # KK[:, 2:KK.shape[1]:GD, 1:KK.shape[2]:GD] = D01 * A_zy + D55 * A_yz
 
-        return KK
+        return KK#
