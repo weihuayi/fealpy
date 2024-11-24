@@ -1,11 +1,19 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.typing import TensorLike
+from fealpy.typing import TensorLike, Literal
+
 from typing import Dict, Optional, Any
+from dataclasses import dataclass
 
 from soptx.material import ElasticMaterialProperties
 from soptx.solver import ElasticFEMSolver
 from soptx.opt import ObjectiveBase
 from soptx.filter import Filter
+from soptx.utils import timer
+
+@dataclass
+class ComplianceConfig:
+    """Configuration for compliance objective computation"""
+    diff_mode: Literal["auto", "manual"] = "manual"  # 微分模式选择
 
 class ComplianceObjective(ObjectiveBase):
     """结构柔度最小化目标函数
@@ -66,8 +74,6 @@ class ComplianceObjective(ObjectiveBase):
             # 更新求解器中的密度并求解
             self.solver.update_density(rho)
             self._current_u = self.solver.solve().displacement 
-            # self._current_u = self.solver.solve_cg().displacement
-            # self._current_rho = bm.copy(rho)  # 这里的 copy 导致内部状态与外部不同步
             self._current_rho = rho  # 直接引用，内部状态会随外部更新
             
         return self._current_u
@@ -143,7 +149,18 @@ class ComplianceObjective(ObjectiveBase):
         -------
         dc : 目标函数对密度的梯度
         """
+        # 创建计时器
+        t = timer("Grad Timing")
+        next(t)  # 启动计时器
+
         # 获取位移场
+        dc_func = bm.vmap(bm.jacfwd(func=self.fun)) # 输入比输出少
+        dc_value = dc_func(rho)
+        t.send('auto grad')
+        print("dc_func:", dc_func)
+        print("dc_auto:", dc_value)
+        # dc = bm.jacrev(func=self.fun) # 输入比输出多
+
         if u is None:
             u = self._update_u(rho)
             
@@ -155,6 +172,13 @@ class ComplianceObjective(ObjectiveBase):
         # 计算梯度
         dE = self.material_properties.calculate_elastic_modulus_derivative(rho)
         dc = -bm.einsum('c, c -> c', dE, ce)
+        print("dc_manual:", dc)
+        t.send('manual grad')
+
+        # 结束计时
+        t.send(None)
+
+        
         
         # 应用滤波
         if self.filter is None:

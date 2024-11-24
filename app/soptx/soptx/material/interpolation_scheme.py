@@ -14,15 +14,6 @@ class SIMPInterpolation(MaterialInterpolation):
 
         self.penalty_factor = penalty_factor
 
-    def _validate_inputs(self, rho: TensorLike, P0: float, Pmin: float = None):
-        """Validate input parameters."""
-        if bm.any(rho < 0) or bm.any(rho > 1):
-            raise ValueError("Density values must be between 0 and 1")
-        if P0 <= 0:
-            raise ValueError("P0 must be positive")
-        if Pmin is not None and Pmin < 0:
-            raise ValueError("Pmin must be non-negative")
-
     def calculate_property(self, 
                         rho: TensorLike, 
                         P0: float, 
@@ -30,12 +21,11 @@ class SIMPInterpolation(MaterialInterpolation):
                         penalty_factor: float
                         ) -> TensorLike:
         """Calculate interpolated property using SIMP model."""
-        self._validate_inputs(rho, P0, Pmin)
 
         if Pmin is None:
-            P = rho[:] ** penalty_factor * P0
+            P = rho ** penalty_factor * P0
         else:
-            P = Pmin + rho[:] ** penalty_factor * (P0 - Pmin)
+            P = Pmin + rho ** penalty_factor * (P0 - Pmin)
         return P
 
     def calculate_property_derivative(self, 
@@ -45,13 +35,12 @@ class SIMPInterpolation(MaterialInterpolation):
                                     penalty_factor: float
                                     ) -> TensorLike:
         """Calculate derivative of interpolated property using SIMP model."""
-        self._validate_inputs(rho, P0, Pmin)
 
         if Pmin is None:
-            dP = penalty_factor * rho[:] ** (penalty_factor - 1) * P0
+            dP = penalty_factor * rho ** (penalty_factor - 1) * P0
             return dP
         else:
-            dP = penalty_factor * rho[:] ** (penalty_factor - 1) * (P0 - Pmin)
+            dP = penalty_factor * rho ** (penalty_factor - 1) * (P0 - Pmin)
             return dP
 
 class RAMPInterpolation(MaterialInterpolation):
@@ -66,14 +55,6 @@ class RAMPInterpolation(MaterialInterpolation):
 
         self.penalty_factor = penalty_factor
 
-    def _validate_inputs(self, rho: TensorLike, P0: float, Pmin: float = None):
-        if bm.any(rho < 0) or bm.any(rho > 1):
-            raise ValueError("Density values must be between 0 and 1")
-        if P0 <= 0:
-            raise ValueError("P0 must be positive")
-        if Pmin is not None and Pmin < 0:
-            raise ValueError("Pmin must be non-negative")
-
     def calculate_property(self, 
                         rho: TensorLike, 
                         P0: float, 
@@ -81,7 +62,6 @@ class RAMPInterpolation(MaterialInterpolation):
                         penalty_factor: float
                         ) -> TensorLike:
         """Calculate interpolated property using 'RAMP' model."""
-        self._validate_inputs(rho, P0, Pmin)
 
         if Pmin is None:
             P = rho * (1 + penalty_factor * (1 - rho)) ** (-1) * P0
@@ -96,7 +76,6 @@ class RAMPInterpolation(MaterialInterpolation):
                                     penalty_factor: float
                                     ) -> TensorLike:
         """Calculate derivative of interpolated property using 'RAMP' model."""
-        self._validate_inputs(rho, P0, Pmin)
         
         if Pmin is None:
             return P0 * (1 + penalty_factor) * (1 + penalty_factor * (1 - rho)) ** (-2)
