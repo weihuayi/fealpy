@@ -2,6 +2,7 @@ import os
 
 from fealpy.backend import backend_manager as bm
 from numpy.typing import NDArray
+import numpy as np
 from fealpy.solver import spsolve
 from typing import Sequence, Callable
 import matplotlib.pyplot as plt
@@ -11,6 +12,8 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator, ScalarConvectionIntegrator, DirichletBC
 from fealpy.fem import BilinearForm, LinearForm
 from fealpy.pde.pml_2d import PMLPDEModel2d
+
+bm.set_backend('numpy')
 
 
 class NearFieldDataFEMGenerator2d:
@@ -52,7 +55,6 @@ class NearFieldDataFEMGenerator2d:
                 self.mesh = UniformMesh2d((0, EXTC_1, 0, EXTC_2), (HC_1, HC_2), origin=(self.domain[0], self.domain[2]))
                 self.meshtype = 'UniformMesh'
 
-        # self.mesh.ftype = bm.complex128
         self.d = d 
         self.k = k
         self.reciever_points = reciever_points
@@ -152,8 +154,8 @@ class NearFieldDataFEMGenerator2d:
                 d_name = d_values[j]
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
-        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.bmz")
-        bm.savez(filename, **data_dict)
+        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
+        np.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k:float, d:Sequence[float]):
 
