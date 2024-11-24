@@ -20,3 +20,4 @@ from .cuckoo_search_opt import CuckooSearchOpt
 from .Butterfly_opt_alg import ButterflyOptAlg
 from .exponential_trigonometric_opt_alg import ExponentialTrigonometricOptAlg
 from .differential_evolution import DifferentialEvolution
+from .differentialted_creative_search import DifferentialtedCreativeSearch
