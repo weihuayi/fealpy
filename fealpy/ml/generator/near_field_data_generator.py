@@ -2,11 +2,9 @@
 import os
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
-import numpy as np
+import numpy as bm
 from typing import Sequence, Callable
-# from scipy.sparse.linalg import spsolve
 
-# from fealpy.backend import backend_manager as np
 from fealpy.mesh import TriangleMesh, QuadrangleMesh, UniformMesh2d
 from fealpy.pde.pml_2d import PMLPDEModel2d
 from fealpy.functionspace import LagrangeFESpace
@@ -19,7 +17,7 @@ from fealpy.fem import (
     LinearForm,
     DirichletBC
 )
-from fealpy.solver import spsolve, cg
+from fealpy.solver import spsolve
 
 
 class NearFieldDataFEMGenerator2d:
@@ -113,12 +111,9 @@ class NearFieldDataFEMGenerator2d:
         F = l.assembly()
 
         bc = DirichletBC(space, pde.dirichlet) 
-        uh = space.function(dtype=np.complex128)
+        uh = space.function(dtype=bm.complex128)
         A, F = bc.apply(A, F)
         uh[:] = spsolve(A, F, solver='scipy')
-        # uh[:] = cg(A, F)
-        # uh[:] = spsolve(A.to_scipy(), F)
-        print(uh.shape)
         return uh
 
     def points_location_and_bc(self, p: NDArray, domain: Sequence[float], nx: int, ny: int):
@@ -145,8 +140,8 @@ class NearFieldDataFEMGenerator2d:
 
         bc_x_ = ((x - domain[0]) / cell_length_x) % 1
         bc_y_ = ((y - domain[2]) / cell_length_y) % 1
-        bc_x = np.array([[bc_x_, 1 - bc_x_]], dtype=np.float64)
-        bc_y = np.array([[bc_y_, 1 - bc_y_]], dtype=np.float64)
+        bc_x = bm.array([[bc_x_, 1 - bc_x_]], dtype=bm.float64)
+        bc_y = bm.array([[bc_y_, 1 - bc_y_]], dtype=bm.float64)
         bc = (bc_x, bc_y)
         return location, bc
 
@@ -163,7 +158,7 @@ class NearFieldDataFEMGenerator2d:
         """
         reciever_points = self.reciever_points
         data_length = reciever_points.shape[0]
-        data = np.zeros((data_length,), dtype=np.complex128)
+        data = bm.zeros((data_length,), dtype=bm.complex128)
         uh = self.get_nearfield_data(k=k, d=d)
 
         if self.meshtype == 'InterfaceMesh':
@@ -205,7 +200,7 @@ class NearFieldDataFEMGenerator2d:
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
         filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
-        np.savez(filename, **data_dict)
+        bm.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k: float, d: Sequence[float]):
         """
@@ -218,7 +213,7 @@ class NearFieldDataFEMGenerator2d:
         uh = self.get_nearfield_data(k=k, d=d)
         value = uh(self.bc)
         if self.meshtype == 'UniformMesh':
-            self.mesh.ftype = np.float64
+            self.mesh.ftype = bm.float64
         self.mesh.add_plot(plt, cellcolor=value[..., 0].real, linewidths=0)
         self.mesh.add_plot(plt, cellcolor=value[..., 0].imag, linewidths=0)
         
@@ -227,10 +222,10 @@ class NearFieldDataFEMGenerator2d:
         # axes = fig.add_subplot(1, 3, 1)
         # self.mesh.add_plot(axes)
         # if self.meshtype == 'UniformMesh':
-        #     uh = uh.view(np.ndarray)
+        #     uh = uh.view(bm.ndarray)
         # axes = fig.add_subplot(1, 3, 2, projection='3d')
-        # self.mesh.show_function(axes, np.real(uh))
+        # self.mesh.show_function(axes, bm.real(uh))
         # axes = fig.add_subplot(1, 3, 3, projection='3d')
-        # self.mesh.show_function(axes, np.imag(uh))
+        # self.mesh.show_function(axes, bm.imag(uh))
         plt.show()
         
