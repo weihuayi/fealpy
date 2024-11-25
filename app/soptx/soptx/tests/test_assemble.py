@@ -15,12 +15,9 @@ from soptx.material import (
 )
 from soptx.pde import MBBBeam2dData1, Cantilever2dData1, Cantilever3dData1
 from soptx.solver import ElasticFEMSolver, AssemblyMethod, AssemblyConfig
-from soptx.opt import ComplianceObjective, VolumeConstraint
-from soptx.filter import Filter, FilterConfig
 
-bm.set_backend('pytorch')
+bm.set_backend('numpy')
 
-mesh = TriangleMesh.from_box(box=[0,1,0,1], nx=10, ny=10)
 @dataclass
 class TestConfig:
     """Configuration for topology optimization test cases."""
@@ -66,13 +63,13 @@ def create_base_components(config: TestConfig):
         extent = [0, config.nx, 0, config.ny]
         h = [1.0, 1.0]
         origin = [0.0, 0.0]
-        mesh = UniformMesh2d(
-            extent=extent, h=h, origin=origin,
-            ipoints_ordering='yx', flip_direction='y',
-            device='cpu'
-        )
-        # mesh = TriangleMesh.from_box(box=[0, config.nx*h[0], 0, config.ny*h[1]], 
-        #                             nx=config.nx, ny=config.ny, device='cpu')
+        # mesh = UniformMesh2d(
+        #     extent=extent, h=h, origin=origin,
+        #     ipoints_ordering='yx', flip_direction='y',
+        #     device='cpu'
+        # )
+        mesh = TriangleMesh.from_box(box=[0, config.nx*h[0], 0, config.ny*h[1]], 
+                                    nx=config.nx, ny=config.ny, device='cpu')
         dimension = 2
     
     # Create function spaces
@@ -150,8 +147,8 @@ def test_solver(config: TestConfig):
     solver.update_density(rho[:])
     solver_result = solver.solve_cg()
     displacement = solver_result.displacement
-    print(f"\nSolver information:")
-    print(f"- Displacement shape: {displacement.shape}:\n {displacement[:]}")
+    # print(f"\nSolver information:")
+    # print(f"- Displacement shape: {displacement.shape}:\n {displacement[:]}")
 
     # base_local_K = solver.get_base_local_stiffness_matrix()
     # print("\n=== 基础局部刚度矩阵信息 ===")
@@ -167,79 +164,6 @@ def test_solver(config: TestConfig):
     # print(f"全局刚度矩阵最大值: {bm.max(bm.abs(K.to_dense()))}")
     # print(f"全局载荷向量 -  {F.shape}:\n {F[:]}")
     
-
-def test_compliance_objective(config: TestConfig):
-    """Test compliance objective computation and sensitivity analysis."""
-    print(f"\n=== Testing Compliance Objective with {config.filter_type} filter ===")
-    
-    # Create base components
-    mesh, space_D, material_properties, solver, rho = create_base_components(config)
-    
-    # Test solver
-    solver.update_density(rho[:])
-    solver_result = solver.solve_cg()
-    displacement = solver_result.displacement
-    print(f"\nSolver information:")
-    print(f"- Displacement shape: {displacement.shape}:\n {displacement[:]}")
-    
-    # Create filter
-    filter_config = FilterConfig(
-        filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
-        filter_radius=config.filter_radius
-    )
-    filter_obj = Filter(filter_config)
-    filter_obj.initialize(mesh)
-    
-    # Create objective and constraint
-    objective = ComplianceObjective(
-        material_properties=material_properties,
-        solver=solver,
-        filter=filter_obj
-    )
-    constraint = VolumeConstraint(
-        mesh=mesh,
-        volume_fraction=config.volume_fraction,
-        filter=filter_obj
-    )
-    
-    # # Test objective function
-    # obj_value = objective.fun(rho=rho[:], u=displacement)
-    # print(f"Objective function value: {obj_value:.6e}")
-    
-    # # Test element compliance
-    # ce = objective.get_element_compliance()
-    # print(f"\nElement compliance information:")
-    # print(f"- Shape: {ce.shape}:\n {ce}")
-    # print(f"- Min: {bm.min(ce):.6e}")
-    # print(f"- Max: {bm.max(ce):.6e}")
-    # print(f"- Mean: {bm.mean(ce):.6e}")
-    
-    # Test sensitivity
-    dce = objective.jac(rho=rho[:], u=displacement)
-    print(f"\nElement sensitivity information:")
-    print(f"- Shape: {dce.shape}:\n, {dce}")
-    print(f"- Min: {bm.min(dce):.6e}")
-    print(f"- Max: {bm.max(dce):.6e}")
-    print(f"- Mean: {bm.mean(dce):.6e}")
-    
-    # Test constraint
-    constraint_value = constraint.fun(rho=rho[:])
-    print(f"\nConstraint function value: {constraint_value:.6e}")
-    
-    gradient = constraint.jac(rho=rho[:])
-    print(f"\nConstraint gradient information:")
-    print(f"- Shape: {gradient.shape}")
-    print(f"- Min: {bm.min(gradient):.6e}")
-    print(f"- Max: {bm.max(gradient):.6e}")
-    print(f"- Mean: {bm.mean(gradient):.6e}")
-    
-    return {
-        'objective_value': obj_value,
-        'element_compliance': ce,
-        'sensitivity': dce,
-        'constraint_value': constraint_value,
-        'constraint_gradient': gradient
-    }
 
 if __name__ == "__main__":
     # Test 3D case with density filter
@@ -265,24 +189,22 @@ if __name__ == "__main__":
     # Test 2D case with sensitivity filter
     config_cantilever_2d = TestConfig(
         problem_type='cantilever_2d',
-        # nx=160, ny=100,
-        nx=8, ny=5,
+        nx=160, ny=100,
+        # nx=8, ny=5,
         volume_fraction=0.4,
         filter_radius=6,
         filter_type='sensitivity'
     )
-    # # 测试标准组装方法
-    # config_standard = dataclasses.replace(
-    #     config_cantilever_2d, 
-    #     assembly_method=AssemblyMethod.STANDARD
-    # )
-    # results_standard = test_solver(config_standard)
+    # 测试标准组装方法
+    config_standard = dataclasses.replace(
+        config_cantilever_2d, 
+        assembly_method=AssemblyMethod.STANDARD
+    )
+    results_standard = test_solver(config_standard)
 
-    # # 测试快速应力组装方法
-    # config_fast_stress = dataclasses.replace(
-    #     config_cantilever_2d, 
-    #     assembly_method=AssemblyMethod.FAST_STRESS
-    # )
-    # results_fast_stress = test_solver(config_fast_stress)
-
-    result = test_compliance_objective(config_cantilever_2d)
+    # 测试快速应力组装方法
+    config_fast_stress = dataclasses.replace(
+        config_cantilever_2d, 
+        assembly_method=AssemblyMethod.FAST_STRESS
+    )
+    results_fast_stress = test_solver(config_fast_stress)

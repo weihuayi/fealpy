@@ -17,6 +17,31 @@ class OCOptions:
     initial_lambda: float = 1e9   # 初始 lambda 值
     bisection_tol: float = 1e-3   # 二分法收敛容差
 
+@dataclass
+class OptimizationHistory:
+    """优化过程的历史记录"""
+    densities: list       # 密度场历史
+
+    def __init__(self):
+        """初始化各个记录列表"""
+        self.densities = []
+
+    def log_iteration(self, iter_idx: int, obj_val: float, volume: float, 
+                     change: float, time: float, density: TensorLike):
+        """记录一次迭代的信息
+        
+        Parameters
+        ----------
+        density : 当前密度场
+        """
+        self.densities.append(density.copy())
+        
+        print(f"Iteration: {iter_idx + 1}, "
+              f"Objective: {obj_val:.3f}, "
+              f"Volume: {volume:.12f}, "
+              f"Change: {change:.3f}, "
+              f"Time: {time:.3f} sec")
+
 class OCOptimizer(OptimizerBase):
     """Optimality Criteria (OC) 优化器
     
@@ -68,25 +93,19 @@ class OCOptimizer(OptimizerBase):
         move = self.options.move_limit
         
         # OC update scheme
-        rho_new = bm.maximum(bm.tensor(0.0, dtype=rho.dtype), 
-                            bm.maximum(rho - move, 
-                                bm.minimum(bm.tensor(1.0, dtype=rho.dtype), 
-                                    bm.minimum(rho + move, rho * bm.sqrt(-dc / dg / lmid))))
+        rho_new = bm.maximum(
+            bm.tensor(0.0, dtype=rho.dtype), 
+            bm.maximum(
+                rho - move, 
+                bm.minimum(
+                    bm.tensor(1.0, dtype=rho.dtype), 
+                    bm.minimum(
+                        rho + move, 
+                        rho * bm.sqrt(-dc / dg / lmid)
+                    )
                 )
-        # OC update scheme
-        # rho_new = bm.maximum(
-        #     bm.tensor(0.0, dtype=rho.dtype), 
-        #     bm.maximum(
-        #         rho - move, 
-        #         bm.minimum(
-        #             bm.tensor(1.0, dtype=rho.dtype), 
-        #             bm.minimum(
-        #                 rho + move, 
-        #                 rho * bm.sqrt(-dc / dg / lmid)
-        #             )
-        #         )
-        #     )
-        # )
+            )
+        )
         
         return rho_new
         
@@ -97,7 +116,7 @@ class OCOptimizer(OptimizerBase):
         ----------
         rho : 初始密度场
         **kwargs : 其他参数，例如：
-            - beta: Heaviside投影参数
+            - beta: Heaviside 投影参数
         
         Returns
         -------
@@ -114,6 +133,9 @@ class OCOptimizer(OptimizerBase):
         # 获取物理密度(对于非 Heaviside 投影，就是设计密度本身)
         rho_phys = (self.filter.get_physical_density(rho, filter_params) 
                    if self.filter is not None else rho)
+        
+        # 初始化历史记录
+        history = OptimizationHistory()
         
         # 优化主循环
         for iter_idx in range(max_iters):
@@ -151,17 +173,27 @@ class OCOptimizer(OptimizerBase):
             # 更新设计变量，确保目标函数内部状态同步
             rho = rho_new
             
-            # 输出迭代信息
             iteration_time = time() - start_time
-            print(f"Iteration: {iter_idx + 1}, "
-                  f"Objective: {obj_val:.3f}, "
-                  f"Volume: {bm.mean(rho_phys[:]):.12f}, "
-                  f"Change: {change:.3f}, "
-                  f"Time: {iteration_time:.3f} sec")
-                  
+
+            history.log_iteration(iter_idx, obj_val, bm.mean(rho_phys[:]), 
+                                change, iteration_time, rho_phys[:])
+            
             # 收敛检查
             if change <= tol:
                 print(f"Converged after {iter_idx + 1} iterations")
                 break
                 
-        return rho
+        return rho, history
+    
+def save_optimization_history(mesh, history: OptimizationHistory, save_path: str):
+    """保存优化过程的所有迭代结果
+    
+    Parameters
+    ----------
+    mesh : 有限元网格对象
+    history : 优化历史记录
+    save_path : 保存路径
+    """
+    for i, density in enumerate(history.densities):
+        mesh.celldata['density'] = density
+        mesh.to_vtk(f"{save_path}/density_iter_{i:03d}.vts")

@@ -8,7 +8,7 @@ from fealpy.opt import opt_alg_options
 
 from app.soptx.soptx.material.material_properties import ElasticMaterialProperties, SIMPInterpolation
 
-from app.soptx.soptx.pde.short_cantilever_2d import ShortCantilever2dOneData
+from soptx.pde.cantilever_2d import ShortCantilever2dOneData
 
 from app.soptx.soptx.opt.volume_objective import VolumeConstraint
 from app.soptx.soptx.opt.compliance_objective import ComplianceObjective
