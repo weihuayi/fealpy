@@ -6,7 +6,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, QuadrangleMesh
 
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolve
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 from fealpy.utils import timer
 import time
 import matplotlib.pyplot as plt
@@ -168,7 +168,7 @@ while isMarkedCell.any():
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-ms = MainSolve(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
+ms = MainSolve(mesh=mesh, material_params=model.params, model_type=model_type)
 tmr.send('init')
 
 '''
@@ -198,7 +198,7 @@ if cupy:
 
 ms.output_timer()
 ms.save_vtkfile(fname=vtkname)
-ms.solve(maxit=maxit)
+ms.solve(p=p, maxit=maxit)
 
 tmr.send('stop')
 tmr.send(None)

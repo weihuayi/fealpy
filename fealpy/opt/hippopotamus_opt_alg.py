@@ -130,4 +130,4 @@ class HippopotamusOptAlg(Optimizer):
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
             # Convergence_curve[0, it] = bm.copy(gbest_f[0])
-        return gbest, gbest_f
+        return gbest[0], gbest_f

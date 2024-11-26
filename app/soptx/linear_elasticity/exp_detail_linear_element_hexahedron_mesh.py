@@ -59,12 +59,14 @@ class BoxDomainPolyLoaded3d():
 
 
 bm.set_backend('numpy')
-nx, ny, nz = 3, 3, 3 
+nx, ny, nz = 2, 2, 2 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
 
 NC = mesh.number_of_cells()
 cm = mesh.cell_volume()
+node = mesh.entity('node')
+cell = mesh.entity('cell')
 
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 
