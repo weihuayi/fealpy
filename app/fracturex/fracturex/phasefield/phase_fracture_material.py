@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from typing import Optional
 
 from fealpy.typing import TensorLike
@@ -327,7 +328,18 @@ class SpectralModel(BasedPhaseFractureMaterial):
         
         @param[in] s strain，（NC, NQ, GD, GD）
         """
-        w, v = bm.linalg.eigh(s) # w 特征值, v 特征向量
+        '''
+        if bm.device_type(s) == 'cuda':
+            torch.cuda.empty_cache()
+            try:
+                w, v = bm.linalg.eigh(s)  # w 特征值, v 特征向量
+            except torch.cuda.OutOfMemoryError as e:
+                print("CUDA out of memory. Attempting to free cache.")
+                torch.cuda.empty_cache()
+        else:
+            w, v = bm.linalg.eigh(s) # w 特征值, v 特征向量
+        '''
+        w, v = bm.linalg.eigh(s)
         p, m = self.macaulay_operation(w)
 
         sp = bm.zeros_like(s)
