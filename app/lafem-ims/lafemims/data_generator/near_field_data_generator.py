@@ -94,7 +94,7 @@ class NearFieldDataFEMGenerator2d:
 
         space = LagrangeFESpace(self.mesh, p=self.p)
 
-        # 定义积分器
+        # 定义积分子
         D = ScalarDiffusionIntegrator(pde.diffusion_coefficient, q=self.q)
         C = ScalarConvectionIntegrator(pde.convection_coefficient, q=self.q)
         M = ScalarMassIntegrator(pde.reaction_coefficient, q=self.q)
