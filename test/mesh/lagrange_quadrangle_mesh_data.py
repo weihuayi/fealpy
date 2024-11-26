@@ -7,8 +7,8 @@ surface = SphereSurface() #以原点为球心，1 为半径的球
 mesh = QuadrangleMesh.from_unit_sphere_surface()
 node = mesh.interpolation_points(3)
 cell = mesh.cell_to_ipoint(3)
-
-from_triangle_mesh_data = [
+"""
+from_quadrangle_mesh_data = [
         {
             "p": 3,
             "surface": surface,
@@ -19,3 +19,4 @@ from_triangle_mesh_data = [
             "NC": 
                 }
 ]
+"""
