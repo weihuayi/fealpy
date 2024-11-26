@@ -667,7 +667,7 @@ class MainSolve:
             Additional parameters passed to the energy degradation function.
         """
         if EDfunc is not None:
-            self.EDFunc = EDfunc(degradation_type=degradation_type, **kwargs)
+            self.EDFunc = EDfunc(degradation_type='user_defined', **kwargs)
         else:
             self.EDFunc = EDFunc(degradation_type=degradation_type)
 
@@ -685,7 +685,7 @@ class MainSolve:
             Additional parameters passed to the crack surface density function.
         """
         if CSDfunc is not None:
-            self.CSDFunc = CSDfunc(density_type=density_type, **kwargs)
+            self.CSDFunc = CSDfunc(density_type=='user_defined', **kwargs)
         else:
             self.CSDFunc = CSDFunc(density_type=density_type)
 
