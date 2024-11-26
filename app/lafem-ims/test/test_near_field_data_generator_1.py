@@ -66,7 +66,7 @@ if __name__ == '__main__':
         from multiprocessing import Pool
         from tqdm import tqdm
         import time
-        
+
         NUM_OF_POOL = 8         # 并行进程数
         AMOUNT_OF_DATA = 100    # 生成数据数量
 
@@ -98,5 +98,3 @@ if __name__ == '__main__':
         IDX = 88  # 选择要可视化的数据索引
         generator = main(IDX, centers[IDX:IDX+1, ...], radius[IDX:IDX+1, ...], SAVE_PATH, TEST_TYPE)
         generator.visualization_of_nearfield_data(k=k[-1], d=d[0])
-
-
