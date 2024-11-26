@@ -8,7 +8,6 @@ from .utils import estr2dim
 from .mesh_base import TensorMesh
 from .plot import Plotable
 
-
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 
@@ -128,7 +127,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         J = bm.einsum('cim, ...in->...cmn', node[cell[:, [0, 3, 1, 2]]], gphi)
         return J
 
-    def first_fundamental_form(self, J:TensorLike) -> TensorLike:
+    def first_fundamental_form(self, J: TensorLike) -> TensorLike:
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。
         """
@@ -163,7 +162,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         n = t @ w
         return n, t
 
-    def interpolation_points(self, p:int, index: Index = _S):
+    def interpolation_points(self, p: int, index: Index = _S):
         """
         @brief Get all p-th order interpolation points on the quadrilateral mesh
         """
@@ -190,7 +189,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
     def number_of_corner_nodes(self):
         return self.number_of_nodes()
 
-    def cell_to_ipoint(self, p:int, index: Index = _S):
+    def cell_to_ipoint(self, p: int, index: Index = _S):
         """
         @brief 获取单元上的双 p 次插值点
         """
@@ -237,7 +236,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         flag = iflag & (edge2cell[:, 3] == 3)
         c2p = bm.set_at(c2p, (edge2cell[flag, 1], 0, slice(None)), e2p[flag])
 
-        c2p = bm.set_at(c2p, (slice(None), slice(1, -1), slice(1, -1)), NN + NE * (p - 1) + 
+        c2p = bm.set_at(c2p, (slice(None), slice(1, -1), slice(1, -1)), NN + NE * (p - 1) +
                         bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
 
         # if bm.backend_name in ["numpy", "pytorch"]:
@@ -327,9 +326,9 @@ class QuadrangleMesh(TensorMesh, Plotable):
         angle = bm.concatenate(angles, axis=-1)
         return angle
 
-    def cell_quality(self)  -> TensorLike:
+    def cell_quality(self) -> TensorLike:
         jacobi = self.jacobi_at_corner()
-        return jacobi.sum(axis=1)/4
+        return jacobi.sum(axis=1) / 4
 
     def reorder_cell(self, idx):
         raise NotImplementedError
@@ -358,26 +357,26 @@ class QuadrangleMesh(TensorMesh, Plotable):
             edge2node = self.edge_to_node()
             cell2node = self.cell_to_node()
             if returnim is True:
-                nonzeros = NN+2*NE+4*NC
-                num_new_node = NN+NE+NC
+                nonzeros = NN + 2 * NE + 4 * NC
+                num_new_node = NN + NE + NC
 
-                data = bm.zeros(nonzeros,dtype=bm.float64)
-                indices = bm.zeros(nonzeros,dtype=bm.int32)
-                indptr = bm.zeros(num_new_node+1,dtype=bm.int32)
+                data = bm.zeros(nonzeros, dtype=bm.float64)
+                indices = bm.zeros(nonzeros, dtype=bm.int32)
+                indptr = bm.zeros(num_new_node + 1, dtype=bm.int32)
 
-                #赋值
+                # 赋值
                 data[:NN] = 1
-                data[NN:NN+2*NE] = 1/2
-                data[NN+2*NE:] = 1/4
+                data[NN:NN + 2 * NE] = 1 / 2
+                data[NN + 2 * NE:] = 1 / 4
 
-                indices[:NN] = bm.arange(NN) 
-                indices[NN:NN+2*NE] = edge2node.flatten()
-                indices[NN+2*NE:] = cell2node.flatten()
+                indices[:NN] = bm.arange(NN)
+                indices[NN:NN + 2 * NE] = edge2node.flatten()
+                indices[NN + 2 * NE:] = cell2node.flatten()
 
-                indptr[:NN+1] = bm.arange(NN+1)
-                indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
-                indptr[NN+NE+1:] = bm.arange(NN+2*NE+4,NN+2*NE+4*NC+1,step=4)
-                A = csr_matrix((data,indices,indptr),dtype=bm.float64)
+                indptr[:NN + 1] = bm.arange(NN + 1)
+                indptr[NN + 1:NN + NE + 1] = bm.arange(NN + 2, NN + 2 * NE + 1, step=2)
+                indptr[NN + NE + 1:] = bm.arange(NN + 2 * NE + 4, NN + 2 * NE + 4 * NC + 1, step=4)
+                A = csr_matrix((data, indices, indptr), dtype=bm.float64)
                 IM.append(A)
 
             # Find the cutted edge
@@ -394,19 +393,18 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
             cell = bm.zeros((4 * NC, 4), dtype=bm.int64, device=bm.get_device(cell2edge))
 
-            cell = bm.set_at(cell, (slice(0, None, 4), slice(None)), 
-                            bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1))
-            cell = bm.set_at(cell, (slice(1, None, 4), slice(None)), 
-                            bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1))
+            cell = bm.set_at(cell, (slice(0, None, 4), slice(None)),
+                             bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1))
+            cell = bm.set_at(cell, (slice(1, None, 4), slice(None)),
+                             bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1))
             cell = bm.set_at(cell, (slice(2, None, 4), slice(None)),
-                            bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1))
-            cell = bm.set_at(cell, (slice(3, None, 4), slice(None)), 
-                            bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1))
+                             bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1))
+            cell = bm.set_at(cell, (slice(3, None, 4), slice(None)),
+                             bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1))
             # cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
             # cell[1::4, :] = bm.concatenate([ep[0], cp[1], ep[1], cc], axis=1)
             # cell[2::4, :] = bm.concatenate([cc, ep[1], cp[2], ep[2]], axis=1)
             # cell[3::4, :] = bm.concatenate([ep[3], cc, ep[2], cp[3]], axis=1)
-
 
             # if bm.backend_name in ["numpy", "pytorch"]:
             #     cell[0::4, :] = bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1)
@@ -426,10 +424,10 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
             self.node = bm.concatenate([self.node, edgeCenter, cellCenter], axis=0)
             self.cell = cell
-            
+
             self.construct()
         if returnim is True:
-            return IM           
+            return IM
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
@@ -439,9 +437,9 @@ class QuadrangleMesh(TensorMesh, Plotable):
             VTK_LINE = 3
             return VTK_LINE
 
-    def to_vtk(self, fname=None, etype='cell', index: Index=_S):
-        
-        from fealpy.mesh.vtk_extent import  write_to_vtu
+    def to_vtk(self, fname=None, etype='cell', index: Index = _S):
+
+        from fealpy.mesh.vtk_extent import write_to_vtu
 
         node = self.entity('node')
         GD = self.GD
@@ -461,8 +459,8 @@ class QuadrangleMesh(TensorMesh, Plotable):
         else:
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
+                         nodedata=self.nodedata,
+                         celldata=self.celldata)
 
     def show_function(self, plot, uh, cmap=None):
         """
@@ -481,14 +479,14 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
         node = self.node
         cax = axes.plot_trisurf(
-                node[:, 0], node[:, 1],
-                uh, cmap=cmap, lw=0.0)
+            node[:, 0], node[:, 1],
+            uh, cmap=cmap, lw=0.0)
         axes.figure.colorbar(cax, ax=axes)
         return axes
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, 
-                threshold:Optional[Callable]=None, device:str=None) -> 'QuadrangleMesh':
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10,
+                 threshold: Optional[Callable] = None, device: str = None) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a rectangular domain.
         """
@@ -520,7 +518,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def from_unit_square(cls, nx=10, ny=10, threshold:Optional[Callable]=None) -> 'QuadrangleMesh':
+    def from_unit_square(cls, nx=10, ny=10, threshold: Optional[Callable] = None) -> 'QuadrangleMesh':
         """
         Generate a quadrilateral mesh for a unit square.
 
@@ -554,7 +552,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         # 添加线段和循环
         lines = []
         for i in range(len(polygon_points)):
-            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i+1) % len(polygon_points)])
+            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i + 1) % len(polygon_points)])
             lines.append(line)
         curve_loop = gmsh.model.geo.addCurveLoop(lines)
 
@@ -609,7 +607,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def from_fuel_rod_gmsh(cls,R1,R2,L,w,h,meshtype='normal'):
+    def from_fuel_rod_gmsh(cls, R1, R2, L, w, h, meshtype='normal'):
         raise NotImplementedError
 
     @classmethod
@@ -641,7 +639,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
                 [0.5, math.sqrt(3) / 2]], dtype=bm.float64)
         cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int64)
         return cls(node, cell)
-    
+
     @classmethod
     def from_square_domain_with_fracture(cls):
         node = bm.tensor([
@@ -683,7 +681,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         node = bm.concatenate([node0, ec, cc], axis=0)
         idx = bm.arange(NC)
 
-        cell1 = bm.concatenate([(NN+NE+idx).reshape(-1, 1),
+        cell1 = bm.concatenate([(NN + NE + idx).reshape(-1, 1),
                                 (cell2edge[:, 0] + NN).reshape(-1, 1),
                                 (cell0[:, 2]).reshape(-1, 1),
                                 (cell2edge[:, 1] + NN).reshape(-1, 1)], axis=1)
@@ -698,7 +696,6 @@ class QuadrangleMesh(TensorMesh, Plotable):
         cell = bm.concatenate([cell1, cell2, cell3], axis=0)
 
         return cls(node, cell)
-
 
     @classmethod
     def polygon_domain_generator(cls, num_vertices=20, radius=1.0, center=[0.0, 0.0]):
@@ -823,6 +820,48 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
         quad_mesh = cls(node, cell)
         quad_mesh.celldata['cell_domain_tag'] = cell_domain_tag
+
+        return quad_mesh
+
+    @classmethod
+    def from_unit_sphere_surface(cls, refine=3, itype=None, ftype=None, device=None):
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        def project_to_sphere(nodes):
+            norms = bm.sqrt(bm.sum(nodes**2, axis=1, keepdims=True))
+            return nodes / norms
+
+        origin_node = bm.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1]
+        ], dtype=ftype, device=device)
+        origin_cell = bm.array(
+            [
+                [0, 3, 2, 1],
+                [4, 5, 6, 7],
+                [3, 7, 6, 2],
+                [0, 1, 5, 4],
+                [0, 4, 7, 3],
+                [1, 2, 6, 5]
+            ], dtype=itype, device=device)
+        origin_node = project_to_sphere(origin_node)
+        quad_mesh = cls(origin_node, origin_cell)
+
+        for i in range(refine):
+            quad_mesh.uniform_refine()
+            refine_node = quad_mesh.node
+            refine_node = project_to_sphere(refine_node)
+            refine_cell = quad_mesh.cell
+            quad_mesh = cls(refine_node, refine_cell)
 
         return quad_mesh
 

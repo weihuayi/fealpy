@@ -381,14 +381,16 @@ def export_to_inp(filename, nodes, elements, fixed_nodes, load_nodes, loads, you
         for i, load_node in enumerate(load_nodes):
             node_id = load_node
             forces = loads[i]
-            file.write(f"GearInstance.{node_id}, 1, {forces[0]}, 2, {forces[1]}, 3, {forces[2]}\n")
+            file.write(f"GearInstance.{node_id}, 1, {forces[0]}\n")
+            file.write(f"GearInstance.{node_id}, 2, {forces[1]}\n")
+            file.write(f"GearInstance.{node_id}, 3, {forces[2]}\n")
 
         file.write("*Output, field, variable=PRESELECT\n")
         file.write("*Output, history, variable=PRESELECT\n")
         file.write("*End Step\n")
         file.write("** Output Global Stiffness Matrix\n")
         file.write("*Step, name=Global_Stiffness_Matrix\n")
-        file.write("*MATRIX GENERATE, STIFFNESS\n")
+        file.write("*MATRIX GENERATE, STIFFNESS, element by element\n")
         file.write("*MATRIX OUTPUT, STIFFNESS, FORMAT=COORDINATE\n")
         file.write("*End Step\n")
 

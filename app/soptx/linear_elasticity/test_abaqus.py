@@ -2,6 +2,8 @@ from fealpy.backend import backend_manager as bm
 
 from fealpy.mesh import HexahedronMesh
 from fealpy.material.elastic_material import LinearElasticMaterial
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
@@ -11,7 +13,7 @@ from fealpy.solver import cg
 class BoxDomainPolyLoaded3d():
     def domain(self):
         return [0, 1, 0, 1, 0, 1]
-    
+
     @cartesian
     def source(self, points: TensorLike):
         x = points[..., 0]
@@ -51,7 +53,7 @@ class BoxDomainPolyLoaded3d():
         val[..., 2] = -100*mu*(z-z**2)**2 * (2*y**3-3*y**2+y) * (2*x**3-3*x**2+x)
 
         return val
-    
+
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return bm.zeros(points.shape, 
@@ -59,7 +61,7 @@ class BoxDomainPolyLoaded3d():
 
 
 bm.set_backend('numpy')
-nx, ny, nz = 2, 2, 2 
+nx, ny, nz = 1, 1, 1 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
 
@@ -81,8 +83,12 @@ tgdof = tensor_space.number_of_global_dofs()
 phi_tensor = tensor_space.basis(bcs) # (1, NQ, tldof, GD)
 cell2tdof = tensor_space.cell_to_dof() # (NC, tldof)
 
+E = 206e3
+nu = 0.3
+lam = (E * nu) / ((1.0 + nu) * (1.0 - 2.0 * nu))
+mu = E / (2.0 * (1.0 + nu))
 linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
-                                                lame_lambda=1, shear_modulus=1, 
+                                                lame_lambda=lam, shear_modulus=mu, 
                                                 hypo='3D', device=bm.get_device(mesh))
 
 B = linear_elastic_material.strain_matrix(dof_priority=True, 
@@ -90,6 +96,10 @@ B = linear_elastic_material.strain_matrix(dof_priority=True,
 D = linear_elastic_material.elastic_matrix(bcs)
 KE = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
 
+integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
+KE_maual = integrator_K.assembly(space=tensor_space)
+
+KE0 = KE[0]
 
 I = bm.broadcast_to(cell2tdof[:, :, None], shape=KE.shape)
 J = bm.broadcast_to(cell2tdof[:, None, :], shape=KE.shape)
@@ -111,6 +121,16 @@ F = COOTensor(
             spshape = (tgdof, ))
 indices = cell2tdof.reshape(1, -1)
 F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense()
+
+from app.gearx.utils import *
+F_load_nodes = bm.transpose(F.reshape(3, -1))
+load_node_indices = cell[0]
+fixed_node_index = bm.tensor([0])
+export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/local_stiffness_matrix.inp', 
+              nodes=node, elements=cell, fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
+              young_modulus=206e3, poisson_ratio=0.3, density=7850.0)
+
+
 
 isDDof = tensor_space.is_boundary_dof(threshold=None, method='interp')
 kwargs = K.values_context()
