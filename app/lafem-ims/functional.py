@@ -72,7 +72,7 @@ def levelset_fourier(points: NDArray, complexity: int, coefficient: NDArray, ori
 
 #################################################################################################################################
 
-def genarate_scatterers_circles(num_of_scatterers: int, seed: int) ->TensorLike:
+def generate_scatterers_circles(num_of_scatterers: int, seed: int) ->TensorLike:
     """
     参数:
     - num_of_scatterers: int, 散射体的数量。
@@ -90,7 +90,7 @@ def genarate_scatterers_circles(num_of_scatterers: int, seed: int) ->TensorLike:
     rads = bm.astype(rads, bm.float64)
 
     return ctrs, rads
-def genarate_scatterers_fourier(complexity: int, num_of_scatterers: int, seed: int) ->TensorLike:
+def generate_scatterers_fourier(complexity: int, num_of_scatterers: int, seed: int) ->TensorLike:
     """
     参数:
     - complexity: int, 水平集函数的复杂度。
