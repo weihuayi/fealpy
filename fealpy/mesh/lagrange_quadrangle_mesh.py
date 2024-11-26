@@ -14,8 +14,8 @@ class LagrangeQuadrangleMesh(TensorMesh):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
+        GD = node.shape[1]
         self.p = p
-        self.GD = node.shape[1]
         self.cell = cell
         self.surface = surface
 
@@ -28,15 +28,15 @@ class LagrangeQuadrangleMesh(TensorMesh):
             bc = bm.einsum('im, jn -> ijmn', bc, bc).reshape(-1, 4)
             self.node[self.cell] = bm.einsum('ijn, kj -> ikn', node[cell], bc)
 
-        self.surface is not None:
-            self.node,_ = self.surface.project(self.node)
-
+        #self.localEdge = self.generate_local_lagrange_edges(p)
+        #self.localFace = self.localEdge
         self.ccw = bm.tensor([0, 2, 3, 1], **kwargs)
 
         if construct:
             self.construct()
 
         self.meshtype = 'lquad'
+        self.qmesh = None # 网格的顶点必须在球面上
 
         self.nodedata = {}
         self.edgedata = {}
@@ -45,6 +45,17 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     def reference_cell_measure(self):
         return 1
+    
+    def generate_local_lagrange_edges(self, p: int) -> TensorLike:
+        """
+        Generate the local edges for Lagrange elements of order p.
+        """
+        multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype, device=bm.get_device(cell))
+        #multiIndex = bm.multi_index_matrix(p, TD)
+
+        localEdge = bm.zeros((4, p+1), dtype=bm.int32)
+
+        return localEdge
     
     def interpolation_points(self, p: int, index: Index=_S):
         """Fetch all p-order interpolation points on the quadrangle mesh."""
@@ -59,7 +70,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             bnode[:],_ = surface.project(bnode)
             node,_ = surface.project(node)
 
-        lemsh = cls(node, mesh, p=p, construct=True)
+        lmesh = cls(node, cell, p=p, construct=True)
         lmesh.qmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
@@ -81,7 +92,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             raise ValueError(f"entity type: {etype} is wrong!")
 
     def bc_to_point(self, bc: TensorLike, index: Index=_S, etype='cell'):
-        node = =self.node
+        node = self.node
         TD = len(bc)
         phi = self.shape_function(bc)
         p = bm.einsum()
@@ -110,3 +121,45 @@ class LagrangeQuadrangleMesh(TensorMesh):
             index: Index=_S, variables='x'):
         pass
 
+    def vtk_cell_type(self, etype='cell'):
+        """
+        @berif  返回网格单元对应的 vtk类型。
+        """
+        if etype in {'cell', 2}:
+            VTK_LAGRANGE_TRIANGLE = 69
+            return VTK_LAGRANGE_TRIANGLE 
+        elif etype in {'face', 'edge', 1}:
+            VTK_LAGRANGE_CURVE = 68
+            return VTK_LAGRANGE_CURVE
+
+    def to_vtk(self, etype='cell', index: Index=_S, fname=None):
+        """
+        Parameters
+        ----------
+
+        @berif 把网格转化为 VTK 的格式
+        """
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
+
+        #cell = self.entity(etype)[index]
+        cell = self.entity(etype, index)
+        cellType = self.vtk_cell_type(etype)
+        idx = vtk_cell_index(self.p, cellType)
+        NV = cell.shape[-1]
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]), axis=1)
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
