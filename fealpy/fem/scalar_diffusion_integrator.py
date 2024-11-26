@@ -63,7 +63,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws, cm = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=self.index)
         gphi = self.fetch_gphix(space)
-
+        
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
 
     @assemblymethod('fast')
