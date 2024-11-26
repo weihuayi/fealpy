@@ -824,7 +824,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         return quad_mesh
 
     @classmethod
-    def from_unit_sphere_surface(cls, refine=3, itype=None, ftype=None, device=None):
+    def from_unit_sphere_surface(cls, refine=1, itype=None, ftype=None, device=None):
         if itype is None:
             itype = bm.int32
         if ftype is None:

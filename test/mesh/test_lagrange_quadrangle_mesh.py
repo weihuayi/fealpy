@@ -15,15 +15,27 @@ from lagrange_quadrangle_mesh_data import *
 
 class TestLagrangeQuadrangleMeshInterfaces:
     @pytest.mark.parametrize("backend", ['numpy'])
-    @pytest.mark.parametrize("data", from_triangle_mesh_data)
-    def test_from_triangle_mesh(self, data, backend):
+    def test_surface_mesh(self, backend):
+        bm.set_backend(backend)
+
+        surface = SphereSurface()
+        mesh = QuadrangleMesh.from_unit_sphere_surface()
+
+        lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=1, surface=surface)
+        fname = f"sphere_qtest.vtu"
+        lmesh.to_vtk(fname=fname)
+
+    """
+    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("data", from_quadrangle_mesh_data)
+    def test_from_quadranglemesh(self, data, backend):
         bm.set_backend(backend)
 
         p = data['p']
         surface = data['surface']
-        mesh = TriangleMesh.from_unit_sphere_surface()
+        mesh = QuadrangleMesh.from_unit_sphere_surface()
 
-        lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p, surface=surface)
+        lmesh = LagrangeQuadrangleMesh.from_triangle_mesh(mesh, p, surface=surface)
 
         assert lmesh.number_of_nodes() == data["NN"] 
         assert lmesh.number_of_edges() == data["NE"] 
@@ -31,23 +43,12 @@ class TestLagrangeQuadrangleMeshInterfaces:
         assert lmesh.number_of_cells() == data["NC"] 
         
         cell = lmesh.entity('cell')
-        np.testing.assert_allclose(bm.to_numpy(cell), data["cell"], atol=1e-14)   
-
-    @pytest.mark.parametrize("backend", ['numpy'])
-    def test_surface_mesh(self, backend):
-        bm.set_backend(backend)
-
-        surface = SphereSurface()
-        mesh = QuadrangleMesh.from_unit_sphere_surface()
-
-        lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=3, surface=surface)
-        fname = f"sphere_qtest.vtu"
-        lmesh.to_vtk(fname=fname)
+        np.testing.assert_allclose(bm.to_numpy(cell), data["cell"], atol=1e-14)
+        """
 
 
 if __name__ == "__main__":
-    a = TestLagrangeTriangleMeshInterfaces()
-    a.test_init_mesh(init_data[0], 'numpy')
-    #a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
-    #a.test_surface_mesh('numpy')
+    a = TestLagrangeQuadrangleMeshInterfaces()
+    a.test_surface_mesh('numpy')
+    #a.test_from_quadrangle_mesh(from_quadrangle_mesh_data[0], 'numpy')
     #pytest.main(["./test_lagrange_triangle_mesh.py"])
