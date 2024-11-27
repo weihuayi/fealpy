@@ -47,9 +47,13 @@ def edim2entity(storage: Dict, factory: Dict, edim: int, index=None):
         return et[index]
 
 
-def inverse_relation(entity: TensorLike, size: int, index=None):
+def inverse_relation(entity: TensorLike, size: int, index=None, *, sorted=True):
     """Return the inverse relationship of a homogeneous entity in COO sparse format,
-    including the row indices, column indices, and shape."""
+    including the row indices, column indices, and shape.
+
+    For instance, if `entity` is cell_to_node, that a indices field on cells,
+    this function returns node_to_cell. In this case, `size` should be the number
+    of nodes, and `index` should be a bool field on nodes."""
     assert entity.ndim == 2
 
     if index is None:
@@ -65,6 +69,10 @@ def inverse_relation(entity: TensorLike, size: int, index=None):
         row = entity.reshape(-1)[relation_flag.reshape(-1)]
         num_selected_each_entity = bm.sum(relation_flag, axis=-1, dtype=bm.int32)
         col = bm.repeat(bm.arange(entity.shape[0]), num_selected_each_entity)
+
+    if sorted:
+        order = bm.lexsort([col, row])
+        row, col = row[order], col[order]
 
     return row, col, (size, entity.shape[0])
 

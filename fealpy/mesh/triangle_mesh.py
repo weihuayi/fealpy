@@ -600,6 +600,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         https://lyc102.github.io/ifem/afem/coarsen/
         """
+        from .utils import inverse_relation
 
         if isMarkedCell is None:
             return
@@ -619,9 +620,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
 
-        node2cell = self.node_to_cell()
+        # node2cell = self.node_to_cell()
 
-        I, J = bm.nonzero(node2cell[isIGoodNode, :])
+        # I, J = bm.nonzero(node2cell[isIGoodNode, :])
+        _, J, _ = inverse_relation(cell, NN, isIGoodNode)
         nodeStar = J.reshape(-1, 4)
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
@@ -649,7 +651,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.set_at(cell , (t2, 2) , p1)
         cell = bm.set_at(cell , (t3, 0) , -1)
 
-        I, J = bm.nonzero(node2cell[isBGoodNode, :])
+        # I, J = bm.nonzero(node2cell[isBGoodNode, :])
+        _, J, _ = inverse_relation(cell, NN, isBGoodNode)
         nodeStar = J.reshape(-1, 2)
         idx = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 1], 1])
         nodeStar = bm.set_at(nodeStar , idx , nodeStar[idx, :][:, [0, 1]])
