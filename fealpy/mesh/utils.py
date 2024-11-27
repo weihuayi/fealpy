@@ -55,10 +55,11 @@ def inverse_relation(entity: TensorLike, size: int, index=None, *, sorted=True):
     this function returns node_to_cell. In this case, `size` should be the number
     of nodes, and `index` should be a bool field on nodes."""
     assert entity.ndim == 2
+    kwargs = {'dtype': entity.dtype, 'device': entity.device}
 
     if index is None:
         row = entity.reshape(-1)
-        col = bm.repeat(bm.arange(entity.shape[0]), entity.shape[1])
+        col = bm.repeat(bm.arange(entity.shape[0], **kwargs), entity.shape[1])
     else:
         if isinstance(index, TensorLike) and index.dtype == bm.bool:
             flag = index
@@ -68,7 +69,7 @@ def inverse_relation(entity: TensorLike, size: int, index=None, *, sorted=True):
         relation_flag = flag[entity]
         row = entity.reshape(-1)[relation_flag.reshape(-1)]
         num_selected_each_entity = bm.sum(relation_flag, axis=-1, dtype=bm.int32)
-        col = bm.repeat(bm.arange(entity.shape[0]), num_selected_each_entity)
+        col = bm.repeat(bm.arange(entity.shape[0], **kwargs), num_selected_each_entity)
 
     if sorted:
         order = bm.lexsort([col, row])

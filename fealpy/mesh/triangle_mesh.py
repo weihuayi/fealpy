@@ -612,10 +612,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         node = self.entity('node')
 
         valence = bm.zeros(NN, dtype=self.itype, device=self.device)
-        bm.add_at(valence, cell, 1)
+        valence = bm.index_add(valence, cell, 1)
 
         valenceNew = bm.zeros(NN, dtype=self.itype, device=self.device)
-        bm.add_at(valenceNew, cell[isMarkedCell][:, 0], 1)
+        valenceNew = bm.index_add(valenceNew, cell[isMarkedCell][:, 0], 1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
