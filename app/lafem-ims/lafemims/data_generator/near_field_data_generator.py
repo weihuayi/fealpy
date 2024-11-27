@@ -2,9 +2,10 @@
 import os
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
-import numpy as bm
+import numpy as np
 from typing import Sequence, Callable
 
+from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, QuadrangleMesh, UniformMesh2d
 from fealpy.pde.pml_2d import PMLPDEModel2d
 from fealpy.functionspace import LagrangeFESpace
@@ -200,7 +201,7 @@ class NearFieldDataFEMGenerator2d:
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
         filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
-        bm.savez(filename, **data_dict)
+        np.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k: float, d: Sequence[float]):
         """
