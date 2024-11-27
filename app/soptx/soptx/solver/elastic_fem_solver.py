@@ -254,7 +254,7 @@ class ElasticFEMSolver:
                         
         isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
 
-        F = F - K.matmul(uh_bd)
+        F = F - K.matmul(uh_bd)  # in-place operations
         F[isBdDof] = uh_bd[isBdDof]
         
         dbc = DirichletBC(space=self.tensor_space, gd=dirichlet,
