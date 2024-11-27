@@ -32,7 +32,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             self.construct()
 
         self.meshtype = 'ltri'
-        self.tmesh = None # 网格的顶点必须在球面上
+        self.linearmesh = None # 网格的顶点必须在球面上
 
         self.nodedata = {}
         self.edgedata = {}
@@ -59,7 +59,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     def interpolation_points(self, p: int, index: Index=_S):
         """Fetch all p-order interpolation points on the triangle mesh."""
-        node = self.tmesh.entity('node')
+        node = self.linearmesh.entity('node')
         if p == 1:
             return node[index]
         if p <= 0:
@@ -104,7 +104,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             node, _ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=True)
-        lmesh.tmesh = mesh
+        lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
         lmesh.cell2edge = mesh.cell_to_edge()
@@ -169,7 +169,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
             return gphi
 
-    # ipoint --> copy TriangleMesh
+    # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
         """
         @berif 每个ltri单元上插值点的个数
@@ -270,7 +270,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         n = bm.cross(J[..., 0], J[..., 1], axis=-1)
         if GD == 3:
             n = bm.sqrt(bm.sum(n**2, axis=-1)) # (NC, NQ)
-        a = bm.einsum('i, ji -> j', ws, n)/2.0
+        a = bm.einsum('q, cq -> c', ws, n)/2.0
         return a
 
     def edge_length(self, q=None, index: Index=_S):
@@ -283,9 +283,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         bcs, ws = qf.get_quadrature_points_and_weights()
         
         J = self.jacobi_matrix(bcs, index=index)
-        a = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
-        l = bm.einsum('i, ij -> j', ws, a)
-        return l
+        l = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
+        a = bm.einsum('q, cq -> c', ws, l)
+        return a
 
     def cell_unit_normal(self, bc: TensorLike, index: Index=_S):
         """
@@ -443,6 +443,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
     
+    # 可视化
     def vtk_cell_type(self, etype='cell'):
         """
         @berif  返回网格单元对应的 vtk类型。
