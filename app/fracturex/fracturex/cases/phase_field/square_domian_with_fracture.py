@@ -205,7 +205,7 @@ tmr.send(None)
 end = time.time()
 
 force = ms.get_residual_force()
-disp = model.is_force()
+
 
 ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.pt'
 
@@ -214,6 +214,12 @@ torch.save(force, ftname)
 tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
 with open(tname, 'w') as file:
     file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+
+if force_type == 'y':
+    disp = model.is_y_force()
+elif force_type == 'x':
+    disp = model.is_x_force()
+
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')

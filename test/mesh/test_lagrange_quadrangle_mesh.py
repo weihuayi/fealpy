@@ -21,11 +21,13 @@ class TestLagrangeQuadrangleMeshInterfaces:
         surface = SphereSurface()
         mesh = QuadrangleMesh.from_unit_sphere_surface()
 
-        lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=1, surface=surface)
+        fname = f"sphere_qtest_quad.vtu"
+        mesh.to_vtk(fname=fname)
+
+        lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=3, surface=surface)
         fname = f"sphere_qtest.vtu"
         lmesh.to_vtk(fname=fname)
 
-    """
     @pytest.mark.parametrize("backend", ['numpy'])
     @pytest.mark.parametrize("data", from_quadrangle_mesh_data)
     def test_from_quadranglemesh(self, data, backend):
@@ -44,7 +46,6 @@ class TestLagrangeQuadrangleMeshInterfaces:
         
         cell = lmesh.entity('cell')
         np.testing.assert_allclose(bm.to_numpy(cell), data["cell"], atol=1e-14)
-        """
 
 
 if __name__ == "__main__":
