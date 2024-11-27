@@ -24,27 +24,42 @@ from solver import Solver
 from fealpy.utils import timer
 
 bm.set_backend('pytorch')
+#bm.set_backend('numpy')
 #bm.set_default_device('cuda')
 
 output = './'
 h = 1/256
+#h = 1/8
 T = 2
 nt = int(T/(0.1*h))
 
 pde = CouetteFlow(h=h)
 mesh = pde.mesh()
+
+
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 time = timer()
 next(time)
 
 phispace = LagrangeFESpace(mesh, p=1)
-#pspace = LagrangeFESpace(mesh, p=0, ctype='D')
+pspace = LagrangeFESpace(mesh, p=0, ctype='D')
 pspace = LagrangeFESpace(mesh, p=1)
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
-solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=7)
+'''
+ipoint = space.interpolation_points()
+import matplotlib.pylab  as plt
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+#mesh.find_edge(axes,fontsize=20,showindex=True)
+mesh.find_node(axes,node=ipoint,fontsize=20,showindex=True)
+plt.show()
+'''
+
+solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=3)
 
 u0 = uspace.function()
 u1 = uspace.function()
@@ -129,6 +144,5 @@ for i in range(nt):
     mesh.to_vtk(fname=fname)
     timeline.advance()
     time.send(f"第{i+1}次画图用时")
-#print(bm.sum(bm.abs(u1[:])))
 #next(time)
 

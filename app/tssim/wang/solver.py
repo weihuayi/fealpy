@@ -33,6 +33,19 @@ class Solver():
         self.dt = dt
         self.q = q
     
+    def CH_BForm_0(self):
+        phispace = self.phispace
+        dt = self.dt
+        L_d = self.pde.L_d
+        epsilon = self.pde.epsilon
+        s = self.pde.s
+        V_s = self.pde.V_s
+        q = self.q
+
+        return A
+
+
+
     def CH_BForm(self):
         phispace = self.phispace
         dt = self.dt
@@ -218,6 +231,8 @@ class Solver():
             result = 2*dt*lam*L_phi*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), tangent[index,:])
             result = bm.repeat(result[..., bm.newaxis], 2, axis=-1)
             
+            #result[..., 0] += -2*dt/L_s*bm.einsum('eld, ed -> el', u_1(bcs, index), tangent[index,:])
+            #result[..., 1] += -2*dt/L_s*bm.einsum('eld, ed -> el', u_1(bcs, index), tangent[index,:])
             return result
         self.u_BF_SI.source = u_BF_SI_coef
         self.u_BF_SI.clear()
