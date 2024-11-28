@@ -21,3 +21,5 @@ from .Butterfly_opt_alg import ButterflyOptAlg
 from .exponential_trigonometric_opt_alg import ExponentialTrigonometricOptAlg
 from .differential_evolution import DifferentialEvolution
 from .differentialted_creative_search import DifferentialtedCreativeSearch
+from .cuckoo_quantum_particle_swarm_opt import CuckooQuantumParticleSwarmOpt
+from .marine_predators_alg import MarinePredatorsAlg
