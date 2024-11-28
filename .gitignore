@@ -41,6 +41,7 @@ dist
 *.png
 *.fig
 *.vtk
+*.vts
 *.so
 *.swn
 *.swo

@@ -2,7 +2,6 @@ import numpy as np
 from numpy.typing import NDArray
 from math import sqrt, pi
 from fealpy.ml.generator import NearFieldDataFEMGenerator2d
-
 from fealpy.ml.sampler import CircleCollocator
 
 

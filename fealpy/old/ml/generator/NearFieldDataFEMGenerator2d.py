@@ -1,8 +1,8 @@
 import os
 
-import numpy as np
+from fealpy.backend import backend_manager as bm
 from numpy.typing import NDArray
-from scipy.sparse.linalg import spsolve
+from fealpy.solver import spsolve
 from typing import Sequence, Callable
 import matplotlib.pyplot as plt
 
@@ -10,7 +10,7 @@ from fealpy.mesh import TriangleMesh, QuadrangleMesh, UniformMesh2d
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import ScalarDiffusionIntegrator, ScalarMassIntegrator, ScalarSourceIntegrator, ScalarConvectionIntegrator, DirichletBC
 from fealpy.fem import BilinearForm, LinearForm
-from fealpy.pde.diffusion_convection_reaction import PMLPDEModel2d
+from fealpy.pde.pml_2d import PMLPDEModel2d
 
 
 class NearFieldDataFEMGenerator2d:
@@ -52,12 +52,12 @@ class NearFieldDataFEMGenerator2d:
                 self.mesh = UniformMesh2d((0, EXTC_1, 0, EXTC_2), (HC_1, HC_2), origin=(self.domain[0], self.domain[2]))
                 self.meshtype = 'UniformMesh'
 
-        self.mesh.ftype = np.complex128
+        self.mesh.ftype = bm.complex128
         self.d = d 
         self.k = k
         self.reciever_points = reciever_points
-        qf = self.mesh.integrator(self.q, 'cell')
-        self.bc, _ = qf.get_quadrature_points_and_weights()
+        qf = self.mesh.quadrature_formula(self.q, 'cell')
+        self.bc, _= qf.get_quadrature_points_and_weights()
 
     def get_nearfield_data(self, k:float, d:Sequence[float]):
 
@@ -77,23 +77,23 @@ class NearFieldDataFEMGenerator2d:
 
         space = LagrangeFESpace(self.mesh, p=self.p)
 
-        D = ScalarDiffusionIntegrator(c=pde.diffusion_coefficient, q=self.q)
-        C = ScalarConvectionIntegrator(c=pde.convection_coefficient, q=self.q)
-        M = ScalarMassIntegrator(c=pde.reaction_coefficient, q=self.q)
+        D = ScalarDiffusionIntegrator(pde.diffusion_coefficient, q=self.q)
+        C = ScalarConvectionIntegrator(pde.convection_coefficient, q=self.q)
+        M = ScalarMassIntegrator(pde.reaction_coefficient, q=self.q)
         f = ScalarSourceIntegrator(pde.source, q=self.q)
 
         b = BilinearForm(space)
-        b.add_domain_integrator([D, C, M])
+        b.add_integrator([D, C, M])
 
         l = LinearForm(space)
-        l.add_domain_integrator(f)
+        l.add_integrator(f)
 
         A = b.assembly()
         F = l.assembly()
         bc = DirichletBC(space, pde.dirichlet) 
-        uh = space.function(dtype=np.complex128)
-        A, F = bc.apply(A, F, uh)
-        uh[:] = spsolve(A, F)
+        uh = space.function(dtype=bm.complex128)
+        A, F = bc.apply(A, F)
+        uh[:] = spsolve(A, F, solver='scipy')
         return uh
     
     def points_location_and_bc(self, p, domain:Sequence[float], nx:int, ny:int):
@@ -108,8 +108,8 @@ class NearFieldDataFEMGenerator2d:
 
         bc_x_ = ((x - domain[0]) / cell_length_x) % 1
         bc_y_ = ((y - domain[2]) / cell_length_y) % 1
-        bc_x = np.array([[bc_x_, 1 - bc_x_]], dtype=np.float64)
-        bc_y = np.array([[bc_y_, 1 - bc_y_]], dtype=np.float64)
+        bc_x = bm.array([[bc_x_, 1 - bc_x_]], dtype=bm.float64)
+        bc_y = bm.array([[bc_y_, 1 - bc_y_]], dtype=bm.float64)
         bc = (bc_x, bc_y)
         return location, bc
 
@@ -117,7 +117,7 @@ class NearFieldDataFEMGenerator2d:
 
         reciever_points = self.reciever_points
         data_length = reciever_points.shape[0]
-        data = np.zeros((data_length, ), dtype=np.complex128)
+        data = bm.zeros((data_length, ), dtype=bm.complex128)
         uh = self.get_nearfield_data(k=k, d=d)
         
         if self.meshtype =='InterfaceMesh':
@@ -152,26 +152,27 @@ class NearFieldDataFEMGenerator2d:
                 d_name = d_values[j]
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
-        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
-        np.savez(filename, **data_dict)
+        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.bmz")
+        bm.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k:float, d:Sequence[float]):
 
         uh = self.get_nearfield_data(k=k, d=d)
-        fig = plt.figure()
+        # fig = plt.figure()
         value = uh(self.bc)
         if self.meshtype == 'UniformMesh':
-            self.mesh.ftype = np.float64
-        self.mesh.add_plot(plt, cellcolor=value[0, ...].real, linewidths=0)
-        self.mesh.add_plot(plt, cellcolor=value[0, ...].imag, linewidths=0)
+            self.mesh.ftype = bm.float64
+        self.mesh.add_plot(plt, cellcolor=value[..., 0].real, linewidths=0)
+        self.mesh.add_plot(plt, cellcolor=value[..., 0].imag, linewidths=0)
         
-        axes = fig.add_subplot(1, 3, 1)
-        self.mesh.add_plot(axes)
-        if self.meshtype == 'UniformMesh':
-            uh = uh.view(np.ndarray)
-        axes = fig.add_subplot(1, 3, 2, projection='3d')
-        self.mesh.show_function(axes, np.real(uh))
-        axes = fig.add_subplot(1, 3, 3, projection='3d')
-        self.mesh.show_function(axes, np.imag(uh))
+        #TODO
+        # axes = fig.add_subplot(1, 3, 1)
+        # self.mesh.add_plot(axes)
+        # if self.meshtype == 'UniformMesh':
+        #     uh = uh.view(bm.ndarray)
+        # axes = fig.add_subplot(1, 3, 2, projection='3d')
+        # self.mesh.show_function(axes, bm.real(uh))
+        # axes = fig.add_subplot(1, 3, 3, projection='3d')
+        # self.mesh.show_function(axes, bm.imag(uh))
         plt.show()
         

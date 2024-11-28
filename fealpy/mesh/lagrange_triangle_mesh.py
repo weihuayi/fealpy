@@ -32,6 +32,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             self.construct()
 
         self.meshtype = 'ltri'
+        self.linearmesh = None # 网格的顶点必须在球面上
 
         self.nodedata = {}
         self.edgedata = {}
@@ -56,15 +57,54 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         return localEdge
 
+    def interpolation_points(self, p: int, index: Index=_S):
+        """Fetch all p-order interpolation points on the triangle mesh."""
+        node = self.linearmesh.entity('node')
+        if p == 1:
+            return node[index]
+        if p <= 0:
+            raise ValueError("p must be a integer larger than 0.")
+
+        ipoint_list = []
+        kwargs = {'dtype': self.ftype}
+
+        GD = self.geo_dimension()
+        vidx = [0, ]
+        ipoint_list.append(node) # ipoints[:NN, :]
+
+        edge = self.entity('edge')
+        w = bm.multi_index_matrix(p, 1, dtype=self.ftype)
+        w = w[1:-1]/p
+
+        ipoints_from_edge = self.bc_to_point(w).reshape(-1, GD)
+        ipoint_list.append(ipoints_from_edge)
+
+        if p >= 3:
+            TD = self.top_dimension()
+            cell = self.entity('cell')
+            multiIndex = bm.multi_index_matrix(p, TD, dtype=self.ftype)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
+                                isEdgeIPoints[:, 2])
+            multiIndex = multiIndex[isInCellIPoints, :]
+            w = multiIndex / p
+            
+            ipoints_from_cell = self.bc_to_point(w).reshape(-1, GD)
+            ipoint_list.append(ipoints_from_cell)
+
+        return bm.concatenate(ipoint_list, axis=0)[index]  # (gdof, GD)
+
     @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
+        bnode = mesh.entity('node')
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
         if surface is not None:
+            bnode[:], _ = surface.project(bnode) 
             node, _ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=True)
-        lmesh.tmesh = mesh
+        lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
         lmesh.cell2edge = mesh.cell_to_edge()
@@ -93,7 +133,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         node = self.node
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index=index) # 
-        phi = self.shape_function(bc) # (NC, NQ, ldof)
+        phi = self.shape_function(bc) # (NC, NQ, NVC)
         p = bm.einsum('cqn, cni -> cqi', phi, node[entity])
         return p
     
@@ -118,18 +158,18 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
         else:
             Dlambda = bm.array([[-1], [1]], dtype=bm.float64)
-        R = bm.simplex_grad_shape_function(bc, p=p) # (..., ldof, TD+1)
-        gphi = bm.einsum('...ij, jn -> ...in', R, Dlambda) # (..., ldof, TD)
+        R = bm.simplex_grad_shape_function(bc, p=p) # (NQ, ldof, TD+1)
+        gphi = bm.einsum('qij, jn -> qin', R, Dlambda) # (NQ, ldof, TD)
         
         if variables == 'u':
-            return gphi[..., None, :, :] #(..., 1, ldof, TD)
+            return gphi[None, :, :, :] #(1, ..., ldof, TD)
         elif variables == 'x':
             G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
             G = bm.linalg.inv(G)
-            gphi = bm.einsum('q...km, q...mn, ...ln -> q...lk', J, G, gphi) 
+            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
             return gphi
 
-    # ipoint --> copy TriangleMesh
+    # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
         """
         @berif 每个ltri单元上插值点的个数
@@ -147,45 +187,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         NC = self.number_of_cells()
         num = (NN, NE, NC)
         return simplex_gdof(p, num)
-
-    def interpolation_points(self, p:int, index:Index=_S):
-        """
-        @berif 获取ltri网格上全部插值点
-        """
-        node = self.entity('node')
-        if p == 1:
-            return node
-        if p <= 0:
-            raise ValueError("p must be a integer larger than 0.")
-
-        ipoint_list = []
-        kwargs = {'dtype': self.ftype}
-
-        GD = self.geo_dimension()
-        ipoint_list.append(node) # ipoints[:NN, :]
-
-        edge = self.entity('edge')
-        w = bm.multi_index_matrix(p, 1, dtype=self.ftype)
-        w = w[1:-1]/p
-        ipoints_from_edge = bm.einsum('ij, ...jm->...im', w,
-                                         node[edge, :]).reshape(-1, GD) # ipoints[NN:NN + (p - 1) * NE, :]
-        ipoint_list.append(ipoints_from_edge)
-
-        if p >= 3:
-            TD = self.top_dimension()
-            cell = self.entity('cell')
-            multiIndex = bm.multi_index_matrix(p, TD, dtype=self.ftype)
-            isEdgeIPoints = (multiIndex == 0)
-            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
-                                isEdgeIPoints[:, 2])
-            multiIndex = multiIndex[isInCellIPoints, :]
-            w = multiIndex / p
-            
-            ipoints_from_cell = bm.einsum('ij, kj...->ki...', w,
-                                          node[cell, :]).reshape(-1, GD) # ipoints[NN + (p - 1) * NE:, :]
-            ipoint_list.append(ipoints_from_cell)
-
-        return bm.concatenate(ipoint_list, axis=0)  # (gdof, GD)
 
     def cell_to_ipoint(self, p:int, index:Index=_S):
         """
@@ -269,7 +270,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         n = bm.cross(J[..., 0], J[..., 1], axis=-1)
         if GD == 3:
             n = bm.sqrt(bm.sum(n**2, axis=-1)) # (NC, NQ)
-        a = bm.einsum('i, ji -> j', ws, n)/2.0
+        a = bm.einsum('q, cq -> c', ws, n)/2.0
         return a
 
     def edge_length(self, q=None, index: Index=_S):
@@ -282,9 +283,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         bcs, ws = qf.get_quadrature_points_and_weights()
         
         J = self.jacobi_matrix(bcs, index=index)
-        a = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
-        l = bm.einsum('i, ij -> j', ws, a)
-        return l
+        l = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
+        a = bm.einsum('q, cq -> c', ws, l)
+        return a
 
     def cell_unit_normal(self, bc: TensorLike, index: Index=_S):
         """
@@ -308,7 +309,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         entity = self.entity(TD, index)
         gphi = self.grad_shape_function(bc, p=p, variables='u')
         J = bm.einsum(
-                'cin, ...cim -> c...nm',
+                'cin, cqim -> cqnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
         if return_grad is False:
             return J #(NC,NQ,GD,TD)
@@ -383,7 +384,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             elif f.shape == (GD, GD):
                 e = cm[:, None, None]*f
             else:
-                e = bm.einsum('q, cq..., c -> c...', ws, f, cm)
+                e = bm.einsum('q, cq..., cq -> c...', ws*rm, f, d)
         else:
             raise ValueError(f"Unsupported type of return value: {f.__class__.__name__}.")
 
@@ -391,13 +392,12 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             return e
         else:
             return bm.sum(e)
-
+    
     def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
         """
         @brief Calculate the error between two functions.
         """
         GD = self.geo_dimension()
-
         qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
@@ -442,8 +442,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
-
-
+    
+    # 可视化
     def vtk_cell_type(self, etype='cell'):
         """
         @berif  返回网格单元对应的 vtk类型。

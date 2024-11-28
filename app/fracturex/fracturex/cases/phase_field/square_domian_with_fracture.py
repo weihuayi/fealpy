@@ -1,11 +1,12 @@
 import numpy as np
 import argparse
+import torch
 
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, QuadrangleMesh
 
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolver
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 from fealpy.utils import timer
 import time
 import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ class square_with_circular_notch():
         E = 210
         nu = 0.3
         Gc = 2.7e-3
-        l0 = 0.015
+        l0 = 0.02
         self.params = {'E': E, 'nu': nu, 'Gc': Gc, 'l0': l0}
 
     def is_y_force(self):
@@ -28,14 +29,14 @@ class square_with_circular_notch():
         -----
         这里向量的第 i 个值表示第 i 个时间步的位移的大小
         """
-        return bm.concatenate((bm.linspace(0, 5e-3, 501), bm.linspace(5e-3,
-            6.1e-3, 1101)[1:]))
+        return bm.concatenate((bm.linspace(0, 5e-3, 501, dtype=bm.float64), bm.linspace(5e-3,
+            6.1e-3, 1101, dtype=bm.float64)[1:]))
     
     def is_x_force(self):
         """
         @brief x 方向的力
         """
-        return bm.linspace(0, 2.2e-2, 2201)
+        return bm.linspace(0, 2.2e-2, 2201, dtype=bm.float64)
 
     def is_force_boundary(self, p):
         """
@@ -115,6 +116,14 @@ parser.add_argument('--force_type',
         default='y', type=str,
         help='Force type, default is y.')
 
+parser.add_argument('--gpu', 
+        default=False, type=bool,
+        help='是否使用 GPU, 默认为 False.')
+
+parser.add_argument('--cupy', 
+        default=False, type=bool,
+        help='是否使用cupy求解.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -127,12 +136,15 @@ n = args.n
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
 force_type = args.force_type
-
+gpu = args.gpu
+cupy = args.cupy
 
 tmr = timer()
 next(tmr)
 start = time.time()
 bm.set_backend(backend)
+if gpu:
+    bm.set_default_device('cuda')
 model = square_with_circular_notch()
 
 if args.mesh_type == 'tri':
@@ -146,18 +158,17 @@ else:
 
 mesh.uniform_refine(n=n)
 
-
+'''
 isMarkedCell = model.adaptive_mesh(mesh)
 while isMarkedCell.any():
     mesh.bisect(isMarkedCell)
     isMarkedCell = model.adaptive_mesh(mesh)
-
+'''
 
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-
-ms = MainSolver(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
+ms = MainSolve(mesh=mesh, material_params=model.params, model_type=model_type)
 tmr.send('init')
 
 '''
@@ -182,19 +193,33 @@ ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundar
 
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
+if cupy:
+    ms.set_cupy_solver()
 
+ms.output_timer()
 ms.save_vtkfile(fname=vtkname)
-ms.solve(maxit=maxit)
+ms.solve(p=p, maxit=maxit)
 
 tmr.send('stop')
+tmr.send(None)
 end = time.time()
 
-force = ms.Rforce
-disp = ms.force_value
-tname = args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
-np.savetxt(tname, bm.to_numpy(force))
+force = ms.get_residual_force()
+
+
+ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.pt'
+
+torch.save(force, ftname)
+#np.savetxt('force'+tname, bm.to_numpy(force))
+tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
 with open(tname, 'w') as file:
     file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+
+if force_type == 'y':
+    disp = model.is_y_force()
+elif force_type == 'x':
+    disp = model.is_x_force()
+
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')

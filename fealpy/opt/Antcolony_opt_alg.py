@@ -22,7 +22,7 @@ class AntColonyOptAlg(Optimizer):
         dim = option["ndim"]
         lb, ub = option["domain"]
 
-        Eta = 1 / self.D
+        Eta = 1 / (self.D + 1e-6)
         Table = bm.zeros((N, dim), dtype=int)
         Tau = bm.ones((dim, dim), dtype=bm.float64)
         route_id = bm.arange(dim - 1)

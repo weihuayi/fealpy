@@ -8,32 +8,43 @@
 	@ref 
 '''  
 
+import os
+os.system(f'rm *.vtu')
+
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import TensorFunctionSpace 
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.solver import spsolve, cg, gmres 
+from fealpy.fem import DirichletBC
 
 from pde import CouetteFlow
 from solver import Solver
 
+from fealpy.utils import timer
+
+bm.set_backend('pytorch')
+#bm.set_default_device('cuda')
+
 output = './'
 h = 1/256
-#h = 1/128
 T = 2
 nt = int(T/(0.1*h))
 
-pde = CouetteFlow()
-mesh = pde.mesh(h)
+pde = CouetteFlow(h=h)
+mesh = pde.mesh()
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
+time = timer()
+next(time)
 
 phispace = LagrangeFESpace(mesh, p=1)
-pspace = LagrangeFESpace(mesh, p=0, ctype='D')
+#pspace = LagrangeFESpace(mesh, p=0, ctype='D')
+pspace = LagrangeFESpace(mesh, p=1)
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
-solver = Solver(pde, mesh, pspace, phispace, uspace, dt)
+solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=7)
 
 u0 = uspace.function()
 u1 = uspace.function()
@@ -54,8 +65,8 @@ phigdof = phispace.number_of_global_dofs()
 
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['phi'] = phi0
-mesh.nodedata['u'] = u0
-mesh.nodedata['p'] = p1
+mesh.nodedata['u'] = u0.reshape(2,-1).T
+#mesh.celldata['p'] = p1
 mesh.nodedata['mu'] = mu1
 mesh.to_vtk(fname=fname)
 
@@ -64,25 +75,44 @@ CH_LForm = solver.CH_LForm()
 NS_BForm = solver.NS_BForm()
 NS_LForm = solver.NS_LForm()
 
-exit()
-for i in range(100):
+is_uy_bd = space.is_boundary_dof(pde.is_uy_Dirichlet)
+ux_gdof = space.number_of_global_dofs()
+
+#NS_BC = DirichletBC(space=(uspace,pspace), \
+#        gd=(pde.u_w, pde.p_dirichlet), \
+#        threshold=(pde.is_wall_boundary, pde.is_p_dirichlet), method='interp')
+
+is_bd = bm.concatenate((bm.zeros(ux_gdof, dtype=bool), is_uy_bd, bm.zeros(pgdof, dtype=bool)))
+NS_BC = DirichletBC(space=(uspace,pspace), \
+        gd=bm.zeros(ugdof+pgdof, dtype=bm.float64), \
+        threshold=is_bd, method='interp')
+
+time.send("初始化用时")
+for i in range(nt):
     t = timeline.next_time_level()
+    print(f"第{i+1}步")
     print("time=", t)
 
     solver.CH_update(u0, u1, phi0, phi1)
     CH_A = CH_BForm.assembly()
     CH_b = CH_LForm.assembly()
+    time.send(f"第{i+1}次CH组装用时")
     CH_x = spsolve(CH_A, CH_b, 'mumps')
+    time.send(f"第{i+1}次CH求解用时")
     
     phi2[:] = CH_x[:phigdof]
+    #phi2[:] = solver.reinit_phi(phi2)
     mu2[:] = CH_x[phigdof:] 
 
-    solver.NS_update(u0, u1, mu2, phi2)
+    solver.NS_update(u0, u1, mu2, phi2, phi1)
     NS_A = NS_BForm.assembly()
     NS_b = NS_LForm.assembly()
+    NS_A,NS_b = NS_BC.apply(NS_A,NS_b)
+    time.send(f"第{i+1}次NS组装用时") 
     NS_x = spsolve(NS_A, NS_b, 'mumps') 
+    time.send(f"第{i+1}次NS求解用时")
     u2[:] = NS_x[:ugdof]
-    p1[:] = NS_x[ugdof:]
+    p2[:] = NS_x[ugdof:]
     
     u0[:] = u1[:]
     u1[:] = u2[:]
@@ -93,31 +123,12 @@ for i in range(100):
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['phi'] = phi2
-    mesh.nodedata['u'] = u2
-    mesh.nodedata['p'] = p2
+    mesh.nodedata['u'] = u2.reshape(2,-1).T
+    #mesh.celldata['p'] = p2
     mesh.nodedata['mu'] = mu2
     mesh.to_vtk(fname=fname)
     timeline.advance()
+    time.send(f"第{i+1}次画图用时")
+#print(bm.sum(bm.abs(u1[:])))
+#next(time)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-bcs = bm.array([[1/3,1/3,1/3],[1/3,1/3,1/3],[1/3,1/3,1/3]])
-qf = mesh.quadrature_formula(q=3, etype='face')
-bcs, ws = qf.get_quadrature_points_and_weights()
-print(u0(bcs).shape)
-print(u0.grad_value(bcs).shape)
-print(phi2.grad_value(bcs).shape)
-print(phi2(bcs).shape)
-'''

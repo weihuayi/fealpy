@@ -2,7 +2,7 @@
 from typing import Union, Optional, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
-from math import factorial
+from math import factorial, prod
 
 try:
     import torch
@@ -152,6 +152,11 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
     @staticmethod
     def dot(x1, x2, /, *, axis=-1):
         return torch.tensordot(x1, x2, dims=[[axis], [axis]])
+
+    @staticmethod
+    def trace(x, /, *, offset: int = 0, axis1=0, axis2=1):
+        data = torch.diagonal(x, offset=offset, dim1=axis1, dim2=axis2)
+        return torch.sum(data, dim=-1)
 
     ### Manipulation Functions ###
     # python array API standard v2023.12
@@ -352,15 +357,16 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     @staticmethod
     def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
-        if index.ndim > 1:
+        src_flat_shape = a.shape[:axis] + (index.numel(), ) + a.shape[axis+1:]
+
+        if isinstance(src, (int, float, complex)):
+            src = torch.full([1,]*len(src_flat_shape), src, dtype=a.dtype, device=a.device)
+            src = torch.broadcast_to(src, src_flat_shape)
+        else:
             src_shape = a.shape[:axis] + index.shape + a.shape[axis+1:]
-            src_flat_shape = a.shape[:axis] + (index.numel(), ) + a.shape[axis+1:]
             src = torch.broadcast_to(src, src_shape).reshape(src_flat_shape)
-            index = index.ravel()
-        if isinstance(src, (int, float)):
-            max_idx = torch.max(index)
-            src = torch.full(max_idx+1, src, dtype=a.dtype, device=a.device)
-        return a.index_add_(axis, index, src, alpha=alpha)
+
+        return a.index_add_(axis, index.ravel(), src, alpha=alpha)
 
     @staticmethod
     def scatter(x: Tensor, index, src, /, *, axis: int=0):

@@ -391,6 +391,10 @@ class TestTriangleMeshInterfaces:
         node = box_with_circle_mesh.node
         cell = box_with_circle_mesh.cell
 
+    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("data", mesh_feom_domain_data)
+    def test_interpolation_matrix(self, data, backend):
+        pass
 
 if __name__ == "__main__":
     #a = TestTriangleMeshInterfaces()

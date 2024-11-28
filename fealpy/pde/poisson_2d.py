@@ -40,6 +40,17 @@ class CosCosData:
         return val
 
     @cartesian
+    def source1(self, p):
+        """ 
+        @brief 源项
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = bm.pi
+        val = 0*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)+1
+        return val
+
+    @cartesian
     def gradient(self, p):
         """  
         @brief 真解梯度
@@ -65,6 +76,14 @@ class CosCosData:
         @brief Dirichlet 边界条件 
         """
         return self.solution(p)
+    
+    @cartesian
+    def grad_dirichlet(self, p, n):
+        val = self.gradient(p)
+        if n.ndim == 2:
+            return bm.einsum('eqd, ed->eq', val, n)
+        else:
+            return bm.einsum("eqd,eqd->eq", val, n)
 
     @cartesian
     def is_dirichlet_boundary(self, p):
