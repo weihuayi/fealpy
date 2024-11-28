@@ -78,9 +78,10 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         cmcoeff = space.coeff
         bgm = MLaplaceBernsteinIntegrator(m=m, q=q).assembly(space.bspace)
-        M = bm.einsum('cil,clm,cpm->cip', cmcoeff, bgm, cmcoeff)
+        #M = bm.einsum('cil,clm,cpm->cip', cmcoeff, bgm, cmcoeff)
+        M = cmcoeff @ bgm @ cmcoeff.transpose(0,2,1)
+        #import numpy as np
+        #np.save('Mcn8.npy', M)
         return M
 
         
-
-

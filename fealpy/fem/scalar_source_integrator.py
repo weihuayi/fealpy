@@ -47,6 +47,6 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
- 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
+  
         return linear_integral(phi, ws, cm, val, batched=self.batched)
