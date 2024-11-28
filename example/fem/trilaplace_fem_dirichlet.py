@@ -12,7 +12,7 @@ from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.backend import backend_manager as bm
 from fealpy.solver import cg
-from fealpy.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, get_flist
+from fealpy.pde.biharmonic_triharmonic_2d import TripleLaplacePDE, get_flist
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
@@ -61,9 +61,13 @@ next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
 #u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**4
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
-pde = DoubleLaplacePDE(u, device=device) 
-ulist = get_flist(u, device=device)[:3]
+#u = (sp.sin(4*sp.pi*y)*sp.sin(4*sp.pi*x))**6
+#u = (sp.sin(2*y)*sp.sin(2*x))
+#u = x**3*y**4
+#u = x**2*(x-1)**5*y+2*x*y**2*(y-1)**5
+u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))
+pde = TripleLaplacePDE(u) 
+ulist = get_flist(u, device=device)
 mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
 
 ikwargs = bm.context(mesh.cell)
@@ -85,7 +89,7 @@ for i in range(maxit):
 
 
 
-    space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
+    space = CmConformingFESpace2d(mesh, p, 2, isCornerNode)
     
     tmr.send(f'第{i}次空间生成时间')
 
@@ -93,7 +97,7 @@ for i in range(maxit):
 
     bform = BilinearForm(space)
     coef = 1
-    integrator = MthLaplaceIntegrator(m=2, coef=1, q=p+4)
+    integrator = MthLaplaceIntegrator(m=3, coef=1, q=p+4)
     bform.add_integrator(integrator)
     lform = LinearForm(space)
     lform.add_integrator(ScalarSourceIntegrator(pde.source, q=p+4))
