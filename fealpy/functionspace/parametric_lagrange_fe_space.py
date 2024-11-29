@@ -23,7 +23,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         self.mesh = mesh
         self.p = p
         self.cellmeasure = mesh.cell_area()
-        self.dof = LinearMeshCFEDof(mesh.tmesh, p)
+        self.dof = LinearMeshCFEDof(mesh.linearmesh, p)
         self.multi_index_matrix = mesh.multi_index_matrix
 
         self.device = mesh.device

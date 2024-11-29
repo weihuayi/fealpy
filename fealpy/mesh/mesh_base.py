@@ -431,8 +431,8 @@ class HomogeneousMesh(Mesh):
                 v = v(ps)
         cm = self.entity_measure('cell')
         NC = self.number_of_cells()
-        if v.shape[-1] == NC:
-            v = bm.swapaxes(v, 0, -1)
+        #if v.shape[-1] == NC:
+        #    v = bm.swapaxes(v, 0, -1)
         #f = bm.power(bm.abs(u - v), power)
         f = bm.abs(u - v)**power
         if len(f.shape) == 1:

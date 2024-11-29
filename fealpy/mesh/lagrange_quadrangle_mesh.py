@@ -72,11 +72,10 @@ class LagrangeQuadrangleMesh(TensorMesh):
             raise ValueError(f"entity type: {etype} is wrong!")
 
     def bc_to_point(self, bc: TensorLike, index: Index=_S, etype='cell'):
-        #TODO 复制粘贴 LagrangeTriangleMesh 的代码
         node = self.node
         TD = len(bc)
-        phi = self.shape_function(bc)
-        p = bm.einsum()
+        phi = self.shape_function(bc, p=p)
+        p = bm.einsum('cqn, cni -> cqi', phi, node[entity])
         return p
 
     # shape function
@@ -87,61 +86,13 @@ class LagrangeQuadrangleMesh(TensorMesh):
         bc[i] 是一个一维积分公式的重心坐标数组
         假设 bc[0]==bc[1]== ... ==bc[TD-1]
         """
-        #TODO test
-        return self.linearmesh.shape_function(bc, p)
+        return self.linearmesh.cell_shape_function(bc, p)
 
     def grad_shape_function(self, bc: TensorLike, p=None, 
             index: Index=_S, variables='x'):
-        return self.linearmesh.grad_shape_function(bc, p, index, variables)
+        return self.linearmesh.cell_grad_shape_function(bc, p, index, variables)
 
-    def vtk_cell_type(self, etype='cell'):
-        """
-
-        Notes
-        -----
-            返回网格单元对应的 vtk 类型。
-        """
-        if etype in {'cell', 2}:
-            VTK_LAGRANGE_QUADRILATERAL = 70 
-            return VTK_LAGRANGE_QUADRILATERAL
-        elif etype in {'face', 'edge', 1}:
-            VTK_LAGRANGE_CURVE = 68
-            return VTK_LAGRANGE_CURVE
-
-
-    def to_vtk(self, etype='cell', index: Index=_S, fname=None):
-        """
-        Parameters
-        ----------
-
-        @berif 把网格转化为 VTK 的格式
-        """
-        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
-
-        node = self.entity('node')
-        GD = self.geo_dimension()
-        if GD == 2:
-            node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
-
-        #cell = self.entity(etype)[index]
-        cell = self.entity(etype, index)
-        cellType = self.vtk_cell_type(etype)
-        idx = vtk_cell_index(self.p, cellType)
-        NV = cell.shape[-1]
-
-        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]), axis=1)
-        cell[:, 0] = NV
-
-        NC = len(cell)
-        if fname is None:
-            return node, cell.flatten(), cellType, NC 
-        else:
-            print("Writting to vtk...")
-            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
-
-         # ipoint --> copy TriangleMesh
+    # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
         """
         @berif 每个ltri单元上插值点的个数
@@ -181,40 +132,34 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """
         Calculate the area of a cell.
         """
-        #TODO Test
         p = self.p
         q = p if q is None else q
-        GD = self.geo_dimension()
 
         qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        J = self.jacobi_matrix(bcs, index=index)
-        n = bm.cross(J[..., 0], J[..., 1], axis=-1)
-        if GD == 3:
-            n = bm.sqrt(bm.sum(n**2, axis=-1)) # (NC, NQ)
-        a = bm.einsum('i, ji -> j', ws, n)/2.0
+        G = self.first_fundamental_form(bcs)
+        d = bm.sqrt(bm.linalg.det(G))
+        a = bm.einsum('q, cq -> c', ws, d)
         return a
 
     def edge_length(self, q=None, index: Index=_S):
         """
         Calculate the length of the side.
         """
-        #TODO Test
         p = self.p
         q = p if q is None else q
         qf = self.quadrature_formula(q, etype='edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         J = self.jacobi_matrix(bcs, index=index)
-        a = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
-        l = bm.einsum('i, ij -> j', ws, a)
-        return l
+        l = bm.sqrt(bm.sum(J**2, axis=(-1, -2)))
+        a = bm.einsum('q, cq -> c', ws, l)
+        return a
 
     def cell_unit_normal(self, bc: TensorLike, index: Index=_S):
         """
         When calculating the surface,the direction of the unit normal at the integration point.
         """
-        #TODO Test
         J = self.jacobi_matrix(bc, index=index)
         n = bm.cross(J[..., 0], J[..., 1], axis=-1)
         if self.GD == 3:
@@ -224,12 +169,11 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     def jacobi_matrix(self, bc: TensorLike, p=None, index: Index=_S, return_grad=False):
         """
-        @berif 计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
+        @berif 计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
-        #TODO 测试，如果不对，那就复制粘贴 TensorMesh 的代码
-        TD = bc.shape[-1] - 1
+        TD = len(bc)
         entity = self.entity(TD, index)
         gphi = self.grad_shape_function(bc, p=p, variables='u')
         J = bm.einsum(
@@ -246,8 +190,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """
         Compute the first fundamental form of a mesh surface at integration points.
         """
-        #TODO 测试
-        TD = bc.shape[-1] - 1
+        TD = len(bc)
 
         J = self.jacobi_matrix(bc, index=index,
                 return_grad=return_grad)
@@ -284,7 +227,6 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """
         @brief 在网格中数值积分一个函数
         """
-        #TODO 测试
         GD = self.geo_dimension()
         qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -323,7 +265,6 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """
         @brief Calculate the error between two functions.
         """
-        #TODO 测试
         GD = self.geo_dimension()
         qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -369,4 +310,51 @@ class LagrangeQuadrangleMesh(TensorMesh):
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
+
+    # 可视化
+    def vtk_cell_type(self, etype='cell'):
+        """
+
+        Notes
+        -----
+            返回网格单元对应的 vtk 类型。
+        """
+        if etype in {'cell', 2}:
+            VTK_LAGRANGE_QUADRILATERAL = 70 
+            return VTK_LAGRANGE_QUADRILATERAL
+        elif etype in {'face', 'edge', 1}:
+            VTK_LAGRANGE_CURVE = 68
+            return VTK_LAGRANGE_CURVE
+
+
+    def to_vtk(self, etype='cell', index: Index=_S, fname=None):
+        """
+        Parameters
+        ----------
+
+        @berif 把网格转化为 VTK 的格式
+        """
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
+
+        cell = self.entity(etype, index)
+        cellType = self.vtk_cell_type(etype)
+        idx = vtk_cell_index(self.p, cellType)
+        NV = cell.shape[-1]
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]), axis=1)
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
 
