@@ -295,8 +295,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         if returnim is True:
             IM = []
-        if returnrm is True:
-            RM = []
+        #if returnrm is True:
+        #    RM = []
 
         for i in range(n):
             NN = self.number_of_nodes()

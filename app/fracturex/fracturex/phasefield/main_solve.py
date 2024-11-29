@@ -125,7 +125,7 @@ class MainSolve:
         self._initialize_force_boundary()
         self._Rforce = bm.zeros_like(self._force_value)
         
-#        for i in range(1):
+        #for i in range(1):
         for i in range(len(self._force_value)-1):
             print('i', i)
             self._currt_force_value = self._force_value[i+1]
