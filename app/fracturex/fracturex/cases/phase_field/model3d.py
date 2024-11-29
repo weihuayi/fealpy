@@ -167,6 +167,7 @@ tmr.send(None)
 end = time.time()
 
 force = ms.get_residual_force()
+disp = model.is_z_force()
 
 ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.pt'
 

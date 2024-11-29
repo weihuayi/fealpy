@@ -10,7 +10,7 @@ from fealpy.utils import timer
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        光滑元有限元方法插值
+        三维光滑元有限元方法插值
         """)
 
 parser.add_argument('--degree',
@@ -56,8 +56,13 @@ if args.backend=="pytorch":
 x = sp.symbols('x')
 y = sp.symbols('y')
 z = sp.symbols('z')
-u = sp.sin(2*x)*sp.sin(2*y)*sp.sin(z)
-#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*z))**4
+#u = sp.sin(2*x)*sp.sin(2*y)*sp.sin(z)
+#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*z))
+#u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x)*sp.sin(sp.pi*z))**2
+#u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x)*sp.sin(sp.pi*z))
+#u = sp.sin(5*x)*sp.sin(5*y)*sp.sin(5*z)
+u = sp.sin(7*x)*sp.sin(7*y)*sp.sin(7*z)
+#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x)*sp.sin(sp.pi*z))**2
 flist = get_flist(u)
 NDof = bm.zeros(maxit, dtype=bm.float64)
 
@@ -67,9 +72,9 @@ errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla^3 u - \\nabla^3 u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((4, maxit), dtype=bm.float64)
 tmr.send('网格和pde生成时间')
-
+nx = n
 for i in range(maxit):
-    mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], 2**i, 2**i, 2**i)
+    mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], nx, nx, nx)
     node = mesh.entity('node')
     isCornerNode = bm.zeros(len(node),dtype=bm.bool)
     for n in bm.array([[0,0,0],[1,0,0],[0,1,0],[1,1,0],[1,1,1],[0,0,1],[1,0,1],[0,1,1]], dtype=bm.float64):
@@ -78,8 +83,13 @@ for i in range(maxit):
     from fealpy.functionspace.cm_conforming_fe_space3d_old import CmConformingFESpace3d as CmConformingFESpace3d_old
     #space = CmConformingFESpace3d_old(mesh,9, 1, isCornerNode)
     space = CmConformingFESpace3d(mesh, p=p, m=m, isCornerNode=isCornerNode)
+    gdof = space.number_of_global_dofs()
+    print("gdof", gdof)
+
     tmr.send(f'第{i}次空间生成时间')
-    fI = space.interpolation(flist)
+    fI = space.function()
+    fI[:] = space.interpolation(flist)
+    print('插值')
     tmr.send(f'第{i}次插值时间')
 
     @barycentric
@@ -92,12 +102,18 @@ for i in range(maxit):
     @barycentric
     def ug3val(p):
         return fI.grad_m_value(p, 3)
-
-    errorMatrix[0, i] = mesh.error(flist[0], fI, q=p+3)
-    errorMatrix[1, i] = mesh.error(flist[1], ug1val, q=p+3)
-    #errorMatrix[2, i] = mesh.error(flist[2], ug2val, q=p+3)
-    #errorMatrix[3, i] = mesh.error(flist[3], ug3val, q=p+3)
+    errorMatrix[0, i] = mesh.error(flist[0], fI)
+    print('error1')
+    errorMatrix[1, i] = mesh.error(flist[1], ug1val)
+    print('error2')
+    errorMatrix[2, i] = mesh.error(flist[2], ug2val)
+    print('error3')
+    errorMatrix[3, i] = mesh.error(flist[3], ug3val)
+    print('error4')
     print(errorMatrix)
+    
+    nx = nx*2
+    #n = int(n)
 
 
 
@@ -107,6 +123,7 @@ print("最终误差",errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 print("order : ", bm.log2(errorMatrix[1,:-1]/errorMatrix[1,1:]))
 print("order : ", bm.log2(errorMatrix[2,:-1]/errorMatrix[2,1:]))
+print("order : ", bm.log2(errorMatrix[3,:-1]/errorMatrix[3,1:]))
 
 
 

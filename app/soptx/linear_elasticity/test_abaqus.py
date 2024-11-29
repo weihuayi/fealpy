@@ -64,7 +64,7 @@ bm.set_backend('numpy')
 nx, ny, nz = 1, 1, 1 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
-
+ip2 = mesh.interpolation_points(3)
 NC = mesh.number_of_cells()
 cm = mesh.cell_volume()
 node = mesh.entity('node')
@@ -77,6 +77,9 @@ qf = mesh.quadrature_formula(q)
 bcs, ws = qf.get_quadrature_points_and_weights()
 phi = space.basis(bcs) # (1, NQ, ldof)
 gphi = space.grad_basis(bc=bcs) # (NC, NQ, ldof, GD)
+
+J = mesh.jacobi_matrix(bcs)
+detJ = bm.linalg.det(J)
 
 tensor_space = TensorFunctionSpace(space, shape=(3, -1))
 tgdof = tensor_space.number_of_global_dofs()
@@ -95,11 +98,16 @@ B = linear_elastic_material.strain_matrix(dof_priority=True,
                                         gphi=gphi, shear_order=['xy', 'yz', 'zx'])
 D = linear_elastic_material.elastic_matrix(bcs)
 KE = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
+KE = bm.einsum('c, cqki, cqkl, cqlj -> cij', cm, B, D, B)
+KE2 = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij', ws, detJ, B, D, B)
 
-integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=tensor_space.p+3)
+error = bm.max(bm.abs(KE[0] - KE2[0]))
+
+integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q)
 KE_maual = integrator_K.assembly(space=tensor_space)
 
 KE0 = KE[0]
+KE_maual[0] = KE_maual[0]
 
 I = bm.broadcast_to(cell2tdof[:, :, None], shape=KE.shape)
 J = bm.broadcast_to(cell2tdof[:, None, :], shape=KE.shape)
@@ -128,7 +136,7 @@ load_node_indices = cell[0]
 fixed_node_index = bm.tensor([0])
 export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/local_stiffness_matrix.inp', 
               nodes=node, elements=cell, fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
-              young_modulus=206e3, poisson_ratio=0.3, density=7850.0)
+              young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9)
 
 
 

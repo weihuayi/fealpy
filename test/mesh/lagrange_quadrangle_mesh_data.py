@@ -8,14 +8,9 @@ mesh = QuadrangleMesh.from_unit_sphere_surface()
 node = mesh.interpolation_points(3)
 cell = mesh.cell_to_ipoint(3)
 
-from_triangle_mesh_data = [
+cell_area_data = [
         {
-            "p": 3,
-            "surface": surface,
-            "cell": np.array(dtype=np.int32),
-            "NN": 
-            "NE": 
-            "NF": 
-            "NC": 
-                }
+            "sphere_cm": 4*np.pi*(1**2)
+            }
 ]
+
