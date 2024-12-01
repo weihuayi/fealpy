@@ -32,7 +32,7 @@ class RimeOptAlg(Optimizer):
         w = 5
         # curve = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
-            RimeFactor = (bm.random.rand(1) - 0.5) * 2 * bm.cos(bm.array(bm.pi * it / (MaxIT / 10))) * (1 - bm.round(bm.array(it * w / MaxIT)) / w) # Parameters of Eq.(3),(4),(5)
+            RimeFactor = (bm.random.rand(N, 1) - 0.5) * 2 * bm.cos(bm.array(bm.pi * it / (MaxIT / 10))) * (1 - bm.round(bm.array(it * w / MaxIT)) / w) # Parameters of Eq.(3),(4),(5)
             E = (it / MaxIT) ** 0.5 # Eq.(6)
             normalized_rime_rates = fit / bm.linalg.norm(fit) # Parameters of Eq.(7) 
             r1 = bm.random.rand(N, 1)
