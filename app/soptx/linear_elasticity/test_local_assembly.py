@@ -4,7 +4,9 @@ from fealpy.typing import TensorLike
 
 from fealpy.decorator import cartesian
 
-from fealpy.mesh import TriangleMesh, TetrahedronMesh, QuadrangleMesh
+from fealpy.mesh import (TriangleMesh, TetrahedronMesh, 
+                         QuadrangleMesh, HexahedronMesh, 
+                         UniformMesh2d, UniformMesh3d)
 
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
@@ -16,43 +18,74 @@ from soptx.utils.timer import timer
 
 
 bm.set_backend('numpy')
-nx, ny = 10, 10
-mesh_simplex = TriangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
-mesh_tensor = QuadrangleMesh.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny)
+box_2d = [0, 1, 0, 1]
+box_3d = [0, 1, 0, 1, 0, 1]
+nx, ny, nz = 4, 4, 4
+extent_2d = [0, nx, 0, ny]
+extent_3d = [0, nx, 0, ny, 0, nz]
+h_2d = [(box_2d[1]-box_2d[0])/nx, (box_2d[3]-box_2d[2])/ny]
+h_3d = [(box_3d[1]-box_3d[0])/nx, (box_3d[3]-box_3d[2])/ny, (box_3d[5]-box_3d[4])/nz]
+origin_2d = [0, 0]
+origin_3d = [0, 0, 0]
+mesh_2d_simplex = TriangleMesh.from_box(box=box_2d, nx=nx, ny=ny)
+mesh_3d_simplex = TetrahedronMesh.from_box(box=box_3d, nx=nx, ny=ny, nz=nx)
+mesh_2d_tensor = QuadrangleMesh.from_box(box=box_2d, nx=nx, ny=ny)
+mesh_3d_tensor = HexahedronMesh.from_box(box=box_3d, nx=nx, ny=ny, nz=nx)
+mesh_2d_struct = UniformMesh2d(extent=extent_2d, h=h_2d, origin=origin_2d)
+mesh_3d_struct = UniformMesh3d(extent=extent_3d, h=h_3d, origin=origin_3d)
 
 p = 4
 
-q = p+1
-qf_simplex = mesh_simplex.quadrature_formula(q)
-bcs_simplex, _ = qf_simplex.get_quadrature_points_and_weights()
-phi_simplex = mesh_simplex.shape_function(bcs=bcs_simplex, p=p) # (NQ, ldof)
 
-qf_tensor = mesh_tensor.quadrature_formula(q)
-bcs_tensor, _ = qf_tensor.get_quadrature_points_and_weights()
-phi_tensor = mesh_tensor.shape_function(bcs=bcs_tensor, p=p) # (NQ, ldof)
+space_2d = LagrangeFESpace(mesh_2d_simplex, p=p, ctype='C')
+tensor_space_2d = TensorFunctionSpace(space_2d, shape=(-1, 2))
 
-space = LagrangeFESpace(mesh_simplex, p=p, ctype='C')
-tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
-tldof = tensor_space.number_of_global_dofs()
-print(f"tldof: {tldof}")
-linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
+tldof_2d_simplex = tensor_space_2d_simplex.number_of_global_dofs()
+print(f"tldof_2d_simplex: {tldof_2d_simplex}")
+
+linear_elastic_material_2d = LinearElasticMaterial(name='lam1_mu1', 
                                         lame_lambda=1, shear_modulus=1, 
                                         hypo='plane_stress')
-integrator0 = LinearElasticIntegrator(material=linear_elastic_material,
-                                    q=tensor_space.p+3)
+linear_elastic_material_3d = LinearElasticMaterial(name='lam1_mu1',
+                                        lame_lambda=1, shear_modulus=1,
+                                        hypo='3D')
+
+integrator_standard = LinearElasticIntegrator(material=linear_elastic_material_2d, q=p+3)
+
 integrator1 = LinearElasticIntegrator(material=linear_elastic_material,
-                                    q=tensor_space.p+3, method='fast_stress')
+                                    q=p+3, method='fast_stress')
 integrator2 = LinearElasticIntegrator(material=linear_elastic_material, 
-                                    q=tensor_space.p+3, method='symbolic_stress')
+                                    q=p+3, method='symbolic_stress')
 integrator1.keep_data()
 integrator2.keep_data()   # 保留中间数据
 # integrator2.keep_result() # 保留积分结果
 # 创建计时器
-t = timer("Local Assembly Timing")
+t = timer("2d Local Assembly Timing")
 next(t)  # 启动计时器
 
-KE0 = integrator0.assembly(space=tensor_space)
+KE_2d_standard = integrator_standard.assembly(space=tensor_space_2d)
 t.send('Assembly')
+
+KE_2d_fast1 = integrator1.fast_assembly_stress(space=tensor_space)
+t.send('Fast Assembly1')
+KE12 = integrator1.fast_assembly_stress(space=tensor_space)
+t.send('Fast Assembly2')
+
+KE21 = integrator2.symbolic_assembly_stress(space=tensor_space)
+t.send('Symbolic Assembly1')
+KE22 = integrator2.symbolic_assembly_stress(space=tensor_space)
+t.send('Symbolic Assembly2')
+KE23 = integrator2.symbolic_assembly_stress(space=tensor_space)
+t.send('Symbolic Assembly3')
+# 结束计时
+t.send(None)
+
+t = timer("3d Local Assembly Timing")
+next(t)  # 启动计时器
+
+KE_2d_standard = integrator_standard.assembly(space=tensor_space)
+t.send('Assembly')
+
 KE11 = integrator1.fast_assembly_stress(space=tensor_space)
 t.send('Fast Assembly1')
 KE12 = integrator1.fast_assembly_stress(space=tensor_space)
@@ -66,4 +99,5 @@ KE23 = integrator2.symbolic_assembly_stress(space=tensor_space)
 t.send('Symbolic Assembly3')
 # 结束计时
 t.send(None)
+
 print("-------------------------------")
