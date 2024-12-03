@@ -120,25 +120,12 @@ class BoxDomainPolyLoaded3d():
                 self.is_dirichlet_boundary_dof_z)
         
         return temp
-    
-    @cartesian
-    def is_bc(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-
-        tag1 = bm.abs(x - 0)<self.eps
-        tag2 = bm.abs(y - 0)<self.eps
-        tag3 = bm.abs(z - 0)<self.eps
-
-        return tag1 & tag2 &tag3
-
-
 
 bm.set_backend('numpy')
 nx, ny, nz = 1, 1, 1 
 mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
+GD = mesh.geo_dimension()
 NN = mesh.number_of_nodes()
 cm = mesh.cell_volume()
 node = mesh.entity('node')
@@ -197,6 +184,7 @@ F = COOTensor(
             spshape = (tgdof, ))
 indices = cell2tdof.reshape(1, -1)
 F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense()
+print(f"F.shape = {F.shape}:\n {F}, ")
 
 from app.gearx.utils import *
 F_load_nodes = bm.transpose(F.reshape(3, -1))
@@ -207,9 +195,6 @@ export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9)
 
 isDDof = tensor_space.is_boundary_dof(threshold=pde.threshold(), method='interp')
-# isDDof2 = tensor_space.is_boundary_dof(threshold=pde.is_bc, method='interp')
-# isDDof = bm.zeros((24, ), dtype=bm.bool)
-# isDDof[0::NN] = True
 
 kwargs = K.values_context()
 # 1. 移除边界自由度相关的非零元素
@@ -235,9 +220,12 @@ uh_bd, _ = tensor_space.boundary_interpolate(gd=pde.dirichlet, uh=uh_bd, thresho
 # 2. 修改右端向量
 F = F - K.matmul(uh_bd)
 F = bm.set_at(F, isDDof, uh_bd[isDDof])
+print(f"F.shape = {F.shape}:\n {F}, ")
 
 uh = tensor_space.function()
 uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
-u_exact = tensor_space.interpolate(pde.solution)
-error = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
+uh_dof_show = uh.reshape(GD, NN).T
+print(f"uh_dof_show.shape = {uh_dof_show.shape}:\n {uh_dof_show}, ")
+uh_magnitude = bm.linalg.norm(uh_dof_show, axis=1)
+print(f"uh_magnitude = {uh_magnitude}")
 print("----------------------")
