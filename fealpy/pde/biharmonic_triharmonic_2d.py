@@ -187,7 +187,7 @@ class TripleLaplacePDE():
     def init_mesh(self, n=1, meshtype='poly'):
         mesh = TriangleMesh.from_box([0, 1, 0, 1], 4, 4)
         return mesh
-
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -212,6 +212,7 @@ class TripleLaplacePDE():
         val[..., 1] = self.uy(x, y) 
         return val
 
+    @cartesian
     def hessian(self, p):
         x = p[..., 0]
         y = p[..., 1]

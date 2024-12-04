@@ -262,14 +262,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         c2dof[:, ldof-cidof:] = c2id
         return c2dof
 
-    def boundary_interpolate(self, gD, uh, threshold=None, method="interp"):
+    def boundary_interpolate(self, gd, uh, threshold=None, method="interp"):
         isDDof = self.is_boundary_dof(threshold=threshold)
-        uI = self.interpolation(gD)
+        uI = self.interpolation(gd)
         uh[isDDof] = uI[isDDof]
         return uh, isDDof
 
 
-    def is_boundary_dof(self, threshold=None): #TODO:threshold 未实现
+    def is_boundary_dof(self, threshold=None, method='interp'): #TODO:threshold 未实现
         mesh = self.mesh
         m = self.m
         p = self.p
@@ -669,7 +669,11 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                         T[:, iii, jjj] = bm.sum(Nv_sym*nv_sym*num[None, :], axis=1)
                 coeff1[:, ndof*v+kk:ndof*v+kk+NSr2, ndof*v+kk:ndof*v+kk+NSr2] = T
                 kk += NSr2
-        coeff[:, :4*ndof] = bm.einsum('cji, cjk->cik',coeff1, coeff[:, :4*ndof])
+        #coeff[:, :4*ndof] = bm.einsum('cji, cjk->cik',coeff1, coeff[:, :4*ndof])
+        coeff[:, :4*ndof] = coeff1.transpose(0,2,1)@coeff[:, :4*ndof]
+        del coeff1
+        import gc
+        gc.collect()
 
         # edge
         edof = self.number_of_internal_dofs('edge')
@@ -705,13 +709,18 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                                                                          2**r)
                     for j in range(r+1):
                         coeff2[:, dof2num[edof_idxr[i]]-ndof*4, dof2num[edof_idxr[j]]-ndof*4] = num[j] * Ncoef_sym[:, symidx[j], None] 
-        coeff[:, 4*ndof:4*ndof+6*edof] = bm.einsum('cji, cjk->cik',coeff2, coeff[:, 4*ndof:4*ndof+6*edof])
-        return coeff[:, : , dof2num]
+        #coeff[:, 4*ndof:4*ndof+6*edof] = bm.einsum('cji, cjk->cik',coeff2, coeff[:, 4*ndof:4*ndof+6*edof])
+        coeff[:, 4*ndof:4*ndof+6*edof] = coeff2.transpose(0,2,1)@coeff[:, 4*ndof:4*ndof+6*edof]
+        del coeff2
+        gc.collect()
+        coeff = coeff[:,:,dof2num]
+        return coeff
 
     def basis(self, bcs, index=_S):
         coeff = self.coeff
         bphi = self.bspace.basis(bcs)
-        return bm.einsum('cil, cql -> cqi', coeff, bphi)[:,:,index]
+        #return bm.einsum('cil, cql -> cqi', coeff, bphi)[:,:,index]
+        return bphi @ (coeff.transpose(0,2,1)[index])
 
     def grad_m_basis(self, bcs, m):
         coeff = self.coeff
@@ -773,7 +782,6 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
 
         # node  
-        __import__('ipdb').set_trace()
         fI[n2id[:, 0]] = flist[0](node)
         k = 1
         for r in range(1, 4*m+1):
