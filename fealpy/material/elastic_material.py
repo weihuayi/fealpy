@@ -143,6 +143,11 @@ class LinearElasticMaterial(ElasticMaterial):
         return self.mu
 
     @property
+    def bulk_modulus(self) -> float:
+        """获取体积模量 K"""
+        return self.calculate_bulk_modulus()
+    
+    @property
     def hypothesis(self) -> str:
         """获取平面假设"""
         return self.hypo
@@ -278,42 +283,6 @@ class LinearElasticMaterial(ElasticMaterial):
             out = bm.set_at(out, (..., cursor, indices[:, j]), gphi[..., :, i])
 
         return out
-    
-    # def shear_strain(self, gphi: TensorLike, 
-    #             indices: TensorLike, *, 
-    #             out: Optional[TensorLike]=None) -> TensorLike:
-    #     """Assembly shear strain tensor.
-
-    #     Parameters:
-    #         gphi (TensorLike): Gradient of the scalar basis functions shaped (..., ldof, GD).\n
-    #         indices (bool, optional): Indices of DoF components in the flattened DoF, shaped (ldof, GD).\n
-    #         out (TensorLike | None, optional): Output tensor. Defaults to None.
-
-    #     Returns:
-    #         TensorLike: Sheared strain shaped (..., NNZ, GD*ldof) where NNZ = (GD + (GD+1))//2.
-    #     """
-    #     kwargs = bm.context(gphi)
-    #     ldof, GD = gphi.shape[-2:]
-    #     if GD < 2:
-    #         raise ValueError(f"The shear strain requires GD >= 2, but GD = {GD}")
-    #     NNZ = (GD * (GD-1))//2 # 剪切应变分量的数量
-    #     new_shape = gphi.shape[:-2] + (NNZ, GD*ldof) # (NC, NQ, NNZ, GD*ldof)
-
-    #     if out is None:
-    #         out = bm.zeros(new_shape, **kwargs)
-    #     else:
-    #         if out.shape != new_shape:
-    #             raise ValueError(f'out.shape={out.shape} != {new_shape}')
-
-    #     cursor = 0
-
-    #     for i in range(0, GD-1):
-    #         for j in range(i+1, GD):
-    #             out = bm.set_at(out, (..., cursor, indices[:, i]), gphi[..., :, j])
-    #             out = bm.set_at(out, (..., cursor, indices[:, j]), gphi[..., :, i])
-    #             cursor += 1
-
-    #     return out
     
 
     
