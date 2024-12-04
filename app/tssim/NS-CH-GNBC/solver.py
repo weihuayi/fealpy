@@ -41,10 +41,7 @@ class Solver():
         s = self.pde.s
         V_s = self.pde.V_s
         q = self.q
-
         return A
-
-
 
     def CH_BForm(self):
         phispace = self.phispace
@@ -97,6 +94,7 @@ class Solver():
         s = self.pde.s
         epsilon =self.pde.epsilon
         tangent = self.mesh.edge_unit_tangent()
+        tangent[..., 0] = 1
         V_s = self.pde.V_s
         theta_s = self.pde.theta_s
 
@@ -137,7 +135,7 @@ class Solver():
             result1 = result10 - result11
 
             result2 = -2*(bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2) * phi_1(bcs, index))
-            result2 += (bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2)*phi_0(bcs, index))
+            result2 +=   (bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2) * phi_0(bcs, index))
             
             result = (1/V_s)*(result0 + result1) + result2
             return result
@@ -204,6 +202,7 @@ class Solver():
         epsilon = self.pde.epsilon
         normal = self.mesh.edge_unit_normal()
         tangent = self.mesh.edge_unit_tangent()
+        tangent[..., 0] = 1
         
         L_s = self.pde.L_s
         theta_s = self.pde.theta_s
@@ -229,10 +228,7 @@ class Solver():
             L_phi +=   (bm.sqrt(bm.array(2))/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_1(bcs, index))
             
             result = 2*dt*lam*L_phi*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), tangent[index,:])
-            result = bm.repeat(result[..., bm.newaxis], 2, axis=-1)
-            
-            #result[..., 0] += -2*dt/L_s*bm.einsum('eld, ed -> el', u_1(bcs, index), tangent[index,:])
-            #result[..., 1] += -2*dt/L_s*bm.einsum('eld, ed -> el', u_1(bcs, index), tangent[index,:])
+            result = bm.repeat(result[..., bm.newaxis], 2, axis=-1) 
             return result
         self.u_BF_SI.source = u_BF_SI_coef
         self.u_BF_SI.clear()

@@ -22,7 +22,7 @@ class CouetteFlow:
         ## init the parameter
         self.R = 5.0 ##dimensionless
         self.l_s = 0.0025 ##dimensionless slip length
-        self.L_s = 0.0025
+        self.L_s = self.l_s / 100
 
         self.epsilon = 0.004 ## the thickness of interface
         self.L_d = 0.0005 ##phenomenological mobility cofficient
@@ -30,7 +30,7 @@ class CouetteFlow:
         self.V_s = 200.0 ##dimensionless 
         self.s = 2.5 ##stablilizing parameter
         #self.theta_s = bm.array(bm.pi/2)
-        self.theta_s = bm.array(0.43111111*bm.pi)
+        self.theta_s = bm.array(77.6/180 * bm.pi)
         self.h = h
 
     def mesh(self):
@@ -74,7 +74,6 @@ class CouetteFlow:
         tag_up = (bm.abs(y-0.125)) < self.eps 
         tag_down = (bm.abs(y+0.125)) < self.eps
         value = bm.where(tag_down, -0.2, 0) + bm.where(tag_up, 0.2, 0)
-        #value = bm.where(tag_down, -0.2, 0)
         result[..., 0] = value 
         return result
 
