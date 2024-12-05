@@ -107,7 +107,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('fast_strain')
     def fast_assembly_strain(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-
         ws, cm, mesh, gphi_lambda, glambda_x = self.fetch_fast_assembly(scalar_space)
 
         if not isinstance(mesh, SimplexMesh):
@@ -133,9 +132,9 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         D = self.material.elastic_matrix()
         if D.shape[0] != 1:
             raise ValueError("Elastic matrix D must have shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        D00 = D[..., 0, 0, None]  # 2*\mu + \lambda
-        D01 = D[..., 0, 1, None]  # \lambda
-        D22 = D[..., 2, 2, None]  # \mu
+        D00 = D[..., 0, 0, None]  # E / (1-\nu^2) * 1
+        D01 = D[..., 0, 1, None]  # E / (1-\nu^2) * \nu
+        D22 = D[..., 2, 2, None]  # E / (1-\nu^2) * (1-nu)/2
         
         if space.dof_priority:
             # Fill the diagonal part
@@ -178,8 +177,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         NC = mesh.number_of_cells()
         ldof = scalar_space.number_of_local_dofs()
-
-        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
+        tldof = space.number_of_local_dofs()
+        KK = bm.zeros((NC, tldof, tldof), dtype=bm.float64)
 
         # TODO 只能处理 (NC, 1, 3, 3) 和 (1, 1, 3, 3) 的情况 
         D = self.material.elastic_matrix()
