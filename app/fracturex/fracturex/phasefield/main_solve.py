@@ -243,7 +243,6 @@ class MainSolve:
         du = self.solver(A, R, atol=1e-20)
         uh += du[:]
         self.uh = uh
-        print('uh', uh)
         
         self.pfcm.update_disp(uh)
         tmr.send('disp_solver')
@@ -294,7 +293,6 @@ class MainSolve:
         dlform = LinearForm(self.space)
         dlform.add_integrator(ScalarSourceIntegrator(source=source_coef, q=self.q))
         R = dlform.assembly()
-        print('R', R)
         R -= A @ d[:] 
  
         
@@ -304,9 +302,7 @@ class MainSolve:
         tmr.send('phase_apply_bc')
         
         dd = self.solver(A, R, atol=1e-20)
-        print('R', R)
         d += dd[:]
-        print('d', d)
   
 
         self.d = d
