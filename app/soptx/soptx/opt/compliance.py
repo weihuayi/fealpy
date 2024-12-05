@@ -140,7 +140,9 @@ class ComplianceObjective(ObjectiveBase):
             E = self.material_properties.calculate_elastic_modulus(rho_i)
             
             # 计算单元柔顺度并取负值 : -(E * u^T * K * u)
-            return -E * bm.einsum('i, ij, j', ue_i, ke0_i, ue_i)
+            dE = -E * bm.einsum('i, ij, j', ue_i, ke0_i, ue_i)
+            
+            return dE
         
         # 创建向量化的梯度计算函数
         # 最内层：lambda x: compliance_contribution(x, u, k)
@@ -154,7 +156,7 @@ class ComplianceObjective(ObjectiveBase):
 
         # 外层：bm.vmap(lambda r, u, k: ...)
         # vmap 将这个操作向量化，使其可以并行处理所有单元
-        vmap_grad = bm.vmap(lambda r, u, k: bm.grad(
+        vmap_grad = bm.vmap(lambda r, u, k: bm.jacrev(
             lambda x: compliance_contribution(x, u, k)
         )(r))
         

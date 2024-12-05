@@ -223,12 +223,6 @@ class ElasticFEMSolver:
         force = self.pde.force
         F = self.tensor_space.interpolate(force)
 
-        # # 让 F 依赖于当前密度
-        # if self._current_density is not None:
-        #     # 创建一个非常小的系数，使 F 依赖于密度但几乎不改变其值
-        #     epsilon = 1e-30
-        #     F = F * (1.0 + epsilon * bm.sum(self._current_density))
-
         self._global_force_vector = F
 
         return F

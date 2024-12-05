@@ -141,6 +141,9 @@ F = bm.set_at(F, isDDof, uh_bd[isDDof])
 
 uh = tensor_space.function()
 uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
+
+
+
 u_exact = tensor_space.interpolate(pde.solution)
 error = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
 print("----------------------")

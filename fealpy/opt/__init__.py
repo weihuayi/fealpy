@@ -23,3 +23,5 @@ from .differential_evolution import DifferentialEvolution
 from .differentialted_creative_search import DifferentialtedCreativeSearch
 from .cuckoo_quantum_particle_swarm_opt import CuckooQuantumParticleSwarmOpt
 from .marine_predators_alg import MarinePredatorsAlg
+from .rime_opt_alg import RimeOptAlg
+from .moss_growth_opt import MossGrowthOpt

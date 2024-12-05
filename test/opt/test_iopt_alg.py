@@ -16,7 +16,9 @@ class TestIOptInterfaces:
         lb, ub = data['domain']
         x0 = initialize(NP, data['ndim'], ub, lb)
         option = opt_alg_options(x0, data['objective'], data['domain'], NP)
-        optimizer = MarinePredatorsAlg(option)
+        optimizer = MossGrowthOpt(option)
+        # optimizer = RimeOptAlg(option)
+        # optimizer = MarinePredatorsAlg(option)
         # optimizer = HoneybadgerAlg(option)
         # optimizer = CrayfishOptAlg(option)
         # optimizer = QuantumParticleSwarmOpt(option)

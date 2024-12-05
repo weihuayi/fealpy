@@ -357,6 +357,7 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     @staticmethod
     def index_add(a: Tensor, index, src, /, *, axis: int=0, alpha=1):
+        axis = a.ndim + axis if (axis < 0) else axis
         src_flat_shape = a.shape[:axis] + (index.numel(), ) + a.shape[axis+1:]
 
         if isinstance(src, (int, float, complex)):
