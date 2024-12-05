@@ -334,6 +334,16 @@ class SpectralModel(BasedPhaseFractureMaterial):
         val[x < -1e-13] = 0
         return val
     
+    def linear_strain_value(self, bc):
+        """
+        Compute the linear strain tensor.
+        """
+        bc = bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64)
+        uh = self.uh
+        guh = uh.grad_value(bc)
+        strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
+        return strain
+    
     @ barycentric
     def maximum_historical_field(self, bc):
 

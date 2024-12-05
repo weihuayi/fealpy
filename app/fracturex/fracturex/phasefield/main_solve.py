@@ -75,7 +75,7 @@ class MainSolve:
         self.tmr = timer()
         next(self.tmr)
     
-    def initialization_settings(self, p: int = 1, q: int = None, ):
+    def initialize_settings(self, p: int = 1, q: int = None, ):
         """
         Initialize the settings for the problem.
         """
@@ -121,11 +121,11 @@ class MainSolve:
             VTK output file name, by default None.
         """
         self._method = method
-        self.initialization_settings(p=p, q=q)
+        self.initialize_settings(p=p, q=q)
         self._initialize_force_boundary()
         self._Rforce = bm.zeros_like(self._force_value)
         
-        #for i in range(1):
+        #for i in range(2):
         for i in range(len(self._force_value)-1):
             print('i', i)
             self._currt_force_value = self._force_value[i+1]
@@ -243,6 +243,7 @@ class MainSolve:
         du = self.solver(A, R, atol=1e-20)
         uh += du[:]
         self.uh = uh
+        print('uh', uh)
         
         self.pfcm.update_disp(uh)
         tmr.send('disp_solver')
@@ -258,32 +259,42 @@ class MainSolve:
             The norm of the residual.
         """
         Gc, l0, d = self.Gc, self.l0, self.d
+
+        @barycentric
+        def diff_coef(bc, index):
+            gg_hd, c_d = self.CSDFunc.grad_grad_density_function(d(bc))
+            return Gc * l0 * 2 / c_d
+
+        @barycentric
+        def mass_coef1(bc, index):
+            gg_hd, c_d = self.CSDFunc.grad_grad_density_function(d(bc))
+            return gg_hd * Gc / (l0 * c_d)
+        
         
         @barycentric
-        def coef(bc, index):
-            gg_gd = self.EDFunc.grad_grad_degradation_function(d)
+        def mass_coef2(bc, index):
+            gg_gd = self.EDFunc.grad_grad_degradation_function(d(bc))
             return gg_gd * self.pfcm.maximum_historical_field(bc)
         
         @barycentric
         def source_coef(bc, index):
-            gg_gd = self.EDFunc.grad_degradation_function_constant_coef()
-            return -1 * gg_gd * self.pfcm.maximum_historical_field(bc)
+            gc_gd = self.EDFunc.grad_degradation_function_constant_coef()
+            return -1 * gc_gd * self.pfcm.maximum_historical_field(bc)
 
         tmr = self.tmr
         tmr.send('phase_start')
 
-        gg_hd, c_d = self.CSDFunc.grad_grad_density_function(d)
-
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(coef=Gc * l0 * 2 / c_d, q=self.q))
-        dbform.add_integrator(ScalarMassIntegrator(coef=gg_hd * Gc / (l0 * c_d), q=self.q))
-        dbform.add_integrator(ScalarMassIntegrator(coef=source_coef, q=self.q))
+        dbform.add_integrator(ScalarDiffusionIntegrator(coef=diff_coef, q=self.q))
+        dbform.add_integrator(ScalarMassIntegrator(coef=mass_coef1, q=self.q))
+        dbform.add_integrator(ScalarMassIntegrator(coef=mass_coef2, q=self.q))
         A = dbform.assembly()
         tmr.send('phase_matrix_assemble')
 
         dlform = LinearForm(self.space)
-        dlform.add_integrator(ScalarSourceIntegrator(source=coef, q=self.q))
+        dlform.add_integrator(ScalarSourceIntegrator(source=source_coef, q=self.q))
         R = dlform.assembly()
+        print('R', R)
         R -= A @ d[:] 
  
         
@@ -293,7 +304,9 @@ class MainSolve:
         tmr.send('phase_apply_bc')
         
         dd = self.solver(A, R, atol=1e-20)
+        print('R', R)
         d += dd[:]
+        print('d', d)
   
 
         self.d = d
@@ -408,11 +421,6 @@ class MainSolve:
         @barycentric
         def mass_grad_kernel_func2(u):
             return self.EDFunc.grad_grad_degradation_function(u)
-        
-        @barycentric
-        def source_coef(bc, index):
-            gg_gd = self.EDFunc.grad_degradation_function_constant_coef()
-            return -1 * gg_gd * self.pfcm.maximum_historical_field(bc)
         
         diffusion_coef.kernel_func = diffusion_kernel_func
         mass_coef1.kernel_func = mass_kernel_func1
