@@ -60,6 +60,7 @@ tmr = timer()
 next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
+#u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**4
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = DoubleLaplacePDE(u, device=device) 
 ulist = get_flist(u, device=device)[:3]
@@ -106,7 +107,7 @@ for i in range(maxit):
 
     gdof = space.number_of_global_dofs()
     NDof[i] = 1/4/2**i
-    bc1 = DirichletBC(space, gD = ulist)
+    bc1 = DirichletBC(space, gd = ulist)
     #import ipdb
     #ipdb.set_trace()
     A, F = bc1.apply(A, F)  

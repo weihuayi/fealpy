@@ -6,7 +6,7 @@ import pytest
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolver
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 
 class TestMainSolver:
 

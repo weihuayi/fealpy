@@ -108,13 +108,13 @@ class ShortestPathApp:
             'PSO': ParticleSwarmOpt,
             'GWO': GreyWolfOptimizer,
             'ACO': AntColonyOptAlg,
-            # 'HO': HippopotamusOptAlg,
+            'HO': HippopotamusOptAlg,
             # 'CPO': CrestedPorcupineOpt,
-            'BKA':BlackwingedKiteAlg,
-            'BOA':ButterflyOptAlg,
-            'CS':CuckooSearchOpt,
-            'DE':DifferentialEvolution,
-            'ETO':ExponentialTrigonometricOptAlg,
+            'BKA': BlackwingedKiteAlg,
+            'BOA': ButterflyOptAlg,
+            'CS': CuckooSearchOpt,
+            'DE': DifferentialEvolution,
+            'ETO': ExponentialTrigonometricOptAlg,
         }
         self.results = {}
 
@@ -143,7 +143,7 @@ class ShortestPathApp:
             gbest, gbest_f = optimizer.run()
             end_time = time.perf_counter()
             running_time = end_time - start_time
-
+            print(gbest)
             result = textMAP.calresult(gbest)
             result["path"] = [x for x, y in zip(result["path"], result["path"][1:] + [None]) if x != y]
 
@@ -154,7 +154,7 @@ class ShortestPathApp:
             }
             print(f'The best optimal value by {algo_name} is: {float(gbest_f):.4f}  Time: {end_time - start_time:.4f} seconds')
 
-        textMAP.printMAP(self.results)
+        # textMAP.printMAP(self.results)
 
 
 
@@ -166,5 +166,5 @@ if __name__ == "__main__":
     tsp_optimizer.optimize()
 
     #Shortest path problem
-    short_optimizer = ShortestPathApp(num)
-    short_optimizer.optimize()
+    # short_optimizer = ShortestPathApp(num)
+    # short_optimizer.optimize()

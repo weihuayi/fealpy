@@ -6,7 +6,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, QuadrangleMesh
 
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolve
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 from fealpy.utils import timer
 import time
 import matplotlib.pyplot as plt
@@ -120,6 +120,10 @@ parser.add_argument('--gpu',
         default=False, type=bool,
         help='是否使用 GPU, 默认为 False.')
 
+parser.add_argument('--cupy', 
+        default=False, type=bool,
+        help='是否使用cupy求解.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -133,6 +137,7 @@ save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
 force_type = args.force_type
 gpu = args.gpu
+cupy = args.cupy
 
 tmr = timer()
 next(tmr)
@@ -163,8 +168,7 @@ while isMarkedCell.any():
 fname = args.mesh_type + '_square_with_a_notch_init.vtu'
 mesh.to_vtk(fname=fname)
 
-
-ms = MainSolve(mesh=mesh, material_params=model.params, p=p, model_type=model_type)
+ms = MainSolve(mesh=mesh, material_params=model.params, model_type=model_type)
 tmr.send('init')
 
 '''
@@ -189,17 +193,19 @@ ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundar
 
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
+if cupy:
+    ms.set_cupy_solver()
 
 ms.output_timer()
 ms.save_vtkfile(fname=vtkname)
-ms.solve(maxit=maxit)
+ms.solve(p=p, maxit=maxit)
 
 tmr.send('stop')
 tmr.send(None)
 end = time.time()
 
-force = ms.Rforce
-disp = ms.force_value
+force = ms.get_residual_force()
+
 
 ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.pt'
 
@@ -208,6 +214,12 @@ torch.save(force, ftname)
 tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model1_disp.txt'
 with open(tname, 'w') as file:
     file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
+
+if force_type == 'y':
+    disp = model.is_y_force()
+elif force_type == 'x':
+    disp = model.is_x_force()
+
 fig, axs = plt.subplots()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')

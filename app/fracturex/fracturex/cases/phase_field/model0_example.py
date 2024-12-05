@@ -6,7 +6,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.old.geometry.domain_2d import SquareWithCircleHoleDomain
 
-from app.fracturex.fracturex.phasefield.main_solver import MainSolve
+from app.fracturex.fracturex.phasefield.main_solve import MainSolve
 
 from fealpy.utils import timer
 
@@ -133,7 +133,7 @@ domain = SquareWithCircleHoleDomain(hmin=h)
 mesh = TriangleMesh.from_domain_distmesh(domain, maxit=100)
 
 
-ms = MainSolve(mesh=mesh, material_params=model.params, p=p)
+ms = MainSolve(mesh=mesh, material_params=model.params)
 tmr.send('init')
 
 # 拉伸模型边界条件
@@ -146,11 +146,11 @@ ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
 if bm.backend_name == 'pytorch':
     ms.auto_assembly_matrix()
 
-
+#ms.set_scipy_solver()
 ms.output_timer()
 
 ms.save_vtkfile(fname=vtkname)
-ms.solve(maxit=maxit)
+ms.solve(p=p, maxit=maxit)
 
 tmr.send('stop')
 tmr.send(None)

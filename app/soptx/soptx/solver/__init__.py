@@ -1,8 +1,11 @@
 from .elastic_fem_solver import (ElasticFEMSolver, 
-                                IterativeSolverResult, DirectSolverResult)
+                                IterativeSolverResult, DirectSolverResult,
+                                AssemblyMethod, AssemblyConfig)
 
 __all__ = [
     'ElasticFEMSolver',
     'IterativeSolverResult',
-    'DirectSolverResult'
+    'DirectSolverResult',
+    'AssemblyMethod',
+    'AssemblyConfig',
 ]

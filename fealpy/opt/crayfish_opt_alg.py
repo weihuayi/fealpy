@@ -43,10 +43,11 @@ class CrayfishOptAlg(Optimizer):
             C = 2 - (t / T)
             temp = bm.random.rand(1) * 15 + 20
             xf = (gbest + global_position) / 2
-            p = 0.2 * ( 1 / (bm.sqrt(bm.array(2 * bm.pi) * 3))) * bm.exp( bm.array(- (temp - 25) ** 2 / (2 * 3 ** 2)))
+            p = 0.2 * (1 / (bm.sqrt(bm.array(2 * bm.pi) * 3))) * bm.exp(bm.array(- (temp - 25) ** 2 / (2 * 3 ** 2)))
             rand = bm.random.rand(N, 1)
             rr = bm.random.rand(4, N, dim)
-            z = [random.randint(0, N - 1) for _ in range(N)]
+            # z = [random.randint(0, N - 1) for _ in range(N)]
+            z = bm.random.randint(0, N - 1, (N,))
 
             gbest = gbest.reshape(1, dim)
 
