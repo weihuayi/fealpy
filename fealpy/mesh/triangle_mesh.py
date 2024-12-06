@@ -295,8 +295,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         if returnim is True:
             IM = []
-        if returnrm is True:
-            RM = []
 
         for i in range(n):
             NN = self.number_of_nodes()
@@ -317,10 +315,8 @@ class TriangleMesh(SimplexMesh, Plotable):
                                 shape=(NN + NE, NN))
                 A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 1])), 
                                 shape=(NN + NE, NN))
-                
-                IM.append(A.tocsr())
-                
 
+                IM.append(A.tocsr())
 
             self.node = bm.concatenate((node, newNode), axis=0)
             p = bm.concatenate((cell, edge2newNode[cell2edge]), axis=1)
@@ -604,6 +600,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         https://lyc102.github.io/ifem/afem/coarsen/
         """
+        from .utils import inverse_relation
 
         if isMarkedCell is None:
             return
@@ -615,17 +612,18 @@ class TriangleMesh(SimplexMesh, Plotable):
         node = self.entity('node')
 
         valence = bm.zeros(NN, dtype=self.itype, device=self.device)
-        bm.add_at(valence, cell, 1)
+        valence = bm.index_add(valence, cell, 1)
 
         valenceNew = bm.zeros(NN, dtype=self.itype, device=self.device)
-        bm.add_at(valenceNew, cell[isMarkedCell][:, 0], 1)
+        valenceNew = bm.index_add(valenceNew, cell[isMarkedCell][:, 0], 1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
 
-        node2cell = self.node_to_cell()
+        # node2cell = self.node_to_cell()
 
-        I, J = bm.nonzero(node2cell[isIGoodNode, :])
+        # I, J = bm.nonzero(node2cell[isIGoodNode, :])
+        _, J, _ = inverse_relation(cell, NN, isIGoodNode)
         nodeStar = J.reshape(-1, 4)
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
@@ -653,7 +651,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.set_at(cell , (t2, 2) , p1)
         cell = bm.set_at(cell , (t3, 0) , -1)
 
-        I, J = bm.nonzero(node2cell[isBGoodNode, :])
+        # I, J = bm.nonzero(node2cell[isBGoodNode, :])
+        _, J, _ = inverse_relation(cell, NN, isBGoodNode)
         nodeStar = J.reshape(-1, 2)
         idx = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 1], 1])
         nodeStar = bm.set_at(nodeStar , idx , nodeStar[idx, :][:, [0, 1]])

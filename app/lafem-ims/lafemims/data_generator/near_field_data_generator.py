@@ -2,6 +2,7 @@
 import os
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
+import numpy as np
 from typing import Sequence, Callable
 
 from fealpy.backend import backend_manager as bm
@@ -94,7 +95,7 @@ class NearFieldDataFEMGenerator2d:
 
         space = LagrangeFESpace(self.mesh, p=self.p)
 
-        # 定义积分器
+        # 定义积分子
         D = ScalarDiffusionIntegrator(pde.diffusion_coefficient, q=self.q)
         C = ScalarConvectionIntegrator(pde.convection_coefficient, q=self.q)
         M = ScalarMassIntegrator(pde.reaction_coefficient, q=self.q)
@@ -199,8 +200,8 @@ class NearFieldDataFEMGenerator2d:
                 d_name = d_values[j]
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
-        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.bmz")
-        bm.savez(filename, **data_dict)
+        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
+        np.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k: float, d: Sequence[float]):
         """

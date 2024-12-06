@@ -105,8 +105,17 @@ class MLaplaceBernsteinIntegrator(LinearInt, OpInt, CellInt):
                 symglambda = bm.einsum('ci,ci,i->c', glambda1, glambda2, num)
                 idx22 = bm.broadcast_to(idx2[None, :], (l, l))
                 B1 = B * c1 * c2
-                BB = B1[None, :, :] * symglambda[:, None, None]
-                bm.add_at(gmB, (slice(None), idx11, idx22), BB)
+                #BB = B1[None, :, :] * symglambda[:, None, None]
+                BB = bm.multiply(B1, symglambda[:, None, None])
+                #bm.add_at(gmB, (slice(None), idx11, idx22), B1[None, :, :] * symglambda[:, None, None])
+                #bm.add_at(gmB, (slice(None), idx11, idx22), BB)
+                #gmB[:, idx11, idx22] += B1[None, :, :] * symglambda[:, None, None]
+                gmB[:, idx11, idx22] += BB
+                del B1,BB 
+                import gc
+                gc.collect()
+        del B
+        gc.collect()
         gmB = gmB * factorial(int(p)) * factorial(int(p))
         return gmB
 

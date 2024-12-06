@@ -4,7 +4,7 @@ import argparse
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.functionspace import BDMFiniteElementSpace2d
+from fealpy.functionspace import BDMFiniteElementSpace2d,BDMFiniteElementSpace3d
 from fealpy.functionspace import LagrangeFESpace
 from fealpy import logger
 logger.setLevel('WARNING')
@@ -59,7 +59,6 @@ if dim == 2:
 else:
     pde = PDE3d()
 
-
 errorType = ['$|| p - p_h||_0$ with k=2',
              '$|| p - p_h||_0$ with k=3',
              '$|| p - p_h||_0$ with k=4',
@@ -83,8 +82,8 @@ for j, p in enumerate(ps):
             space2 = BDMFiniteElementSpace2d(mesh, p=p)
         else:
             mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=2**i, ny=2**i, nz=2**i)
-            space1 = LagrangeFESpace(mesh,p=p,ctype="D")
-            #space2 = RTFiniteElementSpace3d(mesh, p=p)
+            space1 = LagrangeFESpace(mesh,p=p-1,ctype="D")
+            space2 = BDMFiniteElementSpace3d(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
         pdof = space1.dof.number_of_global_dofs()

@@ -68,8 +68,8 @@ parser.add_argument('--model_type',
 
 
 parser.add_argument('--mesh_type',
-        default='tri', type=str,
-        help='网格类型, 默认为 tri.')
+        default='tet', type=str,
+        help='网格类型, 默认为 tet.')
 
 parser.add_argument('--enable_adaptive',
         default=False, type=bool,
@@ -166,8 +166,8 @@ tmr.send('stop')
 tmr.send(None)
 end = time.time()
 
-force = ms.Rforce
-disp = ms.force_value
+force = ms.get_residual_force()
+disp = model.is_z_force()
 
 ftname = 'force_'+args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.pt'
 
@@ -177,6 +177,7 @@ tname = 'params_'+args.mesh_type + '_p' + str(p) + '_' + 'model3d_disp.txt'
 with open(tname, 'w') as file:
     file.write(f'\n time: {end-start},\n degree:{p},\n, backend:{backend},\n, model_type:{model_type},\n, enable_adaptive:{enable_adaptive},\n, marking_strategy:{marking_strategy},\n, refine_method:{refine_method},\n, n:{n},\n, maxit:{maxit},\n, vtkname:{vtkname}\n')
 fig, axs = plt.subplots()
+disp = model.is_z_force()
 plt.plot(disp, force, label='Force')
 plt.xlabel('Displacement Increment')
 plt.ylabel('Residual Force')

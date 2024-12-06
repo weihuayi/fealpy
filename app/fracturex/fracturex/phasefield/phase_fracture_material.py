@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from typing import Optional
 
 from fealpy.typing import TensorLike
@@ -286,7 +287,18 @@ class SpectralModel(BasedPhaseFractureMaterial):
         
         @param[in] s strain，（NC, NQ, GD, GD）
         """
-        w, v = bm.linalg.eigh(s) # w 特征值, v 特征向量
+        '''
+        if bm.device_type(s) == 'cuda':
+            torch.cuda.empty_cache()
+            try:
+                w, v = bm.linalg.eigh(s)  # w 特征值, v 特征向量
+            except torch.cuda.OutOfMemoryError as e:
+                print("CUDA out of memory. Attempting to free cache.")
+                torch.cuda.empty_cache()
+        else:
+            w, v = bm.linalg.eigh(s) # w 特征值, v 特征向量
+        '''
+        w, v = bm.linalg.eigh(s)
         p, m = self.macaulay_operation(w)
 
         sp = bm.zeros_like(s)
@@ -321,6 +333,16 @@ class SpectralModel(BasedPhaseFractureMaterial):
         val[bm.abs(x) < 1e-13] = 0.5
         val[x < -1e-13] = 0
         return val
+    
+    def linear_strain_value(self, bc):
+        """
+        Compute the linear strain tensor.
+        """
+        bc = bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64)
+        uh = self.uh
+        guh = uh.grad_value(bc)
+        strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
+        return strain
     
     @ barycentric
     def maximum_historical_field(self, bc):

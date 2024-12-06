@@ -202,17 +202,17 @@ def test_compliance_objective(config: TestConfig):
         filter=filter_obj
     )
     
-    # # Test objective function
-    # obj_value = objective.fun(rho=rho[:], u=displacement)
-    # print(f"Objective function value: {obj_value:.6e}")
+    # Test objective function
+    obj_value = objective.fun(rho=rho[:], u=displacement)
+    print(f"Objective function value: {obj_value:.6e}")
     
-    # # Test element compliance
-    # ce = objective.get_element_compliance()
-    # print(f"\nElement compliance information:")
-    # print(f"- Shape: {ce.shape}:\n {ce}")
-    # print(f"- Min: {bm.min(ce):.6e}")
-    # print(f"- Max: {bm.max(ce):.6e}")
-    # print(f"- Mean: {bm.mean(ce):.6e}")
+    # Test element compliance
+    ce = objective.get_element_compliance()
+    print(f"\nElement compliance information:")
+    print(f"- Shape: {ce.shape}:\n {ce}")
+    print(f"- Min: {bm.min(ce):.6e}")
+    print(f"- Max: {bm.max(ce):.6e}")
+    print(f"- Mean: {bm.mean(ce):.6e}")
     
     # Test sensitivity
     dce = objective.jac(rho=rho[:], u=displacement)
