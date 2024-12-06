@@ -295,7 +295,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         if returnim is True:
             IM = []
-        if returnim is True:
+        if returnrm is True:
             RM = []
 
         for i in range(n):
