@@ -214,6 +214,106 @@ cell = mesh.entity('cell')
 space = LagrangeFESpace(mesh, p=1, ctype='C')
 cell2dof = space.cell_to_dof()
 
+###########################333
+# bcs1 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64),)
+# p1 = mesh.bc_to_point(bc=bcs1)
+# bcs2 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64),)
+# p2 = mesh.bc_to_point(bc=bcs2)
+# bcs3 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64),)
+# p3 = mesh.bc_to_point(bc=bcs3)
+# bcs4 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64),)
+# p4 = mesh.bc_to_point(bc=bcs4)
+# bcs5 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64),)
+# p5 = mesh.bc_to_point(bc=bcs5)
+# bcs6 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64),)
+# p6 = mesh.bc_to_point(bc=bcs6)
+# bcs7 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64),)
+# p7 = mesh.bc_to_point(bc=bcs7)
+# bcs8 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64), 
+#        bm.tensor([[0, 1]], dtype=bm.float64),)
+# p8 = mesh.bc_to_point(bc=bcs8)
+
+bcs1 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64),)
+p1 = mesh.bc_to_point(bc=bcs1)
+bcs5 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64),)
+p5 = mesh.bc_to_point(bc=bcs5)
+bcs7 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64),)
+p7 = mesh.bc_to_point(bc=bcs7)
+bcs3 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64),)
+p3 = mesh.bc_to_point(bc=bcs3)
+bcs2 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64),)
+p2 = mesh.bc_to_point(bc=bcs2)
+bcs6 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64),)
+p6 = mesh.bc_to_point(bc=bcs6)
+bcs8 = (bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64),)
+p8 = mesh.bc_to_point(bc=bcs8)
+bcs4 = (bm.tensor([[1, 0]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64), 
+       bm.tensor([[0, 1]], dtype=bm.float64),)
+p4 = mesh.bc_to_point(bc=bcs4)
+
+test0 = space.function()
+test0[0] = 1
+print(f"1:{p1},  {test0(bcs1)}, {test0(bcs2)}, {test0(bcs3)}, {test0(bcs4)}, {test0(bcs5)}, {test0(bcs6)}, {test0(bcs7)}, {test0(bcs8)}")
+
+test1 = space.function()
+test1[1] = 1
+print(f"2:{p2},  {test1(bcs2)}, {test1(bcs1)}, {test1(bcs3)}, {test1(bcs4)}, {test1(bcs5)}, {test1(bcs6)}, {test1(bcs7)}, {test1(bcs8)}")
+
+test2 = space.function()
+test2[2] = 1
+print(f"3:{p3},  {test2(bcs3)}, {test2(bcs1)}, {test2(bcs2)}, {test2(bcs4)}, {test2(bcs5)}, {test2(bcs6)}, {test2(bcs7)}, {test2(bcs8)}")
+
+test3 = space.function()
+test3[3] = 1
+print(f"4:{p4},  {test3(bcs4)}, {test3(bcs1)}, {test3(bcs2)}, {test3(bcs3)}, {test3(bcs5)}, {test3(bcs6)}, {test3(bcs7)}, {test3(bcs8)}")
+
+test4 = space.function()
+test4[4] = 1
+print(f"5:{p5},  {test4(bcs5)}, {test4(bcs1)}, {test4(bcs2)}, {test4(bcs3)}, {test4(bcs4)}, {test4(bcs6)}, {test4(bcs7)}, {test4(bcs8)}")
+
+test5 = space.function()
+test5[5] = 1
+print(f"6:{p6},  {test5(bcs6)}, {test5(bcs1)}, {test5(bcs2)}, {test5(bcs3)}, {test5(bcs4)}, {test5(bcs5)}, {test5(bcs7)}, {test5(bcs8)}")
+
+test6 = space.function()
+test6[6] = 1
+print(f"7:{p7},  {test6(bcs7)}, {test6(bcs1)}, {test6(bcs2)}, {test6(bcs3)}, {test6(bcs4)}, {test6(bcs5)}, {test6(bcs6)}, {test6(bcs8)}")
+
+test7 = space.function()
+test7[7] = 1
+print(f"8:{p8},  {test7(bcs8)}, {test7(bcs1)}, {test7(bcs2)}, {test7(bcs3)}, {test7(bcs4)}, {test7(bcs5)}, {test7(bcs6)}, {test7(bcs7)}")
+##############3
+
 q = 2
 
 # tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
