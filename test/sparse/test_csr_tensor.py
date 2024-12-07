@@ -114,7 +114,7 @@ class TestCSRTensorAdd:
 
         assert bm.allclose(result1._crow, expected_crow1)
         assert bm.allclose(result1._col, expected_col1)
-        print("result",result1._values,expected_values1)
+        
         assert bm.allclose(result1._values, expected_values1)
         expected_crow2 = bm.tensor([0,2,3,4,4])
         expected_col2 = bm.tensor([1,2,3,3])
