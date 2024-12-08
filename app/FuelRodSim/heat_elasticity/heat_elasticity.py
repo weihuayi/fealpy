@@ -14,18 +14,70 @@ def varepsilon_therm(p0,p1,alpha_therm):
     varepsilon_therm = alpha_therm * delta_T
     return varepsilon_therm
 
-def sigma_eff(uh,material):
+def compute_sigma_eff(uh,material):
+    # 计算等效应力
+    qf = mesh.quadrature_formula(q=tensor_space.p+3)
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    gphi = space.grad_basis(bcs)
+    NC = mesh.number_of_cells()
+    tldof = tensor_space.number_of_local_dofs()
+    cell2tdof = tensor_space.cell_to_dof() 
     uh = bm.array(uh)
+    uh_cell = bm.zeros((NC, tldof)) # (NC, tldof)
+    for c in range(NC):
+        uh_cell[c] = uh[cell2tdof[c]]
     D = material.elastic_matrix()
-    B = material.matrix()
+    B = material.strain_matrix(True, gphi)
+    # 计算应变和应力 剪应变和剪应力需要除2
+    strain  = bm.einsum('ijkl,il->ijk', B, uh_cell)#(NC,NQ,3)
+    sigma  =  bm.einsum('ijkl,ijk->ijl', D, strain)# (NC, 3)
+    # 计算应变
+    strain[..., 2] /= 2
+    # 计算应力
+    sigma[..., 2] /= 2
+    GD = space.geo_dimension()
+    if GD == 2:
+        # 计算应变
+        strain[..., 2] /= 2
+        # 计算应力
+        sigma[..., 2] /= 2
+        # 计算等效应力
+        sigma_00 = sigma[..., 0]  # 第一个分量 σ00
+        sigma_11 = sigma[..., 1]  # 第二个分量 σ11
+        sigma_01 = sigma[..., 2]  # 第三个分量 σ01
+        # 根据二维 von Mises 应力公式计算等效应力
+        sigma_eff = bm.sqrt(
+            sigma_00**2 - sigma_00 * sigma_11 + sigma_11**2 + 3 * sigma_01**2)
+    elif GD == 3:
+        #计算应变
+        strain[..., 3] /= 2
+        strain[..., 4] /= 2
+        strain[..., 5] /= 2
+        #计算应力
+        sigma[..., 3] /= 2
+        sigma[..., 4] /= 2
+        sigma[..., 5] /= 2
+        #计算等效应力
+        sigma_00 = sigma[..., 0]
+        sigma_11 = sigma[..., 1]
+        sigma_22 = sigma[..., 2]
+        sigma_01 = sigma[..., 3]
+        sigma_02 = sigma[..., 4]
+        sigma_12 = sigma[..., 5]
+        #根据三维 von Mises应力公式计算等效应力
+        sigma_eff = bm.sqrt(0.5 * ((sigma_00 - sigma_11)**2 + 
+                            (sigma_00 - sigma_22)**2 + 
+                            (sigma_11 - sigma_22)**2 + 
+                            6 * (sigma_01**2 + sigma_02**2 + sigma_12**2)))
     return sigma_eff
     
-def varepsilon_sc(C,sigma_eff,phi,t):
-    varepsilon_sc = C * sigma_eff * phi * (t * 3600)
-    return varepsilon_sc
+def compute_varepsilon_cr(C,sigma_eff,phi_cr,t):
+    varepsilon_cr = C * sigma_eff * phi_cr * (t * 3600)
+    return varepsilon_cr
 
-def varepsilon_irr():
-    pass
+def compute_varepsilon_irr(Bu):
+    varepsilon_irr = 3.88088*Bu**2+0.79811*Bu
+    return varepsilon_irr
 
 #bm.set_backend('pytorch') # 选择后端为pytorch
 mm = 1e-03
@@ -113,10 +165,11 @@ for n in range(nt):
     linear_elasticity_K, linear_elasticity_F = dbc.apply(A=linear_elasticity_K, f=linear_elasticity_F, uh=None, gd=pde2.dirichlet, check=True)
     uh = tensor_space.function()
     uh[:] = cg(linear_elasticity_K, linear_elasticity_F, maxiter=1000, atol=1e-14, rtol=1e-14)
+    """
     # 计算等效应力
     qf = mesh.quadrature_formula(q=tensor_space.p+3)
     bcs, ws = qf.get_quadrature_points_and_weights()
-    gphi = tensor_space.grad_basis(bcs)
+    gphi = space.grad_basis(bcs)
     NC = mesh.number_of_cells()
     tldof = tensor_space.number_of_local_dofs()
     cell2tdof = tensor_space.cell_to_dof()
@@ -126,11 +179,26 @@ for n in range(nt):
         uh_cell[c] = uh[cell2tdof[c]]
     D = pfcm.elastic_matrix()
     B = pfcm.strain_matrix(True, gphi)
-    # 重塑 u_h，使其适配 B 的形状
-    uh_cell_new = uh_cell[:, None, :, None]  
-    sigma = bm.einsum('ijkl, cmqijr, cmr -> cmqi', D, B, uh_cell_new)
-    print(sigma.shape)
+    # 计算应变和应力 剪应变和剪应力需要除2
+    strain  = bm.einsum('ijkl,il->ijk', B, uh_cell)#(NC,NQ,3)
+    sigma  =  bm.einsum('ijkl,ijk->ijl', D, strain)# (NC, 3)
+    print(strain.shape,sigma.shape) 
+    # 计算应变
+    strain[..., 2] /= 2
+    # 计算应力
+    sigma[..., 2] /= 2
+    # 计算等效应力
+    sigma_00 = sigma[..., 0]  # 第一个分量 sigma_00
+    sigma_11 = sigma[..., 1]  # 第二个分量 sigma_11
+    sigma_01 = sigma[..., 2]  # 第三个分量 sigma_01
 
+    # 根据 von Mises 应力公式计算等效应力
+    sigma_eff = bm.sqrt(0.5 * ((sigma_00 - sigma_11)**2 + 
+                            (sigma_00 - sigma_01)**2 + 
+                            (sigma_11 - sigma_01)**2))
+    print(sigma_eff.shape)
+    """
+    sigma_eff = compute_sigma_eff(uh,pfcm)
     p0 = p
         
     
