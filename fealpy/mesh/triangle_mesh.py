@@ -253,6 +253,9 @@ class TriangleMesh(SimplexMesh, Plotable):
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
 
+    def boundary_edge_flag(self):
+        return self.boundary_face_flag()
+
     def cell_to_face_sign(self):
         """
         """
