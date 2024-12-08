@@ -1,20 +1,20 @@
 
-from typing import Sequence, overload, List, Dict, Tuple, Optional, TypeVar, Generic
+from typing import Sequence, overload, Iterable, Dict, Tuple, Optional, TypeVar, Generic
 
-from ..typing import TensorLike, Size
+from ..typing import TensorLike, Size, Index
+from ..backend import backend_manager as bm
 from ..functionspace import FunctionSpace as _FS
-from .integrator import Integrator
+from .integrator import Integrator, GroupIntegrator
 
 from .. import logger
 from abc import ABC
 
-_I = TypeVar('_IT', bound=Integrator)
+_I = TypeVar('_I', bound=Integrator)
 
 
 class Form(Generic[_I], ABC):
     _spaces: Tuple[_FS, ...]
-    integrators: Dict[str, Tuple[_I, ...]]
-    memory: Dict[str, Tuple[TensorLike, List[TensorLike]]]
+    integrators: Dict[str, _I]
     batch_size: int
     sparse_shape: Tuple[int, ...]
 
@@ -32,7 +32,6 @@ class Form(Generic[_I], ABC):
         self._spaces = space
         self.integrators = {}
         self._cursor = 0
-        self.memory = {}
         self.batch_size = batch_size
 
         self._values_ravel_shape = (-1,) if self.batch_size == 0 else (self.batch_size, -1)
@@ -41,7 +40,6 @@ class Form(Generic[_I], ABC):
     def copy(self):
         new_obj = self.__class__(self._spaces, batch_size=self.batch_size)
         new_obj.integrators.update(self.integrators)
-        new_obj.memory.update(self.memory)
         new_obj._values_ravel_shape = self._values_ravel_shape
         new_obj.sparse_shape = tuple(reversed(self.sparse_shape))
         return new_obj
@@ -70,17 +68,18 @@ class Form(Generic[_I], ABC):
             return self._spaces
 
     @overload
-    def add_integrator(self, I: _I, *, group: str=...) -> Tuple[_I]: ...
+    def add_integrator(self, I: _I, *, index: Optional[Index] = None, group: str = ...): ...
     @overload
-    def add_integrator(self, I: Sequence[_I], *, group: str=...) -> Tuple[_I, ...]: ...
+    def add_integrator(self, I: Sequence[_I], *, index: Optional[Index] = None, group: str = ...): ...
     @overload
-    def add_integrator(self, *I: _I, group: str=...) -> Tuple[_I, ...]: ...
-    def add_integrator(self, *I, group=None):
+    def add_integrator(self, *I: _I, index: Optional[Index] = None, group: str = ...): ...
+    def add_integrator(self, *I, index: Optional[Index] = None, group=None):
         """Add integrator(s) to the form.
 
         Parameters:
             *I (Integrator): The integrator(s) to add as a new group.
                 Also accepts sequence of integrators.
+            index (Index | None, optional):
             group (str | None, optional): Name of the group. Defaults to None.
 
         Returns:
@@ -88,57 +87,75 @@ class Form(Generic[_I], ABC):
         """
         if len(I) == 0:
             logger.info("add_integrator() is called with no arguments.")
-            return tuple()
+            return self
+
+        if len(I) == 1 and isinstance(I[0], Sequence):
+            I = tuple(I[0])
 
         if len(I) == 1:
-            if isinstance(I[0], Sequence):
-                I = tuple(I[0])
+            I = I[0]
+            if index is not None:
+                I.set_index(index)
+        else:
+            I = GroupIntegrator(*I, index=index)
+
         group = f'_group_{self._cursor}' if group is None else group
         self._cursor += 1
 
         if group in self.integrators:
             self.integrators[group] += I
-            self.clear_memory(group)
         else:
             self.integrators[group] = I
 
-        return I
+        return self
 
-    def clear_memory(self, group: Optional[str]=None) -> None:
-        """Clear the cache of the form, including global output and group output.
+    def _assembly_group(self, group: str, /, *args, **kwds):
+        integrator = self.integrators[group]
+        etg = [integrator.to_global_dof(s) for s in self._spaces]
+        return integrator(self.space), etg
 
-        Parameters:
-            group (str | None, optional): The name of integrator group to clear\
-            the result from. Defaults to None. Clear all cache if `None`.
-        """
-        if group is None:
-            self.memory.clear()
+
+# An iteration util for the `_assembly_group` method.
+class IntegralIter():
+    def __init__(self, integrator: Integrator, /, indices_or_segments: Iterable[TensorLike] | TensorLike):
+        if not hasattr(integrator, 'index'):
+            raise AttributeError(f"{integrator.__class__.__name__} does not have attribute 'index', "
+                                 "which is necessary for the cluster to split field.")
+        self.integrator = integrator
+        self.indices_or_segments = indices_or_segments
+
+    def get(self, spaces: Tuple[_FS, ...], index: Index):
+        self.integrator.set_index(index)
+        etg = [self.integrator.to_global_dof(s) for s in space]
+        space = spaces [0] if (len(space) == 1) else spaces
+        return self.integrator(space), etg
+
+    def __call__(self, spaces: Tuple[_FS, ...]):
+        if isinstance(self.indices_or_segments, TensorLike):
+            return self._call_impl_segments(spaces, self.indices_or_segments)
+        elif isinstance(self.indices_or_segments, Iterable):
+            return self._call_impl_indices(spaces, self.indices_or_segments)
         else:
-            self.memory.pop(group, None)
+            raise TypeError(f"Unsupported indices or segments.")
 
-    def _assembly_group(self, group: str, retain_ints: bool=False):
-        if group in self.memory:
-            return self.memory[group]
+    def _call_impl_indices(self, spaces: Tuple[_FS, ...], /, indices: Iterable[TensorLike]):
+        for index in indices:
+            yield self.get(spaces, index)
 
-        INTS = self.integrators[group]
-        ct = INTS[0](self.space)
-        etg = [INTS[0].to_global_dof(s) for s in self._spaces]
+    def _call_impl_segments(self, spaces: Tuple[_FS, ...], /, segments: TensorLike):
+        assert segments.ndim == 1
+        start = 0
+        stop = 0
+        length = segments.shape[0] + 1
 
-        for int_ in INTS[1:]:
-            new_ct = int_(self.space)
-            fdim = min(ct.ndim, new_ct.ndim)
-            if ct.shape[:fdim] != new_ct.shape[:fdim]:
-                raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "
-                                   f"has an incompatible shape {tuple(new_ct.shape)} "
-                                   f"with the previous {tuple(ct.shape)} in the group '{group}'.")
-            if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct[None, ...]
-            elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct[None, ...]
-            else:
-                ct = ct + new_ct
+        for i in range(length):
+            stop = segments[i] if (i + 1 < length) else None
+            slicing = slice(start, stop, 1)
+            yield self.get(spaces, slicing)
+            start = stop
 
-        if retain_ints:
-            self.memory[group] = (ct, etg)
-
-        return ct, etg
+    @classmethod
+    def split(cls, integrator: Integrator, /, index: TensorLike, chunk_size=0):
+        size = index.shape[0]
+        segments = bm.arange(chunk_size, size, chunk_size)
+        return cls(integrator, segments)
