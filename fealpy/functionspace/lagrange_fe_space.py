@@ -137,6 +137,110 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
 
     @barycentric
+    def cell_basis_on_edge(self, bc: TensorLike, lidx: TensorLike,
+                           direction=True) -> TensorLike:
+        """
+        @brief Return the basis value of cells on points of edges.
+
+        @param bc: TensorLike. Barycentric coordinates of points on edges, with shape [NE, 2].
+        @param lidx: TensorLike. The local index of edges, with shape [NE, ].
+        @param direction: bool. True for the default direction of the edge, False for the opposite direction.
+
+        @return: Basis with shape [NE, NQ, Dofs].
+        """
+        if bc.shape[-1] != 2:
+            raise ValueError('The shape of bc should be [NE, 2].')
+        if lidx.ndim != 1:
+            raise ValueError('lidx is expected to be 1-dimensional.')
+
+        NE = len(lidx)
+        nmap = bm.array([1, 2, 0])
+        pmap = bm.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[:-1] + (3, )
+        bcs = bm.zeros(shape, dtype=self.mesh.ftype)
+        idx = bm.arange(NE)
+
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        return self.mesh.shape_function(bcs, p=self.p)
+
+    @barycentric
+    def cell_grad_basis_on_edge(self, bc: TensorLike, index: TensorLike, lidx: TensorLike,
+                                direction=True) -> TensorLike:
+        """
+
+        Notes
+        -----
+            bc：边上的一组重心坐标积分点
+            index: 边所在的单元编号
+            lidx: 边在该单元的局部编号
+            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致
+
+            计算基函数梯度在单元边上积分点的值.
+
+            这里要把边上的低维的积分点转化为高维的积分点.
+
+        TODO
+        ----
+            二维和三维统一？
+            有没有更好处理办法？
+
+        """
+        NE = len(index)
+        nmap = bm.array([1, 2, 0])
+        pmap = bm.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[0:-1] + (3, )
+        bcs = bm.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = bm.arange(NE)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+
+        p = self.p   # the degree of polynomial basis function
+        TD = self.TD
+        multiIndex = self.mesh.multi_index_matrix(p, TD)
+
+        c = bm.arange(1, p+1, dtype=self.itype)
+        P = 1.0/bm.multiply.accumulate(c)
+
+        t = bm.arange(0, p)
+        shape = bcs.shape[:-1]+(p+1, TD+1)
+        A = bm.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bcs[..., bm.newaxis, :] - t.reshape(-1, 1)
+
+        FF = bm.einsum('...jk, m->...kjm', A[..., 1:, :], bm.ones(p))
+        FF[..., range(p), range(p)] = p
+        bm.cumprod(FF, axis=-2, out=FF)
+        F = bm.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = bm.sum(bm.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        bm.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_dofs()
+        shape = bcs.shape[:-1]+(ldof, TD+1)
+        R = bm.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*bm.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.mesh.grad_lambda()
+        gphi = bm.einsum('k...ij, kjm->k...im', R, Dlambda[index, :, :])
+        return gphi
+ 
+    @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
         if isinstance(bc, tuple):
             TD = len(bc)
