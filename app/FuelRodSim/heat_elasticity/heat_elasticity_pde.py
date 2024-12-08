@@ -114,6 +114,7 @@ class BoxDomainPolyData2D():
         
         return val
     
+    
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return self.solution(points)
