@@ -45,10 +45,9 @@ def compute_sigma_eff(uh,material):
         sigma_00 = sigma[..., 0]  # 第一个分量 σ00
         sigma_11 = sigma[..., 1]  # 第二个分量 σ11
         sigma_01 = sigma[..., 2]  # 第三个分量 σ01
-        # 根据 von Mises 应力公式计算等效应力
-        sigma_eff = bm.sqrt(0.5 * ((sigma_00 - sigma_11)**2 + 
-                            (sigma_00 - sigma_01)**2 + 
-                            (sigma_11 - sigma_01)**2))
+        # 根据二维 von Mises 应力公式计算等效应力
+        sigma_eff = bm.sqrt(
+            sigma_00**2 - sigma_00 * sigma_11 + sigma_11**2 + 3 * sigma_01**2)
     elif GD == 3:
         #计算应变
         strain[..., 3] /= 2
@@ -65,7 +64,7 @@ def compute_sigma_eff(uh,material):
         sigma_01 = sigma[..., 3]
         sigma_02 = sigma[..., 4]
         sigma_12 = sigma[..., 5]
-        #根据von Mises应力公式计算等效应力
+        #根据三维 von Mises应力公式计算等效应力
         sigma_eff = bm.sqrt(0.5 * ((sigma_00 - sigma_11)**2 + 
                             (sigma_00 - sigma_22)**2 + 
                             (sigma_11 - sigma_22)**2 + 
