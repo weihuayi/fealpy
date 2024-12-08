@@ -71,12 +71,13 @@ def compute_sigma_eff(uh,material):
                             6 * (sigma_01**2 + sigma_02**2 + sigma_12**2)))
     return sigma_eff
     
-def varepsilon_sc(C,sigma_eff,phi,t):
-    varepsilon_sc = C * sigma_eff * phi * (t * 3600)
-    return varepsilon_sc
+def compute_varepsilon_cr(C,sigma_eff,phi_cr,t):
+    varepsilon_cr = C * sigma_eff * phi_cr * (t * 3600)
+    return varepsilon_cr
 
-def varepsilon_irr():
-    pass
+def compute_varepsilon_irr(Bu):
+    varepsilon_irr = 3.88088*Bu**2+0.79811*Bu
+    return varepsilon_irr
 
 #bm.set_backend('pytorch') # 选择后端为pytorch
 mm = 1e-03
