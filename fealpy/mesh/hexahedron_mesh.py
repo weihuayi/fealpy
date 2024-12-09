@@ -106,7 +106,7 @@ class HexahedronMesh(TensorMesh, Plotable):
     
     def jacobi_matrix(self, bc, index=_S):
         """
-        @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵。
+        @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵
             x(u, v, w) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         assert isinstance(bc, tuple)
