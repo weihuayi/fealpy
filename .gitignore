@@ -46,6 +46,7 @@ dist
 *.swn
 *.swo
 *.vtu
+*.txt
 
 *.cpython-38.pyc
 .vscode
