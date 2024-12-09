@@ -57,11 +57,11 @@ with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/e
     data = pickle.load(f)
 
 # Ansys 位移结果
-u_x_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_x.txt', 
+u_x_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_x_100.txt', 
                                 skiprows=1, usecols=1), dtype=bm.float64)
-u_y_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_y.txt',
+u_y_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_y_100.txt',
                                 skiprows=1, usecols=1), dtype=bm.float64)
-u_z_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_z.txt',
+u_z_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_z_100.txt',
                                 skiprows=1, usecols=1), dtype=bm.float64)
 uh_ansys_show = bm.stack([u_x_ansys, u_y_ansys, u_z_ansys], axis=1)  # (NN, GD)
 
@@ -77,6 +77,10 @@ strain_xy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/
 strain_yz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_yz.txt',
                                 skiprows=1, usecols=1), dtype=bm.float64)
 strain_xz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_xz.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+
+# Ansys 节点等效应力 # (NN)
+nodal_equiv_stress_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/es_100.txt',
                                 skiprows=1, usecols=1), dtype=bm.float64)
 
 external_gear = data['external_gear']
@@ -503,6 +507,10 @@ nodal_equiv_stress = bm.zeros(NN, dtype=bm.float64)
 bm.add_at(nodal_equiv_stress, cell2dof.flatten(), equiv_stress.flatten())
 nodal_equiv_stress = nodal_equiv_stress / num_count
 
+error_es = nodal_equiv_stress - nodal_equiv_stress_ansys # (NN, )
+relative_error_es = bm.linalg.norm(error_es) / (bm.linalg.norm(nodal_equiv_stress)+bm.linalg.norm(nodal_equiv_stress_ansys))
+print(f"Relative error_es: {relative_error_es:.12e}")
+
 mesh.nodedata['nodal_equiv_strain'] = nodal_equiv_strain[:]
 mesh.nodedata['nodal_equiv_stress'] = nodal_equiv_stress[:]
 
@@ -520,37 +528,4 @@ mesh.nodedata['nodal_stress_xy'] = nodal_stress_xy[:]
 mesh.nodedata['nodal_stress_yz'] = nodal_stress_yz[:]
 mesh.nodedata['nodal_stress_xz'] = nodal_stress_xz[:]
 mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gear15_fealpy.vtu')
-
-# # 首先将应变张量转换为Voigt记号形式
-# strain_voigt = bm.zeros((NC, 8, 6), dtype=bm.float64)
-# strain_voigt[..., 0] = strain[..., 0, 0]  # εxx
-# strain_voigt[..., 1] = strain[..., 1, 1]  # εyy
-# strain_voigt[..., 2] = strain[..., 2, 2]  # εzz
-# strain_voigt[..., 3] = 2 * strain[..., 0, 1]  # 2εxy
-# strain_voigt[..., 4] = 2 * strain[..., 1, 2]  # 2εyz
-# strain_voigt[..., 5] = 2 * strain[..., 0, 2]  # 2εxz
-
-# error_xx = strain_xx - strain_voigt[..., 0]
-# error_yy = strain_yy - strain_voigt[..., 1]
-# error_zz = strain_zz - strain_voigt[..., 2]
-# error_xy = strain_xy - strain_voigt[..., 3] / 2
-# error_yz = strain_yz - strain_voigt[..., 4] / 2
-# error_xz = strain_xz - strain_voigt[..., 5] / 2
-
-# # 使用弹性矩阵计算应力（Voigt记号形式）
-# D = linear_elastic_material.elastic_matrix() # (1, 1, 6, 6)
-# D_expanded = bm.broadcast_to(D, (NC, 8, 6, 6))
-# stress_voigt = bm.einsum('cqij, cqj -> cqi', D_expanded, strain_voigt)  # (NC, 8, 6)
-
-# # 将 Voigt 记号形式的应力转换回张量形式
-# stress = bm.zeros((NC, 8, GD, GD), dtype=bm.float64)
-# stress[..., 0, 0] = stress_voigt[..., 0]  # σxx
-# stress[..., 1, 1] = stress_voigt[..., 1]  # σyy
-# stress[..., 2, 2] = stress_voigt[..., 2]  # σzz
-# stress[..., 0, 1] = stress_voigt[..., 3] / 2  # σxy
-# stress[..., 1, 0] = stress_voigt[..., 3] / 2  # σyx
-# stress[..., 1, 2] = stress_voigt[..., 4] / 2  # σyz
-# stress[..., 2, 1] = stress_voigt[..., 4] / 2  # σzy
-# stress[..., 0, 2] = stress_voigt[..., 5] / 2  # σxz
-# stress[..., 2, 0] = stress_voigt[..., 5] / 2  # σzx
 print("-----------")
