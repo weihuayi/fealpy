@@ -43,9 +43,10 @@ class BilinearForm(Form[LinearInt]):
                 raise ValueError("Spaces should have the same dtype, "
                                 f"but got {s0.ftype} and {s1.ftype}.")
 
-    def _scalar_assembly(self, retain_ints: bool, batch_size: int):
+    def _scalar_assembly(self):
         self.check_space()
         space = self._spaces
+        batch_size = self.batch_size
         ugdof = space[0].number_of_global_dofs()
         vgdof = space[1].number_of_global_dofs() if (len(space) > 1) else ugdof
         init_value_shape = (0,) if (batch_size == 0) else (batch_size, 0)
@@ -56,12 +57,13 @@ class BilinearForm(Form[LinearInt]):
             values = bm.empty(init_value_shape, dtype=space[0].ftype, device=bm.get_device(space[0])),
             spshape = sparse_shape
         )
-        for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
-            ue2dof = e2dofs[0]
-            ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
+        # for group in self.integrators.keys():
+            # group_tensor, e2dofs = self._assembly_group(group, retain_ints)
+        for group_tensor, e2dofs_tuple in self.assembly_local_iterative():
+            ue2dof = e2dofs_tuple[0]
+            ve2dof = e2dofs_tuple[1] if (len(e2dofs_tuple) > 1) else ue2dof
             local_shape = group_tensor.shape[-3:] # (NC, vldof, uldof)
-            
+
             if (batch_size > 0) and (group_tensor.ndim == 3): # Case: no batch dimension
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
             I = bm.broadcast_to(ve2dof[:, :, None], local_shape)
@@ -73,12 +75,12 @@ class BilinearForm(Form[LinearInt]):
         return M
 
     @overload
-    def assembly(self, *, retain_ints: bool=False) -> CSRTensor: ...
+    def assembly(self) -> CSRTensor: ...
     @overload
-    def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
+    def assembly(self, *, format: Literal['coo']) -> COOTensor: ...
     @overload
-    def assembly(self, *, format: Literal['csr'], retain_ints: bool=False) -> CSRTensor: ...
-    def assembly(self, *, format='csr', retain_ints: bool=False):
+    def assembly(self, *, format: Literal['csr']) -> CSRTensor: ...
+    def assembly(self, *, format='csr'):
         """Assembly the bilinear form matrix.
 
         Parameters:
@@ -88,7 +90,7 @@ class BilinearForm(Form[LinearInt]):
         Returns:
             global_matrix (CSRTensor | COOTensor): Global sparse matrix shaped ([batch, ]gdof, gdof).
         """
-        M = self._scalar_assembly(retain_ints, self.batch_size)
+        M = self._scalar_assembly()
         if getattr(self, '_transposed', False):
             M = M.T
 
