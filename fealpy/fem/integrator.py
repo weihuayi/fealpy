@@ -1,9 +1,10 @@
 
-from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Iterable
-from copy import deepcopy
+from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Sequence
+from typing import overload, Generic
+import logging
 
 from .. import logger
-from ..typing import TensorLike, Index, CoefLike, _S
+from ..typing import TensorLike, Index, CoefLike
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import ftype_memory_size
 
@@ -20,6 +21,8 @@ __all__ = [
 ]
 
 Self = TypeVar('Self')
+_SpaceGroup = Union[_FS, Tuple[_FS, ...]]
+_OpIndex = Optional[Index]
 
 
 class IntegratorMeta(type):
@@ -104,6 +107,10 @@ def enable_cache(func: Self) -> Self:
 class Integrator(metaclass=IntegratorMeta):
     """The base class for integrators.
 
+    Integrators are designed to integral given functions in input spaces.
+    Output of integrators are tensors on entities (0-axis), containing data
+    of each local DoFs (1-axis). There may be extra dimensions.
+
     All integrators should inplement the `assembly` and `to_global_dof` method.
     These two methods indicate two functions of an integrator: calculation of the integral,
     and getting relationship between local DoFs and global DoFs, repectively.
@@ -123,8 +130,9 @@ class Integrator(metaclass=IntegratorMeta):
     See `integrator.enable_cache` for details.
     """
     _assembly_name_map: Dict[str, str] = {}
+    _region: Optional[TensorLike] = None
 
-    def __init__(self, method='assembly', keep_data=False, keep_result=False, max_result_MB: float = 256) -> None:
+    def __init__(self, method='assembly', keep_data=False, *args, **kwds) -> None:
         if method not in self._assembly_name_map:
             raise ValueError(f"No assembly method is registered as '{method}'. "
                              f"For {self.__class__.__name__}, only the following options are available: "
@@ -133,87 +141,66 @@ class Integrator(metaclass=IntegratorMeta):
         self._method = method
         self._cache: Dict[Tuple[str, int], Any] = {}
         self.keep_data(keep_data)
-        self._max_result_MB = max_result_MB
-        self._cached_output: Optional[TensorLike] = None
-        self.keep_result(keep_result, None)
 
-    def keep_result(self, status_on=True, /, max_result_MB: Optional[float] = None):
-        self._keep_result = status_on
-        if status_on:
-            if max_result_MB is not None:
-                if max_result_MB <= 0:
-                    raise ValueError("max_result_MB should be positive.")
-                self._max_result_MB = max_result_MB
-
-            if self._result_size_mb() > self._max_result_MB:
-                logger.warning(f"{self.__class__.__name__}: Result is larger ({self._result_size_mb():.2f} Mb) "
-                               f"than the new max_result_MB ({self._max_result_MB:.2f} Mb), "
-                               "and will be cleared automatically.")
-                self._cached_output = None
-        else:
-            self._cached_output = None
-        return self
-
+    ### START: Cache System ###
     def keep_data(self, status_on=True, /):
+        """Set whether to keep the integral material decorated by @enable_cache."""
         self._keep_data = status_on
         if not status_on:
             self._cache.clear()
         return self
 
-    def _result_size_mb(self):
-        if self._cached_output is None:
-            return 0.
+    def clear(self) -> None:
+        """Clear the cache of integrator."""
+        self._cache.clear()
+    ### END: Cache System ###
+
+    ### START: Region of Integration ###
+    def set_region(self, region: Optional[TensorLike], /):
+        """Set the region of integration, given as indices of mesh entity."""
+        self._region = region
+        return self
+
+    def get_region(self):
+        """Get the region of integration, returned as indices of mesh entity."""
+        if self._region is None:
+            raise RuntimeError("Region of integration not specified. "
+                               "Use Integrator.set_region to set indices.")
+        return self._region
+    ### END: Region of Integration ###
+
+    def const(self, space: _SpaceGroup, /):
+        value = self.assembly(space)
+        to_gdof = self.to_global_dof(space)
+        return ConstIntegrator(value, to_gdof)
+
+    def __call__(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
+        logger.debug(f"(INTEGRATOR RUN) {self.__class__.__name__}, on {space.__class__.__name__}")
+        meth = getattr(self, self._assembly_name_map[self._method], None)
+        if indices is None:
+            val = meth(space) # Old API
         else:
-            return ftype_memory_size(self._cached_output, unit='mb')
-
-    def set_index(self, index: Optional[Index], /) -> None:
-        """Set the index of integral entity. Skip if `None`."""
-        if index is not None:
-            self.index = index
-            self.clear(result_only=False)
-
-    def __call__(self, space: _FS) -> TensorLike:
-        if self._cached_output is not None:
-            return self._cached_output
-        else:
-            meth = getattr(self, self._assembly_name_map[self._method], None)
-            value = meth(space)
-
-            if self._keep_result:
-                memory_size = ftype_memory_size(value, unit='mb')
-                if memory_size > self._max_result_MB:
-                    logger.info(f"{self.__class__.__name__}: Result is not kept as it is larger ({memory_size:.2f} Mb) "
-                                f"than the max_result_MB ({self._max_result_MB:.2f} Mb).")
-                else:
-                    self._cached_output = value
-                    logger.debug(f"{self.__class__.__name__}: Result size: {memory_size:.2f} Mb.")
-
-            return value
+            val = meth(space, indices=indices)
+        if logger.level == logging._nameToLevel['INFO']:
+            logger.info(f"Local tensor sized {ftype_memory_size(val)} Mb.")
+        return val
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._method})"
 
-    def to_global_dof(self, space: _FS) -> TensorLike:
+    @overload
+    def to_global_dof(self, space: _FS, /, indices: _OpIndex = None) -> TensorLike: ...
+    @overload
+    def to_global_dof(self, space: Tuple[_FS, ...], /, indices: _OpIndex = None) -> Tuple[TensorLike, ...]: ...
+    def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None):
         """Return the relationship between the integral entities
         and the global dofs."""
         raise NotImplementedError
 
     @assemblymethod('assembly') # The default assemply method
-    def assembly(self, space: _FS) -> TensorLike:
+    def assembly(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
+        """The default method of integration on entities."""
         raise NotImplementedError
-
-    def clear(self, result_only=True) -> None:
-        """Clear the cache of the integrators.
-
-        Parameters:
-            result_only (bool, optional): Whether to only clear the cached result.
-                Other cache may be basis, entity measures, bc points... Defaults to True.
-                If `False`, anything cached will be cleared.
-        """
-        self._cached_output = None
-
-        if not result_only:
-            self._cache.clear()
 
     ### Operations
 
@@ -268,31 +255,38 @@ class EdgeInt(Integrator):
 ### Integral Utils
 ##################################################
 
-class ConstIntegrator(Integrator):
+_GT = TypeVar('_GT')
+
+class ConstIntegrator(Integrator, Generic[_GT]):
     """An integral item with given values.
 
     ConstIntegrator wrap a given TensorLike object as an Integrator type.
     The `to_gdof` is optional but must be provided if `to_global_dof` is needed.
-    Index of entity is ignored if `enable_index` is False.
+    Indices of entity is ignored if `enable_region` is False.
     """
-    def __init__(self, value: TensorLike, to_gdof: Optional[TensorLike] = None, *,
-                 index: Index = _S, enable_index: bool = False):
+    def __init__(self, value: TensorLike, to_gdof: Optional[_GT] = None):
         super().__init__('assembly', False, False)
         self.value = value
         self.to_gdof = to_gdof
-        self.set_index(index)
-        self._enable_index = enable_index
+        self._region = slice(None)
 
-    def to_global_dof(self, space: _FS):
+    def set_region(self, region, /):
+        logger.warning("`set_region` has no effect for ConstIntegrator.")
+        return super().set_region(region)
+
+    def to_global_dof(self, space, /, indices: _OpIndex = None) -> _GT:
         if self.to_gdof is None:
             raise RuntimeError("to_gdof not defined for ConstIntegrator.")
-        return self.to_gdof
+        if indices is None:
+            return self.to_gdof
+        if isinstance(self.to_gdof, (tuple, list)):
+            return self.to_gdof.__class__(tg[indices] for tg in self.to_gdof)
+        return self.to_gdof[indices]
 
-    def assembly(self, space: _FS):
-        if self._enable_index:
-            return self.value[self.index]
-        else:
+    def assembly(self, space, /, indices: _OpIndex = None):
+        if indices is None:
             return self.value
+        return self.value[indices]
 
 
 class GroupIntegrator(Integrator):
@@ -305,10 +299,10 @@ class GroupIntegrator(Integrator):
     own to_global_dof, outputing integrals only.
     The grouped integrator takes the first integrator's `to_global_dof` as its implementation.
 
-    Note: All sub-integrators' index will be replaced by the `index` parameter.
+    Note: All sub-integrators' region will be replaced by the `region` parameter.
     Skip this operation if `None`.
     """
-    def __init__(self, *ints: Integrator, index: Optional[Index] = None):
+    def __init__(self, *ints: Integrator, region: Optional[TensorLike] = None):
         super().__init__('assembly')
         self.ints: List[Integrator] = [] # Integrator except GroupIntegrator.
         if len(ints) == 0:
@@ -321,8 +315,8 @@ class GroupIntegrator(Integrator):
             else:
                 raise TypeError(f"Unsupported type {integrator.__class__.__name__} "
                                 "found in the inputs.")
-
-        self.set_index(index)
+        if region is not None:
+            self.set_region(region)
 
     def __repr__(self):
         return "GroupIntegrator[" + ", ".join([repr(i) for i in self.ints]) + "]"
@@ -345,22 +339,25 @@ class GroupIntegrator(Integrator):
             return NotImplemented
         return self
 
-    def set_index(self, index: Optional[Index], /) -> None:
-        if index is not None:
-            self.clear(result_only=False)
-            for integrator in self.ints:
-                integrator.set_index(index)
+    def set_region(self, region: TensorLike, /) -> None:
+        for integrator in self.ints:
+            integrator.set_region(region)
+        return super().set_region(region)
 
-        self.index = index
+    @overload
+    def to_global_dof(self, space: _FS, /, indices: _OpIndex = None) -> TensorLike: ...
+    @overload
+    def to_global_dof(self, space: Tuple[_FS, ...], /, indices: _OpIndex = None) -> Tuple[TensorLike, ...]: ...
+    def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None):
+        if indices is None:
+            return self.ints[0].to_global_dof(space)
+        return self.ints[0].to_global_dof(space, indices=indices)
 
-    def to_global_dof(self, space: _FS) -> TensorLike:
-        return self.ints[0].to_global_dof(space)
-
-    def assembly(self, space: Union[_FS, Tuple[_FS, ...]]) -> TensorLike:
-        ct = self.ints[0](space)
+    def assembly(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
+        ct = self.ints[0](space, indices=indices)
 
         for int_ in self.ints[1:]:
-            new_ct = int_(space)
+            new_ct = int_(space, indices=indices)
             fdim = min(ct.ndim, new_ct.ndim)
             if ct.shape[:fdim] != new_ct.shape[:fdim]:
                 raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "
