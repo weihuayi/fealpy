@@ -1,10 +1,10 @@
 
 from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Sequence
 from typing import overload, Generic
+import logging
 
 from .. import logger
-from ..typing import TensorLike, Index, CoefLike, _S
-from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, CoefLike
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import ftype_memory_size
 
@@ -175,10 +175,15 @@ class Integrator(metaclass=IntegratorMeta):
         return ConstIntegrator(value, to_gdof)
 
     def __call__(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
+        logger.debug(f"(INTEGRATOR RUN) {self.__class__.__name__}, on {space.__class__.__name__}")
         meth = getattr(self, self._assembly_name_map[self._method], None)
         if indices is None:
-            return meth(space) # Old API
-        return meth(space, indices=indices)
+            val = meth(space) # Old API
+        else:
+            val = meth(space, indices=indices)
+        if logger.level == logging._nameToLevel['INFO']:
+            logger.info(f"Local tensor sized {ftype_memory_size(val)} Mb.")
+        return val
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._method})"

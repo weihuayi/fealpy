@@ -16,6 +16,7 @@ Self = TypeVar('Self')
 class Form(Generic[_I], ABC):
     _spaces: Tuple[_FS, ...]
     integrators: Dict[str, _I]
+    chunk_sizes: Dict[str, int]
     batch_size: int
     sparse_shape: Tuple[int, ...]
 
@@ -32,6 +33,7 @@ class Form(Generic[_I], ABC):
             space = space[0]
         self._spaces = space
         self.integrators = {}
+        self.chunk_sizes = {}
         self._cursor = 0
         self.batch_size = batch_size
 
@@ -69,18 +71,19 @@ class Form(Generic[_I], ABC):
             return self._spaces
 
     @overload
-    def add_integrator(self: Self, I: _I, /, *, region: Optional[Index] = None, group: str = ...) -> Self: ...
+    def add_integrator(self: Self, I: _I, /, *, region: Optional[Index] = None, chunk_size: int = 0, group: str = ...) -> Self: ...
     @overload
-    def add_integrator(self: Self, I: Sequence[_I], /, *, region: Optional[Index] = None, group: str = ...) -> Self: ...
+    def add_integrator(self: Self, I: Sequence[_I], /, *, region: Optional[Index] = None, chunk_size: int = 0, group: str = ...) -> Self: ...
     @overload
-    def add_integrator(self: Self, *I: _I, region: Optional[Index] = None, group: str = ...) -> Self: ...
-    def add_integrator(self, *I, region: Optional[Index] = None, group=None):
+    def add_integrator(self: Self, *I: _I, region: Optional[Index] = None, chunk_size: int = 0, group: str = ...) -> Self: ...
+    def add_integrator(self, *I, region: Optional[Index] = None, chunk_size=0, group=None):
         """Add integrator(s) to the form.
 
         Parameters:
             *I (Integrator): The integrator(s) to add as a new group.
                 Also accepts sequence of integrators.
             index (Index | None, optional):
+            chunk_size (int, optional):
             group (str | None, optional): Name of the group. Defaults to None.
 
         Returns:
@@ -100,7 +103,7 @@ class Form(Generic[_I], ABC):
         else:
             I = GroupIntegrator(*I, region=region)
 
-        return self._add_integrator_impl(I, group)
+        return self._add_integrator_impl(I, group, chunk_size)
 
     @overload
     def __lshift__(self: Self, other: Integrator) -> Self: ...
@@ -110,9 +113,10 @@ class Form(Generic[_I], ABC):
         else:
             return NotImplemented
 
-    def _add_integrator_impl(self, I: _I, group: Optional[str] = None):
+    def _add_integrator_impl(self, I: _I, group: Optional[str] = None, chunk_size: int = 0):
         group = f'_group_{self._cursor}' if group is None else group
         self._cursor += 1
+        self.chunk_sizes[group] = chunk_size
 
         if group in self.integrators:
             self.integrators[group] += I
@@ -128,6 +132,18 @@ class Form(Generic[_I], ABC):
             etg = (etg, )
         return integrator(self.space), etg
 
+    def assembly_local_iterative(self):
+        """Assembly local matrix considering chunk size.
+        Yields local matrix and to_global_dof tuple."""
+        for key, int_ in self.integrators.items():
+            chunk_size = self.chunk_sizes[key]
+            if chunk_size == 0:
+                logger.debug(f"(ASSEMBLY LOCAL FULL) {key}")
+                yield self._assembly_group(key)
+            else:
+                logger.debug(f"(ASSEMBLY LOCAL ITER) {key}, {chunk_size} chunks")
+                yield from IntegralIter.split(int_, chunk_size)(self.space)
+
 
 # An iteration util for the `_assembly_group` method.
 class IntegralIter():
@@ -135,12 +151,11 @@ class IntegralIter():
         self.integrator = integrator
         self.indices_or_segments = indices_or_segments
 
-    def get(self, space: Union[_FS, Tuple[_FS, ...]], region: Index):
-        self.integrator.set_region(region)
-        etg = self.integrator.to_global_dof(space)
+    def kernel(self, space: Union[_FS, Tuple[_FS, ...]], /, indices: Index):
+        etg = self.integrator.to_global_dof(space, indices=indices)
         if not isinstance(etg, (tuple, list)):
             etg = (etg, )
-        return self.integrator(space), etg
+        return self.integrator(space, indices=indices), etg
 
     def __call__(self, spaces: Tuple[_FS, ...]):
         if isinstance(self.indices_or_segments, TensorLike):
@@ -152,7 +167,7 @@ class IntegralIter():
 
     def _call_impl_indices(self, spaces: Tuple[_FS, ...], /, indices: Iterable[TensorLike]):
         for index in indices:
-            yield self.get(spaces, index)
+            yield self.kernel(spaces, index)
 
     def _call_impl_segments(self, spaces: Tuple[_FS, ...], /, segments: TensorLike):
         assert segments.ndim == 1
@@ -161,13 +176,14 @@ class IntegralIter():
         length = segments.shape[0] + 1
 
         for i in range(length):
+            logger.debug(f"(ITERATION) {i}/{length}")
             stop = segments[i] if (i + 1 < length) else None
             slicing = slice(start, stop, 1)
-            yield self.get(spaces, slicing)
+            yield self.kernel(spaces, slicing)
             start = stop
 
     @classmethod
-    def split(cls, integrator: Integrator, /, index: TensorLike, chunk_size=0):
-        size = index.shape[0]
+    def split(cls, integrator: Integrator, /, chunk_size=0):
+        size = integrator.get_region().shape[0]
         segments = bm.arange(chunk_size, size, chunk_size)
         return cls(integrator, segments)
