@@ -240,7 +240,6 @@ dbc = DirichletBC(space=tensor_space,
                     gd=0, 
                     threshold=tensor_is_bd_dof, 
                     method='interp')
-K = dbc.apply_matrix(matrix=K, check=True)
 uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
 # uh_bd, isDDof = tensor_space.boundary_interpolate(gd=0, 
 #                                                 uh=uh_bd, 
@@ -249,6 +248,7 @@ uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=
 isDDof = tensor_is_bd_dof
 F = F - K.matmul(uh_bd)
 F = bm.set_at(F, isDDof, uh_bd[isDDof])
+K = dbc.apply_matrix(matrix=K, check=True)
 values = K.values()
 K_norm = bm.sqrt(bm.sum(values * values))
 F_norm = bm.sqrt(bm.sum(F * F))   
