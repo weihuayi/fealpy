@@ -16,13 +16,13 @@ from soptx.filter import Filter
 class MMAOptions:
     """MMA 算法的配置选项"""
     max_iterations: int = 100      # 最大迭代次数
-    tolerance: float = 0.01       # 收敛容差
-    move_limit: float = 0.2       # 移动限制
-    asymp_init: float = 0.5      # 渐近初始系数
-    asymp_incr: float = 1.2      # 渐近递增系数
-    asymp_decr: float = 0.7      # 渐近递减系数
-    elastic_weight: float = 1e3   # 弹性权重
-    min_asymp: float = 1e-12     # 最小渐近系数
+    tolerance: float = 0.01        # 收敛容差
+    move_limit: float = 0.2        # 移动限制
+    asymp_init: float = 0.5        # 渐近初始系数
+    asymp_incr: float = 1.2        # 渐近递增系数
+    asymp_decr: float = 0.7        # 渐近递减系数
+    elastic_weight: float = 1e3    # 弹性权重
+    min_asymp: float = 1e-12       # 最小渐近系数
 
 @dataclass
 class OptimizationHistory:
@@ -47,8 +47,8 @@ class OptimizationHistory:
 class MMAOptimizer(OptimizerBase):
     """Method of Moving Asymptotes (MMA) 优化器
     
-    用于求解拓扑优化问题的 MMA 方法实现。该方法通过动态调整渐近线位置
-    来控制优化过程，具有良好的收敛性能。
+    用于求解拓扑优化问题的 MMA 方法实现. 该方法通过动态调整渐近线位置
+    来控制优化过程, 具有良好的收敛性能
     """
     
     def __init__(self,
@@ -56,7 +56,7 @@ class MMAOptimizer(OptimizerBase):
                  constraint: ConstraintBase,
                  filter: Optional[Filter] = None,
                  options: Optional[Dict[str, Any]] = None):
-        """初始化 MMA 优化器
+        """
         
         Parameters
         ----------
@@ -100,23 +100,22 @@ class MMAOptimizer(OptimizerBase):
         low : 下渐近线
         upp : 上渐近线
         """
-        n = len(rho)
         xmami = xmax - xmin
-        xmamieps = 0.00001 * np.ones((n, 1))
-        xmami = np.maximum(xmami, xmamieps)
+        asyinit = self.options.asymp_init
+        asyincr = self.options.asymp_incr
+        asydecr = self.options.asymp_decr
         
         if self._epoch <= 2:
             # 初始化渐近线
-            self._low = rho - self.options.asymp_init * xmami
-            self._upp = rho + self.options.asymp_init * xmami
+            self._low = rho - asyinit * xmami
+            self._upp = rho + asyinit * xmami
         else:
             # 基于历史信息调整渐近线
-            factor = np.ones((n, 1))
+            factor = bm.ones((rho.shape[0], 1))
             xxx = (rho - self._xold1) * (self._xold1 - self._xold2)
-            
             # 根据变化趋势调整系数
-            factor[xxx > 0] = self.options.asymp_incr
-            factor[xxx < 0] = self.options.asymp_decr
+            factor[xxx > 0] = asyincr
+            factor[xxx < 0] = asydecr
             
             # 更新渐近线位置
             self._low = rho - factor * (self._xold1 - self._low)
@@ -128,10 +127,10 @@ class MMAOptimizer(OptimizerBase):
             uppmin = rho + 0.01 * xmami
             uppmax = rho + 10 * xmami
             
-            self._low = np.maximum(self._low, lowmin)
-            self._low = np.minimum(self._low, lowmax)
-            self._upp = np.minimum(self._upp, uppmax)
-            self._upp = np.maximum(self._upp, uppmin)
+            self._low = bm.maximum(self._low, lowmin)
+            self._low = bm.minimum(self._low, lowmax)
+            self._upp = bm.minimum(self._upp, uppmax)
+            self._upp = bm.maximum(self._upp, uppmin)
             
         return self._low, self._upp
         
@@ -163,28 +162,54 @@ class MMAOptimizer(OptimizerBase):
         
         # 计算移动限制
         move = self.options.move_limit
-        alpha = np.maximum(low + 0.1 * (rho - low), 
-                         rho - move * (xmax - xmin))
-        beta = np.minimum(upp - 0.1 * (upp - rho),
-                        rho + move * (xmax - xmin))
-        
-        # 构建子问题的参数
-        ux1 = upp - rho
-        xl1 = rho - low
+        alpha = bm.maximum(low + 0.1 * (rho - low), rho - move * (xmax - xmin))
+        beta = bm.minimum(upp - 0.1 * (upp - rho), rho + move * (xmax - xmin))
+
+        # 一些辅助量
+        eeen = bm.ones(n)
+        eeem = bm.ones((m, 1))
+        raa0 = 1e-5  # 参数 raa0，可根据需要修改
+
+        # 计算 xmami, xmamiinv 等参数
+        xmami = xmax - xmin
+        xmamieps = raa0 * eeen
+        xmami = bm.maximum(xmami, xmamieps)
+        xmamiinv = eeen / xmami
+
+        # 定义当前设计点
+        xval = rho
+        ux1 = upp - xval
+        xl1 = xval - low
         ux2 = ux1 * ux1
         xl2 = xl1 * xl1
+        uxinv = eeen / ux1
+        xlinv = eeen / xl1
+
+        # df0dx 对应 dc，dfdx 对应 dg
+        df0dx = dc
+        dfdx  = dg.reshape(m, n)
         
-        # 目标函数的二次近似项
-        p0 = np.maximum(dc, 0)
-        q0 = np.maximum(-dc, 0)
+        # 构建 p0, q0
+        p0 = bm.maximum(df0dx, 0)
+        q0 = bm.maximum(-df0dx, 0)
+        pq0 = 0.001 * (p0 + q0) + raa0 * xmamiinv
+        p0 = p0 + pq0
+        q0 = q0 + pq0
         p0 = p0 * ux2
         q0 = q0 * xl2
         
-        # 约束函数的二次近似项
-        P = np.maximum(dg, 0)
-        Q = np.maximum(-dg, 0)
+        # 构建 P, Q
+        P = bm.maximum(dfdx, 0)
+        Q = bm.maximum(-dfdx, 0)
+        PQ = 0.001 * (P + Q) + raa0*(eeem @ xmamiinv[None,:])
+        P = P + PQ
+        Q = Q + PQ
+        from scipy.sparse import diags
         P = (diags(ux2.flatten(), 0).dot(P.T)).T
         Q = (diags(xl2.flatten(), 0).dot(Q.T)).T
+        
+        # 计算 b
+        b = (P @ uxinv + Q @ xlinv - fval)
         
         # 求解子问题
         xmma, ymma, zmma, lam, xsi, eta, mu, zet, s = self._mma_sub_solver(
@@ -201,7 +226,7 @@ class MMAOptimizer(OptimizerBase):
         
         Parameters
         ----------
-        rho : 初始密度场
+        rho-(NC, ): 初始密度场 
         **kwargs : 其他参数，例如：
             - beta: Heaviside 投影参数
         
@@ -215,8 +240,8 @@ class MMAOptimizer(OptimizerBase):
         tol = self.options.tolerance
         
         # 设置变量界限
-        xmin = np.zeros_like(rho)
-        xmax = np.ones_like(rho)
+        xmin = bm.zeros_like(rho)
+        xmax = bm.ones_like(rho)
         
         # 准备 Heaviside 投影的参数
         filter_params = {'beta': kwargs.get('beta')} if 'beta' in kwargs else None
