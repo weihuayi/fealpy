@@ -315,7 +315,7 @@ def find_node_location_kd_tree(target_node, gear, mesh: HexahedronMesh, error=1e
 
     return -1, -1, -1
 
-def export_to_inp(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, used_app='abaqus'):
+def export_to_inp(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, used_app='abaqus', mesh_type='hex'):
     """
     齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
     :param filename: 文件名
@@ -328,17 +328,19 @@ def export_to_inp(filename, nodes, elements, fixed_nodes, load_nodes, loads, you
     :param poisson_ratio: 泊松比
     :param density: 密度
     :param used_app: 使用的有限元软件，默认为 Abaqus
+    :param mesh_type: 网格类型，默认为六面体网格（hex），可选四面体网格（tet）
     :return:
     """
     assert used_app in ['abaqus', 'ansys']
+    assert mesh_type in ['hex', 'tet']
     if used_app == 'abaqus':
-        export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density)
+        export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, mesh_type)
     elif used_app == 'ansys':
-        export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density)
+        export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, mesh_type)
     else:
         raise ValueError("Invalid used_app parameter!")
 
-def export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density):
+def export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, mesh_type='hex'):
     """
     齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
     :param filename: 文件名
@@ -350,6 +352,7 @@ def export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loa
     :param young_modulus: 杨氏模量（GP）
     :param poisson_ratio: 泊松比
     :param density: 密度
+    :param mesh_type: 网格类型，默认为六面体网格（hex），可选四面体网格（tet）
     :return:
     """
     with open(filename, 'w') as file:
@@ -365,9 +368,15 @@ def export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loa
             file.write(f"{i+1}, {node[0]}, {node[1]}, {node[2]}\n")
 
         # 写入单元信息
-        file.write("*Element, type=C3D8, elset=AllElements\n")
-        for i, elem in enumerate(elements):
-            file.write(f"{i+1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        if mesh_type == 'hex':  # 六面体网格
+            file.write("*Element, type=C3D8, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(
+                    f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        elif mesh_type == 'tet':  # 四面体网格
+            file.write("*Element, type=C3D4, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}\n")
 
         # 写入截面
         file.write("*Solid Section, elset=AllElements, material=Steel\n")
@@ -418,7 +427,7 @@ def export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loa
 
         print("Export to inp file successfully!")
 
-def export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density):
+def export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, mesh_type='hex'):
     """
         齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
         :param filename: 文件名
@@ -430,6 +439,7 @@ def export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, load
         :param young_modulus: 杨氏模量（GP）
         :param poisson_ratio: 泊松比
         :param density: 密度
+        :param mesh_type: 网格类型，默认为六面体网格（hex），可选四面体网格（tet）
         :return:
         """
     with open(filename, 'w') as file:
@@ -445,10 +455,15 @@ def export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, load
             file.write(f"{i + 1}, {node[0]}, {node[1]}, {node[2]}\n")
 
         # 写入单元信息
-        file.write("*Element, type=C3D8, elset=AllElements\n")
-        for i, elem in enumerate(elements):
-            file.write(
-                f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        if mesh_type == 'hex':  # 六面体网格
+            file.write("*Element, type=C3D8, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(
+                    f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        elif mesh_type == 'tet':  # 四面体网格
+            file.write("*Element, type=C3D4, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}\n")
 
         # 定义固定节点集
         file.write("*Nset, nset=FixedNodes\n")
@@ -493,7 +508,7 @@ def export_to_inp_ansys(filename, nodes, elements, fixed_nodes, load_nodes, load
 
         print("Export to inp file successfully!")
 
-def export_to_inp_by_u(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, used_app='abaqus'):
+def export_to_inp_by_u(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, used_app='abaqus', mesh_type='hex'):
     """
     齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
     :param filename: 文件名
@@ -505,17 +520,19 @@ def export_to_inp_by_u(filename, nodes, elements, boundary_nodes_idx, boundary_n
     :param poisson_ratio: 泊松比
     :param density: 密度
     :param used_app: 使用的有限元软件，默认为 Abaqus
+    :param mesh_type: 网格类型，默认为六面体网格（hex），可选四面体网格（tet）
     :return:
     """
     assert used_app in ['abaqus', 'ansys']
+    assert mesh_type in ['hex', 'tet']
     if used_app == 'abaqus':
-        export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density)
+        export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, mesh_type)
     elif used_app == 'ansys':
-        export_to_inp_by_u_ansys(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density)
+        export_to_inp_by_u_ansys(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, mesh_type)
     else:
         raise ValueError("Invalid used_app parameter!")
 
-def export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density):
+def export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, mesh_type='hex'):
     """
     齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
     :param filename: 文件名
@@ -526,6 +543,7 @@ def export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, bou
     :param young_modulus: 杨氏模量（GP）
     :param poisson_ratio: 泊松比
     :param density: 密度
+    :param mesh_type: 网格类型，默认为六面体网格（hex），可选四面体网格（tet）
     :return:
     """
     with open(filename, 'w') as file:
@@ -540,9 +558,15 @@ def export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, bou
             file.write(f"{i+1}, {node[0]}, {node[1]}, {node[2]}\n")
 
         # 写入单元信息
-        file.write("*Element, type=C3D8, elset=AllElements\n")
-        for i, elem in enumerate(elements):
-            file.write(f"{i+1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        if mesh_type == 'hex':  # 六面体网格
+            file.write("*Element, type=C3D8, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(
+                    f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        elif mesh_type == 'tet':  # 四面体网格
+            file.write("*Element, type=C3D4, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}\n")
 
         # 写入截面
         file.write("*Solid Section, elset=AllElements, material=Steel\n")
@@ -580,7 +604,7 @@ def export_to_inp_by_u_abaqus(filename, nodes, elements, boundary_nodes_idx, bou
 
         print("Export to inp file successfully!")
 
-def export_to_inp_by_u_ansys(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density):
+def export_to_inp_by_u_ansys(filename, nodes, elements, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, mesh_type='hex'):
     """
     齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
     :param filename: 文件名
@@ -591,6 +615,7 @@ def export_to_inp_by_u_ansys(filename, nodes, elements, boundary_nodes_idx, boun
     :param young_modulus: 杨氏模量（GP）
     :param poisson_ratio: 泊松比
     :param density: 密度
+    :param mesh_type: 网格类型，默认为六面体网格（hex），可选四面体网格（tet）
     :return:
     """
     with open(filename, 'w') as file:
@@ -604,9 +629,15 @@ def export_to_inp_by_u_ansys(filename, nodes, elements, boundary_nodes_idx, boun
             file.write(f"{i+1}, {node[0]}, {node[1]}, {node[2]}\n")
 
         # 写入单元信息
-        file.write("*Element, type=C3D8, elset=AllElements\n")
-        for i, elem in enumerate(elements):
-            file.write(f"{i+1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        if mesh_type == 'hex':  # 六面体网格
+            file.write("*Element, type=C3D8, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(
+                    f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}, {elem[4]}, {elem[5]}, {elem[6]}, {elem[7]}\n")
+        elif mesh_type == 'tet':  # 四面体网格
+            file.write("*Element, type=C3D4, elset=AllElements\n")
+            for i, elem in enumerate(elements):
+                file.write(f"{i + 1}, {elem[0]}, {elem[1]}, {elem[2]}, {elem[3]}\n")
 
         # 写入材料信息
         file.write("*Material, name=Steel\n")

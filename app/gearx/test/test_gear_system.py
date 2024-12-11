@@ -9,7 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import fsolve
 import pytest
 
-from fealpy.mesh import QuadrangleMesh, HexahedronMesh, IntervalMesh
+from fealpy.mesh import QuadrangleMesh, HexahedronMesh, IntervalMesh, TetrahedronMesh
 from app.gearx.gear import ExternalGear, InternalGear
 from app.gearx.utils import *
 
@@ -301,6 +301,9 @@ class TestGearSystem:
         density = 7.85e-09
         mesh = HexahedronMesh.from_seven_hex_cube()
         node = mesh.node
+        # 四面体网格
+        nx, ny, nz = 2, 2, 2
+        tet_mesh = TetrahedronMesh.from_box(nx=nx, ny=ny, nz=nz)
 
         u = lambda p: (10e-3*(2*p[..., 0]+p[..., 1]+p[..., 2])/2).reshape(-1, 1)
         v = lambda p: (10e-3*(p[..., 0]+2*p[..., 1]+p[..., 2])/2).reshape(-1, 1)
@@ -310,9 +313,19 @@ class TestGearSystem:
         boundary_nodes = node[boundary_nodes_idx]
         boundary_nodes_u = np.concatenate([u(boundary_nodes), v(boundary_nodes), w(boundary_nodes)], axis=1)
 
-        export_to_inp_by_u('../data/seven_hex_by_u.inp', node, mesh.cell, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density)
-        export_to_inp_by_u('../data/seven_hex_ansys_by_u.inp', node, mesh.cell, boundary_nodes_idx, boundary_nodes_u, young_modulus, poisson_ratio, density, used_app='ansys')
+        export_to_inp_by_u('../data/seven_hex_by_u.inp', node, mesh.cell, boundary_nodes_idx, boundary_nodes_u,
+                           young_modulus, poisson_ratio, density)
+        export_to_inp_by_u('../data/seven_hex_ansys_by_u.inp', node, mesh.cell, boundary_nodes_idx, boundary_nodes_u,
+                           young_modulus, poisson_ratio, density, used_app='ansys')
 
+        # 四面体网格导出文件测试
+        tet_boundary_nodes_idx = tet_mesh.boundary_node_index()
+        tet_boundary_nodes = tet_mesh.node[tet_boundary_nodes_idx]
+        tet_boundary_nodes_u = np.concatenate([u(tet_boundary_nodes), v(tet_boundary_nodes), w(tet_boundary_nodes)], axis=1)
+        export_to_inp_by_u('../data/box_tet_by_u.inp', tet_mesh.node, tet_mesh.cell, tet_boundary_nodes_idx, tet_boundary_nodes_u,
+                           young_modulus, poisson_ratio, density, mesh_type='tet')
+        export_to_inp_by_u('../data/box_tet_ansys_by_u.inp', tet_mesh.node, tet_mesh.cell, tet_boundary_nodes_idx, tet_boundary_nodes_u,
+                           young_modulus, poisson_ratio, density, used_app='ansys', mesh_type='tet')
 
 
     def test_face_normal(self):
