@@ -595,13 +595,12 @@ class TensorMesh(HomogeneousMesh):
         elif TD == 2:
             gphi0 = bm.einsum('im, jn -> ijmn', dphi, phi).reshape(-1, ldof, 1)
             gphi1 = bm.einsum('im, jn -> ijmn', phi, dphi).reshape(-1, ldof, 1)
-            gphi = bm.concatenate((gphi0, gphi1), axis=-1)
+            gphi = bm.concatenate((gphi0, gphi1), axis=-1)              # (NQ, ldof, GD)
             if variables == 'x':
-                J = self.jacobi_matrix(bcs, index=index)
-                G = self.first_fundamental_form(J)
+                J = self.jacobi_matrix(bcs, index=index)                # (NC, NQ, GD, GD)
+                G = self.first_fundamental_form(J)                      # (NC, NQ, GD, GD)
                 G = bm.linalg.inv(G)
-                # gphi = bm.einsum('qikm, qimn, qln -> qilk', J, G, gphi)
-                gphi = bm.einsum('qikm, qimn, qln -> iqlk', J, G, gphi)
+                gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) # (NC, NQ, ldof, GD)
 
                 return gphi
             

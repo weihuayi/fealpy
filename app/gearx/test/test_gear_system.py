@@ -2,13 +2,14 @@ import pickle
 import json
 import numpy as np
 import pandas as pd
+from jax.experimental.array_api import reshape
 from numpy import tan, arctan, sin, cos, pi, arctan2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import fsolve
 import pytest
 
-from fealpy.mesh import QuadrangleMesh, HexahedronMesh, IntervalMesh
+from fealpy.mesh import QuadrangleMesh, HexahedronMesh, IntervalMesh, TetrahedronMesh
 from app.gearx.gear import ExternalGear, InternalGear
 from app.gearx.utils import *
 
@@ -235,26 +236,29 @@ class TestGearSystem:
 
         target_hex_mesh = external_gear.set_target_tooth([0, 1, 18])
         # target_hex_mesh.to_vtk(fname='../data/target_hex_mesh.vtu')
+        ansys_uh = np.loadtxt('D:/ansys/gear_15_load_u.txt', skiprows=1)[:, 1]
+        target_hex_mesh.nodedata['ansys_u'] = ansys_uh
+        target_hex_mesh.to_vtk(fname='D:/ansys/gear_15_load_u.vtu')
 
-        n = 15
-        helix_d = np.linspace(external_gear.d, external_gear.effective_da, n)
-        helix_width = np.linspace(0, external_gear.tooth_width, n)
-        helix_node = external_gear.cylindrical_to_cartesian(helix_d, helix_width)
-        helix_cell = np.array([[i, i + 1] for i in range(n - 1)])
-        i_mesh = IntervalMesh(helix_node, helix_cell)
-        # i_mesh.to_vtk(fname='../data/target_interval_mesh.vtu')
-
-        target_cell_idx = np.zeros(n, np.int32)
-        local_face_idx = np.zeros(n, np.int32)
-        parameters = np.zeros((n, 3), np.float64)
-        for i, t_node in enumerate(helix_node):
-            target_cell_idx[i], local_face_idx[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
-
-        node = target_hex_mesh.node
-        # 寻找内圈上节点
-        node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
-        is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
-        inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+        # n = 15
+        # helix_d = np.linspace(external_gear.d, external_gear.effective_da, n)
+        # helix_width = np.linspace(0, external_gear.tooth_width, n)
+        # helix_node = external_gear.cylindrical_to_cartesian(helix_d, helix_width)
+        # helix_cell = np.array([[i, i + 1] for i in range(n - 1)])
+        # i_mesh = IntervalMesh(helix_node, helix_cell)
+        # # i_mesh.to_vtk(fname='../data/target_interval_mesh.vtu')
+        #
+        # target_cell_idx = np.zeros(n, np.int32)
+        # local_face_idx = np.zeros(n, np.int32)
+        # parameters = np.zeros((n, 3), np.float64)
+        # for i, t_node in enumerate(helix_node):
+        #     target_cell_idx[i], local_face_idx[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
+        #
+        # node = target_hex_mesh.node
+        # # 寻找内圈上节点
+        # node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        # is_inner_node = np.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+        # inner_node_idx = np.where(np.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
 
         # with open('../data/external_gear_test_data.pkl', 'wb') as f:
         #     pickle.dump({'external_gear': external_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
@@ -262,7 +266,7 @@ class TestGearSystem:
         #                  'is_inner_node': is_inner_node, 'inner_node_idx': inner_node_idx}, f)
 
     def test_export_to_inp(self):
-        with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/external_gear_data_part.pkl', 'rb') as f:
+        with open('../data/external_gear_data_part.pkl', 'rb') as f:
             data = pickle.load(f)
         external_gear = data['external_gear']
         hex_mesh = data['hex_mesh']
@@ -276,19 +280,53 @@ class TestGearSystem:
         cell = hex_mesh.cell
         fixed_nodes = inner_node_idx
         load_nodes = cell[target_cell_idx[0]]
-        loads = np.array([[-10, -10, 0],
-                          [-10, -10, 0],
-                          [-10, -10, 0],
-                          [-10, -10, 0],
-                          [-10, -10, 0],
-                          [-10, -10, 0],
-                          [-10, -10, 0],
-                          [-10, -10, 0]])
+        loads = np.array([[-10, -1., 0],
+                          [-10, -2., 0],
+                          [-10, -3., 0],
+                          [-10, -4., 0],
+                          [-10, -5., 0],
+                          [-10, -6., 0],
+                          [-10, -7., 0],
+                          [-10, -8., 0]])
         young_modulus = 206e9
         poisson_ratio = 0.3
-        density = 7850
+        density = 7.85e-09
 
         export_to_inp('../data/external_gear_test.inp', node, cell, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density)
+        export_to_inp('../data/external_gear_test_ansys.inp', node, cell, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density, used_app='ansys')
+
+    def test_export_to_inp_by_u(self):
+        young_modulus = 206e9
+        poisson_ratio = 0.3
+        density = 7.85e-09
+        mesh = HexahedronMesh.from_seven_hex_cube()
+        node = mesh.node
+        # 四面体网格
+        nx, ny, nz = 2, 2, 2
+        tet_mesh = TetrahedronMesh.from_box(nx=nx, ny=ny, nz=nz)
+
+        u = lambda p: (10e-3*(2*p[..., 0]+p[..., 1]+p[..., 2])/2).reshape(-1, 1)
+        v = lambda p: (10e-3*(p[..., 0]+2*p[..., 1]+p[..., 2])/2).reshape(-1, 1)
+        w = lambda p: (10e-3*(p[..., 0]+p[..., 1]+2*p[..., 2])/2).reshape(-1, 1)
+
+        boundary_nodes_idx = np.array([8, 9, 10, 11, 12, 13, 14, 15])
+        boundary_nodes = node[boundary_nodes_idx]
+        boundary_nodes_u = np.concatenate([u(boundary_nodes), v(boundary_nodes), w(boundary_nodes)], axis=1)
+
+        export_to_inp_by_u('../data/seven_hex_by_u.inp', node, mesh.cell, boundary_nodes_idx, boundary_nodes_u,
+                           young_modulus, poisson_ratio, density)
+        export_to_inp_by_u('../data/seven_hex_ansys_by_u.inp', node, mesh.cell, boundary_nodes_idx, boundary_nodes_u,
+                           young_modulus, poisson_ratio, density, used_app='ansys')
+
+        # 四面体网格导出文件测试
+        tet_boundary_nodes_idx = tet_mesh.boundary_node_index()
+        tet_boundary_nodes = tet_mesh.node[tet_boundary_nodes_idx]
+        tet_boundary_nodes_u = np.concatenate([u(tet_boundary_nodes), v(tet_boundary_nodes), w(tet_boundary_nodes)], axis=1)
+        export_to_inp_by_u('../data/box_tet_by_u.inp', tet_mesh.node, tet_mesh.cell, tet_boundary_nodes_idx, tet_boundary_nodes_u,
+                           young_modulus, poisson_ratio, density, mesh_type='tet')
+        export_to_inp_by_u('../data/box_tet_ansys_by_u.inp', tet_mesh.node, tet_mesh.cell, tet_boundary_nodes_idx, tet_boundary_nodes_u,
+                           young_modulus, poisson_ratio, density, used_app='ansys', mesh_type='tet')
+
 
     def test_face_normal(self):
         import matplotlib.pyplot as plt

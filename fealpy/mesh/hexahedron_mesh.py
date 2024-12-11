@@ -10,7 +10,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
-        super(HexahedronMesh, self).__init__(TD = 3, 
+        super(HexahedronMesh, self).__init__(TD = 3,
                                         itype = cell.dtype, ftype = node.dtype)
         self.node = node
         self.cell = cell
@@ -40,7 +40,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         self.construct()
         self.nodedata = {}
         self.edgedata = {}
-        self.facedata = {} 
+        self.facedata = {}
         self.celldata = {}
         self.meshdata = {}
 
@@ -103,10 +103,10 @@ class HexahedronMesh(TensorMesh, Plotable):
         n = bm.sqrt(bm.sum(n**2, axis=-1))
         val = bm.einsum('q, qi->i', ws, n)
         return val
-    
+
     def jacobi_matrix(self, bc, index=_S):
         """
-        @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵。
+        @brief 计算参考实体到实际实体间映射的 Jacobi 矩阵
             x(u, v, w) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         assert isinstance(bc, tuple)
@@ -135,7 +135,7 @@ class HexahedronMesh(TensorMesh, Plotable):
             for j in range(i+1, TD):
                 data[i][j] = bm.einsum('...d, ...d->...', J[..., i], J[..., j])
                 data[j][i] = data[i][j]
-        data = [val.reshape(val.shape+(1,)) for data_ in data for val in data_]  
+        data = [val.reshape(val.shape+(1,)) for data_ in data for val in data_]
         G = bm.concatenate(data, axis=-1).reshape(shape)
         return G
 
@@ -149,7 +149,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         gp = self.number_of_global_ipoints(p)
         ipoint = bm.zeros([gp, 3], dtype=self.ftype, device=bm.get_device(cell))
 
-        line = (bm.linspace(0, 1, p+1, endpoint=True, 
+        line = (bm.linspace(0, 1, p+1, endpoint=True,
                         dtype=self.ftype, device=bm.get_device(cell))).reshape(-1, 1)
         line = bm.concatenate([1-line, line], axis=1)
         bcs = (line, line, line)
@@ -163,7 +163,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         """
         @brief 生成每个面上的插值点全局编号
         """
-        return self.quad_to_ipoint(p, index) 
+        return self.quad_to_ipoint(p, index)
 
     def cell_to_ipoint(self, p, index=_S):
         """!
@@ -192,7 +192,7 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         multiIndex = bm.concatenate([multiIndex0, multiIndex1, multiIndex2], axis=-1)
 
-        dofidx = bm.zeros((6, (p+1)**2), 
+        dofidx = bm.zeros((6, (p+1)**2),
                         dtype=self.itype, device=bm.get_device(cell))
         dofidx[0], = bm.nonzero(multiIndex[:, 2]==0)
         dofidx[1], = bm.nonzero(multiIndex[:, 2]==p)
@@ -201,7 +201,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         dofidx[4], = bm.nonzero(multiIndex[:, 1]==0)
         dofidx[5], = bm.nonzero(multiIndex[:, 1]==p)
 
-        cell2ipoint = bm.zeros([NC, (p+1)**3], 
+        cell2ipoint = bm.zeros([NC, (p+1)**3],
                             dtype=self.itype, device=bm.get_device(cell))
         lf2e = bm.array([[0, 1, 2, 3], [8, 9, 10, 11],
                          [3, 7, 11, 4], [1, 6, 9, 5],
@@ -222,13 +222,13 @@ class HexahedronMesh(TensorMesh, Plotable):
             idx = multiIndex2d[:, idx0].swapaxes(0, 1) #(NC, NQ, 4)
 
             idx = idx[..., 0]*(p+1)+idx[..., 1]
-            cell2ipoint = bm.set_at(cell2ipoint, (slice(None), dofidx[i]), 
+            cell2ipoint = bm.set_at(cell2ipoint, (slice(None), dofidx[i]),
                                     face2ipoint[cell2face[:, i, None], idx])
             # cell2ipoint[:, dofidx[i]] = face2ipoint[cell2face[:, i, None], idx]
 
         indof = bm.all(multiIndex>0, axis=-1) & bm.all(multiIndex<p, axis=-1)
         cell2ipoint = bm.set_at(cell2ipoint, (slice(None), indof),
-                        bm.arange(NN + NE*(p-1) + NF*(p-1)**2, NN + NE*(p-1) + NF*(p-1)**2 + NC*(p-1)**3, 
+                        bm.arange(NN + NE*(p-1) + NF*(p-1)**2, NN + NE*(p-1) + NF*(p-1)**2 + NC*(p-1)**3,
                         dtype=cell2ipoint.dtype, device=bm.get_device(cell2ipoint)).reshape(NC, -1))
         # cell2ipoint[:, indof] = bm.arange(NN+NE*(p-1)+NF*(p-1)**2,
         #         NN+NE*(p-1)+NF*(p-1)**2+NC*(p-1)**3).reshape(NC, -1)
@@ -251,7 +251,7 @@ class HexahedronMesh(TensorMesh, Plotable):
             NE = self.number_of_edges()
             NF = self.number_of_faces()
             NC = self.number_of_cells()
-            node = bm.zeros((NN + NE + NF + NC, 3), 
+            node = bm.zeros((NN + NE + NF + NC, 3),
                             dtype=self.ftype, device=self.device)
             start = 0
             end = NN
@@ -266,7 +266,7 @@ class HexahedronMesh(TensorMesh, Plotable):
             end = start + NF
             node[start:end] = self.entity_barycenter('cell')
 
-            cell = bm.zeros((8*NC, 8), 
+            cell = bm.zeros((8*NC, 8),
                             dtype=self.itype, device=self.device)
             c2n = self.entity('cell')
             c2e = self.cell_to_edge() + NN
@@ -405,7 +405,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, 
+    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10,
                 threshold=None, *, itype=None, ftype=None, device=None,):
         """
         Generate a hexahedral mesh for a box domain.
@@ -650,7 +650,45 @@ class HexahedronMesh(TensorMesh, Plotable):
         node = bm.concatenate((node, node[nidx]), axis=0)
         mesh = cls(node, cell)
         return mesh
-    
+
+    @classmethod
+    def from_seven_hex_cube(cls, itype=None, ftype=None, device=None):
+        """
+        @brief 构造一个只有七个六面体的网格
+        """
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        node = bm.array([[0.249, 0.342, 0.192],
+                         [0.826, 0.288, 0.288],
+                         [0.850, 0.649, 0.263],
+                         [0.273, 0.750, 0.230],
+                         [0.320, 0.186, 0.643],
+                         [0.677, 0.305, 0.683],
+                         [0.788, 0.693, 0.644],
+                         [0.165, 0.745, 0.702],
+                         [0, 0, 0],
+                         [1, 0, 0],
+                         [1, 1, 0],
+                         [0, 1, 0],
+                         [0, 0, 1],
+                         [1, 0, 1],
+                         [1, 1, 1],
+                         [0, 1, 1]],
+                        dtype=ftype, device=device)
+
+        cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7],
+                         [0, 3, 2, 1, 8, 11, 10, 9],
+                         [4, 5, 6, 7, 12, 13, 14, 15],
+                         [3, 7, 6, 2, 11, 15, 14, 10],
+                         [0, 1, 5, 4, 8, 9, 13, 12],
+                         [1, 2, 6, 5, 9, 10, 14, 13],
+                         [0, 4, 7, 3, 8, 12, 15, 11]],
+                        dtype=itype, device=device)
+        return cls(node, cell)
+
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
         from .vtk_extent import  write_to_vtu
 
@@ -681,6 +719,6 @@ class HexahedronMesh(TensorMesh, Plotable):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=celldata)
-    
-    
+
+
 HexahedronMesh.set_ploter('3d')
