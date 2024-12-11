@@ -27,6 +27,8 @@ class LinearMeshCFEDof(Generic[_MT]):
             index = threshold
             if (index.dtype == bm.bool) and (len(index) == gdof):
                 return index
+            else:
+                raise ValueError(f"Unknown threshold: {threshold}")
         else:
             if (method == 'centroid') | (method is None):
                 index = self.mesh.boundary_face_index()

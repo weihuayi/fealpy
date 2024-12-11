@@ -35,36 +35,44 @@ mesh_2d_struct = UniformMesh2d(extent=extent_2d, h=h_2d, origin=origin_2d)
 mesh_3d_struct = UniformMesh3d(extent=extent_3d, h=h_3d, origin=origin_3d)
 
 p = 4
-
-
-space_2d = LagrangeFESpace(mesh_2d_simplex, p=p, ctype='C')
-tensor_space_2d = TensorFunctionSpace(space_2d, shape=(-1, 2))
-
-tldof_2d_simplex = tensor_space_2d_simplex.number_of_global_dofs()
-print(f"tldof_2d_simplex: {tldof_2d_simplex}")
+space_2d_simplex = LagrangeFESpace(mesh_2d_simplex, p=p, ctype='C')
+space_3d_simplex = LagrangeFESpace(mesh_3d_simplex, p=p, ctype='C')
+tensor_space_2d_simplex = TensorFunctionSpace(space_2d_simplex, shape=(-1, 2))
+tensor_space_3d_simplex = TensorFunctionSpace(space_3d_simplex, shape=(-1, 3))
 
 linear_elastic_material_2d = LinearElasticMaterial(name='lam1_mu1', 
-                                        lame_lambda=1, shear_modulus=1, 
-                                        hypo='plane_stress')
+                                                lame_lambda=1, shear_modulus=1, 
+                                                hypo='plane_stress')
 linear_elastic_material_3d = LinearElasticMaterial(name='lam1_mu1',
-                                        lame_lambda=1, shear_modulus=1,
-                                        hypo='3D')
+                                                lame_lambda=1, shear_modulus=1,
+                                                hypo='3D')
 
-integrator_standard = LinearElasticIntegrator(material=linear_elastic_material_2d, q=p+3)
+integrator_standard_2d = LinearElasticIntegrator(material=linear_elastic_material_2d, 
+                                                q = p+3)
+integrator_standard_3d = LinearElasticIntegrator(material=linear_elastic_material_3d, 
+                                                q = p+3)
+integrator_fast_stress_2d = LinearElasticIntegrator(material=linear_elastic_material_2d,
+                                                q = p+3, method = 'fast_stress')
+integrator_fast_stress_3d = LinearElasticIntegrator(material=linear_elastic_material_3d,
+                                                q = p+3, method = 'fast_stress')
+integrator_symbolic_stress_2d = LinearElasticIntegrator(material=linear_elastic_material_2d, 
+                                                q = p+3, method = 'symbolic_stress')
+integrator_symbolic_stress_3d = LinearElasticIntegrator(material=linear_elastic_material_3d,
+                                                q = p+3, method = 'symbolic_stress')
 
-integrator1 = LinearElasticIntegrator(material=linear_elastic_material,
-                                    q=p+3, method='fast_stress')
-integrator2 = LinearElasticIntegrator(material=linear_elastic_material, 
-                                    q=p+3, method='symbolic_stress')
-integrator1.keep_data()
-integrator2.keep_data()   # 保留中间数据
+integrator_standard_2d.keep_data()
+integrator_standard_3d.keep_data()   # 保留中间数据
 # integrator2.keep_result() # 保留积分结果
+
 # 创建计时器
 t = timer("2d Local Assembly Timing")
 next(t)  # 启动计时器
 
-KE_2d_standard = integrator_standard.assembly(space=tensor_space_2d)
-t.send('Assembly')
+KE_2d_simplex_standard = integrator_standard_2d.assembly(space=tensor_space_2d_simplex)
+t.send('Standard Assembly 2d simplex')
+KE_2d_simplex_standard
+
+
 
 KE_2d_fast1 = integrator1.fast_assembly_stress(space=tensor_space)
 t.send('Fast Assembly1')

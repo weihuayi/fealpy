@@ -33,9 +33,10 @@ class LinearForm(Form[LinearInt]):
         if len(self._spaces) != 1:
             raise ValueError("LinearForm should have only one space.")
 
-    def _scalar_assembly(self, retain_ints: bool, batch_size: int):
+    def _scalar_assembly(self):
         self.check_space()
         space = self._spaces[0]
+        batch_size = self.batch_size
         gdof = space.number_of_global_dofs()
         init_value_shape = (0,) if (batch_size == 0) else (batch_size, 0)
         sparse_shape = (gdof, )
@@ -46,25 +47,23 @@ class LinearForm(Form[LinearInt]):
             spshape = sparse_shape
         )
 
-        for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, retain_ints)
-
+        for group_tensor, e2dofs_tuple in self.assembly_local_iterative():
             if (batch_size > 0) and (group_tensor.ndim == 2):
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
 
-            indices = e2dofs[0].reshape(1, -1)
+            indices = e2dofs_tuple[0].reshape(1, -1)
             group_tensor = bm.reshape(group_tensor, self._values_ravel_shape)
             M = M.add(COOTensor(indices, group_tensor, sparse_shape))
 
         return M
 
     @overload
-    def assembly(self, *, retain_ints: bool=False) -> TensorLike: ...
+    def assembly(self) -> TensorLike: ...
     @overload
-    def assembly(self, *, format: Literal['coo'], retain_ints: bool=False) -> COOTensor: ...
+    def assembly(self, *, format: Literal['coo']) -> COOTensor: ...
     @overload
-    def assembly(self, *, format: Literal['dense'], retain_ints: bool=False) -> TensorLike: ...
-    def assembly(self, *, format='dense', retain_ints: bool=False):
+    def assembly(self, *, format: Literal['dense']) -> TensorLike: ...
+    def assembly(self, *, format='dense'):
         """Assembly the linear form vector.
 
         Parameters:
@@ -74,7 +73,7 @@ class LinearForm(Form[LinearInt]):
         Returns:
             global_vector (COOTensor | TensorLike): Global sparse vector shaped ([batch, ]gdof).
         """
-        V = self._scalar_assembly(retain_ints, self.batch_size)
+        V = self._scalar_assembly()
 
         if format == 'dense':
             self._V = V.to_dense()
