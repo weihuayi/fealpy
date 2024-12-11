@@ -20,10 +20,11 @@ class TestInteriorPenaltyFESpace2d:
     def test_ip_lfe_space_2d(self):
         mesh = TriangleMesh.from_box([0,1,0,1],1,1)
         space = InteriorPenaltyFESpace2d(mesh, p=2)
-        qf = mesh.integrator(q=2)
+        qf = mesh.integrator(q=2, etype='edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        space.grad_normal_jump_basis(bcs)
-        space.grad_grad_normal_jump_basis(bcs)
+        rval = space.grad_normal_jump_basis(bcs)
+        print('rv:', rval)
+        #space.grad_grad_normal_jump_basis(bcs)
 
 bm.set_backend('numpy')
 dof = TestInteriorPenaltyDof2d()

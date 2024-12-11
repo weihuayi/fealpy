@@ -42,9 +42,9 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        cm = mesh.entity_measure('cell', index=index)
+        cm = mesh.entity_measure('edge', index=index)
         q = space.p+3 if self.q is None else self.q
-        qf = mesh.quadrature_formula(q, 'cell')
+        qf = mesh.quadrature_formula(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
         return bcs, ws, cm
 
@@ -62,7 +62,8 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, cm = self.fetch(space)
-        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=self.index)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='edge', index=self.index)
+        
 
     
     @assemblymethod('fast')

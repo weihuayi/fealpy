@@ -133,6 +133,20 @@ class TriangleMesh(SimplexMesh, Plotable):
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
 
+    def hess_shape_function(self, bc, p=1, index: Index=_S, variables='x'):
+        """
+        """
+        TD = bc.shape[1] - 1
+        H = bm.simplex_hess_shape_function(bc, p)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index, TD=TD)
+            Hphi = bm.einsum('...ijk, kjm -> k...imk', H, Dlambda)
+            return Hphi
+        elif variables == 'u':
+            return H
+        
+    cell_hess_shape_function = hess_shape_function
+
     cell_grad_shape_function = grad_shape_function
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):

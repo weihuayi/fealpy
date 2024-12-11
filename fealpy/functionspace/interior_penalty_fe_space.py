@@ -4,12 +4,12 @@ from ..typing import TensorLike, Index, _S, Threshold
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
 from ..mesh.mesh_base import Mesh
-from .space import FunctionSpace
 from .lagrange_fe_space import LagrangeFESpace
 from .bernstein_fe_space import BernsteinFESpace
 from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
-from .function import Function
-from fealpy.decorator import barycentric, cartesian
+
+import numpy as np
+
 
 _MT = TypeVar('_MT', bound=Mesh)
 
@@ -104,7 +104,7 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
@@ -117,6 +117,7 @@ class InteriorPenaltyFESpace2d:
         # 左边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
+            
             edgeidx = ie2c[:, 2]==i
             dofidx0 = bm.where(self.dof.multiIndex[:, i] != 0)[0]
             dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
@@ -128,7 +129,7 @@ class InteriorPenaltyFESpace2d:
             rval0 = bm.set_at(rval0, indices, val[..., dofidx0])
             rval2 = bm.add_at(rval2, indices, val[..., dofidx1])
 
-        bcss = [bm.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
         # 右边单元的基函数的法向导数跳量
         for i in range(3):
@@ -165,7 +166,7 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
@@ -190,7 +191,7 @@ class InteriorPenaltyFESpace2d:
             rval0 = bm.set_at(rval0, indices, val[..., dofidx0])
             rval2 = bm.add_at(rval2, indices, val[..., dofidx1])
 
-        bcss = [bm.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
         # 右边单元
         for i in range(3):
@@ -226,7 +227,7 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         rval = bm.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
@@ -243,7 +244,7 @@ class InteriorPenaltyFESpace2d:
             rval = bm.set_at(rval, indices, val)
         return rval
 
-    def boundary_edge_grad_normal_2_jump_basis(self, bcs, m=1):
+    def boundary_edge_grad_grad_normal_jump_basis(self, bcs, m=1):
         """
         @brief 法向导数跳量计算
         @return (NQ, NIE, ldof)
@@ -260,7 +261,7 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         rval = bm.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
