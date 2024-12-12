@@ -332,8 +332,9 @@ class TensorFunctionSpace(FunctionSpace):
                                                                     dof_threshold))
                 elif method == 'interp':
                     assert len(threshold) == self.dof_numel 
-                    isScalarBDof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold] 
-                    gd_tensor = [gd(ipoints[isScalarBDof[i]])[...,i] for i in range(self.dof_numel)]
+                    isScalarBDof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold]
+
+                    gd_tensor = [gd(ipoints[isScalarBDof[i]])[..., i] for i in range(self.dof_numel)]
                     isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
                     if uh is None:
                         uh = self.function()
@@ -341,9 +342,32 @@ class TensorFunctionSpace(FunctionSpace):
                         gd_tensor = bm.concatenate(gd_tensor)
                     else:
                         scalar_gdof = scalar_space.number_of_global_dofs()
-                        gd_tensor = bm.concatenate([bm.array([j[i] for j in isScalarBDof]) for i in range(scalar_gdof)])
+                        # 使用列表推导式重新排列数据
+                        gd_values = []
+                        for i in range(scalar_gdof):
+                            for j in range(self.dof_numel):
+                                # 从 gd_tensor[j] 中获取第 i 个标量基函数的值
+                                gd_values.append(gd_tensor[j][i] if i < len(gd_tensor[j]) else 0.0)
+                        gd_tensor = bm.array(gd_values)
+                        gd_tensor = gd_tensor[isTensorBDof]
+
                     uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor)
+                    
                     return uh, isTensorBDof
+
+                    # gd_tensor = [gd(ipoints[isScalarBDof[i]]) for i in range(self.dof_numel)]
+                    # gd_tensor = bm.concatenate(gd_tensor, axis=0)
+
+                    # isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
+                    # index = bm.where(isTensorBDof)
+                    # if uh is None:
+                    #     uh = self.function()
+                    # if self.dof_priority:
+                    #     gd_tensor = gd_tensor.T.reshape(-1)
+                    # else:
+                    #     gd_tensor = gd_tensor.reshape(-1)
+                    # uh[index] = gd_tensor[index]
+                    # return uh, isTensorBDof
                 else:
                     raise ValueError(f"Unknown method: {method}")
             else:

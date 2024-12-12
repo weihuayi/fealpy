@@ -46,6 +46,7 @@ dist
 *.swn
 *.swo
 *.vtu
+*.txt
 
 *.cpython-38.pyc
 .vscode
@@ -67,4 +68,5 @@ __pycache__
 tags
 .idea
 
+.DS_Store
 .DS_Store

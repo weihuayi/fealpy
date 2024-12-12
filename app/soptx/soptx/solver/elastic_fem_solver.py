@@ -25,6 +25,7 @@ class DirectSolverResult:
 class AssemblyMethod(Enum):
     """矩阵组装方法的枚举类"""
     STANDARD = auto()     # 标准组装方法
+    VOIGT = auto()        # Voigt 格式组装
     FAST_STRAIN = auto()  # 应变快速组装
     FAST_STRESS = auto()  # 应力快速组装
     FAST_3D = auto()      # 3D 快速组装
@@ -32,7 +33,7 @@ class AssemblyMethod(Enum):
 @dataclass
 class AssemblyConfig:
     """矩阵组装的配置类"""
-    method: AssemblyMethod = AssemblyMethod.STANDARD
+    method: AssemblyMethod = AssemblyMethod.VOIGT
     quadrature_degree_increase: int = 3 
 
 class ElasticFEMSolver:
@@ -149,6 +150,7 @@ class ElasticFEMSolver:
         # 根据 assembly_config.method 选择对应的组装函数
         method_map = {
             AssemblyMethod.STANDARD: integrator.assembly,
+            AssemblyMethod.VOIGT: integrator.voigt_assembly,
             AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
             AssemblyMethod.FAST_STRESS: integrator.fast_assembly_stress,
             AssemblyMethod.FAST_3D: integrator.fast_assembly
@@ -175,6 +177,7 @@ class ElasticFEMSolver:
         # 确定积分方法
         method_map = {
             AssemblyMethod.STANDARD: 'assembly',
+            AssemblyMethod.VOIGT: 'voigt',
             AssemblyMethod.FAST_STRAIN: 'fast_strain',
             AssemblyMethod.FAST_STRESS: 'fast_stress',
             AssemblyMethod.FAST_3D: 'fast_3d'
@@ -210,6 +213,7 @@ class ElasticFEMSolver:
         bform.add_integrator(integrator)
         # t.send('Local Assembly')
         K = bform.assembly(format='csr')
+        Kdense = K.to_dense()
         # t.send('Global Assembly')
 
         # 结束计时
@@ -222,12 +226,6 @@ class ElasticFEMSolver:
         """组装全局载荷向量"""
         force = self.pde.force
         F = self.tensor_space.interpolate(force)
-
-        # # 让 F 依赖于当前密度
-        # if self._current_density is not None:
-        #     # 创建一个非常小的系数，使 F 依赖于密度但几乎不改变其值
-        #     epsilon = 1e-30
-        #     F = F * (1.0 + epsilon * bm.sum(self._current_density))
 
         self._global_force_vector = F
 
@@ -252,9 +250,10 @@ class ElasticFEMSolver:
         uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(),
                         dtype=bm.float64, device=bm.get_device(self.tensor_space))
                         
-        isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
+        # isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
+        uh_bd, isBdDof = self.tensor_space.boundary_interpolate(gd=dirichlet, threshold=threshold, method='interp')
 
-        F = F - K.matmul(uh_bd)  # in-place operations
+        F = F - K.matmul(uh_bd[:])  
         F[isBdDof] = uh_bd[isBdDof]
         
         dbc = DirichletBC(space=self.tensor_space, gd=dirichlet,
