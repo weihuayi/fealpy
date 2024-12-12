@@ -1,10 +1,11 @@
 
-from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Sequence
-from typing import overload, Generic
+from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict
+from typing import Generic
 import logging
 
 from .. import logger
 from ..typing import TensorLike, Index, CoefLike
+from ..backend import backend_manager as bm
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import ftype_memory_size
 
@@ -167,6 +168,24 @@ class Integrator(metaclass=IntegratorMeta):
             raise RuntimeError("Region of integration not specified. "
                                "Use Integrator.set_region to set indices.")
         return self._region
+
+    def entity_selection(self, indices: _OpIndex = None) -> Index:
+        if self._region is None:
+            if indices is None:
+                return slice(None, None, None)
+            else:
+                return indices
+        else:
+            if indices is None:
+                if bm.is_tensor(self._region):
+                    if self._region.dtype == bm.bool:
+                        return bm.nonzero(self._region)[0][indices]
+                    return self._region[indices]
+                else:
+                    raise TypeError(f"region of type '{self._region.__class__.__name__}' "
+                                    "is not supported when indices is given.")
+            else:
+                return self._region
     ### END: Region of Integration ###
 
     def const(self, space: _SpaceGroup, /):
@@ -188,11 +207,7 @@ class Integrator(metaclass=IntegratorMeta):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._method})"
 
-    @overload
-    def to_global_dof(self, space: _FS, /, indices: _OpIndex = None) -> TensorLike: ...
-    @overload
-    def to_global_dof(self, space: Tuple[_FS, ...], /, indices: _OpIndex = None) -> Tuple[TensorLike, ...]: ...
-    def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None):
+    def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> Union[TensorLike, Tuple[TensorLike, ...]]:
         """Return the relationship between the integral entities
         and the global dofs."""
         raise NotImplementedError
@@ -344,10 +359,6 @@ class GroupIntegrator(Integrator):
             integrator.set_region(region)
         return super().set_region(region)
 
-    @overload
-    def to_global_dof(self, space: _FS, /, indices: _OpIndex = None) -> TensorLike: ...
-    @overload
-    def to_global_dof(self, space: Tuple[_FS, ...], /, indices: _OpIndex = None) -> Tuple[TensorLike, ...]: ...
     def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None):
         if indices is None:
             return self.ints[0].to_global_dof(space)
