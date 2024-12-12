@@ -43,6 +43,7 @@ class Form(Generic[_I], ABC):
     def copy(self):
         new_obj = self.__class__(self._spaces, batch_size=self.batch_size)
         new_obj.integrators.update(self.integrators)
+        new_obj.chunk_sizes.update(self.chunk_sizes)
         new_obj._values_ravel_shape = self._values_ravel_shape
         new_obj.sparse_shape = tuple(reversed(self.sparse_shape))
         return new_obj
