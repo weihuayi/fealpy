@@ -210,6 +210,11 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     #coeff[:, i, j] = sign*comb(bm.sum(beta),r)*bm.prod(bm.array(comb(dalpha, dbeta),**ikwargs),
                     #                                                   axis=0)*factorial(r)
 
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i],coeff[i+1], atol=1e-15)
+        #    print(i)
+
 
         # 局部自由度 边
         glambda = mesh.grad_lambda()
@@ -234,6 +239,17 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     j = dof2num[j]
                     coeff[:, i, j] = comb(beta_sum_cpu,
                                           int(dalpha))*(factorial(int(dalpha)))**2*val[:, None]
+        
+        ## 测试每个单元顶点的系数矩阵是一样的,与单元无关
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i,:18,:18],coeff[i+1,:18,:18], atol=1e-15)
+        #    print(i)
+        #print(coeff[:, :18, :18])
+        import numpy as np
+        np.savetxt('c.csv', coeff[0], delimiter=',')
+        
+
         #for i in range(NC):
         
         #    coeff[i] = solve_triangular(coeff[i], bm.eye(ldof), lower=True)

@@ -550,7 +550,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     alpha = bm.array(alpha)
                     flag = bm.array(flag)
                     gamma = bm.array(gamma)
-                    
+        ## 测试每个单元顶点的系数矩阵是一样的,与单元无关
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i,:105,:105],coeff[i+1,:105,:105], atol=1e-15)
+        #    print(i)
+        #print(coeff[:, :105, :105])
+        
+           
         # edge
         glambda = mesh.grad_lambda() # (NC, 4, 3)
         S12m = self.dof_index["edge"]
@@ -639,6 +646,15 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     I = dof2num[i]
                     J = dof2num[j]
                     coeff[:, I, J] = val 
+
+        ## 测试每个单元顶点的系数矩阵是一样的,与单元无关
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i,:105,:105],coeff[i+1,:105,:105], atol=1e-15)
+        #    print(i)
+        #print(coeff[:, :105, :105])
+        
+
         coeff = bm.linalg.inv(coeff)
         coeff = bm.transpose(coeff, (0, 2, 1))  
 
