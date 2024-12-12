@@ -1,3 +1,6 @@
+"""
+检验两种边界条件处理方法的效果
+"""
 from fealpy.backend import backend_manager as bm
 
 from fealpy.mesh import HexahedronMesh

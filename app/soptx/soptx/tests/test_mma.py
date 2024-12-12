@@ -152,17 +152,13 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     optimizer = MMAOptimizer(
         objective=objective,
         constraint=constraint,
+        m=1,
+        n=mesh.number_of_cells(),
         filter=filter_obj,
         options={
             'max_iterations': config.max_iterations,
-            'tolerance': config.tolerance,
-            'move_limit': config.move_limit,
-            'asymp_init': 0.5,        # 渐近初始系数
-            'asymp_incr': 1.2,        # 渐近递增系数
-            'asymp_decr': 0.7,        # 渐近递减系数
-            'elastic_weight': 1e3,    # 弹性权重
-            'min_asymp': 1e-12        # 最小渐近系数
-    }
+            'tolerance': config.tolerance
+        }
     )
     
     # Prepare optimization parameters
@@ -183,7 +179,7 @@ if __name__ == "__main__":
     # Run single test
     config1 = TestConfig(
         problem_type='cantilever_2d',
-        nx=16, ny=10,
+        nx=160, ny=60,
         volume_fraction=0.4,
         filter_radius=6.0,
         filter_type='sensitivity',
@@ -200,5 +196,15 @@ if __name__ == "__main__":
         save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/mbb_2d'
     )
 
-    result = run_optimization_test(config1)
+    config3 = TestConfig(
+        problem_type='cantilever_3d',
+        nx=6, ny=2, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type='density',
+        max_iterations=30,
+        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d'
+    )
+
+    result = run_optimization_test(config3)
     

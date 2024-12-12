@@ -1254,9 +1254,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        gphi = self.grad_shape_function(bcs, p=1, variables='u')
-        # J = bm.einsum( 'cim, qin -> qcmn', node[cell[:]], gphi)
-        J = bm.einsum( 'cim, qin -> cqmn', node[cell[:]], gphi)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')   # (NQ, ldof, GD)
+        #TODO 这里不能翻转网格，否则会导致 Jacobian 计算错误
+        node_cell_flip = node[cell[:]]                             # (NC, NCN, GD)
+        J = bm.einsum( 'cim, qin -> cqmn', node_cell_flip, gphi)
 
         return J
     

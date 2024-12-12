@@ -124,7 +124,8 @@ class QuadrangleMesh(TensorMesh, Plotable):
         node = self.entity('node')
         cell = self.entity('cell', index=index)
         gphi = self.grad_shape_function(bc, p=1, variables='u', index=index) # (NQ, ldof, GD)
-        J = bm.einsum('cim, qin -> cqmn', node[cell[:, [0, 3, 1, 2]]], gphi) # (NC, NQ, GD, GD)
+        node_cell_flip = node[cell[:, [0, 3, 1, 2]]]
+        J = bm.einsum('cim, qin -> cqmn', node_cell_flip, gphi) # (NC, NQ, GD, GD)
         
         return J
 

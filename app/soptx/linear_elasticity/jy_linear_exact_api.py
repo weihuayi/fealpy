@@ -182,10 +182,10 @@ isBdNode = space.is_boundary_dof(threshold=None)
 boundary_nodes_idx = bm.where(isBdNode)[0]
 boundary_nodes = node[boundary_nodes_idx]
 boundary_nodes_u = bm.concatenate([u(boundary_nodes), v(boundary_nodes), w(boundary_nodes)], axis=1)
-export_to_inp_by_u(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/linear_fealpy.inp', 
+export_to_inp_by_u_ansys(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/linear_fealpy.inp', 
               nodes=node, elements=cell, 
               boundary_nodes_idx=boundary_nodes_idx, boundary_nodes_u=boundary_nodes_u,
-              young_modulus=E, poisson_ratio=nu, density=7.85e-9, used_app='ansys')
+              young_modulus=E, poisson_ratio=nu, density=7.85e-9, mesh_type='tet')
 
 # 边界条件处理
 uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
