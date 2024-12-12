@@ -67,8 +67,8 @@ class Filter:
                         density: TensorLike,
                         filter_params: Optional[dict] = None) -> TensorLike:
         """
-        获取物理密度场。只有在 Heaviside 投影滤波时才会对密度进行变换，
-        其他情况直接返回输入密度。
+        获取物理密度场. 
+        只有在 Heaviside 投影滤波时才会对密度进行变换, 其他情况直接返回输入密度.
 
         Parameters
         ----------
