@@ -224,8 +224,13 @@ class Solver():
         self.u_BF_SI.clear()
 
     def reinit_phi(self, phi):
-       tag0 = phi[:] > 2.1*self.pde.epsilon
-       tag1 = phi[:] < -2.1*self.pde.epsilon
-       phi[tag0] = 1
-       phi[tag1] = -1
-       return phi[:]
+        tag0 = phi[:] > 2.1*self.pde.epsilon
+        tag1 = phi[:] < -2.1*self.pde.epsilon
+        phi[tag0] = 1
+        phi[tag1] = -1
+        return phi[:]
+    
+    def stress(self, u):
+        bcs = bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64)
+        stress = u.grad_value(bcs)
+        return stress

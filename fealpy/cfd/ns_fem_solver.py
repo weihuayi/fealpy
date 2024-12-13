@@ -95,6 +95,7 @@ class NSFEMSolver():
         
         Bform = BilinearForm(uspace)
         M = ScalarMassIntegrator(coef=R , q=q)
-        F = FluidBoundaryFrictionIntegrator(coef=1, q=q, threshold=threshold)
+        S = ScalarDiffusionIntegrator(coef=R , q=q)
+        F = FluidBoundaryFrictionIntegrator(coef=1, q=1, threshold=threshold)
         Bform.add_integrator(F)
         return Bform

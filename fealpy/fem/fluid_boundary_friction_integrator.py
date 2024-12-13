@@ -51,9 +51,9 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
     def to_global_dof(self, space: _FS) -> TensorLike:
         index = self.make_index(space)
         result1 = space.face_to_dof(index=index) 
-        tag = space.mesh.edge2cell[:,0]
+        tag = space.mesh.edge2cell[index,0]
         result2 = space.cell_to_dof()[tag]
-        return (result1, result2) 
+        return (result2, result1) 
     
     @enable_cache
     def fetch(self, space: _FS):
@@ -70,16 +70,17 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
         qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
         edge2cell = mesh.face_to_cell()
-        phi = space.cell_basis_on_edge(bcs, edge2cell[index,2])
+        
+        phi = space.basis(bcs)
         gphi = space.cell_grad_basis_on_edge(bcs, edge2cell[index,0], edge2cell[index,2])
-        n = mesh.edge_normal(index)
+        n = mesh.edge_unit_normal(index)
         return bcs, ws, phi, gphi, facemeasure, index, n
 
     def assembly(self, space: _FS):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, gphi, fm, index, n = self.fetch(space)
-        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
         gphin = bm.einsum('ej, eqlj->eql', n, gphi)
         result =  bilinear_integral(phi, gphin, ws, fm, val, batched=self.batched)
         return result

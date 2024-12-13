@@ -135,11 +135,15 @@ for i in range(nt):
     phi1[:] = phi2[:]
     mu1[:] = mu2[:]
     p1[:] = p2[:]
+    stress = solver.stress(u2)
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['phi'] = phi2
     mesh.nodedata['u'] = u2.reshape(2,-1).T
     #mesh.celldata['p'] = p2
+    mesh.celldata['tauxx'] = stress[..., 0,0]
+    mesh.celldata['tauxy'] = stress[..., 1,0]
+    mesh.celldata['tauyy'] = stress[..., 1,1]
     mesh.nodedata['mu'] = mu2
     mesh.to_vtk(fname=fname)
     timeline.advance()

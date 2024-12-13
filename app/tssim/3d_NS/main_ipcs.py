@@ -19,7 +19,7 @@ from fealpy.solver import spsolve
 output = './'
 T = 10
 nt = 500
-n = 1
+n = 2
 
 pde = ChannelFlow()
 mesh = pde.mesh(n)
@@ -28,7 +28,7 @@ timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=1)
-space = LagrangeFESpace(mesh, p=2)
+space = LagrangeFESpace(mesh, p=1)
 uspace = TensorFunctionSpace(space, (2,-1))
 
 solver = NSFEMSolver(pde, mesh, pspace, space, dt, q=5)
@@ -38,7 +38,16 @@ pgdof = pspace.number_of_global_dofs()
 
 u1 = uspace.function()
 p1 = pspace.function()
-
+'''
+ipoint = space.interpolation_points()
+import matplotlib.pylab  as plt
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+#mesh.find_edge(axes,fontsize=20,showindex=True)
+mesh.find_node(axes,node=ipoint,fontsize=20,showindex=True)
+plt.show()
+'''
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['u'] = u1.reshape(2,-1).T
 mesh.nodedata['p'] = p1
@@ -51,6 +60,7 @@ BC = DirichletBC(space=uspace,
 '''
 BForm = solver.IPCS_BForm_0(None)
 A = BForm.assembly()   
+print(A.to_dense())
 #A = BC.apply_matrix(A)
 print(bm.sum(bm.abs(A.to_dense())))
 
