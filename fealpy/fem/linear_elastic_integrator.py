@@ -50,12 +50,22 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
 
         if isinstance(mesh, SimplexMesh):
+            J = None
             detJ = None
+            is_constant_J = True  
         else:
             J = mesh.jacobi_matrix(bcs)
-            detJ = bm.linalg.det(J)
+            is_constant_J = bm.allclose(
+                                J[:, 0:1, :, :], J[:, 1:, :, :], 
+                                rtol=1e-10, atol=1e-12
+                            )   
+        
+            if is_constant_J:
+                detJ = None
+            else:
+                detJ = bm.linalg.det(J)
 
-        return cm, bcs, ws, gphi, detJ
+        return cm, bcs, ws, gphi, detJ, is_constant_J
     
     @enable_cache
     def fetch_fast_assembly(self, space: _FS):
@@ -106,15 +116,15 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
-        cm, bcs, ws, gphi, detJ = self.fetch_assembly(scalar_space)
+        cm, bcs, ws, gphi, detJ, is_constant_J = self.fetch_assembly(scalar_space)
 
-        if isinstance(mesh, SimplexMesh):
-            # 单纯形网格：直接在实际单元上积分
+        if is_constant_J:
+            # 常数 Jacobian：使用单元测度
             A_xx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 0], cm)
             A_yy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
             A_xy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 1], cm)
         else:
-            # 非单纯形网格：在参考单元上积分
+            # 非常数 Jacobian：使用行列式
             J = mesh.jacobi_matrix(bcs)
             detJ = bm.linalg.det(J)
             A_xx = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 0], detJ)
@@ -125,7 +135,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         GD = mesh.geo_dimension()
         if GD == 3:
-            if isinstance(mesh, SimplexMesh):
+            if is_constant_J:
                 A_xz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 2], cm)
                 A_yz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 2], cm)
                 A_zz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 2], cm)
@@ -230,15 +240,17 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def voigt_assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
-        cm, bcs, ws, gphi, detJ = self.fetch_assembly(scalar_space)
+        cm, bcs, ws, gphi, detJ, is_constant_J = self.fetch_assembly(scalar_space)
         
         D = self.material.elastic_matrix(bcs)
         B = self.material.strain_matrix(dof_priority=space.dof_priority, gphi=gphi)
 
-        if isinstance(mesh, SimplexMesh):
+        if is_constant_J:
+            # 常数 Jacobian：使用单元测度
             KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', 
                         ws, cm, B, D, B)
         else:
+            # 非常数 Jacobian：使用行列式
             KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
                         ws, detJ, B, D, B)
 

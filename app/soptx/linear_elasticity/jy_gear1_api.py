@@ -332,7 +332,7 @@ tgphi = bm.concatenate([tgphi1, tgphi2, tgphi3, tgphi4,
                         tgphi5, tgphi6, tgphi7, tgphi8], axis=1) # (NC, 8, tldof, GD, GD)
 tgrad = bm.einsum('cqimn, ci -> cqmn', tgphi, uh_cell)      # (NC, 8, GD, GD)
 
-# 积分点处的位移荼毒
+# 积分点处的位移
 # tgphi_quadrature = tensor_space.grad_basis(bcs_quadrature)  # (NC, NQ, tldof, GD, GD)
 
 # 应变张量
