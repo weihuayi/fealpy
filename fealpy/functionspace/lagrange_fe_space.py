@@ -166,12 +166,34 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         else:
             bcs[idx, ..., nmap[lidx]] = bc[..., 1]
             bcs[idx, ..., pmap[lidx]] = bc[..., 0]
-
         return self.mesh.shape_function(bcs, p=self.p)
 
     @barycentric
     def cell_grad_basis_on_edge(self, bc: TensorLike, index: TensorLike, lidx: TensorLike,
                                 direction=True) -> TensorLike:
+        TD = self.mesh.TD  ## 一定是单元的
+        NLF = self.mesh.number_of_faces_of_cells()
+        NF = self.mesh.number_of_faces()
+        NQ = bc.shape[0]
+        ldof = self.number_of_local_dofs('cell')
+        result = bm.zeros((NF,NQ,ldof,TD),dtype=self.ftype) 
+        face2cell = self.mesh.face_to_cell() 
+        cell2face = self.mesh.cell_to_face()
+        
+        for i in range(NLF):
+            cbcs = bm.insert(bc, i, 0.0, axis=-1)
+            ggphi = self.grad_basis(cbcs)
+            if direction: ##左边单元
+                tag = bm.where(face2cell[:,2]==i)
+                result[tag] = ggphi[face2cell[tag,0]]
+            else: ##右边单元
+                tag = bm.where(face2cell[:,3]==i)
+                result[tag] = ggphi[face2cell[tag,1]]
+        ii = cell2face[index,lidx]
+        return result[ii]
+    ''' 
+    @barycentric
+    def edge_grad_basis(self, bc, index, lidx, direction=True):
         """
 
         Notes
@@ -192,11 +214,11 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         """
         NE = len(index)
-        nmap = bm.array([1, 2, 0])
-        pmap = bm.array([2, 0, 1])
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
-        bcs = bm.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
-        idx = bm.arange(NE)
+        bcs = np.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NE)
         if direction:
             bcs[idx, ..., nmap[lidx]] = bc[..., 0]
             bcs[idx, ..., pmap[lidx]] = bc[..., 1]
@@ -208,38 +230,38 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         TD = self.TD
         multiIndex = self.mesh.multi_index_matrix(p, TD)
 
-        c = bm.arange(1, p+1, dtype=self.itype)
-        P = 1.0/bm.multiply.accumulate(c)
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
 
-        t = bm.arange(0, p)
+        t = np.arange(0, p)
         shape = bcs.shape[:-1]+(p+1, TD+1)
-        A = bm.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bcs[..., bm.newaxis, :] - t.reshape(-1, 1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bcs[..., np.newaxis, :] - t.reshape(-1, 1)
 
-        FF = bm.einsum('...jk, m->...kjm', A[..., 1:, :], bm.ones(p))
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
         FF[..., range(p), range(p)] = p
-        bm.cumprod(FF, axis=-2, out=FF)
-        F = bm.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = bm.sum(bm.tril(FF), axis=-1).swapaxes(-1, -2)
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
         F[..., 1:, :] *= P.reshape(-1, 1)
 
-        bm.cumprod(A, axis=-2, out=A)
+        np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
 
         Q = A[..., multiIndex, range(TD+1)]
         M = F[..., multiIndex, range(TD+1)]
         ldof = self.number_of_local_dofs()
         shape = bcs.shape[:-1]+(ldof, TD+1)
-        R = bm.zeros(shape, dtype=self.ftype)
+        R = np.zeros(shape, dtype=self.ftype)
         for i in range(TD+1):
             idx = list(range(TD+1))
             idx.remove(i)
-            R[..., i] = M[..., i]*bm.prod(Q[..., idx], axis=-1)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        gphi = bm.einsum('k...ij, kjm->k...im', R, Dlambda[index, :, :])
+        gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[index, :, :])
         return gphi
- 
+    '''
     @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
         if isinstance(bc, tuple):
