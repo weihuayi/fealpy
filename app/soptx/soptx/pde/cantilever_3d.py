@@ -1,6 +1,8 @@
 from fealpy.backend import backend_manager as bm
 
 from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
+
 from typing import Tuple, Callable
 
 
@@ -32,6 +34,7 @@ class Cantilever3dData1:
 
         return box
     
+    @cartesian
     def force(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -48,10 +51,12 @@ class Cantilever3dData1:
 
         return val
     
+    @cartesian
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return bm.zeros(points.shape, dtype=points.dtype)
     
+    @cartesian
     def is_dirichlet_boundary_dof_x(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -61,6 +66,7 @@ class Cantilever3dData1:
         
         return coord
     
+    @cartesian
     def is_dirichlet_boundary_dof_y(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -70,6 +76,7 @@ class Cantilever3dData1:
         
         return coord
     
+    @cartesian
     def is_dirichlet_boundary_dof_z(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 

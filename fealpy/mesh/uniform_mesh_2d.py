@@ -781,7 +781,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     face_to_ipoint = edge_to_ipoint
     
-    
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
@@ -792,8 +791,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        gphi = self.grad_shape_function(bcs, p=1, variables='u', index=index)
-        J = bm.einsum( 'cim, ...in -> ...cmn', node[cell[:]], gphi)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')   # (NQ, ldof, GD)
+        #TODO 这里不能翻转网格，否则会导致 Jacobian 计算错误
+        node_cell_flip = node[cell[:]]                             # (NC, NCN, GD)
+        J = bm.einsum('cim, qin -> cqmn', node_cell_flip, gphi)    # (NC, NQ, GD, GD)
 
         return J
     
