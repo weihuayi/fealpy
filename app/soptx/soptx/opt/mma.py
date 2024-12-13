@@ -8,6 +8,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
 
 from soptx.opt import ObjectiveBase, ConstraintBase, OptimizerBase
+from .utils import solve_mma_subproblem
 from soptx.filter import Filter
 
 @dataclass
@@ -209,7 +210,7 @@ class MMAOptimizer(OptimizerBase):
         b = (P @ uxinv + Q @ xlinv - fval)
         
         # 求解子问题
-        xmma, ymma, zmma, lam, xsi, eta, mu, zet, s = self._mma_sub_solver(
+        xmma, ymma, zmma, lam, xsi, eta, mu, zet, s = solve_mma_subproblem(
             m, n, epsimin, low, upp, alpha, beta,
             p0, q0, P, Q,
             a0, a, b, c, d)
