@@ -86,21 +86,23 @@ def enable_cache(func: Self) -> Self:
 
     Use `Integrator.keep_data(True)` to enable the cache.
     """
-    def wrapper(integrator_obj, space: _FS) -> TensorLike:
-        if not integrator_obj._keep_data:
-            return func(integrator_obj, space)
+    def wrapper(integrator_obj, space, /, indices=None) -> TensorLike:
+        if (indices is None) and (integrator_obj._keep_data):
+            assert hasattr(integrator_obj, '_cache')
+            _cache = integrator_obj._cache
+            key = (func.__name__, id(space))
 
-        assert hasattr(integrator_obj, '_cache')
-        _cache = integrator_obj._cache
-        key = (func.__name__, id(space))
+            if key in _cache:
+                return _cache[key]
 
-        if key in _cache:
-            return _cache[key]
+            data = func(integrator_obj, space)
+            _cache[key] = data
 
-        data = func(integrator_obj, space)
-        _cache[key] = data
-
-        return data
+            return data
+        else:
+            if indices is None:
+                return func(integrator_obj, space)
+            return func(integrator_obj, space, indices)
 
     return wrapper
 
