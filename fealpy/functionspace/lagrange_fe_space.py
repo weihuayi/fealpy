@@ -139,6 +139,27 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     @barycentric
     def cell_basis_on_edge(self, bc: TensorLike, lidx: TensorLike,
                            direction=True) -> TensorLike:
+        TD = self.mesh.TD  ## 一定是单元的
+        NLF = self.mesh.number_of_faces_of_cells()
+        NF = self.mesh.number_of_faces()
+        NQ = bc.shape[0]
+        ldof = self.number_of_local_dofs('cell')
+        result = bm.zeros((NF,NQ,ldof,TD),dtype=self.ftype) 
+        face2cell = self.mesh.face_to_cell() 
+        cell2face = self.mesh.cell_to_face()
+        
+        for i in range(NLF):
+            cbcs = bm.insert(bc, i, 0.0, axis=-1)
+            phi = self.basis(cbcs)
+            if direction: ##左边单元
+                tag = bm.where(face2cell[:,2]==i)
+                result[tag] = phi[face2cell[tag,0]]
+            else: ##右边单元
+                tag = bm.where(face2cell[:,3]==i)
+                result[tag] = phi[face2cell[tag,1]]
+        ii = cell2face[...,lidx]
+        return result[ii]
+        
         """
         @brief Return the basis value of cells on points of edges.
 
@@ -148,6 +169,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         @return: Basis with shape [NE, NQ, Dofs].
         """
+        '''
         if bc.shape[-1] != 2:
             raise ValueError('The shape of bc should be [NE, 2].')
         if lidx.ndim != 1:
@@ -167,7 +189,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             bcs[idx, ..., nmap[lidx]] = bc[..., 1]
             bcs[idx, ..., pmap[lidx]] = bc[..., 0]
         return self.mesh.shape_function(bcs, p=self.p)
-
+        '''
     @barycentric
     def cell_grad_basis_on_edge(self, bc: TensorLike, index: TensorLike, lidx: TensorLike,
                                 direction=True) -> TensorLike:
