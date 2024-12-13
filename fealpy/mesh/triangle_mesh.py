@@ -124,7 +124,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @berif 这里调用的是网格空间基函数的梯度
         """
-        TD = bc.shape[1] - 1
+        TD = bc.shape[-1] - 1
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index, TD=TD)

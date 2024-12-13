@@ -32,6 +32,8 @@ from .vector_source_integrator import VectorSourceIntegrator
 ### Face Operator
 from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
+from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegrator
+from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegratorP
 
 ### Face Source
 from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator
