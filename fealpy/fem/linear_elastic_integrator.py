@@ -239,11 +239,30 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('voigt')
     def voigt_assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-        mesh = getattr(scalar_space, 'mesh', None)
         cm, bcs, ws, gphi, detJ, is_constant_J = self.fetch_assembly(scalar_space)
         
         D = self.material.elastic_matrix(bcs)
         B = self.material.strain_matrix(dof_priority=space.dof_priority, gphi=gphi)
+
+        if is_constant_J:
+            # 常数 Jacobian：使用单元测度
+            KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', 
+                        ws, cm, B, D, B)
+        else:
+            # 非常数 Jacobian：使用行列式
+            KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
+                        ws, detJ, B, D, B)
+
+        return KK
+    
+    @assemblymethod('voigt_bbar')
+    def voigt_bbar_assembly(self, space: _TS) -> TensorLike:
+        scalar_space = space.scalar_space
+        cm, bcs, ws, gphi, detJ, is_constant_J = self.fetch_assembly(scalar_space)
+        
+        D = self.material.elastic_matrix(bcs)
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, gphi=gphi, 
+                                        bbar=True, cm=cm, ws=ws, detJ=detJ)
 
         if is_constant_J:
             # 常数 Jacobian：使用单元测度

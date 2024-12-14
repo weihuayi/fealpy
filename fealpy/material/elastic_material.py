@@ -171,7 +171,9 @@ class LinearElasticMaterial(ElasticMaterial):
     
     def strain_matrix(self, dof_priority: bool, 
                     gphi: TensorLike, 
-                    shear_order: List[str]=['xy', 'zx', 'yz']) -> TensorLike:
+                    shear_order: List[str]=['xy', 'zx', 'yz'],
+                    bbar: bool = False, 
+                    cm: TensorLike = None, ws: TensorLike = None, detJ: TensorLike = None) -> TensorLike:
         '''
         Constructs the strain-displacement matrix B for the material based on the gradient of the shape functions.
         B = [∂Ni/∂x   0       0    ]
@@ -203,8 +205,15 @@ class LinearElasticMaterial(ElasticMaterial):
             indices = flatten_indices((ldof, GD), (1, 0))
         else:
             indices = flatten_indices((ldof, GD), (0, 1))
-        B = bm.concat([self._normal_strain(gphi, indices),
-                    self._shear_strain(gphi, indices, shear_order)], axis=-2)
+        if bbar:
+            normal_B = self._normal_strain_bbar(gphi, cm, ws, detJ, indices)
+        else:
+            normal_B = self._normal_strain(gphi, indices)
+        
+        shear_B = self._shear_strain(gphi, indices, shear_order)
+
+        B = bm.concat([normal_B, shear_B], axis=-2)
+
         return B
     
     def _normal_strain(self, gphi: TensorLike, 
@@ -213,12 +222,12 @@ class LinearElasticMaterial(ElasticMaterial):
         """Assembly normal strain tensor.
 
         Parameters:
-            gphi (TensorLike): Gradient of the scalar basis functions shaped (..., ldof, GD).\n
-            indices (bool, optional): Indices of DoF components in the flattened DoF, shaped (ldof, GD).\n
-            out (TensorLike | None, optional): Output tensor. Defaults to None.
+            gphi - (NC, NQ, ldof, GD).\n
+            indices - (ldof, GD): Indices of DoF components in the flattened DoF, shaped .\n
+            out - (TensorLike | None, optional): Output tensor. Defaults to None.
 
         Returns:
-            TensorLike: Normal strain shaped (..., GD, GD*ldof).
+            out - Normal strain shaped (NC, NQ, GD, GD*ldof): 
         """
         kwargs = bm.context(gphi)
         ldof, GD = gphi.shape[-2:]
@@ -235,6 +244,47 @@ class LinearElasticMaterial(ElasticMaterial):
 
         return out
     
+    def _normal_strain_bbar(self, gphi: TensorLike,
+                        cm, ws, detJ,
+                        indices: TensorLike, *,
+                        out: Optional[TensorLike] = None) -> TensorLike:
+        """
+        Assembly normal strain tensor with B-Bar correction.
+
+        Parameters:
+            gphi - (NC, NQ, LDOF, GD).
+            indices (TensorLike): Indices of DoF components in the flattened DoF shaped (LDOF, GD).
+            out (TensorLike | None, optional): Output tensor. Defaults to None.
+
+        Returns:
+            TensorLike: Corrected normal strain shaped (NC, NQ, GD, GD*LDOF).
+        """
+        kwargs = bm.context(gphi)
+        ldof, GD = gphi.shape[-2:]
+        new_shape = gphi.shape[:-2] + (GD, GD * ldof)  # (NC, NQ, GD, GD*ldof)
+
+        if out is None:
+            out = bm.zeros(new_shape, **kwargs)
+        else:
+            if out.shape != new_shape:
+                raise ValueError(f'out.shape={out.shape} != {new_shape}')
+        
+        average_gphi = bm.einsum('cqid, c, q -> cid', gphi, cm, ws)  # (NC, LDOF, GD)
+        # average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws)  # (NC, LDOF, GD)
+        for i in range(GD):
+            for j in range(GD):
+                if i == j:
+                    corrected_phi = (2.0 / 3.0) * gphi[..., :, i] \
+                                        + (1.0 / (3.0 * cm[:, None, None]) ) * average_gphi[..., None,  :, i] # (NC, NQ, LDOF)
+                else:  
+                    corrected_phi = (-1.0 / 3.0) * gphi[..., :, j] \
+                        + (1.0 / (3.0 * cm[:, None, None]) ) * average_gphi[..., None, :, j]                  # (NC, NQ, LDOF)
+
+                out = bm.set_at(out, (..., i, indices[:, j]), corrected_phi)
+
+        return out
+
+    
     def _shear_strain(self, gphi: TensorLike, 
                     indices: TensorLike, 
                     shear_order: List[str], *,
@@ -242,12 +292,12 @@ class LinearElasticMaterial(ElasticMaterial):
         """Assembly shear strain tensor.
 
         Parameters:
-            gphi (TensorLike): Gradient of the scalar basis functions shaped (..., ldof, GD).\n
+            gphi - (NC, NQ, ldof, GD).\n
             indices (bool, optional): Indices of DoF components in the flattened DoF, shaped (ldof, GD).\n
             out (TensorLike | None, optional): Output tensor. Defaults to None.
 
         Returns:
-            TensorLike: Sheared strain shaped (..., NNZ, GD*ldof) where NNZ = (GD + (GD+1))//2.
+            out - Shear strain shaped (NC, NQ, NNZ, GD*ldof) where NNZ = (GD + (GD+1))//2: .
         """
         kwargs = bm.context(gphi)
         ldof, GD = gphi.shape[-2:]
