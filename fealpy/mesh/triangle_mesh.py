@@ -92,6 +92,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         return quad
 
+    def update_bcs(self, bcs, toetype: Union[int, str]='cell'):
+        TD = bcs.shape[-1] - 1
+        if toetype == 'cell' or toetype == 2: 
+            if TD == 2:
+                return bcs
+            elif TD == 1: # edge up to cell
+                result = bm.stack([bm.insert(bcs, i, 0.0, axis=-1) for i in range(3)], axis=0)
+                return result
+            else:
+                raise ValueError("Unsupported topological dimension: {TD}")
+                    
+        else:
+            raise ValueError("The etype only support face, other etype is not implemented.")
+    
     # shape function
     def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
