@@ -49,17 +49,21 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
 
-        J = mesh.jacobi_matrix(bcs)  # (NC, NQ, GD, GD)
-        
-        # 检查每个单元的 Jacobian 是否为常数
-        is_constant_J = bm.allclose(
-            J[:, 0:1, :, :], J[:, 1:, :, :], 
-            rtol=1e-10, atol=1e-12
-        )
-        if is_constant_J:
+        if isinstance(mesh, SimplexMesh):
+            J = None
             detJ = None
+            is_constant_J = True  
         else:
-            detJ = bm.linalg.det(J)
+            J = mesh.jacobi_matrix(bcs)
+            is_constant_J = bm.allclose(
+                                J[:, 0:1, :, :], J[:, 1:, :, :], 
+                                rtol=1e-10, atol=1e-12
+                            )   
+        
+            if is_constant_J:
+                detJ = None
+            else:
+                detJ = bm.linalg.det(J)
 
         return cm, bcs, ws, gphi, detJ, is_constant_J
     

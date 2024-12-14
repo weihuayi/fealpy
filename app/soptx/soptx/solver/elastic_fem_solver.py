@@ -213,7 +213,6 @@ class ElasticFEMSolver:
         bform.add_integrator(integrator)
         # t.send('Local Assembly')
         K = bform.assembly(format='csr')
-        Kdense = K.to_dense()
         # t.send('Global Assembly')
 
         # 结束计时

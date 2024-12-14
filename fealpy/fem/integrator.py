@@ -179,6 +179,8 @@ class Integrator(metaclass=IntegratorMeta):
                 return indices
         else:
             if indices is None:
+                return self._region
+            else:
                 if bm.is_tensor(self._region):
                     if self._region.dtype == bm.bool:
                         return bm.nonzero(self._region)[0][indices]
@@ -186,8 +188,7 @@ class Integrator(metaclass=IntegratorMeta):
                 else:
                     raise TypeError(f"region of type '{self._region.__class__.__name__}' "
                                     "is not supported when indices is given.")
-            else:
-                return self._region
+
     ### END: Region of Integration ###
 
     def const(self, space: _SpaceGroup, /):
@@ -202,7 +203,7 @@ class Integrator(metaclass=IntegratorMeta):
             val = meth(space) # Old API
         else:
             val = meth(space, indices=indices)
-        if logger.level == logging._nameToLevel['INFO']:
+        if logger.level <= logging._nameToLevel['INFO']:
             logger.info(f"Local tensor sized {ftype_memory_size(val)} Mb.")
         return val
 
