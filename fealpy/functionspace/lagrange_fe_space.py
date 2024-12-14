@@ -51,13 +51,13 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.dof.interpolation_points()
 
     def cell_to_dof(self, index: Index=_S) -> TensorLike:
-        return self.dof.cell_to_dof()[index]
+        return self.dof.cell_to_dof(index=index)
 
     def face_to_dof(self, index: Index=_S) -> TensorLike:
-        return self.dof.face_to_dof()[index]
+        return self.dof.face_to_dof(index=index)
 
     def edge_to_dof(self, index=_S):
-        return self.dof.edge_to_dof()[index]
+        return self.dof.edge_to_dof(index=index)
 
     def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
