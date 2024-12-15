@@ -53,7 +53,7 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
         result1 = space.face_to_dof(index=index) 
         tag = space.mesh.edge2cell[index,0]
         result2 = space.cell_to_dof()[tag]
-        return (result2, result1) 
+        return (result2, result2) 
     
     @enable_cache
     def fetch(self, space: _FS):
@@ -71,8 +71,8 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         edge2cell = mesh.face_to_cell()
         
-        phi = space.basis(bcs)
-        gphi = space.cell_grad_basis_on_edge(bcs, edge2cell[index,0], edge2cell[index,2])
+        phi = space.cell_basis_on_edge(bcs, index)
+        gphi = space.cell_grad_basis_on_edge(bcs, index)
         n = mesh.edge_unit_normal(index)
         return bcs, ws, phi, gphi, facemeasure, index, n
 

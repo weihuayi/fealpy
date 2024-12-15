@@ -19,7 +19,7 @@ from fealpy.solver import spsolve
 output = './'
 T = 10
 nt = 500
-n = 2
+n = 16
 
 pde = ChannelFlow()
 mesh = pde.mesh(n)
@@ -28,7 +28,7 @@ timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=1)
-space = LagrangeFESpace(mesh, p=1)
+space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
 solver = NSFEMSolver(pde, mesh, pspace, space, dt, q=5)
@@ -84,7 +84,6 @@ for i in range(10):
     u1[:] = x[:ugdof]
     p1[:] = x[ugdof:]
     
-    print(mesh.error(u1, pde.velocity))
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['u'] = u1.reshape(2,-1).T
     mesh.nodedata['p'] = p1
